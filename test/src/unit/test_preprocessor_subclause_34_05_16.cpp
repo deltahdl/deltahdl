@@ -53,6 +53,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_digest_block.h"
 #include "preprocessor/protect_keywords.h"
@@ -410,7 +411,13 @@ TEST(ProtectDigestKeynameUnderDefaultedEntity, ANameOutsideThatListIsReported) {
   std::string src = Writes("data_keyowner", kDataOwner);
   src += Writes("digest_keyname", kUnheldKeyName);
   ReadUnderKeys run(src, KeyHeldUnder(kDataOwner, kDigestKeyName));
-  EXPECT_TRUE(run.diag.HasErrors());
+  // §34.5.18 is where the standard puts the name, so that is the rule the
+  // report enforces even where the entity it is measured against is this
+  // subclause's.
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "protect pragma digest_keyname names no key held "
+                            "by the digest_keyowner in effect",
+                            2, "34.5.18"));
 }
 
 // ---------------------------------------------------------------------------
@@ -665,7 +672,10 @@ TEST(ProtectDigestKeyownerDecryptionInput,
   described += Writes("digest_keyname", kUnheldKeyName);
   ReadUnderKeys run(ForeignEnvelope(described),
                     KeyHeldUnder(kDigestOwner, kDigestKeyName));
-  EXPECT_TRUE(run.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "protect pragma digest_keyname names no key held "
+                            "by the digest_keyowner in effect",
+                            3, "34.5.18"));
   EXPECT_TRUE(run.DigestKey().empty());
 }
 

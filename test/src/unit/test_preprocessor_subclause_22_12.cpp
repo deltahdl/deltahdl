@@ -4,6 +4,7 @@
 #include <fstream>
 
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -67,31 +68,40 @@ TEST(Preprocessor, Line_Level2_IncludeExit) {
 TEST(Preprocessor, Line_IllegalLevel) {
   PreprocFixture f;
   Preprocess("`line 1 \"somefile\" 3\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`line level must be 0, 1, or 2", 1, "22.12"));
 }
 
 TEST(Preprocessor, Line_MissingFilename) {
   PreprocFixture f;
   Preprocess("`line 1\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`line directive requires a quoted filename", 1,
+                            "22.12"));
 }
 
 TEST(Preprocessor, Line_MissingLevel) {
   PreprocFixture f;
   Preprocess("`line 1 \"somefile\"\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`line directive requires a level (0, 1, or 2)", 1,
+                            "22.12"));
 }
 
 TEST(Preprocessor, Line_MissingAll) {
   PreprocFixture f;
   Preprocess("`line\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "invalid `line directive: missing or invalid line number", 1, "22.12"));
 }
 
 TEST(Preprocessor, Line_ZeroLineNumber_Error) {
   PreprocFixture f;
   Preprocess("`line 0 \"test.sv\" 0\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`line number must be a positive integer", 1,
+                            "22.12"));
 }
 
 // §22.12 is what requires the number to be a positive integer, so the record
@@ -107,37 +117,49 @@ TEST(Preprocessor, Line_NonPositiveNumberNames22_12) {
 TEST(Preprocessor, Line_NegativeLineNumber) {
   PreprocFixture f;
   Preprocess("`line -12 \"somefile\" 0\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "invalid `line directive: missing or invalid line number", 1, "22.12"));
 }
 
 TEST(Preprocessor, Line_NonStringFilename) {
   PreprocFixture f;
   Preprocess("`line 1 somefile 2\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`line directive requires a quoted filename", 1,
+                            "22.12"));
 }
 
 TEST(Preprocessor, Line_UnterminatedFilename) {
   PreprocFixture f;
   Preprocess("`line 1 \"somefile 0\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unterminated string in `line directive", 1,
+                            "22.12"));
 }
 
 TEST(Preprocessor, Line_TrailingContent_Error) {
   PreprocFixture f;
   Preprocess("`line 1 \"test.sv\" 0 wire x;\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "only whitespace may appear on the same line as `line", 1, "22.12"));
 }
 
 TEST(Preprocessor, Line_TrailingComment_Error) {
   PreprocFixture f;
   Preprocess("`line 1 \"test.sv\" 0 // comment\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "only whitespace may appear on the same line as `line", 1, "22.12"));
 }
 
 TEST(Preprocessor, Line_TrailingBlockComment_Error) {
   PreprocFixture f;
   Preprocess("`line 1 \"test.sv\" 0 /* comment */\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "only whitespace may appear on the same line as `line", 1, "22.12"));
 }
 
 TEST(Preprocessor, Line_NoOutput) {

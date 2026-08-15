@@ -43,6 +43,21 @@ using namespace delta;
 // The engine records a location and a subclause on a warning as well, and this
 // answers for errors alone, because a source a case expects rejected is
 // rejected by an error.
+// The 1-based line of `where` that `what` first stands on, or 0 when `where`
+// writes it nowhere. The line argument below is a number a case can read off
+// its own source only when the case wrote the input out; an input a tool
+// produced puts the construct on a line nobody chose, and this is how such a
+// case still names the line rather than dropping it.
+inline uint32_t LineHolding(std::string_view where, std::string_view what) {
+  size_t at = where.find(what);
+  if (at == std::string_view::npos) return 0;
+  uint32_t line = 1;
+  for (size_t i = 0; i < at; ++i) {
+    if (where[i] == '\n') ++line;
+  }
+  return line;
+}
+
 inline ::testing::AssertionResult ReportedError(
     const std::vector<Diagnostic>& diags, std::string_view message,
     uint32_t line, std::string_view subclause) {

@@ -6,6 +6,7 @@
 #include <string>
 
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
 #include "lexer/keywords.h"
 #include "lexer/lexer.h"
 
@@ -69,25 +70,33 @@ TEST(KeywordVersionPreprocessing, AllVersionSpecifiersRecognized) {
 TEST(KeywordVersionPreprocessing, ErrorUnrecognizedVersion) {
   PreprocFixture f;
   Preprocess("`begin_keywords \"9999-9999\"\n`end_keywords\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unrecognized version specifier: \"9999-9999\"", 1,
+                            "22.14"));
 }
 
 TEST(KeywordVersionPreprocessing, ErrorMissingQuotedString) {
   PreprocFixture f;
   Preprocess("`begin_keywords\n`end_keywords\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "expected quoted version string after `begin_keywords", 1, "22.14"));
 }
 
 TEST(KeywordVersionPreprocessing, ErrorMissingClosingQuote) {
   PreprocFixture f;
   Preprocess("`begin_keywords \"1800-2023\n`end_keywords\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "expected quoted version string after `begin_keywords", 1, "22.14"));
 }
 
 TEST(KeywordVersionPreprocessing, ErrorEndKeywordsWithoutBegin) {
   PreprocFixture f;
   Preprocess("`end_keywords\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`end_keywords without matching `begin_keywords", 1,
+                            "22.14"));
 }
 
 // §22.14 is what requires the two directives to be written as a pair, so the
@@ -104,7 +113,9 @@ TEST(KeywordVersionPreprocessing, ErrorEndKeywordsWithoutBeginNames22_14) {
 TEST(KeywordVersionPreprocessing, ErrorEmptyVersionString) {
   PreprocFixture f;
   Preprocess("`begin_keywords \"\"\n`end_keywords\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unrecognized version specifier: \"\"", 1,
+                            "22.14"));
 }
 
 TEST(KeywordVersionPreprocessing, NestedBeginKeywords) {
@@ -387,7 +398,9 @@ TEST(KeywordVersionPreprocessing, ErrorBeginKeywordsNeverClosed) {
   EXPECT_FALSE(f.diag.HasErrors());
 
   pp.ReportUnterminatedKeywordRegions();
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`begin_keywords without matching `end_keywords", 1,
+                            "22.14"));
 }
 
 // The inner directive of a nested pair is the one left unmatched here: the
@@ -404,7 +417,9 @@ TEST(KeywordVersionPreprocessing, ErrorNestedBeginKeywordsNeverClosed) {
   EXPECT_FALSE(f.diag.HasErrors());
 
   pp.ReportUnterminatedKeywordRegions();
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`begin_keywords without matching `end_keywords", 1,
+                            "22.14"));
 }
 
 // A properly paired region draws no complaint from the same end-of-compilation
@@ -499,7 +514,9 @@ TEST(KeywordVersionPreprocessing, QuoteFlushAgainstBeginKeywordsIsRecognized) {
 TEST(KeywordVersionPreprocessing, ErrorUnquotedVersionSpecifier) {
   PreprocFixture f;
   Preprocess("`begin_keywords 1800-2023\n`end_keywords\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "expected quoted version string after `begin_keywords", 1, "22.14"));
 }
 
 // A directive need not start in column one. Both halves of the pair are still
@@ -559,7 +576,9 @@ TEST(KeywordVersionPreprocessing, BeginKeywordsInTakenIfdefBranch) {
 TEST(KeywordVersionPreprocessing, ErrorPaddedVersionSpecifier) {
   PreprocFixture f;
   Preprocess("`begin_keywords \"  1800-2023  \"\n`end_keywords\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unrecognized version specifier: \"  1800-2023  \"",
+                            1, "22.14"));
 }
 
 // §22.14: the region runs until the matching `end_keywords wherever that
@@ -632,13 +651,19 @@ TEST(KeywordVersionPreprocessing, ErrorInsideEveryDesignElementKind) {
     Preprocess(std::string(c.header) + "\n`begin_keywords \"1800-2023\"\n" +
                    c.footer + "\n",
                begin_fixture);
-    EXPECT_TRUE(begin_fixture.diag.HasErrors()) << c.header;
+    EXPECT_TRUE(ReportedError(begin_fixture.diag.Diagnostics(),
+                              "`begin_keywords illegal inside a design element",
+                              2, "22.14"))
+        << c.header;
 
     PreprocFixture end_fixture;
     Preprocess("`begin_keywords \"1800-2023\"\n" + std::string(c.header) +
                    "\n`end_keywords\n" + c.footer + "\n",
                end_fixture);
-    EXPECT_TRUE(end_fixture.diag.HasErrors()) << c.header;
+    EXPECT_TRUE(ReportedError(end_fixture.diag.Diagnostics(),
+                              "`end_keywords illegal inside a design element",
+                              3, "22.14"))
+        << c.header;
   }
 }
 
@@ -668,7 +693,9 @@ TEST(KeywordVersionPreprocessing, ErrorInsideTabSeparatedDesignElementHeader) {
       "`end_keywords\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`begin_keywords illegal inside a design element",
+                            2, "22.14"));
 }
 
 // A directive that shares its line with a design element header is inside that
@@ -677,7 +704,9 @@ TEST(KeywordVersionPreprocessing, PlacementOnSharedLineFollowsTheElement) {
   PreprocFixture inside;
   Preprocess("module m; `begin_keywords \"1364-2001\"\n`end_keywords\n",
              inside);
-  EXPECT_TRUE(inside.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(inside.diag.Diagnostics(),
+                            "`begin_keywords illegal inside a design element",
+                            1, "22.14"));
 
   PreprocFixture outside;
   Preprocess(

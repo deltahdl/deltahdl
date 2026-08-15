@@ -57,6 +57,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "helpers_protect_region.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_envelope_output.h"
@@ -557,7 +558,10 @@ TEST(ProtectEncryptAgentDescription, ANamingSpellingAKeyNameOpensNothing) {
       WithTheKeyNameWrittenAsTheNaming(Encrypted(RegionWriting("")));
   ASSERT_TRUE(Holds(replaced, NamesTheAgent(kKeyName)));
   ReadWithTheKeys read(replaced);
-  EXPECT_TRUE(read.diags.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      read.diags.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied",
+      LineHolding(replaced, "data_block="), "34.3.2"));
   EXPECT_FALSE(read.Produced("module sealed_m"));
 }
 

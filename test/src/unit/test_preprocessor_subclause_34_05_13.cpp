@@ -48,6 +48,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope_output.h"
@@ -550,7 +551,10 @@ TEST(ProtectDataPublicKeyDecryptionInput,
       EnvelopeFor(described, KeyHeldUnder(kKeyOwner, kPublicKey));
   ReadUnderKeys read(envelope, KeyHeldUnder(kOtherOwner, kPublicKey));
   EXPECT_FALSE(read.Holds("module sealed_m"));
-  EXPECT_TRUE(read.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      read.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied",
+      LineHolding(envelope, "data_block="), "34.3.2"));
 }
 
 // The line the keyword announced is key material of the protected block rather
@@ -629,8 +633,15 @@ TEST(ProtectDataPublicKeyDecryptionInput,
   described += NamesKeyName(kKeyName);
   described += PublicKeyDesignation(kPublicKey, BlockEncoding());
   ProtectKeyList keys = KeysUnderBothDesignations(kRegionKey, kSecondKey);
-  ReadUnderKeys read(EnvelopeFor(described, keys), keys);
-  EXPECT_TRUE(read.diag.HasErrors());
+  std::string envelope = EnvelopeFor(described, keys);
+  ReadUnderKeys read(envelope, keys);
+  // The disagreement is settled where the second designation is read, and
+  // §34.5.13 writes that value on the line below its keyword.
+  EXPECT_TRUE(ReportedError(
+      read.diag.Diagnostics(),
+      "protect pragma data_public_key and data_keyname designate different "
+      "keys of the data_keyowner in effect",
+      LineHolding(envelope, "`pragma protect data_public_key") + 1, "34.5.13"));
 }
 
 // §34.5 numbers one subclause per protect pragma keyword, so the record the

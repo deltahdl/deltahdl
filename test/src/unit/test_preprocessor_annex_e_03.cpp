@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -30,7 +31,11 @@ TEST(Preprocessor, DefaultTriregStrength_MissingArgumentIsError) {
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>", "`default_trireg_strength\n");
   pp.Preprocess(fid);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // Annex E is informative and states that its directives are not part of
+  // the standard, so the report enforces no subclause of it.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`default_trireg_strength requires an argument", 1,
+                            ""));
 }
 
 // E3-C1 (syntax, integer_constant): a non-integer argument does not satisfy the
@@ -40,7 +45,9 @@ TEST(Preprocessor, DefaultTriregStrength_NonIntegerArgumentIsError) {
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>", "`default_trireg_strength strong\n");
   pp.Preprocess(fid);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "invalid `default_trireg_strength argument: 'strong'", 1, ""));
 }
 
 // E3-C2 (shall, lower bound): 0 is within the legal 0..250 range and is
@@ -72,7 +79,9 @@ TEST(Preprocessor, DefaultTriregStrength_AboveRangeIsError) {
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>", "`default_trireg_strength 251\n");
   pp.Preprocess(fid);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "`default_trireg_strength value must be between 0 and 250", 1, ""));
 }
 
 // E3 (baseline): with no directive present, no default trireg strength is in

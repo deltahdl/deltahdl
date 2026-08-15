@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -39,19 +40,25 @@ TEST(Preprocessor, MacroRedefineLatestPrevails) {
 TEST(Preprocessor, RedefineCompilerDirectiveError) {
   PreprocFixture f;
   Preprocess("`define ifdef 1\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "redefining compiler directive 'ifdef'", 1,
+                            "22.5.1"));
 }
 
 TEST(Preprocessor, RedefineDefineError) {
   PreprocFixture f;
   Preprocess("`define define 1\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "redefining compiler directive 'define'", 1,
+                            "22.5.1"));
 }
 
 TEST(Preprocessor, RedefineIncludeError) {
   PreprocFixture f;
   Preprocess("`define include 1\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "redefining compiler directive 'include'", 1,
+                            "22.5.1"));
 }
 
 TEST(Preprocessor, MacroNameReuseOrdinaryIdentifier) {
@@ -101,7 +108,9 @@ TEST(Preprocessor, BackslashNewlineBecomesNewlineInExpansion) {
 TEST(Preprocessor, UnterminatedStringInBody) {
   PreprocFixture f;
   Preprocess("`define BAD \"unterminated\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unterminated string literal in macro body", 1,
+                            "22.5.1"));
 }
 
 TEST(Preprocessor, FunctionLikeMacroSingleArg) {
@@ -198,7 +207,9 @@ TEST(Preprocessor, TooFewArgsNoDefaultError) {
       "`MACRO1 ( 1 )\n",
       f);
 
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "too few arguments for macro 'MACRO1'", 2,
+                            "22.5.1"));
 }
 
 TEST(Preprocessor, TooManyArgsError) {
@@ -207,7 +218,8 @@ TEST(Preprocessor, TooManyArgsError) {
       "`define D(x,y) x + y\n"
       "`D(1,2,3)\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "too many arguments for macro 'D'", 2, "22.5.1"));
 }
 
 TEST(Preprocessor, WhiteSpaceBetweenNameAndParenInUsage) {
@@ -424,7 +436,8 @@ TEST(Preprocessor, DirectRecursiveMacroError) {
       "`define REC `REC\n"
       "`REC\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "recursive expansion of macro 'REC'", 2, "22.5.1"));
 }
 
 TEST(Preprocessor, IndirectRecursiveMacroError) {
@@ -434,7 +447,8 @@ TEST(Preprocessor, IndirectRecursiveMacroError) {
       "`define B `A\n"
       "`A\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "recursive expansion of macro 'A'", 3, "22.5.1"));
 }
 
 TEST(Preprocessor, SquareBracketsInActualArgument) {
@@ -473,7 +487,10 @@ TEST(Preprocessor, FunctionLikeMacroWithoutParensError) {
       "`define FUNC(a=5) a\n"
       "`FUNC\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parentheses required for function-like macro "
+                            "'FUNC'",
+                            2, "22.5.1"));
 }
 
 TEST(Preprocessor, EscapedIdentifierMacroName) {
@@ -552,7 +569,8 @@ TEST(Preprocessor, TwoArgMacroWithSingleArgError) {
       "`define D(x,y) initial $display(x, y);\n"
       "`D(\"msg1\")\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "too few arguments for macro 'D'", 2, "22.5.1"));
 }
 
 TEST(Preprocessor, TwoArgMacroWithEmptyParensError) {
@@ -561,7 +579,8 @@ TEST(Preprocessor, TwoArgMacroWithEmptyParensError) {
       "`define D(x,y) initial $display(x, y);\n"
       "`D()\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "too few arguments for macro 'D'", 2, "22.5.1"));
 }
 
 TEST(Preprocessor, ExplicitEmptyDefault) {
@@ -578,7 +597,9 @@ TEST(Preprocessor, ExplicitEmptyDefault) {
 TEST(Preprocessor, MacroBodySplitAcrossStringLiteral) {
   PreprocFixture f;
   Preprocess("`define first_half \"start of string\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unterminated string literal in macro body", 1,
+                            "22.5.1"));
 }
 
 TEST(Preprocessor, NoSubstitutionInStringLiteralWithinMacroBody) {

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -54,7 +55,10 @@ TEST(Preprocessor, DefaultDecayTime_MissingArgumentIsError) {
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>", "`default_decay_time\n");
   pp.Preprocess(fid);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // Annex E is informative and states that its directives are not part of
+  // the standard, so the report enforces no subclause of it.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`default_decay_time requires an argument", 1, ""));
 }
 
 // E2-C1 (syntax): an argument that is neither an integer/real constant nor the
@@ -64,7 +68,9 @@ TEST(Preprocessor, DefaultDecayTime_InvalidArgumentIsError) {
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>", "`default_decay_time fast\n");
   pp.Preprocess(fid);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "invalid `default_decay_time argument: 'fast'", 1,
+                            ""));
 }
 
 // E2-C4 (baseline): with no directive present, no charge decay applies, i.e.

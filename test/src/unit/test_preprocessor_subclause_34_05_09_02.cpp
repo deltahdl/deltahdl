@@ -79,6 +79,7 @@
 #include <string_view>
 
 #include "fixture_protect_encoding.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
@@ -200,9 +201,13 @@ TEST(ProtectEncodingEncryptionInput,
   std::string list = "(enctype=\"";
   list.append(DefaultProtectEncoding().enctype).append("\", bytes=1)");
   PreprocFixture f;
-  std::string read =
-      Preprocess(EnvelopeReadUnder(StatesEncoding(list)), f, HoldingTheKey());
-  EXPECT_TRUE(f.diag.HasErrors());
+  std::string src = EnvelopeReadUnder(StatesEncoding(list));
+  std::string read = Preprocess(src, f, HoldingTheKey());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "protect pragma value stands for a different number of bytes from the "
+      "one the encoding in effect states",
+      LineHolding(src, kBlockOpening), "34.5.9.2"));
   EXPECT_FALSE(Holds(read, "module sealed_m"));
 }
 
@@ -622,9 +627,14 @@ TEST(ProtectEncodingDecryptionInput, TheStatedSchemeIsWhatOpensTheBlock) {
 // rather than left with an empty design.
 TEST(ProtectEncodingDecryptionInput, ABlockDeclaredWronglyDoesNotOpen) {
   PreprocFixture f;
-  std::string read = Preprocess(EnvelopeReadUnder(NamesScheme(kRawEnctype)), f,
-                                HoldingTheKey());
-  EXPECT_TRUE(f.diag.HasErrors());
+  std::string src = EnvelopeReadUnder(NamesScheme(kRawEnctype));
+  std::string read = Preprocess(src, f, HoldingTheKey());
+  // The characters are a writing the named scheme admits, so they are read and
+  // it is the bytes they stand for under it that no key opens.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied",
+      LineHolding(src, kBlockOpening), "34.3.2"));
   EXPECT_FALSE(Holds(read, "module sealed_m"));
 }
 
@@ -637,9 +647,12 @@ TEST(ProtectEncodingDecryptionInput, ABlockDeclaredWronglyDoesNotOpen) {
 TEST(ProtectEncodingDecryptionInput, ABlockUnderAnUnprovidedSchemeIsNotRead) {
   std::string declared = NamesScheme(kUnprovidedEnctype);
   PreprocFixture f;
-  std::string read =
-      Preprocess(EnvelopeReadUnder(declared), f, HoldingTheKey());
-  EXPECT_TRUE(f.diag.HasErrors());
+  std::string src = EnvelopeReadUnder(declared);
+  std::string read = Preprocess(src, f, HoldingTheKey());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "protect pragma encoding names an enctype this "
+                            "implementation does not provide",
+                            LineHolding(src, kBlockOpening), "34.5.9.2"));
   EXPECT_FALSE(Holds(read, "module sealed_m"));
 }
 

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -47,7 +48,11 @@ TEST(Preprocessor, DelayModeDistributed_IllegalInsideModule) {
                            "`delay_mode_distributed\n"
                            "endmodule\n");
   pp.Preprocess(fid);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // Annex E is informative and states that its directives are not part of
+  // the standard, so the report enforces no subclause of it.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "`delay_mode_distributed illegal inside a design element", 2, ""));
 }
 
 // E4-C3 (shall, boundary): once a module declaration has closed, the design

@@ -9,6 +9,7 @@
 #include <string>
 
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -69,7 +70,8 @@ TEST(PragmaDirective, NameWithCommaSeparatedList_Accepted) {
 TEST(PragmaDirective, KeywordAlone_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`pragma requires a pragma_name", 1, "22.11"));
 }
 
 // Syntax 22-8 is what makes the pragma_name obligatory, so the record the
@@ -85,26 +87,33 @@ TEST(PragmaDirective, KeywordAloneNames22_11) {
 TEST(PragmaDirective, OnlyWhitespaceAfterKeyword_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma   \n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`pragma requires a pragma_name", 1, "22.11"));
 }
 
 // A comma joins two pragma_expressions; it may not stand where one is missing.
 TEST(PragmaDirective, TrailingComma_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma expr1,\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 TEST(PragmaDirective, LeadingComma_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma , expr1\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 TEST(PragmaDirective, EmptyListElement_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma expr1, , expr2\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // The production separates list elements with commas, so two pragma_expressions
@@ -112,7 +121,9 @@ TEST(PragmaDirective, EmptyListElement_Rejected) {
 TEST(PragmaDirective, AdjacentExpressionsWithoutComma_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma expr1 expr2\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // The keyword and the pragma_name are separate lexical elements, so a name
@@ -227,20 +238,26 @@ TEST(PragmaName, DigitsUnderscoreDollarTail_Accepted) {
 TEST(PragmaName, DigitLed_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma 123\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`pragma pragma_name must be a simple identifier",
+                            1, "22.11"));
 }
 
 TEST(PragmaName, String_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma \"my_pragma\"\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`pragma pragma_name must be a simple identifier",
+                            1, "22.11"));
 }
 
 // '$' opens a system name, which is not a simple_identifier.
 TEST(PragmaName, DollarLed_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma $my_pragma\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`pragma directive contains an illegal token", 1,
+                            "22.11"));
 }
 
 // The closest legal-identifier negative: an escaped identifier is an
@@ -248,7 +265,9 @@ TEST(PragmaName, DollarLed_Rejected) {
 TEST(PragmaName, EscapedIdentifier_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma \\my_pragma \n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`pragma pragma_name must be a simple identifier",
+                            1, "22.11"));
 }
 
 // A pragma_name is only required to be a simple_identifier; nothing bars one
@@ -264,7 +283,9 @@ TEST(PragmaName, SpelledLikeADirectiveKeyword_Accepted) {
 TEST(PragmaName, ParenthesizedList_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma (a, b)\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`pragma pragma_name must be a simple identifier",
+                            1, "22.11"));
 }
 
 // ---------------------------------------------------------------------------
@@ -308,20 +329,26 @@ TEST(PragmaExpression, MixedFormsInOneList_Accepted) {
 TEST(PragmaExpression, EqualsWithoutKeyword_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma = val1\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 TEST(PragmaExpression, KeywordWithoutValue_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma key1 =\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // The right side of '=' is a pragma_value, and '=' is not one.
 TEST(PragmaExpression, DoubledEquals_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma key1 = = val1\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // A pragma_value is not itself a pragma_expression, so assignments do not
@@ -329,7 +356,9 @@ TEST(PragmaExpression, DoubledEquals_Rejected) {
 TEST(PragmaExpression, ChainedEquals_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma a = b = c\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // ---------------------------------------------------------------------------
@@ -351,13 +380,17 @@ TEST(PragmaKeyword, UnderscoreLed_Accepted) {
 TEST(PragmaKeyword, NumberOnLeftOfEquals_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma 42 = val1\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 TEST(PragmaKeyword, StringOnLeftOfEquals_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma \"key\" = val1\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // An escaped identifier is a legal pragma_value but not a legal
@@ -365,7 +398,9 @@ TEST(PragmaKeyword, StringOnLeftOfEquals_Rejected) {
 TEST(PragmaKeyword, EscapedIdentifierOnLeftOfEquals_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma \\key$1 = val1\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // A parenthesized list is a pragma_value, and a pragma_value cannot take a
@@ -373,7 +408,9 @@ TEST(PragmaKeyword, EscapedIdentifierOnLeftOfEquals_Rejected) {
 TEST(PragmaKeyword, ParenthesizedListOnLeftOfEquals_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma (a, b) = val1\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // ---------------------------------------------------------------------------
@@ -431,7 +468,9 @@ TEST(PragmaValue, RealNumberWithSignedExponent_Accepted) {
 TEST(PragmaValue, LeadingSign_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma offset = -5\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`pragma directive contains an illegal token", 1,
+                            "22.11"));
 }
 
 TEST(PragmaValue, EmptyString_Accepted) {
@@ -465,7 +504,9 @@ TEST(PragmaValue, TripleQuotedString_Accepted) {
 TEST(PragmaValue, UnterminatedTripleQuotedString_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma note = \"\"\"never closed\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`pragma directive contains an illegal token", 1,
+                            "22.11"));
 }
 
 TEST(PragmaValue, SimpleIdentifier_Accepted) {
@@ -501,38 +542,50 @@ TEST(PragmaValue, NestedParentheses_Accepted) {
 TEST(PragmaValue, EmptyParentheses_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma ()\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 TEST(PragmaValue, UnbalancedOpenParen_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma (a, b\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // The inner list must close before the outer one does.
 TEST(PragmaValue, UnbalancedNestedParen_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma (a, (b, c)\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 TEST(PragmaValue, StrayCloseParen_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma a)\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 TEST(PragmaValue, ParenthesizedListMissingComma_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma (a b)\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 TEST(PragmaValue, UnterminatedString_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma note = \"unterminated\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`pragma directive contains an illegal token", 1,
+                            "22.11"));
 }
 
 // ---------------------------------------------------------------------------
@@ -692,7 +745,9 @@ TEST(PragmaConditional, MalformedPragmaInActiveBranchIsDiagnosed) {
       "`pragma 123\n"
       "`endif\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`pragma pragma_name must be a simple identifier",
+                            3, "22.11"));
 }
 
 TEST(PragmaConditional, MalformedPragmaInInactiveBranchIsIgnored) {
@@ -744,13 +799,17 @@ TEST(PragmaMacroInput, MacroSuppliesWholeExpressionList) {
 TEST(PragmaMacroInput, MacroSuppliesMalformedText_Rejected) {
   PreprocFixture f;
   Preprocess("`define MY_BAD a b\n`pragma my_pragma `MY_BAD\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 2,
+                            "22.11"));
 }
 
 TEST(PragmaMacroInput, MacroSuppliesNonIdentifierName_Rejected) {
   PreprocFixture f;
   Preprocess("`define PNAME 123\n`pragma `PNAME\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`pragma pragma_name must be a simple identifier",
+                            2, "22.11"));
 }
 
 }  // namespace

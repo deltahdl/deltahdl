@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -107,7 +108,11 @@ TEST(Preprocessor, MacroExpansionWithinIncludeDirective) {
   cfg.defines = {{"MY_FILE", "\"nonexistent.svh\""}};
   Preprocess("`include `MY_FILE\n", f, std::move(cfg));
 
-  EXPECT_TRUE(f.diag.HasErrors());
+  // The macro is what put a filename on the directive, so the search running
+  // at all is what this shows; no file of that name exists to be found.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot find include file 'nonexistent.svh'", 1,
+                            ""));
 }
 
 TEST(Preprocessor, DefineSupportsMultilineWithBackslash) {
@@ -379,7 +384,10 @@ TEST(Preprocessor, MacroExpansionWithinTimescale) {
 TEST(Preprocessor, DirectiveInsideDirectiveArgIsError) {
   PreprocFixture f;
   Preprocess("`default_nettype `resetall\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // The inner word is left standing as text rather than acted on, so it
+  // reaches §22.8's net type check as the argument it was written as.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "invalid net type '`resetall'", 1, "22.8"));
 }
 
 TEST(Preprocessor, MacroInRemainderAfterDirectiveExpanded) {

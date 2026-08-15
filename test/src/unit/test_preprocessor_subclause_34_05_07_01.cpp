@@ -60,6 +60,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope_output.h"
 #include "preprocessor/protect_processing.h"
@@ -449,7 +450,9 @@ TEST(ProtectEncryptAgentSyntax, AStringSpellingTheExpressionIsOneValue) {
 // quietly said nothing.
 TEST(ProtectEncryptAgentSyntax, AnEqualsWithNoValueAfterItIsNoExpression) {
   ReadBack read("`pragma protect encrypt_agent =\n");
-  EXPECT_TRUE(read.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(read.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // The parenthesized spelling of a pragma_value written empty. That spelling
@@ -458,7 +461,9 @@ TEST(ProtectEncryptAgentSyntax, AnEqualsWithNoValueAfterItIsNoExpression) {
 // defined with, and not the other spelling either.
 TEST(ProtectEncryptAgentSyntax, AnEmptyParenthesizedValueIsNoExpression) {
   ReadBack read("`pragma protect encrypt_agent=()\n");
-  EXPECT_TRUE(read.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(read.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // A value that opens as a string and never closes. This is the closest input to
@@ -467,7 +472,9 @@ TEST(ProtectEncryptAgentSyntax, AnEmptyParenthesizedValueIsNoExpression) {
 // mark that makes the run of characters a string.
 TEST(ProtectEncryptAgentSyntax, AnUnclosedStringIsNoString) {
   ReadBack read("`pragma protect encrypt_agent=\"Globex Sealer 7\n");
-  EXPECT_TRUE(read.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(read.diag.Diagnostics(),
+                            "`pragma directive contains an illegal token", 1,
+                            "22.11"));
 }
 
 // The same of the triple-quoted spelling, which closes on a run of three marks
@@ -477,7 +484,9 @@ TEST(ProtectEncryptAgentSyntax, AnUnclosedStringIsNoString) {
 // terminator instead of the branch that looks for the shorter one.
 TEST(ProtectEncryptAgentSyntax, AnUnclosedTripleQuotedStringIsNoString) {
   ReadBack read("`pragma protect encrypt_agent=\"\"\"Globex Sealer 7\"\n");
-  EXPECT_TRUE(read.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(read.diag.Diagnostics(),
+                            "`pragma directive contains an illegal token", 1,
+                            "22.11"));
 }
 
 // The keyword and a string with no '=' between them. The syntax line binds the
@@ -489,7 +498,9 @@ TEST(ProtectEncryptAgentSyntax, AnUnclosedTripleQuotedStringIsNoString) {
 // syntax line calls for is on the line, and the one that binds them is not.
 TEST(ProtectEncryptAgentSyntax, TheKeywordAndAStringWithNoEqualsIsRejected) {
   ReadBack read("`pragma protect encrypt_agent \"Globex Sealer 7\"\n");
-  EXPECT_TRUE(read.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(read.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // The same letters written as an escaped identifier. A pragma_keyword is the
@@ -501,7 +512,9 @@ TEST(ProtectEncryptAgentSyntax, TheKeywordAndAStringWithNoEqualsIsRejected) {
 // and take an escaped identifier for the simple one the grammar calls for.
 TEST(ProtectEncryptAgentSyntax, TheKeywordAsAnEscapedIdentifierIsRejected) {
   ReadBack read("`pragma protect \\encrypt_agent = \"Globex Sealer 7\"\n");
-  EXPECT_TRUE(read.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(read.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // ---------------------------------------------------------------------------

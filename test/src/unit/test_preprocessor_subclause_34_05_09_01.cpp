@@ -57,6 +57,7 @@
 #include <string_view>
 
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_processing.h"
 
@@ -469,8 +470,13 @@ TEST(ProtectEncodingSyntax, ACountDisagreeingWithTheBlockIsReported) {
   std::string list =
       EncodingList(DefaultProtectEncoding().enctype, ", bytes=1");
   PreprocFixture f;
-  Preprocess(EnvelopeReadUnder(StatesEncoding(list)), f, HoldingTheKey());
-  EXPECT_TRUE(f.diag.HasErrors());
+  std::string src = EnvelopeReadUnder(StatesEncoding(list));
+  Preprocess(src, f, HoldingTheKey());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "protect pragma value stands for a different number of bytes from the "
+      "one the encoding in effect states",
+      LineHolding(src, kBlockDirective), "34.5.9.2"));
 }
 
 // The same disagreeing count with a length written between it and the scheme,
@@ -482,8 +488,13 @@ TEST(ProtectEncodingSyntax, ALengthBetweenTheSchemeAndCountLeavesBoth) {
   std::string list = EncodingList(DefaultProtectEncoding().enctype,
                                   ", line_length=8, bytes=1");
   PreprocFixture f;
-  Preprocess(EnvelopeReadUnder(StatesEncoding(list)), f, HoldingTheKey());
-  EXPECT_TRUE(f.diag.HasErrors());
+  std::string src = EnvelopeReadUnder(StatesEncoding(list));
+  Preprocess(src, f, HoldingTheKey());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "protect pragma value stands for a different number of bytes from the "
+      "one the encoding in effect states",
+      LineHolding(src, kBlockDirective), "34.5.9.2"));
 }
 
 // The same input with the length written as a string. §34.5.9.1 writes a
@@ -504,8 +515,13 @@ TEST(ProtectEncodingSyntax, ALengthWrittenAsAStringLeavesTheCountBeyondIt) {
   std::string list = EncodingList(DefaultProtectEncoding().enctype,
                                   ", line_length=\"wide\", bytes=1");
   PreprocFixture f;
-  Preprocess(EnvelopeReadUnder(StatesEncoding(list)), f, HoldingTheKey());
-  EXPECT_TRUE(f.diag.HasErrors());
+  std::string src = EnvelopeReadUnder(StatesEncoding(list));
+  Preprocess(src, f, HoldingTheKey());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "protect pragma value stands for a different number of bytes from the "
+      "one the encoding in effect states",
+      LineHolding(src, kBlockDirective), "34.5.9.2"));
 }
 
 // The three names written in the reverse of the order the syntax line puts them
@@ -524,8 +540,13 @@ TEST(ProtectEncodingSyntax, TheNamesAreReadForThemselvesWhateverTheOrder) {
   std::string list = "(bytes=1, line_length=8, enctype=\"";
   list.append(DefaultProtectEncoding().enctype).append("\")");
   PreprocFixture f;
-  Preprocess(EnvelopeReadUnder(StatesEncoding(list)), f, HoldingTheKey());
-  EXPECT_TRUE(f.diag.HasErrors());
+  std::string src = EnvelopeReadUnder(StatesEncoding(list));
+  Preprocess(src, f, HoldingTheKey());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "protect pragma value stands for a different number of bytes from the "
+      "one the encoding in effect states",
+      LineHolding(src, kBlockDirective), "34.5.9.2"));
 }
 
 // The same disagreeing count written as a string rather than as a number.
@@ -593,7 +614,9 @@ TEST(ProtectEncodingSyntax, TheKeywordStandingAloneStatesNoScheme) {
 TEST(ProtectEncodingSyntax, AnEmptyListIsNoValue) {
   PreprocFixture f;
   Preprocess("`pragma protect encoding=()\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // The '=' written with nothing after it. The spelling this keyword is defined
@@ -603,7 +626,9 @@ TEST(ProtectEncodingSyntax, AnEmptyListIsNoValue) {
 TEST(ProtectEncodingSyntax, AnEqualsWithNoValueAfterItIsNoExpression) {
   PreprocFixture f;
   Preprocess("`pragma protect encoding =\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // A list opened and never closed. This is the closest input to the defined
@@ -612,7 +637,9 @@ TEST(ProtectEncodingSyntax, AnEqualsWithNoValueAfterItIsNoExpression) {
 TEST(ProtectEncodingSyntax, AListLeftUnclosedIsNoValue) {
   PreprocFixture f;
   Preprocess("`pragma protect encoding=(enctype=\"base64\"\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // The scheme's string opened and never closed. The mark that would have ended
@@ -621,7 +648,9 @@ TEST(ProtectEncodingSyntax, AListLeftUnclosedIsNoValue) {
 TEST(ProtectEncodingSyntax, AnUnclosedSchemeNameIsNoString) {
   PreprocFixture f;
   Preprocess("`pragma protect encoding=(enctype=\"base64)\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`pragma directive contains an illegal token", 1,
+                            "22.11"));
 }
 
 // A subkeyword written with no '=' and no value, inside a list that is
@@ -634,8 +663,13 @@ TEST(ProtectEncodingSyntax, ABareWordAmongTheSubkeywordsQualifiesNothing) {
   std::string list =
       EncodingList(DefaultProtectEncoding().enctype, ", padded, bytes=1");
   PreprocFixture f;
-  Preprocess(EnvelopeReadUnder(StatesEncoding(list)), f, HoldingTheKey());
-  EXPECT_TRUE(f.diag.HasErrors());
+  std::string src = EnvelopeReadUnder(StatesEncoding(list));
+  Preprocess(src, f, HoldingTheKey());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "protect pragma value stands for a different number of bytes from the "
+      "one the encoding in effect states",
+      LineHolding(src, kBlockDirective), "34.5.9.2"));
 }
 
 // The keyword written as an escaped identifier. A pragma_keyword is the simple
@@ -645,7 +679,9 @@ TEST(ProtectEncodingSyntax, ABareWordAmongTheSubkeywordsQualifiesNothing) {
 TEST(ProtectEncodingSyntax, TheKeywordAsAnEscapedIdentifierIsRejected) {
   PreprocFixture f;
   Preprocess("`pragma protect \\encoding = (enctype = \"base64\")\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 }  // namespace

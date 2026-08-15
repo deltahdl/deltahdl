@@ -6,6 +6,7 @@
 #include <string>
 
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -320,7 +321,8 @@ TEST(CompilationUnitPreprocessing,
                              "endmodule\n");
   Preprocessor preproc_b(mgr_b, diag_b, {});
   auto pp_b = preproc_b.Preprocess(fid_b);
-  EXPECT_TRUE(diag_b.HasErrors());
+  EXPECT_TRUE(ReportedError(diag_b.Diagnostics(), "undefined macro 'WIDTH'", 2,
+                            "22.5.1"));
   EXPECT_EQ(pp_b.find('8'), std::string::npos);
 }
 

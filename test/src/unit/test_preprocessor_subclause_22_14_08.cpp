@@ -8,6 +8,7 @@
 #include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
 #include "helpers_keyword_version.h"
+#include "helpers_reported_error.h"
 #include "lexer/keywords.h"
 #include "lexer/lexer.h"
 #include "model_keyword_tables.h"
@@ -66,7 +67,10 @@ TEST(KeywordVersionPreprocessing,
     auto out = Preprocess(std::string("`begin_keywords \"") + spec +
                               "\"\ninterconnect\n`end_keywords\n",
                           f);
-    EXPECT_TRUE(f.diag.HasErrors())
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::string("unrecognized version specifier: \"") + spec + "\"", 1,
+        "22.14"))
         << spec << " names no version this implementation knows";
     EXPECT_EQ(out.find(kKeywordMarker), std::string::npos)
         << spec << " opened no region, so no list was put in force";

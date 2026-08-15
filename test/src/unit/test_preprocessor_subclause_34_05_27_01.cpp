@@ -3,6 +3,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_program.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 
 using namespace delta;
@@ -73,7 +74,11 @@ TEST_F(ProtectKeyBlockSyntaxTest,
 TEST_F(ProtectKeyBlockSyntaxTest, KeyBlockHasNoSameLineArgument) {
   auto result = Preprocess(
       "module m;\n`pragma protect key_block TRAILINGTOKEN\nendmodule\n");
-  EXPECT_TRUE(diag_.HasErrors());
+  // Syntax 22-8 separates two expressions with a comma, so the stray token is
+  // what §22.11 turns away rather than anything this keyword states.
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 2,
+                            "22.11"));
   EXPECT_EQ(result.find("pragma"), std::string::npos);
   EXPECT_EQ(result.find("TRAILINGTOKEN"), std::string::npos);
   EXPECT_NE(result.find("module m;"), std::string::npos);

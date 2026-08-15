@@ -61,6 +61,7 @@
 #include "common/source_mgr.h"
 #include "fixture_protect_read.h"
 #include "helpers_protect_keys.h"
+#include "helpers_reported_error.h"
 #include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope.h"
@@ -491,8 +492,12 @@ TEST(ProtectBeginProtectedDescription,
 TEST(ProtectBeginProtectedDescription,
      ASealedModelOutsideEveryRegionSelectsNoKeyForTheRegionAfterIt) {
   std::string src = SealedModelNamingItsOwnKeys() + NamedRegionAround("");
-  ReadSource run(EncryptedUnderNames(src), ReadSource::KeyConfig(kSealerKey));
-  EXPECT_TRUE(run.diag.HasErrors());
+  std::string written = EncryptedUnderNames(src);
+  ReadSource run(written, ReadSource::KeyConfig(kSealerKey));
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied",
+      LineHolding(written, "data_block="), "34.3.2"));
   EXPECT_FALSE(Holds(run.text, kOuterStatement));
 }
 
@@ -554,10 +559,13 @@ TEST(ProtectBeginProtectedDescription,
 // case would pass on the wrong failure.
 TEST(ProtectBeginProtectedDescription,
      TheSealedModelsNamesSelectNoKeyForTheLargerModel) {
-  ReadSource run(
-      EncryptedUnderNames(NamedRegionAround(SealedModelNamingItsOwnKeys())),
-      ReadSource::KeyConfig(kSealerKey));
-  EXPECT_TRUE(run.diag.HasErrors());
+  std::string written =
+      EncryptedUnderNames(NamedRegionAround(SealedModelNamingItsOwnKeys()));
+  ReadSource run(written, ReadSource::KeyConfig(kSealerKey));
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied",
+      LineHolding(written, "data_block="), "34.3.2"));
   EXPECT_FALSE(Holds(run.text, kOuterStatement));
 }
 
@@ -579,9 +587,18 @@ TEST(ProtectBeginProtectedDescription,
 // for the one key they are missing.
 TEST(ProtectBeginProtectedDescription,
      AModelRecoveredOutOfABlockIsReportedWhenNoKeyOpensIt) {
-  ReadSource run(EncryptedUnderNames(NamedRegionAround(SealedModel())),
+  // The block that does not open is the sealed model's own, standing in the
+  // text the outer block recovered to. That text is the region's body without
+  // its opening line and without the author line §34.5.5 holds back from a
+  // block, so the model's block stands two lines above where the region wrote
+  // it.
+  std::string region = NamedRegionAround(SealedModel());
+  ReadSource run(EncryptedUnderNames(region),
                  ReadSource::KeyConfig(kAuthorKey));
-  EXPECT_TRUE(run.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied",
+      LineHolding(region, "data_block=") - 2, "34.3.2"));
   EXPECT_TRUE(Holds(run.text, kOuterStatement));
 }
 
@@ -871,10 +888,14 @@ TEST(ProtectBeginProtectedDescription,
 // with an empty design.
 TEST(ProtectBeginProtectedDescription,
      ABlockMissingTheExpressionThatNamesItsKeyDoesNotOpen) {
-  ReadSource run(Without(EncryptedUnderNames(NamedRegionAround(SealedModel())),
-                         KeyNameDirective(kAuthorKeyName)),
-                 ReadSource::KeysConfig(BothEntitiesKeys()));
-  EXPECT_TRUE(run.diag.HasErrors());
+  std::string written =
+      Without(EncryptedUnderNames(NamedRegionAround(SealedModel())),
+              KeyNameDirective(kAuthorKeyName));
+  ReadSource run(written, ReadSource::KeysConfig(BothEntitiesKeys()));
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied",
+      LineHolding(written, "data_block="), "34.3.2"));
   EXPECT_FALSE(Holds(run.text, kOuterStatement));
 }
 

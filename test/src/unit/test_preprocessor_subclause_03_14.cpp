@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_preprocessor_timescale.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -14,14 +15,22 @@ TEST(DesignBuildingBlockPreprocessing,
 }
 
 TEST(DesignBuildingBlockPreprocessing, TimescaleRejectsOtherMagnitudes) {
-  EXPECT_TRUE(PreprocessTimescale("`timescale 5ns / 1ps\n").has_errors);
-  EXPECT_TRUE(PreprocessTimescale("`timescale 50ns / 1ps\n").has_errors);
-  EXPECT_TRUE(PreprocessTimescale("`timescale 1ns / 200ps\n").has_errors);
+  EXPECT_TRUE(ReportedError(PreprocessTimescale("`timescale 5ns / 1ps\n").diags,
+                            "invalid `timescale unit", 1, "22.7"));
+  EXPECT_TRUE(
+      ReportedError(PreprocessTimescale("`timescale 50ns / 1ps\n").diags,
+                    "invalid `timescale unit", 1, "22.7"));
+  EXPECT_TRUE(
+      ReportedError(PreprocessTimescale("`timescale 1ns / 200ps\n").diags,
+                    "invalid `timescale precision", 1, "22.7"));
 }
 
 TEST(DesignBuildingBlockPreprocessing, TimescaleRejectsUnknownSuffix) {
-  EXPECT_TRUE(PreprocessTimescale("`timescale 1sec / 1ps\n").has_errors);
-  EXPECT_TRUE(PreprocessTimescale("`timescale 1ns / 1xs\n").has_errors);
+  EXPECT_TRUE(
+      ReportedError(PreprocessTimescale("`timescale 1sec / 1ps\n").diags,
+                    "invalid `timescale unit", 1, "22.7"));
+  EXPECT_TRUE(ReportedError(PreprocessTimescale("`timescale 1ns / 1xs\n").diags,
+                            "invalid `timescale precision", 1, "22.7"));
 }
 
 TEST(DesignBuildingBlockPreprocessing,
@@ -47,7 +56,9 @@ TEST(DesignBuildingBlockPreprocessing, TimescaleCarriesUnitAndPrecision) {
 }
 
 TEST(DesignBuildingBlockPreprocessing, TimescalePrecisionLessPreciseThanUnit) {
-  EXPECT_TRUE(PreprocessTimescale("`timescale 1ps / 1ns\n").has_errors);
+  EXPECT_TRUE(ReportedError(
+      PreprocessTimescale("`timescale 1ps / 1ns\n").diags,
+      "`timescale precision is less precise than the time unit", 1, "22.7"));
 }
 
 TEST(DesignBuildingBlockPreprocessing, TimescaleMapsEachSuffixToCorrectUnit) {
@@ -67,8 +78,12 @@ TEST(DesignBuildingBlockPreprocessing, TimescaleMapsEachSuffixToCorrectUnit) {
 
 TEST(DesignBuildingBlockPreprocessing,
      TimescalePrecisionLongerByMagnitudeRejected) {
-  EXPECT_TRUE(PreprocessTimescale("`timescale 1ns / 10ns\n").has_errors);
-  EXPECT_TRUE(PreprocessTimescale("`timescale 10ps / 100ps\n").has_errors);
+  EXPECT_TRUE(ReportedError(
+      PreprocessTimescale("`timescale 1ns / 10ns\n").diags,
+      "`timescale precision is less precise than the time unit", 1, "22.7"));
+  EXPECT_TRUE(ReportedError(
+      PreprocessTimescale("`timescale 10ps / 100ps\n").diags,
+      "`timescale precision is less precise than the time unit", 1, "22.7"));
 }
 
 }  // namespace

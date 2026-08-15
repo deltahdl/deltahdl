@@ -4,6 +4,7 @@
 #include "fixture_preprocessor.h"
 #include "fixture_preprocessor_timescale.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "parser/time_resolve.h"
 
 using namespace delta;
@@ -64,14 +65,20 @@ TEST(Preprocessor, Timescale_StepRejectedAsUnit) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`timescale 1step / 1ns\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "step cannot be used to set or modify the time unit or precision", 1,
+      "3.14.3"));
 }
 
 TEST(Preprocessor, Timescale_StepRejectedAsPrecision) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`timescale 1ns / 1step\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "step cannot be used to set or modify the time unit or precision", 1,
+      "3.14.3"));
 }
 
 }  // namespace

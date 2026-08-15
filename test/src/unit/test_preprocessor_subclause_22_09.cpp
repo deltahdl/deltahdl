@@ -2,6 +2,7 @@
 
 #include "common/types.h"
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -48,7 +49,9 @@ TEST(Preprocessor, UnconnectedDrive_InvalidArg) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`unconnected_drive pullx\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "invalid `unconnected_drive argument: 'pullx'", 1,
+                            "22.9"));
 }
 
 // §22.9: `unconnected_drive requires one of the two arguments pull1 or pull0.
@@ -58,7 +61,9 @@ TEST(Preprocessor, UnconnectedDrive_MissingArg) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`unconnected_drive\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "invalid `unconnected_drive argument: ''", 1,
+                            "22.9"));
   EXPECT_EQ(pp.UnconnectedDrive(), NetType::kWire);
 }
 
@@ -85,14 +90,18 @@ TEST(Preprocessor, UnconnectedDrive_InsideModule_Error) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("module t;\n`unconnected_drive pull0\nendmodule\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "`unconnected_drive illegal inside a design element", 2, "22.9"));
 }
 
 TEST(Preprocessor, NounconnectedDrive_InsideModule_Error) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("module t;\n`nounconnected_drive\nendmodule\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "`nounconnected_drive illegal inside a design element", 2, "22.9"));
 }
 
 TEST(Preprocessor, UnconnectedDrive_NoOutput) {

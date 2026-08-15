@@ -6,6 +6,7 @@
 #include <string>
 
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace fs = std::filesystem;
@@ -74,7 +75,10 @@ TEST(Preprocessor, Include_AngleBracket_DoesNotSearchSourceDir) {
   Preprocessor pp(f.mgr, f.diag, {});
   pp.Preprocess(fid);
 
-  EXPECT_TRUE(f.diag.HasErrors());
+  // The search this directive states found no file, which is a fact about the
+  // run rather than a rule of the standard, so the report names no subclause.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot find include file 'local.svh'", 1, ""));
 }
 
 TEST(Preprocessor, Include_AbsolutePath_DoubleQuote) {
@@ -97,7 +101,10 @@ TEST(Preprocessor, Include_AbsolutePath_AngleBracket_Error) {
   auto src = "`include <" + inc.string() + ">\n";
   Preprocess(src, f);
 
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "absolute path not allowed with angle-bracket "
+                            "`include",
+                            1, "22.4"));
 }
 
 TEST(Preprocessor, Include_RelativeToSourceDir) {
@@ -164,25 +171,32 @@ TEST(Preprocessor, Include_MaxDepthExceeded) {
   Preprocessor pp(f.mgr, f.diag, {});
   pp.Preprocess(fid);
 
-  EXPECT_TRUE(f.diag.HasErrors());
+  // §22.4 requires a limit of at least 15 and leaves the limit itself to the
+  // implementation, so what the report states is this tool's own bound.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "include depth exceeds maximum of 15", 1, ""));
 }
 
 TEST(Preprocessor, Include_FileNotFound) {
   PreprocFixture f;
   Preprocess("`include \"no_such_file.svh\"\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot find include file 'no_such_file.svh'", 1,
+                            ""));
 }
 
 TEST(Preprocessor, Include_EmptyFilename) {
   PreprocFixture f;
   Preprocess("`include \"\"\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "`include filename is empty",
+                            1, "22.4"));
 }
 
 TEST(Preprocessor, Include_MissingFilename) {
   PreprocFixture f;
   Preprocess("`include\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`include requires a filename", 1, "22.4"));
 }
 
 TEST(Preprocessor, Include_CommentAfterFilename_OK) {
@@ -207,7 +221,10 @@ TEST(Preprocessor, Include_NonCommentTextAfterFilename_Error) {
   Preprocessor pp(f.mgr, f.diag, {});
   pp.Preprocess(fid);
 
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "only whitespace or a comment may follow `include "
+                            "filename",
+                            1, "22.4"));
 }
 
 TEST(Preprocessor, Include_MacroExpansionInFilename) {
@@ -475,7 +492,10 @@ TEST(Preprocessor, Include_UnquotedFilename_Rejected) {
 
   PreprocFixture f;
   Preprocess("`include bare.svh\n", f, std::move(cfg));
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`include filename must be enclosed in double "
+                            "quotes or angle brackets",
+                            1, "22.4"));
 }
 
 TEST(Preprocessor, Include_AbsolutePath_Missing_DoesNotFallBack) {
@@ -486,7 +506,8 @@ TEST(Preprocessor, Include_AbsolutePath_Missing_DoesNotFallBack) {
 
   PreprocFixture f;
   Preprocess("`include \"/decoy.svh\"\n", f, std::move(cfg));
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot find include file '/decoy.svh'", 1, ""));
 }
 
 // §22.4: for the angle-bracket form, a relative filename is resolved relative
@@ -529,7 +550,8 @@ TEST(Preprocessor,
   Preprocessor pp(f.mgr, f.diag, {});
   auto result = pp.Preprocess(fid);
 
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot find include file 'sys.svh'", 2, ""));
   EXPECT_EQ(result.find("wire from_source_dir;"), std::string::npos);
 }
 

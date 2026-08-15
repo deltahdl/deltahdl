@@ -2,6 +2,7 @@
 
 #include "common/types.h"
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -14,43 +15,57 @@ static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
 TEST(Preprocessor, ResetAll_IllegalInsideModule) {
   PreprocFixture f;
   Preprocess("module m;\n`resetall\nendmodule\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`resetall illegal inside a design element", 2,
+                            "22.3"));
 }
 
 TEST(Preprocessor, ResetAll_IllegalInsideProgram) {
   PreprocFixture f;
   Preprocess("program p;\n`resetall\nendprogram\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`resetall illegal inside a design element", 2,
+                            "22.3"));
 }
 
 TEST(Preprocessor, ResetAll_IllegalInsideInterface) {
   PreprocFixture f;
   Preprocess("interface ifc;\n`resetall\nendinterface\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`resetall illegal inside a design element", 2,
+                            "22.3"));
 }
 
 TEST(Preprocessor, ResetAll_IllegalInsideChecker) {
   PreprocFixture f;
   Preprocess("checker chk;\n`resetall\nendchecker\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`resetall illegal inside a design element", 2,
+                            "22.3"));
 }
 
 TEST(Preprocessor, ResetAll_IllegalInsidePackage) {
   PreprocFixture f;
   Preprocess("package pkg;\n`resetall\nendpackage\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`resetall illegal inside a design element", 2,
+                            "22.3"));
 }
 
 TEST(Preprocessor, ResetAll_IllegalInsidePrimitive) {
   PreprocFixture f;
   Preprocess("primitive udp(out, a);\n`resetall\nendprimitive\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`resetall illegal inside a design element", 2,
+                            "22.3"));
 }
 
 TEST(Preprocessor, ResetAll_IllegalInsideConfig) {
   PreprocFixture f;
   Preprocess("config cfg;\n`resetall\nendconfig\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`resetall illegal inside a design element", 2,
+                            "22.3"));
 }
 
 TEST(Preprocessor, ResetAll_LegalOutsideDesignElements) {
@@ -66,7 +81,9 @@ TEST(Preprocessor, ResetAll_LegalOutsideDesignElements) {
 TEST(Preprocessor, ResetAll_IllegalInsideMacromodule) {
   PreprocFixture f;
   Preprocess("macromodule mm;\n`resetall\nendmodule\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`resetall illegal inside a design element", 2,
+                            "22.3"));
 }
 
 TEST(Preprocessor, ResetAll_ResetsDefaultNettype) {
@@ -130,7 +147,11 @@ TEST(Preprocessor, ResetAll_EndKeywordsWithoutBeginAfterResetallErrors) {
   PreprocessWithPP("`resetall\n", f, pp);
   PreprocessWithPP("`end_keywords\n", f, pp);
 
-  EXPECT_TRUE(f.diag.HasErrors());
+  // `resetall restores the directive defaults and leaves no keyword region
+  // open, so the closer that follows it is the one §22.14 reports unmatched.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`end_keywords without matching `begin_keywords", 1,
+                            "22.14"));
 }
 
 TEST(Preprocessor, ResetAll_DoesNotAffectConditionalStack) {
@@ -184,7 +205,9 @@ TEST(Preprocessor, ResetAll_IllegalInsideNestedDesignElement) {
       "  endmodule\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`resetall illegal inside a design element", 3,
+                            "22.3"));
 }
 
 TEST(Preprocessor, ResetAll_MultipleConsecutiveLegal) {
@@ -289,5 +312,7 @@ TEST(Preprocessor, ResetAll_ErrorInsideGenerateBlock) {
       "  endgenerate\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`resetall illegal inside a design element", 3,
+                            "22.3"));
 }

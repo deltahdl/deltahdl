@@ -4,6 +4,7 @@
 #include <string>
 
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -97,7 +98,10 @@ TEST(CoverageConstantsPreprocessor, DefinedForConditionalCompilation) {
 TEST(CoverageConstantsPreprocessor, UnlistedNameIsNotPredefined) {
   PreprocFixture f;
   Preprocess("`SV_COV_UNDEFINED\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // Nothing predefines the name, so the usage is a macro usage naming nothing
+  // and §22.5.1 is the rule the report enforces.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "undefined macro 'SV_COV_UNDEFINED'", 1, "22.5.1"));
 }
 
 }  // namespace

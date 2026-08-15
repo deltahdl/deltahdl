@@ -6,6 +6,7 @@
 #include <string>
 
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -191,7 +192,8 @@ TEST(UndefPreprocessing, UndefWithoutMacroNameIsAnError) {
       "`define FOO 1\n"
       "`undef\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`undef requires a text macro name", 2, "22.5.2"));
 }
 
 // text_macro_identifier resolves to an identifier, which §5.6 never starts
@@ -200,7 +202,8 @@ TEST(UndefPreprocessing, UndefWithoutMacroNameIsAnError) {
 TEST(UndefPreprocessing, UndefWithNonIdentifierOperandIsAnError) {
   PreprocFixture f;
   Preprocess("`undef 123\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`undef requires a text macro name", 1, "22.5.2"));
 }
 
 // A bare `undef inside a conditional branch that is not compiled is skipped
@@ -245,7 +248,10 @@ TEST(UndefPreprocessing, KeywordRunTogetherWithUndefinedNameDoesNotUndefine) {
       "survived\n"
       "`endif\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // `undefX names no directive, so it reaches the macro expander as a usage of
+  // a macro nothing defined, and §22.5.1 is the rule that report enforces.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "undefined macro 'undefX'", 2,
+                            "22.5.1"));
   EXPECT_NE(result.find("survived"), std::string::npos);
 }
 
@@ -307,7 +313,10 @@ TEST(UndefPreprocessing, UndefStopsFunctionLikeMacroFromExpanding) {
       "`undef SUM\n"
       "int z = `SUM(1,2);\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // The removal is what leaves the usage naming nothing, so the report the
+  // usage draws is §22.5.1's rather than this subclause's.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "undefined macro 'SUM'", 3,
+                            "22.5.1"));
   EXPECT_NE(result.find("`SUM(1,2)"), std::string::npos);
 }
 

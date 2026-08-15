@@ -62,6 +62,7 @@
 #include <string_view>
 
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/protect_processing.h"
 
 using namespace delta;
@@ -292,7 +293,9 @@ TEST(ProtectEncryptAgentInfoSyntax, TheNameBrokenAtItsUnderscoreIsRejected) {
   std::string src = "`pragma protect encrypt_agent _info=";
   src.append("\"assembled in Springfield\"\n");
   Preprocess(src, f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // ---------------------------------------------------------------------------
@@ -485,7 +488,9 @@ TEST(ProtectEncryptAgentInfoSyntax, AParenthesizedListIsNotOneWrittenThing) {
 TEST(ProtectEncryptAgentInfoSyntax, AnEqualsWithNoValueAfterItIsNoExpression) {
   PreprocFixture f;
   Preprocess("`pragma protect encrypt_agent_info =\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // The parenthesized spelling of a pragma_value written empty. That spelling
@@ -495,7 +500,9 @@ TEST(ProtectEncryptAgentInfoSyntax, AnEqualsWithNoValueAfterItIsNoExpression) {
 TEST(ProtectEncryptAgentInfoSyntax, AnEmptyParenthesizedValueIsNoExpression) {
   PreprocFixture f;
   Preprocess("`pragma protect encrypt_agent_info=()\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // A value that opens as a string and never closes. This is the closest input to
@@ -507,7 +514,9 @@ TEST(ProtectEncryptAgentInfoSyntax, AnUnclosedStringIsNoString) {
   std::string src(kAnyOffering);
   src.append("\"assembled in Springfield\n");
   Preprocess(src, f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`pragma directive contains an illegal token", 1,
+                            "22.11"));
 }
 
 // The same of the triple-quoted spelling, which closes on a run of three marks
@@ -520,7 +529,9 @@ TEST(ProtectEncryptAgentInfoSyntax, AnUnclosedTripleQuotedStringIsNoString) {
   std::string src(kAnyOffering);
   src.append("\"\"\"assembled in Springfield\"\n");
   Preprocess(src, f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`pragma directive contains an illegal token", 1,
+                            "22.11"));
 }
 
 // The keyword and a string with no '=' between them. The syntax line binds the
@@ -535,7 +546,9 @@ TEST(ProtectEncryptAgentInfoSyntax, AKeywordAndStringWithNoEqualsIsRejected) {
   std::string src = "`pragma protect encrypt_agent_info ";
   src.append("\"assembled in Springfield\"\n");
   Preprocess(src, f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // The same letters written as an escaped identifier. A pragma_keyword is the
@@ -550,7 +563,9 @@ TEST(ProtectEncryptAgentInfoSyntax, TheKeywordAsAnEscapedIdentifierIsRejected) {
   std::string src = "`pragma protect \\encrypt_agent_info = ";
   src.append("\"assembled in Springfield\"\n");
   Preprocess(src, f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // ---------------------------------------------------------------------------

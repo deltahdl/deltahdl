@@ -51,6 +51,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
@@ -452,7 +453,10 @@ TEST(ProtectDataKeyownerSyntax,
       EnvelopeUnderNames(described), Writes("data_keyowner", kOtherOwner));
   PreprocFixture f;
   std::string read = Preprocess(envelope, f, KeysConfig());
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied",
+      LineHolding(envelope, "data_block="), "34.3.2"));
   EXPECT_FALSE(Carries(read, "module sealed_m"));
 }
 
@@ -545,7 +549,9 @@ TEST(ProtectDataKeyownerSyntax, AnEntityNamedBeforeAListStillSelectsTheKey) {
 TEST(ProtectDataKeyownerSyntax, AnEqualsWithNoValueAfterItIsNoExpression) {
   PreprocFixture f;
   Preprocess("`pragma protect data_keyowner =\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // The entity's string opened and never closed. This is the closest input to the
@@ -555,7 +561,9 @@ TEST(ProtectDataKeyownerSyntax, AnEqualsWithNoValueAfterItIsNoExpression) {
 TEST(ProtectDataKeyownerSyntax, AnUnclosedEntityNameIsNoString) {
   PreprocFixture f;
   Preprocess("`pragma protect data_keyowner=\"acme-semiconductor\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`pragma directive contains an illegal token", 1,
+                            "22.11"));
 }
 
 // The parenthesized spelling written empty. That spelling holds a list of
@@ -565,7 +573,9 @@ TEST(ProtectDataKeyownerSyntax, AnUnclosedEntityNameIsNoString) {
 TEST(ProtectDataKeyownerSyntax, AnEmptyListIsNoValue) {
   PreprocFixture f;
   Preprocess("`pragma protect data_keyowner=()\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 // The keyword written as an escaped identifier. A pragma_keyword is the simple
@@ -575,7 +585,9 @@ TEST(ProtectDataKeyownerSyntax, AnEmptyListIsNoValue) {
 TEST(ProtectDataKeyownerSyntax, TheKeywordAsAnEscapedIdentifierIsRejected) {
   PreprocFixture f;
   Preprocess("`pragma protect \\data_keyowner = \"acme-semiconductor\"\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed pragma_expression after pragma_name", 1,
+                            "22.11"));
 }
 
 }  // namespace

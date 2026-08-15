@@ -35,6 +35,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_processing.h"
 
@@ -470,22 +471,30 @@ TEST(ProtectedEnvelopeProcessing, TwoRegionsOnOneDirectiveArePutBack) {
 // region was encrypted under recovers nothing. Reporting it is what keeps the
 // design that did not arrive from reading as a design that was empty.
 TEST(ProtectedEnvelopeProcessing, AKeyThatIsNotTheProperOneRecoversNothing) {
-  ReadWithKey run(Encrypted("`pragma protect begin\n"
-                            "  initial result = 42;\n"
-                            "`pragma protect end\n"),
-                  kStrangerKey);
-  EXPECT_TRUE(run.diag.HasErrors());
+  std::string sealed = Encrypted(
+      "`pragma protect begin\n"
+      "  initial result = 42;\n"
+      "`pragma protect end\n");
+  ReadWithKey run(sealed, kStrangerKey);
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied",
+      LineHolding(sealed, "data_block="), "34.3.2"));
   EXPECT_FALSE(Holds(run.text, "initial result = 42;"));
 }
 
 // The same where the user supplied no key at all, which is the state a tool
 // reading protected source starts in.
 TEST(ProtectedEnvelopeProcessing, NoKeySuppliedRecoversNothing) {
-  ReadWithKey run(Encrypted("`pragma protect begin\n"
-                            "  initial result = 42;\n"
-                            "`pragma protect end\n"),
-                  "");
-  EXPECT_TRUE(run.diag.HasErrors());
+  std::string sealed = Encrypted(
+      "`pragma protect begin\n"
+      "  initial result = 42;\n"
+      "`pragma protect end\n");
+  ReadWithKey run(sealed, "");
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied",
+      LineHolding(sealed, "data_block="), "34.3.2"));
   EXPECT_FALSE(Holds(run.text, "initial result = 42;"));
 }
 
@@ -530,7 +539,10 @@ TEST(ProtectedEnvelopeProcessing, ARegionOutsideAnEnvelopeIsNotRecovered) {
 TEST(ProtectedEnvelopeProcessing, AValueOutsideTheAlphabetRecordsNoRegion) {
   EXPECT_FALSE(Recoverable("AAAA*AAA", kAuthorKey));
   ReadWithKey run(EnvelopeAround("AAAA*AAA", ""), kAuthorKey);
-  EXPECT_TRUE(run.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma value is not written in the encoding in effect", 2,
+      "34.5.9.2"));
 }
 
 // The alphabet writes bytes in groups, and the shortest group that carries a
@@ -541,7 +553,10 @@ TEST(ProtectedEnvelopeProcessing, AValueOutsideTheAlphabetRecordsNoRegion) {
 TEST(ProtectedEnvelopeProcessing, AValueEndingMidGroupRecordsNoRegion) {
   EXPECT_FALSE(Recoverable("AAAAA", kAuthorKey));
   ReadWithKey run(EnvelopeAround("AAAAA", ""), kAuthorKey);
-  EXPECT_TRUE(run.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma value is not written in the encoding in effect", 2,
+      "34.5.9.2"));
 }
 
 // A region carries a fingerprint of its own text ahead of the text, so a value
@@ -550,8 +565,13 @@ TEST(ProtectedEnvelopeProcessing, AValueEndingMidGroupRecordsNoRegion) {
 // be read as a region whose fingerprint ran off the end of what was there.
 TEST(ProtectedEnvelopeProcessing, AValueShorterThanAFingerprintRecordsNone) {
   EXPECT_FALSE(Recoverable("AAA", kAuthorKey));
+  // The spelling is one the scheme writes, so the value is read and the block
+  // it stands for is what cannot be opened.
   ReadWithKey run(EnvelopeAround("AAA", ""), kAuthorKey);
-  EXPECT_TRUE(run.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied", 2,
+      "34.3.2"));
 }
 
 }  // namespace

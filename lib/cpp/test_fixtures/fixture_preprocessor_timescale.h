@@ -20,6 +20,9 @@ struct PreprocTimescaleResult {
   TimeUnit global_precision;
   bool has_timescale;
   bool has_errors;
+  // A copy rather than a view, because the engine that recorded them is a
+  // local of the call below and its storage is gone once that call returns.
+  std::vector<Diagnostic> diags;
 };
 
 inline PreprocTimescaleResult PreprocessTimescale(const std::string& src) {
@@ -32,6 +35,7 @@ inline PreprocTimescaleResult PreprocessTimescale(const std::string& src) {
   result.global_precision = preproc.GlobalPrecision();
   result.has_timescale = preproc.HasTimescale();
   result.has_errors = diag.HasErrors();
+  result.diags = diag.Diagnostics();
   return result;
 }
 

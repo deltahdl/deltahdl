@@ -4,6 +4,7 @@
 #include "fixture_parser.h"
 #include "fixture_preprocessor.h"
 #include "fixture_preprocessor_timescale.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -41,7 +42,8 @@ TEST(Preprocessor, Timescale_InvalidUnit) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`timescale 1xx / 1ns\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "invalid `timescale unit", 1,
+                            "22.7"));
 }
 
 // The rule the report enforces is §22.7's, so the record it leaves says so
@@ -95,7 +97,9 @@ TEST(Preprocessor, Timescale_PrecisionLessPreciseThanUnit) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`timescale 1ns / 1us\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "`timescale precision is less precise than the time unit", 1, "22.7"));
 }
 
 TEST(Preprocessor, Timescale_PrecisionEqualToUnit) {
@@ -109,21 +113,24 @@ TEST(Preprocessor, Timescale_InvalidMagnitude5) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`timescale 5ns / 1ns\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "invalid `timescale unit", 1,
+                            "22.7"));
 }
 
 TEST(Preprocessor, Timescale_InvalidMagnitude0) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`timescale 0ns / 1ns\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "invalid `timescale unit", 1,
+                            "22.7"));
 }
 
 TEST(Preprocessor, Timescale_InvalidMagnitude1000) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`timescale 1000ns / 1ns\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "invalid `timescale unit", 1,
+                            "22.7"));
 }
 
 TEST(Preprocessor, Timescale_UnitS) {
@@ -180,7 +187,9 @@ TEST(Preprocessor, Timescale_IllegalInsideDesignElement) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("module foo;\n`timescale 1ns / 1ps\nendmodule\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`timescale illegal inside a design element", 2,
+                            "22.7"));
 }
 
 // The "illegal within a design element" rule is not module-specific: the
@@ -191,7 +200,9 @@ TEST(Preprocessor, Timescale_IllegalInsideInterface) {
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("interface ifc;\n`timescale 1ns / 1ps\nendinterface\n", f,
                    pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`timescale illegal inside a design element", 2,
+                            "22.7"));
 }
 
 // A package is another design-element position the same prohibition covers.
@@ -199,7 +210,9 @@ TEST(Preprocessor, Timescale_IllegalInsidePackage) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("package pkg;\n`timescale 1ns / 1ps\nendpackage\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`timescale illegal inside a design element", 2,
+                            "22.7"));
 }
 
 // The accepting side of the same rule: once a design element closes, the
@@ -219,7 +232,9 @@ TEST(Preprocessor, Timescale_IllegalInsideProgram) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("program prg;\n`timescale 1ns / 1ps\nendprogram\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`timescale illegal inside a design element", 2,
+                            "22.7"));
 }
 
 // A checker is likewise a design element, so the directive is illegal inside
@@ -228,7 +243,9 @@ TEST(Preprocessor, Timescale_IllegalInsideChecker) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("checker chk;\n`timescale 1ns / 1ps\nendchecker\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`timescale illegal inside a design element", 2,
+                            "22.7"));
 }
 
 // A primitive is a design element as well; the same rejection applies.
@@ -237,7 +254,9 @@ TEST(Preprocessor, Timescale_IllegalInsidePrimitive) {
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("primitive prim;\n`timescale 1ns / 1ps\nendprimitive\n", f,
                    pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`timescale illegal inside a design element", 2,
+                            "22.7"));
 }
 
 // A configuration is the final design-element kind this prohibition spans.
@@ -245,7 +264,9 @@ TEST(Preprocessor, Timescale_IllegalInsideConfig) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("config cfg;\n`timescale 1ns / 1ps\nendconfig\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`timescale illegal inside a design element", 2,
+                            "22.7"));
 }
 
 // The magnitude-set {1,10,100} constraint governs the precision argument in its
@@ -254,7 +275,8 @@ TEST(Preprocessor, Timescale_InvalidPrecisionMagnitude) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`timescale 1ns / 5ps\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "invalid `timescale precision", 1, "22.7"));
 }
 
 // The largest legal magnitude, 100, is accepted in the precision argument.
@@ -271,14 +293,17 @@ TEST(Preprocessor, Timescale_MissingSlash) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`timescale 1ns\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "invalid `timescale format: missing '/'", 1,
+                            "22.7"));
 }
 
 TEST(Preprocessor, Timescale_MissingPrecisionAfterSlash) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`timescale 1ns /\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "invalid `timescale precision", 1, "22.7"));
 }
 
 TEST(Preprocessor, Timescale_GlobalPrecisionTracksFines) {
@@ -296,14 +321,17 @@ TEST(Preprocessor, Timescale_InvalidPrecisionUnit) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`timescale 1ns / 1xx\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "invalid `timescale precision", 1, "22.7"));
 }
 
 TEST(Preprocessor, Timescale_PrecisionSameUnitLargerMagnitudeError) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`timescale 1ns / 10ns\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "`timescale precision is less precise than the time unit", 1, "22.7"));
 }
 
 TEST(Preprocessor, Timescale_PrecisionSameUnitSmallerMagnitudeOk) {

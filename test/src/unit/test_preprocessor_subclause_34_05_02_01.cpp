@@ -55,6 +55,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_protect_read.h"
+#include "helpers_reported_error.h"
 #include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope.h"
@@ -226,7 +227,11 @@ TEST(ProtectEndSyntax, ARegionTheWordClosedComesBackUnderTheAuthorsKey) {
 TEST(ProtectEndSyntax, AStringWrittenAgainstTheWordIsReported) {
   std::string closing = "`pragma protect end=\"now\"\n";
   ReadSource run(RegionClosedWith(closing));
-  EXPECT_TRUE(run.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma end keyword is written on its own and takes no "
+      "pragma_value",
+      3, "34.5.2.1"));
   EXPECT_EQ(run.OpenEncryptionEnvelopes(), 1U);
   EXPECT_TRUE(run.Closed().empty());
 }
@@ -238,7 +243,11 @@ TEST(ProtectEndSyntax, AStringWrittenAgainstTheWordIsReported) {
 TEST(ProtectEndSyntax, AParenthesizedValueAgainstTheWordIsReported) {
   std::string closing = "`pragma protect end=(enctype=\"raw\")\n";
   ReadSource run(RegionClosedWith(closing));
-  EXPECT_TRUE(run.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma end keyword is written on its own and takes no "
+      "pragma_value",
+      3, "34.5.2.1"));
   EXPECT_EQ(run.OpenEncryptionEnvelopes(), 1U);
 }
 
@@ -298,7 +307,11 @@ TEST(ProtectEndSyntax, AValuedWordLeavesTheDesignUnprotectedEndToEnd) {
   std::string closing = "`pragma protect end=\"now\"\n";
   std::string written = EncryptedByTheAuthor(RegionClosedWith(closing));
   ReadSource run(written, kExchangeKey);
-  EXPECT_TRUE(run.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma end keyword is written on its own and takes no "
+      "pragma_value",
+      LineHolding(written, "end=\"now\""), "34.5.2.1"));
   EXPECT_TRUE(Holds(run.text, "initial result = 42;"));
 }
 

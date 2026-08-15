@@ -5,6 +5,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
 #include "lexer/keywords.h"
 #include "lexer/lexer.h"
 #include "model_keyword_tables.h"
@@ -124,7 +125,11 @@ TEST(KeywordVersionPreprocessing,
                               "reg logic;\n"
                               "`end_keywords\n",
                           f);
-    EXPECT_TRUE(f.diag.HasErrors()) << spec;
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::string("unrecognized version specifier: \"") + spec + "\"", 1,
+        "22.14"))
+        << spec;
     EXPECT_EQ(out.find(kKeywordMarker), std::string::npos) << spec;
     EXPECT_EQ(KindOfWordIn(out, "logic"), TokenKind::kKwLogic) << spec;
   }

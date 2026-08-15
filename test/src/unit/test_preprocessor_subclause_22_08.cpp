@@ -2,6 +2,7 @@
 
 #include "common/types.h"
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -40,14 +41,17 @@ TEST(Preprocessor, DefaultNettype_IllegalInsideDesignElement) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("module foo;\n`default_nettype none\nendmodule\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`default_nettype illegal inside a design element",
+                            2, "22.8"));
 }
 
 TEST(Preprocessor, DefaultNettype_InvalidType) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`default_nettype bogus\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "invalid net type 'bogus'", 1,
+                            "22.8"));
 }
 
 TEST(Preprocessor, DefaultNettype_LatestDirectiveWins) {
@@ -133,7 +137,8 @@ TEST(Preprocessor, DefaultNettype_MissingArgument) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`default_nettype\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "invalid net type ''", 1, "22.8"));
 }
 
 TEST(Preprocessor, DefaultNettype_ResetallRestoresWire) {
@@ -151,12 +156,14 @@ TEST(Preprocessor, DefaultNettype_Supply0Invalid) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`default_nettype supply0\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "invalid net type 'supply0'",
+                            1, "22.8"));
 }
 
 TEST(Preprocessor, DefaultNettype_Supply1Invalid) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`default_nettype supply1\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "invalid net type 'supply1'",
+                            1, "22.8"));
 }

@@ -45,6 +45,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_processing.h"
 
@@ -266,7 +267,10 @@ TEST(EnvelopeDecryption, AMacroWithArgumentsInTheRecoveredTextIsSubstituted) {
 // recovered text were something other than source.
 TEST(EnvelopeDecryption, AnUndefinedMacroInTheRecoveredTextIsReported) {
   ProducedText run(EnvelopeOf("logic [`WIDTH-1:0] sealed_bus;\n"), kAuthorKey);
-  EXPECT_TRUE(run.diag.HasErrors());
+  // The recovered text is read through as a source of its own, counting from
+  // its first line, so the usage stands on line 1 of what the block held.
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(), "undefined macro 'WIDTH'",
+                            1, "22.5.1"));
 }
 
 // ---------------------------------------------------------------------------
@@ -329,7 +333,10 @@ TEST(EnvelopeDecryption, AnEnclosedEnvelopeUnderAnotherKeyIsReported) {
   std::string body = "initial outer_value = 1;\n";
   body += EnvelopeOf("initial inner_value = 2;\n", kOtherKey);
   ProducedText run(EnvelopeOf(body), kAuthorKey);
-  EXPECT_TRUE(run.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied",
+      LineHolding(body, "data_block="), "34.3.2"));
   EXPECT_TRUE(run.Holds("initial outer_value = 1;"));
   EXPECT_FALSE(run.Holds("initial inner_value = 2;"));
 }

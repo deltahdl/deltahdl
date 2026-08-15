@@ -38,6 +38,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_protect_read.h"
+#include "helpers_reported_error.h"
 #include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope.h"
@@ -191,7 +192,11 @@ TEST(ProtectBeginSyntax, ARegionTheWordOpenedComesBackUnderTheAuthorsKey) {
 // written out again below.
 TEST(ProtectBeginSyntax, AStringWrittenAgainstTheWordIsReported) {
   ReadSource run("`pragma protect begin=\"now\"\n");
-  EXPECT_TRUE(run.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma begin keyword is written on its own and takes no "
+      "pragma_value",
+      1, "34.5.1.1"));
   EXPECT_EQ(run.OpenEncryptionEnvelopes(), 0U);
 }
 
@@ -202,7 +207,11 @@ TEST(ProtectBeginSyntax, AStringWrittenAgainstTheWordIsReported) {
 // it.
 TEST(ProtectBeginSyntax, AParenthesizedValueAgainstTheWordIsReported) {
   ReadSource run("`pragma protect begin=(enctype=\"raw\")\n");
-  EXPECT_TRUE(run.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma begin keyword is written on its own and takes no "
+      "pragma_value",
+      1, "34.5.1.1"));
   EXPECT_EQ(run.OpenEncryptionEnvelopes(), 0U);
 }
 
@@ -266,7 +275,11 @@ TEST(ProtectBeginSyntax, AValuedWordLeavesTheDesignUnprotectedEndToEnd) {
       "  initial result = 42;\n"
       "`pragma protect end\n");
   ReadSource run(written, kExchangeKey);
-  EXPECT_TRUE(run.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma begin keyword is written on its own and takes no "
+      "pragma_value",
+      LineHolding(written, "begin=\"now\""), "34.5.1.1"));
   EXPECT_TRUE(Holds(run.text, "initial result = 42;"));
 }
 

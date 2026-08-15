@@ -17,11 +17,13 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope.h"
 
@@ -287,7 +289,16 @@ TEST(ProtectedEnvelopeOverview, NestingBeyondTheSupportedDepthIsReported) {
   EnvelopeRun run(RepeatDirective(
       "begin_protected",
       ProtectEnvelopeState::kNestedDecryptionEnvelopeLimit + 1));
-  EXPECT_TRUE(run.diag.HasErrors());
+  // One directive per line, so the one past the bound stands on the line the
+  // bound numbers. The bound is this tool's own and no rule of the standard,
+  // so the report names no subclause.
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma nests decryption envelopes more deeply than this "
+      "implementation processes",
+      static_cast<uint32_t>(
+          ProtectEnvelopeState::kNestedDecryptionEnvelopeLimit + 1),
+      ""));
   EXPECT_EQ(run.Envelopes().DecryptionEnvelopeDepth(),
             ProtectEnvelopeState::kNestedDecryptionEnvelopeLimit);
 }

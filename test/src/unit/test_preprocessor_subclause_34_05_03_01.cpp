@@ -65,6 +65,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_protect_read.h"
+#include "helpers_reported_error.h"
 #include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope.h"
@@ -350,7 +351,11 @@ TEST(ProtectBeginProtectedSyntax,
 // again below.
 TEST(ProtectBeginProtectedSyntax, AStringWrittenAgainstTheWordIsReported) {
   ReadSource run("`pragma protect begin_protected=\"1\"\n");
-  EXPECT_TRUE(run.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma begin_protected keyword is written on its own and takes "
+      "no pragma_value",
+      1, "34.5.3.1"));
   EXPECT_EQ(run.OpenDecryptionEnvelopes(), 0U);
   EXPECT_FALSE(run.Protected());
 }
@@ -361,7 +366,11 @@ TEST(ProtectBeginProtectedSyntax, AStringWrittenAgainstTheWordIsReported) {
 // value says, so it is the pair to the test above rather than a repeat of it.
 TEST(ProtectBeginProtectedSyntax, AParenthesizedValueAgainstTheWordIsReported) {
   ReadSource run("`pragma protect begin_protected=(enctype=\"raw\")\n");
-  EXPECT_TRUE(run.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma begin_protected keyword is written on its own and takes "
+      "no pragma_value",
+      1, "34.5.3.1"));
   EXPECT_EQ(run.OpenDecryptionEnvelopes(), 0U);
 }
 
@@ -391,9 +400,13 @@ TEST(ProtectBeginProtectedSyntax, AWordWrittenProperlyAfterAReportedOneOpens) {
 // sealed, and the word that failed to open it is reported rather than the
 // author being left to wonder where their design went.
 TEST(ProtectBeginProtectedSyntax, AValuedOpeningWordLeavesTheDesignSealed) {
-  ReadSource run(WithValuedOpeningWord(EncryptedByTheAuthor(Design())),
-                 kExchangeKey);
-  EXPECT_TRUE(run.diag.HasErrors());
+  std::string written = WithValuedOpeningWord(EncryptedByTheAuthor(Design()));
+  ReadSource run(written, kExchangeKey);
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma begin_protected keyword is written on its own and takes "
+      "no pragma_value",
+      LineHolding(written, "begin_protected="), "34.5.3.1"));
   EXPECT_FALSE(Holds(run.text, "initial result = 42;"));
   EXPECT_EQ(run.OpenDecryptionEnvelopes(), 0U);
 }

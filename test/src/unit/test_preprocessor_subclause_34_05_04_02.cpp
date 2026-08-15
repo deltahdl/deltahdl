@@ -63,6 +63,7 @@
 #include "common/source_mgr.h"
 #include "fixture_protect_read.h"
 #include "helpers_protect_keys.h"
+#include "helpers_reported_error.h"
 #include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope.h"
@@ -522,10 +523,13 @@ TEST(ProtectEndProtectedDescription,
 // travelled inside it never arrived to end a model of its own, and the reading
 // closes only the envelope the file itself wrote.
 TEST(ProtectEndProtectedDescription, TheSealedModelsNamesSelectNoKeyForIt) {
-  ReadSource run(
-      EncryptedUnderNames(RegionNamingItsKeyPastTheWord(kWordDirective)),
-      ReadSource::KeyConfig(kSealerKey));
-  EXPECT_TRUE(run.diag.HasErrors());
+  std::string written =
+      EncryptedUnderNames(RegionNamingItsKeyPastTheWord(kWordDirective));
+  ReadSource run(written, ReadSource::KeyConfig(kSealerKey));
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied",
+      LineHolding(written, "data_block="), "34.3.2"));
   EXPECT_FALSE(Holds(run.text, kOuterStatement));
   EXPECT_EQ(run.Closed().size(), 1U);
 }
@@ -860,7 +864,12 @@ TEST(ProtectEndProtectedDescription, TheNextBlockIsNotOpenedByTheEarlierKey) {
   std::string src = EnvelopeCarryingAnUnspentKey(kExchangeKey);
   src.append(EncryptedByTheAuthor(RegionUnderTheAuthorsKey()));
   ReadSource run(src, ReadSource::KeyConfig(kOtherReaderKey));
-  EXPECT_TRUE(run.diag.HasErrors());
+  // The envelope ahead of it carries a key and no block, so the one block in
+  // the text is the one this rule is about.
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied",
+      LineHolding(src, "data_block="), "34.3.2"));
   EXPECT_FALSE(Holds(run.text, kOuterStatement));
 }
 
@@ -871,11 +880,14 @@ TEST(ProtectEndProtectedDescription, TheNextBlockIsNotOpenedByTheEarlierKey) {
 // characters, on the far side of the boundary -- and the block is left with
 // nothing to be opened with.
 TEST(ProtectEndProtectedDescription, AnExpressionPastTheWordIsOutsideTheRun) {
-  ReadSource run(
+  std::string written =
       WithLineMovedPastTheWord(EncryptedUnderNames(RegionUnderTheAuthorsKey()),
-                               KeyNameDirective(kAuthorKeyName)),
-      ReadSource::KeysConfig(BothEntitiesKeys()));
-  EXPECT_TRUE(run.diag.HasErrors());
+                               KeyNameDirective(kAuthorKeyName));
+  ReadSource run(written, ReadSource::KeysConfig(BothEntitiesKeys()));
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied",
+      LineHolding(written, "data_block="), "34.3.2"));
   EXPECT_FALSE(Holds(run.text, kOuterStatement));
 }
 

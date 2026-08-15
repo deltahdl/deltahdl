@@ -5,6 +5,7 @@
 #include "fixture_parser.h"
 #include "fixture_preprocessor.h"
 #include "fixture_preprocessor_timescale.h"
+#include "helpers_reported_error.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 
@@ -96,12 +97,19 @@ TEST(DesignBuildingBlockParsing, FileOrderDependency) {
 
 TEST(DesignBuildingBlockParsing, ErrorMissingSlash) {
   auto r = PreprocessTimescale("`timescale 1ns 1ps\n");
-  EXPECT_TRUE(r.has_errors);
+  // §22.7 is where the standard writes the valid magnitudes, the valid
+  // unit strings and the separator, so that is the rule these reports
+  // enforce even though the directive is introduced here.
+  EXPECT_TRUE(ReportedError(r.diags, "invalid `timescale format: missing '/'",
+                            1, "22.7"));
 }
 
 TEST(DesignBuildingBlockParsing, ErrorInvalidMagnitude) {
   auto r = PreprocessTimescale("`timescale 5ns / 1ps\n");
-  EXPECT_TRUE(r.has_errors);
+  // §22.7 is where the standard writes the valid magnitudes, the valid
+  // unit strings and the separator, so that is the rule these reports
+  // enforce even though the directive is introduced here.
+  EXPECT_TRUE(ReportedError(r.diags, "invalid `timescale unit", 1, "22.7"));
 }
 
 // §3.14.2.1 syntax requires a time_unit operand before the '/'. The separator
@@ -109,7 +117,10 @@ TEST(DesignBuildingBlockParsing, ErrorInvalidMagnitude) {
 // or an empty precision after the '/'.
 TEST(DesignBuildingBlockParsing, ErrorEmptyUnitBeforeSlash) {
   auto r = PreprocessTimescale("`timescale / 1ps\n");
-  EXPECT_TRUE(r.has_errors);
+  // §22.7 is where the standard writes the valid magnitudes, the valid
+  // unit strings and the separator, so that is the rule these reports
+  // enforce even though the directive is introduced here.
+  EXPECT_TRUE(ReportedError(r.diags, "invalid `timescale unit", 1, "22.7"));
 }
 
 TEST(DesignBuildingBlockParsing, WhitespaceAroundSlash) {
@@ -145,7 +156,11 @@ TEST(DesignBuildingBlockParsing, PersistsThroughInterveningModule) {
 // a path distinct from a wholly missing '/'.
 TEST(DesignBuildingBlockParsing, ErrorEmptyPrecisionAfterSlash) {
   auto r = PreprocessTimescale("`timescale 1ns /\n");
-  EXPECT_TRUE(r.has_errors);
+  // §22.7 is where the standard writes the valid magnitudes, the valid
+  // unit strings and the separator, so that is the rule these reports
+  // enforce even though the directive is introduced here.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "invalid `timescale precision", 1, "22.7"));
 }
 
 TEST(DesignBuildingBlockParsing, LrmExampleThreeModules) {
