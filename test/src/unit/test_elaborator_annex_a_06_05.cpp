@@ -61,7 +61,7 @@ TEST(TimingControlElaboration, DelayInAlwaysLatchError) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "always_latch shall not contain timing controls", 3,
-                            "9.2.2.2.2"));
+                            "9.2.2.3"));
 }
 
 TEST(TimingControlElaboration, DelayInFunctionError) {
@@ -121,7 +121,7 @@ TEST(TimingControlElaboration, EventControlInAlwaysLatchError) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "always_latch shall not contain timing controls", 3,
-                            "9.2.2.2.2"));
+                            "9.2.2.3"));
 }
 
 TEST(TimingControlElaboration, EventControlInFunctionError) {

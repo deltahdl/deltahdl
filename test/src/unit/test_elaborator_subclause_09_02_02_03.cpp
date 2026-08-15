@@ -13,11 +13,12 @@ TEST(AlwaysLatchElaboration, TimingControlInAlwaysLatchErrors) {
       "  always_latch #5 if (en) q = d;\n"
       "endmodule\n",
       f);
-  // The delay is reported under §9.2.2.2.2, which §9.2.2.3 carries over to
-  // always_latch, and not under this file's own §9.2.2.3.
+  // The delay is reported under §9.2.2.3. §9.2.2.2.2 states the rule for
+  // always_comb and never mentions always_latch, and §9.2.2.3 is the sentence
+  // that applies §9.2.2.2's statements to always_latch.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "always_latch shall not contain timing controls", 3,
-                            "9.2.2.2.2"));
+                            "9.2.2.3"));
 }
 
 TEST(AlwaysLatchElaboration, ForkJoinInAlwaysLatchErrors) {
@@ -33,11 +34,12 @@ TEST(AlwaysLatchElaboration, ForkJoinInAlwaysLatchErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  // The fork-join is reported under §9.2.2.2.2, which §9.2.2.3 carries over to
-  // always_latch, and not under this file's own §9.2.2.3.
+  // The fork-join is reported under §9.2.2.3. §9.2.2.2.2 states the rule for
+  // always_comb and never mentions always_latch, and §9.2.2.3 is the sentence
+  // that applies §9.2.2.2's statements to always_latch.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "always_latch shall not contain fork-join statements", 3, "9.2.2.2.2"));
+      "always_latch shall not contain fork-join statements", 3, "9.2.2.3"));
 }
 
 TEST(AlwaysLatchElaboration, IncompleteIfNoWarning) {
@@ -163,11 +165,12 @@ TEST(AlwaysLatchElaboration, EventControlInAlwaysLatchErrors) {
       "  always_latch @(posedge clk) if (en) q = d;\n"
       "endmodule\n",
       f);
-  // The explicit event control is reported under §9.2.2.2.2, which §9.2.2.3
-  // carries over to always_latch.
+  // The explicit event control is reported under §9.2.2.3. §9.2.2.2.2 states
+  // the rule for always_comb and never mentions always_latch, and §9.2.2.3 is
+  // the sentence that applies §9.2.2.2's statements to always_latch.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "always_latch shall not have an explicit event control", 3, "9.2.2.2.2"));
+      "always_latch shall not have an explicit event control", 3, "9.2.2.3"));
 }
 
 TEST(AlwaysLatchElaboration, UnconditionalAssignWarnsNotLatched) {
@@ -245,11 +248,12 @@ TEST(AlwaysLatchElaboration, WaitStatementInAlwaysLatchErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  // A wait is one of the blocking statements §9.2.2.2.2 forbids, so the report
-  // stands under that subclause rather than under §9.2.2.3.
+  // A wait is one of the blocking statements §9.2.2.2.2 forbids in an
+  // always_comb, and §9.2.2.3 is what applies that statement to always_latch,
+  // so the report stands under §9.2.2.3.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "always_latch shall not contain timing controls", 3,
-                            "9.2.2.2.2"));
+                            "9.2.2.3"));
 }
 
 // §9.2.2.3 states that §9.2.2.2's rules apply to always_latch. §9.2.2.2's
@@ -490,12 +494,14 @@ TEST(AlwaysLatchElaboration, IndependentArrayElementsLocalparamIndexNoError) {
 // block events, so `##3` blocks and an always_latch shall not contain it.
 //
 // The subclause asserted is the one the emission site passes, which is
-// §9.2.2.2.2 for an always_latch as well as for an always_comb, and the line is
-// the always_latch keyword's rather than the `##3`'s, since the report stands
-// at the procedure. The source draws a second error, "cycle delay (##)
-// requires a default clocking block" under §14.11, for having no default
-// clocking; naming the message, the line and the subclause is what keeps this
-// case answering for §9.2.2.2.2 rather than for whichever report came first.
+// §9.2.2.3 for an always_latch and §9.2.2.2.2 for an always_comb, because
+// §9.2.2.2.2 speaks only of always_comb and §9.2.2.3 is the sentence that
+// applies its statements to always_latch. The line is the always_latch
+// keyword's rather than the `##3`'s, since the report stands at the procedure.
+// The source draws a second error, "cycle delay (##) requires a default
+// clocking block" under §14.11, for having no default clocking; naming the
+// message, the line and the subclause is what keeps this case answering for
+// §9.2.2.3 rather than for whichever report came first.
 TEST(AlwaysLatchElaboration, CycleDelayInAlwaysLatchErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -508,7 +514,7 @@ TEST(AlwaysLatchElaboration, CycleDelayInAlwaysLatchErrors) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "always_latch shall not contain timing controls", 3,
-                            "9.2.2.2.2"));
+                            "9.2.2.3"));
 }
 
 }  // namespace

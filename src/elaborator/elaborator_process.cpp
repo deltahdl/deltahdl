@@ -306,33 +306,47 @@ static void ValidateCombLatchProcess(ModuleItem* item, const RtlirProcess& proc,
   if (kind != RtlirProcessKind::kAlwaysComb &&
       kind != RtlirProcessKind::kAlwaysLatch)
     return;
-  const char* kw =
-      (kind == RtlirProcessKind::kAlwaysComb) ? "always_comb" : "always_latch";
-  // §9.2.2.2.2 / §9.2.2.3: an always_comb (and, by reference, always_latch)
-  // infers its own sensitivity and shall not carry an explicit event control;
-  // the parser stores such a control in the block's sensitivity list.
+  const bool is_comb = kind == RtlirProcessKind::kAlwaysComb;
+  const char* kw = is_comb ? "always_comb" : "always_latch";
+  // The keyword a message names and the subclause a report cites are chosen
+  // together, from one condition, so a report added here cannot name one
+  // construct and send the reader to the other's rules.
+  //
+  // §9.2.2.2.2 "always_comb compared to always @*" states these three rules --
+  // "Statements in an always_comb shall not include those that block, have
+  // blocking timing or event controls, or fork-join statements" -- and every
+  // sentence in it is about always_comb. It never mentions always_latch. What
+  // binds them to always_latch is one sentence in §9.2.2.3 "Latched logic
+  // always_latch procedure": "All statements in 9.2.2.2 shall apply to
+  // always_latch." So §9.2.2.3 is the subclause a reader of an always_latch
+  // report has to open, and §9.2.2.2.2 the one a reader of an always_comb
+  // report has to.
+  const Subclause rule =
+      is_comb ? Subclause("9.2.2.2.2") : Subclause("9.2.2.3");
+  // An always_comb or always_latch infers its own sensitivity and shall not
+  // carry an explicit event control; the parser stores such a control in the
+  // block's sensitivity list.
   if (!item->sensitivity.empty() || item->is_star_sensitivity) {
     diag.Error(item->loc,
                std::format("{} shall not have an explicit event control", kw),
-               Subclause("9.2.2.2.2"));
+               rule);
   }
   if (StmtBlocks(proc.body)) {
     diag.Error(item->loc,
-               std::format("{} shall not contain timing controls", kw),
-               Subclause("9.2.2.2.2"));
+               std::format("{} shall not contain timing controls", kw), rule);
   }
   if (StmtHasForkJoin(proc.body)) {
     diag.Error(item->loc,
                std::format("{} shall not contain fork-join statements", kw),
-               Subclause("9.2.2.2.2"));
+               rule);
   }
-  if (kind == RtlirProcessKind::kAlwaysComb && InfersLatch(proc.body)) {
+  if (is_comb && InfersLatch(proc.body)) {
     diag.Warning(item->loc,
                  "always_comb may infer latched behavior; "
                  "ensure all paths assign all outputs",
                  Subclause("9.2.2.2"));
   }
-  if (kind == RtlirProcessKind::kAlwaysLatch && !InfersLatch(proc.body)) {
+  if (!is_comb && !InfersLatch(proc.body)) {
     diag.Warning(item->loc,
                  "always_latch does not infer latched behavior; "
                  "ensure incomplete assignments create intended latches",

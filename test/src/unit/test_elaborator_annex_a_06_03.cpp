@@ -214,7 +214,7 @@ TEST(ParallelBlockElaboration, ForkInsideAlwaysLatchErrors) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "always_latch shall not contain fork-join "
                             "statements",
-                            3, "9.2.2.2.2"));
+                            3, "9.2.2.3"));
 }
 
 }  // namespace
