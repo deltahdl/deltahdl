@@ -561,7 +561,7 @@ static SelectChain ResolveSelectChain(const Expr* e) {
 // v = arr[i][0];` is the bit-select of a real that sentence bars, and
 // `logic [7:0] mem[4]; v = mem[i][0];` is the legal case the same sentence
 // exists to permit.
-static void CheckElementSelectNode(const Expr* e, const ShapeMap& shapes,
+static void CheckElementSelectNode(const Expr* e, const SelectShapeMap& shapes,
                                    DiagEngine& diag) {
   // Only a chain of two or more addresses is judged here. A select carrying one
   // address is the case CheckRealSelectNode and CheckScalarSelectNode already

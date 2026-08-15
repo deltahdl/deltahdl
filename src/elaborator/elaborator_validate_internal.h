@@ -54,7 +54,7 @@ void CheckForceLhs(
     const Stmt* s, const std::unordered_set<std::string_view>& net_names,
     const std::unordered_set<std::string_view>& nettype_net_names,
     DiagEngine& diag);
-using ShapeMap = std::unordered_map<std::string_view, VarSelectShape>;
+using SelectShapeMap = std::unordered_map<std::string_view, VarSelectShape>;
 
 // What §11.5.1 needs to judge the operand of a select. Its second alternative
 // names two operands, "a real variable or real parameter", carried in separate
@@ -66,7 +66,7 @@ using ShapeMap = std::unordered_map<std::string_view, VarSelectShape>;
 struct SelectOperands {
   const NameSet& variables;
   const NameSet& parameters;
-  const ShapeMap& shapes;
+  const SelectShapeMap& shapes;
 };
 
 // §11.5.1: `operands` decides the operand report. `types` is read for the index
