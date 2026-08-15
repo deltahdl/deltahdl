@@ -729,6 +729,27 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   // per-call save at the instance site; this generalizes it to the full set.)
   ItemElaborationStateSaver saved_item_state(*this);
 
+  // §26.3 and §6.18: a name an import or a typedef declaration introduces
+  // belongs to the scope it was written in, so what this module adds to
+  // typedefs_ and cu_param_scope_ is taken back out before the next module is
+  // elaborated. Without this, `module a; import q::*; endmodule module b;
+  // word_t y; endmodule` sizes b's y from a's import, and a typedef declared in
+  // a is equally visible in b.
+  //
+  // These two are copied and put back rather than moved out and cleared like
+  // the state above, because they also hold the compilation unit's own
+  // declarations: RegisterCuScopeItems fills both with $unit's typedefs and
+  // parameters and with every package parameter under its qualified key before
+  // any module is elaborated, and §3.12.1 makes those visible to every module.
+  // The snapshot keeps them and drops only what this module added.
+  //
+  // A module elaborated as a child instance still starts from its parent's
+  // entry, which is what a lexically nested module (§23.4) requires and what a
+  // separately instantiated one does not; that is a different question from the
+  // one settled here, which is what one module leaves behind for the next.
+  TypedefMap saved_typedefs = typedefs_;
+  ScopeMap saved_cu_param_scope = cu_param_scope_;
+
   // §23.9/§24.3: the enclosing-scope chain follows lexical nesting, not the
   // instance tree. A lexically nested declaration (set up by the nested-decl
   // elaboration site, which records the enclosing scope in
@@ -802,6 +823,8 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   global_clocking_in_scope_ = saved_global_clocking_in_scope;
   current_library_ = std::move(saved_library);
   enclosing_scope_names_ = std::move(saved_enclosing);
+  typedefs_ = std::move(saved_typedefs);
+  cu_param_scope_ = std::move(saved_cu_param_scope);
   saved_item_state.Restore(*this);
   return mod;
 }

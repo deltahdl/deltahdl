@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -119,6 +120,11 @@ TEST(CompilationUnitElaboration, LocalScopeShadowsCuScopeLocalparam) {
              "endmodule\n"));
 }
 
+// The declared widths are what say WIDTH reached both modules. A bound that
+// folds to nothing is not reported: EvalRangeWidth in
+// src/elaborator/type_eval.cpp answers 0 and the declaration falls through to
+// one bit, so an assertion that elaboration succeeded holds whether WIDTH was
+// visible or not.
 TEST(CompilationUnitElaboration, CuScopeLocalparamVisibleInMultipleModules) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -133,6 +139,40 @@ TEST(CompilationUnitElaboration, CuScopeLocalparamVisibleInMultipleModules) {
       f, "top");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+  const auto* a = FindVar(design, "top", "a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->width, 8u);
+  const auto* b = FindVar(design, "sub", "b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(b->width, 8u);
+}
+
+// §3.12.1 puts a compilation-unit declaration in scope for every design element
+// in the unit, and the two modules here are siblings rather than a module and
+// its instance: neither is elaborated inside the other, so WIDTH has to survive
+// the first module's elaboration to size the second one's declaration.
+//
+// Elaborator::ElaborateModule takes back what a module adds to the elaborator's
+// typedef and parameter maps before the next module is elaborated, which is
+// what keeps one module's package import out of the next (§26.3). This states
+// the other half of that: what the compilation unit itself declared is written
+// before any module is elaborated and is still there afterwards.
+TEST(CompilationUnitElaboration, CuScopeLocalparamVisibleInASecondTopModule) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "localparam int WIDTH = 8;\n"
+      "module first;\n"
+      "  logic [WIDTH-1:0] a;\n"
+      "endmodule\n"
+      "module second;\n"
+      "  logic [WIDTH-1:0] b;\n"
+      "endmodule\n",
+      f, "", true);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* b = FindVar(design, "second", "b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(b->width, 8u);
 }
 
 TEST(CompilationUnitElaboration, CuScopeVarDeclElaborates) {

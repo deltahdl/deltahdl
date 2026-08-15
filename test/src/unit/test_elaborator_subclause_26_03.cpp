@@ -502,4 +502,83 @@ TEST(PackageImport, BodyImportedEnumTypedefNamesTheEnumType) {
   EXPECT_EQ(myteeth->enum_type_name, "teeth_t");
 }
 
+// §26.3 makes an identifier potentially locally visible only where "there is a
+// wildcard import of a package before that point within the current scope", and
+// module 'b' is a scope with no import in it. word_t is declared nowhere 'b'
+// can see, so 'b' has to be told nothing about q whatever 'a' imported.
+//
+// The two widths are one claim each and both are needed. 16 on a's x says the
+// import still reaches the module that wrote it, so the test cannot pass by
+// importing nothing anywhere. 0 on b's y is what EvalTypeWidth answers for a
+// DataTypeKind::kNamed it could not resolve
+// (src/elaborator/type_eval.cpp:192), and it is not the 1 that
+// RtlirVariable::width defaults to, so it says the declaration was elaborated
+// and its type went unresolved rather than that nothing ran.
+//
+// Both modules have to be elaborated for the question to arise, which is what
+// auto_top asks for: with a single named top, 'a' is never elaborated and there
+// is nothing for 'b' to inherit.
+//
+// f.has_errors is deliberately not asserted. §6.18 requires a type identifier
+// to be declared, so `word_t y;` in 'b' is illegal and a run that reported it
+// would be more correct than this one; nothing in deltahdl reports an
+// unresolved named type today, and the width says what the elaborator did
+// either way.
+TEST(PackageImport, ImportedTypedefDoesNotReachAnotherModule) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "package q;\n"
+      "  typedef logic [15:0] word_t;\n"
+      "endpackage\n"
+      "module a;\n"
+      "  import q::*;\n"
+      "  word_t x;\n"
+      "endmodule\n"
+      "module b;\n"
+      "  word_t y;\n"
+      "endmodule\n",
+      f, "", true);
+  ASSERT_NE(design, nullptr);
+  const auto* x = FindVar(design, "a", "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->width, 16u);
+  const auto* y = FindVar(design, "b", "y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->width, 0u);
+}
+
+// The same claim for the parameter an import carries rather than the typedef.
+// RegisterImportItem in src/elaborator/elaborator_module.cpp folds an imported
+// parameter into the compilation unit's parameter scope, which
+// Elaborator::BuildParamScope copies for every module, so this covers the map
+// the test above does not.
+//
+// 1 is what b's y is left at: EvalRangeWidth in src/elaborator/type_eval.cpp
+// answers 0 for a bound it cannot fold, and the declared type falls through to
+// DataTypeKind::kLogic, which is one bit. It coincides with the default of
+// RtlirVariable::width, which is why the ASSERT_NE above it is what says the
+// declaration was elaborated at all, and why a's 16 is asserted beside it.
+TEST(PackageImport, ImportedParameterDoesNotReachAnotherModule) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "package q;\n"
+      "  parameter int W = 16;\n"
+      "endpackage\n"
+      "module a;\n"
+      "  import q::*;\n"
+      "  logic [W-1:0] x;\n"
+      "endmodule\n"
+      "module b;\n"
+      "  logic [W-1:0] y;\n"
+      "endmodule\n",
+      f, "", true);
+  ASSERT_NE(design, nullptr);
+  const auto* x = FindVar(design, "a", "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->width, 16u);
+  const auto* y = FindVar(design, "b", "y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->width, 1u);
+}
+
 }  // namespace
