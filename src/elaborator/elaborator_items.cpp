@@ -608,6 +608,10 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       return true;
     }
     case ModuleItemKind::kImportDecl:
+      // §26.3: the package's typedefs and parameters become visible from here
+      // on, so they are registered as this item is reached rather than ahead of
+      // the walk. RecordImportDecl only mirrors the directive into the RTLIR.
+      ApplyBodyImport(item->import_item);
       RecordImportDecl(item, mod);
       return true;
     case ModuleItemKind::kClassDecl:

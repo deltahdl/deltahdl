@@ -122,6 +122,8 @@ class Elaborator : public ElaboratorData {
 
   void ApplyHeaderImports(const ModuleDecl* decl);
 
+  void ApplyBodyImport(const ImportItem& import_item);
+
   void ValidateModports();
 
   void ValidateSpecifyBlocks();

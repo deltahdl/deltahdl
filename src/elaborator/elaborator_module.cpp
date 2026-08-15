@@ -159,11 +159,9 @@ int64_t ConvertOverrideValue(int64_t value, const RtlirParamDecl& pd) {
 // Register a single imported package item into a module's elaboration scopes:
 // typedefs become available by name, and const parameters are folded into the
 // compilation-unit parameter scope. Shared by the wildcard and named-import
-// branches of ApplyHeaderImports.
-static void RegisterHeaderImportItem(const ModuleItem* pi,
-                                     std::string_view name,
-                                     TypedefMap& typedefs,
-                                     ScopeMap& cu_param_scope) {
+// branches of ApplyImport.
+static void RegisterImportItem(const ModuleItem* pi, std::string_view name,
+                               TypedefMap& typedefs, ScopeMap& cu_param_scope) {
   if (pi->kind == ModuleItemKind::kTypedef) {
     typedefs[name] = pi->typedef_type;
   } else if (pi->kind == ModuleItemKind::kParamDecl && pi->init_expr) {
@@ -182,49 +180,66 @@ static const PackageDecl* FindPackageByName(const CompilationUnit* unit,
 }
 
 // Register every named item of a wildcard-imported package.
-static void RegisterWildcardHeaderImport(const PackageDecl* pkg,
-                                         TypedefMap& typedefs,
-                                         ScopeMap& cu_param_scope) {
+static void RegisterWildcardImport(const PackageDecl* pkg, TypedefMap& typedefs,
+                                   ScopeMap& cu_param_scope) {
   for (const auto* pi : pkg->items) {
     if (!pi->name.empty())
-      RegisterHeaderImportItem(pi, pi->name, typedefs, cu_param_scope);
+      RegisterImportItem(pi, pi->name, typedefs, cu_param_scope);
   }
 }
 
 // Register a single named item of an explicitly-named package import.
-static void RegisterNamedHeaderImport(const PackageDecl* pkg,
-                                      std::string_view target,
-                                      TypedefMap& typedefs,
-                                      ScopeMap& cu_param_scope) {
+static void RegisterNamedImport(const PackageDecl* pkg, std::string_view target,
+                                TypedefMap& typedefs,
+                                ScopeMap& cu_param_scope) {
   for (const auto* pi : pkg->items) {
     if (pi->name == target) {
-      RegisterHeaderImportItem(pi, target, typedefs, cu_param_scope);
+      RegisterImportItem(pi, target, typedefs, cu_param_scope);
       break;
     }
   }
 }
 
-// Apply one header (package) import directive, resolving the named package and
+// Apply one package import directive, resolving the named package and
 // registering either all of its items (wildcard) or a single named item.
-static void ApplyHeaderImport(const ImportItem& import_item,
-                              const CompilationUnit* unit, TypedefMap& typedefs,
-                              ScopeMap& cu_param_scope) {
+static void ApplyImport(const ImportItem& import_item,
+                        const CompilationUnit* unit, TypedefMap& typedefs,
+                        ScopeMap& cu_param_scope) {
   const PackageDecl* pkg = FindPackageByName(unit, import_item.package_name);
   if (!pkg) return;
   if (import_item.is_wildcard) {
-    RegisterWildcardHeaderImport(pkg, typedefs, cu_param_scope);
+    RegisterWildcardImport(pkg, typedefs, cu_param_scope);
   } else {
-    RegisterNamedHeaderImport(pkg, import_item.item_name, typedefs,
-                              cu_param_scope);
+    RegisterNamedImport(pkg, import_item.item_name, typedefs, cu_param_scope);
   }
 }
 
+// §26.4: an import written in the module header precedes every declaration in
+// the module, ports included, so these are applied before ports and before the
+// item walk. A body import is applied by ApplyBodyImport below instead, as the
+// walk reaches it.
 void Elaborator::ApplyHeaderImports(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kImportDecl) continue;
     if (!item->import_item.is_header) continue;
-    ApplyHeaderImport(item->import_item, unit_, typedefs_, cu_param_scope_);
+    ApplyImport(item->import_item, unit_, typedefs_, cu_param_scope_);
   }
+}
+
+// §26.3: an identifier is potentially locally visible "at some point within a
+// scope if there is a wildcard import of a package before that point within the
+// current scope", and an explicit import makes one locally visible "prior to
+// that point within the current scope". Both rules are about the import's
+// position in the scope, which is why this registers one import as the item
+// walk in Elaborator::ElaborateItems reaches it rather than hoisting every body
+// import ahead of the walk: a declaration written above the import does not see
+// the package, and one written below it does.
+//
+// A header import is already registered by ApplyHeaderImports before the walk
+// starts and is skipped here.
+void Elaborator::ApplyBodyImport(const ImportItem& import_item) {
+  if (import_item.is_header) return;
+  ApplyImport(import_item, unit_, typedefs_, cu_param_scope_);
 }
 
 // §23.2.2.3: an explicitly named port (.name(expr)) takes the self-determined

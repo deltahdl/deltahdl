@@ -2,6 +2,7 @@
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 namespace {
 
@@ -390,6 +391,115 @@ TEST(PackageImport, UnresolvedReferenceIsError) {
                             "reference to unresolved identifier "
                             "'nonexistent_identifier'",
                             3, "23.9"));
+}
+
+// §26.3 rules that a wildcard import makes an identifier potentially locally
+// visible "at some point within a scope if there is a wildcard import of a
+// package before that point within the current scope", and the clause's own
+// example on printed page 809 writes both import forms in a module body and
+// then declares `teeth_t myteeth;` with the type they made visible. So an
+// import in the body carries a package's typedefs and parameters into the
+// module, exactly as one in the header does under §26.4.
+//
+// The four cases below read the elaborated declaration back rather than
+// asserting that elaboration succeeded, because nothing reports an unresolved
+// named type: EvalTypeWidth at src/elaborator/type_eval.cpp:192 answers 0 for a
+// DataTypeKind::kNamed it could not resolve and the run carries on. An
+// acceptance assertion therefore holds whether the import was applied or not,
+// which is what PackageImport.WildcardImportedIntoModule above still is.
+//
+// 8 is the width to assert and not 1: RtlirVariable::width defaults to 1, so a
+// one-bit declaration cannot tell a resolved type from an untouched field.
+TEST(PackageImport, BodyImportedTypedefSizesTheVariable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package q;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import q::*;\n"
+      "  byte_t data;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* data = FindVar(design, "m", "data");
+  ASSERT_NE(data, nullptr);
+  EXPECT_EQ(data->width, 8u);
+}
+
+// The explicit form of the same claim. §26.3 states it separately -- "an
+// explicit import only imports the symbols specifically referenced by the
+// import" -- and the elaborator reaches it through a different branch of
+// ApplyImport in src/elaborator/elaborator_module.cpp, so it is asserted
+// separately.
+TEST(PackageImport, ExplicitBodyImportOfTypedefSizesTheVariable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package q;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import q::byte_t;\n"
+      "  byte_t data;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* data = FindVar(design, "m", "data");
+  ASSERT_NE(data, nullptr);
+  EXPECT_EQ(data->width, 8u);
+}
+
+// A package parameter is the other kind of item an import registers, folded
+// into the parameter scope rather than the typedef map by RegisterImportItem in
+// src/elaborator/elaborator_module.cpp. The declared range is what reads it
+// back: RegisterPackageParams in src/elaborator/elaborator_resolve.cpp
+// registers 'W' under the qualified key 'q::W' for every package whether it is
+// imported or not, so a width of 8 here answers for the unqualified name the
+// import is what supplies.
+TEST(PackageImport, BodyImportedParameterSizesTheVariable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package q;\n"
+      "  parameter int W = 8;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import q::*;\n"
+      "  logic [W-1:0] data;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* data = FindVar(design, "m", "data");
+  ASSERT_NE(data, nullptr);
+  EXPECT_EQ(data->width, 8u);
+}
+
+// The clause's own source, and the declaration the enumeration half of it turns
+// on. PackageImport.WildcardImportOfEnumBringsLiteralsIntoScope above reads the
+// literals back off mod->enum_types, which RegisterImportedEnumLiterals in
+// src/elaborator/elaborator_typedef.cpp fills for a body import already. This
+// reads the variable instead: SetEnumTypeInfo in
+// src/elaborator/elaborator_decls.cpp looks 'teeth_t' up in the typedef map and
+// leaves RtlirVariable::enum_type_name empty on a miss, so nothing in the
+// elaborated design recorded that myteeth has an enumeration type at all.
+TEST(PackageImport, BodyImportedEnumTypedefNamesTheEnumType) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package q;\n"
+      "  typedef enum { ORIGINAL, FALSE } teeth_t;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import q::*;\n"
+      "  teeth_t myteeth;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* myteeth = FindVar(design, "m", "myteeth");
+  ASSERT_NE(myteeth, nullptr);
+  EXPECT_EQ(myteeth->enum_type_name, "teeth_t");
 }
 
 }  // namespace

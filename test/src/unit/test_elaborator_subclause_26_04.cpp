@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_rtlir_lookup.h"
 
 namespace {
 
@@ -42,14 +43,33 @@ TEST(PackageImportInHeader, ConstantVisibleInParameterDefault) {
              "endmodule\n"));
 }
 
+// The declared width is what says the header import reached the body
+// declaration. Nothing reports an unresolved named type -- EvalTypeWidth at
+// src/elaborator/type_eval.cpp:192 answers 0 for a DataTypeKind::kNamed it
+// could not resolve and the run carries on -- so an assertion that elaboration
+// succeeded holds whether pkg::nibble_t was registered or not. 4 is also not
+// the 1 that RtlirVariable::width defaults to.
+//
+// This is the header half of the pair PackageImport.
+// BodyImportedTypedefSizesTheVariable in
+// test/src/unit/test_elaborator_subclause_26_03.cpp completes: §26.4 permits
+// the import to stand in the header, and §26.3 decides what importing does, so
+// the same declaration is sized the same way whichever form carried it.
 TEST(PackageImportInHeader, WildcardImportVisibleInBody) {
-  EXPECT_TRUE(
-      ElabOk("package pkg;\n"
-             "  typedef logic [3:0] nibble_t;\n"
-             "endpackage\n"
-             "module m import pkg::*; ();\n"
-             "  nibble_t n;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package pkg;\n"
+      "  typedef logic [3:0] nibble_t;\n"
+      "endpackage\n"
+      "module m import pkg::*; ();\n"
+      "  nibble_t n;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* n = FindVar(design, "m", "n");
+  ASSERT_NE(n, nullptr);
+  EXPECT_EQ(n->width, 4u);
 }
 
 TEST(PackageImportInHeader, ExplicitImportVisibleInBody) {
