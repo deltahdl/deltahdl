@@ -306,8 +306,8 @@ static void ValidateCombLatchProcess(ModuleItem* item, const RtlirProcess& proc,
   if (kind != RtlirProcessKind::kAlwaysComb &&
       kind != RtlirProcessKind::kAlwaysLatch)
     return;
-  const bool is_comb = kind == RtlirProcessKind::kAlwaysComb;
-  const char* kw = is_comb ? "always_comb" : "always_latch";
+  const bool kIsComb = kind == RtlirProcessKind::kAlwaysComb;
+  const char* kw = kIsComb ? "always_comb" : "always_latch";
   // The keyword a message names and the subclause a report cites are chosen
   // together, from one condition, so a report added here cannot name one
   // construct and send the reader to the other's rules.
@@ -321,32 +321,32 @@ static void ValidateCombLatchProcess(ModuleItem* item, const RtlirProcess& proc,
   // always_latch." So §9.2.2.3 is the subclause a reader of an always_latch
   // report has to open, and §9.2.2.2.2 the one a reader of an always_comb
   // report has to.
-  const Subclause rule =
-      is_comb ? Subclause("9.2.2.2.2") : Subclause("9.2.2.3");
+  const Subclause kRule =
+      kIsComb ? Subclause("9.2.2.2.2") : Subclause("9.2.2.3");
   // An always_comb or always_latch infers its own sensitivity and shall not
   // carry an explicit event control; the parser stores such a control in the
   // block's sensitivity list.
   if (!item->sensitivity.empty() || item->is_star_sensitivity) {
     diag.Error(item->loc,
                std::format("{} shall not have an explicit event control", kw),
-               rule);
+               kRule);
   }
   if (StmtBlocks(proc.body)) {
     diag.Error(item->loc,
-               std::format("{} shall not contain timing controls", kw), rule);
+               std::format("{} shall not contain timing controls", kw), kRule);
   }
   if (StmtHasForkJoin(proc.body)) {
     diag.Error(item->loc,
                std::format("{} shall not contain fork-join statements", kw),
-               rule);
+               kRule);
   }
-  if (is_comb && InfersLatch(proc.body)) {
+  if (kIsComb && InfersLatch(proc.body)) {
     diag.Warning(item->loc,
                  "always_comb may infer latched behavior; "
                  "ensure all paths assign all outputs",
                  Subclause("9.2.2.2"));
   }
-  if (!is_comb && !InfersLatch(proc.body)) {
+  if (!kIsComb && !InfersLatch(proc.body)) {
     diag.Warning(item->loc,
                  "always_latch does not infer latched behavior; "
                  "ensure incomplete assignments create intended latches",
