@@ -119,6 +119,27 @@ void ParseDefine(std::string_view def, CliOptions& opts) {
                             std::string(def.substr(eq + 1)));
 }
 
+// The simulation options whose argument is a number rather than a name, split
+// out from TryParseSimArg below so that neither function's branch count grows
+// with the other's. A caller reaches these through TryParseSimArg; the split is
+// not visible on the command line.
+bool TryParseSimNumericArg(std::string_view arg, int& i, int argc,
+                           const char* const argv[], CliOptions& opts) {
+  if (arg == "--max-time" && i + 1 < argc) {
+    opts.max_time = std::stoull(argv[++i]);
+    return true;
+  }
+  if (arg == "--seed" && i + 1 < argc) {
+    opts.seed = std::stoul(argv[++i]);
+    return true;
+  }
+  if (arg == "--max-generate-iterations" && i + 1 < argc) {
+    opts.max_generate_iterations = std::stoll(argv[++i]);
+    return true;
+  }
+  return false;
+}
+
 bool TryParseSimArg(std::string_view arg, int& i, int argc,
                     const char* const argv[], CliOptions& opts) {
   if (arg == "--top" && i + 1 < argc) {
@@ -133,18 +154,6 @@ bool TryParseSimArg(std::string_view arg, int& i, int argc,
     opts.output_file = argv[++i];
     return true;
   }
-  if (arg == "--max-time" && i + 1 < argc) {
-    opts.max_time = std::stoull(argv[++i]);
-    return true;
-  }
-  if (arg == "--seed" && i + 1 < argc) {
-    opts.seed = std::stoul(argv[++i]);
-    return true;
-  }
-  if (arg == "--max-generate-iterations" && i + 1 < argc) {
-    opts.max_generate_iterations = std::stoll(argv[++i]);
-    return true;
-  }
   if (arg == "--timescale" && i + 1 < argc) {
     opts.timescale = argv[++i];
     return true;
@@ -153,7 +162,7 @@ bool TryParseSimArg(std::string_view arg, int& i, int argc,
     opts.fst_file = argv[++i];
     return true;
   }
-  return false;
+  return TryParseSimNumericArg(arg, i, argc, argv, opts);
 }
 
 bool TryParseSynthArg(std::string_view arg, int& i, int argc,

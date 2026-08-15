@@ -533,9 +533,8 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
 
   std::unordered_set<int64_t> seen_values;
 
-  const int64_t max_iterations = max_generate_iterations_;
   int64_t iter = 0;
-  for (; iter < max_iterations; ++iter) {
+  for (; iter < max_generate_iterations_; ++iter) {
     if (!GenerateForConditionHolds(item, loop_scope)) break;
 
     if (GenerateForGenvarRepeats(diag_, item, loop_scope[genvar_name],
@@ -570,11 +569,11 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
   // establish that: a scheme that would have stopped at one iteration past it
   // arrives here too. The message names the bound so the two are told apart by
   // the reader the elaborator cannot tell them apart for.
-  if (iter == max_iterations) {
+  if (iter == max_generate_iterations_) {
     diag_.Error(item->loc,
                 std::format("loop generate scheme did not terminate within {} "
                             "iterations",
-                            max_iterations),
+                            max_generate_iterations_),
                 Subclause("27.4"));
   }
 
