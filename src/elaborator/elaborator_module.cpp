@@ -570,8 +570,9 @@ void Elaborator::ResetItemElaborationState() {
 // Holds a snapshot of the per-module item-elaboration state. The constructor
 // moves the state out of the elaborator (resetting it for the nested module
 // about to be elaborated); Restore moves it back. The field set mirrors
-// Elaborator::ResetItemElaborationState exactly; decltype is used so the field
-// types track the members without naming the elaborator's private nested types.
+// Elaborator::ResetItemElaborationState exactly, apart from the two named at
+// the end of it; decltype is used so the field types track the members without
+// naming the elaborator's private nested types.
 struct ItemElaborationStateSaver {
   decltype(Elaborator::forward_typedef_kinds_) forward_typedef_kinds;
   decltype(Elaborator::declared_names_) declared_names;
@@ -617,7 +618,32 @@ struct ItemElaborationStateSaver {
   decltype(Elaborator::sequence_names_) sequence_names;
   decltype(Elaborator::func_decls_) func_decls;
 
-  explicit ItemElaborationStateSaver(Elaborator& e) {
+  // §26.3 and §6.18: a name an import or a typedef declaration introduces
+  // belongs to the scope it was written in, so what a module adds to typedefs_
+  // and cu_param_scope_ is taken back out before the next module is elaborated.
+  // Without this, `module a; import q::*; endmodule module b; word_t y;
+  // endmodule` sizes b's y from a's import, and a typedef declared in a is
+  // equally visible in b.
+  //
+  // These two are the exception to the field set above: they are copied and put
+  // back rather than moved out and cleared, because they also hold the
+  // compilation unit's own declarations. Elaborator::RegisterCuScopeItems fills
+  // both with $unit's typedefs and parameters and with every package parameter
+  // under its qualified key before any module is elaborated, and §3.12.1 makes
+  // those visible to every design element in the unit. Clearing them would take
+  // those away from the module about to be elaborated, so the copy keeps them
+  // and drops only what that module added.
+  // Elaborator::ResetItemElaborationState therefore does not name them.
+  //
+  // A module elaborated as a child instance still starts from its parent's
+  // entry, which is what a lexically nested module (§23.4) requires and a
+  // separately instantiated one does not; that is a different question from the
+  // one settled here, which is what one module leaves behind for the next.
+  decltype(Elaborator::typedefs_) typedefs;
+  decltype(Elaborator::cu_param_scope_) cu_param_scope;
+
+  explicit ItemElaborationStateSaver(Elaborator& e)
+      : typedefs(e.typedefs_), cu_param_scope(e.cu_param_scope_) {
     forward_typedef_kinds = std::move(e.forward_typedef_kinds_);
     declared_names = std::move(e.declared_names_);
     net_names = std::move(e.net_names_);
@@ -708,6 +734,8 @@ struct ItemElaborationStateSaver {
     e.let_names_ = std::move(let_names);
     e.sequence_names_ = std::move(sequence_names);
     e.func_decls_ = std::move(func_decls);
+    e.typedefs_ = std::move(typedefs);
+    e.cu_param_scope_ = std::move(cu_param_scope);
   }
 };
 
@@ -728,27 +756,6 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   // transparent to its caller. (nested_module_decls_ already had a narrower
   // per-call save at the instance site; this generalizes it to the full set.)
   ItemElaborationStateSaver saved_item_state(*this);
-
-  // §26.3 and §6.18: a name an import or a typedef declaration introduces
-  // belongs to the scope it was written in, so what this module adds to
-  // typedefs_ and cu_param_scope_ is taken back out before the next module is
-  // elaborated. Without this, `module a; import q::*; endmodule module b;
-  // word_t y; endmodule` sizes b's y from a's import, and a typedef declared in
-  // a is equally visible in b.
-  //
-  // These two are copied and put back rather than moved out and cleared like
-  // the state above, because they also hold the compilation unit's own
-  // declarations: RegisterCuScopeItems fills both with $unit's typedefs and
-  // parameters and with every package parameter under its qualified key before
-  // any module is elaborated, and §3.12.1 makes those visible to every module.
-  // The snapshot keeps them and drops only what this module added.
-  //
-  // A module elaborated as a child instance still starts from its parent's
-  // entry, which is what a lexically nested module (§23.4) requires and what a
-  // separately instantiated one does not; that is a different question from the
-  // one settled here, which is what one module leaves behind for the next.
-  TypedefMap saved_typedefs = typedefs_;
-  ScopeMap saved_cu_param_scope = cu_param_scope_;
 
   // §23.9/§24.3: the enclosing-scope chain follows lexical nesting, not the
   // instance tree. A lexically nested declaration (set up by the nested-decl
@@ -823,8 +830,6 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   global_clocking_in_scope_ = saved_global_clocking_in_scope;
   current_library_ = std::move(saved_library);
   enclosing_scope_names_ = std::move(saved_enclosing);
-  typedefs_ = std::move(saved_typedefs);
-  cu_param_scope_ = std::move(saved_cu_param_scope);
   saved_item_state.Restore(*this);
   return mod;
 }
