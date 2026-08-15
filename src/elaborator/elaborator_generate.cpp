@@ -528,6 +528,28 @@ static bool GenerateForGenvarRepeats(DiagEngine& diag, const ModuleItem* item,
   return true;
 }
 
+// §27.4: advance a loop generate's genvar to the value its next iteration runs
+// with. Answers false when the loop has to stop, having reported whatever
+// stopped it: an iteration assignment driving the genvar to an x or z bit,
+// which §27.4 makes an error, or a step expression yielding no next value,
+// which ComputeGenerateForNextValue reports where the source breaks a rule.
+static bool AdvanceGenerateForGenvar(DiagEngine& diag, const ModuleItem* item,
+                                     std::string_view genvar_name,
+                                     ScopeMap& loop_scope) {
+  if (GenerateForStepHasXZLiteral(item)) {
+    diag.Error(item->loc,
+               "generate-for genvar shall not have any bit set to x or z "
+               "during evaluation, and the iteration assignment sets one",
+               Subclause("27.4"));
+    return false;
+  }
+  std::optional<int64_t> next =
+      ComputeGenerateForNextValue(diag, item, loop_scope);
+  if (!next) return false;
+  loop_scope[genvar_name] = *next;
+  return true;
+}
+
 // §27.4: check a loop generate construct's header and open its genvar. Yields
 // the genvar name paired with its constant initial value, or nullopt when the
 // header is malformed, the generate-block array name clashes, or the init
@@ -625,26 +647,14 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
     gen_loop_consts_[const_depth].second = loop_scope[genvar_name];
     ElaborateGenerateItems(item->gen_body, mod, loop_scope);
 
-    if (GenerateForStepHasXZLiteral(item)) {
-      diag_.Error(item->loc,
-                  "generate-for genvar shall not have any bit set to x or z "
-                  "during evaluation, and the iteration assignment sets one",
-                  Subclause("27.4"));
+    // Stop the loop when the genvar cannot advance, which
+    // AdvanceGenerateForGenvar has already reported. Return rather than break,
+    // so that a loop stopped here is not also reported as one that never
+    // terminates.
+    if (!AdvanceGenerateForGenvar(diag_, item, genvar_name, loop_scope)) {
       close_loop();
       return;
     }
-
-    // Stop the loop when no next genvar value can be had, which
-    // ComputeGenerateForNextValue has already reported if the step expression
-    // is what failed to fold. Return rather than break, so that a loop stopped
-    // here is not also reported as one that never terminates.
-    std::optional<int64_t> next =
-        ComputeGenerateForNextValue(diag_, item, loop_scope);
-    if (!next) {
-      close_loop();
-      return;
-    }
-    loop_scope[genvar_name] = *next;
   }
 
   // §27.4 states the rule at stake -- "It shall be an error if the loop
