@@ -611,6 +611,13 @@ TEST(KeywordVersionPreprocessing, EndKeywordsInIncludedFileClosesRegion) {
 // `end_keywords at the keyword itself, so neither directive claims the rest of
 // its line. Source text sharing the line is ordinary source, and it is already
 // governed by the version the directive just selected or restored.
+//
+// That text is written straight after the version byte, because
+// Preprocessor::HandleBeginKeywords and Preprocessor::HandleEndKeywords in
+// src/preprocessor/preprocessor_directives.cpp write the keyword marker and the
+// version byte and nothing else. Lexer::ConsumeKeywordMarker at
+// src/lexer/lexer.cpp:436 consumes a newline only when one follows the version
+// byte, which is what keeps the text on the marker's own line lexable.
 TEST(KeywordVersionPreprocessing, SourceOnTheDirectiveLineIsOrdinarySource) {
   PreprocFixture f;
   auto out = Preprocess(

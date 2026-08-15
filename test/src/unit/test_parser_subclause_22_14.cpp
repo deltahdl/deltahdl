@@ -5,11 +5,11 @@ using namespace delta;
 
 namespace {
 
-// The line each rejection below is reported at is counted in the
-// preprocessor's output rather than in the source written here. Every
-// `begin_keywords and `end_keywords leaves a blank line in that output on top
-// of its own directive line (#3095), so each directive line above a source
-// line pushes that line down by two.
+// The line each rejection below is reported at is the line the source written
+// here puts it on. That line is counted in the preprocessor's output, and the
+// two agree: `begin_keywords and `end_keywords each occupy one line of that
+// output, exactly as they occupy one line of the source, so no directive above
+// a line moves it.
 
 TEST(KeywordVersionParsing, BeginKeywordsMultipleModules) {
   EXPECT_TRUE(
@@ -49,7 +49,7 @@ TEST(KeywordVersionParsing, OldVersionIdentifierNamesADesignElement) {
       "endmodule\n"
       "`end_keywords\n");
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got 'logic'", 3, "23.2.1"));
+      ReportedError(r.diags, "expected identifier, got 'logic'", 2, "23.2.1"));
 }
 
 TEST(KeywordVersionParsing, OldVersionIdentifierNamesAParameter) {
@@ -70,7 +70,7 @@ TEST(KeywordVersionParsing, OldVersionIdentifierNamesAParameter) {
       "endmodule\n"
       "`end_keywords\n");
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got '='", 4, "6.20.1"));
+      ReportedError(r.diags, "expected identifier, got '='", 3, "6.20.1"));
 }
 
 TEST(KeywordVersionParsing, OldVersionIdentifierNamesAPort) {
@@ -108,7 +108,7 @@ TEST(KeywordVersionParsing, RegionCoversNonModuleDesignElements) {
   auto r = ParseWithPreprocessor("`begin_keywords \"1800-2009\"\n" + kSrc +
                                  "`end_keywords\n");
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got 'until'", 4, "6.20.1"));
+      ReportedError(r.diags, "expected identifier, got 'until'", 3, "6.20.1"));
 }
 
 // The §3.2 restriction seen through the whole front end rather than only at
@@ -140,7 +140,7 @@ TEST(KeywordVersionParsing, ReservedWordCannotNameNetUnderSelectedVersion) {
       "  wire logic;\n"
       "endmodule\n"
       "`end_keywords\n");
-  EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got ';'", 4, "6.7"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got ';'", 3, "6.7"));
 }
 
 // §22.14: with no `begin_keywords in effect the implementation's default
@@ -162,9 +162,9 @@ TEST(KeywordVersionParsing, DefaultKeywordSetAppliesWithNoDirective) {
 // `logic` as a net name; the second sits after the closing directive, where
 // the default list is back in force and rejects it.
 TEST(KeywordVersionParsing, RegionEndsAtMatchingEndKeywords) {
-  // The second declaration is written on line 7 and reported on line 9: one
-  // `begin_keywords and one `end_keywords stand above it, each of which costs
-  // two output lines.
+  // The second declaration is written on line 7 and reported on line 7. One
+  // `begin_keywords and one `end_keywords stand above it, and each occupies a
+  // single output line, so neither moves the line below it.
   auto r = ParseWithPreprocessor(
       "`begin_keywords \"1364-2001\"\n"
       "module inside;\n"
@@ -174,7 +174,7 @@ TEST(KeywordVersionParsing, RegionEndsAtMatchingEndKeywords) {
       "module outside;\n"
       "  wire logic;\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got ';'", 9, "6.7"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got ';'", 7, "6.7"));
 }
 
 // §22.14: nested pairs are stacked, and closing one returns to the specifier
@@ -194,7 +194,8 @@ TEST(KeywordVersionParsing, NestedRegionRestoresEnclosingVersion) {
                               "`end_keywords\n"));
 
   // The outer module's declaration is written on line 8 and reported on line
-  // 11: three directives stand above it, each costing two output lines.
+  // 8. Three directives stand above it, and each occupies a single output
+  // line, so none of them moves the line below it.
   auto r = ParseWithPreprocessor(
       "`begin_keywords \"1800-2012\"\n"
       "`begin_keywords \"1364-2001\"\n"
@@ -206,8 +207,7 @@ TEST(KeywordVersionParsing, NestedRegionRestoresEnclosingVersion) {
       "  wire logic;\n"
       "endmodule\n"
       "`end_keywords\n");
-  EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got ';'", 11, "6.7"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got ';'", 8, "6.7"));
 }
 
 }  // namespace

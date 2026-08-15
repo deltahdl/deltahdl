@@ -5,11 +5,11 @@ using namespace delta;
 
 namespace {
 
-// The line each rejection below is reported at is counted in the
-// preprocessor's output rather than in the source written here, and a
-// `begin_keywords leaves a blank line there on top of its own directive line
-// (#3095), so a declaration on the third line of a source is reported on the
-// fourth.
+// The line each rejection below is reported at is the line the source written
+// here puts it on. That line is counted in the preprocessor's output, and a
+// `begin_keywords occupies one line of that output just as it occupies one
+// line of the source, so a declaration on the third line of a source is
+// reported on the third.
 
 // §22.14.9 defines the "1800-2017" and "1800-2023" version_specifiers. The
 // begin_keywords/version_specifier grammar itself belongs to §22.14; these
@@ -34,7 +34,7 @@ TEST(CompilerDirectiveParsing,
       "endmodule\n"
       "`end_keywords\n");
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got 'soft'", 4, "6.8"));
+      ReportedError(r.diags, "expected identifier, got 'soft'", 3, "6.8"));
 }
 
 // Same for "1800-2023": the inherited word `soft` stays reserved.
@@ -47,7 +47,7 @@ TEST(CompilerDirectiveParsing,
       "endmodule\n"
       "`end_keywords\n");
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got 'soft'", 4, "6.8"));
+      ReportedError(r.diags, "expected identifier, got 'soft'", 3, "6.8"));
 }
 
 // Contrast (proves the rejection above is version-driven, not unconditional):

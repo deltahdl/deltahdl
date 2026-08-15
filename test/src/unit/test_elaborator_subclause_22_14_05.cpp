@@ -55,17 +55,19 @@ TEST(Verilog2005KeywordElaboration, AddedWordBuildsNetsOfItsOwnType) {
   // in src/lexer/keywords.cpp carries that out by choosing a token kind, which
   // files no diagnostic of its own.
   //
-  // The line named here and in the cases below is the line of the preprocessed
-  // text rather than of the source In2001 wrote: the directive opening the
-  // region contributes a line of its own beyond the one it stands on, which
-  // #3095 is about. Closing that issue moves each of these reports up by one.
+  // The line named here and in the cases below comes from LineInRegion in
+  // lib/cpp/test_helpers/helpers_keyword_version.h rather than from a literal.
+  // LineInRegion counts the lines In writes above the body, so a change to what
+  // In writes moves every one of these cases at once. Its answer is the line of
+  // the source as written, because the region's opening directive occupies one
+  // line of preprocessed output and not two.
   ElabFixture earlier;
   ElaborateWithPreprocessorAllowingParseErrors(In2001("module m;\n"
                                                       "  uwire scalar_net;\n"
                                                       "endmodule\n"),
                                                earlier, "m");
   EXPECT_TRUE(ReportedError(earlier.diag.Diagnostics(), "expected '(', got ';'",
-                            4, "23.3.2"));
+                            LineInRegion(2), "23.3.2"));
 }
 
 // The same net type on a module port, so the addition is observed across a
@@ -158,9 +160,10 @@ TEST(Verilog2005KeywordElaboration, AddedWordCannotNameAnElaboratedVariable) {
   ElabFixture reserved;
   ElaborateWithPreprocessorAllowingParseErrors(In2005(VarDecl(added)), reserved,
                                                "m");
-  EXPECT_TRUE(ReportedError(
-      reserved.diag.Diagnostics(),
-      std::string("expected identifier, got '") + added + "'", 4, "6.8"));
+  EXPECT_TRUE(
+      ReportedError(reserved.diag.Diagnostics(),
+                    std::string("expected identifier, got '") + added + "'",
+                    LineInRegion(2), "6.8"));
 
   for (const auto& earlier : {In2001(VarDecl(added)), In1995(VarDecl(added))}) {
     ElabFixture f;
@@ -171,6 +174,33 @@ TEST(Verilog2005KeywordElaboration, AddedWordCannotNameAnElaboratedVariable) {
     ASSERT_NE(v, nullptr);
     EXPECT_EQ(v->width, 8u);
   }
+}
+
+// The line a report on a `begin_keywords region stands at, read on a
+// declaration further down the region than the cases above put one. A
+// diagnostic sends the user to a line of their own source, and a directive that
+// wrote two lines of preprocessed output where the source had one would send
+// them one line past it. Preprocessor::HandleBeginKeywords writes the keyword
+// marker and the version byte alone, and RunPreprocLoop ends that line at
+// src/preprocessor/preprocessor.cpp:611 as it ends every other line, so the
+// declaration is reported on the line In wrote it, which LineInRegion(3) gives.
+// Counting newlines in the preprocessed text does not show the offset reaching
+// the user; this does.
+TEST(Verilog2005KeywordElaboration, ReservedWordDeeperInARegionKeepsItsLine) {
+  ASSERT_EQ(std::size(kTable223), 1u);
+  const char* added = kTable223[0];
+
+  ElabFixture f;
+  ElaborateWithPreprocessorAllowingParseErrors(
+      In2005(std::string("module m;\n"
+                         "  reg [7:0] first;\n"
+                         "  reg [7:0] ") +
+             added + ";\nendmodule\n"),
+      f, "m");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    std::string("expected identifier, got '") + added + "'",
+                    LineInRegion(3), "6.8"));
 }
 
 // The second included list at this stage, swept whole. Each of Table 22-2's
@@ -184,9 +214,10 @@ TEST(Verilog2005KeywordElaboration, IncludedVerilog2001WordsAreReserved) {
     ElabFixture reserved;
     ElaborateWithPreprocessorAllowingParseErrors(In2005(VarDecl(word)),
                                                  reserved, "m");
-    EXPECT_TRUE(ReportedError(
-        reserved.diag.Diagnostics(),
-        std::string("expected identifier, got '") + word + "'", 4, "6.8"))
+    EXPECT_TRUE(
+        ReportedError(reserved.diag.Diagnostics(),
+                      std::string("expected identifier, got '") + word + "'",
+                      LineInRegion(2), "6.8"))
         << word;
 
     ElabFixture freed;
@@ -210,9 +241,10 @@ TEST(Verilog2005KeywordElaboration, IncludedVerilog1995WordsAreReserved) {
     if (IsGatePrimitiveWord(word)) continue;
     ElabFixture f;
     ElaborateWithPreprocessorAllowingParseErrors(In2005(VarDecl(word)), f, "m");
-    EXPECT_TRUE(ReportedError(
-        f.diag.Diagnostics(),
-        std::string("expected identifier, got '") + word + "'", 4, "6.8"))
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(),
+                      std::string("expected identifier, got '") + word + "'",
+                      LineInRegion(2), "6.8"))
         << word << " is included from Table 22-1 and stays reserved";
     ++swept;
   }
@@ -301,7 +333,7 @@ TEST(Verilog2005KeywordElaboration, UnlistedWordsNameObjectsButAreNotTypes) {
         In2005(std::string("module m;\n  ") + word + " [7:0] v;\nendmodule\n"),
         as_type, "m");
     EXPECT_TRUE(ReportedError(as_type.diag.Diagnostics(),
-                              "expected ';', got '['", 4, "6.8"))
+                              "expected ';', got '['", LineInRegion(2), "6.8"))
         << word << " is not a data type under this version";
   }
 }

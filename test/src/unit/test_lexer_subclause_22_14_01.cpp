@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -157,6 +158,42 @@ TEST(KeywordVersionExampleLexing, RegionDoesNotReachBackOverEarlierSource) {
   ASSERT_EQ(logic_kinds.size(), 2u);
   EXPECT_EQ(logic_kinds[0], TokenKind::kKwLogic);
   EXPECT_EQ(logic_kinds[1], TokenKind::kIdentifier);
+}
+
+// A declaration written after the version_specifier is lexed at the line it
+// was written on, and so is the declaration on the line below it.
+//
+// This is the half of the directive's output that a newline count does not
+// reach. Preprocessor::ProcessKeywordsDirective hands what follows the
+// specifier to OutputText at src/preprocessor/preprocessor_lines.cpp:664,
+// which appends it straight after the version byte, so that text now shares
+// the marker's line instead of starting the line below. Lexer::Advance counts
+// a newline it moves over at src/lexer/lexer.cpp:187, and
+// Lexer::ConsumeKeywordMarker at :442 consumes one only when a newline
+// actually follows the version byte, so the two agree: the marker line costs
+// the counter one line, whatever is written on it.
+TEST(KeywordVersionExampleLexing, DeclarationsKeepTheLineTheyWereWrittenOn) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`begin_keywords \"1364-2001\" reg [63:0] first;\n"
+      "reg [63:0] second;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<preprocessed>", out);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  auto tokens = lexer.LexAll();
+
+  uint32_t first_line = 0;
+  uint32_t second_line = 0;
+  for (const auto& tok : tokens) {
+    if (tok.text == "first") first_line = tok.loc.line;
+    if (tok.text == "second") second_line = tok.loc.line;
+  }
+  EXPECT_EQ(first_line, 1u);
+  EXPECT_EQ(second_line, 2u);
 }
 
 }  // namespace

@@ -64,22 +64,20 @@ inline std::string InSv2012(const std::string& body) {
 // on the version_specifier, because a specifier is one word inside the
 // directive line and adds no line of its own.
 //
-// Two lines separate a report from the body line it was provoked by, not one,
-// because a report's line is counted in the preprocessor's output and not in
-// the source `In` built: the fixtures re-lex that output as a file of its own.
-// One is the `begin_keywords line. The other is blank, because
-// Preprocessor::HandleBeginKeywords writes the keyword marker and a newline of
-// its own at src/preprocessor/preprocessor_directives.cpp:260 while
-// RunPreprocLoop ends the directive's line as it ends every other line at
-// src/preprocessor/preprocessor.cpp:611. #3095 is that extra line, and takes
-// the doubling here out with it.
+// A report's line is counted in the preprocessor's output and not in the
+// source `In` built, because the fixtures re-lex that output as a file of its
+// own. The two agree line for line: Preprocessor::HandleBeginKeywords writes
+// the keyword marker and the version byte and nothing else, and RunPreprocLoop
+// ends the directive's line at src/preprocessor/preprocessor.cpp:611 as it
+// ends every other line. So the lines `In` writes above the body are the whole
+// of the offset.
 inline uint32_t LineInRegion(uint32_t body_line) {
   static constexpr char kBodyMark[] = "\x02";
   const std::string wrapped = In("", kBodyMark);
   const std::string above = wrapped.substr(0, wrapped.find(kBodyMark));
   const auto directive_lines =
       static_cast<uint32_t>(std::count(above.begin(), above.end(), '\n'));
-  return 2 * directive_lines + body_line;
+  return directive_lines + body_line;
 }
 
 // A one-variable module declaring `word` as its variable name. A word the

@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_keyword_version.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -6,10 +7,15 @@ using namespace delta;
 namespace {
 
 // The line each rejection below is reported at is counted in the
-// preprocessor's output rather than in the source Guarded built. Every
-// `begin_keywords and `end_keywords leaves a blank line in that output on top
-// of its own directive line (#3095), so a body Guarded wraps is reported two
-// lines below where it is written.
+// preprocessor's output rather than in the source Guarded built. The two agree
+// line for line, because `begin_keywords and `end_keywords each occupy one
+// line of that output just as they occupy one line of the source.
+//
+// A rejection inside the region takes its line from LineInRegion in
+// lib/cpp/test_helpers/helpers_keyword_version.h rather than writing it, so a
+// change to what the builder puts above the body moves every such test at
+// once. LineInRegion answers for a Guarded source because Guarded writes the
+// same single directive line above its body that In writes.
 
 // The module of §22.14.1's second and third examples, with the port list and
 // body the LRM elides written out. The 64-bit variable is named `logic`, which
@@ -76,11 +82,13 @@ TEST(KeywordVersionExampleParsing, DefaultListGovernsOutsideEveryPair) {
       ReportedError(ahead.diags, "expected identifier, got 'logic'", 2, "6.8"));
 
   // Behind the pair the declaration is written on line 6 and reported on line
-  // 8, the two directives above it costing two output lines each.
+  // 6, each of the two directives above it occupying one output line. The line
+  // is written out rather than taken from LineInRegion, which answers only for
+  // a line inside the region.
   auto behind =
       ParseWithPreprocessor(Guarded("1364-2001", "module other;\nendmodule\n") +
                             std::string(kM2Module));
-  EXPECT_TRUE(ReportedError(behind.diags, "expected identifier, got 'logic'", 8,
+  EXPECT_TRUE(ReportedError(behind.diags, "expected identifier, got 'logic'", 6,
                             "6.8"));
 }
 
@@ -104,8 +112,8 @@ TEST(KeywordVersionExampleParsing,
   for (const char* specifier :
        {"1800-2005", "1800-2009", "1800-2012", "1800-2017", "1800-2023"}) {
     auto r = ParseWithPreprocessor(Guarded(specifier, kM2Module));
-    EXPECT_TRUE(
-        ReportedError(r.diags, "expected identifier, got 'logic'", 4, "6.8"))
+    EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got 'logic'",
+                              LineInRegion(2), "6.8"))
         << specifier;
   }
 }
@@ -129,8 +137,8 @@ TEST(KeywordVersionExampleParsing,
     // Every spelling heads its declaration with a variable type, so all five
     // reach the same §6.8 report on the name that follows it.
     auto r = ParseWithPreprocessor(Guarded("1800-2005", kBody));
-    EXPECT_TRUE(
-        ReportedError(r.diags, "expected identifier, got 'logic'", 4, "6.8"))
+    EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got 'logic'",
+                              LineInRegion(2), "6.8"))
         << decl;
   }
 }
@@ -153,8 +161,8 @@ TEST(KeywordVersionExampleParsing, VerilogRegionRejectsTheInterface) {
     // the declaration heads nothing the compilation unit admits and
     // Parser::ParseTopLevel says so at src/parser/parser.cpp:499.
     auto r = ParseWithPreprocessor(Guarded(specifier, kInterface));
-    EXPECT_TRUE(
-        ReportedError(r.diags, "expected top-level declaration", 3, "3.12.1"))
+    EXPECT_TRUE(ReportedError(r.diags, "expected top-level declaration",
+                              LineInRegion(1), "3.12.1"))
         << specifier;
   }
 }
@@ -176,8 +184,8 @@ TEST(KeywordVersionExampleParsing, VerilogRegionAcceptsInterfaceWordsAsNames) {
     // under §6.7.
     auto r = ParseWithPreprocessor(Guarded("1800-2005", kBody));
     EXPECT_TRUE(ReportedError(
-        r.diags, std::string("expected identifier, got '") + word + "'", 4,
-        "6.7"))
+        r.diags, std::string("expected identifier, got '") + word + "'",
+        LineInRegion(2), "6.7"))
         << word;
   }
 }

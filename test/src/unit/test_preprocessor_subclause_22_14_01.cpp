@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -14,9 +16,11 @@ namespace {
 
 // Every version byte the preprocessor planted in `out`, in order. A source
 // with no `begin_keywords/`end_keywords directive at all yields an empty list.
-// A marker occupies a line of its own — marker, version byte, newline — so
-// only a marker at the start of a line opens one; the byte that follows may
-// happen to equal the marker itself, which is how 1364-2001 encodes.
+// A marker stands at the start of a line, so only a marker there opens a
+// region; the byte that follows may happen to equal the marker itself, which
+// is how 1364-2001 encodes. What comes after the version byte is whatever the
+// directive line carried after its version_specifier, which is usually
+// nothing and is then the newline RunPreprocLoop writes.
 std::vector<KeywordVersion> MarkedVersions(const std::string& out) {
   std::vector<KeywordVersion> versions;
   for (size_t pos = 0; pos + 1 < out.size(); ++pos) {
@@ -39,6 +43,13 @@ size_t EndOfLastMarker(const std::string& out) {
     ++pos;
   }
   return last;
+}
+
+// The number of newline bytes in `text`. Comparing the count in a source with
+// the count in its preprocessed output is how a case reads whether the two
+// texts still have the same number of lines.
+size_t Newlines(const std::string& text) {
+  return static_cast<size_t>(std::count(text.begin(), text.end(), '\n'));
 }
 
 // The module of the §22.14.1 examples, written out with the port list and body
@@ -168,6 +179,72 @@ TEST(KeywordVersionExamplePreproc,
     EXPECT_NE(out.find("interface if1"), std::string::npos) << specifier;
     EXPECT_NE(out.find("endinterface"), std::string::npos) << specifier;
   }
+}
+
+// A `begin_keywords directive line occupies one line of preprocessed output
+// rather than two, so the three lines under it keep the numbers the user wrote
+// them at. The source below holds four newlines, the directive's and the three
+// ordinary lines', and this fails when the output holds a different number.
+// Preprocessor::HandleBeginKeywords in
+// src/preprocessor/preprocessor_directives.cpp appended a newline of its own
+// after the marker byte and the version byte, and RunPreprocLoop at
+// src/preprocessor/preprocessor.cpp:611 ends the directive's line as it ends
+// every other line, so the output held five and every line below the directive
+// was reported one further down than it stands in the source.
+//
+// Nothing closes the region, which is what confines this case to
+// HandleBeginKeywords: HandleEndKeywords never runs, so a correction made to
+// that handler alone leaves this case failing. The open region draws no report
+// here because Preprocessor::ReportUnterminatedKeywordRegions is called from
+// src/main.cpp:397 alone, and the Preprocess of
+// lib/cpp/test_fixtures/fixture_preprocessor.h does not call it.
+TEST(KeywordVersionExamplePreproc, BeginKeywordsLineIsOneLineOfOutput) {
+  const std::string src =
+      "`begin_keywords \"1364-2001\"\n"
+      "module m2;\n"
+      "  reg [63:0] v;\n"
+      "endmodule\n";
+  PreprocFixture f;
+  auto out = Preprocess(src, f);
+
+  // The marker says the directive reached HandleBeginKeywords. Without this the
+  // case would pass on a source whose specifier the preprocessor rejected: that
+  // writes no marker line at all, and the two newline counts match with nothing
+  // under test.
+  auto versions = MarkedVersions(out);
+  ASSERT_EQ(versions.size(), 1u);
+  EXPECT_EQ(versions[0], KeywordVersion::kVer13642001);
+
+  EXPECT_EQ(Newlines(out), Newlines(src));
+}
+
+// An `end_keywords directive line likewise occupies one line of preprocessed
+// output rather than two. Preprocessor::HandleEndKeywords wrote the same
+// trailing newline as HandleBeginKeywords, and either handler could have been
+// corrected without the other, so the claim is made of each.
+//
+// The closing directive needs a region to close, so the opening one stands
+// above it and the source holds five newlines. This case failing while
+// BeginKeywordsLineIsOneLineOfOutput passes is HandleEndKeywords writing the
+// extra newline; both failing is HandleBeginKeywords doing so.
+TEST(KeywordVersionExamplePreproc, EndKeywordsLineIsOneLineOfOutput) {
+  const std::string src =
+      "`begin_keywords \"1364-2001\"\n"
+      "`end_keywords\n"
+      "module m1;\n"
+      "  reg [63:0] v;\n"
+      "endmodule\n";
+  PreprocFixture f;
+  auto out = Preprocess(src, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+
+  // Both markers say both handlers ran, for the reason given above the first
+  // ASSERT_EQ in BeginKeywordsLineIsOneLineOfOutput.
+  auto versions = MarkedVersions(out);
+  ASSERT_EQ(versions.size(), 2u);
+  EXPECT_EQ(versions[1], KeywordVersion::kVer18002023);
+
+  EXPECT_EQ(Newlines(out), Newlines(src));
 }
 
 }  // namespace
