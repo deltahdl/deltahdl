@@ -54,8 +54,14 @@ runs:
           # API. Authenticated (raises the unauthenticated 60/hr limit to
           # 1000/hr) and retried with backoff to ride out transient 403 /
           # rate-limit responses.
+          #
+          # --connect-timeout and --max-time are what make the retry loop
+          # reachable. curl waits on a connection that has gone quiet rather
+          # than returning, so without a bound a single stalled request never
+          # fails, the loop never reaches its second attempt, and the job sits
+          # in this step until the runner's six-hour limit kills it.
           for attempt in 1 2 3 4 5; do
-            resp=$(curl -fsSL \
+            resp=$(curl -fsSL --connect-timeout 10 --max-time 60 \
               -H "Authorization: Bearer ${GH_TOKEN}" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
               https://api.github.com/repos/llvm/llvm-project/releases/latest) &&
@@ -75,7 +81,8 @@ runs:
             # STABLE (never trunk).
             echo "::warning::releases API discovery failed; falling back to" \
               "apt.llvm.org repo listing"
-            major=$(curl -fsSL "http://apt.llvm.org/${VERSION_CODENAME}/dists/" |
+            major=$(curl -fsSL --connect-timeout 10 --max-time 60 \
+              "http://apt.llvm.org/${VERSION_CODENAME}/dists/" |
               grep -oE "llvm-toolchain-${VERSION_CODENAME}-[0-9]+" |
               sed -E 's/.*-([0-9]+)$/\1/' | sort -n | tail -1)
           fi
@@ -90,27 +97,65 @@ runs:
         # Each network step is retried so a single transient blip (apt.llvm.org
         # or the apt mirrors had a bad moment) does not hard-fail the whole
         # matrix under `set -e -o pipefail`.
+        #
+        # Each attempt is bounded by `timeout`, because the failure this loop
+        # actually meets is a stall rather than an error. wget and apt-get both
+        # wait on a mirror that accepted the connection and then stopped
+        # sending, and waiting is not a non-zero exit status, so an unbounded
+        # attempt holds the step open until the runner's six-hour limit and the
+        # remaining four attempts never run. -k escalates to SIGKILL for a
+        # command that ignores SIGTERM, which apt-get does while dpkg holds the
+        # lock.
+        #
+        # A killed apt-get leaves dpkg mid-transaction, and every later
+        # apt-get refuses to start until that is resolved, so each retry
+        # configures dpkg first. The call is a no-op for a wget attempt and for
+        # an apt-get that failed rather than stalled.
+        #
+        # RETRY_TIMEOUT is how long one attempt may run, and a caller raises it
+        # for a command that legitimately takes longer than the default. Set it
+        # generously: it exists to catch a command making no progress at all,
+        # and a bound tight enough to cut off a slow mirror that is still
+        # sending turns a green run red.
+        RETRY_TIMEOUT=300
         retry() {
           local n
           for n in 1 2 3 4 5; do
-            "$@" && return 0
-            echo "::warning::'$*' failed (attempt ${n}); retrying in $((n * 5))s"
+            timeout -k 30 "${RETRY_TIMEOUT}" "$@" && return 0
+            echo "::warning::'$*' failed or stalled (attempt ${n});" \
+              "retrying in $((n * 5))s"
+            sudo dpkg --configure -a || true
             sleep $((n * 5))
           done
           echo "::error::'$*' failed after 5 attempts"
           return 1
         }
         retry wget -qO /tmp/llvm-snapshot.gpg.key \
+          --timeout=30 --tries=1 \
           https://apt.llvm.org/llvm-snapshot.gpg.key
         sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc \
           </tmp/llvm-snapshot.gpg.key >/dev/null
         echo "deb http://apt.llvm.org/${VERSION_CODENAME}/ llvm-toolchain-${VERSION_CODENAME}-${major} main" |
           sudo tee /etc/apt/sources.list.d/llvm.list >/dev/null
-        retry sudo apt-get update
+        # Acquire::*::Timeout gives apt its own bound on a mirror that has gone
+        # quiet, so one stalled file fails that file rather than the whole
+        # attempt. Without it the only bound is the `timeout` around the
+        # attempt, which kills an install that had fetched most of the
+        # toolchain and makes the next attempt start from nothing.
+        apt_opts=(
+          -o Acquire::http::Timeout=30
+          -o Acquire::https::Timeout=30
+          -o Acquire::Retries=3
+        )
+        retry sudo apt-get "${apt_opts[@]}" update
         # Unquoted on purpose: the input is a list of package names and apt
         # has to see each as an argument of its own.
+        # The install fetches and unpacks the better part of a gigabyte, which
+        # is the one command here that can legitimately outrun the default.
+        RETRY_TIMEOUT=900
         # shellcheck disable=SC2086
-        retry sudo apt-get install -y --no-install-recommends ${packages}
+        retry sudo apt-get "${apt_opts[@]}" install -y \
+          --no-install-recommends ${packages}
         # ld.lld is what -fuse-ld=lld looks for on PATH, so it is symlinked
         # alongside the compilers rather than left under its versioned name.
         # A tool a caller did not ask for is absent rather than fatal, which
