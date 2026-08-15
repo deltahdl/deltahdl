@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <sstream>
 #include <string>
+#include <utility>
 
 #include "common/diagnostic.h"
 #include "simulator/coverage.h"
@@ -99,6 +100,22 @@ bool SimContext::RegisterDumpportsTime(uint64_t time) {
     return true;
   }
   return time == dumpports_time_;
+}
+
+void SimContext::SetDumpFileLiteral(std::string text) {
+  dump_file_literal_ = std::move(text);
+}
+
+bool SimContext::RegisterDumpportsScope(const std::string& scope) {
+  return dumpports_scopes_.insert(scope).second;
+}
+
+bool SimContext::RegisterDumpportsFile(const std::string& file) {
+  return dumpports_files_.insert(file).second;
+}
+
+bool SimContext::IsDumpportsFile(const std::string& file) const {
+  return dumpports_files_.count(file) != 0;
 }
 
 void SimContext::EnsureStdioDescriptors() {

@@ -94,20 +94,14 @@ class SimContext {
   // still takes effect. RequestFinish() raises both so process loops that guard
   // on StopRequested() still unwind, while the scheduler halts on
   // FinishRequested().
-  void RequestFinish() {
-    finish_requested_ = true;
-    stop_requested_ = true;
-  }
+  void RequestFinish();
   bool FinishRequested() const { return finish_requested_; }
 
   // Optional $reset family (Annex D.8). RecordReset tallies one reset of the
   // tool and remembers the reset_value argument so that the $reset_value
   // system function can hand that value back after the reset. $reset_count
   // reports how many resets have occurred.
-  void RecordReset(int64_t reset_value) {
-    ++reset_count_;
-    reset_value_ = reset_value;
-  }
+  void RecordReset(int64_t reset_value);
   uint32_t ResetCount() const { return reset_count_; }
   int64_t ResetValue() const { return reset_value_; }
 
@@ -118,9 +112,7 @@ class SimContext {
   // argument (a module, task, function, or named block). This mirrors, on the
   // system-task side, the interactive scope that vpi_control reaches through
   // vpiSetInteractiveScope (§38.4).
-  void SetInteractiveScope(std::string_view name) {
-    interactive_scope_ = std::string(name);
-  }
+  void SetInteractiveScope(std::string_view name);
   const std::string& InteractiveScope() const { return interactive_scope_; }
 
   // Optional $list system task (Annex D.6). $list produces a listing of a
@@ -129,9 +121,7 @@ class SimContext {
   // with an argument it lists the specific named scope. RecordListing remembers
   // the complete hierarchical name of the most recently listed scope so the
   // selection can be observed.
-  void RecordListing(std::string_view name) {
-    last_listed_scope_ = std::string(name);
-  }
+  void RecordListing(std::string_view name);
   const std::string& LastListedScope() const { return last_listed_scope_; }
 
   // Optional $showscopes system task (Annex D.12). $showscopes produces a
@@ -142,10 +132,7 @@ class SimContext {
   // lists only the objects at the current scope level itself. Remember the
   // scope whose contents were shown and whether the listing recursed so the
   // selection can be observed.
-  void RecordShowScopes(std::string_view scope, bool recursive) {
-    last_shown_scope_ = std::string(scope);
-    show_scopes_recursive_ = recursive;
-  }
+  void RecordShowScopes(std::string_view scope, bool recursive);
   const std::string& LastShownScope() const { return last_shown_scope_; }
   bool ShowScopesRecursive() const { return show_scopes_recursive_; }
 
@@ -158,14 +145,9 @@ class SimContext {
   // its underlying vector. Remember the scope the request applied to and the
   // list of variables named (empty when none were given) so the selection can
   // be observed.
-  void RecordShowVars(std::string_view scope, std::vector<std::string> vars) {
-    last_showvars_scope_ = std::string(scope);
-    showvars_variables_ = std::move(vars);
-  }
+  void RecordShowVars(std::string_view scope, std::vector<std::string> vars);
   const std::string& LastShowVarsScope() const { return last_showvars_scope_; }
-  const std::vector<std::string>& ShowVarsVariables() const {
-    return showvars_variables_;
-  }
+  const std::vector<std::string>& ShowVarsVariables() const;
 
   // Optional $log and $nolog system tasks (Annex D.7). A log file holds a copy
   // of everything printed to standard output. $nolog disables that copy and
@@ -176,10 +158,7 @@ class SimContext {
   // file otherwise mirrors all standard output.
   void EnableLogging() { logging_enabled_ = true; }
   void DisableLogging() { logging_enabled_ = false; }
-  void SetLogFile(std::string_view name) {
-    log_file_ = std::string(name);
-    logging_enabled_ = true;
-  }
+  void SetLogFile(std::string_view name);
   bool LoggingEnabled() const { return logging_enabled_; }
   const std::string& LogFile() const { return log_file_; }
 
@@ -201,10 +180,7 @@ class SimContext {
   // $timeformat state per 20.4.3. The defaults follow Table 20-3; the unit
   // number tracks the global precision until $timeformat is invoked.
   const TimeFormatSpec& GetTimeFormat() const { return time_format_; }
-  void SetTimeFormat(const TimeFormatSpec& spec) {
-    time_format_ = spec;
-    time_format_explicit_ = true;
-  }
+  void SetTimeFormat(const TimeFormatSpec& spec);
 
   // Timescale of the design element that is the current scope, reported by
   // $timeunit/$timeprecision when no argument is supplied (see 20.4.1).
@@ -213,9 +189,7 @@ class SimContext {
 
   // Name of the design element that is the current scope. $printtimescale with
   // no argument prints this name in its report line (see 20.4.2).
-  void SetCurrentScopeName(std::string_view name) {
-    current_scope_name_ = std::string(name);
-  }
+  void SetCurrentScopeName(std::string_view name);
   const std::string& CurrentScopeName() const { return current_scope_name_; }
 
   // Timescale of the compilation unit, reported when the $unit argument is
@@ -225,13 +199,8 @@ class SimContext {
 
   // Timescale of a named design element, reported when that element is passed
   // as the argument to $timeunit/$timeprecision.
-  void SetScopeTimeScale(std::string_view name, const TimeScale& ts) {
-    scope_timescales_[std::string(name)] = ts;
-  }
-  const TimeScale* FindScopeTimeScale(std::string_view name) const {
-    auto it = scope_timescales_.find(std::string(name));
-    return it == scope_timescales_.end() ? nullptr : &it->second;
-  }
+  void SetScopeTimeScale(std::string_view name, const TimeScale& ts);
+  const TimeScale* FindScopeTimeScale(std::string_view name) const;
 
   void RegisterFinalProcess(Process* proc);
   void RunFinalBlocks();
@@ -329,28 +298,20 @@ class SimContext {
   // keeps its unevaluated source spelling. The $version section of the VCD
   // header reproduces this literal inside its $dumpfile(...) entry. Empty when
   // no $dumpfile call supplied a filename.
-  void SetDumpFileLiteral(std::string text) {
-    dump_file_literal_ = std::move(text);
-  }
+  void SetDumpFileLiteral(std::string text);
   const std::string& GetDumpFileLiteral() const { return dump_file_literal_; }
 
   // §21.7.3.1: scope names supplied to $dumpports must be unique across every
   // call. Records the scope and returns false when it repeats one already used
   // by an earlier $dumpports call.
-  bool RegisterDumpportsScope(const std::string& scope) {
-    return dumpports_scopes_.insert(scope).second;
-  }
+  bool RegisterDumpportsScope(const std::string& scope);
   // §21.7.3.1: an explicitly named $dumpports output file may not be named by
   // more than one call. Records the name and returns false on a repeat.
-  bool RegisterDumpportsFile(const std::string& file) {
-    return dumpports_files_.insert(file).second;
-  }
+  bool RegisterDumpportsFile(const std::string& file);
   // §21.7.3.7: an extended VCD control task may name the $dumpports output it
   // targets; the name matches only when some $dumpports call explicitly
   // specified that file. Returns true when the name was so registered.
-  bool IsDumpportsFile(const std::string& file) const {
-    return dumpports_files_.count(file) != 0;
-  }
+  bool IsDumpportsFile(const std::string& file) const;
   // §21.7.3.7: true once at least one $dumpports call has explicitly named an
   // output file, so a control task's filename can be matched against the set.
   bool HasDumpportsFiles() const { return !dumpports_files_.empty(); }
@@ -695,39 +656,20 @@ class SimContext {
   // expressed as plain integers here to keep this header free of the SVA
   // engine's enum definitions.
   void SetGlobalAssertCheckingOff(uint32_t assertion_type,
-                                  uint32_t directive_type) {
-    assert_checking_off_ = true;
-    assert_checking_off_atype_ = assertion_type;
-    assert_checking_off_dtype_ = directive_type;
-  }
+                                  uint32_t directive_type);
   void SetGlobalAssertCheckingOn() { assert_checking_off_ = false; }
   bool AssertCheckingEnabled(uint32_t type_bit, uint32_t directive_bit) const;
   void SetGlobalAssertFailActionOff(uint32_t assertion_type,
-                                    uint32_t directive_type) {
-    assert_fail_off_ = true;
-    assert_fail_off_atype_ = assertion_type;
-    assert_fail_off_dtype_ = directive_type;
-  }
+                                    uint32_t directive_type);
   void SetGlobalAssertFailActionOn() { assert_fail_off_ = false; }
-  bool AssertFailActionEnabled(uint32_t type_bit,
-                               uint32_t directive_bit) const {
-    if (!assert_fail_off_) return true;
-    return (assert_fail_off_atype_ & type_bit) == 0 ||
-           (assert_fail_off_dtype_ & directive_bit) == 0;
-  }
+  bool AssertFailActionEnabled(uint32_t type_bit, uint32_t directive_bit) const;
 
   // §20.10: record the last severity system task's tool-specific message parts
   // so a harness can confirm the required call-site information was reported --
   // the severity label, the user message, the simulation time, the hierarchical
   // scope of the call, and its source line (the `__LINE__ equivalent).
   void SetLastSeverity(std::string_view sev, std::string_view msg, SimTime t,
-                       std::string_view scope = {}, uint32_t line = 0) {
-    last_severity_ = std::string(sev);
-    last_severity_msg_ = std::string(msg);
-    last_severity_time_ = t;
-    last_severity_scope_ = std::string(scope);
-    last_severity_line_ = line;
-  }
+                       std::string_view scope = {}, uint32_t line = 0);
   std::string_view LastSeverity() const { return last_severity_; }
   std::string_view LastSeverityMsg() const { return last_severity_msg_; }
   SimTime LastSeverityTime() const { return last_severity_time_; }
@@ -758,10 +700,7 @@ class SimContext {
   // §21.2.3 continuous monitoring. Only one $monitor display list can be
   // active at a time; recording a new one bumps the generation so that
   // watchers left behind by a superseded list deactivate themselves.
-  void SetActiveMonitor(const Expr* call) {
-    active_monitor_ = call;
-    ++monitor_generation_;
-  }
+  void SetActiveMonitor(const Expr* call);
   const Expr* ActiveMonitor() const { return active_monitor_; }
 
   // §33.7: the instance-path prefix the active display list was written in,
@@ -778,16 +717,12 @@ class SimContext {
   // At most one monitor display is produced per time step even when several
   // watched signals change together; this flag coalesces them.
   bool MonitorDisplayPending() const { return monitor_display_pending_; }
-  void SetMonitorDisplayPending(bool pending) {
-    monitor_display_pending_ = pending;
-  }
+  void SetMonitorDisplayPending(bool pending);
 
   // The value a watched signal held when its change was last observed, so a
   // write that does not alter the value is not treated as a change.
   const Logic4Vec* MonitorLastValue(Variable* var) const;
-  void SetMonitorLastValue(Variable* var, const Logic4Vec& value) {
-    monitor_last_values_[var] = value;
-  }
+  void SetMonitorLastValue(Variable* var, const Logic4Vec& value);
 
  private:
   // §13.3.2: static-task (and named-block) storage is per module instance.

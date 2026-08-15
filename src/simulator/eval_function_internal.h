@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <iosfwd>
 #include <string_view>
 
@@ -37,6 +38,19 @@ struct Variable;
 struct ClassObject;
 void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
                       Arena& arena);
+
+// The actual arguments of one call, as §35.6.1 "Argument passing" and §11.12
+// "Let construct" each describe them: the call-site expression, the boundary
+// between the positional actuals and the named ones, and the environment the
+// actuals are evaluated in. It is declared here rather than in either caller
+// because both take it -- the DPI import binding in eval_function.cpp and the
+// let-construct binding in eval_let.cpp.
+struct ActualBindingCtx {
+  const Expr* call;
+  size_t positional_count;
+  SimContext& ctx;
+  Arena& arena;
+};
 
 // Runs a resolved class method on a concrete object (sets `this`, binds args,
 // writes back). Defined in eval_function.cpp; reused by eval_randomize.cpp to

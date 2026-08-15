@@ -275,6 +275,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_subroutine_args.cpp
     lexer/lexer_operators.cpp
     parser/expr_parser_calls.cpp
+    parser/parser_package_import_export.cpp
     parser/parser_udp.cpp
     simulator/constraint_solver_eval.cpp
     simulator/constraint_solver_solve.cpp
@@ -287,6 +288,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_array_queue.cpp
     simulator/eval_function_args.cpp
     simulator/eval_function_body.cpp
+    simulator/eval_let.cpp
     simulator/eval_select.cpp
     simulator/eval_streaming.cpp
     simulator/eval_systask_io.cpp
@@ -306,6 +308,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/sdf_annotate.cpp
     simulator/sdf_annotate_task.cpp
     simulator/sim_context_classgc.cpp
+    simulator/sim_context_systask_state.cpp
     simulator/statement_assign_decl.cpp
     simulator/statement_assign_stream.cpp
     simulator/stmt_exec_control.cpp
