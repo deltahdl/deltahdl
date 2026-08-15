@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <format>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -393,38 +394,99 @@ void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule*) {
   }
 }
 
-void Elaborator::CheckNettypeResolutionFunction(const ModuleItem* item) {
-  auto fit = func_decls_.find(item->nettype_resolve_func);
-  if (fit == func_decls_.end() || !fit->second) return;
-  const ModuleItem* fn = fit->second;
+// §6.6.7: read the declared resolution function against the nettype it resolves
+// and record which of the clause's requirements the signature meets.
+//
+// Two named types differing is a definite mismatch, and any other pairing --
+// integral against real, or a named type against a matching builtin -- is left
+// unasserted, because this stage cannot compare those precisely and a false
+// rejection of a conforming function costs more than a missed report. Both the
+// return type and the argument's element type are judged that way.
+static NettypeResolutionSig BuildNettypeResolutionSig(const ModuleItem* item,
+                                                      const ModuleItem* fn) {
   NettypeResolutionSig sig;
-  // When both the nettype data type and the function's return type are named
-  // types, a difference in the named type is a definite mismatch. Other
-  // combinations (integral/real, or a named type paired with a matching
-  // builtin) are left unasserted to avoid a false rejection.
   const DataType& nettype_dt = item->typedef_type;
   const DataType& return_dt = fn->return_type;
   sig.return_type_matches_nettype = nettype_dt.kind != DataTypeKind::kNamed ||
                                     return_dt.kind != DataTypeKind::kNamed ||
                                     nettype_dt.type_name == return_dt.type_name;
+  // A lifetime keyword and a class method are not carried this far. §6.6.7's
+  // parenthetical "(or preserve no state information)" makes a `static`
+  // lifetime alone no breach, and Parser::ParseNettypeDecl in
+  // src/parser/parser_declaration.cpp keeps only the bare name out of
+  // `with C::res`, so a class method is never found here at all.
   sig.is_automatic = true;
   sig.is_class_method = false;
   sig.is_static_method = false;
   sig.single_input_argument = fn->func_args.size() == 1;
-  bool arg_is_fixed_array = sig.single_input_argument &&
-                            !fn->func_args[0].unpacked_dims.empty() &&
-                            fn->func_args[0].unpacked_dims[0] != nullptr;
-  sig.argument_is_dynamic_array_of_type =
-      sig.single_input_argument && !arg_is_fixed_array;
-  if (!ValidateNettypeResolutionFunction(sig)) {
-    diag_.Error(item->loc,
-                std::format("resolution function '{}' of user-defined "
-                            "nettype '{}' shall return the nettype data "
-                            "type and take a single dynamic array input "
-                            "argument",
-                            item->nettype_resolve_func, item->name),
-                Subclause("6.6.7"));
+  // The three argument requirements are stated met when there is no single
+  // argument to judge, so the argument-count requirement is the one reported.
+  sig.argument_is_input = true;
+  sig.argument_is_dynamic_array = true;
+  sig.argument_element_type_matches = true;
+  if (!sig.single_input_argument) return sig;
+  const FunctionArg& arg = fn->func_args[0];
+  // §6.6.7 admits "a single input argument". Direction::kNone is the bare
+  // `T driver[]` form, which §13.3 gives the default direction input.
+  sig.argument_is_input =
+      arg.direction == Direction::kInput || arg.direction == Direction::kNone;
+  const bool kArgIsFixedArray =
+      !arg.unpacked_dims.empty() && arg.unpacked_dims[0] != nullptr;
+  sig.argument_is_dynamic_array = !kArgIsFixedArray;
+  sig.argument_element_type_matches =
+      nettype_dt.kind != DataTypeKind::kNamed ||
+      arg.data_type.kind != DataTypeKind::kNamed ||
+      nettype_dt.type_name == arg.data_type.type_name;
+  return sig;
+}
+
+// §6.6.7: the sentence the report quotes, one per requirement the clause
+// states. `func_name` names the resolution function, `nettype_name` the nettype
+// it resolves and `data_type_name` the nettype's data type, which is the T the
+// clause writes.
+static std::string NettypeResolutionRuleMessage(
+    NettypeResolutionRule rule, std::string_view func_name,
+    std::string_view nettype_name, std::string_view data_type_name) {
+  std::string prefix =
+      std::format("resolution function '{}' of user-defined nettype '{}' ",
+                  func_name, nettype_name);
+  switch (rule) {
+    case NettypeResolutionRule::kReturnType:
+      return prefix +
+             std::format("shall have a return type of '{}'", data_type_name);
+    case NettypeResolutionRule::kArgumentCount:
+      return prefix + "shall take a single input argument";
+    case NettypeResolutionRule::kArgumentDirection:
+      return prefix +
+             "shall take a single input argument, and this one is not "
+             "declared input";
+    case NettypeResolutionRule::kArgumentIsDynamicArray:
+      return prefix +
+             "shall take an argument whose type is a dynamic array rather "
+             "than a fixed-size array";
+    case NettypeResolutionRule::kArgumentElementType:
+      return prefix + std::format(
+                          "shall take an argument that is a dynamic array of "
+                          "elements of type '{}'",
+                          data_type_name);
+    case NettypeResolutionRule::kAutomaticLifetime:
+      return prefix + "shall be automatic or preserve no state information";
+    default:
+      return prefix + "shall be a static class method";
   }
+}
+
+void Elaborator::CheckNettypeResolutionFunction(const ModuleItem* item) {
+  auto fit = func_decls_.find(item->nettype_resolve_func);
+  if (fit == func_decls_.end() || !fit->second) return;
+  NettypeResolutionSig sig = BuildNettypeResolutionSig(item, fit->second);
+  NettypeResolutionRule rule = ValidateNettypeResolutionFunction(sig);
+  if (rule == NettypeResolutionRule::kConforming) return;
+  diag_.Error(
+      item->loc,
+      NettypeResolutionRuleMessage(rule, item->nettype_resolve_func, item->name,
+                                   item->typedef_type.type_name),
+      Subclause("6.6.7"));
 }
 
 // §6.6.7: record the nettype's resolution function and its canonical (source)

@@ -73,42 +73,68 @@ TEST(NettypeElaboration, AliasNetInheritsResolutionFunction) {
 }
 
 // §6.6.7 resolution-function signature constraints, exercised through the
-// production validator.
+// production validator. This signature breaks no requirement §6.6.7 states.
+// Each case below moves one field away from it, so the rule
+// ValidateNettypeResolutionFunction returns is the rule that field carries.
 static NettypeResolutionSig ConformingSig() {
   NettypeResolutionSig sig;
   sig.return_type_matches_nettype = true;
   sig.single_input_argument = true;
-  sig.argument_is_dynamic_array_of_type = true;
+  sig.argument_is_input = true;
+  sig.argument_is_dynamic_array = true;
+  sig.argument_element_type_matches = true;
   sig.is_automatic = true;
   sig.is_class_method = false;
   sig.is_static_method = false;
   return sig;
 }
 
+// §6.6.7: "A user-defined resolution function for a net of a user-defined
+// nettype with a data type T shall be a function with a return type of T and a
+// single input argument whose type is a dynamic array of elements of type T."
+// The case fails when ValidateNettypeResolutionFunction answers anything but
+// kReturnType for a signature whose only fault is the return type.
 TEST(NettypeElaboration, ResolutionFunctionWrongReturnTypeRejected) {
   auto sig = ConformingSig();
   sig.return_type_matches_nettype = false;
-  EXPECT_FALSE(ValidateNettypeResolutionFunction(sig));
+  EXPECT_EQ(ValidateNettypeResolutionFunction(sig),
+            NettypeResolutionRule::kReturnType);
 }
 
+// §6.6.7: "A resolution function shall be automatic (or preserve no state
+// information) and have no side effects." The case fails when
+// ValidateNettypeResolutionFunction answers anything but kAutomaticLifetime for
+// a signature whose only fault is the lifetime.
 TEST(NettypeElaboration, ResolutionFunctionNonAutomaticRejected) {
   auto sig = ConformingSig();
   sig.is_automatic = false;
-  EXPECT_FALSE(ValidateNettypeResolutionFunction(sig));
+  EXPECT_EQ(ValidateNettypeResolutionFunction(sig),
+            NettypeResolutionRule::kAutomaticLifetime);
 }
 
+// §6.6.7: "While a class function method may be used for a resolution function,
+// such functions shall be class static methods as the method call occurs in a
+// context where no class object is involved in the call." The case fails when
+// ValidateNettypeResolutionFunction answers anything but kClassStaticMethod for
+// a class method that is not static.
 TEST(NettypeElaboration, ResolutionFunctionNonStaticClassMethodRejected) {
   auto sig = ConformingSig();
   sig.is_class_method = true;
   sig.is_static_method = false;
-  EXPECT_FALSE(ValidateNettypeResolutionFunction(sig));
+  EXPECT_EQ(ValidateNettypeResolutionFunction(sig),
+            NettypeResolutionRule::kClassStaticMethod);
 }
 
+// §6.6.7 admits the class method that is static: "While a class function method
+// may be used for a resolution function, such functions shall be class static
+// methods". The case fails when ValidateNettypeResolutionFunction names any
+// rule broken by a static class method conforming in every other field.
 TEST(NettypeElaboration, ResolutionFunctionStaticClassMethodAccepted) {
   auto sig = ConformingSig();
   sig.is_class_method = true;
   sig.is_static_method = true;
-  EXPECT_TRUE(ValidateNettypeResolutionFunction(sig));
+  EXPECT_EQ(ValidateNettypeResolutionFunction(sig),
+            NettypeResolutionRule::kConforming);
 }
 
 // §6.6.7 data-type restriction: a real (or shortreal) type is one of the
@@ -203,9 +229,11 @@ TEST(NettypeElaboration, ConformingResolutionFunctionAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.6.7 resolution-function signature (negative form): a resolution function
-// with more than one input argument violates the single-argument requirement.
-TEST(NettypeElaboration, ResolutionFunctionTwoArgumentsRejected) {
+// §6.6.7 requires "a single input argument", and Tsum here takes two. The case
+// fails unless the run reports "shall take a single input argument" at line 6,
+// the `nettype` declaration, under §6.6.7. No other §6.6.7 report ends there:
+// the argument-direction report continues "and this one is not declared input".
+TEST(NettypeElaboration, ResolutionFunctionArgumentCountNamesItsOwnRule) {
   ElabFixture f;
   Elaborate(
       "module m;\n"
@@ -216,37 +244,15 @@ TEST(NettypeElaboration, ResolutionFunctionTwoArgumentsRejected) {
       "  nettype T wt with Tsum;\n"
       "endmodule\n",
       f);
-  // One report covers every signature facet, so the message cannot say which
-  // one failed; the source is what isolates the argument count. It stands at
-  // the nettype declaration, not at the function.
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "resolution function 'Tsum' of user-defined nettype 'wt'", 6, "6.6.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "shall take a single input argument", 6, "6.6.7"));
 }
 
-// §6.6.7 resolution-function signature (negative form): the single input
-// argument shall be a dynamic array; a fixed-size array argument is rejected.
-TEST(NettypeElaboration, ResolutionFunctionFixedArrayArgumentRejected) {
-  ElabFixture f;
-  Elaborate(
-      "module m;\n"
-      "  typedef struct { real field1; bit field2; } T;\n"
-      "  function T Tsum(input T driver[4]);\n"
-      "    return driver[0];\n"
-      "  endfunction\n"
-      "  nettype T wt with Tsum;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "resolution function 'Tsum' of user-defined nettype 'wt'", 6, "6.6.7"));
-}
-
-// §6.6.7 resolution-function signature (negative form): the resolution function
-// shall return the nettype's data type. A function returning a different named
-// type than the nettype is rejected. Built from real source and driven through
-// parse + elaborate.
-TEST(NettypeElaboration, ResolutionFunctionMismatchedReturnTypeRejected) {
+// §6.6.7 requires a resolution function for a nettype with data type T to "be a
+// function with a return type of T", and Tsum here returns U. The case fails
+// unless the run reports "shall have a return type of 'T'" at line 8, the
+// `nettype` declaration, under §6.6.7.
+TEST(NettypeElaboration, ResolutionFunctionReturnTypeNamesItsOwnRule) {
   ElabFixture f;
   Elaborate(
       "module m;\n"
@@ -259,9 +265,108 @@ TEST(NettypeElaboration, ResolutionFunctionMismatchedReturnTypeRejected) {
       "  nettype T wt with Tsum;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "resolution function 'Tsum' of user-defined nettype 'wt'", 8, "6.6.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "shall have a return type of 'T'", 8, "6.6.7"));
+}
+
+// §6.6.7 requires the argument's "type is a dynamic array of elements of type
+// T", and `input T driver[4]` is a fixed-size array. The case fails unless the
+// run reports "a dynamic array rather than a fixed-size array" at line 6, the
+// `nettype` declaration, under §6.6.7.
+TEST(NettypeElaboration,
+     ResolutionFunctionDynamicArrayArgumentNamesItsOwnRule) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  typedef struct { real field1; bit field2; } T;\n"
+      "  function T Tsum(input T driver[4]);\n"
+      "    return driver[0];\n"
+      "  endfunction\n"
+      "  nettype T wt with Tsum;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a dynamic array rather than a fixed-size array", 6,
+                            "6.6.7"));
+}
+
+// §6.6.7 admits "a single input argument", so an `output` argument breaks the
+// clause even though the count is right. The case fails unless the run reports
+// "and this one is not declared input" at line 6, the `nettype` declaration,
+// under §6.6.7.
+TEST(NettypeElaboration, ResolutionFunctionOutputArgumentRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  typedef struct { real field1; bit field2; } T;\n"
+      "  function T Tsum(output T driver[]);\n"
+      "    return driver[0];\n"
+      "  endfunction\n"
+      "  nettype T wt with Tsum;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "and this one is not declared input", 6, "6.6.7"));
+}
+
+// §6.6.7 admits "a single input argument", so a `ref` argument breaks the
+// clause as an `output` one does. The case fails unless the run reports "and
+// this one is not declared input" at line 6, the `nettype` declaration, under
+// §6.6.7.
+TEST(NettypeElaboration, ResolutionFunctionRefArgumentRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  typedef struct { real field1; bit field2; } T;\n"
+      "  function T Tsum(ref T driver[]);\n"
+      "    return driver[0];\n"
+      "  endfunction\n"
+      "  nettype T wt with Tsum;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "and this one is not declared input", 6, "6.6.7"));
+}
+
+// §6.6.7 requires the argument to be "a dynamic array of elements of type T",
+// and Tsum here takes a dynamic array of U against a nettype whose data type is
+// T. The case fails unless the run reports "dynamic array of elements of type
+// 'T'" at line 8, the `nettype` declaration, under §6.6.7.
+TEST(NettypeElaboration,
+     ResolutionFunctionArgumentElementTypeMismatchRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  typedef struct { real field1; bit field2; } T;\n"
+      "  typedef struct { int other; } U;\n"
+      "  function T Tsum(input U driver[]);\n"
+      "    T t;\n"
+      "    return t;\n"
+      "  endfunction\n"
+      "  nettype T wt with Tsum;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "dynamic array of elements of type 'T'", 8,
+                            "6.6.7"));
+}
+
+// §6.6.7's own example declares `function automatic T Tsum (input T driver[]);`
+// beside a nettype whose data type is T, which breaks none of the clause's
+// requirements. The case fails when the elaborator reports any §6.6.7 rule
+// against a signature that breaks none of them.
+TEST(NettypeElaboration, ConformingResolutionFunctionStillAccepted) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  typedef struct { real field1; bit field2; } T;\n"
+      "  function automatic T Tsum(input T driver[]);\n"
+      "    return driver[0];\n"
+      "  endfunction\n"
+      "  nettype T wt with Tsum;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
 }
 
 // §6.6.7 data-type restriction: a 2-state integral type (here a packed bit

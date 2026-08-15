@@ -218,14 +218,31 @@ RtlirNet MakeImplicitPortNet(std::string_view name, uint32_t port_width,
 struct NettypeResolutionSig {
   bool return_type_matches_nettype = false;
   bool single_input_argument = false;
-  bool argument_is_dynamic_array_of_type = false;
+  bool argument_is_input = false;
+  bool argument_is_dynamic_array = false;
+  bool argument_element_type_matches = false;
   bool is_automatic = false;
   bool is_class_method = false;
   bool is_static_method = false;
 };
 
-// Returns true iff the resolution-function signature conforms to §6.6.7.
-bool ValidateNettypeResolutionFunction(const NettypeResolutionSig& sig);
+// The §6.6.7 requirement a resolution-function signature breaks, one value per
+// requirement the clause states, so a report can name the one that failed.
+// kConforming is the signature that breaks none of them.
+enum class NettypeResolutionRule : uint8_t {
+  kConforming,
+  kReturnType,
+  kArgumentCount,
+  kArgumentDirection,
+  kArgumentIsDynamicArray,
+  kArgumentElementType,
+  kAutomaticLifetime,
+  kClassStaticMethod,
+};
+
+// Returns the first §6.6.7 requirement `sig` breaks, or kConforming.
+NettypeResolutionRule ValidateNettypeResolutionFunction(
+    const NettypeResolutionSig& sig);
 
 // §33.6.1: how far into a library search order `library` sits. Absent a
 // configuration the order is the one the library map declared its libraries in,

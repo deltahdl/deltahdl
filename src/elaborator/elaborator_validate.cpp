@@ -736,18 +736,28 @@ bool ExprContainsIdent(const Expr* e, std::string_view name) {
   return ExprContainsIdent(e->rhs, name);
 }
 
-bool ValidateNettypeResolutionFunction(const NettypeResolutionSig& sig) {
-  // The signature shape §6.6.7 requires: returns the nettype's data type, takes
-  // exactly one input argument that is a dynamic array of that type, and holds
-  // no state across calls.
-  if (!sig.return_type_matches_nettype) return false;
-  if (!sig.single_input_argument) return false;
-  if (!sig.argument_is_dynamic_array_of_type) return false;
-  if (!sig.is_automatic) return false;
+NettypeResolutionRule ValidateNettypeResolutionFunction(
+    const NettypeResolutionSig& sig) {
+  // The requirements §6.6.7 states, one test each, returned in the order the
+  // clause writes them: "shall be a function with a return type of T and a
+  // single input argument whose type is a dynamic array of elements of type T.
+  // A resolution function shall be automatic (or preserve no state
+  // information)". The first one broken is what the caller reports, so a
+  // signature breaking several names the first rather than all of them.
+  if (!sig.return_type_matches_nettype)
+    return NettypeResolutionRule::kReturnType;
+  if (!sig.single_input_argument) return NettypeResolutionRule::kArgumentCount;
+  if (!sig.argument_is_input) return NettypeResolutionRule::kArgumentDirection;
+  if (!sig.argument_is_dynamic_array)
+    return NettypeResolutionRule::kArgumentIsDynamicArray;
+  if (!sig.argument_element_type_matches)
+    return NettypeResolutionRule::kArgumentElementType;
+  if (!sig.is_automatic) return NettypeResolutionRule::kAutomaticLifetime;
   // A class method is admissible only when it is static, because the resolution
   // call occurs with no class object involved.
-  if (sig.is_class_method && !sig.is_static_method) return false;
-  return true;
+  if (sig.is_class_method && !sig.is_static_method)
+    return NettypeResolutionRule::kClassStaticMethod;
+  return NettypeResolutionRule::kConforming;
 }
 
 }  // namespace delta
