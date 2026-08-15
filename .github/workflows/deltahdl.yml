@@ -1309,25 +1309,6 @@ jobs:
                 '06', '07', '08', '09', '10', '11',
                 '12', '13', '14', '15', '16', '17',
                 '18', '19']
-  # Exactly one of the two jobs below runs, so the run graph carries the
-  # answer determining-yamllint reached as a node with a name on it. A step
-  # deciding the same question inside the job that acts on it leaves no such
-  # trace: the job is reported the same way whether the lint ran or not, and
-  # reading which of the two happened means opening a log.
-  concluding-yamllint-necessary:
-    if: ${{ needs.determining-yamllint.outputs.yamllint-necessary == 'true' }}
-    needs: determining-yamllint
-    runs-on: ubuntu-latest
-    steps:
-      - name: No-op
-        run: 'true'
-  concluding-yamllint-unnecessary:
-    if: ${{ needs.determining-yamllint.outputs.yamllint-necessary == 'false' }}
-    needs: determining-yamllint
-    runs-on: ubuntu-latest
-    steps:
-      - name: No-op
-        run: 'true'
   copy-paste-src:
     runs-on: ubuntu-latest
     steps:
@@ -1451,43 +1432,6 @@ jobs:
           --language cpp
           --dir test/src/
           --dir lib/cpp/
-  determining-yamllint:
-    outputs:
-      yamllint-necessary: ${{ steps.decide.outputs.yamllint-necessary }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      - id: decide
-        name: Decide whether YAML linting is necessary
-        run: |
-          # A push names the commit its branch stood at beforehand, and that
-          # is the only event with a base to name. A workflow_dispatch run
-          # leaves this empty, which the fallback below answers by listing the
-          # whole tree.
-          base='${{ github.event.before }}'
-          head='${{ github.sha }}'
-          zero='0000000000000000000000000000000000000000'
-          # Listing the whole tree is never wrong, only wasteful: it answers
-          # yes on any push whose base is missing, zeroed or unreachable, and
-          # that is what a workflow_dispatch run wants, since the tree holds
-          # the files the pattern names.
-          if [ -z "$base" ] || [ "$base" = "$zero" ] \
-              || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
-            git ls-files | tee changed-files.txt
-          else
-            git diff --name-only "$base" "$head" | tee changed-files.txt
-          fi
-          # The lint covers the clang-tidy configurations as well as this
-          # workflow, so a change to either makes it necessary.
-          PATTERN='^(\.github/workflows/deltahdl\.yml|etc/clang_tidy/)'
-          if grep -qE "$PATTERN" changed-files.txt; then
-            necessary=true
-          else
-            necessary=false
-          fi
-          echo "yamllint-necessary=$necessary" | tee -a "$GITHUB_OUTPUT"
   # The twelve integration and e2e jobs below each test the jobs they need
   # rather than the health of the run. !cancelled() supplies a status function
   # so a skipped need does not carry the skip onwards by default, and the
@@ -2422,8 +2366,14 @@ jobs:
   # leave the formatting check, the length cap, the assertions and the
   # copy-paste detectors recorded neither green nor red. A job that did not run
   # reports nothing. Each scan stands on its own instead.
+  #
+  # Nothing stands in front of this job either. A pair of jobs deciding from
+  # the changed paths whether the lint was necessary stood there, and the same
+  # argument condemns them: on a push that touched neither this file nor
+  # etc/clang_tidy/, this job skipped, and a skip reports neither green nor
+  # red. Linting two paths on every run costs one runner and answers the
+  # question in the run graph.
   yamllint:
-    needs: concluding-yamllint-necessary
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
