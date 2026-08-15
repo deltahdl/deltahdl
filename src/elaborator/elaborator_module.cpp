@@ -505,6 +505,7 @@ void Elaborator::ResetItemElaborationState() {
   interconnect_names_.clear();
   scalar_var_names_.clear();
   real_var_names_.clear();
+  real_param_names_.clear();
   var_named_types_.clear();
   alias_pairs_.clear();
   alias_bit_pairs_.clear();
@@ -554,6 +555,7 @@ struct ItemElaborationStateSaver {
   decltype(Elaborator::interconnect_names_) interconnect_names;
   decltype(Elaborator::scalar_var_names_) scalar_var_names;
   decltype(Elaborator::real_var_names_) real_var_names;
+  decltype(Elaborator::real_param_names_) real_param_names;
   decltype(Elaborator::var_named_types_) var_named_types;
   decltype(Elaborator::alias_pairs_) alias_pairs;
   decltype(Elaborator::alias_bit_pairs_) alias_bit_pairs;
@@ -597,6 +599,7 @@ struct ItemElaborationStateSaver {
     interconnect_names = std::move(e.interconnect_names_);
     scalar_var_names = std::move(e.scalar_var_names_);
     real_var_names = std::move(e.real_var_names_);
+    real_param_names = std::move(e.real_param_names_);
     var_named_types = std::move(e.var_named_types_);
     alias_pairs = std::move(e.alias_pairs_);
     alias_bit_pairs = std::move(e.alias_bit_pairs_);
@@ -642,6 +645,7 @@ struct ItemElaborationStateSaver {
     e.interconnect_names_ = std::move(interconnect_names);
     e.scalar_var_names_ = std::move(scalar_var_names);
     e.real_var_names_ = std::move(real_var_names);
+    e.real_param_names_ = std::move(real_param_names);
     e.var_named_types_ = std::move(var_named_types);
     e.alias_pairs_ = std::move(alias_pairs);
     e.alias_bit_pairs_ = std::move(alias_bit_pairs);

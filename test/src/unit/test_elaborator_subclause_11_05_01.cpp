@@ -249,11 +249,13 @@ TEST(SelectElaboration, RealParameterSelectError) {
       "  assign y = P[0];\n"
       "endmodule\n",
       f);
-  // PopulateValueParamInfo records a real parameter in scalar_var_names_ and
-  // not in var_types_, so the select is caught by the scalar rule.
+  // §11.5.1: "A bit-select or part-select of a scalar, or of a real variable or
+  // real parameter, shall be illegal." `P` is a real parameter, which is the
+  // sentence's second alternative. This fails when the report names a scalar,
+  // which is its first.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "bit-select or part-select of a scalar is illegal",
-                            4, "11.5.1"));
+                            "bit-select of a real parameter is illegal", 4,
+                            "11.5.1"));
 }
 
 // §11.5.1 lists a packed structure among the operands a bit-select may
@@ -776,4 +778,115 @@ TEST(RealSelect, ContinuousAssignFromAnUnpackedArrayOfRealsIsLegal) {
       "endmodule\n",
       f);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §11.5.1: "A bit-select or part-select of a scalar, or of a real variable or
+// real parameter, shall be illegal." A real parameter is an operand of the
+// sentence's second alternative, so `P[0]` draws a report naming a real
+// parameter. This fails while PopulateValueParamInfo in
+// src/elaborator/elaborator_items.cpp records a real parameter in
+// scalar_var_names, because CheckScalarSelectNode in
+// src/elaborator/elaborator_validate.cpp then reports the first alternative
+// instead.
+TEST(RealSelect, BitSelectOfARealParameterNamesTheRealRule) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  parameter real P = 1.5;\n"
+      "  wire y;\n"
+      "  assign y = P[0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real parameter is illegal", 4,
+                            "11.5.1"));
+}
+
+// The same operand written as a part-select. §11.5.1 names a bit-select and a
+// part-select as two constructs, and `P[3:0]` is the second of them, so a
+// report naming a bit-select names the construct that was not written. This
+// fails when CheckRealSelectNode in src/elaborator/elaborator_validate.cpp
+// emits one message for every select of a real parameter rather than choosing
+// on the node's own `index_end`.
+TEST(RealSelect, PartSelectOfARealParameterNamesPartSelect) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  parameter real P = 1.5;\n"
+      "  wire [3:0] y;\n"
+      "  assign y = P[3:0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "part-select of a real parameter is illegal", 4,
+                            "11.5.1"));
+}
+
+// The ascending indexed form of the same part-select. Parser::ParseSelectExpr
+// sets `is_part_select_plus` on `P[0 +: 4]` and leaves `index_end` unset, so a
+// check reading `index_end` alone misses this select and calls it a bit-select.
+// This fails when CheckRealSelectNode in
+// src/elaborator/elaborator_validate.cpp reads `index_end` without reading
+// `is_part_select_plus`.
+TEST(RealSelect, IndexedPartSelectOfARealParameterNamesPartSelect) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  parameter real P = 1.5;\n"
+      "  wire [3:0] y;\n"
+      "  assign y = P[0 +: 4];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "part-select of a real parameter is illegal", 4,
+                            "11.5.1"));
+}
+
+// §11.5.1 states one rule, so one breach of it draws one report. This stops a
+// fix that adds the real-parameter report without removing the scalar one:
+// CheckRealSelectNode and CheckScalarSelectNode in
+// src/elaborator/elaborator_validate.cpp then both fire on `P[0]`, and the
+// second calls the real parameter a scalar, which is the other alternative of
+// the sentence.
+//
+// The count is read off f.diag.Diagnostics() directly because ReportedError in
+// lib/cpp/test_helpers/helpers_reported_error.h returns on its first match and
+// cannot see a second report.
+TEST(RealSelect, SelectOfARealParameterDrawsOneReport) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  parameter real P = 1.5;\n"
+      "  wire y;\n"
+      "  assign y = P[0];\n"
+      "endmodule\n",
+      f);
+  int errors = 0;
+  std::string recorded;
+  for (const auto& diag : f.diag.Diagnostics()) {
+    if (diag.severity != DiagSeverity::kError) continue;
+    ++errors;
+    recorded += "\n  ";
+    recorded += diag.message;
+  }
+  EXPECT_EQ(errors, 1) << "one select of a real parameter drew these errors:"
+                       << recorded;
+}
+
+// The first alternative of §11.5.1's sentence, and the control on the four
+// cases above. `x` is declared `logic`, which is a scalar and neither a real
+// variable nor a real parameter, so the scalar message is the one the sentence
+// states here. This stops a fix that routes every select to the real message.
+TEST(RealSelect, BitSelectOfAScalarStillNamesTheScalarRule) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic x;\n"
+      "  wire y;\n"
+      "  assign y = x[0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select or part-select of a scalar is illegal",
+                            4, "11.5.1"));
 }

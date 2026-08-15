@@ -53,19 +53,27 @@ void CheckForceLhs(
     const Stmt* s, const std::unordered_set<std::string_view>& net_names,
     const std::unordered_set<std::string_view>& nettype_net_names,
     DiagEngine& diag);
-// §11.5.1: `reals` holds the real variables the clause's second alternative
-// names -- those declared with no unpacked dimension -- and decides the operand
-// report. `types` is read for the index expression only, which the clause bars
-// separately from being of real type.
-void CheckRealSelect(const Expr* e, const TypeMap& types, const NameSet& reals,
-                     DiagEngine& diag);
+// §11.5.1's second alternative names two operands, "a real variable or real
+// parameter". They are carried in separate sets because the report names the
+// noun the clause gives the operand it found, and a parameter is not a
+// variable. Each set holds only the names declared with no unpacked dimension,
+// since §11.5.2 makes an address written after such a name an element select.
+struct RealOperands {
+  const NameSet& variables;
+  const NameSet& parameters;
+};
+
+// §11.5.1: `reals` decides the operand report. `types` is read for the index
+// expression only, which the clause bars separately from being of real type.
+void CheckRealSelect(const Expr* e, const TypeMap& types,
+                     const RealOperands& reals, DiagEngine& diag);
 void CheckScalarSelect(const Expr* e, const NameSet& scalars, DiagEngine& diag);
 void CheckIndexedPartSelectWidth(const Expr* e, const ScopeMap& scope,
                                  DiagEngine& diag);
 void CheckScalarSelectStmt(const Stmt* s, const NameSet& scalars,
                            DiagEngine& diag);
 void CheckRealSelectStmt(const Stmt* s, const TypeMap& types,
-                         const NameSet& reals, DiagEngine& diag);
+                         const RealOperands& reals, DiagEngine& diag);
 void CheckIndexedPartSelectWidthStmt(const Stmt* s, const ScopeMap& scope,
                                      DiagEngine& diag);
 

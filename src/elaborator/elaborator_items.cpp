@@ -270,16 +270,24 @@ void CheckTypeParamConformsToForwardKind(const ModuleItem* item, bool is_type,
   CheckTypeParamIsAggregateKind(item, fwd, *resolved, diag);
 }
 
-// Fills the value-parameter type information on `pd` and, per §11.5.1, records
-// a real-typed parameter as a scalar so any later bit/part select is rejected.
+// Fills the value-parameter type information on `pd` and records a real-typed
+// parameter in `real_param_names`, which is the set CheckRealSelectNode in
+// src/elaborator/elaborator_validate.cpp reads to reject a later bit-select or
+// part-select of it. §11.5.1 states one sentence -- "A bit-select or
+// part-select of a scalar, or of a real variable or real parameter, shall be
+// illegal" -- whose second alternative names a real parameter, so the name goes
+// in the set standing for that alternative rather than in scalar_var_names_,
+// which stands for the first.
+//
+// A parameter carrying an unpacked dimension stays out, because §11.5.2 makes
+// an address written after such a name an array element select: `parameter real
+// P[4] = '{default: 0.0}; v = P[0];` reads one real element and is legal.
 void PopulateValueParamInfo(
     RtlirParamDecl& pd, const ModuleItem* item,
-    std::unordered_set<std::string_view>& scalar_var_names) {
+    std::unordered_set<std::string_view>& real_param_names) {
   PopulateParamTypeInfo(pd, item->data_type);
-  DataTypeKind pk = item->data_type.kind;
-  if (pk == DataTypeKind::kReal || pk == DataTypeKind::kShortreal ||
-      pk == DataTypeKind::kRealtime) {
-    scalar_var_names.insert(item->name);
+  if (item->unpacked_dims.empty() && IsRealType(item->data_type.kind)) {
+    real_param_names.insert(item->name);
   }
 }
 
@@ -349,7 +357,7 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   pd.is_localparam = item->is_localparam || mod->has_param_port_list;
   pd.default_value = item->init_expr;
   if (!is_type) {
-    PopulateValueParamInfo(pd, item, scalar_var_names_);
+    PopulateValueParamInfo(pd, item, real_param_names_);
     // §11.5.1: a select on this parameter names bits by their index in the
     // range it is declared with, so keep the two bounds. They are folded
     // against the parameters already elaborated, which is what a bound written

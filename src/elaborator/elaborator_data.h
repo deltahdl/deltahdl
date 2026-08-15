@@ -161,6 +161,11 @@ class ElaboratorData {
   // selects an element whose type is real and is legal, so `arr` is not in this
   // set even though its element type is real.
   std::unordered_set<std::string_view> real_var_names_;
+  // §11.5.1: the real parameters the same sentence names beside the real
+  // variables. The two are kept apart because the report names the noun the
+  // clause gives the operand, and a parameter is not a variable. The same
+  // §11.5.2 reason keeps a parameter declared with an unpacked dimension out.
+  std::unordered_set<std::string_view> real_param_names_;
   std::unordered_set<std::string_view> task_names_;
   std::unordered_set<std::string_view> let_names_;  // §11.12 let decl names
   std::unordered_set<std::string_view> sequence_names_;

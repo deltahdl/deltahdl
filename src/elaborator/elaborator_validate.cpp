@@ -489,27 +489,30 @@ using TypeMap = std::unordered_map<std::string_view, DataTypeKind>;
 using NameSet = std::unordered_set<std::string_view>;
 
 static void CheckRealSelectNode(const Expr* e, const TypeMap& types,
-                                const NameSet& reals, DiagEngine& diag) {
+                                const RealOperands& reals, DiagEngine& diag) {
   auto name = ExprIdent(e->base);
-  if (!name.empty() && reals.count(name) != 0) {
+  const bool kIsRealVar = !name.empty() && reals.variables.count(name) != 0;
+  const bool kIsRealParam = !name.empty() && reals.parameters.count(name) != 0;
+  if (kIsRealVar || kIsRealParam) {
     // §11.5.1: "A bit-select or part-select of a scalar, or of a real variable
-    // or real parameter, shall be illegal." The sentence names two constructs,
-    // so the report names the one that was written. A select node carries
-    // `index_end` for `[m:l]` and `is_part_select_plus` or
-    // `is_part_select_minus` for `[b +: w]` and `[b -: w]`, the same three
-    // fields CheckIndexedPartSelectWidthNode reads; a node with none of them
-    // set is a bit-select.
+    // or real parameter, shall be illegal." The sentence names two constructs
+    // and two real operands, so the report names the construct that was written
+    // and the operand it was written on. A select node carries `index_end` for
+    // `[m:l]` and `is_part_select_plus` or `is_part_select_minus` for `[b +:
+    // w]` and `[b -: w]`, the same three fields CheckIndexedPartSelectWidthNode
+    // reads; a node with none of them set is a bit-select.
     //
-    // `reals` holds the real variables declared with no unpacked dimension,
-    // which is why it is asked rather than the declared type of the operand: a
-    // real variable carrying an unpacked dimension is not in the set, because
+    // The two name sets are asked rather than the declared type of the operand,
+    // because a real declared with an unpacked dimension is in neither set:
     // §11.5.2 makes indexing it an array element select, so
     // `real arr[4]; v = arr[i];` reads an element and is legal.
     const bool kIsBitSelect =
         !e->index_end && !e->is_part_select_plus && !e->is_part_select_minus;
+    const char* const kConstruct = kIsBitSelect ? "bit-select" : "part-select";
+    const char* const kOperand =
+        kIsRealVar ? "real variable" : "real parameter";
     diag.Error(e->range.start,
-               kIsBitSelect ? "bit-select of a real variable is illegal"
-                            : "part-select of a real variable is illegal",
+               std::format("{} of a {} is illegal", kConstruct, kOperand),
                Subclause("11.5.1"));
     // Returning here leaves the index check below unreached for this node, so
     // `real a; real i; assign b = a[i];` draws the operand report alone. That
@@ -528,8 +531,8 @@ static void CheckRealSelectNode(const Expr* e, const TypeMap& types,
   }
 }
 
-void CheckRealSelect(const Expr* e, const TypeMap& types, const NameSet& reals,
-                     DiagEngine& diag) {
+void CheckRealSelect(const Expr* e, const TypeMap& types,
+                     const RealOperands& reals, DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kSelect && e->base) {
     CheckRealSelectNode(e, types, reals, diag);
@@ -618,7 +621,7 @@ void CheckScalarSelectStmt(const Stmt* s, const NameSet& scalars,
 // applies to one written on a continuous assignment, so the real-operand check
 // reaches every statement position CheckScalarSelectStmt reaches.
 void CheckRealSelectStmt(const Stmt* s, const TypeMap& types,
-                         const NameSet& reals, DiagEngine& diag) {
+                         const RealOperands& reals, DiagEngine& diag) {
   if (!s) return;
   CheckRealSelect(s->lhs, types, reals, diag);
   CheckRealSelect(s->rhs, types, reals, diag);
