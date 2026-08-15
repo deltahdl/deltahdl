@@ -199,13 +199,13 @@ TEST(KeywordVersionExamplePreproc,
 // src/main.cpp:397 alone, and the Preprocess of
 // lib/cpp/test_fixtures/fixture_preprocessor.h does not call it.
 TEST(KeywordVersionExamplePreproc, BeginKeywordsLineIsOneLineOfOutput) {
-  const std::string src =
+  const std::string kSrc =
       "`begin_keywords \"1364-2001\"\n"
       "module m2;\n"
       "  reg [63:0] v;\n"
       "endmodule\n";
   PreprocFixture f;
-  auto out = Preprocess(src, f);
+  auto out = Preprocess(kSrc, f);
 
   // The marker says the directive reached HandleBeginKeywords. Without this the
   // case would pass on a source whose specifier the preprocessor rejected: that
@@ -215,7 +215,7 @@ TEST(KeywordVersionExamplePreproc, BeginKeywordsLineIsOneLineOfOutput) {
   ASSERT_EQ(versions.size(), 1u);
   EXPECT_EQ(versions[0], KeywordVersion::kVer13642001);
 
-  EXPECT_EQ(Newlines(out), Newlines(src));
+  EXPECT_EQ(Newlines(out), Newlines(kSrc));
 }
 
 // An `end_keywords directive line likewise occupies one line of preprocessed
@@ -228,14 +228,14 @@ TEST(KeywordVersionExamplePreproc, BeginKeywordsLineIsOneLineOfOutput) {
 // BeginKeywordsLineIsOneLineOfOutput passes is HandleEndKeywords writing the
 // extra newline; both failing is HandleBeginKeywords doing so.
 TEST(KeywordVersionExamplePreproc, EndKeywordsLineIsOneLineOfOutput) {
-  const std::string src =
+  const std::string kSrc =
       "`begin_keywords \"1364-2001\"\n"
       "`end_keywords\n"
       "module m1;\n"
       "  reg [63:0] v;\n"
       "endmodule\n";
   PreprocFixture f;
-  auto out = Preprocess(src, f);
+  auto out = Preprocess(kSrc, f);
   EXPECT_FALSE(f.diag.HasErrors());
 
   // Both markers say both handlers ran, for the reason given above the first
@@ -244,7 +244,7 @@ TEST(KeywordVersionExamplePreproc, EndKeywordsLineIsOneLineOfOutput) {
   ASSERT_EQ(versions.size(), 2u);
   EXPECT_EQ(versions[1], KeywordVersion::kVer18002023);
 
-  EXPECT_EQ(Newlines(out), Newlines(src));
+  EXPECT_EQ(Newlines(out), Newlines(kSrc));
 }
 
 }  // namespace
