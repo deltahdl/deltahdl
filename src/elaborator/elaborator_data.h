@@ -153,6 +153,14 @@ class ElaboratorData {
   std::unordered_map<std::string_view, std::string_view> nettype_canonical_;
   std::unordered_set<std::string_view> interconnect_names_;
   std::unordered_set<std::string_view> scalar_var_names_;
+  // §11.5.1: the real variables the sentence "A bit-select or part-select of a
+  // scalar, or of a real variable or real parameter, shall be illegal" names in
+  // its second alternative. A variable is here only when it was declared with
+  // no unpacked dimension, because §11.5.2 makes indexing an unpacked array an
+  // array element select rather than a bit-select: `real arr[4]; v = arr[i];`
+  // selects an element whose type is real and is legal, so `arr` is not in this
+  // set even though its element type is real.
+  std::unordered_set<std::string_view> real_var_names_;
   std::unordered_set<std::string_view> task_names_;
   std::unordered_set<std::string_view> let_names_;  // §11.12 let decl names
   std::unordered_set<std::string_view> sequence_names_;

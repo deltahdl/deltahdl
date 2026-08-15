@@ -709,3 +709,71 @@ TEST(RealSelect, SelectOfARealInAProceduralStatementNamesTheRealRule) {
                             "bit-select of a real variable is illegal", 4,
                             "11.5.1"));
 }
+
+// §11.5.2 "Array and memory addressing": an address written after the name of
+// an array selects one of that array's elements -- "The syntax for a memory
+// address shall consist of the name of the memory and an expression for the
+// address" -- and only "Once selected" do bit-selects and part-selects of the
+// selected word fall to §11.5.1. So `arr[i]` on `real arr[4]` selects one real
+// element, and is not a select of bits out of a real.
+//
+// This fails when CheckRealSelectNode in src/elaborator/elaborator_validate.cpp
+// decides its operand is a real by looking the base name up in var_types_,
+// which records the type kind of every variable including one declared with an
+// unpacked dimension. §11.5.1's sentence -- "A bit-select or part-select of a
+// scalar, or of a real variable or real parameter, shall be illegal" -- names a
+// real variable, and `arr` is an array whose elements are real rather than a
+// real variable, so the check reaches past the rule it enforces.
+TEST(RealSelect, ElementSelectOfAnUnpackedArrayOfRealsIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real arr[4];\n"
+      "  real v;\n"
+      "  int i;\n"
+      "  initial v = arr[i];\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The same §11.5.2 element select written as the target of a procedural
+// statement rather than as an operand read by one. CheckRealSelectStmt in
+// src/elaborator/elaborator_validate.cpp reaches a statement's target through
+// `s->lhs` and its source through `s->rhs`, two separate calls into
+// CheckRealSelect, so a fix that stops §11.5.1's check overreaching on one
+// position leaves the other reporting. Both positions hold the same element
+// select of an unpacked array of reals, which §11.5.2 makes legal.
+TEST(RealSelect, ElementSelectOfAnUnpackedArrayOfRealsAsATargetIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real arr[4];\n"
+      "  real v;\n"
+      "  int i;\n"
+      "  initial arr[i] = 4.0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The third position §11.5.1's check reaches: the right-hand side of a
+// continuous assignment, which src/elaborator/elaborator_validate_matches.cpp
+// passes to CheckRealSelect separately from the procedural walk above. §10.3.2
+// makes the assignment itself legal -- "The continuous assignment statement
+// shall place a continuous assignment on a net or variable data type" -- so
+// `real v` is a permitted target, and §11.5.2 makes `arr[0]` an element select
+// rather than a select of bits out of a real. The index is a literal here, so
+// this also pins that the overreach does not depend on the index being a
+// variable.
+TEST(RealSelect, ContinuousAssignFromAnUnpackedArrayOfRealsIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real arr[4];\n"
+      "  real v;\n"
+      "  assign v = arr[0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}

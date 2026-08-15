@@ -53,13 +53,19 @@ void CheckForceLhs(
     const Stmt* s, const std::unordered_set<std::string_view>& net_names,
     const std::unordered_set<std::string_view>& nettype_net_names,
     DiagEngine& diag);
-void CheckRealSelect(const Expr* e, const TypeMap& types, DiagEngine& diag);
+// §11.5.1: `reals` holds the real variables the clause's second alternative
+// names -- those declared with no unpacked dimension -- and decides the operand
+// report. `types` is read for the index expression only, which the clause bars
+// separately from being of real type.
+void CheckRealSelect(const Expr* e, const TypeMap& types, const NameSet& reals,
+                     DiagEngine& diag);
 void CheckScalarSelect(const Expr* e, const NameSet& scalars, DiagEngine& diag);
 void CheckIndexedPartSelectWidth(const Expr* e, const ScopeMap& scope,
                                  DiagEngine& diag);
 void CheckScalarSelectStmt(const Stmt* s, const NameSet& scalars,
                            DiagEngine& diag);
-void CheckRealSelectStmt(const Stmt* s, const TypeMap& types, DiagEngine& diag);
+void CheckRealSelectStmt(const Stmt* s, const TypeMap& types,
+                         const NameSet& reals, DiagEngine& diag);
 void CheckIndexedPartSelectWidthStmt(const Stmt* s, const ScopeMap& scope,
                                      DiagEngine& diag);
 

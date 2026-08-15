@@ -369,6 +369,7 @@ struct VarDeclNameTables {
   std::unordered_set<std::string_view>& const_var_names;
   std::unordered_map<std::string_view, DataTypeKind>& var_types;
   std::unordered_set<std::string_view>& scalar_var_names;
+  std::unordered_set<std::string_view>& real_var_names;
   std::unordered_set<std::string_view>& packed_array_vars;
   std::unordered_map<std::string_view, std::string_view>& var_named_types;
 };
@@ -455,20 +456,23 @@ static void RegisterVarDeclNames(const ModuleItem* item,
   }
   tables.var_types[item->name] = item->data_type.kind;
   // §7.4/§7.8: a variable carrying an unpacked dimension (fixed, dynamic,
-  // queue, or associative array) is neither a scalar nor a packed-array
-  // variable for select-legality purposes; indexing it is a legal array
-  // select, not a bit-select of a scalar. Only dimensionless variables are
-  // classified here.
+  // queue, or associative array) is neither a scalar, nor a real variable, nor
+  // a packed-array variable for select-legality purposes; §11.5.2 makes
+  // indexing it an array element select, not a bit-select. Only dimensionless
+  // variables are classified here, so `real arr[4];` is left out of
+  // real_var_names and `arr[i]` reads an element whose type is real.
   if (item->unpacked_dims.empty()) {
+    // §11.5.1: "A bit-select or part-select of a scalar, or of a real variable
+    // or real parameter, shall be illegal." The sentence's two alternatives get
+    // one name set each, and the two sets are disjoint: a real variable is the
+    // second alternative and not the first, so it is recorded here and excluded
+    // from scalar_var_names below. Recording it as a scalar as well made one
+    // breach draw two reports. CheckRealSelect and CheckRealSelectStmt read
+    // real_var_names and name the alternative that fits the select written.
+    if (IsRealType(item->data_type.kind))
+      tables.real_var_names.insert(item->name);
     if (item->data_type.packed_dim_left)
       tables.packed_array_vars.insert(item->name);
-    // §11.5.1: "A bit-select or part-select of a scalar, or of a real variable
-    // or real parameter, shall be illegal." A real variable is the second
-    // alternative of that sentence and not the first, so it is not recorded as
-    // a scalar and does not draw the scalar message. CheckRealSelect and
-    // CheckRealSelectStmt report a select on a real variable, naming the
-    // alternative that fits it; recording the real here as well made one breach
-    // draw two reports.
     else if (!IsIntegerAtomKind(item->data_type.kind) &&
              !IsRealType(item->data_type.kind) &&
              !IsPackedAggregateVar(item->data_type, typedefs) &&
@@ -573,7 +577,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   RegisterVarDeclNames(
       item,
       {const_names_, const_var_names_, var_types_, scalar_var_names_,
-       packed_array_vars_, var_named_types_},
+       real_var_names_, packed_array_vars_, var_named_types_},
       typedefs_, diag_);
   // §10.10.1 / §11.2.2: keep the named-type association for a variable that
   // adopted a typedef array's dimensions above; rewriting it to a non-named
