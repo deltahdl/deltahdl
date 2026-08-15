@@ -1,12 +1,15 @@
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
+#include "helpers_reported_error.h"
 #include "synthesizer/synth_lower.h"
 
 using namespace delta;
 
 namespace {
 
+// A disable reached through the then-branch of an `if` is reported at the
+// `disable` rather than at the `if` or at the procedure.
 TEST(DisableStatementSynthesis, RejectDisableInAlwaysComb) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -22,9 +25,13 @@ TEST(DisableStatementSynthesis, RejectDisableInAlwaysComb) {
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
   EXPECT_EQ(aig, nullptr);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "disable statement is not synthesizable", 5,
+                            "9.6.2"));
 }
 
+// The report stands wherever the disable stands, so a sequential procedure
+// gets it as a combinational one does.
 TEST(DisableStatementSynthesis, RejectDisableInAlwaysFF) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -39,7 +46,9 @@ TEST(DisableStatementSynthesis, RejectDisableInAlwaysFF) {
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
   EXPECT_EQ(aig, nullptr);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "disable statement is not synthesizable", 4,
+                            "9.6.2"));
 }
 
 // §9.6.2: a disable statement terminates the activity of an active process,

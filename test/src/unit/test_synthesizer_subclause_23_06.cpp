@@ -54,6 +54,11 @@ TEST(HierarchicalNameSynthesis, HierarchicalNameReadInAssignmentIsReported) {
                             8, "7.2.1"));
 }
 
+// The report comes from Elaborator::ValidateHierRefIntoChecker, at the
+// continuous assignment, before any graph is built. Naming it is what says the
+// source was stopped by §23.6's rule on hierarchical names rather than by the
+// §7.2.1 report the case above draws, which a member access into a module
+// instance draws too.
 TEST(HierarchicalNameSynthesis, HierarchicalRefIntoCheckerRejectedBeforeSynth) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -65,7 +70,9 @@ TEST(HierarchicalNameSynthesis, HierarchicalRefIntoCheckerRejectedBeforeSynth) {
                            "  logic x;\n"
                            "  assign x = chk_inst.captured;\n"
                            "endmodule\n");
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "hierarchical reference into a checker is not permitted", 7, "23.6"));
   if (mod) {
     SynthLower synth(f.arena, f.diag);
     (void)synth.Lower(mod);

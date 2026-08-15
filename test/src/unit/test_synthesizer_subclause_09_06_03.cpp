@@ -1,12 +1,15 @@
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
+#include "helpers_reported_error.h"
 #include "synthesizer/synth_lower.h"
 
 using namespace delta;
 
 namespace {
 
+// A disable fork standing after a statement the synthesizer does lower is
+// still reported, and at its own line rather than at the block's.
 TEST(DisableForkSynthesis, RejectDisableForkInAlwaysComb) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -21,9 +24,13 @@ TEST(DisableForkSynthesis, RejectDisableForkInAlwaysComb) {
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
   EXPECT_EQ(aig, nullptr);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "disable fork statement is not synthesizable", 5,
+                            "9.6.3"));
 }
 
+// The report stands wherever the disable fork stands, so a sequential
+// procedure gets it as a combinational one does.
 TEST(DisableForkSynthesis, RejectDisableForkInAlwaysFF) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -38,7 +45,9 @@ TEST(DisableForkSynthesis, RejectDisableForkInAlwaysFF) {
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
   EXPECT_EQ(aig, nullptr);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "disable fork statement is not synthesizable", 4,
+                            "9.6.3"));
 }
 
 // §9.6.3: a disable fork statement terminates every descendant subprocess of

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
+#include "helpers_reported_error.h"
 #include "synthesizer/aig.h"
 #include "synthesizer/aig_opt.h"
 #include "synthesizer/synth_lower.h"
@@ -172,6 +173,9 @@ TEST(SynthLower, AssignXorGate) {
   EXPECT_NE(aig->outputs[0], AigGraph::kConstFalse);
 }
 
+// No graph comes back for a module whose combinational procedure reads a
+// system function, and the report names the callee, so a design calling
+// several says which one left it without a netlist.
 TEST(SynthLower, RejectSystemCall) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -183,7 +187,10 @@ TEST(SynthLower, RejectSystemCall) {
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
   EXPECT_EQ(aig, nullptr);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "system task or system function '$random' is not synthesizable", 3,
+      "5.6.3"));
 }
 
 TEST(SynthLower, PortInputsMappedToAigInputs) {

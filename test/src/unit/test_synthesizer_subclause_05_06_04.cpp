@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "synthesizer/synth_lower.h"
 
@@ -40,6 +41,12 @@ TEST(CompilerDirectiveSynthesis, DirectivePersistsToSynthesizedModule) {
   EXPECT_NE(aig, nullptr);
 }
 
+// The second compilation unit gets its own Preprocessor, so `ONLY` is undefined
+// in it and the report is the §22.5.1 one for a text-macro usage naming an
+// undefined macro, at the line the usage stands on. The case used to accept
+// either no module or any error at all, which held whatever went wrong in the
+// second unit and would have held had the macro been defined and the module
+// rejected for some other reason.
 TEST(CompilerDirectiveSynthesis, MacroIsolatedBetweenCus) {
   {
     SynthFixture f1;
@@ -52,13 +59,14 @@ TEST(CompilerDirectiveSynthesis, MacroIsolatedBetweenCus) {
     ASSERT_NE(mod, nullptr);
   }
   SynthFixture f2;
-  const auto* mod2 = PreprocessAndElaborate(
+  (void)PreprocessAndElaborate(
       f2,
       "module b(input logic [`ONLY-1:0] x, output logic [`ONLY-1:0] y);\n"
       "  assign y = x;\n"
       "endmodule\n");
 
-  EXPECT_TRUE(mod2 == nullptr || f2.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f2.diag.Diagnostics(), "undefined macro 'ONLY'", 1,
+                            "22.5.1"));
 }
 
 }  // namespace

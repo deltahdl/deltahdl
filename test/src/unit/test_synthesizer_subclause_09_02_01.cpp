@@ -1,12 +1,15 @@
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
+#include "helpers_reported_error.h"
 #include "synthesizer/synth_lower.h"
 
 using namespace delta;
 
 namespace {
 
+// The whole module written on one line still puts the report on that line,
+// which is the line the `initial` keyword stands on.
 TEST(InitialProcedureSynthesis, RejectInitialBlock) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f, "module m; initial begin end endmodule");
@@ -14,7 +17,9 @@ TEST(InitialProcedureSynthesis, RejectInitialBlock) {
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
   EXPECT_EQ(aig, nullptr);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "initial procedure is not synthesizable", 1,
+                            "9.2.1"));
 }
 
 // §9.2.1: an initial procedure executes once and then ceases, so a module

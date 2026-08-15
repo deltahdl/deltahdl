@@ -1,13 +1,23 @@
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
+#include "helpers_reported_error.h"
 #include "synthesizer/synth_lower.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(NamedEventWaitSynthesis, RejectAtEventWaitInAlways) {
+// §15.5.2's report reaches a named event named in the sensitivity list an
+// `always` construct is built from, and not one named by an event control
+// standing as a statement inside the block. SynthLower::CheckSynthesizable
+// reads the list through NamedEventTrigger and reaches the statement through
+// CheckStmtSynthesizable, which knows the kind and not what the kind waits on,
+// so the source below draws the §9.4.2 report for an event control instead.
+// The case names that report rather than claiming coverage of §15.5.2 it does
+// not have.
+TEST(NamedEventWaitSynthesis,
+     NamedEventInEventControlStatementDrawsTheEventControlReport) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module m;\n"
@@ -19,10 +29,15 @@ TEST(NamedEventWaitSynthesis, RejectAtEventWaitInAlways) {
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
   EXPECT_EQ(aig, nullptr);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "event control is not synthesizable", 4, "9.4.2"));
 }
 
-TEST(NamedEventWaitSynthesis, RejectBareAtEventWaitInAlways) {
+// The bare `@ev` form of the event control reaches the same report as the
+// parenthesized `@(ev)` above, so neither spelling is the one that escapes
+// §15.5.2's report while the other is caught.
+TEST(NamedEventWaitSynthesis,
+     BareNamedEventControlStatementDrawsTheEventControlReport) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module m;\n"
@@ -34,9 +49,13 @@ TEST(NamedEventWaitSynthesis, RejectBareAtEventWaitInAlways) {
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
   EXPECT_EQ(aig, nullptr);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "event control is not synthesizable", 4, "9.4.2"));
 }
 
+// An `always` whose body is the null statement still has its sensitivity list
+// read, so the named event in the list is reported even though there is no
+// statement to lower. The report stands at the event identifier.
 TEST(NamedEventWaitSynthesis, RejectAtEventWaitNullBody) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -48,22 +67,9 @@ TEST(NamedEventWaitSynthesis, RejectAtEventWaitNullBody) {
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
   EXPECT_EQ(aig, nullptr);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(NamedEventWaitSynthesis, RejectEventTriggerInAlways) {
-  SynthFixture f;
-  auto* mod = ElaborateSrc(f,
-                           "module m;\n"
-                           "  event ev;\n"
-                           "  reg x;\n"
-                           "  always begin -> ev; x = 1; end\n"
-                           "endmodule");
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  auto* aig = synth.Lower(mod);
-  EXPECT_EQ(aig, nullptr);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "named event in event control is not synthesizable",
+                            3, "15.5.2"));
 }
 
 // §15.5.2: the `@` operator blocks the calling process until the named event
