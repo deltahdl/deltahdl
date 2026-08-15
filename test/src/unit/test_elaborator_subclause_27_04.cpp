@@ -125,12 +125,14 @@ TEST(GenerateElaboration, GenerateForNonTerminatingLoopErrors) {
       "  endgenerate\n"
       "endmodule\n",
       f);
-  // The report is emitted with Subclause::None() in
-  // src/elaborator/elaborator_generate.cpp, because what it states is that the
-  // elaborator's own iteration cap was reached, so there is no subclause text
-  // to name here.
+  // §27.4 states the rule this breaks -- "It shall be an error if the loop
+  // generate scheme does not terminate" -- so the report names it, alongside
+  // the three other §27.4 rules this file covers. The iteration cap in
+  // src/elaborator/elaborator_generate.cpp is how the condition is detected
+  // and is not itself the rule.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "generate-for loop did not terminate", 3, ""));
+                            "loop generate scheme does not terminate", 3,
+                            "27.4"));
 }
 
 TEST(GenerateElaboration, GenerateForRepeatedGenvarValueErrors) {

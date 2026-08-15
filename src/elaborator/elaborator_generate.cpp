@@ -564,9 +564,14 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
     loop_scope[genvar_name] = *next;
   }
 
+  // §27.4: "It shall be an error if the loop generate scheme does not
+  // terminate." The message states that rule rather than the iteration cap,
+  // which is how this elaborator detects the condition and not the condition
+  // itself. The genvar-repeats check above catches a scheme that revisits a
+  // value; reaching the cap is what is left.
   if (iter == kMaxGenerateIterations) {
-    diag_.Error(item->loc, "generate-for loop did not terminate",
-                Subclause::None());
+    diag_.Error(item->loc, "loop generate scheme does not terminate",
+                Subclause("27.4"));
   }
 
   close_loop();
