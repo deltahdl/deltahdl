@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -92,6 +93,12 @@ struct ProtectKeyBlockRequest {
   std::string keyname;
   std::string public_key;
   ProtectDataDecryption data;
+  // The 1-based line of the input the designation was written on. §34.5.27
+  // holds the blocks of one envelope to encoding the same data decryption key
+  // data, and what tells somebody which two blocks disagreed is where each was
+  // asked for, so the position travels on the request rather than being
+  // recovered afterwards from a text the request no longer names.
+  uint32_t line = 0;
 };
 
 // The key blocks one encryption envelope asks for, in the order it asked.
@@ -105,15 +112,16 @@ class ProtectKeyBlockRequests {
  public:
   // Records that the region designated one of `keyowner`'s keys by the name
   // given to it, with `data` the data decryption pragma expressions in effect
-  // where the designation was written.
+  // where the designation was written and `line` the 1-based line of the input
+  // it was written on.
   void Designate(std::string_view keyowner, std::string_view keyname,
-                 const ProtectDataDecryption& data);
+                 const ProtectDataDecryption& data, uint32_t line);
 
   // The same, for the designation §34.5.26 writes as a public key. `key` is the
   // key itself, the line that carried it having already been read out of the
   // scheme it was encoded under.
   void DesignatePublicKey(std::string_view keyowner, std::string_view key,
-                          const ProtectDataDecryption& data);
+                          const ProtectDataDecryption& data, uint32_t line);
 
   const std::vector<ProtectKeyBlockRequest>& Requests() const {
     return requests_;
@@ -141,11 +149,18 @@ struct ProtectKeyBlocks {
   // §34.5.20's default sends a text that named none.
   std::string digest_key;
   std::string directives;
-  // Whether the data decryption pragma expressions changed value between two of
-  // the requests. §34.5.27 has every key block of one envelope encode the same
-  // data decryption key data, so a region that changed them between two of them
-  // asked for blocks that cannot all be the keys of the same data.
-  bool data_changed = false;
+  // The 1-based line of the input the first request that disagreed with the
+  // first one was written on, and zero where they all agreed. §34.5.27 has
+  // every key block of one envelope encode the same data decryption key data,
+  // so a region that changed them between two of them asked for blocks that
+  // cannot all be the keys of the same data.
+  //
+  // It is the line rather than a bare yes because that is what somebody told
+  // about the disagreement has to be given: a region designating several
+  // readers writes its blocks over as many lines, and a report standing at none
+  // of them leaves an author to find which two blocks differ by rereading the
+  // whole region.
+  uint32_t data_changed_line = 0;
 };
 
 // The key a tool makes for one region: the key §34.5.14 has an IP author

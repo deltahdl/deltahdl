@@ -609,7 +609,7 @@ TEST(ProtectBeginProtectedDescription,
 TEST(ProtectBeginProtectedDescription,
      TheBlockInsideTheSealedModelIsNotTakenForOneOfThisEnvelopes) {
   EncryptionRun run(RegionAround(SealedModel()));
-  EXPECT_FALSE(run.report.data_block_outside_protected_block);
+  EXPECT_EQ(run.diag.ErrorCount(), 0U);
 }
 
 // §34.5.13's keyword is the other shape a protect pragma inside the model can
@@ -676,7 +676,7 @@ TEST(ProtectBeginProtectedDescription,
 TEST(ProtectBeginProtectedDescription,
      NeitherBlockOfTheNestedSealedModelsIsReported) {
   EncryptionRun run(RegionAround(SealedModelHoldingAnother()));
-  EXPECT_FALSE(run.report.data_block_outside_protected_block);
+  EXPECT_EQ(run.diag.ErrorCount(), 0U);
   EXPECT_FALSE(Holds(run.text, kNestedBlockMarker));
 }
 
@@ -785,7 +785,7 @@ TEST(ProtectBeginProtectedDescription,
 TEST(ProtectBeginProtectedDescription,
      ASealedModelWithNoClosingExpressionLeavesNothingToEncrypt) {
   EncryptionRun run(RegionAroundAnUnclosedSealedModel());
-  EXPECT_FALSE(run.report.data_block_outside_protected_block);
+  EXPECT_EQ(run.diag.ErrorCount(), 0U);
   EXPECT_FALSE(Holds(run.text, kCurrentMethod));
   EXPECT_TRUE(Holds(run.text, kOuterStatement));
   EXPECT_TRUE(Holds(run.text, kSealedBlockMarker));

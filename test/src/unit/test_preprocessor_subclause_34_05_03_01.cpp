@@ -309,7 +309,7 @@ TEST(ProtectBeginProtectedSyntax,
 TEST(ProtectBeginProtectedSyntax, TheWordAloneMarksASealedModelForEncrypting) {
   EncryptionRun run(
       RegionAroundSealedModel("`pragma protect begin_protected\n"));
-  EXPECT_FALSE(run.report.data_block_outside_protected_block);
+  EXPECT_EQ(run.diag.ErrorCount(), 0U);
 }
 
 // What that marking is worth in the produced text. The sealed model's lines are
@@ -421,9 +421,12 @@ TEST(ProtectBeginProtectedSyntax, AValuedOpeningWordLeavesTheDesignSealed) {
 // envelope it could have come out of.
 TEST(ProtectBeginProtectedSyntax,
      TheValuedWordMarksNoSealedModelWhenEncrypting) {
-  EncryptionRun run(
-      RegionAroundSealedModel("`pragma protect begin_protected=\"1\"\n"));
-  EXPECT_TRUE(run.report.data_block_outside_protected_block);
+  std::string src =
+      RegionAroundSealedModel("`pragma protect begin_protected=\"1\"\n");
+  EncryptionRun run(src);
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "data_block is written where no previously",
+                            LineHolding(src, "data_block="), "34.5.15"));
 }
 
 // The parenthesized value read by the encrypting half, which is the pairing the
@@ -440,9 +443,12 @@ TEST(ProtectBeginProtectedSyntax,
 // description of itself unread.
 TEST(ProtectBeginProtectedSyntax,
      AParenthesizedValueMarksNoSealedModelWhenEncrypting) {
-  EncryptionRun run(RegionAroundSealedModel(
-      "`pragma protect begin_protected=(enctype=\"raw\")\n"));
-  EXPECT_TRUE(run.report.data_block_outside_protected_block);
+  std::string src = RegionAroundSealedModel(
+      "`pragma protect begin_protected=(enctype=\"raw\")\n");
+  EncryptionRun run(src);
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "data_block is written where no previously",
+                            LineHolding(src, "data_block="), "34.5.15"));
 }
 
 // What the unmarked model costs the envelope being written, put directly: its
@@ -477,9 +483,12 @@ TEST(ProtectBeginProtectedSyntax,
 // sealed model and pass over their description of themselves unread.
 TEST(ProtectBeginProtectedSyntax,
      TheLettersAsAnEscapedIdentifierMarkNoSealedModel) {
-  EncryptionRun run(
-      RegionAroundSealedModel("`pragma protect \\begin_protected\n"));
-  EXPECT_TRUE(run.report.data_block_outside_protected_block);
+  std::string src =
+      RegionAroundSealedModel("`pragma protect \\begin_protected\n");
+  EncryptionRun run(src);
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "data_block is written where no previously",
+                            LineHolding(src, "data_block="), "34.5.15"));
 }
 
 // SystemVerilog distinguishes case, so the word written in another case is a
@@ -493,9 +502,12 @@ TEST(ProtectBeginProtectedSyntax, TheWordInAnotherCaseIsNotTheWord) {
 // The same at the encrypting half, which compares the name it scanned against
 // the word rather than folding either one's case first.
 TEST(ProtectBeginProtectedSyntax, TheWordInAnotherCaseMarksNoSealedModel) {
-  EncryptionRun run(
-      RegionAroundSealedModel("`pragma protect BEGIN_PROTECTED\n"));
-  EXPECT_TRUE(run.report.data_block_outside_protected_block);
+  std::string src =
+      RegionAroundSealedModel("`pragma protect BEGIN_PROTECTED\n");
+  EncryptionRun run(src);
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "data_block is written where no previously",
+                            LineHolding(src, "data_block="), "34.5.15"));
 }
 
 // The reserved word that this one's opening letters spell is the one §34.5.1.1
@@ -515,8 +527,11 @@ TEST(ProtectBeginProtectedSyntax,
 // already would be read as the start of a region to seal now.
 TEST(ProtectBeginProtectedSyntax,
      AShorterReservedNameSharingItsLettersMarksNoSealedModel) {
-  EncryptionRun run(RegionAroundSealedModel("`pragma protect begin\n"));
-  EXPECT_TRUE(run.report.data_block_outside_protected_block);
+  std::string src = RegionAroundSealedModel("`pragma protect begin\n");
+  EncryptionRun run(src);
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "data_block is written where no previously",
+                            LineHolding(src, "data_block="), "34.5.15"));
 }
 
 // The other direction of the same confusion, and the one no reserved word
@@ -541,9 +556,12 @@ TEST(ProtectBeginProtectedSyntax, ALongerNameStartingWithTheWordIsNotTheWord) {
 // like the word.
 TEST(ProtectBeginProtectedSyntax,
      ALongerNameStartingWithTheWordMarksNoSealedModel) {
-  EncryptionRun run(
-      RegionAroundSealedModel("`pragma protect begin_protected_v2\n"));
-  EXPECT_TRUE(run.report.data_block_outside_protected_block);
+  std::string src =
+      RegionAroundSealedModel("`pragma protect begin_protected_v2\n");
+  EncryptionRun run(src);
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "data_block is written where no previously",
+                            LineHolding(src, "data_block="), "34.5.15"));
 }
 
 // The letters standing on the right of an '=' are a pragma_value of the keyword
@@ -559,9 +577,12 @@ TEST(ProtectBeginProtectedSyntax, TheWordWrittenAsAValueOpensNothing) {
 // other and has to carry, from the '=' to the letters after it, the fact that
 // what it is reading is a value; a walk that forgot would find this word here.
 TEST(ProtectBeginProtectedSyntax, TheWordWrittenAsAValueMarksNoSealedModel) {
-  EncryptionRun run(
-      RegionAroundSealedModel("`pragma protect comment=begin_protected\n"));
-  EXPECT_TRUE(run.report.data_block_outside_protected_block);
+  std::string src =
+      RegionAroundSealedModel("`pragma protect comment=begin_protected\n");
+  EncryptionRun run(src);
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "data_block is written where no previously",
+                            LineHolding(src, "data_block="), "34.5.15"));
 }
 
 // The word is a keyword of the protect pragma, which is the specification the
@@ -585,8 +606,11 @@ TEST(ProtectBeginProtectedSyntax, TheWordUnderAnotherPragmaNameOpensNothing) {
 // spelling that would slip through.
 TEST(ProtectBeginProtectedSyntax,
      TheWordUnderAnotherPragmaNameMarksNoSealedModel) {
-  EncryptionRun run(RegionAroundSealedModel("`pragma acme begin_protected\n"));
-  EXPECT_TRUE(run.report.data_block_outside_protected_block);
+  std::string src = RegionAroundSealedModel("`pragma acme begin_protected\n");
+  EncryptionRun run(src);
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "data_block is written where no previously",
+                            LineHolding(src, "data_block="), "34.5.15"));
 }
 
 // The other position the word can be written in on a directive of this shape:
@@ -611,8 +635,11 @@ TEST(ProtectBeginProtectedSyntax, TheWordAsThePragmaNameOpensNothing) {
 // would otherwise be looking for. A check reading the name slot loosely would
 // come to opposite answers on the two.
 TEST(ProtectBeginProtectedSyntax, TheWordAsThePragmaNameMarksNoSealedModel) {
-  EncryptionRun run(RegionAroundSealedModel("`pragma begin_protected\n"));
-  EXPECT_TRUE(run.report.data_block_outside_protected_block);
+  std::string src = RegionAroundSealedModel("`pragma begin_protected\n");
+  EncryptionRun run(src);
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "data_block is written where no previously",
+                            LineHolding(src, "data_block="), "34.5.15"));
 }
 
 // A pragma_value may itself be a list of pragma expressions, and the word
@@ -633,9 +660,12 @@ TEST(ProtectBeginProtectedSyntax,
 // could come to it alone.
 TEST(ProtectBeginProtectedSyntax,
      TheWordInsideAParenthesizedValueMarksNoSealedModel) {
-  EncryptionRun run(
-      RegionAroundSealedModel("`pragma protect encoding=(begin_protected)\n"));
-  EXPECT_TRUE(run.report.data_block_outside_protected_block);
+  std::string src =
+      RegionAroundSealedModel("`pragma protect encoding=(begin_protected)\n");
+  EncryptionRun run(src);
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "data_block is written where no previously",
+                            LineHolding(src, "data_block="), "34.5.15"));
 }
 
 }  // namespace

@@ -9,12 +9,15 @@
 #include <utility>
 #include <vector>
 
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "preprocessor/protect_digest.h"
 #include "preprocessor/protect_digest_block.h"
 #include "preprocessor/protect_digest_key.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_envelope_output.h"
+#include "preprocessor/protect_input_line.h"
 #include "preprocessor/protect_key_block.h"
 #include "preprocessor/protect_key_method.h"
 #include "preprocessor/protect_keywords.h"
@@ -26,174 +29,12 @@ namespace {
 // How a region's cleartext becomes the bytes a block records, and those bytes
 // the cleartext again, is written in protect_processing_cipher.cpp. What one
 // line of a source text says -- which protect pragma keywords it names, and how
-// -- is answered in protect_pragma_line.cpp. What the envelope taking a
-// region's place says is written in protect_envelope_output.cpp. What this file
-// does is read a source text for the regions it delimits and settle which key
-// each of them is written under; the other three are reached through the
-// declarations they share.
-
-// How many previously generated begin_protected-end_protected blocks the
-// reading stands inside.
-//
-// §34.5.3 has the contents of such a block treated as input cleartext: the
-// protect pragma expressions written in it are not interpreted and do not
-// override the values the current encryption has in effect. The reading
-// therefore has to know it is inside one before it reads a line rather than
-// after, so a whole source text is walked through one of these.
-//
-// The two delimiting expressions are inside as well. What they describe is the
-// envelope some earlier encryption produced, and letting that description into
-// the reading is exactly the corruption of the current encryption's values
-// §34.5.3 rules out, so the block runs from the line opening it through the
-// line closing it.
-//
-// §34.5.1 allows further such blocks inside one, treating them as bytes of it
-// like everything else, so what ends a block is the closing expression
-// matching its own opening one rather than the first one encountered. A
-// closing expression with nothing open closes nothing and is a line of the
-// text like any other.
-class PreviouslyProtectedBlock {
- public:
-  // Applies one line, and returns whether that line belongs to a previously
-  // generated protected block.
-  //
-  // §34.5.3.1 defines the word opening such a block as the pragma_keyword
-  // standing alone, so a line is only opening one where it named that word in
-  // that spelling. A line writing a pragma_value against the word opens
-  // nothing and is text of whatever region encloses it, which is what keeps
-  // this walk from taking an arbitrary run of an author's design for somebody
-  // else's already-protected model.
-  //
-  // §34.5.4.1 defines the word closing such a block the same way, and both
-  // words are spelled in protect_envelope.h beside those definitions, so the
-  // line this walk takes as the start or the end of an already-protected model
-  // is the line the envelope state takes for the same thing. A line writing a
-  // pragma_value against the closing word ends nothing here either: the model
-  // runs on, and the design written after it stays inside a block whose bytes
-  // travel into the enclosing envelope unread.
-  bool Contains(std::string_view line) {
-    if (NamesBareKeyword(line, kBeginDecryptionKeyword)) {
-      ++depth_;
-      return true;
-    }
-    if (depth_ > 0 && NamesBareKeyword(line, kEndDecryptionKeyword)) {
-      --depth_;
-      return true;
-    }
-    return depth_ > 0;
-  }
-
- private:
-  size_t depth_ = 0;
-};
-
-// Which of the two encryption envelope delimiters a directive line carries.
-enum class EnvelopeDelimiter : uint8_t { kNone, kBegin, kEnd };
-
-// A delimiter found on a directive line, together with the word that spelled
-// it. The word is kept as a view into the line so the rest of the line can be
-// told apart from it: the expressions written beside a delimiter specify the
-// envelope it opens or closes, and they are carried into the envelope that
-// takes its place rather than being read as part of the delimiter.
-struct DelimiterMatch {
-  EnvelopeDelimiter kind;
-  std::string_view keyword;
-};
-
-// A line whose delimiting word was written with a pragma_value against it is a
-// line that delimits nothing: §34.5.1.1 defines the opening word standing
-// alone and §34.5.2.1 defines the closing word the same way, so the walk
-// carries on past either one and, finding no delimiter, leaves the line among
-// the text this transformation copies rather than reads.
-//
-// A closing word written that way leaves the region it was meant to close
-// still open, so the reading runs on to whatever closes next -- or to the end
-// of the text, where a region that was never closed goes back as it was
-// written. Reading such a word as the end of the region anyway would seal it
-// at a point the standard does not put an end there.
-DelimiterMatch DelimiterOfLine(std::string_view line) {
-  std::string_view body;
-  if (!ProtectPragmaLine(line, &body)) return {EnvelopeDelimiter::kNone, {}};
-  for (const ListedKeyword& keyword : TopLevelKeywords(body)) {
-    if (OpensEncryptionEnvelope(keyword.name, keyword.has_value)) {
-      return {EnvelopeDelimiter::kBegin, keyword.name};
-    }
-    if (ClosesEncryptionEnvelope(keyword.name, keyword.has_value)) {
-      return {EnvelopeDelimiter::kEnd, keyword.name};
-    }
-  }
-  return {EnvelopeDelimiter::kNone, {}};
-}
-
-// The expressions a delimiter is followed by on its own line: `rest` up to any
-// comment written there, and without the whitespace that ran up to it.
-//
-// Neither a comment nor the space ahead of it is a pragma expression, and
-// neither states anything about the envelope, so neither is among the things
-// this transformation carries. Leaving the comment behind is also what keeps
-// the envelope readable: a block comment the author never closed would
-// otherwise be carried onto the produced directive and take the expressions
-// written after it -- the description of the encryption, and the block itself
-// -- into the comment with it.
-std::string_view ExpressionsAfterDelimiter(std::string_view rest) {
-  size_t end = rest.size();
-  size_t i = 0;
-  while (i < rest.size()) {
-    // A comment opener inside a string value is content of that value.
-    if (rest[i] == '"') {
-      i = SkipStringValue(rest, i);
-    } else if (StartsLineComment(rest, i) || rest.compare(i, 2, "/*") == 0) {
-      end = i;
-      break;
-    } else {
-      ++i;
-    }
-  }
-  return TrimTrailing(rest.substr(0, end));
-}
-
-// The directive that delimits a decryption envelope where `line` delimited an
-// encryption one.
-//
-// Only the word naming the delimiter is transformed, because only that word
-// said which of the two modes the envelope was defined for. Every expression
-// beside it -- who wrote the design, which algorithm and key name were asked
-// for, what a run of it is licensed on -- specified the encryption envelope,
-// and each is written out again exactly as it stands so that it goes on
-// specifying the envelope standing in its place. The line's own leading
-// whitespace and directive text are kept for the same reason.
-//
-// An expression written ahead of the delimiter describes the envelope and an
-// expression written after it describes the enclosed region, so carrying each
-// one across on the side it was written on is what keeps the two apart.
-std::string TransformedDelimiterLine(std::string_view line,
-                                     const DelimiterMatch& delimiter,
-                                     std::string_view replacement) {
-  auto at = static_cast<size_t>(delimiter.keyword.data() - line.data());
-  std::string transformed(line.substr(0, at));
-  transformed.append(replacement);
-  transformed.append(
-      ExpressionsAfterDelimiter(line.substr(at + delimiter.keyword.size())));
-  // The last line of a source text need not be terminated, and a trimmed
-  // comment takes the terminator with it. What follows this line either way is
-  // a directive of its own.
-  if (transformed.back() != '\n') transformed.push_back('\n');
-  return transformed;
-}
-
-// Splits `text` at every newline, keeping each terminator with the line it
-// ends, so putting the pieces back together reproduces `text` byte for byte.
-std::vector<std::string_view> SplitLines(std::string_view text) {
-  std::vector<std::string_view> lines;
-  size_t pos = 0;
-  while (pos < text.size()) {
-    size_t eol = text.find('\n', pos);
-    size_t end = eol == std::string_view::npos ? text.size() : eol + 1;
-    lines.push_back(text.substr(pos, end - pos));
-    pos = end;
-  }
-  return lines;
-}
+// -- is answered in protect_pragma_line.cpp. Where one line of an encrypting
+// tool's input stands, and what §34.5 makes an error in it, is answered in
+// protect_input_line.cpp. What the envelope taking a region's place says is
+// written in protect_envelope_output.cpp. What this file does is read a source
+// text for the regions it delimits and settle which key each of them is written
+// under; the other four are reached through the declarations they share.
 
 // A run of source text read for what it says about the keys a region is
 // under, together with whether the line just read left a designation to be
@@ -330,7 +171,8 @@ void TakeMethodKeywords(std::string_view line, RegionKeyReader* reader) {
 // itself in hand, so a text writing one key under two schemes has written one
 // designation twice rather than two. A line that is not something the scheme
 // in effect writes carries no key, and the region is left designating none.
-void TakeKeyPublicKeyLine(std::string_view line, RegionKeyReader* reader) {
+void TakeKeyPublicKeyLine(std::string_view line, uint32_t line_num,
+                          RegionKeyReader* reader) {
   reader->encoded_key_next = false;
   std::string key;
   // The reading goes through the same step every encoded value of an envelope
@@ -348,9 +190,14 @@ void TakeKeyPublicKeyLine(std::string_view line, RegionKeyReader* reader) {
   // own keys, and §34.5.26 makes this designation an alternative spelling of
   // the one written against a keyword rather than a lesser one, so a line
   // carrying it asks for a block exactly as that keyword does.
-  reader->key_blocks.DesignatePublicKey(reader->names.key_keyowner,
-                                        reader->names.key_public_key,
-                                        DataDecryptionInEffect(reader->names));
+  //
+  // The block is recorded as asked for here rather than on the keyword's own
+  // line, that keyword having designated nothing until the value beneath it was
+  // read: a line the scheme in effect never wrote leaves the region designating
+  // no key at all and asks for no block.
+  reader->key_blocks.DesignatePublicKey(
+      reader->names.key_keyowner, reader->names.key_public_key,
+      DataDecryptionInEffect(reader->names), line_num);
 }
 
 // A line the previous one announced the data's public key on is that key's
@@ -425,9 +272,10 @@ void TakeEncodingKeyword(std::string_view line, RegionKeyReader* reader) {
 // waiting. Three keywords each give the line beneath them to a public key, so
 // the line after one of them is that key's characters rather than a line of
 // expressions to be read for keywords of its own.
-bool TookAwaitedPublicKey(std::string_view line, RegionKeyReader* reader) {
+bool TookAwaitedPublicKey(std::string_view line, uint32_t line_num,
+                          RegionKeyReader* reader) {
   if (reader->encoded_key_next) {
-    TakeKeyPublicKeyLine(line, reader);
+    TakeKeyPublicKeyLine(line, line_num, reader);
     return true;
   }
   if (reader->encoded_data_key_next) {
@@ -463,7 +311,8 @@ void TakeAuthorship(std::string_view line, RegionKeyReader* reader) {
 // The names a line designates the region's keys by: the data key and the entity
 // that provided it, the digest key and its own entity, and the key the region
 // designates for keys of its own.
-void TakeKeyDesignations(std::string_view line, RegionKeyReader* reader) {
+void TakeKeyDesignations(std::string_view line, uint32_t line_num,
+                         RegionKeyReader* reader) {
   RegionKeyNames* names = &reader->names;
   std::string_view keyname = KeywordValueOnLine(line, kDataKeynameKeyword);
   if (!keyname.empty()) names->data_keyname = keyname;
@@ -492,7 +341,7 @@ void TakeKeyDesignations(std::string_view line, RegionKeyReader* reader) {
   if (!key_name.empty()) {
     names->key_keyname = key_name;
     reader->key_blocks.Designate(names->key_keyowner, key_name,
-                                 DataDecryptionInEffect(*names));
+                                 DataDecryptionInEffect(*names), line_num);
   }
 }
 
@@ -522,10 +371,11 @@ void TakeAnnouncements(std::string_view line, RegionKeyReader* reader) {
       NamesBareKeyword(line, kDigestPublicKeyKeyword);
 }
 
-void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
-  if (TookAwaitedPublicKey(line, reader)) return;
+void TakeKeyNames(std::string_view line, uint32_t line_num,
+                  RegionKeyReader* reader) {
+  if (TookAwaitedPublicKey(line, line_num, reader)) return;
   TakeAuthorship(line, reader);
-  TakeKeyDesignations(line, reader);
+  TakeKeyDesignations(line, line_num, reader);
   TakeMethodKeywords(line, reader);
   TakeAnnouncements(line, reader);
 }
@@ -554,10 +404,11 @@ void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
 // under whatever else it named, and under no key at all where it named nothing
 // else: a region there is nothing to encrypt, rather than one sealed under a
 // key that was never designated for it.
-void TakeKeyNamesOutsideProtectedBlock(std::string_view line, bool contained,
+void TakeKeyNamesOutsideProtectedBlock(std::string_view line, uint32_t line_num,
+                                       bool contained,
                                        RegionKeyReader* reader) {
   if (!contained) {
-    TakeKeyNames(line, reader);
+    TakeKeyNames(line, line_num, reader);
     return;
   }
   reader->encoded_key_next = false;
@@ -619,8 +470,8 @@ bool CarriesAuthorDescription(std::string_view line,
 // goes back where the region cannot be encrypted, to the text a block records
 // unless §34.5.5 or §34.5.6 holds it back from there, and to what the region
 // has said about itself.
-void AppendEnvelopeLine(std::string_view line, bool previously_protected,
-                        ReadRegion* region) {
+void AppendEnvelopeLine(std::string_view line, uint32_t line_num,
+                        bool previously_protected, ReadRegion* region) {
   region->source_body.append(line);
   if (!CarriesAuthorDescription(line, previously_protected)) {
     region->body.append(line);
@@ -629,7 +480,7 @@ void AppendEnvelopeLine(std::string_view line, bool previously_protected,
   // over it: those are the expressions the envelope has to carry in the clear,
   // the rest of the region's text being about to stop being readable. One
   // written outside the region is in the output already.
-  TakeKeyNamesOutsideProtectedBlock(line, previously_protected,
+  TakeKeyNamesOutsideProtectedBlock(line, line_num, previously_protected,
                                     &region->written_inside);
 }
 
@@ -674,14 +525,22 @@ std::string_view RegionKey(const RegionKeyNames& names,
 // a region that wrote none of its own has not thereby asked for nothing. It is
 // consulted only where the region wrote none, because a region that did write
 // its own said which readers this envelope is for.
-ProtectKeyBlockRequests DesignatedKeyBlocks(const RegionKeyNames& names) {
+//
+// `closing_line` is the 1-based line the region's closing expression stands on,
+// and it is what the one request this can produce records. The designation
+// itself was written ahead of the region, where it stood for whichever region
+// closed next rather than for this one, so where it asks for a block is where
+// this region ends. Nothing reads the line off a lone request either way:
+// §34.5.27's requirement is one two blocks can break and one cannot.
+ProtectKeyBlockRequests DesignatedKeyBlocks(const RegionKeyNames& names,
+                                            uint32_t closing_line) {
   ProtectKeyBlockRequests requests;
   if (!names.key_keyname.empty()) {
     requests.Designate(names.key_keyowner, names.key_keyname,
-                       DataDecryptionInEffect(names));
+                       DataDecryptionInEffect(names), closing_line);
   } else if (!names.key_public_key.empty()) {
     requests.DesignatePublicKey(names.key_keyowner, names.key_public_key,
-                                DataDecryptionInEffect(names));
+                                DataDecryptionInEffect(names), closing_line);
   }
   return requests;
 }
@@ -729,7 +588,8 @@ ProtectDigestBlockPolicy DigestPolicyFor(const RegionKeyReader& in_effect) {
 RegionEncryption RegionEncryptionFor(const RegionKeyReader& in_effect,
                                      const ReadRegion& region,
                                      std::string_view exchange_key,
-                                     const ProtectKeyList& keys) {
+                                     const ProtectKeyList& keys,
+                                     uint32_t closing_line) {
   RegionEncryption how;
   how.digest = DigestPolicyFor(in_effect);
   std::string_view named = RegionKey(in_effect.names, exchange_key, keys);
@@ -744,9 +604,10 @@ RegionEncryption RegionEncryptionFor(const RegionKeyReader& in_effect,
     how.digest.key = own.empty() ? named : own;
     return how;
   }
-  ProtectKeyBlockRequests requests = region.written_inside.key_blocks.Empty()
-                                         ? DesignatedKeyBlocks(in_effect.names)
-                                         : region.written_inside.key_blocks;
+  ProtectKeyBlockRequests requests =
+      region.written_inside.key_blocks.Empty()
+          ? DesignatedKeyBlocks(in_effect.names, closing_line)
+          : region.written_inside.key_blocks;
   how.key_blocks = ProtectKeyBlocksFor(
       requests, region.body, keys,
       EnvelopeBlockEncoding(region.written_inside.encoding), how.digest);
@@ -829,83 +690,20 @@ std::string ClosedRegionText(const ReadRegion& region,
   return DecryptionEnvelopeText(envelope, how);
 }
 
-// One line of the input, read for the two things an encrypting tool has to
-// know about it before it does anything else with it: whether a previously
-// generated protected block contains it, and which delimiter of an encryption
-// envelope it carries.
-//
-// The two go together because the first decides the second. §34.5.3 leaves the
-// protect pragmas inside such a block uninterpreted, and a word that opens or
-// closes a region is a protect pragma like any other, so a line inside a block
-// delimits nothing however it is spelled.
-struct InputLine {
-  bool previously_protected;
-  DelimiterMatch delimiter;
-};
-
-// §34.5.1 makes a region opened inside a region that is still open an error.
-// The opening expression marks the point encryption begins at, and a text that
-// marks a second such point before marking where the first region ends has
-// asked for one block of cleartext inside another.
-//
-// The line is still read as the text it is: the transformation runs to the end
-// of the input either way, and §34.5.1 has everything standing between an
-// opening expression and the closing one that answers it -- other protect
-// pragmas included -- encrypted into the enclosing region's block. What the
-// condition costs is the report rather than the transformation, which is how
-// every other condition an encrypting tool's input can carry is treated here.
-//
-// It is a delimiter of this reading's own that counts. A line a previously
-// generated protected block contains delimits nothing, because §34.5.3 leaves
-// its expressions uninterpreted, so an already-protected model sealed inside a
-// region is the arrangement §34.5.1 permits rather than the one it rules out.
-// So is an opening word written with a pragma_value against it, which §34.5.1.1
-// leaves naming no opening expression at all.
-void ReportNestedRegion(const DelimiterMatch& delimiter,
-                        ProtectEncryptionReport* report) {
-  if (report != nullptr && delimiter.kind == EnvelopeDelimiter::kBegin) {
-    report->nested_begin_block = true;
-  }
-}
-
-InputLine ReadInputLine(std::string_view line, PreviouslyProtectedBlock* block,
-                        ProtectEncryptionReport* report) {
-  if (block->Contains(line)) {
-    return {true, {EnvelopeDelimiter::kNone, {}}};
-  }
-  // §34.5.15 makes a data block found in an input file an error unless a
-  // previously generated protected block contains it. This line is outside
-  // every one of them, so a block written here is the block of no envelope --
-  // there is nothing for it to have come out of, and nothing that could read
-  // it back. The line is still carried across like any other; what the
-  // condition costs is a report rather than the transformation.
-  if (report != nullptr && NamesKeyword(line, kDataBlockKeyword)) {
-    report->data_block_outside_protected_block = true;
-  }
-  // §34.5.27 states the same of a key block, and it costs the same: outside
-  // every previously generated protected block there is no envelope whose keys
-  // a key block here could be carrying, and no key it could have been encrypted
-  // under either.
-  if (report != nullptr && NamesKeyword(line, kKeyBlockKeyword)) {
-    report->key_block_outside_protected_block = true;
-  }
-  return {false, DelimiterOfLine(line)};
-}
-
 }  // namespace
 
 std::string EncryptEnvelopes(std::string_view source_text,
                              std::string_view exchange_key,
-                             const ProtectKeyList& keys,
-                             ProtectEncryptionReport* report) {
+                             const ProtectKeyList& keys, DiagEngine* diag,
+                             uint32_t file_id) {
   // With neither a key of one's own nor keys supplied under the names that
   // select them, there is nothing any region could be encrypted under, so the
   // text stands as it is written.
   //
-  // What a caller asking for a report is still owed is the reading. §34.5.1
+  // What a caller holding an engine is still owed is the reading. §34.5.1
   // makes a region opened inside an open one an error in the text itself, and a
   // text carries that error whether or not a key was supplied to act on it, so
-  // a caller that asked to be told is told rather than handed its text back in
+  // a caller that can report is told rather than handed its text back in
   // silence. Skipping the reading here would leave an author who ran this half
   // without a key unable to tell an input that was well formed from one nothing
   // looked at.
@@ -916,7 +714,7 @@ std::string EncryptEnvelopes(std::string_view source_text,
   // as its own bytes, so reading a keyless text through returns exactly what
   // was handed in. The shortcut is kept for the caller with nowhere to report
   // to, which is the caller it saves the reading for.
-  if (report == nullptr && exchange_key.empty() && keys.Empty()) {
+  if (diag == nullptr && exchange_key.empty() && keys.Empty()) {
     return std::string(source_text);
   }
   std::string transformed;
@@ -933,10 +731,17 @@ std::string EncryptEnvelopes(std::string_view source_text,
   // reading does with a line.
   PreviouslyProtectedBlock previously_protected;
   bool in_envelope = false;
+  // Which line of the input the reading stands on, counted from one as the
+  // reports name it. A report about a line of a source description carries the
+  // position of that line, and the only thing that knows where a line stood in
+  // the text is the walk that split the text into lines.
+  uint32_t line_num = 0;
   for (std::string_view line : SplitLines(source_text)) {
-    InputLine input = ReadInputLine(line, &previously_protected, report);
-    TakeKeyNamesOutsideProtectedBlock(line, input.previously_protected,
-                                      &in_effect);
+    ++line_num;
+    SourceLoc loc = LineOf(file_id, line_num);
+    InputLine input = ReadInputLine(line, &previously_protected, diag, loc);
+    TakeKeyNamesOutsideProtectedBlock(line, line_num,
+                                      input.previously_protected, &in_effect);
     DelimiterMatch delimiter = input.delimiter;
     // §34.5.2.2 has the closing expression state, in the input cleartext, where
     // the region that is to be encrypted stops. The region therefore ends at
@@ -945,13 +750,19 @@ std::string EncryptEnvelopes(std::string_view source_text,
     // block and the lines after it go back to being carried across.
     if (in_envelope && delimiter.kind == EnvelopeDelimiter::kEnd) {
       RegionEncryption how =
-          RegionEncryptionFor(in_effect, region, exchange_key, keys);
+          RegionEncryptionFor(in_effect, region, exchange_key, keys, line_num);
       // §34.5.27 has every key block of one envelope encode the same data
       // decryption key data, so a region whose data decryption pragma
       // expressions changed value between two of them is reported rather than
-      // left carrying blocks that open onto different accounts of one key.
-      if (report != nullptr && how.key_blocks.data_changed) {
-        report->key_block_data_changed = true;
+      // left carrying blocks that open onto different accounts of one key. The
+      // report stands at the block that stopped agreeing rather than here,
+      // where the region merely closed.
+      if (diag != nullptr && how.key_blocks.data_changed_line != 0) {
+        diag->Error(
+            LineOf(file_id, how.key_blocks.data_changed_line),
+            "protect pragma data decryption expressions change value between "
+            "the key_block pragma expressions of one encryption envelope",
+            Subclause("34.5.27"));
       }
       transformed.append(
           ClosedRegionText(region, in_effect, line, delimiter, how));
@@ -960,13 +771,13 @@ std::string EncryptEnvelopes(std::string_view source_text,
       // §34.5.1 rules out a second opening expression here, this region not
       // having been closed yet, so a line carrying one is reported before it is
       // taken as text of the region.
-      ReportNestedRegion(delimiter, report);
+      ReportNestedRegion(delimiter, diag, loc);
       // §34.5.3 and §34.5.4 have the two expressions delimiting a previously
       // generated block, and everything between them, encrypted into the block
       // of the envelope enclosing them. Adding the line unread is what does
       // that: an already-protected model travels into the larger one as the
       // bytes it is written with.
-      AppendEnvelopeLine(line, input.previously_protected, &region);
+      AppendEnvelopeLine(line, line_num, input.previously_protected, &region);
     } else if (delimiter.kind == EnvelopeDelimiter::kBegin) {
       in_envelope = true;
       region.opening_line = line;

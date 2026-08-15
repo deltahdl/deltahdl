@@ -1,9 +1,11 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 
+#include "common/diagnostic.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_keywords.h"
 
@@ -54,48 +56,6 @@ inline constexpr std::string_view kDataBlockKeyword = "data_block";
 // It is more than the length of the cleartext, because a block records what
 // the region was as well as the region itself.
 size_t ProtectedRegionBlockSize(std::string_view cleartext);
-
-// What envelope encryption found in the text it was given that the standard
-// makes an error rather than something to transform.
-//
-// §34.5.1 states one such condition on the expression that opens a region: a
-// region opened inside a region that is still open. The point encryption
-// begins at is what that expression marks, and a text marking a second such
-// point without having marked where the first region ends has asked for a
-// block inside a block. What the standard does allow inside an open region is
-// a previously generated begin_protected-end_protected block, which is not a
-// nesting of these two expressions at all: that block's own text is encrypted
-// as a byte stream along with everything else the region holds, so nothing in
-// it opens anything.
-//
-// §34.5.15 states one such condition on an encrypting tool's input: a data
-// block written where no previously generated begin_protected-end_protected
-// block encloses it. A block inside one of those belongs to a model that was
-// protected already, and the same subclause has it passed over rather than
-// objected to; a block outside every one of them belongs to no envelope at
-// all, so there is nothing it can be the block of.
-//
-// The transformation runs to the end of the text either way, the rest of it
-// being ordinary source, so what was found is reported beside the text rather
-// than in place of it. A caller that does not ask for the report gets the same
-// transformation and is told nothing.
-// §34.5.27 states the same condition on a key block, word for word and for the
-// same reason: a key block written where no previously generated block encloses
-// it holds the keys of no envelope, there being nothing it could have come out
-// of, while one written inside such a block belongs to a model that was
-// protected already and is passed over.
-//
-// It also holds the key blocks of a single encryption envelope to encoding the
-// same data decryption key data. Several of them are alternative ways into one
-// envelope rather than ways into several, so a region whose data decryption
-// pragma expressions changed value between two of them has asked for blocks
-// that cannot all be the keys of the same data.
-struct ProtectEncryptionReport {
-  bool nested_begin_block = false;
-  bool data_block_outside_protected_block = false;
-  bool key_block_outside_protected_block = false;
-  bool key_block_data_changed = false;
-};
 
 // Encrypts one region of cleartext under `key` and returns the text that
 // records it, written in the coding scheme `enctype` names. An empty key
@@ -179,16 +139,48 @@ bool DecryptProtectedRegion(std::string_view data_block, std::string_view key,
 // encrypted under the designated key. One block is written per designation the
 // region carries, those being alternative ways into the one envelope.
 //
-// `report` collects what §34.5.1, §34.5.15 and §34.5.27 make an error in the
-// input, and may be null for a caller with nothing to report it to.
+// What §34.5.1, §34.5.15 and §34.5.27 make an error in the input is reported
+// to `diag`, which may be null for a caller with nothing to report it to.
+// `file_id` identifies the source description `source_text` was read from, so
+// that each report stands at the line of it that carries the breach.
 //
-// All three are conditions on the text rather than on the keys, so a caller
-// asking for one gets the text read through even where no key was supplied and
-// no region could be encrypted. The text handed back in that case is the text
-// that went in, there being nothing to transform it into.
+// §34.5.1 makes a region opened inside a region that is still open an error.
+// The point encryption begins at is what the opening expression marks, and a
+// text marking a second such point without having marked where the first region
+// ends has asked for a block inside a block. What the standard does allow
+// inside an open region is a previously generated
+// begin_protected-end_protected block, which is not a nesting of these two
+// expressions at all: that block's own text is encrypted as a byte stream along
+// with everything else the region holds, so nothing in it opens anything.
+//
+// §34.5.15 makes a data block found in an input file an error unless a
+// previously generated begin_protected-end_protected block contains it. A block
+// inside one of those belongs to a model that was protected already, and the
+// same subclause has it passed over rather than objected to; a block outside
+// every one of them belongs to no envelope at all, so there is nothing it can
+// be the block of.
+//
+// §34.5.27 states the same condition on a key block, word for word and for the
+// same reason: a key block written where no previously generated block encloses
+// it holds the keys of no envelope, there being nothing it could have come out
+// of, while one written inside such a block belongs to a model that was
+// protected already and is passed over.
+//
+// It also holds the key blocks of a single encryption envelope to encoding the
+// same data decryption key data. Several of them are alternative ways into one
+// envelope rather than ways into several, so a region whose data decryption
+// pragma expressions changed value between two of them has asked for blocks
+// that cannot all be the keys of the same data.
+//
+// The transformation runs to the end of the text whatever it found, the rest of
+// it being ordinary source, so each condition costs the report rather than the
+// text. All four are conditions on the text rather than on the keys, so a
+// caller holding an engine gets the text read through even where no key was
+// supplied and no region could be encrypted. The text handed back in that case
+// is the text that went in, there being nothing to transform it into.
 std::string EncryptEnvelopes(std::string_view source_text,
                              std::string_view exchange_key,
                              const ProtectKeyList& keys = ProtectKeyList(),
-                             ProtectEncryptionReport* report = nullptr);
+                             DiagEngine* diag = nullptr, uint32_t file_id = 0);
 
 }  // namespace delta

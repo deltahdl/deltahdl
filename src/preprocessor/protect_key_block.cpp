@@ -1,6 +1,7 @@
 #include "preprocessor/protect_key_block.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -75,11 +76,13 @@ std::string ProtectDataDecryptKeyDirective(std::string_view encoded_key) {
 
 void ProtectKeyBlockRequests::Designate(std::string_view keyowner,
                                         std::string_view keyname,
-                                        const ProtectDataDecryption& data) {
+                                        const ProtectDataDecryption& data,
+                                        uint32_t line) {
   ProtectKeyBlockRequest request;
   request.keyowner = ProtectPragmaValueBody(keyowner);
   request.keyname = ProtectPragmaValueBody(keyname);
   request.data = data;
+  request.line = line;
   requests_.push_back(std::move(request));
 }
 
@@ -88,11 +91,12 @@ void ProtectKeyBlockRequests::Designate(std::string_view keyowner,
 // encoded under, so nothing is stripped from it.
 void ProtectKeyBlockRequests::DesignatePublicKey(
     std::string_view keyowner, std::string_view key,
-    const ProtectDataDecryption& data) {
+    const ProtectDataDecryption& data, uint32_t line) {
   ProtectKeyBlockRequest request;
   request.keyowner = ProtectPragmaValueBody(keyowner);
   request.public_key = key;
   request.data = data;
+  request.line = line;
   requests_.push_back(std::move(request));
 }
 
@@ -188,6 +192,12 @@ std::string ProtectKeyBlockDirectives(const ProtectKeyBlockRequest& request,
 // The disagreement is reported beside the blocks rather than in place of them:
 // the blocks are still what the region asked for, and what the condition costs
 // is the report.
+//
+// It is the first request to disagree that is kept, one region drawing one
+// report however many of its blocks differ from the first. A report per
+// disagreeing block would say the same thing over again about one region, and
+// the block an author has to look at to find what changed is the first one that
+// stopped matching.
 ProtectKeyBlocks ProtectKeyBlocksFor(const ProtectKeyBlockRequests& requests,
                                      std::string_view cleartext,
                                      const ProtectKeyList& keys,
@@ -204,8 +214,9 @@ ProtectKeyBlocks ProtectKeyBlocksFor(const ProtectKeyBlockRequests& requests,
     }
     if (first == nullptr) {
       first = &request.data;
-    } else if (!SameProtectDataDecryption(*first, request.data)) {
-      blocks.data_changed = true;
+    } else if (!SameProtectDataDecryption(*first, request.data) &&
+               blocks.data_changed_line == 0) {
+      blocks.data_changed_line = request.line;
     }
     std::string content = KeyBlockContentFor(request, blocks, digest, encoding);
     blocks.directives.append(

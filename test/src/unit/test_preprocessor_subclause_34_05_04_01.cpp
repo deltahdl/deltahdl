@@ -363,8 +363,11 @@ TEST(ProtectEndProtectedSyntax,
 // past it belongs to no earlier envelope, which §34.5.15 makes an error, and
 // that report is the reading saying it came back out of the sealed model here.
 TEST(ProtectEndProtectedSyntax, TheWordAloneEndsASealedModelForEncrypting) {
-  EncryptionRun run(RegionAroundSealedModel("`pragma protect end_protected\n"));
-  EXPECT_TRUE(run.report.data_block_outside_protected_block);
+  std::string src = RegionAroundSealedModel("`pragma protect end_protected\n");
+  EncryptionRun run(src);
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "data_block is written where no previously",
+                            LineHolding(src, "data_block="), "34.5.15"));
 }
 
 // What that ending is worth in the produced text. The lines past the word are
@@ -401,9 +404,12 @@ TEST(ProtectEndProtectedSyntax,
 // leave this model unended and go on reading the design past it as somebody
 // else's sealed bytes.
 TEST(ProtectEndProtectedSyntax, TheWordLastAfterValuedExpressionsEndsTheModel) {
-  EncryptionRun run(RegionAroundSealedModel(
-      "`pragma protect encrypt_agent=\"other-tool\", end_protected\n"));
-  EXPECT_TRUE(run.report.data_block_outside_protected_block);
+  std::string src = RegionAroundSealedModel(
+      "`pragma protect encrypt_agent=\"other-tool\", end_protected\n");
+  EncryptionRun run(src);
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "data_block is written where no previously",
+                            LineHolding(src, "data_block="), "34.5.15"));
 }
 
 // The other order over the same list, at the same half. A comma ends the
@@ -417,9 +423,12 @@ TEST(ProtectEndProtectedSyntax, TheWordLastAfterValuedExpressionsEndsTheModel) {
 // state a walk carries forward from an '='.
 TEST(ProtectEndProtectedSyntax,
      TheWordFirstAheadOfAValuedExpressionEndsTheModel) {
-  EncryptionRun run(RegionAroundSealedModel(
-      "`pragma protect end_protected, comment=\"done\"\n"));
-  EXPECT_TRUE(run.report.data_block_outside_protected_block);
+  std::string src = RegionAroundSealedModel(
+      "`pragma protect end_protected, comment=\"done\"\n");
+  EncryptionRun run(src);
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "data_block is written where no previously",
+                            LineHolding(src, "data_block="), "34.5.15"));
 }
 
 // A comment is not a pragma expression here either, so a directive whose word
@@ -430,9 +439,12 @@ TEST(ProtectEndProtectedSyntax,
 // the reading of the same line at the other half.
 TEST(ProtectEndProtectedSyntax,
      ACommentAfterTheWordLeavesItStandingAloneWhenEncrypting) {
-  EncryptionRun run(RegionAroundSealedModel(
-      "`pragma protect end_protected // that model ends here\n"));
-  EXPECT_TRUE(run.report.data_block_outside_protected_block);
+  std::string src = RegionAroundSealedModel(
+      "`pragma protect end_protected // that model ends here\n");
+  EncryptionRun run(src);
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "data_block is written where no previously",
+                            LineHolding(src, "data_block="), "34.5.15"));
 }
 
 // The word where two already-sealed models stand one inside the other, each of
@@ -547,7 +559,7 @@ TEST(ProtectEndProtectedSyntax, TextAfterAValuedWordIsStillReadAsProtected) {
 TEST(ProtectEndProtectedSyntax, TheValuedWordEndsNoSealedModelWhenEncrypting) {
   EncryptionRun run(
       RegionAroundSealedModel("`pragma protect end_protected=\"1\"\n"));
-  EXPECT_FALSE(run.report.data_block_outside_protected_block);
+  EXPECT_EQ(run.diag.ErrorCount(), 0U);
 }
 
 // The parenthesized value read by the encrypting half, which is the pairing the
@@ -564,7 +576,7 @@ TEST(ProtectEndProtectedSyntax,
      AParenthesizedValueEndsNoSealedModelWhenEncrypting) {
   EncryptionRun run(RegionAroundSealedModel(
       "`pragma protect end_protected=(enctype=\"raw\")\n"));
-  EXPECT_FALSE(run.report.data_block_outside_protected_block);
+  EXPECT_EQ(run.diag.ErrorCount(), 0U);
 }
 
 // What the unended model costs the design around it, put directly. The sealed
@@ -603,7 +615,7 @@ TEST(ProtectEndProtectedSyntax,
      TheLettersAsAnEscapedIdentifierEndNoSealedModel) {
   EncryptionRun run(
       RegionAroundSealedModel("`pragma protect \\end_protected\n"));
-  EXPECT_FALSE(run.report.data_block_outside_protected_block);
+  EXPECT_EQ(run.diag.ErrorCount(), 0U);
 }
 
 // SystemVerilog distinguishes case, so the word written in another case is a
@@ -618,7 +630,7 @@ TEST(ProtectEndProtectedSyntax, TheWordInAnotherCaseIsNotTheWord) {
 // the word rather than folding either one's case first.
 TEST(ProtectEndProtectedSyntax, TheWordInAnotherCaseEndsNoSealedModel) {
   EncryptionRun run(RegionAroundSealedModel("`pragma protect END_PROTECTED\n"));
-  EXPECT_FALSE(run.report.data_block_outside_protected_block);
+  EXPECT_EQ(run.diag.ErrorCount(), 0U);
 }
 
 // The reserved word that this one's opening letters spell is the one §34.5.2.1
@@ -642,7 +654,7 @@ TEST(ProtectEndProtectedSyntax,
 TEST(ProtectEndProtectedSyntax,
      AShorterReservedNameSharingItsLettersEndsNoSealedModel) {
   EncryptionRun run(RegionAroundSealedModel("`pragma protect end\n"));
-  EXPECT_FALSE(run.report.data_block_outside_protected_block);
+  EXPECT_EQ(run.diag.ErrorCount(), 0U);
 }
 
 // The other direction of the same confusion, and the one no reserved word
@@ -669,7 +681,7 @@ TEST(ProtectEndProtectedSyntax,
      ALongerNameStartingWithTheWordEndsNoSealedModel) {
   EncryptionRun run(
       RegionAroundSealedModel("`pragma protect end_protected_v2\n"));
-  EXPECT_FALSE(run.report.data_block_outside_protected_block);
+  EXPECT_EQ(run.diag.ErrorCount(), 0U);
 }
 
 // The letters standing on the right of an '=' are a pragma_value of the keyword
@@ -687,7 +699,7 @@ TEST(ProtectEndProtectedSyntax, TheWordWrittenAsAValueClosesNothing) {
 TEST(ProtectEndProtectedSyntax, TheWordWrittenAsAValueEndsNoSealedModel) {
   EncryptionRun run(
       RegionAroundSealedModel("`pragma protect comment=end_protected\n"));
-  EXPECT_FALSE(run.report.data_block_outside_protected_block);
+  EXPECT_EQ(run.diag.ErrorCount(), 0U);
 }
 
 // The word is a keyword of the protect pragma, which is the specification the
@@ -712,7 +724,7 @@ TEST(ProtectEndProtectedSyntax, TheWordUnderAnotherPragmaNameClosesNothing) {
 TEST(ProtectEndProtectedSyntax,
      TheWordUnderAnotherPragmaNameEndsNoSealedModel) {
   EncryptionRun run(RegionAroundSealedModel("`pragma acme end_protected\n"));
-  EXPECT_FALSE(run.report.data_block_outside_protected_block);
+  EXPECT_EQ(run.diag.ErrorCount(), 0U);
 }
 
 // The other position the word can be written in on a directive of this shape:
@@ -738,7 +750,7 @@ TEST(ProtectEndProtectedSyntax, TheWordAsThePragmaNameClosesNothing) {
 // come to opposite answers on the two.
 TEST(ProtectEndProtectedSyntax, TheWordAsThePragmaNameEndsNoSealedModel) {
   EncryptionRun run(RegionAroundSealedModel("`pragma end_protected\n"));
-  EXPECT_FALSE(run.report.data_block_outside_protected_block);
+  EXPECT_EQ(run.diag.ErrorCount(), 0U);
 }
 
 // A pragma_value may itself be a list of pragma expressions, and the word
@@ -761,7 +773,7 @@ TEST(ProtectEndProtectedSyntax,
      TheWordInsideAParenthesizedValueEndsNoSealedModel) {
   EncryptionRun run(
       RegionAroundSealedModel("`pragma protect encoding=(end_protected)\n"));
-  EXPECT_FALSE(run.report.data_block_outside_protected_block);
+  EXPECT_EQ(run.diag.ErrorCount(), 0U);
 }
 
 }  // namespace

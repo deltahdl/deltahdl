@@ -46,6 +46,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "helpers_protect_keys.h"
+#include "helpers_reported_error.h"
 #include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_keywords.h"
@@ -124,16 +125,20 @@ std::string Encrypted(const std::string& src) {
   return EncryptEnvelopes(src, kAuthorKey);
 }
 
-// The same, with what the reading found in the input that the standard makes an
-// error kept beside the text it produced. The transformation runs to the end of
-// the input whatever it found, so the two are read together rather than one in
-// place of the other.
+// The same, with the reports the reading made about the input kept beside the
+// text it produced. The transformation runs to the end of the input whatever it
+// found, so the two are read together rather than one in place of the other.
+//
+// The source is added to the manager so that a report stands at the line of it
+// that carries the breach, which is what the cases below name.
 struct EncryptionRun {
-  ProtectEncryptionReport report;
+  SourceManager mgr;
+  DiagEngine diag{mgr};
   std::string text;
 
   explicit EncryptionRun(const std::string& src)
-      : text(EncryptEnvelopes(src, kAuthorKey, ProtectKeyList(), &report)) {}
+      : text(EncryptEnvelopes(src, kAuthorKey, ProtectKeyList(), &diag,
+                              mgr.AddFile("<test>", src))) {}
 };
 
 // A source text read through the whole preprocessor, with what the reading left
@@ -228,7 +233,9 @@ TEST(ProtectBeginEncryptionInput, ARegionOpenedInsideAnOpenRegionIsReported) {
       "`pragma protect begin\n"
       "  initial other = 7;\n"
       "`pragma protect end\n");
-  EXPECT_TRUE(run.report.nested_begin_block);
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "opens a region inside a begin-end block", 3,
+                            "34.5.1"));
 }
 
 // What the condition costs is the report rather than the transformation. The
@@ -258,7 +265,9 @@ TEST(ProtectBeginEncryptionInput, TheFirstClosingExpressionAnswersTheOpening) {
       "`pragma protect begin\n"
       "`pragma protect end\n"
       "  int after = 3;\n");
-  EXPECT_TRUE(run.report.nested_begin_block);
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "opens a region inside a begin-end block", 3,
+                            "34.5.1"));
   EXPECT_FALSE(Holds(run.text, kSealedStatement));
   EXPECT_TRUE(Holds(run.text, "int after = 3;"));
 }
@@ -277,7 +286,7 @@ TEST(ProtectBeginEncryptionInput, RegionsWrittenOneAfterAnotherAreNoNesting) {
   std::string src = Region("", "  initial first = 1;\n");
   src += Region("", "  initial second = 2;\n");
   EncryptionRun run(src);
-  EXPECT_FALSE(run.report.nested_begin_block);
+  EXPECT_EQ(run.diag.ErrorCount(), 0U);
   EXPECT_EQ(TimesWritten(run.text, "`pragma protect begin_protected"), 2U);
 }
 
@@ -291,7 +300,7 @@ TEST(ProtectBeginEncryptionInput, AValuedWordInsideTheRegionIsNoNesting) {
       "  initial result = 42;\n"
       "`pragma protect begin=\"again\"\n"
       "`pragma protect end\n");
-  EXPECT_FALSE(run.report.nested_begin_block);
+  EXPECT_EQ(run.diag.ErrorCount(), 0U);
 }
 
 // The other syntactic position the second opening expression can be written in:
@@ -305,12 +314,14 @@ TEST(ProtectBeginEncryptionInput, ANestedExpressionInAListIsReportedToo) {
       "  initial result = 42;\n"
       "`pragma protect author=\"Acme Corp\", begin\n"
       "`pragma protect end\n");
-  EXPECT_TRUE(run.report.nested_begin_block);
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "opens a region inside a begin-end block", 3,
+                            "34.5.1"));
 }
 
 // The condition belongs to the text rather than to the keys a tool was handed.
 // An author who ran the encrypting half without supplying one gave it the same
-// nested input, so asking to be told about that input is answered on the same
+// nested input, so a run with somewhere to report to reports it on the same
 // terms. The text comes back exactly as it was written -- there being nothing
 // any region could be encrypted under -- which is what tells this apart from a
 // reading that reported the error by refusing to do its work.
@@ -320,9 +331,14 @@ TEST(ProtectBeginEncryptionInput, ANestedRegionIsReportedWithNoKeyToo) {
       "  initial result = 42;\n"
       "`pragma protect begin\n"
       "`pragma protect end\n";
-  ProtectEncryptionReport report;
-  EXPECT_EQ(EncryptEnvelopes(src, "", ProtectKeyList(), &report), src);
-  EXPECT_TRUE(report.nested_begin_block);
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  EXPECT_EQ(EncryptEnvelopes(src, "", ProtectKeyList(), &diag,
+                             mgr.AddFile("<test>", src)),
+            src);
+  EXPECT_TRUE(ReportedError(diag.Diagnostics(),
+                            "opens a region inside a begin-end block", 3,
+                            "34.5.1"));
 }
 
 // ---------------------------------------------------------------------------
@@ -353,7 +369,7 @@ TEST(ProtectBeginEncryptionInput, AWordInsideThatBlockIsNoNesting) {
       "`pragma protect begin\n"
       "`pragma protect end_protected\n"
       "`pragma protect end\n");
-  EXPECT_FALSE(run.report.nested_begin_block);
+  EXPECT_EQ(run.diag.ErrorCount(), 0U);
 }
 
 // Previously encrypted content may itself hold previously encrypted content, so
@@ -371,7 +387,7 @@ TEST(ProtectBeginEncryptionInput, TheBlockClosingMatchesItsOwnOpening) {
   enclosing += "`pragma protect begin\n";
   enclosing += "`pragma protect end_protected\n";
   EncryptionRun run(Region("", enclosing));
-  EXPECT_FALSE(run.report.nested_begin_block);
+  EXPECT_EQ(run.diag.ErrorCount(), 0U);
   EXPECT_FALSE(Holds(run.text, sealed));
 }
 

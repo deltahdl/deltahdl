@@ -399,17 +399,20 @@ TEST(ProtectEndEncryptionOutput, WithNoKeyTheExpressionStandsAsWritten) {
 // walked at all, so the case above would answer the same however the
 // replacement behaved -- it observes the shortcut rather than the rule.
 //
-// Asking to be told what the input carried is what suppresses that shortcut,
+// Handing the reading an engine to report to is what suppresses that shortcut,
 // and the walk then reaches this region, finds the word, and finds no key for
 // the region it closed. Nothing was written for the word to have been replaced
 // in, so the word comes back where the author put it.
 TEST(ProtectEndEncryptionOutput, TheUnreplacedWordSurvivesTheReadingItself) {
   std::string src = Region(kSealedDesign);
-  ProtectEncryptionReport report;
+  SourceManager mgr;
+  DiagEngine diag(mgr);
   // Byte equality is the whole of the claim: a text nothing was written into
   // still carries the word the author wrote and carries §34.5.4's nowhere.
   // Naming those two characters again would only restate what it already says.
-  EXPECT_EQ(EncryptEnvelopes(src, "", ProtectKeyList(), &report), src);
+  EXPECT_EQ(EncryptEnvelopes(src, "", ProtectKeyList(), &diag,
+                             mgr.AddFile("<test>", src)),
+            src);
 }
 
 // A word inside a previously generated protected block is replaced by nothing

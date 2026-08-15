@@ -23,29 +23,37 @@ inline std::string EncryptedByTheAuthor(const std::string& src) {
   return EncryptEnvelopes(src, kExchangeKey);
 }
 
-// The same, with what the transformation found in its input that the standard
-// makes an error kept beside the text it produced. The transformation runs to
-// the end of the input whatever it found, so the two are read together rather
-// than one in place of the other.
+// The same, with the reports the transformation made about its input kept
+// beside the text it produced. The transformation runs to the end of the input
+// whatever it found, so the two are read together rather than one in place of
+// the other.
+//
+// The source is added to the manager so that a report can stand at the line of
+// it that carries the breach, which is what a case naming one reads back
+// through ReportedError in lib/cpp/test_helpers/helpers_reported_error.h.
 struct EncryptionRun {
-  ProtectEncryptionReport report;
+  SourceManager mgr;
+  DiagEngine diag{mgr};
   std::string text;
 
   explicit EncryptionRun(const std::string& src)
-      : text(EncryptEnvelopes(src, kExchangeKey, ProtectKeyList(), &report)) {}
+      : text(EncryptEnvelopes(src, kExchangeKey, ProtectKeyList(), &diag,
+                              mgr.AddFile("<test>", src))) {}
 };
 
 // The same reading with no key supplied at all, which is the state a region has
-// nothing to be encrypted under in. A caller asking for a report is still owed
+// nothing to be encrypted under in. A caller holding an engine is still owed
 // the reading, so the text comes back read through from end to end rather than
 // merely handed back, and what it holds is what a region no key reached leaves
 // behind.
 struct KeylessEncryptionRun {
-  ProtectEncryptionReport report;
+  SourceManager mgr;
+  DiagEngine diag{mgr};
   std::string text;
 
   explicit KeylessEncryptionRun(const std::string& src)
-      : text(EncryptEnvelopes(src, {}, ProtectKeyList(), &report)) {}
+      : text(EncryptEnvelopes(src, {}, ProtectKeyList(), &diag,
+                              mgr.AddFile("<test>", src))) {}
 };
 
 // A source text read through the preprocessor, with what the reading left
