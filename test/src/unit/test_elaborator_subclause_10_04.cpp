@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -36,10 +37,9 @@ TEST(ProceduralAssignmentElaboration, ProceduralAssignToNetIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "cannot be the target of a procedural assignment");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.5");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot be the target of a procedural assignment",
+                            4, "6.5"));
 }
 
 TEST(ProceduralAssignmentElaboration, NonblockingAssignToNetIsError) {
@@ -52,10 +52,9 @@ TEST(ProceduralAssignmentElaboration, NonblockingAssignToNetIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "cannot be the target of a procedural assignment");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.5");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot be the target of a procedural assignment",
+                            4, "6.5"));
 }
 
 TEST(ProceduralAssignmentElaboration, SelectOfNetBaseIsError) {
@@ -68,10 +67,9 @@ TEST(ProceduralAssignmentElaboration, SelectOfNetBaseIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "cannot be the target of a procedural assignment");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.5");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot be the target of a procedural assignment",
+                            4, "6.5"));
 }
 
 TEST(ProceduralAssignmentElaboration, ConcatenationContainingNetIsError) {
@@ -85,10 +83,9 @@ TEST(ProceduralAssignmentElaboration, ConcatenationContainingNetIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "cannot be the target of a procedural assignment");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.5");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot be the target of a procedural assignment",
+                            5, "6.5"));
 }
 
 }  // namespace

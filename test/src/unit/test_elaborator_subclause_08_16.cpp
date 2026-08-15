@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -70,12 +71,11 @@ TEST(ClassCastElaboration, DirectSuperclassToSubclassAssignError) {
       "  end\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f,
-               "class handle assignment requires assignment compatible "
-               "types");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "8.4");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "class handle assignment requires assignment compatible "
+                    "types",
+                    8, "8.4"));
 }
 
 // §8.16 says nothing about two class types outside one inheritance tree; the
@@ -96,12 +96,11 @@ TEST(ClassCastElaboration, UnrelatedClassTypesAssignError) {
       "  end\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f,
-               "class handle assignment requires assignment compatible "
-               "types");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "8.4");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "class handle assignment requires assignment compatible "
+                    "types",
+                    8, "8.4"));
 }
 
 TEST(ClassCastElaboration, DeepHierarchyUpcastOk) {

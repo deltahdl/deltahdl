@@ -106,8 +106,9 @@ TEST(KeywordVersionPreprocessing, ErrorEndKeywordsWithoutBegin) {
 TEST(KeywordVersionPreprocessing, ErrorEndKeywordsWithoutBeginNames22_14) {
   PreprocFixture f;
   Preprocess("`end_keywords\n", f);
-  ASSERT_EQ(f.diag.Diagnostics().size(), 1U);
-  EXPECT_EQ(f.diag.Diagnostics().front().subclause, "22.14");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`end_keywords without matching `begin_keywords", 1,
+                            "22.14"));
 }
 
 TEST(KeywordVersionPreprocessing, ErrorEmptyVersionString) {

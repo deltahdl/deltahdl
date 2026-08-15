@@ -246,9 +246,8 @@ TEST(StreamingUnpackSim, ShortStreamErrorNames11_4_14_3) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  const Diagnostic* d = FindDiag(f, "too few bits in stream");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "11.4.14.3");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "too few bits in stream", 3,
+                            "11.4.14.3"));
 }
 
 // §11.4.14.3: an unpack whose with-range depends on an earlier unpacked field
@@ -265,9 +264,8 @@ TEST(StreamingUnpackSim, ShortStreamForwardResolveNames11_4_14_3) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  const Diagnostic* d = FindDiag(f, "too few bits in stream");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "11.4.14.3");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "too few bits in stream", 4,
+                            "11.4.14.3"));
 }
 
 }  // namespace

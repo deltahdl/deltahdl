@@ -36,9 +36,9 @@ TEST(DefaultArgumentElaboration, MissingArgumentWithNoDefaultNames13_5_3) {
       "  initial x = add(1);\n"
       "endmodule\n",
       f);
-  const Diagnostic* rep = FindDiag(f, "missing argument 'b' in call to 'add'");
-  ASSERT_NE(rep, nullptr);
-  EXPECT_EQ(rep->subclause, "13.5.3");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "missing argument 'b' in call to 'add'", 6,
+                            "13.5.3"));
 }
 
 TEST(DefaultArgumentElaboration, MissingArgWithDefaultOk) {

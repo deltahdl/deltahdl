@@ -196,9 +196,8 @@ TEST(SpecifyBlock, MalformedPathDeclarationNames30_3) {
       "    a => b = 1;\n"
       "  endspecify\n"
       "endmodule\n");
-  const auto* diag = FindDiag(r, "unexpected token in specify block");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "30.3");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "unexpected token in specify block", 3, "30.3"));
 }
 
 // §30.3, Syntax 30-1: a specify_block runs from `specify` to `endspecify`, and
@@ -212,10 +211,7 @@ TEST(SpecifyBlock, MissingEndspecifyNames30_3) {
       "module m;\n"
       "  specify\n"
       "    (a => b) = 1;");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "30.3");
-  EXPECT_EQ(r.diags.front().loc.line, 3u);
-  EXPECT_EQ(r.diags.front().loc.column, 18u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected token", 3, "30.3"));
 }
 
 }  // namespace

@@ -395,12 +395,12 @@ jobs:
   # SinglePassPrecompile.DescriptionClaimedByTwoLibrariesNamesBothInItsDiagnostic
   # in test/src/unit/test_parser_subclause_33_05_01.cpp did exactly that until
   # 28234b4ac. #2961 states the defect in full, and the commits closing #3017,
-  # #3018, #3019, #3020, #3021, #3088 and #3112 converted every site the tree
-  # then held. This job is what keeps them converted: no test observes an
+  # #3018, #3019, #3020, #3021, #3088, #3112 and #3113 converted every site the
+  # tree then held. This job is what keeps them converted: no test observes an
   # assertion another test file did not make, so nothing else can report a new
   # one written the old way.
   #
-  # Two rules, because the four shapes are not equally wrong.
+  # Two rules, because the shapes are not equally wrong.
   #
   # EXPECT_TRUE or ASSERT_TRUE on has_errors, or on any name ending in
   # HasErrors(, names no report at all, so it fails wherever it stands. The
@@ -408,10 +408,40 @@ jobs:
   # EXPECT_TRUE(LexHasErrors("…")) hid five such assertions in
   # test/src/unit/test_lexer_annex_a_08_08.cpp from the reading behind #3017.
   #
-  # EXPECT_FALSE on a call ending in Ok(, and EXPECT_EQ against
-  # CompileOutcome::kFailed, also stand as the outcome check beside a
-  # ReportedError for the same run, which 6e204800b records as wanted. Those
-  # two fail only in a TEST body that calls ReportedError nowhere.
+  # Every other shape also stands as an outcome check beside a ReportedError for
+  # the same run, which 6e204800b records as wanted, so each fails only in a TEST
+  # body that names its report nowhere. Those shapes are:
+  #
+  #   EXPECT_FALSE on a call ending in Ok(;
+  #   EXPECT_EQ against CompileOutcome::kFailed;
+  #   EXPECT_TRUE on the boolean an `auto [tokens, errors] = LexWithDiag(…)`
+  #     binding produced, which carries no member, helper or error word of its
+  #     own, so the scan reads the binding to learn the name;
+  #   EXPECT_EQ against diags.size() or Diagnostics().size() of one or more;
+  #   EXPECT_FALSE on diags.empty() or Diagnostics().empty();
+  #   EXPECT_EQ against ErrorCount() of one or more;
+  #   a const Diagnostic* bound out of the record, however it was selected, and
+  #     read field by field afterwards. The binding is what the scan matches
+  #     rather than the name of the finder, because a file-local finder hides one
+  #     as readily as FindDiag does: test_elaborator_subclause_35_05_02.cpp and
+  #     test_elaborator_subclause_33_05_03.cpp each declared one, as
+  #     EXPECT_TRUE(LexHasErrors("…")) hid five assertions from #3017;
+  #   diags.front().subclause, which lib/cpp/test_fixtures/fixture_parser.h:44-46
+  #     documents as the wrong report to read when a source is rejected twice.
+  #
+  # A count is worse than the boolean it replaces rather than better:
+  # ASSERT_EQ(diags.size(), 1u) states how many reports a run made and nothing
+  # about which rule any of them enforced, and it goes red when a second report
+  # is added for an unrelated reason.
+  #
+  # A body that calls DiagEngine::Error or DiagEngine::Warning itself is reading
+  # back a report it wrote rather than one a source provoked, so there is no rule
+  # of the standard for it to name and the shapes above do not apply to it. The
+  # eleven bodies in test/src/unit/test_non_lrm_diagnostic.cpp are all of them.
+  #
+  # ReportedWarning in the same header answers the three questions of a warning,
+  # for a rule the program enforces with one: §23.3.2.1 has the binder warn about
+  # an ordered port connection past the last port rather than reject the source.
   #
   # An assertion that a source was ACCEPTED reads the same members and is sound,
   # because the claim there is that nothing was reported and there is no report
@@ -428,13 +458,16 @@ jobs:
   # truncated by that, which can only hide a body from this scan, never invent
   # one.
   #
-  # Eight bodies are exempt, and every one is sound as written. Six pin what a
+  # Eleven bodies are exempt, and every one is sound as written. Six pin what a
   # fixture helper returns, which is the construct under test there rather than
   # a rule the source breaks, and each is paired with an acceptance of the same
   # call. Two sweep Table B.1 through a fixed template whose control run shows
   # the frame parses, and each word lands in a different parser path, so no one
   # message or subclause holds across the sweep. 6e204800b records both
-  # readings.
+  # readings. Three drive Parser::Expect through the fixture in
+  # test/src/unit/test_non_lrm_parser_expect.cpp with a subclause the case picks
+  # itself, so the report they read back is one the case chose rather than one a
+  # rule of the standard decided.
   #
   # The list is here rather than in a marker comment in the sources, because an
   # inline marker hides the exemption where nobody reading this job would see
@@ -462,6 +495,9 @@ jobs:
                 sound["ParserHarness.ParseWithPreprocessorOkTellsAnAcceptedSourceFromARejected"] = 1
                 sound["KeywordListParsing.NoReservedWordCanNameAVariable"] = 1
                 sound["KeywordListParsing.NoReservedWordCanNameAnythingInAnyPosition"] = 1
+                sound["ExpectWithASubclause.ReportsTheSubclauseTheCallerGave"] = 1
+                sound["ExpectWithASubclause.MessageIsUnchanged"] = 1
+                sound["ExpectStatingNoRuleOfTheStandard.RecordsAnEmptySubclause"] = 1
               }
               {
                 n = split($0, body, /[^A-Za-z0-9_](TYPED_)?TEST(_[FP])?\(/)
@@ -474,11 +510,35 @@ jobs:
                   shape = ""
                   if (match(body[i], /(EXPECT|ASSERT)_TRUE\([A-Za-z0-9_.>:-]*(has_errors|HasErrors\()/)) {
                     shape = "an unqualified claim that some error was reported"
-                  } else if (!index(body[i], "ReportedError")) {
+                  } else if (!index(body[i], "ReportedError") &&
+                             !index(body[i], "ReportedWarning") &&
+                             !match(body[i], /\.(Error|Warning)\(/)) {
                     if (match(body[i], /(EXPECT|ASSERT)_FALSE\([A-Za-z0-9_.>:-]*Ok\(/)) {
                       shape = "a false answer from a helper ending in Ok"
                     } else if (match(body[i], /(EXPECT|ASSERT)_EQ\([^;]*CompileOutcome::kFailed/)) {
                       shape = "a compile outcome of CompileOutcome::kFailed"
+                    } else if (match(body[i], /const +(delta::)?Diagnostic *\* *[A-Za-z_][A-Za-z0-9_]* *=/)) {
+                      shape = "a report bound out of the record and read field by field"
+                    } else if (match(body[i], /(EXPECT|ASSERT)_NE\([^;]*FindDiag/)) {
+                      shape = "a report selected by its message alone"
+                    } else if (index(body[i], ".front().subclause")) {
+                      shape = "the subclause of whichever report the run wrote first"
+                    } else if (match(body[i], /(EXPECT|ASSERT)_EQ\([^;]*(diags|Diagnostics\(\))\.size\(\), *[1-9]/)) {
+                      shape = "a count of the reports the run made"
+                    } else if (match(body[i], /(EXPECT|ASSERT)_FALSE\([^;]*(diags|Diagnostics\(\))\.empty\(\)\)/)) {
+                      shape = "a claim that the run reported something"
+                    } else if (match(body[i], /(EXPECT|ASSERT)_EQ\([^;]*ErrorCount\(\), *[1-9]/)) {
+                      shape = "a count of the errors the run made"
+                    } else if (match(body[i], /auto *\[[A-Za-z0-9_, ]*\] *= *LexWithDiag\(/)) {
+                      bound = substr(body[i], RSTART, RLENGTH)
+                      sub(/^auto *\[ */, "", bound)
+                      sub(/ *\] *= *LexWithDiag\($/, "", bound)
+                      parts = split(bound, names, / *, */)
+                      for (j = 1; j <= parts; j++) {
+                        if (match(body[i], "(EXPECT|ASSERT)_TRUE\\( *" names[j] " *\\)")) {
+                          shape = "a boolean a LexWithDiag binding produced"
+                        }
+                      }
                     }
                   }
                   if (shape == "") continue

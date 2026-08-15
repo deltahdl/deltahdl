@@ -322,10 +322,9 @@ TEST(UdpStateTable, AllXInputsWithOneOutputNames29_3_4) {
       "    x x : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  const auto* diag =
-      FindDiag(r, "UDP table row with all-x inputs shall specify x output");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "29.3.4");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP table row with all-x inputs shall specify x output", 3,
+      "29.3.4"));
 }
 
 // The pair for the case above. §29.3.4, Syntax 29-1: every table_entry ends
@@ -342,10 +341,7 @@ TEST(UdpStateTable, MalformedRowNames29_3_4) {
       "    1 : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "29.3.4");
-  EXPECT_EQ(r.diags.front().loc.line, 4u);
-  EXPECT_EQ(r.diags.front().loc.column, 5u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';'", 4, "29.3.4"));
 }
 
 }  // namespace

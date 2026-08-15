@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
+#include "helpers_reported_error.h"
 #include "synthesizer/aig.h"
 #include "synthesizer/synth_lower.h"
 
@@ -101,10 +102,8 @@ TEST(EventControlSynthesis, EventControlStmtIsRejectedByName) {
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   EXPECT_EQ(synth.Lower(mod), nullptr);
-  const Diagnostic* d = FindDiag(f, "event control is not synthesizable");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "9.4.2");
-  EXPECT_EQ(d->loc.line, 6u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "event control is not synthesizable", 6, "9.4.2"));
 }
 
 }  // namespace

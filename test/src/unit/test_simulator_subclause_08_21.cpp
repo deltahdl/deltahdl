@@ -183,10 +183,9 @@ TEST(AbstractClassSimulation, ConstructAbstractClassNames8_21) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  const Diagnostic* d =
-      FindDiag(f, "cannot construct object of abstract class");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "8.21");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot construct object of abstract class", 6,
+                            "8.21"));
 }
 
 }  // namespace

@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_lexer.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -96,8 +97,9 @@ TEST(IdentifierLexing, SystemIdentMaxLength) {
 
 TEST(IdentifierLexing, SystemIdentExceedsMaxLength) {
   std::string id = "$" + std::string(1025, 'a');
-  auto [tokens, errors] = LexWithDiag(id);
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics(id);
+  EXPECT_TRUE(ReportedError(
+      diags, "identifier exceeds maximum length of 1024 characters", 1, "5.6"));
 }
 
 TEST(IdentifierLexing, BareDollarIsNotSystemIdent) {
@@ -228,8 +230,10 @@ TEST(IdentifierLexing, EscapedIdentifierRejectsControlChar) {
   std::string src = "\\foo";
   src.push_back(static_cast<char>(0x07));
   src.append(" rest");
-  auto [tokens, errors] = LexWithDiag(src);
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics(src);
+  EXPECT_TRUE(ReportedError(
+      diags, "escaped identifier contains non-printable character", 1,
+      "5.6.1"));
 }
 
 TEST(IdentifierLexing, SimpleIdentMaxLength) {
@@ -243,8 +247,9 @@ TEST(IdentifierLexing, SimpleIdentMaxLength) {
 
 TEST(IdentifierLexing, SimpleIdentExceedsMaxLength) {
   std::string id(1025, 'a');
-  auto [tokens, errors] = LexWithDiag(id);
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics(id);
+  EXPECT_TRUE(ReportedError(
+      diags, "identifier exceeds maximum length of 1024 characters", 1, "5.6"));
 }
 
 TEST(IdentifierLexing, EscapedIdentifierMaxLength) {
@@ -258,6 +263,7 @@ TEST(IdentifierLexing, EscapedIdentifierMaxLength) {
 
 TEST(IdentifierLexing, EscapedIdentifierExceedsMaxLength) {
   std::string src = "\\" + std::string(1025, 'q') + " ";
-  auto [tokens, errors] = LexWithDiag(src);
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics(src);
+  EXPECT_TRUE(ReportedError(
+      diags, "identifier exceeds maximum length of 1024 characters", 1, "5.6"));
 }

@@ -348,10 +348,10 @@ TEST(TypeParameterElab, TypeParamScopePrefixInVarDeclIsError) {
       "  C::T x;\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag = FindDiag(
-      f, "type parameter 'C' may prefix the class scope resolution operator");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.20.3");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "type parameter 'C' may prefix the class scope resolution operator", 3,
+      "6.20.3"));
 }
 
 // §6.20.3: the restriction is on the three prefix kinds §8.23 names, not on the

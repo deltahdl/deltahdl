@@ -181,9 +181,8 @@ TEST(ScopeRulesElaboration, DuplicateIdentifierNames23_9) {
       "  wire w;\n"
       "endmodule\n",
       f);
-  const Diagnostic* d = FindDiag(f, "redeclaration of 'w'");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "23.9");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'w'", 3, "23.9"));
 }
 
 }  // namespace

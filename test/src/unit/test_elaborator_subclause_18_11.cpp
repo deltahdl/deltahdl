@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -23,10 +24,10 @@ TEST(InlineRandomControlVisibility, LocalMemberArgRejectedFromOutside) {
       "  end\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag = FindDiag(
-      f, "cannot change random mode of local member from outside its class");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "18.11");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cannot change random mode of local member from outside its class", 8,
+      "18.11"));
 }
 
 // §18.11 conditions the change of random mode on the call having "access to
@@ -47,12 +48,11 @@ TEST(InlineRandomControlVisibility, ProtectedMemberArgRejectedFromOutside) {
       "  end\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag =
-      FindDiag(f,
-               "cannot change random mode of protected member from outside its "
-               "class hierarchy");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "18.11");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cannot change random mode of protected member from outside its "
+      "class hierarchy",
+      8, "18.11"));
 }
 
 // 18.11: a public property carries no access restriction, so naming it as a

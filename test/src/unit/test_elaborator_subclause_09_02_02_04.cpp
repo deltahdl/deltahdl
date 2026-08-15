@@ -330,9 +330,9 @@ TEST(AlwaysFFElaboration, MissingEventControlNames9_2_2_4) {
       "  always_ff q <= d;\n"
       "endmodule\n",
       f);
-  const Diagnostic* rep = FindDiag(f, "always_ff requires an event control");
-  ASSERT_NE(rep, nullptr);
-  EXPECT_EQ(rep->subclause, "9.2.2.4");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_ff requires an event control", 3,
+                            "9.2.2.4"));
 }
 
 // §9.2.2.4: "The always_ff procedure imposes the restriction that it contains

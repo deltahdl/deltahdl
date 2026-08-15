@@ -6,6 +6,7 @@
 #include "helpers_included_keyword_elab.h"
 #include "helpers_keyword_sweep_skips.h"
 #include "helpers_keyword_version.h"
+#include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
 #include "model_keyword_tables.h"
 
@@ -58,9 +59,8 @@ TEST(Verilog2005KeywordElaboration, AddedWordBuildsNetsOfItsOwnType) {
                                                       "  uwire scalar_net;\n"
                                                       "endmodule\n"),
                                                earlier, "m");
-  const Diagnostic* diag = FindDiag(earlier, "expected '(', got ';'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "23.3.2");
+  EXPECT_TRUE(ReportedError(earlier.diag.Diagnostics(), "expected '(', got ';'",
+                            3, "23.3.2"));
 }
 
 // The same net type on a module port, so the addition is observed across a
@@ -153,9 +153,8 @@ TEST(Verilog2005KeywordElaboration, AddedWordCannotNameAnElaboratedVariable) {
   ElabFixture reserved;
   ElaborateWithPreprocessorAllowingParseErrors(In2005(VarDecl(added)), reserved,
                                                "m");
-  const Diagnostic* diag = FindDiag(reserved, "expected identifier, got token");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.8");
+  EXPECT_TRUE(ReportedError(reserved.diag.Diagnostics(),
+                            "expected identifier, got token", 3, "6.8"));
 
   for (const auto& earlier : {In2001(VarDecl(added)), In1995(VarDecl(added))}) {
     ElabFixture f;
@@ -179,10 +178,9 @@ TEST(Verilog2005KeywordElaboration, IncludedVerilog2001WordsAreReserved) {
     ElabFixture reserved;
     ElaborateWithPreprocessorAllowingParseErrors(In2005(VarDecl(word)),
                                                  reserved, "m");
-    const Diagnostic* diag =
-        FindDiag(reserved, "expected identifier, got token");
-    ASSERT_NE(diag, nullptr) << word;
-    EXPECT_EQ(diag->subclause, "6.8") << word;
+    EXPECT_TRUE(ReportedError(reserved.diag.Diagnostics(),
+                              "expected identifier, got token", 3, "6.8"))
+        << word;
 
     ElabFixture freed;
     auto* design = ElaborateWithPreprocessor(In1995(VarDecl(word)), freed, "m");
@@ -205,10 +203,9 @@ TEST(Verilog2005KeywordElaboration, IncludedVerilog1995WordsAreReserved) {
     if (IsGatePrimitiveWord(word)) continue;
     ElabFixture f;
     ElaborateWithPreprocessorAllowingParseErrors(In2005(VarDecl(word)), f, "m");
-    const Diagnostic* diag = FindDiag(f, "expected identifier, got token");
-    ASSERT_NE(diag, nullptr)
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "expected identifier, got token", 3, "6.8"))
         << word << " is included from Table 22-1 and stays reserved";
-    EXPECT_EQ(diag->subclause, "6.8") << word;
     ++swept;
   }
   EXPECT_EQ(swept, 96u);
@@ -295,10 +292,9 @@ TEST(Verilog2005KeywordElaboration, UnlistedWordsNameObjectsButAreNotTypes) {
     ElaborateWithPreprocessorAllowingParseErrors(
         In2005(std::string("module m;\n  ") + word + " [7:0] v;\nendmodule\n"),
         as_type, "m");
-    const Diagnostic* not_a_type = FindDiag(as_type, "expected ';', got '['");
-    ASSERT_NE(not_a_type, nullptr)
+    EXPECT_TRUE(ReportedError(as_type.diag.Diagnostics(),
+                              "expected ';', got '['", 3, "6.8"))
         << word << " is not a data type under this version";
-    EXPECT_EQ(not_a_type->subclause, "6.8") << word;
   }
 }
 

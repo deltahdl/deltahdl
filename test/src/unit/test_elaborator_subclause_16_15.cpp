@@ -230,10 +230,9 @@ TEST(DisableIffResolution, DuplicateDefaultDisableIffNames16_15) {
       "  default disable iff rst2;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "only one default disable iff declaration is allowed");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "16.15");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "only one default disable iff declaration is allowed", 4, "16.15"));
 }
 
 }  // namespace

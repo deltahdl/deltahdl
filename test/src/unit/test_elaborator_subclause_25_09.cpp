@@ -812,9 +812,8 @@ TEST(VirtualInterfaceElaboration, PortTypeNames25_9) {
       "module m(input virtual simple_bus vif);\n"
       "endmodule\n",
       f);
-  const Diagnostic* rep = FindDiag(f, "virtual interface cannot be used");
-  ASSERT_NE(rep, nullptr);
-  EXPECT_EQ(rep->subclause, "25.9");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "virtual interface cannot be used", 2, "25.9"));
 }
 
 }  // namespace

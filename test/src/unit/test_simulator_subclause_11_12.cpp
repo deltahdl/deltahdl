@@ -578,9 +578,8 @@ TEST(LetExpansionSimulation, RecursiveInstantiationNames11_12) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  const Diagnostic* d = FindDiag(f, "recursive instantiation of let");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "11.12");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "recursive instantiation of let", 4, "11.12"));
 }
 
 // §11.12: the report names its subclause in the field DiagEngine::Emit renders,
@@ -599,9 +598,11 @@ TEST(LetExpansionSimulation, RecursiveInstantiationMessageHoldsNoSubclause) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  const Diagnostic* d = FindDiag(f, "recursive instantiation of let");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->message.find("§"), std::string::npos);
+  ASSERT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "recursive instantiation of let", 4, "11.12"));
+  for (const auto& diag : f.diag.Diagnostics()) {
+    EXPECT_EQ(diag.message.find("§"), std::string::npos);
+  }
 }
 
 }  // namespace

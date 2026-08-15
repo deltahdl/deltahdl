@@ -87,11 +87,10 @@ TEST(SystemNameSynthesis, SystemCallIsRejectedByName) {
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   EXPECT_EQ(synth.Lower(mod), nullptr);
-  const Diagnostic* d = FindDiag(
-      f, "system task or system function '$exit' is not synthesizable");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "5.6.3");
-  EXPECT_EQ(d->loc.line, 5u);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "system task or system function '$exit' is not synthesizable", 5,
+      "5.6.3"));
 }
 
 }  // namespace

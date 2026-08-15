@@ -236,9 +236,9 @@ TEST(UwireElaboration, MultipleContinuousAssignmentsNames6_6_2) {
       "  assign w = 1'b1;\n"
       "endmodule\n",
       f);
-  const Diagnostic* d = FindDiag(f, "uwire 'w' cannot have multiple drivers");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "6.6.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "uwire 'w' cannot have multiple drivers", 4,
+                            "6.6.2"));
 }
 
 }  // namespace

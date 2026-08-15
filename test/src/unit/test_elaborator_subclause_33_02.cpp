@@ -79,9 +79,8 @@ TEST(ConfigDesignElementNameSpace, ConfigCollidesWithInterface) {
       "  design work.top;\n"
       "endconfig\n",
       f, "top");
-  const delta::Diagnostic* diag = FindDiag(f, "duplicate definition of 'bar'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "33.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "duplicate definition of 'bar'", 3, "33.2"));
 }
 
 // The program form of the same collision, reported under the same §33.2.
@@ -94,9 +93,8 @@ TEST(ConfigDesignElementNameSpace, ConfigCollidesWithProgram) {
       "  design work.top;\n"
       "endconfig\n",
       f, "top");
-  const delta::Diagnostic* diag = FindDiag(f, "duplicate definition of 'baz'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "33.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "duplicate definition of 'baz'", 3, "33.2"));
 }
 
 // §33.2: a config shares the SystemVerilog design-element name space with
@@ -113,9 +111,8 @@ TEST(ConfigDesignElementNameSpace, ConfigCollidesWithPrimitive) {
       "  design work.top;\n"
       "endconfig\n",
       f, "top");
-  const delta::Diagnostic* diag = FindDiag(f, "duplicate definition of 'qux'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "33.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "duplicate definition of 'qux'", 5, "33.2"));
 }
 
 // §33.2: a design description starts at a top-level module and the source
@@ -157,9 +154,8 @@ TEST(ConfigInstanceSourceMapping, EveryInstanceMappedToSourceDescription) {
 TEST(ConfigInstanceSourceMapping, UnlocatableSubinstanceIsError) {
   ElabFixture f;
   ElaborateSrc("module top; missing u_missing(); endmodule\n", f, "top");
-  const delta::Diagnostic* diag = FindDiag(f, "unknown module 'missing'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "23.3.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "unknown module 'missing'", 1,
+                            "23.3.2"));
 }
 
 // §33.2: the descent continues into each located definition's own
@@ -172,9 +168,8 @@ TEST(ConfigInstanceSourceMapping, UnlocatableNestedSubinstanceIsError) {
       "module mid; ghost u_ghost(); endmodule\n"
       "module top; mid u_mid(); endmodule\n",
       f, "top");
-  const delta::Diagnostic* diag = FindDiag(f, "unknown module 'ghost'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "23.3.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "unknown module 'ghost'", 1,
+                            "23.3.2"));
 }
 
 }  // namespace

@@ -696,12 +696,8 @@ TEST(ReadmemFileLoadSim, AddressOutsideTheArrayRangeIsReportedAtTheCall) {
           "  end\n"
           "endmodule\n",
       f);
-  const Diagnostic* reported = nullptr;
-  for (const auto& d : f.diag.Diagnostics()) {
-    if (d.severity == DiagSeverity::kError) reported = &d;
-  }
-  ASSERT_NE(reported, nullptr);
-  EXPECT_EQ(reported->loc.line, 6u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "outside the range given by the task", 6, "21.4"));
   std::remove(inside.c_str());
   std::remove(outside.c_str());
 }
@@ -720,9 +716,8 @@ TEST(ReadmemFileLoadSim, SliceBoundsErrorNames21_4) {
           "\", mem[8:11], 1, 3);\n"
           "endmodule\n",
       f);
-  const Diagnostic* d = FindDiag(f, "address outside the slice bounds");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "21.4");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "address outside the slice bounds", 3, "21.4"));
   std::remove(path.c_str());
 }
 
@@ -739,9 +734,8 @@ TEST(ReadmemFileLoadSim, FileAddressOutsideTaskRangeNames21_4) {
           "\", mem, 1, 4);\n"
           "endmodule\n",
       f);
-  const Diagnostic* d = FindDiag(f, "outside the range given by the task");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "21.4");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "outside the range given by the task", 3, "21.4"));
   std::remove(path.c_str());
 }
 
@@ -758,9 +752,8 @@ TEST(ReadmemFileLoadSim, WordCountMismatchWarningNames21_4) {
           "\", mem, 2, 6);\n"
           "endmodule\n",
       f);
-  const Diagnostic* d = FindDiag(f, "number of data words differs");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "21.4");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "number of data words differs", 3, "21.4"));
   std::remove(path.c_str());
 }
 
@@ -778,9 +771,9 @@ TEST(ReadmemFileLoadSim, MemoryNameShapeErrorNames21_4) {
           "\", mem[1][2]);\n"
           "endmodule\n",
       f);
-  const Diagnostic* d = FindDiag(f, "memory_name resolves to a single element");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "21.4");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "memory_name resolves to a single element", 3,
+                            "21.4"));
   std::remove(path.c_str());
 }
 
@@ -798,9 +791,7 @@ TEST(ReadmemFileLoadSim, UnopenableFileStatesNoRuleOfTheStandard) {
       "  initial $readmemh(\"/tmp/deltahdl_t2104_no_such.mem\", mem);\n"
       "endmodule\n",
       f);
-  const Diagnostic* d = FindDiag(f, "cannot open file");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), "cannot open file", 3, ""));
 }
 
 }  // namespace

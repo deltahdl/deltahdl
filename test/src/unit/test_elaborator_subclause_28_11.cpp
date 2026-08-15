@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 // §28.11 defines a strength specification as two components: a strength0
 // keyword (supply0/strong0/pull0/weak0/highz0) and a strength1 keyword
@@ -41,10 +42,9 @@ TEST(LogicStrengthModeling, Highz0Highz1PairIsIllegal) {
       "  and (highz0, highz1) g1(y, a, b);\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "drive strength (highz0, highz1) is illegal");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "28.3.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "drive strength (highz0, highz1) is illegal", 3,
+                            "28.3.2"));
 }
 
 // §28.11 names the reverse ordering (highz1, highz0) as equally illegal, and
@@ -58,10 +58,9 @@ TEST(LogicStrengthModeling, Highz1Highz0PairIsIllegal) {
       "  and (highz1, highz0) g1(y, a, b);\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "drive strength (highz0, highz1) is illegal");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "28.3.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "drive strength (highz0, highz1) is illegal", 3,
+                            "28.3.2"));
 }
 
 // §28.11: only the both-highz pairing is illegal — highz on a single component,
@@ -106,10 +105,9 @@ TEST(LogicStrengthModeling, Highz0Highz1OnContinuousAssignIsIllegal) {
       "  assign (highz0, highz1) y = a;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "drive strength (highz0, highz1) is illegal");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "28.3.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "drive strength (highz0, highz1) is illegal", 3,
+                            "28.3.2"));
 }
 
 TEST(LogicStrengthModeling, DrivingPairOnContinuousAssignIsLegal) {
@@ -135,10 +133,9 @@ TEST(LogicStrengthModeling, Highz0Highz1OnNetDeclarationIsIllegal) {
       "  wire (highz0, highz1) w = a;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "drive strength (highz0, highz1) is illegal");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "28.3.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "drive strength (highz0, highz1) is illegal", 3,
+                            "28.3.2"));
 }
 
 TEST(LogicStrengthModeling, DrivingPairOnNetDeclarationIsLegal) {

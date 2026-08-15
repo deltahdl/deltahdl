@@ -2,6 +2,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -378,9 +379,9 @@ TEST(StringFormatTaskSim, ArgCountMismatchWarningNames21_3_3) {
       "  initial $sformat(s, \"x=%0d y=%0d\", 4);\n"
       "endmodule\n",
       f);
-  const Diagnostic* d = FindDiag(f, "does not match supplied argument count");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "21.3.3");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "does not match supplied argument count", 3,
+                              "21.3.3"));
 }
 
 }  // namespace

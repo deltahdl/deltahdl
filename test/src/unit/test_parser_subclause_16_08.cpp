@@ -383,10 +383,7 @@ TEST(SequenceDeclaration, MalformedSequenceHeaderNames16_8) {
       "    a ##1 b;\n"
       "  endsequence\n"
       "endmodule\n");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "16.8");
-  EXPECT_EQ(r.diags.front().loc.line, 3u);
-  EXPECT_EQ(r.diags.front().loc.column, 5u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';'", 3, "16.8"));
 }
 
 }  // namespace

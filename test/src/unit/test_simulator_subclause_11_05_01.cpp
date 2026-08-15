@@ -3,6 +3,7 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
+#include "helpers_reported_error.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -862,9 +863,9 @@ TEST(SelectBoundaryBehavior, ZeroWidthPartSelectWriteNames11_5_1) {
   sel->is_part_select_plus = true;
 
   WriteBitSelect(var, sel, MakeLogic4VecVal(f.arena, 4, 0x3), f.ctx, f.arena);
-  const Diagnostic* d = FindDiag(f, "zero-width part-select is not allowed");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "11.5.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "zero-width part-select is not allowed", 0,
+                            "11.5.1"));
 }
 
 }  // namespace

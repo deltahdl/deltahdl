@@ -442,10 +442,9 @@ TEST(Readmem2StateSim, OutOfRangeEnumValueNames21_4_2) {
           "\", mem);\n"
           "endmodule\n",
       f);
-  const Diagnostic* d =
-      FindDiag(f, "value out of range for the enumerated type");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "21.4.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "value out of range for the enumerated type", 4,
+                            "21.4.2"));
   std::remove(path.c_str());
 }
 

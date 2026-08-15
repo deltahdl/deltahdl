@@ -354,10 +354,7 @@ TEST(PackageDeclaration, MalformedPackageHeaderNames26_2) {
   auto r = Parse(
       "package ;\n"
       "endpackage\n");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "26.2");
-  EXPECT_EQ(r.diags.front().loc.line, 1u);
-  EXPECT_EQ(r.diags.front().loc.column, 9u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected identifier", 1, "26.2"));
 }
 
 }  // namespace

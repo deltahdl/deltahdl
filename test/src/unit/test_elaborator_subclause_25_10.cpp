@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -81,12 +82,11 @@ TEST(InterfaceObjectAccessElaboration,
       "  sub s1(ebus.mp);\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag =
-      FindDiag(f,
-               "'I' is not accessible through modport 'mp' of interface "
-               "'ebus_i'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "25.5");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'I' is not accessible through modport 'mp' of interface "
+                    "'ebus_i'",
+                    8, "25.5"));
 }
 
 TEST(InterfaceObjectAccessElaboration, PortMemberAccessToInterfaceTypedef_Ok) {
@@ -164,12 +164,11 @@ TEST(InterfaceObjectAccessElaboration,
       "  end\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag =
-      FindDiag(f,
-               "'I' is not accessible through modport 'mp' of interface "
-               "'ebus_i'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "25.5");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'I' is not accessible through modport 'mp' of interface "
+                    "'ebus_i'",
+                    12, "25.5"));
 }
 
 TEST(InterfaceObjectAccessElaboration,

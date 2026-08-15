@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_lexer.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -164,23 +165,23 @@ TEST(LexicalConventionLexing, BlockOpenInsideLineCommentDoesNotStartBlock) {
 }
 
 TEST(LexicalConventionLexing, UnterminatedBlockCommentError) {
-  auto [tokens, errors] = LexWithDiag("/* no end");
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics("/* no end");
+  EXPECT_TRUE(ReportedError(diags, "unterminated block comment", 1, "5.4"));
 }
 
 TEST(LexicalConventionLexing, UnterminatedBlockCommentAtEof) {
-  auto [tokens, errors] = LexWithDiag("a /* unterminated");
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics("a /* unterminated");
+  EXPECT_TRUE(ReportedError(diags, "unterminated block comment", 1, "5.4"));
 }
 
 TEST(LexicalConventionLexing, UnterminatedBlockCommentWithStars) {
-  auto [tokens, errors] = LexWithDiag("/* almost ***");
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics("/* almost ***");
+  EXPECT_TRUE(ReportedError(diags, "unterminated block comment", 1, "5.4"));
 }
 
 TEST(LexicalConventionLexing, SlashStarSlashIsUnterminated) {
-  auto [tokens, errors] = LexWithDiag("/*/");
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics("/*/");
+  EXPECT_TRUE(ReportedError(diags, "unterminated block comment", 1, "5.4"));
 }
 
 TEST(LexicalConventionLexing, LineCommentFollowedByBlockComment) {
@@ -297,8 +298,7 @@ TEST(LexicalConventionLexing, BlockCloseWithoutOpenIsOperators) {
 // the run recovers the rule without matching the wording of the message.
 TEST(LexicalConventionLexing, UnterminatedBlockCommentNames5_4) {
   auto diags = LexDiagnostics("a /* never closed");
-  ASSERT_EQ(diags.size(), 1u);
-  EXPECT_EQ(diags.front().subclause, "5.4");
+  EXPECT_TRUE(ReportedError(diags, "unterminated block comment", 1, "5.4"));
 }
 
 TEST(LexicalConventionLexing, LineCommentEndedByCrlf) {

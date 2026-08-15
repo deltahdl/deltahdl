@@ -695,9 +695,9 @@ TEST(SysTask, BareUnpackedNonByteArrayNames21_2_1_1) {
   std::streambuf* saved = std::cout.rdbuf(sink.rdbuf());
   LowerAndRun(design, f);
   std::cout.rdbuf(saved);
-  const Diagnostic* d = FindDiag(f, "unformatted unpacked-array argument");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "21.2.1.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unformatted unpacked-array argument", 5,
+                            "21.2.1.1"));
 }
 
 // §21.2.1.1: the same subclause decides which argument each format
@@ -719,10 +719,9 @@ TEST(SysTask, IntegerSpecifierOnUnpackedArrayNames21_2_1_1) {
   std::streambuf* saved = std::cout.rdbuf(sink.rdbuf());
   LowerAndRun(design, f);
   std::cout.rdbuf(saved);
-  const Diagnostic* d =
-      FindDiag(f, "an integer format specifier cannot be applied");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "21.2.1.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an integer format specifier cannot be applied", 5,
+                            "21.2.1.1"));
 }
 
 }  // namespace

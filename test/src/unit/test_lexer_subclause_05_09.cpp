@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_lexer.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -28,13 +29,13 @@ TEST(LexicalConventionLexing, SingleChar) {
 }
 
 TEST(LexicalConventionLexing, UnterminatedStringError) {
-  auto [tokens, errors] = LexWithDiag("\"unterminated");
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics("\"unterminated");
+  EXPECT_TRUE(ReportedError(diags, "unterminated string literal", 1, "5.9"));
 }
 
 TEST(LexicalConventionLexing, UnterminatedNewlineError) {
-  auto [tokens, errors] = LexWithDiag("\"line1\nline2\"");
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics("\"line1\nline2\"");
+  EXPECT_TRUE(ReportedError(diags, "unterminated string literal", 1, "5.9"));
 }
 
 // A quoted string is contained in a single line unless the newline character is
@@ -74,8 +75,9 @@ TEST(LexicalConventionLexing, TripleQuotedWithEscape) {
 }
 
 TEST(LexicalConventionLexing, UnterminatedTripleQuotedError) {
-  auto [tokens, errors] = LexWithDiag(R"("""no closing triple)");
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics(R"("""no closing triple)");
+  EXPECT_TRUE(
+      ReportedError(diags, "unterminated triple-quoted string", 1, "5.9"));
 }
 
 TEST(LexicalConventionLexing, TripleQuotedLineContinuation) {
@@ -97,8 +99,7 @@ TEST(LexicalConventionLexing, EmptyTripleQuoted) {
 // triple-quoted form takes the same one because §5.9 states both.
 TEST(LexicalConventionLexing, UnterminatedStringLiteralNames5_9) {
   auto diags = LexDiagnostics("\"never closed");
-  ASSERT_EQ(diags.size(), 1u);
-  EXPECT_EQ(diags.front().subclause, "5.9");
+  EXPECT_TRUE(ReportedError(diags, "unterminated string literal", 1, "5.9"));
 }
 
 TEST(LexicalConventionLexing, MultipleStrings) {

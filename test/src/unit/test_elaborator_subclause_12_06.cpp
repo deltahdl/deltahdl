@@ -245,10 +245,9 @@ TEST(PatternMatching, RealLiteralPatternNames12_6) {
       "  end\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "constant expression pattern shall be of integral type");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "12.6");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constant expression pattern shall be of integral type", 7, "12.6"));
 }
 
 }  // namespace

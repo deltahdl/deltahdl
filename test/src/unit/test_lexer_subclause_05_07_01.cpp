@@ -152,8 +152,9 @@ TEST(IntegerLiteralLexing, RejectMissingValueDigits) {
 // digits legal for the base, which the same literal can also breach.
 TEST(IntegerLiteralLexing, MoreThanOneXInADecimalLiteralNames5_7_1) {
   auto diags = LexDiagnostics("2'd1x");
-  ASSERT_EQ(diags.size(), 1u);
-  EXPECT_EQ(diags.front().subclause, "5.7.1");
+  EXPECT_TRUE(ReportedError(
+      diags, "x, z, or ? in decimal literal must be the only digit", 1,
+      "5.7.1"));
 }
 
 // §5.7.1: '?' is the SystemVerilog alternative for the z digit, so it is one of

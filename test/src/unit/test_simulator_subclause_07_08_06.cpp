@@ -18,6 +18,7 @@
 // value through such a variable.
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 #include "simulator/evaluation.h"
 
@@ -329,9 +330,8 @@ TEST(AssocInvalidIndex, MissingIndexReadWarningNames7_8_6) {
       "  initial result = aa[7];\n"
       "endmodule\n",
       f);
-  const Diagnostic* d = FindDiag(f, "': read of non-existent index");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.8.6");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "': read of non-existent index", 4, "7.8.6"));
 }
 
 // §7.8.6: a read whose index carries x or z is invalid for a second reason,
@@ -349,9 +349,8 @@ TEST(AssocInvalidIndex, XzIndexReadWarningNames7_8_6) {
       "  end\n"
       "endmodule\n",
       f);
-  const Diagnostic* d = FindDiag(f, "': index contains x/z");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.8.6");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), "': index contains x/z", 7,
+                              "7.8.6"));
 }
 
 // §7.8.6: a write through an invalid index is ignored and warned about by the
@@ -368,9 +367,9 @@ TEST(AssocInvalidIndex, XzIndexWriteWarningNames7_8_6) {
       "  end\n"
       "endmodule\n",
       f);
-  const Diagnostic* d = FindDiag(f, "associative array index contains x/z");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.8.6");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "associative array index contains x/z", 6,
+                              "7.8.6"));
 }
 
 // §7.8.6: the index argument of an associative array method is checked on its
@@ -389,9 +388,9 @@ TEST(AssocInvalidIndex, XzMethodIndexWarningNames7_8_6) {
       "  end\n"
       "endmodule\n",
       f);
-  const Diagnostic* d = FindDiag(f, "associative array index contains x/z");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.8.6");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "associative array index contains x/z", 8,
+                              "7.8.6"));
 }
 
 }  // namespace

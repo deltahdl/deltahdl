@@ -88,11 +88,9 @@ TEST(NamedEventWaitSynthesis, NamedEventInEventControlIsRejectedByName) {
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   EXPECT_EQ(synth.Lower(mod), nullptr);
-  const Diagnostic* d =
-      FindDiag(f, "named event in event control is not synthesizable");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "15.5.2");
-  EXPECT_EQ(d->loc.line, 4u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "named event in event control is not synthesizable",
+                            4, "15.5.2"));
 }
 
 }  // namespace

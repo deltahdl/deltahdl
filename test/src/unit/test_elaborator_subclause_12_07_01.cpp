@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -84,9 +85,8 @@ TEST(LoopStatementElaboration, ForTypedInitNotVisibleAfterLoop) {
       "  end\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag = FindDiag(f, "undeclared identifier 'i'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "23.9");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "undeclared identifier 'i'",
+                            5, "23.9"));
 }
 
 // A for-loop whose initialization does not declare its control variable

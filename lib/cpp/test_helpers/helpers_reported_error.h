@@ -42,7 +42,11 @@ using namespace delta;
 //
 // The engine records a location and a subclause on a warning as well, and this
 // answers for errors alone, because a source a case expects rejected is
-// rejected by an error.
+// rejected by an error. ReportedWarning below answers the same three questions
+// of a warning, for a case whose rule is enforced by one: §23.3.2.1 has the
+// binder warn about an ordered port connection past the last port rather than
+// reject the source, and a case reading that report through this one would
+// fail whatever the run recorded.
 // The 1-based line of `where` that `what` first stands on, or 0 when `where`
 // writes it nowhere. The line argument below is a number a case can read off
 // its own source only when the case wrote the input out; an input a tool
@@ -58,27 +62,42 @@ inline uint32_t LineHolding(std::string_view where, std::string_view what) {
   return line;
 }
 
-inline ::testing::AssertionResult ReportedError(
-    const std::vector<Diagnostic>& diags, std::string_view message,
-    uint32_t line, std::string_view subclause) {
+inline ::testing::AssertionResult ReportedAt(
+    const std::vector<Diagnostic>& diags, DiagSeverity severity,
+    std::string_view what, std::string_view message, uint32_t line,
+    std::string_view subclause) {
   for (const auto& diag : diags) {
-    if (diag.severity == DiagSeverity::kError &&
+    if (diag.severity == severity &&
         diag.message.find(message) != std::string::npos &&
         diag.loc.line == line && diag.subclause == subclause) {
       return ::testing::AssertionSuccess();
     }
   }
   ::testing::AssertionResult failure = ::testing::AssertionFailure();
-  failure << "no error containing \"" << message << "\" stands at line " << line
-          << " under §" << subclause << "; the run reported";
+  failure << "no " << what << " containing \"" << message
+          << "\" stands at line " << line << " under §" << subclause
+          << "; the run reported";
   if (diags.empty()) failure << " nothing";
   for (const auto& diag : diags) {
     failure << "\n  "
-            << (diag.severity == DiagSeverity::kError ? "error"
-                                                      : "not an error")
+            << (diag.severity == DiagSeverity::kError ? "error" : "warning")
             << " at line " << diag.loc.line << " under §"
             << (diag.subclause.empty() ? "(none)" : diag.subclause) << ": "
             << diag.message;
   }
   return failure;
+}
+
+inline ::testing::AssertionResult ReportedError(
+    const std::vector<Diagnostic>& diags, std::string_view message,
+    uint32_t line, std::string_view subclause) {
+  return ReportedAt(diags, DiagSeverity::kError, "error", message, line,
+                    subclause);
+}
+
+inline ::testing::AssertionResult ReportedWarning(
+    const std::vector<Diagnostic>& diags, std::string_view message,
+    uint32_t line, std::string_view subclause) {
+  return ReportedAt(diags, DiagSeverity::kWarning, "warning", message, line,
+                    subclause);
 }

@@ -328,10 +328,9 @@ TEST(DeferredAssertionElaboration, AssignmentPassActionNames16_4) {
       "  initial assert #0 (c) x = 8'd1;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "deferred assertion pass action shall be a single");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "16.4");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "deferred assertion pass action shall be a single",
+                            4, "16.4"));
   EXPECT_EQ(diag->message.find("§"), std::string::npos);
 }
 

@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_lexer.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -114,8 +115,8 @@ TEST(CommentLexing, BlockCommentCanContainAnyAsciiPunctuation) {
 }
 
 TEST(CommentLexing, UnterminatedBlockCommentIsAnError) {
-  auto [tokens, errors] = LexWithDiag("a /* no closing");
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics("a /* no closing");
+  EXPECT_TRUE(ReportedError(diags, "unterminated block comment", 1, "5.4"));
 }
 
 TEST(CommentLexing, BlockCommentJoinsAdjacentTokens) {

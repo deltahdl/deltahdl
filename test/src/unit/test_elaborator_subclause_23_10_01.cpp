@@ -248,10 +248,9 @@ TEST(DefparamElaboration, CannotOverrideLocalparamNames23_10_1) {
       "  defparam u.L = 5;\n"
       "endmodule\n",
       f, "top");
-  const Diagnostic* d =
-      FindDiag(f, "defparam cannot override a local parameter");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "23.10.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "defparam cannot override a local parameter", 6,
+                            "23.10.1"));
 }
 
 }  // namespace

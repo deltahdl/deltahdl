@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_string_var.h"
 #include "parser/ast.h"
 #include "simulator/eval_array.h"
@@ -352,12 +353,9 @@ TEST(AssignmentPatternSimulation, SizeMismatchIsReportedAtTheConcatenation) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  const Diagnostic* reported = nullptr;
-  for (const auto& d : f.diag.Diagnostics()) {
-    if (d.severity == DiagSeverity::kError) reported = &d;
-  }
-  ASSERT_NE(reported, nullptr);
-  EXPECT_EQ(reported->loc.line, 6u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array concatenation size mismatch", 6,
+                            "10.10"));
 }
 
 }  // namespace

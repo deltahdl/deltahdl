@@ -777,10 +777,9 @@ TEST(GenerateElaboration, GenerateForInitReferencesOwnGenvarNames27_4) {
       "  endgenerate\n"
       "endmodule\n",
       f);
-  const Diagnostic* d =
-      FindDiag(f, "generate-for init shall not reference the loop index");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "27.4");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "generate-for init shall not reference the loop index", 3, "27.4"));
 }
 
 }  // namespace

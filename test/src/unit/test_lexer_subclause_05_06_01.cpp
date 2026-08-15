@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_lexer.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -158,24 +159,30 @@ TEST(LexicalConventionLexing, EscapedIdentifierRejectsControlCharBelow33) {
   std::string src = "\\ab";
   src += '\x01';
   src += "cd ";
-  auto [tokens, errors] = LexWithDiag(src);
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics(src);
+  EXPECT_TRUE(ReportedError(
+      diags, "escaped identifier contains non-printable character", 1,
+      "5.6.1"));
 }
 
 TEST(LexicalConventionLexing, EscapedIdentifierRejectsDel) {
   std::string src = "\\ab";
   src += '\x7F';
   src += "cd ";
-  auto [tokens, errors] = LexWithDiag(src);
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics(src);
+  EXPECT_TRUE(ReportedError(
+      diags, "escaped identifier contains non-printable character", 1,
+      "5.6.1"));
 }
 
 TEST(LexicalConventionLexing, EscapedIdentifierRejectsHighByte) {
   std::string src = "\\ab";
   src += static_cast<char>(0x80);
   src += "cd ";
-  auto [tokens, errors] = LexWithDiag(src);
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics(src);
+  EXPECT_TRUE(ReportedError(
+      diags, "escaped identifier contains non-printable character", 1,
+      "5.6.1"));
 }
 
 TEST(LexicalConventionLexing, EscapedIdentifierEmptyBodyAtSpace) {
@@ -225,8 +232,9 @@ TEST(LexicalConventionLexing,
 // for a simple identifier.
 TEST(LexicalConventionLexing, NonPrintableCharacterNames5_6_1) {
   auto diags = LexDiagnostics("\\cpu\x01 ");
-  ASSERT_EQ(diags.size(), 1u);
-  EXPECT_EQ(diags.front().subclause, "5.6.1");
+  EXPECT_TRUE(ReportedError(
+      diags, "escaped identifier contains non-printable character", 1,
+      "5.6.1"));
 }
 
 TEST(LexicalConventionLexing, EscapedIdentifierBareBackslashAtEof) {

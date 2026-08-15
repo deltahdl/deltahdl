@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -164,10 +165,9 @@ TEST(OperatorElaboration, WildcardEqIncompatibleClassHandlesRejected) {
       "  initial eq = (a ==? b);\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "class handle comparison requires assignment compatible");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "11.4.5");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "class handle comparison requires assignment compatible", 9, "11.4.5"));
 }
 
 // Wildcard inequality is the other operator §11.4.6 makes equivalent to its
@@ -186,10 +186,9 @@ TEST(OperatorElaboration, WildcardNeqIncompatibleClassHandlesRejected) {
       "  initial eq = (a !=? b);\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "class handle comparison requires assignment compatible");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "11.4.5");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "class handle comparison requires assignment compatible", 9, "11.4.5"));
 }
 
 }  // namespace

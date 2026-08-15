@@ -7,6 +7,7 @@
 #include "common/diagnostic.h"
 #include "fixture_elaborator.h"
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -112,10 +113,8 @@ TEST(ParserHarness, AParseRejectionIsReadableByItsMessageAndPosition) {
       "endmodule\n"
       "    %\n");
 
-  ASSERT_EQ(result.diags.size(), 1u);
-  EXPECT_EQ(result.diags.front().message, "expected top-level declaration");
-  EXPECT_EQ(result.diags.front().loc.line, 3u);
-  EXPECT_EQ(result.diags.front().loc.column, 5u);
+  EXPECT_TRUE(ReportedError(result.diags, "expected top-level declaration", 3,
+                            "3.12.1"));
 }
 
 TEST(ParserHarness, AnAcceptedParseKeepsNoDiagnostic) {
@@ -152,9 +151,9 @@ TEST(ParserHarness, ADiagnosticReportedBeforeTheParseSurvivesIt) {
       "endmodule\n"
       "`end_keywords\n");
 
-  ASSERT_FALSE(result.diags.empty());
-  EXPECT_EQ(result.diags.front().message,
-            "`end_keywords without matching `begin_keywords");
+  EXPECT_TRUE(ReportedError(result.diags,
+                            "`end_keywords without matching `begin_keywords", 3,
+                            "22.14"));
 }
 
 TEST(ParserHarness, AnAcceptedPreprocessedSourceKeepsNoDiagnostic) {

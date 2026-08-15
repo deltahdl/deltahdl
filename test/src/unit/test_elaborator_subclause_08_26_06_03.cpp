@@ -1,6 +1,7 @@
 
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -127,10 +128,10 @@ TEST(InterfaceClassDiamond, DifferentSpecializationsNotDiamondError) {
       "module m;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag = FindDiag(
-      f, "is inherited from multiple interface classes and must be overridden");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "8.26.6.2");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "is inherited from multiple interface classes and must be overridden", 10,
+      "8.26.6.2"));
 }
 
 TEST(InterfaceClassDiamond, DifferentSpecializationsWithOverrideOk) {
@@ -197,10 +198,10 @@ TEST(InterfaceClassDiamond, DifferentValueSpecializationsNotDiamondError) {
       "module m;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag = FindDiag(
-      f, "is inherited from multiple interface classes and must be overridden");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "8.26.6.2");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "is inherited from multiple interface classes and must be overridden", 10,
+      "8.26.6.2"));
 }
 
 // Boundary of the value-specialization rule: identical value parameterizations
@@ -249,10 +250,10 @@ TEST(InterfaceClassDiamond, DifferentNamedTypeSpecializationsNotDiamondError) {
       "module m;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag = FindDiag(
-      f, "is inherited from multiple interface classes and must be overridden");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "8.26.6.2");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "is inherited from multiple interface classes and must be overridden", 12,
+      "8.26.6.2"));
 }
 
 // §8.1 lets a class be declared wherever a data declaration may appear. Two
@@ -277,10 +278,10 @@ TEST(InterfaceClassDiamond, DifferentSpecializationsInsideAModuleError) {
       "  endclass\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag = FindDiag(
-      f, "is inherited from multiple interface classes and must be overridden");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "8.26.6.2");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "is inherited from multiple interface classes and must be overridden", 11,
+      "8.26.6.2"));
 }
 
 TEST(InterfaceClassDiamond, SameSpecializationInsideAModuleOk) {

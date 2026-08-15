@@ -200,9 +200,9 @@ TEST(ArrayMethodWithClause, LocatorIteratorWithoutWithNames7_12) {
   auto* call = MakeMethodCall(f.arena, "arr", "find", {MakeId(f.arena, "e")});
   std::vector<Logic4Vec> out;
   TryCollectLocatorResult(call, f.ctx, f.arena, out);
-  const Diagnostic* d = FindDiag(f, "iterator argument without 'with' clause");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.12");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "iterator argument without 'with' clause", 0,
+                            "7.12"));
 }
 
 // §7.12: the ordering methods reach the same rule on their own path, so the
@@ -212,9 +212,9 @@ TEST(ArrayMethodWithClause, OrderingIteratorWithoutWithNames7_12) {
   MakeDynArray(f, "arr", {9, 4});
   auto* call = MakeMethodCall(f.arena, "arr", "sort", {MakeId(f.arena, "e")});
   TryExecArrayMethodStmt(call, f.ctx, f.arena);
-  const Diagnostic* d = FindDiag(f, "iterator argument without 'with' clause");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.12");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "iterator argument without 'with' clause", 0,
+                            "7.12"));
 }
 
 }  // namespace

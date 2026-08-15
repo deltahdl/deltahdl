@@ -1,6 +1,7 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_queue.h"
+#include "helpers_reported_error.h"
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
 #include "simulator/statement_assign.h"
@@ -501,9 +502,8 @@ TEST(QueueOps, XZIndexWriteWarningNames7_10_1) {
       MakeSelectExpr(f.arena, MakeId(f.arena, "q"), MakeXLiteral(f.arena));
   auto rhs_val = MakeLogic4VecVal(f.arena, 32, 33);
   TryQueueIndexedWrite(lhs, rhs_val, f.ctx, f.arena);
-  const Diagnostic* d = FindDiag(f, "queue write index contains x/z");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.10.1");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "queue write index contains x/z", 0, "7.10.1"));
 }
 
 // §7.10.1: a value outside 0...$+1 is invalid for the same reason, and the
@@ -517,9 +517,8 @@ TEST(QueueOps, OutOfBoundsWriteWarningNames7_10_1) {
   lhs->index = MakeUnary(f.arena, TokenKind::kMinus, MakeInt(f.arena, 2));
   auto rhs_val = MakeLogic4VecVal(f.arena, 32, 53);
   TryQueueIndexedWrite(lhs, rhs_val, f.ctx, f.arena);
-  const Diagnostic* d = FindDiag(f, "queue write index out of bounds");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.10.1");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "queue write index out of bounds", 0, "7.10.1"));
 }
 
 }  // namespace

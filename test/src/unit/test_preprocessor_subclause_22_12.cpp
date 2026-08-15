@@ -110,8 +110,9 @@ TEST(Preprocessor, Line_ZeroLineNumber_Error) {
 TEST(Preprocessor, Line_NonPositiveNumberNames22_12) {
   PreprocFixture f;
   Preprocess("`line 0 \"f\" 0\n", f);
-  ASSERT_EQ(f.diag.Diagnostics().size(), 1U);
-  EXPECT_EQ(f.diag.Diagnostics().front().subclause, "22.12");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`line number must be a positive integer", 1,
+                            "22.12"));
 }
 
 TEST(Preprocessor, Line_NegativeLineNumber) {

@@ -3,6 +3,7 @@
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -260,10 +261,7 @@ TEST(DataType, MalformedPackedDimensionNames6_9) {
       "module m;\n"
       "  logic [7 0] x;\n"
       "endmodule\n");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "6.9");
-  EXPECT_EQ(r.diags.front().loc.line, 2u);
-  EXPECT_EQ(r.diags.front().loc.column, 12u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ':'", 2, "6.9"));
 }
 
 }  // namespace

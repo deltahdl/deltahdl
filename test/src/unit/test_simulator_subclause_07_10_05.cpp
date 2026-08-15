@@ -1,6 +1,7 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_queue.h"
+#include "helpers_reported_error.h"
 #include "simulator/eval_array.h"
 #include "simulator/statement_assign.h"
 
@@ -255,9 +256,9 @@ TEST(BoundedQueue, PushBackDiscardWarningNames7_10_5) {
   auto* call =
       MakeMethodCall(f.arena, "q", "push_back", {MakeInt(f.arena, 88)});
   TryExecQueueMethodStmt(call, f.ctx, f.arena);
-  const Diagnostic* d = FindDiag(f, "bounded queue overflow in push_back");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.10.5");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "bounded queue overflow in push_back", 0,
+                              "7.10.5"));
 }
 
 // §7.10.5: push_front pushes the queue's last element past the bound, which is
@@ -268,9 +269,9 @@ TEST(BoundedQueue, PushFrontDiscardWarningNames7_10_5) {
   auto* call =
       MakeMethodCall(f.arena, "q", "push_front", {MakeInt(f.arena, 42)});
   TryExecQueueMethodStmt(call, f.ctx, f.arena);
-  const Diagnostic* d = FindDiag(f, "bounded queue overflow in push_front");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.10.5");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "bounded queue overflow in push_front", 0,
+                              "7.10.5"));
 }
 
 // §7.10.5: insert() likewise discards past the bound.
@@ -280,9 +281,8 @@ TEST(BoundedQueue, InsertDiscardWarningNames7_10_5) {
   auto* call = MakeMethodCall(f.arena, "q", "insert",
                               {MakeInt(f.arena, 0), MakeInt(f.arena, 6)});
   TryExecQueueMethodStmt(call, f.ctx, f.arena);
-  const Diagnostic* d = FindDiag(f, "bounded queue overflow in insert");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.10.5");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "bounded queue overflow in insert", 0, "7.10.5"));
 }
 
 // §7.10.5: writing q[$+1] on a full bounded queue is the operator form of the
@@ -296,9 +296,9 @@ TEST(BoundedQueue, IndexedWriteDiscardWarningNames7_10_5) {
   auto* lhs = MakeSelectExpr(f.arena, MakeId(f.arena, "q"), idx);
   auto rhs_val = MakeLogic4VecVal(f.arena, 32, 12);
   TryQueueIndexedWrite(lhs, rhs_val, f.ctx, f.arena);
-  const Diagnostic* d = FindDiag(f, "bounded queue overflow in indexed write");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.10.5");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "bounded queue overflow in indexed write", 0,
+                              "7.10.5"));
 }
 
 // §7.10.5: an assignment whose value has more elements than the bound allows
@@ -311,9 +311,9 @@ TEST(BoundedQueue, ConcatAssignTruncateWarningNames7_10_5) {
   auto* rhs = MakeConcat(f.arena, {MakeId(f.arena, "q"), MakeInt(f.arena, 4)});
   auto* stmt = MakeAssign(f.arena, "q", rhs);
   TryQueueBlockingAssign(stmt, f.ctx, f.arena);
-  const Diagnostic* d = FindDiag(f, "bounded queue overflow in assignment");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.10.5");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "bounded queue overflow in assignment", 0,
+                              "7.10.5"));
 }
 
 }  // namespace

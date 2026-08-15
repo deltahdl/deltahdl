@@ -171,12 +171,9 @@ TEST(VirtualInterfaceSim, NullReferenceIsReportedAtTheReference) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  const Diagnostic* reported = nullptr;
-  for (const auto& d : f.diag.Diagnostics()) {
-    if (d.severity == DiagSeverity::kError) reported = &d;
-  }
-  ASSERT_NE(reported, nullptr);
-  EXPECT_EQ(reported->loc.line, 11u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference through a null virtual interface", 11,
+                            "25.9"));
 }
 
 // §25.9: attempting to use a null virtual interface shall result in a fatal
@@ -196,10 +193,9 @@ TEST(VirtualInterfaceSim, NullReferenceNames25_9) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  const Diagnostic* d =
-      FindDiag(f, "reference through a null virtual interface");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "25.9");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference through a null virtual interface", 7,
+                            "25.9"));
 }
 
 }  // namespace

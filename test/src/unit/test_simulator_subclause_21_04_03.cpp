@@ -478,9 +478,9 @@ TEST(ReadmemMultiDimSim, AddressBeyondHighestDimensionNames21_4_3) {
           "\", mem);\n"
           "endmodule\n",
       f);
-  const Diagnostic* d = FindDiag(f, "outside the highest dimension's range");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "21.4.3");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "outside the highest dimension's range", 3,
+                            "21.4.3"));
   std::remove(path.c_str());
 }
 

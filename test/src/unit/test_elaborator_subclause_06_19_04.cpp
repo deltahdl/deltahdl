@@ -16,6 +16,7 @@
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "lexer/token.h"
 
 using namespace delta;
@@ -36,10 +37,9 @@ TEST(EnumNumericalExpr, EnumArithNoCast_Error) {
       "  end\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "compound assignment to enum variable without cast");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.19.3");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "compound assignment to enum variable without cast",
+                            6, "6.19.3"));
 }
 
 TEST(EnumNumericalExpr, EnumToIntAutocast_Ok) {
@@ -96,10 +96,9 @@ TEST(EnumNumericalExpr, EnumExprAssignNoCast_Error) {
       "  end\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "integer assigned to enum variable without cast");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.19.3");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 6,
+                            "6.19.3"));
 }
 
 TEST(EnumNumericalExpr, EnumCastExprAssign_Ok) {
@@ -189,10 +188,9 @@ TEST(EnumNumericalExpr, EnumIncrementNoCast_Error) {
       "  end\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "increment/decrement of enum variable without cast");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.19.3");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "increment/decrement of enum variable without cast",
+                            6, "6.19.3"));
 }
 
 }  // namespace

@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -222,10 +223,9 @@ TEST(PragmaElaboration, MalformedPragmaIsDiagnosed) {
       "  wire a;\n"
       "endmodule\n",
       f, "top");
-  const Diagnostic* diag =
-      FindDiag(f, "`pragma pragma_name must be a simple identifier");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "22.11");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`pragma pragma_name must be a simple identifier",
+                            2, "22.11"));
 }
 
 }  // namespace

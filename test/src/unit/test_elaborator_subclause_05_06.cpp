@@ -1,6 +1,7 @@
 #include <string>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -66,10 +67,9 @@ TEST(IdentifierElaboration, CaseMismatchedReferenceFailsToResolve) {
       "  assign x = Foo;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "reference to unresolved identifier 'Foo'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "23.9");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'Foo'", 4,
+                            "23.9"));
 }
 
 // §5.6: "If an identifier exceeds the implementation-specific length limit, an
@@ -89,10 +89,9 @@ TEST(IdentifierElaboration, IdentifierExceedingMaxLengthReportsError) {
           ";\n"
           "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "identifier exceeds maximum length of 1024 characters");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "5.6");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "identifier exceeds maximum length of 1024 characters", 2, "5.6"));
 }
 
 // The §5.6 length limit governs every identifier, escaped ones included. Here
@@ -128,10 +127,9 @@ TEST(IdentifierElaboration, EscapedIdentifierExceedingMaxLengthReportsError) {
           " ;\n"
           "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "identifier exceeds maximum length of 1024 characters");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "5.6");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "identifier exceeds maximum length of 1024 characters", 2, "5.6"));
 }
 
 }  // namespace

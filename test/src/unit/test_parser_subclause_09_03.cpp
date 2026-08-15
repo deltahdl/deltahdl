@@ -282,6 +282,10 @@ TEST(BlockStatementParsing,
   // the `endmodule` looking for a statement would draw the §11.2 "expected
   // expression" report on each of them and the §12.3 "expected ';'" beside, so
   // this fails on a §9.3.2 report bolted onto the old recovery.
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "expected join, join_any or join_none to close the parallel block", 5,
+      "9.3.2"));
   EXPECT_EQ(r.diags.size(), 1u);
 }
 

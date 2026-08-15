@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
+#include "helpers_reported_error.h"
 #include "synthesizer/synth_lower.h"
 
 using namespace delta;
@@ -25,10 +26,9 @@ TEST(ExpectStatementSynthesis, ExpectIsRejectedByName) {
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   EXPECT_EQ(synth.Lower(mod), nullptr);
-  const Diagnostic* d = FindDiag(f, "expect statement is not synthesizable");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "16.17");
-  EXPECT_EQ(d->loc.line, 3u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "expect statement is not synthesizable", 3,
+                            "16.17"));
 }
 
 }  // namespace

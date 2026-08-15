@@ -4,6 +4,7 @@
 #include "common/arena.h"
 #include "elaborator/const_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "parser/ast.h"
 
 using namespace delta;
@@ -254,10 +255,9 @@ TEST(LongestStaticPrefixDriver, ConstantIndexSameElementConflicts) {
       "  always_comb arr[1] = 8'h2;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "driven by multiple always_comb/always_latch/always_ff");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "9.2.2.2");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "driven by multiple always_comb/always_latch/always_ff", 5, "9.2.2.2"));
 }
 
 // The negative form: a variable index is not a constant expression, so the
@@ -275,10 +275,9 @@ TEST(LongestStaticPrefixDriver, VariableIndexCollapsesToBaseConflicts) {
       "  always_comb arr[1] = 8'h2;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "driven by multiple always_comb/always_latch/always_ff");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "9.2.2.2");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "driven by multiple always_comb/always_latch/always_ff", 5, "9.2.2.2"));
 }
 
 // C2 / C5, field select from real struct syntax: `s.a` and `s.b` are field
@@ -311,10 +310,9 @@ TEST(LongestStaticPrefixDriver, FieldSelectSameFieldConflicts) {
       "  always_comb s.a = 8'h2;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "driven by multiple always_comb/always_latch/always_ff");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "9.2.2.2");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "driven by multiple always_comb/always_latch/always_ff", 4, "9.2.2.2"));
 }
 
 // C3, non-indexed part-select (a form of indexing select): its bounds are
@@ -348,10 +346,9 @@ TEST(LongestStaticPrefixDriver, IndexedPartSelectVariableBaseConflicts) {
       "  always_comb vect[3:0] = 4'h2;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "driven by multiple always_comb/always_latch/always_ff");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "9.2.2.2");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "driven by multiple always_comb/always_latch/always_ff", 5, "9.2.2.2"));
 }
 
 // C3, the descending indexed part-select (`-:`) is another indexing-select
@@ -387,10 +384,9 @@ TEST(LongestStaticPrefixDriver, ConstantExpressionIndexEvaluated) {
       "  always_comb arr[2] = 8'h2;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "driven by multiple always_comb/always_latch/always_ff");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "9.2.2.2");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "driven by multiple always_comb/always_latch/always_ff", 4, "9.2.2.2"));
 }
 
 // The longest-static-prefix rule also governs a continuous-assignment left-hand
@@ -429,10 +425,9 @@ TEST(LongestStaticPrefixDriver, ContinuousAssignConstantIndexSameBitConflicts) {
       "  always_comb v[1] = 1'b0;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "driven by always_comb and continuous assignment");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "10.3.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "driven by always_comb and continuous assignment",
+                            5, "10.3.2"));
 }
 
 // The following three build the worked examples of this subclause from real
@@ -471,10 +466,9 @@ TEST(LongestStaticPrefixDriver, MultiDimVariableOuterIndexStopsAtRow) {
       "  always_comb mem[1][2] = 8'h2;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "driven by multiple always_comb/always_latch/always_ff");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "9.2.2.2");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "driven by multiple always_comb/always_latch/always_ff", 5, "9.2.2.2"));
 }
 
 // LRM example `m[i][1]`: a variable inner index makes the inner select
@@ -492,10 +486,9 @@ TEST(LongestStaticPrefixDriver, MultiDimVariableInnerIndexCollapsesToBase) {
       "  always_comb mem[0][0] = 8'h2;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "driven by multiple always_comb/always_latch/always_ff");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "9.2.2.2");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "driven by multiple always_comb/always_latch/always_ff", 5, "9.2.2.2"));
 }
 
 }  // namespace

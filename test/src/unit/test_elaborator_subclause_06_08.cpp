@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -23,10 +24,9 @@ TEST(VarDecl, ConstWithoutInitializerIsError) {
       "  const int x;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "const variable 'x' must be initialized");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.20.6");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "const variable 'x' must be initialized", 2,
+                            "6.20.6"));
 }
 
 TEST(VarDecl, ConstWithInitializerOk) {
@@ -131,10 +131,9 @@ TEST(VarDecl, AutomaticInPackageIsError) {
       "  automatic int x;\n"
       "endpackage\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "'automatic' is not allowed in a data_declaration outside");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.8");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'automatic' is not allowed in a data_declaration outside", 2, "6.8"));
 }
 
 TEST(VarDecl, StaticInPackageOk) {
@@ -167,10 +166,9 @@ TEST(VarDecl, StructPackedDimWithoutPackedKeywordIsError) {
       "  struct { int x; } [3:0] s;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "packed dimension on struct requires the packed keyword");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "7.2");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "packed dimension on struct requires the packed keyword", 2, "7.2"));
 }
 
 // The union half of the same §7.2 footnote 17.
@@ -181,10 +179,9 @@ TEST(VarDecl, UnionPackedDimWithoutPackedKeywordIsError) {
       "  union { int x; logic [31:0] y; } [3:0] u;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "packed dimension on union requires the packed keyword");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "7.2");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "packed dimension on union requires the packed keyword", 2, "7.2"));
 }
 
 TEST(VarDecl, PackedStructWithPackedDimOk) {

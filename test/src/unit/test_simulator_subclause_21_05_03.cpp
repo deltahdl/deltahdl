@@ -440,10 +440,9 @@ TEST(WritememAddressSim, StringIndexRejectionNames21_5_3) {
           "\", aa);\n"
           "endmodule\n",
       f);
-  const Diagnostic* d =
-      FindDiag(f, "associative array index must be of an integral type");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "21.5.3");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "associative array index must be of an integral type", 3, "21.5.3"));
   std::remove(path.c_str());
 }
 

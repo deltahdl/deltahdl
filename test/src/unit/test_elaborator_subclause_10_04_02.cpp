@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -468,10 +469,9 @@ TEST(NonblockingAssignSim, AutomaticVariableNbaIsError) {
       "  initial set_val();\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "automatic task variable in nonblocking assignment");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "13.3.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic task variable in nonblocking assignment",
+                            4, "13.3.2"));
 }
 
 // §10.4.2 bars a nonblocking assignment to an element of a dynamically sized
@@ -492,12 +492,11 @@ TEST(NonblockingAssignSim, QueueElementNbaIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f,
-               "nonblocking assignment to element of dynamically sized "
-               "array");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.21");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "nonblocking assignment to element of dynamically sized "
+                    "array",
+                    5, "6.21"));
 }
 
 // An associative array is dynamically sized as well, so the same §6.21
@@ -513,12 +512,11 @@ TEST(NonblockingAssignSim, AssociativeArrayElementNbaIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f,
-               "nonblocking assignment to element of dynamically sized "
-               "array");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.21");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "nonblocking assignment to element of dynamically sized "
+                    "array",
+                    5, "6.21"));
 }
 
 // The dynamic array is the case §6.21 and §10.4.2 both name outright.
@@ -533,12 +531,11 @@ TEST(NonblockingAssignSim, DynamicArrayElementNbaIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f,
-               "nonblocking assignment to element of dynamically sized "
-               "array");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.21");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "nonblocking assignment to element of dynamically sized "
+                    "array",
+                    5, "6.21"));
 }
 
 }  // namespace

@@ -1,6 +1,7 @@
 
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -71,10 +72,9 @@ TEST(AggregateExpr, NonEquivalentTypeComparisonError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "comparison of non-equivalent aggregate");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.22.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "comparison of non-equivalent aggregate", 7,
+                            "6.22.2"));
 }
 
 TEST(AggregateExpr, AssignmentPatternAsAggregate) {
@@ -136,10 +136,9 @@ TEST(AggregateExpr, NonEquivalentTypeInequalityError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "comparison of non-equivalent aggregate");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.22.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "comparison of non-equivalent aggregate", 7,
+                            "6.22.2"));
 }
 
 TEST(AggregateExpr, ArrayEqualityComparison) {
@@ -216,10 +215,9 @@ TEST(AggregateExpr, NonEquivalentArrayTypeComparisonError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "comparison of non-equivalent aggregate");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.22.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "comparison of non-equivalent aggregate", 7,
+                            "6.22.2"));
 }
 
 TEST(AggregateExpr, EquivalentTypeComparisonInContAssign) {
@@ -251,10 +249,9 @@ TEST(AggregateExpr, NonEquivalentTypeComparisonInContAssign) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "comparison of non-equivalent aggregate");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.22.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "comparison of non-equivalent aggregate", 7,
+                            "6.22.2"));
 }
 
 // Array inequality, held to §6.22.2 equivalence like array equality.
@@ -271,10 +268,9 @@ TEST(AggregateExpr, NonEquivalentArrayTypeInequalityError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "comparison of non-equivalent aggregate");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.22.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "comparison of non-equivalent aggregate", 7,
+                            "6.22.2"));
 }
 
 TEST(AggregateExpr, ArrayPassedThroughPort) {
@@ -341,10 +337,9 @@ TEST(AggregateExpr, NonEquivalentArraySliceComparisonError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "comparison of non-equivalent aggregate");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.22.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "comparison of non-equivalent aggregate", 7,
+                            "6.22.2"));
 }
 
 TEST(AggregateExpr, EquivalentArraySliceInequality) {
@@ -380,10 +375,9 @@ TEST(AggregateExpr, NonEquivalentArraySliceInequalityError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "comparison of non-equivalent aggregate");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.22.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "comparison of non-equivalent aggregate", 7,
+                            "6.22.2"));
 }
 
 }  // namespace

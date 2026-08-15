@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -66,10 +67,7 @@ TEST(DataTypeParsing, MalformedEnumRangeNames6_19_2) {
       "module m;\n"
       "  typedef enum { a[3 } e;\n"
       "endmodule\n");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "6.19.2");
-  EXPECT_EQ(r.diags.front().loc.line, 2u);
-  EXPECT_EQ(r.diags.front().loc.column, 22u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ']'", 2, "6.19.2"));
 }
 
 }  // namespace

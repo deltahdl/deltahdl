@@ -389,7 +389,11 @@ TEST(ProtectBeginProtectedSyntax, AWordWrittenProperlyAfterAReportedOneOpens) {
   ReadSource run(
       "`pragma protect begin_protected=\"1\"\n"
       "`pragma protect begin_protected\n");
-  EXPECT_EQ(run.diag.ErrorCount(), 1U);
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma begin_protected keyword is written on its own and takes "
+      "no pragma_value",
+      1, "34.5.3.1"));
   EXPECT_EQ(run.OpenDecryptionEnvelopes(), 1U);
 }
 

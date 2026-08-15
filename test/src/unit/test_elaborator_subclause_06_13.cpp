@@ -6,6 +6,7 @@
 
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "parser/ast.h"
 
 using namespace delta;
@@ -38,9 +39,8 @@ TEST(VoidDataType, VoidFunctionReturnsValue_Error) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag = FindDiag(f, "void function returns a value");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "13.4.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "void function returns a value", 3, "13.4.1"));
 }
 
 TEST(VoidDataType, VoidFunctionBareReturn_Ok) {
@@ -81,9 +81,8 @@ TEST(VoidDataType, VoidFunctionNestedReturnValue_Error) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag = FindDiag(f, "void function returns a value");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "13.4.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "void function returns a value", 4, "13.4.1"));
 }
 
 // A bare return nested inside a conditional is still legal: the recursive walk

@@ -53,8 +53,9 @@ TEST(Preprocessor, Timescale_InvalidUnit) {
 TEST(Preprocessor, Timescale_PrecisionLessPreciseThanUnitNames22_7) {
   PreprocFixture f;
   Preprocess("`timescale 1ns/1us\n", f);
-  ASSERT_EQ(f.diag.Diagnostics().size(), 1U);
-  EXPECT_EQ(f.diag.Diagnostics().front().subclause, "22.7");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "`timescale precision is less precise than the time unit", 1, "22.7"));
 }
 
 TEST(Preprocessor, DelayToTicks_Magnitude) {

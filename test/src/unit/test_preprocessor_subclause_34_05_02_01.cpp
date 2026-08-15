@@ -259,7 +259,11 @@ TEST(ProtectEndSyntax, AWordWrittenProperlyAfterAReportedOneStillCloses) {
   std::string closing = "`pragma protect end=\"now\"\n";
   closing.append("`pragma protect end\n");
   ReadSource run(RegionClosedWith(closing));
-  EXPECT_EQ(run.diag.ErrorCount(), 1U);
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma end keyword is written on its own and takes no "
+      "pragma_value",
+      3, "34.5.2.1"));
   EXPECT_EQ(run.OpenEncryptionEnvelopes(), 0U);
   EXPECT_EQ(run.Closed().size(), 1U);
 }

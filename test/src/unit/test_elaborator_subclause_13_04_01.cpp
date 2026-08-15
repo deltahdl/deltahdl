@@ -46,9 +46,8 @@ TEST(FunctionReturnElaboration,
       "  endfunction\n"
       "endmodule\n",
       f);
-  const Diagnostic* rep = FindDiag(f, "void function returns a value");
-  ASSERT_NE(rep, nullptr);
-  EXPECT_EQ(rep->subclause, "13.4.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "void function returns a value", 3, "13.4.1"));
 }
 
 TEST(FunctionReturnElaboration, FunctionCallAsExprElaborates) {

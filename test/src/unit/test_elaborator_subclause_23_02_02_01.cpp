@@ -469,9 +469,8 @@ TEST(NonAnsiStylePortDeclarations, PortWithoutADirectionNames23_2_2_1) {
       "  input a;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* rep = FindDiag(f, "has no direction declaration");
-  ASSERT_NE(rep, nullptr);
-  EXPECT_EQ(rep->subclause, "23.2.2.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "has no direction declaration", 1, "23.2.2.1"));
 }
 
 }  // namespace

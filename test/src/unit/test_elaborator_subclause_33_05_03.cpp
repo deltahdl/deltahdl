@@ -499,18 +499,6 @@ TEST(SeparateCompilationBinding, LoadingAFileThatIsNoCompiledFormIsReported) {
       ReportedError(h.diag.Diagnostics(), "no cells read from library", 0, ""));
 }
 
-// The first report this binder's engine recorded whose message contains
-// `needle`, or nullptr when it recorded none. A test that names the subclause a
-// report enforces reads it off this rather than off whichever report the run
-// wrote first, because one bind can fail for more than one reason and the first
-// report is then a different rule's.
-const Diagnostic* FindBindDiag(const BindHarness& h, std::string_view needle) {
-  for (const auto& diag : h.diag.Diagnostics()) {
-    if (diag.message.find(needle) != std::string::npos) return &diag;
-  }
-  return nullptr;
-}
-
 // §33.5.3: "The only restriction is that all cells in a design shall be
 // precompiled prior to binding the design." The report naming a cell no loaded
 // library holds carries that subclause, which lets a caller learn which rule
@@ -523,9 +511,8 @@ TEST(SeparateCompilationBinding, CellNotPrecompiledNames33_5_3) {
   BindHarness h;
   ASSERT_TRUE(h.binder.LoadLibrary(path));
   EXPECT_EQ(h.binder.Bind({"two_missing"}), nullptr);
-  const Diagnostic* rep = FindBindDiag(h, "was not precompiled");
-  ASSERT_NE(rep, nullptr);
-  EXPECT_EQ(rep->subclause, "33.5.3");
+  EXPECT_TRUE(ReportedError(h.diag.Diagnostics(),
+                            "cell 'gone_a' was not precompiled", 2, "33.5.3"));
 }
 
 // §33.5.3: the report naming a cell no loaded library holds stands at the

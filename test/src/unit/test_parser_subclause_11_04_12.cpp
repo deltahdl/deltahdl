@@ -1,6 +1,7 @@
 #include "fixture_evaluator.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -152,10 +153,7 @@ TEST(Concatenation, MalformedConcatenationNames11_4_12) {
       "module m;\n"
       "  assign y = {a, b;\n"
       "endmodule\n");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "11.4.12");
-  EXPECT_EQ(r.diags.front().loc.line, 2u);
-  EXPECT_EQ(r.diags.front().loc.column, 19u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected '}'", 2, "11.4.12"));
 }
 
 }  // namespace

@@ -5,6 +5,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_temp_file.h"
 
 using namespace delta;
@@ -826,9 +827,9 @@ TEST(ReadingFormattedData, IntegerCodeOnAggregateNames21_3_4_3) {
       "  end\n"
       "endmodule\n",
       f);
-  const Diagnostic* d = FindDiag(f, "may not read into unpacked aggregate");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "21.3.4.3");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "may not read into unpacked aggregate", 6,
+                              "21.3.4.3"));
 }
 
 }  // namespace

@@ -89,10 +89,8 @@ TEST(LevelSensitiveEventSynthesis, WaitStatementIsRejectedByName) {
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   EXPECT_EQ(synth.Lower(mod), nullptr);
-  const Diagnostic* d = FindDiag(f, "wait statement is not synthesizable");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "9.4.3");
-  EXPECT_EQ(d->loc.line, 5u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "wait statement is not synthesizable", 5, "9.4.3"));
 }
 
 }  // namespace

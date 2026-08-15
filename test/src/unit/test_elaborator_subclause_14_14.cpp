@@ -176,10 +176,9 @@ TEST(GlobalClockingElab, DuplicateGlobalClockingNames14_14) {
       "  global clocking gc2 @(posedge clk2); endclocking\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "only one global clocking block is allowed per scope");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "14.14");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "only one global clocking block is allowed per scope", 3, "14.14"));
 }
 
 }  // namespace

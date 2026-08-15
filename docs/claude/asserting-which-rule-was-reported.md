@@ -9,6 +9,12 @@ EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
 
 `EXPECT_TRUE(f.diag.HasErrors())` is what this replaces, along with `EXPECT_TRUE(f.has_errors)`, `EXPECT_FALSE(ParseOk(...))` and `EXPECT_EQ(..., CompileOutcome::kFailed)`. Every one of those is satisfied by any rejection.
 
+So is every count. `ASSERT_EQ(r.diags.size(), 1u)`, `ASSERT_FALSE(r.diags.empty())` and `EXPECT_EQ(f.diag.ErrorCount(), 1U)` state how many reports a run made and nothing about which rule any of them enforced, and a count goes red when a second report is added for an unrelated reason. `EXPECT_TRUE(errors)`, off an `auto [tokens, errors] = LexWithDiag(…)` binding, is the same claim with no member, helper or error word in the assertion at all; write the case against `LexDiagnostics` in `lib/cpp/test_fixtures/fixture_lexer.h` instead, which hands back the reports themselves.
+
+Two more shapes name the rule without naming all three of it. `FindDiag` selects a report by its message alone and matches a warning as readily as an error, so a body that binds one and asserts `d->subclause` leaves the line unstated and a second breach of the same rule on a different line satisfies it. `r.diags.front().subclause` reads whichever report the run wrote first, which `lib/cpp/test_fixtures/fixture_parser.h:44-46` documents as the wrong one when a source is rejected twice. The four `FindDiag` declarations stay: they serve the acceptance form `EXPECT_EQ(FindDiag(f, "…"), nullptr)`.
+
+`ReportedWarning` in the same header takes the same three arguments and answers them of a warning, for a rule the program enforces with one. §23.3.2.1 has the binder warn about an ordered port connection past the last port rather than reject the source, so a case reading that report through `ReportedError` would fail whatever the run recorded.
+
 ## What that costs
 
 A test written for one rule passes when a different rule fired, and passes when the source never reached the construct the test is about.
@@ -31,10 +37,12 @@ The three are one call rather than three expectations because a test that names 
 
 **A test that asserts a source was accepted.** The claim there is that nothing was reported, so there is no report to name, and `HasErrors()` is the right member for it.
 
+**A test that reports the diagnostic itself.** The eleven cases in `test/src/unit/test_non_lrm_diagnostic.cpp` call `DiagEngine::Error` and `DiagEngine::Warning` and read the record back, so the report they check is one the case wrote rather than one a source provoked, and no rule of the standard is in question.
+
 **A site whose report does not exist.** Where the standard states a rule and no stage reports it, the test is passing on some other rejection. Leave the assertion alone and open an issue about the program in the six-section form; converting it would only move the silence.
 
 ## Where the assertion lives
 
-`ReportedError` takes `const std::vector<Diagnostic>&` rather than a fixture, so it serves every component: a simulator test passes `f.diag.Diagnostics()` and a parser test passes the `diags` that `ParseResult` in `lib/cpp/test_fixtures/fixture_parser.h` copied. The two `FindDiag` overloads, in that file and in `lib/cpp/test_fixtures/fixture_simulator.h`, predate it and select a report by message alone; a new test names all three instead.
+`ReportedError` takes `const std::vector<Diagnostic>&` rather than a fixture, so it serves every component: a simulator test passes `f.diag.Diagnostics()` and a parser test passes the `diags` that `ParseResult` in `lib/cpp/test_fixtures/fixture_parser.h` copied. The four `FindDiag` declarations, in that file and in `fixture_elaborator.h`, `fixture_simulator.h` and `fixture_synthesizer.h`, predate it and select a report by message alone; a new test names all three instead.
 
 Related: [test-driven-development](test-driven-development.md) for when the test is written, [how-issues-are-written](how-issues-are-written.md) for the issue a missing report needs, and [verifying-through-ci](verifying-through-ci.md) for reading the result.

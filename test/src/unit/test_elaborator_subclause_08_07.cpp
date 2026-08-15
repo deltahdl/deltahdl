@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -149,10 +150,10 @@ TEST(ClassConstructorElaboration, ConstructorWithTimingControlError) {
       "  C c;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag = FindDiag(
-      f, "time-controlling statement is not allowed inside a function");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "13.4");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "time-controlling statement is not allowed inside a function", 4,
+      "13.4"));
 }
 
 // §8.7's nonblocking requirement bars every kind of time control in the
@@ -173,10 +174,10 @@ TEST(ClassConstructorElaboration, ConstructorWithEventControlError) {
       "  C c;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag = FindDiag(
-      f, "time-controlling statement is not allowed inside a function");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "13.4");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "time-controlling statement is not allowed inside a function", 5,
+      "13.4"));
 }
 
 }  // namespace

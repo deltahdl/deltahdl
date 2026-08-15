@@ -80,8 +80,8 @@ TEST(PragmaDirective, KeywordAlone_Rejected) {
 TEST(PragmaDirective, KeywordAloneNames22_11) {
   PreprocFixture f;
   Preprocess("`pragma\n", f);
-  ASSERT_EQ(f.diag.Diagnostics().size(), 1U);
-  EXPECT_EQ(f.diag.Diagnostics().front().subclause, "22.11");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`pragma requires a pragma_name", 1, "22.11"));
 }
 
 TEST(PragmaDirective, OnlyWhitespaceAfterKeyword_Rejected) {

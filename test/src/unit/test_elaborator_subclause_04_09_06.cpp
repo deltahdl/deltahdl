@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -23,9 +24,7 @@ TEST(PortConnectionElab, PrimitiveOutputMustBeOneBitNet) {
       "  buf b(out, in_sig);\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag = FindDiag(f, kOneBitTerminal);
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "4.9.6");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kOneBitTerminal, 4, "4.9.6"));
 }
 
 TEST(PortConnectionElab, PrimitiveOneBitOutputElaboratesCleanly) {
@@ -48,9 +47,7 @@ TEST(PortConnectionElab, BidirectionalSwitchInoutMustBeOneBitNets) {
       "  tran t(a, b);\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag = FindDiag(f, kOneBitTerminal);
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "4.9.6");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kOneBitTerminal, 3, "4.9.6"));
 }
 
 // Positive boundary of the same rule for the inout half: a bidirectional
@@ -94,9 +91,7 @@ TEST(PortConnectionElab, PrimitiveOutputMultiBitPartSelectRejected) {
       "  buf b(bus[3:1], in_sig);\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag = FindDiag(f, kOneBitTerminal);
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "4.9.6");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kOneBitTerminal, 4, "4.9.6"));
 }
 
 // The part-select bounds are a constant expression (§11.2.1); a localparam is
@@ -117,9 +112,7 @@ TEST(PortConnectionElab, PrimitiveOutputPartSelectWidthFromLocalparam) {
       "  buf b(bus[HI:LO], in_sig);\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag = FindDiag(f, kOneBitTerminal);
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "4.9.6");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kOneBitTerminal, 6, "4.9.6"));
 }
 
 // An indexed part-select `[base +: width]` is another structural net expression
@@ -149,9 +142,7 @@ TEST(PortConnectionElab, PrimitiveOutputIndexedPartSelectMultiBitRejected) {
       "  buf b(bus[2 +: 3], in_sig);\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag = FindDiag(f, kOneBitTerminal);
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "4.9.6");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kOneBitTerminal, 4, "4.9.6"));
 }
 
 // A concatenation of net selects is a structural net expression (§23.3.3). A
@@ -179,9 +170,7 @@ TEST(PortConnectionElab, PrimitiveOutputConcatMultiBitRejected) {
       "  buf b({bus[1:0]}, in_sig);\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag = FindDiag(f, kOneBitTerminal);
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "4.9.6");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kOneBitTerminal, 4, "4.9.6"));
 }
 
 // The 1-bit rule covers the *inout* terminal position as well as output. A
@@ -196,9 +185,7 @@ TEST(PortConnectionElab, PrimitiveInoutMultiBitPartSelectRejected) {
       "  tran t(bus[3:1], other);\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag = FindDiag(f, kOneBitTerminal);
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "4.9.6");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kOneBitTerminal, 4, "4.9.6"));
 }
 
 // A module parameter is another constant form (§11.2.1) admissible as a
@@ -213,9 +200,7 @@ TEST(PortConnectionElab, PrimitiveOutputPartSelectWidthFromParameter) {
       "  buf b(bus[HI:1], in_sig);\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag = FindDiag(f, kOneBitTerminal);
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "4.9.6");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kOneBitTerminal, 4, "4.9.6"));
 }
 
 }  // namespace

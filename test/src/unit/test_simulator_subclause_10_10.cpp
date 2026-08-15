@@ -211,10 +211,9 @@ TEST(UnpackedArrayConcatSim, BlockingSizeMismatchNames10_10) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  const Diagnostic* d =
-      FindDiag(f, "unpacked array concatenation size mismatch");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "10.10");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array concatenation size mismatch", 3,
+                            "10.10"));
 }
 
 // §10.10: a nonblocking assignment applies the concatenation on its own update
@@ -231,10 +230,9 @@ TEST(UnpackedArrayConcatSim, NonblockingSizeMismatchNames10_10) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  const Diagnostic* d =
-      FindDiag(f, "unpacked array concatenation size mismatch");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "10.10");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array concatenation size mismatch", 3,
+                            "10.10"));
 }
 
 }  // namespace

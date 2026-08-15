@@ -252,10 +252,7 @@ TEST(ForeachStmt, MalformedLoopVariableListNames12_7_3) {
       "module m;\n"
       "  initial foreach (arr[i) begin end\n"
       "endmodule\n");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "12.7.3");
-  EXPECT_EQ(r.diags.front().loc.line, 2u);
-  EXPECT_EQ(r.diags.front().loc.column, 25u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ']'", 2, "12.7.3"));
 }
 
 // Covers Parser::ParseForeachArrayId in src/parser/parser_stmt_loop.cpp, which

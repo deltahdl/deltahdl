@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -45,10 +46,9 @@ TEST(ChargeStrengthElaboration, SmallOnNonTriregIsIllegal) {
       "  wire (small) w;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "charge strength can only be used with trireg nets");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.3.2.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "charge strength can only be used with trireg nets",
+                            2, "6.3.2.1"));
 }
 
 // An explicit `medium` charge strength on a trireg is carried to the net as

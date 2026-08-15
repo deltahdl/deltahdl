@@ -580,9 +580,8 @@ TEST_F(DumpportsSysTask, UnwritablePathNames21_7_3_1) {
          "    $dumpports(, \"absent_dir_217310/g.vcd\");\n"
          "  end\n"
          "endmodule\n");
-  const Diagnostic* d = FindDiag(f, "cannot write dump file at path");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "21.7.3.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot write dump file at path", 5, "21.7.3.1"));
 }
 
 // §21.7.3.1: string literals are not allowed for the module_identifier of a
@@ -598,9 +597,8 @@ TEST_F(DumpportsSysTask, StringLiteralScopeNames21_7_3_1) {
          "  subA k1();\n"
          "  initial $dumpports(\"k1\", \"lit.dump\");\n"
          "endmodule\n");
-  const Diagnostic* d = FindDiag(f, "not a string literal");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "21.7.3.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "not a string literal", 7,
+                            "21.7.3.1"));
 }
 
 // §21.7.3.1: only modules are allowed in the scope_list, not variables.
@@ -614,9 +612,8 @@ TEST_F(DumpportsSysTask, VariableScopeNames21_7_3_1) {
          "    $dumpports(w, \"var.dump\");\n"
          "  end\n"
          "endmodule\n");
-  const Diagnostic* d = FindDiag(f, "not a variable");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "21.7.3.1");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "not a variable", 5, "21.7.3.1"));
 }
 
 // §21.7.3.1: each scope specified in the scope_list shall be unique.
@@ -631,9 +628,9 @@ TEST_F(DumpportsSysTask, DuplicateScopeWithinCallNames21_7_3_1) {
          "  subB k2();\n"
          "  initial $dumpports(k2, k2, \"dup.dump\");\n"
          "endmodule\n");
-  const Diagnostic* d = FindDiag(f, "scope_list entries must be unique");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "21.7.3.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "scope_list entries must be unique", 7,
+                            "21.7.3.1"));
 }
 
 // §21.7.3.1: if multiple calls to $dumpports are specified, the scope_list
@@ -652,9 +649,9 @@ TEST_F(DumpportsSysTask, DuplicateScopeAcrossCallsNames21_7_3_1) {
          "    $dumpports(k3, \"g2.vcd\");\n"
          "  end\n"
          "endmodule\n");
-  const Diagnostic* d = FindDiag(f, "scope already named by an earlier call");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "21.7.3.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "scope already named by an earlier call", 9,
+                            "21.7.3.1"));
 }
 
 // §21.7.3.1: specifying the same filename multiple times is not allowed.
@@ -677,9 +674,9 @@ TEST_F(DumpportsSysTask, RepeatedFileNameNames21_7_3_1) {
          "    $dumpports(k5, \"twice.vcd\");\n"
          "  end\n"
          "endmodule\n");
-  const Diagnostic* d = FindDiag(f, "may not name the same output file");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "21.7.3.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "may not name the same output file", 14,
+                            "21.7.3.1"));
 }
 
 // §21.7.3.1: the execution of all $dumpports tasks shall be at the same
@@ -703,9 +700,8 @@ TEST_F(DumpportsSysTask, CallsAtDifferentTimesName21_7_3_1) {
          "    #20 $dumpports(k7, \"h2.vcd\");\n"
          "  end\n"
          "endmodule\n");
-  const Diagnostic* d = FindDiag(f, "at the same simulation time");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "21.7.3.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "at the same simulation time",
+                            14, "21.7.3.1"));
 }
 
 }  // namespace

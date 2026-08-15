@@ -204,10 +204,7 @@ TEST(ImmediateAssertionStatementParsing, MalformedAssertedExprNames16_3) {
       "module m;\n"
       "  initial assert x;\n"
       "endmodule\n");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "16.3");
-  EXPECT_EQ(r.diags.front().loc.line, 2u);
-  EXPECT_EQ(r.diags.front().loc.column, 18u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected '('", 2, "16.3"));
 }
 
 }  // namespace

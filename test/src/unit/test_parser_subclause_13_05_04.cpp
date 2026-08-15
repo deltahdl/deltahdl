@@ -125,10 +125,7 @@ TEST(NamedArgument, MissingActualParenthesesName13_5_4) {
       "module m;\n"
       "  initial begin foo(.a 1); end\n"
       "endmodule\n");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "13.5.4");
-  EXPECT_EQ(r.diags.front().loc.line, 2u);
-  EXPECT_EQ(r.diags.front().loc.column, 24u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected '('", 2, "13.5.4"));
 }
 
 // §13.5.4 closes the actual of an argument bound by name with the ')' that
@@ -149,10 +146,7 @@ TEST(NamedArgument, UnclosedActualNames13_5_4) {
       "module m;\n"
       "  initial begin foo(.a(1 2); end\n"
       "endmodule\n");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "13.5.4");
-  EXPECT_EQ(r.diags.front().loc.line, 2u);
-  EXPECT_EQ(r.diags.front().loc.column, 26u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')'", 2, "13.5.4"));
 }
 
 TEST(TaskAndFunctionParsing, PositionalAfterNamedIsError) {

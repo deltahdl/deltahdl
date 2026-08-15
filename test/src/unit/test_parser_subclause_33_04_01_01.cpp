@@ -139,10 +139,7 @@ TEST(ConfigDesignStatement, MalformedDesignStatementNames33_4_1_1) {
       "config cfg;\n"
       "  design top\n"
       "endconfig\n");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "33.4.1.1");
-  EXPECT_EQ(r.diags.front().loc.line, 3u);
-  EXPECT_EQ(r.diags.front().loc.column, 1u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';'", 3, "33.4.1.1"));
 }
 
 }  // namespace

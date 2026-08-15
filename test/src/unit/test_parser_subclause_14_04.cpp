@@ -6,6 +6,7 @@
 // parser counterpart at all.
 
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -21,10 +22,7 @@ TEST(ClockingBlock, MalformedClockingItemNames14_4) {
       "    default input #1step\n"
       "  endclocking\n"
       "endmodule\n");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "14.4");
-  EXPECT_EQ(r.diags.front().loc.line, 4u);
-  EXPECT_EQ(r.diags.front().loc.column, 3u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';'", 4, "14.4"));
 }
 
 // The same declaration written with its ';' is accepted, so the case above

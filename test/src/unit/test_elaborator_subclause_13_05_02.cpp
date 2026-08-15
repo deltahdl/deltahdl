@@ -408,9 +408,8 @@ TEST(PassByRefValidation, RefInStaticFuncNames13_5_2) {
       {Direction::kRef, false, false, false, {}, "slot", nullptr, {}}};
 
   ValidateRefLifetime(func, f.diag);
-  const Diagnostic* d = FindDiag(f, "not allowed in static subroutine");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "13.5.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "not allowed in static subroutine", 0, "13.5.2"));
 }
 
 // §13.5.2: a const ref formal cannot be altered by the subroutine, and the
@@ -422,9 +421,8 @@ TEST(PassByRefValidation, ConstRefWriteNames13_5_2) {
   func->func_body_stmts = {MakeAssign(f.arena, "data", MakeInt(f.arena, 3))};
 
   ValidateConstRefWriteProtection(func, f.diag);
-  const Diagnostic* d = FindDiag(f, "cannot write to const ref argument");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "13.5.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot write to const ref argument", 0, "13.5.2"));
 }
 
 }  // namespace

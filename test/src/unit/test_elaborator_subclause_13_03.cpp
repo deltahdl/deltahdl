@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -118,9 +119,8 @@ TEST(TaskElaboration, ReturnValueDeclaredNames13_3) {
       "  endtask\n"
       "endmodule\n",
       f);
-  const Diagnostic* rep = FindDiag(f, "task returns a value");
-  ASSERT_NE(rep, nullptr);
-  EXPECT_EQ(rep->subclause, "13.3");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "task returns a value", 3, "13.3"));
 }
 
 }  // namespace

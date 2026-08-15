@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_lexer.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -74,14 +75,16 @@ TEST(LexicalConventionLexing, MaxLength1024Ok) {
 
 TEST(LexicalConventionLexing, MaxLength1025Error) {
   std::string id(1025, 'a');
-  auto [tokens, errors] = LexWithDiag(id);
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics(id);
+  EXPECT_TRUE(ReportedError(
+      diags, "identifier exceeds maximum length of 1024 characters", 1, "5.6"));
 }
 
 TEST(LexicalConventionLexing, EscapedMaxLength1025Error) {
   std::string id = "\\" + std::string(1025, 'a') + " ";
-  auto [tokens, errors] = LexWithDiag(id);
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics(id);
+  EXPECT_TRUE(ReportedError(
+      diags, "identifier exceeds maximum length of 1024 characters", 1, "5.6"));
 }
 
 TEST(LexicalConventionLexing, EscapedMaxLength1024Ok) {
@@ -101,8 +104,8 @@ TEST(LexicalConventionLexing, EscapedMaxLength1024Ok) {
 // number to look like a fact about this run.
 TEST(LexicalConventionLexing, OverLimitIdentifierNames5_6) {
   auto diags = LexDiagnostics(std::string(1025, 'a'));
-  ASSERT_EQ(diags.size(), 1u);
-  EXPECT_EQ(diags.front().subclause, "5.6");
+  EXPECT_TRUE(ReportedError(
+      diags, "identifier exceeds maximum length of 1024 characters", 1, "5.6"));
 }
 
 TEST(LexicalConventionLexing, IdentifierFollowedByOperator) {

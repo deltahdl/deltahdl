@@ -1,6 +1,7 @@
 
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -82,10 +83,9 @@ TEST(UnpackedArrayConcatElaboration, ScalarChandleTargetKeepsScalarRule) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "chandle can only be assigned from another chandle or null");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.14");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "chandle can only be assigned from another chandle or null", 4, "6.14"));
 }
 
 }  // namespace

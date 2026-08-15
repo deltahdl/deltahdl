@@ -330,9 +330,8 @@ TEST(TaggedUnionEval, MismatchedReadNames11_9) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  const Diagnostic* d = FindDiag(f, "run-time error: accessing member");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "11.9");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "run-time error: accessing member", 7, "11.9"));
 }
 
 // §11.9: the same sentence covers an assignment whose type is inconsistent
@@ -358,9 +357,8 @@ TEST(TaggedUnionEval, MismatchedWriteNames11_9) {
   lhs->rhs = MakeId(f.arena, "q");
   WriteStructField(lhs, MakeLogic4VecVal(f.arena, 8, 0x22), f.ctx);
 
-  const Diagnostic* d = FindDiag(f, "run-time error: assigning member");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "11.9");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "run-time error: assigning member", 0, "11.9"));
 }
 
 }  // namespace

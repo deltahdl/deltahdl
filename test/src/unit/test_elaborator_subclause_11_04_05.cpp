@@ -1,6 +1,7 @@
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -198,10 +199,9 @@ TEST(OperatorElaboration, ClassHandleEqualityIncompatibleRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "class handle comparison requires assignment compatible");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "11.4.5");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "class handle comparison requires assignment compatible", 7, "11.4.5"));
 }
 
 // §11.4.5: case equality (===) is one of the operators the rule permits between

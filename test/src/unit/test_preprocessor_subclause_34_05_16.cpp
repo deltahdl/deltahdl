@@ -432,7 +432,11 @@ TEST(ProtectDigestDesignationUniqueness, OneValueAgainstTwoNamesIsReported) {
   src += Writes("digest_keyname", kSharedValue);
   src += Writes("digest_public_key", kSharedValue);
   ReadUnderKeys run(src, ProtectKeyList());
-  EXPECT_EQ(run.diag.ErrorCount(), 1U);
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma writes one value against two of the names that "
+      "designate a key of the digest_keyowner in effect",
+      3, "34.5.16"));
 }
 
 // The session key for the digest is the third of the three names, so a value it
@@ -442,7 +446,11 @@ TEST(ProtectDigestDesignationUniqueness, TheSessionKeyIsHeldToTheSameRule) {
   src += Writes("digest_keyname", kSharedValue);
   src += Writes("digest_decrypt_key", kSharedValue);
   ReadUnderKeys run(src, ProtectKeyList());
-  EXPECT_EQ(run.diag.ErrorCount(), 1U);
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma writes one value against two of the names that "
+      "designate a key of the digest_keyowner in effect",
+      3, "34.5.16"));
 }
 
 // The entity is what the values are unique for. Written under two entities the
@@ -491,7 +499,11 @@ TEST(ProtectDigestDesignationUniqueness, OneDefaultedEntityMakesOneRepetition) {
   src += Writes("digest_keyname", kSharedValue);
   src += Writes("digest_public_key", kSharedValue);
   ReadUnderKeys run(src, ProtectKeyList());
-  EXPECT_EQ(run.diag.ErrorCount(), 1U);
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma writes one value against two of the names that "
+      "designate a key of the digest_keyowner in effect",
+      3, "34.5.16"));
 }
 
 // The third pair the three names make between them. The requirement ranges over
@@ -502,7 +514,11 @@ TEST(ProtectDigestDesignationUniqueness, TheSessionKeyAndThePublicKeyPairToo) {
   src += Writes("digest_decrypt_key", kSharedValue);
   src += Writes("digest_public_key", kSharedValue);
   ReadUnderKeys run(src, ProtectKeyList());
-  EXPECT_EQ(run.diag.ErrorCount(), 1U);
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma writes one value against two of the names that "
+      "designate a key of the digest_keyowner in effect",
+      3, "34.5.16"));
 }
 
 // The three names §34.5.16 ranges over are the digest's own. A value shared

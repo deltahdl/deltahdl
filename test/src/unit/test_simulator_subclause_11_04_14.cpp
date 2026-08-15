@@ -252,9 +252,8 @@ TEST(StreamingOperatorSim, NarrowTargetErrorNames11_4_14) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  const Diagnostic* d = FindDiag(f, "wider than the fixed-size target");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "11.4.14");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "wider than the fixed-size target", 6, "11.4.14"));
 }
 
 }  // namespace

@@ -1,6 +1,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -49,10 +50,9 @@ TEST(FunctionLifetimeElaboration, AutoFunctionItemHierRefInContAssignError) {
       "  assign y = g.x;\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag =
-      FindDiag(f, "hierarchical reference to object in automatic function");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "13.4.2");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "hierarchical reference to object in automatic function", 7, "13.4.2"));
 }
 
 // Contrast: a static function allocates its items statically, so the same
@@ -86,10 +86,9 @@ TEST(FunctionLifetimeElaboration, AutoFunctionItemHierRefInInitialError) {
       "  initial y = g.x;\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag =
-      FindDiag(f, "hierarchical reference to object in automatic function");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "13.4.2");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "hierarchical reference to object in automatic function", 7, "13.4.2"));
 }
 
 }  // namespace

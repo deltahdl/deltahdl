@@ -977,9 +977,8 @@ TEST(SdfAnnotateTask, MissingSdfFileNames32_9) {
   Design d;
   ASSERT_TRUE(d.Build(TripleDesign("\"\"")));
   d.Run();
-  const Diagnostic* found = FindDiag(d.f, "requires an SDF file name");
-  ASSERT_NE(found, nullptr);
-  EXPECT_EQ(found->subclause, "32.9");
+  EXPECT_TRUE(ReportedError(d.f.diag.Diagnostics(), "requires an SDF file name",
+                            8, "32.9"));
 }
 
 // §32.9: the legal scale_type keywords are the ones Table 32-6 lists, so a
@@ -991,9 +990,8 @@ TEST(SdfAnnotateTask, UnknownScaleTypeNames32_9) {
       "\"" + kSdf +
       "\", , , , \"MAXIMUM\", \"1.0:1.0:1.0\", \"FROM_ELSEWHERE\"")));
   d.Run();
-  const Diagnostic* found = FindDiag(d.f, "unknown scale_type");
-  ASSERT_NE(found, nullptr);
-  EXPECT_EQ(found->subclause, "32.9");
+  EXPECT_TRUE(
+      ReportedWarning(d.f.diag.Diagnostics(), "unknown scale_type", 8, "32.9"));
 }
 
 }  // namespace

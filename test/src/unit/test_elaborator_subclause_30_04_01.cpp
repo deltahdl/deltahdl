@@ -179,9 +179,8 @@ TEST(SpecifyTerminalElaboration, VariableSourceNames30_4_1) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag = FindDiag(f, "must be a net");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "30.4.1");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "must be a net", 3, "30.4.1"));
 }
 
 }  // namespace

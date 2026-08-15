@@ -354,10 +354,9 @@ TEST(ContAssignStatementElaboration, VarInitializerAndContAssignNames10_3_2) {
       "  assign v = 1'b1;\n"
       "endmodule\n",
       f);
-  const Diagnostic* d =
-      FindDiag(f, "variable 'v' has both an initializer and a continuous");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "10.3.2");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'v' has both an initializer and a continuous", 3, "10.3.2"));
 }
 
 }  // namespace

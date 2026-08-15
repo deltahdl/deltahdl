@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -37,10 +38,9 @@ TEST(PulseControlTerminalElaboration, InputTerminalMayNotBeOutputPort) {
       "endmodule\n",
       f);
   (void)design;
-  const delta::Diagnostic* diag =
-      FindDiag(f, "PATHPULSE$ input terminal 'q' must be an input");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "30.4.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "PATHPULSE$ input terminal 'q' must be an input", 3,
+                            "30.4.1"));
 }
 
 // §30.4.1 applied to the PATHPULSE$ output terminal: a destination must be an
@@ -56,10 +56,9 @@ TEST(PulseControlTerminalElaboration, OutputTerminalMayNotBeInputPort) {
       "endmodule\n",
       f);
   (void)design;
-  const delta::Diagnostic* diag =
-      FindDiag(f, "PATHPULSE$ output terminal 'clk' must be an output");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "30.4.1");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "PATHPULSE$ output terminal 'clk' must be an output", 3, "30.4.1"));
 }
 
 // An inout port satisfies both the source and destination direction rules, so

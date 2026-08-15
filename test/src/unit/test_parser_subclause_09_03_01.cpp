@@ -343,10 +343,7 @@ TEST(SequentialBlockParsing, MissingEndNames9_3_1) {
       "module m;\n"
       "  initial begin\n"
       "    a = 1;");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "9.3.1");
-  EXPECT_EQ(r.diags.front().loc.line, 3u);
-  EXPECT_EQ(r.diags.front().loc.column, 11u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected token", 3, "9.3.1"));
 }
 
 }  // namespace

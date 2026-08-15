@@ -195,9 +195,8 @@ TEST(ModuleInstanceParameterAssignment,
       "  child #(.L(9)) u0();\n"
       "endmodule\n",
       f, "top");
-  const Diagnostic* rep = FindDiag(f, "has no parameter");
-  ASSERT_NE(rep, nullptr);
-  EXPECT_EQ(rep->subclause, "23.10.2.2");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "has no parameter", 4, "23.10.2.2"));
 }
 
 }  // namespace

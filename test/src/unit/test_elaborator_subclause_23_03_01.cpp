@@ -119,10 +119,9 @@ TEST(TopLevelModules, NoTopLevelModuleReportStandsAtNoPosition) {
       "  a a1();\n"
       "endmodule\n",
       f, "", /*auto_top=*/true);
-  const Diagnostic* report = FindDiag(f, "design contains no top-level module");
-  ASSERT_NE(report, nullptr);
-  EXPECT_EQ(report->subclause, "23.3.1");
-  EXPECT_FALSE(report->loc.IsValid());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "design contains no top-level module", 0,
+                            "23.3.1"));
 }
 
 // §23.3.1: a module that appears in a module instantiation statement does not

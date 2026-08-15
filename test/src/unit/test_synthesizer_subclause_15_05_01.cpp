@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
+#include "helpers_reported_error.h"
 #include "synthesizer/synth_lower.h"
 
 using namespace delta;
@@ -25,10 +26,8 @@ TEST(EventTriggerSynthesis, EventTriggerIsRejectedByName) {
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   EXPECT_EQ(synth.Lower(mod), nullptr);
-  const Diagnostic* d = FindDiag(f, "event trigger is not synthesizable");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "15.5.1");
-  EXPECT_EQ(d->loc.line, 5u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "event trigger is not synthesizable", 5, "15.5.1"));
 }
 
 // §15.5.1: the `->>` operator is the second of the two event triggers Syntax
@@ -52,11 +51,9 @@ TEST(EventTriggerSynthesis, NonblockingEventTriggerIsRejectedByName) {
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   EXPECT_EQ(synth.Lower(mod), nullptr);
-  const Diagnostic* d =
-      FindDiag(f, "nonblocking event trigger is not synthesizable");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "15.5.1");
-  EXPECT_EQ(d->loc.line, 5u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "nonblocking event trigger is not synthesizable", 5,
+                            "15.5.1"));
   EXPECT_EQ(FindDiag(f, "event trigger is not synthesizable"), nullptr);
 }
 

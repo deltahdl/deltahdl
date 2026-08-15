@@ -67,10 +67,9 @@ TEST(DisableStatementSynthesis, DisableIsRejectedByName) {
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   EXPECT_EQ(synth.Lower(mod), nullptr);
-  const Diagnostic* d = FindDiag(f, "disable statement is not synthesizable");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "9.6.2");
-  EXPECT_EQ(d->loc.line, 5u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "disable statement is not synthesizable", 5,
+                            "9.6.2"));
 }
 
 }  // namespace

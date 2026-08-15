@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_lexer.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -102,8 +103,9 @@ TEST(SystemNameLexing, MaxLengthOk) {
 
 TEST(SystemNameLexing, ExceedsMaxLength) {
   std::string id = "$" + std::string(1024, 'a');
-  auto [tokens, errors] = LexWithDiag(id);
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics(id);
+  EXPECT_TRUE(ReportedError(
+      diags, "identifier exceeds maximum length of 1024 characters", 1, "5.6"));
 }
 
 }  // namespace

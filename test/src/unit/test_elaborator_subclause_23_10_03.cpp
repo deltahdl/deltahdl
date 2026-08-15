@@ -1,5 +1,6 @@
 #include "fixture_elaborator.h"
 #include "helpers_child_instance.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -202,12 +203,11 @@ TEST(ParameterDependence, TypeOverrideToClassMakesDependentAssignmentIllegal) {
       "  child #(.T(C)) u0();\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag =
-      FindDiag(f,
-               "cannot assign an integral value to parameter whose type "
-               "parameter 'T' resolved to a class type");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "23.10.3");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "cannot assign an integral value to parameter whose type "
+                    "parameter 'T' resolved to a class type",
+                    4, "23.10.3"));
 }
 
 // §23.10.3 states "if the type parameter T is not overridden to an integral
@@ -225,12 +225,11 @@ TEST(ParameterDependence, UnoverriddenClassTypeDefaultFailsElaboration) {
       "  child u0();\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag =
-      FindDiag(f,
-               "cannot assign an integral value to parameter whose type "
-               "parameter 'T' resolved to a class type");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "23.10.3");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "cannot assign an integral value to parameter whose type "
+                    "parameter 'T' resolved to a class type",
+                    4, "23.10.3"));
 }
 
 TEST(ParameterDependence, TypeOverrideToIntegralMakesClassDefaultLegal) {
@@ -265,12 +264,11 @@ TEST(ParameterDependence, NoDefaultTypeParamWithDependentRequiresOverride) {
       "  child u0();\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag =
-      FindDiag(f,
-               "type parameter 'T2' of 'child' has no default type and no "
-               "override at instantiation");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.20.1");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "type parameter 'T2' of 'child' has no default type and no "
+                    "override at instantiation",
+                    5, "6.20.1"));
 }
 
 // §23.10.3 para 4/5: when a no-default type parameter is overridden at

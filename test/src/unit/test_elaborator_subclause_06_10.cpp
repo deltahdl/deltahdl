@@ -11,6 +11,7 @@
 
 #include "common/types.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -140,9 +141,8 @@ TEST(ImplicitDeclaration, ImplicitNetForbiddenUnderNone) {
   cu->default_nettype = NetType::kNone;
   Elaborator elab(f.arena, f.diag, cu);
   elab.Elaborate("top");
-  const delta::Diagnostic* diag = FindDiag(f, "implicit net 'w' forbidden by");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "22.8");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "implicit net 'w' forbidden by", 2, "22.8"));
 }
 
 // The same §22.8 rule reached through an instance port connection rather than
@@ -162,9 +162,8 @@ TEST(ImplicitDeclaration, ImplicitNetOnInstancePortForbiddenUnderNone) {
   cu->default_nettype = NetType::kNone;
   Elaborator elab(f.arena, f.diag, cu);
   elab.Elaborate("top");
-  const delta::Diagnostic* diag = FindDiag(f, "implicit net 'x' forbidden by");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "22.8");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "implicit net 'x' forbidden by", 4, "22.8"));
 }
 
 TEST(ImplicitDeclaration, ExplicitVarNotDuplicatedByImplicit) {
@@ -381,9 +380,8 @@ TEST(ImplicitDeclaration, PrimitiveTerminalForbiddenUnderNone) {
   cu->default_nettype = NetType::kNone;
   Elaborator elab(f.arena, f.diag, cu);
   elab.Elaborate("top");
-  const delta::Diagnostic* diag = FindDiag(f, "implicit net 'y' forbidden by");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "22.8");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "implicit net 'y' forbidden by", 2, "22.8"));
 }
 
 }  // namespace

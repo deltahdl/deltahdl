@@ -256,10 +256,9 @@ TEST(ArrayAssignmentSimulation, FixedSizeMismatchNames7_6) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  const Diagnostic* d =
-      FindDiag(f, "array size mismatch in assignment to fixed-size array");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.6");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "array size mismatch in assignment to fixed-size array", 4, "7.6"));
 }
 
 }  // namespace

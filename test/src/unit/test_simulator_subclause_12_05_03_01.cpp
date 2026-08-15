@@ -1,6 +1,7 @@
 
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
@@ -384,9 +385,9 @@ TEST(CaseViolationDeferralSim, UniqueCaseOverlapNames12_5_3_1) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  const Diagnostic* d = FindDiag(f, "unique case: multiple items matched");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "12.5.3.1");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "unique case: multiple items matched", 5,
+                              "12.5.3.1"));
 }
 
 }  // namespace

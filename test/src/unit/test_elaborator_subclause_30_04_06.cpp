@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -37,10 +38,10 @@ TEST(MultiplePathDeclarationElaboration, EveryDestinationInListIsAnEndpoint) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "module path destination 'y' must be connected to an output");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "30.4.1");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "module path destination 'y' must be connected to an output", 3,
+      "30.4.1"));
 }
 
 // §30.4.6: the expansion to individual paths is symmetric, so every member of
@@ -61,10 +62,9 @@ TEST(MultiplePathDeclarationElaboration, EverySourceInListIsAnEndpoint) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "module path source 'b' must be connected to an input");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "30.4.1");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "module path source 'b' must be connected to an input", 3, "30.4.1"));
 }
 
 // §30.4.6: within a multiple module path the source and destination lists may

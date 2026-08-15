@@ -3,6 +3,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "fixture_synthesizer.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_stmt.h"
 #include "synthesizer/synth_lower.h"
 
@@ -30,11 +31,9 @@ TEST(ProceduralTimingControlSynthesis, TimingControlStmtIsRejectedByName) {
   stmt->range.start = SourceLoc{fid, 2, 3};
   SynthLower synth(f.arena, f.diag);
   EXPECT_FALSE(synth.CheckStmtSynthesizable(stmt));
-  const Diagnostic* d =
-      FindDiag(f, "procedural timing control is not synthesizable");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "9.4");
-  EXPECT_EQ(d->loc.line, 2u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "procedural timing control is not synthesizable", 2,
+                            "9.4"));
 }
 
 }  // namespace

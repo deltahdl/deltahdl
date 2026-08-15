@@ -2,6 +2,7 @@
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "lexer/token.h"
 
 using namespace delta;
@@ -226,9 +227,8 @@ TEST(NamedPortConnectionElaboration, PortNameNamesNoPortNames23_3_2_2) {
       "  child c1(.nope(x));\n"
       "endmodule\n",
       f, "top");
-  const Diagnostic* rep = FindDiag(f, "not found on module");
-  ASSERT_NE(rep, nullptr);
-  EXPECT_EQ(rep->subclause, "23.3.2.2");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), "not found on module", 5,
+                              "23.3.2.2"));
 }
 
 }  // namespace

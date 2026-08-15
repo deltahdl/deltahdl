@@ -485,9 +485,8 @@ TEST_F(DumpportslimitSysTask, MissingFilesizeNames21_7_3_4) {
          "    repeat (4) #10 e = e + 1;\n"
          "  end\n"
          "endmodule\n");
-  const Diagnostic* d = FindDiag(f, "requires a filesize argument");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "21.7.3.4");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "requires a filesize argument", 6, "21.7.3.4"));
 }
 
 }  // namespace

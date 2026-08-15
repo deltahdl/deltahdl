@@ -348,9 +348,8 @@ TEST(DynamicCastSim, TaskCallInvalidAssignmentNames6_24_2) {
                                    "  end\n"
                                    "endmodule\n");
   ASSERT_NE(design, nullptr);
-  const Diagnostic* d = FindDiag(f, "assignment is invalid");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "6.24.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment is invalid", 6,
+                            "6.24.2"));
 }
 
 // A void function whose body casts an out-of-range value into the module's
@@ -381,7 +380,8 @@ TEST(DynamicCastSim, TaskFormInvalidInFunctionBodyRaisesRuntimeError) {
   auto* design = ElaborateLowerRun(f, kInvalidCastInFunction);
   ASSERT_NE(design, nullptr);
 
-  EXPECT_NE(FindDiag(f, "$cast task could not assign"), nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "$cast task could not assign",
+                            5, "6.24.2"));
 }
 
 // §6.24.2: the report a function body raises is the same rule as the one an
@@ -391,9 +391,8 @@ TEST(DynamicCastSim, TaskFormInvalidInFunctionBodyNames6_24_2) {
   auto* design = ElaborateLowerRun(f, kInvalidCastInFunction);
   ASSERT_NE(design, nullptr);
 
-  const Diagnostic* d = FindDiag(f, "$cast task could not assign");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "6.24.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "$cast task could not assign",
+                            5, "6.24.2"));
 }
 
 // §6.24.2: "the destination variable is left unchanged". The destination holds
@@ -434,7 +433,8 @@ TEST(DynamicCastSim, TaskFormInvalidInClassMethodRaisesRuntimeError) {
                         "endmodule\n");
   ASSERT_NE(design, nullptr);
 
-  EXPECT_NE(FindDiag(f, "$cast task could not assign"), nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "$cast task could not assign",
+                            6, "6.24.2"));
 }
 
 // §6.24.2: the run-time error belongs to the invalid assignment and not to the

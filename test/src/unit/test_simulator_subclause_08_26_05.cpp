@@ -1,3 +1,6 @@
+#include <cstddef>
+#include <vector>
+
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
 #include "helpers_reported_error.h"
@@ -362,10 +365,12 @@ TEST(InterfaceClassCastingAndRefAssignment, ConstructionRejectionNames8_26_5) {
   // search starts after the reports elaboration left behind.
   size_t after_elaboration = f.diag.Diagnostics().size();
   LowerAndRun(design, f);
-  const Diagnostic* d = FindDiagFrom(f, after_elaboration,
-                                     "cannot construct object of interface");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "8.26.5");
+  std::vector<Diagnostic> after(
+      f.diag.Diagnostics().begin() +
+          static_cast<std::ptrdiff_t>(after_elaboration),
+      f.diag.Diagnostics().end());
+  EXPECT_TRUE(ReportedError(after, "cannot construct object of interface", 6,
+                            "8.26.5"));
 }
 
 }  // namespace

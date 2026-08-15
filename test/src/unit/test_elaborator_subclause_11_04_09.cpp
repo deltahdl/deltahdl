@@ -1,5 +1,6 @@
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -111,10 +112,9 @@ TEST(OperatorElaboration, UnaryReductionOnRealOperandRejected) {
       "  initial x = &r;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "operator is not allowed on real operands");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "11.3.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(AlwaysCombBasicSim, AlwaysCombReductionAnd) {

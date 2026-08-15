@@ -1,6 +1,7 @@
 
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -35,10 +36,9 @@ TEST(WaitForkInAlwaysComb, WaitForkInAlwaysCombErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "always_comb shall not contain timing controls");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "9.2.2.2.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_comb shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
 }
 
 }  // namespace

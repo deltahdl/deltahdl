@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -21,10 +22,9 @@ TEST(DpiExportOpenArray, ExportedFunctionWithOpenArrayArgIsError) {
     endmodule
   )",
             f, "m");
-  const delta::Diagnostic* diag =
-      FindDiag(f, "SystemVerilog function 'sv_take' has a dynamic array");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "35.5.6");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "SystemVerilog function 'sv_take' has a dynamic array", 4, "35.5.6"));
 }
 
 // §35.5.6.1: the open-array allowance applies to imports, not exports. The same

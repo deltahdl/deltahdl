@@ -36,10 +36,9 @@ TEST(FinalProcedureSynthesis, FinalProcedureIsRejectedByName) {
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   EXPECT_EQ(synth.Lower(mod), nullptr);
-  const Diagnostic* d = FindDiag(f, "final procedure is not synthesizable");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "9.2.3");
-  EXPECT_EQ(d->loc.line, 2u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "final procedure is not synthesizable", 2,
+                            "9.2.3"));
 }
 
 }  // namespace

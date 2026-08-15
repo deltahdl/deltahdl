@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "simulator/udp_eval.h"
 
 using namespace delta;
@@ -623,10 +624,7 @@ TEST(ConditionalOperator, MalformedConditionalNames11_4_11) {
       "module m;\n"
       "  assign y = c ? a b;\n"
       "endmodule\n");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "11.4.11");
-  EXPECT_EQ(r.diags.front().loc.line, 2u);
-  EXPECT_EQ(r.diags.front().loc.column, 20u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ':'", 2, "11.4.11"));
 }
 
 // Covers Parser::TryParseSpecialInfix in src/parser/expr_parser.cpp, the sole

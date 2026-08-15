@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -43,10 +44,9 @@ TEST(EventWaitElaborator, WaitOnTaskCallRejected) {
       "  initial @(t());\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag =
-      FindDiag(f, "task 't' cannot be called in an event expression");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "9.4.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "task 't' cannot be called in an event expression",
+                            3, "9.4.2"));
 }
 
 TEST(EventWaitElaborator, HierarchicalEventWaitElaborates) {

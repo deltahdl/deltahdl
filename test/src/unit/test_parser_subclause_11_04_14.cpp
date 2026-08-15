@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -184,10 +185,7 @@ TEST(StreamingConcatenation, MalformedStreamNames11_4_14) {
       "module m;\n"
       "  assign y = {<<{a, b;\n"
       "endmodule\n");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "11.4.14");
-  EXPECT_EQ(r.diags.front().loc.line, 2u);
-  EXPECT_EQ(r.diags.front().loc.column, 22u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected '}'", 2, "11.4.14"));
 }
 
 }  // namespace

@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_lexer.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -360,23 +361,28 @@ TEST(NumberTokenLexing, RealExponentSignWithoutDigit) {
 }
 
 TEST(NumberTokenLexing, ErrorBinaryDigitOutOfRange) {
-  auto [tokens, errors] = LexWithDiag("4'b2 ");
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics("4'b2 ");
+  EXPECT_TRUE(
+      ReportedError(diags, "illegal digit for specified base", 1, "5.7.1"));
 }
 
 TEST(NumberTokenLexing, ErrorOctalDigitOutOfRange) {
-  auto [tokens, errors] = LexWithDiag("4'o8 ");
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics("4'o8 ");
+  EXPECT_TRUE(
+      ReportedError(diags, "illegal digit for specified base", 1, "5.7.1"));
 }
 
 TEST(NumberTokenLexing, ErrorHexDigitOutOfRange) {
-  auto [tokens, errors] = LexWithDiag("8'hG ");
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics("8'hG ");
+  EXPECT_TRUE(
+      ReportedError(diags, "illegal digit for specified base", 1, "5.7.1"));
 }
 
 TEST(NumberTokenLexing, ErrorUnderscoreLeadingDigitValue) {
-  auto [tokens, errors] = LexWithDiag("4'b_1 ");
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics("4'b_1 ");
+  EXPECT_TRUE(ReportedError(
+      diags, "underscore cannot be first character of number value", 1,
+      "5.7.1"));
 }
 
 TEST(NumberTokenLexing, WhitespaceAfterApostropheNotUnbasedUnsized) {
@@ -386,23 +392,30 @@ TEST(NumberTokenLexing, WhitespaceAfterApostropheNotUnbasedUnsized) {
 }
 
 TEST(NumberTokenLexing, ErrorUnderscoreLeadingDigitValueHex) {
-  auto [tokens, errors] = LexWithDiag("8'h_FF ");
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics("8'h_FF ");
+  EXPECT_TRUE(ReportedError(
+      diags, "underscore cannot be first character of number value", 1,
+      "5.7.1"));
 }
 
 TEST(NumberTokenLexing, ErrorDecimalNoValueDigits) {
-  auto [tokens, errors] = LexWithDiag("8'd-6");
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics("8'd-6");
+  EXPECT_TRUE(ReportedError(diags, "missing value digits after base specifier",
+                            1, "5.7.1"));
 }
 
 TEST(NumberTokenLexing, ErrorDecimalXZMixedWithDigit) {
-  auto [tokens, errors] = LexWithDiag("8'd1x");
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics("8'd1x");
+  EXPECT_TRUE(ReportedError(
+      diags, "x, z, or ? in decimal literal must be the only digit", 1,
+      "5.7.1"));
 }
 
 TEST(NumberTokenLexing, ErrorDecimalMultipleXZDigits) {
-  auto [tokens, errors] = LexWithDiag("8'dxz");
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics("8'dxz");
+  EXPECT_TRUE(ReportedError(
+      diags, "x, z, or ? in decimal literal must be the only digit", 1,
+      "5.7.1"));
 }
 
 TEST(NumberTokenLexing, BinaryValueWithQuestion) {
@@ -464,13 +477,17 @@ TEST(NumberTokenLexing, ApostropheQuestionNotUnbasedUnsized) {
 }
 
 TEST(NumberTokenLexing, ErrorOctalValueLeadingUnderscore) {
-  auto [tokens, errors] = LexWithDiag("8'o_77 ");
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics("8'o_77 ");
+  EXPECT_TRUE(ReportedError(
+      diags, "underscore cannot be first character of number value", 1,
+      "5.7.1"));
 }
 
 TEST(NumberTokenLexing, ErrorDecimalValueLeadingUnderscore) {
-  auto [tokens, errors] = LexWithDiag("8'd_42 ");
-  EXPECT_TRUE(errors);
+  auto diags = LexDiagnostics("8'd_42 ");
+  EXPECT_TRUE(ReportedError(
+      diags, "underscore cannot be first character of number value", 1,
+      "5.7.1"));
 }
 
 TEST(NumberTokenLexing, UnsizedSignedOctalBaseUpperS) {

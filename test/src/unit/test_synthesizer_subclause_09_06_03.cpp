@@ -65,11 +65,9 @@ TEST(DisableForkSynthesis, DisableForkIsRejectedByName) {
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   EXPECT_EQ(synth.Lower(mod), nullptr);
-  const Diagnostic* d =
-      FindDiag(f, "disable fork statement is not synthesizable");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "9.6.3");
-  EXPECT_EQ(d->loc.line, 4u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "disable fork statement is not synthesizable", 4,
+                            "9.6.3"));
 }
 
 }  // namespace

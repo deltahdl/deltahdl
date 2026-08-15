@@ -494,10 +494,7 @@ TEST(FunctionDeclParsing, DpiImportMissingFunctionKeywordNames35_5_4) {
       "module m;\n"
       "  import \"DPI-C\" foo(input int x);\n"
       "endmodule\n");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "35.5.4");
-  EXPECT_EQ(r.diags.front().loc.line, 2u);
-  EXPECT_EQ(r.diags.front().loc.column, 18u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected token", 2, "35.5.4"));
 }
 
 }  // namespace

@@ -2,6 +2,7 @@
 
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
+#include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 #include "simulator/process.h"
 #include "simulator/stmt_exec.h"
@@ -557,9 +558,9 @@ TEST(UniqueIfViolationSim, OverlapReportNames12_4_2_1) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  const Diagnostic* d = FindDiag(f, "unique if: multiple conditions matched");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "12.4.2.1");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "unique if: multiple conditions matched", 5,
+                              "12.4.2.1"));
 }
 
 }  // namespace

@@ -146,11 +146,7 @@ TEST(ConstraintBlock, MalformedConstraintNames18_5) {
       "  rand int x;\n"
       "  constraint { x > 0; }\n"
       "endclass\n");
-  const auto* diag = FindDiag(r, "expected identifier");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "18.5");
-  EXPECT_EQ(diag->loc.line, 3u);
-  EXPECT_EQ(diag->loc.column, 14u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected identifier", 3, "18.5"));
 }
 
 }  // namespace

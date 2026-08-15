@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
+#include "helpers_reported_error.h"
 #include "synthesizer/synth_lower.h"
 
 using namespace delta;
@@ -23,10 +24,8 @@ TEST(ForeverLoopSynthesis, ForeverIsRejectedByName) {
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   EXPECT_EQ(synth.Lower(mod), nullptr);
-  const Diagnostic* d = FindDiag(f, "forever loop is not synthesizable");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "12.7.6");
-  EXPECT_EQ(d->loc.line, 4u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "forever loop is not synthesizable", 4, "12.7.6"));
 }
 
 }  // namespace

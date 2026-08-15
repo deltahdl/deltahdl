@@ -306,9 +306,9 @@ TEST(DynamicArrayNewSimulation, ProceduralNegativeSizeNames7_5_1) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  const Diagnostic* d = FindDiag(f, "dynamic array new[] size is negative");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.5.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "dynamic array new[] size is negative", 6,
+                            "7.5.1"));
 }
 
 // §7.5.1: the declaration-assignment form is lowered on its own path and
@@ -324,9 +324,9 @@ TEST(DynamicArrayNewSimulation, DeclNegativeSizeNames7_5_1) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  const Diagnostic* d = FindDiag(f, "dynamic array new[] size is negative");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.5.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "dynamic array new[] size is negative", 2,
+                            "7.5.1"));
 }
 
 }  // namespace

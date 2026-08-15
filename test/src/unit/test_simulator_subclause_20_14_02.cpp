@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_text_lines.h"
 
 using namespace delta;
@@ -323,10 +324,9 @@ TEST(DistributionFunctions, NonPositiveArgumentWarningNames20_14_2) {
       "  end\n"
       "endmodule\n",
       f);
-  const Diagnostic* d =
-      FindDiag(f, "argument of a distribution function shall be greater");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "20.14.2");
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(),
+      "argument of a distribution function shall be greater", 6, "20.14.2"));
 }
 
 }  // namespace

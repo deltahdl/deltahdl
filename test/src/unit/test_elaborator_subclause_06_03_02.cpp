@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -55,10 +56,9 @@ TEST(NetStrengths, ChargeStrengthRejectedOnNonTrireg) {
       "  wire (large) w;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "charge strength can only be used with trireg nets");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.3.2.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "charge strength can only be used with trireg nets",
+                            2, "6.3.2.1"));
 }
 
 // §6.3.2 states "Drive strength shall only be used when placing a continuous
@@ -74,10 +74,9 @@ TEST(NetStrengths, DriveStrengthRejectedWithoutAssignment) {
       "  wire (strong0, weak1) w;\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "drive strength on net declaration requires an assignment");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.3.2");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "drive strength on net declaration requires an assignment", 2, "6.3.2"));
 }
 
 // §6.3.2: drive strength is permitted when the same statement that declares

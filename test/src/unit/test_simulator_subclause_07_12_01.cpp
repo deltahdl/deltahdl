@@ -667,9 +667,8 @@ TEST(ArrayLocator, IndexedFindWithoutWithNames7_12_1) {
   auto* expr = MakeMethodCall(f.arena, "arr", "find_last", {});
   std::vector<Logic4Vec> out;
   TryCollectLocatorResult(expr, f.ctx, f.arena, out);
-  const Diagnostic* d = FindDiag(f, "requires a 'with' clause");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.12.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "requires a 'with' clause", 0,
+                            "7.12.1"));
 }
 
 // §7.12.1: an associative source is checked on its own path, and the report it
@@ -680,9 +679,8 @@ TEST(ArrayLocator, AssocFindWithoutWithNames7_12_1) {
   auto* expr = MakeMethodCall(f.arena, "aa", "find_first", {});
   std::vector<Logic4Vec> out;
   TryCollectLocatorResult(expr, f.ctx, f.arena, out);
-  const Diagnostic* d = FindDiag(f, "requires a 'with' clause");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.12.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "requires a 'with' clause", 0,
+                            "7.12.1"));
 }
 
 }  // namespace

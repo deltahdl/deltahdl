@@ -289,10 +289,9 @@ TEST(InterfaceModportAccess, UnlistedMemberNames25_5) {
       "  always @(*) x = b.secret;\n"
       "endmodule\n",
       f, "child");
-  const delta::Diagnostic* d =
-      FindDiag(f, "'secret' is not accessible through modport 'master'");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "25.5");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'secret' is not accessible through modport 'master'", 7, "25.5"));
 }
 
 // §25.5: the report that refuses a modport item the interface never declares
@@ -309,9 +308,8 @@ TEST(InterfaceModportNames, UndeclaredModportNameNames25_5) {
       "  bus i();\n"
       "endmodule\n",
       f, "top");
-  const delta::Diagnostic* diag = FindDiag(f, "which interface 'bus'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "25.5");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "which interface 'bus'", 3, "25.5"));
 }
 
 }  // namespace

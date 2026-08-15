@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -152,10 +153,10 @@ TEST(ClassScopeResolutionElaboration, TypeParamScopePrefixRestricted) {
       "  initial x = T::val;\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag = FindDiag(
-      f, "type parameter 'T' may prefix the class scope resolution operator");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.20.3");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "type parameter 'T' may prefix the class scope resolution operator", 7,
+      "6.20.3"));
 }
 
 // §8.23: the same restriction holds when the type parameter comes from the
@@ -175,10 +176,10 @@ TEST(ClassScopeResolutionElaboration,
       "  always @(posedge clk) q <= T::n;\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag = FindDiag(
-      f, "type parameter 'T' may prefix the class scope resolution operator");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.20.3");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "type parameter 'T' may prefix the class scope resolution operator", 4,
+      "6.20.3"));
 }
 
 // §8.23: an incomplete forward type is one of the three prefix kinds whose use
@@ -195,12 +196,11 @@ TEST(ClassScopeResolutionElaboration, IncompleteForwardTypePrefixIsError) {
       "  initial x = C::val;\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag =
-      FindDiag(f,
-               "incomplete forward type 'C' may prefix the class scope "
-               "resolution operator");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "8.23");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "incomplete forward type 'C' may prefix the class scope "
+                    "resolution operator",
+                    4, "8.23"));
 }
 
 // §8.23: a type defined by an interface-based typedef, the §6.18 form that
@@ -219,10 +219,9 @@ TEST(ClassScopeResolutionElaboration, InterfaceBasedTypedefPrefixIsError) {
       "  initial x = my_data_t::val;\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag =
-      FindDiag(f, "type 'my_data_t' defined by an interface-based typedef");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "8.23");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "type 'my_data_t' defined by an interface-based typedef", 7, "8.23"));
 }
 
 // §8.23 restricts an *incomplete* forward type, and §6.18 lets the definition
@@ -291,9 +290,8 @@ TEST(ClassScopeResolutionElaboration, NonClassForwardPrefixInTypedefIsError) {
       "  typedef pkt_fwd::Field field_t;\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag = FindDiag(f, "scope-resolution prefix");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.18");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "scope-resolution prefix", 4,
+                            "6.18"));
 }
 
 // §8.23: an ordinary class type name remains a valid scope resolution prefix in
@@ -371,12 +369,11 @@ TEST(ClassScopeResolutionElaboration,
       "  C::T x;\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag =
-      FindDiag(f,
-               "incomplete forward type 'C' may prefix the class scope "
-               "resolution operator");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "8.23");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "incomplete forward type 'C' may prefix the class scope "
+                    "resolution operator",
+                    3, "8.23"));
 }
 
 // §8.23: a type defined by an interface-based typedef, the §6.18 form naming a
@@ -399,10 +396,9 @@ TEST(ClassScopeResolutionElaboration,
       "  my_data_t::Field x;\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag =
-      FindDiag(f, "type 'my_data_t' defined by an interface-based typedef");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "8.23");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "type 'my_data_t' defined by an interface-based typedef", 6, "8.23"));
 }
 
 // §6.20.3 gives `class P#(type C); C::T x;` as its worked illegal example
@@ -421,10 +417,10 @@ TEST(ClassScopeResolutionElaboration, TypeParamPrefixInClassPropertyIsError) {
       "module m;\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag = FindDiag(
-      f, "type parameter 'C' may prefix the class scope resolution operator");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.20.3");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "type parameter 'C' may prefix the class scope resolution operator", 2,
+      "6.20.3"));
 }
 
 // §6.20.3 marks the other half of that same example legal: `localparam type
@@ -462,10 +458,10 @@ TEST(ClassScopeResolutionElaboration,
       "  localparam type field_t = pkt_fwd::Field;\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag = FindDiag(
-      f, "scope-resolution prefix 'pkt_fwd' of a type parameter assignment");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.18");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "scope-resolution prefix 'pkt_fwd' of a type parameter assignment", 4,
+      "6.18"));
 }
 
 }  // namespace

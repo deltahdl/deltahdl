@@ -697,9 +697,8 @@ TEST(BindDirective, TargetIsNeitherScopeNorInstanceNames23_11) {
       "endmodule\n"
       "bind nosuch probe p1();\n",
       f, "top");
-  const Diagnostic* rep = FindDiag(f, "is neither a module or interface");
-  ASSERT_NE(rep, nullptr);
-  EXPECT_EQ(rep->subclause, "23.11");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is neither a module or interface", 4, "23.11"));
 }
 
 }  // namespace

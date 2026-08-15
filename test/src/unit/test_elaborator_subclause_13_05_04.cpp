@@ -44,9 +44,8 @@ TEST(ArgumentBindingElaboration, NamedArgumentNamesNoFormalNames13_5_4) {
       "  initial x = add(.c(1), .a(2));\n"
       "endmodule\n",
       f);
-  const Diagnostic* rep = FindDiag(f, "no parameter 'c' in 'add'");
-  ASSERT_NE(rep, nullptr);
-  EXPECT_EQ(rep->subclause, "13.5.4");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "no parameter 'c' in 'add'",
+                            4, "13.5.4"));
 }
 
 TEST(ArgumentBindingElaboration, MixedPositionalNamedOk) {

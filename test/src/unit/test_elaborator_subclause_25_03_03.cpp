@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -77,12 +78,11 @@ TEST(GenericInterfaceReference, ImplicitOnlyCannotReferenceGenericInterface) {
       "  memMod mem(.*);\n"
       "endmodule\n",
       f, "top");
-  const delta::Diagnostic* diag =
-      FindDiag(f,
-               "implicit .* port connection cannot reference generic interface "
-               "port 'a' of module 'memMod'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "25.3.3");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "implicit .* port connection cannot reference generic interface "
+      "port 'a' of module 'memMod'",
+      9, "25.3.3"));
 }
 
 TEST(GenericInterfaceReference, FullExampleEndToEnd) {

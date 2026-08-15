@@ -546,9 +546,8 @@ TEST(ModuleItem, ConstructNotAllowedAtTheTopLevelNames3_12_1) {
   // rejection from a design element that failed inside its own body: both
   // leave has_errors true and both leave r.cu->modules empty.
   auto r = Parse("always @(*) x = 1;\n");
-  const auto* diag = FindDiag(r, "expected top-level declaration");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "3.12.1");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected top-level declaration", 1, "3.12.1"));
 }
 
 }  // namespace

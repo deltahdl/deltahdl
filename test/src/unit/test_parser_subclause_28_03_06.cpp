@@ -103,10 +103,7 @@ TEST(GateInstance, MalformedTerminalListNames28_3_6) {
       "module m;\n"
       "  and g1(y, a, b;\n"
       "endmodule\n");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "28.3.6");
-  EXPECT_EQ(r.diags.front().loc.line, 2u);
-  EXPECT_EQ(r.diags.front().loc.column, 17u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')'", 2, "28.3.6"));
 }
 
 }  // namespace

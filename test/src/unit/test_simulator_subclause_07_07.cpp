@@ -367,9 +367,8 @@ TEST(ArrayArgPassing, FixedFormalSizeMismatchNames7_7) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  const Diagnostic* d = FindDiag(f, "array size mismatch: formal expects");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.7");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array size mismatch: formal expects", 7, "7.7"));
 }
 
 }  // namespace

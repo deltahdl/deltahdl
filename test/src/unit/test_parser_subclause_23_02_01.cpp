@@ -438,10 +438,7 @@ TEST(ModuleHeaderDefinition, ErrorMissingSemicolonAfterPortList) {
 // statement. This case pins the header's rule; the statement's is §12.3.
 TEST(ModuleHeaderDefinition, MissingSemicolonNames23_2_1) {
   auto r = Parse("module m(input logic a) endmodule\n");
-  ASSERT_EQ(r.diags.size(), 1u);
-  EXPECT_EQ(r.diags.front().subclause, "23.2.1");
-  EXPECT_EQ(r.diags.front().loc.line, 1u);
-  EXPECT_EQ(r.diags.front().loc.column, 25u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';'", 1, "23.2.1"));
 }
 
 }  // namespace

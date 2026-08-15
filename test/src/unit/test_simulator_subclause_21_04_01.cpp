@@ -499,10 +499,9 @@ TEST(ReadmemAssocSim, StringIndexRejectionNames21_4_1) {
           "\", aa);\n"
           "endmodule\n",
       f);
-  const Diagnostic* d =
-      FindDiag(f, "associative array index must be of an integral type");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "21.4.1");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "associative array index must be of an integral type", 3, "21.4.1"));
   std::remove(path.c_str());
 }
 

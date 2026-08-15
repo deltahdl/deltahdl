@@ -18,6 +18,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 
@@ -390,9 +391,9 @@ TEST(ArrayMap, IndexedSourceMissingWithNames7_12_5) {
       "  initial R = A.map();\n"
       "endmodule\n",
       f);
-  const Diagnostic* d = FindDiag(f, "array method 'map' requires a 'with'");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.12.5");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array method 'map' requires a 'with'", 4,
+                            "7.12.5"));
 }
 
 // §7.12.5: an associative source reaches the same rule on its own path, and
@@ -409,9 +410,9 @@ TEST(ArrayMap, AssociativeSourceMissingWithNames7_12_5) {
       "  end\n"
       "endmodule\n",
       f);
-  const Diagnostic* d = FindDiag(f, "array method 'map' requires a 'with'");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.12.5");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array method 'map' requires a 'with'", 6,
+                            "7.12.5"));
 }
 
 }  // namespace

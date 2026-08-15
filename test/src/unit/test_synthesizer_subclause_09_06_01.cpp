@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
+#include "helpers_reported_error.h"
 #include "synthesizer/synth_lower.h"
 
 using namespace delta;
@@ -24,10 +25,9 @@ TEST(WaitForkSynthesis, WaitForkIsRejectedByName) {
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   EXPECT_EQ(synth.Lower(mod), nullptr);
-  const Diagnostic* d = FindDiag(f, "wait fork statement is not synthesizable");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "9.6.1");
-  EXPECT_EQ(d->loc.line, 5u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "wait fork statement is not synthesizable", 5,
+                            "9.6.1"));
 }
 
 }  // namespace

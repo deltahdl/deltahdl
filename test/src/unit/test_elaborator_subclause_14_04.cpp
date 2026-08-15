@@ -171,10 +171,9 @@ TEST(ClockingSkewConstExpr, VariableSkewNames14_4) {
       "  endclocking\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "clocking skew shall be a constant expression");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "14.4");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "clocking skew shall be a constant expression", 5,
+                            "14.4"));
   EXPECT_EQ(diag->message.find("§"), std::string::npos);
 }
 

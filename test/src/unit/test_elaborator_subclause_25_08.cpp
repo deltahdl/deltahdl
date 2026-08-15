@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -195,9 +196,8 @@ TEST(ParameterizedInterface, UnknownParameterOverrideNameRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  const Diagnostic* diag = FindDiag(f, "has no parameter 'NOPE'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "23.10.2.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "has no parameter 'NOPE'", 5,
+                            "23.10.2.2"));
 }
 
 }  // namespace

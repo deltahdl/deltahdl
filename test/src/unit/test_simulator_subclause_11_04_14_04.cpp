@@ -460,9 +460,9 @@ TEST(StreamingDynamicDataSim, OutOfRangeWithRangeNames11_4_14_4) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  const Diagnostic* d = FindDiag(f, "with-range exceeds fixed array bounds");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "11.4.14.4");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "with-range exceeds fixed array bounds", 3,
+                            "11.4.14.4"));
 }
 
 // §11.4.14.4: a with-range that depends on an earlier unpacked field is
@@ -481,9 +481,9 @@ TEST(StreamingDynamicDataSim, OutOfRangeForwardWithRangeNames11_4_14_4) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  const Diagnostic* d = FindDiag(f, "with-range exceeds fixed array bounds");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "11.4.14.4");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "with-range exceeds fixed array bounds", 4,
+                            "11.4.14.4"));
 }
 
 }  // namespace

@@ -289,9 +289,8 @@ TEST(TimeformatSysTask, OutOfRangeArgumentNames20_4_3) {
       "  initial $timeformat(4, 0, \"\", 20);\n"
       "endmodule\n",
       f);
-  const Diagnostic* d = FindDiag(f, "out of range [2 .. -15]");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "20.4.3");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "out of range [2 .. -15]", 2,
+                            "20.4.3"));
 }
 
 }  // namespace

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -68,10 +69,9 @@ TEST(StructLiteralElaboration, InvalidMemberName) {
       "'{nonexistent: 8'hFF};\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag =
-      FindDiag(f, "'nonexistent' is not a member of the struct");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "10.9.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'nonexistent' is not a member of the struct", 2,
+                            "10.9.2"));
 }
 
 TEST(StructLiteralElaboration, DuplicateMemberKey) {
@@ -82,9 +82,9 @@ TEST(StructLiteralElaboration, DuplicateMemberKey) {
       "'{a: 8'h01, a: 8'h02};\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag = FindDiag(f, "duplicate member key 'a' in pattern");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "10.9.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "duplicate member key 'a' in pattern", 2,
+                            "10.9.2"));
 }
 
 TEST(StructLiteralElaboration, NestedBracesArrayOfStructs) {
@@ -112,10 +112,10 @@ TEST(StructLiteralElaboration, CLikeFlatLiteralForArrayOfStructsRejected) {
       "  ab abarr[1:0] = '{1, 1.0, 2, 2.0};\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag = FindDiag(
-      f, "assignment pattern has 4 elements, but array dimension requires 2");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "10.9.1");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "assignment pattern has 4 elements, but array dimension requires 2", 3,
+      "10.9.1"));
 }
 
 TEST(StructLiteralElaboration, ReplicationStructLiteral) {

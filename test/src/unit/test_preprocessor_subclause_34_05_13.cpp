@@ -660,9 +660,13 @@ TEST(ProtectDataPublicKeyDecryptionInput,
   described += NamesKeyName(kKeyName);
   described += PublicKeyDesignation(kPublicKey, BlockEncoding());
   ProtectKeyList keys = KeysUnderBothDesignations(kRegionKey, kSecondKey);
-  ReadUnderKeys read(EnvelopeFor(described, keys), keys);
-  ASSERT_FALSE(read.diag.Diagnostics().empty());
-  EXPECT_EQ(read.diag.Diagnostics().front().subclause, "34.5.13");
+  std::string envelope = EnvelopeFor(described, keys);
+  ReadUnderKeys read(envelope, keys);
+  EXPECT_TRUE(ReportedError(
+      read.diag.Diagnostics(),
+      "protect pragma data_public_key and data_keyname designate different "
+      "keys of the data_keyowner in effect",
+      LineHolding(envelope, "`pragma protect data_public_key") + 1, "34.5.13"));
 }
 
 // The disagreement is about the pair rather than about the block: the name
@@ -704,9 +708,14 @@ TEST(ProtectDataPublicKeyDecryptionInput,
   std::string described = NamesKeyOwner(kKeyOwner);
   described += PublicKeyDesignation(kPublicKey, BlockEncoding());
   described += NamesKeyName(kKeyName);
-  ReadUnderKeys read(ForeignEnvelope(described),
+  std::string envelope = ForeignEnvelope(described);
+  ReadUnderKeys read(envelope,
                      KeysUnderBothDesignations(kRegionKey, kSecondKey));
-  EXPECT_EQ(read.diag.ErrorCount(), 1U);
+  EXPECT_TRUE(ReportedError(
+      read.diag.Diagnostics(),
+      "protect pragma data_public_key and data_keyname designate different "
+      "keys of the data_keyowner in effect",
+      LineHolding(envelope, "`pragma protect data_keyname"), "34.5.13"));
 }
 
 // The same envelope whose two designations reach one key raises nothing,

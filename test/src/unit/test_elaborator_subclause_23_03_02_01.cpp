@@ -2,6 +2,7 @@
 #include <string>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -300,9 +301,8 @@ TEST(OrderedPortElaboration, TooManyOrderedConnectionsNames23_3_2_1) {
       "  child c1(x, y);\n"
       "endmodule\n",
       f, "top");
-  const delta::Diagnostic* rep = FindDiag(f, "too many ordered port");
-  ASSERT_NE(rep, nullptr);
-  EXPECT_EQ(rep->subclause, "23.3.2.1");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), "too many ordered port", 5,
+                              "23.3.2.1"));
 }
 
 }  // namespace

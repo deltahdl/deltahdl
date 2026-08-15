@@ -299,8 +299,7 @@ TEST(LexicalConventionLexing, BlockCommentOnlyInputProducesEofOnly) {
 // which describes what a grave accent introduces and not what a file may hold.
 TEST(LexicalConventionLexing, UnexpectedCharacterNames5_2) {
   auto diags = LexDiagnostics("a ` b");
-  ASSERT_EQ(diags.size(), 1u);
-  EXPECT_EQ(diags.front().subclause, "5.2");
+  EXPECT_TRUE(ReportedError(diags, "unexpected character '`'", 1, "5.2"));
 }
 
 // The three cases below hand the Lexer a grave accent the preprocessor never

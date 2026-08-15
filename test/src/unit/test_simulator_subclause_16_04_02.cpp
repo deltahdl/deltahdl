@@ -7,6 +7,7 @@
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sva_engine.h"
@@ -445,7 +446,8 @@ TEST(DeferredFlushPointsLive, CastTaskInActionBlockRaisesRuntimeError) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
 
-  EXPECT_NE(FindDiag(f, "$cast task could not assign"), nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "$cast task could not assign",
+                            6, "6.24.2"));
 }
 
 }  // namespace

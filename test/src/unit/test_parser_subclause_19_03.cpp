@@ -284,10 +284,7 @@ TEST(CovergroupParsing, MissingEndgroupNames19_3) {
   auto r = Parse(
       "module m;\n"
       "  covergroup cg;");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "19.3");
-  EXPECT_EQ(r.diags.front().loc.line, 2u);
-  EXPECT_EQ(r.diags.front().loc.column, 17u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected token", 2, "19.3"));
 }
 
 }  // namespace

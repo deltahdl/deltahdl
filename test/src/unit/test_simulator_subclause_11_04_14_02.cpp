@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
@@ -160,9 +161,9 @@ TEST(StreamReordering, PackZeroSliceSizeNames11_4_14_2) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  const Diagnostic* d = FindDiag(f, "slice_size for streaming operator");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "11.4.14.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "slice_size for streaming operator", 4,
+                            "11.4.14.2"));
 }
 
 // §11.4.14.2: the unpack side resolves the slice_size on its own path, and the
@@ -180,9 +181,9 @@ TEST(StreamReordering, UnpackZeroSliceSizeNames11_4_14_2) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  const Diagnostic* d = FindDiag(f, "slice_size for streaming operator");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "11.4.14.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "slice_size for streaming operator", 4,
+                            "11.4.14.2"));
 }
 
 }  // namespace

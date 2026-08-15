@@ -8,6 +8,7 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_queue.h"
+#include "helpers_reported_error.h"
 #include "simulator/eval_array.h"
 
 using namespace delta;
@@ -406,9 +407,8 @@ TEST(ArrayOrdering, ReverseWithClauseErrorNames7_12_2) {
   auto* call = MakeMethodCall(f.arena, "arr", "reverse", {});
   call->with_expr = MakeId(f.arena, "item");
   TryExecArrayMethodStmt(call, f.ctx, f.arena);
-  const Diagnostic* d = FindDiag(f, "does not accept a 'with' clause");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.12.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "does not accept a 'with' clause", 0, "7.12.2"));
 }
 
 }  // namespace

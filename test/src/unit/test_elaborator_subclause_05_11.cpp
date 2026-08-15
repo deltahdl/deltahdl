@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -27,10 +28,10 @@ TEST(ArrayLiteralElaboration, FlatLiteralForMultiDimRejected) {
       "  int n [1:2][1:3] = '{0, 1, 2, 3, 4, 5};\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag = FindDiag(
-      f, "assignment pattern has 6 elements, but array dimension requires 2");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "10.9.1");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "assignment pattern has 6 elements, but array dimension requires 2", 2,
+      "10.9.1"));
 }
 
 // §5.11 — an array literal whose element count does not match the dimension is
@@ -42,10 +43,10 @@ TEST(ArrayLiteralElaboration, WrongElementCountRejected) {
       "  int n [1:3] = '{0, 1};\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag = FindDiag(
-      f, "assignment pattern has 2 elements, but array dimension requires 3");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "10.9.1");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "assignment pattern has 2 elements, but array dimension requires 3", 2,
+      "10.9.1"));
 }
 
 // §5.11 — a replication operator sets values within one dimension; the inner

@@ -169,9 +169,8 @@ TEST(ConfigDefaultClause, DuplicateDefaultLiblistNames33_4_1_2) {
       "  default liblist other;\n"
       "endconfig\n",
       f, "top");
-  const delta::Diagnostic* diag = FindDiag(f, "default clauses");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "33.4.1.2");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "default clauses", 5, "33.4.1.2"));
 }
 
 }  // namespace

@@ -1,6 +1,7 @@
 #include <cstdint>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -411,13 +412,8 @@ TEST(RandcaseWeightedCase, AllZeroWeightsWarningNames18_16) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  const Diagnostic* found = nullptr;
-  for (const auto& d : f.diag.Diagnostics()) {
-    if (d.message.find("randcase: all weights are zero") != std::string::npos)
-      found = &d;
-  }
-  ASSERT_NE(found, nullptr);
-  EXPECT_EQ(found->subclause, "18.16");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "randcase: all weights are zero", 5, "18.16"));
 }
 
 }  // namespace

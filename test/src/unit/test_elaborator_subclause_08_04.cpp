@@ -119,10 +119,9 @@ TEST(ClassObjectElaboration, ArithmeticOnAnObjectHandleNames8_4) {
       "  end\n"
       "endmodule\n",
       f);
-  const auto* diag =
-      FindDiag(f, "operator is not allowed on class object handles");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "8.4");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on class object handles",
+                            6, "8.4"));
 }
 
 TEST(ClassObjectElaboration, ClassHandleRelationalError) {

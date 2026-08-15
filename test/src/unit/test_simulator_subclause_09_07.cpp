@@ -560,12 +560,8 @@ TEST(FineGrainProcessControlSimulation,
   lowerer.Lower(design);
   f.scheduler.Run();
   f.ctx.RunFinalBlocks();
-  const Diagnostic* reported = nullptr;
-  for (const auto& d : f.diag.Diagnostics()) {
-    if (d.severity == DiagSeverity::kError) reported = &d;
-  }
-  ASSERT_NE(reported, nullptr);
-  EXPECT_EQ(reported->loc.line, 10u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "kill() shall only target a process", 10, "9.7"));
 }
 
 // §9.7: kill(), await(), suspend() and resume() shall be restricted to a
@@ -585,9 +581,8 @@ TEST(FineGrainProcessControlSimulation, KillOnFinalProcessNames9_7) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
   f.ctx.RunFinalBlocks();
-  const Diagnostic* d = FindDiag(f, "kill() shall only target a process");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "9.7");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "kill() shall only target a process", 5, "9.7"));
 }
 
 TEST(FineGrainProcessControlSimulation, SuspendOnFinalProcessNames9_7) {
@@ -604,9 +599,8 @@ TEST(FineGrainProcessControlSimulation, SuspendOnFinalProcessNames9_7) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
   f.ctx.RunFinalBlocks();
-  const Diagnostic* d = FindDiag(f, "suspend() shall only target a process");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "9.7");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "suspend() shall only target a process", 5, "9.7"));
 }
 
 TEST(FineGrainProcessControlSimulation, ResumeOnFinalProcessNames9_7) {
@@ -623,9 +617,8 @@ TEST(FineGrainProcessControlSimulation, ResumeOnFinalProcessNames9_7) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
   f.ctx.RunFinalBlocks();
-  const Diagnostic* d = FindDiag(f, "resume() shall only target a process");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "9.7");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "resume() shall only target a process", 5, "9.7"));
 }
 
 TEST(FineGrainProcessControlSimulation, AwaitOnFinalProcessNames9_7) {
@@ -642,9 +635,8 @@ TEST(FineGrainProcessControlSimulation, AwaitOnFinalProcessNames9_7) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
   f.ctx.RunFinalBlocks();
-  const Diagnostic* d = FindDiag(f, "await() shall only target a process");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "9.7");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "await() shall only target a process", 5, "9.7"));
 }
 
 // §9.7: it shall be an error to call await() on the current process, i.e. a
@@ -661,9 +653,8 @@ TEST(FineGrainProcessControlSimulation, AwaitOnSelfNames9_7) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  const Diagnostic* d = FindDiag(f, "cannot await its own termination");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "9.7");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot await its own termination", 4, "9.7"));
 }
 
 // §9.7: it shall be an error for a function to call suspend() on the current
@@ -681,9 +672,8 @@ TEST(FineGrainProcessControlSimulation, FunctionSuspendingItselfNames9_7) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  const Diagnostic* d = FindDiag(f, "function cannot suspend its own");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "9.7");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function cannot suspend its own", 4, "9.7"));
 }
 
 }  // namespace

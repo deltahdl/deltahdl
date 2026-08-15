@@ -322,10 +322,9 @@ TEST(StringFormat, NonByteUnpackedArrayNames21_2_1_7) {
   testing::internal::CaptureStdout();
   LowerAndRun(design, f);
   testing::internal::GetCapturedStdout();
-  const Diagnostic* d =
-      FindDiag(f, "a string format specifier applied to an unpacked array");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "21.2.1.7");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a string format specifier applied to an unpacked array", 6, "21.2.1.7"));
 }
 
 }  // namespace

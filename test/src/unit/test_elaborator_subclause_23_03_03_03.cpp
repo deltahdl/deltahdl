@@ -1,5 +1,6 @@
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -188,10 +189,9 @@ TEST(PortConnectionRulesForNetsElaboration,
       "  child u(.a(x));\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag =
-      FindDiag(f, "variable 'x' cannot be connected to inout port 'a'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "23.3.3.3");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'x' cannot be connected to inout port 'a'", 5, "23.3.3.3"));
 }
 
 // §23.3.3.3's inout rule is about what the connection is, not about how the
@@ -208,10 +208,9 @@ TEST(PortConnectionRulesForNetsElaboration,
       "  child u(x);\n"
       "endmodule\n",
       f);
-  const Diagnostic* diag =
-      FindDiag(f, "variable 'x' cannot be connected to inout port 'a'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "23.3.3.3");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'x' cannot be connected to inout port 'a'", 5, "23.3.3.3"));
 }
 
 // An input net port admits any compatible expression, including a constant

@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -14,10 +15,8 @@ TEST(ClassDeclaration, MalformedClassItemNames8_3) {
       "class C;\n"
       "  local protected int x;\n"
       "endclass\n");
-  const auto* diag =
-      FindDiag(r, "cannot combine 'local' and 'protected' qualifiers");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "8.3");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "cannot combine 'local' and 'protected' qualifiers", 2, "8.3"));
 }
 
 TEST(ClassDeclaration, ClassItemWithOneAccessQualifierIsAccepted) {

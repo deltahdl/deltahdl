@@ -13,6 +13,7 @@
 
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "parser/ast.h"
 
 using namespace delta;
@@ -319,10 +320,9 @@ TEST(SingularAggregateTypes, UnpackedArrayPortDefaultRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "default value on non-singular port 'p'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "23.2.2.4");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value on non-singular port 'p'", 1,
+                            "23.2.2.4"));
 }
 
 // A packed structure is singular (control that discriminates against the
@@ -347,10 +347,9 @@ TEST(SingularAggregateTypes, InlineUnpackedStructPortDefaultRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "default value on non-singular port 'p'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "23.2.2.4");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value on non-singular port 'p'", 1,
+                            "23.2.2.4"));
 }
 
 // An unpacked structure reached through a typedef name is still aggregate: the
@@ -364,10 +363,9 @@ TEST(SingularAggregateTypes, TypedefUnpackedStructPortDefaultRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "default value on non-singular port 'p'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "23.2.2.4");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value on non-singular port 'p'", 2,
+                            "23.2.2.4"));
 }
 
 // Likewise, an unpacked union reached through a typedef name is aggregate, and
@@ -380,10 +378,9 @@ TEST(SingularAggregateTypes, TypedefUnpackedUnionPortDefaultRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "default value on non-singular port 'p'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "23.2.2.4");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value on non-singular port 'p'", 2,
+                            "23.2.2.4"));
 }
 
 // The string data type is singular (a distinct claim from the integral types),
@@ -437,10 +434,9 @@ TEST(SingularAggregateTypes, UnpackedArrayOfPackedStructPortDefaultRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "default value on non-singular port 'p'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "23.2.2.4");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value on non-singular port 'p'", 2,
+                            "23.2.2.4"));
 }
 
 // §6.4's classification is also consumed where an equality operator compares
@@ -463,10 +459,10 @@ TEST(SingularAggregateTypes, NonEquivalentUnpackedStructComparisonRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  const delta::Diagnostic* diag = FindDiag(
-      f, "comparison of non-equivalent aggregate types 's1_t' and 's2_t'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.22.2");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "comparison of non-equivalent aggregate types 's1_t' and 's2_t'", 7,
+      "6.22.2"));
 }
 
 // Positive control for the comparison position: singular operands (here two

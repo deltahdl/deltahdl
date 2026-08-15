@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -87,9 +88,9 @@ TEST(EndedSequenceMethodDeprecated, RejectionNamesC_2_3) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  const Diagnostic* d = FindDiag(f, "ended sequence method has been removed");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "C.2.3");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "ended sequence method has been removed", 7,
+                            "C.2.3"));
 }
 
 }  // namespace

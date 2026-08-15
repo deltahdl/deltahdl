@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -257,10 +258,7 @@ TEST(PropertyDeclaration, MalformedPropertyHeaderNames16_12) {
       "    a;\n"
       "  endproperty\n"
       "endmodule\n");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "16.12");
-  EXPECT_EQ(r.diags.front().loc.line, 3u);
-  EXPECT_EQ(r.diags.front().loc.column, 5u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';'", 3, "16.12"));
 }
 
 }  // namespace

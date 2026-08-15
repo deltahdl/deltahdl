@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -87,10 +88,7 @@ TEST(DefaultDisableIff, MalformedDefaultDisableNames16_15) {
       "module m;\n"
       "  default disable x;\n"
       "endmodule\n");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "16.15");
-  EXPECT_EQ(r.diags.front().loc.line, 2u);
-  EXPECT_EQ(r.diags.front().loc.column, 19u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected token", 2, "16.15"));
 }
 
 }  // namespace

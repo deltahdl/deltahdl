@@ -172,10 +172,9 @@ TEST(TimingCheckCommandElaboration, WidthNegativeLimitNames31_4_4) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "$width timing check limit must be a non-negative");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "31.4.4");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$width timing check limit must be a non-negative",
+                            3, "31.4.4"));
 }
 
 }  // namespace

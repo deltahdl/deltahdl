@@ -108,10 +108,7 @@ TEST(ModuleInstantiation, MalformedInstanceListNames23_3_2) {
       "module m;\n"
       "  sub u1(a)\n"
       "endmodule\n");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "23.3.2");
-  EXPECT_EQ(r.diags.front().loc.line, 3u);
-  EXPECT_EQ(r.diags.front().loc.column, 1u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';'", 3, "23.3.2"));
 }
 
 }  // namespace

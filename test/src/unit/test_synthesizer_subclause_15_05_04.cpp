@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
+#include "helpers_reported_error.h"
 #include "synthesizer/synth_lower.h"
 
 using namespace delta;
@@ -27,11 +28,9 @@ TEST(EventSequencingSynthesis, WaitOrderIsRejectedByName) {
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   EXPECT_EQ(synth.Lower(mod), nullptr);
-  const Diagnostic* d =
-      FindDiag(f, "wait_order construct is not synthesizable");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "15.5.4");
-  EXPECT_EQ(d->loc.line, 5u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "wait_order construct is not synthesizable", 5,
+                            "15.5.4"));
 }
 
 }  // namespace

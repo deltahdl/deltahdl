@@ -387,10 +387,7 @@ TEST(AssignmentPattern, MalformedPatternNames10_9) {
       "module m;\n"
       "  int a[2] = '{1, 2;\n"
       "endmodule\n");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "10.9");
-  EXPECT_EQ(r.diags.front().loc.line, 2u);
-  EXPECT_EQ(r.diags.front().loc.column, 20u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected '}'", 2, "10.9"));
 }
 
 }  // namespace

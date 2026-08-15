@@ -413,10 +413,7 @@ TEST(CaseSyntaxParsing, MissingEndcaseNames12_5) {
       "  initial begin\n"
       "    case (x)\n"
       "      0: y = 1;");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "12.5");
-  EXPECT_EQ(r.diags.front().loc.line, 4u);
-  EXPECT_EQ(r.diags.front().loc.column, 16u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected token", 4, "12.5"));
 }
 
 }  // namespace

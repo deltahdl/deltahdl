@@ -223,10 +223,7 @@ TEST(RandseqBaseParse, MalformedProductionNames18_17) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_EQ(r.diags.size(), 1u);
-  EXPECT_EQ(r.diags.front().subclause, "18.17");
-  EXPECT_EQ(r.diags.front().loc.line, 4u);
-  EXPECT_EQ(r.diags.front().loc.column, 12u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ':'", 4, "18.17"));
 }
 
 }  // namespace

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -113,10 +114,9 @@ TEST(ObjectPropertyElaboration, TypeParamAccessViaHandleIsIllegal) {
       "  end\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "cannot access type parameter via class handle");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "8.5");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot access type parameter via class handle", 8,
+                            "8.5"));
 }
 
 // §8.5 says of a parameter value read through an instance name "Such an
@@ -139,10 +139,9 @@ TEST(ObjectPropertyElaboration, InstanceParamAccessIsNotConstant) {
       "  end\n"
       "endmodule\n",
       f);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "indexed part-select width must be a constant expression");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "11.5.1");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "indexed part-select width must be a constant expression", 10, "11.5.1"));
 }
 
 // The same part-select with a literal constant width is legal, isolating the

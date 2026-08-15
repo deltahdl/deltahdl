@@ -66,10 +66,8 @@ TEST(SynthLower, DelayControlIsRejectedByName) {
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   EXPECT_EQ(synth.Lower(mod), nullptr);
-  const Diagnostic* d = FindDiag(f, "delay control is not synthesizable");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "9.4.1");
-  EXPECT_EQ(d->loc.line, 4u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "delay control is not synthesizable", 4, "9.4.1"));
 }
 
 // A module holding two rejectable constructs on different lines is reported at
@@ -91,9 +89,8 @@ TEST(SynthLower, RejectedConstructIsReportedAtItsOwnLocation) {
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   EXPECT_EQ(synth.Lower(mod), nullptr);
-  const Diagnostic* d = FindDiag(f, "wait statement is not synthesizable");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->loc.line, 5u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "wait statement is not synthesizable", 5, "9.4.3"));
   EXPECT_EQ(FindDiag(f, "delay control is not synthesizable"), nullptr);
 }
 

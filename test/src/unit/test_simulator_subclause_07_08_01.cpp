@@ -1,6 +1,7 @@
 #include "fixture_simulator.h"
 #include "helpers_assoc.h"
 #include "helpers_assoc_multikey.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/eval_array.h"
@@ -259,10 +260,9 @@ TEST(WildcardAssocArraySimulation, ForeachRejectionNames7_8_1) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  const Diagnostic* d =
-      FindDiag(f, "foreach not allowed on wildcard associative array");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "7.8.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "foreach not allowed on wildcard associative array",
+                            6, "7.8.1"));
 }
 
 }  // namespace
