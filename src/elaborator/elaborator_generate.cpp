@@ -332,19 +332,43 @@ static bool ExprReferencesName(const Expr* e, std::string_view name) {
   return false;
 }
 
-static std::string_view StepLhsName(const Stmt* step) {
-  if (!step) return {};
-  if (step->lhs && step->lhs->kind == ExprKind::kIdentifier) {
-    return step->lhs->text;
-  }
-  if (step->expr) {
-    const auto* e = step->expr;
-    if ((e->kind == ExprKind::kUnary || e->kind == ExprKind::kPostfixUnary) &&
-        e->lhs && e->lhs->kind == ExprKind::kIdentifier) {
-      return e->lhs->text;
+// §27.3 gives a loop generate's third header position three forms and no
+// others:
+//
+//   genvar_iteration ::=
+//       genvar_identifier assignment_operator genvar_expression
+//     | inc_or_dec_operator genvar_identifier
+//     | genvar_identifier inc_or_dec_operator
+//
+// Answer the genvar_identifier the step names, or nullopt where the step is
+// none of the three and so names no genvar at all. §27.4 puts the same
+// requirement in prose -- "Both the initialization and iteration assignments in
+// the loop generate scheme shall assign to the same genvar" -- and a position
+// holding `i` or `~i` assigns to nothing, so it breaks that sentence as well as
+// the production.
+//
+// Parser::ParseAssignmentOrExprNoSemi builds StmtKind::kBlockingAssign for both
+// `i = i + 1` and `i += 1`, which is why one test covers every
+// assignment_operator; it builds StmtKind::kNonblockingAssign for `i <= 1`,
+// which is no assignment_operator in Annex A.6.2 and is rejected here.
+static std::optional<std::string_view> GenvarIterationName(const Stmt* step) {
+  if (!step) return std::nullopt;
+  if (step->kind == StmtKind::kBlockingAssign) {
+    if (step->lhs && step->lhs->kind == ExprKind::kIdentifier) {
+      return step->lhs->text;
     }
+    return std::nullopt;
   }
-  return {};
+  const auto* e = step->expr;
+  if (!e) return std::nullopt;
+  if (e->kind != ExprKind::kUnary && e->kind != ExprKind::kPostfixUnary) {
+    return std::nullopt;
+  }
+  if (e->op != TokenKind::kPlusPlus && e->op != TokenKind::kMinusMinus) {
+    return std::nullopt;
+  }
+  if (!e->lhs || e->lhs->kind != ExprKind::kIdentifier) return std::nullopt;
+  return e->lhs->text;
 }
 
 // §27.4: a genvar value with any bit set to x or z is illegal during loop
@@ -386,8 +410,15 @@ static std::optional<std::string_view> ValidateGenerateForHeader(
     return std::nullopt;
   }
 
-  auto step_lhs = StepLhsName(item->gen_step);
-  if (!step_lhs.empty() && step_lhs != genvar_name) {
+  auto step_genvar = GenvarIterationName(item->gen_step);
+  if (!step_genvar) {
+    diag.Error(item->loc,
+               "generate-for iteration shall assign to a genvar, increment one "
+               "or decrement one",
+               Subclause("27.4"));
+    return std::nullopt;
+  }
+  if (*step_genvar != genvar_name) {
     diag.Error(item->loc,
                "generate-for init and step shall assign to the same genvar",
                Subclause("27.4"));
