@@ -460,12 +460,32 @@ static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
   mod->imports.push_back(std_import);
 }
 
+// What a parameter port declaration is built against, and the name table it is
+// registered into. The three travel together because a parameter port cannot be
+// built without the first two nor judged under §11.5.1 without the third, and
+// etc/clang_tidy/src.yml caps a function at five parameters.
+struct ParamPortCtx {
+  const TypedefMap& typedefs;
+  const ScopeMap& scope;
+  std::unordered_set<std::string_view>& real_param_names;
+};
+
 // Build the non-value identity/type fields of a parameter declaration (name,
-// localparam/type-param flags, declared-type info). Value resolution is handled
-// separately because it requires Elaborator member helpers.
+// localparam/type-param flags, declared-type info), and record a real-typed one
+// in `ctx.real_param_names`. Value resolution is handled separately because it
+// requires Elaborator member helpers.
+//
+// The registration is here rather than at the call site because §11.5.1 states
+// "A bit-select or part-select of a scalar, or of a real variable or real
+// parameter, shall be illegal", naming the parameter rather than the position
+// the parameter was written in. PopulateValueParamInfo in
+// src/elaborator/elaborator_items.cpp records a real parameter written in the
+// module body into the same set, and CheckRealSelectNode in
+// src/elaborator/elaborator_validate.cpp reads it for either position. A
+// localparam port is recorded on the same terms, since §6.20.2 makes it a value
+// parameter.
 static RtlirParamDecl BuildParamDeclShell(const ModuleDecl* decl, size_t i,
-                                          const TypedefMap& typedefs,
-                                          const ScopeMap& scope,
+                                          const ParamPortCtx& ctx,
                                           bool has_param_type) {
   const auto& [pname, pval] = decl->params[i];
   RtlirParamDecl pd;
@@ -475,8 +495,10 @@ static RtlirParamDecl BuildParamDeclShell(const ModuleDecl* decl, size_t i,
   pd.is_type_param = decl->type_param_names.count(pname) > 0;
   pd.is_localparam = decl->localparam_port_names.count(pname) > 0;
   if (has_param_type) {
-    PopulateParamTypeInfo(pd, decl->param_types[i], typedefs, scope);
-    RecordParamDeclRange(pd, decl->param_types[i], scope);
+    PopulateParamTypeInfo(pd, decl->param_types[i], ctx.typedefs, ctx.scope);
+    RecordParamDeclRange(pd, decl->param_types[i], ctx.scope);
+    if (IsRealType(decl->param_types[i].kind))
+      ctx.real_param_names.insert(pname);
   }
   return pd;
 }
@@ -725,26 +747,8 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
     auto scope = BuildParamScope(mod);
     bool has_param_type = i < decl->param_types.size() &&
                           decl->type_param_names.count(pname) == 0;
-    RtlirParamDecl pd =
-        BuildParamDeclShell(decl, i, typedefs_, scope, has_param_type);
-    // §11.5.1 states "A bit-select or part-select of a scalar, or of a real
-    // variable or real parameter, shall be illegal", and it names the parameter
-    // rather than the position the parameter was written in. So a real
-    // parameter port is registered here the way PopulateValueParamInfo in
-    // src/elaborator/elaborator_items.cpp registers one written in the module
-    // body, and CheckRealSelectNode finds either. The registration stands
-    // beside BuildParamDeclShell rather than inside it, because that function
-    // builds an RtlirParamDecl and holds no name table.
-    //
-    // The unpacked-dimension test mirrors the body position, where §11.5.2
-    // makes an address written after such a name an element select.
-    // ParseValueParamPortDecl in src/parser/parser_port.cpp parses no unpacked
-    // dimension for a parameter port, unlike Parser::ParseParamDecl in
-    // src/parser/parser_types.cpp, so the test holds rather than selects.
-    if (has_param_type && IsRealType(decl->param_types[i].kind) &&
-        decl->param_types[i].unpacked_dims.empty()) {
-      real_param_names_.insert(pname);
-    }
+    RtlirParamDecl pd = BuildParamDeclShell(
+        decl, i, {typedefs_, scope, real_param_names_}, has_param_type);
     ApplyParamOverride(pd, params, pname);
     if (!pd.is_resolved && pval) {
       const DataType* param_type =
