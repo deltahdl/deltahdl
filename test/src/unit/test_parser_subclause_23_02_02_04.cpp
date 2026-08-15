@@ -1,6 +1,7 @@
 
 
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -46,7 +47,9 @@ TEST(DefaultPortValueParsing, NonAnsiPortDefaultRejected) {
       "module m(a);\n"
       "  input logic a = 1'b0;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The `=` has nowhere to bind in the non-ANSI body declaration §23.2.2.1
+  // states, so the declaration's terminator is what the report names.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got '='", 2, "23.2.2.1"));
 }
 
 }  // namespace

@@ -1,6 +1,7 @@
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 static ModuleItem* FindNettypeDecl(ParseResult& r, std::string_view name = "") {
@@ -166,10 +167,13 @@ TEST(NettypeParsing, NettypeNoResolveFunc) {
 // declaration carrying only a single identifier (a name with no preceding data
 // type or source nettype) is not well formed and shall be rejected.
 TEST(NettypeParsing, NettypeRequiresExplicitDataType) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  nettype mynet;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  nettype mynet;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "nettype declaration requires an explicit data type", 2,
+      "6.6.7"));
 }
 
 }  // namespace

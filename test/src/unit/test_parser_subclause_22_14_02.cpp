@@ -2,6 +2,7 @@
 #include "helpers_included_keyword_parse.h"
 #include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -349,18 +350,27 @@ TEST(CompilerDirectiveParsing, ConstantKeywordsOutsideTheListAreIdentifiers) {
                  "  reg [P-1:0] v;\n"
                  "endmodule\n"));
 
-  EXPECT_FALSE(
-      Parses1995("module m;\n"
-                 "  localparam Q = 8;\n"
-                 "endmodule\n"));
-  EXPECT_FALSE(
-      Parses1995("module m;\n"
-                 "  genvar i;\n"
-                 "  generate\n"
-                 "    for (i = 0; i < 2; i = i + 1) begin : g\n"
-                 "    end\n"
-                 "  endgenerate\n"
-                 "endmodule\n"));
+  // §23.3.2 owns both reports, not §22.14: with the word an ordinary
+  // identifier the two names read as a module name and an instance name, so
+  // Parser::ParseImplicitTypeOrInst hands them to Parser::ParseModuleInstList
+  // and that demands the port connection list at src/parser/parser_inst.cpp:78.
+  auto as_localparam =
+      ParseWithPreprocessor(In1995("module m;\n"
+                                   "  localparam Q = 8;\n"
+                                   "endmodule\n"));
+  EXPECT_TRUE(ReportedError(as_localparam.diags, "expected '(', got '='",
+                            LineInRegion(2), "23.3.2"));
+
+  auto as_genvar = ParseWithPreprocessor(
+      In1995("module m;\n"
+             "  genvar i;\n"
+             "  generate\n"
+             "    for (i = 0; i < 2; i = i + 1) begin : g\n"
+             "    end\n"
+             "  endgenerate\n"
+             "endmodule\n"));
+  EXPECT_TRUE(ReportedError(as_genvar.diags, "expected '(', got ';'",
+                            LineInRegion(2), "23.3.2"));
 
   auto r =
       ParseWithPreprocessor(In1995("module m;\n"
@@ -401,18 +411,24 @@ TEST(CompilerDirectiveParsing, ReservedWordsAreMatchedCaseSensitively) {
 // tests above — the same syntactic slot, a word from the other side of the
 // list.
 TEST(CompilerDirectiveParsing, ReservedWordCannotNameAVariable) {
-  EXPECT_FALSE(
-      Parses1995("module m;\n"
-                 "  reg [7:0] wire;\n"
-                 "endmodule\n"));
-  EXPECT_FALSE(
-      Parses1995("module m;\n"
-                 "  reg [7:0] trireg;\n"
-                 "endmodule\n"));
+  // §6.8 owns the report, not §22.14: the word stands where
+  // Parser::ParseVarDeclList reads the declared name of a variable at
+  // src/parser/parser_types.cpp:584. TokenKindName answers "token" for every
+  // keyword (#3089), so the message cannot say which word was rejected.
+  auto as_wire = ParseWithPreprocessor(In1995(VarDecl("wire")));
+  EXPECT_TRUE(ReportedError(as_wire.diags, "expected identifier, got token",
+                            LineInRegion(2), "6.8"));
+  auto as_trireg = ParseWithPreprocessor(In1995(VarDecl("trireg")));
+  EXPECT_TRUE(ReportedError(as_trireg.diags, "expected identifier, got token",
+                            LineInRegion(2), "6.8"));
 }
 
 TEST(CompilerDirectiveParsing, ReservedWordCannotNameAModule) {
-  EXPECT_FALSE(Parses1995("module always;\nendmodule\n"));
+  // §23.2.1 owns the report on the module name: the word stands where
+  // Parser::ParseModuleDecl reads it at src/parser/parser.cpp:652.
+  auto r = ParseWithPreprocessor(In1995("module always;\nendmodule\n"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got token",
+                            LineInRegion(1), "23.2.1"));
 }
 
 // Negative from the other direction: a word Table 22-1 omits is not reserved,
@@ -420,20 +436,31 @@ TEST(CompilerDirectiveParsing, ReservedWordCannotNameAModule) {
 // `always_comb` as a block header both fail under this list, though both are
 // accepted under the default one.
 TEST(CompilerDirectiveParsing, WordOutsideVerilog1995ListIsNotAKeyword) {
-  EXPECT_FALSE(
-      Parses1995("module m;\n"
-                 "  logic [7:0] v;\n"
-                 "endmodule\n"));
+  // §6.8 owns this report: with `logic` an ordinary identifier the packed
+  // dimension is where the declaration was meant to end, so
+  // Parser::ParsePlainVarDecl demands the semicolon at
+  // src/parser/parser_items.cpp:712.
+  auto as_type =
+      ParseWithPreprocessor(In1995("module m;\n"
+                                   "  logic [7:0] v;\n"
+                                   "endmodule\n"));
+  EXPECT_TRUE(ReportedError(as_type.diags, "expected ';', got '['",
+                            LineInRegion(2), "6.8"));
   EXPECT_TRUE(
       ParseWithPreprocessorOk("module m;\n"
                               "  logic [7:0] v;\n"
                               "endmodule\n"));
 
-  EXPECT_FALSE(
-      Parses1995("module m;\n"
-                 "  reg r;\n"
-                 "  always_comb r = 1'b0;\n"
-                 "endmodule\n"));
+  // §23.3.2 owns this one instead: two identifiers read as a module name and
+  // an instance name, so Parser::ParseModuleInstList is looking for the port
+  // connection list.
+  auto as_process =
+      ParseWithPreprocessor(In1995("module m;\n"
+                                   "  reg r;\n"
+                                   "  always_comb r = 1'b0;\n"
+                                   "endmodule\n"));
+  EXPECT_TRUE(ReportedError(as_process.diags, "expected '(', got '='",
+                            LineInRegion(3), "23.3.2"));
 }
 
 }  // namespace

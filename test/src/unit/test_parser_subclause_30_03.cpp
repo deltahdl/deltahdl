@@ -2,6 +2,7 @@
 #include "fixture_program.h"
 #include "fixture_specify.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -116,7 +117,10 @@ TEST(SpecifyBlockDeclParsing, ErrorMissingEndspecify) {
       "  specify\n"
       "    (a => b) = 5;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::Expect writes `expected token, got token` for the missing
+  // endspecify, because TokenKindName spells every keyword `token`; the line
+  // and the subclause are what say which keyword was wanted and where.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got token", 4, "30.3"));
 }
 
 TEST(SpecifyBlockDeclParsing, ErrorSpecifyOutsideModule) {
@@ -124,7 +128,10 @@ TEST(SpecifyBlockDeclParsing, ErrorSpecifyOutsideModule) {
       "specify\n"
       "  (a => b) = 5;\n"
       "endspecify\n");
-  EXPECT_TRUE(r.has_errors);
+  // §3.12.1 owns the set of top-level descriptions, and that is the rule the
+  // parser reports for a specify block at file scope; §30.3 has no report here.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected top-level declaration", 1, "3.12.1"));
 }
 
 TEST(SpecifyBlockDeclParsing, ErrorSpecifyInsidePackage) {
@@ -134,7 +141,9 @@ TEST(SpecifyBlockDeclParsing, ErrorSpecifyInsidePackage) {
       "    (a => b) = 5;\n"
       "  endspecify\n"
       "endpackage\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "specify block must appear inside a module declaration", 2,
+      "30.3"));
 }
 
 TEST(SpecifyBlockDeclParsing, ErrorUnknownSpecifyItem) {
@@ -144,7 +153,8 @@ TEST(SpecifyBlockDeclParsing, ErrorUnknownSpecifyItem) {
       "    initial x = 1;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "unexpected token in specify block", 3, "30.3"));
 }
 
 // A specify_item admits system_timing_check as its only system-call form, so a
@@ -157,7 +167,10 @@ TEST(SpecifyBlockDeclParsing, ErrorNonTimingCheckSystemTask) {
       "    $display(\"hi\");\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §31.2 owns the system timing checks a specify block admits, and the parser
+  // files the rejection of any other system task under it, not under §30.3.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "system task cannot appear in specify block", 3, "31.2"));
 }
 
 TEST(SpecifyBlockDeclParsing, ErrorStrayEndspecify) {
@@ -165,7 +178,10 @@ TEST(SpecifyBlockDeclParsing, ErrorStrayEndspecify) {
       "module m;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §23.2.4 owns the module item list, and a stray endspecify is reported as a
+  // module body item there rather than under §30.3.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
 }
 
 TEST(SpecifyBlock, MalformedPathDeclarationNames30_3) {

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -156,11 +157,16 @@ TEST(ExternModuleParsing, NestedExternModuleDecl) {
 }
 
 TEST(ExternModuleParsing, ErrorMissingSemicolon) {
-  EXPECT_FALSE(ParseOk("extern module m(input a)\n"));
+  auto r = Parse("extern module m(input a)\n");
+  // The header terminator is shared with module_ansi_header, so
+  // src/parser/parser_port.cpp:729 files it under §23.2.1 rather than §23.5.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got EOF", 2, "23.2.1"));
 }
 
 TEST(ExternModuleParsing, ErrorMissingModuleName) {
-  EXPECT_FALSE(ParseOk("extern module ;\n"));
+  auto r = Parse("extern module ;\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ';'", 1, "23.5"));
 }
 
 }  // namespace

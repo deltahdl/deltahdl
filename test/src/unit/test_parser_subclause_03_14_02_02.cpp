@@ -2,6 +2,7 @@
 #include "fixture_preprocessor_timescale.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "parser/time_resolve.h"
 
 using namespace delta;
@@ -291,39 +292,52 @@ TEST(CompilationUnitTimeDeclarations, TimeunitAndTimeprecisionBothSet) {
 }
 
 TEST(DesignBuildingBlockParsing, DistinctTimeunitInSameModuleRejected) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  timeunit 1ns;\n"
-              "  logic x;\n"
-              "  timeunit 1us;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "  logic x;\n"
+      "  timeunit 1us;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "timeunit does not match prior declaration", 4, "3.14.2.2"));
 }
 
 TEST(DesignBuildingBlockParsing, DistinctTimeprecisionInSameModuleRejected) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  timeunit 1ns;\n"
-              "  timeprecision 1ps;\n"
-              "  logic x;\n"
-              "  timeprecision 10fs;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "  logic x;\n"
+      "  timeprecision 10fs;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "timeprecision does not match prior declaration", 5,
+                            "3.14.2.2"));
 }
 
 TEST(DesignBuildingBlockParsing, TimeunitAfterOtherItemsWithoutPriorRejected) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  logic x;\n"
-              "  timeunit 1ns;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  logic x;\n"
+      "  timeunit 1ns;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "timeunit as a later item requires a matching "
+                            "prior declaration in the same time scope",
+                            3, "3.14.2.2"));
 }
 
 TEST(DesignBuildingBlockParsing,
      TimeprecisionAfterOtherItemsWithoutPriorRejected) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  logic x;\n"
-              "  timeprecision 1ps;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  logic x;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "timeprecision as a later item requires a matching "
+                            "prior declaration in the same time scope",
+                            3, "3.14.2.2"));
 }
 
 TEST(DesignBuildingBlockParsing,
@@ -338,52 +352,67 @@ TEST(DesignBuildingBlockParsing,
 
 TEST(DesignBuildingBlockParsing,
      DistinctTimeunitMagnitudeInSameModuleRejected) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  timeunit 1ns;\n"
-              "  logic x;\n"
-              "  timeunit 10ns;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "  logic x;\n"
+      "  timeunit 10ns;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "timeunit does not match prior declaration", 4, "3.14.2.2"));
 }
 
 TEST(DesignBuildingBlockParsing, DistinctTimeunitInSameInterfaceRejected) {
-  EXPECT_FALSE(
-      ParseOk("interface ifc;\n"
-              "  timeunit 1ns;\n"
-              "  logic x;\n"
-              "  timeunit 1us;\n"
-              "endinterface\n"));
+  auto r = Parse(
+      "interface ifc;\n"
+      "  timeunit 1ns;\n"
+      "  logic x;\n"
+      "  timeunit 1us;\n"
+      "endinterface\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "timeunit does not match prior declaration", 4, "3.14.2.2"));
 }
 
 TEST(DesignBuildingBlockParsing, DistinctTimeunitInSameProgramRejected) {
-  EXPECT_FALSE(
-      ParseOk("program p;\n"
-              "  timeunit 1ns;\n"
-              "  logic x;\n"
-              "  timeunit 1us;\n"
-              "endprogram\n"));
+  auto r = Parse(
+      "program p;\n"
+      "  timeunit 1ns;\n"
+      "  logic x;\n"
+      "  timeunit 1us;\n"
+      "endprogram\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "timeunit does not match prior declaration", 4, "3.14.2.2"));
 }
 
 TEST(CompilationUnitTimeDeclarations, DistinctTimeunitInCuRejected) {
-  EXPECT_FALSE(
-      ParseOk("timeunit 1ns;\n"
-              "module m; endmodule\n"
-              "timeunit 1us;\n"));
+  auto r = Parse(
+      "timeunit 1ns;\n"
+      "module m; endmodule\n"
+      "timeunit 1us;\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "timeunit does not match prior declaration", 3, "3.14.2.2"));
 }
 
 TEST(CompilationUnitTimeDeclarations, DistinctTimeprecisionInCuRejected) {
-  EXPECT_FALSE(
-      ParseOk("timeunit 1ns;\n"
-              "timeprecision 1ps;\n"
-              "module m; endmodule\n"
-              "timeprecision 10fs;\n"));
+  auto r = Parse(
+      "timeunit 1ns;\n"
+      "timeprecision 1ps;\n"
+      "module m; endmodule\n"
+      "timeprecision 10fs;\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "timeprecision does not match prior declaration", 4,
+                            "3.14.2.2"));
 }
 
 TEST(CompilationUnitTimeDeclarations,
      TimeunitAfterModuleWithoutPriorInCuRejected) {
-  EXPECT_FALSE(
-      ParseOk("module m; endmodule\n"
-              "timeunit 1ns;\n"));
+  auto r = Parse(
+      "module m; endmodule\n"
+      "timeunit 1ns;\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "timeunit as a later item requires a matching "
+                            "prior declaration in the same time scope",
+                            2, "3.14.2.2"));
 }
 
 TEST(CompilationUnitTimeDeclarations, TimeunitMatchingRepeatAfterModuleInCu) {
@@ -413,31 +442,40 @@ TEST(DesignBuildingBlockParsing, TimeunitInPackageStored) {
 }
 
 TEST(DesignBuildingBlockParsing, DistinctTimeunitInSamePackageRejected) {
-  EXPECT_FALSE(
-      ParseOk("package pkg;\n"
-              "  timeunit 1ns;\n"
-              "  parameter int x = 1;\n"
-              "  timeunit 1us;\n"
-              "endpackage\n"));
+  auto r = Parse(
+      "package pkg;\n"
+      "  timeunit 1ns;\n"
+      "  parameter int x = 1;\n"
+      "  timeunit 1us;\n"
+      "endpackage\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "timeunit does not match prior declaration", 4, "3.14.2.2"));
 }
 
 TEST(DesignBuildingBlockParsing, DistinctTimeprecisionInSamePackageRejected) {
-  EXPECT_FALSE(
-      ParseOk("package pkg;\n"
-              "  timeunit 1ns;\n"
-              "  timeprecision 1ps;\n"
-              "  parameter int x = 1;\n"
-              "  timeprecision 10fs;\n"
-              "endpackage\n"));
+  auto r = Parse(
+      "package pkg;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "  parameter int x = 1;\n"
+      "  timeprecision 10fs;\n"
+      "endpackage\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "timeprecision does not match prior declaration", 5,
+                            "3.14.2.2"));
 }
 
 TEST(DesignBuildingBlockParsing,
      TimeunitAfterOtherItemsWithoutPriorInPackageRejected) {
-  EXPECT_FALSE(
-      ParseOk("package pkg;\n"
-              "  parameter int x = 1;\n"
-              "  timeunit 1ns;\n"
-              "endpackage\n"));
+  auto r = Parse(
+      "package pkg;\n"
+      "  parameter int x = 1;\n"
+      "  timeunit 1ns;\n"
+      "endpackage\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "timeunit as a later item requires a matching "
+                            "prior declaration in the same time scope",
+                            3, "3.14.2.2"));
 }
 
 TEST(DesignBuildingBlockParsing, TimeunitMatchingRepeatInPackageAccepted) {
@@ -455,20 +493,28 @@ TEST(DesignBuildingBlockParsing, TimeunitMatchingRepeatInPackageAccepted) {
 
 TEST(DesignBuildingBlockParsing,
      TimeunitAfterOtherItemsWithoutPriorInInterfaceRejected) {
-  EXPECT_FALSE(
-      ParseOk("interface ifc;\n"
-              "  logic x;\n"
-              "  timeunit 1ns;\n"
-              "endinterface\n"));
+  auto r = Parse(
+      "interface ifc;\n"
+      "  logic x;\n"
+      "  timeunit 1ns;\n"
+      "endinterface\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "timeunit as a later item requires a matching "
+                            "prior declaration in the same time scope",
+                            3, "3.14.2.2"));
 }
 
 TEST(DesignBuildingBlockParsing,
      TimeunitAfterOtherItemsWithoutPriorInProgramRejected) {
-  EXPECT_FALSE(
-      ParseOk("program p;\n"
-              "  logic x;\n"
-              "  timeunit 1ns;\n"
-              "endprogram\n"));
+  auto r = Parse(
+      "program p;\n"
+      "  logic x;\n"
+      "  timeunit 1ns;\n"
+      "endprogram\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "timeunit as a later item requires a matching "
+                            "prior declaration in the same time scope",
+                            3, "3.14.2.2"));
 }
 
 TEST(DesignBuildingBlockParsing, TimeunitMatchingRepeatInInterfaceAccepted) {

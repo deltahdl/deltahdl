@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -231,7 +232,9 @@ TEST(LexicalConventionParsing, BinaryOperatorMissingRightOperandFails) {
       "module m;\n"
       "  initial x = a +;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §11.2 owns the report: the parser demands an expression where the right
+  // operand belongs, and §5.5 states no rejection of its own.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
 // A binary operator sits between two operands; with the left operand absent
@@ -242,7 +245,8 @@ TEST(LexicalConventionParsing, BinaryOperatorMissingLeftOperandFails) {
       "module m;\n"
       "  initial x = * b;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §11.2 owns the report; §5.5 states no rejection of its own.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
 TEST(LexicalConventionParsing, UnaryOperatorMissingOperandFails) {
@@ -250,7 +254,8 @@ TEST(LexicalConventionParsing, UnaryOperatorMissingOperandFails) {
       "module m;\n"
       "  initial x = ~;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §11.2 owns the report; §5.5 states no rejection of its own.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
 TEST(LexicalConventionParsing, ConditionalMissingColonFails) {
@@ -258,7 +263,8 @@ TEST(LexicalConventionParsing, ConditionalMissingColonFails) {
       "module m;\n"
       "  initial x = a ? b;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §11.4.11 owns the conditional operator's ':' and reports its absence.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ':', got ';'", 2, "11.4.11"));
 }
 
 TEST(LexicalConventionParsing, ConditionalMissingFalseOperandFails) {
@@ -266,7 +272,8 @@ TEST(LexicalConventionParsing, ConditionalMissingFalseOperandFails) {
       "module m;\n"
       "  initial x = a ? b :;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §11.2 owns the report; §5.5 states no rejection of its own.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
 TEST(LexicalConventionParsing, ConditionalMissingTrueOperandFails) {
@@ -274,7 +281,8 @@ TEST(LexicalConventionParsing, ConditionalMissingTrueOperandFails) {
       "module m;\n"
       "  initial x = a ? : c;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §11.2 owns the report; §5.5 states no rejection of its own.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
 // The conditional operator separates three operands; with the first operand
@@ -284,7 +292,8 @@ TEST(LexicalConventionParsing, ConditionalMissingConditionOperandFails) {
       "module m;\n"
       "  initial x = ? b : c;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §11.2 owns the report; §5.5 states no rejection of its own.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
 }  // namespace

@@ -14,6 +14,7 @@
 // observed where the kind actually decides something, in the elaborator file
 // for this subclause.
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -58,32 +59,47 @@ TEST(CellClauseNotation, BareNameIsTheCellAndNamesNoLibrary) {
 // The cell identifier is the one part of the production that is not optional,
 // so a qualifier with nothing after the dot names no cell.
 TEST(CellClauseNotation, QualifierWithoutCellIdentifierRejected) {
-  EXPECT_FALSE(
-      ParseOk("config cfg;\n"
-              "  design rtlLib.top;\n"
-              "  cell gateLib. liblist gateLib;\n"
-              "endconfig\n"));
+  auto r = Parse(
+      "config cfg;\n"
+      "  design rtlLib.top;\n"
+      "  cell gateLib. liblist gateLib;\n"
+      "endconfig\n");
+  // The cell_clause the parser reads is §33.4.1.4's, and that is the subclause
+  // its report names; §33.2.1 has no report of its own here.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got token", 3, "33.4.1.4"));
 }
 
 // The notation reaches exactly one level: a library holds cells, and a cell is
 // a design element rather than a further collection, so there is no second
 // qualifier to write.
 TEST(CellClauseNotation, TwiceQualifiedNameRejected) {
-  EXPECT_FALSE(
-      ParseOk("config cfg;\n"
-              "  design rtlLib.top;\n"
-              "  cell gateLib.inner.adder liblist gateLib;\n"
-              "endconfig\n"));
+  auto r = Parse(
+      "config cfg;\n"
+      "  design rtlLib.top;\n"
+      "  cell gateLib.inner.adder liblist gateLib;\n"
+      "endconfig\n");
+  // The cell_clause ends after the second identifier, so the second '.' stands
+  // where §33.4.1 requires a liblist_clause or a use_clause, and that is the
+  // report; §33.2.1 has no report of its own here.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "cell selection requires a 'liblist' or 'use' clause", 3,
+      "33.4.1"));
 }
 
 // The keyword is what introduces the notation; the name alone continues no
 // production of the config grammar.
 TEST(CellClauseNotation, NameWithoutCellKeywordRejected) {
-  EXPECT_FALSE(
-      ParseOk("config cfg;\n"
-              "  design rtlLib.top;\n"
-              "  gateLib.adder liblist gateLib;\n"
-              "endconfig\n"));
+  auto r = Parse(
+      "config cfg;\n"
+      "  design rtlLib.top;\n"
+      "  gateLib.adder liblist gateLib;\n"
+      "endconfig\n");
+  // Without the 'cell' keyword no config_rule_statement starts, so the
+  // identifier stands where §33.4.1 requires the rule's ';'; §33.2.1 has no
+  // report of its own here.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got identifier", 3, "33.4.1"));
 }
 
 // Both parts of the notation are identifiers, so either may be written in the

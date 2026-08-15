@@ -2,6 +2,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_parser.h"
 #include "fixture_program.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -42,7 +43,10 @@ TEST(FunctionDeclParsing, DpiImportFunctionImplicitReturnTypeRejected) {
       "  import \"DPI-C\" function get_value(input int x);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "an imported function must explicitly specify a "
+                            "data type or void for its result",
+                            2, "35.5.5"));
 }
 
 // §35.5.5: chandle is one of the data types allowed for imported function
@@ -108,7 +112,9 @@ TEST(FunctionDeclParsing, DpiImportFunctionPackedLogicResultRejected) {
       "  import \"DPI-C\" function logic [3:0] read_nibble();\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "result type is not permitted for a DPI imported function", 2,
+      "35.5.5"));
 }
 
 // §35.5.5: the permitted result list excludes the wide 4-state 'time' type, so
@@ -120,7 +126,9 @@ TEST(FunctionDeclParsing, DpiImportFunctionTimeResultRejected) {
       "  import \"DPI-C\" function time stamp();\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "result type is not permitted for a DPI imported function", 2,
+      "35.5.5"));
 }
 
 // §35.5.5: results are restricted to *small values*. A packed bit vector is not
@@ -131,7 +139,9 @@ TEST(FunctionDeclParsing, DpiImportFunctionPackedBitResultRejected) {
       "  import \"DPI-C\" function bit [7:0] read_byte();\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "result type is not permitted for a DPI imported function", 2,
+      "35.5.5"));
 }
 
 // §35.5.5: only the *scalar* form of bit is permitted. A width-one packed
@@ -144,7 +154,9 @@ TEST(FunctionDeclParsing, DpiImportFunctionWidthOnePackedBitResultRejected) {
       "  import \"DPI-C\" function bit [0:0] read_single();\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "result type is not permitted for a DPI imported function", 2,
+      "35.5.5"));
 }
 
 // §35.5.5: the allowed result list excludes the wide 4-state 'integer' type
@@ -156,7 +168,9 @@ TEST(FunctionDeclParsing, DpiImportFunctionIntegerResultRejected) {
       "  import \"DPI-C\" function integer count();\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "result type is not permitted for a DPI imported function", 2,
+      "35.5.5"));
 }
 
 // §35.5.5: 'byte' is one of the C-compatible integer types named in the

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -700,27 +701,34 @@ TEST(ProceduralBlockSyntaxParsing, ProceduralReleaseNet) {
 }
 
 TEST(ProceduralBlockSyntaxParsing, ErrorForceMissingRhs) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  initial begin force a; end\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin force a; end\n"
+      "endmodule\n");
+  // §10.6.2 owns force and release; A.6.2 only states the production.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '=', got ';'", 2, "10.6.2"));
 }
 
 TEST(ProceduralBlockSyntaxParsing, ErrorReleaseWithExtraRhs) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  initial begin release a = b; end\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin release a = b; end\n"
+      "endmodule\n");
+  // §10.6.2 owns force and release; A.6.2 only states the production.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got '='", 2, "10.6.2"));
 }
 
 // Negative form of the `assign variable_assignment` alternative: the assign
 // form of a procedural_continuous_assignment requires `lvalue = expression`, so
 // an assign with a bare lvalue and no right-hand side must be rejected.
 TEST(ProceduralBlockSyntaxParsing, ErrorProceduralAssignMissingRhs) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  initial begin assign a; end\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin assign a; end\n"
+      "endmodule\n");
+  // §10.6.1 owns the procedural assign and deassign statements; A.6.2 only
+  // states the production.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '=', got ';'", 2, "10.6.1"));
 }
 
 TEST(ProceduralBlockSyntaxParsing, NonblockingAssignment_WithEventControl) {

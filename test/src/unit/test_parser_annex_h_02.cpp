@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "fixture_program.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -71,7 +72,13 @@ TEST_F(DpiParseTest, DpiImportFormalRejectsSizedPackedDimBeforeUnspecifiedOne) {
       "module m;\n"
       "  import \"DPI-C\" function void f(input bit [7:0] [] a);\n"
       "endmodule\n");
-  EXPECT_TRUE(diag_.HasErrors());
+  // §35.5.6.1 owns the report: ValidateDpiImportOpenArrayPackedDims in
+  // src/parser/parser_dpi_validate.cpp files the solitary-dimension rule
+  // under the DPI open-array subclause rather than under Annex H.
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "formal argument 'a' gives a packed dimension no "
+                            "range alongside a sized one",
+                            2, "35.5.6.1"));
 }
 
 // §H.2: the solitary-dimension rule does not depend on which dimension is
@@ -82,7 +89,11 @@ TEST_F(DpiParseTest, DpiImportFormalRejectsSizedPackedDimAfterUnspecifiedOne) {
       "module m;\n"
       "  import \"DPI-C\" function void f(input bit [] [7:0] a);\n"
       "endmodule\n");
-  EXPECT_TRUE(diag_.HasErrors());
+  // §35.5.6.1 owns the report, as above.
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "formal argument 'a' gives a packed dimension no "
+                            "range alongside a sized one",
+                            2, "35.5.6.1"));
 }
 
 // §H.2: a formal is open only where a range is left *unspecified*. A packed
@@ -111,7 +122,12 @@ TEST_F(DpiParseTest, UnspecifiedPackedRangeIsRejectedOutsideAnImport) {
       "module m;\n"
       "  bit [] a;\n"
       "endmodule\n");
-  EXPECT_TRUE(diag_.HasErrors());
+  // §11.2 owns the report: Parser::AtUnsizedPackedDim admits the empty pair
+  // only inside a DPI import's formals, so outside one Parser::ParsePackedDims
+  // reads the bracket as an ordinary packed dimension and the ']' stands where
+  // the range expression is required.
+  EXPECT_TRUE(
+      ReportedError(diag_.Diagnostics(), "expected expression", 2, "11.2"));
 }
 
 // §H.2: the relaxation is granted to a formal argument of an import, not to
@@ -122,7 +138,11 @@ TEST_F(DpiParseTest, UnspecifiedPackedRangeIsRejectedOnAnImportResult) {
       "module m;\n"
       "  import \"DPI-C\" function bit [] f(input int a);\n"
       "endmodule\n");
-  EXPECT_TRUE(diag_.HasErrors());
+  // §11.2 owns the report: Parser::ParseDpiImport parses the result type
+  // before it sets in_dpi_import_formals_, so the ']' stands where the range
+  // expression of an ordinary packed dimension is required.
+  EXPECT_TRUE(
+      ReportedError(diag_.Diagnostics(), "expected expression", 2, "11.2"));
 }
 
 }  // namespace

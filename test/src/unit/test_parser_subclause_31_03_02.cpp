@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -102,7 +103,9 @@ TEST(TimingCheckCommandParsing, HoldRejectsMissingLimit) {
       "  $hold(posedge clk, data);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The shared timing-check parser files the missing separator under §31.2, the
+  // system_timing_check production, rather than under §31.3.2.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ',', got ')'", 3, "31.2"));
 }
 
 }  // namespace

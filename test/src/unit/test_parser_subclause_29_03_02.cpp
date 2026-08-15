@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 #include "simulator/udp_eval.h"
 
 using namespace delta;
@@ -321,7 +322,9 @@ TEST(UdpPortDeclaration, OutputDeclMultipleNamesRejected) {
       "    0 : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // The second name is where the output declaration stops being legal, so the
+  // report is the `;` Parser::ParseUdpOutputDecl expects after the one name.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got ','", 2, "29.3.2"));
 }
 
 TEST(UdpPortDeclaration, RegDeclNotNamingOutputRejected) {
@@ -335,7 +338,8 @@ TEST(UdpPortDeclaration, RegDeclNotNamingOutputRejected) {
       "    0 r : ? : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP reg declaration shall name the output port", 3, "29.3.2"));
 }
 
 TEST(UdpPortDeclaration, SequentialUdpWithoutRegRejected) {
@@ -348,7 +352,12 @@ TEST(UdpPortDeclaration, SequentialUdpWithoutRegRejected) {
       "    1 r : ? : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // Without the reg the primitive is combinational, so the row's current-state
+  // field is read as its output field and §29.3.6 reports the `?` there. The
+  // parser has no report of its own for the missing reg.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP output field shall be 0, 1, or x (- is sequential only)", 5,
+      "29.3.6"));
 }
 
 // §29.3.2: a combinational UDP shall not carry a reg declaration. The reg
@@ -363,7 +372,13 @@ TEST(UdpPortDeclaration, CombinationalUdpWithRegRejected) {
       "    1 : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // The reg makes the primitive sequential, so the row's output field is read
+  // as its current-state field and the `;` closing the row lands in the output
+  // field, which §29.3.6 reports. The parser has no report of its own for a
+  // combinational table under a reg output.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP output field shall be 0, 1, or x (- is sequential only)", 3,
+      "29.3.6"));
 }
 
 // §29.3.2: the same prohibition holds when the reg is written as a separate
@@ -380,7 +395,12 @@ TEST(UdpPortDeclaration, CombinationalUdpWithSeparateRegRejected) {
       "    1 : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // Same route as CombinationalUdpWithRegRejected: the reg makes the rows read
+  // as sequential ones, and §29.3.6 reports the `;` that lands in the output
+  // field.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP output field shall be 0, 1, or x (- is sequential only)", 6,
+      "29.3.6"));
 }
 
 // §29.3.2: the output port declaration is the keyword `output` followed by one
@@ -397,7 +417,8 @@ TEST(UdpPortDeclaration, OutputDeclWithoutNameRejected) {
       "    1 : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ';'", 2, "29.3.2"));
 }
 
 // §29.3.2: the input port declaration is the keyword `input` followed by one or
@@ -414,7 +435,8 @@ TEST(UdpPortDeclaration, InputDeclWithoutNameRejected) {
       "    1 : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ';'", 3, "29.3.2"));
 }
 
 }  // namespace

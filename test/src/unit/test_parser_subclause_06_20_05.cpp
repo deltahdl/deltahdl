@@ -2,6 +2,7 @@
 #include "fixture_program.h"
 #include "fixture_specify.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -97,7 +98,9 @@ TEST(SpecparamParsing, ErrorSpecparamMissingSemicolon) {
       "module m;\n"
       "  specify specparam tRISE = 100 endspecify\n"
       "endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // TokenKindName answers "token" for every keyword, so `endspecify` is what
+  // the ';' the specparam declaration wants was found instead of.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 2, "6.20.5"));
 }
 
 TEST(SpecparamParsing, CommaSeparatedSpecparamList) {

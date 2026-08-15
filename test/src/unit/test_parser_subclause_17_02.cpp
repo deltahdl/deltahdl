@@ -1,6 +1,7 @@
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -55,14 +56,18 @@ TEST(CheckerDeclaration, EndLabelMatchesCheckerName) {
 }
 
 TEST(CheckerDeclaration, MissingEndcheckerIsError) {
-  EXPECT_FALSE(ParseOk("checker c;"));
+  auto r = Parse("checker c;");
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 1, "17.2"));
 }
 
 TEST(CheckerDeclaration, EndLabelMismatchIsError) {
   // §17.2: the optional name following endchecker must match the checker name.
   auto r = Parse("checker ck; endchecker : other\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  // §9.3.4 owns the end-label matching rule the parser reports here; §17.2
+  // states it for endchecker but has no report of its own.
+  EXPECT_TRUE(ReportedError(r.diags, "end label 'other' does not match 'ck'", 1,
+                            "9.3.4"));
 }
 
 TEST(CheckerDeclaration, OutputDirectionFormalParses) {
@@ -296,7 +301,8 @@ TEST(CheckerDeclaration, InputPortDefaultValueParses) {
 TEST(CheckerDeclaration, UntypedOutputFormalIsError) {
   auto r = Parse("checker c(output a); endchecker\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "checker output formal 'a' shall have a type", 1, "17.2"));
 }
 
 // §17.2: an output formal that carries a type is accepted, confirming the

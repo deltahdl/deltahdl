@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -172,7 +173,8 @@ TEST(LoopSyntaxParsing, ErrorForeachMissingOpenParen) {
       "    foreach arr[i]) x = i;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got identifier", 3, "12.7.3"));
 }
 
 TEST(LoopSyntaxParsing, ErrorForeachMissingCloseParen) {
@@ -182,7 +184,8 @@ TEST(LoopSyntaxParsing, ErrorForeachMissingCloseParen) {
       "    foreach (arr[i] x = i;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ')', got identifier", 3, "12.7.3"));
 }
 
 TEST(LoopSyntaxParsing, ErrorForeachMissingOpenBracket) {
@@ -192,7 +195,8 @@ TEST(LoopSyntaxParsing, ErrorForeachMissingOpenBracket) {
       "    foreach (arr i]) x = i;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '[', got identifier", 3, "12.7.3"));
 }
 
 TEST(LoopSyntaxParsing, ErrorForeachMissingCloseBracket) {
@@ -202,7 +206,7 @@ TEST(LoopSyntaxParsing, ErrorForeachMissingCloseBracket) {
       "    foreach (arr[i) x = i;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ']', got ')'", 3, "12.7.3"));
 }
 
 // §12.7.3 — the implicit block a foreach creates is unnamed by default but can
@@ -233,7 +237,9 @@ TEST(LoopSyntaxParsing, ErrorForeachFunctionCallAsLoopVar) {
       "    foreach (arr[f()]) x = 0;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::ParseForeachVars takes `f` as the loop variable and stops, so the
+  // call's '(' is what stands where §12.7.3 requires the ']'.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ']', got '('", 3, "12.7.3"));
 }
 
 // §12.7.3 brackets the loop variables of a foreach, so a loop-variable list

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -116,7 +117,8 @@ TEST(LexicalConventionParsing, CommentsDoNotAffectParseResult) {
 }
 
 TEST(LexicalConventionParsing, UnterminatedBlockCommentCausesParseError) {
-  EXPECT_FALSE(ParseOk("module t; /* unterminated comment endmodule"));
+  auto r = Parse("module t; /* unterminated comment endmodule");
+  EXPECT_TRUE(ReportedError(r.diags, "unterminated block comment", 1, "5.4"));
 }
 
 TEST(LexicalConventionParsing, CommentsInPackageDeclaration) {

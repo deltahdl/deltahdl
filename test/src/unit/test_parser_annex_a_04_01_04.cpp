@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -187,10 +188,13 @@ TEST(CheckerInstantiationGrammar, PackageScopedCheckerInst) {
 
 // The trailing `;` of checker_instantiation is mandatory.
 TEST(CheckerInstantiationGrammar, Error_MissingSemicolon) {
-  EXPECT_FALSE(
-      ParseOk("checker my_chk;\n"
-              "endchecker\n"
-              "module m; my_chk u0() endmodule\n"));
+  auto r = Parse(
+      "checker my_chk;\n"
+      "endchecker\n"
+      "module m; my_chk u0() endmodule\n");
+  // Parser::ParseModuleInstList files the shared instantiation reports under
+  // §23.3.2, and a checker instance takes that same path.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "23.3.2"));
 }
 
 // list_of_checker_port_connections is either an all-ordered list or an
@@ -204,7 +208,11 @@ TEST(CheckerInstantiationGrammar, Error_MixedOrderedAndNamedPorts) {
       "  my_chk u0(a, .clk(clk));\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  // §23.3.2 owns the no-mixing rule, and Parser::ParsePortConnection reports
+  // it for a checker instance through the shared instantiation path.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "ordered and named port connections cannot be mixed", 5,
+      "23.3.2"));
 }
 
 }  // namespace

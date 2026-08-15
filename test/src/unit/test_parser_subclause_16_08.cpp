@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -132,7 +133,10 @@ TEST(SequenceDeclarationParsing, SequenceDeclEndLabelMismatchIsError) {
       "  endsequence : wrong\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  // §9.3.4 owns the end-label rule for every named block, so the mismatch is
+  // reported there rather than under §16.8.
+  EXPECT_TRUE(ReportedError(r.diags, "end label 'wrong' does not match 's'", 4,
+                            "9.3.4"));
 }
 
 TEST(SequenceDeclarationParsing, DollarAsSequenceActualParses) {

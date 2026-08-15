@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -26,7 +27,9 @@ TEST(ModuleAndHierarchyParsing, EndLabelProgram) {
 }
 
 TEST(BlockNames, MismatchedEndLabelIsError) {
-  EXPECT_FALSE(ParseOk("module foo; endmodule : bar\n"));
+  auto r = Parse("module foo; endmodule : bar\n");
+  EXPECT_TRUE(ReportedError(r.diags, "end label 'bar' does not match 'foo'", 1,
+                            "9.3.4"));
 }
 
 TEST(BlockNameParsing, LabeledSeqBlock) {
@@ -66,7 +69,8 @@ TEST(BlockNameParsing, MismatchedEndLabelError) {
       "  end : bar\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "end label 'bar' does not match block name 'foo'", 4, "9.3.4"));
 }
 
 TEST(BlockNameParsing, NamedForkBlock) {
@@ -118,7 +122,10 @@ TEST(BlockNameParsing, NamedForkMismatchedEndLabelError) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "end label 'beta' does not match block name "
+                            "'alpha'",
+                            5, "9.3.4"));
 }
 
 TEST(BlockNameParsing, NamedForkWithJoinAnyLabel) {
@@ -168,7 +175,8 @@ TEST(BlockNameParsing, MismatchedJoinAnyEndLabelError) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "end label 'y' does not match block name 'x'", 5, "9.3.4"));
 }
 
 TEST(BlockNameParsing, MismatchedJoinNoneEndLabelError) {
@@ -181,7 +189,8 @@ TEST(BlockNameParsing, MismatchedJoinNoneEndLabelError) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "end label 'y' does not match block name 'x'", 5, "9.3.4"));
 }
 
 TEST(BlockNameParsing, EndLabelOnUnnamedSeqBlockError) {
@@ -192,7 +201,8 @@ TEST(BlockNameParsing, EndLabelOnUnnamedSeqBlockError) {
       "  end : orphan\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "end label 'orphan' specified for unnamed block", 4, "9.3.4"));
 }
 
 TEST(BlockNameParsing, JoinLabelOnUnnamedForkError) {
@@ -205,7 +215,8 @@ TEST(BlockNameParsing, JoinLabelOnUnnamedForkError) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "end label 'orphan' specified for unnamed block", 5, "9.3.4"));
 }
 
 TEST(BlockNameParsing, NamedBlockWithVarDecl) {

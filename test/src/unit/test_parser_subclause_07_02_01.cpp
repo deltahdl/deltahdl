@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -527,7 +528,11 @@ TEST(PackedStructParsing, UnpackedSignedStruct_Rejected) {
       "module t;\n"
       "  typedef struct signed { int f1; logic f2; } bad_t;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::ParseStructPackedSigning files this report under §7.2, the clause
+  // that states the structure declaration, not under §7.2.1.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "signing is not allowed on an unpacked structure or union", 2,
+      "7.2"));
   // The targeted signing diagnostic drops the stray 'signed' and still parses
   // the member list, so the (illegal) body is recovered with both members
   // rather than desyncing on a generic brace error.
@@ -542,7 +547,9 @@ TEST(PackedStructParsing, UnpackedUnsignedStruct_Rejected) {
       "module t;\n"
       "  typedef struct unsigned { int f1; logic f2; } bad_t;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "signing is not allowed on an unpacked structure or union", 2,
+      "7.2"));
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -149,7 +150,8 @@ TEST(StateDependentPathSyntax, IfGuardRequiresParenthesizedCondition) {
       "    if en (a => y) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got identifier", 3, "30.4.4"));
 }
 
 }  // namespace

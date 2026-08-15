@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 #include "parser/ast.h"
 
 using namespace delta;
@@ -77,12 +78,14 @@ TEST(MinTypMaxParse, SingleValueIsNotTriplet) {
 // Negative form: the triplet requires exactly two colons. A single colon
 // (min:typ with no max) is rejected.
 TEST(MinTypMaxParse, RejectsMissingMaxExpression) {
-  EXPECT_FALSE(ParseOk("module t; initial x = (1:2); endmodule"));
+  auto r = Parse("module t; initial x = (1:2); endmodule");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ':', got ')'", 1, "11.11"));
 }
 
 // Negative form: a fourth colon-separated value is not part of the grammar.
 TEST(MinTypMaxParse, RejectsFourthValue) {
-  EXPECT_FALSE(ParseOk("module t; initial x = (1:2:3:4); endmodule"));
+  auto r = Parse("module t; initial x = (1:2:3:4); endmodule");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ':'", 1, "11.11"));
 }
 
 }  // namespace

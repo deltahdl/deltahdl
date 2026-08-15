@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -138,7 +139,10 @@ TEST(ChainedConstructorParsing, ErrorDuplicateDefaultInConstructorArgs) {
       "  function new(default, int x, default);\n"
       "  endfunction\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "'default' keyword shall appear at most once in a "
+                            "class constructor argument list",
+                            2, "8.17"));
 }
 
 TEST(ChainedConstructorParsing, ExtendsWithMultipleArgs) {

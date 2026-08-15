@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -478,7 +479,9 @@ TEST(ConditionalEventIffParsing, IffWithoutConditionIsError) {
       "module m;\n"
       "  always @(posedge clk iff) q <= d;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The guard is an expression, so Parser::ParseSingleEvent files its absence
+  // under §11.2 rather than under §9.4.2.3.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
 // Edge case for iff-over-or precedence: wrapping a single guarded event in

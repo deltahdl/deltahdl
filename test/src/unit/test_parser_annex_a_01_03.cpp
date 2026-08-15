@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -534,13 +535,15 @@ TEST(ModuleParametersAndPorts, AnsiPortsWithAttributes) {
 // parameter_port_list requires the closing ")".
 TEST(ModuleParametersAndPorts, ParameterPortListMissingCloseParen) {
   auto r = Parse("module m #(parameter int W = 8 ; endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // §23.2.3 owns the parameter_port_list, so the closing ')' it wants is
+  // reported there rather than under §23.2.1 with the header as a whole.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 1, "23.2.3"));
 }
 
 // list_of_port_declarations requires the closing ")".
 TEST(ModuleParametersAndPorts, PortListMissingCloseParen) {
   auto r = Parse("module m (input logic a ; endmodule");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 1, "23.2.2.2"));
 }
 
 // A non-ANSI body port_declaration must be terminated by ";".
@@ -549,13 +552,16 @@ TEST(ModuleParametersAndPorts, NonAnsiPortDeclMissingSemicolon) {
       "module m (a);\n"
       "  input a\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // `endmodule` is a keyword, which Parser::Expect names "token", and it is
+  // the token standing where the ';' was wanted on line 3.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "23.2.2.1"));
 }
 
 // The explicit-named ANSI port form requires "(" after the port identifier.
 TEST(ModuleParametersAndPorts, AnsiExplicitlyNamedPortMissingParen) {
   auto r = Parse("module m (input .x a); endmodule");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got identifier", 1, "23.2.2.2"));
 }
 
 // --- additional input forms ---

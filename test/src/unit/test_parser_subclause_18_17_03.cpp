@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -37,7 +38,9 @@ TEST(CaseProductionParsing, MultipleDefaultsAreIllegal) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "case production shall have at most one 'default' item", 4,
+      "18.17.3"));
 }
 
 // 18.17.3: the colon after a default item is optional in the case production

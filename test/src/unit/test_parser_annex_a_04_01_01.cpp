@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -199,7 +200,12 @@ TEST(ModuleInstantiationGrammar, WildcardPortConnection) {
 // A second .* in the same port-connection list is rejected.
 TEST(ModuleInstantiationGrammar, ErrorDuplicateWildcardPort) {
   auto r = Parse("module m; sub u0(.*, .*); endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §23.3.2 owns the at-most-one rule for `.*`; A.4.1.1 only lists the
+  // alternative.
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      ".* port connection shall appear at most once in a port connection list",
+      1, "23.3.2"));
 }
 
 // named_port_connection ::= { attribute_instance } . port_identifier
@@ -257,30 +263,42 @@ TEST(ModuleInstantiationGrammar, OrderedPortConnectionEmptyExpression) {
 // ordered and named port connections.
 TEST(ModuleInstantiationGrammar, ErrorOrderedAndNamedPortsCannotMix) {
   auto r = Parse("module m; sub u0(a, .b(c)); endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §23.3.2 owns the rule; A.4.1.1 only states the two-alternative grammar.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "ordered and named port connections cannot be mixed", 1,
+      "23.3.2"));
 }
 
 // list_of_parameter_value_assignments has the same two-alternative shape, so
 // ordered and named parameter value assignments cannot be combined either.
 TEST(ModuleInstantiationGrammar, ErrorOrderedAndNamedParamsCannotMix) {
   auto r = Parse("module m; sub #(8, .D(4)) u0(a); endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §23.3.2 owns the no-mixing rule, and Parser::ParseParamValueAssignment
+  // files the parameter-list report under it too.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "ordered and named parameter value assignments cannot be mixed",
+      1, "23.3.2"));
 }
 
 TEST(ModuleInstantiationGrammar, ErrorMissingInstanceName) {
   auto r = Parse("module m; sub(a, b); endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // With no instance name after `sub`, Parser::ParseImplicitTypeOrInst takes
+  // the data_declaration branch, so the report is the §6.8 one for a
+  // declaration that does not end in `;`.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got '('", 1, "6.8"));
 }
 
 TEST(ModuleInstantiationGrammar, ErrorMissingPortParentheses) {
   auto r = Parse("module m; sub u0; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §23.3.2 owns the hierarchical_instance shape the parser enforces here.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '(', got ';'", 1, "23.3.2"));
 }
 
 // module_instantiation is terminated by a semicolon; omitting it is an error.
 TEST(ModuleInstantiationGrammar, ErrorMissingSemicolon) {
   auto r = Parse("module m; sub u0(a) endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §23.3.2 owns the terminating semicolon of a module_instantiation.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 1, "23.3.2"));
 }
 
 }  // namespace

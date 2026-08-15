@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -20,25 +21,33 @@ TEST(DataHidingParsing, ClassWithQualifiersLocalProtected) {
   EXPECT_TRUE(cls->members[1]->is_protected);
 }
 
+// Parser::TryConsumeAccessQualifier files every class-property qualifier
+// report under §8.3, the subclause listing the qualifiers a property
+// declaration may carry, so that is the subclause each of these names.
 TEST(DataHidingParsing, LocalAndProtectedError) {
-  EXPECT_FALSE(
-      ParseOk("class Packet;\n"
-              "  local protected int x;\n"
-              "endclass\n"));
+  auto r = Parse(
+      "class Packet;\n"
+      "  local protected int x;\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "cannot combine 'local' and 'protected' qualifiers", 2, "8.3"));
 }
 
 TEST(DataHidingParsing, DuplicateLocalError) {
-  EXPECT_FALSE(
-      ParseOk("class Packet;\n"
-              "  local local int x;\n"
-              "endclass\n"));
+  auto r = Parse(
+      "class Packet;\n"
+      "  local local int x;\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(r.diags, "duplicate 'local' qualifier", 2, "8.3"));
 }
 
 TEST(DataHidingParsing, DuplicateProtectedError) {
-  EXPECT_FALSE(
-      ParseOk("class Packet;\n"
-              "  protected protected int x;\n"
-              "endclass\n"));
+  auto r = Parse(
+      "class Packet;\n"
+      "  protected protected int x;\n"
+      "endclass\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "duplicate 'protected' qualifier", 2, "8.3"));
 }
 
 TEST(DataHidingParsing, LocalAccessSameClassParses) {
@@ -100,7 +109,9 @@ TEST(DataHidingParsing, ErrorDuplicateVirtual) {
       "class C;\n"
       "  virtual virtual function void f(); endfunction\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  // §8.3 owns the qualifier reports, as noted above LocalAndProtectedError.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "duplicate 'virtual' qualifier", 2, "8.3"));
 }
 
 TEST(DataHidingParsing, ConstProtectedProperty) {
@@ -259,17 +270,22 @@ TEST(DataHidingParsing, ExternLocalMethodPrototype) {
 }
 
 TEST(DataHidingParsing, ProtectedLocalError) {
-  EXPECT_FALSE(
-      ParseOk("class Packet;\n"
-              "  protected local int x;\n"
-              "endclass\n"));
+  auto r = Parse(
+      "class Packet;\n"
+      "  protected local int x;\n"
+      "endclass\n");
+  // §8.3 owns the qualifier reports, as noted above LocalAndProtectedError.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "cannot combine 'local' and 'protected' qualifiers", 2, "8.3"));
 }
 
 TEST(DataHidingParsing, DuplicateConstError) {
-  EXPECT_FALSE(
-      ParseOk("class C;\n"
-              "  const const int X = 1;\n"
-              "endclass\n"));
+  auto r = Parse(
+      "class C;\n"
+      "  const const int X = 1;\n"
+      "endclass\n");
+  // §8.3 owns the qualifier reports, as noted above LocalAndProtectedError.
+  EXPECT_TRUE(ReportedError(r.diags, "duplicate 'const' qualifier", 2, "8.3"));
 }
 
 // §8.18: class parameters and class local parameters are public. The

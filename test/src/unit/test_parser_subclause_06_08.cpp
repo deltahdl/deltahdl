@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -369,7 +370,10 @@ TEST(VariableDeclarations, AutomaticWithoutDataTypeOrVarIsError) {
       "    automatic x = 0;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "data_declaration without an explicit data type "
+                            "requires the 'var' keyword",
+                            3, "6.8"));
 }
 
 TEST(VariableDeclarations, StaticWithoutDataTypeOrVarIsError) {
@@ -379,7 +383,10 @@ TEST(VariableDeclarations, StaticWithoutDataTypeOrVarIsError) {
       "    static y = 0;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "data_declaration without an explicit data type "
+                            "requires the 'var' keyword",
+                            3, "6.8"));
 }
 
 TEST(VariableDeclarations, StaticAtModuleScopeWithoutDataTypeOrVarIsError) {
@@ -387,7 +394,10 @@ TEST(VariableDeclarations, StaticAtModuleScopeWithoutDataTypeOrVarIsError) {
       "module m;\n"
       "  static x = 0;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "data_declaration without an explicit data type "
+                            "requires the 'var' keyword",
+                            2, "6.8"));
 }
 
 TEST(VariableDeclarations, AutomaticAtModuleScopeWithoutDataTypeOrVarIsError) {
@@ -395,7 +405,10 @@ TEST(VariableDeclarations, AutomaticAtModuleScopeWithoutDataTypeOrVarIsError) {
       "module m;\n"
       "  automatic x = 0;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "data_declaration without an explicit data type "
+                            "requires the 'var' keyword",
+                            2, "6.8"));
 }
 
 TEST(VariableDeclarations, AutomaticVarWithoutDataTypeOk) {
@@ -428,7 +441,10 @@ TEST(VariableDeclarations, TypeRefInVarDeclWithoutVarIsError) {
       "  int a;\n"
       "  type(a) b;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "type_reference in a variable declaration must be "
+                            "preceded by the 'var' keyword",
+                            3, "6.8"));
 }
 
 TEST(VariableDeclarations, TypeRefInVarDeclWithVarOk) {
@@ -484,7 +500,10 @@ TEST(VariableDeclarations, TypeRefBareWithoutNetTypeOrVarIsError) {
       "  wire x;\n"
       "  type(x) y;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "type_reference in a variable declaration must be "
+                            "preceded by the 'var' keyword",
+                            3, "6.8"));
 }
 
 TEST(DataTypeParsing, ClassTypeVarDecl) {

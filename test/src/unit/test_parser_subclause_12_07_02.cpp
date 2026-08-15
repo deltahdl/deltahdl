@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -77,7 +78,8 @@ TEST(LoopSyntaxParsing, ErrorRepeatMissingCloseParen) {
       "    repeat (10 x = x + 1;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ')', got identifier", 3, "12.7.2"));
 }
 
 TEST(LoopSyntaxParsing, RepeatAsStatement) {

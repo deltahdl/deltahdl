@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -70,7 +71,12 @@ TEST(LibraryText, ComprehensiveExample) {
 
 TEST(LibraryText, ErrorUnexpectedToken) {
   auto r = ParseLibrary("module m; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §33.3.1 owns the library_text production, so the report over a description
+  // that is none of its three alternatives is filed there.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "expected library declaration, include statement, "
+                            "config declaration, or ';'",
+                            1, "33.3.1"));
 }
 
 TEST(LibraryText, LineComments) {
@@ -359,32 +365,42 @@ TEST(LibraryText, MultipleIncludeStatements) {
 
 TEST(LibraryText, ErrorMissingSemicolon) {
   auto r = ParseLibrary("library lib /proj/*.v\n");
-  EXPECT_TRUE(r.has_errors);
+  // The end of the source stands on line 2, the line the trailing newline
+  // opened, so that is where the missing ';' is reported.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got EOF", 2, "33.3.1"));
 }
 
 TEST(LibraryText, ErrorMissingFilePath) {
   auto r = ParseLibrary("library lib;\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "expected at least one file path in library", 1, "33.3.1"));
 }
 
 TEST(LibraryText, ErrorMissingLibraryName) {
   auto r = ParseLibrary("library;\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ';'", 1, "33.3.1"));
 }
 
 TEST(LibraryText, ErrorIncludeNoPath) {
   auto r = ParseLibrary("include;\n");
-  EXPECT_TRUE(r.has_errors);
+  // §33.3.2 gives the include statement, but the report over its missing path
+  // is filed under §33.3.1 with the rest of the file path specifications.
+  EXPECT_TRUE(ReportedError(r.diags, "expected file path after 'include'", 1,
+                            "33.3.1"));
 }
 
 TEST(LibraryText, ErrorIncludeMissingSemicolon) {
   auto r = ParseLibrary("include /proj/lib.map\n");
-  EXPECT_TRUE(r.has_errors);
+  // The end of the source stands on line 2, the line the trailing newline
+  // opened, so that is where the missing ';' is reported.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got EOF", 2, "33.3.2"));
 }
 
 TEST(LibraryText, ErrorTrailingCommaInFileList) {
   auto r = ParseLibrary("library lib /a.v, ;\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected file path specification", 1, "33.3.1"));
 }
 
 }  // namespace

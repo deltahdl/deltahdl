@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -118,7 +119,11 @@ TEST(UdpInitialStatement, RejectsInitialAssignmentToNonOutputPort) {
       "    1 r : ? : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // §29.3.3 owns the target rule the parser reports here; §29.7 restates it in
+  // Table 29-2 without a report of its own.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP initial statement shall target the output port", 2,
+      "29.3.3"));
 }
 
 // Table 29-2 r1: the contents are limited to one procedural assignment; a
@@ -132,7 +137,11 @@ TEST(UdpInitialStatement, RejectsBlockStatementInInitial) {
       "    1 r : ? : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // §29.3.3 owns the single-procedural-assignment rule the parser reports here;
+  // §29.7 restates it in Table 29-2 without a report of its own.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP initial statement shall be a single procedural assignment",
+      2, "29.3.3"));
 }
 
 // "Delays are not permitted in a UDP initial statement": a delay control before
@@ -146,7 +155,9 @@ TEST(UdpInitialStatement, RejectsDelayBeforeAssignment) {
       "    1 r : ? : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP initial statement shall not contain delay control", 2,
+      "29.7"));
 }
 
 // Table 29-2 r3: a value outside the permitted single-bit set is rejected. A
@@ -162,7 +173,12 @@ TEST(UdpInitialStatement, RejectsMultiBitSizedLiteralRhs) {
       "    1 r : ? : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // §29.3.3 owns the permitted-value rule the parser reports here; §29.7
+  // restates it in Table 29-2 without a report of its own.
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "UDP initial statement RHS shall be 0, 1, or a single-bit literal", 2,
+      "29.3.3"));
 }
 
 }  // namespace

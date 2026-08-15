@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -763,7 +764,9 @@ TEST(NetAndVariableTypeParsing, UnionRejectsBothSoftAndTagged) {
       "module m;\n"
       "  typedef union soft tagged { int a; bit b; } u_t;\n"
       "endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // §7.2 is where Parser::ParseUnionQualifiers files the rule, not §7.3.2.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "union may have at most one of 'soft' or 'tagged'", 2, "7.2"));
 }
 
 // interface_class_type ::= ps_class_identifier [ parameter_value_assignment ]

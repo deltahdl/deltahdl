@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "model_gate_logic.h"
 
 using namespace delta;
@@ -299,7 +300,12 @@ TEST(PrimitiveStrengthParsing, Error_PulldownSingleStrength1) {
       "module m;\n"
       "  pulldown (strong1) pd1(out);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3.2 owns the pull-gate strength rule; the report stands on the gate
+  // keyword.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "pulldown single-strength must be a strength0 "
+                            "keyword",
+                            2, "28.3.2"));
 }
 
 TEST(PrimitiveStrengthParsing, Error_PullupSingleStrength0) {
@@ -307,7 +313,10 @@ TEST(PrimitiveStrengthParsing, Error_PullupSingleStrength0) {
       "module m;\n"
       "  pullup (strong0) pu1(out);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "pullup single-strength must be a strength1 "
+                            "keyword",
+                            2, "28.3.2"));
 }
 
 }  // namespace

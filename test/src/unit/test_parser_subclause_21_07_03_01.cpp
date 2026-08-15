@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -62,10 +63,14 @@ TEST(IoSystemTaskParsing, DumpportsVariableFilename) {
 // §21.7.3.1 negative: the task's arguments are comma-separated, so a scope
 // butted directly against the filename with no separator does not parse.
 TEST(IoSystemTaskParsing, DumpportsMissingArgumentSeparatorRejected) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  initial $dumpports(a \"ports.vcd\");\n"
-              "endmodule\n"));
+  auto result = Parse(
+      "module t;\n"
+      "  initial $dumpports(a \"ports.vcd\");\n"
+      "endmodule\n");
+  // §13.5 owns the closing parenthesis of a subroutine call argument list;
+  // §21.7.3.1 states the dumpports_task production but reports nothing itself.
+  EXPECT_TRUE(ReportedError(result.diags, "expected ')', got string literal", 2,
+                            "13.5"));
 }
 
 }  // namespace

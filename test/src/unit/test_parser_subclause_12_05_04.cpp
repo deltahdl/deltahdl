@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -170,7 +171,10 @@ TEST(CaseInsideSyntaxParsing, CasexInsideIsError) {
       "    endcase\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The emission site files this under §12.5, which states the case statement
+  // the 'inside' keyword is restricted to, rather than under §12.5.4.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "'inside' is only valid with 'case'", 3, "12.5"));
 }
 
 TEST(CaseInsideSyntaxParsing, CasezInsideIsError) {
@@ -183,7 +187,9 @@ TEST(CaseInsideSyntaxParsing, CasezInsideIsError) {
       "    endcase\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // Filed under §12.5 for the same reason as CasexInsideIsError above.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "'inside' is only valid with 'case'", 3, "12.5"));
 }
 
 TEST(CaseInsideSyntaxParsing, CaseInsideWithDefault) {

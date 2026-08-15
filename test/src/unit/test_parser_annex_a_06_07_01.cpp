@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -328,7 +329,10 @@ TEST(PatternParsing, PatternTaggedMissingMember) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  // §7.3.2 owns the tagged union member name the parser demands here; A.6.7.1
+  // only states the pattern production that admits `tagged`.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ':'", 4, "7.3.2"));
 }
 
 TEST(AssignmentPatternParsing, SingleElement) {
@@ -369,7 +373,8 @@ TEST(AssignmentPatternParsing, UnclosedBrace) {
       "  int a[2];\n"
       "  initial a = '{1, 2;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §10.9 owns the assignment pattern braces; A.6.7.1 only states its BNF.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '}', got ';'", 3, "10.9"));
 }
 
 TEST(AssignmentPatternLvalueParsing, VariableLvalueInProceduralAssign) {
@@ -482,7 +487,9 @@ TEST(AssignmentPatternParsing, KeyedMissingValue) {
       "  int a;\n"
       "  initial a = '{x:};\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The value after the key is read as an expression, so `}` reaches
+  // ParsePrimaryExpr, whose report is filed under §11.2.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
 // §A.6.7.1 negative: pattern ::= . variable_identifier requires an identifier
@@ -494,7 +501,10 @@ TEST(PatternParsing, PatternDotMissingIdentifier) {
       "    if (v matches .) x = 1;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The `.identifier` primary is shared with the §23.3.2.3 named port
+  // connection, and the emission site in ParsePrimaryExpr files it there.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ')'", 3, "23.3.2.3"));
 }
 
 }  // namespace

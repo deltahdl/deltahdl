@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -37,12 +38,15 @@ TEST(IoSystemTaskParsing, FerrorAsExpressionOperandWithStringDest) {
 
 // Negative form: an unterminated $ferror call cannot parse.
 TEST(IoSystemTaskParsing, UnterminatedFerrorRejected) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  integer fd, errno;\n"
-              "  reg [639:0] msg;\n"
-              "  initial errno = $ferror(fd, msg;\n"
-              "endmodule\n"));
+  auto result = Parse(
+      "module t;\n"
+      "  integer fd, errno;\n"
+      "  reg [639:0] msg;\n"
+      "  initial errno = $ferror(fd, msg;\n"
+      "endmodule\n");
+  // §13.5 owns the closing parenthesis of a subroutine call argument list;
+  // §21.3.7 states the $ferror argument list but reports nothing of its own.
+  EXPECT_TRUE(ReportedError(result.diags, "expected ')', got ';'", 4, "13.5"));
 }
 
 }  // namespace

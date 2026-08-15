@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -188,7 +189,7 @@ TEST(AssignmentPatternParsing, ErrorAssignmentPatternMissingCloseBrace) {
       "    x = '{1, 2, 3;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected '}', got ';'", 3, "10.9"));
 }
 
 TEST(AssignmentPatternParsing, ErrorAssignmentPatternMissingApostrophe) {
@@ -213,7 +214,9 @@ TEST(AssignmentPatternParsing, ErrorReplicationMissingCloseBrace) {
       "    x = '{3{8'd5};\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The inner '}' closes the replication under §10.9.1, so the brace the
+  // pattern itself is missing is the one §10.9 asks for at the ';'.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '}', got ';'", 3, "10.9"));
 }
 
 TEST(AssignmentPatternParsing, ByteTypePrefix) {

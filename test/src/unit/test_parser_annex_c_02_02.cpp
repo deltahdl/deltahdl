@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -26,7 +27,12 @@ TEST(SampledClockingEventArgDeprecated, ClockingEventArgIsRejected) {
   auto r = Parse(
       "module m; logic a, b, clk; "
       "assign b = $sampled(a, @(posedge clk)); endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §16.9.3 owns the report: Parser::ParseSysClockingEventArg files the
+  // removal of C.2.2's argument under the subclause that still grants a
+  // clocking event to the other sampled value functions.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "$sampled does not accept a clocking event argument", 1,
+      "16.9.3"));
 }
 
 // The clocking event may also be written without parentheses as a bare
@@ -35,7 +41,10 @@ TEST(SampledClockingEventArgDeprecated, BareClockingEventArgIsRejected) {
   auto r = Parse(
       "module m; logic a, b, clk; "
       "assign b = $sampled(a, @clk); endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §16.9.3 owns the report, as above.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "$sampled does not accept a clocking event argument", 1,
+      "16.9.3"));
 }
 
 // The deprecation is specific to $sampled; other sampled value functions

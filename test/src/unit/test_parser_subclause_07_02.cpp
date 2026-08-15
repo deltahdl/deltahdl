@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -216,7 +217,9 @@ TEST(StructDeclarationParsing, StructTagBeforeBraceRejected) {
       "module m;\n"
       "  typedef struct mytag { int a; } s_t;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "structure declarations may not have a tag before '{'", 2,
+      "7.2"));
 }
 
 TEST(StructDeclarationParsing, UnionTagBeforeBraceRejected) {
@@ -224,7 +227,8 @@ TEST(StructDeclarationParsing, UnionTagBeforeBraceRejected) {
       "module m;\n"
       "  typedef union mytag { int a; logic [31:0] b; } u_t;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "union declarations may not have a tag before '{'", 2, "7.2"));
 }
 
 TEST(StructDeclarationParsing, UnionSoftAndTaggedRejected) {
@@ -232,7 +236,8 @@ TEST(StructDeclarationParsing, UnionSoftAndTaggedRejected) {
       "module m;\n"
       "  union tagged soft { int a; logic [31:0] b; } u;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "union may have at most one of 'soft' or 'tagged'", 2, "7.2"));
 }
 
 TEST(StructDeclarationParsing, UnionTaggedAloneOk) {

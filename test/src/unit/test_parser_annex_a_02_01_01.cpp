@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -67,22 +68,28 @@ TEST(ParameterDeclParsing, ParameterExpressionDefault) {
 
 TEST(ParameterDeclParsing, ErrorParameterMissingSemicolon) {
   auto r = Parse("module m; parameter int X = 5 endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // TokenKindName renders every keyword as `token`, so the 'endmodule' standing
+  // where the ';' belongs is not named; §6.20.1 and the line carry the rest.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 1, "6.20.1"));
 }
 
 TEST(ParameterDeclParsing, ErrorLocalparamMissingSemicolon) {
   auto r = Parse("module m; localparam int Y = 10 endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // A localparam declaration runs through the same list terminator as a
+  // parameter one, so §6.20.1 is where its missing ';' is filed.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 1, "6.20.1"));
 }
 
 TEST(ParameterDeclParsing, ErrorParameterMissingEquals) {
   auto r = Parse("module m; parameter int X; endmodule");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "parameter declaration requires a default value", 1, "6.20.1"));
 }
 
 TEST(ParameterDeclParsing, ErrorLocalparamMissingEquals) {
   auto r = Parse("module m; localparam int Y; endmodule");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "parameter declaration requires a default value", 1, "6.20.1"));
 }
 
 TEST(FormalSyntaxParsing, ParamDecl) {
@@ -139,7 +146,10 @@ TEST(ParameterDeclParsing, TypeParamForwardInterfaceClass) {
 
 TEST(ParameterDeclParsing, ErrorTypeParamWithoutDefault) {
   auto r = Parse("module m; parameter type T; endmodule");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "type parameter 'T' outside a parameter port list "
+                            "must have a default type",
+                            1, "6.20.1"));
 }
 
 TEST(ParameterDeclParsing, ErrorSpecparamMissingSemicolon) {
@@ -149,7 +159,9 @@ TEST(ParameterDeclParsing, ErrorSpecparamMissingSemicolon) {
       "    specparam tpd = 1.5\n"
       "  endspecify\n"
       "endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // §6.20.5 owns specparam_declaration, so its list terminator is demanded
+  // there. TokenKindName renders 'endspecify' as `token`.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "6.20.5"));
 }
 
 TEST(ParameterDeclParsing, TypeParamCommaSeparatedList) {

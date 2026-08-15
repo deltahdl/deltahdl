@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -84,17 +85,21 @@ TEST(LevelSensitiveEventParsing, WaitConditionNull) {
 }
 
 TEST(LevelSensitiveEventParsing, WaitMissingLParen) {
-  EXPECT_TRUE(Parse("module m;\n"
-                    "  initial wait ready a = 1;\n"
-                    "endmodule\n")
-                  .has_errors);
+  auto r = Parse(
+      "module m;\n"
+      "  initial wait ready a = 1;\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got identifier", 2, "9.4.3"));
 }
 
 TEST(LevelSensitiveEventParsing, WaitMissingRParen) {
-  EXPECT_TRUE(Parse("module m;\n"
-                    "  initial wait(ready a = 1;\n"
-                    "endmodule\n")
-                  .has_errors);
+  auto r = Parse(
+      "module m;\n"
+      "  initial wait(ready a = 1;\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ')', got identifier", 2, "9.4.3"));
 }
 
 }  // namespace

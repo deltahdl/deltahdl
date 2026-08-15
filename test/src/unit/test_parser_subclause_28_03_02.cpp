@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 #include "model_gate_declaration.h"
 
 namespace {
@@ -61,7 +62,10 @@ TEST(GateInstStrengthParsing, DelayBeforeStrengthRejected) {
       "  wire y, a, b;\n"
       "  and #5 (strong0, strong1) g(y, a, b);\n"
       "endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // Syntax 28-1 puts the drive strength before the delay, so a parenthesized
+  // group after `#5` is the terminal list; the strength keywords standing there
+  // are rejected as expressions, and §11.2 is the subclause that report names.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
 TEST(GateInstStrengthParsing, SingleStrengthRejectedOnNonPullGate) {
@@ -70,7 +74,10 @@ TEST(GateInstStrengthParsing, SingleStrengthRejectedOnNonPullGate) {
       "  wire y, a, b;\n"
       "  and (strong0) g(y, a, b);\n"
       "endmodule");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "drive strength on this gate type requires both a "
+                            "strength0 and a strength1 keyword",
+                            3, "28.3.2"));
 }
 
 TEST(GateInstStrengthParsing, SingleStrength1RejectedOnNonPullGate) {
@@ -79,7 +86,10 @@ TEST(GateInstStrengthParsing, SingleStrength1RejectedOnNonPullGate) {
       "  wire y, a, b;\n"
       "  nand (strong1) g(y, a, b);\n"
       "endmodule");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "drive strength on this gate type requires both a "
+                            "strength0 and a strength1 keyword",
+                            3, "28.3.2"));
 }
 
 TEST(GateInstStrengthParsing, Strength1BeforeStrength0Encoding) {
@@ -128,7 +138,9 @@ TEST(PullupStrengthForms, OnlyStrength0Rejected) {
       "  wire out;\n"
       "  pullup (strong0) pu1(out);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "pullup single-strength must be a strength1 keyword", 3,
+      "28.3.2"));
 }
 
 TEST(PulldownStrengthForms, NoStrengthAccepted) {
@@ -164,7 +176,9 @@ TEST(PulldownStrengthForms, OnlyStrength1Rejected) {
       "  wire out;\n"
       "  pulldown (strong1) pd1(out);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "pulldown single-strength must be a strength0 keyword", 3,
+      "28.3.2"));
 }
 
 TEST(SwitchStrengthRejection, NmosStrengthRejected) {
@@ -173,7 +187,8 @@ TEST(SwitchStrengthRejection, NmosStrengthRejected) {
       "  wire y, in, ctrl;\n"
       "  nmos (strong0, strong1) g(y, in, ctrl);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "drive strength not allowed on this gate type", 3, "28.3.2"));
 }
 
 TEST(GateInstStrengthParsing, BufWithStrengthAccepted) {
@@ -208,7 +223,10 @@ TEST(GateInstStrengthParsing, MissingCommaBetweenStrengthsRejected) {
       "  wire y, a, b;\n"
       "  and (strong0 strong1) g(y, a, b);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // With no comma the strength spec ends after strong0, so the report is the
+  // one for the closing parenthesis the parser wanted; every keyword prints as
+  // `token`.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got token", 3, "28.3.2"));
 }
 
 // §28.3.2 admits every Table 28-2 primitive as a strength carrier. Each gate
@@ -314,7 +332,9 @@ TEST(GateInstStrengthParsing, StrengthWithoutParenthesesRejected) {
       "  wire y, a, b;\n"
       "  and strong0, strong1 g(y, a, b);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // Without the parentheses the gate has no strength spec at all, so the
+  // instance tail demands the terminal list's '(' and reports under §28.3.6.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '(', got token", 3, "28.3.6"));
 }
 
 // §28.3.2 negative form: only Table 28-2 primitives may carry a drive strength.
@@ -326,7 +346,8 @@ TEST(SwitchStrengthRejection, PmosStrengthRejected) {
       "  wire y, in, ctrl;\n"
       "  pmos (strong0, strong1) g(y, in, ctrl);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "drive strength not allowed on this gate type", 3, "28.3.2"));
 }
 
 TEST(SwitchStrengthRejection, CmosStrengthRejected) {
@@ -335,7 +356,8 @@ TEST(SwitchStrengthRejection, CmosStrengthRejected) {
       "  wire y, in, nc, pc;\n"
       "  cmos (strong0, strong1) g(y, in, nc, pc);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "drive strength not allowed on this gate type", 3, "28.3.2"));
 }
 
 TEST(SwitchStrengthRejection, TranStrengthRejected) {
@@ -344,7 +366,8 @@ TEST(SwitchStrengthRejection, TranStrengthRejected) {
       "  wire a, b;\n"
       "  tran (strong0, strong1) g(a, b);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "drive strength not allowed on this gate type", 3, "28.3.2"));
 }
 
 }  // namespace

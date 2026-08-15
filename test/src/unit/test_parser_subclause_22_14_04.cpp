@@ -5,6 +5,7 @@
 #include "fixture_parser.h"
 #include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "model_keyword_tables.h"
 
 using namespace delta;
@@ -47,7 +48,14 @@ TEST(CompilerDirectiveParsing, NoconfigExcludedWordsCanNameAVariable) {
   for (const char* word : kExcluded) {
     EXPECT_TRUE(ParseWithPreprocessorOk(InNoconfig(VarDecl(word))))
         << word << " is dropped from the reserved list by this version";
-    EXPECT_FALSE(ParseWithPreprocessorOk(In2001(VarDecl(word))))
+    // §6.8 owns the report: VarDecl heads its declaration with `reg`, so the
+    // word stands where Parser::ParseVarDeclList reads a variable's name.
+    // TokenKindName answers "token" for most keywords (#3089), so the word
+    // under test is told apart by the failure message rather than by the
+    // report.
+    auto r = ParseWithPreprocessor(In2001(VarDecl(word)));
+    EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got ",
+                              LineInRegion(2), "6.8"))
         << word << " is reserved by the version this one is defined from";
   }
 }
@@ -59,7 +67,9 @@ TEST(CompilerDirectiveParsing, NoconfigExcludedWordsCanNameAVariable) {
 TEST(CompilerDirectiveParsing, NoconfigKeepsOtherVerilog2001AdditionsReserved) {
   EXPECT_EQ(std::size(kKept), 11u);
   for (const char* word : kKept) {
-    EXPECT_FALSE(ParseWithPreprocessorOk(InNoconfig(VarDecl(word))))
+    auto r = ParseWithPreprocessor(InNoconfig(VarDecl(word)));
+    EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got ",
+                              LineInRegion(2), "6.8"))
         << word << " is not among the ten this version drops";
     EXPECT_TRUE(ParseWithPreprocessorOk(In1995(VarDecl(word))))
         << word << " is an addition of 1364-2001, not of the list it extends";
@@ -73,7 +83,9 @@ TEST(CompilerDirectiveParsing, NoconfigKeepsOtherVerilog2001AdditionsReserved) {
 TEST(CompilerDirectiveParsing, NoconfigKeepsAllVerilog1995KeywordsReserved) {
   EXPECT_EQ(std::size(kTable221), 102u);
   for (const char* word : kTable221) {
-    EXPECT_FALSE(ParseWithPreprocessorOk(InNoconfig(VarDecl(word))))
+    auto r = ParseWithPreprocessor(InNoconfig(VarDecl(word)));
+    EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got ",
+                              LineInRegion(2), "6.8"))
         << word << " is inherited from Table 22-1 and stays reserved";
   }
 }
@@ -213,19 +225,29 @@ TEST(CompilerDirectiveParsing, NoconfigExcludedWordNamesASubroutineArgument) {
   EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kFunctionDecl, "twice"));
   EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kTaskDecl, "bump"));
 
-  EXPECT_FALSE(ParseWithPreprocessorOk(
+  // §13.3 owns both reports: a reserved word in a tf_port_item's name slot
+  // leaves the item with no port_identifier, which is what
+  // Parser::ParseFunctionArgTrailer says.
+  auto as_func_arg = ParseWithPreprocessor(
       In2001("module m;\n"
              "  function [7:0] twice(input reg [7:0] library);\n"
              "    twice = library;\n"
              "  endfunction\n"
-             "endmodule\n")));
-  EXPECT_FALSE(
-      ParseWithPreprocessorOk(In2001("module m;\n"
-                                     "  reg [7:0] result;\n"
-                                     "  task bump(input reg [7:0] incdir);\n"
-                                     "    result = incdir;\n"
-                                     "  endtask\n"
-                                     "endmodule\n")));
+             "endmodule\n"));
+  EXPECT_TRUE(ReportedError(as_func_arg.diags,
+                            "tf_port_item shall include a port_identifier",
+                            LineInRegion(2), "13.3"));
+
+  auto as_task_arg =
+      ParseWithPreprocessor(In2001("module m;\n"
+                                   "  reg [7:0] result;\n"
+                                   "  task bump(input reg [7:0] incdir);\n"
+                                   "    result = incdir;\n"
+                                   "  endtask\n"
+                                   "endmodule\n"));
+  EXPECT_TRUE(ReportedError(as_task_arg.diags,
+                            "tf_port_item shall include a port_identifier",
+                            LineInRegion(3), "13.3"));
 }
 
 // The dropped words in their *keyword* role rather than in an identifier slot,
@@ -258,7 +280,12 @@ TEST(CompilerDirectiveParsing, NoconfigCannotWriteAConfigDeclaration) {
   EXPECT_EQ(cfg->rules.size(), 3u);
 
   // Dropping the words from the reserved list takes the construct with them.
-  EXPECT_FALSE(ParseWithPreprocessorOk(InNoconfig(kSrc)));
+  // §3.12.1 owns the report: with `config` an ordinary identifier, line 3 of
+  // the source heads nothing the compilation unit admits and
+  // Parser::ParseTopLevel says so at src/parser/parser.cpp:499.
+  auto dropped = ParseWithPreprocessor(InNoconfig(kSrc));
+  EXPECT_TRUE(ReportedError(dropped.diags, "expected top-level declaration",
+                            LineInRegion(3), "3.12.1"));
 
   // The module on its own parses under this version, so the rejection above is
   // the configuration's doing and not a wholesale failure of the region.
@@ -273,10 +300,15 @@ TEST(CompilerDirectiveParsing, NoconfigFreesTheWordThatOpensAConfiguration) {
       ParseWithPreprocessorOk(In2001("config c;\n"
                                      "  design lib.top;\n"
                                      "endconfig\n")));
-  EXPECT_FALSE(
-      ParsesNoconfig("config c;\n"
-                     "  design lib.top;\n"
-                     "endconfig\n"));
+  // §3.12.1 owns the report: with `config` an ordinary identifier the first
+  // line heads nothing the compilation unit admits, and Parser::ParseTopLevel
+  // says so at src/parser/parser.cpp:499.
+  auto dropped =
+      ParseWithPreprocessor(InNoconfig("config c;\n"
+                                       "  design lib.top;\n"
+                                       "endconfig\n"));
+  EXPECT_TRUE(ReportedError(dropped.diags, "expected top-level declaration",
+                            LineInRegion(1), "3.12.1"));
 
   // The very same word, now naming a design element under this version.
   auto r = ParseWithPreprocessor(InNoconfig("module config;\nendmodule\n"));
@@ -355,25 +387,49 @@ TEST(CompilerDirectiveParsing, NoconfigKeepsPulseControlKeywords) {
 // is defined from.
 TEST(CompilerDirectiveParsing, NoconfigExcludedWordNamesAModule) {
   EXPECT_TRUE(ParsesNoconfig("module config;\nendmodule\n"));
-  EXPECT_FALSE(ParseWithPreprocessorOk(In2001("module config;\nendmodule\n")));
+  // §23.2.1 owns the report on the module name: the word stands where
+  // Parser::ParseModuleDecl reads it.
+  auto as_module = ParseWithPreprocessor(In2001("module config;\nendmodule\n"));
+  EXPECT_TRUE(ReportedError(as_module.diags, "expected identifier, got token",
+                            LineInRegion(1), "23.2.1"));
 
   EXPECT_TRUE(
       ParsesNoconfig("module sub;\nendmodule\n"
                      "module top;\n  sub library ();\nendmodule\n"));
-  EXPECT_FALSE(
-      ParseWithPreprocessorOk(In2001("module sub;\nendmodule\n"
-                                     "module top;\n  sub library ();\n"
-                                     "endmodule\n")));
+  // §6.8 owns the report on the instance name, not §23.3.2: an instantiation
+  // is recognized by the identifier following the module name, so
+  // Parser::ParseImplicitTypeOrInst hands `sub` to Parser::ParsePlainVarDecl
+  // instead and that demands a semicolon at src/parser/parser_items.cpp:712.
+  auto as_instance =
+      ParseWithPreprocessor(In2001("module sub;\nendmodule\n"
+                                   "module top;\n  sub library ();\n"
+                                   "endmodule\n"));
+  EXPECT_TRUE(ReportedError(as_instance.diags, "expected ';', got token",
+                            LineInRegion(4), "6.8"));
 }
 
 // A kept word still cannot name a module, which is the same complement claim
 // in a position the variable sweep does not reach.
 TEST(CompilerDirectiveParsing, NoconfigKeptAdditionCannotNameAModule) {
-  EXPECT_FALSE(ParsesNoconfig("module generate;\nendmodule\n"));
+  // §23.2.1 owns the report on the module name: the word stands where
+  // Parser::ParseModuleDecl reads it.
+  auto as_module =
+      ParseWithPreprocessor(InNoconfig("module generate;\n"
+                                       "endmodule\n"));
+  EXPECT_TRUE(ReportedError(as_module.diags, "expected identifier, got token",
+                            LineInRegion(1), "23.2.1"));
   EXPECT_TRUE(ParseWithPreprocessorOk(In1995("module generate;\nendmodule\n")));
-  EXPECT_FALSE(
-      ParsesNoconfig("module sub;\nendmodule\n"
-                     "module top;\n  sub localparam ();\nendmodule\n"));
+
+  // §6.8 owns the report on the instance name, not §23.3.2: an instantiation
+  // is recognized by the identifier that follows the module name, so
+  // Parser::ParseImplicitTypeOrInst hands `sub` to Parser::ParsePlainVarDecl
+  // instead and that demands a semicolon at src/parser/parser_items.cpp:712.
+  auto as_instance =
+      ParseWithPreprocessor(InNoconfig("module sub;\nendmodule\n"
+                                       "module top;\n  sub localparam ();\n"
+                                       "endmodule\n"));
+  EXPECT_TRUE(ReportedError(as_instance.diags, "expected ';', got token",
+                            LineInRegion(4), "6.8"));
 }
 
 // The bound from above: this version reserves no more than "1364-2001" does,
@@ -382,18 +438,35 @@ TEST(CompilerDirectiveParsing, NoconfigKeptAdditionCannotNameAModule) {
 // version. Each case is paired with the same source outside the region, which
 // is what shows the region and not some unrelated limitation is rejecting it.
 TEST(CompilerDirectiveParsing, WordOutsideNoconfigListIsNotAKeyword) {
-  EXPECT_FALSE(ParsesNoconfig("module m;\n  uwire w;\nendmodule\n"));
+  // §23.3.2 owns the report: with the word an ordinary identifier the two
+  // names read as a module name and an instance name, so
+  // Parser::ParseModuleInstList is looking for the port connection list.
+  auto as_net =
+      ParseWithPreprocessor(InNoconfig("module m;\n  uwire w;\n"
+                                       "endmodule\n"));
+  EXPECT_TRUE(ReportedError(as_net.diags, "expected '(', got ';'",
+                            LineInRegion(2), "23.3.2"));
   EXPECT_TRUE(ParseWithPreprocessorOk("module m;\n  uwire w;\nendmodule\n"));
 
-  EXPECT_FALSE(ParsesNoconfig("module m;\n  logic [7:0] v;\nendmodule\n"));
+  // §6.8 owns this one instead: a packed dimension is where the declaration
+  // was meant to end, so Parser::ParsePlainVarDecl demands the semicolon at
+  // src/parser/parser_items.cpp:712.
+  auto as_type =
+      ParseWithPreprocessor(InNoconfig("module m;\n"
+                                       "  logic [7:0] v;\n"
+                                       "endmodule\n"));
+  EXPECT_TRUE(ReportedError(as_type.diags, "expected ';', got '['",
+                            LineInRegion(2), "6.8"));
   EXPECT_TRUE(
       ParseWithPreprocessorOk("module m;\n  logic [7:0] v;\nendmodule\n"));
 
-  EXPECT_FALSE(
-      ParsesNoconfig("module m;\n"
-                     "  reg r;\n"
-                     "  always_comb r = 1'b0;\n"
-                     "endmodule\n"));
+  auto as_process =
+      ParseWithPreprocessor(InNoconfig("module m;\n"
+                                       "  reg r;\n"
+                                       "  always_comb r = 1'b0;\n"
+                                       "endmodule\n"));
+  EXPECT_TRUE(ReportedError(as_process.diags, "expected '(', got '='",
+                            LineInRegion(3), "23.3.2"));
 }
 
 // Words neither table lists are ordinary identifiers under this version too,

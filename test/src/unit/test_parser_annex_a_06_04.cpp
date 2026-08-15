@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -79,7 +80,11 @@ TEST(StatementSyntaxParsing, StmtLabelAndBlockNameClashErrors) {
       "    end\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §9.3.5 owns the label-and-block-name rule; A.6.4 only states the
+  // statement production that allows the leading label.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "cannot have both a statement label and a block name", 3,
+      "9.3.5"));
 }
 
 TEST(StatementSyntaxParsing, AttrPrefixOnAssignment) {

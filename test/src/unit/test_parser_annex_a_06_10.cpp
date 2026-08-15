@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -587,7 +588,9 @@ TEST(AssertionStatementSyntaxParsing, ErrorAssertMissingExpression) {
       "module m;\n"
       "  initial assert();\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §11.2 owns the report for a missing expression; §16.3 requires one between
+  // the parentheses but has no report of its own for the empty case.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
 TEST(AssertionStatementSyntaxParsing, ErrorAssertMissingOpenParen) {
@@ -595,7 +598,8 @@ TEST(AssertionStatementSyntaxParsing, ErrorAssertMissingOpenParen) {
       "module m;\n"
       "  initial assert 1;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got integer literal", 2, "16.3"));
 }
 
 TEST(AssertionStatementSyntaxParsing, ErrorAssertMissingCloseParen) {
@@ -603,7 +607,7 @@ TEST(AssertionStatementSyntaxParsing, ErrorAssertMissingCloseParen) {
       "module m;\n"
       "  initial assert(1;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 2, "16.3"));
 }
 
 TEST(AssertionStatementSyntaxParsing, ErrorAssumeMissingExpression) {
@@ -611,7 +615,8 @@ TEST(AssertionStatementSyntaxParsing, ErrorAssumeMissingExpression) {
       "module m;\n"
       "  initial assume();\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §11.2 owns the report for a missing expression, as for the assert form.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
 TEST(AssertionStatementSyntaxParsing, ErrorCoverMissingExpression) {
@@ -619,7 +624,8 @@ TEST(AssertionStatementSyntaxParsing, ErrorCoverMissingExpression) {
       "module m;\n"
       "  initial cover();\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §11.2 owns the report for a missing expression, as for the assert form.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
 TEST(AssertionStatementSyntaxParsing, ErrorCoverWithElseClause) {
@@ -627,7 +633,11 @@ TEST(AssertionStatementSyntaxParsing, ErrorCoverWithElseClause) {
       "module m;\n"
       "  initial cover(1) $display(\"hit\"); else $display(\"miss\");\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The cover form takes a pass statement and no else, so the else is left
+  // standing as a module item and §23.2.4 is what reports it. No report names
+  // the §16.3 rule that a cover has no fail statement.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
 }
 
 TEST(AssertionStatementSyntaxParsing, AssumeWithPassActionOnly) {
@@ -649,7 +659,9 @@ TEST(AssertionStatementSyntaxParsing, ErrorDeferredAssertHashNonZero) {
       "module m;\n"
       "  initial assert #1 (a);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §16.4 owns the rule that a deferred immediate assertion is written #0.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "deferred immediate assertion requires #0, got #1", 2, "16.4"));
 }
 
 TEST(AssertionStatementSyntaxParsing, ErrorDeferredAssumeHashNonZero) {
@@ -657,7 +669,9 @@ TEST(AssertionStatementSyntaxParsing, ErrorDeferredAssumeHashNonZero) {
       "module m;\n"
       "  initial assume #2 (a);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §16.4 owns the rule that a deferred immediate assertion is written #0.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "deferred immediate assertion requires #0, got #2", 2, "16.4"));
 }
 
 TEST(AssertionStatementSyntaxParsing, ErrorDeferredCoverHashNonZero) {
@@ -665,7 +679,9 @@ TEST(AssertionStatementSyntaxParsing, ErrorDeferredCoverHashNonZero) {
       "module m;\n"
       "  initial cover #3 (a);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §16.4 owns the rule that a deferred immediate assertion is written #0.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "deferred immediate assertion requires #0, got #3", 2, "16.4"));
 }
 
 TEST(AssertionStatementSyntaxParsing, ErrorDeferredCoverHash0WithElseClause) {
@@ -673,7 +689,10 @@ TEST(AssertionStatementSyntaxParsing, ErrorDeferredCoverHash0WithElseClause) {
       "module m;\n"
       "  initial cover #0 (1) $display(\"hit\"); else $display(\"miss\");\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // As for the undeferred cover: the else is left standing as a module item
+  // and §23.2.4 is what reports it.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
 }
 
 TEST(AssertionStatementSyntaxParsing, ErrorDeferredCoverFinalWithElseClause) {
@@ -681,7 +700,10 @@ TEST(AssertionStatementSyntaxParsing, ErrorDeferredCoverFinalWithElseClause) {
       "module m;\n"
       "  initial cover final (1) $display(\"hit\"); else $display(\"miss\");\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // As for the undeferred cover: the else is left standing as a module item
+  // and §23.2.4 is what reports it.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
 }
 
 // procedural_assertion_statement has three alternatives; the immediate one is

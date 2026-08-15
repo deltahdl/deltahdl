@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -13,7 +14,9 @@ TEST(ConstraintSideEffect, IncrementOperatorRejected) {
       "  rand int x;\n"
       "  constraint c { x == y++; }\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "operator with side effects is not allowed in a constraint", 3,
+      "18.5"));
 }
 
 TEST(ConstraintSideEffect, DecrementOperatorRejected) {
@@ -22,7 +25,9 @@ TEST(ConstraintSideEffect, DecrementOperatorRejected) {
       "  rand int x;\n"
       "  constraint c { x == y--; }\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "operator with side effects is not allowed in a constraint", 3,
+      "18.5"));
 }
 
 // 18.5: the side-effect prohibition applies to the prefix position of the
@@ -33,7 +38,9 @@ TEST(ConstraintSideEffect, PrefixIncrementOperatorRejected) {
       "  rand int x;\n"
       "  constraint c { ++x < 10; }\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "operator with side effects is not allowed in a constraint", 3,
+      "18.5"));
 }
 
 // 18.5: likewise the prefix position of the decrement operator is rejected.
@@ -43,7 +50,9 @@ TEST(ConstraintSideEffect, PrefixDecrementOperatorRejected) {
       "  rand int x;\n"
       "  constraint c { --x < 10; }\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "operator with side effects is not allowed in a constraint", 3,
+      "18.5"));
 }
 
 // A constraint without side-effecting operators parses cleanly.
@@ -91,7 +100,9 @@ TEST(ConstraintDistNesting, DistInsideParenthesizedOperandRejected) {
       "  rand int y;\n"
       "  constraint c { y == (x dist {1:=1, 2:=3}); }\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a dist expression may not appear within another expression", 4,
+      "18.5"));
 }
 
 // 18.5: a dist expression may not be combined with another operator; an
@@ -103,7 +114,9 @@ TEST(ConstraintDistNesting, DistFollowedByOperatorRejected) {
       "  rand int y;\n"
       "  constraint c { x dist {1:=1} + y; }\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a dist expression may not appear within another expression", 4,
+      "18.5"));
 }
 
 // 18.5: a dist expression may not form the antecedent of an implication; the
@@ -115,7 +128,9 @@ TEST(ConstraintDistNesting, DistAsImplicationAntecedentRejected) {
       "  rand int y;\n"
       "  constraint c { x dist {1:=1} -> y > 0; }\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a dist expression may not appear within another expression", 4,
+      "18.5"));
 }
 
 // §18.5 names every constraint block: Syntax 18-1 writes the declaration as

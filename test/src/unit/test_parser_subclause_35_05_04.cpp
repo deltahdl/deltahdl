@@ -4,6 +4,7 @@
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "simulator/vpi.h"
 
 using namespace delta;
@@ -393,7 +394,9 @@ TEST(FunctionDeclParsing, DpiSpecStringInvalidIsError) {
   Lexer lexer(mgr.FileContent(fid), fid, diag);
   Parser parser(lexer, arena, diag);
   parser.Parse();
-  EXPECT_TRUE(diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      diag.Diagnostics(),
+      "DPI specification string must be \"DPI-C\" or \"DPI\"", 2, "35.5.4"));
 }
 
 TEST(FunctionDeclParsing, DpiDeprecatedStringWarnsButParses) {
@@ -437,7 +440,9 @@ TEST(FunctionDeclParsing, DpiImportRefArgumentIsError) {
   Lexer lexer(mgr.FileContent(fid), fid, diag);
   Parser parser(lexer, arena, diag);
   parser.Parse();
-  EXPECT_TRUE(diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      diag.Diagnostics(),
+      "ref qualifier cannot be used in a DPI import declaration", 2, "35.5.4"));
 }
 
 // §35.5.4: the c_identifier carries the foreign-language linkage name and
@@ -455,7 +460,9 @@ TEST(FunctionDeclParsing, DpiCIdentifierWithDollarIsError) {
   Lexer lexer(mgr.FileContent(fid), fid, diag);
   Parser parser(lexer, arena, diag);
   parser.Parse();
-  EXPECT_TRUE(diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      diag.Diagnostics(), "DPI c_identifier must match [a-zA-Z_][a-zA-Z0-9_]*",
+      2, "35.5.4"));
 }
 
 // §35.5.4: the C-identifier conformance rule applies to export declarations
@@ -471,7 +478,9 @@ TEST(FunctionDeclParsing, DpiExportCIdentifierWithDollarIsError) {
   Lexer lexer(mgr.FileContent(fid), fid, diag);
   Parser parser(lexer, arena, diag);
   parser.Parse();
-  EXPECT_TRUE(diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      diag.Diagnostics(), "DPI c_identifier must match [a-zA-Z_][a-zA-Z0-9_]*",
+      2, "35.5.4"));
 }
 
 // Syntax 35-1 in §35.5.4 writes every import declaration with `task` or

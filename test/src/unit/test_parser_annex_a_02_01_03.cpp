@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -467,51 +468,69 @@ TEST(TypeDeclParsing, NetDeclInterconnectWithPackedDim) {
 
 TEST(TypeDeclParsing, ErrorTypedefMissingSemicolon) {
   auto r = Parse("module m; typedef int my_t endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // §6.18 owns type_declaration, so its terminator is demanded there.
+  // TokenKindName renders 'endmodule' as `token`.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 1, "6.18"));
 }
 
 TEST(TypeDeclParsing, ErrorImportMissingSemicolon) {
   auto r = Parse("module m; import pkg::foo endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // §26.3 owns package_import_declaration, so its terminator is demanded
+  // there.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 1, "26.3"));
 }
 
 TEST(TypeDeclParsing, ErrorGenvarMissingSemicolon) {
   auto r = Parse("module m; genvar i endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // §27.4 owns genvar_declaration, so its terminator is demanded there.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 1, "27.4"));
 }
 
 TEST(TypeDeclParsing, ErrorNetDeclMissingSemicolon) {
   auto r = Parse("module m; wire w endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // §6.7 states the net declaration, so the declarator list a net type heads
+  // takes its terminator's report from there.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 1, "6.7"));
 }
 
 TEST(TypeDeclParsing, ErrorExportMissingSemicolon) {
   auto r = Parse(
       "package pkg; endpackage\n"
       "package q; export pkg::* endpackage");
-  EXPECT_TRUE(r.has_errors);
+  // §26.6 owns package_export_declaration, so its terminator is demanded
+  // there.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 2, "26.6"));
 }
 
 TEST(TypeDeclParsing, ErrorNettypeMissingSemicolon) {
   auto r = Parse("module m; nettype real foo endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // §6.6.7 owns nettype_declaration, so its terminator is demanded there.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 1, "6.6.7"));
 }
 
 TEST(TypeDeclParsing, ErrorNettypeWithoutDataType) {
   // nettype_declaration alt-1 makes the data_type mandatory; a lone
   // `nettype name;` with no data type must be rejected.
   auto r = Parse("module m; nettype foo; endmodule");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "nettype declaration requires an explicit data type", 1,
+      "6.6.7"));
 }
 
 TEST(TypeDeclParsing, ErrorAutomaticAtModuleScope) {
   auto r = Parse("module m; automatic int x; endmodule");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "'automatic' is not allowed in a data_declaration "
+                            "outside a procedural context",
+                            1, "6.8"));
 }
 
 TEST(TypeDeclParsing, ErrorImplicitDataTypeWithLifetimeAtModuleScope) {
   auto r = Parse("module m; static x = 1; endmodule");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "data_declaration without an explicit data type "
+                            "requires the 'var' keyword",
+                            1, "6.8"));
 }
 
 TEST(TypeDeclParsing, ErrorImplicitDataTypeWithoutVarInBlock) {
@@ -521,7 +540,10 @@ TEST(TypeDeclParsing, ErrorImplicitDataTypeWithoutVarInBlock) {
       "    static x = 1;\n"
       "  end\n"
       "endmodule");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "data_declaration without an explicit data type "
+                            "requires the 'var' keyword",
+                            3, "6.8"));
 }
 
 TEST(TypeDeclParsing, ErrorImportInsideClassScope) {
@@ -530,12 +552,17 @@ TEST(TypeDeclParsing, ErrorImportInsideClassScope) {
       "class c;\n"
       "  import pkg::*;\n"
       "endclass");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "package import declaration is not allowed in class scope", 3,
+      "26.3"));
 }
 
 TEST(TypeDeclParsing, ErrorChargeStrengthOnNonTriregNet) {
   auto r = Parse("module m; wire (small) bus; endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // §6.3.2.1 states the charge strength rule, so the report is filed there.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "charge strength can only be used with trireg nets",
+                            1, "6.3.2.1"));
 }
 
 TEST(TypeDeclParsing, NetDeclNettypeIdentifierWithDelayControl) {

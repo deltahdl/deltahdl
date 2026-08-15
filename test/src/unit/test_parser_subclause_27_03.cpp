@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -12,7 +13,8 @@ TEST(GenerateRegion, DirectRegionNestingRejected) {
       "    endgenerate\n"
       "  endgenerate\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "generate regions shall not nest", 3, "27.3"));
 }
 
 TEST(GenerateRegion, RegionNestedInGenerateIfBodyRejected) {
@@ -25,7 +27,8 @@ TEST(GenerateRegion, RegionNestedInGenerateIfBodyRejected) {
       "    end\n"
       "  endgenerate\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "generate regions shall not nest", 4, "27.3"));
 }
 
 TEST(GenerateRegion, GenerateRegionAtModuleScopeAllowedOncePerSibling) {
@@ -46,7 +49,9 @@ TEST(GenerateRegion, MissingEndgenerateRejected) {
       "  generate\n"
       "    wire w;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The region swallows `endmodule` as a stray item first, so the report for
+  // the missing `endgenerate` stands at the end of the source, on line 5.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 5, "27.3"));
 }
 
 TEST(GenerateRegion, OptionalRegionKeywordsProduceSameItems) {

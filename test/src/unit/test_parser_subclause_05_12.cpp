@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -182,10 +183,13 @@ TEST(LexicalConventionParsing, AttrOnFunctionCallNoArgs) {
 }
 
 TEST(LexicalConventionParsing, NestedAttributeError) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  (* foo = 1 + (* bar *) 2 *) logic x;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  (* foo = 1 + (* bar *) 2 *) logic x;\n"
+      "endmodule\n");
+  // The inner `*)` closes the outer attribute_instance too, so the outer one
+  // never meets its own `*)` and Parser::ParseAttributes reports the miss.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '*)', got token", 2, "5.12"));
 }
 
 TEST(LexicalConventionParsing, NonNestedConstExprOk) {
@@ -198,19 +202,23 @@ TEST(LexicalConventionParsing, NonNestedConstExprOk) {
 // Syntax 5-4: attr_name is an identifier. A non-identifier token (here a
 // number literal) in the attr_name position is rejected by the parser.
 TEST(LexicalConventionParsing, AttrNameMustBeIdentifier) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  (* 7 *) logic x;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  (* 7 *) logic x;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got integer literal",
+                            2, "5.12"));
 }
 
 // Syntax 5-4: an attribute_instance contains one or more attr_spec, so an
 // empty (* *) with no attr_spec is rejected.
 TEST(LexicalConventionParsing, EmptyAttributeInstanceRejected) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  (* *) logic x;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  (* *) logic x;\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got '*)'", 2, "5.12"));
 }
 
 // §5.12 Example 5: an attribute prefix binds only to the declaration it

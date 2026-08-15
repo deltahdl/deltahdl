@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -293,47 +294,70 @@ TEST(PackageItemsParsing, MultipleAnonymousPrograms) {
 }
 
 TEST(PackageItemsParsing, ErrorAnonymousProgramWithPorts) {
-  EXPECT_FALSE(
-      ParseOk("package pkg;\n"
-              "  program(input clk);\n"
-              "  endprogram\n"
-              "endpackage\n"));
+  auto r = Parse(
+      "package pkg;\n"
+      "  program(input clk);\n"
+      "  endprogram\n"
+      "endpackage\n");
+  // §24.6 owns anonymous_program, whose header is 'program ;' with no port
+  // list, so the ';' is demanded there.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got '('", 2, "24.6"));
 }
 
 TEST(PackageItemsParsing, ErrorAnonymousProgramMissingEndprogram) {
-  EXPECT_FALSE(
-      ParseOk("package pkg;\n"
-              "  program;\n"
-              "    task t(); endtask\n"
-              "endpackage\n"));
+  auto r = Parse(
+      "package pkg;\n"
+      "  program;\n"
+      "    task t(); endtask\n"
+      "endpackage\n");
+  // The body scan runs past 'endpackage' looking for 'endprogram' and reaches
+  // the end of the source, which stands on line 5, the line the trailing
+  // newline opened. TokenKindName renders every keyword as `token`, so §24.6
+  // and the line carry which keyword was wanted.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 5, "24.6"));
 }
 
 TEST(PackageItemsParsing, ErrorAnonymousProgramWithName) {
-  EXPECT_FALSE(
-      ParseOk("package pkg;\n"
-              "  program named_prog;\n"
-              "  endprogram\n"
-              "endpackage\n"));
+  auto r = Parse(
+      "package pkg;\n"
+      "  program named_prog;\n"
+      "  endprogram\n"
+      "endpackage\n");
+  // §24.6 owns anonymous_program, whose header is 'program ;' with no name.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got identifier", 2, "24.6"));
 }
 
 // net_declaration is not a legal anonymous_program_item.
 TEST(PackageItemsParsing, ErrorAnonymousProgramWithNetDecl) {
-  EXPECT_FALSE(
-      ParseOk("package pkg;\n"
-              "  program;\n"
-              "    wire w;\n"
-              "  endprogram\n"
-              "endpackage\n"));
+  auto r = Parse(
+      "package pkg;\n"
+      "  program;\n"
+      "    wire w;\n"
+      "  endprogram\n"
+      "endpackage\n");
+  // §24.3 lists the anonymous_program_item alternatives, so the rejection of a
+  // net declaration among them is filed there rather than under §24.6.
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "a net or variable declaration is not allowed in an anonymous program", 3,
+      "24.3"));
 }
 
 // data_declaration is not a legal anonymous_program_item.
 TEST(PackageItemsParsing, ErrorAnonymousProgramWithDataDecl) {
-  EXPECT_FALSE(
-      ParseOk("package pkg;\n"
-              "  program;\n"
-              "    int x;\n"
-              "  endprogram\n"
-              "endpackage\n"));
+  auto r = Parse(
+      "package pkg;\n"
+      "  program;\n"
+      "    int x;\n"
+      "  endprogram\n"
+      "endpackage\n");
+  // §24.3 lists the anonymous_program_item alternatives, so the rejection of a
+  // variable declaration among them is filed there rather than under §24.6.
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "a net or variable declaration is not allowed in an anonymous program", 3,
+      "24.3"));
 }
 
 }  // namespace

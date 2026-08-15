@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -18,7 +19,11 @@ TEST(LexicalConventionParsing, KeywordsAreReserved) {
 }
 
 TEST(LexicalConventionParsing, UppercaseNotKeyword) {
-  EXPECT_FALSE(ParseOk("MODULE m; endmodule"));
+  auto r = Parse("MODULE m; endmodule");
+  // §3.12.1 lists what may open a compilation unit, and Parser::ParseTopLevel
+  // files the report under it; `MODULE` is an ordinary identifier there.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected top-level declaration", 1, "3.12.1"));
 }
 
 // 5.6.2: a keyword preceded by an escape (backslash) character is not

@@ -10,6 +10,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -39,7 +40,12 @@ TEST(NetStrengthParsing, ChargeStrengthOnNonTriregNetRejected) {
       "module t;\n"
       "  wire (large) w;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §6.3.2.1 states the trireg-only restriction on the charge strength, and
+  // Parser::ParseNetStrength files the report under it rather than under
+  // §6.3.2.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "charge strength can only be used with trireg nets",
+                            2, "6.3.2.1"));
 }
 
 }  // namespace

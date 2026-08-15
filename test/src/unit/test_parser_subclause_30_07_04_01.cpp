@@ -2,6 +2,7 @@
 #include "fixture_program.h"
 #include "fixture_specify.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -94,7 +95,8 @@ TEST(SpecifyBlockDeclParsing, ErrorPulsestyleEmptyOutputList) {
       "    pulsestyle_onevent ;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ';'", 3, "30.7.4.1"));
 }
 
 TEST(SpecifyBlockDeclParsing, ErrorPulsestyleMissingSemicolon) {
@@ -104,7 +106,9 @@ TEST(SpecifyBlockDeclParsing, ErrorPulsestyleMissingSemicolon) {
       "    pulsestyle_onevent out1\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // TokenKindName spells every keyword `token`, so the report reads
+  // `expected ';', got token` at the endspecify that followed the output list.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "30.7.4.1"));
 }
 
 }  // namespace

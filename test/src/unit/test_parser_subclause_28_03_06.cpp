@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -12,7 +13,10 @@ TEST(PrimitiveTerminals, PassSwitchInoutLiteral) {
       "module m;\n"
       "  tran (1, b);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the report that a terminal must be a net lvalue; §28.3.6 states
+  // the connection-list syntax and has no report of its own here.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "inout terminal must be a net lvalue", 2, "28.3"));
 }
 
 TEST(PrimitiveTerminals, PassEnSwitchInoutExpression) {
@@ -20,7 +24,9 @@ TEST(PrimitiveTerminals, PassEnSwitchInoutExpression) {
       "module m;\n"
       "  tranif0 (a + b, c, en);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the net-lvalue report, not §28.3.6.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "inout terminal must be a net lvalue", 2, "28.3"));
 }
 
 TEST(PrimitiveTerminals, NInputGateOutputLiteralRejected) {
@@ -28,7 +34,9 @@ TEST(PrimitiveTerminals, NInputGateOutputLiteralRejected) {
       "module m;\n"
       "  and (1, a, b);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the net-lvalue report, not §28.3.6.
+  EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 2,
+                            "28.3"));
 }
 
 TEST(PrimitiveTerminals, NOutputGateOutputLiteralRejected) {
@@ -36,7 +44,9 @@ TEST(PrimitiveTerminals, NOutputGateOutputLiteralRejected) {
       "module m;\n"
       "  buf (1, a);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the net-lvalue report, not §28.3.6.
+  EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 2,
+                            "28.3"));
 }
 
 // §28.3.6: the output terminal comes first for a three-state gate too, so its
@@ -47,7 +57,9 @@ TEST(PrimitiveTerminals, ThreeStateGateOutputLiteralRejected) {
       "module m;\n"
       "  bufif0 (1, a, en);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the net-lvalue report, not §28.3.6.
+  EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 2,
+                            "28.3"));
 }
 
 // §28.3.6: a MOS switch also lists its output terminal first, so a literal in
@@ -57,7 +69,9 @@ TEST(PrimitiveTerminals, MosSwitchOutputLiteralRejected) {
       "module m;\n"
       "  nmos (1, a, en);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the net-lvalue report, not §28.3.6.
+  EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 2,
+                            "28.3"));
 }
 
 // §28.3.6: the connection list shall be enclosed in a pair of parentheses.
@@ -67,7 +81,7 @@ TEST(PrimitiveTerminals, ConnectionListWithoutParenthesesRejected) {
       "module m;\n"
       "  and y, a, b;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected '(', got ','", 2, "28.3.6"));
 }
 
 // §28.3.6: the terminals shall be separated by commas. Two adjacent terminal
@@ -77,7 +91,8 @@ TEST(PrimitiveTerminals, TerminalsWithoutSeparatingCommaRejected) {
       "module m;\n"
       "  and (y a, b);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ')', got identifier", 2, "28.3.6"));
 }
 
 // §28.3.6 parenthesizes a primitive instance's connection list. A terminal list

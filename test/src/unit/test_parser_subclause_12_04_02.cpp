@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -165,7 +166,10 @@ TEST(QualifiedIfParsing, QualifiedElseIfRejectedAfterUniqueOuter) {
       "    else unique if (b) x = 2;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "unique, unique0, or priority cannot appear on an "
+                            "else-if branch",
+                            4, "12.4.2"));
 }
 
 TEST(QualifiedIfParsing, QualifiedElseIfRejectedAfterPriorityOuter) {
@@ -176,7 +180,10 @@ TEST(QualifiedIfParsing, QualifiedElseIfRejectedAfterPriorityOuter) {
       "    else priority if (b) x = 2;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "unique, unique0, or priority cannot appear on an "
+                            "else-if branch",
+                            4, "12.4.2"));
 }
 
 TEST(QualifiedIfParsing, QualifiedElseIfRejectedAfterUnique0Outer) {
@@ -187,7 +194,10 @@ TEST(QualifiedIfParsing, QualifiedElseIfRejectedAfterUnique0Outer) {
       "    else unique0 if (b) x = 2;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "unique, unique0, or priority cannot appear on an "
+                            "else-if branch",
+                            4, "12.4.2"));
 }
 
 TEST(QualifiedIfParsing, QualifiedElseIfRejectedDeepInChain) {
@@ -199,7 +209,10 @@ TEST(QualifiedIfParsing, QualifiedElseIfRejectedDeepInChain) {
       "    else priority if (c) x = 3;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "unique, unique0, or priority cannot appear on an "
+                            "else-if branch",
+                            5, "12.4.2"));
 }
 
 TEST(QualifiedIfParsing, UnqualifiedOuterAllowsQualifiedElseIf) {

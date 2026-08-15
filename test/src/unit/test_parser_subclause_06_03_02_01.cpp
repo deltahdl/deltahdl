@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -72,7 +73,10 @@ TEST(DataTypeParsing, DriveStrengthKeywordIsNotChargeStrength) {
       "module t;\n"
       "  trireg (weak) c;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §6.7 owns the net declaration list, and that is where the declaration
+  // fails: ParseChargeStrength puts the position back on the '(' it could not
+  // read as small, medium or large, so no §6.3.2.1 report is written here.
+  EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got '('", 2, "6.7"));
 }
 
 TEST(DataTypeParsing, ChargeStrengthKeywordOnWireFails) {
@@ -80,7 +84,9 @@ TEST(DataTypeParsing, ChargeStrengthKeywordOnWireFails) {
       "module t;\n"
       "  wire (small) w;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "charge strength can only be used with trireg nets",
+                            2, "6.3.2.1"));
 }
 
 }  // namespace

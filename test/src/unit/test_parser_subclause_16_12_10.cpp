@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -35,7 +36,9 @@ TEST(NexttimeIndexParsing, NegativeLiteralIndexIsRejected) {
       "    nexttime[-1] a;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "nexttime index must be a non-negative integer constant", 3,
+      "16.12.10"));
 }
 
 // §16.12.10: the same non-negative requirement applies to the strong indexed
@@ -48,7 +51,9 @@ TEST(NexttimeIndexParsing, StrongNegativeLiteralIndexIsRejected) {
       "    s_nexttime[-1] a;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "nexttime index must be a non-negative integer constant", 3,
+      "16.12.10"));
 }
 
 // §16.12.10: a symbolic index — here a module parameter — takes a different

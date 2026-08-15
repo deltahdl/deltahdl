@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "fixture_program.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -12,7 +13,10 @@ TEST_F(AnnexHParseTest, DpiPureTaskRejected) {
       "module m;\n"
       "  import \"DPI-C\" pure task t();\n"
       "endmodule\n");
-  EXPECT_TRUE(diag_.HasErrors());
+  // The emission site files this report under §35.5.4, not §35.5.1.3.
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "an imported task cannot be declared pure", 2,
+                            "35.5.4"));
 }
 
 // §35.5.1.3: the pure property remains legal on an imported function, so a
@@ -55,7 +59,10 @@ TEST_F(AnnexHParseTest, DpiPureTaskWithCIdentifierRejected) {
       "module m;\n"
       "  import \"DPI-C\" pure c_do = task do_work();\n"
       "endmodule\n");
-  EXPECT_TRUE(diag_.HasErrors());
+  // The emission site files this report under §35.5.4, not §35.5.1.3.
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "an imported task cannot be declared pure", 2,
+                            "35.5.4"));
 }
 
 // §35.5.1.3: pure is forbidden on a task regardless of any other property the
@@ -66,7 +73,10 @@ TEST_F(AnnexHParseTest, DpiPureContextTaskRejected) {
       "module m;\n"
       "  import \"DPI-C\" pure context task t();\n"
       "endmodule\n");
-  EXPECT_TRUE(diag_.HasErrors());
+  // The emission site files this report under §35.5.4, not §35.5.1.3.
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "an imported task cannot be declared pure", 2,
+                            "35.5.4"));
 }
 
 }  // namespace

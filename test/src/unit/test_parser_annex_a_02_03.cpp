@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -345,7 +346,9 @@ TEST(DeclarationListParsing, ListOfDefparamAssignmentsTrailingCommaErrors) {
       "module m;\n"
       "  defparam u.A = 1, ;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The trailing comma makes the parser read a defparam_assignment starting at
+  // the ';', and §11.2 owns the report for a primary that is not an expression.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
 }  // namespace

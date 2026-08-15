@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "helpers_three_comma_instances.h"
 
 using namespace delta;
@@ -60,7 +61,8 @@ TEST(InterfaceParsing, LifetimeAutomatic) {
 }
 
 TEST(InterfaceParsing, MissingEndinterfaceIsError) {
-  EXPECT_FALSE(ParseOk("interface i;"));
+  auto r = Parse("interface i;");
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 1, "25.3"));
 }
 
 TEST(InterfaceParsing, ContainsDeclarations) {
@@ -323,7 +325,10 @@ TEST(InterfaceItemsParsing, InvalidTokenInBodyIsError) {
       "interface ifc;\n"
       "  123bad\n"
       "endinterface\n");
-  EXPECT_TRUE(r.has_errors);
+  // The body item dispatcher is shared with module bodies, so
+  // src/parser/parser_items.cpp:633 files the report under §23.2.4.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
 }
 
 TEST(InterfaceInstantiationGrammar, MultipleInterfaceInstances) {
@@ -444,7 +449,10 @@ TEST(InterfaceInstantiationGrammar, ParamsWithEmptyPorts) {
 }
 
 TEST(InterfaceInstantiationGrammar, MissingSemicolonIsError) {
-  EXPECT_FALSE(ParseOk("module m; my_if u0() endmodule\n"));
+  auto r = Parse("module m; my_if u0() endmodule\n");
+  // An interface instantiation is read by the module instantiation parser, so
+  // src/parser/parser_inst.cpp:99 files the missing ';' under §23.3.2.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 1, "23.3.2"));
 }
 
 TEST(InterfaceItemsParsing, NestedProgramInInterface) {

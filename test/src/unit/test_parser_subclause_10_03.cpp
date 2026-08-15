@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -169,7 +170,11 @@ TEST(NetDeclarationSyntax, ChargeStrengthOnWireIsRejected) {
       "module m;\n"
       "  wire (small) [7:0] w;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §6.3.2.1 owns the rule that a charge strength belongs to trireg alone, and
+  // Parser::ParseNetStrength files the report under it; §10.3 has none here.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "charge strength can only be used with trireg nets",
+                            2, "6.3.2.1"));
 }
 
 TEST(NetDeclarationSyntax, TriregWithChargeStrengthAndVectored) {

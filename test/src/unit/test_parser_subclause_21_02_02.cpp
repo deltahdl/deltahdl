@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -75,7 +76,10 @@ TEST(IoSystemTaskParsing, StrobeUnbalancedArgumentParenRejected) {
       "    $strobe(\"a=%b\", a;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §13.5 owns the closing parenthesis of a system task call's argument list,
+  // so Parser::ParseSystemCall files the report under it rather than under
+  // §21.2.2.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 4, "13.5"));
 }
 
 }  // namespace

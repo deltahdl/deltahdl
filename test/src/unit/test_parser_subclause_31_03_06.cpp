@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -69,7 +70,9 @@ TEST(TimingCheckCommandParsing, ErrorRecremMissingSecondLimit) {
       "  $recrem(posedge clk, rst, 8);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "$recrem requires two timing_check_limit arguments",
+                            3, "31.3.6"));
 }
 
 TEST(TimingCheckCommandParsing, ErrorRecremMissingBothLimits) {
@@ -79,7 +82,9 @@ TEST(TimingCheckCommandParsing, ErrorRecremMissingBothLimits) {
       "  $recrem(posedge clk, rst);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // With no limit at all the argument list stops matching at the separator, so
+  // the shared timing-check parser reports under §31.2 rather than §31.3.6.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ',', got ')'", 3, "31.2"));
 }
 
 // timing_check_limit ::= expression, so each limit slot accepts a full constant

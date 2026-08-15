@@ -12,6 +12,7 @@
 //   path_delay_expression ::= constant_mintypmax_expression   (DEP §A.8.3)
 
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 #include "parser/ast.h"
 
 using namespace delta;
@@ -149,7 +150,10 @@ TEST(SpecifyPathDelayGrammar, NonEnumeratedValueCountRejected) {
       "    (a *> b) = (1, 2, 3, 4);\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §30.5 owns the path delay value count; the report stands at the '(' that
+  // opens the list.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "path delay must have 1, 2, 3, 6, or 12 values", 3, "30.5"));
 }
 
 // The parenthesized path_delay_value alternative,
@@ -162,7 +166,8 @@ TEST(SpecifyPathDelayGrammar, ParenthesizedListMissingCloseParen) {
       "    (a => b) = (1, 2;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §30.5 owns the parenthesized path_delay_value.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 3, "30.5"));
 }
 
 }  // namespace

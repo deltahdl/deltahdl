@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "model_gate_logic.h"
 
 using namespace delta;
@@ -125,7 +126,10 @@ TEST(GateLevelModelingParsing, GateArrayDuplicateIdentifierIsError) {
       "module m;\n"
       "  nand #2 t_nand[0:3](o1, a, b), t_nand[4:7](o2, c, d);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "instance identifier reused for another array of "
+                            "instances in the same declaration",
+                            2, "28.3.5"));
 }
 
 TEST(GateLevelModelingParsing, GateArrayTwoUniqueArrayNamesInOneDeclaration) {

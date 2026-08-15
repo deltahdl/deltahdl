@@ -3,6 +3,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -113,7 +114,11 @@ TEST(InterfaceItemsParsing, ExternForkjoinFunctionIsError) {
       "interface ifc;\n"
       "  extern forkjoin function int compute();\n"
       "endinterface\n");
-  EXPECT_TRUE(r.has_errors);
+  // `forkjoin` commits the item to a task_declaration, so the rejection is
+  // src/parser/parser_declaration.cpp:782 failing to find the `task` keyword
+  // and is filed under §13.3. TokenKindName answers "token" for every keyword,
+  // which is why the message names neither `task` nor `function`.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got token", 2, "13.3"));
 }
 
 // §25.7: a subroutine declared extern in an interface may be defined out of

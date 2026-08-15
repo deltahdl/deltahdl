@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -257,7 +258,9 @@ TEST(SequentialBlockParsing, MissingEndKeywordProducesParseError) {
       "  initial begin\n"
       "    a = 1;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The block swallows `endmodule` looking for a statement, so ParseBlockStmt
+  // asks for `end` at the EOF that follows, on line 5.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 5, "9.3.1"));
 }
 
 TEST(BlockItemDeclParsing, LocalParamAsBlockItem) {

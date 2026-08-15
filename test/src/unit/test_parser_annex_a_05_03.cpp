@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 #include "simulator/udp_eval.h"
 
 using namespace delta;
@@ -838,7 +839,9 @@ TEST(UdpBodyGrammar, EmptyTableError) {
       "  table\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // §29.3.4 owns the table entries; A.5.3 only states the udp_body production.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP table shall contain at least one entry", 3, "29.3.4"));
 }
 
 TEST(UdpBodyGrammar, SeqEntry_ManyInputsWithEdge) {
@@ -908,7 +911,10 @@ TEST(UdpBodyGrammar, CombinationalOutputRejectsNonOutputSymbol) {
       "    0 : b;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // §29.3.6 owns the symbol tables A.5.3 names; the report is filed there.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP output field shall be 0, 1, or x (- is sequential only)", 3,
+      "29.3.6"));
 }
 
 // The dash (no-change) is only legal as a next_state; a combinational
@@ -920,7 +926,10 @@ TEST(UdpBodyGrammar, CombinationalOutputRejectsDash) {
       "    0 : -;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // §29.3.6 owns the symbol tables A.5.3 names; the report is filed there.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP output field shall be 0, 1, or x (- is sequential only)", 3,
+      "29.3.6"));
 }
 
 // current_state is a level_symbol, so an edge symbol is not allowed there.
@@ -931,7 +940,10 @@ TEST(UdpBodyGrammar, CurrentStateRejectsEdgeSymbol) {
       "    0 r : r : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // §29.3.6 owns the symbol tables A.5.3 names; the report is filed there.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "edge symbols shall not appear in the current-state field", 3,
+      "29.3.6"));
 }
 
 // current_state is a level_symbol; the dash (no-change) is not a level_symbol.
@@ -942,7 +954,9 @@ TEST(UdpBodyGrammar, CurrentStateRejectsDash) {
       "    0 1 : - : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // §29.3.6 owns the symbol tables A.5.3 names; the report is filed there.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "- shall not appear in the current-state field", 3, "29.3.6"));
 }
 
 // Input fields are made of level/edge symbols; the dash is neither and may not
@@ -954,7 +968,9 @@ TEST(UdpBodyGrammar, InputFieldRejectsDash) {
       "    - 1 : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // §29.3.6 owns the symbol tables A.5.3 names; the report is filed there.
+  EXPECT_TRUE(ReportedError(r.diags, "- shall not appear in a UDP input field",
+                            3, "29.3.6"));
 }
 
 // A parenthesized edge_indicator's two endpoints are level_symbols; an edge
@@ -966,7 +982,10 @@ TEST(UdpBodyGrammar, ParenEdgeEndpointsRejectNonLevelSymbol) {
       "    0 (r0) : ? : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // §29.3.6 owns the symbol tables A.5.3 names; the report is filed there.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "parenthesized edge endpoints shall be level symbols", 3,
+      "29.3.6"));
 }
 
 }  // namespace

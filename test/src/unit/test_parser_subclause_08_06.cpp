@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -96,7 +97,8 @@ TEST(ObjectMethodParsing, FunctionStaticLifetimeError) {
       "  function static void foo();\n"
       "  endfunction\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "class method shall not have static lifetime", 2, "8.6"));
 }
 
 TEST(ObjectMethodParsing, TaskStaticLifetimeError) {
@@ -105,7 +107,8 @@ TEST(ObjectMethodParsing, TaskStaticLifetimeError) {
       "  task static do_stuff();\n"
       "  endtask\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "class method shall not have static lifetime", 2, "8.6"));
 }
 
 }  // namespace

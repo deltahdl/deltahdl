@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -530,7 +531,9 @@ TEST(UdpInstantiationParsing, UdpInstThreeDelaysRejected) {
       "  inv #(1, 2, 3) u1(y, a);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  // §29.8 owns UDP instances; A.5.4 only states the production.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP instantiation shall have at most two delays", 6, "29.8"));
 }
 
 // The udp_instantiation production terminates with a mandatory semicolon;
@@ -545,7 +548,8 @@ TEST(UdpInstantiationParsing, UdpInstMissingSemicolonRejected) {
       "  inv u1(y, a)\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  // §29.8 owns UDP instances; A.5.4 only states the production.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 7, "29.8"));
 }
 
 // The udp_instance production wraps its terminals in parentheses; a terminal
@@ -560,7 +564,9 @@ TEST(UdpInstantiationParsing, UdpInstMissingCloseParenRejected) {
       "  inv u1(y, a ;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  // ParseGateInstanceTail parses the terminal list for gate and UDP instances
+  // alike and files its reports under §28.3.6, the gate-instance subclause.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 6, "28.3.6"));
 }
 
 TEST(UdpInstantiationParsing, AllStrengthKeywords) {

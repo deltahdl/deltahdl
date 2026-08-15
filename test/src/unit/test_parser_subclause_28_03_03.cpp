@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "model_gate_logic.h"
 
 using namespace delta;
@@ -11,7 +12,8 @@ TEST(GateDelayParsing, PullupDelayRejected) {
       "module m;\n"
       "  pullup #5 pu1(net1);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "delay not allowed on this gate type", 2,
+                            "28.3.3"));
 }
 
 TEST(GateDelayParsing, PulldownDelayRejected) {
@@ -19,7 +21,8 @@ TEST(GateDelayParsing, PulldownDelayRejected) {
       "module m;\n"
       "  pulldown #5 pd1(net1);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "delay not allowed on this gate type", 2,
+                            "28.3.3"));
 }
 
 TEST(GateDelayParsing, NInputGateThreeValueDelayRejected) {
@@ -27,7 +30,8 @@ TEST(GateDelayParsing, NInputGateThreeValueDelayRejected) {
       "module m;\n"
       "  and #(1, 2, 3) a1(o, i1, i2);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "this gate type allows at most 2 delay values", 2, "28.3.3"));
 }
 
 TEST(DelayParsing, AndGateSingleValueDelay) {

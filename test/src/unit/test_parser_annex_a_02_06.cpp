@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -387,7 +388,10 @@ TEST(FunctionDeclParsing, DpiImportSpecStringInvalidRejected) {
       "  import \"DPI++\" function void f();\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  // §35.5.4 owns dpi_spec_string; A.2.6 states the production alone.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "DPI specification string must be \"DPI-C\" or \"DPI\"", 2,
+      "35.5.4"));
 }
 
 TEST(FunctionDeclParsing, DpiExportSpecStringInvalidRejected) {
@@ -398,7 +402,10 @@ TEST(FunctionDeclParsing, DpiExportSpecStringInvalidRejected) {
       "  export \"DPI++\" function g;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  // §35.5.4 owns dpi_spec_string; A.2.6 states the production alone.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "DPI specification string must be \"DPI-C\" or \"DPI\"", 2,
+      "35.5.4"));
 }
 
 TEST(FunctionDeclParsing, FunctionBodyInterfaceIdentifierPrefix) {

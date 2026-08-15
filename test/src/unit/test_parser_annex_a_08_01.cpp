@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -22,7 +23,12 @@ TEST(ConcatenationParsing, ModulePathConcatenation) {
       "  endspecify\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  // §30.4.5 owns the one-source, one-destination rule of the parallel path,
+  // and the report stands at the '(' opening the path declaration.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "parallel path '=>' requires a single source and "
+                            "destination terminal",
+                            3, "30.4.5"));
 }
 
 TEST(ConcatenationParsing, ConcatenationBasic) {
@@ -195,7 +201,8 @@ TEST(ConcatenationParsing, ErrorConcatenationMissingCloseBrace) {
       "module m;\n"
       "  initial x = {a, b;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §11.4.12 owns the concatenation braces.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '}', got ';'", 2, "11.4.12"));
 }
 
 TEST(ConcatenationParsing, StreamExpressionWithSingleIndex) {
@@ -234,12 +241,17 @@ TEST(ConcatenationParsing, ModulePathMultipleConcatenation) {
   // A multiple concatenation is likewise not a legal specify path terminal
   // (Annex A.7.2/A.7.3; §30.4.5). The parallel '=>' source must be a single
   // specify_input_terminal_descriptor, so this is rejected.
-  EXPECT_FALSE(
-      ParseOk("module m(input a, input b, output c);\n"
-              "  specify\n"
-              "    ({2{a, b}} => c) = 5;\n"
-              "  endspecify\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m(input a, input b, output c);\n"
+      "  specify\n"
+      "    ({2{a, b}} => c) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  // §30.4.5 owns the one-source, one-destination rule of the parallel path.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "parallel path '=>' requires a single source and "
+                            "destination terminal",
+                            3, "30.4.5"));
 }
 
 // Positive observation of the module_path_concatenation production. The
@@ -285,10 +297,13 @@ TEST(ConcatenationParsing, StreamingConcatWithParameterSliceSize) {
 // { , stream_expression } }: the inner brace list must hold at least one
 // stream_expression, so an empty stream body is rejected.
 TEST(ConcatenationParsing, StreamConcatenationEmptyRejected) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  initial x = {>> {}};\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = {>> {}};\n"
+      "endmodule\n");
+  // §11.2 owns the report Parser::ParsePrimaryExpr makes for the missing
+  // stream_expression; §11.4.14 states the stream_concatenation itself.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
 }  // namespace

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -129,7 +130,9 @@ TEST(TimingCheckCommandParsing, ErrorFullskewMissingSecondLimit) {
       "  $fullskew(posedge clk1, negedge clk2, 4);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "$fullskew requires two timing_check_limit arguments", 3,
+      "31.4.3"));
 }
 
 TEST(TimingCheckCommandParsing, ErrorFullskewMissingBothLimits) {
@@ -139,7 +142,9 @@ TEST(TimingCheckCommandParsing, ErrorFullskewMissingBothLimits) {
       "  $fullskew(posedge clk1, negedge clk2);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // With no limit at all the argument list stops matching at the separator, so
+  // the shared timing-check parser reports under §31.2 rather than §31.4.3.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ',', got ')'", 3, "31.2"));
 }
 
 }  // namespace

@@ -12,6 +12,7 @@
 // The complementary symbol-matching semantics live in the simulator canonical
 // file for this subclause.
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -26,7 +27,9 @@ TEST(UdpSymbolFields, QuestionInOutputFieldRejected) {
       "    0 : ?;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP output field shall be 0, 1, or x (- is sequential only)", 3,
+      "29.3.6"));
 }
 
 TEST(UdpSymbolFields, BInOutputFieldRejected) {
@@ -36,7 +39,9 @@ TEST(UdpSymbolFields, BInOutputFieldRejected) {
       "    0 : b;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP output field shall be 0, 1, or x (- is sequential only)", 3,
+      "29.3.6"));
 }
 
 TEST(UdpSymbolFields, QuestionInInputFieldAccepted) {
@@ -96,7 +101,8 @@ TEST(UdpSymbolFields, DashInInputFieldRejected) {
       "    - 0 : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "- shall not appear in a UDP input field",
+                            3, "29.3.6"));
 }
 
 TEST(UdpSymbolFields, DashInCombinationalOutputRejected) {
@@ -106,7 +112,9 @@ TEST(UdpSymbolFields, DashInCombinationalOutputRejected) {
       "    0 1 : -;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP output field shall be 0, 1, or x (- is sequential only)", 3,
+      "29.3.6"));
 }
 
 TEST(UdpSymbolFields, DashInSequentialCurrentStateRejected) {
@@ -116,7 +124,8 @@ TEST(UdpSymbolFields, DashInSequentialCurrentStateRejected) {
       "    0 0 : - : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "- shall not appear in the current-state field", 3, "29.3.6"));
 }
 
 TEST(UdpSymbolFields, DashInSequentialOutputAccepted) {
@@ -140,7 +149,9 @@ TEST(UdpSymbolFields, EdgeSymbolInCurrentStateRejected) {
       "    0 0 : r : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "edge symbols shall not appear in the current-state field", 3,
+      "29.3.6"));
 }
 
 // The accepting side: a (vw) transition symbol in an input field is permitted.

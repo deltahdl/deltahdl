@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -340,7 +341,8 @@ TEST(NonAnsiStylePortDeclarations, DuplicatePortDirectionDeclarationIsError) {
       "  input a;\n"
       "  input a;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "duplicate port declaration for 'a'", 3,
+                            "23.2.2.1"));
 }
 
 // §23.2.2.1: redeclaring a port with a second, conflicting direction is also
@@ -351,7 +353,8 @@ TEST(NonAnsiStylePortDeclarations, ConflictingPortDirectionDeclarationIsError) {
       "  input a;\n"
       "  output a;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "duplicate port declaration for 'a'", 3,
+                            "23.2.2.1"));
 }
 
 // Covers ParserPortHelpers::ParseNonAnsiPortSelect in

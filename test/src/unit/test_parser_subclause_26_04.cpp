@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -74,7 +75,12 @@ TEST(ProgramDeclaration, AnsiHeaderPackageImportRequiresPortList) {
       "package pkg; endpackage\n"
       "program prg import pkg::*;\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  // Every ansi header shares one report, and §23.2.1 is the subclause it names.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "package_import_declaration in ansi header must be "
+                            "followed by parameter_port_list or "
+                            "list_of_port_declarations",
+                            2, "23.2.1"));
 }
 
 // Syntax 26-3 lists program_nonansi_header among the headers that may carry a
@@ -124,7 +130,12 @@ TEST(ModuleHeaderDefinition, AnsiHeaderPackageImportRequiresPortList) {
       "package pkg; endpackage\n"
       "module m import pkg::*;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §23.2.1 is the subclause the shared ansi-header report names.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "package_import_declaration in ansi header must be "
+                            "followed by parameter_port_list or "
+                            "list_of_port_declarations",
+                            2, "23.2.1"));
 }
 
 TEST(InterfaceParsing, AnsiHeaderPackageImportRequiresPortList) {
@@ -132,7 +143,12 @@ TEST(InterfaceParsing, AnsiHeaderPackageImportRequiresPortList) {
       "package pkg; endpackage\n"
       "interface ifc import pkg::*;\n"
       "endinterface\n");
-  EXPECT_TRUE(r.has_errors);
+  // §23.2.1 is the subclause the shared ansi-header report names.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "package_import_declaration in ansi header must be "
+                            "followed by parameter_port_list or "
+                            "list_of_port_declarations",
+                            2, "23.2.1"));
 }
 
 TEST(ModuleHeaderDefinition, AnsiHeaderPackageImportFollowedByEmptyPortList) {

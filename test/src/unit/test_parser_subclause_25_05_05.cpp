@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -64,7 +65,8 @@ TEST(ClockingModportParsing, ClockingWithoutIdentifierRejected) {
       "  clocking cb @(posedge clk); endclocking\n"
       "  modport mp(clocking);\n"
       "endinterface\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ')'", 3, "25.5.5"));
 }
 
 }  // namespace

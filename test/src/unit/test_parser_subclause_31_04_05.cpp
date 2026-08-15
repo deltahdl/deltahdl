@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -76,7 +77,9 @@ TEST(TimingCheckCommandParsing, ErrorPeriodReferenceMissingEdge) {
       "  $period(clk, 50);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "$period reference_event must be an edge specification", 3,
+      "31.4.5"));
 }
 
 TEST(TimingCheckCommandParsing, PeriodEmptyNotifierSlot) {

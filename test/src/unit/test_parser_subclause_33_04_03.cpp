@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -8,7 +9,10 @@ TEST(ConfigPositionalParamNotation, SinglePositionalRejected) {
       "  design top;\n"
       "  instance top.a1 use #(8);\n"
       "endconfig\n");
-  EXPECT_TRUE(r.has_errors);
+  // Only named notation is permitted, so the parser demands the '.' that opens
+  // a named_parameter_assignment where the positional value stands.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '.', got integer literal", 3, "33.4.3"));
 }
 
 TEST(ConfigPositionalParamNotation, MultiplePositionalRejected) {
@@ -17,7 +21,8 @@ TEST(ConfigPositionalParamNotation, MultiplePositionalRejected) {
       "  design top;\n"
       "  instance top.a1 use #(8, 16);\n"
       "endconfig\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '.', got integer literal", 3, "33.4.3"));
 }
 
 TEST(ConfigPositionalParamNotation, MixedNamedThenPositionalRejected) {
@@ -26,7 +31,8 @@ TEST(ConfigPositionalParamNotation, MixedNamedThenPositionalRejected) {
       "  design top;\n"
       "  instance top.a1 use #(.W(8), 16);\n"
       "endconfig\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '.', got integer literal", 3, "33.4.3"));
 }
 
 TEST(ConfigPositionalParamNotation, NamedAssignmentAccepted) {

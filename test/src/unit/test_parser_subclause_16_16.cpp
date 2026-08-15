@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -36,7 +37,10 @@ TEST(ClockResolutionParse, ClockingBlockPropertyWithExplicitClockIsRejected) {
       "  endclocking\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a property declared in a clocking block may not "
+                            "specify an explicit clocking event",
+                            4, "16.16"));
 }
 
 // §16.16(b1): a sequence declared inside a clocking block with no explicit
@@ -68,7 +72,10 @@ TEST(ClockResolutionParse, ClockingBlockSequenceWithExplicitClockIsRejected) {
       "  endclocking\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a sequence declared in a clocking block may not "
+                            "specify an explicit clocking event",
+                            4, "16.16"));
 }
 
 // §16.16(b1): the prohibition is scoped to clocking blocks. The identical
@@ -122,7 +129,9 @@ TEST(ClockResolutionParse, ClockingBlockMulticlockedPropertyIsRejected) {
       "  endclocking\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a multiclocked property is not allowed in a clocking block", 4,
+      "16.16"));
 }
 
 // §16.16(b2): a multiclocked sequence with a non-leading clocking event is
@@ -138,7 +147,9 @@ TEST(ClockResolutionParse, ClockingBlockMulticlockedSequenceIsRejected) {
       "  endclocking\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a multiclocked sequence is not allowed in a clocking block", 4,
+      "16.16"));
 }
 
 // §16.16(b2): a sequence carrying two explicit clocking events is likewise
@@ -155,7 +166,9 @@ TEST(ClockResolutionParse, ClockingBlockSequenceWithTwoClocksIsRejected) {
       "  endclocking\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a multiclocked sequence is not allowed in a clocking block", 4,
+      "16.16"));
 }
 
 }  // namespace

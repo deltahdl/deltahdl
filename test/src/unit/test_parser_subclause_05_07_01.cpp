@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -354,7 +355,9 @@ TEST(IntegerLiteralParsing, ZeroSizeError) {
       "module t;\n"
       "  initial x = 0'hFF;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.diag->HasErrors() || r.diag->WarningCount() > 0u);
+  EXPECT_TRUE(ReportedError(r.diag->Diagnostics(),
+                            "size of integer literal shall be nonzero", 2,
+                            "5.7.1"));
   delete r.diag;
 }
 

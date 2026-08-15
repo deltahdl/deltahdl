@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -150,7 +151,11 @@ TEST(TimingCheckCommandParsing, SetupholdSingleLimitRejected) {
       "  $setuphold(posedge clk, data, 10);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §31.3.3 owns the $setuphold argument list; the report stands at the
+  // check's own name.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "$setuphold requires two timing_check_limit arguments", 3,
+      "31.3.3"));
 }
 
 // $recrem_timing_check likewise takes two timing_check_limit arguments.
@@ -176,7 +181,10 @@ TEST(TimingCheckCommandParsing, RecremSingleLimitRejected) {
       "  $recrem(posedge rst, posedge clk, 10);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §31.3.6 owns the $recrem argument list.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "$recrem requires two timing_check_limit arguments",
+                            3, "31.3.6"));
 }
 
 // $fullskew_timing_check is the two-limit member of the skew family.
@@ -202,7 +210,10 @@ TEST(TimingCheckCommandParsing, FullskewSingleLimitRejected) {
       "  $fullskew(posedge clk1, posedge clk2, 50);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §31.4.3 owns the $fullskew argument list.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "$fullskew requires two timing_check_limit arguments", 3,
+      "31.4.3"));
 }
 
 // $period_timing_check opens with a controlled_reference_event and has no
@@ -252,7 +263,8 @@ TEST(TimingCheckCommandParsing, ErrorMissingCloseParen) {
       "  $setup(data, posedge clk, 10;\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §31.2 owns the system_timing_check parentheses.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 3, "31.2"));
 }
 
 TEST(TimingCheckCommandParsing, ErrorMissingSemicolon) {
@@ -262,7 +274,9 @@ TEST(TimingCheckCommandParsing, ErrorMissingSemicolon) {
       "  $setup(data, posedge clk, 10)\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §31.2 owns the terminating semicolon; the report stands at the
+  // 'endspecify' that arrived instead, and every keyword answers "token".
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "31.2"));
 }
 
 }  // namespace

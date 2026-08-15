@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -83,7 +84,9 @@ TEST(TimingCheckCommandParsing, ErrorNochangeEdgeControlSpecifier) {
       "  $nochange(edge clk, data, 0, 0);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "$nochange reference_event must use posedge or negedge", 3,
+      "31.4.6"));
 }
 
 // End-to-end over the §31.5 edge-control-specifier dependency: an edge[...]
@@ -99,7 +102,9 @@ TEST(TimingCheckCommandParsing,
       "  $nochange(edge[01, 10] clk, data, 0, 0);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "$nochange reference_event must use posedge or negedge", 3,
+      "31.4.6"));
 }
 
 // Table 31-12 requires the reference_event to be edge triggered. A plain
@@ -112,7 +117,9 @@ TEST(TimingCheckCommandParsing, ErrorNochangePlainReferenceNoEdge) {
       "  $nochange(clk, data, 0, 0);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "$nochange reference_event must use posedge or negedge", 3,
+      "31.4.6"));
 }
 
 // The start/end edge offsets are constant expressions (Table 31-12); a named
@@ -140,7 +147,9 @@ TEST(TimingCheckCommandParsing, ErrorNochangeMissingEndOffset) {
       "  $nochange(posedge clk, data, 0);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "$nochange requires both start_edge_offset and end_edge_offset",
+      3, "31.4.6"));
 }
 
 }  // namespace

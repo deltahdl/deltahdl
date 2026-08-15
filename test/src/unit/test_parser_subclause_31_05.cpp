@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -157,7 +158,9 @@ TEST(EdgeControlSpecifierParsing, SevenDescriptorsError) {
       "  $setup(data, edge [01, 0x, 10, 1x, x0, x1, z0] clk, 10);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "edge-control specifier accepts at most six edge_descriptors", 3,
+      "31.5"));
 }
 
 TEST(EdgeControlSpecifierParsing, EmptyBracketListError) {
@@ -167,7 +170,9 @@ TEST(EdgeControlSpecifierParsing, EmptyBracketListError) {
       "  $setup(data, edge [] clk, 10);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "edge-control specifier requires at least one edge_descriptor",
+      3, "31.5"));
 }
 
 TEST(EdgeControlSpecifierParsing, MissingCloseBracketError) {
@@ -177,7 +182,8 @@ TEST(EdgeControlSpecifierParsing, MissingCloseBracketError) {
       "  $setup(data, edge [01 clk, 10);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ']', got identifier", 3, "31.5"));
 }
 
 TEST(EdgeControlSpecifierParsing, PosedgeShorthandRecorded) {
@@ -215,7 +221,7 @@ TEST(EdgeControlSpecifierParsing, DescriptorDoubleZeroError) {
       "  $setup(data, edge [00] clk, 10);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "invalid edge_descriptor", 3, "31.5"));
 }
 
 // In the split-token edge_descriptor form (zero_or_one followed by z_or_x), the
@@ -229,7 +235,7 @@ TEST(EdgeControlSpecifierParsing, ZeroOrOneWithoutZorXIsError) {
       "  $setup(data, edge [1, 10] clk, 10);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "invalid edge_descriptor", 3, "31.5"));
 }
 
 // z_or_x admits uppercase X and Z. In the z_or_x zero_or_one form (e.g. X0)
@@ -282,7 +288,8 @@ TEST(EdgeControlSpecifierParsing, SplitFormEmbeddedSpaceRejected) {
       "  $setup(data, edge [0 x] clk, 10);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "edge_descriptor may not contain embedded spaces", 3, "31.5"));
 }
 
 }  // namespace

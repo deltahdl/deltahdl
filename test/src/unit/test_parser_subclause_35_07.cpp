@@ -4,6 +4,7 @@
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "simulator/vpi.h"
 
 using namespace delta;
@@ -68,7 +69,10 @@ TEST(DpiParsing, DpiExportInsideClassBodyIsError) {
       export "DPI-C" function f;
     endclass
   )");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "DPI export declaration is not allowed in class "
+                            "scope; class member functions cannot be exported",
+                            4, "35.7"));
 }
 
 // §35.7: Syntax 35-2 restricts dpi_spec_string to "DPI-C" or its deprecated
@@ -80,7 +84,10 @@ TEST(DpiParsing, DpiExportRejectsUnknownSpecString) {
       export "DPI-X" function sv_func;
     endmodule
   )");
-  EXPECT_TRUE(r.has_errors);
+  // §35.5.4 owns the dpi_spec_string report; the export path reuses it.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "DPI specification string must be \"DPI-C\" or \"DPI\"", 4,
+      "35.5.4"));
 }
 
 }  // namespace

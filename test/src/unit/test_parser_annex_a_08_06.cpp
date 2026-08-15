@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -250,79 +251,83 @@ TEST(OperatorParsing, PostfixDecrement) {
                       ExprKind::kPostfixUnary, TokenKind::kMinusMinus);
 }
 
+// A binary_operator standing where a primary is required leaves
+// Parser::ParsePrimaryExpr with no production to take, and §11.2 owns the
+// report it writes there; A.8.6 states the grammar but has no report of its
+// own. Every case below names that report.
 TEST(OperatorParsing, BinaryStarRejectedAsPrefix) {
   auto r = Parse("module m; initial x = * a; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
 TEST(OperatorParsing, BinarySlashRejectedAsPrefix) {
   auto r = Parse("module m; initial x = / a; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
 TEST(OperatorParsing, BinaryPercentRejectedAsPrefix) {
   auto r = Parse("module m; initial x = % a; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
 TEST(OperatorParsing, BinaryPowerRejectedAsPrefix) {
   auto r = Parse("module m; initial x = ** a; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
 TEST(OperatorParsing, BinaryLessThanRejectedAsPrefix) {
   auto r = Parse("module m; initial x = < a; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
 TEST(OperatorParsing, BinaryEqEqRejectedAsPrefix) {
   auto r = Parse("module m; initial x = == a; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
 TEST(OperatorParsing, BinaryAmpAmpRejectedAsPrefix) {
   auto r = Parse("module m; initial x = && a; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
 TEST(OperatorParsing, BinaryPipePipeRejectedAsPrefix) {
   auto r = Parse("module m; initial x = || a; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
 TEST(OperatorParsing, BinaryShiftLeftRejectedAsPrefix) {
   auto r = Parse("module m; initial x = << a; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
 TEST(OperatorParsing, BinaryArithShiftLeftRejectedAsPrefix) {
   auto r = Parse("module m; initial x = <<< a; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
 TEST(OperatorParsing, BinaryArrowRejectedAsPrefix) {
   auto r = Parse("module m; initial x = -> a; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
 TEST(OperatorParsing, BinaryEquivalenceRejectedAsPrefix) {
   auto r = Parse("module m; initial x = <-> a; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
 TEST(OperatorParsing, BinaryPlusMissingRhs) {
   auto r = Parse("module m; initial x = a + ; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
 TEST(OperatorParsing, BinaryStarMissingRhs) {
   auto r = Parse("module m; initial x = a * ; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
 TEST(OperatorParsing, BinaryPowerMissingRhs) {
   auto r = Parse("module m; initial x = a ** ; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
 // -- Module-path operators (unary_module_path_operator /

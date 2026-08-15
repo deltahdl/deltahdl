@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -92,17 +93,22 @@ TEST(ClassAssignRenameParsing, DeepChainedMemberAccess) {
 // The plain `c2 = new c1;` form (covered by ShallowCopyNewIdentifier) parses
 // cleanly, isolating the difference to the `C::` typed prefix.
 TEST(ClassAssignRenameParsing, TypedConstructorShallowCopyRejected) {
-  EXPECT_FALSE(
-      ParseOk("class C;\n"
-              "  int x;\n"
-              "endclass\n"
-              "module m;\n"
-              "  initial begin\n"
-              "    C c1, c2;\n"
-              "    c1 = new;\n"
-              "    c2 = C::new c1;\n"
-              "  end\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "class C;\n"
+      "  int x;\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    C c1, c2;\n"
+      "    c1 = new;\n"
+      "    c2 = C::new c1;\n"
+      "  end\n"
+      "endmodule\n");
+  // `C::new` completes the expression, so `c1` stands where the statement
+  // terminator belongs and Parser::ParseAssignmentOrExprStmt files the report
+  // under §12.3, the subclause stating that a statement ends in a semicolon.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got identifier", 8, "12.3"));
 }
 
 }  // namespace

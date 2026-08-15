@@ -7,6 +7,7 @@
 #include "helpers_included_keyword_parse.h"
 #include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "model_identifier_positions.h"
 #include "model_keyword_tables.h"
 
@@ -20,7 +21,14 @@ namespace {
 TEST(CompilerDirectiveParsing, Verilog2005ReservesEveryVerilog1995Keyword) {
   EXPECT_EQ(std::size(kTable221), 102u);
   for (const char* word : kTable221) {
-    EXPECT_FALSE(ParseWithPreprocessorOk(In2005(VarDecl(word))))
+    // §6.8 owns the report: VarDecl heads its declaration with `reg`, so the
+    // word stands where Parser::ParseVarDeclList reads a variable's name.
+    // TokenKindName answers "token" for most keywords (#3089), so the word
+    // under test is told apart by the failure message rather than by the
+    // report.
+    auto r = ParseWithPreprocessor(In2005(VarDecl(word)));
+    EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got ",
+                              LineInRegion(2), "6.8"))
         << word << " is included from Table 22-1 and stays reserved";
   }
 }
@@ -32,7 +40,9 @@ TEST(CompilerDirectiveParsing, Verilog2005ReservesEveryVerilog1995Keyword) {
 TEST(CompilerDirectiveParsing, Verilog2005ReservesEveryVerilog2001Keyword) {
   EXPECT_EQ(std::size(kTable222Words), 21u);
   for (const char* word : kTable222Words) {
-    EXPECT_FALSE(ParseWithPreprocessorOk(In2005(VarDecl(word))))
+    auto r = ParseWithPreprocessor(In2005(VarDecl(word)));
+    EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got ",
+                              LineInRegion(2), "6.8"))
         << word << " is included from Table 22-2 and is reserved here";
     EXPECT_TRUE(ParseWithPreprocessorOk(In1995(VarDecl(word))))
         << word << " is an addition of the later of the two included lists";
@@ -73,7 +83,9 @@ TEST(CompilerDirectiveParsing, Verilog2005ReservesTheWordItAddsItself) {
   ASSERT_EQ(std::size(kTable223), 1u);
   const char* added = kTable223[0];
 
-  EXPECT_FALSE(ParseWithPreprocessorOk(In2005(VarDecl(added))));
+  auto here = ParseWithPreprocessor(In2005(VarDecl(added)));
+  EXPECT_TRUE(ReportedError(here.diags, "expected identifier, got token",
+                            LineInRegion(2), "6.8"));
 
   for (const auto& earlier : {In2001(VarDecl(added)), In1995(VarDecl(added))}) {
     auto r = ParseWithPreprocessor(earlier);
@@ -131,11 +143,16 @@ TEST(CompilerDirectiveParsing, Verilog2005AddedWordOpensANetDeclaration) {
   EXPECT_TRUE(signed_seen);
 
   // Under the list this version extends the same declarations are not
-  // declarations at all.
-  EXPECT_FALSE(
-      ParseWithPreprocessorOk(In2001("module m;\n"
-                                     "  uwire scalar_net;\n"
-                                     "endmodule\n")));
+  // declarations at all. §23.3.2 owns the report, not §6.7: with the word an
+  // ordinary identifier the two names read as a module name and an instance
+  // name, so Parser::ParseModuleInstList is looking for the port connection
+  // list when it reaches the semicolon.
+  auto earlier =
+      ParseWithPreprocessor(In2001("module m;\n"
+                                   "  uwire scalar_net;\n"
+                                   "endmodule\n"));
+  EXPECT_TRUE(ReportedError(earlier.diags, "expected '(', got ';'",
+                            LineInRegion(2), "23.3.2"));
 }
 
 // The declaration forms the test above does not reach. A net declaration may
@@ -184,17 +201,26 @@ TEST(CompilerDirectiveParsing, Verilog2005AddedWordTypesEveryDeclarationForm) {
   }
   EXPECT_TRUE(typed_in_body);
 
-  EXPECT_FALSE(
-      ParseWithPreprocessorOk(In2001("module m;\n"
-                                     "  reg   [7:0] src;\n"
-                                     "  uwire [7:0] bus = src + 8'd1;\n"
-                                     "endmodule\n")));
-  EXPECT_FALSE(
-      ParseWithPreprocessorOk(In2001("module ch (a, y);\n"
-                                     "  input  [7:0] a;\n"
-                                     "  output [7:0] y;\n"
-                                     "  uwire  [7:0] y;\n"
-                                     "endmodule\n")));
+  // §6.8 owns both reports. A packed dimension is where the declaration was
+  // meant to end, so with the word an ordinary identifier
+  // Parser::ParsePlainVarDecl reads it as a variable of an implicit type and
+  // demands the semicolon at src/parser/parser_items.cpp:712.
+  auto assigned =
+      ParseWithPreprocessor(In2001("module m;\n"
+                                   "  reg   [7:0] src;\n"
+                                   "  uwire [7:0] bus = src + 8'd1;\n"
+                                   "endmodule\n"));
+  EXPECT_TRUE(ReportedError(assigned.diags, "expected ';', got '['",
+                            LineInRegion(3), "6.8"));
+
+  auto in_body =
+      ParseWithPreprocessor(In2001("module ch (a, y);\n"
+                                   "  input  [7:0] a;\n"
+                                   "  output [7:0] y;\n"
+                                   "  uwire  [7:0] y;\n"
+                                   "endmodule\n"));
+  EXPECT_TRUE(ReportedError(in_body.diags, "expected ';', got '['",
+                            LineInRegion(4), "6.8"));
 }
 
 // The other side of the addition across the positions an identifier can occupy.
@@ -273,7 +299,12 @@ TEST(CompilerDirectiveParsing, Verilog2005LeavesUnlistedWordsAsIdentifiers) {
 
     std::string as_type =
         std::string("module m;\n  ") + word + " [7:0] v;\nendmodule\n";
-    EXPECT_FALSE(ParseWithPreprocessorOk(In2005(as_type)))
+    // §6.8 owns the report: the word is an ordinary identifier here, so
+    // Parser::ParsePlainVarDecl reads it as a variable of an implicit type and
+    // the packed dimension is where it expected the declaration to end.
+    auto typed = ParseWithPreprocessor(In2005(as_type));
+    EXPECT_TRUE(ReportedError(typed.diags, "expected ';', got '['",
+                              LineInRegion(2), "6.8"))
         << word << " is not a data type under this version";
   }
 }

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -95,31 +96,42 @@ TEST(TimingControlSyntaxParsing, WaitOrder) {
 }
 
 TEST(TimingControlSyntaxParsing, DelayControlMissingRParen) {
-  EXPECT_TRUE(Parse("module m;\n"
-                    "  initial #(5 + 3 a = 1;\n"
-                    "endmodule\n")
-                  .has_errors);
+  auto r = Parse(
+      "module m;\n"
+      "  initial #(5 + 3 a = 1;\n"
+      "endmodule\n");
+  // §9.4.1 owns the delay_control parenthesis; A.6.5 only states its BNF.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ')', got identifier", 2, "9.4.1"));
 }
 
 TEST(TimingControlSyntaxParsing, EventControlMissingRParen) {
-  EXPECT_TRUE(Parse("module m;\n"
-                    "  initial @(posedge clk a = 1;\n"
-                    "endmodule\n")
-                  .has_errors);
+  auto r = Parse(
+      "module m;\n"
+      "  initial @(posedge clk a = 1;\n"
+      "endmodule\n");
+  // §9.4.2 owns the event_control parenthesis; A.6.5 only states its BNF.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ')', got identifier", 2, "9.4.2"));
 }
 
 TEST(TimingControlSyntaxParsing, WaitOrderMissingLParen) {
-  EXPECT_TRUE(Parse("module m;\n"
-                    "  initial wait_order a, b;\n"
-                    "endmodule\n")
-                  .has_errors);
+  auto r = Parse(
+      "module m;\n"
+      "  initial wait_order a, b;\n"
+      "endmodule\n");
+  // §15.5.4 owns wait_order; A.6.5 only states its BNF.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got identifier", 2, "15.5.4"));
 }
 
 TEST(TimingControlSyntaxParsing, WaitOrderMissingRParen) {
-  EXPECT_TRUE(Parse("module m;\n"
-                    "  initial wait_order(a, b ;\n"
-                    "endmodule\n")
-                  .has_errors);
+  auto r = Parse(
+      "module m;\n"
+      "  initial wait_order(a, b ;\n"
+      "endmodule\n");
+  // §15.5.4 owns wait_order; A.6.5 only states its BNF.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 2, "15.5.4"));
 }
 
 TEST(TimingControlSyntaxParsing, CycleDelayStmtParen) {
@@ -153,21 +165,26 @@ TEST(TimingControlSyntaxParsing, CycleDelayStmtLiteral) {
 }
 
 TEST(TimingControlSyntaxParsing, CycleDelayMissingSemicolon) {
-  EXPECT_TRUE(Parse("module m;\n"
-                    "  initial begin\n"
-                    "    ##5\n"
-                    "  end\n"
-                    "endmodule\n")
-                  .has_errors);
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    ##5\n"
+      "  end\n"
+      "endmodule\n");
+  // A cycle_delay takes a statement_or_null after it, so `end` is taken as the
+  // statement and reaches ParsePrimaryExpr, whose report is filed under §11.2.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 4, "11.2"));
 }
 
 TEST(TimingControlSyntaxParsing, CycleDelayMissingRParen) {
-  EXPECT_TRUE(Parse("module m;\n"
-                    "  initial begin\n"
-                    "    ##(5 ;\n"
-                    "  end\n"
-                    "endmodule\n")
-                  .has_errors);
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    ##(5 ;\n"
+      "  end\n"
+      "endmodule\n");
+  // §14.11 owns the cycle_delay parenthesis; A.6.5 only states its BNF.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 3, "14.11"));
 }
 
 TEST(TimingControlSyntaxParsing, IntraAssignCycleDelayBlocking) {
@@ -321,26 +338,33 @@ TEST(JumpStatementSyntaxParsing, ReturnWithExpressionBnf) {
 }
 
 TEST(JumpStatementSyntaxParsing, ReturnMissingSemicolonBnf) {
-  EXPECT_TRUE(Parse("module m;\n"
-                    "  function int f();\n"
-                    "    return 42\n"
-                    "  endfunction\n"
-                    "endmodule\n")
-                  .has_errors);
+  auto r = Parse(
+      "module m;\n"
+      "  function int f();\n"
+      "    return 42\n"
+      "  endfunction\n"
+      "endmodule\n");
+  // §12.8 owns the jump statements; A.6.5 only states their BNF. Every
+  // keyword answers "token" in a report, so `endfunction` reads that way.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "12.8"));
 }
 
 TEST(JumpStatementSyntaxParsing, BreakMissingSemicolonBnf) {
-  EXPECT_TRUE(Parse("module m;\n"
-                    "  initial forever begin break end\n"
-                    "endmodule\n")
-                  .has_errors);
+  auto r = Parse(
+      "module m;\n"
+      "  initial forever begin break end\n"
+      "endmodule\n");
+  // §12.8 owns the jump statements; A.6.5 only states their BNF.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 2, "12.8"));
 }
 
 TEST(JumpStatementSyntaxParsing, ContinueMissingSemicolonBnf) {
-  EXPECT_TRUE(Parse("module m;\n"
-                    "  initial forever begin continue end\n"
-                    "endmodule\n")
-                  .has_errors);
+  auto r = Parse(
+      "module m;\n"
+      "  initial forever begin continue end\n"
+      "endmodule\n");
+  // §12.8 owns the jump statements; A.6.5 only states their BNF.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 2, "12.8"));
 }
 
 TEST(WaitStatementSyntaxParsing, WaitExpressionStatement) {
@@ -388,21 +412,27 @@ TEST(WaitStatementSyntaxParsing, WaitForkStatement) {
 }
 
 TEST(WaitStatementSyntaxParsing, WaitMissingLParenErrors) {
-  EXPECT_TRUE(Parse("module m;\n"
-                    "  initial begin\n"
-                    "    wait done) a = 1;\n"
-                    "  end\n"
-                    "endmodule\n")
-                  .has_errors);
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait done) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  // §9.4.3 owns the wait condition parenthesis; A.6.5 only states its BNF.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got identifier", 3, "9.4.3"));
 }
 
 TEST(WaitStatementSyntaxParsing, WaitForkMissingSemicolonErrors) {
-  EXPECT_TRUE(Parse("module m;\n"
-                    "  initial begin\n"
-                    "    wait fork\n"
-                    "  end\n"
-                    "endmodule\n")
-                  .has_errors);
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait fork\n"
+      "  end\n"
+      "endmodule\n");
+  // §9.6.1 owns wait fork; A.6.5 only states its BNF. Every keyword answers
+  // "token" in a report, so `end` reads that way.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "9.6.1"));
 }
 
 TEST(TimingControlSyntaxParsing, ParenthesizedEventExprEdges) {
@@ -491,10 +521,14 @@ TEST(EventTriggerSyntaxParsing, NonblockingWithRepeatEventControl) {
 }
 
 TEST(EventTriggerSyntaxParsing, NonblockingRepeatEventControlMissingAt) {
-  EXPECT_TRUE(Parse("module m;\n"
-                    "  initial ->> repeat (3) ev;\n"
-                    "endmodule\n")
-                  .has_errors);
+  auto r = Parse(
+      "module m;\n"
+      "  initial ->> repeat (3) ev;\n"
+      "endmodule\n");
+  // §15.5.1 owns the ->> event trigger; A.6.5 only states its BNF. '@' has no
+  // name of its own in a report, so the missing token reads as "token".
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected token, got identifier", 2, "15.5.1"));
 }
 
 // event_trigger ::= ->> [ delay_or_event_control ] ...
@@ -631,10 +665,13 @@ TEST(DisableStatementSyntaxParsing, DisableHierarchicalBlock) {
 }
 
 TEST(DisableStatementSyntaxParsing, DisableMissingSemicolon) {
-  EXPECT_TRUE(Parse("module m;\n"
-                    "  initial disable foo\n"
-                    "endmodule\n")
-                  .has_errors);
+  auto r = Parse(
+      "module m;\n"
+      "  initial disable foo\n"
+      "endmodule\n");
+  // §9.6.2 owns the disable statement; A.6.5 only states its BNF. Every
+  // keyword answers "token" in a report, so `endmodule` reads that way.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "9.6.2"));
 }
 
 // event_expression ::= [ edge_identifier ] expression [ iff expression ]

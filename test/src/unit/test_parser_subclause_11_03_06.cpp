@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -85,7 +86,10 @@ TEST(OperatorAndExpressionParsing, UnparenthesizedAssignInExprIsRejected) {
       "  int a, b, c;\n"
       "  initial a = b = c;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The second '=' is left standing where the statement terminator belongs, so
+  // §12.3 reports it: §11.3.6 has no report of its own for the unparenthesized
+  // form.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got '='", 3, "12.3"));
 }
 
 // §11.3.6: a blocking assignment within an expression is permitted only when it
@@ -97,7 +101,9 @@ TEST(OperatorAndExpressionParsing, AssignWithTimingControlInExprIsRejected) {
       "  int a, b, c;\n"
       "  initial b = (a = #5 c);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The '#' stands where the assignment's right-hand operand belongs, so
+  // §11.2's primary report is what fires: §11.3.6 has no report of its own.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
 // §11.3.6: an assignment operator is legal in an expression, and §9.4.2's
@@ -111,7 +117,9 @@ TEST(OperatorAndExpressionParsing, AssignInEventExpressionIsRejected) {
       "  logic a, b;\n"
       "  always @(a = b) ;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §9.4.2 owns the event control's closing parenthesis, and that is where the
+  // '=' is refused.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got '='", 3, "9.4.2"));
 }
 
 }  // namespace

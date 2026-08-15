@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -430,12 +431,15 @@ TEST(IntraAssignTimingParsing, IntraDelayNoEventsField) {
 }
 
 TEST(IntraAssignTimingParsing, IntraAssignRepeatEventMissingAt) {
-  EXPECT_TRUE(Parse("module m;\n"
-                    "  initial begin\n"
-                    "    a <= repeat(3) (posedge clk) b;\n"
-                    "  end\n"
-                    "endmodule\n")
-                  .has_errors);
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a <= repeat(3) (posedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
+  // TokenKindName answers "token" for '@', so the sentence names the '(' that
+  // stood where the event control should have opened, on line 3.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got '('", 3, "9.4.5"));
 }
 
 }  // namespace

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "helpers_three_comma_instances.h"
 
 using namespace delta;
@@ -150,10 +151,13 @@ TEST(ProgramInstantiationGrammar, ParamsWithEmptyPorts) {
 }
 
 TEST(ProgramInstantiationGrammar, Error_MissingSemicolon) {
-  EXPECT_FALSE(
-      ParseOk("program my_prog;\n"
-              "endprogram\n"
-              "module m; my_prog u0() endmodule\n"));
+  auto r = Parse(
+      "program my_prog;\n"
+      "endprogram\n"
+      "module m; my_prog u0() endmodule\n");
+  // Parser::ParseModuleInstList files the shared instantiation reports under
+  // §23.3.2, whatever kind of design element the leading identifier names.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "23.3.2"));
 }
 
 }  // namespace

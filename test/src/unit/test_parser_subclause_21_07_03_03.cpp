@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -43,10 +44,14 @@ TEST(IoSystemTaskParsing, DumpportsallVariableFilename) {
 // §21.7.3.3 negative: the task call requires a parenthesized argument; a
 // filename butted against the task name without parentheses does not parse.
 TEST(IoSystemTaskParsing, DumpportsallUnparenthesizedFilenameRejected) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  initial $dumpportsall \"ports.vcd\";\n"
-              "endmodule\n"));
+  auto result = Parse(
+      "module t;\n"
+      "  initial $dumpportsall \"ports.vcd\";\n"
+      "endmodule\n");
+  // §12.3 owns the semicolon that terminates a subroutine call statement, and
+  // the unparenthesized filename is what stands where that semicolon must be.
+  EXPECT_TRUE(ReportedError(result.diags, "expected ';', got string literal", 2,
+                            "12.3"));
 }
 
 }  // namespace

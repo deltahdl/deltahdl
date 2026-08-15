@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -138,7 +139,10 @@ TEST(UdpSequentialInitial, NonLiteralValueIsRejected) {
       "    0 r : ? : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "UDP initial statement RHS shall be 0, 1, or a single-bit literal", 2,
+      "29.3.3"));
 }
 
 // S3 facet "to the output port": the assignment target must be the output
@@ -151,7 +155,9 @@ TEST(UdpSequentialInitial, AssignmentMustTargetOutputPort) {
       "    0 r : ? : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP initial statement shall target the output port", 2,
+      "29.3.3"));
 }
 
 // S3 facet "single-bit literal value": a multi-bit literal is rejected.
@@ -163,7 +169,10 @@ TEST(UdpSequentialInitial, MultiBitLiteralIsRejected) {
       "    0 r : ? : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "UDP initial statement RHS shall be 0, 1, or a single-bit literal", 2,
+      "29.3.3"));
 }
 
 // S3 facet "an assignment statement": a procedural block is not a plain
@@ -176,7 +185,9 @@ TEST(UdpSequentialInitial, BlockStatementIsRejected) {
       "    0 r : ? : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP initial statement shall be a single procedural assignment",
+      2, "29.3.3"));
 }
 
 }  // namespace

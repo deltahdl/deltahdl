@@ -90,6 +90,7 @@
 #include "common/source_mgr.h"
 #include "fixture_scratch_dir.h"
 #include "fixture_tagged_file.h"
+#include "helpers_reported_error.h"
 #include "lexer/lexer.h"
 #include "parser/ast.h"
 #include "parser/library_map.h"
@@ -376,7 +377,13 @@ TEST(ResolveMultiplePathSpecsCompile, ANameTwoLibrariesAreLevelOnIsRejected) {
 
   EXPECT_EQ(h.compiler.CompileSource(SourcePath(tmp, kFooVer), h.unit),
             CompileOutcome::kFailed);
-  EXPECT_TRUE(h.diag.HasErrors());
+  // §33.3.1.1 is what makes the level claim an error, so that is the subclause
+  // the report names; it stands at the first of the two declarations making
+  // the claim, which is lib1's on line 1 of the map file.
+  EXPECT_TRUE(ReportedError(
+      h.diag.Diagnostics(),
+      "source description claimed by more than one library (lib1, lib4): ", 1,
+      "33.3.1.1"));
   EXPECT_EQ(h.libs.CellInLibrary("lib1", "foover"), nullptr);
   EXPECT_EQ(h.libs.CellInLibrary("lib4", "foover"), nullptr);
   EXPECT_TRUE(h.unit.modules.empty());

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -108,7 +109,9 @@ TEST(InterfaceInstantiationGrammar, ErrorMissingSemicolon) {
       "module m;\n"
       "  ifc u0()\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::ParseModuleInstList files the shared instantiation reports under
+  // §23.3.2, the module_instantiation subclause A.4.1.2 duplicates.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "23.3.2"));
 }
 
 // In the { , hierarchical_instance } repetition each comma must be followed by
@@ -119,7 +122,10 @@ TEST(InterfaceInstantiationGrammar, ErrorTrailingCommaInInstanceList) {
       "module m;\n"
       "  ifc u0(), ;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §23.3.2 owns the hierarchical_instance name the parser demands after the
+  // comma.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ';'", 3, "23.3.2"));
 }
 
 }  // namespace

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -326,34 +327,45 @@ TEST(ModportDeclarationParsing, AllAlternativesTogether) {
 }
 
 TEST(ModportDeclarationParsing, MissingModportName) {
-  EXPECT_FALSE(
-      ParseOk("interface ifc;\n"
-              "  modport (input a);\n"
-              "endinterface\n"));
+  auto r = Parse(
+      "interface ifc;\n"
+      "  modport (input a);\n"
+      "endinterface\n");
+  // §25.5 owns the modport declaration; A.2.9 states the production alone.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got '('", 2, "25.5"));
 }
 
 TEST(ModportDeclarationParsing, MissingOpenParen) {
-  EXPECT_FALSE(
-      ParseOk("interface ifc;\n"
-              "  logic a;\n"
-              "  modport mp input a);\n"
-              "endinterface\n"));
+  auto r = Parse(
+      "interface ifc;\n"
+      "  logic a;\n"
+      "  modport mp input a);\n"
+      "endinterface\n");
+  // §25.5 owns the modport declaration. Every keyword prints as `token` in
+  // Parser::Expect's message, so `input` reads that way here.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '(', got token", 3, "25.5"));
 }
 
 TEST(ModportDeclarationParsing, MissingCloseParen) {
-  EXPECT_FALSE(
-      ParseOk("interface ifc;\n"
-              "  logic a;\n"
-              "  modport mp(input a;\n"
-              "endinterface\n"));
+  auto r = Parse(
+      "interface ifc;\n"
+      "  logic a;\n"
+      "  modport mp(input a;\n"
+      "endinterface\n");
+  // §25.5 owns the modport declaration; A.2.9 states the production alone.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 3, "25.5"));
 }
 
 TEST(ModportDeclarationParsing, MissingSemicolon) {
-  EXPECT_FALSE(
-      ParseOk("interface ifc;\n"
-              "  logic a;\n"
-              "  modport mp(input a)\n"
-              "endinterface\n"));
+  auto r = Parse(
+      "interface ifc;\n"
+      "  logic a;\n"
+      "  modport mp(input a)\n"
+      "endinterface\n");
+  // §25.5 owns the modport declaration. The token standing where the ';'
+  // should be is `endinterface`, which Parser::Expect prints as `token`.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "25.5"));
 }
 
 }  // namespace

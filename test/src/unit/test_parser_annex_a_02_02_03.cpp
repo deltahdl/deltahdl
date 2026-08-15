@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -264,7 +265,9 @@ TEST(DelayParsing, Delay3OverArityRejected) {
       "module m;\n"
       "  wire #(1, 2, 3, 4) w;\n"
       "endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::ParseGateDelay stops after the third delay and demands the closing
+  // parenthesis, so the fourth delay is reported under §28.16.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 2, "28.16"));
 }
 
 }  // namespace

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -13,7 +14,9 @@ TEST(ConstraintFourState, TripleEqualOperatorRejected) {
       "  rand int x;\n"
       "  constraint c { x === 0; }\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "4-state equality operator is not allowed in a constraint", 3,
+      "18.3"));
 }
 
 TEST(ConstraintFourState, TripleNotEqualOperatorRejected) {
@@ -22,7 +25,9 @@ TEST(ConstraintFourState, TripleNotEqualOperatorRejected) {
       "  rand int x;\n"
       "  constraint c { x !== 0; }\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "4-state equality operator is not allowed in a constraint", 3,
+      "18.3"));
 }
 
 // 18.3: 4-state values (x or z) are illegal in a constraint.
@@ -32,7 +37,8 @@ TEST(ConstraintFourState, FourStateLiteralRejected) {
       "  rand int x;\n"
       "  constraint c { x == 4'b01xz; }\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "4-state value is not allowed in a constraint", 3, "18.3"));
 }
 
 // A constraint that uses only 2-state values and 2-state operators is legal.

@@ -1,4 +1,7 @@
+#include <string_view>
+
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 #include "parser/time_resolve.h"
 
 using namespace delta;
@@ -39,7 +42,9 @@ TEST(DesignBuildingBlockParsing, InvalidTimeUnitStringsRejected) {
 }
 
 TEST(DesignBuildingBlockParsing, SlashPrecisionLessPreciseThanUnit) {
-  EXPECT_FALSE(ParseOk("module m; timeunit 1ps / 1ns; endmodule\n"));
+  auto r = Parse("module m; timeunit 1ps / 1ns; endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "time precision is less precise than the time unit", 1, "3.14"));
 }
 
 TEST(DesignBuildingBlockParsing, SlashPrecisionValid) {
@@ -60,19 +65,33 @@ TEST(DesignBuildingBlockParsing, ParserAcceptsMagnitudesOneTenHundred) {
 }
 
 TEST(DesignBuildingBlockParsing, ParserRejectsOtherMagnitudesOnTimeunit) {
-  EXPECT_FALSE(ParseOk("module m; timeunit 5ns; endmodule\n"));
-  EXPECT_FALSE(ParseOk("module m; timeunit 50ns; endmodule\n"));
-  EXPECT_FALSE(ParseOk("module m; timeunit 1000ns; endmodule\n"));
-  EXPECT_FALSE(ParseOk("module m; timeunit 2ns; endmodule\n"));
+  static constexpr std::string_view kBadMagnitude =
+      "time literal must use magnitude 1, 10, or 100 and unit s/ms/us/ns/ps/fs";
+  auto five = Parse("module m; timeunit 5ns; endmodule\n");
+  EXPECT_TRUE(ReportedError(five.diags, kBadMagnitude, 1, "3.14"));
+  auto fifty = Parse("module m; timeunit 50ns; endmodule\n");
+  EXPECT_TRUE(ReportedError(fifty.diags, kBadMagnitude, 1, "3.14"));
+  auto thousand = Parse("module m; timeunit 1000ns; endmodule\n");
+  EXPECT_TRUE(ReportedError(thousand.diags, kBadMagnitude, 1, "3.14"));
+  auto two = Parse("module m; timeunit 2ns; endmodule\n");
+  EXPECT_TRUE(ReportedError(two.diags, kBadMagnitude, 1, "3.14"));
 }
 
 TEST(DesignBuildingBlockParsing, ParserRejectsOtherMagnitudesOnTimeprecision) {
-  EXPECT_FALSE(ParseOk("module m; timeprecision 5ps; endmodule\n"));
-  EXPECT_FALSE(ParseOk("module m; timeprecision 200ps; endmodule\n"));
+  static constexpr std::string_view kBadMagnitude =
+      "time literal must use magnitude 1, 10, or 100 and unit s/ms/us/ns/ps/fs";
+  auto five = Parse("module m; timeprecision 5ps; endmodule\n");
+  EXPECT_TRUE(ReportedError(five.diags, kBadMagnitude, 1, "3.14"));
+  auto two_hundred = Parse("module m; timeprecision 200ps; endmodule\n");
+  EXPECT_TRUE(ReportedError(two_hundred.diags, kBadMagnitude, 1, "3.14"));
 }
 
 TEST(DesignBuildingBlockParsing, ParserRejectsBadMagnitudeInSlashPrecision) {
-  EXPECT_FALSE(ParseOk("module m; timeunit 1ns / 5ps; endmodule\n"));
+  auto r = Parse("module m; timeunit 1ns / 5ps; endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "time literal must use magnitude 1, 10, or 100 "
+                            "and unit s/ms/us/ns/ps/fs",
+                            1, "3.14"));
 }
 
 TEST(DesignBuildingBlockParsing, RangeSpansHundredSecondsDownToOneFemtosecond) {
@@ -110,8 +129,12 @@ TEST(DesignBuildingBlockParsing, ParsedModuleStoresBothUnitAndPrecision) {
 }
 
 TEST(DesignBuildingBlockParsing, SlashPrecisionLongerByMagnitudeRejected) {
-  EXPECT_FALSE(ParseOk("module m; timeunit 1ns / 10ns; endmodule\n"));
-  EXPECT_FALSE(ParseOk("module m; timeunit 10ps / 100ps; endmodule\n"));
+  static constexpr std::string_view kLessPrecise =
+      "time precision is less precise than the time unit";
+  auto ns = Parse("module m; timeunit 1ns / 10ns; endmodule\n");
+  EXPECT_TRUE(ReportedError(ns.diags, kLessPrecise, 1, "3.14"));
+  auto ps = Parse("module m; timeunit 10ps / 100ps; endmodule\n");
+  EXPECT_TRUE(ReportedError(ps.diags, kLessPrecise, 1, "3.14"));
 }
 
 TEST(DesignBuildingBlockParsing, SlashPrecisionFinerByMagnitudeAccepted) {

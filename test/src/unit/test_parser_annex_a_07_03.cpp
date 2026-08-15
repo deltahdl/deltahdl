@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -255,7 +256,9 @@ TEST(SpecifyTerminalParsing, ErrorTerminalUnclosedBracket) {
       "    (a[3 => b) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §30.4 owns the specify_input_terminal_descriptor bracket; '=>' names no
+  // token kind of its own, so TokenKindName answers "token" for it.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ']', got token", 3, "30.4"));
 }
 
 TEST(SpecifyTerminalParsing, ErrorEmptyTerminalList) {
@@ -265,7 +268,9 @@ TEST(SpecifyTerminalParsing, ErrorEmptyTerminalList) {
       "    ( => b) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §30.4 owns the terminal identifier ParseSpecifyTerminal demands.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got token", 3, "30.4"));
 }
 
 TEST(SpecifyTerminalParsing, ErrorTrailingCommaInInputList) {
@@ -275,7 +280,9 @@ TEST(SpecifyTerminalParsing, ErrorTrailingCommaInInputList) {
       "    (a, => b) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §30.4 owns the terminal identifier the comma promises.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got token", 3, "30.4"));
 }
 
 TEST(SpecifyTerminalParsing, ErrorEmptyOutputList) {
@@ -285,7 +292,9 @@ TEST(SpecifyTerminalParsing, ErrorEmptyOutputList) {
       "    (a => ) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §30.4 owns the terminal identifier ParseSpecifyTerminal demands.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ')'", 3, "30.4"));
 }
 
 TEST(SpecifyTerminalParsing, ErrorTrailingCommaInOutputList) {
@@ -295,7 +304,9 @@ TEST(SpecifyTerminalParsing, ErrorTrailingCommaInOutputList) {
       "    (a => b,) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §30.4 owns the terminal identifier the comma promises.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ')'", 3, "30.4"));
 }
 
 TEST(SpecifyTerminalParsing, ErrorOutputTerminalUnclosedBracket) {
@@ -305,7 +316,8 @@ TEST(SpecifyTerminalParsing, ErrorOutputTerminalUnclosedBracket) {
       "    (a => b[3) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §30.4 owns the specify_output_terminal_descriptor bracket.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ']', got ')'", 3, "30.4"));
 }
 
 TEST(SpecifyTerminalParsing, InputIdentifierInterfaceForm) {

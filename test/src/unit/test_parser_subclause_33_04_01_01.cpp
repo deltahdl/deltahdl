@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -8,7 +9,10 @@ TEST(ConfigDesignStatement, ZeroDesignStatementsRejected) {
   auto r = Parse(
       "config c;\n"
       "endconfig\n");
-  EXPECT_TRUE(r.has_errors);
+  // The report stands at the config_declaration, which is what lacks the
+  // statement, so it is on line 1 rather than on the 'endconfig'.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "config 'c' is missing a 'design' statement", 1, "33.4.1.1"));
 }
 
 TEST(ConfigDesignStatement, DuplicateDesignStatementsRejected) {
@@ -17,7 +21,8 @@ TEST(ConfigDesignStatement, DuplicateDesignStatementsRejected) {
       "  design work.top;\n"
       "  design work.other;\n"
       "endconfig\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "duplicate 'design' statement in config 'c'", 3, "33.4.1.1"));
 }
 
 TEST(ConfigDesignStatement, MultipleTopModulesInOneDesignStatement) {
@@ -70,7 +75,8 @@ TEST(ConfigDesignStatement, RuleBeforeDesignRejected) {
       "  default liblist work;\n"
       "  design work.top;\n"
       "endconfig\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'design' statement in config", 2,
+                            "33.4.1.1"));
 }
 
 TEST(ConfigDesignStatement, MultipleBareTopModulesInOneDesignStatement) {

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -314,14 +315,20 @@ TEST(DeclarationAssignmentParsing, SpecparamMissingEqualsIsError) {
       "module m;\n"
       "  specparam delay 5;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §6.20.5 owns the specparam declaration; A.2.4 states the assignment
+  // production alone.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '=', got integer literal", 2, "6.20.5"));
 }
 
 TEST(DeclarationAssignmentParsing, DefparamMissingEqualsIsError) {
   auto r = Parse(
       "module child; parameter P = 1; endmodule\n"
       "module m; child c(); defparam c.P 5; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §23.10.1 owns the defparam statement; A.2.4 states the assignment
+  // production alone.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '=', got integer literal", 2,
+                            "23.10.1"));
 }
 
 TEST(DeclarationAssignmentParsing, PulseControlSpecparamMissingParensIsError) {
@@ -331,7 +338,10 @@ TEST(DeclarationAssignmentParsing, PulseControlSpecparamMissingParensIsError) {
       "    specparam PATHPULSE$ = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §30.7.1 owns the PATHPULSE$ value form, which is parenthesized; A.2.4
+  // states the pulse_control_specparam production alone.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got integer literal", 3, "30.7.1"));
 }
 
 }  // namespace

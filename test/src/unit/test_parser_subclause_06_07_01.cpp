@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -364,17 +365,23 @@ TEST(DataTypeParsing, WandWithRange) {
 }
 
 TEST(DataTypeParsing, TriRegDirectlyIsError) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  tri reg r;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module t;\n"
+      "  tri reg r;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "net type keyword shall not be followed directly by 'reg'", 2,
+      "6.7.1"));
 }
 
 TEST(DataTypeParsing, WireRegDirectlyIsError) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  wire reg p;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module t;\n"
+      "  wire reg p;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "net type keyword shall not be followed directly by 'reg'", 2,
+      "6.7.1"));
 }
 
 TEST(DataTypeParsing, WireDriveStrengthRegOk) {
@@ -400,7 +407,10 @@ TEST(DataTypeParsing, IdentifierStartingWithRegOk) {
 // §6.7.1: the no-reg-after-a-net-keyword rule applies to port declarations too,
 // not just standalone net declarations.
 TEST(DataTypeParsing, PortNetTypeFollowedByRegIsError) {
-  EXPECT_FALSE(ParseOk("module m(inout wire reg p); endmodule\n"));
+  auto r = Parse("module m(inout wire reg p); endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "net type keyword shall not be followed directly by 'reg'", 1,
+      "6.7.1"));
 }
 
 TEST(StrengthParsing, DriveStrengthSupply0Weak1) {
@@ -518,16 +528,27 @@ TEST(InterconnectParsing, UnpackedDimensionOk) {
 }
 
 TEST(InterconnectParsing, DataTypeIsError) {
-  EXPECT_FALSE(ParseOk("module m; interconnect logic w; endmodule\n"));
+  auto r = Parse("module m; interconnect logic w; endmodule\n");
+  // Syntax 23-4 gives `interconnect` an implicit_data_type, so `logic` is read
+  // as the net name. §6.7 owns the net declaration list that then fails on it,
+  // and §6.6.8 has no report of its own here.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got token", 1, "6.7"));
 }
 
 // A parenthesized strength spec after `interconnect` -- whether it reads as a
 // drive strength like (strong0, strong1) or a charge strength like (small) --
 // is rejected through the same grammar path.
 TEST(InterconnectParsing, StrengthSpecIsError) {
-  EXPECT_FALSE(
-      ParseOk("module m; interconnect (strong0, strong1) w; endmodule\n"));
-  EXPECT_FALSE(ParseOk("module m; interconnect (small) w; endmodule\n"));
+  // §6.7 owns the net declaration list, which is where the '(' is met once
+  // Syntax 23-4 has admitted no strength after `interconnect`.
+  auto drive =
+      Parse("module m; interconnect (strong0, strong1) w; endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(drive.diags, "expected identifier, got '('", 1, "6.7"));
+  auto charge = Parse("module m; interconnect (small) w; endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(charge.diags, "expected identifier, got '('", 1, "6.7"));
 }
 
 }  // namespace

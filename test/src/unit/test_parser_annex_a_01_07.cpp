@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -42,7 +43,11 @@ TEST(ProgramItem, NonAnsiPortDeclarationMissingSemicolonIsError) {
       "  input a\n"
       "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  // A program body reads its non-ANSI port declarations through
+  // Parser::ParseNonAnsiPortDecls, which files the missing ';' under §23.2.2.1
+  // with the module form it shares. `endprogram` is a keyword, which
+  // Parser::Expect names "token", and it stands on line 3.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "23.2.2.1"));
 }
 
 // program_item ::= port_declaration ; | non_port_program_item — both top-level

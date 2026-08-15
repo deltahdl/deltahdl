@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -42,7 +43,11 @@ TEST(GenericInterfaceReference, NonAnsiDeclarationIsError) {
       "  input interface a;\n"
       "  input logic clk;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "generic interface port must be declared with "
+                            "ANSI-style port declarations, not the non-ANSI "
+                            "port style",
+                            2, "25.3.3"));
 }
 
 }  // namespace

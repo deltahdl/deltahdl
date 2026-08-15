@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -396,7 +397,8 @@ TEST(GenerateInstantiationGrammar, CaseGenerateItemMissingColonRejected) {
       "    8 assign out = in;\n"
       "  endcase\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §27.5 owns the case generate construct; A.4.2 only states its production.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ':', got token", 3, "27.5"));
 }
 
 // if_generate_construct ::= if ( constant_expression ) generate_block
@@ -408,7 +410,10 @@ TEST(GenerateInstantiationGrammar, IfGenerateMissingParenRejected) {
       "  if EN\n"
       "    assign out = in;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §27.5 owns the conditional generate construct; A.4.2 only states its
+  // production.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got identifier", 2, "27.5"));
 }
 
 }  // namespace

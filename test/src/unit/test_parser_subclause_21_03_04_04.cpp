@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -57,12 +58,16 @@ TEST(IoSystemTaskParsing, FreadAsExpressionOperand) {
 }
 
 TEST(IoSystemTaskParsing, FreadUnterminatedCallRejected) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  integer fd;\n"
-              "  reg [7:0] mem [0:255];\n"
-              "  initial $fread(mem, fd;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module t;\n"
+      "  integer fd;\n"
+      "  reg [7:0] mem [0:255];\n"
+      "  initial $fread(mem, fd;\n"
+      "endmodule\n");
+  // §13.5 owns the closing parenthesis of a system task call's argument list,
+  // so Parser::ParseSystemCall files the report under it rather than under
+  // §21.3.4.4.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 4, "13.5"));
 }
 
 }  // namespace

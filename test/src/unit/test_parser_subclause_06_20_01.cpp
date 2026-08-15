@@ -1,5 +1,6 @@
 #include "fixture_elaborator.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -172,12 +173,18 @@ TEST(ParameterDeclarations, CompilationUnitParameterPromotedToLocalparam) {
 
 TEST(ParameterPortListParsing, LocalparamPortRequiresDefaultValue) {
   auto r = Parse("module m #(localparam int X); endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "localparam 'X' in parameter port list must have a default value", 1,
+      "6.20.1"));
 }
 
 TEST(ParameterPortListParsing, LocalparamTypePortRequiresDefaultType) {
   auto r = Parse("module m #(localparam type T); endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "localparam type 'T' in parameter port list must "
+                            "have a default type",
+                            1, "6.20.1"));
 }
 
 TEST(ParameterDeclarations, ParameterPromotedToLocalparamInGenerateIf) {
@@ -324,7 +331,10 @@ TEST(DeclarationAssignmentParsing, BodyTypeAssignmentRequiresDefault) {
       "module m;\n"
       "  parameter type T;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "type parameter 'T' outside a parameter port list "
+                            "must have a default type",
+                            2, "6.20.1"));
 }
 
 TEST(DeclarationAssignmentParsing, BodyForwardTypeParameterParses) {

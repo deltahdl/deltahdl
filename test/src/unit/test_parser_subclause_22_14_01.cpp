@@ -1,8 +1,15 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
 namespace {
+
+// The line each rejection below is reported at is counted in the
+// preprocessor's output rather than in the source Guarded built. Every
+// `begin_keywords and `end_keywords leaves a blank line in that output on top
+// of its own directive line (#3095), so a body Guarded wraps is reported two
+// lines below where it is written.
 
 // The module of §22.14.1's second and third examples, with the port list and
 // body the LRM elides written out. The 64-bit variable is named `logic`, which
@@ -33,7 +40,13 @@ TEST(KeywordVersionExampleParsing, ModuleWithNoDirectiveUsesTheDefaultList) {
                               "  reg [63:0] v;\n"
                               "endmodule\n"));
 
-  EXPECT_FALSE(ParseWithPreprocessorOk(kM2Module));
+  // §6.8 owns the report: `logic` stands where Parser::ParseVarDeclList reads
+  // the declared name of a variable, and TokenKindName answers "token" for the
+  // keyword the default list makes of it. No directive stands above the
+  // declaration, so it is reported on the line it is written on.
+  auto r = ParseWithPreprocessor(kM2Module);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got token", 2, "6.8"));
 }
 
 // The same claim from the two other positions a module can occupy relative to
@@ -56,12 +69,19 @@ TEST(KeywordVersionExampleParsing, DefaultListGovernsOutsideEveryPair) {
 
   // The negative in both positions: the older list's spelling of the module is
   // not readable outside the pair that selects that list.
-  EXPECT_FALSE(ParseWithPreprocessorOk(
-      std::string(kM2Module) +
-      Guarded("1364-2001", "module other;\nendmodule\n")));
-  EXPECT_FALSE(ParseWithPreprocessorOk(
-      Guarded("1364-2001", "module other;\nendmodule\n") +
-      std::string(kM2Module)));
+  auto ahead =
+      ParseWithPreprocessor(std::string(kM2Module) +
+                            Guarded("1364-2001", "module other;\nendmodule\n"));
+  EXPECT_TRUE(
+      ReportedError(ahead.diags, "expected identifier, got token", 2, "6.8"));
+
+  // Behind the pair the declaration is written on line 6 and reported on line
+  // 8, the two directives above it costing two output lines each.
+  auto behind =
+      ParseWithPreprocessor(Guarded("1364-2001", "module other;\nendmodule\n") +
+                            std::string(kM2Module));
+  EXPECT_TRUE(
+      ReportedError(behind.diags, "expected identifier, got token", 8, "6.8"));
 }
 
 // §22.14.1's second example. Under a version_specifier naming 1364-2001,
@@ -83,7 +103,9 @@ TEST(KeywordVersionExampleParsing,
      SystemVerilogRegionRejectsLogicAsAVariableName) {
   for (const char* specifier :
        {"1800-2005", "1800-2009", "1800-2012", "1800-2017", "1800-2023"}) {
-    EXPECT_FALSE(ParseWithPreprocessorOk(Guarded(specifier, kM2Module)))
+    auto r = ParseWithPreprocessor(Guarded(specifier, kM2Module));
+    EXPECT_TRUE(
+        ReportedError(r.diags, "expected identifier, got token", 4, "6.8"))
         << specifier;
   }
 }
@@ -104,7 +126,12 @@ TEST(KeywordVersionExampleParsing,
     const std::string kBody =
         std::string("module t;\n  ") + decl + "\nendmodule\n";
     EXPECT_TRUE(ParseWithPreprocessorOk(Guarded("1364-2001", kBody))) << decl;
-    EXPECT_FALSE(ParseWithPreprocessorOk(Guarded("1800-2005", kBody))) << decl;
+    // Every spelling heads its declaration with a variable type, so all five
+    // reach the same §6.8 report on the name that follows it.
+    auto r = ParseWithPreprocessor(Guarded("1800-2005", kBody));
+    EXPECT_TRUE(
+        ReportedError(r.diags, "expected identifier, got token", 4, "6.8"))
+        << decl;
   }
 }
 
@@ -122,7 +149,12 @@ TEST(KeywordVersionExampleParsing, SystemVerilogRegionAcceptsTheInterface) {
 // 1364 lists, none of which reserves either word.
 TEST(KeywordVersionExampleParsing, VerilogRegionRejectsTheInterface) {
   for (const char* specifier : {"1364-2005", "1364-2001", "1364-1995"}) {
-    EXPECT_FALSE(ParseWithPreprocessorOk(Guarded(specifier, kInterface)))
+    // §3.12.1 owns the report: with `interface` an ordinary identifier again,
+    // the declaration heads nothing the compilation unit admits and
+    // Parser::ParseTopLevel says so at src/parser/parser.cpp:499.
+    auto r = ParseWithPreprocessor(Guarded(specifier, kInterface));
+    EXPECT_TRUE(
+        ReportedError(r.diags, "expected top-level declaration", 3, "3.12.1"))
         << specifier;
   }
 }
@@ -139,7 +171,13 @@ TEST(KeywordVersionExampleParsing, VerilogRegionAcceptsInterfaceWordsAsNames) {
     const std::string kBody =
         std::string("module t;\n  wire ") + word + ";\nendmodule\n";
     EXPECT_TRUE(ParseWithPreprocessorOk(Guarded("1364-2005", kBody))) << word;
-    EXPECT_FALSE(ParseWithPreprocessorOk(Guarded("1800-2005", kBody))) << word;
+    // §6.7 owns the report rather than §6.8, because `wire` heads the
+    // declaration and Parser::ParseVarDeclList files a net declaration's name
+    // under §6.7.
+    auto r = ParseWithPreprocessor(Guarded("1800-2005", kBody));
+    EXPECT_TRUE(
+        ReportedError(r.diags, "expected identifier, got token", 4, "6.7"))
+        << word;
   }
 }
 

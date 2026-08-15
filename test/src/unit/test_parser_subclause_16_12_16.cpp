@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -89,7 +90,9 @@ TEST(PropertyCaseParsing, MultipleDefaultsIsError) {
       "    endcase\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "property case statement shall have at most one 'default' item",
+      6, "16.12.16"));
 }
 
 // §16.12.16: the multiple-default rule is triggered by the `default` keyword
@@ -109,7 +112,9 @@ TEST(PropertyCaseParsing, MultipleColonlessDefaultsIsError) {
       "    endcase\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "property case statement shall have at most one 'default' item",
+      6, "16.12.16"));
 }
 
 // §16.12.16: the at-most-one-default rule is per case statement. Two sibling

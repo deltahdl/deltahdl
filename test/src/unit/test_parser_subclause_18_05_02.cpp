@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -17,11 +18,16 @@ const ClassMember* FindConstraint(const ClassDecl* cls, std::string_view name) {
 // followed by ':final'), so a declaration that names both is rejected at parse
 // time.
 TEST(ConstraintInheritanceParsing, InitialAndExtendsRejected) {
-  EXPECT_FALSE(
-      ParseOk("class C;\n"
-              "  rand int x;\n"
-              "  constraint :initial :extends c { x > 0; }\n"
-              "endclass\n"));
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint :initial :extends c { x > 0; }\n"
+      "endclass\n");
+  // The override-specifier grammar admits ':final' after the second ':' and
+  // nothing else, so the parser stands at 'extends' wanting the constraint
+  // name; §18.5 is the subclause the constraint-name report names.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got token", 3, "18.5"));
 }
 
 // 18.5.2: ':final' may be combined with ':initial'. The parser accepts the

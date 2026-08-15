@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -326,7 +327,9 @@ TEST(PrimaryParsing, ModulePathPrimaryParenthesizedMintypMax) {
 }
 
 TEST(PrimaryParsing, ErrorUnclosedParenthesizedExpr) {
-  EXPECT_FALSE(ParseOk("module m; initial x = (1 + 2; endmodule\n"));
+  auto r = Parse("module m; initial x = (1 + 2; endmodule\n");
+  // §11.5 owns the parenthesized operand form of a primary.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 1, "11.5"));
 }
 
 TEST(PrimaryParsing, PrimaryThis) {
@@ -361,7 +364,9 @@ TEST(PrimaryParsing, ConstantPrimaryParenthesized) {
 }
 
 TEST(PrimaryParsing, ErrorUnclosedBitSelect) {
-  EXPECT_FALSE(ParseOk("module m; initial x = a[3; endmodule\n"));
+  auto r = Parse("module m; initial x = a[3; endmodule\n");
+  // §11.5.1 owns the bit-select brackets.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ']', got ';'", 1, "11.5.1"));
 }
 
 TEST(PrimaryParsing, PrimaryAssignmentPattern) {
@@ -414,7 +419,9 @@ TEST(PrimaryParsing, ConstantPrimaryConstantCast) {
 // cast ::= casting_type ' ( expression ) — the parenthesized operand is
 // mandatory; a cast whose closing parenthesis is missing must be rejected.
 TEST(PrimaryParsing, ErrorCastMissingCloseParen) {
-  EXPECT_FALSE(ParseOk("module m; initial x = int'(3; endmodule\n"));
+  auto r = Parse("module m; initial x = int'(3; endmodule\n");
+  // §6.24.1 owns the cast operator's parentheses.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 1, "6.24.1"));
 }
 
 }  // namespace

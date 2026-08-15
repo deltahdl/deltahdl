@@ -3,6 +3,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -446,15 +447,23 @@ TEST(ExpressionParsing, AllUnaryOperators) {
 
 TEST(ExpressionParsing, ErrorMissingTernaryColon) {
   auto r = Parse("module m; initial x = a ? b c; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §11.4.11 owns the conditional operator's ':'.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ':', got identifier", 1, "11.4.11"));
 }
 
 TEST(ExpressionParsing, ErrorInsideMissingBrace) {
-  EXPECT_FALSE(ParseOk("module m; initial if (x inside 1) a = 1; endmodule\n"));
+  auto r = Parse("module m; initial if (x inside 1) a = 1; endmodule\n");
+  // §11.4.13 owns the open_range_list braces the 'inside' operator requires.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '{', got integer literal", 1,
+                            "11.4.13"));
 }
 
 TEST(ExpressionParsing, ErrorIncompletePartSelect) {
-  EXPECT_FALSE(ParseOk("module m; initial x = a[7:]; endmodule\n"));
+  auto r = Parse("module m; initial x = a[7:]; endmodule\n");
+  // §11.2 owns the report Parser::ParsePrimaryExpr makes for the missing
+  // right bound; §11.5.1 states the part-select itself.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
 TEST(ExpressionParsing, ConstantIndexedRangePlusInPackedDimSelect) {
@@ -484,17 +493,23 @@ TEST(ExpressionParsing, ConstantIndexedRangeMinusInPackedDimSelect) {
 }
 
 TEST(ExpressionParsing, ErrorTaggedExpressionMissingMember) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  initial x = tagged ;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = tagged ;\n"
+      "endmodule\n");
+  // §7.3.2 owns the member name a tagged union expression names.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ';'", 2, "7.3.2"));
 }
 
 TEST(ExpressionParsing, ErrorBinaryOperatorMissingRhs) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  initial x = a + ;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = a + ;\n"
+      "endmodule\n");
+  // §11.2 owns the report Parser::ParsePrimaryExpr makes for the missing
+  // right operand.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
 // §A.8.3 expression ::= unary_operator { attribute_instance } primary — the
@@ -549,20 +564,29 @@ TEST(ExpressionParsing, ModulePathConditionalTernaryCondition) {
 // §A.8.3 inc_or_dec_expression requires a variable_lvalue operand; a prefix
 // ++/-- with no operand must be rejected.
 TEST(ExpressionParsing, ErrorPrefixIncrementMissingOperand) {
-  EXPECT_FALSE(ParseOk("module m; initial begin ++; end endmodule\n"));
+  auto r = Parse("module m; initial begin ++; end endmodule\n");
+  // §11.2 owns the report Parser::ParsePrimaryExpr makes for the missing
+  // operand of the prefix '++'.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
 // §A.8.3 indexed_range ::= expression +: constant_expression — the width after
 // '+:' is mandatory; omitting it must be rejected.
 TEST(ExpressionParsing, ErrorIndexedPartSelectMissingWidth) {
-  EXPECT_FALSE(ParseOk("module m; initial x = a[0+:]; endmodule\n"));
+  auto r = Parse("module m; initial x = a[0+:]; endmodule\n");
+  // §11.2 owns the report Parser::ParsePrimaryExpr makes for the missing
+  // width; §11.5.1 states the indexed part-select itself.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
 // §A.8.3 constant_range ::= constant_expression : constant_expression — both
 // bounds are mandatory; a packed dimension missing its right bound must be
 // rejected.
 TEST(ExpressionParsing, ErrorConstantRangeMissingBound) {
-  EXPECT_FALSE(ParseOk("module m; logic [7:] x; endmodule\n"));
+  auto r = Parse("module m; logic [7:] x; endmodule\n");
+  // §11.2 owns the report Parser::ParsePrimaryExpr makes for the missing
+  // right bound; §6.9 states the packed dimension it belongs to.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
 TEST(ExpressionParsing, ConstantRangeReversedBounds) {

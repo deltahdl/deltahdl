@@ -1,6 +1,7 @@
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -171,7 +172,10 @@ TEST(ModuleAndHierarchyParsing, ErrorNestedModuleMissingEndmodule) {
       "  module inner;\n"
       "    wire w;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The one `endmodule` closes `inner`, so `outer` runs to end of file and
+  // src/parser/parser.cpp:658 reports the missing keyword under §23.2, the
+  // subclause that owns module_declaration's terminator.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 5, "23.2"));
 }
 
 }  // namespace

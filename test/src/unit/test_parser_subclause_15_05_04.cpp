@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -119,7 +120,9 @@ TEST(WaitOrderParser, WaitOrderEmptyOperandListRejected) {
       "    wait_order();\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §11.2 owns the report: the missing first operand is read as a missing
+  // expression, and §15.5.4's own report is the ')' the parser then wants.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
 TEST(WaitOrderParser, WaitOrderElseOnly) {

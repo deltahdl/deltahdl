@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "simulator/udp_eval.h"
 
 using namespace delta;
@@ -289,13 +290,17 @@ TEST(UdpDeclGrammar, EndLabelSequential) {
 }
 
 TEST(UdpDeclGrammar, EndLabelMismatchIsError) {
-  EXPECT_FALSE(
-      ParseOk("primitive inv(output y, input a);\n"
-              "  table\n"
-              "    0 : 1;\n"
-              "    1 : 0;\n"
-              "  endtable\n"
-              "endprimitive : wrong_name\n"));
+  auto r = Parse(
+      "primitive inv(output y, input a);\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive : wrong_name\n");
+  // Parser::MatchEndLabel is shared by every block end label and files its
+  // report under §9.3.4, not under the UDP subclauses.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "end label 'wrong_name' does not match 'inv'", 6, "9.3.4"));
 }
 
 TEST(UdpDeclGrammar, AttributeOnAnsiUdp) {
@@ -361,13 +366,16 @@ TEST(UdpDeclGrammar, AttributeOnExternUdp) {
 // semicolon after the closing parenthesis of its port list. Dropping it must
 // be diagnosed by the declaration parser.
 TEST(UdpDeclGrammar, MissingSemicolonAfterPortListIsError) {
-  EXPECT_FALSE(
-      ParseOk("primitive inv(output out, input in)\n"
-              "  table\n"
-              "    0 : 1;\n"
-              "    1 : 0;\n"
-              "  endtable\n"
-              "endprimitive\n"));
+  auto r = Parse(
+      "primitive inv(output out, input in)\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  // §29.3.1 owns the UDP header, so Parser::ParseUdpAnsiOutputHeader files the
+  // missing semicolon there rather than under A.5.1.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 2, "29.3.1"));
 }
 
 // Every alternative of the A.5.1 udp_declaration production ends in the
@@ -375,12 +383,16 @@ TEST(UdpDeclGrammar, MissingSemicolonAfterPortListIsError) {
 // matches no alternative and must be diagnosed. The clause 29.3.1 file carries
 // the same requirement stated as UDP definition prose.
 TEST(UdpDeclGrammar, MissingEndprimitiveInUdpDeclarationProductionIsError) {
-  EXPECT_FALSE(
-      ParseOk("primitive inv(output out, input in);\n"
-              "  table\n"
-              "    0 : 1;\n"
-              "    1 : 0;\n"
-              "  endtable\n"));
+  auto r = Parse(
+      "primitive inv(output out, input in);\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n");
+  // §29.3 owns udp_declaration, so Parser::ParseUdpDecl files the missing
+  // endprimitive there. TokenKindName renders every keyword as `token`, so the
+  // subclause and the line carry which keyword was wanted.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 6, "29.3"));
 }
 
 }  // namespace

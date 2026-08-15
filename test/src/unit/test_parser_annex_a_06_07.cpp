@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -170,7 +171,9 @@ TEST(CaseInsideItemParsing, RejectsCasezWithInside) {
       "    endcase\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §12.5 owns the case statement; A.6.7 only states its BNF.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "'inside' is only valid with 'case'", 3, "12.5"));
 }
 
 TEST(CaseInsideItemParsing, RangeListMultipleValueRanges) {
@@ -394,7 +397,9 @@ TEST(CaseInsideItemParsing, RejectsCasexWithInside) {
       "    endcase\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §12.5 owns the case statement; A.6.7 only states its BNF.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "'inside' is only valid with 'case'", 3, "12.5"));
 }
 
 TEST(CaseInsideItemParsing, RejectsInsideCombinedWithMatches) {
@@ -406,7 +411,9 @@ TEST(CaseInsideItemParsing, RejectsInsideCombinedWithMatches) {
       "    endcase\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §12.5 owns the case statement; A.6.7 only states its BNF.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'matches' and 'inside' cannot be used together", 3, "12.5"));
 }
 
 TEST(CaseInsideItemParsing, DefaultOnlyItem) {
@@ -456,7 +463,9 @@ TEST(RandcaseItemParsing, RejectsDefaultLabel) {
       "    endcase\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // A randcase_item begins with a weight expression, so `default` reaches
+  // ParsePrimaryExpr, whose report is filed under §11.2.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 4, "11.2"));
 }
 
 }  // namespace

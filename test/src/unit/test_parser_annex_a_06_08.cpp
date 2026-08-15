@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -514,7 +515,9 @@ TEST(LoopSyntaxParsing, ErrorForMissingSemicolonAfterInit) {
       "    for (int i = 0 i < 10; i++) x = i;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §12.7.1 owns the for statement; A.6.8 only states its BNF.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got identifier", 3, "12.7.1"));
 }
 
 TEST(LoopSyntaxParsing, ErrorForMissingCloseParen) {
@@ -524,7 +527,9 @@ TEST(LoopSyntaxParsing, ErrorForMissingCloseParen) {
       "    for (int i = 0; i < 10; i++ x = i;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §12.7.1 owns the for statement; A.6.8 only states its BNF.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ')', got identifier", 3, "12.7.1"));
 }
 
 // loop_statement ::= for ... — for_initialization may declare more than one
@@ -659,7 +664,10 @@ TEST(LoopSyntaxParsing, ErrorDoWhileMissingWhile) {
       "    do x = x + 1;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §12.7.5 owns the do-while statement; A.6.8 only states its BNF. Every
+  // keyword answers "token" in a report, so the missing `while` and the `end`
+  // standing where it belongs both read that way.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got token", 4, "12.7.5"));
 }
 
 // loop_statement ::= foreach ( ps_or_hierarchical_array_identifier
@@ -728,7 +736,9 @@ TEST(LoopSyntaxParsing, ErrorRepeatMissingParen) {
       "    repeat 8 x = x + 1;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §12.7.2 owns the repeat statement; A.6.8 only states its BNF.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got integer literal", 3, "12.7.2"));
 }
 
 // while ( expression ) — the parentheses around the condition are required.
@@ -739,7 +749,9 @@ TEST(LoopSyntaxParsing, ErrorWhileMissingParen) {
       "    while x < 10 x = x + 1;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §12.7.4 owns the while statement; A.6.8 only states its BNF.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got identifier", 3, "12.7.4"));
 }
 
 // foreach ( array [ loop_variables ] ) — the bracketed loop-variable list is
@@ -752,7 +764,8 @@ TEST(LoopSyntaxParsing, ErrorForeachMissingBrackets) {
       "    foreach (arr) arr[0] = 0;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §12.7.3 owns the foreach statement; A.6.8 only states its BNF.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '[', got ')'", 4, "12.7.3"));
 }
 
 }  // namespace

@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "model_gate_logic.h"
 
 using namespace delta;
@@ -13,7 +14,10 @@ TEST(CmosSwitches, CmosRejectsFiveTerminals) {
       "module m;\n"
       "  cmos c1(out, data, nctrl, pctrl, extra);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the terminal-count rule for every gate; §28.9 states only which
+  // four terminals a cmos switch takes.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(CmosSwitches, CmosRejectsThreeTerminals) {
@@ -21,7 +25,8 @@ TEST(CmosSwitches, CmosRejectsThreeTerminals) {
       "module m;\n"
       "  cmos c1(out, data, nctrl);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(CmosSwitches, CmosRejectsTwoTerminals) {
@@ -29,7 +34,8 @@ TEST(CmosSwitches, CmosRejectsTwoTerminals) {
       "module m;\n"
       "  cmos c1(out, data);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(CmosSwitches, RcmosRejectsFiveTerminals) {
@@ -37,7 +43,8 @@ TEST(CmosSwitches, RcmosRejectsFiveTerminals) {
       "module m;\n"
       "  rcmos r1(out, data, nctrl, pctrl, extra);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(CmosSwitches, RcmosRejectsThreeTerminals) {
@@ -45,7 +52,8 @@ TEST(CmosSwitches, RcmosRejectsThreeTerminals) {
       "module m;\n"
       "  rcmos r1(out, data, nctrl);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(CmosSwitches, RcmosRejectsTwoTerminals) {
@@ -53,7 +61,8 @@ TEST(CmosSwitches, RcmosRejectsTwoTerminals) {
       "module m;\n"
       "  rcmos r1(out, data);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(CmosSwitches, NamedCmosInstantiation) {
@@ -169,7 +178,9 @@ TEST(CmosSwitches, CmosTooManyDelaysRejected) {
       "module m;\n"
       "  cmos #(1, 2, 3, 4) c1(out, data, nctrl, pctrl);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::ParseGateDelay closes the delay list after the third value, and
+  // files the missing ')' under §28.16, where the delay forms are stated.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 2, "28.16"));
 }
 
 TEST(CmosSwitches, CmosTerminalOrderIsOutDataNctrlPctrl) {
@@ -243,7 +254,7 @@ TEST(CmosSwitches, RcmosTooManyDelaysRejected) {
       "module m;\n"
       "  rcmos #(1, 2, 3, 4) r1(out, data, nctrl, pctrl);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 2, "28.16"));
 }
 
 // rcmos shares cmos's terminal ordering: data output, data input, then the

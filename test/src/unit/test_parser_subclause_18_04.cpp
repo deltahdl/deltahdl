@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -34,7 +35,10 @@ TEST(ClassSyntaxParsing, ErrorBothRandAndRandc) {
       "class C;\n"
       "  rand randc int x;\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  // §8.3 owns the class-property qualifier report; §18.4 states the rand and
+  // randc modes but has no report of its own here.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "cannot combine 'rand' and 'randc' qualifiers", 2, "8.3"));
 }
 
 }  // namespace

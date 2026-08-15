@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -76,11 +77,14 @@ TEST(IoSystemTaskParsing, FeofFdFromFopenCallResult) {
 
 // Negative form: an unterminated $feof call cannot parse.
 TEST(IoSystemTaskParsing, UnterminatedFeofRejected) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  integer fd, code;\n"
-              "  initial code = $feof(fd;\n"
-              "endmodule\n"));
+  auto result = Parse(
+      "module t;\n"
+      "  integer fd, code;\n"
+      "  initial code = $feof(fd;\n"
+      "endmodule\n");
+  // §13.5 owns the closing parenthesis of a subroutine call argument list;
+  // §21.3.8 states the $feof argument list but reports nothing of its own.
+  EXPECT_TRUE(ReportedError(result.diags, "expected ')', got ';'", 3, "13.5"));
 }
 
 }  // namespace

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -76,12 +77,15 @@ TEST(ProceduralAssignAndControlParsing, ForkJoinAnyWithDisableFork) {
 }
 
 TEST(DisableForkParsing, DisableForkMissingSemicolon) {
-  EXPECT_TRUE(Parse("module m;\n"
-                    "  initial begin\n"
-                    "    disable fork\n"
-                    "  end\n"
-                    "endmodule\n")
-                  .has_errors);
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    disable fork\n"
+      "  end\n"
+      "endmodule\n");
+  // TokenKindName answers "token" for every keyword, so the sentence names the
+  // `end` on line 4 only as the token that stood where the ';' should have.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "9.6.3"));
 }
 
 }  // namespace

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -60,7 +61,10 @@ TEST(ForeachIterativeConstraint, LoopVariableNameClashRejected) {
       "  rand int A[];\n"
       "  constraint c { foreach (A[A]) A[A] > 0; }\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "foreach loop variable 'A' may not have the same "
+                            "name as the array it iterates over",
+                            3, "18.5.7.1"));
 }
 
 // 18.5.7.1: the loop-variable naming rule fires on the clashing variable even
@@ -71,7 +75,10 @@ TEST(ForeachIterativeConstraint, LaterLoopVariableNameClashRejected) {
       "  rand int A[2][3];\n"
       "  constraint c { foreach (A[i, A]) A[i][0] > 0; }\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "foreach loop variable 'A' may not have the same "
+                            "name as the array it iterates over",
+                            3, "18.5.7.1"));
 }
 
 // 18.5.7.1: a loop variable that merely resembles, but does not equal, the
@@ -111,7 +118,10 @@ TEST(ForeachIterativeConstraint, FunctionCallArrayIdentifierRejected) {
       "  rand int A[];\n"
       "  constraint c { foreach (f()[i]) A[i] > 0; }\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a function call may not stand in for the array "
+                            "identifier of a foreach iterative constraint",
+                            3, "18.5.7.1"));
 }
 
 // 18.5.7.1: the array being iterated may be named by a hierarchical reference,
@@ -125,7 +135,10 @@ TEST(ForeachIterativeConstraint,
       "  rand int arr[];\n"
       "  constraint c { foreach (this.arr[arr]) this.arr[arr] > 0; }\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "foreach loop variable 'arr' may not have the same "
+                            "name as the array it iterates over",
+                            3, "18.5.7.1"));
 }
 
 // 18.5.7.1: the foreach argument is a ps_or_hierarchical_array_identifier, so

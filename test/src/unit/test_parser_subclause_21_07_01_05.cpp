@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -72,12 +73,16 @@ TEST(IoSystemTaskParsing, DumplimitExpressionFilesize) {
 // Negative: the production requires the terminating semicolon, so a
 // $dumplimit task enable running straight into the block end is rejected.
 TEST(IoSystemTaskParsing, DumplimitMissingSemicolonRejected) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  initial begin\n"
-              "    $dumplimit(200)\n"
-              "  end\n"
-              "endmodule\n"));
+  auto result = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    $dumplimit(200)\n"
+      "  end\n"
+      "endmodule\n");
+  // §12.3 owns the semicolon that terminates a subroutine call statement;
+  // §21.7.1.5 states the dumplimit_task production but reports nothing itself.
+  EXPECT_TRUE(
+      ReportedError(result.diags, "expected ';', got token", 4, "12.3"));
 }
 
 }  // namespace

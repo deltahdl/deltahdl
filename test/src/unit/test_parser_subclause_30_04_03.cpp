@@ -1,6 +1,7 @@
 #include "fixture_parser.h"
 #include "fixture_specify.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -298,7 +299,8 @@ TEST(SpecifyPathParsing, ErrorDataSourceMissingColon) {
       "    (posedge clk => (q d)) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ':', got identifier", 3, "30.4.3"));
 }
 
 // The data source requires an expression after the ':'.
@@ -309,7 +311,9 @@ TEST(SpecifyPathParsing, ErrorDataSourceMissingExpression) {
       "    (posedge clk => (q :)) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §11.2 owns the expression the data source is, and the missing operand is
+  // reported there; §30.4.3 has no report of its own for an empty data source.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
 }  // namespace

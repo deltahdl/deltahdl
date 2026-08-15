@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -66,7 +67,9 @@ TEST(TimingCheckCommandParsing, ErrorSetupholdMissingSecondLimit) {
       "  $setuphold(posedge clk, data, 10);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "$setuphold requires two timing_check_limit arguments", 3,
+      "31.3.3"));
 }
 
 TEST(TimingCheckCommandParsing, ErrorSetupholdMissingBothLimits) {
@@ -76,7 +79,9 @@ TEST(TimingCheckCommandParsing, ErrorSetupholdMissingBothLimits) {
       "  $setuphold(posedge clk, data);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // With no limit at all the argument list stops matching at the separator, so
+  // the shared timing-check parser reports under §31.2 rather than §31.3.3.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ',', got ')'", 3, "31.2"));
 }
 
 TEST(TimingCheckCommandParsing, SetupholdConstantExpressionLimits) {

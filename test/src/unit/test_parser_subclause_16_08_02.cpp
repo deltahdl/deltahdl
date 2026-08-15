@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -53,7 +54,9 @@ TEST(SequenceLocalLvarArgumentParsing, DirectionWithoutLocalIsError) {
       "    @(posedge clk) a;\n"
       "  endsequence\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "sequence port direction requires the 'local' keyword", 2,
+      "16.8.2"));
 }
 
 // §16.8.2: the `local`-required-with-direction rule holds for `input` too — an
@@ -66,7 +69,9 @@ TEST(SequenceLocalLvarArgumentParsing, InputDirectionWithoutLocalIsError) {
       "    @(posedge clk) a;\n"
       "  endsequence\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "sequence port direction requires the 'local' keyword", 2,
+      "16.8.2"));
 }
 
 // §16.8.2: likewise for `inout` — a direction keyword without a preceding
@@ -78,7 +83,9 @@ TEST(SequenceLocalLvarArgumentParsing, InoutDirectionWithoutLocalIsError) {
       "    @(posedge clk) b;\n"
       "  endsequence\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "sequence port direction requires the 'local' keyword", 2,
+      "16.8.2"));
 }
 
 // §16.8.2: it shall be illegal to specify a default actual argument for a
@@ -90,7 +97,11 @@ TEST(SequenceLocalLvarArgumentParsing, DefaultActualOnInoutLocalIsError) {
       "    @(posedge clk) b;\n"
       "  endsequence\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "default actual argument is illegal for a local "
+                            "variable formal argument of direction inout or "
+                            "output",
+                            2, "16.8.2"));
 }
 
 // §16.8.2: it shall be illegal to specify a default actual argument for a
@@ -102,7 +113,11 @@ TEST(SequenceLocalLvarArgumentParsing, DefaultActualOnOutputLocalIsError) {
       "    @(posedge clk) c;\n"
       "  endsequence\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "default actual argument is illegal for a local "
+                            "variable formal argument of direction inout or "
+                            "output",
+                            2, "16.8.2"));
 }
 
 // §16.8.2: a local input formal may have a default actual argument; this is
@@ -157,7 +172,10 @@ TEST(SequenceLocalLvarArgumentParsing, LocalWithoutExplicitTypeIsError) {
       "    @(posedge clk) a;\n"
       "  endsequence\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a local variable formal argument requires an "
+                            "explicit type in its own port item",
+                            2, "16.8.2"));
 }
 
 // §16.8.2: a port item with `local` whose type is a user-defined type alias
@@ -212,7 +230,10 @@ TEST(SequenceLocalLvarArgumentParsing, LocalEventTypeIsError) {
       "    @(posedge clk) e;\n"
       "  endsequence\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "the type of a local variable formal argument must "
+                            "be one of the types allowed in",
+                            2, "16.8.2"));
 }
 
 // §16.8.2: `property` is a formal-type category (§16.12.19) but not a §16.6
@@ -225,7 +246,10 @@ TEST(SequenceLocalLvarArgumentParsing, LocalPropertyTypeIsError) {
       "    @(posedge clk) 1;\n"
       "  endsequence\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "the type of a local variable formal argument must "
+                            "be one of the types allowed in",
+                            2, "16.8.2"));
 }
 
 // §16.8.2: `sequence` and `untyped`, though legal formal-type categories for a
@@ -238,14 +262,20 @@ TEST(SequenceLocalLvarArgumentParsing, LocalSequenceOrUntypedTypeIsError) {
       "    @(posedge clk) 1;\n"
       "  endsequence\n"
       "endmodule\n");
-  EXPECT_TRUE(r1.has_errors);
+  EXPECT_TRUE(ReportedError(r1.diags,
+                            "the type of a local variable formal argument must "
+                            "be one of the types allowed in",
+                            2, "16.8.2"));
   auto r2 = Parse(
       "module m;\n"
       "  sequence s(local untyped u);\n"
       "    @(posedge clk) 1;\n"
       "  endsequence\n"
       "endmodule\n");
-  EXPECT_TRUE(r2.has_errors);
+  EXPECT_TRUE(ReportedError(r2.diags,
+                            "the type of a local variable formal argument must "
+                            "be one of the types allowed in",
+                            2, "16.8.2"));
 }
 
 // §16.8.2: a local formal whose type IS one of the §16.6 data types (here the

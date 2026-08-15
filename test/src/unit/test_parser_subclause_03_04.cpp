@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -21,7 +22,11 @@ TEST(ProgramBlockParsing, ProgramEndprogramEnclosureProducesProgramDecl) {
 
 TEST(ProgramBlockParsing, ProgramBodyTerminatesOnlyAtEndprogram) {
   auto r = Parse("program p; initial begin end\n");
-  EXPECT_TRUE(r.has_errors);
+  // §24.3 owns the report: Parser::ParseProgramDecl demands 'endprogram' and
+  // reaches EOF instead, which stands on line 2 because the source ends in a
+  // newline. TokenKindName answers "token" for every keyword, so the message
+  // names no keyword of its own.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 2, "24.3"));
 }
 
 TEST(ProgramBlockParsing, ProgramScopeEncapsulatesItems) {
@@ -140,7 +145,10 @@ TEST(ProgramBlockParsing, ProgramAcceptsPortListWithDirections) {
 
 TEST(ProgramBlockParsing, ProgramRejectsAlwaysProcedure) {
   auto r = Parse("program p; always @(*) begin end endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  // §24.3 owns every in-program prohibition the parser reports; §3.4 has no
+  // report of its own here.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "always procedures not allowed in programs", 1, "24.3"));
 }
 
 // The prohibition on "always procedures" covers every always variant, not just
@@ -148,7 +156,8 @@ TEST(ProgramBlockParsing, ProgramRejectsAlwaysProcedure) {
 // in-program guard must reject.
 TEST(ProgramBlockParsing, ProgramRejectsAlwaysCombProcedure) {
   auto r = Parse("program p; always_comb begin end endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "always procedures not allowed in programs", 1, "24.3"));
 }
 
 TEST(ProgramBlockParsing, ProgramRejectsAlwaysFfProcedure) {
@@ -157,7 +166,8 @@ TEST(ProgramBlockParsing, ProgramRejectsAlwaysFfProcedure) {
       "  logic clk, q;\n"
       "  always_ff @(posedge clk) q <= 1'b1;\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "always procedures not allowed in programs", 3, "24.3"));
 }
 
 TEST(ProgramBlockParsing, ProgramRejectsAlwaysLatchProcedure) {
@@ -166,7 +176,8 @@ TEST(ProgramBlockParsing, ProgramRejectsAlwaysLatchProcedure) {
       "  logic en, d, q;\n"
       "  always_latch if (en) q = d;\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "always procedures not allowed in programs", 3, "24.3"));
 }
 
 TEST(ProgramBlockParsing, ProgramRejectsGatePrimitiveInstance) {
@@ -175,7 +186,8 @@ TEST(ProgramBlockParsing, ProgramRejectsGatePrimitiveInstance) {
       "  wire a, b, c;\n"
       "  and g1(c, a, b);\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "primitive instances not allowed in programs", 3, "24.3"));
 }
 
 TEST(ProgramBlockParsing, ProgramRejectsUserDefinedPrimitiveInstance) {
@@ -190,7 +202,8 @@ TEST(ProgramBlockParsing, ProgramRejectsUserDefinedPrimitiveInstance) {
       "  wire x, z;\n"
       "  my_udp u1(x, z);\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "primitive instances not allowed in programs", 9, "24.3"));
 }
 
 TEST(ProgramBlockParsing, ProgramRejectsModuleInstance) {
@@ -199,7 +212,8 @@ TEST(ProgramBlockParsing, ProgramRejectsModuleInstance) {
       "program p;\n"
       "  sub inst();\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "instantiations not allowed in programs",
+                            3, "24.3"));
 }
 
 TEST(ProgramBlockParsing, ProgramRejectsInterfaceInstance) {
@@ -208,7 +222,8 @@ TEST(ProgramBlockParsing, ProgramRejectsInterfaceInstance) {
       "program p;\n"
       "  bus inst();\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "instantiations not allowed in programs",
+                            3, "24.3"));
 }
 
 TEST(ProgramBlockParsing, ProgramRejectsNestedProgramDeclaration) {
@@ -216,7 +231,8 @@ TEST(ProgramBlockParsing, ProgramRejectsNestedProgramDeclaration) {
       "program outer;\n"
       "  program inner; endprogram\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "program declarations not allowed in programs", 2, "24.3"));
 }
 
 TEST(ProgramBlockParsing, ProgramRejectsOtherProgramInstance) {
@@ -225,7 +241,8 @@ TEST(ProgramBlockParsing, ProgramRejectsOtherProgramInstance) {
       "program p;\n"
       "  other inst();\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "instantiations not allowed in programs",
+                            3, "24.3"));
 }
 
 }  // namespace

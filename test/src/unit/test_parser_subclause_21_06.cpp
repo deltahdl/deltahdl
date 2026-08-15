@@ -6,6 +6,7 @@
 // be a string literal or a variable; $value$plusargs takes a second,
 // destination-variable argument.
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -85,12 +86,16 @@ TEST(PlusargsParsing, CallInsideTaskBody) {
 
 // Negative: an unterminated call is a syntax error.
 TEST(PlusargsParsing, UnterminatedTestPlusargsRejected) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  initial begin\n"
-              "    if ($test$plusargs(\"VERBOSE\") $display(\"v\");\n"
-              "  end\n"
-              "endmodule\n"));
+  auto result = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if ($test$plusargs(\"VERBOSE\") $display(\"v\");\n"
+      "  end\n"
+      "endmodule\n");
+  // §12.4 owns the parentheses around a conditional statement's condition, and
+  // that is what the missing ')' after the $test$plusargs call breaks first.
+  EXPECT_TRUE(ReportedError(result.diags, "expected ')', got system identifier",
+                            3, "12.4"));
 }
 
 }  // namespace

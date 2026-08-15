@@ -8,6 +8,7 @@
 #include "helpers_keyword_sweep_skips.h"
 #include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "model_identifier_positions.h"
 #include "model_keyword_tables.h"
 
@@ -179,20 +180,38 @@ TEST(CompilerDirectiveParsing,
   EXPECT_TRUE(typed_in_body);
 
   // None of the three forms can be written under the union of everything this
-  // version includes, where the words introduce nothing.
-  EXPECT_FALSE(
-      ParseWithPreprocessorOk(In2005("module m;\n  int counted = 21;\n"
-                                     "endmodule\n")));
-  EXPECT_FALSE(ParseWithPreprocessorOk(
+  // version includes, where the words introduce nothing. Each of the three
+  // draws a different report, because what an ordinary identifier followed by
+  // a second name reads as depends on what comes after it. §23.3.2 owns the
+  // first, where `int counted` reads as a module name and an instance name and
+  // Parser::ParseModuleInstList wants the port connection list.
+  auto initialized =
+      ParseWithPreprocessor(In2005("module m;\n  int counted = 21;\n"
+                                   "endmodule\n"));
+  EXPECT_TRUE(ReportedError(initialized.diags, "expected '(', got '='",
+                            LineInRegion(2), "23.3.2"));
+
+  // §23.2.2.2 owns the second: `logic` is read as the first port's own name
+  // and `[7:0]` as its unpacked dimension, which leaves `a` where
+  // Parser::ParsePortList wants the closing parenthesis.
+  auto ansi = ParseWithPreprocessor(
       In2005("module ch (input logic [7:0] a, output int y);\n"
              "  assign y = a;\n"
-             "endmodule\n")));
-  EXPECT_FALSE(
-      ParseWithPreprocessorOk(In2005("module ch (a, y);\n"
-                                     "  input  [7:0] a;\n"
-                                     "  output [7:0] y;\n"
-                                     "  logic  [7:0] y;\n"
-                                     "endmodule\n")));
+             "endmodule\n"));
+  EXPECT_TRUE(ReportedError(ansi.diags, "expected ')', got identifier",
+                            LineInRegion(1), "23.2.2.2"));
+
+  // §6.8 owns the third: a packed dimension is where the declaration was meant
+  // to end, so Parser::ParsePlainVarDecl demands the semicolon at
+  // src/parser/parser_items.cpp:712.
+  auto in_body =
+      ParseWithPreprocessor(In2005("module ch (a, y);\n"
+                                   "  input  [7:0] a;\n"
+                                   "  output [7:0] y;\n"
+                                   "  logic  [7:0] y;\n"
+                                   "endmodule\n"));
+  EXPECT_TRUE(ReportedError(in_body.diags, "expected ';', got '['",
+                            LineInRegion(4), "6.8"));
 }
 
 // The keyword roles the additions exist for, starting with the data types.
@@ -246,7 +265,12 @@ TEST(CompilerDirectiveParsing,
     EXPECT_TRUE(found) << d.name;
   }
 
-  EXPECT_FALSE(ParseWithPreprocessorOk(In2005(kSrc)));
+  // §6.8 owns the report: with `logic` an ordinary identifier the first
+  // declaration reads as a variable of an implicit type, and its packed
+  // dimension is where Parser::ParsePlainVarDecl expected the semicolon.
+  auto before = ParseWithPreprocessor(In2005(kSrc));
+  EXPECT_TRUE(ReportedError(before.diags, "expected ';', got '['",
+                            LineInRegion(2), "6.8"));
 }
 
 // The aggregate and user-defined type words, which reach the parser by a path
@@ -288,7 +312,13 @@ TEST(CompilerDirectiveParsing,
     EXPECT_TRUE(found) << name;
   }
 
-  EXPECT_FALSE(ParseWithPreprocessorOk(In2005(kSrc)));
+  // §23.3.2 owns the report: with `typedef` and `logic` both ordinary
+  // identifiers the first line reads as a module instantiation carrying an
+  // instance range, and Parser::ParseModuleInstList wants the port connection
+  // list where the declared name stands.
+  auto before = ParseWithPreprocessor(In2005(kSrc));
+  EXPECT_TRUE(ReportedError(before.diags, "expected '(', got identifier",
+                            LineInRegion(2), "23.3.2"));
 }
 
 // The words that open a process. Each of the three inferred always forms and
@@ -315,7 +345,13 @@ TEST(CompilerDirectiveParsing, SystemVerilog2005AddedProcessWordsOpenBlocks) {
   EXPECT_NE(FindItemByKind(items, ModuleItemKind::kAlwaysLatchBlock), nullptr);
   EXPECT_NE(FindItemByKind(items, ModuleItemKind::kFinalBlock), nullptr);
 
-  EXPECT_FALSE(ParseWithPreprocessorOk(In2005(kSrc)));
+  // §23.3.2 owns the report. The header survives, because "input logic clk"
+  // reads as a port of a user-defined type; the first body declaration does
+  // not, because "logic combo" reads as a module name and an instance name and
+  // Parser::ParseModuleInstList wants the port connection list.
+  auto before = ParseWithPreprocessor(In2005(kSrc));
+  EXPECT_TRUE(ReportedError(before.diags, "expected '(', got ';'",
+                            LineInRegion(2), "23.3.2"));
 }
 
 // The words that open a statement rather than a declaration or a process. The
@@ -369,7 +405,12 @@ TEST(CompilerDirectiveParsing,
   ASSERT_NE(fn, nullptr);
   EXPECT_EQ(fn->name, "twice");
 
-  EXPECT_FALSE(ParseWithPreprocessorOk(In2005(kSrc)));
+  // §23.3.2 owns the report: "int arr [0:3]" reads as a module name, an
+  // instance name and an instance range, and Parser::ParseModuleInstList wants
+  // the port connection list after it.
+  auto before = ParseWithPreprocessor(In2005(kSrc));
+  EXPECT_TRUE(ReportedError(before.diags, "expected '(', got ';'",
+                            LineInRegion(2), "23.3.2"));
 }
 
 // The words that open a design element, which is the outermost syntactic
@@ -421,7 +462,12 @@ TEST(CompilerDirectiveParsing,
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl),
       nullptr);
 
-  EXPECT_FALSE(ParseWithPreprocessorOk(In2005(kSrc)));
+  // §3.12.1 owns the report: with `package` an ordinary identifier the first
+  // line heads nothing the compilation unit admits, and Parser::ParseTopLevel
+  // says so at src/parser/parser.cpp:499.
+  auto before = ParseWithPreprocessor(In2005(kSrc));
+  EXPECT_TRUE(ReportedError(before.diags, "expected top-level declaration",
+                            LineInRegion(1), "3.12.1"));
 }
 
 // The verification vocabulary, which is the part of Table 22-4 with no Verilog
@@ -471,7 +517,13 @@ TEST(CompilerDirectiveParsing,
   EXPECT_NE(FindItemByKind(items, ModuleItemKind::kClockingBlock), nullptr);
   EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kCovergroupDecl, "cg"));
 
-  EXPECT_FALSE(ParseWithPreprocessorOk(In2005(kSrc)));
+  // §6.8 owns the report. The header survives, because "input logic clk" reads
+  // as a port of a user-defined type; the first body declaration does not,
+  // because its packed dimension is where Parser::ParsePlainVarDecl expected
+  // the semicolon.
+  auto before = ParseWithPreprocessor(In2005(kSrc));
+  EXPECT_TRUE(ReportedError(before.diags, "expected ';', got '['",
+                            LineInRegion(2), "6.8"));
 }
 
 // Table 22-1 in its keyword role under this version: inclusion is not only
@@ -527,7 +579,12 @@ TEST(CompilerDirectiveParsing,
 
     std::string as_type =
         std::string("module m;\n  ") + word + " [7:0] v;\nendmodule\n";
-    EXPECT_FALSE(ParseWithPreprocessorOk(InSv2005(as_type)))
+    // §6.8 owns the report: the word is an ordinary identifier here, so
+    // Parser::ParsePlainVarDecl reads it as a variable of an implicit type and
+    // the packed dimension is where it expected the declaration to end.
+    auto typed = ParseWithPreprocessor(InSv2005(as_type));
+    EXPECT_TRUE(ReportedError(typed.diags, "expected ';', got '['",
+                              LineInRegion(2), "6.8"))
         << word << " is not a data type under this version";
   }
 }

@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -89,7 +90,8 @@ TEST(PackageDeclaration, PackageEndLabel) {
 }
 
 TEST(PackageDeclaration, MissingEndpackageIsError) {
-  EXPECT_FALSE(ParseOk("package p;"));
+  auto r = Parse("package p;");
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 1, "26.2"));
 }
 
 // §3.14.2.2: a package is one time scope, and a repeated timeunit or
@@ -97,19 +99,27 @@ TEST(PackageDeclaration, MissingEndpackageIsError) {
 // repeat is grammatical, so the pair below differs from its neighbours only in
 // whether the two declarations agree.
 TEST(PackageDeclaration, RepeatedTimeunitMustMatchThePreviousOne) {
-  EXPECT_FALSE(
-      ParseOk("package pkg;\n"
-              "  timeunit 1ns;\n"
-              "  timeunit 1ps;\n"
-              "endpackage\n"));
+  auto r = Parse(
+      "package pkg;\n"
+      "  timeunit 1ns;\n"
+      "  timeunit 1ps;\n"
+      "endpackage\n");
+  // §3.14.2.2 owns the matching rule and is what the report names; §26.2 states
+  // only that a package is a time scope.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "timeunit does not match prior declaration", 3, "3.14.2.2"));
 }
 
 TEST(PackageDeclaration, RepeatedTimeprecisionMustMatchThePreviousOne) {
-  EXPECT_FALSE(
-      ParseOk("package pkg;\n"
-              "  timeprecision 1ps;\n"
-              "  timeprecision 1fs;\n"
-              "endpackage\n"));
+  auto r = Parse(
+      "package pkg;\n"
+      "  timeprecision 1ps;\n"
+      "  timeprecision 1fs;\n"
+      "endpackage\n");
+  // §3.14.2.2 owns the matching rule and is what the report names.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "timeprecision does not match prior declaration", 3,
+                            "3.14.2.2"));
 }
 
 TEST(PackageDeclaration, ARepeatedTimeunitThatMatchesIsAccepted) {
@@ -120,28 +130,37 @@ TEST(PackageDeclaration, ARepeatedTimeunitThatMatchesIsAccepted) {
               "endpackage\n"));
 }
 
+// §26.2 lists package_declaration under description alone, so `package` inside
+// a module, interface or program body reaches no dispatch and is rejected by
+// the module-item fallback, whose report names §23.2.4.
 TEST(PackageDeclaration, PackageNotAllowedInsideModule) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  package inner;\n"
-              "  endpackage\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  package inner;\n"
+      "  endpackage\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
 }
 
 TEST(PackageDeclaration, PackageNotAllowedInsideInterface) {
-  EXPECT_FALSE(
-      ParseOk("interface ifc;\n"
-              "  package inner;\n"
-              "  endpackage\n"
-              "endinterface\n"));
+  auto r = Parse(
+      "interface ifc;\n"
+      "  package inner;\n"
+      "  endpackage\n"
+      "endinterface\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
 }
 
 TEST(PackageDeclaration, PackageNotAllowedInsideProgram) {
-  EXPECT_FALSE(
-      ParseOk("program prg;\n"
-              "  package inner;\n"
-              "  endpackage\n"
-              "endprogram\n"));
+  auto r = Parse(
+      "program prg;\n"
+      "  package inner;\n"
+      "  endpackage\n"
+      "endprogram\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
 }
 
 TEST(PackageDeclaration, NullItemInPackageBody) {
@@ -170,7 +189,9 @@ TEST(PackageDeclaration, LocalparamAsPackageItem) {
 }
 
 TEST(PackageDeclaration, MissingPackageIdentifierIsError) {
-  EXPECT_FALSE(ParseOk("package ; endpackage\n"));
+  auto r = Parse("package ; endpackage\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ';'", 1, "26.2"));
 }
 
 TEST(PackageDeclaration, AnonymousProgramAsPackageItem) {

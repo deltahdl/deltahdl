@@ -1,4 +1,5 @@
 #include "fixture_program.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -29,7 +30,9 @@ TEST_F(VerifyParseTest, SingleItemCrossIsError) {
       endgroup
     endmodule
   )");
-  EXPECT_TRUE(diag_.HasErrors());
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "a cross shall list at least two coverage points",
+                            5, "19.6"));
 }
 
 // §19.6: expressions cannot be used directly in a cross; a coverage point must
@@ -45,7 +48,11 @@ TEST_F(VerifyParseTest, ExpressionCrossItemIsError) {
       endgroup
     endmodule
   )");
-  EXPECT_TRUE(diag_.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      diag_.Diagnostics(),
+      "a cross item shall be a coverage point or variable identifier; "
+      "an expression cannot be used directly in a cross",
+      7, "19.6"));
 }
 
 // §19.6: the cross label is optional and, when present, precedes the

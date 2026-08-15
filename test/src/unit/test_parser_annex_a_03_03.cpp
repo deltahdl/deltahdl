@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "model_gate_logic.h"
 
 using namespace delta;
@@ -346,7 +347,9 @@ TEST(PrimitiveTerminalParsing, Error_OutputTerminalIntegerLiteral) {
       "module m;\n"
       "  and (1, a, b);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the terminal-lvalue rule; the report stands on the gate keyword.
+  EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 2,
+                            "28.3"));
 }
 
 TEST(PrimitiveTerminalParsing, Error_OutputTerminalTernaryExpr) {
@@ -354,7 +357,8 @@ TEST(PrimitiveTerminalParsing, Error_OutputTerminalTernaryExpr) {
       "module m;\n"
       "  buf (sel ? a : b, in);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 2,
+                            "28.3"));
 }
 
 TEST(PrimitiveTerminalParsing, Error_InoutTerminalIntegerLiteral) {
@@ -362,7 +366,8 @@ TEST(PrimitiveTerminalParsing, Error_InoutTerminalIntegerLiteral) {
       "module m;\n"
       "  tran (1, b);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "inout terminal must be a net lvalue", 2, "28.3"));
 }
 
 TEST(PrimitiveTerminalParsing, Error_InoutTerminalTernaryExpr) {
@@ -370,7 +375,8 @@ TEST(PrimitiveTerminalParsing, Error_InoutTerminalTernaryExpr) {
       "module m;\n"
       "  tranif0 (sel ? a : b, c, en);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "inout terminal must be a net lvalue", 2, "28.3"));
 }
 
 TEST(PrimitiveTerminalParsing, GateInst_ComplexTerminalExpressions) {

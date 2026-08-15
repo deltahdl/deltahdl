@@ -6,6 +6,7 @@
 // These tests observe the parser building the Syntax 12-5 grammar into the AST.
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -363,7 +364,10 @@ TEST(LoopStatementSyntax, RepeatRequiresParenthesizedExpression) {
       "  initial\n"
       "    repeat 3 x = 1;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §12.7.2 owns the repeat loop, so its opening parenthesis is reported
+  // there rather than under the §12.7 head clause.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got integer literal", 3, "12.7.2"));
 }
 
 // NEGATIVE — while requires its control expression to be parenthesized.
@@ -373,7 +377,10 @@ TEST(LoopStatementSyntax, WhileRequiresParenthesizedExpression) {
       "  initial\n"
       "    while c x = 1;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §12.7.4 owns the while loop, so its opening parenthesis is reported there
+  // rather than under the §12.7 head clause.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got identifier", 3, "12.7.4"));
 }
 
 // NEGATIVE — foreach requires its array reference and loop_variables to be
@@ -384,7 +391,10 @@ TEST(LoopStatementSyntax, ForeachRequiresParentheses) {
       "  initial\n"
       "    foreach arr[i] x = i;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §12.7.3 owns the foreach loop, so its opening parenthesis is reported
+  // there rather than under the §12.7 head clause.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got identifier", 3, "12.7.3"));
 }
 
 // NEGATIVE — the for header requires both clause-separating semicolons; a
@@ -395,7 +405,10 @@ TEST(LoopStatementSyntax, ForRequiresClauseSemicolons) {
       "  initial\n"
       "    for (int i = 0 i < 3; i++) x = i;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §12.7.1 owns the for loop, so the missing clause separator is reported
+  // there rather than under the §12.7 head clause.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got identifier", 3, "12.7.1"));
 }
 
 // NEGATIVE — the do...while form requires the while keyword after the body.
@@ -406,7 +419,10 @@ TEST(LoopStatementSyntax, DoWhileRequiresWhileKeyword) {
       "    do x = 1; y = 2;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §12.7.5 owns the do-while loop. TokenKindName answers "token" for every
+  // keyword, so the report for the absent 'while' reads "expected token".
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected token, got identifier", 3, "12.7.5"));
 }
 
 }  // namespace

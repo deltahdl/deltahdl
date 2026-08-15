@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -33,7 +34,10 @@ TEST(TypedPropertyFormalParsing,
       "    q |-> b;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a 'property'-typed formal argument may not be "
+                            "referenced as the antecedent of '|->' or '|=>'",
+                            3, "16.12.18"));
 }
 
 // §16.12.18: the same prohibition covers the non-overlapping implication `|=>`,
@@ -47,7 +51,10 @@ TEST(TypedPropertyFormalParsing,
       "    q |=> b;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a 'property'-typed formal argument may not be "
+                            "referenced as the antecedent of '|->' or '|=>'",
+                            3, "16.12.18"));
 }
 
 // §16.12.18: the prohibition is specific to `property`-typed formals. A
@@ -80,7 +87,10 @@ TEST(TypedPropertyFormalParsing, PropertyTypeCarriesOverCommaSeparatedRun) {
       "    r |-> b;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a 'property'-typed formal argument may not be "
+                            "referenced as the antecedent of '|->' or '|=>'",
+                            3, "16.12.18"));
 }
 
 // §16.12.18: the property run is ended not only by a §16.6 data type but by any

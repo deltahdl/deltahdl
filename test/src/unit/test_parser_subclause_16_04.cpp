@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -110,7 +111,10 @@ TEST(DeferredAssertionParsing, FinalAssertMissingExpressionRejected) {
       "module m;\n"
       "  initial assert final;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §16.3 owns the parenthesized asserted expression that a deferred assertion
+  // shares with the simple immediate form, so the missing '(' is reported
+  // there rather than under §16.4.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '(', got ';'", 2, "16.3"));
 }
 
 TEST(DeferredAssertionParsing, Hash0PrecludesFinalKeyword) {
@@ -118,7 +122,11 @@ TEST(DeferredAssertionParsing, Hash0PrecludesFinalKeyword) {
       "module m;\n"
       "  initial assert #0 final (1);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §16.4 admits #0 or final, never both, so after #0 the parser is already
+  // reading the asserted expression §16.3 owns and reports the `final` keyword
+  // standing where its '(' belongs. Every keyword's name in that sentence is
+  // `token`.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '(', got token", 2, "16.3"));
 }
 
 TEST(DeferredAssertionParsing, FinalAssertWithPassAndFailActions) {
@@ -140,7 +148,8 @@ TEST(DeferredAssertionParsing, ProceduralAssertNonZeroHashRejected) {
       "module m;\n"
       "  initial assert #5 (1);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "deferred immediate assertion requires #0, got #5", 2, "16.4"));
 }
 
 TEST(DeferredAssertionParsing, ProceduralAssumeNonZeroHashRejected) {
@@ -148,7 +157,8 @@ TEST(DeferredAssertionParsing, ProceduralAssumeNonZeroHashRejected) {
       "module m;\n"
       "  initial assume #3 (1);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "deferred immediate assertion requires #0, got #3", 2, "16.4"));
 }
 
 TEST(DeferredAssertionParsing, ProceduralCoverNonZeroHashRejected) {
@@ -156,7 +166,8 @@ TEST(DeferredAssertionParsing, ProceduralCoverNonZeroHashRejected) {
       "module m;\n"
       "  initial cover #7 (1);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "deferred immediate assertion requires #0, got #7", 2, "16.4"));
 }
 
 TEST(DeferredAssertionParsing, ModuleLevelAssertNonZeroHashRejected) {
@@ -165,7 +176,8 @@ TEST(DeferredAssertionParsing, ModuleLevelAssertNonZeroHashRejected) {
       "  logic c;\n"
       "  chk: assert #2 (c);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "deferred immediate assertion requires #0, got #2", 3, "16.4"));
 }
 
 TEST(DeferredAssertionParsing, ModuleLevelCoverNonZeroHashRejected) {
@@ -174,7 +186,8 @@ TEST(DeferredAssertionParsing, ModuleLevelCoverNonZeroHashRejected) {
       "  logic c;\n"
       "  hit: cover #4 (c);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "deferred immediate assertion requires #0, got #4", 3, "16.4"));
 }
 
 }  // namespace

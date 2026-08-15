@@ -1,6 +1,7 @@
 #include "fixture_parser.h"
 #include "helpers_if_else_chain.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -327,7 +328,8 @@ TEST(ConditionalSyntaxParsing, IfMissingOpenParen) {
       "    if a) x = 1;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got identifier", 3, "12.4"));
 }
 
 TEST(ConditionalSyntaxParsing, IfMissingCloseParen) {
@@ -337,7 +339,8 @@ TEST(ConditionalSyntaxParsing, IfMissingCloseParen) {
       "    if (a x = 1;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ')', got identifier", 3, "12.4"));
 }
 
 TEST(ConditionalSyntaxParsing, IfEmptyCondition) {
@@ -347,7 +350,9 @@ TEST(ConditionalSyntaxParsing, IfEmptyCondition) {
       "    if () x = 1;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §11.2 owns the primary the condition is missing; §12.4 reports only the
+  // parentheses around it.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
 TEST(ConditionalSyntaxParsing, IfNonblockingAssignBody) {
@@ -473,7 +478,10 @@ TEST(ConditionalSyntaxParsing, ElseWithoutIfIsError) {
       "    else x = 1;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // No statement production begins with 'else', so it reaches the expression
+  // statement path and §11.2 refuses it as a primary; §12.4 has no report for
+  // an else with no if.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
 TEST(ConditionalSyntaxParsing, ElseIfChainProducesNestedIf) {

@@ -2,6 +2,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -39,7 +40,10 @@ TEST(PackedArrayParsing, ConstantRangeInPackedDim) {
 
 TEST(PackedArrayParsing, SingleNumberDimIsError) {
   auto r = Parse("module m; logic [8] x; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::ParsePackedDims files the first packed dimension's colon under
+  // §6.9, the vector declaration it belongs to; only a second and later
+  // dimension is filed under §7.4.1.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ':', got ']'", 1, "6.9"));
 }
 
 TEST(PackedArrayParsing, SignedPackedArray) {

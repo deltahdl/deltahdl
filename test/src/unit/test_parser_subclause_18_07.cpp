@@ -1,6 +1,7 @@
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -62,7 +63,11 @@ TEST(ConstrainedRandomParsing, RandomizeWithBlockRejectsFourStateEquality) {
       "    this.randomize() with { x === y; };\n"
       "  endfunction\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  // §18.3 owns the 4-state operator rule and files the report under itself,
+  // whether the constraint block is inline or in the class.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "4-state equality operator is not allowed in a constraint", 4,
+      "18.3"));
 }
 
 // 18.7 inline_constraint_declaration admits 'null' as the random-variable

@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -20,25 +21,33 @@ TEST(OverriddenSampleMethod, BasicOverrideParses) {
 // §19.8.1: a formal argument of an overridden sample method shall not designate
 // an output direction.
 TEST(OverriddenSampleMethod, OutputSampleFormalRejected) {
-  EXPECT_FALSE(ParseOk(R"(
+  auto r = Parse(R"(
     module m;
       covergroup cg with function sample(output int x);
         coverpoint x;
       endgroup
     endmodule
-  )"));
+  )");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a sample method formal argument cannot designate "
+                            "an output direction",
+                            3, "19.8.1"));
 }
 
 // §19.8.1: inout designates an output direction as well and is likewise not
 // permitted for a sample method formal argument.
 TEST(OverriddenSampleMethod, InoutSampleFormalRejected) {
-  EXPECT_FALSE(ParseOk(R"(
+  auto r = Parse(R"(
     module m;
       covergroup cg with function sample(inout int x);
         coverpoint x;
       endgroup
     endmodule
-  )"));
+  )");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a sample method formal argument cannot designate "
+                            "an output direction",
+                            3, "19.8.1"));
 }
 
 // §19.8.1: an input-direction sample formal (the default) is allowed.
@@ -56,13 +65,18 @@ TEST(OverriddenSampleMethod, InputSampleFormalAllowed) {
 // formals consumed by the covergroup new operator), so it shall be an error for
 // the same argument name to appear in both lists.
 TEST(OverriddenSampleMethod, NameSharedBetweenBothListsRejected) {
-  EXPECT_FALSE(ParseOk(R"(
+  auto r = Parse(R"(
     module m;
       covergroup cg (int v) with function sample(int v, bit b);
         coverpoint v;
       endgroup
     endmodule
-  )"));
+  )");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "sample method formal argument 'v' shares the "
+                            "covergroup argument scope and cannot reuse a "
+                            "covergroup formal-argument name",
+                            3, "19.8.1"));
 }
 
 // §19.8.1: distinct names across the covergroup and sample argument lists do
@@ -80,13 +94,18 @@ TEST(OverriddenSampleMethod, DistinctNamesAcrossListsAccepted) {
 // §19.8.1: the collision check applies to any shared name, including one buried
 // among several covergroup and sample formals.
 TEST(OverriddenSampleMethod, SharedNameAmongManyFormalsRejected) {
-  EXPECT_FALSE(ParseOk(R"(
+  auto r = Parse(R"(
     module m;
       covergroup cg (int a, ref int data) with function sample(bit c, int data);
         coverpoint c;
       endgroup
     endmodule
-  )"));
+  )");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "sample method formal argument 'data' shares the "
+                            "covergroup argument scope and cannot reuse a "
+                            "covergroup formal-argument name",
+                            3, "19.8.1"));
 }
 
 // §19.8.1: the shared-name error is about the argument name, so it still fires
@@ -94,25 +113,34 @@ TEST(OverriddenSampleMethod, SharedNameAmongManyFormalsRejected) {
 // before the default expression and is checked against the covergroup formals
 // all the same.
 TEST(OverriddenSampleMethod, DefaultValuedSampleFormalStillCollides) {
-  EXPECT_FALSE(ParseOk(R"(
+  auto r = Parse(R"(
     module m;
       covergroup cg (int v) with function sample(int v = 0);
         coverpoint v;
       endgroup
     endmodule
-  )"));
+  )");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "sample method formal argument 'v' shares the "
+                            "covergroup argument scope and cannot reuse a "
+                            "covergroup formal-argument name",
+                            3, "19.8.1"));
 }
 
 // §19.8.1: the output-direction prohibition applies to every sample formal, not
 // only the first, so an output direction on a later formal is also rejected.
 TEST(OverriddenSampleMethod, OutputOnLaterSampleFormalRejected) {
-  EXPECT_FALSE(ParseOk(R"(
+  auto r = Parse(R"(
     module m;
       covergroup cg with function sample(int a, output int b);
         coverpoint a;
       endgroup
     endmodule
-  )"));
+  )");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a sample method formal argument cannot designate "
+                            "an output direction",
+                            3, "19.8.1"));
 }
 
 // §19.8.1: only an output direction is forbidden for a sample formal. A
@@ -133,41 +161,56 @@ TEST(OverriddenSampleMethod, RefSampleFormalAllowed) {
 // context. Referencing the sample formal 'a' from a coverage-option assignment
 // (as in the LRM's own error example, option.per_instance = b) is rejected.
 TEST(OverriddenSampleMethod, SampleFormalInOptionAssignmentRejected) {
-  EXPECT_FALSE(ParseOk(R"(
+  auto r = Parse(R"(
     module m;
       covergroup cg with function sample(bit a, int x);
         coverpoint x;
         option.per_instance = a;
       endgroup
     endmodule
-  )"));
+  )");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "sample method formal argument 'a' may only "
+                            "designate a coverpoint or conditional guard "
+                            "expression, not a coverage-option value",
+                            5, "19.8.1"));
 }
 
 // §19.8.1: the prohibition applies to a type_option assignment just as to an
 // option assignment; a sample formal on the right-hand side is still illegal.
 TEST(OverriddenSampleMethod, SampleFormalInTypeOptionAssignmentRejected) {
-  EXPECT_FALSE(ParseOk(R"(
+  auto r = Parse(R"(
     module m;
       covergroup cg with function sample(int weight_src, int x);
         coverpoint x;
         type_option.weight = weight_src;
       endgroup
     endmodule
-  )"));
+  )");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "sample method formal argument 'weight_src' may "
+                            "only designate a coverpoint or conditional guard "
+                            "expression, not a coverage-option value",
+                            5, "19.8.1"));
 }
 
 // §19.8.1: the illegal reference need not be the whole option value -- a sample
 // formal appearing anywhere inside the value expression is still an illegal
 // use, so it is detected even when embedded in a larger arithmetic expression.
 TEST(OverriddenSampleMethod, SampleFormalInsideOptionValueExpressionRejected) {
-  EXPECT_FALSE(ParseOk(R"(
+  auto r = Parse(R"(
     module m;
       covergroup cg with function sample(int a, int x);
         coverpoint x;
         option.weight = a + 1;
       endgroup
     endmodule
-  )"));
+  )");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "sample method formal argument 'a' may only "
+                            "designate a coverpoint or conditional guard "
+                            "expression, not a coverage-option value",
+                            5, "19.8.1"));
 }
 
 // §19.8.1: the usage check flags only sample formals. An option assignment

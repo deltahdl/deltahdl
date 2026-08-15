@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "model_gate_logic.h"
 
 using namespace delta;
@@ -567,7 +568,9 @@ TEST(PrimitiveInstantiationParsing, Error_MissingSemicolon) {
       "module m;\n"
       "  and a1(o, i1, i2)\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // 'endmodule' stands where the ';' was demanded, and TokenKindName spells
+  // every keyword "token".
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "28.3"));
 }
 
 TEST(PrimitiveInstantiationParsing, Error_MissingClosingParen) {
@@ -575,7 +578,8 @@ TEST(PrimitiveInstantiationParsing, Error_MissingClosingParen) {
       "module m;\n"
       "  and a1(o, i1, i2;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3.6 owns the terminal list's closing ')'.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 2, "28.3.6"));
 }
 
 TEST(PrimitiveInstantiationParsing, Error_StrengthOnMosSwitch) {
@@ -583,7 +587,10 @@ TEST(PrimitiveInstantiationParsing, Error_StrengthOnMosSwitch) {
       "module m;\n"
       "  nmos (strong0, weak1) n1(o, i, g);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3.2 owns the drive-strength rule; the report stands on the gate
+  // keyword.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "drive strength not allowed on this gate type", 2, "28.3.2"));
 }
 
 TEST(PrimitiveInstantiationParsing, Error_StrengthOnCmosSwitch) {
@@ -591,7 +598,8 @@ TEST(PrimitiveInstantiationParsing, Error_StrengthOnCmosSwitch) {
       "module m;\n"
       "  cmos (pull0, pull1) c1(o, i, n, p);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "drive strength not allowed on this gate type", 2, "28.3.2"));
 }
 
 TEST(PrimitiveInstantiationParsing, Error_StrengthOnPassSwitch) {
@@ -599,7 +607,8 @@ TEST(PrimitiveInstantiationParsing, Error_StrengthOnPassSwitch) {
       "module m;\n"
       "  tran (strong0, strong1) t1(a, b);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "drive strength not allowed on this gate type", 2, "28.3.2"));
 }
 
 TEST(PrimitiveInstantiationParsing, Error_StrengthOnPassEnSwitch) {
@@ -607,7 +616,8 @@ TEST(PrimitiveInstantiationParsing, Error_StrengthOnPassEnSwitch) {
       "module m;\n"
       "  tranif0 (strong0, strong1) t1(a, b, c);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "drive strength not allowed on this gate type", 2, "28.3.2"));
 }
 
 TEST(PrimitiveInstantiationParsing, Error_PullGateTooManyTerminals) {
@@ -615,7 +625,9 @@ TEST(PrimitiveInstantiationParsing, Error_PullGateTooManyTerminals) {
       "module m;\n"
       "  pullup (a, b);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the terminal-count rule; the report stands on the gate keyword.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(PrimitiveInstantiationParsing, Error_PassSwitchTooManyTerminals) {
@@ -623,7 +635,8 @@ TEST(PrimitiveInstantiationParsing, Error_PassSwitchTooManyTerminals) {
       "module m;\n"
       "  tran (a, b, c);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(PrimitiveInstantiationParsing, Error_CmosSwitchTooFewTerminals) {
@@ -631,7 +644,8 @@ TEST(PrimitiveInstantiationParsing, Error_CmosSwitchTooFewTerminals) {
       "module m;\n"
       "  cmos c1(o, i, n);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(PrimitiveInstantiationParsing, Error_EnableGateTooFewTerminals) {
@@ -639,7 +653,8 @@ TEST(PrimitiveInstantiationParsing, Error_EnableGateTooFewTerminals) {
       "module m;\n"
       "  bufif0 (o, i);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(PrimitiveInstantiationParsing, Error_NInputGateSingleTerminal) {
@@ -647,7 +662,8 @@ TEST(PrimitiveInstantiationParsing, Error_NInputGateSingleTerminal) {
       "module m;\n"
       "  and (o);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 // The pass-switch alternative of gate_instantiation carries no delay slot, so a
@@ -657,7 +673,9 @@ TEST(PrimitiveInstantiationParsing, Error_DelayOnPassSwitch) {
       "module m;\n"
       "  tran #5 (a, b);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3.3 owns the gate-delay rule; the report stands on the gate keyword.
+  EXPECT_TRUE(ReportedError(r.diags, "delay not allowed on this gate type", 2,
+                            "28.3.3"));
 }
 
 // The pulldown/pullup alternatives accept only an optional strength, never a
@@ -667,7 +685,8 @@ TEST(PrimitiveInstantiationParsing, Error_DelayOnPullGate) {
       "module m;\n"
       "  pullup #5 (net1);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "delay not allowed on this gate type", 2,
+                            "28.3.3"));
 }
 
 // The n_input alternative uses the two-value delay form, so supplying a third
@@ -677,7 +696,8 @@ TEST(PrimitiveInstantiationParsing, Error_ThreeDelaysOnNInputGate) {
       "module m;\n"
       "  and #(1, 2, 3) g1(y, a, b);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "this gate type allows at most 2 delay values", 2, "28.3.3"));
 }
 
 TEST(PrimitiveInstantiationParsing, AllNineAlternativesInOneModule) {

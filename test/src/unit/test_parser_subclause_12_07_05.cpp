@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -53,7 +54,8 @@ TEST(LoopSyntaxParsing, ErrorDoWhileMissingSemicolon) {
       "    do x = x + 1; while (x < 10)\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The `end` on line 4 is the token standing where §12.7.5 requires the ';'.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "12.7.5"));
 }
 
 TEST(LoopSyntaxParsing, ErrorDoWhileMissingWhileKeyword) {
@@ -63,7 +65,9 @@ TEST(LoopSyntaxParsing, ErrorDoWhileMissingWhileKeyword) {
       "    do x = x + 1; (x < 10);\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::Expect names every keyword "token", so the report for the missing
+  // `while` reads "expected token"; §12.7.5 and the line say which one.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got '('", 3, "12.7.5"));
 }
 
 TEST(LoopSyntaxParsing, ErrorDoWhileMissingOpenParen) {
@@ -73,7 +77,8 @@ TEST(LoopSyntaxParsing, ErrorDoWhileMissingOpenParen) {
       "    do x = x + 1; while x < 10);\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got identifier", 3, "12.7.5"));
 }
 
 TEST(LoopSyntaxParsing, ErrorDoWhileMissingCloseParen) {
@@ -83,7 +88,7 @@ TEST(LoopSyntaxParsing, ErrorDoWhileMissingCloseParen) {
       "    do x = x + 1; while (x < 10;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 3, "12.7.5"));
 }
 
 }  // namespace

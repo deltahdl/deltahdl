@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "fixture_program.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -136,24 +137,32 @@ TEST(CovergroupParsing, CovergroupWithCoverageOption) {
 
 // LRM 19.3: an output formal argument is illegal for a covergroup.
 TEST(CovergroupParsing, OutputFormalArgumentRejected) {
-  EXPECT_FALSE(ParseOk(R"(
+  auto r = Parse(R"(
     module m;
       covergroup cg (output int x) @(posedge clk);
         coverpoint x;
       endgroup
     endmodule
-  )"));
+  )");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a covergroup formal argument cannot be declared "
+                            "'output' or 'inout'",
+                            3, "19.3"));
 }
 
 // LRM 19.3: an inout formal argument is illegal for a covergroup.
 TEST(CovergroupParsing, InoutFormalArgumentRejected) {
-  EXPECT_FALSE(ParseOk(R"(
+  auto r = Parse(R"(
     module m;
       covergroup cg (inout int x) @(posedge clk);
         coverpoint x;
       endgroup
     endmodule
-  )"));
+  )");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a covergroup formal argument cannot be declared "
+                            "'output' or 'inout'",
+                            3, "19.3"));
 }
 
 // LRM 19.3: a covergroup can be defined in an interface.
@@ -238,26 +247,30 @@ TEST(CovergroupParsing, CovergroupWithEndBlockEvent) {
 // expression must open with either "begin" or "end"; a bare hierarchical name
 // with no keyword is illegal.
 TEST(CovergroupParsing, CovergroupBlockEventMissingBeginEndRejected) {
-  EXPECT_FALSE(ParseOk(R"(
+  auto r = Parse(R"(
     module m;
       covergroup cg @@(top.worker);
         coverpoint x;
       endgroup
     endmodule
-  )"));
+  )");
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'begin' or 'end' in block event",
+                            3, "19.3"));
 }
 
 // LRM 19.3 (negative form of the with-function coverage_event): the customized
 // sampling method introduced by "with function" must name the sample method;
 // any other function name is illegal.
 TEST(CovergroupParsing, CovergroupWithFunctionNonSampleRejected) {
-  EXPECT_FALSE(ParseOk(R"(
+  auto r = Parse(R"(
     module m;
       covergroup cg with function collect(int v);
         coverpoint v;
       endgroup
     endmodule
-  )"));
+  )");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'sample', got 'collect'", 3, "19.3"));
 }
 
 // §19.3, Syntax 19-1: a covergroup_declaration runs from `covergroup` to

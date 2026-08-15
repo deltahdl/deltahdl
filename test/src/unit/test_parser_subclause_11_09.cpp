@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -87,7 +88,10 @@ TEST(TaggedUnionExprParsing, TaggedWithAssignmentPatternPrimary) {
 // error the parser must report.
 TEST(TaggedUnionExprParsing, TaggedWithoutMemberIdentifierRejected) {
   auto r = Parse("module m; initial x = tagged 42; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §7.3.2 owns the tagged union member name, so the missing identifier is
+  // reported there rather than under §11.9.
+  EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got integer literal",
+                            1, "7.3.2"));
 }
 
 }  // namespace

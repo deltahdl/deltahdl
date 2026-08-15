@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -188,12 +189,18 @@ TEST(PortDeclParsing, ErrorInputMissingIdentifier) {
   // list_of_port_identifiers; the parser must reject input declarations that
   // omit it.
   auto r = Parse("module m(input wire); endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // §23.2.2.2 owns the ANSI port list, so the port_identifier is demanded
+  // there rather than under §23.2.2.1.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ')'", 1, "23.2.2.2"));
 }
 
 TEST(PortDeclParsing, ErrorRefMissingIdentifier) {
   auto r = Parse("module m(ref logic); endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // §23.2.2.2 owns the ANSI port list, so the port_identifier is demanded
+  // there rather than under §23.2.2.1.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ')'", 1, "23.2.2.2"));
 }
 
 }  // namespace

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -123,7 +124,8 @@ TEST(SpecifyPathDelayParsing, InvalidDelayCount) {
       "    (a => b) = (1, 2, 3, 4);\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "path delay must have 1, 2, 3, 6, or 12 values", 3, "30.5"));
 }
 
 // §30.5: one or more delay values must appear on the right-hand side; an empty
@@ -135,7 +137,10 @@ TEST(SpecifyPathDelayParsing, ErrorEmptyDelayList) {
       "    (a => b) = ();\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §11.2 owns the expression a path delay value is, and the empty list is
+  // rejected by the missing operand; §30.5 reports only the value count, which
+  // an empty list does not reach.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
 }  // namespace

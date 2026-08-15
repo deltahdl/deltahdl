@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -34,24 +35,28 @@ TEST(RestrictStatementParsing, FormWithoutActionBlock) {
 // §16.14.4: because the statement has no action block, a pass statement placed
 // after the property_spec is not accepted — the form ends at the semicolon.
 TEST(RestrictStatementParsing, RejectsActionBlock) {
-  EXPECT_FALSE(ParseOk(
+  auto r = Parse(
       "module m;\n"
       "  logic clk;\n"
       "  logic ctr;\n"
       "  restrict property (@(posedge clk) ctr == '0) $display(\"x\");\n"
-      "endmodule\n"));
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got system identifier", 4,
+                            "16.14.4"));
 }
 
 // §16.14.4: the statement has no action block at all, so neither does it accept
 // a fail action — an else clause after the property_spec is rejected, unlike an
 // assert or assume statement.
 TEST(RestrictStatementParsing, RejectsElseClause) {
-  EXPECT_FALSE(ParseOk(
+  auto r = Parse(
       "module m;\n"
       "  logic clk;\n"
       "  logic ctr;\n"
       "  restrict property (@(posedge clk) ctr == '0) else $error(\"x\");\n"
-      "endmodule\n"));
+      "endmodule\n");
+  // `else` is a keyword, and TokenKindName answers "token" for every keyword.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "16.14.4"));
 }
 
 }  // namespace

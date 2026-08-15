@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -10,7 +11,10 @@ TEST(ModuleInstantiationParser, MultipleWildcardPortConnectionsRejected) {
       "module top;\n"
       "  child u0(.*, .*);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            ".* port connection shall appear at most once in a "
+                            "port connection list",
+                            2, "23.3.2"));
 }
 
 TEST(ModuleInstantiationParser,
@@ -20,7 +24,9 @@ TEST(ModuleInstantiationParser,
       "  logic a, b;\n"
       "  child u0(a, .b(b));\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "ordered and named port connections cannot be mixed", 3,
+      "23.3.2"));
 }
 
 TEST(ModuleInstantiationParser, NamedParameterValueAssignmentParses) {
@@ -61,7 +67,7 @@ TEST(ModuleInstantiationParser, PortlessInstanceWithoutParensRejected) {
       "module top;\n"
       "  child u0;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected '(', got ';'", 3, "23.3.2"));
 }
 
 // §23.3.2: positional and named connections cannot be mixed, but the three
@@ -86,7 +92,12 @@ TEST(ModuleInstantiationParser, DuplicateNamedParameterAssignmentRejected) {
       "module top;\n"
       "  child #(.W(1), .W(2)) u0();\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §23.10.2.2 owns the named parameter value assignment, so the report over a
+  // repeated parameter name stands there rather than under §23.3.2.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "duplicate parameter name 'W' in parameter value "
+                            "assignment",
+                            4, "23.10.2.2"));
 }
 
 // §23.3.2 terminates a module instantiation with a ';'. An instantiation left

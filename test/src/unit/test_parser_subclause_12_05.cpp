@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -381,7 +382,9 @@ TEST(CaseSyntaxParsing, TwoDefaultItemsIsIllegal) {
       "    endcase\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "case statement shall have at most one 'default' item", 6,
+      "12.5"));
 }
 
 TEST(CaseSyntaxParsing, SingleDefaultItemAccepted) {

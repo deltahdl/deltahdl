@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -61,19 +62,27 @@ TEST(IoSystemTaskParsing, DumpportsOffOnVariableFilename) {
 // §21.7.3.2 negative: the task call requires a parenthesized argument; a
 // filename butted against the task name without parentheses does not parse.
 TEST(IoSystemTaskParsing, DumpportsoffUnparenthesizedFilenameRejected) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  initial $dumpportsoff \"ports.vcd\";\n"
-              "endmodule\n"));
+  auto result = Parse(
+      "module t;\n"
+      "  initial $dumpportsoff \"ports.vcd\";\n"
+      "endmodule\n");
+  // §12.3 owns the semicolon that terminates a subroutine call statement, and
+  // the unparenthesized filename is what stands where that semicolon must be.
+  EXPECT_TRUE(ReportedError(result.diags, "expected ';', got string literal", 2,
+                            "12.3"));
 }
 
 // §21.7.3.2 negative: the same unparenthesized-filename form is rejected for
 // the resume task too.
 TEST(IoSystemTaskParsing, DumpportsonUnparenthesizedFilenameRejected) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  initial $dumpportson \"ports.vcd\";\n"
-              "endmodule\n"));
+  auto result = Parse(
+      "module t;\n"
+      "  initial $dumpportson \"ports.vcd\";\n"
+      "endmodule\n");
+  // §12.3 owns the semicolon that terminates a subroutine call statement, and
+  // the unparenthesized filename is what stands where that semicolon must be.
+  EXPECT_TRUE(ReportedError(result.diags, "expected ';', got string literal", 2,
+                            "12.3"));
 }
 
 }  // namespace

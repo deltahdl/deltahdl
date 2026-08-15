@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -109,19 +110,21 @@ TEST(EmbeddedCovergroupInheritance, ExtendsFormEmptyBodyParses) {
 // covergroup_identifier. Omitting that identifier (`covergroup extends ;`) is a
 // syntax error reported by the parser.
 TEST(EmbeddedCovergroupInheritance, ExtendsFormRequiresBaseIdentifier) {
-  EXPECT_FALSE(
-      ParseOk("class base;\n"
-              "  bit a;\n"
-              "  covergroup g1;\n"
-              "    coverpoint a;\n"
-              "  endgroup\n"
-              "endclass\n"
-              "class derived extends base;\n"
-              "  bit d;\n"
-              "  covergroup extends ;\n"
-              "    coverpoint d;\n"
-              "  endgroup\n"
-              "endclass\n"));
+  auto r = Parse(
+      "class base;\n"
+      "  bit a;\n"
+      "  covergroup g1;\n"
+      "    coverpoint a;\n"
+      "  endgroup\n"
+      "endclass\n"
+      "class derived extends base;\n"
+      "  bit d;\n"
+      "  covergroup extends ;\n"
+      "    coverpoint d;\n"
+      "  endgroup\n"
+      "endclass\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ';'", 9, "19.4.1"));
 }
 
 }  // namespace

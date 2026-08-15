@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -431,7 +432,10 @@ TEST(RandsequenceSyntaxParsing, MissingEndsequenceErrors) {
       "      main : { ; };\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // Without endsequence the enclosing end reaches the production list, where
+  // §18.17 reports it as a missing production identifier.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got token", 5, "18.17"));
 }
 
 TEST(RandsequenceSyntaxParsing, MissingColonInProductionErrors) {
@@ -443,7 +447,7 @@ TEST(RandsequenceSyntaxParsing, MissingColonInProductionErrors) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ':', got '{'", 4, "18.17"));
 }
 
 TEST(RandsequenceSyntaxParsing, MissingSemicolonInProductionErrors) {
@@ -455,7 +459,8 @@ TEST(RandsequenceSyntaxParsing, MissingSemicolonInProductionErrors) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The endsequence keyword stands where §18.17 requires the production's ';'.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 5, "18.17"));
 }
 
 TEST(RandsequenceSyntaxParsing, RandJoinSingleItemErrors) {
@@ -468,7 +473,10 @@ TEST(RandsequenceSyntaxParsing, RandJoinSingleItemErrors) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // rand join takes two production items, so the ';' after the first stands
+  // where §18.17 requires the second one's identifier.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ';'", 4, "18.17"));
 }
 
 }  // namespace

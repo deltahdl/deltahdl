@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -284,7 +285,8 @@ TEST(TimingCheckEventDefParsing, EdgeDescriptorInvalidRejected) {
       "  $setup(data, edge[01, 00] clk, 10);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §31.5 owns the edge_descriptor set.
+  EXPECT_TRUE(ReportedError(r.diags, "invalid edge_descriptor", 3, "31.5"));
 }
 
 // edge_control_specifier with a bracketed list requires at least one
@@ -296,7 +298,10 @@ TEST(TimingCheckEventDefParsing, EdgeControlSpecifierEmptyListRejected) {
       "  $setup(data, edge[] clk, 10);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §31.5 owns the edge_control_specifier list length.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "edge-control specifier requires at least one edge_descriptor",
+      3, "31.5"));
 }
 
 }  // namespace

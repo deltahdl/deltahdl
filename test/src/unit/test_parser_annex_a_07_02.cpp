@@ -1,6 +1,7 @@
 #include "fixture_parser.h"
 #include "fixture_specify.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -27,7 +28,9 @@ TEST(SpecifyPathParsing, ErrorPathDeclMissingSemicolon) {
       "    (a => b) = 5\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §30.4 owns the path_declaration's terminating ';'; endspecify stands where
+  // it must be, and TokenKindName spells every keyword "token".
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "30.4"));
 }
 
 TEST(SpecifyPathParsing, ErrorPathDeclMissingEquals) {
@@ -37,7 +40,9 @@ TEST(SpecifyPathParsing, ErrorPathDeclMissingEquals) {
       "    (a => b) 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §30.5 owns the '=' that introduces the path_delay_value.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '=', got integer literal", 3, "30.5"));
 }
 
 TEST(SpecifyPathParsing, ErrorPathDeclMissingCloseParen) {
@@ -47,7 +52,7 @@ TEST(SpecifyPathParsing, ErrorPathDeclMissingCloseParen) {
       "    (a => b = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got '='", 3, "30.4"));
 }
 
 TEST(SpecifyPathParsing, ErrorPathDeclMissingOpenParen) {
@@ -57,7 +62,10 @@ TEST(SpecifyPathParsing, ErrorPathDeclMissingOpenParen) {
       "    a => b) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // Without the opening '(' nothing marks the item as a path_declaration, so
+  // §30.3's specify_item dispatch is what reports it.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "unexpected token in specify block", 3, "30.3"));
 }
 
 // A parallel path ('=>') is described with a single input and a single output
@@ -70,7 +78,11 @@ TEST(SpecifyPathParsing, ErrorParallelPathMultipleTerminals) {
       "    (a, b => c) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §30.4.5 owns the single-terminal rule for a parallel path.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "parallel path '=>' requires a single source and "
+                            "destination terminal",
+                            3, "30.4.5"));
 }
 
 // The single-terminal rule for parallel paths holds for the edge-sensitive
@@ -83,7 +95,12 @@ TEST(SpecifyPathParsing, ErrorEdgeSensitiveParallelMultipleTerminals) {
       "    (posedge a, b => c) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §30.4.5 owns the single-terminal rule for a parallel path, edge-sensitive
+  // or not.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "parallel path '=>' requires a single source and "
+                            "destination terminal",
+                            3, "30.4.5"));
 }
 
 // The 'ifnone' alternative of a state-dependent path declaration accepts only
@@ -96,7 +113,9 @@ TEST(SpecifyPathParsing, ErrorIfnoneRejectsEdgeSensitivePath) {
       "    ifnone (posedge clk => q) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §30.4.4.4 owns the ifnone alternative and its simple-path restriction.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "ifnone requires a simple path declaration", 3, "30.4.4.4"));
 }
 
 // --- simple_path_declaration: the parallel ('=>') form followed by

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -66,7 +67,9 @@ TEST(ModuleInstantiationGrammar, NamedPortNameCannotBeBitSelect) {
       "  sub u1 (.a[0](x));\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  // `.a` closes as an implicit named connection, so the `[` stands where the
+  // connection list's closing parenthesis belongs, which §23.3.2 expects.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got '['", 2, "23.3.2"));
 }
 
 TEST(ModuleInstantiationGrammar, NamedPortNameCannotBePartSelect) {
@@ -79,7 +82,9 @@ TEST(ModuleInstantiationGrammar, NamedPortNameCannotBePartSelect) {
       "  sub u1 (.a[1:0](x));\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  // As with the bit-select, `.a` closes first and the `[` stands where
+  // §23.3.2 expects the connection list to close.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got '['", 2, "23.3.2"));
 }
 
 TEST(ModuleInstantiationGrammar, NamedPortNameCannotBeConcatenation) {
@@ -93,7 +98,8 @@ TEST(ModuleInstantiationGrammar, NamedPortNameCannotBeConcatenation) {
       "  sub u1 (.{a, b}(x));\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got '{'", 2, "23.3.2.2"));
 }
 
 TEST(ModuleInstantiationGrammar, NamedPortWithConcatenation) {

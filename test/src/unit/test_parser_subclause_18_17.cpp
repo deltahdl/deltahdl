@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -201,7 +202,11 @@ TEST(RandseqBaseParse, MissingEndsequenceIsRejected) {
       "      a : { ; } ;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The 'end' closing the initial block is where a production was required, so
+  // ParseRsProduction's ExpectIdentifier is what reports the absent
+  // endsequence.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got token", 6, "18.17"));
 }
 
 // §18.17, Syntax 18-13: `production ::= [ data_type_or_void ]

@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -54,10 +55,14 @@ TEST(IoSystemTaskParsing, DumpportslimitNullFilesizeCommaFormParses) {
 // Syntax 21-24 negative: the task call requires a parenthesized argument list;
 // a filesize butted against the task name without parentheses does not parse.
 TEST(IoSystemTaskParsing, DumpportslimitUnparenthesizedFilesizeRejected) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  initial $dumpportslimit 500000;\n"
-              "endmodule\n"));
+  auto result = Parse(
+      "module t;\n"
+      "  initial $dumpportslimit 500000;\n"
+      "endmodule\n");
+  // §12.3 owns the semicolon that terminates a subroutine call statement, and
+  // the unparenthesized filesize is what stands where that semicolon must be.
+  EXPECT_TRUE(ReportedError(result.diags, "expected ';', got integer literal",
+                            2, "12.3"));
 }
 
 }  // namespace

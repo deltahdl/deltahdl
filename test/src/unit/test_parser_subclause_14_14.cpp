@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -40,7 +41,9 @@ TEST(GlobalClockingParse, GlobalClockingInGenerateBlockIsError) {
       "    global clocking gclk @(posedge clk); endclocking\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "global clocking shall not be declared in a generate block", 4,
+      "14.14"));
 }
 
 TEST(GlobalClockingParse, RegularClockingInGenerateBlockIsAllowed) {

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "helpers_subroutine_call_verify.h"
 
 using namespace delta;
@@ -110,10 +111,11 @@ TEST(SubroutineCallSyntaxParsing, TaskCallAsStatement) {
 }
 
 TEST(SubroutineCallSyntaxParsing, ErrorMissingCloseParen) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  initial foo(1;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  initial foo(1;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 2, "13.5"));
 }
 
 // Syntax 13-3 gives subroutine_call_statement a second alternative,
@@ -177,24 +179,31 @@ TEST(SubroutineCallSyntaxParsing, SystemTaskCallAsStatement) {
 // subroutine_call_statement needs both parentheses. The annex counterpart is
 // ErrorVoidCastMissingCloseParen in test_parser_annex_a_08_02.cpp.
 TEST(SubroutineCallSyntaxParsing, ErrorVoidCastStatementMissingCloseParen) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  function int foo(); return 1; endfunction\n"
-              "  initial void'(foo();\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  function int foo(); return 1; endfunction\n"
+      "  initial void'(foo();\n"
+      "endmodule\n");
+  // §6.24.1 owns the cast parentheses, so the report for the unclosed
+  // `void'(` is filed there rather than under §13.5.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 3, "6.24.1"));
 }
 
 // A void-cast subroutine_call_statement still terminates with a semicolon.
 // The annex counterpart is ErrorVoidCastMissingSemicolon in
 // test_parser_annex_a_08_02.cpp.
 TEST(SubroutineCallSyntaxParsing, ErrorVoidCastStatementMissingSemicolon) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  function int foo(); return 1; endfunction\n"
-              "  initial begin\n"
-              "    void'(foo())\n"
-              "  end\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  function int foo(); return 1; endfunction\n"
+      "  initial begin\n"
+      "    void'(foo())\n"
+      "  end\n"
+      "endmodule\n");
+  // §12.3 owns the semicolon that ends a statement, and the `end` on line 5 is
+  // the token standing where it belongs. Parser::Expect names every keyword
+  // "token".
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 5, "12.3"));
 }
 
 }  // namespace

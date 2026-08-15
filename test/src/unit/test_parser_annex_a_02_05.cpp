@@ -17,6 +17,7 @@
 // §A.2.2.1) are produced by genuine source syntax.
 
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -185,7 +186,9 @@ TEST(DeclarationRangeParsing, QueueDimensionColonWithoutBoundRejected) {
   // queue_dimension ::= [ $ [ : constant_expression ] ]: when the colon is
   // present, the bound expression is mandatory.
   auto r = Parse("module m; int a [$:]; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §11.2 owns the report for a primary that is not an expression; §7.10 states
+  // the queue dimension whose bound is missing.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
 }  // namespace

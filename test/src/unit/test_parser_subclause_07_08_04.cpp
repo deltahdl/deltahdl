@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -74,7 +75,10 @@ TEST(IntegralIndexAssocArrayParsing, AssocDimIntSignedType) {
 // is not an index type this grammar admits.
 TEST(IntegralIndexAssocArrayParsing, AssocDimStringTakesNoSigning) {
   auto r = Parse("module m; int aa [string unsigned]; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::ParseAssocIndexDim leaves `unsigned` unconsumed, so the closing
+  // bracket §7.8 requires is missing. TokenKindName answers "token" for every
+  // keyword, which is why the tail names no keyword.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ']', got token", 1, "7.8"));
 }
 
 // An integral index type with no qualifier records none, so the default

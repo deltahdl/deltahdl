@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -217,7 +218,9 @@ TEST(TimingCheckArgumentParsing, ErrorDelayedRefMissingCloseBracket) {
       "  $setuphold(posedge clk, data, 10, 5, ntfr, , , dCLK[1, dD);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §31.9 owns the bit-select on a delayed_reference; Parser::Expect reports
+  // the missing ']' from Parser::ParseOptionalDelayedRef.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ']', got ','", 3, "31.9"));
 }
 
 }  // namespace

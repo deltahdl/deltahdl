@@ -7,6 +7,7 @@
 // §9.3.1-§9.3.5 and are exercised by their own canonical files.
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -156,7 +157,11 @@ TEST(BlockStatementParsing, SequentialMissingEndIsError) {
       "  initial begin\n"
       "    a = 1'b1;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §9.3.1 owns the begin-end delimiter rule, so ParseBlockStmt files the
+  // missing `end` under it; §9.3 has no report of its own. The block swallows
+  // `endmodule` looking for a statement, so the report stands at the EOF that
+  // follows, on line 6.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 6, "9.3.1"));
 }
 
 // §9.3 head: the parallel block is delimited by fork and one of join, join_any,

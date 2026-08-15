@@ -1,6 +1,7 @@
 #include "fixture_parser.h"
 #include "fixture_specify.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -47,7 +48,11 @@ TEST(SpecifyPathParsing, ParallelPathRejectsMultipleSources) {
       "    (a, b => c) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §30.4.5 owns the one-source-one-destination rule for '=>', and the parser
+  // files the report there rather than under §30.4.2.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "parallel path '=>' requires a single source and destination", 3,
+      "30.4.5"));
 }
 
 TEST(SpecifyPathParsing, ParallelPathRejectsMultipleDestinations) {
@@ -57,7 +62,11 @@ TEST(SpecifyPathParsing, ParallelPathRejectsMultipleDestinations) {
       "    (a => b, c) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §30.4.5 owns the one-source-one-destination rule for '=>', and the parser
+  // files the report there rather than under §30.4.2.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "parallel path '=>' requires a single source and destination", 3,
+      "30.4.5"));
 }
 
 TEST(SpecifyPathParsing, InputTerminalBitSelect) {

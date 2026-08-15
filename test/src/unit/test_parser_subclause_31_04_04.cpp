@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -86,7 +87,9 @@ TEST(TimingCheckCommandParsing, ErrorWidthNotifierWithoutThreshold) {
       "  $width(posedge clk, 20, , ntfr);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The threshold slot is parsed as an expression, so the empty slot is
+  // reported by the expression parser under §11.2.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
 // A compilation error is required when the reference event is not an edge
@@ -98,7 +101,9 @@ TEST(TimingCheckCommandParsing, ErrorWidthReferenceMissingEdge) {
       "  $width(clk, 20);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "$width reference_event must be an edge specification", 3,
+      "31.4.4"));
 }
 
 // Syntax 31-12 / edge requirement, negedge input form: a negedge reference is a
@@ -145,7 +150,9 @@ TEST(TimingCheckCommandParsing, ErrorWidthMissingLimit) {
       "  $width(posedge clk);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The shared timing-check parser files the missing separator under §31.2, the
+  // system_timing_check production, rather than under §31.4.4.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ',', got ')'", 3, "31.2"));
 }
 
 }  // namespace

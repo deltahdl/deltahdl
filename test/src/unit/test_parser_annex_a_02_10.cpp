@@ -1,110 +1,144 @@
 #include "fixture_parser.h"
 #include "helpers_concurrent_assertion_types.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
 namespace {
 
 TEST(ConcurrentAssertionParsing, ErrorAssertPropertyMissingSemicolon) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  assert property (a |-> b)\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (a |-> b)\n"
+      "endmodule\n");
+  // With the ';' gone, §16.14's action_block reads `endmodule` as the pass
+  // statement, so §11.2 is the rule the parser reports against.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
 TEST(ConcurrentAssertionParsing, ErrorAssertPropertyMissingOpenParen) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  assert property a |-> b);\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  assert property a |-> b);\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got identifier", 2, "16.14"));
 }
 
 TEST(ConcurrentAssertionParsing, ErrorAssertPropertyMissingCloseParen) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  assert property (a |-> b;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (a |-> b;\n"
+      "endmodule\n");
+  // The property_spec skip runs to end of file looking for the ')', so §16.14
+  // reports the missing token at the end-of-file location, line 4.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got EOF", 4, "16.14"));
 }
 
 TEST(ConcurrentAssertionParsing, ErrorAssertPropertyMissingPropertyKw) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  assert (a |-> b);\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  assert (a |-> b);\n"
+      "endmodule\n");
+  // TokenKindName answers "token" for every keyword, so the report for the
+  // missing `property` keyword names the '(' that stood in its place.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got '('", 2, "16.14"));
 }
 
 TEST(ConcurrentAssertionParsing, ErrorAssumePropertyMissingSemicolon) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  assume property (a |-> b)\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  assume property (a |-> b)\n"
+      "endmodule\n");
+  // As for assert property: §16.14's action_block reads `endmodule` as the
+  // pass statement, and §11.2 owns the report.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
 TEST(ConcurrentAssertionParsing, ErrorAssumePropertyMissingCloseParen) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  assume property (a |-> b;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  assume property (a |-> b;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got EOF", 4, "16.14"));
 }
 
 TEST(ConcurrentAssertionParsing, ErrorCoverPropertyMissingSemicolon) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  cover property (a |-> b)\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  cover property (a |-> b)\n"
+      "endmodule\n");
+  // With the ';' gone, §16.14.3 reads `endmodule` as the cover statement, so
+  // §11.2 is the rule the parser reports against.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
 TEST(ConcurrentAssertionParsing, ErrorCoverPropertyMissingCloseParen) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  cover property (a |-> b;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  cover property (a |-> b;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got EOF", 4, "16.14.3"));
 }
 
 TEST(ConcurrentAssertionParsing, ErrorCoverSequenceMissingSemicolon) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  cover sequence (a ##1 b)\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  cover sequence (a ##1 b)\n"
+      "endmodule\n");
+  // As for cover property: §16.14.3 reads `endmodule` as the cover statement
+  // and §11.2 owns the report.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
 TEST(ConcurrentAssertionParsing, ErrorCoverSequenceMissingCloseParen) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  cover sequence (a ##1 b;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  cover sequence (a ##1 b;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got EOF", 4, "16.14.3"));
 }
 
 TEST(ConcurrentAssertionParsing, ErrorRestrictPropertyMissingSemicolon) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  restrict property (a |-> b)\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  restrict property (a |-> b)\n"
+      "endmodule\n");
+  // restrict property takes no action_block, so §16.14.4 requires the ';'
+  // itself and names the `endmodule` keyword it found instead.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "16.14.4"));
 }
 
 TEST(ConcurrentAssertionParsing, ErrorRestrictPropertyMissingCloseParen) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  restrict property (a |-> b;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  restrict property (a |-> b;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got EOF", 4, "16.14.4"));
 }
 
 TEST(PropertyDeclParsing, ErrorMissingEndproperty) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  property p;\n"
-              "    a |-> b;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  property p;\n"
+      "    a |-> b;\n"
+      "endmodule\n");
+  // The body scan runs to end of file, so §16.12 reports the missing
+  // `endproperty` at the end-of-file location, line 5. TokenKindName answers
+  // "token" for every keyword.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 5, "16.12"));
 }
 
 TEST(PropertyDeclParsing, ErrorMissingPropertyName) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  property;\n"
-              "    a |-> b;\n"
-              "  endproperty\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  property;\n"
+      "    a |-> b;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ';'", 2, "16.12"));
 }
 
 TEST(PropertyDeclParsing, ErrorMismatchedEndLabel) {
@@ -114,42 +148,56 @@ TEST(PropertyDeclParsing, ErrorMismatchedEndLabel) {
       "    a |-> b;\n"
       "  endproperty : p2\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §9.3.4 owns the block end-label matching rule that Parser::MatchEndLabel
+  // applies to every named block, a property declaration included.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "end label 'p2' does not match 'p1'", 4, "9.3.4"));
 }
 
 TEST(PropertyDeclParsing, ErrorMissingSemicolonAfterName) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  property p\n"
-              "    a |-> b;\n"
-              "  endproperty\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  property p\n"
+      "    a |-> b;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got identifier", 3, "16.12"));
 }
 
 TEST(PropertyDeclParsing, ErrorUnclosedPortList) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  property p(a, b;\n"
-              "    a |-> b;\n"
-              "  endproperty\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  property p(a, b;\n"
+      "    a |-> b;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  // The port-list scan never meets its ')' and swallows the rest of the file,
+  // so §16.12 reports the declaration's own ';' missing at end of file.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got EOF", 6, "16.12"));
 }
 
 TEST(SequenceDeclParsing, ErrorMissingEndsequence) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  sequence s;\n"
-              "    a ##1 b;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s;\n"
+      "    a ##1 b;\n"
+      "endmodule\n");
+  // The body scan runs to end of file, so §16.8 reports the missing
+  // `endsequence` at the end-of-file location, line 5. TokenKindName answers
+  // "token" for every keyword.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 5, "16.8"));
 }
 
 TEST(SequenceDeclParsing, ErrorMissingSequenceName) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  sequence;\n"
-              "    a ##1 b;\n"
-              "  endsequence\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  sequence;\n"
+      "    a ##1 b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ';'", 2, "16.8"));
 }
 
 TEST(SequenceDeclParsing, ErrorMismatchedEndLabel) {
@@ -159,25 +207,33 @@ TEST(SequenceDeclParsing, ErrorMismatchedEndLabel) {
       "    a ##1 b;\n"
       "  endsequence : s2\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §9.3.4 owns the block end-label matching rule that Parser::MatchEndLabel
+  // applies to every named block, a sequence declaration included.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "end label 's2' does not match 's1'", 4, "9.3.4"));
 }
 
 TEST(SequenceDeclParsing, ErrorMissingSemicolonAfterName) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  sequence s\n"
-              "    a ##1 b;\n"
-              "  endsequence\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s\n"
+      "    a ##1 b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got identifier", 3, "16.8"));
 }
 
 TEST(SequenceDeclParsing, ErrorUnclosedPortList) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  sequence s(a, b;\n"
-              "    a ##1 b;\n"
-              "  endsequence\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s(a, b;\n"
+      "    a ##1 b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  // The port-list scan never meets its ')' and swallows the rest of the file,
+  // so §16.8 reports the declaration's own ';' missing at end of file.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got EOF", 6, "16.8"));
 }
 
 TEST(PropertyDeclParsing, MultiplePropertyDecls) {
@@ -275,7 +331,10 @@ TEST(PropertyDeclParsing, PropertyPortLocalOutputRejected) {
       "    x;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §16.12.19 owns the property local-variable formal direction rule that
+  // A.2.10's property_lvar_port_direction states as `input` alone.
+  EXPECT_TRUE(ReportedError(r.diags, "property port direction must be 'input'",
+                            2, "16.12.19"));
 }
 
 TEST(PropertyDeclParsing, PropertyPortLocalInoutRejected) {
@@ -285,7 +344,8 @@ TEST(PropertyDeclParsing, PropertyPortLocalInoutRejected) {
       "    x;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "property port direction must be 'input'",
+                            2, "16.12.19"));
 }
 
 // 'output' or 'inout' inside a property port list is illegal even
@@ -298,7 +358,8 @@ TEST(PropertyDeclParsing, PropertyPortOutputWithoutLocalRejected) {
       "    x;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "property port direction must be 'input'",
+                            2, "16.12.19"));
 }
 
 TEST(PropertyDeclParsing, PropertyPortInoutWithoutLocalRejected) {
@@ -308,7 +369,8 @@ TEST(PropertyDeclParsing, PropertyPortInoutWithoutLocalRejected) {
       "    x;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "property port direction must be 'input'",
+                            2, "16.12.19"));
 }
 
 TEST(PropertyDeclParsing, PropertyPortInputWithoutLocalRejected) {
@@ -318,7 +380,9 @@ TEST(PropertyDeclParsing, PropertyPortInputWithoutLocalRejected) {
       "    x;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "property port direction 'input' requires 'local'",
+                            2, "16.12.19"));
 }
 
 // expect_property_statement ::= expect ( property_spec ) action_block
@@ -343,12 +407,16 @@ TEST(ExpectStatementParsing, ExpectWithActionBlock) {
 }
 
 TEST(ExpectStatementParsing, ExpectMissingCloseParen) {
-  EXPECT_TRUE(Parse("module m;\n"
-                    "  initial begin\n"
-                    "    expect (a |-> b ;\n"
-                    "  end\n"
-                    "endmodule\n")
-                  .has_errors);
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    expect (a |-> b ;\n"
+      "  end\n"
+      "endmodule\n");
+  // §16.17 files no report of its own for the unclosed property_spec: the
+  // skip loop runs to end of file, and the action block that follows is read
+  // as a statement there, so §11.2 is the rule the parser reports against.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 6, "11.2"));
 }
 
 // property_formal_type ::= sequence_formal_type | property

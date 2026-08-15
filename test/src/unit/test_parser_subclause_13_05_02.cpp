@@ -2,6 +2,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -231,13 +232,18 @@ TEST(PassByRefParsing, RefArgWithUnpackedArrayDims) {
   EXPECT_FALSE(fn->func_args[0].unpacked_dims.empty());
 }
 
+// Parser::ParseArgDirection files every rejection below under §13.3, which
+// carries tf_port_direction, rather than under this file's own §13.5.2. Each
+// stands at the second directional keyword, on line 2 of its own source.
 TEST(PassByRefParsing, RefInputCombinationRejected) {
   auto r = Parse(
       "module m;\n"
       "  task automatic incr(ref input int a);\n"
       "  endtask\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "combining ref with another directional qualifier is illegal", 2,
+      "13.3"));
 }
 
 TEST(PassByRefParsing, RefOutputCombinationRejected) {
@@ -246,7 +252,9 @@ TEST(PassByRefParsing, RefOutputCombinationRejected) {
       "  function automatic void f(ref output int a);\n"
       "  endfunction\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "combining ref with another directional qualifier is illegal", 2,
+      "13.3"));
 }
 
 TEST(PassByRefParsing, RefInoutCombinationRejected) {
@@ -255,7 +263,9 @@ TEST(PassByRefParsing, RefInoutCombinationRejected) {
       "  task automatic t(ref inout int a);\n"
       "  endtask\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "combining ref with another directional qualifier is illegal", 2,
+      "13.3"));
 }
 
 TEST(PassByRefParsing, InputRefCombinationRejected) {
@@ -264,7 +274,9 @@ TEST(PassByRefParsing, InputRefCombinationRejected) {
       "  task automatic t(input ref int a);\n"
       "  endtask\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "combining ref with another directional qualifier is illegal", 2,
+      "13.3"));
 }
 
 TEST(PassByRefParsing, OutputRefCombinationRejected) {
@@ -273,7 +285,9 @@ TEST(PassByRefParsing, OutputRefCombinationRejected) {
       "  function automatic void f(output ref int a);\n"
       "  endfunction\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "combining ref with another directional qualifier is illegal", 2,
+      "13.3"));
 }
 
 TEST(PassByRefParsing, InoutRefCombinationRejected) {
@@ -282,7 +296,9 @@ TEST(PassByRefParsing, InoutRefCombinationRejected) {
       "  task automatic t(inout ref int a);\n"
       "  endtask\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "combining ref with another directional qualifier is illegal", 2,
+      "13.3"));
 }
 
 TEST(PassByRefParsing, RefRefDoubleKeywordRejected) {
@@ -291,7 +307,9 @@ TEST(PassByRefParsing, RefRefDoubleKeywordRejected) {
       "  task automatic t(ref ref int a);\n"
       "  endtask\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "combining ref with another directional qualifier is illegal", 2,
+      "13.3"));
 }
 
 TEST(PassByRefParsing, ConstRefAloneAcceptedNotCombined) {

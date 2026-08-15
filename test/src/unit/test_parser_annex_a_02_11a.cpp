@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -116,19 +117,25 @@ TEST(CovergroupDeclParsing, CoverGroup_PortsWithBody) {
 }
 
 TEST(CovergroupDeclParsing, ErrorMissingEndgroup) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  covergroup cg;\n"
+      "    coverpoint x;\n"
+      "endmodule\n");
+  // The unterminated body swallows 'endmodule', so the covergroup is what runs
+  // out of source. TokenKindName spells every keyword "token", and the end of
+  // the source stands on line 5, the line the trailing newline opened.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 5, "19.3"));
 }
 
 TEST(CovergroupDeclParsing, ErrorMissingCovergroupName) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  covergroup;\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  covergroup;\n"
+      "  endgroup\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ';'", 2, "19.3"));
 }
 
 TEST(CovergroupDeclParsing, ErrorMismatchedEndLabel) {
@@ -137,101 +144,133 @@ TEST(CovergroupDeclParsing, ErrorMismatchedEndLabel) {
       "  covergroup cg1;\n"
       "  endgroup : cg2\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §9.3.4 owns the end-label rule Parser::MatchEndLabel enforces for every
+  // named block, the covergroup included; §19.3 has no report of its own here.
+  EXPECT_TRUE(ReportedError(r.diags, "end label 'cg2' does not match 'cg1'", 3,
+                            "9.3.4"));
 }
 
 TEST(CovergroupDeclParsing, ErrorMissingSemicolonAfterDecl) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  covergroup cg\n"
-              "    coverpoint x;\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  covergroup cg\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "endmodule\n");
+  // 'coverpoint' stands where the ';' was demanded, and TokenKindName spells
+  // every keyword "token".
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "19.3"));
 }
 
 TEST(CovergroupDeclParsing, ErrorUnclosedPortList) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  covergroup cg(ref int x;\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  covergroup cg(ref int x;\n"
+      "  endgroup\n"
+      "endmodule\n");
+  // The unclosed formal list scans to the end of the source, so the ';' that
+  // ends the covergroup declaration is demanded at EOF, on line 5.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got EOF", 5, "19.3"));
 }
 
 TEST(CovergroupDeclParsing, ErrorCoverPointMissingSemicolon) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  covergroup cg;\n"
+      "    coverpoint x\n"
+      "  endgroup\n"
+      "endmodule\n");
+  // The unterminated coverpoint swallows 'endgroup' and 'endmodule', so the
+  // covergroup runs out of source at line 6.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 6, "19.3"));
 }
 
 TEST(CovergroupDeclParsing, ErrorCoverPointUnclosedBinsBlock) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      bins a = {0};\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  covergroup cg;\n"
+      "    coverpoint x {\n"
+      "      bins a = {0};\n"
+      "  endgroup\n"
+      "endmodule\n");
+  // The unclosed coverpoint body swallows 'endgroup', so the covergroup runs
+  // out of source at line 7.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 7, "19.3"));
 }
 
 TEST(CovergroupDeclParsing, ErrorCrossUnclosedBody) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    cp1: coverpoint a;\n"
-              "    cp2: coverpoint b;\n"
-              "    cross cp1, cp2 {\n"
-              "      bins sel = binsof(cp1);\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  covergroup cg;\n"
+      "    cp1: coverpoint a;\n"
+      "    cp2: coverpoint b;\n"
+      "    cross cp1, cp2 {\n"
+      "      bins sel = binsof(cp1);\n"
+      "  endgroup\n"
+      "endmodule\n");
+  // The unclosed cross body swallows 'endgroup', so the covergroup runs out of
+  // source at line 9.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 9, "19.3"));
 }
 
 TEST(CovergroupDeclParsing, ErrorCrossMissingSemicolon) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    cp1: coverpoint a;\n"
-              "    cp2: coverpoint b;\n"
-              "    cross cp1, cp2\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  covergroup cg;\n"
+      "    cp1: coverpoint a;\n"
+      "    cp2: coverpoint b;\n"
+      "    cross cp1, cp2\n"
+      "  endgroup\n"
+      "endmodule\n");
+  // The unterminated cross swallows 'endgroup' and 'endmodule', so the
+  // covergroup runs out of source at line 8.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 8, "19.3"));
 }
 
 TEST(CovergroupDeclParsing, ErrorBinsMissingSemicolon) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      bins a = {0}\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  covergroup cg;\n"
+      "    coverpoint x {\n"
+      "      bins a = {0}\n"
+      "    }\n"
+      "  endgroup\n"
+      "endmodule\n");
+  // The coverpoint body's closing '}' on line 5 is where the missing ';' is
+  // detected.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "missing ';' in covergroup item", 5, "19.3"));
 }
 
 TEST(CovergroupDeclParsing, ErrorBinsMissingEquals) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      bins a {0};\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  covergroup cg;\n"
+      "    coverpoint x {\n"
+      "      bins a {0};\n"
+      "    }\n"
+      "  endgroup\n"
+      "endmodule\n");
+  // §19.5.1 owns the bins_selection '=' the header scan demands; §19.3 has no
+  // report of its own here.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '=' in bins declaration", 4, "19.5.1"));
 }
 
 TEST(CovergroupDeclParsing, ErrorBinsofMissingCloseParen) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    cp1: coverpoint a;\n"
-              "    cp2: coverpoint b;\n"
-              "    cross cp1, cp2 {\n"
-              "      bins sel = binsof(cp1;\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  covergroup cg;\n"
+      "    cp1: coverpoint a;\n"
+      "    cp2: coverpoint b;\n"
+      "    cross cp1, cp2 {\n"
+      "      bins sel = binsof(cp1;\n"
+      "    }\n"
+      "  endgroup\n"
+      "endmodule\n");
+  // The unbalanced paren is reported where the cross body closes, on line 7.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "missing ')' in covergroup item", 7, "19.3"));
 }
 
 TEST(CovergroupDeclParsing, MultipleCovergroupDecls) {
@@ -277,19 +316,23 @@ TEST(CovergroupDeclParsing, CovergroupWithAllSpecTypes) {
 }
 
 TEST(CovergroupDeclParsing, ErrorWithFunctionWrongName) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  covergroup cg with function foo(int x);\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  covergroup cg with function foo(int x);\n"
+      "  endgroup\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'sample', got 'foo'", 2, "19.3"));
 }
 
 TEST(CovergroupDeclParsing, ErrorBlockEventMissingBeginOrEnd) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  covergroup cg @@(foo);\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  covergroup cg @@(foo);\n"
+      "  endgroup\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'begin' or 'end' in block event",
+                            2, "19.3"));
 }
 
 }  // namespace

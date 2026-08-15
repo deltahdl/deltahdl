@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -27,7 +28,11 @@ TEST(UdpEdgeSeq, TwoParenthesizedEdgeIndicatorsInRowRejected) {
       "    (01) (10) 0 : 0 : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // ValidateUdpRowEdgeCount in src/parser/parser_udp.cpp files the
+  // at-most-one-transition report under §29.3.4, not under §29.6.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP table row shall contain at most one input transition", 3,
+      "29.3.4"));
 }
 
 // §29.6 names two ways to write a transition: a parenthesized pair such as
@@ -44,7 +49,9 @@ TEST(UdpEdgeSeq, TwoLetterEdgeSymbolsInRowRejected) {
       "    r f : ? : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP table row shall contain at most one input transition", 3,
+      "29.3.4"));
 }
 
 }  // namespace

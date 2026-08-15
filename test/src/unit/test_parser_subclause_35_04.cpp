@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -124,7 +125,10 @@ TEST(DpiGlobalNameParsing, ImportGlobalNameWithDollarRejected) {
       import "DPI-C" foo$bar = function void sv_local();
     endmodule
   )");
-  EXPECT_TRUE(r.has_errors);
+  // §35.5.4 owns the c_identifier report; §35.4 has no report of its own here.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "DPI c_identifier must match [a-zA-Z_][a-zA-Z0-9_]*", 3,
+      "35.5.4"));
 }
 
 // §35.4: "After this stripping, the linkage identifier so formed shall comply
@@ -142,7 +146,10 @@ TEST(DpiGlobalNameParsing, EscapedNameStartingWithDigitIsRejected) {
   Lexer lexer(mgr.FileContent(fid), fid, diag);
   Parser parser(lexer, arena, diag);
   parser.Parse();
-  EXPECT_TRUE(diag.HasErrors());
+  // §35.5.4 owns the c_identifier report; §35.4 has no report of its own here.
+  EXPECT_TRUE(ReportedError(
+      diag.Diagnostics(), "DPI c_identifier must match [a-zA-Z_][a-zA-Z0-9_]*",
+      2, "35.5.4"));
 }
 
 }  // namespace

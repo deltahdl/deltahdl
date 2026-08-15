@@ -1,6 +1,7 @@
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -176,7 +177,12 @@ TEST(ProgramItemsParsing, ProgramTimeunitAfterOtherItemRejected) {
       "  int x;\n"
       "  timeunit 1ns;\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  // §3.14.2.2 owns the placement rule for a later timeunit, so
+  // src/parser/parser_items.cpp:101 files the report there rather than §24.3.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "timeunit as a later item requires a matching "
+                            "prior declaration in the same time scope",
+                            3, "3.14.2.2"));
 }
 
 TEST(ProgramItemsParsing, ProgramGenFor) {
@@ -401,7 +407,8 @@ TEST(ProgramItemsParsing, CannotContainNestedModuleDecl) {
       "program p;\n"
       "  module inner; endmodule\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "module declarations not allowed in programs", 2, "24.3"));
 }
 
 TEST(ProgramItemsParsing, CannotContainNestedInterfaceDecl) {
@@ -409,7 +416,8 @@ TEST(ProgramItemsParsing, CannotContainNestedInterfaceDecl) {
       "program p;\n"
       "  interface inner; endinterface\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "interface declarations not allowed in programs", 2, "24.3"));
 }
 
 TEST(ProgramItemsParsing, CannotContainNestedProgramDecl) {
@@ -417,7 +425,8 @@ TEST(ProgramItemsParsing, CannotContainNestedProgramDecl) {
       "program p;\n"
       "  program inner; endprogram\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "program declarations not allowed in programs", 2, "24.3"));
 }
 
 TEST(ProgramItemsParsing, GenerateRegionCannotContainAlways) {
@@ -428,7 +437,8 @@ TEST(ProgramItemsParsing, GenerateRegionCannotContainAlways) {
       "    always @(posedge clk) q <= d;\n"
       "  endgenerate\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "always procedures not allowed in programs", 4, "24.3"));
 }
 
 TEST(ProgramItemsParsing, LoopGenerateCannotContainAlways) {
@@ -439,7 +449,8 @@ TEST(ProgramItemsParsing, LoopGenerateCannotContainAlways) {
       "    always @* begin end\n"
       "  end\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "always procedures not allowed in programs", 4, "24.3"));
 }
 
 TEST(ProgramItemsParsing, ConditionalGenerateCannotContainModuleInst) {
@@ -450,7 +461,8 @@ TEST(ProgramItemsParsing, ConditionalGenerateCannotContainModuleInst) {
       "    sub u0();\n"
       "  end\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "instantiations not allowed in programs",
+                            4, "24.3"));
 }
 
 static int CountItemsOfKind(const std::vector<ModuleItem*>& items,
@@ -557,7 +569,8 @@ TEST_F(ProgramParseTest, ProgramWithTaskAndFunction) {
 }
 
 TEST(ProgramDeclaration, MissingEndprogramIsError) {
-  EXPECT_FALSE(ParseOk("program p;"));
+  auto r = Parse("program p;");
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 1, "24.3"));
 }
 
 TEST(ProgramDeclaration, SampleDeclaration) {
@@ -605,7 +618,8 @@ TEST(ProgramItemsParsing, CannotContainAlways) {
       "  logic clk, d, q;\n"
       "  always @(posedge clk) q <= d;\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "always procedures not allowed in programs", 3, "24.3"));
 }
 
 TEST(ProgramItemsParsing, CannotContainAlwaysComb) {
@@ -614,7 +628,8 @@ TEST(ProgramItemsParsing, CannotContainAlwaysComb) {
       "  logic a, b;\n"
       "  always_comb b = a;\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "always procedures not allowed in programs", 3, "24.3"));
 }
 
 TEST(ProgramItemsParsing, CannotContainAlwaysFF) {
@@ -623,7 +638,8 @@ TEST(ProgramItemsParsing, CannotContainAlwaysFF) {
       "  logic clk, d, q;\n"
       "  always_ff @(posedge clk) q <= d;\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "always procedures not allowed in programs", 3, "24.3"));
 }
 
 TEST(ProgramItemsParsing, CannotContainAlwaysLatch) {
@@ -632,7 +648,8 @@ TEST(ProgramItemsParsing, CannotContainAlwaysLatch) {
       "  logic en, d, q;\n"
       "  always_latch if (en) q <= d;\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "always procedures not allowed in programs", 3, "24.3"));
 }
 
 TEST(ProgramItemsParsing, CannotContainModuleInst) {
@@ -641,7 +658,8 @@ TEST(ProgramItemsParsing, CannotContainModuleInst) {
       "program p;\n"
       "  sub u0();\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "instantiations not allowed in programs",
+                            3, "24.3"));
 }
 
 TEST(ProgramItemsParsing, CannotContainGateInst) {
@@ -650,7 +668,8 @@ TEST(ProgramItemsParsing, CannotContainGateInst) {
       "  wire a, b, y;\n"
       "  nand g1(y, a, b);\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "primitive instances not allowed in programs", 3, "24.3"));
 }
 
 TEST(ProgramItemsParsing, CannotContainUdpInst) {
@@ -662,7 +681,8 @@ TEST(ProgramItemsParsing, CannotContainUdpInst) {
       "  wire a, b;\n"
       "  udp_buf u1(a, b);\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "primitive instances not allowed in programs", 6, "24.3"));
 }
 
 TEST(ProgramItemsParsing, CannotContainInterfaceInst) {
@@ -671,7 +691,8 @@ TEST(ProgramItemsParsing, CannotContainInterfaceInst) {
       "program p;\n"
       "  ifc i0();\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "instantiations not allowed in programs",
+                            3, "24.3"));
 }
 
 TEST(ProgramItemsParsing, CannotContainProgramInst) {
@@ -680,7 +701,8 @@ TEST(ProgramItemsParsing, CannotContainProgramInst) {
       "program p;\n"
       "  other o0();\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "instantiations not allowed in programs",
+                            3, "24.3"));
 }
 
 TEST(ProgramDeclaration, AnonymousProgramAcceptsTaskFunctionClass) {
@@ -732,7 +754,13 @@ TEST(ProgramDeclaration, AnsiHeaderPackageImportWithoutPortListFails) {
       "endpackage\n"
       "program prg import pkg::*;\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  // The three ansi headers share one report, filed under §23.2.1 at
+  // src/parser/parser_port.cpp:704 rather than under this file's §24.3.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "package_import_declaration in ansi header must be "
+                            "followed by parameter_port_list or "
+                            "list_of_port_declarations",
+                            4, "23.2.1"));
 }
 
 TEST(ProgramDeclaration, AnsiHeaderPackageImportWithPortListSucceeds) {

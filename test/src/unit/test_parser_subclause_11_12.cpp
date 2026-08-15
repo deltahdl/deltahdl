@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -621,7 +622,8 @@ TEST(LetDeclParsing, ErrorMissingEquals) {
       "module m;\n"
       "  let f(x) x;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '=', got identifier", 2, "11.12"));
 }
 
 TEST(LetDeclParsing, ErrorMissingSemicolon) {
@@ -629,7 +631,9 @@ TEST(LetDeclParsing, ErrorMissingSemicolon) {
       "module m;\n"
       "  let f(x) = x\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // TokenKindName answers "token" for every keyword, so 'endmodule' is what
+  // stands at line 3 where the let declaration's semicolon belongs.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "11.12"));
 }
 
 TEST(LetDeclParsing, ErrorMissingIdentifier) {
@@ -637,7 +641,8 @@ TEST(LetDeclParsing, ErrorMissingIdentifier) {
       "module m;\n"
       "  let = 1;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got '='", 2, "11.12"));
 }
 
 TEST(LetDeclParsing, ErrorMissingBody) {
@@ -645,7 +650,9 @@ TEST(LetDeclParsing, ErrorMissingBody) {
       "module m;\n"
       "  let f(x) = ;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §11.2 owns the primary the let body is missing; §11.12 has no report of
+  // its own for an absent expression.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
 TEST(LetDeclParsing, ErrorUnclosedParens) {
@@ -653,7 +660,7 @@ TEST(LetDeclParsing, ErrorUnclosedParens) {
       "module m;\n"
       "  let f(x = x;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 2, "11.12"));
 }
 
 TEST(LetDeclParsing, ErrorEmptyBodyNoEquals) {
@@ -661,7 +668,7 @@ TEST(LetDeclParsing, ErrorEmptyBodyNoEquals) {
       "module m;\n"
       "  let f;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected '=', got ';'", 2, "11.12"));
 }
 
 TEST(LetDeclParsing, LetDeclInGenerateBlock) {

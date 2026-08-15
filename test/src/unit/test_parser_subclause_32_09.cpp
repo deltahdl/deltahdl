@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -166,14 +167,20 @@ TEST(SdfAnnotateSyntax, ModuleInstanceMayIndexPartWayAlongAPath) {
 // The call is a statement, so it is terminated by a semicolon like any other.
 // Dropping the semicolon is not a $sdf_annotate call.
 TEST(SdfAnnotateSyntax, CallWithoutItsTerminatingSemicolonIsRejected) {
-  EXPECT_FALSE(ParseOk(
-      "module top;\n  initial $sdf_annotate(\"timing.sdf\")\nendmodule\n"));
+  ParseResult r = Parse(
+      "module top;\n  initial $sdf_annotate(\"timing.sdf\")\nendmodule\n");
+  // The statement terminator is §12.3's rule, and it is what the parser
+  // reports; §32.9 has no report of its own here.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "12.3"));
 }
 
 // The operand list is parenthesized; an unclosed list is not a call.
 TEST(SdfAnnotateSyntax, CallWithAnUnclosedOperandListIsRejected) {
-  EXPECT_FALSE(ParseOk(
-      "module top;\n  initial $sdf_annotate(\"timing.sdf\";\nendmodule\n"));
+  ParseResult r = Parse(
+      "module top;\n  initial $sdf_annotate(\"timing.sdf\";\nendmodule\n");
+  // The closing parenthesis of a system task call is §13.5's rule, and it is
+  // what the parser reports; §32.9 has no report of its own here.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 2, "13.5"));
 }
 
 }  // namespace

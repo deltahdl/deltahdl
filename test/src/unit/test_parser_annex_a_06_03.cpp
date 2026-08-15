@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -380,11 +381,14 @@ TEST(BlockStatementSyntaxParsing, ActionBlockNullStatement) {
 // seq_block requires a closing end; reaching the module boundary without it
 // is a parse error.
 TEST(BlockStatementSyntaxParsing, SeqBlockMissingEndRejected) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    a = 1;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "endmodule\n");
+  // §9.3.1 owns seq_block, and Parser::ParseBlockStmt demands its `end` at
+  // end-of-input, where TokenKindName renders the wanted keyword as `token`.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 5, "9.3.1"));
 }
 
 // par_block requires a join_keyword to close; terminating a fork with end

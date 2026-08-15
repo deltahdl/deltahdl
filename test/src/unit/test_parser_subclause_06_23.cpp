@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -510,11 +511,17 @@ TEST(TypeOperatorParsing, TypeRefScopedTypeRetainsClassPrefix) {
 // the accepting `var type(a) b;` forms above: a bare `type(a) b;` omits the
 // required keyword and the parser reports an error.
 TEST(TypeOperatorParsing, VarTypeRefWithoutVarKeywordRejected) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  int a;\n"
-              "  type(a) b;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module t;\n"
+      "  int a;\n"
+      "  type(a) b;\n"
+      "endmodule\n");
+  // §6.8 states the data_declaration the `var` keyword belongs to, and that is
+  // where Parser::ParseTypedItemOrInst files the report.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "type_reference in a variable declaration must be "
+                            "preceded by the 'var' keyword",
+                            3, "6.8"));
 }
 
 }  // namespace

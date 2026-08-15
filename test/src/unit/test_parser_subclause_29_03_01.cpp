@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 #include "simulator/udp_eval.h"
 
 using namespace delta;
@@ -63,12 +64,15 @@ TEST(UdpDeclGrammar, NonAnsiWithPortDecls) {
 // definition that ends after endtable is incomplete. The annex A.5.1 file
 // carries the same requirement stated as the udp_declaration production.
 TEST(UdpDeclGrammar, UdpDefinitionWithoutEndprimitiveIsError) {
-  EXPECT_FALSE(
-      ParseOk("primitive inv(output y, input a);\n"
-              "  table\n"
-              "    0 : 1;\n"
-              "    1 : 0;\n"
-              "  endtable\n"));
+  auto r = Parse(
+      "primitive inv(output y, input a);\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n");
+  // Parser::ParseUdpDecl demands endprimitive under §29.3; the source runs out
+  // first, so the report stands on line 6, past the last written line.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 6, "29.3"));
 }
 
 TEST(UdpDeclGrammar, UdpWithNoOutputPortRejected) {
@@ -78,7 +82,8 @@ TEST(UdpDeclGrammar, UdpWithNoOutputPortRejected) {
       "  input b;\n"
       "  table 0 0 : 0; 1 1 : 1; endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "UDP shall have exactly one output port",
+                            1, "29.3.1"));
 }
 
 TEST(UdpDeclGrammar, UdpWithNoInputPortsRejected) {
@@ -87,7 +92,8 @@ TEST(UdpDeclGrammar, UdpWithNoInputPortsRejected) {
       "  output q;\n"
       "  table : 0; endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "UDP shall have at least one input port",
+                            1, "29.3.1"));
 }
 
 TEST(UdpDeclGrammar, UdpAnsiHeaderWithNoInputPortRejected) {
@@ -98,7 +104,8 @@ TEST(UdpDeclGrammar, UdpAnsiHeaderWithNoInputPortRejected) {
       "primitive p(output q);\n"
       "  table : 0; endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "UDP shall have at least one input port",
+                            1, "29.3.1"));
 }
 
 TEST(UdpDeclGrammar, UdpWithDuplicateOutputsRejected) {
@@ -109,7 +116,10 @@ TEST(UdpDeclGrammar, UdpWithDuplicateOutputsRejected) {
       "  input c;\n"
       "  table 0 : 0; endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::ParseUdpOutputDecl reports the second output declaration where it
+  // stands, on line 3.
+  EXPECT_TRUE(ReportedError(r.diags, "UDP shall have exactly one output port",
+                            3, "29.3.1"));
 }
 
 TEST(UdpDeclGrammar, UdpDuplicateOutputInAnsiHeaderRejected) {
@@ -117,7 +127,11 @@ TEST(UdpDeclGrammar, UdpDuplicateOutputInAnsiHeaderRejected) {
       "primitive p(output a, output b, input c);\n"
       "  table 0 0 : 0; endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::ParseUdpAnsiOutputHeader takes every port after the first as an
+  // input, so the second `output` keyword is rejected as a missing port
+  // identifier under §29.3.1 rather than named as a duplicate output.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got token", 1, "29.3.1"));
 }
 
 TEST(UdpDeclGrammar, UdpInoutPortInAnsiHeaderRejected) {
@@ -125,7 +139,9 @@ TEST(UdpDeclGrammar, UdpInoutPortInAnsiHeaderRejected) {
       "primitive p(output o, inout io);\n"
       "  table 0 : 0; endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP ports shall be input or output; inout not permitted", 1,
+      "29.3.1"));
 }
 
 TEST(UdpDeclGrammar, UdpInoutPortInNonAnsiDeclRejected) {
@@ -135,7 +151,9 @@ TEST(UdpDeclGrammar, UdpInoutPortInNonAnsiDeclRejected) {
       "  inout io;\n"
       "  table 0 : 0; endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP ports shall be input or output; inout not permitted", 3,
+      "29.3.1"));
 }
 
 TEST(UdpDeclGrammar, UdpInoutAsLeadingPortRejected) {
@@ -146,7 +164,9 @@ TEST(UdpDeclGrammar, UdpInoutAsLeadingPortRejected) {
       "primitive p(inout io, output o, input a);\n"
       "  table 0 : 0; endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP ports shall be input or output; inout not permitted", 1,
+      "29.3.1"));
 }
 
 TEST(UdpDeclGrammar, UdpVectorOutputInAnsiHeaderRejected) {
@@ -154,7 +174,9 @@ TEST(UdpDeclGrammar, UdpVectorOutputInAnsiHeaderRejected) {
       "primitive p(output [3:0] q, input a);\n"
       "  table 0 : 0; endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP port shall be scalar; vector range not permitted", 1,
+      "29.3.1"));
 }
 
 TEST(UdpDeclGrammar, UdpVectorInputInAnsiHeaderRejected) {
@@ -162,7 +184,9 @@ TEST(UdpDeclGrammar, UdpVectorInputInAnsiHeaderRejected) {
       "primitive p(output q, input [3:0] a);\n"
       "  table 0 : 0; endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP port shall be scalar; vector range not permitted", 1,
+      "29.3.1"));
 }
 
 TEST(UdpDeclGrammar, UdpVectorOutputInNonAnsiDeclRejected) {
@@ -172,7 +196,9 @@ TEST(UdpDeclGrammar, UdpVectorOutputInNonAnsiDeclRejected) {
       "  input a;\n"
       "  table 0 : 0; endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP port shall be scalar; vector range not permitted", 2,
+      "29.3.1"));
 }
 
 TEST(UdpDeclGrammar, UdpVectorInputInNonAnsiDeclRejected) {
@@ -182,7 +208,9 @@ TEST(UdpDeclGrammar, UdpVectorInputInNonAnsiDeclRejected) {
       "  input [3:0] a;\n"
       "  table 0 : 0; endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP port shall be scalar; vector range not permitted", 3,
+      "29.3.1"));
 }
 
 TEST(UdpDeclGrammar, UdpOutputNotFirstInNonAnsiPortListRejected) {
@@ -192,7 +220,10 @@ TEST(UdpDeclGrammar, UdpOutputNotFirstInNonAnsiPortListRejected) {
       "  output q;\n"
       "  table 0 : 0; endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // The report stands on the offending port-list entry, which is on line 1.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP output port shall be the first port in the port list", 1,
+      "29.3.1"));
 }
 
 TEST(UdpDeclGrammar, UdpOutputNotFirstInAnsiHeaderRejected) {
@@ -203,14 +234,20 @@ TEST(UdpDeclGrammar, UdpOutputNotFirstInAnsiHeaderRejected) {
       "primitive p(input a, output o);\n"
       "  table 0 : 0; endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // A header whose first port is not `output` takes the non-ANSI path in
+  // Parser::ParseUdpDecl, so the leading `input` keyword is rejected as a
+  // missing port identifier under §29.3.1.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got token", 1, "29.3.1"));
 }
 
 TEST(UdpDeclGrammar, UdpHeaderWithoutStateTableRejected) {
   auto r = Parse(
       "primitive p(output o, input a);\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // §29.3.4 owns the udp_body table, so Parser::ParseUdpTable files the
+  // missing `table` keyword there rather than under §29.3.1.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got token", 2, "29.3.4"));
 }
 
 }  // namespace

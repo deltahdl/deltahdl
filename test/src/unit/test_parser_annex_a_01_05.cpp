@@ -7,6 +7,7 @@
 // use_clause cases below exercise only the named_parameter_assignment list form
 // that this subclause's grammar defines.
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -57,27 +58,36 @@ TEST(ConfigSourceText, ConfigDeclarationLocalParams) {
 
 // The endconfig terminal is required to close the declaration.
 TEST(ConfigSourceText, ConfigDeclarationRequiresEndconfig) {
-  EXPECT_FALSE(
-      ParseOk("config cfg;\n"
-              "  design top;"));
+  auto r = Parse(
+      "config cfg;\n"
+      "  design top;");
+  // `endconfig` is a keyword, which Parser::Expect names "token"; the source
+  // ends on line 2, so that is where the EOF standing in for it is reported.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 2, "33.4.1"));
 }
 
 // The grammar makes design_statement a mandatory member of config_declaration.
 TEST(ConfigSourceText, ConfigDeclarationRequiresDesign) {
-  EXPECT_FALSE(
-      ParseOk("config cfg;\n"
-              "  default liblist work;\n"
-              "endconfig\n"));
+  auto r = Parse(
+      "config cfg;\n"
+      "  default liblist work;\n"
+      "endconfig\n");
+  // §33.4.1.1 owns design_statement, so the report over its absence is filed
+  // there rather than under §33.4.1 with config_declaration.
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'design' statement in config", 2,
+                            "33.4.1.1"));
 }
 
 // config_declaration carries design_statement exactly once (it is not part of
 // the repeated config_rule_statement group), so a second design is rejected.
 TEST(ConfigSourceText, ConfigDeclarationRejectsSecondDesign) {
-  EXPECT_FALSE(
-      ParseOk("config cfg;\n"
-              "  design lib.top;\n"
-              "  design lib.other;\n"
-              "endconfig\n"));
+  auto r = Parse(
+      "config cfg;\n"
+      "  design lib.top;\n"
+      "  design lib.other;\n"
+      "endconfig\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "duplicate 'design' statement in config 'cfg'", 3, "33.4.1.1"));
 }
 
 // --- design_statement ------------------------------------------------------
@@ -159,11 +169,14 @@ TEST(ConfigSourceText, ConfigRuleStatementsRepeat) {
 }
 
 TEST(ConfigSourceText, ConfigRuleRequiresSemicolon) {
-  EXPECT_FALSE(
-      ParseOk("config cfg;\n"
-              "  design top;\n"
-              "  default liblist work\n"
-              "endconfig\n"));
+  auto r = Parse(
+      "config cfg;\n"
+      "  design top;\n"
+      "  default liblist work\n"
+      "endconfig\n");
+  // `endconfig` is a keyword, which Parser::Expect names "token", and it is
+  // the token standing where the rule's ';' was wanted on line 4.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "33.4.1"));
 }
 
 // --- default_clause and liblist_clause -------------------------------------

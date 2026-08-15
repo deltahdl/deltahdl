@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -162,30 +163,45 @@ TEST(AttributeSyntaxParsing, AttrNameEscapedIdentifier) {
   EXPECT_EQ(r.cu->modules[0]->attrs[0].name, "full-case");
 }
 
+// Parser::ParseAttributes files every report it writes under §5.12, which
+// carries the attribute_instance prose; A.9.1 states the grammar and has no
+// report of its own.
 TEST(AttributeSyntaxParsing, ErrorUnterminatedAttribute) {
-  EXPECT_FALSE(ParseOk("(* missing_end module m; endmodule\n"));
+  auto r = Parse("(* missing_end module m; endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected '*)', got token", 1, "5.12"));
 }
 
 TEST(AttributeSyntaxParsing, ErrorEmptyAttribute) {
-  EXPECT_FALSE(ParseOk("(* *) module m; endmodule\n"));
+  auto r = Parse("(* *) module m; endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got '*)'", 1, "5.12"));
 }
 
 TEST(AttributeSyntaxParsing, ErrorTrailingComma) {
-  EXPECT_FALSE(ParseOk("(* full_case, *) module m; endmodule\n"));
+  auto r = Parse("(* full_case, *) module m; endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got '*)'", 1, "5.12"));
 }
 
 TEST(AttributeSyntaxParsing, ErrorMissingCommaBetweenSpecs) {
-  EXPECT_FALSE(ParseOk("(* full_case parallel_case *) module m; endmodule\n"));
+  auto r = Parse("(* full_case parallel_case *) module m; endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '*)', got identifier", 1, "5.12"));
 }
 
+// The attr_spec value is parsed as an expression, so §11.2 owns the report for
+// a value that is missing, not §5.12.
 TEST(AttributeSyntaxParsing, ErrorMissingValueAfterEquals) {
-  EXPECT_FALSE(ParseOk("(* depth = *) module m; endmodule\n"));
+  auto r = Parse("(* depth = *) module m; endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
 // attr_name must be an identifier; a numeric literal in the name position is
 // the closest non-identifier input the rule must reject.
 TEST(AttributeSyntaxParsing, ErrorNonIdentifierAttrName) {
-  EXPECT_FALSE(ParseOk("(* 5 = 1 *) module m; endmodule\n"));
+  auto r = Parse("(* 5 = 1 *) module m; endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got integer literal",
+                            1, "5.12"));
 }
 
 TEST(AttributeSyntaxParsing, AttrNameUnderscoreStart) {
@@ -222,10 +238,12 @@ TEST(AttributeSyntaxParsing, AttrOnClassMember) {
 // A malformed attribute_instance (no attr_spec) in the class-member position
 // must be rejected, confirming the production is genuinely applied there.
 TEST(AttributeSyntaxParsing, ErrorEmptyAttrOnClassMember) {
-  EXPECT_FALSE(
-      ParseOk("class c;\n"
-              "  (* *) int x;\n"
-              "endclass\n"));
+  auto r = Parse(
+      "class c;\n"
+      "  (* *) int x;\n"
+      "endclass\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got '*)'", 2, "5.12"));
 }
 
 TEST(AttributeSyntaxParsing, AttrInstanceCanBeRepeatedAcrossDeclarations) {

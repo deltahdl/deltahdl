@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -152,13 +153,17 @@ TEST(FileReadFunctions, ReadCallOperandsMayBeExpressions) {
 // The negative form: an argument list left unterminated is not an instance of
 // the production and must be rejected by the call grammar.
 TEST(FileReadFunctions, UnterminatedReadCallRejected) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  integer fd, c;\n"
-              "  initial begin\n"
-              "    c = $fgetc(fd;\n"
-              "  end\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module t;\n"
+      "  integer fd, c;\n"
+      "  initial begin\n"
+      "    c = $fgetc(fd;\n"
+      "  end\n"
+      "endmodule\n");
+  // §13.5 owns the closing parenthesis of a system function call's argument
+  // list, so Parser::ParseSystemCall files the report under it rather than
+  // under §21.3.4.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 4, "13.5"));
 }
 
 TEST(FileReadFunctions, FreadMemoryFormWithCountButNoStart) {

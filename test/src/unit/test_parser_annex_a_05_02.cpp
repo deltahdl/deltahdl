@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 #include "simulator/udp_eval.h"
 
 using namespace delta;
@@ -212,7 +213,9 @@ TEST(UdpPortGrammar, NonAnsiPortDeclarationMissingSemicolon) {
       "    1 r : ? : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // §29.3.2 owns the UDP port declarations, so Parser::ParseUdpPortDecls files
+  // the missing semicolon there rather than under A.5.2.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "29.3.2"));
 }
 
 TEST(UdpPortGrammar, SimStandaloneRegSequential) {

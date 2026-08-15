@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -112,7 +113,8 @@ TEST(ExpectStatementParsing, MissingParenthesesIsAnError) {
       "  initial\n"
       "    expect a;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got identifier", 3, "16.17"));
 }
 
 // Walks a statement subtree and records every expect statement it contains, so

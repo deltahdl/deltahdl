@@ -1,6 +1,7 @@
 
 
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -256,12 +257,13 @@ TEST(PortDeclParsing, InterfacePortWithUnpackedDims) {
 
 TEST(PortDeclParsing, ErrorMissingPortName) {
   auto r = Parse("module m(input logic); endmodule");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ')'", 1, "23.2.2.2"));
 }
 
 TEST(PortDeclParsing, ErrorMissingCloseParen) {
   auto r = Parse("module m(input logic a; endmodule");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 1, "23.2.2.2"));
 }
 
 // §23.2.2.2: a module shall be declared either entirely with the
@@ -270,7 +272,11 @@ TEST(PortDeclParsing, ErrorMissingCloseParen) {
 // header is therefore illegal.
 TEST(AnsiStylePortDeclarations, MixedAnsiAndNonAnsiHeaderIsError) {
   auto r = Parse("module m(a, input logic b); endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The bare `a` puts the header on the non-ANSI list_of_ports path, so the
+  // report is the port reference §23.2.2.1 requires after the comma, not a
+  // report of the §23.2.2.2 rule against mixing the two styles.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got token", 1, "23.2.2.1"));
 }
 
 // §23.2.2.2: generic interface ports cannot be declared using the non-ANSI
@@ -281,7 +287,11 @@ TEST(AnsiStylePortDeclarations, GenericInterfacePortNonAnsiIsError) {
       "  input interface d;\n"
       "  input logic clk;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §25.3.3 owns the generic interface port, and the report stands there.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "generic interface port must be declared with "
+                            "ANSI-style port declarations",
+                            2, "25.3.3"));
 }
 
 // §23.2.2.2: an explicitly named ANSI port may bind a concatenation of

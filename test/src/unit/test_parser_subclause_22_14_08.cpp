@@ -9,6 +9,7 @@
 #include "helpers_keyword_sweep_skips.h"
 #include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "model_identifier_positions.h"
 #include "model_keyword_tables.h"
 
@@ -153,7 +154,12 @@ TEST(CompilerDirectiveParsing, SystemVerilog2012AddedImplementsOpensAClause) {
   // fourth included list already offers.
   EXPECT_EQ(impl->base_class, "base");
 
-  EXPECT_FALSE(ParseWithPreprocessorOk(In("1800-2009", kSrc)));
+  // §8.3 owns the report: with `implements` an ordinary identifier the
+  // extends clause on line 10 ends where it stands, and Parser::ParseClassDecl
+  // is looking for the semicolon that closes the class header.
+  auto included = ParseWithPreprocessor(In("1800-2009", kSrc));
+  EXPECT_TRUE(ReportedError(included.diags, "expected ';', got identifier",
+                            LineInRegion(10), "8.3"));
 }
 
 // The second added word, which opens a net whose type is left to be settled by
@@ -197,7 +203,13 @@ TEST(CompilerDirectiveParsing,
   }
   EXPECT_EQ(marked, 3u);
 
-  EXPECT_FALSE(ParseWithPreprocessorOk(In("1800-2009", kSrc)));
+  // §23.2.2.1 owns the report: with `interconnect` an ordinary identifier and
+  // no direction ahead of it, the header reads as a non-ANSI port list whose
+  // first entry is the name `interconnect` with a part select, which leaves
+  // `p` where Parser::ParseNonAnsiPortList wants the closing parenthesis.
+  auto included = ParseWithPreprocessor(In("1800-2009", kSrc));
+  EXPECT_TRUE(ReportedError(included.diags, "expected ')', got identifier",
+                            LineInRegion(1), "23.2.2.1"));
 }
 
 // The direction and signedness qualifiers the interconnect form admits, which
@@ -223,7 +235,13 @@ TEST(CompilerDirectiveParsing,
     EXPECT_TRUE(ports[i].data_type.is_interconnect) << ports[i].name;
     EXPECT_EQ(ports[i].direction, kDirections[i]) << ports[i].name;
   }
-  EXPECT_FALSE(ParseWithPreprocessorOk(In("1800-2009", kPorts)));
+  // §23.2.2.2 owns the report: the direction makes the header ANSI, so
+  // `interconnect` is read as the first port's own name and `[3:0]` as its
+  // unpacked dimension, leaving `a` where Parser::ParsePortList wants the
+  // closing parenthesis.
+  auto included = ParseWithPreprocessor(In("1800-2009", kPorts));
+  EXPECT_TRUE(ReportedError(included.diags, "expected ')', got identifier",
+                            LineInRegion(1), "23.2.2.2"));
 
   // The declaration form's other signedness qualifier.
   const std::string kUnsigned =
@@ -238,7 +256,12 @@ TEST(CompilerDirectiveParsing,
     EXPECT_TRUE(item->data_type.is_interconnect);
     EXPECT_FALSE(item->data_type.is_signed);
   }
-  EXPECT_FALSE(ParseWithPreprocessorOk(In("1800-2009", kUnsigned)));
+  // §6.8 owns the report: with `interconnect` an ordinary identifier,
+  // Parser::ParsePlainVarDecl reads it as a variable of an implicit type and
+  // demands the semicolon where `unsigned` stands.
+  auto included_unsigned = ParseWithPreprocessor(In("1800-2009", kUnsigned));
+  EXPECT_TRUE(ReportedError(included_unsigned.diags, "expected ';', got token",
+                            LineInRegion(2), "6.8"));
 }
 
 // The third added word, which opens a declaration binding a name to a net's
@@ -276,11 +299,21 @@ TEST(CompilerDirectiveParsing, SystemVerilog2012AddedNettypeOpensDeclarations) {
   }
   EXPECT_EQ(nettypes, 2u);
 
-  // The declaration's own negative: the data type is required.
-  EXPECT_FALSE(ParseWithPreprocessorOk(
-      In("1800-2012", "module m;\n  nettype lone;\nendmodule\n")));
+  // The declaration's own negative: the data type is required, which
+  // Parser::ParseNettypeDecl states under §6.6.7 at the keyword itself.
+  auto typeless = ParseWithPreprocessor(
+      In("1800-2012", "module m;\n  nettype lone;\nendmodule\n"));
+  EXPECT_TRUE(ReportedError(typeless.diags,
+                            "nettype declaration requires an explicit data "
+                            "type",
+                            LineInRegion(2), "6.6.7"));
 
-  EXPECT_FALSE(ParseWithPreprocessorOk(In("1800-2009", kSrc)));
+  // §6.8 owns the report under the included lists: with `nettype` an ordinary
+  // identifier, Parser::ParsePlainVarDecl reads it as a variable of an
+  // implicit type and demands the semicolon where `logic` stands.
+  auto included = ParseWithPreprocessor(In("1800-2009", kSrc));
+  EXPECT_TRUE(ReportedError(included.diags, "expected ';', got token",
+                            LineInRegion(5), "6.8"));
 }
 
 // The remaining forms of the declaration the third added word opens: the
@@ -308,7 +341,12 @@ TEST(CompilerDirectiveParsing, SystemVerilog2012AddedNettypeTakesEveryForm) {
   // The trailing name is the resolver; the scope qualifying it is consumed by
   // the same branch.
   EXPECT_EQ(scoped->nettype_resolve_func, "res");
-  EXPECT_FALSE(ParseWithPreprocessorOk(In("1800-2009", kScoped)));
+  // §6.8 owns the report, as it does for the plain form: `nettype` reads as a
+  // variable of an implicit type and Parser::ParsePlainVarDecl demands the
+  // semicolon where `real` stands.
+  auto included_scoped = ParseWithPreprocessor(In("1800-2009", kScoped));
+  EXPECT_TRUE(ReportedError(included_scoped.diags, "expected ';', got token",
+                            LineInRegion(7), "6.8"));
 
   // The second position: a package item rather than a design-element item.
   const std::string kInPackage =
@@ -323,7 +361,9 @@ TEST(CompilerDirectiveParsing, SystemVerilog2012AddedNettypeTakesEveryForm) {
   EXPECT_FALSE(pk.has_errors);
   EXPECT_TRUE(HasItemKindNamed(pk.cu->packages[0]->items,
                                ModuleItemKind::kNettypeDecl, "byte_net"));
-  EXPECT_FALSE(ParseWithPreprocessorOk(In("1800-2009", kInPackage)));
+  auto included_pkg = ParseWithPreprocessor(In("1800-2009", kInPackage));
+  EXPECT_TRUE(ReportedError(included_pkg.diags, "expected ';', got token",
+                            LineInRegion(2), "6.8"));
 }
 
 // The fourth added word, the only one with two unrelated keyword roles, so both
@@ -357,15 +397,25 @@ TEST(CompilerDirectiveParsing,
     if (item->name == "plain_t") EXPECT_FALSE(item->typedef_type.is_soft);
   }
   EXPECT_EQ(typedefs, 2u);
-  EXPECT_FALSE(ParseWithPreprocessorOk(In("1800-2009", kUnion)));
+  // §7.2 owns the report: with `soft` an ordinary identifier it stands where
+  // Parser::ParseStructOrUnionType admits nothing between `union` and its
+  // member list.
+  auto included_union = ParseWithPreprocessor(In("1800-2009", kUnion));
+  EXPECT_TRUE(ReportedError(included_union.diags,
+                            "union declarations may not have a tag before '{'",
+                            LineInRegion(2), "7.2"));
 
   // The qualifier's exclusivity rule, which only attaches when the word is read
-  // as a qualifier at all.
-  EXPECT_FALSE(ParseWithPreprocessorOk(
+  // as a qualifier at all. §7.2 states it, and Parser::ParseUnionQualifiers
+  // reports it at the second qualifier.
+  auto both = ParseWithPreprocessor(
       In("1800-2012",
          "module m;\n"
          "  typedef union soft tagged { logic [7:0] a; } both_t;\n"
-         "endmodule\n")));
+         "endmodule\n"));
+  EXPECT_TRUE(ReportedError(both.diags,
+                            "union may have at most one of 'soft' or 'tagged'",
+                            LineInRegion(2), "7.2"));
 
   // Both constraint productions the word appears in: the qualifier that opens a
   // droppable relation, and the directive that discards the relations already
@@ -420,7 +470,13 @@ TEST(CompilerDirectiveParsing, SystemVerilog2012AddedSoftTakesEveryPosition) {
   ASSERT_NE(u_decl, nullptr);
   EXPECT_EQ(u_decl->name, "u");
   EXPECT_TRUE(u_decl->data_type.is_soft);
-  EXPECT_FALSE(ParseWithPreprocessorOk(In("1800-2009", kDirectUnion)));
+  // §7.2 owns the report here too: with `soft` an ordinary identifier it
+  // stands where Parser::ParseStructOrUnionType admits nothing between `union`
+  // and its member list.
+  auto included = ParseWithPreprocessor(In("1800-2009", kDirectUnion));
+  EXPECT_TRUE(ReportedError(included.diags,
+                            "union declarations may not have a tag before '{'",
+                            LineInRegion(2), "7.2"));
 
   const std::string kSoftDist =
       "class c;\n"
@@ -543,7 +599,12 @@ TEST(CompilerDirectiveParsing,
   }
   EXPECT_EQ(qualified, 2u);
 
-  EXPECT_FALSE(ParseWithPreprocessorOk(In("1800-2005", kSrc)));
+  // §3.12.1 owns the report: with `checker` an ordinary identifier the first
+  // line heads nothing the compilation unit admits, and Parser::ParseTopLevel
+  // says so at src/parser/parser.cpp:499.
+  auto included = ParseWithPreprocessor(In("1800-2005", kSrc));
+  EXPECT_TRUE(ReportedError(included.diags, "expected top-level declaration",
+                            LineInRegion(1), "3.12.1"));
 }
 
 // The negative the six tables imply: a word none of them lists is an ordinary
@@ -569,7 +630,12 @@ TEST(CompilerDirectiveParsing,
 
     std::string as_type =
         std::string("module m;\n  ") + word + " [7:0] v;\nendmodule\n";
-    EXPECT_FALSE(ParseWithPreprocessorOk(In("1800-2012", as_type)))
+    // §6.8 owns the report: the word is an ordinary identifier here, so
+    // Parser::ParsePlainVarDecl reads it as a variable of an implicit type and
+    // the packed dimension is where it expected the declaration to end.
+    auto typed = ParseWithPreprocessor(In("1800-2012", as_type));
+    EXPECT_TRUE(ReportedError(typed.diags, "expected ';', got '['",
+                              LineInRegion(2), "6.8"))
         << word << " is not a data type under this version";
   }
 }

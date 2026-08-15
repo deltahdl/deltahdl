@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "model_gate_logic.h"
 
 using namespace delta;
@@ -13,7 +14,9 @@ TEST(TristateGateParsing, TooManyTerminals) {
       "module m;\n"
       "  bufif0 b1(out, in, en, extra);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the terminal-count report; §28.6 has no report of its own here.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(TristateGateParsing, SingleTerminalRejected) {
@@ -21,7 +24,9 @@ TEST(TristateGateParsing, SingleTerminalRejected) {
       "module m;\n"
       "  bufif0 b1(out);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the terminal-count report; §28.6 has no report of its own here.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(TristateGateParsing, TwoTerminalsRejected) {
@@ -29,7 +34,9 @@ TEST(TristateGateParsing, TwoTerminalsRejected) {
       "module m;\n"
       "  notif1 b1(out, data);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the terminal-count report; §28.6 has no report of its own here.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(TristateGateParsing, NoDelaySpecLeavesDelayNull) {
@@ -79,7 +86,9 @@ TEST(TristateGateParsing, FourValueDelayRejected) {
       "module m;\n"
       "  bufif0 #(1, 2, 3, 4) b1(o, d, c);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The delay list closes after three values, and §28.16 is the subclause the
+  // parser files that demand for ')' under; §28.6 has no report of its own.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 2, "28.16"));
 }
 
 TEST(TristateGateParsing, AllFourKindsParseToDistinctGateKind) {

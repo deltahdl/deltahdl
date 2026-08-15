@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -44,7 +45,9 @@ TEST(ProceduralContinuousAssignmentParsing,
       "module m;\n"
       "  initial begin assign q; end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §10.6.1 owns the assign statement's own syntax, so
+  // Parser::ParseProceduralAssignStmt files the missing '=' under it.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '=', got ';'", 2, "10.6.1"));
 }
 
 }  // namespace

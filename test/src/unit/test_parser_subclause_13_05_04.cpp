@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -164,7 +165,11 @@ TEST(TaskAndFunctionParsing, PositionalAfterNamedIsError) {
       "    x = fun(.s(\"yes\"), 2);\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // Once a named argument has been read, Parser::ParseTrailingNamedArgs asks
+  // for the '.' of another, so the positional `2` on line 6 is what the report
+  // stands at.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '.', got integer literal", 6, "13.5.4"));
 }
 
 }  // namespace

@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -185,7 +186,9 @@ TEST(SequenceExpressionParsing, InvertedDelayRangeIsError) {
       "  endsequence\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "cycle-delay range upper bound must be at least the lower bound",
+      3, "16.7"));
 }
 
 TEST(SequenceExpressionParsing, NegativeDelayRangeBoundIsError) {
@@ -198,7 +201,8 @@ TEST(SequenceExpressionParsing, NegativeDelayRangeBoundIsError) {
       "  endsequence\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "cycle-delay range bounds cannot be negative", 3, "16.7"));
 }
 
 TEST(SequenceExpressionParsing, NegativeUpperDelayRangeBoundIsError) {
@@ -213,7 +217,8 @@ TEST(SequenceExpressionParsing, NegativeUpperDelayRangeBoundIsError) {
       "  endsequence\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "cycle-delay range bounds cannot be negative", 3, "16.7"));
 }
 
 TEST(SequenceExpressionParsing, EqualDelayRangeBoundsIsAccepted) {
@@ -241,7 +246,10 @@ TEST(SequenceExpressionParsing, MinTypMaxCycleDelayValueIsError) {
       "  endsequence\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "a min:typ:max expression may not be used as a cycle-delay value", 3,
+      "16.7"));
 }
 
 TEST(SequenceExpressionParsing, ParenthesizedConditionalCycleDelayIsAccepted) {
@@ -274,7 +282,10 @@ TEST(SequenceExpressionParsing, MinTypMaxCycleDelayWithParamOperandsIsError) {
       "  endsequence\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "a min:typ:max expression may not be used as a cycle-delay value", 4,
+      "16.7"));
 }
 
 TEST(SequenceExpressionParsing, ParenthesizedParamCycleDelayIsAccepted) {
@@ -303,7 +314,8 @@ TEST(SequenceExpressionParsing, RealLiteralCycleDelayValueIsError) {
       "  endsequence\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "cycle-delay value must be an integer", 3,
+                            "16.7"));
 }
 
 TEST(SequenceExpressionParsing, StringLiteralCycleDelayValueIsError) {
@@ -316,7 +328,8 @@ TEST(SequenceExpressionParsing, StringLiteralCycleDelayValueIsError) {
       "  endsequence\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "cycle-delay value must be an integer", 3,
+                            "16.7"));
 }
 
 TEST(SequenceExpressionParsing, IntegerLiteralCycleDelayValueIsAccepted) {

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -99,7 +100,10 @@ TEST(LoopSyntaxParsing, ForMixedLocalAndNonLocalInitIsIllegal) {
       "      x = y;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "for-loop initialization shall declare either all "
+                            "or none of its control variables locally",
+                            4, "12.7.1"));
 }
 
 TEST(LoopSyntaxParsing, ForAllComponentsEmpty) {

@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "model_gate_logic.h"
 
 using namespace delta;
@@ -13,7 +14,9 @@ TEST(PullSources, EmptyTerminals) {
       "module m;\n"
       "  pullup ();\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The terminal list is parsed as an expression list, so the empty one is
+  // rejected by Parser::ParsePrimaryExpr under §11.2 rather than by §28.10.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
 TEST(PullSources, PullupAndPulldownInstantiation) {
@@ -54,7 +57,10 @@ TEST(PullSources, PullupRejectsDelay) {
       "module m;\n"
       "  pullup #5 pu1(net1);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3.3 owns the rule that a pull gate takes no delay; §28.10 only defines
+  // the two pull sources.
+  EXPECT_TRUE(ReportedError(r.diags, "delay not allowed on this gate type", 2,
+                            "28.3.3"));
 }
 
 TEST(PullSources, PulldownRejectsDelay) {
@@ -62,7 +68,8 @@ TEST(PullSources, PulldownRejectsDelay) {
       "module m;\n"
       "  pulldown #5 pd1(net1);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "delay not allowed on this gate type", 2,
+                            "28.3.3"));
 }
 
 }  // namespace

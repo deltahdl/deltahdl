@@ -1,4 +1,7 @@
+#include <string_view>
+
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -142,10 +145,18 @@ TEST(Strength1Keywords, EachKeyword) {
 }
 
 TEST(ChargeStrengthSyntax, NonTriregKeywordRejectsChargeStrength) {
-  EXPECT_FALSE(ParseOk("module m; wire (small) w; endmodule\n"));
-  EXPECT_FALSE(ParseOk("module m; tri (medium) w; endmodule\n"));
-  EXPECT_FALSE(ParseOk("module m; wand (large) w; endmodule\n"));
-  EXPECT_FALSE(ParseOk("module m; supply0 (small) w; endmodule\n"));
+  // §6.3.2.1 owns the rule that only trireg carries a charge strength, and it
+  // is where Parser::ParseNetStrength files the report.
+  static constexpr std::string_view kMessage =
+      "charge strength can only be used with trireg nets";
+  auto wire_small = Parse("module m; wire (small) w; endmodule\n");
+  EXPECT_TRUE(ReportedError(wire_small.diags, kMessage, 1, "6.3.2.1"));
+  auto tri_medium = Parse("module m; tri (medium) w; endmodule\n");
+  EXPECT_TRUE(ReportedError(tri_medium.diags, kMessage, 1, "6.3.2.1"));
+  auto wand_large = Parse("module m; wand (large) w; endmodule\n");
+  EXPECT_TRUE(ReportedError(wand_large.diags, kMessage, 1, "6.3.2.1"));
+  auto supply0_small = Parse("module m; supply0 (small) w; endmodule\n");
+  EXPECT_TRUE(ReportedError(supply0_small.diags, kMessage, 1, "6.3.2.1"));
 }
 
 TEST(ChargeStrengthSyntax, SmallMediumLarge) {

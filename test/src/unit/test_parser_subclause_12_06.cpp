@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -102,7 +103,10 @@ TEST(CaseMatchesSyntaxParsing, CaseInsideAndMatchesMutualExclusion) {
       "    endcase\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The emission site files this under §12.5, which carries the case statement
+  // both keywords qualify, rather than under §12.6.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'matches' and 'inside' cannot be used together", 3, "12.5"));
 }
 
 // §12.6 BNF: the `[ pattern ]` after `tagged member_identifier` is optional,

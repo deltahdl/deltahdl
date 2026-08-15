@@ -1,6 +1,7 @@
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -72,7 +73,10 @@ TEST(AssertionParsing, InferredClockDefaultOnTypedFormalIsRejected) {
       "  endproperty\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "$inferred_clock default requires an untyped or "
+                            "event formal argument",
+                            3, "16.14.7"));
 }
 
 // §16.14.7 (negative): a formal declared with the `property` type keyword is
@@ -87,7 +91,10 @@ TEST(AssertionParsing, InferredClockDefaultOnPropertyFormalIsRejected) {
       "  endproperty\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "$inferred_clock default requires an untyped or "
+                            "event formal argument",
+                            3, "16.14.7"));
 }
 
 // §16.14.7 (negative): a formal declared with the `sequence` type keyword is
@@ -102,7 +109,10 @@ TEST(AssertionParsing, InferredClockDefaultOnSequenceFormalIsRejected) {
       "  endproperty\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "$inferred_clock default requires an untyped or "
+                            "event formal argument",
+                            3, "16.14.7"));
 }
 
 // §16.14.7: the untyped/event-formal restriction on a $inferred_clock default
@@ -132,7 +142,10 @@ TEST(AssertionParsing, InferredClockDefaultOnTypedSequenceFormalIsRejected) {
       "  endsequence\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "$inferred_clock default requires an untyped or "
+                            "event formal argument",
+                            3, "16.14.7"));
 }
 
 // §16.14.7 (negative): an inferred clocking or disable function shall be used
@@ -148,7 +161,10 @@ TEST(AssertionParsing, InferredFunctionAsPartialDefaultInPropertyIsRejected) {
       "  endproperty\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "an inferred clocking or disable function must be "
+                            "the entire default value of a formal argument",
+                            3, "16.14.7"));
 }
 
 // §16.14.7 (negative): the same entire-default restriction holds for a sequence
@@ -163,7 +179,10 @@ TEST(AssertionParsing, InferredFunctionAsPartialDefaultInSequenceIsRejected) {
       "  endsequence\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "an inferred clocking or disable function must be "
+                            "the entire default value of a formal argument",
+                            3, "16.14.7"));
 }
 
 TEST(AssertionParsing, InferredClockAndDisableTogether) {

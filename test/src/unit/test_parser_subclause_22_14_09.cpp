@@ -1,8 +1,15 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
 namespace {
+
+// The line each rejection below is reported at is counted in the
+// preprocessor's output rather than in the source written here, and a
+// `begin_keywords leaves a blank line there on top of its own directive line
+// (#3095), so a declaration on the third line of a source is reported on the
+// fourth.
 
 // §22.14.9 defines the "1800-2017" and "1800-2023" version_specifiers. The
 // begin_keywords/version_specifier grammar itself belongs to §22.14; these
@@ -18,23 +25,30 @@ namespace {
 // region.
 TEST(CompilerDirectiveParsing,
      BeginKeywords1800_2017_InheritedKeywordStaysReserved) {
-  EXPECT_FALSE(
-      ParseWithPreprocessorOk("`begin_keywords \"1800-2017\"\n"
-                              "module t;\n"
-                              "  logic soft;\n"
-                              "endmodule\n"
-                              "`end_keywords\n"));
+  // §6.8 owns the report: `soft` stands where Parser::ParseVarDeclList reads
+  // the declared name, and TokenKindName answers "token" for the keyword it
+  // has become.
+  auto r = ParseWithPreprocessor(
+      "`begin_keywords \"1800-2017\"\n"
+      "module t;\n"
+      "  logic soft;\n"
+      "endmodule\n"
+      "`end_keywords\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got token", 4, "6.8"));
 }
 
 // Same for "1800-2023": the inherited word `soft` stays reserved.
 TEST(CompilerDirectiveParsing,
      BeginKeywords1800_2023_InheritedKeywordStaysReserved) {
-  EXPECT_FALSE(
-      ParseWithPreprocessorOk("`begin_keywords \"1800-2023\"\n"
-                              "module t;\n"
-                              "  logic soft;\n"
-                              "endmodule\n"
-                              "`end_keywords\n"));
+  auto r = ParseWithPreprocessor(
+      "`begin_keywords \"1800-2023\"\n"
+      "module t;\n"
+      "  logic soft;\n"
+      "endmodule\n"
+      "`end_keywords\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got token", 4, "6.8"));
 }
 
 // Contrast (proves the rejection above is version-driven, not unconditional):

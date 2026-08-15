@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -53,7 +54,12 @@ TEST(CheckerVariables, AutomaticCheckerVariableIsIllegal) {
       "  automatic bit flag;\n"
       "endchecker\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  // §6.8 owns the report: the parser rejects `automatic` on any
+  // data_declaration outside a procedural context, checker body included.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "'automatic' is not allowed in a data_declaration "
+                            "outside a procedural context",
+                            2, "6.8"));
 }
 
 }  // namespace

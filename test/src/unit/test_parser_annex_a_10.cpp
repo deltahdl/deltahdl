@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -68,7 +69,11 @@ TEST(BnfClarificationParsing, ErrorRandAndRandc) {
       "class c;\n"
       "  rand randc int x;\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  // §8.3 owns the class-property qualifier rules Parser::ParseClassQualifiers
+  // enforces; A.10 states the grammar clarification and has no report of its
+  // own.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "cannot combine 'rand' and 'randc' qualifiers", 2, "8.3"));
 }
 
 TEST(BnfClarificationParsing, ErrorDuplicateRand) {
@@ -76,7 +81,7 @@ TEST(BnfClarificationParsing, ErrorDuplicateRand) {
       "class c;\n"
       "  rand rand int x;\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "duplicate 'rand' qualifier", 2, "8.3"));
 }
 
 TEST(BnfClarificationParsing, ErrorDuplicateStatic) {
@@ -84,7 +89,7 @@ TEST(BnfClarificationParsing, ErrorDuplicateStatic) {
       "class c;\n"
       "  static static int x;\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "duplicate 'static' qualifier", 2, "8.3"));
 }
 
 TEST(BnfClarificationParsing, NonvoidFunctionCallWithParens) {
@@ -126,7 +131,13 @@ TEST(BnfClarificationParsing, ErrorHeaderImportWithoutPortList) {
   auto r = Parse(
       "module m import pkg::*; ;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §23.2.1 owns the ANSI header rule; the report stands at the `import`
+  // keyword the header opened with.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "package_import_declaration in ansi header must be "
+                            "followed by parameter_port_list or "
+                            "list_of_port_declarations",
+                            1, "23.2.1"));
 }
 
 // §A.10 item 7: in a class scope the `parameter` keyword is accepted as a
@@ -146,7 +157,11 @@ TEST(BnfClarificationParsing, ErrorDuplicateDefaultInConstructorArgs) {
       "  function new(default, int x, default);\n"
       "  endfunction\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  // §8.17 owns the `default` sentinel rule.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "'default' keyword shall appear at most once in a "
+                            "class constructor argument list",
+                            2, "8.17"));
 }
 
 // §A.10 item 18: a type_reference used in a variable declaration must be
@@ -173,7 +188,12 @@ TEST(BnfClarificationParsing, ErrorBareTypeRefWithoutVarOrNetKeyword) {
       "  wire x;\n"
       "  type(x) y;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §6.8 owns the rule that a type_reference in a variable declaration needs
+  // the `var` keyword.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "type_reference in a variable declaration must be "
+                            "preceded by the 'var' keyword",
+                            3, "6.8"));
 }
 
 // §A.10 item 22: a localparam in a parameter_port_list must carry a default;
@@ -188,7 +208,11 @@ TEST(BnfClarificationParsing, ErrorParamPortListLocalparamWithoutDefault) {
   auto r = Parse(
       "module m #(localparam int W);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §6.20.1 owns the rule that a localparam is assigned where it is declared.
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "localparam 'W' in parameter port list must have a default value", 1,
+      "6.20.1"));
 }
 
 // §A.10 item 28: a tf_port_item may omit its port_identifier only inside a
@@ -206,7 +230,11 @@ TEST(BnfClarificationParsing, ErrorFullSubroutinePortOmitsIdentifier) {
       "  function void foo(int);\n"
       "  endfunction\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §13.3 owns the tf_port_item rule.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "tf_port_item shall include a port_identifier "
+                            "outside of a function_prototype or task_prototype",
+                            2, "13.3"));
 }
 
 // §A.10 item 34: the `.*` token pair may appear at most once in a port
@@ -216,7 +244,11 @@ TEST(BnfClarificationParsing, ErrorDoubleWildcardPortConnection) {
       "module m;\n"
       "  sub u(.*, .*);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §23.3.2 owns the port connection list rules.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            ".* port connection shall appear at most once in a "
+                            "port connection list",
+                            2, "23.3.2"));
 }
 
 // §A.10 item 15: a package import statement may not appear directly within a
@@ -226,7 +258,10 @@ TEST(BnfClarificationParsing, ErrorImportInClassScope) {
       "class c;\n"
       "  import p::*;\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  // §26.3 owns the package import declaration and its placement rule.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "package import declaration is not allowed in class scope", 2,
+      "26.3"));
 }
 
 // §A.10 item 27: a DPI import prototype's formal arguments may not use the
@@ -236,7 +271,11 @@ TEST(BnfClarificationParsing, ErrorRefFormalInDpiImport) {
       "module m;\n"
       "  import \"DPI-C\" function void f(ref int x);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §35.5.4 owns the DPI import declaration rules; the report stands at the
+  // declaration's own location, the "DPI-C" spec string.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "ref qualifier cannot be used in a DPI import declaration", 2,
+      "35.5.4"));
 }
 
 }  // namespace

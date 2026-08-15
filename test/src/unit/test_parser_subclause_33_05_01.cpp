@@ -9,6 +9,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_scratch_dir.h"
+#include "helpers_reported_error.h"
 #include "parser/ast.h"
 #include "parser/library_map.h"
 #include "parser/single_pass_compile.h"
@@ -222,7 +223,12 @@ TEST(SinglePassPrecompile, UnreadableDescriptionFailsRatherThanBeingIgnored) {
   CompileHarness h;
   ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
   EXPECT_EQ(h.compiler.CompileSource(absent, h.unit), CompileOutcome::kFailed);
-  EXPECT_TRUE(h.diag.HasErrors());
+  // The report is about the run rather than about a construct somebody wrote,
+  // so SinglePassCompiler::CompileSource emits it with SourceLoc::None() and
+  // Subclause::None(): line 0 and no subclause are what the emission site
+  // passes.
+  EXPECT_TRUE(ReportedError(h.diag.Diagnostics(),
+                            "cannot read source description: ", 0, ""));
 }
 
 TEST(SinglePassPrecompile, UnparseableDescriptionIsReportedAsASyntaxError) {
@@ -241,10 +247,10 @@ TEST(SinglePassPrecompile, UnparseableDescriptionIsReportedAsASyntaxError) {
   CompileHarness h;
   ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
   EXPECT_EQ(h.compiler.CompileSource(bad, h.unit), CompileOutcome::kFailed);
-  ASSERT_FALSE(h.diag.Diagnostics().empty());
-  EXPECT_EQ(h.diag.Diagnostics().front().message,
-            "unexpected token in module body");
-  EXPECT_EQ(h.diag.Diagnostics().front().loc.line, 2u);
+  // §23.2.4 owns the module body, so the stray text is reported there rather
+  // than under §33.5.1.
+  EXPECT_TRUE(ReportedError(h.diag.Diagnostics(),
+                            "unexpected token in module body", 2, "23.2.4"));
   EXPECT_EQ(h.libs.CellInLibrary("rtlLib", "bad"), nullptr);
   EXPECT_TRUE(h.unit.modules.empty());
 }
@@ -264,7 +270,11 @@ TEST(SinglePassPrecompile, DirectoryNamedInPlaceOfADescriptionIsRejected) {
   CompileHarness h;
   ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
   EXPECT_EQ(h.compiler.CompileSource(dir, h.unit), CompileOutcome::kFailed);
-  EXPECT_TRUE(h.diag.HasErrors());
+  // The directory is refused by the read, whose report is about the run rather
+  // than about a construct: line 0 and no subclause are what the emission site
+  // passes.
+  EXPECT_TRUE(ReportedError(h.diag.Diagnostics(),
+                            "cannot read source description: ", 0, ""));
   EXPECT_TRUE(h.unit.modules.empty());
 }
 
@@ -309,10 +319,14 @@ TEST(SinglePassPrecompile,
   ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
   EXPECT_EQ(h.compiler.CompileSource(src, h.unit), CompileOutcome::kFailed);
   ASSERT_EQ(h.diag.Diagnostics().size(), 1u);
-  EXPECT_EQ(h.diag.Diagnostics().front().message,
-            "source description claimed by more than one library (alphaLib, "
-            "betaLib): " +
-                src.string());
+  // §33.3.1.1 makes the double claim an error, so that is the subclause the
+  // report names; the position is the first claiming declaration, on line 1 of
+  // the map file.
+  EXPECT_TRUE(ReportedError(h.diag.Diagnostics(),
+                            "source description claimed by more than one "
+                            "library (alphaLib, betaLib): " +
+                                src.string(),
+                            1, "33.3.1.1"));
   EXPECT_EQ(h.libs.CellInLibrary("alphaLib", "one_cell"), nullptr);
   EXPECT_EQ(h.libs.CellInLibrary("betaLib", "one_cell"), nullptr);
 }
@@ -330,6 +344,11 @@ TEST(SinglePassPrecompile, OneUnusableDescriptionDoesNotHideTheOthers) {
   CompileHarness h;
   ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
   EXPECT_FALSE(h.compiler.CompileCommandLine({absent, good}, h.unit));
+  // The run names the description it could not read, and that report is about
+  // the run rather than about a construct: line 0 and no subclause are what
+  // the emission site passes.
+  EXPECT_TRUE(ReportedError(h.diag.Diagnostics(),
+                            "cannot read source description: ", 0, ""));
   EXPECT_NE(h.libs.CellInLibrary("rtlLib", "good"), nullptr);
 }
 

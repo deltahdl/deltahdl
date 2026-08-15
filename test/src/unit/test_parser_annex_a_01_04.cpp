@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -214,7 +215,11 @@ TEST(BindDirective, BindTargetWithoutBitSelect) {
 
 TEST(BindDirective, ErrorBindMissingTarget) {
   auto r = Parse("bind ;\n");
-  EXPECT_TRUE(r.has_errors);
+  // The bind target is read by Parser::ParseDottedPath, which files its report
+  // under §23.6 with the rest of the hierarchical names rather than under
+  // §23.11 with the bind directive.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ';'", 1, "23.6"));
 }
 
 // --- module_common_item ---
@@ -495,7 +500,9 @@ TEST(ElaborationSeverityTask, SeverityTaskMissingSemicolonRejected) {
       "module m;\n"
       "  $info(\"x\")\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // `endmodule` is a keyword, which Parser::Expect names "token", and it is
+  // the token standing where the ';' was wanted on line 3.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "20.10.1"));
 }
 
 // parameter_override ::= defparam list_of_defparam_assignments ; — the trailing
@@ -505,7 +512,7 @@ TEST(ModuleOrGenerateItem, ParameterOverrideMissingSemicolonRejected) {
       "module m;\n"
       "  defparam u.p = 4\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "23.10.1"));
 }
 
 // module_or_generate_item_declaration's `default disable iff
@@ -515,7 +522,10 @@ TEST(ModuleOrGenerateItemDecl, DefaultDisableMissingIffRejected) {
       "module m;\n"
       "  default disable rst;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §16.15 owns `default disable iff`, so the missing `iff` is reported there
+  // rather than under A.1.4's module_or_generate_item_declaration.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected token, got identifier", 2, "16.15"));
 }
 
 }  // namespace

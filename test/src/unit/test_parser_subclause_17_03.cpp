@@ -1,4 +1,5 @@
 #include "fixture_program.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -65,7 +66,12 @@ TEST_F(VerifyParseTest, CheckerInstantiationRejectsRepeatedWildcard) {
     endmodule
   )");
   ASSERT_EQ(unit->checkers.size(), 1u);
-  EXPECT_TRUE(diag_.HasErrors());
+  // §23.3.2 owns the at-most-one-`.*` rule the parser reports here; §17.3
+  // repeats it for checker instantiations but has no report of its own.
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            ".* port connection shall appear at most once in a "
+                            "port connection list",
+                            8, "23.3.2"));
 }
 
 TEST_F(VerifyParseTest, CheckerInstantiationEmptyConnectionList) {

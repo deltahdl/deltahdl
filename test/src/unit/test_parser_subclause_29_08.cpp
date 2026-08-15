@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -158,7 +159,8 @@ TEST(UdpInstantiation, RejectsThreeDelays) {
                  "module top;\n"
                  "  my_udp #(1, 2, 3) u1 (y, a, b);\n"
                  "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP instantiation shall have at most two delays", 8, "29.8"));
 }
 
 }  // namespace

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "fixture_program.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -57,7 +58,10 @@ TEST_F(DpiParseTest, DpiImportEventArgRejected) {
       "module m;\n"
       "  import \"DPI-C\" function void notify(input event ev);\n"
       "endmodule\n");
-  EXPECT_TRUE(diag_.HasErrors());
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "type of formal argument 'ev' is not permitted for "
+                            "a DPI imported subroutine",
+                            2, "35.5.6"));
 }
 
 // §35.5.6: the remaining C-compatible scalar and integral types named by the
@@ -117,7 +121,10 @@ TEST_F(DpiParseTest, DpiImportNonPermittedArgAmongPermittedRejected) {
       "    input event bad\n"
       "  );\n"
       "endmodule\n");
-  EXPECT_TRUE(diag_.HasErrors());
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "type of formal argument 'bad' is not permitted "
+                            "for a DPI imported subroutine",
+                            2, "35.5.6"));
 }
 
 // §35.5.6: "Scalar values of type bit and logic" are listed among the permitted
@@ -180,7 +187,10 @@ TEST_F(DpiParseTest, DpiImportUnpackedUnionArgRejected) {
       "  import \"DPI-C\" function void f(\n"
       "    input union { bit [7:0] a; logic [7:0] b; } u);\n"
       "endmodule\n");
-  EXPECT_TRUE(diag_.HasErrors());
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "unpacked union formal argument 'u' is not "
+                            "permitted for a DPI imported subroutine",
+                            2, "35.5.6"));
 }
 
 // §35.5.6: enumeration types are permitted as formal arguments (interpreted as

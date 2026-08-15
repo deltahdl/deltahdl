@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -112,7 +113,9 @@ TEST(TimingCheckCommandParsing, TimeskewMissingLimitIsError) {
       "  $timeskew(posedge clk1, posedge clk2);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The shared timing-check parser files the missing separator under §31.2, the
+  // system_timing_check production, rather than under §31.4.2.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ',', got ')'", 3, "31.2"));
 }
 
 TEST(TimingCheckCommandParsing, TimeskewEmptyArgListIsError) {
@@ -122,7 +125,10 @@ TEST(TimingCheckCommandParsing, TimeskewEmptyArgListIsError) {
       "  $timeskew();\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The reference_event's specify_terminal_descriptor is missing, and the
+  // shared terminal parser files that under §30.4.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ')'", 3, "30.4"));
 }
 
 }  // namespace

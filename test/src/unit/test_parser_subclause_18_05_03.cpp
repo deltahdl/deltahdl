@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -55,7 +56,9 @@ TEST(ConstraintDistParsing, DefaultWithAssignWeightRejected) {
       "  rand int x;\n"
       "  constraint c { x dist {[100:102]:/3, default:=1}; }\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a default distribution specification shall use the :/ operator",
+      3, "18.5.3"));
 }
 
 // 18.5.3: it shall be an error if the :/ operator is omitted from a default
@@ -66,7 +69,9 @@ TEST(ConstraintDistParsing, DefaultWithoutWeightOperatorRejected) {
       "  rand int x;\n"
       "  constraint c { x dist {100:=1, default 5}; }\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a default distribution specification shall use the :/ operator",
+      3, "18.5.3"));
 }
 
 // 18.5.3: there shall be at most one default specification in a distribution.
@@ -76,7 +81,9 @@ TEST(ConstraintDistParsing, MultipleDefaultsRejected) {
       "  rand int x;\n"
       "  constraint c { x dist {default:/1, default:/2}; }\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a distribution shall contain at most one default specification",
+      3, "18.5.3"));
 }
 
 }  // namespace

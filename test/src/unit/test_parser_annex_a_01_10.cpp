@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -557,7 +558,8 @@ TEST(ConstraintItemsParsing, ErrorConstraintMissingName) {
       "class C;\n"
       "  constraint { x > 0; }\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got '{'", 2, "18.5"));
 }
 
 TEST(ConstraintItemsParsing, ErrorConstraintPrototypeMissingSemicolon) {
@@ -565,12 +567,16 @@ TEST(ConstraintItemsParsing, ErrorConstraintPrototypeMissingSemicolon) {
       "class C;\n"
       "  constraint c\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  // TokenKindName answers "token" for every keyword, so the '{' the header
+  // demands is named and the 'endclass' that stands in its place is not.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '{', got token", 3, "18.5"));
 }
 
 TEST(ConstraintItemsParsing, ErrorExternConstraintMissingScope) {
   auto r = Parse("constraint c { x > 0; }\n");
-  EXPECT_TRUE(r.has_errors);
+  // §18.5.1 owns the external constraint block's class scope; TokenKindName has
+  // no name for '::', so the demanded token is reported as "token".
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got '{'", 1, "18.5.1"));
 }
 
 TEST(ConstraintItemsParsing, ErrorConstraintUnmatchedBrace) {
@@ -578,7 +584,10 @@ TEST(ConstraintItemsParsing, ErrorConstraintUnmatchedBrace) {
       "class C;\n"
       "  constraint c { x > 0;\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  // The unclosed block swallows 'endclass', so §8.3 owns the report: the class
+  // declaration is what runs out of source. The end of the source stands on
+  // line 4, the line the trailing newline opened.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 4, "8.3"));
 }
 
 TEST(ConstraintItemsParsing, ErrorExternConstraintMissingIdentifier) {
@@ -588,7 +597,9 @@ TEST(ConstraintItemsParsing, ErrorExternConstraintMissingIdentifier) {
       "  extern constraint c;\n"
       "endclass\n"
       "constraint C:: { x > 0; }\n");
-  EXPECT_TRUE(r.has_errors);
+  // §18.5.1 owns the external constraint block, so its name is demanded there.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got '{'", 5, "18.5.1"));
 }
 
 TEST(ConstraintItemsParsing, MultipleConstraintBlockItems) {
@@ -710,7 +721,9 @@ TEST(ConstraintItemsParsing, ErrorDistDefaultEqualWeight) {
       "  rand int x;\n"
       "  constraint c { x dist { [0:9] :/ 1, default := 1 }; }\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a default distribution specification shall use the :/ operator",
+      3, "18.5.3"));
 }
 
 }  // namespace

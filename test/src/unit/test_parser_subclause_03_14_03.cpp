@@ -1,6 +1,7 @@
 #include "fixture_parser.h"
 #include "fixture_preprocessor_timescale.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "parser/time_resolve.h"
 
 using namespace delta;
@@ -136,7 +137,10 @@ TEST(DesignBuildingBlockParsing, StepRejectedAsTimeunit) {
       "module m;\n"
       "  timeunit 1step;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "step cannot be used to set or modify the time unit or precision", 2,
+      "3.14.3"));
 }
 
 TEST(DesignBuildingBlockParsing, StepRejectedAsTimeprecision) {
@@ -144,7 +148,10 @@ TEST(DesignBuildingBlockParsing, StepRejectedAsTimeprecision) {
       "module m;\n"
       "  timeprecision 1step;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "step cannot be used to set or modify the time unit or precision", 2,
+      "3.14.3"));
 }
 
 TEST(DesignBuildingBlockParsing, StepRejectedAsTimeunitPrecArg) {
@@ -152,7 +159,10 @@ TEST(DesignBuildingBlockParsing, StepRejectedAsTimeunitPrecArg) {
       "module m;\n"
       "  timeunit 1ns / 1step;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "step cannot be used to set or modify the time unit or precision", 2,
+      "3.14.3"));
 }
 
 TEST(DesignBuildingBlockParsing, TimeunitWithoutPrecArgDoesNotContribute) {
@@ -172,14 +182,20 @@ TEST(DesignBuildingBlockParsing, StepRejectedInPackageTimeunit) {
       "package p;\n"
       "  timeunit 1step;\n"
       "endpackage\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "step cannot be used to set or modify the time unit or precision", 2,
+      "3.14.3"));
 }
 
 TEST(DesignBuildingBlockParsing, StepRejectedInCuScopeTimeunit) {
   auto r = ParseTimescale31402(
       "timeunit 1step;\n"
       "module m; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "step cannot be used to set or modify the time unit or precision", 1,
+      "3.14.3"));
 }
 
 // The precision-argument source (ii) must be picked up from a timeunit slash

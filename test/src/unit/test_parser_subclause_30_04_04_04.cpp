@@ -1,6 +1,7 @@
 #include "fixture_parser.h"
 #include "fixture_specify.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -42,7 +43,9 @@ TEST(IfnoneConditionParsing, ErrorMissingPath) {
       "    ifnone = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §30.4 owns the '(' that opens a path description, and the missing path is
+  // reported there; §30.4.4.4 reports only the not-a-simple-path rule below.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '(', got '='", 3, "30.4"));
 }
 
 TEST(IfnoneConditionParsing, ErrorEdgeSensitiveParallel) {
@@ -52,7 +55,8 @@ TEST(IfnoneConditionParsing, ErrorEdgeSensitiveParallel) {
       "    ifnone (posedge clk => q) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "ifnone requires a simple path declaration", 3, "30.4.4.4"));
 }
 
 // The simple-only restriction also rejects a data-source path description,
@@ -66,7 +70,8 @@ TEST(IfnoneConditionParsing, ErrorDataSourcePath) {
       "    ifnone (clk => (q : d)) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "ifnone requires a simple path declaration", 3, "30.4.4.4"));
 }
 
 // Claim B admits any SIMPLE module path under ifnone. §30.4.2 defines two

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -177,10 +178,14 @@ TEST(DefaultClockingParse, InlineDefaultInChecker) {
 // `default clocking ;` with neither a name nor a clocking event matches no
 // production of Syntax 14-3 and shall be rejected.
 TEST(DefaultClockingParse, MissingIdentifierRejected) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  default clocking ;\n"
-              "endmodule\n"));
+  // With no name to end the assignment form, Parser::ParseClockingDecl reads
+  // the source as the inline form and asks for the clocking event's '@' under
+  // §14.3. Parser::Expect has no name for '@' and prints "token".
+  auto r = Parse(
+      "module m;\n"
+      "  default clocking ;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got ';'", 2, "14.3"));
 }
 
 }  // namespace

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -62,7 +63,10 @@ TEST(AlwaysRangeParsing, NegativeWeakAlwaysBoundIsRejected) {
       "    always[-1:3] a;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "always range bounds must be non-negative "
+                            "integer constant expressions",
+                            3, "16.12.11"));
 }
 
 // §16.12.11: the non-negative requirement applies to the weak form's maximum
@@ -76,7 +80,10 @@ TEST(AlwaysRangeParsing, NegativeWeakAlwaysMaximumIsRejected) {
       "    always[0:-2] a;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "always range bounds must be non-negative "
+                            "integer constant expressions",
+                            3, "16.12.11"));
 }
 
 // §16.12.11: the range for a strong always shall be bounded, so `s_always` with
@@ -90,7 +97,9 @@ TEST(AlwaysRangeParsing, StrongAlwaysUnboundedMaximumIsRejected) {
       "    s_always[1:$] a;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "s_always range shall be bounded; a `$` maximum is not allowed",
+      3, "16.12.11"));
 }
 
 // §16.12.11: a bounded non-negative range remains legal for a strong always.
@@ -116,7 +125,10 @@ TEST(AlwaysRangeParsing, NegativeStrongAlwaysMaximumIsRejected) {
       "    s_always[0:-2] a;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "always range bounds must be non-negative "
+                            "integer constant expressions",
+                            3, "16.12.11"));
 }
 
 // §16.12.11: the non-negative requirement applies to the strong form's minimum
@@ -130,7 +142,10 @@ TEST(AlwaysRangeParsing, NegativeStrongAlwaysMinimumIsRejected) {
       "    s_always[-1:4] a;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "always range bounds must be non-negative "
+                            "integer constant expressions",
+                            3, "16.12.11"));
 }
 
 // §16.12.11: when both bounds are non-negative integer constant literals the
@@ -143,7 +158,9 @@ TEST(AlwaysRangeParsing, LiteralMinimumGreaterThanMaximumIsRejected) {
       "    always[3:1] a;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "always range minimum must not exceed the maximum",
+                            3, "16.12.11"));
 }
 
 // §16.12.11: the same minimum-not-exceeding-maximum requirement applies to the
@@ -155,7 +172,9 @@ TEST(AlwaysRangeParsing, StrongLiteralMinimumGreaterThanMaximumIsRejected) {
       "    s_always[5:2] a;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "always range minimum must not exceed the maximum",
+                            3, "16.12.11"));
 }
 
 // §16.12.11: the relation is less-than-or-equal, so equal literal bounds are a

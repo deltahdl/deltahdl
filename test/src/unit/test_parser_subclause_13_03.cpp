@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -449,7 +450,8 @@ TEST(TaskAndFunctionParsing, FormalArgRequiresIdentifierInTaskBody) {
       "  task my_task(input int);\n"
       "  endtask\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "tf_port_item shall include a port_identifier", 2, "13.3"));
 }
 
 TEST(TaskAndFunctionParsing, FormalArgRequiresIdentifierInFunctionBody) {
@@ -459,7 +461,8 @@ TEST(TaskAndFunctionParsing, FormalArgRequiresIdentifierInFunctionBody) {
       "    return 0;\n"
       "  endfunction\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "tf_port_item shall include a port_identifier", 2, "13.3"));
 }
 
 TEST(TaskAndFunctionParsing, FormalArgIdentifierOptionalInPrototype) {
@@ -527,7 +530,12 @@ TEST(TaskAndFunctionParsing, VirtualTaskAtModuleScopeRejected) {
       "  virtual task t;\n"
       "  endtask\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // No report of the §13.3 rule exists: `virtual` outside a class body is only
+  // the head of a virtual interface type, so Parser::ParseVirtualInterfaceType
+  // asks for the interface name and reports §25.9 at the `task` that stands
+  // there. Parser::Expect names every keyword "token".
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got token", 2, "25.9"));
 }
 
 TEST(TaskAndFunctionParsing, FunctionFormalArgDataTypeInherited) {

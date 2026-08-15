@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -19,7 +20,11 @@ TEST(UdpTopLevelParsing, PrimitiveInsideModuleRejected) {
       "    table 0 : 1; 1 : 0; endtable\n"
       "  endprimitive\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::TryParseSecondaryTopLevel is the only place `primitive` is
+  // recognized, so inside a module body it reaches the module_common_item
+  // fallback and is reported under §23.2.4.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
 }
 
 TEST(UdpTopLevelParsing, PrimitiveBetweenModulesAccepted) {
@@ -150,7 +155,10 @@ TEST(UdpTopLevelParsing, MismatchedEndprimitiveLabelRejected) {
       "primitive inv(output out, input in);\n"
       "  table 0 : 1; 1 : 0; endtable\n"
       "endprimitive : wrong\n");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::MatchEndLabel is shared by every named block and files the
+  // mismatch under §9.3.4.
+  EXPECT_TRUE(ReportedError(r.diags, "end label 'wrong' does not match 'inv'",
+                            3, "9.3.4"));
 }
 
 // §29.3 head: a UDP definition shall not appear between program/endprogram,
@@ -165,7 +173,8 @@ TEST(UdpTopLevelParsing, PrimitiveInsideProgramRejected) {
       "    table 0 : 1; 1 : 0; endtable\n"
       "  endprimitive\n"
       "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
 }
 
 TEST(UdpTopLevelParsing, PrimitiveInsideInterfaceRejected) {
@@ -175,7 +184,8 @@ TEST(UdpTopLevelParsing, PrimitiveInsideInterfaceRejected) {
       "    table 0 : 1; 1 : 0; endtable\n"
       "  endprimitive\n"
       "endinterface\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
 }
 
 TEST(UdpTopLevelParsing, PrimitiveInsidePackageRejected) {
@@ -185,7 +195,8 @@ TEST(UdpTopLevelParsing, PrimitiveInsidePackageRejected) {
       "    table 0 : 1; 1 : 0; endtable\n"
       "  endprimitive\n"
       "endpackage\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
 }
 
 }  // namespace

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -64,7 +65,9 @@ TEST(TimingCheckCommandParsing, SkewRejectsTrailingArgument) {
       "  $skew(posedge clk, data, 5, ntfr, extra);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // $skew takes no argument past the notifier, so the argument list has to
+  // close there; the shared timing-check parser reports under §31.2.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 3, "31.2"));
 }
 
 TEST(TimingCheckCommandParsing, SkewWithoutEdgeControls) {
@@ -109,7 +112,9 @@ TEST(TimingCheckCommandParsing, SkewMissingLimitIsError) {
       "  $skew(posedge clk, d);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The shared timing-check parser files the missing separator under §31.2, the
+  // system_timing_check production, rather than under §31.4.1.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ',', got ')'", 3, "31.2"));
 }
 
 TEST(TimingCheckCommandParsing, SkewEmptyArgListIsError) {
@@ -119,7 +124,10 @@ TEST(TimingCheckCommandParsing, SkewEmptyArgListIsError) {
       "  $skew();\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The reference_event's specify_terminal_descriptor is missing, and the
+  // shared terminal parser files that under §30.4.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ')'", 3, "30.4"));
 }
 
 }  // namespace

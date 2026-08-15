@@ -1,6 +1,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -686,7 +687,9 @@ TEST(ClockingBlockParse, MissingClockingEventRejected) {
       "    input data;\n"
       "  endclocking\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §14.3 owns the clocking_event; the '@' it expects is a keyword-class token,
+  // which TokenKindName spells "token".
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got ';'", 2, "14.3"));
 }
 
 // clocking_drive ::= clockvar_expression <= [ cycle_delay ] expression.
@@ -870,7 +873,10 @@ TEST(ClockingBlockParse, AttributeBeforeDirectionRejected) {
       "    (* foo *) input data;\n"
       "  endclocking\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "expected property, sequence, or let declaration "
+                            "after attribute instances in clocking block",
+                            3, "14.3"));
 }
 
 // Negative: the inout alternative of clocking_direction admits no
@@ -882,7 +888,10 @@ TEST(ClockingBlockParse, InoutWithSkewRejected) {
       "    inout #1 data;\n"
       "  endclocking\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The inout alternative parses no skew, so the '#' stands where §14.3
+  // requires the signal identifier.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got '#'", 3, "14.3"));
 }
 
 }  // namespace

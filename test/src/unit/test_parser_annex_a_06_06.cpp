@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -254,7 +255,9 @@ TEST(ConditionalStmtBnf, EmptyCondPredicateIsRejected) {
       "module m;\n"
       "  initial if () x = 1;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The empty parens leave `)` where an expression must start, and
+  // ParsePrimaryExpr files that report under §11.2.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
 // The `(` after `if` is a literal terminal in the BNF.
@@ -263,7 +266,9 @@ TEST(ConditionalStmtBnf, IfMissingLParenIsRejected) {
       "module m;\n"
       "  initial if a) x = 1;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §12.4 owns the conditional statement; A.6.6 only states its BNF.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got identifier", 2, "12.4"));
 }
 
 // The `)` after cond_predicate is a literal terminal in the BNF.
@@ -272,7 +277,9 @@ TEST(ConditionalStmtBnf, IfMissingRParenIsRejected) {
       "module m;\n"
       "  initial if (a x = 1;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §12.4 owns the conditional statement; A.6.6 only states its BNF.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ')', got identifier", 2, "12.4"));
 }
 
 // The `{ else if ( cond_predicate ) statement_or_null }` element of the BNF
@@ -286,7 +293,12 @@ TEST(ConditionalStmtBnf, UniquePriorityRejectedOnElseIfBranch) {
       "    else unique if (b) x = 2;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §12.4.2 owns the violation-check qualifiers; A.6.6 only states the BNF
+  // slot they may occupy.
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "unique, unique0, or priority cannot appear on an else-if branch", 4,
+      "12.4.2"));
 }
 
 // The `{ else if ... }` iteration matched exactly once produces a two-step

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -36,7 +37,10 @@ TEST(SubroutineCallExprParsing, ExpressionArgIsRejected) {
       "module m;\n"
       "  initial begin obj.randomize(a + 1); end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "randomize() arguments shall be object property "
+                            "names, not expressions",
+                            2, "18.11"));
 }
 
 // 18.11: a literal constant is an expression, not a property name, so it is not
@@ -46,7 +50,10 @@ TEST(SubroutineCallExprParsing, LiteralArgIsRejected) {
       "module m;\n"
       "  initial begin obj.randomize(5); end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "randomize() arguments shall be object property "
+                            "names, not expressions",
+                            2, "18.11"));
 }
 
 // 18.11: a function call yields a value through computation rather than naming
@@ -57,7 +64,10 @@ TEST(SubroutineCallExprParsing, FunctionCallArgIsRejected) {
       "module m;\n"
       "  initial begin obj.randomize(f()); end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "randomize() arguments shall be object property "
+                            "names, not expressions",
+                            2, "18.11"));
 }
 
 }  // namespace

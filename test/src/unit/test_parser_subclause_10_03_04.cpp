@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -111,7 +112,10 @@ TEST(DriveStrengthParsing, TwoStrength0KeywordsIsError) {
       "  assign (strong0, weak0) w = 1'b1;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "drive_strength requires one strength0 keyword and "
+                            "one strength1 keyword",
+                            3, "10.3.4"));
 }
 
 // The mirror case: two strength-1 keywords leave the strength-0 slot unfilled.
@@ -122,7 +126,10 @@ TEST(DriveStrengthParsing, TwoStrength1KeywordsIsError) {
       "  assign (strong1, pull1) w = 1'b1;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "drive_strength requires one strength0 keyword and "
+                            "one strength1 keyword",
+                            3, "10.3.4"));
 }
 
 // §10.3.4: on a net declaration the strength follows the net-type keyword and
@@ -152,7 +159,10 @@ TEST(DriveStrengthParsing, StrengthAfterDelayIsError) {
       "  assign #5 (pull0, pull1) a = b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  // Nothing reports the ordering rule: the strength is past the point
+  // Parser::ParseContinuousAssign reads one, so `pull0` reaches the expression
+  // parser as the assignment target and is rejected under §11.2 on line 3.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
 // §10.3.4: the strength shall precede any delay on a net declaration too, where
@@ -166,7 +176,9 @@ TEST(DriveStrengthParsing, NetDeclDelayBeforeStrengthIsError) {
       "  wire #5 (strong1, strong0) w = 1'b1;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  // Parser::ParseVarDeclList asks for the net name where the '(' stands, and
+  // files that under §6.7, the net declaration; §10.3.4 has no report here.
+  EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got '('", 2, "6.7"));
 }
 
 }  // namespace

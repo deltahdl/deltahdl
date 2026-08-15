@@ -5,6 +5,7 @@
 #include "helpers_included_keyword_parse.h"
 #include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "model_keyword_tables.h"
 
 using namespace delta;
@@ -25,7 +26,13 @@ TEST(CompilerDirectiveParsing, Verilog2001AdditionsCannotNameAVariable) {
   for (const char* word : kTable222Words) {
     std::string decl =
         std::string("module m;\n  reg [7:0] ") + word + ";\nendmodule\n";
-    EXPECT_FALSE(ParseWithPreprocessorOk(In2001(decl)))
+    // §6.8 owns the report: the word stands where Parser::ParseVarDeclList
+    // reads the declared name of a variable. TokenKindName answers "token" for
+    // most keywords (#3089), so the word under test is told apart by the
+    // failure message rather than by the report.
+    auto r = ParseWithPreprocessor(In2001(decl));
+    EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got ",
+                              LineInRegion(2), "6.8"))
         << word << " is reserved by Table 22-2";
     EXPECT_TRUE(ParseWithPreprocessorOk(In1995(decl)))
         << word << " is not in the list this version extends";
@@ -43,7 +50,9 @@ TEST(CompilerDirectiveParsing, InheritedKeywordsCannotNameAVariable) {
   for (const char* word : kTable221) {
     std::string decl =
         std::string("module m;\n  reg [7:0] ") + word + ";\nendmodule\n";
-    EXPECT_FALSE(ParseWithPreprocessorOk(In2001(decl)))
+    auto r = ParseWithPreprocessor(In2001(decl));
+    EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got ",
+                              LineInRegion(2), "6.8"))
         << word << " is carried over from Table 22-1 and stays reserved";
   }
 }
@@ -295,28 +304,58 @@ TEST(CompilerDirectiveParsing,
 // same source outside the region, which is what shows the region and not some
 // unrelated limitation is doing the rejecting.
 TEST(CompilerDirectiveParsing, WordOutsideVerilog2001ListIsNotAKeyword) {
-  EXPECT_FALSE(Parses2001("module m;\n  uwire w;\nendmodule\n"));
+  // §23.3.2 owns the report: with the word an ordinary identifier the two
+  // names read as a module name and an instance name, so
+  // Parser::ParseModuleInstList is looking for the port connection list.
+  auto as_net =
+      ParseWithPreprocessor(In2001("module m;\n  uwire w;\n"
+                                   "endmodule\n"));
+  EXPECT_TRUE(ReportedError(as_net.diags, "expected '(', got ';'",
+                            LineInRegion(2), "23.3.2"));
   EXPECT_TRUE(ParseWithPreprocessorOk("module m;\n  uwire w;\nendmodule\n"));
 
-  EXPECT_FALSE(Parses2001("module m;\n  logic [7:0] v;\nendmodule\n"));
+  // §6.8 owns this one instead: a packed dimension is where the declaration
+  // was meant to end, so Parser::ParsePlainVarDecl demands the semicolon at
+  // src/parser/parser_items.cpp:712.
+  auto as_type =
+      ParseWithPreprocessor(In2001("module m;\n  logic [7:0] v;\n"
+                                   "endmodule\n"));
+  EXPECT_TRUE(ReportedError(as_type.diags, "expected ';', got '['",
+                            LineInRegion(2), "6.8"));
   EXPECT_TRUE(
       ParseWithPreprocessorOk("module m;\n  logic [7:0] v;\nendmodule\n"));
 
-  EXPECT_FALSE(
-      Parses2001("module m;\n"
-                 "  reg r;\n"
-                 "  always_comb r = 1'b0;\n"
-                 "endmodule\n"));
+  auto as_process =
+      ParseWithPreprocessor(In2001("module m;\n"
+                                   "  reg r;\n"
+                                   "  always_comb r = 1'b0;\n"
+                                   "endmodule\n"));
+  EXPECT_TRUE(ReportedError(as_process.diags, "expected '(', got '='",
+                            LineInRegion(3), "23.3.2"));
 }
 
 // A word this version reserves cannot name a module or an instance either --
 // the same rule in the two positions the variable sweep above does not cover.
 TEST(CompilerDirectiveParsing, Verilog2001AdditionCannotNameAModule) {
-  EXPECT_FALSE(Parses2001("module generate;\nendmodule\n"));
+  // §23.2.1 owns the report on the module name: the word stands where
+  // Parser::ParseModuleDecl reads it.
+  auto as_module =
+      ParseWithPreprocessor(In2001("module generate;\n"
+                                   "endmodule\n"));
+  EXPECT_TRUE(ReportedError(as_module.diags, "expected identifier, got token",
+                            LineInRegion(1), "23.2.1"));
   EXPECT_TRUE(ParseWithPreprocessorOk(In1995("module generate;\nendmodule\n")));
-  EXPECT_FALSE(
-      Parses2001("module sub;\nendmodule\n"
-                 "module top;\n  sub localparam ();\nendmodule\n"));
+
+  // §6.8 owns the report on the instance name, not §23.3.2: an instantiation
+  // is recognized by the identifier that follows the module name, so
+  // Parser::ParseImplicitTypeOrInst hands `sub` to Parser::ParsePlainVarDecl
+  // instead and that demands a semicolon at src/parser/parser_items.cpp:712.
+  auto as_instance =
+      ParseWithPreprocessor(In2001("module sub;\nendmodule\n"
+                                   "module top;\n  sub localparam ();\n"
+                                   "endmodule\n"));
+  EXPECT_TRUE(ReportedError(as_instance.diags, "expected ';', got token",
+                            LineInRegion(4), "6.8"));
 }
 
 // The tables name particular spellings, and the language distinguishes case,

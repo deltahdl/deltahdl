@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -117,7 +118,9 @@ TEST(PulseControlSpecparamParsing, TerminalCannotBeBitOrPartSelect) {
       "    specparam PATHPULSE$a[0]$b = (1, 3);\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The '[' ends the identifier, so what the parser reports is the specparam
+  // name not being followed by '='; §6.20.5 owns that, not §30.7.1.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '=', got '['", 3, "6.20.5"));
 }
 
 // The other rejected select form: a part-select terminal. Like the bit-select
@@ -130,7 +133,9 @@ TEST(PulseControlSpecparamParsing, TerminalCannotBePartSelect) {
       "    specparam PATHPULSE$a[1:0]$b = (1, 3);\n"
       "  endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The '[' ends the identifier, so what the parser reports is the specparam
+  // name not being followed by '='; §6.20.5 owns that, not §30.7.1.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '=', got '['", 3, "6.20.5"));
 }
 
 }  // namespace

@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -63,10 +64,15 @@ TEST(IoSystemTaskParsing, DumpportsflushInsideTaskBody) {
 // Syntax 21-25 negative: the filename requires a parenthesized argument list;
 // a name butted against the task keyword without parentheses does not parse.
 TEST(IoSystemTaskParsing, DumpportsflushUnparenthesizedFilenameRejected) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  initial $dumpportsflush \"ports.vcd\";\n"
-              "endmodule\n"));
+  auto result = Parse(
+      "module t;\n"
+      "  initial $dumpportsflush \"ports.vcd\";\n"
+      "endmodule\n");
+  // The call parses as a subroutine call with no argument list, so the string
+  // that follows it stands where the statement's terminator belongs; §12.3
+  // owns that terminator and files the report.
+  EXPECT_TRUE(ReportedError(result.diags, "expected ';', got string literal", 2,
+                            "12.3"));
 }
 
 }  // namespace

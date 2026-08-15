@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -611,7 +612,9 @@ TEST(TaskDeclParsing, ErrorTfPortDirectionInputCombinedWithRef) {
       "  task my_task(input ref int a);\n"
       "  endtask\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "combining ref with another directional qualifier is illegal", 2,
+      "13.3"));
 }
 
 TEST(TaskDeclParsing, ErrorTfPortDirectionRefCombinedWithInout) {
@@ -620,7 +623,9 @@ TEST(TaskDeclParsing, ErrorTfPortDirectionRefCombinedWithInout) {
       "  task my_task(ref inout int a);\n"
       "  endtask\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "combining ref with another directional qualifier is illegal", 2,
+      "13.3"));
 }
 
 TEST(TaskDeclParsing, TaskBodyWithNullStatement) {
@@ -665,7 +670,11 @@ TEST(TaskDeclParsing, ErrorTaskDeclDynOverrideInitialAndExtends) {
       "  virtual task :initial :extends my_task;\n"
       "  endtask\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::ParseDynamicOverrideSpecifiers accepts only `final` after the
+  // second colon, so the task_identifier parse stops on `extends` and §13.3
+  // reports it. Every keyword prints as `token` in Parser::Expect's message.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got token", 2, "13.3"));
 }
 
 }  // namespace

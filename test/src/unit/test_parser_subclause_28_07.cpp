@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "model_gate_logic.h"
 
 using namespace delta;
@@ -13,7 +14,9 @@ TEST(MosSwitchParsing, TooFewTerminals) {
       "module m;\n"
       "  nmos n1(out, data);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the terminal-count report; §28.7 has no report of its own here.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(MosSwitchParsing, TooManyTerminals) {
@@ -21,7 +24,9 @@ TEST(MosSwitchParsing, TooManyTerminals) {
       "module m;\n"
       "  pmos p1(out, data, ctrl, extra);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the terminal-count report; §28.7 has no report of its own here.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(MosSwitchParsing, NamedNmosInstantiation) {
@@ -108,7 +113,9 @@ TEST(MosSwitchParsing, TooManyDelaysRejected) {
       "module m;\n"
       "  nmos #(1, 2, 3, 4) n1(o, i, g);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The delay list closes after three values, and §28.16 is the subclause the
+  // parser files that demand for ')' under; §28.7 has no report of its own.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 2, "28.16"));
 }
 
 TEST(MosSwitchParsing, AllFourKindsParseToDistinctGateKind) {

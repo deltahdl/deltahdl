@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -260,10 +261,13 @@ TEST(LetDeclParsing, LetExpression_PackageScopeNoArgs) {
 
 // Error recovery: a let_declaration without the required `= expression`.
 TEST(LetDeclParsing, ErrorMissingAssignment) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  let bad(x);\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  let bad(x);\n"
+      "endmodule\n");
+  // §11.12 owns the let_declaration's '='; the report stands on the ';' that
+  // arrived in its place.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '=', got ';'", 2, "11.12"));
 }
 
 // Error recovery: a let_declaration must end with a semicolon. This is the
@@ -271,10 +275,13 @@ TEST(LetDeclParsing, ErrorMissingAssignment) {
 // the expression alone; test_parser_subclause_11_12.cpp covers the form that
 // carries a port list.
 TEST(LetDeclParsing, ErrorMissingSemicolonNoPortList) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  let bad = 1\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  let bad = 1\n"
+      "endmodule\n");
+  // 'endmodule' stands where the ';' was demanded, and TokenKindName spells
+  // every keyword "token".
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "11.12"));
 }
 
 }  // namespace

@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -146,7 +147,9 @@ TEST(ConditionedTimingCheckParsing, ConditionRequiredAfterAmpAmpAmp) {
       "  $setup(data &&&, posedge clk, 10);\n"
       "endspecify\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The condition body is parsed by the expression parser, so the empty
+  // condition is reported by §11.2; §31.7 has no report of its own here.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
 }  // namespace

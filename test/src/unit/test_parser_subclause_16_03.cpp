@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -132,7 +133,10 @@ TEST(ImmediateAssertionStatementParsing, CoverWithElseClauseRejected) {
       "module m;\n"
       "  initial cover(c) hit = 1; else miss = 1;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §16.3 gives cover no else arm, so the else is left standing in the module
+  // body and §23.2.4 reports it there; the parser writes nothing under §16.3.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
 }
 
 TEST(ImmediateAssertionStatementParsing, AssertMissingExpressionRejected) {
@@ -140,7 +144,9 @@ TEST(ImmediateAssertionStatementParsing, AssertMissingExpressionRejected) {
       "module m;\n"
       "  initial assert();\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §11.2 owns the report: the empty parentheses fail as a missing expression,
+  // and §16.3's own report is the ')' the parser wants after it.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
 TEST(ImmediateAssertionStatementParsing, AssumeMissingExpressionRejected) {
@@ -148,7 +154,9 @@ TEST(ImmediateAssertionStatementParsing, AssumeMissingExpressionRejected) {
       "module m;\n"
       "  initial assume();\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §11.2 owns the report: the empty parentheses fail as a missing expression,
+  // and §16.3's own report is the ')' the parser wants after it.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
 // §16.3: the fail statement is any legal procedural statement, so it can signal

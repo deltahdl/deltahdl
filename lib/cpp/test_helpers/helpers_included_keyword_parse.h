@@ -9,6 +9,7 @@
 #include "fixture_parser.h"
 #include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "model_keyword_table_sweeps.h"
 #include "model_keyword_tables.h"
 #include "parser/ast.h"
@@ -148,7 +149,12 @@ inline void ExpectConfigurationWordsParse(const char* spec) {
   // instance rule, and the cell rule.
   EXPECT_EQ(cfg->rules.size(), 3u);
 
-  EXPECT_FALSE(ParseWithPreprocessorOk(InNoconfig(kSrc)));
+  // The companion list leaves `config` an ordinary identifier, so the
+  // declaration heading line 3 of the source above is no top-level declaration
+  // at all and Parser::ParseTopLevel says so at src/parser/parser.cpp:499.
+  auto dropped = ParseWithPreprocessor(InNoconfig(kSrc));
+  EXPECT_TRUE(ReportedError(dropped.diags, "expected top-level declaration",
+                            LineInRegion(3), "3.12.1"));
 
   EXPECT_TRUE(ParseWithPreprocessorOk(InNoconfig("module top;\nendmodule\n")));
 }
@@ -274,7 +280,12 @@ inline void ExpectTable224ConstructsParse(const char* spec) {
     EXPECT_TRUE(found) << d.name;
   }
 
-  EXPECT_FALSE(ParseWithPreprocessorOk(In2005(kSrc)));
+  // "1364-2005" reserves none of the words the source above is written in, so
+  // `package` on its first line heads no top-level declaration and
+  // Parser::ParseTopLevel says so at src/parser/parser.cpp:499.
+  auto before = ParseWithPreprocessor(In2005(kSrc));
+  EXPECT_TRUE(ReportedError(before.diags, "expected top-level declaration",
+                            LineInRegion(1), "3.12.1"));
 }
 
 // The reserving half at this stage, table by table. Every entry of `t` is put
@@ -292,7 +303,15 @@ inline void ExpectKeywordTableIsReservedAtParse(const char* spec,
     if (t.skip != nullptr && t.skip(word)) continue;
     ++swept;
 
-    EXPECT_FALSE(ParseWithPreprocessorOk(In(spec, VarDecl(word))))
+    // VarDecl heads its declaration with `reg`, so the list is a variable
+    // declaration and Parser::ParseVarDeclList reads the name under §6.8 --
+    // the choice against §6.7 is made at src/parser/parser_types.cpp:568.
+    // TokenKindName answers "token" for most keywords (#3089), so the message
+    // is the same sentence for every entry of every table and the word under
+    // test is told apart by the failure message rather than by the report.
+    auto reserved = ParseWithPreprocessor(In(spec, VarDecl(word)));
+    EXPECT_TRUE(ReportedError(reserved.diags, "expected identifier, got ",
+                              LineInRegion(2), "6.8"))
         << word << " is listed in " << t.what << " and is reserved here";
 
     for (const char* earlier : t.earlier) {

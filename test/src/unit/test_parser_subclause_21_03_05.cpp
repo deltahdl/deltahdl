@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -53,11 +54,15 @@ TEST(IoSystemTaskParsing, PositioningFunctionAsDeclarationInitializer) {
 
 // Negative form: an unterminated $fseek call cannot parse.
 TEST(IoSystemTaskParsing, UnterminatedFseekRejected) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  integer fd, code;\n"
-              "  initial code = $fseek(fd, 10, 0;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module t;\n"
+      "  integer fd, code;\n"
+      "  initial code = $fseek(fd, 10, 0;\n"
+      "endmodule\n");
+  // §13.5 owns the closing parenthesis of a system function call's argument
+  // list, so Parser::ParseSystemCall files the report under it rather than
+  // under §21.3.5.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 3, "13.5"));
 }
 
 }  // namespace

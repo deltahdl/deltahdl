@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "helpers_subroutine_call_verify.h"
 
 using namespace delta;
@@ -254,7 +255,9 @@ TEST(SubroutineCallSyntaxParsing, ErrorCallMissingSemicolon) {
       "    foo()\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §12.3 owns the semicolon that ends a statement; the report stands at the
+  // 'end' that arrived instead, and every keyword answers "token".
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "12.3"));
 }
 
 TEST(SubroutineCallSyntaxParsing, ErrorVoidCastMissingSemicolon) {
@@ -265,7 +268,9 @@ TEST(SubroutineCallSyntaxParsing, ErrorVoidCastMissingSemicolon) {
       "    void'(foo())\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §12.3 owns the semicolon that ends a statement; the report stands at the
+  // 'end' that arrived instead.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 5, "12.3"));
 }
 
 TEST(SubroutineCallSyntaxParsing, ErrorVoidCastMissingOpenParen) {
@@ -274,7 +279,10 @@ TEST(SubroutineCallSyntaxParsing, ErrorVoidCastMissingOpenParen) {
       "  function int foo(); return 1; endfunction\n"
       "  initial void'foo());\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §6.24.1 owns the cast operator's parentheses, which Parser::ParseCastExpr
+  // applies for the void'() form as for every other cast.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got identifier", 3, "6.24.1"));
 }
 
 TEST(SubroutineCallSyntaxParsing, ErrorVoidCastMissingCloseParen) {
@@ -283,7 +291,8 @@ TEST(SubroutineCallSyntaxParsing, ErrorVoidCastMissingCloseParen) {
       "  function int foo(); return 1; endfunction\n"
       "  initial void'(foo();\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §6.24.1 owns the cast operator's parentheses.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 3, "6.24.1"));
 }
 
 TEST(SubroutineCallExprParsing, ListOfArgsAllNamed) {
@@ -366,7 +375,8 @@ TEST(SubroutineCallExprParsing, ErrorSystemCallMissingCloseParen) {
       "module m;\n"
       "  initial $display(\"hi\";\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §13.5 owns the argument-list parentheses of a subroutine call.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 2, "13.5"));
 }
 
 TEST(SubroutineCallExprParsing, FunctionCallInBinaryExpr) {

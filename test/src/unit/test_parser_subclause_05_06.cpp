@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -110,13 +111,18 @@ TEST(LexicalConventionParsing, IdentifierInAssignExpression) {
 
 TEST(LexicalConventionParsing, KeywordCannotBeUsedAsIdentifier) {
   auto r = Parse("module m; logic module; endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // §6.8 states the variable declaration whose declarator the keyword stands
+  // in, and Parser::ParseVarDeclList files the report under it.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got token", 1, "6.8"));
 }
 
 TEST(LexicalConventionParsing, IdentifierExceedingMaxLengthReportsError) {
   std::string long_id(1025, 'a');
   auto r = Parse("module m; logic " + long_id + "; endmodule");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "identifier exceeds maximum length of 1024 characters", 1,
+      "5.6"));
 }
 
 }  // namespace

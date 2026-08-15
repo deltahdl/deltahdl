@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -161,7 +162,10 @@ TEST(MinTypMaxDelayParsing, IncompleteMinTypMaxIsRejected) {
       "  assign #(1:2) y = a;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  // §11.11 states the mintypmax_expression itself, and
+  // Parser::ParseMinTypMaxExpr files the missing second colon there rather than
+  // under §28.16.1.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ':', got ')'", 3, "11.11"));
 }
 
 // §28.16.1 extends the min:typ:max delay syntax to gate primitives

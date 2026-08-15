@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -189,7 +190,10 @@ TEST(EventTriggerParser, BlockingTriggerRejectsDelay) {
       "  initial -> #5 ev;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  // §15.5.1 has no report of its own here: Parser::ParseEventTriggerStmt reads
+  // the target as an expression, and the '#' on line 3 opens none, so the
+  // report is the §11.2 one.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
 // §15.5.1 notes that an edge's state cannot be ascertained, i.e., a posedge
@@ -202,7 +206,9 @@ TEST(EventTriggerParser, PosedgeInIfConditionIsRejected) {
       "  initial if (posedge clk) ;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  // The rejection is §11.2's: `posedge` opens no primary expression, so the
+  // if condition never reaches a form §15.5.1 could speak about.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
 }  // namespace

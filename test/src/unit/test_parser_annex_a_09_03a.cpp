@@ -3,6 +3,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_reported_error.h"
 #include "lexer/lexer.h"
 #include "parser/ast.h"
 #include "parser/parser.h"
@@ -513,7 +514,11 @@ TEST(IdentifierSyntaxParsing, DpiImportCIdentifierWithDollarIsError) {
       "  import \"DPI-C\" bad$name = function void sv_func();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // §35.5.4 owns the c_identifier rule the DPI import and export forms share;
+  // A.9.3 states the identifier grammar and has no report of its own.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "DPI c_identifier must match [a-zA-Z_][a-zA-Z0-9_]*", 2, "35.5.4"));
 }
 
 TEST(IdentifierSyntaxParsing, DpiExportCIdentifierWithDollarIsError) {
@@ -524,7 +529,9 @@ TEST(IdentifierSyntaxParsing, DpiExportCIdentifierWithDollarIsError) {
       "  export \"DPI-C\" bad$name = function sv_func;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "DPI c_identifier must match [a-zA-Z_][a-zA-Z0-9_]*", 3, "35.5.4"));
 }
 
 TEST(IdentifierSyntaxParsing, DpiImportCIdentifierLeadingDigitIsError) {
@@ -534,7 +541,13 @@ TEST(IdentifierSyntaxParsing, DpiImportCIdentifierLeadingDigitIsError) {
       "  import \"DPI-C\" 9bad = function void sv_func();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // `9bad` lexes as the integer literal `9` followed by `bad`, so
+  // ParserPortHelpers::TryParseDpiCName never sees an identifier and the
+  // §35.5.4 `function` keyword is what the declaration is found to be missing.
+  // TokenKindName answers "token" for every keyword.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "expected token, got integer literal", 2,
+                            "35.5.4"));
 }
 
 TEST(IdentifierSyntaxParsing, SimpleIdentifierWithDollarInBody) {

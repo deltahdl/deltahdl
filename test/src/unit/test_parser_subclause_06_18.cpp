@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -231,7 +232,10 @@ TEST(DataTypeParsing, HierarchicalTypeReferenceRejected) {
       "  inner i();\n"
       "  i.data_t x;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // `i` names no type, so the parse falls through to Parser::ParsePlainVarDecl
+  // and the '.' is met where the §6.8 data declaration wants its ';'. §6.18 has
+  // no report of its own here.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got '.'", 6, "6.8"));
 }
 
 TEST(DataTypeParsing, InterfacePortTypedef) {
@@ -263,7 +267,10 @@ TEST(DataTypeParsing, TypeReferenceBeforeDeclarationRejected) {
       "  my_type x;\n"
       "  typedef int my_type;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // `my_type` is not yet a known type name, so `my_type x` reads as the
+  // §23.3.2 module instantiation it also spells, and the report is the port
+  // connection list that instantiation requires. §6.18 has none of its own.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '(', got ';'", 2, "23.3.2"));
 }
 
 }  // namespace

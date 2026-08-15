@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -15,7 +16,8 @@ TEST(PropertyLocalLvarArgumentParsing, LocalInoutInPropertyIsError) {
       "    @(posedge clk) a;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "property port direction must be 'input'",
+                            2, "16.12.19"));
 }
 
 // §16.12.19: it shall be illegal to declare a local variable formal argument
@@ -27,7 +29,8 @@ TEST(PropertyLocalLvarArgumentParsing, LocalOutputInPropertyIsError) {
       "    @(posedge clk) a;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "property port direction must be 'input'",
+                            2, "16.12.19"));
 }
 
 // §16.12.19: a local variable formal argument whose direction `input` is
@@ -75,7 +78,8 @@ TEST(PropertyLocalLvarArgumentParsing, InoutOnNonFirstLocalIsError) {
       "    @(posedge clk) a;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "property port direction must be 'input'",
+                            2, "16.12.19"));
 }
 
 // §16.12.19: likewise, a `local output` formal in a non-first position is
@@ -87,7 +91,8 @@ TEST(PropertyLocalLvarArgumentParsing, OutputOnNonFirstLocalIsError) {
       "    @(posedge clk) a;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "property port direction must be 'input'",
+                            2, "16.12.19"));
 }
 
 // §16.12.19: multiple local variable formal arguments all of direction

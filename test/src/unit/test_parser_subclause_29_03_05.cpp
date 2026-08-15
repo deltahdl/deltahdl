@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -12,7 +13,8 @@ TEST(UdpZValues, ZSymbolInInputFieldRejected) {
       "    1 1 : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "UDP table row shall not contain z", 3, "29.3.5"));
 }
 
 TEST(UdpZValues, ZSymbolInOutputFieldRejected) {
@@ -23,7 +25,8 @@ TEST(UdpZValues, ZSymbolInOutputFieldRejected) {
       "    1 : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "UDP table row shall not contain z", 3, "29.3.5"));
 }
 
 TEST(UdpZValues, ZSymbolInCurrentStateFieldRejected) {
@@ -33,7 +36,8 @@ TEST(UdpZValues, ZSymbolInCurrentStateFieldRejected) {
       "    0 1 : z : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "UDP table row shall not contain z", 3, "29.3.5"));
 }
 
 TEST(UdpZValues, UppercaseZSymbolInInputFieldRejected) {
@@ -43,7 +47,8 @@ TEST(UdpZValues, UppercaseZSymbolInInputFieldRejected) {
       "    Z 0 : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "UDP table row shall not contain z", 3, "29.3.5"));
 }
 
 TEST(UdpZValues, ZSymbolInParenthesizedEdgeRejected) {
@@ -53,7 +58,8 @@ TEST(UdpZValues, ZSymbolInParenthesizedEdgeRejected) {
       "    (0z) 0 : ? : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "UDP table row shall not contain z", 3, "29.3.5"));
 }
 
 // The z-scan flags either endpoint of a parenthesized edge; the case above
@@ -65,7 +71,8 @@ TEST(UdpZValues, ZSymbolAtStartOfParenthesizedEdgeRejected) {
       "    (z0) 0 : ? : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "UDP table row shall not contain z", 3, "29.3.5"));
 }
 
 }  // namespace

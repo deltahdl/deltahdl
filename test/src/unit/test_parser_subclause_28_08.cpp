@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "model_gate_logic.h"
 
 using namespace delta;
@@ -13,7 +14,9 @@ TEST(PassSwitches, TranRejectsSingleTerminal) {
       "module m;\n"
       "  tran t1(a);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the terminal-count report; §28.8 has no report of its own here.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(PassEnableSwitches, Tranif0RejectsTwoTerminals) {
@@ -21,7 +24,9 @@ TEST(PassEnableSwitches, Tranif0RejectsTwoTerminals) {
       "module m;\n"
       "  tranif0 t1(a, b);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the terminal-count report; §28.8 has no report of its own here.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(PassEnableSwitches, Tranif1RejectsFourTerminals) {
@@ -29,7 +34,9 @@ TEST(PassEnableSwitches, Tranif1RejectsFourTerminals) {
       "module m;\n"
       "  tranif1 t1(a, b, en, extra);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the terminal-count report; §28.8 has no report of its own here.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(PassEnableSwitches, MultipleInstances) {
@@ -73,7 +80,10 @@ TEST(PassSwitches, TranRejectsDelay) {
       "module m;\n"
       "  tran #5 t1(a, b);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3.3 owns the report that a gate type admits no delay; §28.8 has no
+  // report of its own here.
+  EXPECT_TRUE(ReportedError(r.diags, "delay not allowed on this gate type", 2,
+                            "28.3.3"));
 }
 
 TEST(PassSwitches, RtranRejectsDelay) {
@@ -81,7 +91,10 @@ TEST(PassSwitches, RtranRejectsDelay) {
       "module m;\n"
       "  rtran #5 (a, b);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3.3 owns the report that a gate type admits no delay; §28.8 has no
+  // report of its own here.
+  EXPECT_TRUE(ReportedError(r.diags, "delay not allowed on this gate type", 2,
+                            "28.3.3"));
 }
 
 TEST(PassEnableSwitches, Tranif0AcceptsSingleValueDelay) {
@@ -102,7 +115,10 @@ TEST(PassEnableSwitches, Tranif1RejectsThreeValueDelay) {
       "module m;\n"
       "  tranif1 #(2, 4, 6) t1(a, b, c);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3.3 owns the count of delay values a gate type admits; §28.8 has no
+  // report of its own here.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "this gate type allows at most 2 delay values", 2, "28.3.3"));
 }
 
 TEST(PassEnableSwitches, Tranif0AcceptsTwoValueDelay) {
@@ -135,7 +151,10 @@ TEST(PassEnableSwitches, Rtranif1RejectsThreeValueDelay) {
       "module m;\n"
       "  rtranif1 #(1, 2, 3) r1(a, b, en);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3.3 owns the count of delay values a gate type admits; §28.8 has no
+  // report of its own here.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "this gate type allows at most 2 delay values", 2, "28.3.3"));
 }
 
 TEST(PassSwitches, TranRejectsThreeTerminals) {
@@ -143,7 +162,9 @@ TEST(PassSwitches, TranRejectsThreeTerminals) {
       "module m;\n"
       "  tran t1(a, b, c);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the terminal-count report; §28.8 has no report of its own here.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(PassSwitches, RtranAcceptsTwoTerminals) {
@@ -163,7 +184,9 @@ TEST(PassSwitches, RtranRejectsSingleTerminal) {
       "module m;\n"
       "  rtran r1(a);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the terminal-count report; §28.8 has no report of its own here.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(PassSwitches, RtranRejectsThreeTerminals) {
@@ -171,7 +194,9 @@ TEST(PassSwitches, RtranRejectsThreeTerminals) {
       "module m;\n"
       "  rtran r1(a, b, c);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the terminal-count report; §28.8 has no report of its own here.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(PassEnableSwitches, Rtranif0Instantiation) {
@@ -205,7 +230,9 @@ TEST(PassEnableSwitches, Rtranif0RejectsTwoTerminals) {
       "module m;\n"
       "  rtranif0 r1(a, b);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the terminal-count report; §28.8 has no report of its own here.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(PassEnableSwitches, Rtranif1RejectsFourTerminals) {
@@ -213,7 +240,9 @@ TEST(PassEnableSwitches, Rtranif1RejectsFourTerminals) {
       "module m;\n"
       "  rtranif1 r1(a, b, en, extra);\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §28.3 owns the terminal-count report; §28.8 has no report of its own here.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
 TEST(PassSwitches, TranAcceptsTwoTerminals) {

@@ -8,6 +8,7 @@
 #include "helpers_keyword_sweep_skips.h"
 #include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "model_identifier_positions.h"
 #include "model_keyword_tables.h"
 
@@ -139,7 +140,12 @@ TEST(CompilerDirectiveParsing, SystemVerilog2009AddedCheckerOpensAnElement) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 
-  EXPECT_FALSE(ParseWithPreprocessorOk(InSv2005(kSrc)));
+  // §3.12.1 owns the report: with `checker` an ordinary identifier the first
+  // line heads nothing the compilation unit admits, and Parser::ParseTopLevel
+  // says so at src/parser/parser.cpp:499.
+  auto before = ParseWithPreprocessor(InSv2005(kSrc));
+  EXPECT_TRUE(ReportedError(before.diags, "expected top-level declaration",
+                            LineInRegion(1), "3.12.1"));
 }
 
 // The `let` declaration, which is the added word with the widest position axis:
@@ -206,7 +212,12 @@ TEST(CompilerDirectiveParsing, SystemVerilog2009AddedLetOpensDeclarations) {
   }
   EXPECT_TRUE(block_let_seen);
 
-  EXPECT_FALSE(ParseWithPreprocessorOk(InSv2005(kSrc)));
+  // §3.12.1 owns the report: with `let` an ordinary identifier the
+  // compilation-unit form on the first line heads nothing, and
+  // Parser::ParseTopLevel says so at src/parser/parser.cpp:499.
+  auto before = ParseWithPreprocessor(InSv2005(kSrc));
+  EXPECT_TRUE(ReportedError(before.diags, "expected top-level declaration",
+                            LineInRegion(1), "3.12.1"));
 }
 
 // The two remaining non-temporal additions, each of which lands as something
@@ -256,7 +267,13 @@ TEST(CompilerDirectiveParsing,
   }
   EXPECT_EQ(qualified, 3u);
 
-  EXPECT_FALSE(ParseWithPreprocessorOk(InSv2005(kSrc)));
+  // §6.8 owns the report. Everything above the global clocking block is
+  // written in words 1800-2005 already reserves, so the source survives to
+  // line 4, where `global` is an ordinary identifier and
+  // Parser::ParsePlainVarDecl reads it as a variable of an implicit type.
+  auto before = ParseWithPreprocessor(InSv2005(kSrc));
+  EXPECT_TRUE(ReportedError(before.diags, "expected ';', got token",
+                            LineInRegion(4), "6.8"));
 }
 
 // The bulk of Table 22-5 is temporal-property vocabulary, and its keyword role
@@ -357,25 +374,43 @@ TEST(CompilerDirectiveParsing,
            "endmodule\n";
   };
 
+  // Each row carries the report its own bad operand draws, because the five
+  // break three different rules: §16.12.10 states the tick count of both
+  // nexttime forms, §16.12.11 the boundedness of a strong always range, and
+  // §16.12.13 both the boundedness of a weak eventually range and the
+  // ordering of the bounds of any eventually range.
   struct Form {
     const char* word;
     const char* bad;
     const char* good;
+    const char* message;
+    const char* subclause;
   };
   // The last two rows are the pair that differs only in strength, and they are
   // arranged so the table itself makes that comparison: the unbounded maximum
   // is the strong operator's well-formed operand and the weak one's bad
   // operand, the same source rejected on one row and accepted on the other.
   const Form kForms[] = {
-      {"nexttime", "nexttime [-1] a", "nexttime [1] a"},
-      {"s_nexttime", "s_nexttime [-1] a", "s_nexttime [1] a"},
-      {"s_always", "s_always [1:$] a", "s_always [1:2] a"},
-      {"eventually", "eventually [1:$] a", "eventually [1:2] a"},
-      {"s_eventually", "s_eventually [3:1] a", "s_eventually [1:$] a"},
+      {"nexttime", "nexttime [-1] a", "nexttime [1] a",
+       "nexttime index must be a non-negative integer constant expression",
+       "16.12.10"},
+      {"s_nexttime", "s_nexttime [-1] a", "s_nexttime [1] a",
+       "nexttime index must be a non-negative integer constant expression",
+       "16.12.10"},
+      {"s_always", "s_always [1:$] a", "s_always [1:2] a",
+       "s_always range shall be bounded", "16.12.11"},
+      {"eventually", "eventually [1:$] a", "eventually [1:2] a",
+       "eventually range shall be bounded", "16.12.13"},
+      {"s_eventually", "s_eventually [3:1] a", "s_eventually [1:$] a",
+       "eventually range minimum must not exceed the maximum", "16.12.13"},
   };
 
   for (const auto& f : kForms) {
-    EXPECT_FALSE(ParseWithPreprocessorOk(InSv2009(property_src(f.bad))))
+    // The report stands at the opening '[' of the operand, on the third line
+    // of the source property_src builds.
+    auto rejected = ParseWithPreprocessor(InSv2009(property_src(f.bad)));
+    EXPECT_TRUE(
+        ReportedError(rejected.diags, f.message, LineInRegion(3), f.subclause))
         << f.word << " is read as an operator here, so its operand is checked";
     EXPECT_TRUE(ParseWithPreprocessorOk(InSv2009(property_src(f.good))))
         << f.word << " takes the well-formed operand";
@@ -447,14 +482,21 @@ TEST(CompilerDirectiveParsing, SystemVerilog2009LeavesLaterWordsAsIdentifiers) {
 
     std::string as_type =
         std::string("module m;\n  ") + word + " [7:0] v;\nendmodule\n";
-    EXPECT_FALSE(ParseWithPreprocessorOk(InSv2009(as_type)))
+    // §6.8 owns the report: the word is an ordinary identifier here, so
+    // Parser::ParsePlainVarDecl reads it as a variable of an implicit type and
+    // the packed dimension is where it expected the declaration to end.
+    auto typed = ParseWithPreprocessor(InSv2009(as_type));
+    EXPECT_TRUE(ReportedError(typed.diags, "expected ';', got '['",
+                              LineInRegion(2), "6.8"))
         << word << " is not a data type under this version";
 
     // The leg that makes each of these a *later* word rather than one this
     // implementation simply does not know: the specifier for the standard after
     // this one reserves it, so the very same declaration is refused there. That
     // is what places the boundary of this version's list between the two.
-    EXPECT_FALSE(ParseWithPreprocessorOk(InSv2012(VarDecl(word))))
+    auto later = ParseWithPreprocessor(InSv2012(VarDecl(word)));
+    EXPECT_TRUE(ReportedError(later.diags, "expected identifier, got token",
+                              LineInRegion(2), "6.8"))
         << word << " is reserved by the version after this one";
   }
 }

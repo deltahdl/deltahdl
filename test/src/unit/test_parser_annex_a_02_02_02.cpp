@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -135,7 +136,12 @@ TEST(StrengthParsing, SameDirectionStrength0PairRejected) {
       "module m;\n"
       "  wire (weak0, strong0) w;\n"
       "endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // §10.3.4 owns the one-strength0-and-one-strength1 rule the net declaration
+  // here breaks; A.2.2.2 states the production alone.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "drive_strength requires one strength0 keyword and "
+                            "one strength1 keyword",
+                            2, "10.3.4"));
 }
 
 TEST(StrengthParsing, SameDirectionStrength1PairRejected) {
@@ -143,7 +149,11 @@ TEST(StrengthParsing, SameDirectionStrength1PairRejected) {
       "module m;\n"
       "  wire (pull1, supply1) w;\n"
       "endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // §10.3.4 owns the rule; A.2.2.2 states the production alone.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "drive_strength requires one strength0 keyword and "
+                            "one strength1 keyword",
+                            2, "10.3.4"));
 }
 
 TEST(StrengthParsing, Highz0WithStrength0Rejected) {
@@ -151,7 +161,11 @@ TEST(StrengthParsing, Highz0WithStrength0Rejected) {
       "module m;\n"
       "  wire (highz0, weak0) w;\n"
       "endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // §10.3.4 owns the rule; A.2.2.2 states the production alone.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "drive_strength requires one strength0 keyword and "
+                            "one strength1 keyword",
+                            2, "10.3.4"));
 }
 
 TEST(StrengthParsing, Highz1WithStrength1Rejected) {
@@ -159,7 +173,11 @@ TEST(StrengthParsing, Highz1WithStrength1Rejected) {
       "module m;\n"
       "  wire (highz1, weak1) w;\n"
       "endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // §10.3.4 owns the rule; A.2.2.2 states the production alone.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "drive_strength requires one strength0 keyword and "
+                            "one strength1 keyword",
+                            2, "10.3.4"));
 }
 
 TEST(StrengthParsing, Highz0Highz1ParsesAtParserStage) {
@@ -192,7 +210,11 @@ TEST(StrengthParsing, ContAssignSameDirectionPairRejected) {
       "  wire w;\n"
       "  assign (strong0, weak0) w = 1'b0;\n"
       "endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // §10.3.4 owns the rule; A.2.2.2 states the production alone.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "drive_strength requires one strength0 keyword and "
+                            "one strength1 keyword",
+                            3, "10.3.4"));
 }
 
 TEST(StrengthParsing, UdpInstSingleStrengthRejected) {
@@ -204,7 +226,12 @@ TEST(StrengthParsing, UdpInstSingleStrengthRejected) {
       "  wire y, a;\n"
       "  my_udp (weak0) u1(y, a);\n"
       "endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::TryParseStrengthSpec files the UDP-instantiation strength pair
+  // under §28.3.2, not under §29.8.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "drive_strength requires one strength0 keyword and "
+                            "one strength1 keyword",
+                            6, "28.3.2"));
 }
 
 TEST(StrengthParsing, UdpInstSameDirectionPairRejected) {
@@ -216,7 +243,12 @@ TEST(StrengthParsing, UdpInstSameDirectionPairRejected) {
       "  wire y, a;\n"
       "  my_udp (weak0, weak0) u1(y, a);\n"
       "endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::TryParseStrengthSpec files the UDP-instantiation strength pair
+  // under §28.3.2, not under §29.8.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "drive_strength requires one strength0 keyword and "
+                            "one strength1 keyword",
+                            6, "28.3.2"));
 }
 
 // Positive input form for drive_strength in UDP-instantiation position: a

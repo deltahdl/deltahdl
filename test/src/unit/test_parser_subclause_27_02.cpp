@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -11,7 +12,8 @@ TEST(GenerateBlockContent, SpecifyBlockRejectedInGenerateIf) {
       "    specify endspecify\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "specify block not allowed inside a generate block", 3, "27.2"));
 }
 
 TEST(GenerateBlockContent, SpecifyBlockRejectedInGenerateFor) {
@@ -22,7 +24,8 @@ TEST(GenerateBlockContent, SpecifyBlockRejectedInGenerateFor) {
       "    specify endspecify\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "specify block not allowed inside a generate block", 4, "27.2"));
 }
 
 TEST(GenerateBlockContent, SpecifyBlockRejectedInGenerateCase) {
@@ -33,7 +36,8 @@ TEST(GenerateBlockContent, SpecifyBlockRejectedInGenerateCase) {
       "    default: ;\n"
       "  endcase\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "specify block not allowed inside a generate block", 3, "27.2"));
 }
 
 TEST(GenerateBlockContent, SpecifyBlockRejectedInNestedGenerate) {
@@ -45,7 +49,8 @@ TEST(GenerateBlockContent, SpecifyBlockRejectedInNestedGenerate) {
       "    end\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "specify block not allowed inside a generate block", 4, "27.2"));
 }
 
 TEST(GenerateBlockContent, SpecifyBlockAllowedAtModuleScope) {
@@ -71,7 +76,10 @@ TEST(GenerateBlockContent, SpecparamRejectedInGenerateIf) {
       "    specparam t = 1.0;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "specparam declaration not allowed inside a "
+                            "generate block",
+                            3, "27.2"));
 }
 
 TEST(GenerateBlockContent, SpecparamRejectedInGenerateFor) {
@@ -82,7 +90,10 @@ TEST(GenerateBlockContent, SpecparamRejectedInGenerateFor) {
       "    specparam t = 1.0;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "specparam declaration not allowed inside a "
+                            "generate block",
+                            4, "27.2"));
 }
 
 TEST(GenerateBlockContent, SpecparamRejectedInSingleItemGenerateBody) {
@@ -90,7 +101,10 @@ TEST(GenerateBlockContent, SpecparamRejectedInSingleItemGenerateBody) {
       "module m;\n"
       "  if (1) specparam t = 1.0;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "specparam declaration not allowed inside a "
+                            "generate block",
+                            2, "27.2"));
 }
 
 TEST(GenerateBlockContent, SpecparamAllowedAtModuleScope) {
@@ -107,7 +121,9 @@ TEST(GenerateBlockContent, PortDeclarationRejectedInGenerateIf) {
       "    input a;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "port declaration not allowed inside a generate block", 3,
+      "27.2"));
 }
 
 TEST(GenerateBlockContent, PortDeclarationRejectedInGenerateFor) {
@@ -118,7 +134,9 @@ TEST(GenerateBlockContent, PortDeclarationRejectedInGenerateFor) {
       "    output b;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "port declaration not allowed inside a generate block", 4,
+      "27.2"));
 }
 
 TEST(GenerateBlockContent, PortDeclarationRejectedInGenerateCase) {
@@ -129,7 +147,9 @@ TEST(GenerateBlockContent, PortDeclarationRejectedInGenerateCase) {
       "    default: ;\n"
       "  endcase\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "port declaration not allowed inside a generate block", 3,
+      "27.2"));
 }
 
 TEST(GenerateBlockContent, PortDeclarationRejectedInNestedGenerate) {
@@ -141,7 +161,9 @@ TEST(GenerateBlockContent, PortDeclarationRejectedInNestedGenerate) {
       "    end\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "port declaration not allowed inside a generate block", 4,
+      "27.2"));
 }
 
 TEST(GenerateBlockContent, PortDeclarationRejectedWithRefDirection) {
@@ -153,7 +175,9 @@ TEST(GenerateBlockContent, PortDeclarationRejectedWithRefDirection) {
       "    ref r;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "port declaration not allowed inside a generate block", 3,
+      "27.2"));
 }
 
 TEST(GenerateBlockContent, PortDeclarationAllowedAtModuleScope) {

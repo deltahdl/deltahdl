@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -461,7 +462,12 @@ TEST(ModuleItemsParsing, ErrorTimeunitNoPriorDeclaration) {
       "  wire w;\n"
       "  timeunit 1ns;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §3.14.2.2 states the time scope rule, so the report is filed there rather
+  // than under §23.2.4.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "timeunit as a later item requires a matching "
+                            "prior declaration in the same time scope",
+                            3, "3.14.2.2"));
 }
 
 // Footnote 3: a repeated timeunits_declaration that does not match the prior
@@ -473,7 +479,8 @@ TEST(ModuleItemsParsing, ErrorTimeunitMismatch) {
       "  wire w;\n"
       "  timeunit 1us;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "timeunit does not match prior declaration", 4, "3.14.2.2"));
 }
 
 // parameter_override is terminated by ';' (BNF-6).
@@ -482,7 +489,9 @@ TEST(ModuleItemsParsing, ErrorDefparamMissingSemicolon) {
       "module m;\n"
       "  defparam u.W = 16\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §23.10.1 owns the parameter override, and the report stands on the
+  // `endmodule` that follows the unterminated one, on line 3.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "23.10.1"));
 }
 
 // A generate_region must be closed with endgenerate.
@@ -492,7 +501,10 @@ TEST(ModuleItemsParsing, ErrorUnclosedGenerateRegion) {
       "  generate\n"
       "    wire w;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §27.3 owns the generate region and expects its `endgenerate`. The region
+  // swallows the `endmodule` as a stray item first, so the keyword the region
+  // wants is missing at the end of the source, on line 5.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 5, "27.3"));
 }
 
 // A net_alias module item is terminated by ';'.
@@ -502,7 +514,9 @@ TEST(ModuleItemsParsing, ErrorNetAliasMissingSemicolon) {
       "  wire w1, w2;\n"
       "  alias w1 = w2\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §10.11 owns the net alias, and the report stands on the `endmodule` that
+  // follows the unterminated one, on line 4.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "10.11"));
 }
 
 // A timeunits_declaration module item is terminated by ';'.
@@ -511,7 +525,9 @@ TEST(ModuleItemsParsing, ErrorTimeunitMissingSemicolon) {
       "module m;\n"
       "  timeunit 1ns\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §3.14.2.2 owns the timeunits declaration, and the report stands on the
+  // `endmodule` that follows the unterminated one, on line 3.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "3.14.2.2"));
 }
 
 // module_item ::= port_declaration ; | non_port_module_item — the rejecting
@@ -524,7 +540,8 @@ TEST(ModuleItemsParsing, ErrorNonModuleItemInBody) {
       "module m;\n"
       "  42;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
 }
 
 }  // namespace

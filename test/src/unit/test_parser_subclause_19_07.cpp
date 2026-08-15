@@ -1,4 +1,5 @@
 #include "fixture_program.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -44,7 +45,10 @@ TEST_F(VerifyParseTest, DuplicateCovergroupOptionIsError) {
       endgroup
     endmodule
   )");
-  EXPECT_TRUE(diag_.HasErrors());
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "coverage option 'option.goal' is assigned more "
+                            "than once in the same covergroup definition",
+                            5, "19.7"));
 }
 
 // §19.7: the repeat is detected even when other, distinct option assignments
@@ -60,7 +64,10 @@ TEST_F(VerifyParseTest, NonAdjacentDuplicateCovergroupOptionIsError) {
       endgroup
     endmodule
   )");
-  EXPECT_TRUE(diag_.HasErrors());
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "coverage option 'option.weight' is assigned more "
+                            "than once in the same covergroup definition",
+                            6, "19.7"));
 }
 
 // §19.7: the same member name assigned once through `option` and once through
@@ -90,7 +97,10 @@ TEST_F(VerifyParseTest, DuplicateTypeOptionIsError) {
       endgroup
     endmodule
   )");
-  EXPECT_TRUE(diag_.HasErrors());
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "coverage option 'type_option.weight' is assigned "
+                            "more than once in the same covergroup definition",
+                            5, "19.7"));
 }
 
 // §19.7: the option value is an expression. The LRM's own example initializes
@@ -154,7 +164,10 @@ TEST_F(VerifyParseTest, ClassEmbeddedCovergroupDuplicateOptionIsError) {
       endgroup
     endclass
   )");
-  EXPECT_TRUE(diag_.HasErrors());
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "coverage option 'option.goal' is assigned more "
+                            "than once in the same covergroup definition",
+                            5, "19.7"));
 }
 
 // §19.7: the clocking event on a covergroup header is optional; the duplicate
@@ -169,7 +182,10 @@ TEST_F(VerifyParseTest, DuplicateOptionWithoutClockingEventIsError) {
       endgroup
     endmodule
   )");
-  EXPECT_TRUE(diag_.HasErrors());
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "coverage option 'option.weight' is assigned more "
+                            "than once in the same covergroup definition",
+                            5, "19.7"));
 }
 
 // §19.7: the duplicate-option diagnosis also holds for a covergroup that
@@ -185,7 +201,10 @@ TEST_F(VerifyParseTest, DuplicateOptionWithCustomSampleMethodIsError) {
       endgroup
     endmodule
   )");
-  EXPECT_TRUE(diag_.HasErrors());
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "coverage option 'option.at_least' is assigned "
+                            "more than once in the same covergroup definition",
+                            5, "19.7"));
 }
 
 // §19.7, Table 19-2: options allowed at the coverpoint level (weight, goal,
@@ -218,7 +237,10 @@ TEST_F(VerifyParseTest, PerInstanceAtCoverpointLevelIsError) {
       endgroup
     endmodule
   )");
-  EXPECT_TRUE(diag_.HasErrors());
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "coverage option 'option.per_instance' may not be "
+                            "specified at the coverpoint level",
+                            5, "19.7"));
 }
 
 // §19.7, Table 19-2: a cross-only option (cross_num_print_missing) may not be
@@ -233,7 +255,10 @@ TEST_F(VerifyParseTest, CrossOnlyOptionAtCoverpointLevelIsError) {
       endgroup
     endmodule
   )");
-  EXPECT_TRUE(diag_.HasErrors());
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "coverage option 'option.cross_num_print_missing' "
+                            "may not be specified at the coverpoint level",
+                            5, "19.7"));
 }
 
 // §19.7, Table 19-2: options allowed at the cross level (weight, goal, comment,
@@ -270,7 +295,10 @@ TEST_F(VerifyParseTest, AutoBinMaxAtCrossLevelIsError) {
       endgroup
     endmodule
   )");
-  EXPECT_TRUE(diag_.HasErrors());
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "coverage option 'option.auto_bin_max' may not be "
+                            "specified at the cross level",
+                            7, "19.7"));
 }
 
 // §19.7, Table 19-2: a covergroup-only option (get_inst_coverage) may not be
@@ -287,7 +315,10 @@ TEST_F(VerifyParseTest, GetInstCoverageAtCrossLevelIsError) {
       endgroup
     endmodule
   )");
-  EXPECT_TRUE(diag_.HasErrors());
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "coverage option 'option.get_inst_coverage' may "
+                            "not be specified at the cross level",
+                            7, "19.7"));
 }
 
 }  // namespace

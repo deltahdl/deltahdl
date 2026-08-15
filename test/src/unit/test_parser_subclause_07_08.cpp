@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -47,7 +48,10 @@ TEST(AssocArrayParsing, InlineStructTypeAsIndexRejected) {
       "module t;\n"
       "  int aa [ struct { int x; } ];\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // `struct` is no index type Parser::ParseUnpackedDims recognizes, so the
+  // dimension falls through to Parser::ParsePrimary, and §11.2 owns the report
+  // that the bracket holds no expression.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
 // Covers Parser::ParseAssocIndexDim in src/parser/parser_types.cpp, which

@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -40,7 +41,12 @@ TEST(VirtualMethodParsing, InitialAndExtendsTogetherIsRejected) {
       "class C;\n"
       "  function :initial :extends void foo(); endfunction\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::ParseDynamicOverrideSpecifiers admits `final` alone after the
+  // second colon, so `extends` is left standing where the method name belongs
+  // and Parser::ParseFuncName files the report under §13.4. TokenKindName
+  // answers "token" for every keyword, which is why the tail names none.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got token", 2, "13.4"));
 }
 
 TEST(VirtualMethodParsing, MethodFinalSpecifier) {

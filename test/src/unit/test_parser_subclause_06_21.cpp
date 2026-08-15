@@ -1,6 +1,7 @@
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -488,7 +489,13 @@ TEST(ScopeAndLifetimeParsing, LifetimeAutomaticOnModuleItem) {
   // task, function, or block (a procedural context). A module-level `automatic`
   // data declaration is therefore illegal and is rejected.
   auto r = Parse("module m; automatic int y = 0; endmodule");
-  EXPECT_TRUE(r.has_errors);
+  // §6.8 states the data_declaration the lifetime is written on, and that is
+  // where Parser::ParseDataDeclItem files the report; §6.21 has none of its
+  // own.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "'automatic' is not allowed in a data_declaration "
+                            "outside a procedural context",
+                            1, "6.8"));
 }
 
 TEST(ScopeAndLifetimeParsing, FunctionDeclLifetimeAutomatic) {

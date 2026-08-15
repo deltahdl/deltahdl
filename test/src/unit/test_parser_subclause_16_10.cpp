@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -135,7 +136,10 @@ TEST(LocalVariableParsing, LocalVariableInClockingEventIsError) {
       "  endsequence\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "local variable \"x\" may not be used in a clocking event expression", 4,
+      "16.10"));
 }
 
 // §16.10: the companion accepting case — a body local variable that is only

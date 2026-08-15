@@ -1,6 +1,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -610,29 +611,39 @@ TEST(ClockingBlockParse, InProgram) {
 }
 
 TEST(ClockingBlockParse, ErrorMissingClockingEvent) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  clocking cb;\n"
-              "    input data;\n"
-              "  endclocking\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb;\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  // §14.3 owns the clocking_event; the '@' it expects is a keyword-class token,
+  // which TokenKindName spells "token".
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got ';'", 2, "14.3"));
 }
 
 TEST(ClockingBlockParse, ErrorMissingEndclocking) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  clocking cb @(posedge clk);\n"
-              "    input data;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "endmodule\n");
+  // Without endclocking the enclosing endmodule reaches the clocking_item list,
+  // where §14.3 reports it as a missing clocking_direction.
+  EXPECT_TRUE(ReportedError(r.diags, "expected clocking direction", 4, "14.3"));
 }
 
 TEST(ClockingBlockParse, EndLabelMismatchAccepted) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  clocking cb @(posedge clk);\n"
-              "    input data;\n"
-              "  endclocking : wrong_name\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking : wrong_name\n"
+      "endmodule\n");
+  // §9.3.4 owns the rule that a block's end label repeats its name; §14.3 does
+  // not restate it for endclocking.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "end label 'wrong_name' does not match 'cb'", 4, "9.3.4"));
 }
 
 TEST(ClockingSkewParse, OutputEdgeKeyword) {
@@ -758,12 +769,15 @@ TEST(ClockingBlockParse, AttributedLetDecl) {
 }
 
 TEST(GlobalClockingParse, RejectsClockingItems) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  global clocking gc @(posedge clk);\n"
-              "    input data;\n"
-              "  endclocking\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  global clocking gc @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  // The global form parses no clocking_item list, so §14.3 requires endclocking
+  // straight after the event; both keywords spell as "token".
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got token", 3, "14.3"));
 }
 
 }  // namespace

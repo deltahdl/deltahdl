@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -149,7 +150,12 @@ TEST(PureVirtualMethodParsing, PureVirtualWithBodyRejected) {
       "    return;\n"
       "  endfunction\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  // `pure` makes Parser::ParseFunctionDecl take the prototype alone, so the
+  // body's first statement is read as a class member and Parser::
+  // ParseClassMembers files the report under §8.5, the class property
+  // declaration. TokenKindName answers "token" for every keyword.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got token", 3, "8.5"));
 }
 
 }  // namespace

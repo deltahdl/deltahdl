@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -98,7 +99,10 @@ TEST(BlockNameParsing, MismatchedEndLabelBeginEndErrors) {
       "    $display(\"hello\");\n"
       "  end : blk_b\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §9.3.4 owns the end-label rule; A.6.3 only states the block productions.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "end label 'blk_b' does not match block name 'blk_a'", 4,
+      "9.3.4"));
 }
 
 TEST(BlockNameParsing, MismatchedEndLabelForkJoinErrors) {
@@ -110,7 +114,10 @@ TEST(BlockNameParsing, MismatchedEndLabelForkJoinErrors) {
       "    join : blk_b\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §9.3.4 owns the end-label rule; A.6.3 only states the block productions.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "end label 'blk_b' does not match block name 'blk_a'", 5,
+      "9.3.4"));
 }
 
 TEST(BlockNameParsing, EndLabelWithoutStartLabelErrors) {
@@ -125,7 +132,9 @@ TEST(BlockNameParsing, EndLabelWithoutStartLabelErrors) {
       "  end : unnamed_end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "end label 'unnamed_end' specified for unnamed block", 4,
+      "9.3.4"));
 }
 
 TEST(BlockStatementSyntaxParsing, SequentialBlockNamedWithDecls) {
@@ -239,41 +248,53 @@ TEST(BlockStatementSyntaxParsing, ParBlockNullStatements) {
 }
 
 TEST(BlockStatementSyntaxParsing, UnterminatedSeqBlockErrors) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    a = 1;\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "endmodule\n");
+  // The seq_block body runs until `end`, so `endmodule` is taken as a statement
+  // and reaches ParsePrimaryExpr, whose report is filed under §11.2.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 4, "11.2"));
 }
 
 TEST(BlockStatementSyntaxParsing, UnterminatedParBlockErrors) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    fork\n"
-              "      a = 1;\n"
-              "  end\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  // The par_block body runs until a join keyword, so `end` is taken as a
+  // statement and reaches ParsePrimaryExpr, whose report is filed under §11.2.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 5, "11.2"));
 }
 
 TEST(BlockStatementSyntaxParsing, BeginWithJoinTerminatorErrors) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    a = 1;\n"
-              "  join\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "  join\n"
+      "endmodule\n");
+  // A seq_block ends only at `end`, so `join` is taken as a statement and
+  // reaches ParsePrimaryExpr, whose report is filed under §11.2.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 4, "11.2"));
 }
 
 TEST(BlockStatementSyntaxParsing, ForkWithEndTerminatorErrors) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    fork\n"
-              "      a = 1;\n"
-              "    end\n"
-              "  end\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  // A par_block ends only at a join keyword, so `end` is taken as a statement
+  // and reaches ParsePrimaryExpr, whose report is filed under §11.2.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 5, "11.2"));
 }
 
 }  // namespace

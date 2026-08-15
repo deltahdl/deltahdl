@@ -1,6 +1,7 @@
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -268,7 +269,9 @@ TEST(CompilationUnitStructure, PreservesInsertionOrder) {
 }
 
 TEST(CompilationUnitStructure, UnrecognizedTopLevelTokenIsError) {
-  EXPECT_FALSE(ParseOk("42"));
+  auto r = Parse("42");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected top-level declaration", 1, "3.12.1"));
 }
 
 TEST(CompilationUnitStructure, MultiplePackagesAccumulate) {
@@ -426,15 +429,26 @@ TEST(CompilationUnitStructure, DesignElementsAndCuItemsInterleaved) {
 }
 
 TEST(CompilationUnitParsing, CompilationUnitScopeCannotBeImportedWildcard) {
-  EXPECT_FALSE(
-      ParseOk("import $unit::*;\n"
-              "module m; endmodule\n"));
+  auto r = Parse(
+      "import $unit::*;\n"
+      "module m; endmodule\n");
+  // §26.3 owns the report: Parser::ParseImportItem files the prohibition
+  // under the package-import subclause the declaration belongs to.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "the compilation-unit scope cannot be used with "
+                            "an import declaration",
+                            1, "26.3"));
 }
 
 TEST(CompilationUnitParsing, CompilationUnitScopeCannotBeImportedSelective) {
-  EXPECT_FALSE(
-      ParseOk("import $unit::foo;\n"
-              "module m; endmodule\n"));
+  auto r = Parse(
+      "import $unit::foo;\n"
+      "module m; endmodule\n");
+  // §26.3 owns the report, as above.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "the compilation-unit scope cannot be used with "
+                            "an import declaration",
+                            1, "26.3"));
 }
 
 TEST(CompilationUnitParsing, CuScopeSelectiveImport) {
@@ -476,7 +490,9 @@ TEST(CompilationUnitParsing, DollarUnitInSubexpression) {
 }
 
 TEST(CompilationUnitParsing, BareStatementAtTopLevelIsError) {
-  EXPECT_FALSE(ParseOk("assign x = 1;"));
+  auto r = Parse("assign x = 1;");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected top-level declaration", 1, "3.12.1"));
 }
 
 TEST(CompilationUnitStructure, AllDescriptionTypesCoexist) {

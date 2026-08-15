@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -67,7 +68,8 @@ TEST(StaticMethodParsing, StaticVirtualFunctionError) {
       "    return 0;\n"
       "  endfunction\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "static method shall not be declared virtual", 2, "8.10"));
 }
 
 TEST(StaticMethodParsing, StaticVirtualTaskError) {
@@ -76,7 +78,8 @@ TEST(StaticMethodParsing, StaticVirtualTaskError) {
       "  virtual static task bar();\n"
       "  endtask\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "static method shall not be declared virtual", 2, "8.10"));
 }
 
 TEST(StaticMethodParsing, StaticFlagPropagatedToMethod) {
@@ -103,7 +106,10 @@ TEST(StaticMethodParsing, StaticLifetimeFunctionRejected) {
       "    return 0;\n"
       "  endfunction\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  // §8.6 owns the report: Parser::ValidateClassMethod files the lifetime
+  // qualifier under the subclause stating a class method is automatic.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "class method shall not have static lifetime", 2, "8.6"));
 }
 
 TEST(StaticMethodParsing, StaticLifetimeTaskRejected) {
@@ -112,7 +118,9 @@ TEST(StaticMethodParsing, StaticLifetimeTaskRejected) {
       "  task static t2();\n"
       "  endtask\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  // §8.6 owns the report, as in StaticLifetimeFunctionRejected above.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "class method shall not have static lifetime", 2, "8.6"));
 }
 
 }  // namespace

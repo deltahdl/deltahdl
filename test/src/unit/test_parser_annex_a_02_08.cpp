@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -259,7 +260,10 @@ TEST(BlockItemDeclParsing, ErrorBlockItemLocalparamMissingSemicolon) {
       "    $display(\"%0d\", W);\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::ParseParamDecl demands the terminating ';' under §6.20.1, and the
+  // token standing where it should be is the $display on the next line.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got system identifier", 4,
+                            "6.20.1"));
 }
 
 TEST(BlockItemDeclParsing, ErrorBlockItemParameterMissingSemicolon) {
@@ -270,7 +274,10 @@ TEST(BlockItemDeclParsing, ErrorBlockItemParameterMissingSemicolon) {
       "    $display(\"%0d\", D);\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::ParseParamDecl demands the terminating ';' under §6.20.1, and the
+  // token standing where it should be is the $display on the next line.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got system identifier", 4,
+                            "6.20.1"));
 }
 
 // block_item_declaration admits exactly four alternatives (data_declaration,
@@ -286,7 +293,9 @@ TEST(BlockItemDeclParsing, ErrorNetDeclNotABlockItem) {
       "    w = 1;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::IsBlockVarDeclStartCore does not admit `wire`, so the block parses
+  // it as a statement and §11.2 reports the primary that is not an expression.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
 }  // namespace

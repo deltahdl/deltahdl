@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -36,7 +37,10 @@ TEST(ModulePathDeclParsing, PathOutsideSpecifyBlockRejected) {
       "module m;\n"
       "  (a => b) = 5;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §23.2.4 owns the module item list, and a path declaration with no enclosing
+  // specify block is reported against that list rather than under §30.4.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
 }
 
 // §30.4: "A module path may be described as a simple path, an edge-sensitive

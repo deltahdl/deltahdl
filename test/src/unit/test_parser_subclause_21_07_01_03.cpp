@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -60,12 +61,16 @@ TEST(IoSystemTaskParsing, DumpOffOnInTaskBody) {
 // Negative: the production requires the terminating semicolon, so a $dumpoff
 // task enable running straight into the block end is rejected.
 TEST(IoSystemTaskParsing, DumpOffMissingSemicolonRejected) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  initial begin\n"
-              "    $dumpoff\n"
-              "  end\n"
-              "endmodule\n"));
+  auto result = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    $dumpoff\n"
+      "  end\n"
+      "endmodule\n");
+  // §12.3 owns the semicolon that terminates a subroutine call statement;
+  // §21.7.1.3 states the dumpoff_task production but reports nothing itself.
+  EXPECT_TRUE(
+      ReportedError(result.diags, "expected ';', got token", 4, "12.3"));
 }
 
 }  // namespace

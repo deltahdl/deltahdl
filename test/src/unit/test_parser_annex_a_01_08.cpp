@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -439,7 +440,11 @@ TEST(CheckerItemsParsing, CheckerPortMissingIdentifierRejected) {
       "checker chk(input logic);\n"
       "endchecker\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  // A checker port list is read by Parser::ParsePortDecl, which files the
+  // missing port identifier under §23.2.2.2 with the ANSI module port it
+  // shares rather than under §17.2 with the checker.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ')'", 1, "23.2.2.2"));
 }
 
 // Error: the `default disable iff expression_or_dist ;` alternative of
@@ -450,7 +455,10 @@ TEST(CheckerItemsParsing, CheckerDefaultDisableIffMissingSemicolonRejected) {
       "  default disable iff rst\n"
       "endchecker\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
+  // §16.15 owns `default disable iff`, so its trailing ';' is reported there.
+  // `endchecker` is a keyword, which Parser::Expect names "token", and it
+  // stands on line 3.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "16.15"));
 }
 
 }  // namespace

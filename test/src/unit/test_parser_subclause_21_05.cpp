@@ -4,6 +4,7 @@
 // system-task statement, so the generic call grammar accepts every form of the
 // production.
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -127,11 +128,14 @@ TEST(IoSystemTaskParsing, WritememInAlwaysAndTaskPositions) {
 // The negative form: an argument list left unterminated is not an instance of
 // the production and must be rejected by the call grammar.
 TEST(IoSystemTaskParsing, UnterminatedWritememRejected) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  reg [7:0] mem [0:255];\n"
-              "  initial $writememh(\"out.hex\", mem;\n"
-              "endmodule\n"));
+  auto result = Parse(
+      "module t;\n"
+      "  reg [7:0] mem [0:255];\n"
+      "  initial $writememh(\"out.hex\", mem;\n"
+      "endmodule\n");
+  // §13.5 owns the closing parenthesis of a subroutine call argument list;
+  // §21.5 states the writemem_tasks production but reports nothing of its own.
+  EXPECT_TRUE(ReportedError(result.diags, "expected ')', got ';'", 3, "13.5"));
 }
 
 }  // namespace

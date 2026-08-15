@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -137,7 +138,10 @@ TEST(StatementLabelParsing, LabelAndBlockNameErrors) {
       "    end\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The report stands at the `begin` the label precedes, on line 3.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "cannot have both a statement label and a block name", 3,
+      "9.3.5"));
 }
 
 TEST(StatementLabelParsing, StatementLabelOnTaskCall) {
@@ -354,7 +358,13 @@ TEST(StatementLabelParsing, MismatchedEndLabelOnLabeledBeginIsError) {
       "      a = 1;\n"
       "    end : wrong\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §9.3.4 owns the rule that a name after end must match the block name, and
+  // ParserStmtHelpers::MatchEndBlockLabel files the report under it; §9.3.5
+  // contributes only the equivalence that makes `blk` the block name here.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "end label 'wrong' does not match block name "
+                            "'blk'",
+                            5, "9.3.4"));
 }
 
 TEST(StatementLabelParsing, MismatchedEndLabelOnLabeledForkIsError) {
@@ -366,7 +376,9 @@ TEST(StatementLabelParsing, MismatchedEndLabelOnLabeledForkIsError) {
       "    join : wrong\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §9.3.4 owns the matching-name rule the report is filed under, as above.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "end label 'wrong' does not match block name 'fg'", 5, "9.3.4"));
 }
 
 TEST(StatementLabelParsing, LabelAndBlockNameOnForkIsError) {
@@ -378,7 +390,10 @@ TEST(StatementLabelParsing, LabelAndBlockNameOnForkIsError) {
       "    join\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The report stands at the `fork` the label precedes, on line 3.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "cannot have both a statement label and a block name", 3,
+      "9.3.5"));
 }
 
 TEST(StatementLabelParsing, PrefixLabelMatchesEndLabelOnBegin) {
@@ -425,7 +440,10 @@ TEST(StatementLabelParsing, LabelBeforeEndIsError) {
       "    a = 1;\n"
       "    tail: end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // Nothing reports the label rule itself: the label is taken, `end` is then
+  // asked to start a statement, and the expression parser rejects it under
+  // §11.2 at the `end` on line 4.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 4, "11.2"));
 }
 
 TEST(StatementLabelParsing, LabelBeforeJoinIsError) {
@@ -436,7 +454,8 @@ TEST(StatementLabelParsing, LabelBeforeJoinIsError) {
       "    a = 1;\n"
       "    tail: join\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // As above, §11.2 is what rejects the `join` asked to start a statement.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 4, "11.2"));
 }
 
 TEST(StatementLabelParsing, LabelBeforeDeclarationIsError) {
@@ -449,7 +468,11 @@ TEST(StatementLabelParsing, LabelBeforeDeclarationIsError) {
       "    lbl: int x;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // The label makes `int x` a statement rather than a declaration, so `int`
+  // parses as an expression and the statement's own §12.3 semicolon is asked
+  // for at `x` on line 3.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got identifier", 3, "12.3"));
 }
 
 TEST(StatementLabelParsing, LabelBeforeJoinAnyIsError) {
@@ -461,7 +484,8 @@ TEST(StatementLabelParsing, LabelBeforeJoinAnyIsError) {
       "    a = 1;\n"
       "    tail: join_any\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // As above, §11.2 is what rejects the `join_any` asked to start a statement.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 4, "11.2"));
 }
 
 TEST(StatementLabelParsing, LabelBeforeJoinNoneIsError) {
@@ -472,7 +496,8 @@ TEST(StatementLabelParsing, LabelBeforeJoinNoneIsError) {
       "    a = 1;\n"
       "    tail: join_none\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // As above, §11.2 is what rejects the `join_none` asked to start a statement.
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 4, "11.2"));
 }
 
 TEST(StatementLabelParsing, MultipleLabelsInSequence) {

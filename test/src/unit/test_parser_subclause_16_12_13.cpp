@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -31,7 +32,10 @@ TEST(EventuallyRangeParsing, WeakUnboundedEventuallyDollarMaximumIsRejected) {
       "    eventually[2:$] a;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "eventually range shall be bounded; a `$` maximum "
+                            "is not allowed for weak eventually",
+                            3, "16.12.13"));
 }
 
 // §16.12.13: the range for a strong `s_eventually` may be unbounded, so a `$`
@@ -91,7 +95,10 @@ TEST(EventuallyRangeParsing, NegativeWeakEventuallyMinimumIsRejected) {
       "    eventually[-1:3] a;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "eventually range bounds must be non-negative "
+                            "integer constant expressions",
+                            3, "16.12.13"));
 }
 
 // §16.12.13: the non-negative requirement applies to the maximum bound as well,
@@ -104,7 +111,10 @@ TEST(EventuallyRangeParsing, NegativeWeakEventuallyMaximumIsRejected) {
       "    eventually[0:-2] a;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "eventually range bounds must be non-negative "
+                            "integer constant expressions",
+                            3, "16.12.13"));
 }
 
 // §16.12.13: the non-negative requirement applies to the strong form's minimum
@@ -117,7 +127,10 @@ TEST(EventuallyRangeParsing, NegativeStrongEventuallyMinimumIsRejected) {
       "    s_eventually[-1:3] a;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "eventually range bounds must be non-negative "
+                            "integer constant expressions",
+                            3, "16.12.13"));
 }
 
 // §16.12.13: the non-negative requirement also applies to the strong form's
@@ -132,7 +145,10 @@ TEST(EventuallyRangeParsing, NegativeStrongEventuallyMaximumIsRejected) {
       "    s_eventually[0:-2] a;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "eventually range bounds must be non-negative "
+                            "integer constant expressions",
+                            3, "16.12.13"));
 }
 
 // §16.12.13: when both bounds are non-negative integer constant literals the
@@ -145,7 +161,9 @@ TEST(EventuallyRangeParsing, WeakLiteralMinimumGreaterThanMaximumIsRejected) {
       "    eventually[5:2] a;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "eventually range minimum must not exceed the maximum", 3,
+      "16.12.13"));
 }
 
 // §16.12.13: the same minimum-not-exceeding-maximum requirement applies to the
@@ -157,7 +175,9 @@ TEST(EventuallyRangeParsing, StrongLiteralMinimumGreaterThanMaximumIsRejected) {
       "    s_eventually[5:2] a;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "eventually range minimum must not exceed the maximum", 3,
+      "16.12.13"));
 }
 
 // §16.12.13: the relation is less-than-or-equal, so equal literal bounds are a

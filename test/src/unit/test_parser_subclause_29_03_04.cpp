@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -11,7 +12,10 @@ TEST(UdpStateTable, MissingTableKeywordRejected) {
       "  1 : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // TokenKindName answers "token" for every keyword, so the sentence names the
+  // row's first token rather than the missing `table`.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got integer literal", 2,
+                            "29.3.4"));
 }
 
 TEST(UdpStateTable, MissingEndtableKeywordRejected) {
@@ -20,7 +24,9 @@ TEST(UdpStateTable, MissingEndtableKeywordRejected) {
       "  table\n"
       "    0 : 1;\n"
       "    1 : 0;\n");
-  EXPECT_TRUE(r.has_errors);
+  // The source ends after line 4's newline, so the EOF token the `endtable`
+  // expectation reports against stands at line 5, column 1.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 5, "29.3.4"));
 }
 
 TEST(UdpStateTable, RowMissingSemicolonRejected) {
@@ -31,7 +37,9 @@ TEST(UdpStateTable, RowMissingSemicolonRejected) {
       "    1 : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // The row's missing `;` is reported against the first token of the next row.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got integer literal", 4, "29.3.4"));
 }
 
 TEST(UdpStateTable, InputFieldOrderFollowsHeaderPortList) {
@@ -127,7 +135,9 @@ TEST(UdpStateTable, AllXInputsWithZeroOutputRejected) {
       "    x x : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP table row with all-x inputs shall specify x output", 3,
+      "29.3.4"));
 }
 
 TEST(UdpStateTable, AllXInputsWithOneOutputRejected) {
@@ -137,7 +147,9 @@ TEST(UdpStateTable, AllXInputsWithOneOutputRejected) {
       "    x : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP table row with all-x inputs shall specify x output", 3,
+      "29.3.4"));
 }
 
 TEST(UdpStateTable, AllXInputsWithXOutputAccepted) {
@@ -161,7 +173,12 @@ TEST(UdpStateTable, DuplicateInputsWithDifferentOutputsRejected) {
       "    0 1 : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::ValidateUdpTable compares whole rows once the table is complete,
+  // so the report stands at the primitive's own line rather than at a row.
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "UDP table rows with identical inputs shall not "
+                            "specify different outputs",
+                            1, "29.3.4"));
 }
 
 TEST(UdpStateTable, SequentialDuplicateInputsWithDifferentOutputsRejected) {
@@ -172,7 +189,10 @@ TEST(UdpStateTable, SequentialDuplicateInputsWithDifferentOutputsRejected) {
       "    0 1 : ? : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "UDP table rows with identical inputs shall not "
+                            "specify different outputs",
+                            1, "29.3.4"));
 }
 
 TEST(UdpStateTable, RowWithTwoInputTransitionsRejected) {
@@ -184,7 +204,9 @@ TEST(UdpStateTable, RowWithTwoInputTransitionsRejected) {
       "    (01) (10) 0 : 0 : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP table row shall contain at most one input transition", 3,
+      "29.3.4"));
 }
 
 TEST(UdpStateTable, RowWithSingleInputTransitionAccepted) {
@@ -222,7 +244,9 @@ TEST(UdpStateTable, RowWithTwoShorthandEdgesRejected) {
       "    r f : 0 : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP table row shall contain at most one input transition", 3,
+      "29.3.4"));
 }
 
 TEST(UdpStateTable, SequentialAllXInputsWithXOutputAccepted) {
@@ -248,7 +272,9 @@ TEST(UdpStateTable, SequentialAllXInputsWithNonXOutputRejected) {
       "    x x : 0 : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP table row with all-x inputs shall specify x output", 3,
+      "29.3.4"));
 }
 
 TEST(UdpStateTable, DuplicateEdgeInputsWithDifferentOutputsRejected) {
@@ -262,7 +288,10 @@ TEST(UdpStateTable, DuplicateEdgeInputsWithDifferentOutputsRejected) {
       "    (01) 0 : 0 : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "UDP table rows with identical inputs shall not "
+                            "specify different outputs",
+                            1, "29.3.4"));
 }
 
 TEST(UdpStateTable, DuplicateEdgeRowsWithSameOutputNotFlagged) {

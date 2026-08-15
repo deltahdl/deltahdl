@@ -3,6 +3,7 @@
 // grammar. Semantic rules from descendant subclauses (§33.4.1.1 etc.) are not
 // exercised here.
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -59,7 +60,7 @@ TEST(ConfigDeclarationParsing, MissingSemicolonAfterNameReported) {
       "config c\n"
       "  design top;\n"
       "endconfig\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 2, "33.4.1"));
 }
 
 // config_declaration requires the closing 'endconfig' keyword.
@@ -67,7 +68,10 @@ TEST(ConfigDeclarationParsing, MissingEndconfigReported) {
   auto r = Parse(
       "config c;\n"
       "  design top;\n");
-  EXPECT_TRUE(r.has_errors);
+  // TokenKindName answers every keyword with "token", so the expected
+  // 'endconfig' is not named in the message; the EOF that stands in its place
+  // on line 3 is.
+  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 3, "33.4.1"));
 }
 
 // design_statement ::= design { [ library_identifier . ] cell_identifier } ;
@@ -94,7 +98,9 @@ TEST(ConfigDesignStatementParsing, MissingTerminatingSemicolonRejected) {
       "config c;\n"
       "  design top\n"
       "endconfig\n");
-  EXPECT_TRUE(r.has_errors);
+  // §33.4.1.1 owns the design_statement, so its terminator is reported there
+  // rather than under §33.4.1.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "33.4.1.1"));
 }
 
 // design_statement's cell list is a { } repetition, so an empty list still
@@ -137,7 +143,9 @@ TEST(ConfigRuleStatementParsing,
       "  design top;\n"
       "  instance top.a;\n"
       "endconfig\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "instance selection requires a 'liblist' or 'use' clause", 3,
+      "33.4.1"));
 }
 
 // Likewise there is no bare 'cell_clause ;' alternative; a cell selection with
@@ -148,7 +156,9 @@ TEST(ConfigRuleStatementParsing, CellSelectionWithoutExpansionClauseRejected) {
       "  design top;\n"
       "  cell adder;\n"
       "endconfig\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "cell selection requires a 'liblist' or 'use' clause", 3,
+      "33.4.1"));
 }
 
 // default_clause ::= default

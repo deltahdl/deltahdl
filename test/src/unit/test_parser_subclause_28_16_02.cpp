@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -84,7 +85,9 @@ TEST(ChargeDecayParsing, MoreThanThreeDelaysRejected) {
       "module t;\n"
       "  trireg #(1, 2, 3, 4) cap;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // Parser::ParseGateDelay closes the delay list after the third value and
+  // files the missing ')' under §28.16, not under §28.16.2.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 2, "28.16"));
 }
 
 }  // namespace
