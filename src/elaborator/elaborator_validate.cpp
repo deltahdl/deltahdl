@@ -492,8 +492,24 @@ static void CheckRealSelectNode(const Expr* e, const TypeMap& types,
   if (!name.empty()) {
     auto it = types.find(name);
     if (it != types.end() && IsRealType(it->second)) {
-      diag.Error(e->range.start, "bit-select on real type is illegal",
+      // §11.5.1: "A bit-select or part-select of a scalar, or of a real
+      // variable or real parameter, shall be illegal." The sentence names two
+      // constructs, so the report names the one that was written. A select node
+      // carries `index_end` for `[m:l]` and `is_part_select_plus` or
+      // `is_part_select_minus` for `[b +: w]` and `[b -: w]`, the same three
+      // fields CheckIndexedPartSelectWidthNode reads; a node with none of them
+      // set is a bit-select.
+      const bool kIsBitSelect =
+          !e->index_end && !e->is_part_select_plus && !e->is_part_select_minus;
+      diag.Error(e->range.start,
+                 kIsBitSelect ? "bit-select of a real variable is illegal"
+                              : "part-select of a real variable is illegal",
                  Subclause("11.5.1"));
+      // Returning here leaves the index check below unreached for this node, so
+      // `real a; real i; assign b = a[i];` draws the operand report alone. That
+      // is deliberate: the operand breach already makes the whole select
+      // illegal under the sentence quoted above, and one construct drawing one
+      // report is what this check exists to do.
       return;
     }
   }
@@ -592,6 +608,29 @@ void CheckScalarSelectStmt(const Stmt* s, const NameSet& scalars,
   for (const auto& ci : s->case_items)
     CheckScalarSelectStmt(ci.body, scalars, diag);
   for (auto* fs : s->fork_stmts) CheckScalarSelectStmt(fs, scalars, diag);
+}
+
+// §11.5.1 applies to a select written in a procedural statement exactly as it
+// applies to one written on a continuous assignment, so the real-operand check
+// reaches every statement position CheckScalarSelectStmt reaches.
+void CheckRealSelectStmt(const Stmt* s, const TypeMap& types,
+                         DiagEngine& diag) {
+  if (!s) return;
+  CheckRealSelect(s->lhs, types, diag);
+  CheckRealSelect(s->rhs, types, diag);
+  CheckRealSelect(s->expr, types, diag);
+  CheckRealSelect(s->condition, types, diag);
+  for (auto* child : s->stmts) CheckRealSelectStmt(child, types, diag);
+  CheckRealSelectStmt(s->then_branch, types, diag);
+  CheckRealSelectStmt(s->else_branch, types, diag);
+  CheckRealSelectStmt(s->body, types, diag);
+  for (auto* fi : s->for_inits) CheckRealSelectStmt(fi, types, diag);
+  CheckRealSelectStmt(s->for_body, types, diag);
+  for (auto* fs : s->for_steps) CheckRealSelectStmt(fs, types, diag);
+  CheckRealSelect(s->for_cond, types, diag);
+  for (const auto& ci : s->case_items)
+    CheckRealSelectStmt(ci.body, types, diag);
+  for (auto* fs : s->fork_stmts) CheckRealSelectStmt(fs, types, diag);
 }
 
 void CheckIndexedPartSelectWidthStmt(const Stmt* s, const ScopeMap& scope,

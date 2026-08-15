@@ -144,12 +144,14 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
   }
   if (item->kind == ModuleItemKind::kContAssign) {
     CheckRealSelect(item->assign_rhs, var_types_, diag_);
+    CheckRealSelect(item->assign_lhs, var_types_, diag_);
     CheckScalarSelect(item->assign_rhs, scalar_var_names_, diag_);
     CheckScalarSelect(item->assign_lhs, scalar_var_names_, diag_);
     CheckIndexedPartSelectWidth(item->assign_rhs, scope, diag_);
     CheckIndexedPartSelectWidth(item->assign_lhs, scope, diag_);
   }
   if (is_proc && item->body) {
+    CheckRealSelectStmt(item->body, var_types_, diag_);
     CheckScalarSelectStmt(item->body, scalar_var_names_, diag_);
     CheckIndexedPartSelectWidthStmt(item->body, scope, diag_);
   }

@@ -176,7 +176,8 @@ TEST(SelectElaboration, RealVariableBitSelectError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "bit-select on real type is illegal", 4, "11.5.1"));
+                            "bit-select of a real variable is illegal", 4,
+                            "11.5.1"));
 }
 
 TEST(SelectElaboration, RealVariablePartSelectError) {
@@ -188,10 +189,9 @@ TEST(SelectElaboration, RealVariablePartSelectError) {
       "  assign y = r[3:0];\n"
       "endmodule\n",
       f);
-  // The message says "bit-select" for a part-select because CheckRealSelectNode
-  // reads neither index_end nor the part-select flags -- see #3066.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "bit-select on real type is illegal", 4, "11.5.1"));
+                            "part-select of a real variable is illegal", 4,
+                            "11.5.1"));
 }
 
 TEST(SelectElaboration, NonIndexedPartSelectBoundsMustBeConstant) {
@@ -366,7 +366,8 @@ TEST(SelectElaboration, ShortrealVariableBitSelectError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "bit-select on real type is illegal", 4, "11.5.1"));
+                            "bit-select of a real variable is illegal", 4,
+                            "11.5.1"));
 }
 
 // §11.5.1: realtime is likewise a real type, so selecting from it is illegal.
@@ -380,7 +381,8 @@ TEST(SelectElaboration, RealtimeVariableBitSelectError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "bit-select on real type is illegal", 4, "11.5.1"));
+                            "bit-select of a real variable is illegal", 4,
+                            "11.5.1"));
 }
 
 // §11.5.1: for an ascending [0:15] declaration the smaller index names the more
@@ -578,5 +580,132 @@ TEST(SelectElaboration,
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "part-select's first index must address a more", 4,
+                            "11.5.1"));
+}
+
+// §11.5.1: "A bit-select or part-select of a scalar, or of a real variable or
+// real parameter, shall be illegal." The sentence names two constructs, and
+// `a[3:0]` is the second of them, so a report naming a bit-select names the
+// construct that was not written. This fails when CheckRealSelectNode in
+// src/elaborator/elaborator_validate.cpp emits one message for every select
+// rather than choosing on the node's own `index_end`.
+TEST(RealSelect, PartSelectOfARealNamesPartSelect) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real a;\n"
+      "  wire [3:0] b;\n"
+      "  assign b = a[3:0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "part-select of a real variable is illegal", 4,
+                            "11.5.1"));
+}
+
+// The same alternative of §11.5.1's sentence reached through the ascending
+// indexed form. Parser::ParseSelectExpr sets `is_part_select_plus` on
+// `a[0 +: 4]`, so this fails when CheckRealSelectNode reads none of the three
+// part-select fields, and it holds a fix that reads `is_part_select_minus`
+// alone to the same answer.
+TEST(RealSelect, IndexedPlusPartSelectOfARealNamesPartSelect) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real a;\n"
+      "  wire [3:0] b;\n"
+      "  assign b = a[0 +: 4];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "part-select of a real variable is illegal", 4,
+                            "11.5.1"));
+}
+
+// The descending indexed form, which sets `is_part_select_minus` instead. It is
+// the third of the fields CheckRealSelectNode has to read, and a check that
+// covered only `index_end` and `is_part_select_plus` would call this select a
+// bit-select while the §11.5.1 sentence names it a part-select.
+TEST(RealSelect, IndexedMinusPartSelectOfARealNamesPartSelect) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real a;\n"
+      "  wire [3:0] b;\n"
+      "  assign b = a[3 -: 4];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "part-select of a real variable is illegal", 4,
+                            "11.5.1"));
+}
+
+// The other alternative, and the control on the three above. `a[2]` sets none
+// of `index_end`, `is_part_select_plus` or `is_part_select_minus`, so §11.5.1's
+// bit-select is what was written. This fails when CheckRealSelectNode answers
+// "part-select" for every select, which is how a fix for the three cases above
+// goes wrong.
+TEST(RealSelect, BitSelectOfARealStillNamesBitSelect) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real a;\n"
+      "  wire b;\n"
+      "  assign b = a[2];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real variable is illegal", 4,
+                            "11.5.1"));
+}
+
+// §11.5.1 states one rule, so one breach of it draws one report. This fails
+// when RegisterVarDeclNames in src/elaborator/elaborator_decls_var.cpp records
+// a real variable in scalar_var_names as well as in var_types:
+// CheckRealSelectNode and CheckScalarSelectNode then both fire on `a[2]`, and
+// the second calls the real a scalar, which is the other alternative of the
+// sentence.
+//
+// The count is read off f.diag.Diagnostics() directly because ReportedError in
+// lib/cpp/test_helpers/helpers_reported_error.h returns on its first match and
+// cannot see a second report, which makes this the only case here that can.
+TEST(RealSelect, SelectOfARealDrawsOneReport) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real a;\n"
+      "  wire b;\n"
+      "  assign b = a[2];\n"
+      "endmodule\n",
+      f);
+  int errors = 0;
+  std::string recorded;
+  for (const auto& diag : f.diag.Diagnostics()) {
+    if (diag.severity != DiagSeverity::kError) continue;
+    ++errors;
+    recorded += "\n  ";
+    recorded += diag.message;
+  }
+  EXPECT_EQ(errors, 1) << "one select of a real variable drew these errors:"
+                       << recorded;
+}
+
+// §11.5.1 lists "a scalar" and "a real variable or real parameter" as separate
+// alternatives, so a select on a real is reported as a real wherever it is
+// written. This fails when CheckRealSelect is called on continuous assignments
+// alone and no CheckRealSelectStmt walks procedural statements: the select then
+// draws either the scalar message, which names the wrong alternative, or --
+// once a real leaves scalar_var_names -- no report at all.
+TEST(RealSelect, SelectOfARealInAProceduralStatementNamesTheRealRule) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real a;\n"
+      "  int b;\n"
+      "  always @* b = a[2];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real variable is illegal", 4,
                             "11.5.1"));
 }

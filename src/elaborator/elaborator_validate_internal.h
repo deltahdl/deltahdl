@@ -59,6 +59,7 @@ void CheckIndexedPartSelectWidth(const Expr* e, const ScopeMap& scope,
                                  DiagEngine& diag);
 void CheckScalarSelectStmt(const Stmt* s, const NameSet& scalars,
                            DiagEngine& diag);
+void CheckRealSelectStmt(const Stmt* s, const TypeMap& types, DiagEngine& diag);
 void CheckIndexedPartSelectWidthStmt(const Stmt* s, const ScopeMap& scope,
                                      DiagEngine& diag);
 

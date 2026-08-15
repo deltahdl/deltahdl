@@ -462,7 +462,15 @@ static void RegisterVarDeclNames(const ModuleItem* item,
   if (item->unpacked_dims.empty()) {
     if (item->data_type.packed_dim_left)
       tables.packed_array_vars.insert(item->name);
+    // §11.5.1: "A bit-select or part-select of a scalar, or of a real variable
+    // or real parameter, shall be illegal." A real variable is the second
+    // alternative of that sentence and not the first, so it is not recorded as
+    // a scalar and does not draw the scalar message. CheckRealSelect and
+    // CheckRealSelectStmt report a select on a real variable, naming the
+    // alternative that fits it; recording the real here as well made one breach
+    // draw two reports.
     else if (!IsIntegerAtomKind(item->data_type.kind) &&
+             !IsRealType(item->data_type.kind) &&
              !IsPackedAggregateVar(item->data_type, typedefs) &&
              !IsStringVar(item->data_type, typedefs))
       tables.scalar_var_names.insert(item->name);
