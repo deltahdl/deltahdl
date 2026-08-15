@@ -178,6 +178,29 @@ const DataType* FindClassScopedTypedefType(std::string_view cls_name,
                                            const CompilationUnit* unit);
 bool IsRealType(DataTypeKind k);
 
+// §11.5.2 fixes how many addresses a select may carry before §11.5.1 judges it:
+// "To express bit-selects or part-selects of array elements, the desired word
+// shall first be selected by supplying an address for each dimension. Once
+// selected, bit-selects and part-selects shall be addressed in the same manner
+// as net and variable bit-selects and part-selects (see 11.5.1)." So a select
+// chain written on a declaration is measured against the dimensions that
+// declaration has, and the address after the last of them is the one §11.5.1
+// rules on.
+//
+// `addressable_dims` counts the unpacked dimensions and the vector dimensions
+// together, because an address spends one of either. A packed dimension
+// contributes one, and an integer atom type or a packed aggregate contributes
+// one for the implicit vector it presents. The two flags say which alternative
+// of §11.5.1's sentence -- "A bit-select or part-select of a scalar, or of a
+// real variable or real parameter, shall be illegal" -- the operand at that
+// depth falls under, and a declaration whose operand falls under neither gets
+// no entry.
+struct VarSelectShape {
+  size_t addressable_dims = 0;
+  bool element_is_real = false;
+  bool element_is_scalar = false;
+};
+
 // Constructs the implicit net that an identifier acquires when it is used as a
 // port expression. This is the single point shared by two subclauses: §6.10
 // fixes the net's kind and size -- the default net type, sized to the vector

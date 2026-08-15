@@ -372,6 +372,7 @@ struct VarDeclNameTables {
   std::unordered_set<std::string_view>& real_var_names;
   std::unordered_set<std::string_view>& packed_array_vars;
   std::unordered_map<std::string_view, std::string_view>& var_named_types;
+  std::unordered_map<std::string_view, VarSelectShape>& var_select_shapes;
 };
 
 // §6.11.1 / Table 6-8: the integer atom types (byte, shortint, int, longint,
@@ -434,6 +435,55 @@ static bool IsStringVar(const DataType& dtype, const TypedefMap& typedefs) {
   return d != nullptr && d->kind == DataTypeKind::kString;
 }
 
+// §11.5.2 states how many addresses a select written on this declaration may
+// carry: "To express bit-selects or part-selects of array elements, the desired
+// word shall first be selected by supplying an address for each dimension. Once
+// selected, bit-selects and part-selects shall be addressed in the same manner
+// as net and variable bit-selects and part-selects (see 11.5.1)." This records
+// that count, and which alternative of §11.5.1's sentence the operand one
+// address past it falls under. CheckElementSelectNode in
+// src/elaborator/elaborator_validate.cpp reads it.
+//
+// Only a declared type whose select behaviour §11.5.1 settles gets an entry:
+// the real types, the scalar types logic, reg and bit, the integer atom types,
+// and a packed structure or union. Every other declaration is left out, so it
+// keeps drawing no report rather than one naming a rule that does not cover it.
+// A named type is among them because its dimensions live in the typedef and not
+// at the declaration, so a count taken here would put the boundary too early
+// and report a legal element select. A string is another: §6.16 says "A single
+// character of a string variable may be selected for reading or writing by
+// indexing the variable", so the address after a string's own reaches a
+// character, whose own bits are selectable.
+static void RecordVarSelectShape(
+    const ModuleItem* item, const TypedefMap& typedefs,
+    std::unordered_map<std::string_view, VarSelectShape>& shapes) {
+  const DataType& dtype = item->data_type;
+  const bool kIsAtom = IsIntegerAtomKind(dtype.kind);
+  const bool kIsPackedAggregate = IsPackedAggregateVar(dtype, typedefs);
+  const bool kIsScalarKind = dtype.kind == DataTypeKind::kLogic ||
+                             dtype.kind == DataTypeKind::kReg ||
+                             dtype.kind == DataTypeKind::kBit;
+  if (!IsRealType(dtype.kind) && !kIsAtom && !kIsPackedAggregate &&
+      !kIsScalarKind) {
+    return;
+  }
+  // A packed dimension takes one address, and so does the implicit vector that
+  // an integer atom type or a packed aggregate presents, because §11.5.1 lists
+  // both among the operands a bit-select may address.
+  size_t vector_dims = (dtype.packed_dim_left ? 1 : 0) +
+                       dtype.extra_packed_dims.size() +
+                       (dtype.has_unsized_packed_dim ? 1 : 0);
+  if (kIsAtom || kIsPackedAggregate) ++vector_dims;
+  VarSelectShape shape;
+  shape.addressable_dims = item->unpacked_dims.size() + vector_dims;
+  // Every address up to that count reaches either an array element or a bit, so
+  // what the next address is written on is a real variable when the declared
+  // type is real and a scalar otherwise -- the two alternatives §11.5.1 names.
+  shape.element_is_real = IsRealType(dtype.kind);
+  shape.element_is_scalar = !shape.element_is_real;
+  shapes[item->name] = shape;
+}
+
 // §6.11 / §6.20: record the bookkeeping name tables for a variable declaration
 // (const-ness, type kind, scalar/packed-array shape, named type) before the
 // RtlirVariable is built.
@@ -481,6 +531,7 @@ static void RegisterVarDeclNames(const ModuleItem* item,
   }
   if (item->data_type.kind == DataTypeKind::kNamed)
     tables.var_named_types[item->name] = item->data_type.type_name;
+  RecordVarSelectShape(item, typedefs, tables.var_select_shapes);
 }
 
 // §25.9: bundle of virtual-interface name-table state updated while registering
@@ -574,11 +625,11 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
        declared_names_, ScopedName(item->name)},
       "variable", diag_);
 
-  RegisterVarDeclNames(
-      item,
-      {const_names_, const_var_names_, var_types_, scalar_var_names_,
-       real_var_names_, packed_array_vars_, var_named_types_},
-      typedefs_, diag_);
+  RegisterVarDeclNames(item,
+                       {const_names_, const_var_names_, var_types_,
+                        scalar_var_names_, real_var_names_, packed_array_vars_,
+                        var_named_types_, var_select_shapes_},
+                       typedefs_, diag_);
   // §10.10.1 / §11.2.2: keep the named-type association for a variable that
   // adopted a typedef array's dimensions above; rewriting it to a non-named
   // base type kept RegisterVarDeclNames from recording it, but aggregate

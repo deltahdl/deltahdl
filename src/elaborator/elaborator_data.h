@@ -166,6 +166,12 @@ class ElaboratorData {
   // clause gives the operand, and a parameter is not a variable. The same
   // §11.5.2 reason keeps a parameter declared with an unpacked dimension out.
   std::unordered_set<std::string_view> real_param_names_;
+  // §11.5.2: the dimensions each variable declares, which is what a chain of
+  // selects written on that variable is measured against. The three sets above
+  // answer for a select carrying one address; this map answers for a select
+  // carrying more, where §11.5.2 sends the address past the last dimension back
+  // to §11.5.1.
+  std::unordered_map<std::string_view, VarSelectShape> var_select_shapes_;
   std::unordered_set<std::string_view> task_names_;
   std::unordered_set<std::string_view> let_names_;  // §11.12 let decl names
   std::unordered_set<std::string_view> sequence_names_;

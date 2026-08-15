@@ -489,10 +489,12 @@ using TypeMap = std::unordered_map<std::string_view, DataTypeKind>;
 using NameSet = std::unordered_set<std::string_view>;
 
 static void CheckRealSelectNode(const Expr* e, const TypeMap& types,
-                                const RealOperands& reals, DiagEngine& diag) {
+                                const SelectOperands& operands,
+                                DiagEngine& diag) {
   auto name = ExprIdent(e->base);
-  const bool kIsRealVar = !name.empty() && reals.variables.count(name) != 0;
-  const bool kIsRealParam = !name.empty() && reals.parameters.count(name) != 0;
+  const bool kIsRealVar = !name.empty() && operands.variables.count(name) != 0;
+  const bool kIsRealParam =
+      !name.empty() && operands.parameters.count(name) != 0;
   if (kIsRealVar || kIsRealParam) {
     // §11.5.1: "A bit-select or part-select of a scalar, or of a real variable
     // or real parameter, shall be illegal." The sentence names two constructs
@@ -531,16 +533,78 @@ static void CheckRealSelectNode(const Expr* e, const TypeMap& types,
   }
 }
 
+// §11.5.2: the name a chain of selects is written on, and how many addresses
+// the chain carries. Parser::ParseSelectExpr in src/parser/expr_parser.cpp
+// builds one ExprKind::kSelect node per bracketed address, so `arr[i][0]` is
+// two nodes with the inner one standing as the outer one's `base`.
+struct SelectChain {
+  std::string_view name;
+  size_t addresses = 0;
+};
+
+static SelectChain ResolveSelectChain(const Expr* e) {
+  SelectChain chain;
+  const Expr* n = e;
+  while (n && n->kind == ExprKind::kSelect) {
+    ++chain.addresses;
+    n = n->base;
+  }
+  if (n && n->kind == ExprKind::kIdentifier) chain.name = n->text;
+  return chain;
+}
+
+// §11.5.1 reached through §11.5.2: report an address written one past the
+// dimensions of the declaration the chain stands on. §11.5.2 says "the desired
+// word shall first be selected by supplying an address for each dimension" and
+// that the select which follows is "addressed in the same manner as net and
+// variable bit-selects and part-selects (see 11.5.1)", so `real arr[4];
+// v = arr[i][0];` is the bit-select of a real that sentence bars, and
+// `logic [7:0] mem[4]; v = mem[i][0];` is the legal case the same sentence
+// exists to permit.
+static void CheckElementSelectNode(const Expr* e, const ShapeMap& shapes,
+                                   DiagEngine& diag) {
+  // Only a chain of two or more addresses is judged here. A select carrying one
+  // address is the case CheckRealSelectNode and CheckScalarSelectNode already
+  // report from the name sets, and judging it here as well would make one
+  // breach draw two reports.
+  if (!e->base || e->base->kind != ExprKind::kSelect) return;
+  SelectChain chain = ResolveSelectChain(e);
+  if (chain.name.empty()) return;
+  auto it = shapes.find(chain.name);
+  if (it == shapes.end()) return;
+  // Exactly the first address past the last dimension is reported. A longer
+  // chain addresses bits of that bit, which this one report already stands for.
+  if (chain.addresses != it->second.addressable_dims + 1) return;
+  const bool kIsBitSelect =
+      !e->index_end && !e->is_part_select_plus && !e->is_part_select_minus;
+  if (it->second.element_is_real) {
+    diag.Error(e->range.start,
+               std::format("{} of a real variable is illegal",
+                           kIsBitSelect ? "bit-select" : "part-select"),
+               Subclause("11.5.1"));
+    return;
+  }
+  if (it->second.element_is_scalar) {
+    diag.Error(e->range.start,
+               "bit-select or part-select of a scalar is illegal",
+               Subclause("11.5.1"));
+  }
+}
+
 void CheckRealSelect(const Expr* e, const TypeMap& types,
-                     const RealOperands& reals, DiagEngine& diag) {
+                     const SelectOperands& operands, DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kSelect && e->base) {
-    CheckRealSelectNode(e, types, reals, diag);
+    CheckRealSelectNode(e, types, operands, diag);
+    // The element-select case rides this walk rather than one of its own,
+    // because it is judged at the same nodes and both alternatives of
+    // §11.5.1's sentence are reported from here.
+    CheckElementSelectNode(e, operands.shapes, diag);
   }
-  CheckRealSelect(e->lhs, types, reals, diag);
-  CheckRealSelect(e->rhs, types, reals, diag);
-  CheckRealSelect(e->base, types, reals, diag);
-  CheckRealSelect(e->index, types, reals, diag);
+  CheckRealSelect(e->lhs, types, operands, diag);
+  CheckRealSelect(e->rhs, types, operands, diag);
+  CheckRealSelect(e->base, types, operands, diag);
+  CheckRealSelect(e->index, types, operands, diag);
 }
 
 static void CheckScalarSelectNode(const Expr* e, const NameSet& scalars,
@@ -621,23 +685,24 @@ void CheckScalarSelectStmt(const Stmt* s, const NameSet& scalars,
 // applies to one written on a continuous assignment, so the real-operand check
 // reaches every statement position CheckScalarSelectStmt reaches.
 void CheckRealSelectStmt(const Stmt* s, const TypeMap& types,
-                         const RealOperands& reals, DiagEngine& diag) {
+                         const SelectOperands& operands, DiagEngine& diag) {
   if (!s) return;
-  CheckRealSelect(s->lhs, types, reals, diag);
-  CheckRealSelect(s->rhs, types, reals, diag);
-  CheckRealSelect(s->expr, types, reals, diag);
-  CheckRealSelect(s->condition, types, reals, diag);
-  for (auto* child : s->stmts) CheckRealSelectStmt(child, types, reals, diag);
-  CheckRealSelectStmt(s->then_branch, types, reals, diag);
-  CheckRealSelectStmt(s->else_branch, types, reals, diag);
-  CheckRealSelectStmt(s->body, types, reals, diag);
-  for (auto* fi : s->for_inits) CheckRealSelectStmt(fi, types, reals, diag);
-  CheckRealSelectStmt(s->for_body, types, reals, diag);
-  for (auto* fs : s->for_steps) CheckRealSelectStmt(fs, types, reals, diag);
-  CheckRealSelect(s->for_cond, types, reals, diag);
+  CheckRealSelect(s->lhs, types, operands, diag);
+  CheckRealSelect(s->rhs, types, operands, diag);
+  CheckRealSelect(s->expr, types, operands, diag);
+  CheckRealSelect(s->condition, types, operands, diag);
+  for (auto* child : s->stmts)
+    CheckRealSelectStmt(child, types, operands, diag);
+  CheckRealSelectStmt(s->then_branch, types, operands, diag);
+  CheckRealSelectStmt(s->else_branch, types, operands, diag);
+  CheckRealSelectStmt(s->body, types, operands, diag);
+  for (auto* fi : s->for_inits) CheckRealSelectStmt(fi, types, operands, diag);
+  CheckRealSelectStmt(s->for_body, types, operands, diag);
+  for (auto* fs : s->for_steps) CheckRealSelectStmt(fs, types, operands, diag);
+  CheckRealSelect(s->for_cond, types, operands, diag);
   for (const auto& ci : s->case_items)
-    CheckRealSelectStmt(ci.body, types, reals, diag);
-  for (auto* fs : s->fork_stmts) CheckRealSelectStmt(fs, types, reals, diag);
+    CheckRealSelectStmt(ci.body, types, operands, diag);
+  for (auto* fs : s->fork_stmts) CheckRealSelectStmt(fs, types, operands, diag);
 }
 
 void CheckIndexedPartSelectWidthStmt(const Stmt* s, const ScopeMap& scope,
