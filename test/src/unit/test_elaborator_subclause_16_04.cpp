@@ -331,7 +331,9 @@ TEST(DeferredAssertionElaboration, AssignmentPassActionNames16_4) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "deferred assertion pass action shall be a single",
                             4, "16.4"));
-  EXPECT_EQ(diag->message.find("§"), std::string::npos);
+  for (const auto& reported : f.diag.Diagnostics()) {
+    EXPECT_EQ(reported.message.find("§"), std::string::npos);
+  }
 }
 
 }  // namespace

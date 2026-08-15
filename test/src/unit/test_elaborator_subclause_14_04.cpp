@@ -174,7 +174,9 @@ TEST(ClockingSkewConstExpr, VariableSkewNames14_4) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "clocking skew shall be a constant expression", 5,
                             "14.4"));
-  EXPECT_EQ(diag->message.find("§"), std::string::npos);
+  for (const auto& reported : f.diag.Diagnostics()) {
+    EXPECT_EQ(reported.message.find("§"), std::string::npos);
+  }
 }
 
 }  // namespace

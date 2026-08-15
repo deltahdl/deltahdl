@@ -109,9 +109,9 @@ TEST(IncrementSynthesis, PrefixDecrementLowersAsABlockingAssignment) {
 // The report carries no subclause. No rule of IEEE 1800-2023 is broken by
 // incrementing a bit-select; what the design meets is a limit of this
 // synthesizer, and `Subclause::None()` holds empty text, which is why the
-// assertion reads `EXPECT_EQ(d->subclause, "")`. The line is what tells the
-// reader which statement is missing, so it is asserted too: a report standing
-// at the block or at the module would name the whole design.
+// subclause named below is the empty string. The line is what tells the reader
+// which statement is missing, so it is named beside it: a report standing at
+// the block or at the module would name the whole design.
 TEST(IncrementSynthesis, IncrementOfABitSelectIsReportedRatherThanDropped) {
   SynthFixture f;
   const auto* mod = ElaborateSrc(f, AlwaysCombEndingIn("y[0]++"));
