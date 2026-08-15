@@ -211,20 +211,30 @@ void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
   line_override_src_line_ = loc.line;
   has_line_override_ = true;
   line_file_override_ = std::string(filename);
-  // §22.12 has the directive set the file name of the line that follows it, so
-  // the name is registered and its id kept for the origins of those lines. It
-  // is registered with no content because this run was never given that file.
+  TakeLineFileOverrideId();
+}
+
+// §22.12 has a `line directive set the file name of the line that follows it,
+// so the name it gave is registered and its id kept for the origins of those
+// lines. The file is registered with no content, because this run was handed
+// the file the directive appears in and never the one it names: a report can
+// say where the line came from, and SourceManager::GetLineText finds nothing
+// to quote back, which is correct.
+//
+// One id is kept per name rather than one per directive, because a
+// machine-generated source carries a `line on many of its lines and
+// registering each would leave SourceManager holding one entry per directive.
+void Preprocessor::TakeLineFileOverrideId() {
   line_file_override_id_ = 0;
-  if (!line_file_override_.empty()) {
-    auto it = line_file_override_ids_.find(line_file_override_);
-    if (it == line_file_override_ids_.end()) {
-      it = line_file_override_ids_
-               .emplace(line_file_override_,
-                        src_mgr_.AddFile(line_file_override_, ""))
-               .first;
-    }
-    line_file_override_id_ = it->second;
+  if (line_file_override_.empty()) return;
+  auto it = line_file_override_ids_.find(line_file_override_);
+  if (it == line_file_override_ids_.end()) {
+    it = line_file_override_ids_
+             .emplace(line_file_override_,
+                      src_mgr_.AddFile(line_file_override_, ""))
+             .first;
   }
+  line_file_override_id_ = it->second;
 }
 
 std::string Preprocessor::ResolveInclude(std::string_view filename,

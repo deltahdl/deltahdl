@@ -106,6 +106,13 @@ class Preprocessor {
   // alone and appended to no output stays out of the table.
   void NoteOutputLine(uint32_t file_id, uint32_t line);
 
+  // Registers the file name the `line directive just read gave, and keeps its
+  // id for the origins of the lines that follow. Defined in
+  // src/preprocessor/preprocessor_directives.cpp beside HandleLine, which is
+  // its only caller and which it is separate from so that HandleLine stays
+  // inside the statement count etc/clang_tidy/src.yml allows.
+  void TakeLineFileOverrideId();
+
   // Whether `line` carried the value a keyword on the line before it announced,
   // in which case it belongs to the protected block above rather than being a
   // directive or a line of the design (§34.5.13, §34.5.14, §34.5.19, §34.5.20,
@@ -528,15 +535,9 @@ class Preprocessor {
   uint32_t line_override_src_line_ = 0;
   bool has_line_override_ = false;
   std::string line_file_override_;
-  // The id `line_file_override_` is registered under, so an origin can name it.
-  // A `line directive names a file this run was never given, and a file id is
-  // what SourceManager answers a path from, so the name is registered with no
-  // content: the report can say where the line came from, and GetLineText finds
-  // nothing to quote, which is correct because that file was never read.
+  // The id `line_file_override_` is registered under, so an origin can name it,
+  // and the id kept for each name TakeLineFileOverrideId has registered.
   uint32_t line_file_override_id_ = 0;
-  // One id per name, because a machine-generated source carries a `line
-  // directive on many lines and registering each would leave one entry per
-  // directive rather than one per file named.
   std::unordered_map<std::string, uint32_t> line_file_override_ids_;
   // One entry per `begin_keywords region still open, innermost last. The
   // opening location rides along so an unterminated region can be blamed on
