@@ -2,6 +2,8 @@
 #include <format>
 #include <functional>
 #include <optional>
+#include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -13,6 +15,7 @@
 #include "elaborator/elaborator_validate_specify_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
+#include "lexer/token.h"
 #include "parser/ast.h"
 
 namespace delta {
@@ -181,6 +184,26 @@ bool IsAllowedConditionOp(TokenKind op) {
   }
 }
 
+// §30.4.4.1 states its rule as Table 30-1, which lists the operators a
+// conditional expression may use, so the report names the operator it refused.
+// TokenKindName in src/lexer/keywords.cpp answers with the source spelling the
+// table lists, already quoted.
+//
+// The form is named too, because `&`, `|`, `^`, `~^` and `^~` are each both a
+// unary and a binary operator in that table, and the spelling alone leaves the
+// reader to work out which reading the elaborator took. A postfix increment or
+// decrement gets its own word rather than sharing "unary", since §11.4.2 makes
+// it a construct of its own and the node already says which it is.
+static std::string ConditionOpMessage(const Expr* e) {
+  std::string_view form = e->kind == ExprKind::kPostfixUnary ? "postfix"
+                          : e->kind == ExprKind::kUnary      ? "unary"
+                                                             : "binary";
+  return std::format(
+      "{} operator {} is not permitted in a state-dependent path "
+      "conditional expression",
+      form, TokenKindName(e->op));
+}
+
 // §30.4.4.1: recursively validates a state-dependent path conditional
 // expression. Every operator must be one of the Table 30-1 forms, and every
 // identifier operand must be a permitted signal: an input or inout port (or a
@@ -206,19 +229,13 @@ void CheckConditionExpr(const Expr* e, SourceLoc loc, const PortMap& port_map,
     case ExprKind::kUnary:
     case ExprKind::kPostfixUnary:
       if (!IsAllowedConditionOp(e->op)) {
-        diag.Error(loc,
-                   "operator is not permitted in a state-dependent path "
-                   "conditional expression",
-                   Subclause("30.4.4.1"));
+        diag.Error(loc, ConditionOpMessage(e), Subclause("30.4.4.1"));
       }
       CheckConditionExpr(e->lhs, loc, port_map, diag);
       return;
     case ExprKind::kBinary:
       if (!IsAllowedConditionOp(e->op)) {
-        diag.Error(loc,
-                   "operator is not permitted in a state-dependent path "
-                   "conditional expression",
-                   Subclause("30.4.4.1"));
+        diag.Error(loc, ConditionOpMessage(e), Subclause("30.4.4.1"));
       }
       CheckConditionExpr(e->lhs, loc, port_map, diag);
       CheckConditionExpr(e->rhs, loc, port_map, diag);

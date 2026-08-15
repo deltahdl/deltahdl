@@ -285,7 +285,8 @@ TEST(OperatorElaboration, OutputPortBitSelectOperandIsRejected) {
 // §30.4.4.1, Table 30-1: an arithmetic operator is not among the valid
 // conditional-expression operators and must be rejected. Both operands (an
 // input port and a local net) are otherwise legal, so the sole error is the
-// '+' operator.
+// '+' operator. The report names it as binary, which separates this case from
+// OperatorElaboration.UnaryArithmeticOperatorIsRejected below.
 TEST(OperatorElaboration, ArithmeticOperatorIsRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -299,12 +300,13 @@ TEST(OperatorElaboration, ArithmeticOperatorIsRejected) {
   ASSERT_NE(design, nullptr);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "operator is not permitted in a state-dependent path conditional "
-      "expression",
+      "binary operator '+' is not permitted in a state-dependent path "
+      "conditional expression",
       4, "30.4.4.1"));
 }
 
-// §30.4.4.1, Table 30-1: relational operators are excluded.
+// §30.4.4.1, Table 30-1: relational operators are excluded. The source uses
+// greater-than, so the report names '>'.
 TEST(OperatorElaboration, RelationalOperatorIsRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -318,12 +320,13 @@ TEST(OperatorElaboration, RelationalOperatorIsRejected) {
   ASSERT_NE(design, nullptr);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "operator is not permitted in a state-dependent path conditional "
-      "expression",
+      "binary operator '>' is not permitted in a state-dependent path "
+      "conditional expression",
       4, "30.4.4.1"));
 }
 
-// §30.4.4.1, Table 30-1: shift operators are excluded.
+// §30.4.4.1, Table 30-1: shift operators are excluded. The source uses the
+// logical left shift, so the report names '<<'.
 TEST(OperatorElaboration, ShiftOperatorIsRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -336,8 +339,8 @@ TEST(OperatorElaboration, ShiftOperatorIsRejected) {
   ASSERT_NE(design, nullptr);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "operator is not permitted in a state-dependent path conditional "
-      "expression",
+      "binary operator '<<' is not permitted in a state-dependent path "
+      "conditional expression",
       3, "30.4.4.1"));
 }
 
@@ -356,8 +359,8 @@ TEST(OperatorElaboration, CaseEqualityOperatorIsRejected) {
   ASSERT_NE(design, nullptr);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "operator is not permitted in a state-dependent path conditional "
-      "expression",
+      "binary operator '===' is not permitted in a state-dependent path "
+      "conditional expression",
       4, "30.4.4.1"));
 }
 
@@ -375,15 +378,17 @@ TEST(OperatorElaboration, PowerOperatorIsRejected) {
   ASSERT_NE(design, nullptr);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "operator is not permitted in a state-dependent path conditional "
-      "expression",
+      "binary operator '**' is not permitted in a state-dependent path "
+      "conditional expression",
       3, "30.4.4.1"));
 }
 
 // §30.4.4.1, Table 30-1: the restriction applies to unary operators too. A
 // unary arithmetic operator (unary +) is not in the table and must be rejected
 // -- this exercises the unary branch of the check, distinct from the binary
-// rejections above.
+// rejections above. The report says "unary", which is what keeps this case
+// from passing on the '+' source of
+// OperatorElaboration.ArithmeticOperatorIsRejected.
 TEST(OperatorElaboration, UnaryArithmeticOperatorIsRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -396,14 +401,15 @@ TEST(OperatorElaboration, UnaryArithmeticOperatorIsRejected) {
   ASSERT_NE(design, nullptr);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "operator is not permitted in a state-dependent path conditional "
-      "expression",
+      "unary operator '+' is not permitted in a state-dependent path "
+      "conditional expression",
       3, "30.4.4.1"));
 }
 
 // §30.4.4.1: the operand and operator rules are enforced on the whole tree, not
 // just its root -- a disallowed operator nested beneath a permitted one is
-// still rejected.
+// still rejected. The root is logical OR, which Table 30-1 admits, so the one
+// report names the binary '-' beneath it.
 TEST(OperatorElaboration, NestedDisallowedOperatorIsRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -417,9 +423,26 @@ TEST(OperatorElaboration, NestedDisallowedOperatorIsRejected) {
   ASSERT_NE(design, nullptr);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "operator is not permitted in a state-dependent path conditional "
-      "expression",
+      "binary operator '-' is not permitted in a state-dependent path "
+      "conditional expression",
       4, "30.4.4.1"));
+}
+
+// §30.4.4.1, Table 30-1: bitwise AND (&) is a valid operator, so a condition
+// built from it elaborates with no error at all. This case goes red if the
+// operator check starts reporting every operator once the report names the one
+// it read.
+TEST(OperatorElaboration, PermittedOperatorStillAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input a, input b, output y);\n"
+      "  specify\n"
+      "    if (a & b) (a => y) = 3;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 // §30.4.4.1: the conditional expression governs a state-dependent path whether
