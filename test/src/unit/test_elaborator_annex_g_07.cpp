@@ -44,9 +44,11 @@ TEST(WeakReferenceStdPackageElaborator, BuiltInClassNeedsNoUserDefinition) {
 TEST(WeakReferenceStdPackageElaborator, TypeParameterRejectsNonClassType) {
   // A weak_reference declared inside a procedural block is a kVarDecl
   // statement, so ValidateLocalWeakRefDecls answers for it
-  // (src/elaborator/elaborator_scope_rules.cpp:133-146) and reports §8.30 at
-  // the declaration statement. The same rule reaches a class member and a
-  // subroutine argument through different walks that report §8.30.1.
+  // (src/elaborator/elaborator_scope_rules.cpp:133-146) and reports at the
+  // declaration statement. The same rule reaches a class member and a
+  // subroutine argument through different walks, and all four sites cite
+  // §8.30.1, which is the subclause carrying the sentence they enforce. This
+  // site cited §8.30 until #3058.
   ElabFixture f;
   ElabOk(
       "module m;\n"
@@ -58,7 +60,7 @@ TEST(WeakReferenceStdPackageElaborator, TypeParameterRejectsNonClassType) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "weak_reference type parameter shall be a class "
                             "type",
-                            3, "8.30"));
+                            3, "8.30.1"));
 }
 
 // Edge of the same `type class T` restriction: a named type that is not a class
@@ -77,7 +79,7 @@ TEST(WeakReferenceStdPackageElaborator, TypeParameterRejectsNamedNonClassType) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "weak_reference type parameter shall be a class "
                             "type",
-                            4, "8.30"));
+                            4, "8.30.1"));
 }
 
 // The prototype constructor new(T referent), get(), and clear() elaborate at
