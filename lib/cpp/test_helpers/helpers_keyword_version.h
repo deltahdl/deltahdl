@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cstdint>
 #include <string>
 
 #include "common/diagnostic.h"
@@ -54,6 +56,32 @@ inline std::string InSv2009(const std::string& body) {
 inline std::string InSv2012(const std::string& body) {
   return In("1800-2012", body);
 }
+
+// The line that line `body_line` of a body `In` wraps is reported at. A test
+// naming the line a report stands at gets the number from here rather than
+// writing it, so a change to what `In` writes above the body moves every such
+// test at once instead of moving them one by one. The answer does not depend
+// on the version_specifier, because a specifier is one word inside the
+// directive line and adds no line of its own.
+//
+// Two lines separate a report from the body line it was provoked by, not one,
+// because a report's line is counted in the preprocessor's output and not in
+// the source `In` built: the fixtures re-lex that output as a file of its own.
+// One is the `begin_keywords line. The other is blank, because
+// Preprocessor::HandleBeginKeywords writes the keyword marker and a newline of
+// its own at src/preprocessor/preprocessor_directives.cpp:260 while
+// RunPreprocLoop ends the directive's line as it ends every other line at
+// src/preprocessor/preprocessor.cpp:611. #3095 is that extra line, and takes
+// the doubling here out with it.
+inline uint32_t LineInRegion(uint32_t body_line) {
+  static constexpr char kBodyMark[] = "\x02";
+  const std::string wrapped = In("", kBodyMark);
+  const std::string above = wrapped.substr(0, wrapped.find(kBodyMark));
+  const auto directive_lines =
+      static_cast<uint32_t>(std::count(above.begin(), above.end(), '\n'));
+  return 2 * directive_lines + body_line;
+}
+
 // A one-variable module declaring `word` as its variable name. A word the
 // version in force reserves cannot be a declaration name, so this source
 // elaborates exactly when the word is still an identifier there.

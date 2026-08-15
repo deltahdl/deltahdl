@@ -6,11 +6,13 @@
 #include <initializer_list>
 #include <iterator>
 #include <string>
+#include <string_view>
 
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_keyword_sweep_skips.h"
 #include "helpers_keyword_version.h"
+#include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
 #include "model_keyword_table_sweeps.h"
 #include "model_keyword_tables.h"
@@ -51,7 +53,12 @@ inline void ExpectKeywordTableIsReserved(const char* spec,
     // this leg's subject, so the source is not required to parse.
     ElaborateWithPreprocessorAllowingParseErrors(In(spec, VarDecl(word)),
                                                  reserved, "m");
-    EXPECT_TRUE(reserved.has_errors)
+    // TokenKindName answers "token" for most keywords (#3089), so the message
+    // is the same sentence for every entry of every table and the word under
+    // test is told apart by the failure message rather than by the report.
+    EXPECT_TRUE(ReportedError(reserved.diag.Diagnostics(),
+                              "expected identifier, got ", LineInRegion(2),
+                              "6.8"))
         << word << " is listed in " << t.what << " and is reserved here";
 
     for (const char* earlier : t.earlier) {
@@ -123,7 +130,8 @@ inline void ExpectWordsNameObjectsButAreNotTypes(
         In(spec,
            std::string("module m;\n  ") + word + " [7:0] v;\nendmodule\n"),
         as_type, "m");
-    EXPECT_TRUE(as_type.has_errors)
+    EXPECT_TRUE(ReportedError(as_type.diag.Diagnostics(),
+                              "expected ';', got '['", LineInRegion(2), "6.8"))
         << word << " is not a data type under this version";
 
     if (later_spec == nullptr) continue;
@@ -131,7 +139,10 @@ inline void ExpectWordsNameObjectsButAreNotTypes(
     // Reserved under the later specifier, so this is the parser report above.
     ElaborateWithPreprocessorAllowingParseErrors(In(later_spec, VarDecl(word)),
                                                  later, "m");
-    EXPECT_TRUE(later.has_errors) << word << " is reserved by " << later_spec;
+    EXPECT_TRUE(ReportedError(later.diag.Diagnostics(),
+                              "expected identifier, got ", LineInRegion(2),
+                              "6.8"))
+        << word << " is reserved by " << later_spec;
   }
 }
 
@@ -150,7 +161,18 @@ inline void ExpectDeclsFailInRegionButElaborateOutside(
     // dimension, and "expected '(', got ';'" at src/parser/parser_inst.cpp:78
     // for one read as a module instantiation instead.
     ElaborateWithPreprocessorAllowingParseErrors(In(spec, src), in_region, "t");
-    EXPECT_TRUE(in_region.has_errors) << decl;
+    // Which of the two the declaration draws is decided by the packed
+    // dimension it carries: with one, the dimension is where the declaration
+    // was meant to end, and without one the two names read as a module name
+    // and an instance name.
+    const bool has_packed_dim =
+        std::string_view(decl).find('[') != std::string_view::npos;
+    const char* message =
+        has_packed_dim ? "expected ';', got '['" : "expected '(', got ';'";
+    const char* subclause = has_packed_dim ? "6.8" : "23.3.2";
+    EXPECT_TRUE(ReportedError(in_region.diag.Diagnostics(), message,
+                              LineInRegion(2), subclause))
+        << decl;
 
     ElabFixture outside;
     auto* design = ElaborateWithPreprocessor(src, outside, "t");

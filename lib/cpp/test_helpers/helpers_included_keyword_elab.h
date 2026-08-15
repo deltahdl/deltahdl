@@ -7,6 +7,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_keyword_version.h"
+#include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
 
 using namespace delta;
@@ -275,7 +276,9 @@ inline void ExpectTable224DeclarationsElaborate(const char* spec) {
   // declaration" at src/parser/parser.cpp:499. That report is this leg's
   // subject, so the source is not required to parse.
   ElaborateWithPreprocessorAllowingParseErrors(In2005(kSrc), included, "m");
-  EXPECT_TRUE(included.has_errors);
+  EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
+                            "expected top-level declaration", LineInRegion(1),
+                            "3.12.1"));
 }
 
 // The two let declarations a source states the `let` and `untyped` words
