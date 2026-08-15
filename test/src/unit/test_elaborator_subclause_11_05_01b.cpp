@@ -136,3 +136,83 @@ TEST(SelectElaboration, BitSelectOfATwoDimensionalArrayElementIsStillLegal) {
       f);
   EXPECT_FALSE(f.has_errors);
 }
+
+// §11.5.1: "A bit-select or part-select of a scalar, or of a real variable or
+// real parameter, shall be illegal." The sentence names the parameter and not
+// the position the parameter is written in, so a real parameter declared in a
+// parameter port list draws the same report as one declared in the module
+// body. This fails while a parameter port reaches BuildParamDeclShell in
+// src/elaborator/elaborator_module.cpp, which writes the name into none of the
+// elaborator's name sets. CheckRealSelectNode in
+// src/elaborator/elaborator_validate.cpp then finds no entry for `P` in
+// real_param_names_, and the run reports no error at all.
+TEST(RealSelect, BitSelectOfARealParameterPortNamesTheRealRule) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top #(parameter real P = 1.5);\n"
+      "  wire y;\n"
+      "  assign y = P[0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real parameter is illegal", 3,
+                            "11.5.1"));
+}
+
+// The same parameter port written with a part-select. §11.5.1 names a
+// bit-select and a part-select as two constructs, and `P[3:0]` is the second of
+// them. This pins that the parameter port position reaches the same message
+// chosen on two axes -- the construct written and the operand selected -- as
+// the module body position does, rather than a message of its own. This fails
+// when a fix registers the parameter port on a path that emits its own text, as
+// well as when the port draws no report at all.
+TEST(RealSelect, PartSelectOfARealParameterPortNamesPartSelect) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top #(parameter real P = 1.5);\n"
+      "  wire [3:0] y;\n"
+      "  assign y = P[3:0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "part-select of a real parameter is illegal", 3,
+                            "11.5.1"));
+}
+
+// A localparam written in the parameter port list draws the same report.
+// BuildParamDeclShell in src/elaborator/elaborator_module.cpp distinguishes a
+// localparam port from a parameter port through `decl->localparam_port_names`,
+// which it reads to set `pd.is_localparam`. §6.20.2 makes a localparam a value
+// parameter, so §11.5.1 -- "A bit-select or part-select of a scalar, or of a
+// real variable or real parameter, shall be illegal" -- reaches it the same
+// way. This fails when a fix registers the name only where
+// `decl->localparam_port_names` does not hold it.
+TEST(RealSelect, BitSelectOfARealLocalparamPortNamesTheRealRule) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top #(localparam real P = 1.5);\n"
+      "  wire y;\n"
+      "  assign y = P[0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real parameter is illegal", 3,
+                            "11.5.1"));
+}
+
+// The control that keeps a legal use of a real parameter port legal. §11.5.1
+// bars one construct -- "A bit-select or part-select of a scalar, or of a real
+// variable or real parameter, shall be illegal" -- and `assign v = P;` writes
+// neither a bit-select nor a part-select, so the source is legal. This stops a
+// fix that reports every use of a real parameter port rather than every select
+// of one.
+TEST(RealSelect, RealParameterPortWithNoSelectIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top #(parameter real P = 1.5);\n"
+      "  real v;\n"
+      "  assign v = P;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}

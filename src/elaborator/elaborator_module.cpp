@@ -727,6 +727,24 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
                           decl->type_param_names.count(pname) == 0;
     RtlirParamDecl pd =
         BuildParamDeclShell(decl, i, typedefs_, scope, has_param_type);
+    // §11.5.1 states "A bit-select or part-select of a scalar, or of a real
+    // variable or real parameter, shall be illegal", and it names the parameter
+    // rather than the position the parameter was written in. So a real
+    // parameter port is registered here the way PopulateValueParamInfo in
+    // src/elaborator/elaborator_items.cpp registers one written in the module
+    // body, and CheckRealSelectNode finds either. The registration stands
+    // beside BuildParamDeclShell rather than inside it, because that function
+    // builds an RtlirParamDecl and holds no name table.
+    //
+    // The unpacked-dimension test mirrors the body position, where §11.5.2
+    // makes an address written after such a name an element select.
+    // ParseValueParamPortDecl in src/parser/parser_port.cpp parses no unpacked
+    // dimension for a parameter port, unlike Parser::ParseParamDecl in
+    // src/parser/parser_types.cpp, so the test holds rather than selects.
+    if (has_param_type && IsRealType(decl->param_types[i].kind) &&
+        decl->param_types[i].unpacked_dims.empty()) {
+      real_param_names_.insert(pname);
+    }
     ApplyParamOverride(pd, params, pname);
     if (!pd.is_resolved && pval) {
       const DataType* param_type =
