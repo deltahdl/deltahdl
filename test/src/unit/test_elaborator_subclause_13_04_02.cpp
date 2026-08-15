@@ -1,7 +1,6 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
-#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -32,25 +31,6 @@ TEST(FunctionLifetimeElaboration, RecursiveAutomaticFunctionElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-}
-
-TEST(FunctionLifetimeElaboration, StaticVarNonConstantInitializerError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  function automatic int bad_init(int x);\n"
-      "    static int s = x;\n"
-      "    return s;\n"
-      "  endfunction\n"
-      "endmodule\n",
-      f);
-  // The report names no subclause: elaborator_validate_funcbody.cpp:172 passes
-  // Subclause::None(), since §6.8 permits a run-time initial value and neither
-  // §6.21 nor §13.4.2 narrows that for a static variable inside a subroutine.
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "static variable 's' initializer must be a "
-                            "constant expression",
-                            3, ""));
 }
 
 // §13.4.2: "Automatic function items cannot be accessed by hierarchical

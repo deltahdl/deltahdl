@@ -307,4 +307,69 @@ TEST(VarDecl, VarRangeOnlyEquivalentToVarLogic) {
   EXPECT_EQ(mod->variables[0].is_signed, mod->variables[1].is_signed);
 }
 
+// §6.8 on the initial value a static variable may take: "Initial values are
+// not constrained to simple constants; they can include run-time expressions,
+// including dynamic memory allocation. For example, a static class handle or a
+// mailbox can be created and initialized by calling its new method (see
+// 15.4.1), or static variables can be initialized to random values by calling
+// the $urandom system task."
+//
+// The three tests below hold that for a static variable declared inside a
+// subroutine, which is where the elaborator used to require a constant
+// expression. Nothing narrows §6.8 there: §6.21 constrains only when the
+// initialization runs, once at the beginning of simulation, and §13.4.2
+// covers storage and reentrancy.
+
+// $urandom is the example §6.8 names, so this is the standard's own case.
+TEST(StaticVariableInitializers, SubroutineStaticTakesASystemCallInitializer) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  function automatic int f();\n"
+      "    static int x = $urandom;\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A parameter reference is a constant expression by §11.2.1, so this source
+// was legal even under the rule the elaborator used to state. It was rejected
+// anyway, because the constancy test was called without a scope and so
+// answered false for every identifier. Keeping the case distinguishes a
+// literal from a constant expression, which a literal initializer cannot.
+TEST(StaticVariableInitializers, SubroutineStaticTakesAParameterInitializer) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  parameter int P = 4;\n"
+      "  function automatic int f();\n"
+      "    static int x = P;\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// An argument of an automatic function has no value until the call, so this
+// is a run-time expression in the plainest sense, and §6.8 admits it.
+TEST(StaticVariableInitializers,
+     SubroutineStaticTakesARunTimeExpressionInitializer) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  function automatic int f(int a);\n"
+      "    static int x = a;\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

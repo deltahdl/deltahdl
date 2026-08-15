@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "common/diagnostic.h"
-#include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -158,19 +157,14 @@ static void CheckFuncBodyVarDecl(const Stmt* s, std::string_view func_name,
                            func_name),
                Subclause("13.4.1"));
   }
-  // No subclause states this. §6.8 says the opposite in as many words:
+  // A static variable's initializer is deliberately not checked for
+  // constancy. §6.8 permits a run-time initial value in as many words:
   // "Initial values are not constrained to simple constants; they can include
-  // run-time expressions, including dynamic memory allocation", and neither
-  // §6.21 nor §13.4.2 narrows that for a static variable declared inside a
-  // subroutine. The report is therefore Subclause::None() until somebody
-  // decides whether it should exist at all.
-  if (s->var_is_static && s->var_init && !IsConstantExpr(s->var_init)) {
-    diag.Error(s->range.start,
-               std::format("static variable '{}' initializer must be a "
-                           "constant expression",
-                           s->var_name),
-               Subclause::None());
-  }
+  // run-time expressions, including dynamic memory allocation", and names
+  // calling $urandom as one of its own examples. §6.21 constrains only when
+  // that initialization runs, once at the beginning of simulation, and
+  // §13.4.2 covers storage and reentrancy, so neither narrows §6.8 for a
+  // static variable declared inside a subroutine.
 }
 
 static void CheckFuncBodyStmtSelf(
