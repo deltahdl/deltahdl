@@ -141,7 +141,7 @@ void ValidateLocalWeakRefDecls(
     if (!WeakRefTypeParamNamesClass(tp, typedefs, class_names)) {
       diag.Error(s->range.start,
                  "weak_reference type parameter shall be a class type",
-                 Subclause("8.30"));
+                 Subclause("8.30.1"));
     }
   }
   for (const auto* sub : s->stmts)

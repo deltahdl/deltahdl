@@ -48,7 +48,7 @@ static void ValidateWeakReferenceTypeParam(
   const auto& tp = item->data_type.type_params[0];
   if (!WeakRefTypeParamNamesClass(tp, typedefs, class_names)) {
     diag.Error(item->loc, "weak_reference type parameter shall be a class type",
-               Subclause("8.30"));
+               Subclause("8.30.1"));
   }
 }
 

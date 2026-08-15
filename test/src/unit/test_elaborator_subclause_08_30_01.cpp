@@ -30,12 +30,13 @@ TEST(ClassConstraintElaboration, WeakReferenceAsMemberOk) {
 }
 
 // The declaration position decides which of the four sites enforcing this rule
-// fires, and they do not all pass the same subclause. A procedural-block local
-// is reached by ValidateLocalWeakRefDecls in
-// src/elaborator/elaborator_scope_rules.cpp, which passes Subclause("8.30"),
-// where the class-member and subroutine-argument sites pass
-// Subclause("8.30.1"). The subclause asserted is the one the emission site
-// passes.
+// fires, and all four cite §8.30.1. That is the subclause carrying the sentence
+// they enforce -- "The parameter type T shall be a class type; all other types
+// shall result in a compiler error" -- while §8.30 "Weak references" is the
+// heading above it and states no rule. Two of the four cited §8.30 until #3058,
+// so the same breach named a different clause depending on where the
+// declaration stood. Asserting one subclause across all five cases is what a
+// single site drifting again would break.
 TEST(ClassConstraintElaboration, WeakReferenceNonClassTypeError) {
   ElabFixture f;
   ElabOk(
@@ -48,7 +49,7 @@ TEST(ClassConstraintElaboration, WeakReferenceNonClassTypeError) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "weak_reference type parameter shall be a class "
                             "type",
-                            3, "8.30"));
+                            3, "8.30.1"));
 }
 
 TEST(ClassConstraintElaboration, WeakReferenceAsFunctionArgOk) {
@@ -123,7 +124,7 @@ TEST(ClassConstraintElaboration, WeakReferenceModuleItemNonClassError) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "weak_reference type parameter shall be a class "
                             "type",
-                            2, "8.30"));
+                            2, "8.30.1"));
 }
 
 // The Overview's own example forward-declares the referent class with
@@ -178,7 +179,7 @@ TEST(ClassConstraintElaboration, WeakReferenceTypedefNonClassError) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "weak_reference type parameter shall be a class "
                             "type",
-                            4, "8.30"));
+                            4, "8.30.1"));
 }
 
 }  // namespace
