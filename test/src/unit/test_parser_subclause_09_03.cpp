@@ -212,7 +212,96 @@ TEST(BlockStatementParsing, ParallelMissingJoinIsError) {
       "    a = 1'b0;\n"
       "    b = 1'b1;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  // §9.3.2 owns the fork-join delimiter rule, so Parser::ParseForkStmt files
+  // the missing join keyword under it; §9.3 has no report of its own. The
+  // fork's statement loop stops at `endmodule`, which closes an enclosing
+  // construct, so the report stands on line 6.
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "expected join, join_any or join_none to close the parallel block", 6,
+      "9.3.2"));
+}
+
+// §9.3 head negative: a parallel block is closed by a join keyword and not by
+// the end of the file. A fork truncated at end of input is diagnosed under
+// §9.3.2, the subclause whose join_keyword production the source never
+// reached, rather than under whatever rule the enclosing module breaks next.
+TEST(BlockStatementParsing,
+     ParallelUnterminatedAtEndOfInputNamesTheJoinKeyword) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial fork\n"
+      "    a = 1;\n");
+  // The report stands at the EOF token, which Lexer::Advance places on line 4:
+  // SkipWhitespaceAndComments crosses the newline that ends line 3 and
+  // increments the line before MakeLoc reads it. The same source also draws the
+  // module's own missing-`endmodule` report, and this case claims nothing about
+  // that one.
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "expected join, join_any or join_none to close the parallel block", 4,
+      "9.3.2"));
+}
+
+// §9.3 head negative: a fork standing in a task body is closed by a join
+// keyword and not by `endtask`. §9.3.2 makes a par_block a statement_or_null,
+// so a fork reaches Parser::ParseTaskDecl's body loop, and `endtask` is a
+// distinct exit from the fork's statement loop and a distinct token from `end`.
+TEST(BlockStatementParsing, ParallelInATaskClosedByEndtaskNamesTheJoinKeyword) {
+  auto r = Parse(
+      "module m;\n"
+      "  task t;\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "  endtask\n"
+      "endmodule\n");
+  // The fork's statement loop stops at `endtask` without consuming it, so the
+  // report stands on line 5 and the task's own body loop still finds the
+  // `endtask` it expects under §13.3.
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "expected join, join_any or join_none to close the parallel block", 5,
+      "9.3.2"));
+}
+
+// §9.3 head negative: an unterminated parallel block leaves the token that
+// closes the enclosing construct where it stands. The `end` on line 5 belongs
+// to the sequential block of §9.3.1, so Parser::ParseForkStmt reports and does
+// not consume it, Parser::ParseBlockStmt consumes it as its own, and the module
+// closes on `endmodule`.
+TEST(BlockStatementParsing,
+     ParallelMissingJoinLeavesTheEnclosingEndToItsOwnProduction) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  // One report, and the count is the claim: a fork that swallowed the `end` and
+  // the `endmodule` looking for a statement would draw the §11.2 "expected
+  // expression" report on each of them and the §12.3 "expected ';'" beside, so
+  // this fails on a §9.3.2 report bolted onto the old recovery.
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
+// §9.3 head negative: a token that is not one of join, join_any and join_none
+// never becomes the block's terminator in the AST. Stmt::join_kind keeps the
+// TokenKind::kKwJoin default declared at src/parser/ast_stmt.h:176, so
+// src/simulator/stmt_exec.cpp:346 and
+// src/elaborator/elaborator_validate_funcbody.cpp:119 read a join_keyword
+// §9.3.2 admits rather than the `end` that stopped the parse.
+TEST(BlockStatementParsing, ParallelMalformedTerminatorDoesNotBecomeAJoinKind) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial fork\n"
+      "    a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->kind, StmtKind::kFork);
+  EXPECT_EQ(body->join_kind, TokenKind::kKwJoin);
 }
 
 TEST(BlockStatementParsing, ParallelDelimitedByForkJoinNone) {

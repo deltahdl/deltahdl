@@ -623,6 +623,24 @@ Stmt* Parser::ParseForStmt() {
   return stmt;
 }
 
+// Answers whether tk closes a construct a par_block can stand inside. The
+// first seven are the keywords Parser::Synchronize enumerates at
+// src/parser/parser.cpp:157; endtask and endfunction join them because §9.3.2
+// makes a par_block a statement_or_null, so a fork can stand in a task or a
+// function body.
+static bool ClosesEnclosingConstruct(TokenKind tk) {
+  static constexpr TokenKind kClosers[] = {
+      TokenKind::kKwEnd,        TokenKind::kKwEndmodule,
+      TokenKind::kKwEndpackage, TokenKind::kKwEndinterface,
+      TokenKind::kKwEndprogram, TokenKind::kKwEndchecker,
+      TokenKind::kKwEndclass,   TokenKind::kKwEndtask,
+      TokenKind::kKwEndfunction};
+  for (TokenKind closer : kClosers) {
+    if (tk == closer) return true;
+  }
+  return false;
+}
+
 Stmt* Parser::ParseForkStmt(std::string_view prefix_label) {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kFork;
@@ -632,8 +650,14 @@ Stmt* Parser::ParseForkStmt(std::string_view prefix_label) {
   if (Match(TokenKind::kColon)) {
     stmt->label = ExpectIdentifier(Subclause("9.3.4")).text;
   }
+  // Stop at a token that closes an enclosing construct as well as at the three
+  // join keywords. Without that stop, Parser::ParsePrimaryExpr consumes the
+  // token as a failed expression under §11.2, so the §9.3.2 report below could
+  // only ever fire at end of input and the §11.2 cascade over the enclosing
+  // block would stay.
   while (!Check(TokenKind::kKwJoin) && !Check(TokenKind::kKwJoinAny) &&
-         !Check(TokenKind::kKwJoinNone) && !AtEnd()) {
+         !Check(TokenKind::kKwJoinNone) && !AtEnd() &&
+         !ClosesEnclosingConstruct(CurrentToken().kind)) {
     if (IsBlockVarDeclStart()) {
       ParseBlockVarDecls(stmt->fork_stmts);
     } else {
@@ -641,8 +665,21 @@ Stmt* Parser::ParseForkStmt(std::string_view prefix_label) {
       if (s != nullptr) stmt->fork_stmts.push_back(s);
     }
   }
-  stmt->join_kind = CurrentToken().kind;
-  Consume();
+  if (Check(TokenKind::kKwJoin) || Check(TokenKind::kKwJoinAny) ||
+      Check(TokenKind::kKwJoinNone)) {
+    stmt->join_kind = CurrentToken().kind;
+    Consume();
+  } else {
+    // Leave the token for the enclosing production, which is what lets an
+    // enclosing begin find its end and a module find its endmodule. Leave
+    // stmt->join_kind at the TokenKind::kKwJoin default declared at
+    // src/parser/ast_stmt.h:176 rather than recording a token §9.3.2 does not
+    // admit as a join_keyword.
+    diag_.Error(
+        CurrentLoc(),
+        "expected join, join_any or join_none to close the parallel block",
+        Subclause("9.3.2"));
+  }
 
   ParserStmtHelpers::MatchEndBlockLabel(*this, stmt->label, prefix_label);
   return stmt;

@@ -394,14 +394,21 @@ TEST(BlockStatementSyntaxParsing, SeqBlockMissingEndRejected) {
 // par_block requires a join_keyword to close; terminating a fork with end
 // is a parse error.
 TEST(BlockStatementSyntaxParsing, ParBlockMissingJoinRejected) {
-  EXPECT_FALSE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    fork\n"
-              "      a = 1;\n"
-              "    end\n"
-              "  end\n"
-              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  // §9.3.2 owns par_block, and Parser::ParseForkStmt demands one of the three
+  // join keywords at the `end` on line 5, which is where its statement loop
+  // stops. The message names all three because join_keyword is a choice of
+  // three, where TokenKindName would render one wanted keyword as `token`.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "expected join, join_any or join_none to close the parallel", 5,
+      "9.3.2"));
 }
 
 }  // namespace

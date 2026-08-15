@@ -266,9 +266,13 @@ TEST(BlockStatementSyntaxParsing, UnterminatedParBlockErrors) {
       "      a = 1;\n"
       "  end\n"
       "endmodule\n");
-  // The par_block body runs until a join keyword, so `end` is taken as a
-  // statement and reaches ParsePrimaryExpr, whose report is filed under §11.2.
-  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 5, "11.2"));
+  // §9.3.2 owns the join_keyword production, and Parser::ParseForkStmt demands
+  // it at the `end` on line 5, where its statement loop stops. That `end`
+  // closes the seq_block of §9.3.1 on line 2, so the fork reports it and leaves
+  // it rather than taking it for a statement.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "expected join, join_any or join_none to close the parallel", 5,
+      "9.3.2"));
 }
 
 TEST(BlockStatementSyntaxParsing, BeginWithJoinTerminatorErrors) {
@@ -292,9 +296,14 @@ TEST(BlockStatementSyntaxParsing, ForkWithEndTerminatorErrors) {
       "    end\n"
       "  end\n"
       "endmodule\n");
-  // A par_block ends only at a join keyword, so `end` is taken as a statement
-  // and reaches ParsePrimaryExpr, whose report is filed under §11.2.
-  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 5, "11.2"));
+  // The `end` on line 5 goes to the seq_block that opened on line 2, which is
+  // what leaves the `end` on line 6 with no block left to close. §23.2.4 owns
+  // the module body, so Parser::ParseTypedItemOrInst reports that second `end`
+  // there. This case claims that recovery; the §9.3.2 report this source also
+  // draws is named by BlockStatementSyntaxParsing.ParBlockMissingJoinRejected
+  // in test/src/unit/test_parser_annex_a_06_03.cpp.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "unexpected token in module body", 6, "23.2.4"));
 }
 
 }  // namespace
