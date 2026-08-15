@@ -20,6 +20,7 @@
 #include "common/source_mgr.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "helpers_reported_error.h"
 #include "lexer/lexer.h"
 #include "parser/ast.h"
 #include "parser/parser.h"
@@ -484,7 +485,10 @@ TEST(LibraryCellNotation, DesignStatementNamingOnlyAConfigRejected) {
       "  design lib1.tcell;\n"
       "endconfig\n",
       {.modules = {"lib1"}});
-  EXPECT_TRUE(e.diag.HasErrors());
+  EXPECT_TRUE(
+      ReportedError(e.diag.Diagnostics(),
+                    "config 'cfg' design statement names configuration 'only'",
+                    3, "33.4.1.1"));
 }
 
 }  // namespace

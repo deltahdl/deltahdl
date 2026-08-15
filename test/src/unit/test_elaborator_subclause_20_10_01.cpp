@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -64,7 +65,9 @@ TEST(ElabSeverityTask, NonConstantArgumentRejected) {
       "  $error(\"x=%0d\", x);\n"
       "endmodule\n",
       ef);
-  EXPECT_TRUE(ef.has_errors);
+  EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(),
+                            "argument to $error must be a constant expression",
+                            3, "20.10.1"));
 }
 
 // §20.10.1 — a parameter reference qualifies as a constant expression and is
@@ -363,7 +366,9 @@ TEST(ElabSeverityTask, NonConstantArgInFatalRejected) {
       "  $fatal(1, \"x=%0d\", x);\n"
       "endmodule\n",
       ef);
-  EXPECT_TRUE(ef.has_errors);
+  EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(),
+                            "argument to $fatal must be a constant expression",
+                            3, "20.10.1"));
 }
 
 // §20.10.1 — a severity task called from inside a procedure becomes a
@@ -503,7 +508,9 @@ TEST(ElabSeverityTask, NonConstantStillRejectedAfterGenerateFor) {
       "  $error(\"y=%0d\", y);\n"
       "endmodule\n",
       ef);
-  EXPECT_TRUE(ef.has_errors);
+  EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(),
+                            "argument to $error must be a constant expression",
+                            6, "20.10.1"));
 }
 
 }  // namespace

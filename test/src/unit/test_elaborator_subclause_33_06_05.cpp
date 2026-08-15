@@ -62,6 +62,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_library_design.h"
 #include "fixture_scratch_dir.h"
+#include "helpers_reported_error.h"
 #include "parser/ast.h"
 
 using namespace delta;
@@ -370,7 +371,13 @@ TEST(ConfigHierarchicalConfigExample, DelegatedPathAgainstOuterTopIsReported) {
   auto config = Both(kOuterRelativeInnerConfig, kDelegatingToOuterRelative);
   auto* elaborated = ElaborateNamedConfig(tmp, design, config, "cfg12");
   EXPECT_NE(elaborated, nullptr);
-  EXPECT_TRUE(design.diag.HasErrors());
+  // Both configurations go into one file, cfg11 first, so its instance clause
+  // is on the fourth line and that is where its report stands.
+  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(),
+                            "instance path 'top.a2.f1' in config 'cfg11' does "
+                            "not start at a top-level cell of the config's "
+                            "design statement",
+                            4, "33.4.1.3"));
 }
 
 // And it selects nothing: the cell that path would have named had paths been
@@ -402,7 +409,11 @@ TEST(ConfigHierarchicalConfigExample, DelegationToAnUnknownConfigIsReported) {
   auto config = kDelegatingToUnknownConfig;
   auto* elaborated = ElaborateNamedConfig(tmp, design, config, "cfg10");
   EXPECT_NE(elaborated, nullptr);
-  EXPECT_TRUE(design.diag.HasErrors());
+  // kDelegatingToUnknownConfig writes its instance clause on its fourth line.
+  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(),
+                            "config 'cfg10' delegates instance 'top.a2' to "
+                            "unknown config 'nosuch'",
+                            4, "33.4.2"));
 }
 
 // One cell described in a file of its own, for the pairs below that vary the

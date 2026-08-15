@@ -6,6 +6,7 @@
 #include "helpers_included_keyword_elab.h"
 #include "helpers_keyword_sweep_skips.h"
 #include "helpers_keyword_version.h"
+#include "helpers_reported_error.h"
 #include "helpers_reserved_keyword_elab.h"
 #include "helpers_rtlir_lookup.h"
 #include "model_keyword_tables.h"
@@ -104,7 +105,10 @@ TEST(SystemVerilog2012KeywordElaboration, AddedInterconnectNetsReachTheDesign) {
   ElaborateWithPreprocessor(
       In("1800-2012", "module m (interconnect signed [3:0] p);\nendmodule\n"),
       signed_ic, "m");
-  EXPECT_TRUE(signed_ic.has_errors);
+  EXPECT_TRUE(ReportedError(signed_ic.diag.Diagnostics(),
+                            "interconnect port 'p' shall not be declared "
+                            "signed",
+                            LineInRegion(1), "23.2.2.3"));
   ElabFixture signed_wire;
   ElaborateWithPreprocessor(
       In("1800-2012", "module m (input wire signed [3:0] p);\nendmodule\n"),
@@ -117,7 +121,10 @@ TEST(SystemVerilog2012KeywordElaboration, AddedInterconnectNetsReachTheDesign) {
   ElaborateWithPreprocessor(
       In("1800-2012", "module m;\n  interconnect [3:0] q = 4'd1;\nendmodule\n"),
       ic_assign, "m");
-  EXPECT_TRUE(ic_assign.has_errors);
+  EXPECT_TRUE(ReportedError(
+      ic_assign.diag.Diagnostics(),
+      "interconnect net shall not have a net declaration assignment",
+      LineInRegion(2), "10.3.1"));
   ElabFixture wire_assign;
   ElaborateWithPreprocessor(
       In("1800-2012", "module m;\n  wire [3:0] q = 4'd1;\nendmodule\n"),
@@ -130,7 +137,9 @@ TEST(SystemVerilog2012KeywordElaboration, AddedInterconnectNetsReachTheDesign) {
   // src/parser/parser_port.cpp:854.
   ElaborateWithPreprocessorAllowingParseErrors(In("1800-2009", kSrc), included,
                                                "m");
-  EXPECT_TRUE(included.has_errors);
+  EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
+                            "expected ')', got identifier", LineInRegion(1),
+                            "23.2.2.1"));
 }
 
 // The added word that binds a name to a net's data type. What the elaborator
@@ -180,7 +189,10 @@ TEST(SystemVerilog2012KeywordElaboration,
   ElaborateWithPreprocessor(
       In("1800-2012", "module m;\n  nettype string text_net;\nendmodule\n"),
       bad_type, "m");
-  EXPECT_TRUE(bad_type.has_errors);
+  EXPECT_TRUE(ReportedError(bad_type.diag.Diagnostics(),
+                            "data type of user-defined nettype 'text_net' is "
+                            "not a legal nettype data type",
+                            LineInRegion(2), "6.6.7"));
 
   ElabFixture included;
   // `nettype` is an ordinary identifier under 1800-2009, so the declaration
@@ -188,7 +200,8 @@ TEST(SystemVerilog2012KeywordElaboration,
   // src/parser/parser_items.cpp:712.
   ElaborateWithPreprocessorAllowingParseErrors(In("1800-2009", kSrc), included,
                                                "m");
-  EXPECT_TRUE(included.has_errors);
+  EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
+                            "expected ';', got token", LineInRegion(5), "6.8"));
 }
 
 // The added word whose clause the elaborator itself acts on. Naming an
@@ -234,7 +247,10 @@ TEST(SystemVerilog2012KeywordElaboration,
                                "  initial result = 0;\n"
                                "endmodule\n"),
                             missing_read, "m");
-  EXPECT_TRUE(missing_read.has_errors);
+  EXPECT_TRUE(ReportedError(missing_read.diag.Diagnostics(),
+                            "class 'port_t' does not implement pure virtual "
+                            "method 'read' from interface 'reader'",
+                            LineInRegion(4), "8.26"));
 
   // The same class without the clause is not under the obligation at all, so
   // what the rejection above tracks is the clause rather than the missing
@@ -260,7 +276,9 @@ TEST(SystemVerilog2012KeywordElaboration,
   // src/parser/parser_class.cpp:301.
   ElaborateWithPreprocessorAllowingParseErrors(In("1800-2009", kSrc), included,
                                                "m");
-  EXPECT_TRUE(included.has_errors);
+  EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
+                            "expected ';', got identifier", LineInRegion(7),
+                            "8.3"));
 }
 
 // The added word with two keyword roles, both reaching this stage. As a union
@@ -292,7 +310,9 @@ TEST(SystemVerilog2012KeywordElaboration, AddedSoftQualifierReachesTheDesign) {
   // src/parser/parser_declaration.cpp:218.
   ElaborateWithPreprocessorAllowingParseErrors(In("1800-2009", kUnion),
                                                union_included, "m");
-  EXPECT_TRUE(union_included.has_errors);
+  EXPECT_TRUE(ReportedError(union_included.diag.Diagnostics(),
+                            "union declarations may not have a tag before '{'",
+                            LineInRegion(2), "7.2"));
 
   // The constraint role, and the rule the elaborator applies to it.
   const std::string kCyclic =
@@ -306,7 +326,10 @@ TEST(SystemVerilog2012KeywordElaboration, AddedSoftQualifierReachesTheDesign) {
       "endmodule\n";
   ElabFixture cyclic;
   ElaborateWithPreprocessor(In("1800-2012", kCyclic), cyclic, "m");
-  EXPECT_TRUE(cyclic.has_errors);
+  EXPECT_TRUE(ReportedError(cyclic.diag.Diagnostics(),
+                            "a soft constraint may not be specified on randc "
+                            "variable 'v'",
+                            LineInRegion(3), "18.5.13.1"));
 
   // The same relation on an ordinary random variable is accepted, so the
   // rejection above is the rule and not the qualifier being unusable.
@@ -477,7 +500,10 @@ TEST(SystemVerilog2012KeywordElaboration,
          "  global clocking gcb2 @(negedge clk); endclocking\n"
          "endmodule\n"),
       two_global, "m");
-  EXPECT_TRUE(two_global.has_errors);
+  EXPECT_TRUE(ReportedError(two_global.diag.Diagnostics(),
+                            "only one global clocking block is allowed per "
+                            "scope",
+                            LineInRegion(3), "14.14"));
 
   ElabFixture included;
   // `checker` is an ordinary identifier under 1800-2005, so it heads the file
@@ -485,7 +511,9 @@ TEST(SystemVerilog2012KeywordElaboration,
   // reports at src/parser/parser.cpp:499.
   ElaborateWithPreprocessorAllowingParseErrors(In("1800-2005", kSrc), included,
                                                "m");
-  EXPECT_TRUE(included.has_errors);
+  EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
+                            "expected top-level declaration", LineInRegion(1),
+                            "3.12.1"));
 }
 
 // The constant forms that reach a declaration's width, which is where a

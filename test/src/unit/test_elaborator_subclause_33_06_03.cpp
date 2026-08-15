@@ -54,6 +54,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_library_design.h"
 #include "fixture_scratch_dir.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -226,7 +227,10 @@ TEST(ConfigCellClauseExample, UseExpansionNamingNoCellLeavesTheCellsUnbound) {
 
   auto* top = OnlyTop(ElaborateConfigText(tmp, design, kConfigMissingTarget));
   ASSERT_NE(top, nullptr);
-  EXPECT_TRUE(design.diag.HasErrors());
+  // f1, the first of the two instances of m kAdderSource writes, on its second
+  // line.
+  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(), "unknown module 'm'", 2,
+                            "23.3.2"));
   std::vector<std::string> expected(4, "");
   EXPECT_EQ(LibrariesBindingM(top), expected);
 }
@@ -421,7 +425,9 @@ TEST(ConfigCellClauseExample, WithoutTheClauseThePrimitiveIsUnbound) {
   auto* top = OnlyTop(ElaborateSoloCell(tmp, design, cell, kNoCellClause));
   ASSERT_NE(top, nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "w", "gateLib"));
-  EXPECT_TRUE(design.diag.HasErrors());
+  // kPrimitiveTop instantiates w on its fourth line.
+  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(), "unknown module 'w'", 4,
+                            "23.3.2"));
   ASSERT_EQ(top->children.size(), 1u);
   EXPECT_EQ(top->children[0].resolved, nullptr);
 }

@@ -6,6 +6,7 @@
 #include "helpers_included_keyword_elab.h"
 #include "helpers_keyword_sweep_skips.h"
 #include "helpers_keyword_version.h"
+#include "helpers_reported_error.h"
 #include "helpers_reserved_keyword_elab.h"
 #include "helpers_rtlir_lookup.h"
 #include "model_keyword_tables.h"
@@ -118,7 +119,9 @@ TEST(SystemVerilog2005KeywordElaboration, AddedTypeWordsQualifyConstants) {
   // once and the parser reports at src/parser/parser_types.cpp:695. The
   // rejection is the parser's, so the source is not required to parse.
   ElaborateWithPreprocessorAllowingParseErrors(In2005(kSrc), included, "t");
-  EXPECT_TRUE(included.has_errors);
+  EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
+                            "parameter declaration requires a default value",
+                            LineInRegion(2), "6.20.1"));
 }
 
 // Table 22-1 doing its work under this version, read back as elaborated

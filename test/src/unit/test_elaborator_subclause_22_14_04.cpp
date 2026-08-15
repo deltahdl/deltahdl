@@ -5,6 +5,7 @@
 #include "fixture_elaborator.h"
 #include "helpers_included_keyword_elab.h"
 #include "helpers_keyword_version.h"
+#include "helpers_reported_error.h"
 #include "helpers_reserved_keyword_elab.h"
 #include "helpers_rtlir_lookup.h"
 
@@ -58,7 +59,13 @@ TEST(NoconfigKeywordElaboration, ExcludedWordsNameElaboratedVariables) {
     // identifier is required, so the parser reports at
     // src/parser/parser_inst.cpp:387 and the source does not parse.
     ElaborateWithPreprocessorAllowingParseErrors(In2001(decl), reserved, "t");
-    EXPECT_TRUE(reserved.has_errors) << word;
+    // TokenKindName answers "token" for a keyword (#3089), so the sentence is
+    // the same for all ten and the word under test stays in the failure
+    // message rather than in the report.
+    EXPECT_TRUE(ReportedError(reserved.diag.Diagnostics(),
+                              "expected identifier, got ", LineInRegion(2),
+                              "6.8"))
+        << word;
   }
 }
 
@@ -77,7 +84,10 @@ TEST(NoconfigKeywordElaboration, KeptAdditionsCannotNameElaboratedVariables) {
     // leg rests on is the parser's, at src/parser/parser_inst.cpp:387.
     ElaborateWithPreprocessorAllowingParseErrors(InNoconfig(decl), reserved,
                                                  "t");
-    EXPECT_TRUE(reserved.has_errors) << word;
+    EXPECT_TRUE(ReportedError(reserved.diag.Diagnostics(),
+                              "expected identifier, got ", LineInRegion(2),
+                              "6.8"))
+        << word;
 
     ElabFixture freed;
     auto* design = ElaborateWithPreprocessor(In1995(decl), freed, "t");
@@ -255,8 +265,11 @@ TEST(NoconfigKeywordElaboration, ExcludedWordNamesAGenvarDrivingAGenerateLoop) {
 
   // The identical construct under the version this one is defined from, where
   // both names are still reserved and so cannot be declared. Being reserved is
-  // what the parser enforces, at src/parser/parser_inst.cpp:387, so this leg
-  // reaches its subject through a source that does not parse.
+  // what the parser enforces, so this leg reaches its subject through a source
+  // that does not parse. `incdir` is the first of the two the parser reaches:
+  // it is a keyword token in the name slot of a parameter declaration, so
+  // Parser::ParseParamDecl reports through Parser::Expect at
+  // src/parser/parser_types.cpp:688 under §6.20.1.
   ElabFixture reserved;
   ElaborateWithPreprocessorAllowingParseErrors(
       In2001("module t;\n"
@@ -264,7 +277,9 @@ TEST(NoconfigKeywordElaboration, ExcludedWordNamesAGenvarDrivingAGenerateLoop) {
              "  genvar design;\n"
              "endmodule\n"),
       reserved, "t");
-  EXPECT_TRUE(reserved.has_errors);
+  EXPECT_TRUE(ReportedError(reserved.diag.Diagnostics(),
+                            "expected identifier, got token", LineInRegion(2),
+                            "6.20.1"));
 }
 
 // The bound from above: this version reserves no more than "1364-2001" does,

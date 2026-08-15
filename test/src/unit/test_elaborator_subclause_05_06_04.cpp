@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -49,7 +50,8 @@ TEST(CompilerDirectiveElaboration, MacroFromOneElabInvisibleInAnother) {
       "  parameter P = `ONLY_IN_FIRST;\n"
       "endmodule\n",
       f2);
-  EXPECT_TRUE(f2.has_errors);
+  EXPECT_TRUE(ReportedError(f2.diag.Diagnostics(),
+                            "undefined macro 'ONLY_IN_FIRST'", 2, "22.5.1"));
 }
 
 }  // namespace

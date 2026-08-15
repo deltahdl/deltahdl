@@ -43,6 +43,7 @@
 #include "fixture_config_unit.h"
 #include "fixture_library_design.h"
 #include "fixture_scratch_dir.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -129,7 +130,10 @@ TEST(ConfigBasicElements, DesignStatementRejectsCellMissingFromNamedLibrary) {
               "endconfig\n"));
   u.PlaceModulesInLibraries({"gateLib"});
   EXPECT_EQ(u.ElaborateConfig(0), nullptr);
-  EXPECT_TRUE(u.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      u.diag.Diagnostics(),
+      "config 'cfg' design cell 'top' not found in library 'rtlLib'", 3,
+      "33.4.1.1"));
 }
 
 // A design statement may name more than one top cell, and each name carries its

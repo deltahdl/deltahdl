@@ -2,6 +2,7 @@
 
 #include "fixture_elaborator.h"
 #include "helpers_keyword_version.h"
+#include "helpers_reported_error.h"
 #include "helpers_reserved_keyword_elab.h"
 #include "helpers_rtlir_lookup.h"
 
@@ -144,7 +145,8 @@ TEST(Verilog1995KeywordElaboration, WordOutsideTheListIsNotADataType) {
                                                       "  logic [7:0] v;\n"
                                                       "endmodule\n"),
                                                in_region, "t");
-  EXPECT_TRUE(in_region.has_errors);
+  EXPECT_TRUE(ReportedError(in_region.diag.Diagnostics(),
+                            "expected ';', got '['", LineInRegion(2), "6.8"));
 
   ElabFixture outside;
   auto* design = ElaborateWithPreprocessor(

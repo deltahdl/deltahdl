@@ -225,7 +225,11 @@ TEST(SeparateCompilationBinding, NamingNoTopAtAllIsReported) {
   BindHarness h;
   ASSERT_TRUE(h.binder.LoadLibrary(path));
   EXPECT_EQ(h.binder.Bind({}), nullptr);
-  EXPECT_TRUE(h.diag.HasErrors());
+  // The report is about the invocation rather than about anything written in a
+  // source description, so it stands at no position and enforces no subclause.
+  EXPECT_TRUE(ReportedError(h.diag.Diagnostics(),
+                            "no top-level module was named to elaborate", 0,
+                            ""));
 }
 
 // ---------------------------------------------------------------------------
@@ -354,7 +358,10 @@ TEST(SeparateCompilationBinding, CellBelowATopNeverCompiledStopsTheBind) {
   BindHarness h;
   ASSERT_TRUE(h.binder.LoadLibrary(path));
   EXPECT_EQ(h.binder.Bind({"top"}), nullptr);
-  EXPECT_TRUE(h.diag.HasErrors());
+  // mid instantiates leaf on its own second line, and that instantiation is
+  // where the design asks for the cell nobody compiled.
+  EXPECT_TRUE(ReportedError(h.diag.Diagnostics(),
+                            "cell 'leaf' was not precompiled", 2, "33.5.3"));
 }
 
 TEST(SeparateCompilationBinding, TwoCellsMissingUnderOneTopAreBothNamed) {
@@ -486,7 +493,10 @@ TEST(SeparateCompilationBinding, LoadingAFileThatIsNoCompiledFormIsReported) {
 
   BindHarness h;
   EXPECT_FALSE(h.binder.LoadLibrary(path));
-  EXPECT_TRUE(h.diag.HasErrors());
+  // A library that cannot be read is a fact about the run, so this report too
+  // stands at no position and enforces no subclause.
+  EXPECT_TRUE(
+      ReportedError(h.diag.Diagnostics(), "no cells read from library", 0, ""));
 }
 
 // The first report this binder's engine recorded whose message contains

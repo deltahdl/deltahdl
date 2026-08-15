@@ -14,6 +14,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/separate_compilation_bind.h"
 #include "fixture_scratch_dir.h"
+#include "helpers_reported_error.h"
 #include "parser/ast.h"
 #include "parser/library_map.h"
 #include "parser/precompiled_library.h"
@@ -415,7 +416,10 @@ TEST(CommandLineBinding, QualifiedDesignCellAbsentFromThatLibraryIsReported) {
   auto* design = h.Run(
       tmp.dir, {s.rtl_child, s.gate_child, s.rtl_top, s.gate_top, only, cfg});
   EXPECT_EQ(design, nullptr);
-  EXPECT_TRUE(h.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      h.diag.Diagnostics(),
+      "config 'cfg' design cell 'rtl_only' not found in library 'gateLib'", 2,
+      "33.4.1.1"));
 }
 
 TEST(CommandLineBinding, ConfigNamingNoCellAtAllPutsNoDesignInForce) {
@@ -454,7 +458,13 @@ TEST(CommandLineBinding, TwoConfigsNamingDesignsOfTheirOwnAreReported) {
   CommandLineHarness h;
   auto* design = h.Run(tmp.dir, {s.child, s.spare, s.top, s.cfg, other});
   EXPECT_EQ(design, nullptr);
-  EXPECT_TRUE(h.diag.HasErrors());
+  // The report is about the command line rather than about anything written in
+  // a source description, so it stands at no position.
+  EXPECT_TRUE(ReportedError(h.diag.Diagnostics(),
+                            "command line puts 2 configurations in force; "
+                            "'cfg' and 'cfg_spare' each name a design of their "
+                            "own",
+                            0, "33.5.4"));
 }
 
 // ---------------------------------------------------------------------------
@@ -602,7 +612,10 @@ TEST(ConfigDrivenBinding, ConfigNamingNoCellDescribesNoDesignToBind) {
   ASSERT_TRUE(h.binder.LoadLibrary(path));
   auto* design = h.binder.BindConfig("cfg_empty");
   EXPECT_EQ(design, nullptr);
-  EXPECT_TRUE(h.diag.HasErrors());
+  // The report stands at the `config` keyword, the first line of kEmptyConfig.
+  EXPECT_TRUE(ReportedError(h.diag.Diagnostics(),
+                            "config 'cfg_empty' names no design", 1,
+                            "33.4.1.1"));
 }
 
 TEST(ConfigDrivenBinding, ConfigNoCompiledFormHoldsIsReported) {
@@ -618,7 +631,10 @@ TEST(ConfigDrivenBinding, ConfigNoCompiledFormHoldsIsReported) {
   ASSERT_TRUE(h.binder.LoadLibrary(path));
   auto* design = h.binder.BindConfig("cfg");
   EXPECT_EQ(design, nullptr);
-  EXPECT_TRUE(h.diag.HasErrors());
+  // No source description reaches a bind, so the missing configuration is
+  // written nowhere this report could stand at.
+  EXPECT_TRUE(ReportedError(h.diag.Diagnostics(),
+                            "config 'cfg' was not precompiled", 0, "33.5.4"));
 }
 
 TEST(ConfigDrivenBinding, CellTheDesignStatementNamesMustBePrecompiledToo) {

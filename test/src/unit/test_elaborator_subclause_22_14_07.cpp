@@ -6,6 +6,7 @@
 #include "helpers_included_keyword_elab.h"
 #include "helpers_keyword_sweep_skips.h"
 #include "helpers_keyword_version.h"
+#include "helpers_reported_error.h"
 #include "helpers_reserved_keyword_elab.h"
 #include "helpers_rtlir_lookup.h"
 #include "model_keyword_tables.h"
@@ -89,7 +90,9 @@ TEST(SystemVerilog2009KeywordElaboration, AddedLetDeclarationsReachTheDesign) {
   // where no top-level production can take it and Parser::ParseTopLevel
   // reports at src/parser/parser.cpp:499.
   ElaborateWithPreprocessorAllowingParseErrors(InSv2005(kSrc), included, "m");
-  EXPECT_TRUE(included.has_errors);
+  EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
+                            "expected top-level declaration", LineInRegion(1),
+                            "3.12.1"));
 }
 
 // The added word pair that brackets a design element. A checker is elaborated
@@ -130,7 +133,9 @@ TEST(SystemVerilog2009KeywordElaboration, AddedCheckerElementIsInstantiable) {
   // where no top-level production can take it and Parser::ParseTopLevel
   // reports at src/parser/parser.cpp:499.
   ElaborateWithPreprocessorAllowingParseErrors(InSv2005(kSrc), included, "m");
-  EXPECT_TRUE(included.has_errors);
+  EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
+                            "expected top-level declaration", LineInRegion(1),
+                            "3.12.1"));
 }
 
 // The added word whose effect the elaborator itself acts on. `global` marks a
@@ -166,7 +171,10 @@ TEST(SystemVerilog2009KeywordElaboration,
                "  global clocking gcb2 @(negedge clk); endclocking\n"
                "endmodule\n"),
       two, "m");
-  EXPECT_TRUE(two.has_errors);
+  EXPECT_TRUE(ReportedError(two.diag.Diagnostics(),
+                            "only one global clocking block is allowed per "
+                            "scope",
+                            LineInRegion(3), "14.14"));
 
   // A reference to the global clock, resolvable only because a marked block is
   // in scope.
@@ -186,7 +194,10 @@ TEST(SystemVerilog2009KeywordElaboration,
                "  assert property (@($global_clock) a);\n"
                "endmodule\n"),
       without_block, "m");
-  EXPECT_TRUE(without_block.has_errors);
+  EXPECT_TRUE(ReportedError(
+      without_block.diag.Diagnostics(),
+      "$global_clock has no effective global clocking declaration",
+      LineInRegion(2), "14.14"));
 
   // The addition leg: neither source exists under the included lists. `global`
   // is an ordinary identifier under 1800-2005, so the clocking block reads as
@@ -195,7 +206,11 @@ TEST(SystemVerilog2009KeywordElaboration,
   for (const auto& src : {kOne, kReference}) {
     ElabFixture included;
     ElaborateWithPreprocessorAllowingParseErrors(InSv2005(src), included, "m");
-    EXPECT_TRUE(included.has_errors);
+    // Both sources carry the clocking block on the second line of the body.
+    EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
+                              "expected ';', got token", LineInRegion(2),
+                              "6.8"))
+        << src;
   }
 }
 
@@ -246,7 +261,8 @@ TEST(SystemVerilog2009KeywordElaboration,
   // src/parser/parser_items.cpp:712, the same site the `global clocking` leg
   // above reaches.
   ElaborateWithPreprocessorAllowingParseErrors(InSv2005(kSrc), included, "m");
-  EXPECT_TRUE(included.has_errors);
+  EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
+                            "expected ';', got token", LineInRegion(4), "6.8"));
 }
 
 // Table 22-1 doing its work under this version, read back as elaborated

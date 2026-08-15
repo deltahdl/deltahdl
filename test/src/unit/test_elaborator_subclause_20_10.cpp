@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -23,7 +24,8 @@ TEST(SeveritySystemTaskElab, FatalFinishNumberOutOfRangeRejected) {
       "endmodule\n",
       ef);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(ef.has_errors);
+  EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(),
+                            "finish_number must be 0, 1, or 2", 2, "20.10"));
 }
 
 }  // namespace

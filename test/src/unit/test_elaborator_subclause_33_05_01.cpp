@@ -9,6 +9,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_scratch_dir.h"
+#include "helpers_reported_error.h"
 #include "parser/ast.h"
 #include "parser/library_map.h"
 #include "parser/single_pass_compile.h"
@@ -168,7 +169,10 @@ TEST(SinglePassBinding, CellHeldInTheLibraryOffThisCommandLineStillCannotBind) {
 
   Elaborator elab(h.arena, h.diag, &h.unit);
   elab.Elaborate("");
-  EXPECT_TRUE(h.diag.HasErrors());
+  // mid.v instantiates leaf on its own second line, and that instance is what
+  // finds nothing to bind against.
+  EXPECT_TRUE(ReportedError(h.diag.Diagnostics(), "unknown module 'leaf'", 2,
+                            "23.3.2"));
 }
 
 TEST(SinglePassBinding, HierarchySpanningTwoLibrariesBindsFromBoth) {

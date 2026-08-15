@@ -45,6 +45,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_library_design.h"
 #include "fixture_scratch_dir.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -548,7 +549,8 @@ TEST(DefaultLibraryBinding, InstanceOfACellNoLibraryHoldsIsLeftUnbound) {
 
   auto* top = OnlyTop(ElaborateUnderMapOrder(d, "top"));
   ASSERT_NE(top, nullptr);
-  EXPECT_TRUE(d.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(d.diag.Diagnostics(), "unknown module 'subtractor'",
+                            2, "23.3.2"));
   ASSERT_EQ(top->children.size(), 1u);
   EXPECT_EQ(top->children[0].resolved, nullptr);
 }
@@ -564,7 +566,10 @@ TEST(DefaultLibraryBinding, RootCellNoLibraryHoldsYieldsNoDesign) {
 
   auto* design = ElaborateUnderMapOrder(d, "subtractor");
   EXPECT_EQ(design, nullptr);
-  EXPECT_TRUE(d.diag.HasErrors());
+  // The name was handed to the elaborator rather than written in a source
+  // description, so the report stands at no position and enforces no subclause.
+  EXPECT_TRUE(ReportedError(d.diag.Diagnostics(),
+                            "top module 'subtractor' not found", 0, ""));
 }
 
 }  // namespace

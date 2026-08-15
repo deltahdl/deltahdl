@@ -50,6 +50,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_library_design.h"
 #include "fixture_scratch_dir.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -526,7 +527,9 @@ TEST(ConfigInstanceClauseExample, WithoutTheClauseThePrimitiveIsUnbound) {
   auto* mid = NamedInstanceOf(elaborated);
   ASSERT_NE(mid, nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "w", "gateLib"));
-  EXPECT_TRUE(design.diag.HasErrors());
+  // kPrimitiveTop instantiates w on its seventh line.
+  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(), "unknown module 'w'", 7,
+                            "23.3.2"));
   ASSERT_EQ(mid->children.size(), 1u);
   EXPECT_EQ(mid->children[0].resolved, nullptr);
 }
@@ -618,7 +621,9 @@ TEST(ConfigInstanceClauseExample, InheritedListWithoutTheCellLeavesItUnbound) {
   auto* mid = NamedInstanceOf(elaborated);
   ASSERT_NE(mid, nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "leaf", "gateLib"));
-  EXPECT_TRUE(design.diag.HasErrors());
+  // kNarrowedTopSource instantiates leaf on its fifth line.
+  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(), "unknown module 'leaf'",
+                            5, "23.3.2"));
   EXPECT_EQ(ChildBoundTo(mid, "u"), nullptr);
 }
 
@@ -655,7 +660,9 @@ TEST(ConfigInstanceClauseExample, ClauseListLackingTheCellLeavesItUnbound) {
   auto* top = OnlyTop(elaborated);
   ASSERT_NE(top, nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "mid", "rtlLib"));
-  EXPECT_TRUE(design.diag.HasErrors());
+  // kNarrowedTopSource instantiates mid on its second line.
+  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(), "unknown module 'mid'",
+                            2, "23.3.2"));
   EXPECT_EQ(ChildBoundTo(top, "m1"), nullptr);
 }
 
@@ -783,7 +790,9 @@ TEST(ConfigInstanceClauseExample, WithoutTheClauseTheNamedPrimitiveIsUnbound) {
       OnlyTop(ElaborateNestedCell(tmp, design, cell, kNoInstanceClause));
   ASSERT_NE(top, nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "w", "gateLib"));
-  EXPECT_TRUE(design.diag.HasErrors());
+  // kSoloPrimTop instantiates w on its fourth line.
+  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(), "unknown module 'w'", 4,
+                            "23.3.2"));
   ASSERT_EQ(top->children.size(), 1u);
   EXPECT_EQ(top->children[0].resolved, nullptr);
 }
