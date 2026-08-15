@@ -251,4 +251,87 @@ TEST(ScopeRulesElaboration,
                             9, "23.9"));
 }
 
+// §23.9 lists "fork-join blocks (named or unnamed)" beside "begin-end blocks
+// (named or unnamed)" among the elements that define a new scope, and an
+// identifier shall be used to declare only one item within a scope, so two
+// variables sharing a name directly inside one fork are illegal. This case
+// fails while CheckOneBlockLocals in
+// src/elaborator/elaborator_scope_rules.cpp is reached only for a
+// StmtKind::kBlock node, because Parser::ParseForkStmt puts a declaration
+// written inside a fork into Stmt::fork_stmts on a StmtKind::kFork node, which
+// that guard never compares against itself.
+//
+// One source covers all three closing keywords. Parser::ParseForkStmt at
+// src/parser/parser_stmt.cpp:644 records the closing keyword in
+// Stmt::join_kind and pushes the declarations into Stmt::fork_stmts whether
+// join, join_any or join_none closes the block, so the three shapes differ in
+// Stmt::join_kind alone and a case per keyword would hand the walk one input
+// three times.
+TEST(ScopeRulesElaboration, DuplicateLocalInForkJoinError) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  initial fork\n"
+      "    int x;\n"
+      "    int x;\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 4, "23.9"));
+}
+
+// §23.9 makes a fork-join block a scope wherever it is written, so the same
+// duplicate inside a function body is illegal for the same reason. A second
+// case is needed because a second walk reads this shape:
+// CheckSubroutineBodyRedeclarations in
+// src/elaborator/elaborator_validate_funcbody.cpp checks a function body and
+// CheckBlockLocalRedeclarations in src/elaborator/elaborator_scope_rules.cpp
+// checks an initial procedure, and each carried its own StmtKind::kBlock guard,
+// so repairing one leaves the other silent. This case fails when
+// CheckBlockDeclDups is called on Stmt::stmts alone and never on
+// Stmt::fork_stmts.
+//
+// The fork is closed by join_none rather than join because §13.4 rule a) lists
+// fork-join among the time-controlling statements a function shall not contain,
+// which src/elaborator/elaborator_validate_funcbody.cpp reports as "only
+// fork/join_none is permitted inside a function" under §13.4. Closing with join
+// here would break a second rule in the source and leave the case asserting on
+// one of two reports.
+TEST(ScopeRulesElaboration, DuplicateLocalInForkJoinInsideFunctionError) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  function int fn();\n"
+      "    fork\n"
+      "      int x;\n"
+      "      int x;\n"
+      "    join_none\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 5, "23.9"));
+}
+
+// §23.9 makes the fork-join block a new scope of its own, so a name declared in
+// the fork and in the begin-end block enclosing it declares one item in each of
+// two scopes and is legal shadowing. This case fails when the fork's
+// declarations are compared against the enclosing block's set instead of
+// against a set of their own, which is the shape a repair to
+// CheckOneBlockLocals in src/elaborator/elaborator_scope_rules.cpp reaches for
+// by merging Stmt::fork_stmts into the list it walks.
+TEST(ScopeRulesElaboration, SameLocalNameInForkAndEnclosingBlockOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  initial begin\n"
+             "    int x;\n"
+             "    fork\n"
+             "      int x;\n"
+             "    join\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
 }  // namespace

@@ -78,22 +78,18 @@ void CollectScopeWalk(const Stmt* s, ScopeWalk& out) {
   out.active_loop_vars.resize(out.active_loop_vars.size() - pushed);
 }
 
-// §23.9: each begin-end block -- named or unnamed -- defines a new scope, and
-// an identifier shall be used to declare only one item within a scope. Flags a
-// second variable declaration that shares a name with an earlier one in the
-// SAME block. Only the declarations that are direct children of a single block
-// are compared: a nested begin-end is a distinct scope, so reusing a name there
-// is legal shadowing rather than a redeclaration. The walk then descends so
-// every nested block is checked against itself.
-//
-// §23.9 lists fork-join blocks beside begin-end ones, and this reaches neither
-// their declarations nor those of a fork-join block nested in one: the parser
-// puts a declaration inside a fork in Stmt::fork_stmts on a node whose kind is
-// StmtKind::kFork, and the caller reaches this only for a StmtKind::kBlock.
-// Issue #3120 covers that.
-static void CheckOneBlockLocals(const Stmt* s, DiagEngine& diag) {
+// §23.9: each begin-end block and each fork-join block -- named or unnamed --
+// defines a new scope, and an identifier shall be used to declare only one item
+// within a scope. Flags a second variable declaration that shares a name with
+// an earlier one in the SAME statement list. Only the declarations that are
+// direct children of one list are compared: a nested block is a distinct scope,
+// so reusing a name there is legal shadowing rather than a redeclaration. The
+// caller passes one scope's own statement list, and then descends so every
+// nested block is checked against itself.
+static void CheckOneBlockLocals(const std::vector<Stmt*>& block_stmts,
+                                DiagEngine& diag) {
   std::unordered_set<std::string_view> block_locals;
-  for (const auto* child : s->stmts) {
+  for (const auto* child : block_stmts) {
     if (!child || child->kind != StmtKind::kVarDecl || child->var_name.empty())
       continue;
     if (!block_locals.insert(child->var_name).second) {
@@ -106,7 +102,16 @@ static void CheckOneBlockLocals(const Stmt* s, DiagEngine& diag) {
 
 void CheckBlockLocalRedeclarations(const Stmt* s, DiagEngine& diag) {
   if (!s) return;
-  if (s->kind == StmtKind::kBlock) CheckOneBlockLocals(s, diag);
+  if (s->kind == StmtKind::kBlock) CheckOneBlockLocals(s->stmts, diag);
+  // §23.9 lists "fork-join blocks (named or unnamed)" among the elements that
+  // define a new scope, beside "begin-end blocks (named or unnamed)". A
+  // declaration written directly inside a fork lands in Stmt::fork_stmts on a
+  // node whose kind is StmtKind::kFork, so that list is the fork-join block's
+  // own scope and two declarations of one name in it are a redeclaration. The
+  // list is checked on its own rather than merged into the enclosing block's,
+  // because the fork-join block is a separate scope and a name reused there is
+  // legal shadowing.
+  if (s->kind == StmtKind::kFork) CheckOneBlockLocals(s->fork_stmts, diag);
   for (const auto* sub : s->stmts) CheckBlockLocalRedeclarations(sub, diag);
   for (const auto* sub : s->fork_stmts)
     CheckBlockLocalRedeclarations(sub, diag);

@@ -472,16 +472,25 @@ static void CheckBlockDeclDups(const std::vector<Stmt*>& block_stmts,
   }
 }
 
-// §23.9: functions, tasks and every named or unnamed begin-end block nested
-// inside the body each define a new scope, and an identifier shall be used to
-// declare only one item within a scope. Walks the body so each nested begin-end
-// block is compared against itself; a name reused in a nested or sibling block
-// is a distinct scope, hence legal shadowing rather than a redeclaration. The
-// body's own top-level statement list is handled separately by the caller (it
-// is a bare statement list, not a kBlock node).
+// §23.9: functions, tasks and every named or unnamed begin-end or fork-join
+// block nested inside the body each define a new scope, and an identifier shall
+// be used to declare only one item within a scope. Walks the body so each
+// nested block is compared against itself; a name reused in a nested or sibling
+// block is a distinct scope, hence legal shadowing rather than a
+// redeclaration. The body's own top-level statement list is handled separately
+// by the caller (it is a bare statement list, not a kBlock node).
 static void CheckSubroutineBodyRedeclarations(const Stmt* s, DiagEngine& diag) {
   if (!s) return;
   if (s->kind == StmtKind::kBlock) CheckBlockDeclDups(s->stmts, diag);
+  // §23.9 lists "fork-join blocks (named or unnamed)" among the elements that
+  // define a new scope, beside "begin-end blocks (named or unnamed)". A
+  // declaration written directly inside a fork standing in a function or task
+  // body lands in Stmt::fork_stmts on a node whose kind is StmtKind::kFork, so
+  // that list is the fork-join block's own scope and two declarations of one
+  // name in it are a redeclaration. The list is checked on its own rather than
+  // merged into the enclosing block's, because the fork-join block is a
+  // separate scope and a name reused there is legal shadowing.
+  if (s->kind == StmtKind::kFork) CheckBlockDeclDups(s->fork_stmts, diag);
   for (const auto* sub : s->stmts) CheckSubroutineBodyRedeclarations(sub, diag);
   for (const auto* sub : s->fork_stmts)
     CheckSubroutineBodyRedeclarations(sub, diag);
