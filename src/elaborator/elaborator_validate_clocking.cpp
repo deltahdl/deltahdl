@@ -3,6 +3,8 @@
 #include <format>
 #include <functional>
 #include <optional>
+#include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -73,19 +75,59 @@ void CheckClockingOutputBinding(const ClockingSignalDecl& sig,
 
 }  // namespace
 
-// §14.3: a skew that folded to neither an integer nor a time literal. If it
-// folds to a real value that is negative or has a fractional part, it violates
-// the non-negative-integer requirement. An unfoldable-yet-constant form (e.g. a
-// constant function call) yields no value here and is left for its own
-// evaluation to resolve.
+// §14.3: the skew a report names for a clocking signal reads the signal's
+// direction rather than the field the skew was parsed into.
+// ParseClockingDirection in src/parser/parser_clocking.cpp:152 parses an
+// output-only signal's one skew into `in_delay`, and MakeClockingSignal at :26
+// stores that in ClockingSignalDecl::skew_delay and leaves out_skew_delay null,
+// so `output #P a;` arrives in the input slot and would otherwise be reported
+// as an input skew.
+static std::string ClockingSignalSkewRole(const ClockingSignalDecl& sig,
+                                          bool from_out_field) {
+  std::string_view half =
+      (from_out_field || sig.direction == Direction::kOutput) ? "output"
+                                                              : "input";
+  return std::format("{} skew of clocking signal '{}'", half, sig.name);
+}
+
+// §14.3's sentence names one requirement with two ways to break it, and a
+// clocking block carries up to four skews, two of which are routinely written
+// on one line. So the report names which skew it read, which half of the
+// requirement broke, and the value that broke it. `role` is what the caller
+// knows and this function does not.
+static std::string ClockingSkewMessage(std::string_view role,
+                                       std::string_view breach,
+                                       std::string_view value) {
+  return std::format(
+      "{} is {} ({}); a clocking skew shall be a non-negative integer value",
+      role, breach, value);
+}
+
+// §14.3: a skew that folded to neither an integer nor a time literal. A real
+// value that is negative or has a fractional part breaks the non-negative
+// integer requirement. An unfoldable-yet-constant form (e.g. a constant
+// function call) yields no value here and is left for its own evaluation to
+// resolve.
 static void CheckClockingSkewRealValue(const Expr* delay,
                                        const ScopeMap& skew_scope,
+                                       std::string_view role,
                                        DiagEngine& diag) {
   std::optional<double> rv = ConstEvalReal(delay, skew_scope);
-  if (rv.has_value() && (*rv < 0.0 || *rv != std::floor(*rv))) {
+  if (!rv.has_value()) return;
+  // The sign is reported before the fractional part, so a skew that breaks both
+  // -- `#-1.5` -- still draws one report. An author reading it fixes the sign
+  // first, and two reports for one skew would be worse than one.
+  if (*rv < 0.0) {
     diag.Error(delay->range.start,
-               "clocking skew shall be a non-negative integer value",
+               ClockingSkewMessage(role, "negative", std::format("{}", *rv)),
                Subclause("14.3"));
+    return;
+  }
+  if (*rv != std::floor(*rv)) {
+    diag.Error(
+        delay->range.start,
+        ClockingSkewMessage(role, "not an integer", std::format("{}", *rv)),
+        Subclause("14.3"));
   }
 }
 
@@ -98,7 +140,7 @@ static void CheckClockingSkewRealValue(const Expr* delay,
 // so it is exempt from the integer requirement. The 1step pseudo-literal folds
 // to 0 and is accepted.
 static void CheckClockingSkew(const Expr* delay, const ScopeMap& skew_scope,
-                              DiagEngine& diag) {
+                              std::string_view role, DiagEngine& diag) {
   if (delay == nullptr) return;
   if (delay->kind == ExprKind::kTimeLiteral) return;
   if (!IsConstantExpr(delay, skew_scope)) {
@@ -111,12 +153,12 @@ static void CheckClockingSkew(const Expr* delay, const ScopeMap& skew_scope,
   if (iv.has_value()) {
     if (*iv < 0) {
       diag.Error(delay->range.start,
-                 "clocking skew shall be a non-negative integer value",
+                 ClockingSkewMessage(role, "negative", std::format("{}", *iv)),
                  Subclause("14.3"));
     }
     return;
   }
-  CheckClockingSkewRealValue(delay, skew_scope, diag);
+  CheckClockingSkewRealValue(delay, skew_scope, role, diag);
 }
 
 void Elaborator::ValidateClockingBlock(ModuleItem* item,
@@ -136,11 +178,17 @@ void Elaborator::ValidateClockingBlock(ModuleItem* item,
   // acceptable form. Any skew delay that cannot be folded against the module's
   // parameter scope (e.g. a reference to a net or variable) violates the rule.
   ScopeMap skew_scope = mod ? BuildParamScope(mod) : ScopeMap{};
-  CheckClockingSkew(item->default_input_skew_delay, skew_scope, diag_);
-  CheckClockingSkew(item->default_output_skew_delay, skew_scope, diag_);
+  CheckClockingSkew(item->default_input_skew_delay, skew_scope,
+                    "default input skew", diag_);
+  CheckClockingSkew(item->default_output_skew_delay, skew_scope,
+                    "default output skew", diag_);
   for (const auto& sig : item->clocking_signals) {
-    CheckClockingSkew(sig.skew_delay, skew_scope, diag_);
-    CheckClockingSkew(sig.out_skew_delay, skew_scope, diag_);
+    // §14.3 lets a signal carry its own skew in place of the block's default,
+    // so the report names the signal to tell the two apart.
+    CheckClockingSkew(sig.skew_delay, skew_scope,
+                      ClockingSignalSkewRole(sig, false), diag_);
+    CheckClockingSkew(sig.out_skew_delay, skew_scope,
+                      ClockingSignalSkewRole(sig, true), diag_);
     CheckClockingOutputBinding(sig, diag_);
   }
 
