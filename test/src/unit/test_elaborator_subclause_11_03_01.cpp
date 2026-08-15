@@ -14,9 +14,9 @@ TEST(RealOps, CaseEqualityOnRealIsIllegal) {
       "  initial eq = (a === b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "binary operator '===' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, CaseInequalityOnRealIsIllegal) {
@@ -28,9 +28,9 @@ TEST(RealOps, CaseInequalityOnRealIsIllegal) {
       "  initial eq = (a !== b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "binary operator '!==' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, WildcardEqualityOnRealIsIllegal) {
@@ -42,9 +42,9 @@ TEST(RealOps, WildcardEqualityOnRealIsIllegal) {
       "  initial eq = (a ==? b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "binary operator '==?' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, BitwiseAndOnRealIsIllegal) {
@@ -56,9 +56,9 @@ TEST(RealOps, BitwiseAndOnRealIsIllegal) {
       "  initial c = a & b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "binary operator '&' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, BitwiseOrOnRealIsIllegal) {
@@ -70,9 +70,9 @@ TEST(RealOps, BitwiseOrOnRealIsIllegal) {
       "  initial c = a | b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "binary operator '|' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, BitwiseXorOnRealIsIllegal) {
@@ -84,9 +84,9 @@ TEST(RealOps, BitwiseXorOnRealIsIllegal) {
       "  initial c = a ^ b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "binary operator '^' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, BitwiseNegOnRealIsIllegal) {
@@ -98,9 +98,9 @@ TEST(RealOps, BitwiseNegOnRealIsIllegal) {
       "  initial c = ~a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unary operator '~' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, ShiftOnRealIsIllegal) {
@@ -112,9 +112,9 @@ TEST(RealOps, ShiftOnRealIsIllegal) {
       "  initial c = a << 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "binary operator '<<' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, ModulusOnRealIsIllegal) {
@@ -126,9 +126,9 @@ TEST(RealOps, ModulusOnRealIsIllegal) {
       "  initial c = a % b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "binary operator '%' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, LogicalAndOnRealIsLegal) {
@@ -155,6 +155,11 @@ TEST(RealOps, RelationalOnRealIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// Table 11-1 gives the binary arithmetic operators `+ - * / **` the operand
+// data types "Integral, real, shortreal", so `+` on two real operands is
+// admitted and the elaborator must accept this source. This is also what
+// catches a change that rejects every operator while building the message
+// §11.3.1 reports.
 TEST(RealOps, ArithOnRealIsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -213,9 +218,9 @@ TEST(RealOps, WildcardInequalityOnRealIsIllegal) {
       "  initial eq = (a !=? b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "binary operator '!=?' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, RightShiftOnRealIsIllegal) {
@@ -227,9 +232,9 @@ TEST(RealOps, RightShiftOnRealIsIllegal) {
       "  initial c = a >> 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "binary operator '>>' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, ArithLeftShiftOnRealIsIllegal) {
@@ -241,9 +246,9 @@ TEST(RealOps, ArithLeftShiftOnRealIsIllegal) {
       "  initial c = a <<< 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "binary operator '<<<' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, ArithRightShiftOnRealIsIllegal) {
@@ -255,9 +260,9 @@ TEST(RealOps, ArithRightShiftOnRealIsIllegal) {
       "  initial c = a >>> 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "binary operator '>>>' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, BitwiseXnorOnRealIsIllegal) {
@@ -269,9 +274,9 @@ TEST(RealOps, BitwiseXnorOnRealIsIllegal) {
       "  initial c = a ~^ b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "binary operator '~^' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, ReductionAndOnRealIsIllegal) {
@@ -283,9 +288,9 @@ TEST(RealOps, ReductionAndOnRealIsIllegal) {
       "  initial c = &a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unary operator '&' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, ReductionOrOnRealIsIllegal) {
@@ -297,9 +302,9 @@ TEST(RealOps, ReductionOrOnRealIsIllegal) {
       "  initial c = |a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unary operator '|' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, ReductionXorOnRealIsIllegal) {
@@ -311,9 +316,9 @@ TEST(RealOps, ReductionXorOnRealIsIllegal) {
       "  initial c = ^a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unary operator '^' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, ReductionNandOnRealIsIllegal) {
@@ -325,9 +330,9 @@ TEST(RealOps, ReductionNandOnRealIsIllegal) {
       "  initial c = ~&a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unary operator '~&' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, ReductionNorOnRealIsIllegal) {
@@ -339,9 +344,9 @@ TEST(RealOps, ReductionNorOnRealIsIllegal) {
       "  initial c = ~|a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unary operator '~|' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, ReductionXnorOnRealIsIllegal) {
@@ -353,9 +358,9 @@ TEST(RealOps, ReductionXnorOnRealIsIllegal) {
       "  initial c = ~^a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unary operator '~^' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, ShortrealSubjectToSameRestrictions) {
@@ -367,9 +372,9 @@ TEST(RealOps, ShortrealSubjectToSameRestrictions) {
       "  initial c = a & b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "binary operator '&' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, RealtimeSubjectToSameRestrictions) {
@@ -381,9 +386,9 @@ TEST(RealOps, RealtimeSubjectToSameRestrictions) {
       "  initial c = a & b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "binary operator '&' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, LogicalOrOnRealIsLegal) {
@@ -436,9 +441,9 @@ TEST(RealOps, IllegalOpOnRealInContAssign) {
       "  assign c = a & b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "binary operator '&' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(RealOps, LegalOpOnRealInContAssign) {
@@ -557,7 +562,9 @@ TEST(RealOps, UnionMemberRealAccessIsLegal) {
 }
 
 // The XNOR bitwise operator also spells as ^~, which is integral-only just like
-// its ~^ form, so applying it to real operands must be rejected.
+// its ~^ form, so applying it to real operands must be rejected. The report
+// echoes the spelling the source wrote, so this case expects '^~' where
+// RealOps.BitwiseXnorOnRealIsIllegal expects '~^'.
 TEST(RealOps, BitwiseXnorCaretTildeOnRealIsIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -567,13 +574,14 @@ TEST(RealOps, BitwiseXnorCaretTildeOnRealIsIllegal) {
       "  initial c = a ^~ b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "binary operator '^~' is not allowed on real operands", 4, "11.3.1"));
 }
 
 // The ^~ spelling of the reduction XNOR operator is likewise integral-only and
-// is not permitted on a real operand.
+// is not permitted on a real operand. The report names the unary form, which is
+// what separates this case from RealOps.BitwiseXnorCaretTildeOnRealIsIllegal.
 TEST(RealOps, ReductionXnorCaretTildeOnRealIsIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -583,9 +591,36 @@ TEST(RealOps, ReductionXnorCaretTildeOnRealIsIllegal) {
       "  initial c = ^~a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unary operator '^~' is not allowed on real operands", 4, "11.3.1"));
+}
+
+// Table 11-1 bars `^~` twice, once in the row for the binary bitwise operators
+// and once in the row for the unary reduction operators, so a source breaking
+// both rules breaks two rules and must draw two reports that differ. This case
+// writes `a ^~ b` and `^~a` into one source and names each report separately.
+// Two assertions in one case is deliberate: one assertion cannot say that two
+// reports differ, and that is the whole claim here. Every other case in this
+// file asserts one report at line 4, so none of them can tell the two emission
+// sites in Elaborator::WalkExprForRealOps apart.
+TEST(RealOps, BinaryXnorAndReductionXnorGiveDifferentReports) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real a, b;\n"
+      "  real c;\n"
+      "  logic d;\n"
+      "  initial c = a ^~ b;\n"
+      "  initial d = ^~a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "binary operator '^~' is not allowed on real operands", 5, "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unary operator '^~' is not allowed on real operands", 6, "11.3.1"));
 }
 
 }  // namespace

@@ -11,6 +11,7 @@
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
+#include "lexer/token.h"
 #include "parser/ast.h"
 
 namespace delta {
@@ -548,14 +549,28 @@ void Elaborator::WalkExprForRealOps(const Expr* expr) {
     bool lhs_real = expr->lhs && IsRealVar(expr->lhs, var_types_);
     bool rhs_real = expr->rhs && IsRealVar(expr->rhs, var_types_);
     if ((lhs_real || rhs_real) && IsIllegalOnReal(expr->op)) {
-      diag_.Error(expr->range.start, "operator is not allowed on real operands",
+      // §11.3.1 states its rule as Table 11-1, which admits or bars each
+      // operator separately, so the report names the operator it barred.
+      // TokenKindName in src/lexer/keywords.cpp answers with the source
+      // spelling the table lists, already quoted.
+      //
+      // The form is named too, because `&`, `|`, `^`, `~^` and `^~` are each
+      // both a binary and a unary operator, and the spelling alone leaves the
+      // reader to work out which reading the elaborator took.
+      diag_.Error(expr->range.start,
+                  std::format("binary operator {} is not allowed on real "
+                              "operands",
+                              TokenKindName(expr->op)),
                   Subclause("11.3.1"));
     }
   }
   if (expr->kind == ExprKind::kUnary) {
     bool operand_real = expr->lhs && IsRealVar(expr->lhs, var_types_);
     if (operand_real && IsUnaryIllegalOnReal(expr->op)) {
-      diag_.Error(expr->range.start, "operator is not allowed on real operands",
+      diag_.Error(expr->range.start,
+                  std::format("unary operator {} is not allowed on real "
+                              "operands",
+                              TokenKindName(expr->op)),
                   Subclause("11.3.1"));
     }
   }
