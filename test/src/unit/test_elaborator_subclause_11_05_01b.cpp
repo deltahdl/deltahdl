@@ -216,3 +216,110 @@ TEST(RealSelect, RealParameterPortWithNoSelectIsLegal) {
       f);
   EXPECT_FALSE(f.has_errors);
 }
+
+// The statement RealSelect.BitSelectOfARealArrayElementIsIllegal writes in an
+// initial procedure, written in an always_comb procedure instead. §9.2.2.2
+// says what that procedure is: "SystemVerilog provides a special always_comb
+// procedure for modeling combinational logic behavior." The clause does not
+// change what a statement inside the procedure may contain. §11.5.1 therefore
+// bars `arr[i][0]` here exactly as it bars the same select in an initial
+// procedure.
+//
+// This fails while `is_proc` in
+// src/elaborator/elaborator_validate_matches.cpp names kAlwaysBlock and
+// kInitialBlock alone. CheckRealSelectStmt runs behind that flag, so a
+// kAlwaysCombBlock item never reaches it and the run reports no error at all.
+TEST(RealSelect, BitSelectOfARealArrayElementInAlwaysCombIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real arr[4];\n"
+      "  real v;\n"
+      "  int i;\n"
+      "  always_comb v = arr[i][0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real variable is illegal", 5,
+                            "11.5.1"));
+}
+
+// The same select written in an always_ff procedure. §9.2.2.4 says what that
+// procedure is: "The always_ff procedure can be used to model synthesizable
+// flip-flop logic behavior." The clause does not change what a statement
+// inside the procedure may contain. §11.5.1 therefore bars `arr[i][0]` here as
+// well, and the event control the procedure requires decides nothing about the
+// select.
+//
+// This fails while `is_proc` in
+// src/elaborator/elaborator_validate_matches.cpp names kAlwaysBlock and
+// kInitialBlock alone. A kAlwaysFFBlock item reaches neither
+// CheckRealSelectStmt nor the eight other calls behind that flag, and the run
+// reports no error at all.
+TEST(RealSelect, BitSelectOfARealArrayElementInAlwaysFfIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real arr[4];\n"
+      "  real v;\n"
+      "  int i;\n"
+      "  logic clk;\n"
+      "  always_ff @(posedge clk) v = arr[i][0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real variable is illegal", 6,
+                            "11.5.1"));
+}
+
+// The same select written in an always_latch procedure. §9.2.2.3 says what
+// that procedure is: "SystemVerilog also provides a special always_latch
+// procedure for modeling latched logic behavior." The clause does not change
+// what a statement inside the procedure may contain. §11.5.1 therefore bars
+// `arr[i][0]` here as well.
+//
+// This fails while `is_proc` in
+// src/elaborator/elaborator_validate_matches.cpp names kAlwaysBlock and
+// kInitialBlock alone. A kAlwaysLatchBlock item never reaches
+// CheckRealSelectStmt, and the run reports no error at all.
+TEST(RealSelect, BitSelectOfARealArrayElementInAlwaysLatchIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real arr[4];\n"
+      "  real v;\n"
+      "  int i;\n"
+      "  always_latch v = arr[i][0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real variable is illegal", 5,
+                            "11.5.1"));
+}
+
+// The same select written in a final procedure. §9.2.3 says what that
+// procedure is: "The final procedure is like an initial procedure, defining a
+// procedural block of statements, except that it occurs at the end of
+// simulation time and executes without delays." The clause does not change
+// what a statement inside the procedure may contain. §11.5.1 therefore bars
+// `arr[i][0]` here exactly as it bars the same select in the initial procedure
+// the clause compares this one to.
+//
+// This fails while `is_proc` in
+// src/elaborator/elaborator_validate_matches.cpp names kAlwaysBlock and
+// kInitialBlock alone. A kFinalBlock item never reaches CheckRealSelectStmt,
+// and the run reports no error at all.
+TEST(RealSelect, BitSelectOfARealArrayElementInFinalIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real arr[4];\n"
+      "  real v;\n"
+      "  int i;\n"
+      "  final v = arr[i][0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real variable is illegal", 5,
+                            "11.5.1"));
+}

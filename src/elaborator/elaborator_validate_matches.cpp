@@ -106,10 +106,31 @@ void Elaborator::ValidateLhsPatternWidths(const ModuleDecl* decl,
   }
 }
 
+// The six item kinds that carry a procedural body. §9.2.1 defines the `initial`
+// procedure, §9.2.2.1 the general purpose `always`, §9.2.2.2 `always_comb`,
+// §9.2.2.3 `always_latch`, §9.2.2.4 `always_ff` and §9.2.3 `final`. None of the
+// six changes what a statement inside it may contain, so every check over a
+// procedural statement reaches all of them. The parser gives each its own
+// ModuleItemKind rather than folding the four SystemVerilog forms into
+// kAlwaysBlock, which is how a test naming two of the six came to skip the
+// other four; listing them in one place is what keeps the set readable.
+static bool IsProceduralItem(ModuleItemKind kind) {
+  switch (kind) {
+    case ModuleItemKind::kInitialBlock:
+    case ModuleItemKind::kFinalBlock:
+    case ModuleItemKind::kAlwaysBlock:
+    case ModuleItemKind::kAlwaysCombBlock:
+    case ModuleItemKind::kAlwaysFFBlock:
+    case ModuleItemKind::kAlwaysLatchBlock:
+      return true;
+    default:
+      return false;
+  }
+}
+
 void Elaborator::ValidateItemConstraints(const ModuleItem* item,
                                          const ScopeMap& scope) {
-  bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                 item->kind == ModuleItemKind::kInitialBlock;
+  bool is_proc = IsProceduralItem(item->kind);
   if (is_proc && item->body) {
     CollectProcTargets(item->body, proc_assign_targets_);
 

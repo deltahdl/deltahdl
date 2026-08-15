@@ -520,4 +520,31 @@ TEST(NetsAndVariables, ImplicitNetFromContinuousAssignNeedsNoDeclarationOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §6.5 bars a variable from carrying both kinds of assignment wherever the
+// procedural one is written, and §9.2.2.2's `always_comb` is one of the places
+// it can be written. The case above writes the procedural half in `always`;
+// this one writes it in `always_comb` and expects the same report, because
+// neither §6.5 nor §9.2.2.2 makes which procedure encloses the assignment
+// decide the rule.
+//
+// This fails while `is_proc` in src/elaborator/elaborator_validate_matches.cpp
+// names two of the six procedural item kinds. CollectProcTargets never runs on
+// an `always_comb` body, so `y` is absent from proc_assign_targets_ and
+// ValidateMixedAssignments finds nothing to compare the continuous assignment
+// against.
+TEST(NetsAndVariables, ContinuousAndAlwaysCombAssignmentsToOneVariableError) {
+  ElabFixture f;
+  Elaborate(
+      "module top();\n"
+      "  logic a;\n"
+      "  logic y;\n"
+      "  assign y = a;\n"
+      "  always_comb y = ~a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'y' has both continuous and procedural assignments", 4, "6.5"));
+}
+
 }  // namespace
