@@ -223,7 +223,14 @@ bool Preprocessor::TakeKeyBlockValue(std::string_view line, SourceLoc loc,
           &content)) {
     return true;
   }
+  // The block is run for what it defines and its text is appended nowhere, so
+  // its lines are not lines of the output and must not be recorded as such.
+  // Recording them would name lines the output does not have and would displace
+  // every line written after this one.
+  bool was_recording = recording_origins_;
+  recording_origins_ = false;
   ProcessSource(content, loc.file_id, depth + 1);
+  recording_origins_ = was_recording;
   // §34.5.22 owes this block a digest of its own, written immediately after it,
   // so what the block recovered to is held for the digest that follows. The key
   // that digest is under is read only now, because the block just read is what

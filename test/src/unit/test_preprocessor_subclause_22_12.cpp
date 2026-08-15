@@ -3,8 +3,11 @@
 #include <filesystem>
 #include <fstream>
 
+#include "common/arena.h"
 #include "fixture_preprocessor.h"
 #include "helpers_reported_error.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
 
 using namespace delta;
 
@@ -376,4 +379,121 @@ TEST(Preprocessor, Line_LibrarySearchUnaffectedByOverride) {
 
   std::remove(inc_path.c_str());
   std::filesystem::remove_all(tmp_dir);
+}
+
+// §22.12's first sentence is what the three cases below are about: "The
+// compiler shall maintain the current line number and file name of the file
+// being compiled." The preprocessor's output is not that file. It splices in
+// the lines of every `include and joins a `define body that spanned
+// continuation lines, so a position in it names neither the file somebody
+// wrote nor the line they wrote it on, and a user handed one is sent to a
+// buffer they have never seen.
+//
+// What answers for the rule is SourceManager::FormatLoc, because that is what
+// DiagEngine::Emit prints at src/common/diagnostic.cpp:42. The report's own
+// SourceLoc still stands in the preprocessed text and every other assertion in
+// this tree still reads it as such; only what a position is printed as
+// changes.
+
+// Preprocesses `src` registered under `path`, registers the output with the
+// origins the preprocessor recorded, and parses it -- the sequence
+// src/main.cpp:393 and :420 run. The parse is what provokes a report from a
+// stage below the preprocessor, which is the half of a run that had no file
+// name of its own.
+static void PreprocessAndParseUnder(const std::string& path,
+                                    const std::string& src, PreprocFixture& f,
+                                    Arena& arena, PreprocConfig cfg = {}) {
+  auto fid = f.mgr.AddFile(path, src);
+  Preprocessor pp(f.mgr, f.diag, std::move(cfg));
+  auto out = pp.Preprocess(fid);
+  auto out_fid =
+      f.mgr.AddPreprocessedFile("<preprocessed>", out, pp.LineOrigins());
+  Lexer lexer(f.mgr.FileContent(out_fid), out_fid, f.diag);
+  Parser parser(lexer, arena, f.diag);
+  parser.Parse();
+}
+
+// Where the first error of the run is printed, formatted as
+// src/common/diagnostic.cpp:42 formats it.
+static std::string FirstErrorLocation(PreprocFixture& f) {
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.severity == DiagSeverity::kError) return f.mgr.FormatLoc(d.loc);
+  }
+  return "<no error was reported>";
+}
+
+// The file name, on a source with no directive at all. Nothing here moves a
+// line, so the line was already right and the name is the whole of the claim:
+// every report made after preprocessing named <preprocessed>, which opens no
+// file.
+TEST(Preprocessor, ReportAfterPreprocessingNamesTheFileItWasWrittenIn) {
+  PreprocFixture f;
+  Arena arena;
+  PreprocessAndParseUnder("design.sv",
+                          "module m;\n"
+                          "endmodule\n"
+                          "%\n",
+                          f, arena);
+
+  // The third line opens no top-level declaration, so Parser::ParseTopLevel
+  // reports it at src/parser/parser.cpp:498, standing at its first column.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "expected top-level declaration", 3, "3.12.1"));
+  EXPECT_EQ(FirstErrorLocation(f), "design.sv:3:1");
+}
+
+// The line, below an `include. §22.12 requires the current line and file name
+// to be stored when an included file is entered and restored when it ends, and
+// the included file's lines are spliced into the output where the directive
+// stood. The offending line is the fourth of top.sv and the seventh of the
+// output, so a run that reports 7 reports a line the user's file does not have.
+TEST(Preprocessor, ReportBelowAnIncludeStandsAtTheIncludingFilesOwnLine) {
+  std::string tmp_dir = "/tmp/deltahdl_test_22_12_origin";
+  std::string inc_path = tmp_dir + "/pad.svh";
+  std::filesystem::create_directories(tmp_dir);
+  {
+    std::ofstream ofs(inc_path);
+    ofs << "// pad a\n// pad b\n// pad c\n";
+  }
+
+  PreprocFixture f;
+  Arena arena;
+  PreprocConfig cfg;
+  cfg.include_dirs.push_back(tmp_dir);
+  PreprocessAndParseUnder("top.sv",
+                          "`include \"pad.svh\"\n"
+                          "module m;\n"
+                          "endmodule\n"
+                          "%\n",
+                          f, arena, cfg);
+
+  // Three lines of pad.svh and the directive's own line stand above the module,
+  // so the report is at line 7 of the preprocessed text.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "expected top-level declaration", 7, "3.12.1"));
+  EXPECT_EQ(FirstErrorLocation(f), "top.sv:4:1");
+
+  std::remove(inc_path.c_str());
+  std::filesystem::remove_all(tmp_dir);
+}
+
+// Both halves together, set by the directive §22.12 defines. `line gives the
+// following line a number and a file name, and until now it gave them to
+// `__FILE__ and `__LINE__ alone while every report ignored it. The file named
+// is one this run was never handed, which is why it is registered with no
+// content: the report can say where the line came from, and there is no text
+// of it to quote back.
+TEST(Preprocessor, ReportBelowALineDirectiveTakesTheNameAndNumberItSet) {
+  PreprocFixture f;
+  Arena arena;
+  PreprocessAndParseUnder("generated.sv",
+                          "`line 3 \"orig.v\" 2\n"
+                          "%\n",
+                          f, arena);
+
+  // The directive leaves its own line in the output, so the report stands at
+  // line 2 of the preprocessed text whatever name that line is given.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "expected top-level declaration", 2, "3.12.1"));
+  EXPECT_EQ(FirstErrorLocation(f), "orig.v:3:1");
 }

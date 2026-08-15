@@ -32,4 +32,16 @@ struct SourceRange {
   SourceLoc end;
 };
 
+// The source one line of preprocessed text was written on. §22.12 requires a
+// compiler to maintain the current line number and file name of the file being
+// compiled, and the preprocessor's output is not that file: it splices in the
+// lines of every `include and joins a `define body that spanned continuation
+// lines, so neither the name nor the count survives it. One of these per output
+// line is what carries both across, so a report about a token of that line can
+// name the file the user wrote and the line they wrote it on.
+struct OutputLineOrigin {
+  uint32_t file_id = 0;
+  uint32_t line = 0;
+};
+
 }  // namespace delta

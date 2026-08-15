@@ -6,10 +6,32 @@ namespace delta {
 
 uint32_t SourceManager::AddFile(std::string path, std::string content) {
   uint32_t id = static_cast<uint32_t>(files_.size()) + 1;
-  FileEntry entry{std::move(path), std::move(content), {}};
+  FileEntry entry{std::move(path), std::move(content), {}, {}};
   ComputeLineOffsets(entry);
   files_.push_back(std::move(entry));
   return id;
+}
+
+uint32_t SourceManager::AddPreprocessedFile(
+    std::string path, std::string content,
+    std::vector<OutputLineOrigin> line_origins) {
+  uint32_t id = static_cast<uint32_t>(files_.size()) + 1;
+  FileEntry entry{
+      std::move(path), std::move(content), {}, std::move(line_origins)};
+  ComputeLineOffsets(entry);
+  files_.push_back(std::move(entry));
+  return id;
+}
+
+SourceLoc SourceManager::ResolveToOrigin(SourceLoc loc) const {
+  if (loc.file_id == 0 || loc.file_id > files_.size()) return loc;
+  const auto& origins = files_[loc.file_id - 1].line_origins;
+  // The last line of the text is the empty one after its final newline, which
+  // no source line wrote, so a position can stand one line past the table.
+  if (loc.line == 0 || loc.line > origins.size()) return loc;
+  const auto& origin = origins[loc.line - 1];
+  if (origin.file_id == 0) return loc;
+  return SourceLoc{origin.file_id, origin.line, loc.column};
 }
 
 std::string_view SourceManager::FilePath(uint32_t file_id) const {
@@ -30,11 +52,13 @@ std::string SourceManager::FormatLoc(SourceLoc loc) const {
   if (!loc.IsValid()) {
     return "<unknown location>";
   }
-  auto path = FilePath(loc.file_id);
-  return std::format("{}:{}:{}", path, loc.line, loc.column);
+  auto at = ResolveToOrigin(loc);
+  auto path = FilePath(at.file_id);
+  return std::format("{}:{}:{}", path, at.line, at.column);
 }
 
-std::string_view SourceManager::GetLineText(SourceLoc loc) const {
+std::string_view SourceManager::GetLineText(SourceLoc where) const {
+  auto loc = ResolveToOrigin(where);
   if (loc.file_id == 0 || loc.file_id > files_.size()) {
     return "";
   }

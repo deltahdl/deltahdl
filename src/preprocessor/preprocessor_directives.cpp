@@ -211,6 +211,20 @@ void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
   line_override_src_line_ = loc.line;
   has_line_override_ = true;
   line_file_override_ = std::string(filename);
+  // §22.12 has the directive set the file name of the line that follows it, so
+  // the name is registered and its id kept for the origins of those lines. It
+  // is registered with no content because this run was never given that file.
+  line_file_override_id_ = 0;
+  if (!line_file_override_.empty()) {
+    auto it = line_file_override_ids_.find(line_file_override_);
+    if (it == line_file_override_ids_.end()) {
+      it = line_file_override_ids_
+               .emplace(line_file_override_,
+                        src_mgr_.AddFile(line_file_override_, ""))
+               .first;
+    }
+    line_file_override_id_ = it->second;
+  }
 }
 
 std::string Preprocessor::ResolveInclude(std::string_view filename,

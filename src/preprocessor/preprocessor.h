@@ -3,6 +3,7 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -74,6 +75,19 @@ class Preprocessor {
   Preprocessor(SourceManager& src_mgr, DiagEngine& diag, PreprocConfig config);
 
   std::string Preprocess(uint32_t file_id);
+
+  // The source each line of everything Preprocess() has returned was written
+  // on, one entry per line and in the order the lines were written. It
+  // accumulates across calls because a driver handed several source files
+  // concatenates the results into one text. §22.12 makes
+  // this the compiler's business: the output splices in the lines of every
+  // `include and joins a `define body that spanned continuation lines, so a
+  // position in it is a position in no file the user wrote. Registering the
+  // output with SourceManager::AddPreprocessedFile and this table is what lets
+  // a report about it name the file and line somebody can open.
+  const std::vector<OutputLineOrigin>& LineOrigins() const {
+    return line_origins_;
+  }
   // §22.14 pairs `begin_keywords with a later `end_keywords, and the region
   // between them is allowed to run past the end of a source file. A region is
   // therefore only known to be unterminated once every source file has been
@@ -84,6 +98,13 @@ class Preprocessor {
 
  private:
   std::string ProcessSource(std::string_view src, uint32_t file_id, int depth);
+
+  // Records that the output line just ended was written on line `line` of
+  // `file_id`. Called wherever a newline is appended to the output, which is
+  // the one place an output line is known to be complete. It does nothing while
+  // recording_origins_ is false, which is how text run for its definitions
+  // alone and appended to no output stays out of the table.
+  void NoteOutputLine(uint32_t file_id, uint32_t line);
 
   // Whether `line` carried the value a keyword on the line before it announced,
   // in which case it belongs to the protected block above rather than being a
@@ -340,6 +361,15 @@ class Preprocessor {
   int include_depth_ = 0;
   static constexpr int kMaxIncludeDepth = 15;
 
+  // The table LineOrigins() answers with, filled as the output is written.
+  std::vector<OutputLineOrigin> line_origins_;
+  // Whether lines being written now reach the output LineOrigins() describes.
+  // False while a recovered protected block is run for what it defines, at
+  // src/preprocessor/preprocessor_protect_keys.cpp:226, because that run
+  // appends its text to no output: an entry recorded for it would name a line
+  // the output does not have and would displace every line after it.
+  bool recording_origins_ = false;
+
  public:
   const TimeScale& CurrentTimescale() const { return current_timescale_; }
   TimeUnit GlobalPrecision() const { return global_precision_; }
@@ -498,6 +528,16 @@ class Preprocessor {
   uint32_t line_override_src_line_ = 0;
   bool has_line_override_ = false;
   std::string line_file_override_;
+  // The id `line_file_override_` is registered under, so an origin can name it.
+  // A `line directive names a file this run was never given, and a file id is
+  // what SourceManager answers a path from, so the name is registered with no
+  // content: the report can say where the line came from, and GetLineText finds
+  // nothing to quote, which is correct because that file was never read.
+  uint32_t line_file_override_id_ = 0;
+  // One id per name, because a machine-generated source carries a `line
+  // directive on many lines and registering each would leave one entry per
+  // directive rather than one per file named.
+  std::unordered_map<std::string, uint32_t> line_file_override_ids_;
   // One entry per `begin_keywords region still open, innermost last. The
   // opening location rides along so an unterminated region can be blamed on
   // the directive that opened it.

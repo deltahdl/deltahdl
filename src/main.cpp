@@ -357,6 +357,11 @@ std::string ReadFile(const std::string& path) {
 
 struct PreprocResult {
   std::string source;
+  // The source each line of `source` was written on, which §22.12 requires a
+  // compiler to maintain and which `source` does not carry: it splices in the
+  // lines of every `include and joins a `define body that spanned continuation
+  // lines. It travels beside `source` because the two are appended together.
+  std::vector<delta::OutputLineOrigin> line_origins;
   delta::NetType default_nettype = delta::NetType::kWire;
   delta::NetType unconnected_drive = delta::NetType::kWire;
   std::vector<std::string> cell_module_names;
@@ -395,6 +400,7 @@ PreprocResult PreprocessSources(const CliOptions& opts,
   // A `begin_keywords region may span source file boundaries (22.14), so the
   // pairing check only makes sense once every file has been preprocessed.
   preproc.ReportUnterminatedKeywordRegions();
+  result.line_origins = preproc.LineOrigins();
   result.default_nettype = preproc.DefaultNetType();
   result.unconnected_drive = preproc.UnconnectedDrive();
   result.cell_module_names = preproc.CellModuleNames();
@@ -409,11 +415,17 @@ PreprocResult PreprocessSources(const CliOptions& opts,
   return result;
 }
 
-delta::CompilationUnit* ParseSource(const std::string& source,
-                                    delta::SourceManager& src_mgr,
-                                    delta::DiagEngine& diag,
-                                    delta::Arena& arena) {
-  auto file_id = src_mgr.AddFile("<preprocessed>", source);
+delta::CompilationUnit* ParseSource(
+    const std::string& source,
+    const std::vector<delta::OutputLineOrigin>& line_origins,
+    delta::SourceManager& src_mgr, delta::DiagEngine& diag,
+    delta::Arena& arena) {
+  // Registered with its origins, so a report about a token of this text names
+  // the file and line somebody can open rather than a position in a buffer
+  // they have never seen. The path stays <preprocessed> because it is what a
+  // position with no origin recorded falls back to.
+  auto file_id =
+      src_mgr.AddPreprocessedFile("<preprocessed>", source, line_origins);
   delta::Lexer lexer(source, file_id, diag);
   delta::Parser parser(lexer, arena, diag);
   return parser.Parse();
@@ -603,7 +615,7 @@ int main(int argc, char* argv[]) {
   }
 
   delta::Arena ast_arena;
-  auto* cu = ParseSource(pp.source, src_mgr, diag, ast_arena);
+  auto* cu = ParseSource(pp.source, pp.line_origins, src_mgr, diag, ast_arena);
   if (diag.HasErrors()) {
     return 1;
   }

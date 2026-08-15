@@ -47,7 +47,30 @@ void Preprocessor::DefinePredefined(std::string name, std::string body) {
 
 std::string Preprocessor::Preprocess(uint32_t file_id) {
   auto content = src_mgr_.FileContent(file_id);
-  return ProcessSource(content, file_id, 0);
+  // The table accumulates across calls rather than starting afresh, because a
+  // driver given several source files concatenates what each call returns:
+  // src/main.cpp:393 appends to one string, so the origins of the whole of it
+  // are what describe the text the lexer is handed.
+  recording_origins_ = true;
+  auto output = ProcessSource(content, file_id, 0);
+  recording_origins_ = false;
+  return output;
+}
+
+void Preprocessor::NoteOutputLine(uint32_t file_id, uint32_t line) {
+  if (!recording_origins_) return;
+  // §22.12's `line directive sets the line number and file name of the lines
+  // after it, so an origin for one of those names what the directive said
+  // rather than where the text stands. The arithmetic is the one
+  // Preprocessor::TryPredefinedMacro answers `__LINE__ with at
+  // src/preprocessor/preprocessor_inline.cpp:46, so a report and a `__LINE__
+  // on the same line agree. The directive's own line is not one of the lines
+  // after it and keeps the position it really has.
+  if (has_line_override_ && line > line_override_src_line_) {
+    line = line_offset_ + (line - line_override_src_line_ - 1);
+    if (line_file_override_id_ != 0) file_id = line_file_override_id_;
+  }
+  line_origins_.push_back({file_id, line});
 }
 
 std::string_view Preprocessor::Trim(std::string_view s) {
@@ -483,6 +506,7 @@ bool Preprocessor::ProcessBlockCommentLine(std::string_view line,
   if (close == std::string_view::npos) {
     output.append(line);
     output.push_back('\n');
+    NoteOutputLine(file_id, line_num);
     return true;
   }
   output.append(line.substr(0, close + 2));
@@ -496,6 +520,7 @@ bool Preprocessor::ProcessBlockCommentLine(std::string_view line,
     }
   }
   output.push_back('\n');
+  NoteOutputLine(file_id, line_num);
   return true;
 }
 
@@ -516,6 +541,7 @@ void Preprocessor::SkipBlockCommentLine(std::string_view line, uint32_t file_id,
     }
   }
   output.push_back('\n');
+  NoteOutputLine(file_id, line_num);
 }
 
 static bool DefineSpansMultipleLines(std::string_view line) {
@@ -572,6 +598,9 @@ struct PreprocLoopOps {
   std::function<bool()> is_active;
   std::function<void(std::string_view)> emit_active_line;
   std::function<void(std::string_view)> note_ignored_line;
+  // Called once the newline ending an output line has been appended, which is
+  // where that line is known to be complete and which source line wrote it.
+  std::function<void()> note_output_line;
 };
 
 // Process one ordinary (non-block-comment) source line: a `define whose body
@@ -609,6 +638,7 @@ static void RunPreprocLoop(std::string_view src, uint32_t& line_num,
       LineCursor cursor{src, pos, eol, line_num};
       ProcessOrdinaryLine(line, cursor, ops);
       output.push_back('\n');
+      ops.note_output_line();
     }
     pos = eol + 1;
   }
@@ -738,6 +768,11 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   ops.note_ignored_line = [&](std::string_view line) {
     StripComments(line, in_block_comment_);
   };
+  // The line just ended is this file's, at the number this frame is on. An
+  // `include has already recorded the included file's lines by the time this
+  // runs, because HandleInclude appends that file's whole output before the
+  // directive's own line is ended.
+  ops.note_output_line = [&] { NoteOutputLine(file_id, line_num); };
 
   RunPreprocLoop(src, line_num, ops, output);
   return output;
