@@ -184,8 +184,21 @@ static std::optional<int64_t> EvalDefparamOverride(
   }
   auto val = ConstEvalInt(ovr.val_expr, ovr.scope);
   if (!val) {
-    diag.Warning(ovr.loc, "defparam value is not constant",
+    // §23.10.1 states that the expression on the right-hand side of a defparam
+    // assignment shall be a constant expression involving only numbers and
+    // references to parameters. A right-hand side that is no constant
+    // expression breaks that rule, so the source is illegal and the report is
+    // an error. Folding can also fail on a right-hand side that is a constant
+    // expression, which breaks no rule and stays the warning it was.
+    if (!IsConstantExpr(ovr.val_expr, ovr.scope)) {
+      diag.Error(ovr.loc,
+                 "defparam right-hand side shall be a constant expression "
+                 "involving only numbers and references to parameters",
                  Subclause("23.10.1"));
+    } else {
+      diag.Warning(ovr.loc, "defparam value is not constant",
+                   Subclause("23.10.1"));
+    }
     rec.applied.insert(rec.key);
     return std::nullopt;
   }

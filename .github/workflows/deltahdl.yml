@@ -383,6 +383,120 @@ jobs:
             fi
           done
           exit $fail
+  # A test that hands deltahdl an illegal source shows the rule it covers is
+  # enforced only if it names the report: a substring of the message, the line
+  # of the test's own source the report stands at, and the exact Subclause("…")
+  # text the emission site passes, in one call to ReportedError in
+  # lib/cpp/test_helpers/helpers_reported_error.h. EXPECT_TRUE(f.has_errors),
+  # EXPECT_TRUE(f.diag.HasErrors()), EXPECT_FALSE(ParseOk(...)) and
+  # EXPECT_EQ(..., CompileOutcome::kFailed) are each satisfied by any rejection,
+  # so a test written for one rule passes when a different rule fired, and
+  # passes when the source never reached the construct the test is about.
+  # SinglePassPrecompile.DescriptionClaimedByTwoLibrariesNamesBothInItsDiagnostic
+  # in test/src/unit/test_parser_subclause_33_05_01.cpp did exactly that until
+  # 28234b4ac. #2961 states the defect in full, and the commits closing #3017,
+  # #3018, #3019, #3020, #3021, #3088 and #3112 converted every site the tree
+  # then held. This job is what keeps them converted: no test observes an
+  # assertion another test file did not make, so nothing else can report a new
+  # one written the old way.
+  #
+  # Two rules, because the four shapes are not equally wrong.
+  #
+  # EXPECT_TRUE or ASSERT_TRUE on has_errors, or on any name ending in
+  # HasErrors(, names no report at all, so it fails wherever it stands. The
+  # name is matched with a prefix so a file-local wrapper is caught too:
+  # EXPECT_TRUE(LexHasErrors("…")) hid five such assertions in
+  # test/src/unit/test_lexer_annex_a_08_08.cpp from the reading behind #3017.
+  #
+  # EXPECT_FALSE on a call ending in Ok(, and EXPECT_EQ against
+  # CompileOutcome::kFailed, also stand as the outcome check beside a
+  # ReportedError for the same run, which 6e204800b records as wanted. Those
+  # two fail only in a TEST body that calls ReportedError nowhere.
+  #
+  # An assertion that a source was ACCEPTED reads the same members and is sound,
+  # because the claim there is that nothing was reported and there is no report
+  # to name. That is why every shape is anchored on the assertion macro:
+  # EXPECT_FALSE(f.diag.HasErrors()) and EXPECT_TRUE(ParseOk(…)) have to pass a
+  # scan that fails their opposites.
+  #
+  # The scan reads a TEST body rather than a line, and joins each file with
+  # tr '\n' ' ' before it matches, because clang-format wraps an assertion whose
+  # argument is a multi-line source string, and because the ReportedError call
+  # answering an EXPECT_FALSE(ElabOk(…)) stands on a later line than the
+  # assertion it answers. // comments are stripped first, so that a shape quoted
+  # in a comment is not read as an assertion; a string literal holding // is
+  # truncated by that, which can only hide a body from this scan, never invent
+  # one.
+  #
+  # Eight bodies are exempt, and every one is sound as written. Six pin what a
+  # fixture helper returns, which is the construct under test there rather than
+  # a rule the source breaks, and each is paired with an acceptance of the same
+  # call. Two sweep Table B.1 through a fixed template whose control run shows
+  # the frame parses, and each word lands in a different parser path, so no one
+  # message or subclause holds across the sweep. 6e204800b records both
+  # readings.
+  #
+  # The list is here rather than in a marker comment in the sources, because an
+  # inline marker hides the exemption where nobody reading this job would see
+  # it, which is what assert-no-inline-directives exists to stop. Nothing else
+  # belongs on it: an assertion that cannot name a report because the rule has
+  # no report is a defect in the program, and it is fixed rather than exempted.
+  # DefparamElaboration.RhsRejectsNonConstantExpression was the one such body,
+  # and #3070 is what took it off this list.
+  assert-no-unnamed-rejections:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check every rejection test names the report it rests on
+        run: |
+          fail=0
+          for f in test/src/unit/*.cpp
+          do
+            found=$(sed 's|//.*||' "$f" | tr '\n' ' ' | awk -v f="$f" '
+              BEGIN {
+                sound["ElaboratorFixture.ElaborateSrcAllowingParseErrorsReportsWithoutFailing"] = 1
+                sound["ElaboratorFixture.ElaborateWithPreprocessorAllowingParseErrorsReportsWithoutFailing"] = 1
+                sound["ElaboratorHarness.ASourceTheElaboratorRejectsIsReportedAsRejected"] = 1
+                sound["ElaboratorHarness.AnElaborationRejectionIsReadableByItsMessage"] = 1
+                sound["ParserHarness.ParseOkTellsAnAcceptedSourceFromARejectedOne"] = 1
+                sound["ParserHarness.ParseWithPreprocessorOkTellsAnAcceptedSourceFromARejected"] = 1
+                sound["KeywordListParsing.NoReservedWordCanNameAVariable"] = 1
+                sound["KeywordListParsing.NoReservedWordCanNameAnythingInAnyPosition"] = 1
+              }
+              {
+                n = split($0, body, /[^A-Za-z0-9_](TYPED_)?TEST(_[FP])?\(/)
+                for (i = 2; i <= n; i++) {
+                  if (!match(body[i], /^[A-Za-z0-9_]+ *, *[A-Za-z0-9_]+ *\)/)) continue
+                  name = substr(body[i], 1, RLENGTH)
+                  sub(/ *, */, ".", name)
+                  sub(/ *\)$/, "", name)
+                  if (name in sound) continue
+                  shape = ""
+                  if (match(body[i], /(EXPECT|ASSERT)_TRUE\([A-Za-z0-9_.>:-]*(has_errors|HasErrors\()/)) {
+                    shape = "an unqualified claim that some error was reported"
+                  } else if (!index(body[i], "ReportedError")) {
+                    if (match(body[i], /(EXPECT|ASSERT)_FALSE\([A-Za-z0-9_.>:-]*Ok\(/)) {
+                      shape = "a false answer from a helper ending in Ok"
+                    } else if (match(body[i], /(EXPECT|ASSERT)_EQ\([^;]*CompileOutcome::kFailed/)) {
+                      shape = "a compile outcome of CompileOutcome::kFailed"
+                    }
+                  }
+                  if (shape == "") continue
+                  msg = "declares " name ", which claims deltahdl rejected a"
+                  msg = msg " source on " shape " and names no report, so it"
+                  msg = msg " passes when a different rule fired; name the"
+                  msg = msg " message, the line and the subclause the emission"
+                  msg = msg " site passes, in one call to ReportedError in"
+                  msg = msg " lib/cpp/test_helpers/helpers_reported_error.h"
+                  print "::error file=" f ",line=1::" f " " msg
+                }
+              }')
+            if [ -n "$found" ]; then
+              echo "$found"
+              fail=1
+            fi
+          done
+          exit $fail
   # Every report names the subclause of IEEE 1800-2023 whose rule it enforces,
   # and names it once. Two things can take that away, and this job fails on
   # either.

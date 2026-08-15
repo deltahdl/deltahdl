@@ -123,7 +123,11 @@ TEST(DefparamElaboration, RhsRejectsNonConstantExpression) {
       "  defparam u.P = data;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors || f.diag.WarningCount() > 0);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "defparam right-hand side shall be a constant "
+                            "expression involving only numbers and references "
+                            "to parameters",
+                            6, "23.10.1"));
 }
 
 TEST(DefparamElaboration, DefparamInGenerateBlockCannotEscapeScope) {

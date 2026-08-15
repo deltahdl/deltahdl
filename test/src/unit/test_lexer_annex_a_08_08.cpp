@@ -1,21 +1,11 @@
 #include <gtest/gtest.h>
 
-#include <string>
-
 #include "fixture_lexer.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
 namespace {
-
-static bool LexHasErrors(const std::string& src) {
-  SourceManager mgr;
-  auto fid = mgr.AddFile("<test>", src);
-  DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  lexer.LexAll();
-  return diag.HasErrors();
-}
 
 TEST(StringLiteralLexing, StringLiteralQuotedString) {
   auto tokens = Lex("\"hello\"");
@@ -107,7 +97,8 @@ TEST(StringLiteralLexing, TripleQuotedStringEscapeSeq) {
 }
 
 TEST(StringLiteralLexing, TripleQuotedStringUnterminatedError) {
-  EXPECT_TRUE(LexHasErrors("\"\"\"no closing triple"));
+  EXPECT_TRUE(ReportedError(LexDiagnostics("\"\"\"no closing triple"),
+                            "unterminated triple-quoted string", 1, "5.9"));
 }
 
 TEST(StringLiteralLexing, TwoConsecutiveStringLiterals) {
@@ -130,19 +121,23 @@ TEST(StringLiteralLexing, TripleQuotedStringEmpty) {
 }
 
 TEST(StringLiteralLexing, QuotedStringNewlineTerminatesError) {
-  EXPECT_TRUE(LexHasErrors("\"before\nafter\""));
+  EXPECT_TRUE(ReportedError(LexDiagnostics("\"before\nafter\""),
+                            "unterminated string literal", 1, "5.9"));
 }
 
 TEST(StringLiteralLexing, QuotedStringUnterminatedAtEofError) {
-  EXPECT_TRUE(LexHasErrors("\"no close quote"));
+  EXPECT_TRUE(ReportedError(LexDiagnostics("\"no close quote"),
+                            "unterminated string literal", 1, "5.9"));
 }
 
 TEST(StringLiteralLexing, TripleQuotedStringPartialCloseError) {
-  EXPECT_TRUE(LexHasErrors("\"\"\"only two closing quotes\"\""));
+  EXPECT_TRUE(ReportedError(LexDiagnostics("\"\"\"only two closing quotes\"\""),
+                            "unterminated triple-quoted string", 1, "5.9"));
 }
 
 TEST(StringLiteralLexing, QuotedStringCarriageReturnTerminatesError) {
-  EXPECT_TRUE(LexHasErrors("\"before\rafter\""));
+  EXPECT_TRUE(ReportedError(LexDiagnostics("\"before\rafter\""),
+                            "unterminated string literal", 1, "5.9"));
 }
 
 }  // namespace
