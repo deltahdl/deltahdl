@@ -180,8 +180,7 @@ static void CollectBlockClassVarDecls(
 void Elaborator::ValidateLocalProtectedAccess(const ModuleDecl* decl) {
   if (class_names_.empty()) return;
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (!is_proc || !item->body) continue;
     // Combine module-scope handles with any declared inside this block.
     auto var_types = class_var_types_;
@@ -351,12 +350,7 @@ void Elaborator::ValidateParameterizedScopeResolution(const ModuleDecl* decl) {
     if (item->kind == ModuleItemKind::kContAssign) {
       CheckParamScopeExpr(item->assign_rhs, parameterized_class_names_, diag_);
     }
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock ||
-                   item->kind == ModuleItemKind::kFinalBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForParamScope(item->body, parameterized_class_names_, diag_);
     }
@@ -554,12 +548,7 @@ static void CheckItemForRestrictedScopePrefix(const ModuleItem* item,
     CheckRestrictedScopePrefixExpr(item->assign_rhs, r, diag);
     return;
   }
-  bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                 item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                 item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                 item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-                 item->kind == ModuleItemKind::kInitialBlock ||
-                 item->kind == ModuleItemKind::kFinalBlock;
+  bool is_proc = IsProceduralItemKind(item->kind);
   if (is_proc && item->body) {
     WalkStmtsForRestrictedScopePrefix(item->body, r, diag);
   }

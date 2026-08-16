@@ -640,12 +640,7 @@ static void CheckAutoVarWritesInProc(
 
 void Elaborator::ValidateAutomaticVarProcWrites(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kInitialBlock ||
-                   item->kind == ModuleItemKind::kFinalBlock ||
-                   item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                   item->kind == ModuleItemKind::kAlwaysLatchBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (!is_proc || !item->body) continue;
     std::unordered_set<std::string_view> auto_vars;
     CollectAutoVarNames(item->body, false, auto_vars);

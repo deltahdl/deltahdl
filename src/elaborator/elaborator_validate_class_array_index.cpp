@@ -191,8 +191,7 @@ void Elaborator::ValidateClassIndexSelect(const ModuleDecl* decl) {
       CheckClassIndexSelectExpr(item->assign_lhs, ctx);
       CheckClassIndexSelectExpr(item->assign_rhs, ctx);
     }
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForClassIndexSelect(item->body, ctx);
     }
@@ -312,8 +311,7 @@ void Elaborator::ValidateStringIndexSelect(const ModuleDecl* decl) {
       CheckStringIndexSelectExpr(item->assign_rhs, var_array_info_, var_types_,
                                  diag_);
     }
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForStringIndexSelect(item->body, var_array_info_, var_types_,
                                     diag_);
@@ -410,8 +408,7 @@ void Elaborator::ValidateIntegralIndexSelect(const ModuleDecl* decl) {
       CheckIntegralIndexSelectExpr(item->assign_rhs, integral_names, var_types_,
                                    diag_);
     }
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForIntegralIndexSelect(item->body, integral_names, var_types_,
                                       diag_);

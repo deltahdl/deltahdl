@@ -413,12 +413,7 @@ void Elaborator::WalkStmtsForClockvarAccess(const Stmt* s) {
 void Elaborator::ValidateClockvarAccess(const ModuleDecl* decl) {
   if (clocking_signals_.empty()) return;
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock ||
-                   item->kind == ModuleItemKind::kFinalBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForClockvarAccess(item->body);
     }
@@ -860,12 +855,7 @@ void Elaborator::WalkStmtsForSyncDriveForm(const Stmt* s) {
 void Elaborator::ValidateSyncDriveForm(const ModuleDecl* decl) {
   if (clocking_signals_.empty()) return;
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock ||
-                   item->kind == ModuleItemKind::kFinalBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) WalkStmtsForSyncDriveForm(item->body);
   }
 }

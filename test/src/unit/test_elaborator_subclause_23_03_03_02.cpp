@@ -58,6 +58,26 @@ TEST(PortConnectionRulesForVariablesElaboration,
                             2, "23.3.3.2"));
 }
 
+// §9.2.2.2 makes always_comb a structured procedure exactly as §9.2.2.1 makes
+// always one, and neither narrows what its body may assign, so the §23.3.3.2
+// rule that a variable input port is not the target of an assignment is the
+// same rule here as in the initial case above. The procedure keyword is the
+// only thing this case varies, because that is what decides whether the
+// assignment is collected as a procedural one at all.
+TEST(PortConnectionRulesForVariablesElaboration,
+     InputPortDrivenFromAlwaysCombIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child(input var logic a);\n"
+      "  always_comb a = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'a' is declared as an input port and "
+                            "cannot be the target of an assignment",
+                            2, "23.3.3.2"));
+}
+
 TEST(PortConnectionRulesForVariablesElaboration, OutputPortConnectsToVariable) {
   ElabFixture f;
   EXPECT_TRUE(

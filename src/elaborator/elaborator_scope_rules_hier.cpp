@@ -17,18 +17,6 @@ namespace delta {
 
 namespace {
 
-// Local copy of the procedural-block predicate (the primary definition lives in
-// elaborator_scope_rules.cpp); both files need it and it is too small to
-// warrant a shared header.
-bool IsProcBodyItem(ModuleItemKind k) {
-  return k == ModuleItemKind::kInitialBlock ||
-         k == ModuleItemKind::kFinalBlock ||
-         k == ModuleItemKind::kAlwaysBlock ||
-         k == ModuleItemKind::kAlwaysCombBlock ||
-         k == ModuleItemKind::kAlwaysFFBlock ||
-         k == ModuleItemKind::kAlwaysLatchBlock;
-}
-
 void CollectMemberAccess(const Expr* e, std::vector<const Expr*>& out) {
   if (!e) return;
   if (e->kind == ExprKind::kMemberAccess) {
@@ -108,7 +96,7 @@ void CollectModuleMemberAccesses(const ModuleDecl* decl,
       CollectMemberAccess(item->assign_lhs, accesses);
       CollectMemberAccess(item->assign_rhs, accesses);
     }
-    if (IsProcBodyItem(item->kind)) {
+    if (IsProceduralItemKind(item->kind)) {
       CollectMemberAccessInStmt(item->body, accesses);
     }
   }
@@ -229,7 +217,7 @@ bool ChildDeclAllowsMemberCheck(const ModuleDecl* child) {
   if (child->decl_kind != ModuleDeclKind::kModule) return false;
   if (!child->modports.empty()) return false;
   for (const auto* item : child->items) {
-    if (IsProcBodyItem(item->kind)) return false;
+    if (IsProceduralItemKind(item->kind)) return false;
     if (item->kind == ModuleItemKind::kGenerateFor ||
         item->kind == ModuleItemKind::kGenerateIf ||
         item->kind == ModuleItemKind::kGenerateCase) {

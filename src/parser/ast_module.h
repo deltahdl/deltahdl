@@ -73,6 +73,41 @@ enum class ModuleItemKind : uint8_t {
   kNestedModuleDecl,
 };
 
+// Whether `kind` is a module item whose body is a procedural statement. §9.2
+// lists the structured procedures: the `initial` procedure of §9.2.1, the
+// `always` procedure in its four spellings -- `always` (§9.2.2.1),
+// `always_comb` (§9.2.2.2), `always_latch` (§9.2.2.3) and `always_ff`
+// (§9.2.2.4) -- and the `final` procedure of §9.2.3. None of the six changes
+// what a statement inside it may contain, so a check over a procedural
+// statement reaches all six.
+//
+// The answer lives beside ModuleItemKind rather than inside the validator that
+// first needed it, because a caller that spells the set out for itself omits
+// part of it. Every such caller listed `always` and `initial` and left the four
+// remaining kinds unchecked, which meant a source rejected when its statement
+// sat in `always` was accepted when the same statement sat in `always_comb`.
+// Written here, a seventh procedural kind added to the enum is added to the
+// predicate in the same place.
+//
+// §9.2 also names a task and a function structured procedures. Neither is one
+// of these six: ModuleItemKind gives each its own kind, and a caller that walks
+// `ModuleItem::body` finds nothing there for either, because a task or function
+// declaration carries its statements under its own declaration rather than
+// inline.
+inline bool IsProceduralItemKind(ModuleItemKind kind) {
+  switch (kind) {
+    case ModuleItemKind::kInitialBlock:
+    case ModuleItemKind::kFinalBlock:
+    case ModuleItemKind::kAlwaysBlock:
+    case ModuleItemKind::kAlwaysCombBlock:
+    case ModuleItemKind::kAlwaysFFBlock:
+    case ModuleItemKind::kAlwaysLatchBlock:
+      return true;
+    default:
+      return false;
+  }
+}
+
 enum class GateKind : uint8_t {
 
   kAnd,

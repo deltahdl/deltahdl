@@ -580,12 +580,7 @@ void Elaborator::ValidatePackageItems() {
                     "not allowed in a package",
                     Subclause("26.2"));
       }
-      if (item->kind == ModuleItemKind::kInitialBlock ||
-          item->kind == ModuleItemKind::kFinalBlock ||
-          item->kind == ModuleItemKind::kAlwaysBlock ||
-          item->kind == ModuleItemKind::kAlwaysCombBlock ||
-          item->kind == ModuleItemKind::kAlwaysFFBlock ||
-          item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+      if (IsProceduralItemKind(item->kind)) {
         diag_.Error(item->loc, "process is not allowed in a package",
                     Subclause("26.2"));
       }

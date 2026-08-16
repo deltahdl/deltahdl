@@ -351,17 +351,6 @@ static void CheckForeachInStmt(
   for (auto& ci : s->case_items) CheckForeachInStmt(ci.body, arrays, diag);
 }
 
-// True for the procedural-block module items (initial/final/always*) whose
-// jump and foreach rules are checked against their single `body` statement.
-static bool IsProceduralBlock(const ModuleItem* item) {
-  return item->kind == ModuleItemKind::kInitialBlock ||
-         item->kind == ModuleItemKind::kFinalBlock ||
-         item->kind == ModuleItemKind::kAlwaysBlock ||
-         item->kind == ModuleItemKind::kAlwaysCombBlock ||
-         item->kind == ModuleItemKind::kAlwaysFFBlock ||
-         item->kind == ModuleItemKind::kAlwaysLatchBlock;
-}
-
 // §12.8 — applies the jump rules to a function/task body and, for a
 // value-returning function, also checks each return statement's expression.
 static void CheckSubroutineJumpRules(const ModuleItem* item, DiagEngine& diag) {
@@ -386,7 +375,7 @@ void Elaborator::ValidateForeachLoops(const ModuleDecl* decl) {
       arrays.emplace(item->name, item);
   }
   for (const auto* item : decl->items) {
-    if (IsProceduralBlock(item) && item->body) {
+    if (IsProceduralItemKind(item->kind) && item->body) {
       CheckForeachInStmt(item->body, arrays, diag_);
     } else if (item->kind == ModuleItemKind::kFunctionDecl ||
                item->kind == ModuleItemKind::kTaskDecl) {
@@ -398,7 +387,7 @@ void Elaborator::ValidateForeachLoops(const ModuleDecl* decl) {
 
 void Elaborator::ValidateJumpStatements(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    if (IsProceduralBlock(item) && item->body) {
+    if (IsProceduralItemKind(item->kind) && item->body) {
       CheckJumpRules(item->body, 0, 0, /*in_subroutine=*/false, diag_);
       continue;
     }

@@ -559,6 +559,24 @@ TEST(AlwaysCombMultiDriver, MultiDriverCombAndInitialErrors) {
                             3, "9.2.2.2"));
 }
 
+TEST(AlwaysCombMultiDriver, MultiDriverCombAndFinalErrors) {
+  // §9.2.2.2: "The variables assigned on the left-hand side of assignments
+  // shall not be assigned by any other process." §9.2 makes the final procedure
+  // a process, so a final block assigning an always_comb target is illegal.
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, y;\n"
+      "  always_comb y = a;\n"
+      "  final y = 1'b0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'y' driven by always_comb and "
+                            "another process",
+                            3, "9.2.2.2"));
+}
+
 TEST(AlwaysCombMultiDriver, CombAndGeneralAlwaysDifferentVarsOk) {
   // §9.2.2.2: the rule only applies when the same variable is driven; distinct
   // targets in an always_comb and a general always are legal.

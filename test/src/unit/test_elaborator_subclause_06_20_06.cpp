@@ -58,6 +58,22 @@ TEST(ConstConstantElaboration, ConstNonblockingReassignmentIsError) {
                             3, "6.20"));
 }
 
+// §6.20.6: a const variable cannot be written wherever the write appears, so
+// the report an assignment inside `initial` draws is the same one an assignment
+// inside `always_ff` draws.
+TEST(ConstConstantElaboration, ConstReassignmentInAlwaysFfIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  const int x = 5;\n"
+      "  logic clk;\n"
+      "  always_ff @(posedge clk) x <= 10;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment to constant 'x'",
+                            4, "6.20"));
+}
+
 TEST(ConstConstantElaboration, ConstInitializedFromParameterSucceeds) {
   ElabFixture f;
   auto* design = ElaborateSrc(

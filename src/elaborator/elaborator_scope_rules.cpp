@@ -126,15 +126,6 @@ void CheckBlockLocalRedeclarations(const Stmt* s, DiagEngine& diag) {
     CheckBlockLocalRedeclarations(ci.body, diag);
 }
 
-bool IsProcBodyItem(ModuleItemKind k) {
-  return k == ModuleItemKind::kInitialBlock ||
-         k == ModuleItemKind::kFinalBlock ||
-         k == ModuleItemKind::kAlwaysBlock ||
-         k == ModuleItemKind::kAlwaysCombBlock ||
-         k == ModuleItemKind::kAlwaysFFBlock ||
-         k == ModuleItemKind::kAlwaysLatchBlock;
-}
-
 // §8.30.1: a weak_reference's type parameter shall name a class type. The same
 // rule already guards module-level variables, class members, and subroutine
 // arguments; this walk extends it to procedural-block local variables, which
@@ -539,7 +530,7 @@ void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
 void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
   ScopeWalk walk;
   for (const auto* item : decl->items) {
-    if (IsProcBodyItem(item->kind)) {
+    if (IsProceduralItemKind(item->kind)) {
       CollectScopeWalk(item->body, walk);
       ValidateLocalWeakRefDecls(item->body, typedefs_, class_names_, diag_);
       CheckBlockLocalRedeclarations(item->body, diag_);
@@ -645,11 +636,12 @@ void ReportProcUnresolved(const ModuleDecl* decl, Pred declared,
                           DiagEngine& diag) {
   std::unordered_set<std::string_view> locals;
   for (const auto* item : decl->items) {
-    if (IsProcBodyItem(item->kind)) CollectProcLocalNames(item->body, locals);
+    if (IsProceduralItemKind(item->kind))
+      CollectProcLocalNames(item->body, locals);
   }
   std::vector<const Expr*> refs;
   for (const auto* item : decl->items) {
-    if (IsProcBodyItem(item->kind)) {
+    if (IsProceduralItemKind(item->kind)) {
       CollectProcRhsIdents(item->body, locals, refs);
     }
   }
@@ -753,7 +745,7 @@ void ReportUnknownScopeBases(const ModuleDecl* decl, Pred known,
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       CollectScopeBases(item->assign_rhs, bases);
-    } else if (IsProcBodyItem(item->kind)) {
+    } else if (IsProceduralItemKind(item->kind)) {
       CollectProcScopeBases(item->body, bases);
     }
   }
@@ -847,7 +839,7 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   // type-incompatible whatever a module imports, so this check answers on its
   // own and is stated before the §23.9 reads below.
   for (const auto* item : decl->items) {
-    if (IsProcBodyItem(item->kind)) {
+    if (IsProceduralItemKind(item->kind)) {
       CheckStringNumericAssigns(item->body, var_types_, diag_);
     }
   }

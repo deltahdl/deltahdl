@@ -755,8 +755,7 @@ void Elaborator::ValidateClassHandleOps(const ModuleDecl* decl) {
                                                    diag_);
       CheckNewOnInterfaceModuleItem(item, unit_, diag_);
     }
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForClassHandleOps(item->body);
     }

@@ -105,20 +105,6 @@ static void WalkStmtsForSequenceEvents(Stmt* s, const SequenceEventCtx& ctx) {
   for (auto& ci : s->case_items) WalkStmtsForSequenceEvents(ci.body, ctx);
 }
 
-static bool IsProcessBlockItem(ModuleItemKind kind) {
-  switch (kind) {
-    case ModuleItemKind::kInitialBlock:
-    case ModuleItemKind::kAlwaysBlock:
-    case ModuleItemKind::kAlwaysCombBlock:
-    case ModuleItemKind::kAlwaysFFBlock:
-    case ModuleItemKind::kAlwaysLatchBlock:
-    case ModuleItemKind::kFinalBlock:
-      return true;
-    default:
-      return false;
-  }
-}
-
 // Walk one module item's statements for sequence-event arguments. A process
 // block's statements live in item->body; a task body's statements live in
 // func_body_stmts (item->body is the module-process body form), so both are
@@ -131,7 +117,7 @@ static void WalkItemForSequenceEvents(
     const ModuleItem* item,
     const std::unordered_set<std::string_view>& seq_names,
     const SequenceDeclMap& seq_decls, DiagEngine& diag) {
-  if (IsProcessBlockItem(item->kind)) {
+  if (IsProceduralItemKind(item->kind)) {
     if (item->body) {
       WalkStmtsForSequenceEvents(const_cast<Stmt*>(item->body),
                                  {seq_names, seq_decls, false, diag});

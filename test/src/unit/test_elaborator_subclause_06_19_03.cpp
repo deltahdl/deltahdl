@@ -71,6 +71,24 @@ TEST(Elaboration, EnumNonblockingIntAssign_Error) {
                             "6.19.3"));
 }
 
+// §6.19.3: the strong-typing rule holds in every procedural block, not only in
+// `initial` and `always`. An integer assigned to an enum variable inside an
+// `always_comb` block is rejected exactly as EnumStrictTypeCheck_Error's
+// `initial` form is.
+TEST(Elaboration, EnumAlwaysCombIntAssign_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {a, b, c, d} e;\n"
+      "  e val;\n"
+      "  always_comb val = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 4,
+                            "6.19.3"));
+}
+
 TEST(Elaboration, EnumExprAssignNoCast_Error) {
   ElabFixture f;
   ElaborateSrc(

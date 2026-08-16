@@ -232,8 +232,7 @@ void Elaborator::ValidateArrayAssignments(const ModuleDecl* decl) {
     if (item->kind == ModuleItemKind::kContAssign) {
       ValidateOneArrayAssignment(item);
     }
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForArrayAssign(item->body);
     }
@@ -415,9 +414,7 @@ void Elaborator::ValidateArrayArgTypes(const ModuleDecl* decl) {
   const ArrayArgTypeCtx kCtx{all_decls, var_array_info_, class_names_,
                              typedefs_, diag_};
   for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock ||
-        item->kind == ModuleItemKind::kAlwaysBlock ||
-        item->kind == ModuleItemKind::kFinalBlock) {
+    if (IsProceduralItemKind(item->kind)) {
       WalkStmtForArrayArgTypes(item->body, kCtx);
     }
     if (item->kind == ModuleItemKind::kFunctionDecl ||
@@ -485,8 +482,7 @@ void Elaborator::ValidateAssocArraySlices(const ModuleDecl* decl) {
       CheckAssocSliceExpr(item->assign_lhs, assoc_names, diag_);
       CheckAssocSliceExpr(item->assign_rhs, assoc_names, diag_);
     }
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForAssocSlice(item->body, assoc_names, diag_);
     }
@@ -631,8 +627,7 @@ void Elaborator::ValidateAssocWildcardTraversal(const ModuleDecl* decl) {
       CheckWildcardTraversalExpr(item->assign_rhs, wildcard_names, var_types_,
                                  diag_);
     }
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForWildcardTraversal(item->body, wildcard_names, var_types_,
                                     diag_);
@@ -789,8 +784,7 @@ void Elaborator::ValidateAssocTraversalArgType(const ModuleDecl* decl) {
       CheckTraversalArgTypeExpr(item->assign_rhs, assoc_keys, var_types_,
                                 diag_);
     }
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body)
       WalkStmtsForTraversalArgType(item->body, assoc_keys, var_types_, diag_);
   }
@@ -909,8 +903,7 @@ void Elaborator::ValidateArrayOrderingMethods(const ModuleDecl* decl) {
       CheckArrayOrderingExpr(item->assign_lhs, var_array_info_, diag_);
       CheckArrayOrderingExpr(item->assign_rhs, var_array_info_, diag_);
     }
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForArrayOrdering(item->body, var_array_info_, diag_);
     }

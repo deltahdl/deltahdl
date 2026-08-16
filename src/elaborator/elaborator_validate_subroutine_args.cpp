@@ -570,15 +570,6 @@ static void WalkStmtForScopeRandomize(const Stmt* s, DiagEngine& diag) {
   for (const auto& ci : s->case_items) WalkStmtForScopeRandomize(ci.body, diag);
 }
 
-static bool IsProceduralBlock(const ModuleItem* item) {
-  return item->kind == ModuleItemKind::kInitialBlock ||
-         item->kind == ModuleItemKind::kAlwaysBlock ||
-         item->kind == ModuleItemKind::kAlwaysCombBlock ||
-         item->kind == ModuleItemKind::kAlwaysFFBlock ||
-         item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-         item->kind == ModuleItemKind::kFinalBlock;
-}
-
 // Builds a name→decl map of all callable subroutines (the elaborator's known
 // functions plus the task declarations local to `decl`).
 static std::unordered_map<std::string_view, const ModuleItem*> BuildAllDecls(
@@ -597,7 +588,8 @@ static std::unordered_map<std::string_view, const ModuleItem*> BuildAllDecls(
 static void ValidateScopeRandomizeInDecl(const ModuleDecl* decl,
                                          DiagEngine& diag) {
   for (const auto* item : decl->items) {
-    if (IsProceduralBlock(item)) WalkStmtForScopeRandomize(item->body, diag);
+    if (IsProceduralItemKind(item->kind))
+      WalkStmtForScopeRandomize(item->body, diag);
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
       for (const auto* s : item->func_body_stmts)
@@ -713,7 +705,7 @@ static void ValidateContAssignCallArgs(
 // Validates the subroutine-call rules in one top-level item.
 static void ValidateCallArgsInItem(const ModuleItem* item,
                                    const SubroutineCallContext& ctx) {
-  if (IsProceduralBlock(item)) {
+  if (IsProceduralItemKind(item->kind)) {
     ValidateProcBlockEvents(item, ctx);
   }
 
@@ -920,7 +912,7 @@ void Elaborator::ValidateParameterizedMailboxCalls(const ModuleDecl* decl) {
   if (mbx_elem.empty()) return;
 
   for (const auto* item : decl->items) {
-    if (IsProceduralBlock(item)) {
+    if (IsProceduralItemKind(item->kind)) {
       CheckMailboxCallStmt(item->body, mbx_elem, var_kinds, diag_);
     }
     if (item->kind == ModuleItemKind::kFunctionDecl ||

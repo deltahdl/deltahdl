@@ -809,8 +809,7 @@ void Elaborator::ValidateEnumAssignments(const ModuleDecl* decl) {
       diag_.Error(item->loc, "integer assigned to enum variable without cast",
                   Subclause("6.19.3"));
     }
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForEnumAssign(item->body);
     }
@@ -839,8 +838,7 @@ void Elaborator::WalkStmtsForConstAssign(const Stmt* s) {
 
 void Elaborator::ValidateConstAssignments(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForConstAssign(item->body);
     }

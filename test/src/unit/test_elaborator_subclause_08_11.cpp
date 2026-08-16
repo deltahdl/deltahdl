@@ -39,6 +39,25 @@ TEST(ThisElaboration, ThisInModuleAlwaysBlockError) {
       "'this' shall only be used within non-static class methods", 3, "8.11"));
 }
 
+// §8.11 holds for every procedural block a module can contain, not just
+// `always`. Elaborator::ValidateThisInItem selects the item kinds it checks
+// with IsProceduralItemKind in src/parser/ast_module.h, which names
+// always_comb alongside always, always_ff, always_latch, initial and final.
+// The report stands at the `always_comb` keyword, the module item's own
+// location.
+TEST(ThisElaboration, ThisInModuleAlwaysCombBlockError) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  int y;\n"
+      "  always_comb y = this.data;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'this' shall only be used within non-static class methods", 3, "8.11"));
+}
+
 TEST(ThisElaboration, ThisInModuleFunctionError) {
   ElabFixture f;
   ElabOk(

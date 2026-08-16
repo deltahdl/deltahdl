@@ -56,12 +56,7 @@ void Elaborator::WalkStmtsForStringConcatLvalue(const Stmt* s) {
 
 void Elaborator::ValidateStringConcatLvalue(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock ||
-                   item->kind == ModuleItemKind::kFinalBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForStringConcatLvalue(item->body);
     }
@@ -270,12 +265,7 @@ void Elaborator::WalkStmtsForStreamingContext(const Stmt* s) {
 
 void Elaborator::ValidateStreamingConcatContext(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock ||
-                   item->kind == ModuleItemKind::kFinalBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForStreamingContext(item->body);
     }
@@ -474,12 +464,7 @@ void Elaborator::WalkStmtsForBitStreamCast(const Stmt* s) {
 
 void Elaborator::ValidateBitStreamCast(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock ||
-                   item->kind == ModuleItemKind::kFinalBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForBitStreamCast(item->body);
     }
@@ -556,8 +541,7 @@ void Elaborator::ValidateHierRefIntoChecker(const ModuleDecl* decl) {
                     "hierarchical reference into a checker is not permitted",
                     Subclause("23.6"));
     }
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body)
       WalkStmtsForCheckerRef(item->body, checker_inst_names_, diag_);
   }
@@ -601,15 +585,6 @@ static void WalkStmtsForFreeBlockingAssign(
 // only. Collects the free (rand) checker variables declared in the checker body
 // and rejects any continuous assign or blocking procedural assign that targets
 // one. Runs only on checker declarations.
-// The module items that carry a procedural body.
-static bool IsProceduralBlockItem(ModuleItemKind kind) {
-  return kind == ModuleItemKind::kInitialBlock ||
-         kind == ModuleItemKind::kAlwaysBlock ||
-         kind == ModuleItemKind::kAlwaysCombBlock ||
-         kind == ModuleItemKind::kAlwaysLatchBlock ||
-         kind == ModuleItemKind::kAlwaysFFBlock;
-}
-
 // §17.7.1: a free checker variable is updated only by a nonblocking
 // assignment, so a continuous assignment may not target one.
 static void CheckContAssignNotFreeVariable(
@@ -638,7 +613,7 @@ void Elaborator::ValidateFreeCheckerVariableAssignments(
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign)
       CheckContAssignNotFreeVariable(item, free_vars, diag_);
-    if (IsProceduralBlockItem(item->kind) && item->body)
+    if (IsProceduralItemKind(item->kind) && item->body)
       WalkStmtsForFreeBlockingAssign(item->body, free_vars, diag_);
   }
 }
@@ -760,9 +735,7 @@ void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
                     "the program is not permitted",
                     Subclause("24.3"));
     }
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock ||
-                   item->kind == ModuleItemKind::kFinalBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body)
       WalkStmtsForProgramRef(item->body, program_inst_names_, diag_);
   }
@@ -872,8 +845,7 @@ static void CheckHierRefToAutomatic(const ModuleDecl* decl,
       if (ExprRefersToAutomatic(item->assign_rhs, rule.names))
         diag.Error(item->loc, std::string(rule.message), rule.subclause);
     }
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) WalkStmtsForAutoRef(item->body, rule, diag);
   }
 }
@@ -966,12 +938,7 @@ void Elaborator::ValidateProgramSubroutineCall(const ModuleDecl* decl) {
       WalkExprForProgramCall(item->assign_rhs, program_inst_names_, diag_,
                              item->loc);
     }
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock ||
-                   item->kind == ModuleItemKind::kFinalBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body)
       WalkStmtForProgramCall(item->body, program_inst_names_, diag_);
   }

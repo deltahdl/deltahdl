@@ -47,12 +47,7 @@ void Elaborator::WalkStmtsForCast(const Stmt* s) {
 
 void Elaborator::ValidateCastOperations(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock ||
-                   item->kind == ModuleItemKind::kFinalBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForCast(item->body);
     }
@@ -121,14 +116,11 @@ void Elaborator::WalkStmtsForAssignInExpr(const Stmt* s) {
 
 void Elaborator::ValidateAssignInExprRestrictions(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock) {
+    if (IsProceduralItemKind(item->kind)) {
       for (const auto& ev : item->sensitivity) {
         WalkExprForAssignInExpr(ev.signal, true);
       }
       if (item->body) WalkStmtsForAssignInExpr(item->body);
-    }
-    if (item->kind == ModuleItemKind::kInitialBlock && item->body) {
-      WalkStmtsForAssignInExpr(item->body);
     }
     if (item->kind == ModuleItemKind::kContAssign && item->assign_rhs) {
       WalkExprForAssignInExpr(item->assign_rhs, true);
@@ -532,12 +524,7 @@ void Elaborator::WalkStmtsForAssocConcatTarget(const Stmt* s) {
 
 void Elaborator::ValidateAssocConcatTarget(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock ||
-        item->kind == ModuleItemKind::kFinalBlock ||
-        item->kind == ModuleItemKind::kAlwaysBlock ||
-        item->kind == ModuleItemKind::kAlwaysCombBlock ||
-        item->kind == ModuleItemKind::kAlwaysFFBlock ||
-        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+    if (IsProceduralItemKind(item->kind)) {
       WalkStmtsForAssocConcatTarget(item->body);
     }
   }

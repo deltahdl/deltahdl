@@ -119,6 +119,29 @@ TEST(InterconnectElaboration, ForceIsError) {
                             3, "6.6.8"));
 }
 
+// The same force, moved out of `initial` and into `always_latch`. §9.2.2.3
+// makes an always_latch procedure a structured procedure like any other, and
+// §6.6.8 forbids the interconnect net in a procedural continuous assignment
+// whichever keyword introduced the procedure.
+// Elaborator::ValidateItemConstraints decides which module items carry a
+// procedural body, so a case that only ever writes `initial` or `always` cannot
+// tell whether the other four kinds reach CheckInterconnectProcContAssign at
+// all.
+TEST(InterconnectElaboration, ForceOnInterconnectFromAlwaysLatchIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  interconnect ic;\n"
+      "  logic x;\n"
+      "  always_latch force ic = x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interconnect net cannot be used in procedural "
+                            "continuous assignment",
+                            4, "6.6.8"));
+}
+
 TEST(InterconnectElaboration, ReleaseIsError) {
   ElabFixture f;
   ElaborateSrc(

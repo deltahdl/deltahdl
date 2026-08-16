@@ -14,7 +14,7 @@
 namespace delta {
 
 void Elaborator::ValidateEdgeOnReal(const ModuleItem* item) {
-  if (item->kind != ModuleItemKind::kAlwaysBlock) return;
+  if (!IsProceduralItemKind(item->kind)) return;
   for (const auto& ev : item->sensitivity) {
     if (ev.edge == Edge::kNone) continue;
     auto name = ExprIdent(ev.signal);
@@ -44,7 +44,7 @@ void Elaborator::ValidateChandleContAssign(const ModuleItem* item) {
 }
 
 void Elaborator::ValidateChandleSensitivity(const ModuleItem* item) {
-  if (item->kind != ModuleItemKind::kAlwaysBlock) return;
+  if (!IsProceduralItemKind(item->kind)) return;
   for (const auto& ev : item->sensitivity) {
     if (IsChandleVar(ev.signal, var_types_)) {
       diag_.Error(item->loc, "chandle cannot appear in event expression",
@@ -182,8 +182,7 @@ void Elaborator::ValidateChandleOps(const ModuleDecl* decl) {
   }
   if (!has_chandle) return;
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForChandleOps(item->body);
     }
@@ -244,7 +243,7 @@ void Elaborator::ValidateVirtualInterfaceContAssign(const ModuleItem* item) {
 }
 
 void Elaborator::ValidateVirtualInterfaceSensitivity(const ModuleItem* item) {
-  if (item->kind != ModuleItemKind::kAlwaysBlock) return;
+  if (!IsProceduralItemKind(item->kind)) return;
   for (const auto& ev : item->sensitivity) {
     if (ExprUsesVirtualInterface(ev.signal, var_types_)) {
       diag_.Error(item->loc,
@@ -635,8 +634,7 @@ void Elaborator::ValidateVirtualInterfaceOps(const ModuleDecl* decl) {
   CollectExternalDefparamInsts(decl, interface_inst_types_,
                                vi_external_defparam_insts_);
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForVirtualInterfaceOps(item->body);
     }
@@ -727,8 +725,7 @@ void Elaborator::ValidateEventOps(const ModuleDecl* decl) {
   }
   if (!has_event) return;
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForEventOps(item->body);
     }

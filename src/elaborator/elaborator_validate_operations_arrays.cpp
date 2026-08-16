@@ -56,12 +56,7 @@ void Elaborator::WalkStmtsForAssocOperand(const Stmt* s) {
 
 void Elaborator::ValidateAssocOperandInExpr(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock ||
-        item->kind == ModuleItemKind::kFinalBlock ||
-        item->kind == ModuleItemKind::kAlwaysBlock ||
-        item->kind == ModuleItemKind::kAlwaysCombBlock ||
-        item->kind == ModuleItemKind::kAlwaysFFBlock ||
-        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+    if (IsProceduralItemKind(item->kind)) {
       WalkStmtsForAssocOperand(item->body);
     }
     if (item->kind == ModuleItemKind::kContAssign) {
@@ -147,12 +142,7 @@ void Elaborator::WalkStmtsForArrayPatternElemType(const Stmt* s) {
 
 void Elaborator::ValidateArrayPatternElemType(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock ||
-        item->kind == ModuleItemKind::kFinalBlock ||
-        item->kind == ModuleItemKind::kAlwaysBlock ||
-        item->kind == ModuleItemKind::kAlwaysCombBlock ||
-        item->kind == ModuleItemKind::kAlwaysFFBlock ||
-        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+    if (IsProceduralItemKind(item->kind)) {
       WalkStmtsForArrayPatternElemType(item->body);
     }
     CheckArrayPatternElemTypeInInit(item);
@@ -198,12 +188,7 @@ void Elaborator::WalkStmtsForReplicateTargetingArray(const Stmt* s) {
 
 void Elaborator::ValidateReplicateTargetingArray(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock ||
-        item->kind == ModuleItemKind::kFinalBlock ||
-        item->kind == ModuleItemKind::kAlwaysBlock ||
-        item->kind == ModuleItemKind::kAlwaysCombBlock ||
-        item->kind == ModuleItemKind::kAlwaysFFBlock ||
-        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+    if (IsProceduralItemKind(item->kind)) {
       WalkStmtsForReplicateTargetingArray(item->body);
     }
     CheckReplicateTargetingArrayInit(item);
@@ -343,12 +328,7 @@ void Elaborator::WalkStmtsForArrayElementPartSelect(const Stmt* s) {
 
 void Elaborator::ValidateArrayElementPartSelect(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kInitialBlock ||
-                   item->kind == ModuleItemKind::kFinalBlock ||
-                   item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                   item->kind == ModuleItemKind::kAlwaysLatchBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForArrayElementPartSelect(item->body);
     }
@@ -454,12 +434,7 @@ void Elaborator::WalkStmtsForArrayConcatNesting(const Stmt* s) {
 
 void Elaborator::ValidateUnpackedArrayConcatNesting(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock ||
-        item->kind == ModuleItemKind::kFinalBlock ||
-        item->kind == ModuleItemKind::kAlwaysBlock ||
-        item->kind == ModuleItemKind::kAlwaysCombBlock ||
-        item->kind == ModuleItemKind::kAlwaysFFBlock ||
-        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+    if (IsProceduralItemKind(item->kind)) {
       WalkStmtsForArrayConcatNesting(item->body);
     }
     CheckArrayConcatNestingInInit(item);
@@ -536,12 +511,7 @@ void Elaborator::WalkStmtsForUnsizedInConcat(const Stmt* s) {
 
 void Elaborator::ValidateUnsizedInConcat(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock ||
-                   item->kind == ModuleItemKind::kFinalBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForUnsizedInConcat(item->body);
     }
@@ -608,12 +578,7 @@ void Elaborator::WalkStmtsForSelectOnConcatLvalue(const Stmt* s) {
 
 void Elaborator::ValidateSelectOnConcatLvalue(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock ||
-                   item->kind == ModuleItemKind::kFinalBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForSelectOnConcatLvalue(item->body);
     }
@@ -661,12 +626,7 @@ void Elaborator::WalkStmtsForReplicateLvalue(const Stmt* s) {
 
 void Elaborator::ValidateReplicateLvalue(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock ||
-                   item->kind == ModuleItemKind::kFinalBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForReplicateLvalue(item->body);
     }
@@ -826,12 +786,7 @@ void Elaborator::WalkStmtsForReplicateMultiplier(const Stmt* s) {
 void Elaborator::ValidateReplicateMultiplier(const ModuleDecl* decl) {
   const ScopeMap& scope = replicate_multiplier_scope_;
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock ||
-                   item->kind == ModuleItemKind::kFinalBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForReplicateMultiplier(item->body);
       WalkStmtsForZeroReplicateStandalone(item->body, scope, diag_);

@@ -150,8 +150,7 @@ void Elaborator::WalkStmtsForAggregateCompare(const Stmt* s) {
 
 void Elaborator::ValidateAggregateComparisons(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForAggregateCompare(item->body);
     }
@@ -279,8 +278,7 @@ void Elaborator::WalkStmtsForTypeRefCompare(const Stmt* s) {
 
 void Elaborator::ValidateTypeRefComparisons(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForTypeRefCompare(item->body);
     }
@@ -417,8 +415,7 @@ void Elaborator::ValidateTypeRefArgs(const ModuleDecl* decl) {
     if (item->data_type.type_ref_expr) {
       CheckTypeRefArgInner(item->data_type.type_ref_expr, item->loc);
     }
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForTypeRefArg(item->body);
     }
@@ -486,8 +483,7 @@ void Elaborator::ValidateTaggedUnionMembers(const ModuleDecl* decl) {
     if (item->kind == ModuleItemKind::kVarDecl && item->init_expr) {
       CheckTaggedMemberName(item->name, item->init_expr);
     }
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForTaggedExpr(item->body);
     }
@@ -600,8 +596,7 @@ void Elaborator::WalkStmtsForRealOps(const Stmt* s) {
 
 void Elaborator::ValidateRealOperatorRestrictions(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
+    bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForRealOps(item->body);
     }

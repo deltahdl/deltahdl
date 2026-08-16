@@ -222,8 +222,7 @@ void Elaborator::ValidateStaticMethodBodies(const ModuleDecl* decl) {
 }
 
 void Elaborator::ValidateThisInItem(const ModuleItem* item) {
-  bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                 item->kind == ModuleItemKind::kInitialBlock;
+  bool is_proc = IsProceduralItemKind(item->kind);
   if (is_proc && item->body && StmtRefsThisOrSuper(item->body)) {
     diag_.Error(item->loc,
                 "'this' shall only be used within non-static class methods",

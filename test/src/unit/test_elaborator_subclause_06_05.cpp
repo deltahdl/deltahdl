@@ -547,4 +547,64 @@ TEST(NetsAndVariables, ContinuousAndAlwaysCombAssignmentsToOneVariableError) {
       "variable 'y' has both continuous and procedural assignments", 4, "6.5"));
 }
 
+// §6.5 bars a net from being the target of a procedural assignment whichever
+// procedure encloses it, and §9.2.2.2 makes `always_comb` one such procedure.
+// NetCannotBeProcedurallyAssigned above writes the same statement in `initial`
+// and expects the same report, because neither subclause makes the procedure
+// keyword decide the rule.
+TEST(NetsAndVariables, NetAssignedFromAlwaysCombError) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  wire w;\n"
+      "  always_comb w = 1;\n"
+      "endmodule\n",
+      f);
+  // ValidateProceduralNetAssign stands the report at the assignment, which is
+  // the location CollectProcTargets recorded in proc_assign_targets_.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "net 'w' cannot be the target of a procedural assignment", 3, "6.5"));
+}
+
+// §9.2.3's `final` is a procedure too, and it reaches the procedural-item set
+// by its own ModuleItemKind rather than by any of the `always` enumerators, so
+// this names the §6.5 net rule for the one kind the three `always_` cases
+// cannot speak for.
+TEST(NetsAndVariables, NetAssignedFromFinalError) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  wire w;\n"
+      "  final w = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "net 'w' cannot be the target of a procedural assignment", 3, "6.5"));
+}
+
+// §6.5's bar on mixing the two kinds of assignment holds for a procedural
+// assignment written in §9.2.2.4's `always_ff`, exactly as
+// ContinuousAndAlwaysCombAssignmentsToOneVariableError shows it holding for
+// `always_comb`. The report is reached through proc_assign_targets_, so this
+// covers whether that map is populated from an `always_ff` body.
+TEST(NetsAndVariables, ContinuousAndAlwaysFfAssignmentsToOneVariableError) {
+  ElabFixture f;
+  Elaborate(
+      "module top();\n"
+      "  logic clk;\n"
+      "  logic a;\n"
+      "  logic y;\n"
+      "  assign y = a;\n"
+      "  always_ff @(posedge clk) y <= a;\n"
+      "endmodule\n",
+      f);
+  // ValidateMixedAssignments stands the report at the continuous assignment,
+  // not at the procedural one.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'y' has both continuous and procedural assignments", 5, "6.5"));
+}
+
 }  // namespace

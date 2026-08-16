@@ -600,12 +600,17 @@ static void CollectProcessLhsInfo(const ModuleDecl* decl,
       std::string prefix = LongestStaticPrefix(item->assign_lhs, scope);
       if (!prefix.empty()) drivers.cont_assign_lhs.insert(std::move(prefix));
     }
-    // §9.2.2.2: an always_comb LHS shall not be assigned by any other process,
-    // which includes a general-purpose always block or an initial block. Their
-    // assignment targets are gathered separately so an overlap with an
-    // always_comb prefix can be flagged.
+    // §9.2.2.2: the variables an always_comb assigns "shall not be assigned by
+    // any other process". §9.2 makes the general purpose always procedure, the
+    // initial procedure and the final procedure each a process, so all three
+    // are gathered here; their assignment targets are kept apart from `procs`
+    // so an overlap with an always_comb prefix can be flagged. always_comb,
+    // always_latch and always_ff are the ones that go into `procs` instead,
+    // because a process is also compared against the other two of its own three
+    // kinds rather than only against an always_comb.
     if (item->kind == ModuleItemKind::kAlwaysBlock ||
-        item->kind == ModuleItemKind::kInitialBlock) {
+        item->kind == ModuleItemKind::kInitialBlock ||
+        item->kind == ModuleItemKind::kFinalBlock) {
       CollectStmtLhsPrefixes(item->body, drivers.general_proc_lhs, scope);
     }
   }
@@ -729,7 +734,8 @@ struct ContTarget {
 // Gather the continuous-assignment targets of `decl` and the assignment targets
 // of its general procedural blocks. always_comb, always_latch, and always_ff
 // are left out: CheckAlwaysCombMultiDriver already covers them at element
-// granularity.
+// granularity. The initial, always and final procedures §9.2 defines have no
+// such second pass, so all three are gathered here.
 static void CollectAggregateDriverTargets(
     const ModuleDecl* decl, const ScopeMap& scope,
     std::vector<ContTarget>& conts,
@@ -743,7 +749,8 @@ static void CollectAggregateDriverTargets(
       conts.push_back({std::move(prefix), aggregate, item->loc});
     }
     if (item->kind == ModuleItemKind::kInitialBlock ||
-        item->kind == ModuleItemKind::kAlwaysBlock) {
+        item->kind == ModuleItemKind::kAlwaysBlock ||
+        item->kind == ModuleItemKind::kFinalBlock) {
       CollectStmtLhsPrefixes(item->body, proc_prefixes, scope);
     }
   }

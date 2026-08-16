@@ -328,12 +328,7 @@ void Elaborator::ValidateVirtualInterfaceClocking(const ModuleDecl* decl) {
         WalkStmtsForVirtualInterfaceClocking(item->body);
       }
     } else {
-      bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                     item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                     item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                     item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-                     item->kind == ModuleItemKind::kInitialBlock ||
-                     item->kind == ModuleItemKind::kFinalBlock;
+      bool is_proc = IsProceduralItemKind(item->kind);
       if (is_proc && item->body) {
         WalkStmtsForVifClocking(item->body, module_vifs, module_mps, unit_,
                                 diag_);
@@ -530,15 +525,6 @@ void WalkStmtsForInterfaceObjectAccess(const Stmt* s,
   WalkInterfaceObjectAccessChildStmts(s, ctx);
 }
 
-bool IsProceduralBlockItem(ModuleItemKind kind) {
-  return kind == ModuleItemKind::kAlwaysBlock ||
-         kind == ModuleItemKind::kAlwaysCombBlock ||
-         kind == ModuleItemKind::kAlwaysFFBlock ||
-         kind == ModuleItemKind::kAlwaysLatchBlock ||
-         kind == ModuleItemKind::kInitialBlock ||
-         kind == ModuleItemKind::kFinalBlock;
-}
-
 // Runs the interface-object-access checks for one module item, using the
 // module-level interface-port and virtual-interface maps. Task/function bodies
 // are walked with their formal-argument-scoped maps, continuous assignments are
@@ -557,7 +543,7 @@ void CheckInterfaceObjectAccessItem(const ModuleItem* item,
   } else if (item->kind == ModuleItemKind::kContAssign) {
     CheckInterfaceObjectAccessExpr(item->assign_lhs, module_ctx);
     CheckInterfaceObjectAccessExpr(item->assign_rhs, module_ctx);
-  } else if (IsProceduralBlockItem(item->kind) && item->body) {
+  } else if (IsProceduralItemKind(item->kind) && item->body) {
     WalkStmtsForInterfaceObjectAccess(item->body, module_ctx);
   }
 }
