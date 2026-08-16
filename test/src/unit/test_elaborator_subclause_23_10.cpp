@@ -1,5 +1,6 @@
 #include "fixture_elaborator.h"
 #include "helpers_child_instance.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -463,6 +464,93 @@ TEST(ParameterOverride, TypeParameterOverriddenByDefaultClassSpecialization) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   ExpectVariableWidth(SoleChildInstance(design), "data", 32u);
+}
+
+// §8.25.1 (printed page 205) states that "not all parameterized classes have a
+// default specialization since it is legal for a class to not provide parameter
+// defaults", and that in that case "all specializations shall override at least
+// those parameters with no defaults". D#(4) overrides the only such parameter,
+// so the child's handle is declared from a concrete specialization and nothing
+// is reported. The companion below writes D unspecialized and is reported, so
+// this case cannot pass by nothing ever being reported here.
+TEST(ParameterOverride,
+     BareClassSpecializationOverrideSuppliesTheClassParameter) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class D #(int p);\n"
+      "  int data;\n"
+      "endclass\n"
+      "module child #(parameter type P = int)();\n"
+      "  P obj;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.P(D#(4))) u0();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §8.25.1 makes the unadorned D illegal where D provides no default for p, the
+// LRM's own `D obj;` example. The override binds the child's P to D, so the
+// child's declaration is that example and is reported at the declaration rather
+// than passed over because the name written there is P.
+TEST(ParameterOverride, BareClassNameOverrideHasNoDefaultSpecialization) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class D #(int p);\n"
+      "  int data;\n"
+      "endclass\n"
+      "module child #(parameter type P = int)();\n"
+      "  P obj;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.P(D)) u0();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "has no default specialization; parameter", 5,
+                            "8.25"));
+}
+
+// §8.30.1 requires the type parameter of weak_reference to be a class type, and
+// §8.25 (printed page 204) makes weak_reference#(my_obj) and
+// weak_reference#(int) different types. This is the pair that turns on which
+// argument the specialization carries rather than on whether it carries one:
+// my_obj is a class, so nothing is reported.
+TEST(ParameterOverride, BareClassSpecializationOverrideCarriesItsArgument) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class my_obj;\n"
+      "endclass\n"
+      "module child #(parameter type P = int)();\n"
+      "  P wr;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.P(weak_reference#(my_obj))) u0();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The other half of that pair: int is not a class type, so §8.30.1 rejects the
+// same declaration. An override that dropped the argument would report neither
+// case, and one that dropped the class would report both.
+TEST(ParameterOverride,
+     BareClassSpecializationOverrideRejectsANonClassArgument) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child #(parameter type P = int)();\n"
+      "  P wr;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.P(weak_reference#(int))) u0();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "weak_reference type parameter shall be a class type", 2, "8.30.1"));
 }
 
 }  // namespace

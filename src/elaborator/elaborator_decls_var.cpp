@@ -52,6 +52,33 @@ static void ValidateWeakReferenceTypeParam(
   }
 }
 
+// Rewrites a declared type name that is bound to a class to the class it names.
+//
+// §6.20.3 lets a type parameter resolve to a class type, and §6.18 lets a
+// typedef name one, so `P obj;` declares a handle when `P` is bound to `D`.
+// Both bindings live in the typedef map under the written name, and the
+// declaration keeps that name, so every check that recognizes a handle by
+// looking the declared name up in class_names_ misses the declaration
+// entirely -- the name there is `P` and the class is `D`. Rewriting the name is
+// what puts the declaration in front of those checks, and it carries the
+// specialization arguments §8.25 makes the type depend on along with it.
+// Only the three fields that say which type it is are taken, so a qualifier or
+// a dimension written on the declaration itself survives.
+static void AdoptClassTypedefBinding(
+    DataType& dtype, const TypedefMap& typedefs,
+    const std::unordered_set<std::string_view>& class_names) {
+  if (dtype.kind != DataTypeKind::kNamed) return;
+  if (class_names.count(dtype.type_name) > 0) return;
+  auto it = typedefs.find(dtype.type_name);
+  if (it == typedefs.end()) return;
+  const DataType& bound = it->second;
+  if (bound.kind != DataTypeKind::kNamed) return;
+  if (class_names.count(bound.type_name) == 0) return;
+  dtype.type_name = bound.type_name;
+  dtype.scope_name = bound.scope_name;
+  dtype.type_params = bound.type_params;
+}
+
 void Elaborator::ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope) {
   if (item->data_type.kind == DataTypeKind::kNamed &&
       class_names_.count(item->data_type.type_name)) {
@@ -601,6 +628,8 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   ResolveTypeRef(item, mod);
 
   ResolveParameterizedType(item->data_type, unit_);
+
+  AdoptClassTypedefBinding(item->data_type, typedefs_, class_names_);
 
   std::string_view adopted_array_typedef =
       AdoptTypedefArrayDims(item, typedefs_, td_array_dims_);

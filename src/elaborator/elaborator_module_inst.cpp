@@ -186,8 +186,18 @@ static void PrependWrittenPackedDims(DataType& dt,
 static DataType OverrideHeadToDataType(const Expr* head,
                                        const CompilationUnit* unit) {
   if (head == nullptr) return DataType{};
-  if (head->kind == ExprKind::kIdentifier)
-    return TypeNameToDataType(head->text);
+  if (head->kind == ExprKind::kIdentifier) {
+    DataType dt = TypeNameToDataType(head->text);
+    // §8.25 (printed page 204): a specialization is the generic class combined
+    // with its arguments, and "a generic class is not a type; only a concrete
+    // specialization represents a type". So `D#(4)` names a type where the bare
+    // `D` names none when D leaves a parameter without a default, and the
+    // arguments are what the declaration the override reaches is judged on.
+    if (head->has_param_spec) {
+      dt.type_params = OverrideSpecializationArgs(head, unit);
+    }
+    return dt;
+  }
   if (head->kind == ExprKind::kMemberAccess && head->is_scope_resolution) {
     return ClassScopedOverrideToDataType(head, unit);
   }
