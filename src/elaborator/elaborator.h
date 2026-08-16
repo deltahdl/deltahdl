@@ -184,8 +184,6 @@ class Elaborator : public ElaboratorData {
   void ElaborateAssertPropertyItem(ModuleItem* item, RtlirModule* mod);
   void ElaborateParamDecl(ModuleItem* item, RtlirModule* mod);
   void ElaborateNetDecl(ModuleItem* item, RtlirModule* mod);
-  void RecordNetArrayShape(ModuleItem* item, const RtlirNet& net,
-                           RtlirModule* mod);
   void ElaborateVarDecl(ModuleItem* item, RtlirModule* mod);
   // §23.2.2.1: reconciles the signedness of a non-ANSI port with its separate
   // net or variable declaration -- `signed` on either side makes both signed.
