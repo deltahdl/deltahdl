@@ -148,6 +148,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/type_eval.cpp
     elaborator/const_eval.cpp
     elaborator/const_eval_func.cpp
+    elaborator/const_eval_builtin_method.cpp
     elaborator/sensitivity.cpp
     simulator/driver_update.cpp
     simulator/net.cpp

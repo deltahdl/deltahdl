@@ -55,6 +55,8 @@ ParamRangeRegistryGuard::~ParamRangeRegistryGuard() {
   g_param_range_module = prev_;
 }
 
+const RtlirModule* RegisteredModule() { return g_param_range_module; }
+
 std::optional<PackedRange> RegisteredParamRange(std::string_view name) {
   if (!g_param_range_module) return std::nullopt;
   for (const auto& pd : g_param_range_module->params) {
@@ -137,6 +139,10 @@ static std::optional<ConstVal> ConstEvalMemberAccessFull(
     const Expr* expr, const ScopeMap& scope) {
   if (auto override_val = ConstEvalSpecializationOverride(expr, scope))
     return override_val;
+  // §5.13 makes the empty parentheses optional, so `c.num` parses as a member
+  // access rather than a call and is folded here as well as from the kCall arm
+  // of ConstEvalFull.
+  if (auto builtin = ConstEvalBuiltinMethodFull(expr)) return builtin;
   if (expr->lhs && expr->rhs && expr->lhs->kind == ExprKind::kIdentifier &&
       expr->rhs->kind == ExprKind::kIdentifier) {
     std::string compound =
@@ -536,10 +542,15 @@ std::optional<ConstVal> ConstEvalFull(const Expr* expr, const ScopeMap& scope) {
       return ConstEvalSysCallFull(expr, scope);
     case ExprKind::kMemberAccess:
       return ConstEvalMemberAccessFull(expr, scope);
-    case ExprKind::kCall:
+    case ExprKind::kCall: {
+      // §11.2.1: a constant built-in method call (§5.13) is evaluated at
+      // elaboration time. It is tried first because a built-in method is not a
+      // user function and would never be found in the §13.4.3 registry below.
+      if (auto builtin = ConstEvalBuiltinMethodFull(expr)) return builtin;
       // §13.4.3: a call to a user-defined constant function folds at
       // elaboration time.
       return ConstEvalUserCall(expr, scope);
+    }
     default:
       return std::nullopt;
   }
@@ -728,8 +739,8 @@ bool IsConstantSysFunc(std::string_view name) {
   return kConstSysFuncs.count(name) > 0;
 }
 
-static bool AllElementsConstant(const std::vector<Expr*>& elems,
-                                const ScopeMap& scope) {
+bool AllElementsConstant(const std::vector<Expr*>& elems,
+                         const ScopeMap& scope) {
   for (auto* elem : elems) {
     if (!IsConstantExpr(elem, scope)) return false;
   }
@@ -748,54 +759,6 @@ static bool IsConstantSysCallExpr(const Expr* expr, const ScopeMap& scope) {
   if (!IsConstantSysFunc(expr->callee)) return false;
   if (IsConstEvenWithNonConstArgs(expr->callee)) return true;
   return AllElementsConstant(expr->args, scope);
-}
-
-// §5.13 built-in methods that return an integer a constant expression could
-// use. The list decides nothing on its own: what each returns depends on the
-// declared type of the operand, which is why the operand is tested below rather
-// than exempted by the method's name.
-static bool IsBuiltinMethodName(std::string_view method) {
-  static const std::unordered_set<std::string_view> kMethods = {
-      "size", "num",   "bits", "dimensions", "unpacked_dimensions",
-      "left", "right", "low",  "high",       "increment",
-      "len",
-  };
-  return kMethods.count(method) > 0;
-}
-
-// Whether `expr` is a constant built-in method call, or nullopt when it is not
-// a built-in method call at all.
-//
-// §11.2.1 makes a built-in method call constant "if the identifier and input
-// arguments are constant expressions", and exempts the identifier only for a
-// method "whose value does not depend on the current value of the identifier".
-// No method here can claim that exemption from its name, because the name does
-// not say what the operand is declared as: §7.5 states that "the size()
-// built-in method returns the current size of the array" for a dynamic array,
-// §7.9.1 and §7.10.2.1 state the same for an associative array and a queue, and
-// §6.19.5.5 gives num() a second meaning on an enumeration. So the identifier
-// is tested, which is what §11.2.1's first sentence asks for.
-//
-// A call that names a built-in method is decided here rather than left to
-// IsConstantExpr's argument test, which admits any call whose arguments are all
-// constant and so admits every one of these, their argument lists being empty.
-static std::optional<bool> BuiltinMethodCallIsConstant(const Expr* expr,
-                                                       const ScopeMap& scope) {
-  if (!expr) return std::nullopt;
-  const Expr* member = nullptr;
-  if (expr->kind == ExprKind::kCall && expr->lhs &&
-      expr->lhs->kind == ExprKind::kMemberAccess) {
-    member = expr->lhs;
-  } else if (expr->kind == ExprKind::kMemberAccess) {
-    member = expr;
-  } else {
-    return std::nullopt;
-  }
-  if (!member->rhs || member->rhs->kind != ExprKind::kIdentifier)
-    return std::nullopt;
-  if (!IsBuiltinMethodName(member->rhs->text)) return std::nullopt;
-  if (!AllElementsConstant(expr->args, scope)) return false;
-  return IsConstantExpr(member->lhs, scope);
 }
 
 static bool IsConstantSelectExpr(const Expr* expr, const ScopeMap& scope) {

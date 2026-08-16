@@ -184,17 +184,6 @@ TEST(ConstantExpressionElaboration, ConstantPartSelectOfParameterElaborates) {
              "endmodule\n"));
 }
 
-// §11.2.1: a built-in method call is a constant built-in method call "if the
-// identifier and input arguments are constant expressions". `V` is a parameter
-// here, so `V.bits` is constant — observe that path through const_eval.
-TEST(ConstantExpressionElaboration,
-     ConstantBuiltinMethodOnConstantIdentifierElaborates) {
-  EvalFixture f;
-  ScopeMap scope = {{"V", 0}};
-  auto* e = ParseExprFrom("V.bits", f);
-  EXPECT_TRUE(IsConstantExpr(e, scope));
-}
-
 // §7.2.2 requires a struct member default to be a constant expression, and
 // §11.2.1 decides what one is. `q` is a queue, so §7.10.2.1's size() returns
 // the current number of items in the queue and depends on the queue's value,
@@ -244,6 +233,88 @@ TEST(ConstantExpressionElaboration, GenvarOperandInConstantExpr) {
              "    end\n"
              "  endgenerate\n"
              "endmodule\n"));
+}
+
+// §11.2.1 requires that a constant built-in method call be folded during
+// elaboration: "when used in constant expressions, these function calls shall
+// be evaluated at elaboration time". §6.19.5.5 decides the value the call
+// folds to, since "The num() method returns the number of elements in the
+// given enumeration". `color_t` declares RED, GREEN and BLUE, so `N` resolves
+// to 3. No other quantity in this source is 3, so a fold that read some other
+// count would not reach the same answer.
+TEST(ConstantExpressionElaboration, EnumNumFoldsToTheMemberCount) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef enum { RED, GREEN, BLUE } color_t;\n"
+      "  color_t c;\n"
+      "  localparam int N = c.num();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const RtlirParamDecl* n = nullptr;
+  for (const auto& param : design->top_modules[0]->params) {
+    if (param.name == "N") n = &param;
+  }
+  ASSERT_NE(n, nullptr);
+  EXPECT_TRUE(n->is_resolved);
+  EXPECT_EQ(n->resolved_value, 3);
+}
+
+// §11.2.1 makes `c.num()` a constant built-in method call although `c` is a
+// variable and not a constant expression. The clause rules that built-in
+// methods "whose value does not depend on the current value of the identifier
+// are constant built-in method calls if the input arguments are constant
+// expressions even when the identifier is not constant". §6.19.5.5 makes
+// num() such a method, because the number of elements in an enumeration is
+// fixed by the declaration of `color_t` rather than by what `c` holds. §7.2.2
+// requires a struct member default to be a constant expression, so this
+// source is accepted and nothing is reported.
+TEST(ConstantExpressionElaboration, EnumNumIsConstantWhereTheIdentifierIsNot) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef enum { RED, GREEN, BLUE } color_t;\n"
+      "  color_t c;\n"
+      "  typedef struct {\n"
+      "    int a = c.num();\n"
+      "    int b;\n"
+      "  } s_t;\n"
+      "  s_t s;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §5.13 rules that "a built-in method can only be associated with a particular
+// data type", and it associates size() with a dynamic array. No built-in
+// method is associated with an integer, so `P.size()` names no built-in method
+// call and §11.2.1 admits it nowhere a constant expression is required. §7.2.2
+// requires a struct member default to be a constant expression, so the
+// declaration is rejected. Before the fix nothing was reported and the
+// member's value was left unresolved.
+//
+// The report stands at the typedef's own line, which is line 3 of this source,
+// rather than at the member's line 4. That is where
+// ConstantExpressionElaboration.QueueSizeInStructMemberDefaultIsReported above
+// reads it too.
+TEST(ConstantExpressionElaboration,
+     IntegerParameterSizeInStructMemberDefaultIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  localparam int P = 4;\n"
+      "  typedef struct {\n"
+      "    int a = P.size();\n"
+      "    int b;\n"
+      "  } s_t;\n"
+      "  s_t s;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "struct member default value must be a constant "
+                            "expression",
+                            3, "7.2.2"));
 }
 
 }  // namespace
