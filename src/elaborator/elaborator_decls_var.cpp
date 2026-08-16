@@ -52,7 +52,14 @@ static void ValidateWeakReferenceTypeParam(
   }
 }
 
-// Rewrites a declared type name that is bound to a class to the class it names.
+// Rewrites the type a declaration wrote to the type it denotes, so that every
+// check downstream reads the second rather than the first. Two rewrites are
+// needed and both are done here, because either one alone leaves a declaration
+// whose written name says nothing about what it declares.
+//
+// §8.25 makes a member of a parameterized class depend on the specialization it
+// is reached through, so `C#(int)::T v;` denotes int and
+// ResolveParameterizedType substitutes it.
 //
 // §6.20.3 lets a type parameter resolve to a class type, and §6.18 lets a
 // typedef name one, so `P obj;` declares a handle when `P` is bound to `D`.
@@ -64,9 +71,10 @@ static void ValidateWeakReferenceTypeParam(
 // specialization arguments §8.25 makes the type depend on along with it.
 // Only the three fields that say which type it is are taken, so a qualifier or
 // a dimension written on the declaration itself survives.
-static void AdoptClassTypedefBinding(
-    DataType& dtype, const TypedefMap& typedefs,
+static void ResolveDeclaredTypeName(
+    DataType& dtype, const CompilationUnit* unit, const TypedefMap& typedefs,
     const std::unordered_set<std::string_view>& class_names) {
+  ResolveParameterizedType(dtype, unit);
   if (dtype.kind != DataTypeKind::kNamed) return;
   if (class_names.count(dtype.type_name) > 0) return;
   auto it = typedefs.find(dtype.type_name);
@@ -627,9 +635,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
 
   ResolveTypeRef(item, mod);
 
-  ResolveParameterizedType(item->data_type, unit_);
-
-  AdoptClassTypedefBinding(item->data_type, typedefs_, class_names_);
+  ResolveDeclaredTypeName(item->data_type, unit_, typedefs_, class_names_);
 
   std::string_view adopted_array_typedef =
       AdoptTypedefArrayDims(item, typedefs_, td_array_dims_);
