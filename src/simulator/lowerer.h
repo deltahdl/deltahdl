@@ -73,6 +73,15 @@ class Lowerer {
 
   void LowerAllImported(PackageDecl* pkg,
                         std::unordered_set<const PackageDecl*>& visited);
+
+  // §26.3: binds one imported parameter or variable of `pkg` under its
+  // unqualified spelling in the scope whose imports are being lowered, which is
+  // the instance inst_prefix_ names. The other two walk a whole package for a
+  // wildcard import and one named item for an explicit one.
+  void AliasPackageDataItem(const PackageDecl* pkg, const ModuleItem* item);
+  void AliasAllPackageDataItems(const PackageDecl* pkg);
+  void AliasNamedPackageDataItem(const PackageDecl* pkg,
+                                 std::string_view item_name);
   void LowerDynArrayInit(QueueObject* q, const RtlirVariable& var);
   void InitAssocDefault(const Expr* init, AssocArrayObject* aa);
   void RegisterEnumForCast(std::string_view name, const RtlirVariable& var);

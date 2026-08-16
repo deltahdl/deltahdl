@@ -77,11 +77,6 @@ static std::vector<std::string_view> WildcardExportImportNames(
   return names;
 }
 
-// Defined below; forward-declared so the name-resolution helpers can alias a
-// re-exported package data item from the package that actually declares it.
-static void AliasPackageDataItem(const PackageDecl* pkg, const ModuleItem* item,
-                                 SimContext& ctx);
-
 void Lowerer::LowerImportedName(
     PackageDecl* pkg, std::string_view name,
     std::unordered_set<const PackageDecl*>& visited) {
@@ -95,7 +90,7 @@ void Lowerer::LowerImportedName(
     // that declares it. LowerPackageItem only handles subroutines/classes, so
     // alias the data item here from `pkg` -- the origin package where `found`
     // is declared -- so a re-exported constant/variable resolves at runtime.
-    AliasPackageDataItem(pkg, found, ctx_);
+    AliasPackageDataItem(pkg, found);
     return;
   }
 
@@ -174,7 +169,7 @@ void Lowerer::LowerAllImported(
     // lowering all of a (possibly re-exported) package must also be aliased
     // from this package so a wildcard consumer of a re-exported constant or
     // variable can resolve it at runtime.
-    AliasPackageDataItem(pkg, item, ctx_);
+    AliasPackageDataItem(pkg, item);
   }
 
   ReExportWalk walk{pkg, visited,
@@ -193,30 +188,43 @@ void Lowerer::LowerAllImported(
   }
 }
 
-static void AliasPackageDataItem(const PackageDecl* pkg, const ModuleItem* item,
-                                 SimContext& ctx) {
+void Lowerer::AliasPackageDataItem(const PackageDecl* pkg,
+                                   const ModuleItem* item) {
   bool is_param = item->kind == ModuleItemKind::kParamDecl;
   bool is_var = item->kind == ModuleItemKind::kVarDecl;
   if (!(is_param || is_var) || !item->init_expr) return;
-  if (ctx.FindVariable(item->name)) return;
+  // §26.3 makes the imported name visible "within the current scope", and the
+  // current scope is the one that wrote the import. Key the binding by the
+  // instance being lowered so two instances importing a like-named item from
+  // two different packages each read their own, which §26.3 permits: the only
+  // conflict it rules illegal is between wildcard imports "within the same
+  // scope". The prefix is empty for a top module, where the key is the bare
+  // name and SimContext::FindVariable's ordinary lookup answers it.
+  std::string key = inst_prefix_ + std::string(item->name);
+  // §26.5: a declaration of the importing scope shadows the import, and the
+  // first import of a name wins over a later one. Both are already bound under
+  // this key, so an occupied key is left alone. The map is read directly rather
+  // than through SimContext::FindVariable, which would also answer from an
+  // enclosing scope's binding and let one module's import silence another's.
+  if (ctx_.GetVariables().count(key) != 0) return;
   std::string qname = std::string(pkg->name) + "." + std::string(item->name);
-  ctx.AliasVariable(item->name, qname);
+  auto* stored = arena_.Create<std::string>(key);
+  ctx_.AliasVariable(*stored, qname);
   // §26.3: the import makes this name visible under its unqualified spelling,
   // and that binding belongs to no module. SimContext::FindVariable is told so
   // because it otherwise stops a bare name at the module boundary §23.9 draws,
   // which would hide an imported item from inside every instance.
-  ctx.RegisterImportedName(item->name);
+  ctx_.RegisterImportedName(*stored);
 }
 
-static void AliasAllPackageDataItems(const PackageDecl* pkg, SimContext& ctx) {
-  for (const auto* item : pkg->items) AliasPackageDataItem(pkg, item, ctx);
+void Lowerer::AliasAllPackageDataItems(const PackageDecl* pkg) {
+  for (const auto* item : pkg->items) AliasPackageDataItem(pkg, item);
 }
 
-static void AliasNamedPackageDataItem(const PackageDecl* pkg,
-                                      std::string_view item_name,
-                                      SimContext& ctx) {
+void Lowerer::AliasNamedPackageDataItem(const PackageDecl* pkg,
+                                        std::string_view item_name) {
   for (const auto* item : pkg->items) {
-    if (item->name == item_name) AliasPackageDataItem(pkg, item, ctx);
+    if (item->name == item_name) AliasPackageDataItem(pkg, item);
   }
 }
 
@@ -227,10 +235,10 @@ void Lowerer::LowerImports(const RtlirModule* mod) {
     std::unordered_set<const PackageDecl*> visited;
     if (imp.is_wildcard) {
       LowerAllImported(pkg, visited);
-      AliasAllPackageDataItems(pkg, ctx_);
+      AliasAllPackageDataItems(pkg);
     } else {
       LowerImportedName(pkg, imp.item_name, visited);
-      AliasNamedPackageDataItem(pkg, imp.item_name, ctx_);
+      AliasNamedPackageDataItem(pkg, imp.item_name);
     }
   };
 

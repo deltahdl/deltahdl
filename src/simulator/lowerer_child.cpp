@@ -90,6 +90,13 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     // its own body resolves (and %m composes the instance + subroutine path);
     // LowerModule registers these for the top only.
     RegisterModuleSubroutines(child.resolved, ctx_);
+    // §26.3: an import makes a package's names visible "within the current
+    // scope", and the scope is the one that writes the import. A module writes
+    // its own imports whether it is the top or an instance, so the instance's
+    // are lowered here. This runs after the child's variables, ports and
+    // subroutines exist, which is where LowerModule runs it too, so a
+    // module-local declaration still shadows an import as §26.5 requires.
+    LowerImports(child.resolved);
 
     // Port connections resolve in the parent scope (see LowerPortBindings),
     // then restore the child prefix for the child's own body.
