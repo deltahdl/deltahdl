@@ -131,3 +131,34 @@ class TestMain:
 
         get_exit_code(run)
         assert "    expected:" in capsys.readouterr().out
+
+    def test_a_malformed_exit_file_does_not_stop_the_later_cases(
+        self,
+        rst: ModuleType,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+        get_exit_code: Callable[[Callable[[], object]], int | str | None],
+    ) -> None:
+        """main() should report a case whose .exit file is unreadable and go on.
+
+        The unreadable case is named so that it sorts first, since collect_tests
+        orders the cases by their source path and a run that stopped at this one
+        would leave the case after it unreported.
+        """
+        (tmp_path / "bad.sv").write_text("module bad; endmodule\n")
+        (tmp_path / "bad.expected").write_text("bad output\n")
+        (tmp_path / "bad.exit").write_text("yes\n")
+        (tmp_path / "good.sv").write_text("module good; endmodule\n")
+        (tmp_path / "good.expected").write_text("good output\n")
+
+        def fake_run(_cmd: list[str], **_: Any) -> MagicMock:
+            mock = MagicMock()
+            mock.stdout = "good output\n"
+            mock.stderr = ""
+            return mock
+
+        def run() -> None:
+            _run_main_with_fake(rst, tmp_path, fake_run)
+
+        get_exit_code(run)
+        assert "sim-tests summary: 1/2 passed, 1 failed" in capsys.readouterr().out

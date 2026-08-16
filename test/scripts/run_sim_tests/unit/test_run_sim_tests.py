@@ -243,3 +243,26 @@ class TestExpectedStatus:
         """run_test() should pass a matching text whatever the status was."""
         _, outcome = _run_over_case(rst, tmp_path, "loose", 3)
         assert outcome == (True, "")
+
+    def test_a_malformed_exit_file_fails_the_case_rather_than_raising(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should fail a case whose .exit file holds no status."""
+        (tmp_path / "bogus.exit").write_text("yes\n")
+        assert not _run_over_case(rst, tmp_path, "bogus", 0)[1][0]
+
+    def test_a_malformed_exit_file_is_named_in_the_detail(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should name the .exit file and the text it holds."""
+        status_path = tmp_path / "unreadable.exit"
+        status_path.write_text("yes\n")
+        detail = _run_over_case(rst, tmp_path, "unreadable", 4)[1][1]
+        assert str(status_path) in detail and "'yes'" in detail
+
+    def test_a_negative_status_is_accepted(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should read a signed status from a .exit file."""
+        (tmp_path / "killed.exit").write_text("-1\n")
+        assert _run_over_case(rst, tmp_path, "killed", -1)[1] == (True, "")

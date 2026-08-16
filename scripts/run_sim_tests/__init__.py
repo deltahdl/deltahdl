@@ -1,6 +1,7 @@
 """Run simulation e2e tests against deltahdl."""
 
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -8,6 +9,12 @@ from pathlib import Path
 from lib.python.run_tests_common import BINARY, REPO_ROOT, check_binary, print_result
 
 TEST_DIR = REPO_ROOT / "test" / "src" / "e2e"
+
+# What a .exit file may hold: one status, written as digits with an optional
+# sign. The sign is admitted because run_test passes whatever it reads straight
+# to a comparison against a returncode, and a platform is free to report a
+# signal as a negative number there.
+STATUS_TEXT = re.compile(r"[+-]?[0-9]+")
 
 
 def visible_output(result: subprocess.CompletedProcess[str]) -> str:
@@ -62,11 +69,20 @@ def expected_status(sv_path: Path) -> int | None:
 
     Returns None where the file is absent, which leaves the case judged on its
     printed text alone.
+
+    Raises ValueError where the file holds anything but a status, naming the
+    file and the text found in it. int() raises on such a text already, but its
+    message names neither, so the report a maintainer reads would point at this
+    module and leave them to find which case carries the bad file.
     """
     status_path = sv_path.with_suffix(".exit")
     if not status_path.exists():
         return None
-    return int(status_path.read_text().strip())
+    text = status_path.read_text().strip()
+    if not STATUS_TEXT.fullmatch(text):
+        msg = f"{status_path}: expected an exit status, got {text!r}"
+        raise ValueError(msg)
+    return int(text)
 
 
 def collect_tests() -> list[tuple[Path, Path]]:
@@ -93,8 +109,18 @@ def run_test(sv_path: Path, expected_path: Path) -> tuple[bool, str]:
     and imposes no order between an option and a source file. Putting them
     after leaves the source path in the position it has always held, which is
     the first one after the program name.
+
+    A .exit file the runner cannot read fails its own case and is reported like
+    any other failure, rather than raising out of here and stopping every case
+    after this one. The file is read before deltahdl is started, since a case
+    whose own definition cannot be read is not worth a run.
     """
     expected_text = expected_path.read_text()
+    try:
+        status = expected_status(sv_path)
+    except ValueError as exc:
+        return False, str(exc)
+
     try:
         result = subprocess.run(
             [str(BINARY), str(sv_path), *case_arguments(sv_path)],
@@ -109,7 +135,6 @@ def run_test(sv_path: Path, expected_path: Path) -> tuple[bool, str]:
     actual = visible_output(result)
     if actual.rstrip("\n") != expected_text.rstrip("\n"):
         return False, f"expected:\n{expected_text}got:\n{actual}"
-    status = expected_status(sv_path)
     if status is not None and result.returncode != status:
         return False, f"expected exit status {status}, got {result.returncode}"
     return True, ""
