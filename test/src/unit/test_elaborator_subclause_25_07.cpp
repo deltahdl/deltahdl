@@ -100,13 +100,10 @@ TEST(InterfaceSubroutines, HierarchicalBodyArgumentCountMismatchIsError) {
       "module m;\n"
       "endmodule\n",
       f);
-  // The signature comparison an interface's hierarchical body goes through is
-  // the one ValidateOutOfBlockSignature runs for a class out-of-block body, so
-  // the report names §8.24 rather than the §25.7 rule this case is about.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "out-of-block declaration for 'ifc::my_task' has 2 "
+                            "out-of-block declaration for 'ifc.my_task' has 2 "
                             "argument(s) but the prototype has 1",
-                            4, "8.24"));
+                            4, "25.7"));
 }
 
 // §25.7: the types of the arguments in a prototype shall match those in the
@@ -122,11 +119,10 @@ TEST(InterfaceSubroutines, HierarchicalBodyArgumentTypeMismatchIsError) {
       "module m;\n"
       "endmodule\n",
       f);
-  // §8.24 for the reason given in HierarchicalBodyArgumentCountMismatchIsError.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "out-of-block declaration for 'ifc::my_task' "
+                            "out-of-block declaration for 'ifc.my_task' "
                             "argument 'x' has mismatched type",
-                            4, "8.24"));
+                            4, "25.7"));
 }
 
 // §25.7: argument directions named by a prototype shall match the subroutine
@@ -142,11 +138,10 @@ TEST(InterfaceSubroutines, HierarchicalBodyArgumentDirectionMismatchIsError) {
       "module m;\n"
       "endmodule\n",
       f);
-  // §8.24 for the reason given in HierarchicalBodyArgumentCountMismatchIsError.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "out-of-block declaration for 'ifc::my_task' "
+                            "out-of-block declaration for 'ifc.my_task' "
                             "argument 'x' has mismatched direction",
-                            4, "8.24"));
+                            4, "25.7"));
 }
 
 // §25.7: a function prototype specifies the return value as well as the
@@ -164,11 +159,10 @@ TEST(InterfaceSubroutines, HierarchicalFunctionBodyReturnTypeMismatchIsError) {
       "module m;\n"
       "endmodule\n",
       f);
-  // §8.24 for the reason given in HierarchicalBodyArgumentCountMismatchIsError.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "out-of-block declaration for 'ifc::my_func' has "
+                            "out-of-block declaration for 'ifc.my_func' has "
                             "mismatched return type",
-                            4, "8.24"));
+                            4, "25.7"));
 }
 
 // §25.7: a prototype is either a function prototype or a task prototype, so the
@@ -186,11 +180,10 @@ TEST(InterfaceSubroutines, HierarchicalBodyKindMismatchIsError) {
       "module m;\n"
       "endmodule\n",
       f);
-  // §8.24 for the reason given in HierarchicalBodyArgumentCountMismatchIsError.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "out-of-block declaration for 'ifc::my_task' is a "
+                            "out-of-block declaration for 'ifc.my_task' is a "
                             "function but the prototype is a task",
-                            4, "8.24"));
+                            4, "25.7"));
 }
 
 // §25.7: when a modport exports a subroutine via a full prototype, a connected

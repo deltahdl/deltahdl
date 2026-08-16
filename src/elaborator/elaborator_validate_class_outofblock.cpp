@@ -56,25 +56,41 @@ static bool DefaultArgExprsEqual(const Expr* a, const Expr* b) {
   return true;
 }
 
+// The declaration a subroutine body was prototyped by, for the two rules that
+// state one shall match the other. §8.24 governs a class out-of-block
+// declaration and writes the qualified name with the class-scope operator;
+// §25.7 governs a subroutine defined for an interface by a hierarchical name
+// and writes it with a dot. The comparison below is the same rule in both, so
+// the clause to cite and the separator to write are passed in rather than
+// decided inside it by asking what kind of declaration this is.
+struct OutOfBlockScope {
+  std::string_view name;
+  std::string_view separator;
+  Subclause subclause;
+};
+
 // Compares one prototype argument against the corresponding out-of-block
-// declaration argument (type, direction, and repeated default value per §8.24).
+// declaration argument: type, direction, and, per §8.24, a repeated default
+// value.
 static void CheckOutOfBlockArg(const FunctionArg& proto_arg,
                                const FunctionArg& impl_arg,
                                const ModuleItem* impl,
-                               std::string_view class_name, DiagEngine& diag) {
+                               const OutOfBlockScope& scope, DiagEngine& diag) {
   if (!TypesMatch(proto_arg.data_type, impl_arg.data_type)) {
-    diag.Error(impl->loc,
-               std::format("out-of-block declaration for '{}::{}' argument "
-                           "'{}' has mismatched type",
-                           class_name, impl->name, impl_arg.name),
-               Subclause("8.24"));
+    diag.Error(
+        impl->loc,
+        std::format("out-of-block declaration for '{}{}{}' argument "
+                    "'{}' has mismatched type",
+                    scope.name, scope.separator, impl->name, impl_arg.name),
+        scope.subclause);
   }
   if (proto_arg.direction != impl_arg.direction) {
-    diag.Error(impl->loc,
-               std::format("out-of-block declaration for '{}::{}' argument "
-                           "'{}' has mismatched direction",
-                           class_name, impl->name, impl_arg.name),
-               Subclause("8.24"));
+    diag.Error(
+        impl->loc,
+        std::format("out-of-block declaration for '{}{}{}' argument "
+                    "'{}' has mismatched direction",
+                    scope.name, scope.separator, impl->name, impl_arg.name),
+        scope.subclause);
   }
   // §8.24: omitting the prototype's default value is allowed, but repeating a
   // default value in the out-of-block declaration requires a syntactically
@@ -82,65 +98,70 @@ static void CheckOutOfBlockArg(const FunctionArg& proto_arg,
   const Expr* impl_default = impl_arg.default_value;
   if (impl_default != nullptr &&
       !DefaultArgExprsEqual(proto_arg.default_value, impl_default)) {
-    diag.Error(impl->loc,
-               std::format("out-of-block declaration for '{}::{}' argument "
-                           "'{}' has a default value that is not "
-                           "syntactically identical to the prototype",
-                           class_name, impl->name, impl_arg.name),
-               Subclause("8.24"));
+    diag.Error(
+        impl->loc,
+        std::format("out-of-block declaration for '{}{}{}' argument "
+                    "'{}' has a default value that is not "
+                    "syntactically identical to the prototype",
+                    scope.name, scope.separator, impl->name, impl_arg.name),
+        scope.subclause);
   }
 }
 
 static void CheckOutOfBlockReturnType(const ModuleItem* proto,
                                       const ModuleItem* impl,
-                                      std::string_view class_name,
+                                      const OutOfBlockScope& scope,
                                       DiagEngine& diag) {
   if (proto->kind != ModuleItemKind::kFunctionDecl) return;
   auto impl_ret = impl->return_type;
   if (impl_ret.kind == DataTypeKind::kNamed && !impl_ret.scope_name.empty() &&
-      impl_ret.scope_name == class_name) {
+      impl_ret.scope_name == scope.name) {
     impl_ret.scope_name = {};
   }
   if (!TypesMatch(proto->return_type, impl_ret)) {
     diag.Error(impl->loc,
-               std::format("out-of-block declaration for '{}::{}' has "
+               std::format("out-of-block declaration for '{}{}{}' has "
                            "mismatched return type",
-                           class_name, impl->name),
-               Subclause("8.24"));
+                           scope.name, scope.separator, impl->name),
+               scope.subclause);
   }
 }
 
+// §8.24 for a class out-of-block declaration and §25.7 for a subroutine defined
+// for an interface by a hierarchical name state one rule in the same words.
+// §25.7 (printed page 793): "The number and types of arguments in a prototype
+// shall match the argument types in the subroutine declaration."
 static void ValidateOutOfBlockSignature(const ModuleItem* proto,
                                         const ModuleItem* impl,
-                                        std::string_view class_name,
+                                        const OutOfBlockScope& scope,
                                         DiagEngine& diag) {
   if (proto->kind != impl->kind) {
     diag.Error(
         impl->loc,
         std::format(
-            "out-of-block declaration for '{}::{}' is a {} but "
+            "out-of-block declaration for '{}{}{}' is a {} but "
             "the prototype is a {}",
-            class_name, impl->name,
+            scope.name, scope.separator, impl->name,
             impl->kind == ModuleItemKind::kFunctionDecl ? "function" : "task",
             proto->kind == ModuleItemKind::kFunctionDecl ? "function" : "task"),
-        Subclause("8.24"));
+        scope.subclause);
     return;
   }
   const auto& proto_args = proto->func_args;
   const auto& impl_args = impl->func_args;
   if (proto_args.size() != impl_args.size()) {
     diag.Error(impl->loc,
-               std::format("out-of-block declaration for '{}::{}' has {} "
+               std::format("out-of-block declaration for '{}{}{}' has {} "
                            "argument(s) but the prototype has {}",
-                           class_name, impl->name, impl_args.size(),
-                           proto_args.size()),
-               Subclause("8.24"));
+                           scope.name, scope.separator, impl->name,
+                           impl_args.size(), proto_args.size()),
+               scope.subclause);
     return;
   }
   for (size_t i = 0; i < proto_args.size(); ++i) {
-    CheckOutOfBlockArg(proto_args[i], impl_args[i], impl, class_name, diag);
+    CheckOutOfBlockArg(proto_args[i], impl_args[i], impl, scope, diag);
   }
-  CheckOutOfBlockReturnType(proto, impl, class_name, diag);
+  CheckOutOfBlockReturnType(proto, impl, scope, diag);
 }
 
 static const ModuleDecl* FindInterfaceDecl(std::string_view name,
@@ -195,7 +216,8 @@ static void ValidateInterfaceOutOfBlockBody(
     return;
   }
   linked.insert(key);
-  ValidateOutOfBlockSignature(proto, item, item->method_class, diag);
+  ValidateOutOfBlockSignature(
+      proto, item, {item->method_class, ".", Subclause("25.7")}, diag);
 }
 
 // Handles an out-of-block body whose `method_class` names a regular class.
@@ -232,7 +254,8 @@ static void ValidateClassOutOfBlockBody(const ClassDecl* cls, ModuleItem* item,
     return;
   }
   linked.insert(key);
-  ValidateOutOfBlockSignature(proto, item, item->method_class, diag);
+  ValidateOutOfBlockSignature(
+      proto, item, {item->method_class, "::", Subclause("8.24")}, diag);
 }
 
 void Elaborator::ValidateOutOfBlockDeclarations() {

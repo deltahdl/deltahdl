@@ -207,8 +207,13 @@ TEST(OutOfBlockDeclElaboration, MismatchedArgCountError) {
       "module m;\n"
       "endmodule\n",
       f);
+  // The name is part of the claim: one comparison serves both this rule and
+  // §25.7's for an interface hierarchical body, and only naming 'C::foo' here
+  // fails a change that gave the class caller the interface's spelling.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "argument(s) but the prototype has", 4, "8.24"));
+                            "out-of-block declaration for 'C::foo' has 2 "
+                            "argument(s) but the prototype has 1",
+                            4, "8.24"));
 }
 
 TEST(OutOfBlockDeclElaboration, MismatchedArgTypeError) {
@@ -223,8 +228,10 @@ TEST(OutOfBlockDeclElaboration, MismatchedArgTypeError) {
       "module m;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(), "has mismatched type", 4, "8.24"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "out-of-block declaration for 'C::foo' argument "
+                            "'a' has mismatched type",
+                            4, "8.24"));
 }
 
 TEST(OutOfBlockDeclElaboration, MismatchedReturnTypeError) {
@@ -240,7 +247,9 @@ TEST(OutOfBlockDeclElaboration, MismatchedReturnTypeError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "' has mismatched return type", 4, "8.24"));
+                            "out-of-block declaration for 'C::foo' has "
+                            "mismatched return type",
+                            4, "8.24"));
 }
 
 TEST(OutOfBlockDeclElaboration, MatchingSignatureOk) {
@@ -266,8 +275,10 @@ TEST(OutOfBlockDeclElaboration, MismatchedArgDirectionError) {
       "module m;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "has mismatched direction", 4,
-                            "8.24"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "out-of-block declaration for 'C::foo' argument "
+                            "'a' has mismatched direction",
+                            4, "8.24"));
 }
 
 // §8.24: matching the prototype exactly includes the method kind; a task body
@@ -283,8 +294,10 @@ TEST(OutOfBlockDeclElaboration, MismatchedMethodKindError) {
       "module m;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(), "but the prototype is a", 4, "8.24"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "out-of-block declaration for 'C::foo' is a task "
+                            "but the prototype is a function",
+                            4, "8.24"));
 }
 
 // §8.24: a default argument value specified in the prototype may be omitted in
