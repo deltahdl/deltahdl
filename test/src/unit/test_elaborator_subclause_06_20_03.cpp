@@ -198,6 +198,50 @@ TEST(TypeParameterElab, RestrictedClassTypeParamConformsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §6.20.3: a name that no class declaration defines conforms to a `class`
+// restriction no more than a built-in type does, so the assignment is an error.
+// The name is `Cfg::my_type` written unqualified: §8.23 makes a class-scoped
+// typedef reachable through the class name, and RegisterClassTypedefs in
+// src/elaborator/elaborator_resolve.cpp records it under that qualified key
+// alone, so the bare name reaches no typedef and no class. A name that is
+// declared nowhere at all cannot stand here instead, because
+// Parser::ParseDataType in src/parser/parser_types.cpp reads an identifier as a
+// type only when an earlier declaration registered it, and reads any other
+// identifier as an expression -- which is TypeParamSetToValueIsError's rule
+// rather than this one.
+TEST(TypeParameterElab, ClassTypeParamAssignedUndeclaredNameIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class Cfg;\n"
+      "  typedef int my_type;\n"
+      "endclass\n"
+      "module m;\n"
+      "  parameter type class C = my_type;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type parameter 'C' is restricted to a class type "
+                            "but is assigned 'my_type', which no class "
+                            "declaration defines",
+                            5, "6.20.3"));
+}
+
+// §6.20.3: the built-in classes §15.x predefines conform to a `class`
+// restriction, and `mailbox` is one of them. No ClassDecl declares it, so the
+// elaborator answers for it from its set of known class names instead. A check
+// that demanded a ClassDecl of every assigned name would reject every built-in
+// class, and this is the case that says so.
+TEST(TypeParameterElab, ClassTypeParamAssignedABuiltInClassIsOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter type class C = mailbox;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 // §6.20.3: the restriction keyword may also be `interface class`. An
 // `interface class`-restricted type parameter assigned a built-in (non-class)
 // type does not conform and must be rejected.
@@ -210,9 +254,51 @@ TEST(TypeParameterElab, RestrictedInterfaceClassTypeParamMismatchIsError) {
       f);
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(),
-                    "type parameter 'IC' is restricted to a interface class "
+                    "type parameter 'IC' is restricted to an interface class "
                     "type but is assigned a type that is not a class",
                     2, "6.20.3"));
+}
+
+// §6.20.3: `class` and `interface class` are two of the five basic data types
+// the clause lists, and §8.26 makes them different kinds of declaration, so an
+// ordinary class does not conform to an `interface class` restriction. The
+// assigned name reaches a ClassDecl here, which is what separates this from
+// ClassTypeParamAssignedUndeclaredNameIsError above; that declaration's
+// is_interface is false, so the report names the kind the name does have.
+TEST(TypeParameterElab, InterfaceClassTypeParamAssignedOrdinaryClassIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class my_cls;\n"
+      "  int x;\n"
+      "endclass\n"
+      "module m;\n"
+      "  parameter type interface class IC = my_cls;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type parameter 'IC' is restricted to an interface "
+                            "class type but is assigned 'my_cls', which is an "
+                            "ordinary class",
+                            5, "6.20.3"));
+}
+
+// §6.20.3: an `interface class`-restricted type parameter assigned an interface
+// class conforms to the specified basic data type and must elaborate cleanly.
+// A check that rejected every name, rather than reading
+// ClassDecl::is_interface, would reject this source while still passing
+// InterfaceClassTypeParamAssignedOrdinaryClassIsError above.
+TEST(TypeParameterElab, InterfaceClassTypeParamAssignedInterfaceClassIsOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface class ic;\n"
+      "  pure virtual function void f();\n"
+      "endclass\n"
+      "module m;\n"
+      "  parameter type interface class IC = ic;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 // §6.20.3: a type parameter's default may itself be a user-defined type name

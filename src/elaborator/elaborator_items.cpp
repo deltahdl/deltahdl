@@ -209,19 +209,73 @@ const DataType* ResolveNamedTypeChain(const DataType* dtype,
   return dtype;
 }
 
-// §6.20.3: a class (or interface class) type is always referenced by name, so
-// a resolved concrete type -- a built-in scalar/vector, enum, struct, or union
-// -- cannot be a class and does not conform. A type still named after
-// resolution is left alone: it may be a class declared elsewhere.
+// §6.20.3: "it shall be an error if the type parameter is assigned a type
+// definition that does not conform to the specified basic data type" (printed
+// page 128 of ~/LRM.pdf). `class` and `interface class` are two of the five
+// basic data types that clause lists, and §8.26 makes them different kinds of
+// declaration, so a type conforming to one does not conform to the other.
+//
+// Four answers, and the declaration decides them. A class (or interface class)
+// type is always referenced by name, so a resolved concrete type -- a built-in
+// scalar or vector, an enum, a struct or a union -- is not a class at all. A
+// name that reaches a ClassDecl conforms when that declaration's kind is the
+// restricted one. A name known to be a class that reaches no ClassDecl is taken
+// as an ordinary class. A name that is neither conforms to neither restriction,
+// because nothing makes it a class.
+//
+// Deciding from DataTypeKind alone is what let the second and fourth of those
+// through: every name survives typedef resolution as kNamed, so an ordinary
+// class assigned to an `interface class` restriction and a name nothing
+// declares were both accepted in silence, and `fwd` reached the function only
+// to pick a word for the message.
+struct ClassTypeLookup {
+  // Carries each ClassDecl, and so is what says whether a class is an interface
+  // class.
+  const CompilationUnit* unit;
+  // The names known to be classes. It holds two kinds FindClassDecl cannot
+  // return a declaration for: the built-in classes, which have no declaration
+  // to find, and a name declared as a class in more than one scope, which
+  // FindClassDecl reports as ambiguous by returning null. Neither is an
+  // interface class as far as anything here can tell, and both are classes, so
+  // the set decides only whether the name is one -- never which kind.
+  const std::unordered_set<std::string_view>* names;
+};
+
 void CheckTypeParamIsClass(const ModuleItem* item, DataTypeKind fwd,
-                           const DataType& resolved, DiagEngine& diag) {
-  if (resolved.kind == DataTypeKind::kNamed) return;
+                           const DataType& resolved,
+                           const ClassTypeLookup& lookup, DiagEngine& diag) {
+  const bool kWantsInterface = fwd == DataTypeKind::kVoid;
+  // The article travels with the noun. Written as a literal `a` before a
+  // substituted noun it read "restricted to a interface class type".
+  const std::string_view kRestriction =
+      kWantsInterface ? "an interface class" : "a class";
+  if (resolved.kind != DataTypeKind::kNamed) {
+    diag.Error(item->loc,
+               std::format("type parameter '{}' is restricted to {} type but "
+                           "is assigned a type that is not a class",
+                           item->name, kRestriction),
+               Subclause("6.20.3"));
+    return;
+  }
+  const ClassDecl* cls = FindClassDecl(resolved.type_name, lookup.unit);
+  const bool kIsKnownClass = cls || lookup.names->count(resolved.type_name) > 0;
+  if (!kIsKnownClass) {
+    diag.Error(item->loc,
+               std::format("type parameter '{}' is restricted to {} type but "
+                           "is assigned '{}', which no class declaration "
+                           "defines",
+                           item->name, kRestriction, resolved.type_name),
+               Subclause("6.20.3"));
+    return;
+  }
+  const bool kIsInterface = cls && cls->is_interface;
+  if (kIsInterface == kWantsInterface) return;
   diag.Error(
       item->loc,
-      std::format("type parameter '{}' is restricted to a {} type but is "
-                  "assigned a type that is not a class",
-                  item->name,
-                  fwd == DataTypeKind::kVoid ? "interface class" : "class"),
+      std::format("type parameter '{}' is restricted to {} type but is "
+                  "assigned '{}', which is {}",
+                  item->name, kRestriction, resolved.type_name,
+                  kIsInterface ? "an interface class" : "an ordinary class"),
       Subclause("6.20.3"));
 }
 
@@ -251,6 +305,7 @@ void CheckTypeParamIsAggregateKind(const ModuleItem* item, DataTypeKind fwd,
 
 void CheckTypeParamConformsToForwardKind(const ModuleItem* item, bool is_type,
                                          const TypedefMap& typedefs,
+                                         const ClassTypeLookup& lookup,
                                          DiagEngine& diag) {
   if (!is_type) return;
   DataTypeKind fwd = item->forward_type_kind;
@@ -264,7 +319,7 @@ void CheckTypeParamConformsToForwardKind(const ModuleItem* item, bool is_type,
   const DataType* resolved =
       ResolveNamedTypeChain(&item->typedef_type, typedefs);
   if (class_restriction) {
-    CheckTypeParamIsClass(item, fwd, *resolved, diag);
+    CheckTypeParamIsClass(item, fwd, *resolved, lookup, diag);
     return;
   }
   CheckTypeParamIsAggregateKind(item, fwd, *resolved, diag);
@@ -345,7 +400,8 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   }
 
   CheckTypeParamNotSetToValue(item, diag_);
-  CheckTypeParamConformsToForwardKind(item, is_type, typedefs_, diag_);
+  CheckTypeParamConformsToForwardKind(
+      item, is_type, typedefs_, ClassTypeLookup{unit_, &class_names_}, diag_);
 
   if (is_type) {
     typedefs_[item->name] = item->typedef_type;
