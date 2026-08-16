@@ -622,6 +622,10 @@ class SimContext {
   void PushThis(ClassObject* obj);
   void PopThis();
   ClassObject* CurrentThis() const;
+  // The handle of the object CurrentThis returns, or kNullClassHandle when no
+  // object is in scope. This is what a bare `this` evaluates to, §8.11 making
+  // the keyword "a predefined object handle".
+  uint64_t CurrentThisHandle() const;
 
   // §8.15/§8.17: the class whose method body is currently executing (the
   // lexically enclosing class), so `super` resolves relative to that class

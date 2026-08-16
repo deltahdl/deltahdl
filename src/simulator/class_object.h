@@ -100,10 +100,26 @@ struct ClassTypeInfo {
   bool IsA(const ClassTypeInfo* other) const;
 };
 
+inline constexpr uint64_t kNullClassHandle = 0;
+
 struct ClassObject {
   const ClassTypeInfo* type = nullptr;
   std::unordered_map<std::string, Logic4Vec> properties;
   uint32_t ref_count = 0;
+
+  // The handle SimContext::AllocateClassObject issued for this object, which is
+  // what a design holds in a class variable and what SimContext::GetClassObject
+  // takes to get back here. It is recorded on the object because the two places
+  // that hold an object without one are reached with no handle to pass:
+  // ExecInstanceMethodCall in src/simulator/eval_function.cpp and
+  // ConstraintEvalScope in src/simulator/eval_randomize_internal.h both take a
+  // ClassObject* and push it as the current `this`, so evaluating a bare `this`
+  // to the handle §8.11 says it denotes has to read the handle off the object.
+  // kNullClassHandle until the allocation issues one, which every object
+  // reaches: the two sites that create a ClassObject, EvalClassNew in
+  // src/simulator/eval_function.cpp and ClassObject::ShallowCopy in
+  // src/simulator/class_object.cpp, both allocate straight afterwards.
+  uint64_t handle = kNullClassHandle;
 
   // §18.14.1 object stability: every instance owns an independent RNG for its
   // randomization methods. The allocating context installs rng_seed when the
@@ -319,8 +335,6 @@ std::vector<const ClassTypespecInfo*> VpiClassDefnSpecializations(
 // construct through this.
 std::string_view MemberClassTypeName(const ClassTypeInfo* type,
                                      std::string_view field);
-
-inline constexpr uint64_t kNullClassHandle = 0;
 
 struct WeakReference {
   uint64_t referent_handle = kNullClassHandle;

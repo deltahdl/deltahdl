@@ -17,6 +17,7 @@ uint64_t SimContext::AllocateClassObject(ClassObject* obj) {
   // declaration initializer. Each object therefore receives its own stream.
   obj->rng_seed = DrawSeedForChild();
   class_objects_[id] = obj;
+  obj->handle = id;
   obj->ref_count = 1;
   return id;
 }
@@ -204,6 +205,11 @@ void SimContext::PopThis() {
 
 ClassObject* SimContext::CurrentThis() const {
   return this_stack_.empty() ? nullptr : this_stack_.back();
+}
+
+uint64_t SimContext::CurrentThisHandle() const {
+  const ClassObject* self = CurrentThis();
+  return self ? self->handle : kNullClassHandle;
 }
 
 uint64_t SimContext::RegisterProcessHandle(Process* proc) {

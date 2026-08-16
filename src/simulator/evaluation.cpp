@@ -37,6 +37,24 @@ static Logic4Vec EvalIdentifierClassScope(const Expr* expr, SimContext& ctx,
 
 static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
+  // §8.11: "The this keyword denotes a predefined object handle that refers to
+  // the object that was used to invoke the subroutine that this is used
+  // within." A bare `this` arrives as an ExprKind::kIdentifier node whose text
+  // is the keyword, Parser::ParseMemberAccessChain in
+  // src/parser/expr_parser.cpp building one for it, so it is answered here and
+  // reaches every reader of an expression rather than one site.
+  //
+  // It is answered before SimContext::FindVariable, which no source can reach
+  // first because `this` is a keyword and names no variable. Left to fall
+  // through, the name reached EvalIdentifierClassScope below and was looked up
+  // as a property called "this", which no class declares, so the value handed
+  // back was not a handle at all. TryClassCopyNewAssign in
+  // src/simulator/statement_assign_core.cpp then found no object for
+  // `p2 = new this;` and let TryClassNewAssign construct a fresh one, breaching
+  // all three steps §8.12 gives the shallow copy.
+  if (expr->text == "this") {
+    return MakeLogic4VecVal(arena, 64, ctx.CurrentThisHandle());
+  }
   auto* var = ctx.FindVariable(expr->text);
   if (!var) {
     // §11.12 — a no-argument let referenced without parentheses appears here

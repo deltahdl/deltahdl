@@ -401,6 +401,100 @@ TEST(ClassAssignRenameSim, E2eDeclInitShallowCopyCopiesProperties) {
   LowerRunAndCheck(f, design, {{"result", 55u}});
 }
 
+// §8.11 makes `this` "a predefined object handle that refers to the object that
+// was used to invoke the subroutine that this is used within", and footnote 23
+// on A.2.4's class_new asks only that a copy source "evaluate to an object
+// handle", so `new this` copies the object the running method was called on.
+//
+// 42 is the value that discriminates. The declared default is 0 and the
+// constructor writes 7, so a run that copied returns 42, a run that constructed
+// returns 7, and a run that allocated without constructing returns 0. Reading
+// the copy through the method's own return value is what puts the copy inside
+// the invocation `this` belongs to.
+TEST(ClassAssignRenameSim, E2eNewThisCopiesTheInvokingObjectsProperties) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int x;\n"
+                      "  function new();\n"
+                      "    x = 7;\n"
+                      "  endfunction\n"
+                      "  function int copied_x();\n"
+                      "    C copy;\n"
+                      "    copy = new this;\n"
+                      "    return copy.x;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C p;\n"
+                      "    p = new;\n"
+                      "    p.x = 42;\n"
+                      "    result = p.copied_x();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            42u);
+}
+
+// §8.12 step 3 assigns "a handle to the newly created object", so the copy is a
+// second object rather than another name for the first. Writing through the
+// copy and reading both back is what separates the two: a run that returned the
+// invoking object's own handle instead of a copy leaves r1 at 99 rather than
+// 10, and passes E2eNewThisCopiesTheInvokingObjectsProperties either way.
+TEST(ClassAssignRenameSim, E2eNewThisCopyIsADistinctObject) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  int x;\n"
+      "  function int copy_and_set();\n"
+      "    C copy;\n"
+      "    copy = new this;\n"
+      "    copy.x = 99;\n"
+      "    return copy.x;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int r1, r2;\n"
+      "  initial begin\n"
+      "    C p;\n"
+      "    p = new;\n"
+      "    p.x = 10;\n"
+      "    r2 = p.copy_and_set();\n"
+      "    r1 = p.x;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 10u}, {"r2", 99u}});
+}
+
+// A bare `this` is an expression wherever §8.11 admits the keyword, and the
+// shallow copy is one use of it among several. Returning it hands the caller
+// the invoking object's handle with no copy involved, so this case states what
+// EvalIdentifier in src/simulator/evaluation.cpp answers rather than what the
+// copy site does with the answer. It fails on a run that resolves the keyword
+// by looking for a property named "this", which no class declares: the value
+// handed back is not a handle, q holds no object, and 55 is not what comes out.
+TEST(ClassAssignRenameSim, E2eBareThisEvaluatesToTheInvokingObjectHandle) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int x;\n"
+                      "  function C self();\n"
+                      "    return this;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C p, q;\n"
+                      "    p = new;\n"
+                      "    p.x = 55;\n"
+                      "    q = p.self();\n"
+                      "    result = q.x;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            55u);
+}
+
 // §8.12: renaming (a plain handle copy that aliases the same object) likewise
 // has a declaration-initializer position (`C p2 = p1;`) distinct from the
 // procedural `p2 = p1;`. The decl-init copy shares the object, so a write
