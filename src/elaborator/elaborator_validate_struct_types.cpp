@@ -265,7 +265,7 @@ BuildSpecializationSubst(const ClassDecl* cls,
       subst[cls->params[i].first] = &args[i];
     }
   }
-  const size_t defaults = std::min(cls->params.size(), cls->param_types.size());
+  size_t defaults = std::min(cls->params.size(), cls->param_types.size());
   for (size_t i = 0; i < defaults; ++i) {
     if (cls->param_types[i].kind == DataTypeKind::kImplicit) continue;
     subst.emplace(cls->params[i].first, &cls->param_types[i]);
