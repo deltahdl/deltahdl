@@ -194,9 +194,19 @@ void Parser::ParsePackedDims(DataType& dtype) {
     if (!Check(TokenKind::kLBracket)) return;
     Consume();
     dtype.packed_dim_left = ParseExpr();
-    Expect(TokenKind::kColon, Subclause("6.9"));
+    // §7.4.1 states the rule both these calls enforce: "Each packed dimension
+    // in a packed array declaration shall be specified by a range
+    // specification of the form [ constant_expression : constant_expression
+    // ]", and its NOTE rules out the single-number form "[8]" by name. "Each
+    // packed dimension" covers the first as squarely as the fifth, so the
+    // first names the clause the loop below already names rather than a second
+    // one. §6.9 has no rule to cite here. It defines a scalar and a vector and
+    // defers the form to §7.4, and this function parses the packed dimensions
+    // of a struct, union, enum, named type and port type, none of which is a
+    // vector.
+    Expect(TokenKind::kColon, Subclause("7.4.1"));
     dtype.packed_dim_right = ParseExpr();
-    Expect(TokenKind::kRBracket, Subclause("6.9"));
+    Expect(TokenKind::kRBracket, Subclause("7.4.1"));
   }
 
   while (Check(TokenKind::kLBracket)) {

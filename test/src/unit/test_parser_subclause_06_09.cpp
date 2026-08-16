@@ -252,16 +252,19 @@ TEST(ScalarAndVectorDeclaration, MultidimensionalPackedArrayIsNotAVector) {
   EXPECT_FALSE(IsVector(item->data_type));
 }
 
-// §6.9 writes a vector's range as `[ msb : lsb ]`, so the ':' between the two
-// bounds is what makes the declaration a range rather than a single index. A
-// range written without it is rejected at the token standing where the ':'
-// belongs, and the report names §6.9 rather than the token it wanted.
-TEST(DataType, MalformedPackedDimensionNames6_9) {
+// A vector's malformed range is reported under §7.4.1 and not under §6.9.
+// §6.9 states no range form to cite: it defines a scalar and a vector and then
+// defers the form, saying "Vectors are packed arrays of scalars (see 7.4)".
+// §7.4.1 is where the form is written, as "Each packed dimension in a packed
+// array declaration shall be specified by a range specification of the form
+// [ constant_expression : constant_expression ]". The case belongs in this
+// file because the spelling under test is a vector's.
+TEST(DataType, MalformedVectorRangeNamesThePackedArrayClause) {
   auto r = Parse(
       "module m;\n"
       "  logic [7 0] x;\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedError(r.diags, "expected ':'", 2, "6.9"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected ':'", 2, "7.4.1"));
 }
 
 }  // namespace
