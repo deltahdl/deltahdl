@@ -16,56 +16,56 @@ namespace {
 TEST(ArrayQueryConstExpr, SizeWithNonConstArgIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$size(arr)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ArrayQueryConstExpr, DimensionsWithNonConstArgIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$dimensions(arr)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ArrayQueryConstExpr, UnpackedDimensionsWithNonConstArgIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$unpacked_dimensions(arr)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ArrayQueryConstExpr, LeftWithNonConstArgIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$left(arr)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ArrayQueryConstExpr, RightWithNonConstArgIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$right(arr)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ArrayQueryConstExpr, LowWithNonConstArgIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$low(arr)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ArrayQueryConstExpr, HighWithNonConstArgIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$high(arr)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ArrayQueryConstExpr, IncrementWithNonConstArgIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$increment(arr)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 // A query with an explicit constant dimension expression is also constant.
 TEST(ArrayQueryConstExpr, SizeWithDimensionExprIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$size(arr, 2)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 // §20.7: applying an array query function directly to a dynamically sized type

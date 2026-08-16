@@ -102,19 +102,19 @@ TEST(ConstantExpressionParsing, ConstantSelectParameterExpr) {
 TEST(ConstExpr, IntLiteralIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("42", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, RealLiteralIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("3.14", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, StringLiteralIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("\"hello\"", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, ParameterIdentifierIsConstant) {
@@ -127,55 +127,55 @@ TEST(ConstExpr, ParameterIdentifierIsConstant) {
 TEST(ConstExpr, UnresolvedIdentifierNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("x", f);
-  EXPECT_FALSE(IsConstantExpr(e));
+  EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, UnaryOnConstantIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("-42", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, BinaryOnConstantsIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("3 + 4", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, BinaryWithNonConstantNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("x + 4", f);
-  EXPECT_FALSE(IsConstantExpr(e));
+  EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, TernaryOnConstantsIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("1 ? 10 : 20", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, ConcatenationOfConstantsIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("{4'd1, 4'd2}", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, ReplicationOfConstantsIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("{4{1'b1}}", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, Clog2ConstantSysFuncIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$clog2(8)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, Clog2NonConstantArgNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$clog2(x)", f);
-  EXPECT_FALSE(IsConstantExpr(e));
+  EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstEvalReal, NonConstantReturnsNullopt) {
@@ -188,148 +188,150 @@ TEST(ConstEvalReal, NonConstantReturnsNullopt) {
 TEST(ConstExpr, UnbasedUnsizedLiteralIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("'1", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, BitsIsConstantSysFunc) {
   EvalFixture f;
   auto* e = ParseExprFrom("$bits(32'd0)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, CountonesConstantArg) {
   EvalFixture f;
   auto* e = ParseExprFrom("$countones(8'hFF)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, OnehotConstantArg) {
   EvalFixture f;
   auto* e = ParseExprFrom("$onehot(8'h04)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, Onehot0ConstantArg) {
   EvalFixture f;
   auto* e = ParseExprFrom("$onehot0(8'h00)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, TimeLiteralIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("10ns", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, CastOfConstantIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("int'(3)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, CastOfNonConstantNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("int'(x)", f);
-  EXPECT_FALSE(IsConstantExpr(e));
+  EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, SignedIsConstantSysFunc) {
   EvalFixture f;
   auto* e = ParseExprFrom("$signed(42)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, UnsignedIsConstantSysFunc) {
   EvalFixture f;
   auto* e = ParseExprFrom("$unsigned(42)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, ConversionSysFuncNonConstantArgNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$signed(x)", f);
-  EXPECT_FALSE(IsConstantExpr(e));
+  EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, SqrtIsConstantSysFunc) {
   EvalFixture f;
   auto* e = ParseExprFrom("$sqrt(4.0)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, LnIsConstantSysFunc) {
   EvalFixture f;
   auto* e = ParseExprFrom("$ln(1.0)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, FloorIsConstantSysFunc) {
   EvalFixture f;
   auto* e = ParseExprFrom("$floor(3.7)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, CeilIsConstantSysFunc) {
   EvalFixture f;
   auto* e = ParseExprFrom("$ceil(3.2)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, MathSysFuncNonConstantArgNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$sqrt(x)", f);
-  EXPECT_FALSE(IsConstantExpr(e));
+  EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, CountbitsIsConstantSysFunc) {
   EvalFixture f;
   auto* e = ParseExprFrom("$countbits(8'hFF, 1'b1)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, IsunboundedIsConstantSysFunc) {
   EvalFixture f;
   auto* e = ParseExprFrom("$isunbounded(8)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, NonConstantSysFuncNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$time", f);
-  EXPECT_FALSE(IsConstantExpr(e));
+  EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, NestedConstantSysFuncIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$clog2($bits(32'd0))", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, NestedTernaryIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("1 ? (0 ? 3 : 4) : 5", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, TernaryWithNonConstantCondNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("x ? 10 : 20", f);
-  EXPECT_FALSE(IsConstantExpr(e));
+  EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, ConcatenationWithNonConstantNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("{4'd1, x}", f);
-  EXPECT_FALSE(IsConstantExpr(e));
+  EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, ReplicationWithNonConstantCountNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("{x{1'b1}}", f);
-  EXPECT_FALSE(IsConstantExpr(e));
+  EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
-TEST(ConstExpr, NullExprNotConstant) { EXPECT_FALSE(IsConstantExpr(nullptr)); }
+TEST(ConstExpr, NullExprNotConstant) {
+  EXPECT_FALSE(IsConstantExpr(nullptr, {}));
+}
 
 TEST(ConstEval, NullExprReturnsNullopt) {
   EXPECT_EQ(ConstEvalInt(nullptr), std::nullopt);
@@ -339,13 +341,13 @@ TEST(ConstEval, NullExprReturnsNullopt) {
 TEST(ConstExpr, NonVoidFunctionCallWithConstantArgsIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("foo(3, 4)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, FunctionCallWithNonConstantArgNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("foo(x, 4)", f);
-  EXPECT_FALSE(IsConstantExpr(e));
+  EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
 // §11.2.1: "Built-in method calls that meet the above conditions are constant
@@ -357,7 +359,7 @@ TEST(ConstExpr, FunctionCallWithNonConstantArgNotConstant) {
 TEST(ConstExpr, BuiltinMethodSizeWithParensOnNonConstantIdentifierNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("arr.size()", f);
-  EXPECT_FALSE(IsConstantExpr(e));
+  EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
 // §5.13 lets a built-in method with no arguments be called without parentheses,
@@ -365,7 +367,7 @@ TEST(ConstExpr, BuiltinMethodSizeWithParensOnNonConstantIdentifierNotConstant) {
 TEST(ConstExpr, BuiltinMethodSizeNoParensOnNonConstantIdentifierNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("arr.size", f);
-  EXPECT_FALSE(IsConstantExpr(e));
+  EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
 // `bits` names no built-in method at all. `$bits` is a system function
@@ -377,7 +379,7 @@ TEST(ConstExpr, BuiltinMethodSizeNoParensOnNonConstantIdentifierNotConstant) {
 TEST(ConstExpr, MemberNamedBitsWithNoCompoundParameterNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("v.bits", f);
-  EXPECT_FALSE(IsConstantExpr(e));
+  EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
 // A name off the array query list without its `$` names nothing the standard
@@ -391,7 +393,7 @@ TEST(ConstExpr, MemberNamedBitsWithNoCompoundParameterNotConstant) {
 TEST(ConstExpr, ArrayQueryNameWithoutItsDollarIsNotABuiltinMethod) {
   EvalFixture f;
   auto* e = ParseExprFrom("v.left", f);
-  EXPECT_FALSE(IsConstantExpr(e));
+  EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
 // `A.size()` names no built-in method. `A` is in scope with the value 0, so it
@@ -425,61 +427,61 @@ TEST(ConstExpr, BuiltinMethodLenOnAnIntegerParameterNotConstant) {
 TEST(ConstExpr, BuiltinMethodLenWithNonConstantIdentifierNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("s.len", f);
-  EXPECT_FALSE(IsConstantExpr(e));
+  EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, BuiltinMethodSizeWithNonConstantArgNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("arr.size(x)", f);
-  EXPECT_FALSE(IsConstantExpr(e));
+  EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, SformatfWithConstantArgsIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$sformatf(\"v=%0d\", 42)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, TimescaleIsConstantSysFunc) {
   EvalFixture f;
   auto* e = ParseExprFrom("$timescale", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, TimeprecisionIsConstantSysFunc) {
   EvalFixture f;
   auto* e = ParseExprFrom("$timeprecision", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, ItorIsConstantSysFunc) {
   EvalFixture f;
   auto* e = ParseExprFrom("$itor(42)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, RtoiIsConstantSysFunc) {
   EvalFixture f;
   auto* e = ParseExprFrom("$rtoi(3.7)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, BitsConstantEvenWhenArgIsNonConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$bits(x)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, DimensionsConstantEvenWhenArgIsNonConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$dimensions(x)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, SizeQueryConstantEvenWhenArgIsNonConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$size(x)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
 TEST(ConstExpr, ConstantBitSelectOfParameterIsConstant) {
@@ -499,7 +501,7 @@ TEST(ConstExpr, ConstantPartSelectOfParameterIsConstant) {
 TEST(ConstExpr, BitSelectOfNonParameterNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("x[2]", f);
-  EXPECT_FALSE(IsConstantExpr(e));
+  EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
 }  // namespace
