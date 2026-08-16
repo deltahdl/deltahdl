@@ -230,63 +230,83 @@ static bool ExprMentionsAny(const Expr* e,
 // source got wrong, and CollectUnpackedDimSizes in elaborator_decls_var.cpp
 // drops the array dimension the parameter was sizing rather than reporting it.
 //
-// `formals` holds the class's own parameter names, type parameters included. A
-// value that mentions one is left alone whether it folds or not, because §8.25
-// binds those only when the class is specialized: `class C #(type T = int, int
-// S = $bits(T));` is legal and has no value where it stands.
-//
-// `class_scope` is `cu_param_scope` with the values already recorded for this
-// class layered over it under their bare names, which is what §6.20.1's "in a
-// list of parameter constants, a parameter can depend on earlier parameters"
-// requires.
-static void RecordClassParam(
-    const ClassDecl* cls, std::string_view pname, const Expr* pexpr,
-    ScopeMap& cu_param_scope, ScopeMap& class_scope, Arena& arena,
-    const std::unordered_set<std::string_view>& formals, DiagEngine& diag) {
+// §6.20.1: one class's list of parameter constants, as far as registration has
+// read it. `formals` holds every parameter name the class declares, type
+// parameters included; a value that mentions one is left alone whether it folds
+// or not, because §8.25 binds those only when the class is specialized, and
+// `class C #(type T = int, int S = $bits(T));` is legal and has no value where
+// it stands. `values` is `cu_param_scope` with the values recorded so far
+// layered over it under their bare names, which is what §6.20.1's "in a list of
+// parameter constants, a parameter can depend on earlier parameters" requires.
+// The three fields that follow are where a recorded value goes and how a
+// breach is reported.
+struct ClassParamRegistration {
+  const ClassDecl* cls;
+  std::unordered_set<std::string_view> formals;
+  ScopeMap values;
+  ScopeMap& cu_param_scope;
+  Arena& arena;
+  DiagEngine& diag;
+};
+
+// Every parameter name `cls` declares: its type parameters, its #() parameter
+// ports and its body parameter declarations.
+static std::unordered_set<std::string_view> ClassParamNames(
+    const ClassDecl* cls) {
+  std::unordered_set<std::string_view> names = cls->type_param_names;
+  for (const auto& [pname, pexpr] : cls->params) names.insert(pname);
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kProperty && m->is_param)
+      names.insert(m->name);
+  }
+  return names;
+}
+
+static void RecordClassParam(std::string_view pname, const Expr* pexpr,
+                             ClassParamRegistration& reg) {
   if (!pexpr) return;
-  auto val = ConstEvalInt(pexpr, class_scope);
+  auto val = ConstEvalInt(pexpr, reg.values);
   if (!val) {
-    if (!ExprMentionsAny(pexpr, formals)) {
-      diag.Error(pexpr->range.start,
-                 std::format("class parameter '{}' value is not a constant "
-                             "expression",
-                             pname),
-                 Subclause("6.20.2"));
+    if (!ExprMentionsAny(pexpr, reg.formals)) {
+      reg.diag.Error(pexpr->range.start,
+                     std::format("class parameter '{}' value is not a constant "
+                                 "expression",
+                                 pname),
+                     Subclause("6.20.2"));
     }
     return;
   }
-  auto* qname = arena.Create<std::string>(std::string(cls->name) + "." +
-                                          std::string(pname));
-  cu_param_scope[*qname] = *val;
-  class_scope[pname] = *val;
+  auto* qname = reg.arena.Create<std::string>(std::string(reg.cls->name) + "." +
+                                              std::string(pname));
+  reg.cu_param_scope[*qname] = *val;
+  reg.values[pname] = *val;
+}
+
+// The #() parameter ports live in cls->params; type parameters carry no value
+// and are skipped. They are taken before the body declarations because that is
+// the order they are written in, and a body declaration may name one of them.
+// Body parameter and localparam declarations are class members flagged is_param
+// (parser_class.cpp records them as kProperty members).
+static void RegisterOneClassParams(ClassParamRegistration& reg) {
+  for (const auto& [pname, pexpr] : reg.cls->params) {
+    if (reg.cls->type_param_names.count(pname)) continue;
+    RecordClassParam(pname, pexpr, reg);
+  }
+  for (const auto* m : reg.cls->members) {
+    if (m->kind == ClassMemberKind::kProperty && m->is_param)
+      RecordClassParam(m->name, m->init_expr, reg);
+  }
 }
 
 void RegisterClassParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
                          Arena& arena, DiagEngine& diag) {
   for (auto* cls : unit->classes) {
-    std::unordered_set<std::string_view> formals = cls->type_param_names;
-    for (const auto& [pname, pexpr] : cls->params) formals.insert(pname);
-    for (const auto* m : cls->members) {
-      if (m->kind == ClassMemberKind::kProperty && m->is_param)
-        formals.insert(m->name);
-    }
-    ScopeMap class_scope = cu_param_scope;
-    // The #() parameter ports live in cls->params; type parameters carry no
-    // value and are skipped. They are taken before the body declarations
-    // because that is the order they are written in, and a body declaration may
-    // name one of them.
-    for (const auto& [pname, pexpr] : cls->params) {
-      if (cls->type_param_names.count(pname)) continue;
-      RecordClassParam(cls, pname, pexpr, cu_param_scope, class_scope, arena,
-                       formals, diag);
-    }
-    // Body parameter/localparam declarations are class members flagged
-    // is_param (parser_class.cpp records them as kProperty members).
-    for (const auto* m : cls->members) {
-      if (m->kind == ClassMemberKind::kProperty && m->is_param)
-        RecordClassParam(cls, m->name, m->init_expr, cu_param_scope,
-                         class_scope, arena, formals, diag);
-    }
+    // cu_param_scope appears twice: once copied into `values`, which the class
+    // layers its own bare names over, and once bound as the scope the qualified
+    // "Class.name" keys are written to.
+    ClassParamRegistration reg{
+        cls, ClassParamNames(cls), cu_param_scope, cu_param_scope, arena, diag};
+    RegisterOneClassParams(reg);
   }
 }
 
