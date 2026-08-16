@@ -44,6 +44,14 @@ struct NonSynthRule {
   std::string_view subclause;
 };
 
+// What IEEE 1800-2023 calls an expression kind this synthesizer has no lowering
+// for, and the subclause that defines it. A kind LowerExprBit lowers has no
+// entry and comes back with an empty message. Defined in synth_lower.cpp beside
+// LowerExprBit; synth_lower_check.cpp asks the same table so that a declaration
+// initializer, which LowersToNothing drops before the lowering runs, draws the
+// report the identical expression draws on the right of an assignment.
+NonSynthRule NonSynthExprRule(ExprKind kind);
+
 class SynthLower {
  public:
   SynthLower(Arena& arena, DiagEngine& diag);
@@ -77,6 +85,7 @@ class SynthLower {
   bool CheckCaseSynth(const Stmt* stmt);
   bool CheckDeclSynthesizable(const Stmt* stmt);
   bool CheckInitializerLowerable(const Expr* expr);
+  bool CheckInitializerOperands(const Expr* expr);
 
   void MapPorts(const RtlirModule* mod, AigGraph& aig);
 

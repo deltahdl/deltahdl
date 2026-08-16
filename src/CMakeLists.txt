@@ -217,6 +217,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/sv_vpi_user.cpp
     synthesizer/aig.cpp
     synthesizer/synth_lower.cpp
+    synthesizer/synth_lower_check.cpp
     synthesizer/synth_lower_compare.cpp
     synthesizer/synth_lower_concat.cpp
     synthesizer/synth_lower_dotted_name.cpp
