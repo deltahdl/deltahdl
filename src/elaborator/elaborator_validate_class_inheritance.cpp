@@ -74,6 +74,16 @@ static std::string MakeSpecKey(std::string_view name,
       // value-parameterized base reached through two paths with different
       // arguments would be mistaken for a single diamond and its inherited
       // names would wrongly collapse instead of colliding.
+      // The fold is given no ScopeMap, so it succeeds only for an argument
+      // written as a literal: `extends C#(K)` with K a localparam yields "v?"
+      // as surely as `extends C#(v)` with v a variable does. Every argument
+      // that does not fold therefore shares one key, and two parameterizations
+      // that share a key are read here as one specialization.
+      //
+      // Splitting them instead -- by source position, say -- would report a
+      // name collision between two parameterizations that are in fact the same
+      // one, which is the worse of the two errors, so the shared key stays
+      // until a scope reaches this function.
       if (auto v = ConstEvalInt(dt.type_ref_expr))
         key += 'v' + std::to_string(*v);
       else

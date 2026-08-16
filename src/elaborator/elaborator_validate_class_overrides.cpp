@@ -285,10 +285,16 @@ void Elaborator::ValidateInterfaceClassMembers(const ClassDecl* cls) {
   // parameter scope before checking defaults; otherwise a default naming such a
   // parameter would be wrongly rejected as non-constant.
   ScopeMap method_scope = cu_param_scope_;
+  // A parameter whose value is not a constant expression contributes nothing.
+  // Substituting zero for it made a method-argument default naming that
+  // parameter fold, so §8.26.8 read as satisfied by a default whose value the
+  // source never wrote and the elaborator could not compute.
+  // RegisterClassParams in elaborator_resolve.cpp reports the parameter itself
+  // under §6.20.2, so the breach is named once, at the value that caused it.
   auto add_param = [&](std::string_view pname, const Expr* pexpr) {
     if (pname.empty() || method_scope.count(pname)) return;
-    auto val = ConstEvalInt(pexpr, method_scope);
-    method_scope[pname] = val.value_or(0);
+    if (auto val = ConstEvalInt(pexpr, method_scope))
+      method_scope[pname] = *val;
   };
   for (const auto& [pname, pexpr] : cls->params) {
     if (cls->type_param_names.count(pname)) continue;

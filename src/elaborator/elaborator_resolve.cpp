@@ -189,40 +189,103 @@ void RegisterPackageParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
   }
 }
 
+// Whether `e` mentions any name in `names`, at any depth. Every identifier the
+// expression carries is compared, whatever node holds it, so a type parameter
+// named by a `type` operator or a cast counts as a mention.
+static bool ExprMentionsAny(const Expr* e,
+                            const std::unordered_set<std::string_view>& names) {
+  if (!e) return false;
+  if (!e->text.empty() && names.count(e->text)) return true;
+  if (!e->callee.empty() && names.count(e->callee)) return true;
+  for (const Expr* child :
+       {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr, e->base,
+        e->index, e->index_end, e->with_expr}) {
+    if (ExprMentionsAny(child, names)) return true;
+  }
+  for (const Expr* arg : e->args) {
+    if (ExprMentionsAny(arg, names)) return true;
+  }
+  for (const Expr* elem : e->elements) {
+    if (ExprMentionsAny(elem, names)) return true;
+  }
+  return false;
+}
+
 // §8.23: a class value parameter or local parameter is a public element and a
 // constant expression, reachable from outside the class via the class scope
 // resolution operator (Class::PARAM). Record each such parameter under its
 // "Class.name" key so a constant expression referring to it -- which parses as
 // a member access whose compound key is "Class.name" -- folds at elaboration.
 // Type parameters carry no value and are skipped.
-// Record one class parameter under its "Class.name" qualified key. A parameter
-// whose default does not fold is left out, exactly as an unresolved
-// module-level parameter is.
-static void RecordClassParam(const ClassDecl* cls, std::string_view pname,
-                             const Expr* pexpr, ScopeMap& cu_param_scope,
-                             Arena& arena) {
+//
+// A value that is not a constant expression is reported here rather than left
+// out. §6.20.1's Syntax 6-6 writes a param_assignment as `parameter_identifier
+// { variable_dimension } [ = constant_param_expression ]`, and rules that "all
+// param_assignments appearing within a class body shall become localparam
+// declarations regardless of the presence or absence of a parameter_port_list"
+// (printed page 125 of ~/LRM.pdf), so a class body parameter and a #()
+// parameter port are both under that rule. Leaving the parameter out instead is
+// what let a breach elaborate in silence: a name absent from the scope reads to
+// every later consumer as a name it cannot see rather than as a value the
+// source got wrong, and CollectUnpackedDimSizes in elaborator_decls_var.cpp
+// drops the array dimension the parameter was sizing rather than reporting it.
+//
+// `formals` holds the class's own parameter names, type parameters included. A
+// value that mentions one is left alone whether it folds or not, because §8.25
+// binds those only when the class is specialized: `class C #(type T = int, int
+// S = $bits(T));` is legal and has no value where it stands.
+//
+// `class_scope` is `cu_param_scope` with the values already recorded for this
+// class layered over it under their bare names, which is what §6.20.1's "in a
+// list of parameter constants, a parameter can depend on earlier parameters"
+// requires.
+static void RecordClassParam(
+    const ClassDecl* cls, std::string_view pname, const Expr* pexpr,
+    ScopeMap& cu_param_scope, ScopeMap& class_scope, Arena& arena,
+    const std::unordered_set<std::string_view>& formals, DiagEngine& diag) {
   if (!pexpr) return;
-  auto val = ConstEvalInt(pexpr, cu_param_scope);
-  if (!val) return;
+  auto val = ConstEvalInt(pexpr, class_scope);
+  if (!val) {
+    if (!ExprMentionsAny(pexpr, formals)) {
+      diag.Error(pexpr->range.start,
+                 std::format("class parameter '{}' value is not a constant "
+                             "expression",
+                             pname),
+                 Subclause("6.20.2"));
+    }
+    return;
+  }
   auto* qname = arena.Create<std::string>(std::string(cls->name) + "." +
                                           std::string(pname));
   cu_param_scope[*qname] = *val;
+  class_scope[pname] = *val;
 }
 
 void RegisterClassParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
-                         Arena& arena) {
+                         Arena& arena, DiagEngine& diag) {
   for (auto* cls : unit->classes) {
+    std::unordered_set<std::string_view> formals = cls->type_param_names;
+    for (const auto& [pname, pexpr] : cls->params) formals.insert(pname);
+    for (const auto* m : cls->members) {
+      if (m->kind == ClassMemberKind::kProperty && m->is_param)
+        formals.insert(m->name);
+    }
+    ScopeMap class_scope = cu_param_scope;
+    // The #() parameter ports live in cls->params; type parameters carry no
+    // value and are skipped. They are taken before the body declarations
+    // because that is the order they are written in, and a body declaration may
+    // name one of them.
+    for (const auto& [pname, pexpr] : cls->params) {
+      if (cls->type_param_names.count(pname)) continue;
+      RecordClassParam(cls, pname, pexpr, cu_param_scope, class_scope, arena,
+                       formals, diag);
+    }
     // Body parameter/localparam declarations are class members flagged
     // is_param (parser_class.cpp records them as kProperty members).
     for (const auto* m : cls->members) {
       if (m->kind == ClassMemberKind::kProperty && m->is_param)
-        RecordClassParam(cls, m->name, m->init_expr, cu_param_scope, arena);
-    }
-    // The #() parameter ports live in cls->params; type parameters carry no
-    // value and are skipped.
-    for (const auto& [pname, pexpr] : cls->params) {
-      if (cls->type_param_names.count(pname)) continue;
-      RecordClassParam(cls, pname, pexpr, cu_param_scope, arena);
+        RecordClassParam(cls, m->name, m->init_expr, cu_param_scope,
+                         class_scope, arena, formals, diag);
     }
   }
 }
@@ -353,7 +416,7 @@ void Elaborator::RegisterCuScopeItems() {
   RegisterCuClasses(unit_, class_names_, cu_scope_names_,
                     parameterized_class_names_);
   RegisterPackageParams(unit_, cu_param_scope_, arena_);
-  RegisterClassParams(unit_, cu_param_scope_, arena_);
+  RegisterClassParams(unit_, cu_param_scope_, arena_, diag_);
   RegisterPackageTypedefs(unit_, typedefs_, arena_);
   RegisterClassTypedefs(unit_, typedefs_, arena_);
   // Seed the unions ItemElaborationStateSaver folds each module's entries into.

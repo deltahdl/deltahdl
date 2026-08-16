@@ -92,31 +92,42 @@ static std::optional<size_t> ValueParamPortPosition(const ClassDecl* decl,
   return std::nullopt;
 }
 
+// §8.25.1: what a specialization's argument list says about one value
+// parameter. `supplied` records that an argument occupied the parameter, named
+// or ordered; `value` records what that argument folded to. The two are kept
+// apart because they are separate facts, and one optional cannot hold both: an
+// argument that is not a constant expression is supplied and has no value.
+// Reading that as "no argument was written" is what made `C#(v)::P` fold to the
+// class default, which is a number the source did not write.
+struct SpecializationArg {
+  bool supplied = false;
+  std::optional<ConstVal> value;
+};
+
 // A named override, `.name(value)`, anywhere in the specialization's argument
 // list.
-static std::optional<ConstVal> NamedParamOverride(const Expr& base,
-                                                  std::string_view name,
-                                                  const ScopeMap& scope) {
+static SpecializationArg NamedParamOverride(const Expr& base,
+                                            std::string_view name,
+                                            const ScopeMap& scope) {
   const auto& elems = base.elements;
   const auto& names = base.arg_names;
   for (size_t j = 0; j < elems.size(); ++j) {
     if (j < names.size() && !names[j].empty() && names[j] == name && elems[j])
-      return ConstEvalFull(elems[j], scope);
+      return {true, ConstEvalFull(elems[j], scope)};
   }
-  return std::nullopt;
+  return {};
 }
 
 // An ordered override, the argument occupying the parameter's own port
 // position. Only an argument list that is ordered at that position qualifies.
-static std::optional<ConstVal> OrderedParamOverride(const Expr& base,
-                                                    size_t pos,
-                                                    const ScopeMap& scope) {
+static SpecializationArg OrderedParamOverride(const Expr& base, size_t pos,
+                                              const ScopeMap& scope) {
   const auto& elems = base.elements;
   const auto& names = base.arg_names;
   bool ordered = names.empty() || (pos < names.size() && names[pos].empty());
   if (ordered && pos < elems.size() && elems[pos])
-    return ConstEvalFull(elems[pos], scope);
-  return std::nullopt;
+    return {true, ConstEvalFull(elems[pos], scope)};
+  return {};
 }
 
 // §8.25.1: when a member access is `C#(args)::name` and `name` is one of class
@@ -124,21 +135,26 @@ static std::optional<ConstVal> OrderedParamOverride(const Expr& base,
 // rather than the class default. Matches a named override first, then an
 // ordered one; anything else is left to the ordinary "Class.name" default
 // lookup.
-static std::optional<ConstVal> ConstEvalSpecializationOverride(
+static SpecializationArg ConstEvalSpecializationOverride(
     const Expr* expr, const ScopeMap& scope) {
   const ClassDecl* decl = SpecializedParamClass(expr);
-  if (!decl) return std::nullopt;
+  if (!decl) return {};
   auto pos = ValueParamPortPosition(decl, expr->rhs->text);
-  if (!pos) return std::nullopt;
-  if (auto named = NamedParamOverride(*expr->lhs, expr->rhs->text, scope))
-    return named;
+  if (!pos) return {};
+  SpecializationArg named =
+      NamedParamOverride(*expr->lhs, expr->rhs->text, scope);
+  if (named.supplied) return named;
   return OrderedParamOverride(*expr->lhs, *pos, scope);
 }
 
 static std::optional<ConstVal> ConstEvalMemberAccessFull(
     const Expr* expr, const ScopeMap& scope) {
-  if (auto override_val = ConstEvalSpecializationOverride(expr, scope))
-    return override_val;
+  // §8.25.1 makes the override the value of `C#(args)::name`, so an override
+  // that was written decides the answer whether or not it folded. Only an
+  // absent one falls through to the class default below.
+  if (SpecializationArg arg = ConstEvalSpecializationOverride(expr, scope);
+      arg.supplied)
+    return arg.value;
   // §5.13 makes the empty parentheses optional, so `c.num` parses as a member
   // access rather than a call and is folded here as well as from the kCall arm
   // of ConstEvalFull.

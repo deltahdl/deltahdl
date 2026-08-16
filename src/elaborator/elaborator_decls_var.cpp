@@ -38,6 +38,32 @@ static void ValidateParameterizedClassDefaults(const ModuleItem* item,
   }
 }
 
+// §8.25: the objects of a parameterized class "can then be instantiated like
+// modules or interfaces, using the same parameter override rules (see 23.10)"
+// (printed page 203 of ~/LRM.pdf), and §23.10.2 gives a parameter override a
+// constant expression as its value. Reports a value argument of `C#(...) c;`
+// that is not one.
+//
+// A value argument parses as an implicit-typed slot carrying the expression, so
+// `type_name` is empty and `type_ref_expr` holds it; a type argument names a
+// type and is decided elsewhere. Without this, the argument was folded only
+// where a later constant expression happened to reach it, and the failure was
+// read as "no override was written" rather than as a value the source got
+// wrong.
+static void ValidateSpecializationArgsConstant(const ModuleItem* item,
+                                               const ScopeMap& scope,
+                                               DiagEngine& diag) {
+  for (const auto& tp : item->data_type.type_params) {
+    if (!tp.type_name.empty() || tp.type_ref_expr == nullptr) continue;
+    if (ConstEvalInt(tp.type_ref_expr, scope)) continue;
+    diag.Error(tp.type_ref_expr->range.start,
+               std::format("class '{}' parameter override is not a constant "
+                           "expression",
+                           item->data_type.type_name),
+               Subclause("23.10.2"));
+  }
+}
+
 static void ValidateWeakReferenceTypeParam(
     const ModuleItem* item, const TypedefMap& typedefs,
     const std::unordered_set<std::string_view>& class_names, DiagEngine& diag) {
@@ -98,6 +124,7 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope) {
     class_var_names_.insert(item->name);
     class_var_types_[item->name] = item->data_type.type_name;
     ValidateParameterizedClassDefaults(item, unit_, diag_);
+    ValidateSpecializationArgsConstant(item, scope, diag_);
     ValidateWeakReferenceTypeParam(item, typedefs_, class_names_, diag_);
   }
   if (item->data_type.kind == DataTypeKind::kEnum) {

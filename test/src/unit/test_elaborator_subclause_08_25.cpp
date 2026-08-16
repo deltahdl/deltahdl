@@ -360,4 +360,46 @@ TEST(ParameterizedClassElaboration, NamedClassParameterAssignedTwiceIsError) {
                             5, "23.10.2.2"));
 }
 
+// §8.25 instantiates a parameterized class object "using the same parameter
+// override rules (see 23.10)", and §23.10.2 gives a parameter override a
+// constant expression as its value, so the module variable `v` is not a legal
+// argument of the specialization `C#(v)`. An elaborator that folds the argument
+// only where a later constant expression happens to read it accepts this
+// declaration and carries C's own default of 1 in place of the value the source
+// wrote, so the report is the only thing that says the source is wrong.
+TEST(ParameterizedClassElaboration,
+     NonConstantValueArgumentInDeclarationIsError) {
+  ElabFixture f;
+  ElabOk(
+      "class C #(int P = 1);\n"
+      "  int data;\n"
+      "endclass\n"
+      "module m;\n"
+      "  int v;\n"
+      "  C#(v) c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class 'C' parameter override is not a constant", 6,
+                            "23.10.2"));
+}
+
+// A localparam is a constant expression per §6.20.2, so `C#(K)` is a legal
+// specialization and the rejection above is specific to an argument that is not
+// one. Without this case the cheapest way to pass
+// NonConstantValueArgumentInDeclarationIsError is to reject every value
+// argument. K is 4 rather than C's own default of 1, so the argument the source
+// wrote is the value that has to fold here.
+TEST(ParameterizedClassElaboration,
+     ConstantLocalparamValueArgumentInDeclarationOk) {
+  EXPECT_TRUE(
+      ElabOk("class C #(int P = 1);\n"
+             "  int data;\n"
+             "endclass\n"
+             "module m;\n"
+             "  localparam int K = 4;\n"
+             "  C#(K) c;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

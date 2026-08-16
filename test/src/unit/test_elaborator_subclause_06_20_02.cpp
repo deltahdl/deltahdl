@@ -542,4 +542,86 @@ TEST(ValueParameters, HierarchicalReferenceInConditionalDefaultNamesItsLine) {
       "parameter 'P' value contains a hierarchical reference", 2, "6.20.2"));
 }
 
+// §6.20.2: "A parameter constant can have a type specification and a range
+// specification", so a parameter's value is a constant expression. A class
+// #() parameter port whose default names a module variable has no constant
+// value, and RecordClassParam in src/elaborator/elaborator_resolve.cpp:250
+// stands the report at that default expression's range.start -- the `v` on
+// line 4. Before that report the parameter was left out of the scope
+// altogether, which read to every later consumer as a name it could not see
+// rather than as a value the source got wrong, so the source elaborated with
+// the parameter silently absent.
+TEST(ValueParameters, NonConstantClassParamDefaultIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [3:0] v;\n"
+      "endmodule\n"
+      "class C #(int P = v);\n"
+      "endclass\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "class parameter 'P' value is not a constant expression", 4, "6.20.2"));
+}
+
+// §6.20.1 rules that "all param_assignments appearing within a class body
+// shall become localparam declarations regardless of the presence or absence
+// of a parameter_port_list" (printed page 125 of ~/LRM.pdf), so a parameter
+// declared in the class body is under the §6.20.2 constancy rule exactly as a
+// #() parameter port is. The two reach RecordClassParam through different
+// loops in RegisterClassParams -- cls->params for the ports, cls->members for
+// the body declarations -- so a fix covering only the ports leaves this one
+// silent. The default's `v` stands on line 5.
+TEST(ValueParameters, NonConstantClassBodyParamDefaultIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [3:0] v;\n"
+      "endmodule\n"
+      "class C;\n"
+      "  localparam int P = v;\n"
+      "endclass\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "class parameter 'P' value is not a constant expression", 5, "6.20.2"));
+}
+
+// §6.20.1: "in a list of parameter constants, a parameter can depend on
+// earlier parameters", which holds inside a class body as it does in a module.
+// `B = A * 2` is therefore a constant expression and the source is legal. This
+// is what the cheapest repair of the two rejections above would break, by
+// folding each class parameter against the compilation unit alone and
+// reporting every one that names a sibling.
+TEST(ValueParameters, ClassParamDefaultDependsOnEarlierClassParam) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "endmodule\n"
+      "class C #(int A = 4, int B = A * 2);\n"
+      "endclass\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §8.25 binds a class's type parameter only when the class is specialized, so
+// `$bits(T)` has no value where it stands and is not a breach of §6.20.2's
+// constancy rule. The source is legal and must elaborate without a report,
+// which is what distinguishes a value the source got wrong from a value that
+// is not yet decided. A rejection here would make every parameterized class
+// whose value parameter is sized from its type parameter unwritable.
+TEST(ValueParameters, ClassParamDefaultComputedFromTypeParamIsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "endmodule\n"
+      "class C #(type T = int, int S = $bits(T));\n"
+      "endclass\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
