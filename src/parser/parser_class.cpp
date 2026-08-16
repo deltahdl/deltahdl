@@ -283,12 +283,19 @@ ClassDecl* Parser::ParseClassDecl() {
   Match(TokenKind::kKwAutomatic);
   Match(TokenKind::kKwStatic);
   decl->name = Expect(TokenKind::kIdentifier, Subclause("8.3")).text;
-  // The class's own name is registered before the guard, so it outlives the
-  // class body: §8.3 makes a class a type, and a class declared at compilation
-  // unit scope is one throughout the unit. What the guard scopes is everything
-  // the body declares, including the type parameters of the #() list below.
+  // §8.3 makes a class a type, so its own name is registered here and is a type
+  // name wherever the declaration is written.
+  //
+  // No TypeNameScope over the body, although §23.9 makes a class a scope. §8.26
+  // gives an interface class type declarations that the interface classes
+  // extending it and the classes implementing it name without a prefix, and
+  // §8.24 does the same down an ordinary inheritance chain. The parser decides
+  // what is a type name from known_types_ alone, with nothing that tracks which
+  // base a class extends, so restoring the set at `endclass` makes a derived
+  // class stop parsing its base's type names. That is the same shape as the
+  // package case in Parser::ParsePackageDecl, and it needs an
+  // inheritance-aware type table rather than a scope guard.
   known_types_.insert(decl->name);
-  TypeNameScope type_scope(*this);
 
   if (Check(TokenKind::kHash)) {
     Consume();

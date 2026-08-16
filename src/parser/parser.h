@@ -597,11 +597,16 @@ class Parser {
   // together, and a nettype name decides how `#` after an identifier is read,
   // so restoring one without the other leaves the leak for that reading.
   //
-  // The six design elements of that list are what the parser guards. The five
-  // that remain -- a task, a function, a begin-end block, a fork-join block and
-  // a generate block -- are scopes by the same sentence and are not guarded
-  // yet, so a typedef written inside one is still a type name in the design
-  // element that contains it.
+  // Four of that list are guarded: a module, an interface, a program and a
+  // checker, plus the extern headers of the first three. A package and a class
+  // are not, because §26.3 and §8.26 let an importing or a derived scope name
+  // their type declarations without a prefix and the parser has no table of
+  // which imports or bases are in force; ParsePackageDecl and ParseClassDecl
+  // each say so where the guard would have gone. The remaining five -- a task,
+  // a function, a begin-end block, a fork-join block and a generate block --
+  // are scopes by the same sentence and are not guarded either, so a typedef
+  // written inside one is still a type name in the design element containing
+  // it.
   //
   // A destructor rather than a save and a restore written at each site, because
   // a parse function has more than one exit and error recovery takes some of
