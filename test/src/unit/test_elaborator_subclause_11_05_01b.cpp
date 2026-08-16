@@ -323,3 +323,78 @@ TEST(RealSelect, BitSelectOfARealArrayElementInFinalIsIllegal) {
                             "bit-select of a real variable is illegal", 5,
                             "11.5.1"));
 }
+
+// A.6.12 makes a randsequence code block a list of statements, so the §11.5.1
+// walk reaches this select; mirrors ScalarBitSelectError in
+// test/src/unit/test_elaborator_subclause_11_05_01a.cpp.
+TEST(SelectElaboration, ScalarSelectInARandsequenceCodeBlockIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic x;\n"
+      "  logic y;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { y = x[0]; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select or part-select of a scalar is illegal",
+                            6, "11.5.1"));
+}
+
+// §16.3 makes an assertion's pass action a statement, held in
+// Stmt::assert_pass_stmt; mirrors RealVariableBitSelectError in
+// test/src/unit/test_elaborator_subclause_11_05_01a.cpp.
+TEST(SelectElaboration, RealSelectInAnAssertPassArmIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real r;\n"
+      "  logic y;\n"
+      "  initial assert (1) y = r[0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real variable is illegal", 4,
+                            "11.5.1"));
+}
+
+// A.6.8 makes a for-loop initialization a statement; mirrors
+// IndexedPartSelectWidthMustBeConstant in
+// test/src/unit/test_elaborator_subclause_11_05_01a.cpp, whose width is the
+// same non-constant.
+TEST(SelectElaboration, IndexedPartSelectWidthInAForInitIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic [15:0] data;\n"
+      "  integer w;\n"
+      "  logic [7:0] y;\n"
+      "  initial for (y = data[0+:w]; w < 2; w = w + 1) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "indexed part-select width must be a constant expression", 5, "11.5.1"));
+}
+
+// The control on the three above: A.6.12's code block holds a part-select
+// §11.5.1 allows, so a walk that newly reaches it must report nothing.
+TEST(SelectElaboration, PartSelectInARandsequenceCodeBlockIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic [7:0] data;\n"
+      "  logic [3:0] y;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { y = data[7:4]; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}

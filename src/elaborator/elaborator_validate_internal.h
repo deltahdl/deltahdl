@@ -55,6 +55,37 @@ void ForEachRandsequenceStmt(const Stmt* s, Visit visit) {
   }
 }
 
+// Hands `visit` every statement `s` holds, in every field of Stmt that holds
+// one. src/parser/ast_stmt.h declares thirteen: stmts, then_branch,
+// else_branch, for_inits, for_steps, for_body, case_items, fork_stmts, body,
+// assert_pass_stmt, assert_fail_stmt, randcase_items and rs_productions.
+//
+// This is the list, stated once, that a walker over statements recurses on. A
+// walker that writes its own runs a rule over the positions somebody happened
+// to write down rather than over the positions Annex A admits, which is what
+// #3141, #3165 and #3166 were each about. Where a rule genuinely cannot reach a
+// field, say so in a comment above the walker rather than by dropping this call
+// and writing a shorter list.
+//
+// `visit` is called with a null pointer for an absent single-statement field,
+// which every walker here already answers with an early return.
+template <typename Visit>
+void ForEachChildStmt(const Stmt* s, Visit visit) {
+  for (const auto* sub : s->stmts) visit(sub);
+  for (const auto* sub : s->fork_stmts) visit(sub);
+  for (const auto* sub : s->for_inits) visit(sub);
+  for (const auto* sub : s->for_steps) visit(sub);
+  visit(s->then_branch);
+  visit(s->else_branch);
+  visit(s->body);
+  visit(s->for_body);
+  visit(s->assert_pass_stmt);
+  visit(s->assert_fail_stmt);
+  for (const auto& ci : s->case_items) visit(ci.body);
+  for (const auto& rc : s->randcase_items) visit(rc.second);
+  ForEachRandsequenceStmt(s, visit);
+}
+
 // Parses the size prefix of an integer literal's text (the digits before the
 // base tick "'"). Returns that width when present and positive, otherwise the
 // default unsized-literal width of 32. Defined in elaborator_validate.cpp.

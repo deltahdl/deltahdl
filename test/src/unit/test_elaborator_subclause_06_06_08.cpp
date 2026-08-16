@@ -390,4 +390,74 @@ TEST(InterconnectElaboration, ResolvesToDissimilarNetTypesImplicitNamed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §6.6.8's rule against an interconnect net in a procedural continuous
+// assignment is decided by the statement, not by where the statement stands,
+// and §9.3.2 makes a par_block a statement_or_null. ForceIsError above writes
+// the same force directly under `initial` and expects the same report;
+// CheckInterconnectProcContAssign skipped Stmt::fork_stmts before it recursed
+// through ForEachChildStmt, so that case could not tell whether a fork member
+// was reached at all.
+TEST(InterconnectElaboration,
+     ProceduralContinuousAssignToAnInterconnectInAForkIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  interconnect sig;\n"
+      "  initial fork\n"
+      "    force sig = 1;\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interconnect net cannot be used in procedural "
+                            "continuous assignment",
+                            4, "6.6.8"));
+}
+
+// §6.6.8's rule against reading an interconnect net in a procedural expression
+// is decided by the expression, not by where the statement stands, and §18.16
+// makes each randcase_item's body a statement_or_null.
+// ProceduralRhsReadIsError above writes the same assignment directly under
+// `initial` and expects the same report; CheckInterconnectProceduralRead
+// skipped Stmt::randcase_items before it recursed through ForEachChildStmt.
+TEST(InterconnectElaboration, ReadOfAnInterconnectInARandcaseArmIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  interconnect ic;\n"
+      "  logic y;\n"
+      "  initial randcase\n"
+      "    1 : y = ic;\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "interconnect net cannot be used in a procedural expression", 5,
+      "6.6.8"));
+}
+
+// The regression against a walk that reports on every statement it newly
+// reaches: §9.3.2 makes a par_block a statement_or_null, so both walkers now
+// descend into a fork member, and forcing an ordinary wire there is what
+// §6.6.8 leaves alone. The module declares an interconnect net as well, so the
+// set of interconnect names both walkers test against is non-empty and the
+// acceptance is the rule's answer rather than an empty set's.
+// ProceduralContinuousAssignToAnInterconnectInAForkIsRejected above writes the
+// same fork with an interconnect target.
+TEST(InterconnectElaboration, ForceOnAPlainNetInAForkIsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  interconnect ic;\n"
+      "  wire w;\n"
+      "  initial fork\n"
+      "    force w = 1'b1;\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

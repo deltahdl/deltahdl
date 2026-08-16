@@ -273,16 +273,9 @@ void CheckNbaDynamicArrayTarget(
                  Subclause("6.21"));
     }
   }
-  for (auto* sub : s->stmts)
+  ForEachChildStmt(s, [&](const Stmt* sub) {
     CheckNbaDynamicArrayTarget(sub, dyn_names, dynsized_names, diag);
-  for (auto* sub : s->fork_stmts)
-    CheckNbaDynamicArrayTarget(sub, dyn_names, dynsized_names, diag);
-  CheckNbaDynamicArrayTarget(s->then_branch, dyn_names, dynsized_names, diag);
-  CheckNbaDynamicArrayTarget(s->else_branch, dyn_names, dynsized_names, diag);
-  CheckNbaDynamicArrayTarget(s->body, dyn_names, dynsized_names, diag);
-  CheckNbaDynamicArrayTarget(s->for_body, dyn_names, dynsized_names, diag);
-  for (auto& ci : s->case_items)
-    CheckNbaDynamicArrayTarget(ci.body, dyn_names, dynsized_names, diag);
+  });
 }
 
 static void CollectLhsBaseNames(
@@ -306,13 +299,9 @@ static void CollectLhsBaseNames(
 // been walked, so this only collects; Elaborator::ValidateMixedAssignments and
 // Elaborator::ValidateProceduralNetAssign report.
 //
-// The statement position an assignment stands in decides nothing about either
-// rule, so this descends every field of Stmt that holds a statement.
-// src/parser/ast_stmt.h declares thirteen: stmts, then_branch, else_branch,
-// for_inits, for_steps, for_body, case_items, fork_stmts, body,
-// assert_pass_stmt, assert_fail_stmt, randcase_items and rs_productions. The
-// last holds the statements of a randsequence code block and is reached through
-// ForEachRandsequenceStmt, which reads the two places an rs_rule holds them.
+// The statement position an assignment stands in decides neither rule, so this
+// recurses through ForEachChildStmt, which holds the list of every field of
+// Stmt that carries a statement.
 void CollectProcTargets(const Stmt* s,
                         std::unordered_map<std::string_view, SourceLoc>& out) {
   if (!s) return;
@@ -320,20 +309,8 @@ void CollectProcTargets(const Stmt* s,
       s->kind == StmtKind::kNonblockingAssign) {
     CollectLhsBaseNames(s->lhs, s->range.start, out);
   }
-  for (auto* sub : s->stmts) CollectProcTargets(sub, out);
-  for (auto* sub : s->fork_stmts) CollectProcTargets(sub, out);
-  for (auto* sub : s->for_inits) CollectProcTargets(sub, out);
-  for (auto* sub : s->for_steps) CollectProcTargets(sub, out);
-  CollectProcTargets(s->then_branch, out);
-  CollectProcTargets(s->else_branch, out);
-  CollectProcTargets(s->body, out);
-  CollectProcTargets(s->for_body, out);
-  CollectProcTargets(s->assert_pass_stmt, out);
-  CollectProcTargets(s->assert_fail_stmt, out);
-  for (auto& ci : s->case_items) CollectProcTargets(ci.body, out);
-  for (auto& rc : s->randcase_items) CollectProcTargets(rc.second, out);
-  ForEachRandsequenceStmt(
-      s, [&out](const Stmt* sub) { CollectProcTargets(sub, out); });
+  ForEachChildStmt(s,
+                   [&out](const Stmt* sub) { CollectProcTargets(sub, out); });
 }
 
 // Records the variable each force or release statement names, for §10.6.2's
@@ -343,21 +320,17 @@ void CollectProcTargets(const Stmt* s,
 // left to Elaborator::ValidateMixedAssignments and this only collects. Uses the
 // same CollectLhsBaseNames as CollectProcTargets, which descends a
 // concatenation, because §10.6.2 admits "a concatenation of these" as a force
-// target and the rule holds of each operand. Descends fork_stmts as
-// CheckForceLhs does, since §9.3.2 makes a par_block a statement_or_null.
+// target and the rule holds of each operand. Recurses through ForEachChildStmt
+// for the reason CollectProcTargets above does: where a force or release is
+// written decides nothing about the rule.
 void CollectForceReleaseTargets(
     const Stmt* s, std::unordered_map<std::string_view, SourceLoc>& out) {
   if (!s) return;
   if (s->kind == StmtKind::kForce || s->kind == StmtKind::kRelease) {
     CollectLhsBaseNames(s->lhs, s->range.start, out);
   }
-  for (auto* sub : s->stmts) CollectForceReleaseTargets(sub, out);
-  for (auto* sub : s->fork_stmts) CollectForceReleaseTargets(sub, out);
-  CollectForceReleaseTargets(s->then_branch, out);
-  CollectForceReleaseTargets(s->else_branch, out);
-  CollectForceReleaseTargets(s->body, out);
-  CollectForceReleaseTargets(s->for_body, out);
-  for (auto& ci : s->case_items) CollectForceReleaseTargets(ci.body, out);
+  ForEachChildStmt(
+      s, [&out](const Stmt* sub) { CollectForceReleaseTargets(sub, out); });
 }
 
 void CheckInterconnectProcContAssign(
@@ -375,14 +348,9 @@ void CheckInterconnectProcContAssign(
                  Subclause("6.6.8"));
     }
   }
-  for (auto* sub : s->stmts)
+  ForEachChildStmt(s, [&](const Stmt* sub) {
     CheckInterconnectProcContAssign(sub, interconnect_names, diag);
-  CheckInterconnectProcContAssign(s->then_branch, interconnect_names, diag);
-  CheckInterconnectProcContAssign(s->else_branch, interconnect_names, diag);
-  CheckInterconnectProcContAssign(s->body, interconnect_names, diag);
-  CheckInterconnectProcContAssign(s->for_body, interconnect_names, diag);
-  for (auto& ci : s->case_items)
-    CheckInterconnectProcContAssign(ci.body, interconnect_names, diag);
+  });
 }
 
 // §6.6.8: an interconnect net is typeless/generic and shall not be used in any
@@ -416,14 +384,9 @@ void CheckInterconnectProceduralRead(
                    Subclause("6.6.8"));
         break;
       }
-  for (auto* sub : s->stmts)
+  ForEachChildStmt(s, [&](const Stmt* sub) {
     CheckInterconnectProceduralRead(sub, interconnect_names, diag);
-  CheckInterconnectProceduralRead(s->then_branch, interconnect_names, diag);
-  CheckInterconnectProceduralRead(s->else_branch, interconnect_names, diag);
-  CheckInterconnectProceduralRead(s->body, interconnect_names, diag);
-  CheckInterconnectProceduralRead(s->for_body, interconnect_names, diag);
-  for (auto& ci : s->case_items)
-    CheckInterconnectProceduralRead(ci.body, interconnect_names, diag);
+  });
 }
 
 // §10.6.1: the LHS of an assign statement shall be a singular variable
@@ -449,13 +412,8 @@ void CheckProceduralAssignLhs(const Stmt* s, DiagEngine& diag) {
                "bit-select or part-select in procedural assign LHS",
                Subclause("10.6.1"));
   }
-  for (auto* sub : s->stmts) CheckProceduralAssignLhs(sub, diag);
-  for (auto* sub : s->fork_stmts) CheckProceduralAssignLhs(sub, diag);
-  CheckProceduralAssignLhs(s->then_branch, diag);
-  CheckProceduralAssignLhs(s->else_branch, diag);
-  CheckProceduralAssignLhs(s->body, diag);
-  CheckProceduralAssignLhs(s->for_body, diag);
-  for (auto& ci : s->case_items) CheckProceduralAssignLhs(ci.body, diag);
+  ForEachChildStmt(
+      s, [&diag](const Stmt* sub) { CheckProceduralAssignLhs(sub, diag); });
 }
 
 static void CheckForceLhsOperand(
@@ -486,8 +444,7 @@ static void CheckForceLhsOperand(
 }
 
 // Reports §10.6.2's rule on what a force statement may name, at every statement
-// position a force can stand in. Descends the same thirteen fields of Stmt as
-// CollectProcTargets above.
+// position a force can stand in, which is what ForEachChildStmt enumerates.
 void CheckForceLhs(
     const Stmt* s, const std::unordered_set<std::string_view>& net_names,
     const std::unordered_set<std::string_view>& nettype_net_names,
@@ -497,25 +454,7 @@ void CheckForceLhs(
     CheckForceLhsOperand(s->lhs, net_names, nettype_net_names, s->range.start,
                          diag);
   }
-  for (auto* sub : s->stmts)
-    CheckForceLhs(sub, net_names, nettype_net_names, diag);
-  for (auto* sub : s->fork_stmts)
-    CheckForceLhs(sub, net_names, nettype_net_names, diag);
-  for (auto* sub : s->for_inits)
-    CheckForceLhs(sub, net_names, nettype_net_names, diag);
-  for (auto* sub : s->for_steps)
-    CheckForceLhs(sub, net_names, nettype_net_names, diag);
-  CheckForceLhs(s->then_branch, net_names, nettype_net_names, diag);
-  CheckForceLhs(s->else_branch, net_names, nettype_net_names, diag);
-  CheckForceLhs(s->body, net_names, nettype_net_names, diag);
-  CheckForceLhs(s->for_body, net_names, nettype_net_names, diag);
-  CheckForceLhs(s->assert_pass_stmt, net_names, nettype_net_names, diag);
-  CheckForceLhs(s->assert_fail_stmt, net_names, nettype_net_names, diag);
-  for (auto& ci : s->case_items)
-    CheckForceLhs(ci.body, net_names, nettype_net_names, diag);
-  for (auto& rc : s->randcase_items)
-    CheckForceLhs(rc.second, net_names, nettype_net_names, diag);
-  ForEachRandsequenceStmt(s, [&](const Stmt* sub) {
+  ForEachChildStmt(s, [&](const Stmt* sub) {
     CheckForceLhs(sub, net_names, nettype_net_names, diag);
   });
 }
@@ -730,22 +669,15 @@ void CheckScalarSelectStmt(const Stmt* s, const NameSet& scalars,
   CheckScalarSelect(s->rhs, scalars, diag);
   CheckScalarSelect(s->expr, scalars, diag);
   CheckScalarSelect(s->condition, scalars, diag);
-  for (auto* child : s->stmts) CheckScalarSelectStmt(child, scalars, diag);
-  CheckScalarSelectStmt(s->then_branch, scalars, diag);
-  CheckScalarSelectStmt(s->else_branch, scalars, diag);
-  CheckScalarSelectStmt(s->body, scalars, diag);
-  for (auto* fi : s->for_inits) CheckScalarSelectStmt(fi, scalars, diag);
-  CheckScalarSelectStmt(s->for_body, scalars, diag);
-  for (auto* fs : s->for_steps) CheckScalarSelectStmt(fs, scalars, diag);
   CheckScalarSelect(s->for_cond, scalars, diag);
-  for (const auto& ci : s->case_items)
-    CheckScalarSelectStmt(ci.body, scalars, diag);
-  for (auto* fs : s->fork_stmts) CheckScalarSelectStmt(fs, scalars, diag);
+  ForEachChildStmt(
+      s, [&](const Stmt* sub) { CheckScalarSelectStmt(sub, scalars, diag); });
 }
 
 // §11.5.1 applies to a select written in a procedural statement exactly as it
-// applies to one written on a continuous assignment, so the real-operand check
-// reaches every statement position CheckScalarSelectStmt reaches.
+// applies to one written on a continuous assignment. The real-operand check
+// reaches every statement position CheckScalarSelectStmt reaches because both
+// recurse through ForEachChildStmt.
 void CheckRealSelectStmt(const Stmt* s, const TypeMap& types,
                          const SelectOperands& operands, DiagEngine& diag) {
   if (!s) return;
@@ -753,18 +685,10 @@ void CheckRealSelectStmt(const Stmt* s, const TypeMap& types,
   CheckRealSelect(s->rhs, types, operands, diag);
   CheckRealSelect(s->expr, types, operands, diag);
   CheckRealSelect(s->condition, types, operands, diag);
-  for (auto* child : s->stmts)
-    CheckRealSelectStmt(child, types, operands, diag);
-  CheckRealSelectStmt(s->then_branch, types, operands, diag);
-  CheckRealSelectStmt(s->else_branch, types, operands, diag);
-  CheckRealSelectStmt(s->body, types, operands, diag);
-  for (auto* fi : s->for_inits) CheckRealSelectStmt(fi, types, operands, diag);
-  CheckRealSelectStmt(s->for_body, types, operands, diag);
-  for (auto* fs : s->for_steps) CheckRealSelectStmt(fs, types, operands, diag);
   CheckRealSelect(s->for_cond, types, operands, diag);
-  for (const auto& ci : s->case_items)
-    CheckRealSelectStmt(ci.body, types, operands, diag);
-  for (auto* fs : s->fork_stmts) CheckRealSelectStmt(fs, types, operands, diag);
+  ForEachChildStmt(s, [&](const Stmt* sub) {
+    CheckRealSelectStmt(sub, types, operands, diag);
+  });
 }
 
 void CheckIndexedPartSelectWidthStmt(const Stmt* s, const ScopeMap& scope,
@@ -774,21 +698,10 @@ void CheckIndexedPartSelectWidthStmt(const Stmt* s, const ScopeMap& scope,
   CheckIndexedPartSelectWidth(s->rhs, scope, diag);
   CheckIndexedPartSelectWidth(s->expr, scope, diag);
   CheckIndexedPartSelectWidth(s->condition, scope, diag);
-  for (auto* child : s->stmts)
-    CheckIndexedPartSelectWidthStmt(child, scope, diag);
-  CheckIndexedPartSelectWidthStmt(s->then_branch, scope, diag);
-  CheckIndexedPartSelectWidthStmt(s->else_branch, scope, diag);
-  CheckIndexedPartSelectWidthStmt(s->body, scope, diag);
-  for (auto* fi : s->for_inits)
-    CheckIndexedPartSelectWidthStmt(fi, scope, diag);
-  CheckIndexedPartSelectWidthStmt(s->for_body, scope, diag);
-  for (auto* fs : s->for_steps)
-    CheckIndexedPartSelectWidthStmt(fs, scope, diag);
   CheckIndexedPartSelectWidth(s->for_cond, scope, diag);
-  for (const auto& ci : s->case_items)
-    CheckIndexedPartSelectWidthStmt(ci.body, scope, diag);
-  for (auto* fs : s->fork_stmts)
-    CheckIndexedPartSelectWidthStmt(fs, scope, diag);
+  ForEachChildStmt(s, [&](const Stmt* sub) {
+    CheckIndexedPartSelectWidthStmt(sub, scope, diag);
+  });
 }
 
 // Whether `fn` holds for any child expression of `e`. Expr in

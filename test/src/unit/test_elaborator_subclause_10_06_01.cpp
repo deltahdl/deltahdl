@@ -258,4 +258,41 @@ TEST(ProceduralAssignDeassignElaboration,
       "bit-select or part-select in procedural assign LHS", 4, "10.6.1"));
 }
 
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so the fail arm of an immediate assertion is a statement
+// position, and §10.6.1's rule reaches the procedural assign written there.
+// This is the source AssignBitSelectLhsIsError writes in an initial block, with
+// only the offending statement moved into that arm.
+TEST(ProceduralAssignDeassignElaboration,
+     ProceduralAssignWithASelectLhsInAnAssertFailArmIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  reg [7:0] data;\n"
+      "  initial assert (0) else\n"
+      "    assign data[3] = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "bit-select or part-select in procedural assign LHS", 4, "10.6.1"));
+}
+
+// The same §16.3 action-block arm holding an assign LHS §10.6.1 allows, which
+// mirrors AssignSingularVariableLhs. It pins that reaching the arm reports on
+// what the rule forbids rather than on every statement newly walked.
+TEST(ProceduralAssignDeassignElaboration,
+     ProceduralAssignWithAWholeVariableLhsInAnAssertFailArmIsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  reg q;\n"
+      "  initial assert (0) else\n"
+      "    assign q = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

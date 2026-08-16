@@ -600,4 +600,46 @@ TEST(ScopeAndLifetimeElaboration, ForLoopVariableDefaultsAutomaticElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §6.21's "elements of dynamically sized array variables shall not be written
+// with nonblocking ... assignments" is decided by the assignment's target, not
+// by where the statement stands, and §18.16 makes each randcase_item's body a
+// statement_or_null. DynamicArrayElementNonblockingIsError above writes the
+// same assignment directly under `initial` and expects the same report.
+TEST(ScopeAndLifetimeElaboration,
+     NonblockingAssignToDynamicArrayElementInARandcaseArmIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int d[] = new[4];\n"
+      "  initial randcase\n"
+      "    1 : d[0] <= 1;\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "nonblocking assignment to element of dynamically sized array", 4,
+      "6.21"));
+}
+
+// The regression against a walk that reports on every statement it newly
+// reaches: §6.21 bars a nonblocking assignment to an element of a dynamically
+// sized array and not to the whole array, and §18.16's randcase_item body is a
+// statement position like any other, so this source stays accepted.
+TEST(ScopeAndLifetimeElaboration,
+     NonblockingAssignToAWholeDynamicArrayInARandcaseArmIsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int d[] = new[4];\n"
+      "  int e[] = new[4];\n"
+      "  initial randcase\n"
+      "    1 : d <= e;\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

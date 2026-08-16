@@ -324,4 +324,29 @@ TEST(ForceReleaseElaboration, ForceBitSelectVariableLhsInARandsequenceIsError) {
       "10.6.2"));
 }
 
+// §10.6.2's rule against forcing a variable assigned by both a continuous and
+// a procedural assignment holds wherever the force stands, and §18.16 makes
+// each randcase_item's body a statement_or_null.
+// ForceOnAMixedAssignmentVariableNamesItsOwnRule above writes the same force in
+// a begin-end block and expects the same report.
+TEST(ForceReleaseElaboration,
+     ForceInARandcaseArmOverAMixedlyAssignedVariableIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic x;\n"
+      "  assign x = 1'b0;\n"
+      "  initial begin\n"
+      "    x = 1'b1;\n"
+      "    randcase\n"
+      "      1 : force x = 1'b1;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "force or release applied to variable 'x'", 7,
+                            "10.6.2"));
+}
+
 }  // namespace
