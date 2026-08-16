@@ -581,4 +581,31 @@ TEST(PackageImport, ImportedParameterDoesNotReachAnotherModule) {
   EXPECT_EQ(y->width, 1u);
 }
 
+// §26.3 (printed page 808): "One way to use declarations made in a package is
+// to reference them using the package scope resolution operator ::", written in
+// the clause as `ComplexPkg::Complex cout = ComplexPkg::mul(a, b);` -- a
+// declaration through a package-qualified type name, with no import in sight.
+// The cases above all reach a package typedef through an import, which enters
+// it under its bare name, so none of them exercises the prefix itself.
+//
+// 16 is the width to assert: shortint is the only type in the source, so a
+// prefix that resolved to nothing leaves v at 0 and one that resolved to some
+// other declaration could not answer 16.
+TEST(PackageReference, ScopedTypedefSizesTheVariableWithoutImport) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package pkg;\n"
+      "  typedef shortint word_t;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  pkg::word_t v;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* v = FindVar(design, "m", "v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->width, 16u);
+}
+
 }  // namespace

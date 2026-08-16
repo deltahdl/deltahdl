@@ -227,6 +227,50 @@ void RegisterClassParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
   }
 }
 
+// Records one typedef under the "Scope::name" key ResolveNamed in
+// src/elaborator/type_eval.cpp looks a prefixed name up by. The key is
+// arena-allocated because TypedefMap keys are string_views, which a local
+// string would leave dangling.
+void RegisterScopedTypedef(std::string_view scope_name,
+                           std::string_view type_name, const DataType& dtype,
+                           TypedefMap& typedefs, Arena& arena) {
+  auto* qname = arena.Create<std::string>(std::string(scope_name) +
+                                          "::" + std::string(type_name));
+  typedefs[*qname] = dtype;
+}
+
+// Records each package's typedefs under their qualified key. §26.3 references a
+// package's declarations through the package name, as its example on printed
+// page 808 does in `ComplexPkg::Complex cout = ComplexPkg::mul(a, b);`, and it
+// does so whether or not the package was imported. RegisterImportItem in
+// src/elaborator/elaborator_module.cpp enters an imported typedef under its
+// bare name, which is the separate spelling an import makes legal.
+void RegisterPackageTypedefs(CompilationUnit* unit, TypedefMap& typedefs,
+                             Arena& arena) {
+  for (auto* pkg : unit->packages) {
+    for (auto* item : pkg->items) {
+      if (item->kind != ModuleItemKind::kTypedef) continue;
+      RegisterScopedTypedef(pkg->name, item->name, item->typedef_type, typedefs,
+                            arena);
+    }
+  }
+}
+
+// Records each class's typedefs under their qualified key. §8.23 states that
+// "type declarations nested inside a class scope are public and can be accessed
+// outside the class", through the class name. The reach over unit->classes is
+// the one RegisterClassParams already has for the same clause's parameters.
+void RegisterClassTypedefs(CompilationUnit* unit, TypedefMap& typedefs,
+                           Arena& arena) {
+  for (auto* cls : unit->classes) {
+    for (const auto* m : cls->members) {
+      if (m->kind != ClassMemberKind::kTypedef || !m->typedef_item) continue;
+      RegisterScopedTypedef(cls->name, m->name, m->typedef_item->typedef_type,
+                            typedefs, arena);
+    }
+  }
+}
+
 // Inserts the built-in class names that always live in the compilation-unit
 // scope (§6.14, §15.x predefined process/semaphore/mailbox classes).
 void RegisterBuiltinClassNames(
@@ -310,6 +354,8 @@ void Elaborator::RegisterCuScopeItems() {
                     parameterized_class_names_);
   RegisterPackageParams(unit_, cu_param_scope_, arena_);
   RegisterClassParams(unit_, cu_param_scope_, arena_);
+  RegisterPackageTypedefs(unit_, typedefs_, arena_);
+  RegisterClassTypedefs(unit_, typedefs_, arena_);
   // Seed the unions ItemElaborationStateSaver folds each module's entries into.
   // A compilation unit with no module to elaborate never reaches that fold, and
   // the passes reading the unions afterwards still have to see what the

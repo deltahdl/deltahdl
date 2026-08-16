@@ -339,4 +339,33 @@ TEST(ParameterOverride, TypedUnrangedConvertsNamedInstanceOverride) {
   EXPECT_EQ(u0->params[0].resolved_value, 1);
 }
 
+// A type parameter overridden by a package-qualified type name. §26.3 (printed
+// page 808) references a package's declarations through the package name, and
+// §23.10 makes a type parameter overridable by a data type, so `pkg::word_t` is
+// a value this assignment may carry. It is the one override form that reaches
+// ResolveNamed in src/elaborator/type_eval.cpp still carrying its prefix:
+// ClassScopedOverrideToDataType in src/elaborator/elaborator_module_inst.cpp
+// resolves a class-scoped override itself and publishes the resolved type, and
+// hands on the unresolved scope_name plus type_name shape only when that lookup
+// finds nothing, which a package prefix always does.
+//
+// 16 is shortint, against the 8 of the byte default the override replaces.
+TEST(ParameterOverride, TypeParameterOverriddenByPackageScopedTypeName) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package pkg;\n"
+      "  typedef shortint word_t;\n"
+      "endpackage\n"
+      "module child #(parameter type T = byte)();\n"
+      "  T data;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.T(pkg::word_t)) u0();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ExpectVariableWidth(SoleChildInstance(design), "data", 16u);
+}
+
 }  // namespace

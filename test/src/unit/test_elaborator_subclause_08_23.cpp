@@ -1,5 +1,6 @@
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -462,6 +463,58 @@ TEST(ClassScopeResolutionElaboration,
       f.diag.Diagnostics(),
       "scope-resolution prefix 'pkt_fwd' of a type parameter assignment", 4,
       "6.18"));
+}
+
+// §8.23 (printed page 200): "Because classes and other scopes can have the same
+// identifiers, the class scope resolution operator uniquely identifies a
+// member, a parameter or local parameter of a particular class", which the
+// clause writes out as `b.print( Base::bin, bin );  // Base::bin and bin are
+// different`. The two my_type declarations below therefore have to differ in
+// width, or the case passes whether the prefix was read or dropped: 32 is the
+// int inside Cfg, and the module's byte would answer 8.
+//
+// The widths are read back rather than elaboration being asserted to succeed,
+// because nothing reports a named type that resolved to nothing. EvalTypeWidth
+// at src/elaborator/type_eval.cpp answers 0 for an unresolved
+// DataTypeKind::kNamed and the run carries on, so ScopeResolutionTypedefOk
+// above holds however the lookup went.
+TEST(ClassScopeResolutionElaboration, ScopedTypedefSizesFromTheNamedClass) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class Cfg;\n"
+      "  typedef int my_type;\n"
+      "endclass\n"
+      "module m;\n"
+      "  typedef byte my_type;\n"
+      "  Cfg::my_type x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* x = FindVar(design, "m", "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->width, 32u);
+}
+
+// The same declaration with no unqualified my_type anywhere, which is
+// ScopeResolutionTypedefOk's source read back. It separates a prefix that
+// resolves from one that finds nothing: 32 is Cfg's int, and a lookup that
+// missed would leave x at the 0 an unresolved kNamed evaluates to.
+TEST(ClassScopeResolutionElaboration, ScopedTypedefSizesWithNoUnqualifiedName) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class Cfg;\n"
+      "  typedef int my_type;\n"
+      "endclass\n"
+      "module m;\n"
+      "  Cfg::my_type x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* x = FindVar(design, "m", "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->width, 32u);
 }
 
 }  // namespace

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <string>
 
 #include "common/arena.h"
 #include "elaborator/const_eval.h"
@@ -269,9 +270,28 @@ DataType TypeNameToDataType(std::string_view name) {
   return dt;
 }
 
+// The type a named type denotes, or null when no declaration matches it.
+//
+// A name written with a scope prefix selects the declaration in the scope it
+// names and never the unqualified one. §8.23 (printed page 200) states that
+// "the class scope resolution operator uniquely identifies a member, a
+// parameter or local parameter of a particular class", and writes the
+// consequence out as `b.print( Base::bin, bin );  // Base::bin and bin are
+// different`. §26.3 (printed page 808) references a package's declarations the
+// same way, declaring `ComplexPkg::Complex cout` through the prefix. So a
+// prefixed name looks up the "Scope::name" key that RegisterPackageTypedefs and
+// RegisterClassTypedefs in src/elaborator/elaborator_resolve.cpp record, and
+// misses rather than falling back to whatever unqualified name happens to
+// match: falling back would size the declared object from a different type.
 static const DataType* ResolveNamed(const DataType& dtype,
                                     const TypedefMap& typedefs) {
   if (dtype.kind != DataTypeKind::kNamed) return nullptr;
+  if (!dtype.scope_name.empty()) {
+    std::string qualified =
+        std::string(dtype.scope_name) + "::" + std::string(dtype.type_name);
+    auto qit = typedefs.find(qualified);
+    return (qit != typedefs.end()) ? &qit->second : nullptr;
+  }
   auto it = typedefs.find(dtype.type_name);
   return (it != typedefs.end()) ? &it->second : nullptr;
 }
