@@ -319,4 +319,146 @@ TEST(PortDeclaration, UnpackedArrayOfStructPortElaborates) {
   EXPECT_EQ(design->top_modules[0]->ports[0].type_kind, DataTypeKind::kStruct);
 }
 
+// §7.4.2: "Unpacked arrays shall be declared by specifying the element address
+// range(s) after the declared identifier", so `[1:4]` addresses elements 1
+// through 4. §11.5.2 makes those bounds decide what a select reads: "the
+// address bounds given in the declaration of the memory determine the effect of
+// the address expression". RtlirPort records a size per dimension and no bound
+// of any kind, so this port and one declared `[0:3]` read back identically
+// after elaboration and `mem[1]` reaches a different element of each.
+TEST(PortDeclaration, UnpackedArrayPortRecordsItsAddressBounds) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(\n"
+      "  input logic [7:0] mem [1:4]\n"
+      ");\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules[0]->ports.size(), 1u);
+  const auto& port = design->top_modules[0]->ports[0];
+  ASSERT_EQ(port.unpacked_dims.size(), 1u);
+  EXPECT_EQ(port.unpacked_dims[0].left, 1);
+  EXPECT_EQ(port.unpacked_dims[0].right, 4);
+}
+
+// §7.4.2: "[size] shall mean the same as [0:size-1]", so this port holds the
+// same four elements the port above holds, at addresses 0 through 3 rather
+// than 1 through 4. RtlirPort records size 4 for both and no bound of any
+// kind, so the two declarations are indistinguishable once elaborated.
+TEST(PortDeclaration, UnpackedArrayPortDistinguishesTheSizeFormFromARange) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(\n"
+      "  input logic [7:0] mem [4]\n"
+      ");\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules[0]->ports.size(), 1u);
+  const auto& port = design->top_modules[0]->ports[0];
+  ASSERT_EQ(port.unpacked_dims.size(), 1u);
+  EXPECT_EQ(port.unpacked_dims[0].left, 0);
+  EXPECT_EQ(port.unpacked_dims[0].right, 3);
+}
+
+// §7.4.2 on the two indices of a range specification: "The first value may be
+// greater than, equal to, or less than the second value." Written the greater
+// way round, element 4 is the first of the array rather than the last.
+// RtlirPort records size 4 and no bound of any kind, so a descending
+// declaration reads back exactly as `[1:4]` does and the order written is
+// lost.
+TEST(PortDeclaration, DescendingUnpackedArrayPortRecordsItsDeclaredOrder) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(\n"
+      "  input logic [7:0] mem [4:1]\n"
+      ");\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules[0]->ports.size(), 1u);
+  const auto& port = design->top_modules[0]->ports[0];
+  ASSERT_EQ(port.unpacked_dims.size(), 1u);
+  EXPECT_EQ(port.unpacked_dims[0].left, 4);
+  EXPECT_EQ(port.unpacked_dims[0].right, 1);
+}
+
+// §7.4.2: "A fixed-size unpacked dimension may also be specified by a single
+// positive constant integer expression to specify the number of elements in
+// the unpacked dimension", and a parameter of the module is such an
+// expression. The fold is done in an empty scope, where `N` resolves to
+// nothing, so the dimension is dropped and RtlirPort records no dimension at
+// all rather than a size without a bound. §11.5.2 then never gets its first
+// step -- "the desired word shall first be selected by supplying an address
+// for each dimension" -- because the synthesizer is never told the name is an
+// array, and it lowers `mem[2]` as a §11.5.1 bit-select of the one element.
+TEST(PortDeclaration, ParameterSizedUnpackedArrayPortFolds) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m #(parameter int N = 4) (\n"
+      "  input logic [7:0] mem [N]\n"
+      ");\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules[0]->ports.size(), 1u);
+  const auto& port = design->top_modules[0]->ports[0];
+  EXPECT_EQ(port.num_unpacked_dims, 1u);
+  ASSERT_EQ(port.unpacked_dim_sizes.size(), 1u);
+  EXPECT_EQ(port.unpacked_dim_sizes[0], 4u);
+}
+
+// The bound form of the same declaration. §7.4.2: "Each fixed-size unpacked
+// dimension shall be specified by a range specification of the form
+// [ constant_expression : constant_expression ]", so a parameter stands as the
+// second index as readily as it stands as a size. It is resolved in the same
+// empty scope, so the dimension is dropped and RtlirPort records no dimension
+// at all. §11.5.2's "the desired word shall first be selected by supplying an
+// address for each dimension" is again never reached, and the synthesizer
+// lowers `mem[2]` as a §11.5.1 bit-select of the one element.
+TEST(PortDeclaration, ParameterBoundedUnpackedArrayPortFolds) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m #(parameter int N = 4) (\n"
+      "  input logic [7:0] mem [1:N]\n"
+      ");\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules[0]->ports.size(), 1u);
+  const auto& port = design->top_modules[0]->ports[0];
+  ASSERT_EQ(port.unpacked_dims.size(), 1u);
+  EXPECT_EQ(port.unpacked_dims[0].left, 1);
+  EXPECT_EQ(port.unpacked_dims[0].right, 4);
+}
+
+// The same size expression on a non-ANSI port, whose parameter is declared in
+// the module body beside the port declaration that reads it. The packed width
+// on this shape already folds, so the scope holding `N` is reachable where the
+// port declaration is elaborated; the unpacked dimension is folded somewhere
+// else and comes back with nothing, so RtlirPort records no dimension at all
+// rather than the range §7.4.2 makes the size mean, "[size] shall mean the
+// same as [0:size-1]". §11.5.2's "the desired word shall first be selected by
+// supplying an address for each dimension" is never reached, and the
+// synthesizer lowers `mem[2]` as a §11.5.1 bit-select of the one element.
+TEST(PortDeclaration, BodyParameterSizedUnpackedArrayPortFolds) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(mem);\n"
+      "  parameter int N = 4;\n"
+      "  input logic [7:0] mem [N];\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules[0]->ports.size(), 1u);
+  EXPECT_EQ(design->top_modules[0]->ports[0].num_unpacked_dims, 1u);
+}
+
 }  // namespace

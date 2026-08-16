@@ -68,7 +68,7 @@ static bool TryParseRangeDim(const Expr* dim, RtlirVariable& var,
   if (!lval || !rval) return false;
   auto lo = std::min(*lval, *rval);
   auto hi = std::max(*lval, *rval);
-  var.unpacked_lo = static_cast<uint32_t>(lo);
+  var.unpacked_lo = lo;
   var.unpacked_size = static_cast<uint32_t>(hi - lo + 1);
   var.is_descending = (*lval > *rval);
   return true;

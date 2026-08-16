@@ -40,6 +40,35 @@ enum class RtlirProcessKind : uint8_t {
   kFinal,
 };
 
+// §7.4.2: one element address range of an unpacked dimension, as the
+// declaration wrote it -- the first bound and the second, in that order.
+//
+// The order is the record. §7.4.2 rules that "the first value may be greater
+// than, equal to, or less than the second value", so `[1:4]` and `[4:1]` are
+// different declarations, and a single low bound cannot tell them apart.
+// §11.5.2 is what reads them: "the address bounds given in the declaration of
+// the memory determine the effect of the address expression. If the address is
+// invalid (it is out of bounds or has one or more x or z bits), then the value
+// of the reference shall be as described in 7.4.5". A dimension written
+// `[size]` is recorded here as `[0:size-1]`, which §7.4.2 makes it mean.
+//
+// The bounds are int64_t because §7.4.2 admits "any integer value -- positive,
+// negative, or zero", and an unsigned field turns `[-3:5]` into a bound no
+// address reaches.
+struct RtlirUnpackedDim {
+  int64_t left = 0;
+  int64_t right = 0;
+
+  // The address a dimension counts from, which is the smaller bound whichever
+  // way it was written.
+  [[nodiscard]] int64_t Low() const { return left < right ? left : right; }
+
+  [[nodiscard]] uint32_t Size() const {
+    return static_cast<uint32_t>((left < right ? right - left : left - right) +
+                                 1);
+  }
+};
+
 struct RtlirPort {
   std::string_view name;
   Direction direction;
@@ -63,8 +92,17 @@ struct RtlirPort {
   std::string_view interface_type_name;
   Expr* default_value = nullptr;
   std::vector<ResolvedAttribute> attrs;
+  // The number of unpacked dimensions the port declaration wrote, whether or
+  // not each one folded to constants. A count larger than unpacked_dims.size()
+  // says a dimension went unrecorded, which is what tells a consumer that the
+  // port is an array it cannot address from a port that is not an array at all.
   uint32_t num_unpacked_dims = 0;
   std::vector<uint32_t> unpacked_dim_sizes;
+  // §11.5.2: the address bounds of each dimension that folded, in declaration
+  // order. unpacked_dim_sizes beside it says how many elements a dimension
+  // holds and this says which addresses reach them, which are different
+  // questions for every dimension not written `[0:n]`.
+  std::vector<RtlirUnpackedDim> unpacked_dims;
 };
 
 struct RtlirNet {
@@ -110,7 +148,9 @@ struct RtlirVariable {
   const DataType* dtype = nullptr;
   DataTypeKind elem_type_kind = DataTypeKind::kImplicit;
   uint32_t unpacked_size = 0;
-  uint32_t unpacked_lo = 0;
+  // The address the first unpacked dimension counts from. int64_t because
+  // §7.4.2 admits a negative bound, and `int x [-3:5]` counts from -3.
+  int64_t unpacked_lo = 0;
   bool is_descending = false;
   // §7.4.2: full per-dimension extents of a fixed multidimensional unpacked
   // array, outermost first, so the simulator can materialize one leaf variable
@@ -120,7 +160,16 @@ struct RtlirVariable {
   // associative arrays (which keep the single-dimension
   // unpacked_size/unpacked_lo above).
   std::vector<uint32_t> unpacked_dim_sizes;
-  std::vector<uint32_t> unpacked_dim_los;
+  // §11.5.2: the address bounds of each unpacked dimension that folded to
+  // constants, in declaration order, filled for a one-dimensional declaration
+  // as well as a multidimensional one. unpacked_size, unpacked_lo and
+  // is_descending above summarize the first of these and describe no other.
+  std::vector<RtlirUnpackedDim> unpacked_dims;
+  // The number of unpacked dimensions the declaration wrote, counting one whose
+  // bounds did not fold and one written `[]`. Without it `logic [7:0] m [1:4]`
+  // and `logic [7:0] m [1:4][]` record the same thing, and a consumer reads the
+  // second as an array of words it can address.
+  uint32_t num_unpacked_dims = 0;
   bool is_dynamic = false;
   bool is_queue = false;
   int32_t queue_max_size = -1;

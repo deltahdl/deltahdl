@@ -168,20 +168,22 @@ void Elaborator::TrackVarArrayInfo(
   CollectUnpackedDimSizes(item->unpacked_dims, info.declared_dims,
                           info.dim_sizes, scope);
   out[item->name] = info;
-  // §7.4.2: carry full per-dimension extents to the simulator only when every
-  // dimension is a fixed const size — queue/dynamic/assoc dims fall short of
-  // the declared count, so the single-dimension unpacked_size/lo stays in
-  // force.
-  if (info.dim_sizes.size() >= 2 &&
-      info.dim_sizes.size() == item->unpacked_dims.size()) {
-    std::vector<uint32_t> dim_los;
-    dim_los.reserve(info.declared_dims.size());
-    // Addressing runs from the lower bound whichever way the dimension was
-    // declared, so the offset a dimension starts at is the smaller of its two
-    // bounds.
-    for (const auto& dim : info.declared_dims)
-      dim_los.push_back(static_cast<uint32_t>(std::min(dim.left, dim.right)));
-    var.unpacked_dim_los = std::move(dim_los);
+  // §11.5.2 resolves an address against "the address bounds given in the
+  // declaration", so both bounds of every dimension that folded are carried
+  // through as declared, in declaration order. A dimension written the other
+  // way round is a different declaration, which the smaller bound alone cannot
+  // say, and one dimension needs the record as much as two: an address is
+  // resolved the same way whatever the dimension count.
+  var.num_unpacked_dims = static_cast<uint32_t>(item->unpacked_dims.size());
+  var.unpacked_dims.reserve(info.declared_dims.size());
+  for (const auto& dim : info.declared_dims) {
+    var.unpacked_dims.push_back({dim.left, dim.right});
+  }
+  // §7.4.2: carry full per-dimension extents only when every dimension is a
+  // fixed const size — a queue, dynamic or associative dimension folds to
+  // nothing, so the count falls short of the declared one and the sizes do not
+  // line up with the dimensions they would be read as.
+  if (info.dim_sizes.size() == item->unpacked_dims.size()) {
     var.unpacked_dim_sizes = info.dim_sizes;
   }
 }

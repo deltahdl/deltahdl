@@ -1,3 +1,6 @@
+#include <cstdint>
+#include <utility>
+
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -252,6 +255,110 @@ TEST(UnpackedArrayValidation, ZeroValuedParameterSizeFormRejected) {
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "unpacked dimension size shall be a positive integer", 1, "7.4.2"));
+}
+
+// §7.4.2 writes a fixed-size unpacked dimension as a range of element
+// addresses, and §11.5.2 rules that "the address bounds given in the
+// declaration of the memory determine the effect of the address expression",
+// so both values written are part of the declaration. The elaborator records
+// only `std::min` of each pair, in `unpacked_dim_los`, and only from two
+// dimensions up; of `[3:1]` it keeps the 1 and the declared 3 is gone.
+TEST(UnpackedArrayValidation, EachDimensionKeepsBothDeclaredBounds) {
+  ElabFixture f;
+  auto* design =
+      Elaborate("module m; logic [7:0] x [1:2][3:1]; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  ASSERT_EQ(mod->variables[0].unpacked_dims.size(), 2u);
+  EXPECT_EQ(std::make_pair(mod->variables[0].unpacked_dims[1].left,
+                           mod->variables[0].unpacked_dims[1].right),
+            std::make_pair(int64_t{3}, int64_t{1}));
+}
+
+// §7.4.2 rules that in a dimension's range "the first value may be greater
+// than, equal to, or less than the second value", so `[3:1]` and `[1:3]` are
+// two different declarations and the record has to tell them apart. Both
+// collapse to `std::min` of the pair, which is 1 for either, so the two
+// declarations leave the same `unpacked_dim_los`.
+TEST(UnpackedArrayValidation, OppositeSecondDimensionRecordsDifferently) {
+  ElabFixture f1;
+  auto* d1 = Elaborate("module m; logic [7:0] x [1:2][3:1]; endmodule\n", f1);
+  ASSERT_NE(d1, nullptr);
+
+  ElabFixture f2;
+  auto* d2 = Elaborate("module m; logic [7:0] x [1:2][1:3]; endmodule\n", f2);
+  ASSERT_NE(d2, nullptr);
+
+  const auto& a = d1->top_modules[0]->variables[0];
+  const auto& b = d2->top_modules[0]->variables[0];
+  ASSERT_EQ(a.unpacked_dims.size(), 2u);
+  ASSERT_EQ(b.unpacked_dims.size(), 2u);
+  EXPECT_NE(std::make_pair(a.unpacked_dims[1].left, a.unpacked_dims[1].right),
+            std::make_pair(b.unpacked_dims[1].left, b.unpacked_dims[1].right));
+}
+
+// §7.4.2 gives a multidimensional fixed-size unpacked array one range per
+// dimension, so how many dimensions the declaration wrote is part of what was
+// declared. `RtlirVariable` carries no count of them at all: `unpacked_dims`
+// and `unpacked_dim_sizes` hold an entry only for a dimension whose bounds
+// folded to constants, so the number written can only be guessed from a vector
+// that a dimension can be missing from.
+TEST(UnpackedArrayValidation, DeclaredDimensionCountIsRecorded) {
+  ElabFixture f;
+  auto* design =
+      Elaborate("module m; logic [7:0] x [1:4][2:5]; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].num_unpacked_dims, 2u);
+}
+
+// The dimension §7.4.2 admits and the vector cannot hold. `[]` is a dynamic
+// dimension, and the parser pushes a null dimension for it, so no entry for it
+// can reach `unpacked_dims`. With no count recorded, `logic [7:0] x [1:4][]`
+// and `logic [7:0] x [1:4]` leave the same one-entry record, and §11.5.2
+// addressing cannot tell how many addresses a select has to supply.
+TEST(UnpackedArrayValidation,
+     DynamicSecondDimensionIsNotRecordedAsOneDimension) {
+  ElabFixture f;
+  auto* design = Elaborate("module m; logic [7:0] x [1:4][]; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].num_unpacked_dims, 2u);
+}
+
+// §7.4.2 admits any constant expression as an element address bound, so a bound
+// may be negative -- `NegativeBoundYieldsCorrectSize` above elaborates the same
+// declaration and asks only for its size. §11.5.2 makes the declared bounds
+// decide which element an address names, and `unpacked_lo` is `uint32_t`, so
+// -3 is recorded as 4294967293 and every address computed from it is wrong.
+TEST(UnpackedArrayValidation, NegativeLowBoundIsRecordedAsDeclared) {
+  ElabFixture f;
+  auto* design = Elaborate("module m; int x [-3:5]; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  ASSERT_EQ(mod->variables[0].unpacked_dims.size(), 1u);
+  EXPECT_EQ(mod->variables[0].unpacked_dims[0].left, -3);
+}
+
+// §7.4.2 draws no distinction between a one-dimensional unpacked array and a
+// multidimensional one: each dimension is a range of element addresses, and a
+// declaration with one dimension wrote one such range. The per-dimension record
+// is filled only from two dimensions up, so `[1:4]` leaves it empty and its
+// declared bounds survive only as `std::min` of the pair in `unpacked_lo`.
+TEST(UnpackedArrayValidation, SingleDimensionFillsThePerDimensionRecord) {
+  ElabFixture f;
+  auto* design = Elaborate("module m; logic [7:0] x [1:4]; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  ASSERT_EQ(mod->variables[0].unpacked_dims.size(), 1u);
+  EXPECT_EQ(std::make_pair(mod->variables[0].unpacked_dims[0].left,
+                           mod->variables[0].unpacked_dims[0].right),
+            std::make_pair(int64_t{1}, int64_t{4}));
 }
 
 }  // namespace

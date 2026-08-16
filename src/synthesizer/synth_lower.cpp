@@ -369,33 +369,35 @@ void SynthLower::RecordSignal(std::string_view name, uint32_t width,
   signal_ranges_[name] = SignalDeclaredRange(name, mod, param_scope_);
 }
 
-void SynthLower::MapPortBits(const RtlirPort& port, AigGraph& aig) {
+void SynthLower::MapPortBits(const RtlirPort& port, uint32_t width,
+                             AigGraph& aig) {
   if (port.direction == Direction::kInput) {
     auto& bits = signal_bits_[port.name];
-    for (uint32_t b = 0; b < port.width; ++b) {
+    for (uint32_t b = 0; b < width; ++b) {
       bits[b] = aig.AddInput();
     }
     return;
   }
   if (port.direction == Direction::kOutput) {
-    output_ports_.emplace_back(port.name, port.width);
+    output_ports_.emplace_back(port.name, width);
   }
 }
 
 void SynthLower::MapPorts(const RtlirModule* mod, AigGraph& aig) {
   for (const auto& port : mod->ports) {
-    RecordSignal(port.name, port.width, port.is_signed, mod);
+    RecordArrayShape(port.name, port.width, port.num_unpacked_dims,
+                     port.unpacked_dims);
+    uint32_t width = ArrayStorageWidth(port.name, port.width);
+    RecordSignal(port.name, width, port.is_signed, mod);
     if (port.num_unpacked_dims > 0) unpacked_arrays_.insert(port.name);
-    MapPortBits(port, aig);
+    MapPortBits(port, width, aig);
   }
   for (const auto& var : mod->variables) {
     if (signal_widths_.count(var.name)) continue;
-    // §11.5.2: an array holds one element's bits per address its declaration
-    // admits, so the storage is the element width times the element count.
-    // RtlirVariable::width is the width of one element.
-    uint32_t width = var.width;
-    if (RecordArrayShape(var)) width *= var.unpacked_size;
-    RecordSignal(var.name, width, var.is_signed, mod);
+    RecordArrayShape(var.name, var.width, var.num_unpacked_dims,
+                     var.unpacked_dims);
+    RecordSignal(var.name, ArrayStorageWidth(var.name, var.width),
+                 var.is_signed, mod);
     if (var.unpacked_size > 0 || !var.unpacked_dim_sizes.empty()) {
       unpacked_arrays_.insert(var.name);
     }

@@ -101,25 +101,60 @@ static void ValidatePortDefaultValue(const PortDecl& port, bool is_non_ansi,
   }
 }
 
-// Fold each unpacked-dimension expression of a port into a concrete size,
-// supporting both [msb:lsb] ranges and single-size [n] forms.
-static void ComputePortUnpackedDimSizes(const PortDecl& port, RtlirPort& rp) {
-  for (auto* dim : port.unpacked_dims) {
-    if (!dim) continue;
-    if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
-      auto lv = ConstEvalInt(dim->lhs);
-      auto rv = ConstEvalInt(dim->rhs);
-      if (lv && rv) {
-        rp.unpacked_dim_sizes.push_back(
-            static_cast<uint32_t>(std::abs(*lv - *rv) + 1));
-      }
-    } else {
-      auto sv = ConstEvalInt(dim);
-      if (sv && *sv > 0)
-        rp.unpacked_dim_sizes.push_back(static_cast<uint32_t>(*sv));
-    }
+// Fold one unpacked dimension of a port into the address range it declares.
+//
+// §7.4.2 writes a fixed-size unpacked dimension as
+// `[ constant_expression : constant_expression ]`, whose "first value may be
+// greater than, equal to, or less than the second value", and admits the short
+// form where "[size] shall mean the same as [0:size-1]". Both bounds are kept
+// in the order written, because §11.5.2 resolves an address against "the
+// address bounds given in the declaration" and `[1:4]` and `[4:1]` place their
+// elements at the same addresses in opposite order.
+//
+// The bounds are folded in the port's own parameter scope. §11.2.1 lets a
+// constant expression name a parameter, so `mem [N]` and `mem [1:N-1]` are
+// dimensions the empty scope resolves nothing in, and a dimension that folds to
+// nothing is one no consumer is told about.
+static std::optional<RtlirUnpackedDim> FoldPortUnpackedDim(
+    const Expr* dim, const ScopeMap& scope) {
+  if (dim == nullptr) return std::nullopt;
+  if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
+    auto lv = ConstEvalInt(dim->lhs, scope);
+    auto rv = ConstEvalInt(dim->rhs, scope);
+    if (!lv || !rv) return std::nullopt;
+    return RtlirUnpackedDim{*lv, *rv};
   }
-  rp.num_unpacked_dims = static_cast<uint32_t>(rp.unpacked_dim_sizes.size());
+  auto sv = ConstEvalInt(dim, scope);
+  if (!sv || *sv <= 0) return std::nullopt;
+  return RtlirUnpackedDim{0, *sv - 1};
+}
+
+// The address range and the element count of every unpacked dimension of a
+// port, and the number of dimensions the declaration wrote. The count is what
+// the declaration says rather than what folded, so a consumer reading fewer
+// ranges than dimensions knows a dimension went unrecorded rather than reading
+// the port as one that is not an array.
+static void ComputePortUnpackedDims(const PortDecl& port, RtlirPort& rp,
+                                    const ScopeMap& scope, DiagEngine& diag) {
+  for (auto* dim : port.unpacked_dims) {
+    // §7.5 writes a dynamic array dimension as an empty pair of brackets, which
+    // Parser::ParseUnpackedDims records as a null expression. It declares no
+    // fixed size and no address range, so there is nothing here to fold and
+    // nothing to report.
+    if (dim == nullptr) continue;
+    auto folded = FoldPortUnpackedDim(dim, scope);
+    if (!folded) {
+      diag.Error(port.loc,
+                 std::format("unpacked dimension of port '{}' is not a "
+                             "constant expression",
+                             port.name),
+                 Subclause("7.4.2"));
+      continue;
+    }
+    rp.unpacked_dims.push_back(*folded);
+    rp.unpacked_dim_sizes.push_back(folded->Size());
+  }
+  rp.num_unpacked_dims = static_cast<uint32_t>(port.unpacked_dims.size());
 }
 
 // Reject port types that may never appear on a port (chandle, virtual
@@ -246,7 +281,8 @@ static void TrackNonAnsiPortType(const ModuleDecl* decl, const PortDecl& port,
 // Fill the base (non-interface) fields of an RtlirPort from its declaration,
 // including the folded unpacked-dimension sizes.
 static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
-                                    uint32_t width) {
+                                    uint32_t width, const ScopeMap& scope,
+                                    DiagEngine& diag) {
   RtlirPort rp;
   rp.name = port.name;
   // §23.2.2.1: a named port connection may reach an implicit port only when its
@@ -274,7 +310,7 @@ static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
   rp.is_var = port_is_var;
   rp.is_interconnect = port.data_type.is_interconnect;
   rp.default_value = port.default_value;
-  ComputePortUnpackedDimSizes(port, rp);
+  ComputePortUnpackedDims(port, rp, scope, diag);
   return rp;
 }
 
@@ -296,7 +332,8 @@ static RtlirPort ElaborateOnePort(const ModuleDecl* decl, const PortDecl& port,
   ValidateNetPortDataType(decl, port, port_is_var, ctx);
 
   uint32_t width = EvalTypeWidth(port.data_type, ctx.typedefs, ctx.param_scope);
-  return BuildRtlirPortBase(port, port_is_var, width);
+  return BuildRtlirPortBase(port, port_is_var, width, ctx.param_scope,
+                            ctx.diag);
 }
 
 // 23.2.2.4: a default input-port value is a constant expression evaluated in

@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <optional>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 #include "elaborator/elaborator_helpers.h"
 #include "synthesizer/synth_lower.h"
@@ -41,16 +43,35 @@ static const Expr* SelectRootName(const Expr* expr) {
   return expr;
 }
 
-bool SynthLower::RecordArrayShape(const RtlirVariable& var) {
-  // §11.5.2 resolves an address against the bounds the declaration gives, so an
-  // array this can address is one whose low bound reached RTLIR.
-  // RtlirVariable::unpacked_dim_sizes is filled only for a declaration of more
-  // than one dimension, and it carries no direction per dimension, so a
-  // multidimensional array is not one of them.
-  if (var.unpacked_size == 0 || !var.unpacked_dim_sizes.empty()) return false;
-  array_shapes_[var.name] =
-      ArrayShape{var.width, var.unpacked_lo, var.unpacked_size};
+bool SynthLower::RecordArrayShape(std::string_view name, uint32_t elem_width,
+                                  uint32_t num_dims,
+                                  const std::vector<RtlirUnpackedDim>& dims) {
+  // §11.5.2 resolves an address against "the address bounds given in the
+  // declaration", so an array this can address is one every dimension of which
+  // reached RTLIR with its bounds. A declaration that wrote more dimensions
+  // than it recorded is one whose addresses cannot all be resolved -- a queue,
+  // a dynamic dimension, or a bound that did not fold -- and it records
+  // nothing, so a select on it is reported rather than answered.
+  if (num_dims == 0 || dims.size() != num_dims) return false;
+  ArrayShape shape;
+  shape.elem_width = elem_width;
+  shape.dims.reserve(dims.size());
+  for (const auto& dim : dims) {
+    shape.dims.push_back(ArrayDim{dim.Low(), dim.Size()});
+  }
+  array_shapes_[name] = std::move(shape);
   return true;
+}
+
+// §11.5.2: an array holds one element's bits per address its declaration
+// admits, so its storage is the element width times the element count. Both
+// RtlirPort::width and RtlirVariable::width are one element's width, so a
+// declaration whose shape was recorded is the one that gets the rest.
+uint32_t SynthLower::ArrayStorageWidth(std::string_view name,
+                                       uint32_t elem_width) {
+  auto it = array_shapes_.find(name);
+  if (it == array_shapes_.end()) return elem_width;
+  return elem_width * it->second.Count();
 }
 
 const SynthLower::ArrayShape* SynthLower::ArrayShapeOf(const Expr* base) {
@@ -59,27 +80,80 @@ const SynthLower::ArrayShape* SynthLower::ArrayShapeOf(const Expr* base) {
   return it == array_shapes_.end() ? nullptr : &it->second;
 }
 
+// The select nodes of a chain, outermost dimension first, and the expression
+// they are written on. §11.5.2 writes `mem[2][3]` as a select over a select, so
+// the address written first is the innermost node.
+static std::vector<const Expr*> CollectSelectChain(const Expr* sel,
+                                                   const Expr** name) {
+  std::vector<const Expr*> nodes;
+  const Expr* e = sel;
+  for (; e != nullptr && e->kind == ExprKind::kSelect; e = e->base) {
+    nodes.push_back(e);
+  }
+  *name = e;
+  std::reverse(nodes.begin(), nodes.end());
+  return nodes;
+}
+
 SynthLower::SelectStorage SynthLower::ResolveArraySelect(const Expr* sel) {
-  const ArrayShape* shape = ArrayShapeOf(sel->base);
-  if (!shape) return {};
-  // §11.5.2 gives an address per dimension, so a range written where an address
-  // belongs is not an address this addresses an element with.
-  if (sel->index_end) return {};
-  std::optional<int64_t> address = ConstEvalInt(sel->index, scope_);
-  if (!address) return {};
-  // An address outside the declared bounds names a run outside the storage,
-  // which SynthLower::GetSignalBit answers as constant false and
-  // SynthLower::SetSignalBit ignores. §11.5.2 sends an invalid address to
-  // §7.4.5, and a 2-state value reads 0 where a 4-state one reads x.
-  int64_t lo = (*address - shape->lo) * static_cast<int64_t>(shape->elem_width);
-  return {sel->base->text, lo, shape->elem_width};
+  const Expr* name = nullptr;
+  std::vector<const Expr*> nodes = CollectSelectChain(sel, &name);
+  const ArrayShape* shape = ArrayShapeOf(name);
+  if (shape == nullptr || nodes.size() != shape->dims.size()) return {};
+
+  // §11.5.2 rules that "the desired word shall first be selected by supplying
+  // an address for each dimension", so one address per dimension names an
+  // element and the element is at the offset those addresses give, counted
+  // from the innermost dimension outward. A range written where an address
+  // belongs names no element.
+  int64_t element = 0;
+  bool out_of_bounds = false;
+  for (size_t d = 0; d < shape->dims.size(); ++d) {
+    if (nodes[d]->index_end) return {};
+    std::optional<int64_t> address = ConstEvalInt(nodes[d]->index, scope_);
+    if (!address) return {};
+    int64_t offset = *address - shape->dims[d].lo;
+    if (offset < 0 || offset >= static_cast<int64_t>(shape->dims[d].count)) {
+      out_of_bounds = true;
+    }
+    element = element * static_cast<int64_t>(shape->dims[d].count) + offset;
+  }
+  // §11.5.2 sends an address that "is out of bounds" to §7.4.5, and a 2-state
+  // value reads 0 there where a 4-state one reads x. Naming a run past the
+  // whole storage is that answer: SynthLower::GetSignalBit reads constant false
+  // above a signal's width and SynthLower::SetSignalBit ignores a write there.
+  // The run has to be past the whole array rather than at the offset the
+  // arithmetic gave, because an address out of one dimension's bounds lands
+  // inside another dimension's elements.
+  if (out_of_bounds) element = shape->Count();
+  return {name->text, element * static_cast<int64_t>(shape->elem_width),
+          shape->elem_width};
+}
+
+SynthLower::ArraySelectKind SynthLower::ClassifyArraySelect(const Expr* sel) {
+  const Expr* name = nullptr;
+  std::vector<const Expr*> nodes = CollectSelectChain(sel, &name);
+  const ArrayShape* shape = ArrayShapeOf(name);
+  if (shape == nullptr) return ArraySelectKind::kNotArray;
+  if (nodes.size() < shape->dims.size()) return ArraySelectKind::kSlice;
+  if (nodes.size() == shape->dims.size()) return ArraySelectKind::kElement;
+  return ArraySelectKind::kInsideElement;
 }
 
 SynthLower::SelectStorage SynthLower::ResolveSelect(const Expr* sel) {
   if (!sel || !sel->base) return {};
 
-  // §11.5.2: an address written on the name of an array selects an element.
-  if (ArrayShapeOf(sel->base) != nullptr) return ResolveArraySelect(sel);
+  // §11.5.2: an address per dimension written on the name of an array selects
+  // an element, and a select past those is §11.5.1 within it, which the
+  // recursion below resolves.
+  switch (ClassifyArraySelect(sel)) {
+    case ArraySelectKind::kSlice:
+      return {};
+    case ArraySelectKind::kElement:
+      return ResolveArraySelect(sel);
+    default:
+      break;
+  }
 
   // §11.5.2 rules that once the element is selected, "bit-selects and
   // part-selects shall be addressed in the same manner as net and variable
@@ -128,11 +202,14 @@ SynthLower::SelectStorage SynthLower::ResolveSelect(const Expr* sel) {
 uint32_t SynthLower::LowerArraySelectBit(const Expr* expr, AigGraph& aig,
                                          uint32_t bit) {
   const ArrayShape* shape = ArrayShapeOf(expr->base);
+  // The multiplexer below is written over one dimension, so an address that did
+  // not fold on an array of more than one is reported rather than built.
+  if (shape != nullptr && shape->dims.size() != 1) shape = nullptr;
   if (!shape || expr->index_end) {
     // §11.5.2 addressing this cannot resolve: an array whose declaration
-    // reached RTLIR without the low bound its addresses are counted from, which
-    // is every array port and every array of more than one dimension, or a
-    // range written where an address belongs.
+    // reached RTLIR without an address range per dimension it wrote, an address
+    // that did not fold on an array of more than one dimension, or a range
+    // written where an address belongs.
     ReportExprUnlowered(expr,
                         "an element of this unpacked array has no lowering in "
                         "the synthesizer",
@@ -147,11 +224,12 @@ uint32_t SynthLower::LowerArraySelectBit(const Expr* expr, AigGraph& aig,
   // none of them leaves constant false, which is what §7.4.5 gives a 2-state
   // value for an address that is out of bounds.
   uint32_t result = AigGraph::kConstFalse;
-  for (uint32_t element = 0; element < shape->count; ++element) {
+  for (uint32_t element = 0; element < shape->dims[0].count; ++element) {
     uint32_t source =
         GetSignalBit(expr->base->text, element * shape->elem_width + bit);
-    result = aig.AddMux(ExprEqualsValue(expr->index, aig, shape->lo + element),
-                        source, result);
+    result = aig.AddMux(
+        ExprEqualsValue(expr->index, aig, shape->dims[0].lo + element), source,
+        result);
   }
   return result;
 }
@@ -159,6 +237,8 @@ uint32_t SynthLower::LowerArraySelectBit(const Expr* expr, AigGraph& aig,
 bool SynthLower::LowerArrayTarget(const Expr* lhs, const Expr* rhs,
                                   AigGraph& aig) {
   const ArrayShape* shape = ArrayShapeOf(lhs->base);
+  // As on the read side, the multiplexer is written over one dimension.
+  if (shape != nullptr && shape->dims.size() != 1) shape = nullptr;
   if (!shape || lhs->index_end) return false;
 
   // §11.5.2: the address names one element, so every other element keeps what
@@ -167,8 +247,9 @@ bool SynthLower::LowerArrayTarget(const Expr* lhs, const Expr* rhs,
   // read side builds, written into the storage rather than read out of it.
   propagated_width_ = shape->elem_width;
   propagated_signed_ = IsSignedExpr(rhs);
-  for (uint32_t element = 0; element < shape->count; ++element) {
-    uint32_t selected = ExprEqualsValue(lhs->index, aig, shape->lo + element);
+  for (uint32_t element = 0; element < shape->dims[0].count; ++element) {
+    uint32_t selected =
+        ExprEqualsValue(lhs->index, aig, shape->dims[0].lo + element);
     for (uint32_t b = 0; b < shape->elem_width; ++b) {
       uint32_t offset = element * shape->elem_width + b;
       uint32_t held = GetSignalBit(lhs->base->text, offset);

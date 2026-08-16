@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string_view>
 #include <unordered_map>
@@ -93,13 +94,11 @@ class SynthLower {
   void RecordSignal(std::string_view name, uint32_t width, bool is_signed,
                     const RtlirModule* mod);
 
-  // Give an input port one AIG input per bit, and record an output port so
-  // that RegisterOutputs can emit what drove it.
-  void MapPortBits(const RtlirPort& port, AigGraph& aig);
-
-  // Record the §11.5.2 shape of `var` where it declares an unpacked array this
-  // can address, and answer whether it did.
-  bool RecordArrayShape(const RtlirVariable& var);
+  // Give an input port one AIG input per bit of `width`, and record an output
+  // port so that RegisterOutputs can emit what drove it. `width` is the port's
+  // storage rather than RtlirPort::width, which is one element's worth where
+  // the port declares an unpacked array.
+  void MapPortBits(const RtlirPort& port, uint32_t width, AigGraph& aig);
 
   uint32_t LowerIdentBit(std::string_view name, uint32_t bit);
 
@@ -242,20 +241,69 @@ class SynthLower {
   // of the address expression", and an address names its element whichever way
   // §7.4.2 let the dimension be written, so the direction decides which
   // addresses are admitted rather than which element each reaches.
-  struct ArrayShape {
-    uint32_t elem_width = 0;
+  // §11.5.2: one dimension of an unpacked array as its declaration admits
+  // addressing it. `lo` is the smallest address the dimension admits and
+  // `count` is how many elements it holds, so an address `a` of this dimension
+  // selects the element at `a - lo` and every other address is out of bounds.
+  struct ArrayDim {
     int64_t lo = 0;
     uint32_t count = 0;
   };
 
+  struct ArrayShape {
+    uint32_t elem_width = 0;
+    // One entry per unpacked dimension, outermost first, because §11.5.2 rules
+    // that "the desired word shall first be selected by supplying an address
+    // for each dimension". Element `[a0][a1]` of a two-dimensional array
+    // occupies the `elem_width` bits at
+    // `((a0 - lo0) * count1 + (a1 - lo1)) * elem_width`.
+    std::vector<ArrayDim> dims;
+
+    // How many elements the whole array holds.
+    [[nodiscard]] uint32_t Count() const {
+      uint32_t n = 1;
+      for (const auto& d : dims) n *= d.count;
+      return n;
+    }
+  };
+
   // The shape of the array `base` names, or null where `base` names no array
-  // this can address: a multidimensional one, whose per-dimension direction the
-  // elaborator does not record, and an array port, whose unpacked dimension
-  // reaches RTLIR as a size with no low bound.
+  // whose address ranges reached RTLIR.
   const ArrayShape* ArrayShapeOf(const Expr* base);
 
-  // §11.5.2: the storage the array select `sel` addresses, for an address that
-  // folds to a constant.
+  // §11.5.2: record the shape of `name` from the address ranges its
+  // declaration wrote, so a select on it resolves against them. `num_dims` is
+  // the number of unpacked dimensions the declaration wrote and `dims` the
+  // ranges that folded, so a shorter `dims` is a declaration this cannot
+  // address and records nothing. Answers whether a shape was recorded, which is
+  // what says the storage holds one element per address rather than one
+  // element.
+  bool RecordArrayShape(std::string_view name, uint32_t elem_width,
+                        uint32_t num_dims,
+                        const std::vector<RtlirUnpackedDim>& dims);
+
+  // The storage a declaration of one element's width `elem_width` occupies:
+  // that width where `name` has no recorded array shape, and one element per
+  // address the shape admits where it has.
+  uint32_t ArrayStorageWidth(std::string_view name, uint32_t elem_width);
+
+  // What a chain of selects names against the array its base was declared as.
+  // §11.5.2 rules that "the desired word shall first be selected by supplying
+  // an address for each dimension", so a chain carrying exactly that many
+  // addresses names an element, a shorter one names a slice of the array, and a
+  // longer one names a §11.5.1 select within the element the leading addresses
+  // reach.
+  enum class ArraySelectKind : uint8_t {
+    kNotArray,
+    kSlice,
+    kElement,
+    kInsideElement,
+  };
+
+  ArraySelectKind ClassifyArraySelect(const Expr* sel);
+
+  // §11.5.2: the storage the array select chain ending at `sel` addresses, for
+  // addresses that fold to constants.
   SelectStorage ResolveArraySelect(const Expr* sel);
 
   // §11.5.2: lower one bit of an array select whose address did not fold,

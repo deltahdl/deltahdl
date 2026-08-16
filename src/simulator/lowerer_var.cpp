@@ -205,7 +205,9 @@ static void CreateMultiDimLeaves(const MultiDimArray& m,
       elem->value = MakeLogic4VecVal(m.arena, m.var.width, 0);
     return;
   }
-  uint32_t lo = m.var.unpacked_dim_los[d];
+  // §11.5.2 counts an address from the smaller of the two bounds the
+  // declaration wrote, whichever way round it wrote them.
+  int64_t lo = m.var.unpacked_dims[d].Low();
   for (uint32_t i = 0; i < sizes[d]; ++i) {
     CreateMultiDimLeaves(m, prefix + "[" + std::to_string(lo + i) + "]", d + 1);
   }
@@ -219,14 +221,20 @@ static bool TryCreateMultiDimArray(std::string_view name,
                                    const RtlirVariable& var, SimContext& ctx,
                                    Arena& arena) {
   if (var.unpacked_dim_sizes.size() < 2) return false;
+  if (var.unpacked_dims.size() != var.unpacked_dim_sizes.size()) return false;
   ArrayInfo info;
-  info.lo = var.unpacked_lo;
+  info.lo = static_cast<uint32_t>(var.unpacked_lo);
   info.size = var.unpacked_size;
   info.elem_width = var.width;
   info.is_descending = var.is_descending;
   info.is_4state = var.is_4state;
   info.elem_type_kind = var.elem_type_kind;
-  info.dim_los = var.unpacked_dim_los;
+  // ArrayInfo::dim_los is uint32_t, so a negative bound does not survive the
+  // copy. §7.4.2 admits one; carrying it into the simulator is separate work.
+  info.dim_los.reserve(var.unpacked_dims.size());
+  for (const auto& dim : var.unpacked_dims) {
+    info.dim_los.push_back(static_cast<uint32_t>(dim.Low()));
+  }
   info.dim_sizes = var.unpacked_dim_sizes;
   ctx.RegisterArray(name, info);
   CreateMultiDimLeaves(MultiDimArray{var, ctx, arena}, std::string(name), 0);
@@ -238,7 +246,7 @@ static void CreateArrayElements(std::string_view name, const RtlirVariable& var,
   if (var.unpacked_size == 0) return;
   if (TryCreateMultiDimArray(name, var, ctx, arena)) return;
   ArrayInfo info;
-  info.lo = var.unpacked_lo;
+  info.lo = static_cast<uint32_t>(var.unpacked_lo);
   info.size = var.unpacked_size;
   info.elem_width = var.width;
   info.is_descending = var.is_descending;
@@ -250,7 +258,7 @@ static void CreateArrayElements(std::string_view name, const RtlirVariable& var,
   bool replicate = var.init_expr && var.init_expr->elements.size() == 1 &&
                    var.init_expr->elements[0]->kind == ExprKind::kReplicate;
   for (uint32_t i = 0; i < var.unpacked_size; ++i) {
-    uint32_t idx = var.unpacked_lo + i;
+    uint32_t idx = static_cast<uint32_t>(var.unpacked_lo) + i;
     auto elem_name = std::string(name) + "[" + std::to_string(idx) + "]";
     auto* stored = arena.Create<std::string>(std::move(elem_name));
     auto* elem = ctx.CreateVariable(*stored, var.width);
