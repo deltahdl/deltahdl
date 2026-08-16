@@ -80,6 +80,16 @@ RsCaseItem Parser::ParseRsCaseItem() {
 }
 
 void Parser::ParseRsCodeBlockStmts(std::vector<Stmt*>& stmts) {
+  // Records that a right brace now closes something, so that a block left open
+  // inside this code block stops at it rather than taking it for a statement.
+  // Parser::ClosesOpenRsCodeBlock in src/parser/parser.h is what reads the
+  // count, and the guard restores it however this returns.
+  struct DepthGuard {
+    int& d;
+    explicit DepthGuard(int& d) : d(d) { ++d; }
+    ~DepthGuard() { --d; }
+  } guard(rs_code_block_depth_);
+
   while (!Check(TokenKind::kRBrace) && !AtEnd()) {
     if (IsBlockVarDeclStart()) {
       ParseBlockVarDecls(stmts);

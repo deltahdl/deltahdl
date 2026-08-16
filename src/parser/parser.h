@@ -648,6 +648,20 @@ class Parser {
   int generate_block_depth_ = 0;
   bool InGenerateBlock() const { return generate_block_depth_ > 0; }
 
+  // How many of §18.17's rs_code_block are open around the statement being
+  // read. A.6.12 gives `rs_code_block ::= { { data_declaration }
+  // { statement_or_null } }`, so the block a statement stands in is closed by a
+  // right brace rather than by a keyword, and the statement loops of
+  // Parser::ParseBlockStmt and Parser::ParseForkStmt have to stop at one to
+  // leave it for Parser::ParseRsCodeBlockStmts. The count is what tells that
+  // brace from the one closing a concatenation under §11.4.12 or an assignment
+  // pattern under §10.9, neither of which any statement loop ever meets: both
+  // are consumed by the expression that opened them.
+  int rs_code_block_depth_ = 0;
+  bool ClosesOpenRsCodeBlock(TokenKind tk) const {
+    return tk == TokenKind::kRBrace && rs_code_block_depth_ > 0;
+  }
+
   bool in_generate_region_ = false;
 
   // §H.2: true while the formal argument list of a DPI import declaration is

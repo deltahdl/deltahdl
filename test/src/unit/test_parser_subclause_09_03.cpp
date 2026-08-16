@@ -228,6 +228,58 @@ TEST(BlockStatementParsing, SequentialInsideAForkClosedByJoinNamesTheEnd) {
   EXPECT_TRUE(ReportedError(r.diags, "expected 'end', got 'join'", 5, "9.3.1"));
 }
 
+// §9.3 head negative: a sequential block standing in a randsequence code block
+// is closed by `end` and not by the brace that closes the code block. A.6.12
+// gives `rs_code_block ::= { { data_declaration } { statement_or_null } }`, so
+// the construct enclosing this block ends in punctuation rather than a keyword,
+// and Parser::ClosesOpenRsCodeBlock is asked for it separately: a right brace
+// closes a concatenation under §11.4.12 and an assignment pattern under §10.9
+// as readily as a code block, and only the count of open code blocks tells
+// them apart.
+TEST(BlockStatementParsing,
+     SequentialInARandsequenceCodeBlockClosedByBraceNamesTheEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : {\n"
+      "        begin\n"
+      "          a = 1;\n"
+      "      } ;\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+  // The block's statement loop stops at the `}` without consuming it, so the
+  // report stands on line 7 and Parser::ParseRsCodeBlockStmts still finds the
+  // brace it expects under §18.17.
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'end', got '}'", 7, "9.3.1"));
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
+// §9.3 head negative: the parallel block answers to the same brace, for the
+// same reason and through the same predicate. Without this case a stop given to
+// Parser::ParseBlockStmt alone passes the case above and leaves a fork in a
+// code block swallowing the brace.
+TEST(BlockStatementParsing,
+     ParallelInARandsequenceCodeBlockClosedByBraceNamesTheJoinKeyword) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : {\n"
+      "        fork\n"
+      "          a = 1;\n"
+      "      } ;\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "expected join, join_any or join_none to close the parallel block", 7,
+      "9.3.2"));
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
 // §9.3 head negative: a sequential block reaches a generate region through the
 // initial block that holds it, Parser::ParseGenerateRegion reading module items
 // and an initial block being one. A bare `begin` written straight into a

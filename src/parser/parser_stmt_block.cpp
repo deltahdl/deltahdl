@@ -156,9 +156,12 @@ Stmt* Parser::ParseBlockStmt(std::string_view prefix_label) {
   // `endcase`, another on the `endmodule` behind it, the §9.3.1 report below at
   // end of input rather than at the token at fault, and the enclosing case
   // statement's own §12.5 report for the `endcase` it never saw. Four reports
-  // for one missing `end`.
+  // for one missing `end`. The right brace of an open rs_code_block closes an
+  // enclosing construct too and is asked for separately, being punctuation that
+  // closes one construct among several uses.
   while (!Check(TokenKind::kKwEnd) && !AtEnd() &&
-         !ClosesEnclosingConstruct(CurrentToken().kind)) {
+         !ClosesEnclosingConstruct(CurrentToken().kind) &&
+         !ClosesOpenRsCodeBlock(CurrentToken().kind)) {
     if (IsBlockVarDeclStart()) {
       ParseBlockVarDecls(stmt->stmts);
     } else if (!RejectMisplacedStmtLabel()) {
@@ -191,10 +194,13 @@ Stmt* Parser::ParseForkStmt(std::string_view prefix_label) {
   // join keywords. Without that stop, Parser::ParsePrimaryExpr consumes the
   // token as a failed expression under §11.2, so the §9.3.2 report below could
   // only ever fire at end of input and the §11.2 cascade over the enclosing
-  // block would stay.
+  // block would stay. The right brace of an open rs_code_block closes an
+  // enclosing construct too and is asked for separately, being punctuation that
+  // closes one construct among several uses.
   while (!Check(TokenKind::kKwJoin) && !Check(TokenKind::kKwJoinAny) &&
          !Check(TokenKind::kKwJoinNone) && !AtEnd() &&
-         !ClosesEnclosingConstruct(CurrentToken().kind)) {
+         !ClosesEnclosingConstruct(CurrentToken().kind) &&
+         !ClosesOpenRsCodeBlock(CurrentToken().kind)) {
     if (IsBlockVarDeclStart()) {
       ParseBlockVarDecls(stmt->fork_stmts);
     } else if (!RejectMisplacedStmtLabel()) {
