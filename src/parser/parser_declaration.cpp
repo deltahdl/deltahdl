@@ -728,7 +728,7 @@ void Parser::ParseFuncBody(ModuleItem* item) {
   while (!Check(TokenKind::kKwEndfunction) && !AtEnd()) {
     if (IsBlockVarDeclStart()) {
       ParseBlockVarDecls(item->func_body_stmts);
-    } else {
+    } else if (!RejectMisplacedStmtLabel()) {
       item->func_body_stmts.push_back(ParseStmt());
     }
   }
@@ -814,7 +814,7 @@ ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
   while (!Check(TokenKind::kKwEndtask) && !AtEnd()) {
     if (IsBlockVarDeclStart()) {
       ParseBlockVarDecls(item->func_body_stmts);
-    } else {
+    } else if (!RejectMisplacedStmtLabel()) {
       item->func_body_stmts.push_back(ParseStmt());
     }
   }

@@ -142,6 +142,47 @@ std::string_view Parser::TryParseStmtLabel() {
   return {};
 }
 
+// Reports the two placements §9.3.5 forbids a statement label, and answers
+// whether it reported one: "A label can be specified before any procedural
+// statement (any non-declaration statement that can appear inside a begin-end
+// block)", and "A label cannot appear before the end, join, join_any, or
+// join_none, as these keywords do not form a statement". Call it at the head of
+// a body loop rather than from Parser::ParseStmt, where the label is taken,
+// because each recovery is the loop's: the closing keyword has to survive for
+// the loop's own terminator test, and the declaration has to reach the loop's
+// Parser::ParseBlockVarDecls branch. Consumes the label and its colon when it
+// reports, so the next iteration reads what the label stood before and the loop
+// makes progress; restores the position otherwise, leaving a legal label for
+// Parser::TryParseStmtLabel. A label in a single-statement position, such as an
+// if branch, is not examined, since nothing there re-reads what it would leave.
+bool Parser::RejectMisplacedStmtLabel() {
+  if (!CheckIdentifier()) return false;
+  auto saved = lexer_.SavePos();
+  auto id_tok = Consume();
+  if (!Match(TokenKind::kColon)) {
+    lexer_.RestorePos(saved);
+    return false;
+  }
+  if (Check(TokenKind::kKwEnd) || Check(TokenKind::kKwJoin) ||
+      Check(TokenKind::kKwJoinAny) || Check(TokenKind::kKwJoinNone)) {
+    diag_.Error(id_tok.loc,
+                "a statement label cannot appear before '" +
+                    std::string(CurrentToken().text) +
+                    "', which does not form a statement",
+                Subclause("9.3.5"));
+    return true;
+  }
+  if (IsBlockVarDeclStart()) {
+    diag_.Error(id_tok.loc,
+                "a statement label cannot appear before a declaration; a label "
+                "may precede only a procedural statement",
+                Subclause("9.3.5"));
+    return true;
+  }
+  lexer_.RestorePos(saved);
+  return false;
+}
+
 Stmt* Parser::ParseStmt() {
   auto prefix_label = TryParseStmtLabel();
   auto attrs = ParseAttributes();
@@ -504,7 +545,7 @@ Stmt* Parser::ParseBlockStmt(std::string_view prefix_label) {
   while (!Check(TokenKind::kKwEnd) && !AtEnd()) {
     if (IsBlockVarDeclStart()) {
       ParseBlockVarDecls(stmt->stmts);
-    } else {
+    } else if (!RejectMisplacedStmtLabel()) {
       auto* s = ParseStmt();
       if (s != nullptr) {
         stmt->stmts.push_back(s);
@@ -670,7 +711,7 @@ Stmt* Parser::ParseForkStmt(std::string_view prefix_label) {
          !ClosesEnclosingConstruct(CurrentToken().kind)) {
     if (IsBlockVarDeclStart()) {
       ParseBlockVarDecls(stmt->fork_stmts);
-    } else {
+    } else if (!RejectMisplacedStmtLabel()) {
       auto* s = ParseStmt();
       if (s != nullptr) stmt->fork_stmts.push_back(s);
     }

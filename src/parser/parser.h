@@ -407,6 +407,7 @@ class Parser {
 
   Stmt* ParseStmt();
   std::string_view TryParseStmtLabel();
+  bool RejectMisplacedStmtLabel();
   Stmt* ParseStmtBody(std::string_view prefix_label = {});
   Stmt* ParseBlockStmt(std::string_view prefix_label = {});
   Stmt* ParseIfStmt();

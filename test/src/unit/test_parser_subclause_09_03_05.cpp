@@ -432,72 +432,158 @@ TEST(StatementLabelParsing, PrefixLabelMatchesJoinLabelOnFork) {
 }
 
 TEST(StatementLabelParsing, LabelBeforeEndIsError) {
-  // A label binds to a statement, and end is not a statement, so a label
-  // immediately before the closing end is rejected.
+  // §9.3.5: "A label cannot appear before the end, join, join_any, or
+  // join_none, as these keywords do not form a statement." The report names the
+  // keyword, so each of the four sources below fixes a different message. It
+  // stands at the label on line 4, not at the keyword.
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
       "    a = 1;\n"
       "    tail: end\n"
       "endmodule\n");
-  // Nothing reports the label rule itself: the label is taken, `end` is then
-  // asked to start a statement, and the expression parser rejects it under
-  // §11.2 at the `end` on line 4.
-  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 4, "11.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a statement label cannot appear before 'end', which does not",
+      4, "9.3.5"));
+}
+
+TEST(StatementLabelParsing, LabelBeforeEndReportsExactlyOneError) {
+  // The rejection leaves the `end` unconsumed, so the block closes on it and
+  // the module closes on `endmodule`. Parser::ParsePrimaryExpr used to consume
+  // that `end` as a failed expression, after which the module reported a second
+  // time; a count is what states the cascade is gone.
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "    tail: end\n"
+      "endmodule\n");
+  uint32_t errors = 0;
+  for (const auto& d : r.diags) {
+    if (d.severity == DiagSeverity::kError) errors++;
+  }
+  EXPECT_EQ(errors, 1U);
 }
 
 TEST(StatementLabelParsing, LabelBeforeJoinIsError) {
-  // The same holds for the fork-join terminators.
+  // The same §9.3.5 sentence covers the three fork terminators.
   auto r = Parse(
       "module m;\n"
       "  initial fork\n"
       "    a = 1;\n"
       "    tail: join\n"
       "endmodule\n");
-  // As above, §11.2 is what rejects the `join` asked to start a statement.
-  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 4, "11.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a statement label cannot appear before 'join', which does not",
+      4, "9.3.5"));
 }
 
 TEST(StatementLabelParsing, LabelBeforeDeclarationIsError) {
-  // A label binds only to a procedural (non-declaration) statement. A data
-  // declaration is not a statement, so a label placed before one is rejected:
-  // the label is taken, then the type keyword has no valid statement form.
+  // §9.3.5: "A label can be specified before any procedural statement (any
+  // non-declaration statement that can appear inside a begin-end block)." A
+  // data declaration is not one, so a label before it is rejected. This message
+  // differs from the keyword one above and from the "cannot have both a
+  // statement label and a block name" report the same subclause already
+  // carries, which is what keeps the three §9.3.5 rules apart.
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
       "    lbl: int x;\n"
       "  end\n"
       "endmodule\n");
-  // The label makes `int x` a statement rather than a declaration, so `int`
-  // parses as an expression and the statement's own §12.3 semicolon is asked
-  // for at `x` on line 3.
-  EXPECT_TRUE(
-      ReportedError(r.diags, "expected ';', got identifier", 3, "12.3"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a statement label cannot appear before a declaration", 3,
+      "9.3.5"));
+}
+
+TEST(StatementLabelParsing,
+     LabelBeforeDeclarationReportsAtTheLabelNotTheDeclaration) {
+  // The label and the declaration stand on separate lines, so the asserted line
+  // can fail. ReportedError compares the line and not the column, and
+  // StatementLabelParsing.LabelBeforeDeclarationIsError puts both on line 3,
+  // where a report about the declaration would satisfy it just as well.
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    lbl:\n"
+      "    int x;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a statement label cannot appear before a declaration", 3,
+      "9.3.5"));
+}
+
+TEST(StatementLabelParsing, LabelBeforeDeclarationLeavesTheDeclarationParsed) {
+  // The label is dropped and what followed it is then read as the declaration
+  // it is, so the block holds `int x` rather than the expression statement the
+  // label used to turn it into.
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    lbl: int x;\n"
+      "  end\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(stmt->var_name, "x");
+}
+
+TEST(StatementLabelParsing, LabelBeforeDeclarationInFunctionRejected) {
+  // A function body admits declarations as a begin-end block does, so §9.3.5
+  // reaches it through the same rejection. Parser::ParseFuncBody has its own
+  // statement loop, separate from the one in Parser::ParseBlockStmt.
+  auto r = Parse(
+      "module m;\n"
+      "  function void f();\n"
+      "    lbl: int x;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a statement label cannot appear before a declaration", 3,
+      "9.3.5"));
+}
+
+TEST(StatementLabelParsing, LabelBeforeDeclarationInTaskRejected) {
+  // A task body has a third such loop, in Parser::ParseTaskDecl.
+  auto r = Parse(
+      "module m;\n"
+      "  task t;\n"
+      "    lbl: int x;\n"
+      "  endtask\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a statement label cannot appear before a declaration", 3,
+      "9.3.5"));
 }
 
 TEST(StatementLabelParsing, LabelBeforeJoinAnyIsError) {
-  // join_any is one of the fork terminators a label may not precede: it does
-  // not form a statement for the label to bind to.
+  // join_any is the second fork terminator the sentence enumerates.
   auto r = Parse(
       "module m;\n"
       "  initial fork\n"
       "    a = 1;\n"
       "    tail: join_any\n"
       "endmodule\n");
-  // As above, §11.2 is what rejects the `join_any` asked to start a statement.
-  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 4, "11.2"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a statement label cannot appear before "
+                            "'join_any', which does not",
+                            4, "9.3.5"));
 }
 
 TEST(StatementLabelParsing, LabelBeforeJoinNoneIsError) {
-  // The same holds for join_none, the remaining enumerated fork terminator.
+  // join_none is the third and last.
   auto r = Parse(
       "module m;\n"
       "  initial fork\n"
       "    a = 1;\n"
       "    tail: join_none\n"
       "endmodule\n");
-  // As above, §11.2 is what rejects the `join_none` asked to start a statement.
-  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 4, "11.2"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a statement label cannot appear before "
+                            "'join_none', which does not",
+                            4, "9.3.5"));
 }
 
 TEST(StatementLabelParsing, MultipleLabelsInSequence) {
