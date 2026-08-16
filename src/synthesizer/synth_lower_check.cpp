@@ -221,5 +221,5 @@ bool SynthLower::CheckCaseSynth(const Stmt* stmt) {
   }
   return true;
 }
-\n
+
 }  // namespace delta
