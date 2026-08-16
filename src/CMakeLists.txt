@@ -274,6 +274,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_specify_limits.cpp
     elaborator/elaborator_validate_subroutine.cpp
     elaborator/elaborator_validate_subroutine_args.cpp
+    lexer/lexer_numbers.cpp
     lexer/lexer_operators.cpp
     parser/expr_parser_calls.cpp
     parser/parser_package_import_export.cpp
