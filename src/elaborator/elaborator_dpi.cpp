@@ -159,7 +159,19 @@ void CheckDuplicateImportNamesInScope(const ModuleDecl* mod, DiagEngine& diag) {
   }
 }
 
-// §35.7: an exported function adheres to the same restrictions on argument
+// The word for what the source exported. §35.8 states that "SystemVerilog
+// allows tasks to be called from a foreign language, similar to functions. Such
+// tasks are termed exported tasks" and forwards the whole of §35.7 to them:
+// "all aspects of exported functions described above in 35.7 apply to exported
+// tasks" (printed page 983 of ~/LRM.pdf). So the two checks below are reached
+// for an exported task as readily as for an exported function, and a report
+// that spells the word as a literal tells a user who wrote `task` to go looking
+// for a function they never declared.
+std::string_view ExportedSubroutineKind(const ModuleItem* callable) {
+  return callable->kind == ModuleItemKind::kTaskDecl ? "task" : "function";
+}
+
+// §35.7: an exported subroutine adheres to the same restrictions on argument
 // types as imports. The §35.5.4 prohibition on the ref qualifier in a DPI
 // declaration therefore carries through to the exported routine's formal
 // arguments.
@@ -168,9 +180,9 @@ void CheckExportRefArguments(const ModuleItem* callable, const ModuleItem* item,
   for (const auto& arg : callable->func_args) {
     if (arg.direction == Direction::kRef) {
       diag.Error(item->loc,
-                 std::format("SystemVerilog function '{}' has a ref argument "
+                 std::format("SystemVerilog {} '{}' has a ref argument "
                              "and therefore cannot be exported",
-                             item->name),
+                             ExportedSubroutineKind(callable), item->name),
                  Subclause("35.7"));
       break;
     }
@@ -198,10 +210,10 @@ void CheckExportDynamicArrayArguments(const ModuleItem* callable,
     }
     if (has_dynamic_dim) {
       diag.Error(item->loc,
-                 std::format("SystemVerilog function '{}' has a dynamic array "
+                 std::format("SystemVerilog {} '{}' has a dynamic array "
                              "formal argument and therefore cannot be exported "
                              "for DPI",
-                             item->name),
+                             ExportedSubroutineKind(callable), item->name),
                  Subclause("35.5.6"));
       break;
     }
@@ -209,8 +221,10 @@ void CheckExportDynamicArrayArguments(const ModuleItem* callable,
 }
 
 // §35.5.5: an exported function's result type is subject to the same
-// small-value restriction as an imported function's result. Tasks carry no
-// result, so the check applies only when the exported routine is a function.
+// small-value restriction as an imported function's result. §35.8 states that
+// "SystemVerilog tasks do not have return value types", so the check applies
+// only when the exported routine is a function and its message needs no word
+// taken from the declaration.
 void CheckExportResultType(const ModuleItem* callable, const ModuleItem* item,
                            DiagEngine& diag) {
   if (callable->kind == ModuleItemKind::kFunctionDecl &&

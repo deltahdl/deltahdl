@@ -27,8 +27,10 @@ TEST(DpiExportFormalType, ExportedFunctionWithDynamicArrayArgIsError) {
 }
 
 // §35.5.6: the dynamic-array prohibition on exported subroutines applies to
-// tasks as well as functions, since both are DPI subroutines.
-TEST(DpiExportFormalType, ExportedTaskWithDynamicArrayArgIsError) {
+// tasks as well as functions, since both are DPI subroutines. §35.8 terms such
+// a subroutine an exported task, so the report names the word the declaration
+// used rather than calling it a function.
+TEST(DpiExportFormalType, ExportedTaskWithDynamicArrayArgSaysTask) {
   ElabFixture f;
   Elaborate(R"(
     module m;
@@ -37,10 +39,8 @@ TEST(DpiExportFormalType, ExportedTaskWithDynamicArrayArgIsError) {
     endmodule
   )",
             f, "m");
-  // elaborator_dpi.cpp:200 words the report "SystemVerilog function '{}'" for
-  // an exported task as well as an exported function.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "SystemVerilog function 'sv_consume' has a dynamic "
+                            "SystemVerilog task 'sv_consume' has a dynamic "
                             "array formal argument and therefore cannot be "
                             "exported for DPI",
                             4, "35.5.6"));

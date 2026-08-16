@@ -119,6 +119,26 @@ TEST(DpiExportElab, ExportedFunctionWithRefArgumentIsError) {
                             4, "35.7"));
 }
 
+// §35.8: "All aspects of exported functions described above in 35.7 apply to
+// exported tasks", so the ref-argument prohibition of §35.7 refuses an exported
+// task with a ref formal exactly as it refuses a function. §35.8 terms such a
+// subroutine an exported task, so the report names the word the declaration
+// used rather than calling it a function.
+TEST(DpiExportElab, ExportedTaskWithRefArgumentSaysTask) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      task sv_task(ref int x); endtask
+      export "DPI-C" task sv_task;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "SystemVerilog task 'sv_task' has a ref "
+                            "argument and therefore cannot be exported",
+                            4, "35.7"));
+}
+
 // §35.7: "Export declarations are allowed to occur only in the scope in which
 // the function being exported is defined." An export that names an identifier
 // with no matching SystemVerilog function in the enclosing module is rejected.
