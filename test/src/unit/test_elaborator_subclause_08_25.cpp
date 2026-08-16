@@ -1,5 +1,7 @@
 #include "fixture_elaborator.h"
+#include "helpers_child_instance.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -245,6 +247,74 @@ TEST(ParameterizedClassElaboration, MixedDefaultPartialOverrideOk) {
              "module m;\n"
              "  C #(5) c;\n"
              "endmodule\n"));
+}
+
+// §23.10.2.2 binds a named parameter argument to the formal it names, so `byte`
+// reaches T2 although T2 is declared second and the argument is written first.
+// The width says which formal it reached: T1's default is int at 32 bits and
+// T2's is bit at 1 bit, so only `byte` landing on T2 gives elem_t 8 bits.
+//
+// This case alone passes wrongly for an elaborator that ignores the name and
+// gives elem_t whatever type the specialization mentions, which is what
+// OmittedNamedTypeArgumentKeepsItsDeclaredDefault below rules out.
+TEST(ParameterizedClassElaboration, NamedTypeArgumentReachesTheFormalItNames) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class Buf #(type T1 = int, type T2 = bit);\n"
+      "  typedef T2 elem_t;\n"
+      "endclass\n"
+      "module m;\n"
+      "  Buf#(.T2(byte))::elem_t v;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ExpectVariableWidth(FindModule(design, "m"), "v", 8u);
+}
+
+// §23.10.2.2 requires only the parameters being given new values to be
+// specified, so naming T1 alone leaves T2 at its declared default of bit and
+// elem_t 1 bit wide. The 8 bits of `byte` and the 32 of T1's own default are
+// both distinct from 1, so neither reaching elem_t can be mistaken for this.
+//
+// This case alone passes wrongly for an elaborator that discards every named
+// argument and defaults the whole specialization, which is what
+// NamedTypeArgumentReachesTheFormalItNames above rules out.
+TEST(ParameterizedClassElaboration,
+     OmittedNamedTypeArgumentKeepsItsDeclaredDefault) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class Buf #(type T1 = int, type T2 = bit);\n"
+      "  typedef T2 elem_t;\n"
+      "endclass\n"
+      "module m;\n"
+      "  Buf#(.T1(byte))::elem_t v;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ExpectVariableWidth(FindModule(design, "m"), "v", 1u);
+}
+
+// Both formals are named, in the reverse of the order the class declares them,
+// so §23.10.2.2's binding by name is the only rule that puts `byte` on T2 and
+// `shortint` on T1. An elaborator binding these two arguments by the position
+// they are written in gives T2 shortint and elem_t 16 bits, and one taking the
+// last argument mentioned gives the same 16, so 8 is reachable only by name.
+TEST(ParameterizedClassElaboration,
+     NamedTypeArgumentsResolveOutOfDeclarationOrder) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class Buf #(type T1 = int, type T2 = bit);\n"
+      "  typedef T2 elem_t;\n"
+      "endclass\n"
+      "module m;\n"
+      "  Buf#(.T2(byte), .T1(shortint))::elem_t v;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ExpectVariableWidth(FindModule(design, "m"), "v", 8u);
 }
 
 }  // namespace

@@ -553,4 +553,32 @@ TEST(ParameterOverride,
       "weak_reference type parameter shall be a class type", 2, "8.30.1"));
 }
 
+// The specialization carries a named argument rather than the ordered one the
+// cases above write. ClassScopedOverrideToDataType in
+// src/elaborator/elaborator_module_inst.cpp substitutes the class parameters
+// for an override written on an instance, reaching the same substitution by a
+// route separate from the one a declaration takes in
+// test/src/unit/test_elaborator_subclause_08_25.cpp, so the case is written
+// here as well. T1 defaults to int, 32 bits, T2 to bit, 1 bit, and the child's
+// P to longint, 64, so an override that bound .T2(byte) by position, or that
+// dropped the specialization, cannot give 8.
+TEST(ParameterOverride,
+     TypeParameterOverriddenByClassSpecializationWithNamedArgument) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class Buf #(type T1 = int, type T2 = bit);\n"
+      "  typedef T2 elem_t;\n"
+      "endclass\n"
+      "module child #(parameter type P = longint)();\n"
+      "  P data;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.P(Buf#(.T2(byte))::elem_t)) u0();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ExpectVariableWidth(SoleChildInstance(design), "data", 8u);
+}
+
 }  // namespace

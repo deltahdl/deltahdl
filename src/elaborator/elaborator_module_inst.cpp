@@ -48,24 +48,24 @@ static std::vector<DataType> OverrideSpecializationArgs(
   return args;
 }
 
-// Fills the arguments an override list leaves out from the class's own
-// defaults.
+// Gives an override list written as `Buf#()` the class's own default
+// arguments, so that the specialization it names survives the substitution.
 //
 // §8.25.1 (printed page 205) states that "the default specialization of a
 // parameterized class is the specialization of the parameterized class with an
 // empty parameter override list", so `Buf#()::elem_t` names elem_t with every
-// parameter of Buf at the default its declaration gives, and a list shorter
-// than the parameter list leaves the rest there the same way. A named argument
-// binds to a formal by name rather than by position, which the positional fill
-// here would get wrong, so a list carrying one is left as it was written.
+// parameter of Buf at the default its declaration gives. DataType carries no
+// flag recording that `#(...)` was written, only the arguments themselves, so
+// an empty list reaching ResolveParameterizedType is indistinguishable there
+// from the unspecialized `Buf::elem_t` that function rejects. Filling the
+// defaults here is what tells the two apart. A list that is not empty needs
+// nothing, because ResolveParameterizedType supplies the default of every
+// formal the list leaves unmentioned, whether the list binds by name or by
+// position.
 static void FillDefaultSpecializationArgs(std::vector<DataType>& args,
                                           const ClassDecl* cls) {
-  for (const auto& arg : args) {
-    if (!arg.param_arg_name.empty()) return;
-  }
-  for (size_t i = args.size(); i < cls->param_types.size(); ++i) {
-    args.push_back(cls->param_types[i]);
-  }
+  if (!args.empty()) return;
+  args = cls->param_types;
 }
 
 // §8.23 names a type parameter assignment as one of the contexts in which a

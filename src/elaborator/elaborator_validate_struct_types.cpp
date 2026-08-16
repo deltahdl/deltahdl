@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <format>
 #include <optional>
@@ -236,15 +237,47 @@ const DataType* FindClassScopedTypedefType(std::string_view cls_name,
   return &td->typedef_type;
 }
 
+// What each parameter of `cls` stands for in the specialization `args` writes,
+// keyed by the parameter's own name.
+//
+// §23.10.2.2 (printed page 767) states that "parameter assignment by name
+// consists of explicitly linking the parameter name and its new value", so a
+// written name selects the formal whatever position the argument holds, and an
+// argument written without one takes the position it holds. The same subclause
+// states that "it is not necessary to assign values to all of the parameters
+// ... Only parameters that are assigned new values need to be specified", so a
+// formal the list does not mention keeps the default its declaration gave,
+// which ClassDecl::param_types records. §8.25 (printed page 204) instantiates a
+// specialization "using the same parameter override rules (see 23.10)", which
+// is what brings all three to bear on a specialization.
+//
+// A formal declared with no default has a kImplicit entry in param_types and is
+// left out, so a member reaching it fails to resolve rather than resolving to a
+// type nothing named.
+static std::unordered_map<std::string_view, const DataType*>
+BuildSpecializationSubst(const ClassDecl* cls,
+                         const std::vector<DataType>& args) {
+  std::unordered_map<std::string_view, const DataType*> subst;
+  for (size_t i = 0; i < args.size(); ++i) {
+    if (!args[i].param_arg_name.empty()) {
+      subst[args[i].param_arg_name] = &args[i];
+    } else if (i < cls->params.size()) {
+      subst[cls->params[i].first] = &args[i];
+    }
+  }
+  const size_t defaults = std::min(cls->params.size(), cls->param_types.size());
+  for (size_t i = 0; i < defaults; ++i) {
+    if (cls->param_types[i].kind == DataTypeKind::kImplicit) continue;
+    subst.emplace(cls->params[i].first, &cls->param_types[i]);
+  }
+  return subst;
+}
+
 bool ResolveParameterizedType(DataType& dtype, const CompilationUnit* unit) {
   if (dtype.scope_name.empty() || dtype.type_params.empty()) return false;
   const auto* cls = FindClassDecl(dtype.scope_name, unit);
   if (!cls) return false;
-  std::unordered_map<std::string_view, const DataType*> subst;
-  for (size_t i = 0; i < cls->params.size() && i < dtype.type_params.size();
-       ++i) {
-    subst[cls->params[i].first] = &dtype.type_params[i];
-  }
+  auto subst = BuildSpecializationSubst(cls, dtype.type_params);
 
   // The scope resolution operator applied to a specialization may name a type
   // parameter of the class directly, or a member typedef whose aliased type is
