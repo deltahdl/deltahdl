@@ -1,5 +1,6 @@
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -183,12 +184,42 @@ TEST(ConstantExpressionElaboration, ConstantPartSelectOfParameterElaborates) {
              "endmodule\n"));
 }
 
-// §11.2.1: a built-in method call is constant when used as the initialiser
-// of a parameter — observe that path through const_eval.
-TEST(ConstantExpressionElaboration, ConstantBuiltinMethodTypeQueryElaborates) {
+// §11.2.1: a built-in method call is a constant built-in method call "if the
+// identifier and input arguments are constant expressions". `V` is a parameter
+// here, so `V.bits` is constant — observe that path through const_eval.
+TEST(ConstantExpressionElaboration,
+     ConstantBuiltinMethodOnConstantIdentifierElaborates) {
   EvalFixture f;
-  auto* e = ParseExprFrom("v.bits", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  ScopeMap scope = {{"V", 0}};
+  auto* e = ParseExprFrom("V.bits", f);
+  EXPECT_TRUE(IsConstantExpr(e, scope));
+}
+
+// §7.2.2 requires a struct member default to be a constant expression, and
+// §11.2.1 decides what one is. `q` is a queue, so §7.10.2.1's size() returns
+// the current number of items in the queue and depends on the queue's value,
+// which leaves the default non-constant and the declaration rejected. Before
+// the fix nothing was reported and the member's value was left unresolved.
+//
+// The report stands at the typedef's own line rather than at the member's,
+// as it does for every typedef case in
+// test/src/unit/test_elaborator_subclause_07_02_02.cpp.
+TEST(ConstantExpressionElaboration, QueueSizeInStructMemberDefaultIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int q[$];\n"
+      "  typedef struct {\n"
+      "    int a = q.size();\n"
+      "    int b;\n"
+      "  } s_t;\n"
+      "  s_t s;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "struct member default value must be a constant "
+                            "expression",
+                            3, "7.2.2"));
 }
 
 // §11.2.1: a localparam is an admitted constant-expression operand, resolved on

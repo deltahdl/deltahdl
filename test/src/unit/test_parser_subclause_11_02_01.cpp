@@ -348,22 +348,44 @@ TEST(ConstExpr, FunctionCallWithNonConstantArgNotConstant) {
   EXPECT_FALSE(IsConstantExpr(e));
 }
 
-TEST(ConstExpr, BuiltinMethodSizeWithParensIsConstant) {
+// §11.2.1: "Built-in method calls that meet the above conditions are constant
+// built-in method calls if the identifier and input arguments are constant
+// expressions." `arr` is in no scope here, so it is not a constant expression
+// and neither is the call. This is the case whose wrong answer went unseen:
+// ConstEvalInt cannot evaluate `arr.size()` either, so calling it constant left
+// the value unresolved with nothing reported.
+TEST(ConstExpr, BuiltinMethodSizeWithParensOnNonConstantIdentifierNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("arr.size()", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_FALSE(IsConstantExpr(e));
 }
 
-TEST(ConstExpr, BuiltinMethodSizeNoParensIsConstant) {
+// §5.13 lets a built-in method with no arguments be called without parentheses,
+// so §11.2.1's rule on the identifier decides the paren-less form the same way.
+TEST(ConstExpr, BuiltinMethodSizeNoParensOnNonConstantIdentifierNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("arr.size", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_FALSE(IsConstantExpr(e));
 }
 
-TEST(ConstExpr, BuiltinMethodBitsIsConstant) {
+// §11.2.1 exempts the identifier only for a method "whose value does not depend
+// on the current value of the identifier", which no method name claims on its
+// own, so `v.bits` follows the identifier as every other built-in method call
+// does.
+TEST(ConstExpr, BuiltinMethodBitsOnNonConstantIdentifierNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("v.bits", f);
-  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_FALSE(IsConstantExpr(e));
+}
+
+// §11.2.1: a built-in method call is a constant built-in method call "if the
+// identifier and input arguments are constant expressions". `A` is a parameter
+// here, so the call is constant.
+TEST(ConstExpr, BuiltinMethodSizeOnConstantIdentifierIsConstant) {
+  EvalFixture f;
+  ScopeMap scope = {{"A", 0}};
+  auto* e = ParseExprFrom("A.size()", f);
+  EXPECT_TRUE(IsConstantExpr(e, scope));
 }
 
 TEST(ConstExpr, BuiltinMethodLenWithConstantIdentifierIsConstant) {

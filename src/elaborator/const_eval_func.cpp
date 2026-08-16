@@ -750,41 +750,52 @@ static bool IsConstantSysCallExpr(const Expr* expr, const ScopeMap& scope) {
   return AllElementsConstant(expr->args, scope);
 }
 
-static bool IsTypeOnlyBuiltinMethod(std::string_view method) {
+// §5.13 built-in methods that return an integer a constant expression could
+// use. The list decides nothing on its own: what each returns depends on the
+// declared type of the operand, which is why the operand is tested below rather
+// than exempted by the method's name.
+static bool IsBuiltinMethodName(std::string_view method) {
   static const std::unordered_set<std::string_view> kMethods = {
       "size", "num",   "bits", "dimensions", "unpacked_dimensions",
       "left", "right", "low",  "high",       "increment",
-  };
-  return kMethods.count(method) > 0;
-}
-
-static bool IsValueDependentBuiltinMethod(std::string_view method) {
-  static const std::unordered_set<std::string_view> kMethods = {
       "len",
   };
   return kMethods.count(method) > 0;
 }
 
-static bool IsConstantBuiltinMethodCall(const Expr* expr,
-                                        const ScopeMap& scope) {
-  if (!expr) return false;
+// Whether `expr` is a constant built-in method call, or nullopt when it is not
+// a built-in method call at all.
+//
+// §11.2.1 makes a built-in method call constant "if the identifier and input
+// arguments are constant expressions", and exempts the identifier only for a
+// method "whose value does not depend on the current value of the identifier".
+// No method here can claim that exemption from its name, because the name does
+// not say what the operand is declared as: §7.5 states that "the size()
+// built-in method returns the current size of the array" for a dynamic array,
+// §7.9.1 and §7.10.2.1 state the same for an associative array and a queue, and
+// §6.19.5.5 gives num() a second meaning on an enumeration. So the identifier
+// is tested, which is what §11.2.1's first sentence asks for.
+//
+// A call that names a built-in method is decided here rather than left to
+// IsConstantExpr's argument test, which admits any call whose arguments are all
+// constant and so admits every one of these, their argument lists being empty.
+static std::optional<bool> BuiltinMethodCallIsConstant(const Expr* expr,
+                                                       const ScopeMap& scope) {
+  if (!expr) return std::nullopt;
   const Expr* member = nullptr;
   if (expr->kind == ExprKind::kCall && expr->lhs &&
       expr->lhs->kind == ExprKind::kMemberAccess) {
-    if (!AllElementsConstant(expr->args, scope)) return false;
     member = expr->lhs;
   } else if (expr->kind == ExprKind::kMemberAccess) {
     member = expr;
   } else {
-    return false;
+    return std::nullopt;
   }
-  if (!member->rhs || member->rhs->kind != ExprKind::kIdentifier) return false;
-  std::string_view method = member->rhs->text;
-  if (IsTypeOnlyBuiltinMethod(method)) return true;
-  if (IsValueDependentBuiltinMethod(method)) {
-    return IsConstantExpr(member->lhs, scope);
-  }
-  return false;
+  if (!member->rhs || member->rhs->kind != ExprKind::kIdentifier)
+    return std::nullopt;
+  if (!IsBuiltinMethodName(member->rhs->text)) return std::nullopt;
+  if (!AllElementsConstant(expr->args, scope)) return false;
+  return IsConstantExpr(member->lhs, scope);
 }
 
 static bool IsConstantSelectExpr(const Expr* expr, const ScopeMap& scope) {
@@ -796,7 +807,11 @@ static bool IsConstantSelectExpr(const Expr* expr, const ScopeMap& scope) {
 
 static bool IsConstantMemberAccessExpr(const Expr* expr,
                                        const ScopeMap& scope) {
-  if (IsConstantBuiltinMethodCall(expr, scope)) return true;
+  // A built-in method name that answers false here still falls through to the
+  // compound lookup below, because a parameter of a class may carry one of
+  // these names and `C.size` is then an ordinary scoped parameter read.
+  auto builtin = BuiltinMethodCallIsConstant(expr, scope);
+  if (builtin.value_or(false)) return true;
   if (expr->lhs && expr->rhs && expr->lhs->kind == ExprKind::kIdentifier &&
       expr->rhs->kind == ExprKind::kIdentifier) {
     std::string compound =
@@ -841,7 +856,8 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
     case ExprKind::kAssignmentPattern:
       return AllElementsConstant(expr->elements, scope);
     case ExprKind::kCall:
-      if (IsConstantBuiltinMethodCall(expr, scope)) return true;
+      if (auto builtin = BuiltinMethodCallIsConstant(expr, scope))
+        return *builtin;
       return AllElementsConstant(expr->args, scope);
     case ExprKind::kMemberAccess:
       return IsConstantMemberAccessExpr(expr, scope);
