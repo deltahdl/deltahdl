@@ -54,7 +54,7 @@ TEST(StructuredProcedureLexing, KeywordsAreNotIdentifiers) {
     const char* text;
     TokenKind kind;
   };
-  const KeywordCase keywords[] = {
+  const KeywordCase kKeywords[] = {
       {"initial", TokenKind::kKwInitial},
       {"always", TokenKind::kKwAlways},
       {"always_comb", TokenKind::kKwAlwaysComb},
@@ -62,7 +62,7 @@ TEST(StructuredProcedureLexing, KeywordsAreNotIdentifiers) {
       {"always_ff", TokenKind::kKwAlwaysFF},
       {"final", TokenKind::kKwFinal},
   };
-  for (const auto& kw : keywords) {
+  for (const auto& kw : kKeywords) {
     std::string src = std::string(kw.text) + " ";
     auto r = LexOne(src);
     EXPECT_EQ(r.token.kind, kw.kind) << kw.text;
