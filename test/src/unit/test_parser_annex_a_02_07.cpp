@@ -664,17 +664,17 @@ TEST(TaskDeclParsing, ErrorTaskDeclDynOverrideInitialAndExtends) {
   // dynamic_override_specifiers is [ initial_or_extends_specifier ]
   // [ final_specifier ]: at most one initial_or_extends_specifier is allowed,
   // so `:initial :extends' (two of them) is not in the grammar and must be
-  // rejected.
+  // rejected. §8.20 states the same rule in prose, and that is what reports it.
   auto r = Parse(
       "class c;\n"
       "  virtual task :initial :extends my_task;\n"
       "  endtask\n"
       "endclass\n");
-  // Parser::ParseDynamicOverrideSpecifiers accepts only `final` after the
-  // second colon, so the task_identifier parse stops on `extends` and §13.3
-  // reports it.
-  EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got 'extends'", 2, "13.3"));
+  // Parser::ParseTaskDecl reaches the rule through the same
+  // Parser::ParseDynamicOverrideSpecifiers the function form uses, so the task
+  // form names the report the function form names.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "':initial' and ':extends' are mutually exclusive", 2, "8.20"));
 }
 
 }  // namespace

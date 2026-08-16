@@ -113,11 +113,11 @@ static void ValidateOverrideSignature(const ModuleItem* base_method,
 void Elaborator::ValidateOneMethodOverride(const ClassDecl* cls,
                                            const ClassMember* m) {
   auto* method = m->method;
-  if (method->is_method_initial && method->is_method_extends) {
-    diag_.Error(method->loc, "':initial' and ':extends' are mutually exclusive",
-                Subclause("8.20"));
-    return;
-  }
+  // §8.20's rule that `:initial` and `:extends` are mutually exclusive is
+  // reported by Parser::ParseDynamicOverrideSpecifiers, which consumes the
+  // second specifier without recording it. No source can therefore set both
+  // ModuleItem::is_method_initial and ModuleItem::is_method_extends, so this
+  // function does not test for the pair.
   const auto* base_virtual = FindBaseVirtualMethod(cls, method->name, unit_);
   if (method->is_method_initial && base_virtual) {
     diag_.Error(method->loc,

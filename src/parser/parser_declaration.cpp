@@ -676,12 +676,31 @@ void Parser::ParseOneOverrideSpecifier(ModuleItem* item) {
 }
 
 void Parser::ParseDynamicOverrideSpecifiers(ModuleItem* item) {
+  bool saw_initial = false;
+  bool saw_extends = false;
   if (Match(TokenKind::kColon)) {
+    saw_initial = Check(TokenKind::kKwInitial);
+    saw_extends = Check(TokenKind::kKwExtends);
     ParseOneOverrideSpecifier(item);
   }
   if (Match(TokenKind::kColon)) {
     if (Match(TokenKind::kKwFinal)) {
       if (item) item->is_method_final = true;
+    } else if ((saw_initial && Check(TokenKind::kKwExtends)) ||
+               (saw_extends && Check(TokenKind::kKwInitial))) {
+      // §8.20 (printed page 197): "initial and extends are mutually exclusive;
+      // specifying both in a method declaration shall result in an error."
+      // Syntax 8-1 says it in the grammar too, giving
+      // `dynamic_override_specifiers ::= [ initial_or_extends_specifier ]
+      // [ final_specifier ]`, which admits one initial_or_extends_specifier at
+      // most. The second specifier is consumed and not recorded, so the method
+      // name parses and neither §13.4 nor §13.3 reports it a second time, and
+      // ModuleItem::is_method_initial and ModuleItem::is_method_extends cannot
+      // both end up true.
+      diag_.Error(CurrentLoc(),
+                  "':initial' and ':extends' are mutually exclusive",
+                  Subclause("8.20"));
+      Consume();
     }
   }
 }

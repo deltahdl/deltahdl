@@ -31,21 +31,60 @@ TEST(VirtualMethodParsing, MethodExtendsSpecifier) {
   ASSERT_FALSE(r.has_errors);
 }
 
-// §8.20: `:initial` and `:extends` make opposite claims about whether a method
-// overrides one above it, so a method carrying both is refused where the
-// qualifiers are read. The three cases above it accept each qualifier alone,
-// which is what keeps this one from being satisfied by a parser that refused
-// every qualifier.
+// §8.20 (printed page 197): "initial and extends are mutually exclusive;
+// specifying both in a method declaration shall result in an error." The three
+// cases above accept each specifier alone, which is what keeps this one from
+// being satisfied by a parser that refused every specifier.
 TEST(VirtualMethodParsing, InitialAndExtendsTogetherIsRejected) {
   auto r = Parse(
       "class C;\n"
       "  function :initial :extends void foo(); endfunction\n"
       "endclass\n");
-  // Parser::ParseDynamicOverrideSpecifiers admits `final` alone after the
-  // second colon, so `extends` is left standing where the method name belongs
-  // and Parser::ParseFuncName files the report under §13.4.
-  EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got 'extends'", 2, "13.4"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "':initial' and ':extends' are mutually exclusive", 2, "8.20"));
+}
+
+TEST(VirtualMethodParsing, ExtendsThenInitialIsRejected) {
+  // Parser::ParseOneOverrideSpecifier takes whichever specifier comes first, so
+  // a check written only for `extends` after `initial` passes the case above
+  // and fails this one.
+  auto r = Parse(
+      "class C;\n"
+      "  function :extends :initial void foo(); endfunction\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "':initial' and ':extends' are mutually exclusive", 2, "8.20"));
+}
+
+TEST(VirtualMethodParsing, InitialAndExtendsTogetherReportsExactlyOneError) {
+  // The second specifier is consumed, so `foo` is still read as the method
+  // name. It used to stand where the name belongs, and Parser::ParseFuncName
+  // reported it a second time under §13.4.
+  auto r = Parse(
+      "class C;\n"
+      "  function :initial :extends void foo(); endfunction\n"
+      "endclass\n");
+  uint32_t errors = 0;
+  for (const auto& d : r.diags) {
+    if (d.severity == DiagSeverity::kError) errors++;
+  }
+  EXPECT_EQ(errors, 1U);
+}
+
+TEST(VirtualMethodParsing, InitialAndExtendsTogetherStoresOnlyTheFirst) {
+  // The rejected specifier is not recorded, which is what makes the pair
+  // unreachable in Elaborator::ValidateOneMethodOverride rather than merely
+  // unreported here.
+  auto r = Parse(
+      "class C;\n"
+      "  function :initial :extends void foo(); endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* m = r.cu->classes[0]->members[0]->method;
+  ASSERT_NE(m, nullptr);
+  EXPECT_EQ(m->name, "foo");
+  EXPECT_TRUE(m->is_method_initial);
+  EXPECT_FALSE(m->is_method_extends);
 }
 
 TEST(VirtualMethodParsing, MethodFinalSpecifier) {
