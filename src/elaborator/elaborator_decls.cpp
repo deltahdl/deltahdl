@@ -563,6 +563,29 @@ static void ValidateNetDeclDataType(
   ValidateNetDataTypeIs4State(item->data_type, typedefs, diag, item->loc);
 }
 
+// Records what a select written on this net may reach, which is what a variable
+// declaration records through RegisterVarDeclNames and TrackVarArrayInfo.
+// §11.5.2 draws no distinction between the two -- a select of an array element
+// is "addressed in the same manner as net and variable bit-selects and
+// part-selects" -- so the net is given the same shape and the same dimensions,
+// and CheckElementSelectNode and CheckArrayElementPartSelectNode judge a net
+// array and a variable array alike. Before this, a net reached neither, so
+// §11.5.2's own example, `wire threed_array[0:255][0:255][0:7]` sliced `[3:0]`,
+// went unjudged. The RtlirVariable is the carrier those helpers take; nothing
+// but the dimensions is read back off it.
+void Elaborator::RecordNetArrayShape(ModuleItem* item, const RtlirNet& net,
+                                     RtlirModule* mod) {
+  RecordVarSelectShape(item, typedefs_, var_select_shapes_);
+  if (item->unpacked_dims.empty()) return;
+  RtlirVariable dims;
+  dims.width = net.width;
+  dims.is_signed = net.is_signed;
+  ComputeUnpackedDims(
+      item->unpacked_dims, dims,
+      {{typedefs_, class_names_}, BuildParamScope(mod), diag_, item->loc});
+  TrackVarArrayInfo(item, dims, BuildParamScope(mod));
+}
+
 void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   // §6.23: a net declared with a type_reference data type (e.g. `wire type(x)
   // y`) resolves the referenced object's width/signedness before the net is
@@ -589,11 +612,6 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
     else
       packed_array_vars_.insert(item->name);
   }
-  // §11.5.2 delegates a select of an array element to §11.5.1 "in the same
-  // manner as net and variable bit-selects and part-selects", drawing no
-  // distinction between the two, so a net is given the same shape a variable
-  // gets and CheckElementSelectNode judges both alike.
-  RecordVarSelectShape(item, typedefs_, var_select_shapes_);
   RtlirNet net;
   net.name = ScopedName(item->name);
 
@@ -662,23 +680,7 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
 
   ApplyTriregNetDefaults(item, net, unit_, BuildParamScope(mod));
 
-  // §11.5.2 sends a slice of a net array to the same rule it sends a variable
-  // array's to, drawing no distinction between the two, and
-  // Elaborator::CheckArrayElementPartSelectNode reads var_array_info_ to apply
-  // it. A net reached that map through nothing, so the clause's own example --
-  // `wire threed_array[0:255][0:255][0:7]` sliced `[3:0]` -- went unjudged. The
-  // dimensions are computed by the helpers the variable path uses, so the two
-  // agree on what a dimension is; the RtlirVariable is the carrier they take
-  // and nothing but the dimensions is read back off it.
-  if (!item->unpacked_dims.empty()) {
-    RtlirVariable dims;
-    dims.width = net.width;
-    dims.is_signed = net.is_signed;
-    ComputeUnpackedDims(
-        item->unpacked_dims, dims,
-        {{typedefs_, class_names_}, BuildParamScope(mod), diag_, item->loc});
-    TrackVarArrayInfo(item, dims, BuildParamScope(mod));
-  }
+  RecordNetArrayShape(item, net, mod);
 
   net.attrs = ResolveAttributes(item->attrs, diag_);
   mod->nets.push_back(net);
