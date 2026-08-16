@@ -1,10 +1,14 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
 #include "helpers_reported_error.h"
 #include "lexer/keywords.h"
+#include "lexer/lexer.h"
 
 using namespace delta;
 
@@ -103,6 +107,83 @@ TEST(LexicalConventionPreprocessor,
       "endmodule\n",
       f);
   EXPECT_EQ(out.find(kKeywordMarker), std::string::npos);
+}
+
+// A value given for a macro on the command line is text of the same kind, and
+// §5.2 lists no token a 0x01 byte begins wherever it stands. The value never
+// passes through the scan the source text above meets, so the report is the
+// only thing that says the byte was read at all. A command-line define stands
+// on no line of any file, which is the line 0 below.
+TEST(LexicalConventionPreprocessor,
+     KeywordMarkerByteInCommandLineDefineValueIsReported) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"WIDTH", std::string("8") + kKeywordMarker}};
+  Preprocess(
+      "module t;\n"
+      "  parameter W = `WIDTH;\n"
+      "  logic [W-1:0] a;\n"
+      "endmodule\n",
+      f, std::move(cfg));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unexpected character 0x01 in the value of command-line define 'WIDTH'",
+      0, "5.2"));
+}
+
+// What that report protects, in the text the macro's expansion writes. The
+// source expands `WIDTH, so the value reaches the output rather than sitting in
+// the macro table where no assertion about the output could fail.
+TEST(LexicalConventionPreprocessor,
+     KeywordMarkerByteIsBlankedFromExpandedCommandLineDefine) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"WIDTH", std::string("8") + kKeywordMarker}};
+  auto out = Preprocess(
+      "module t;\n"
+      "  parameter W = `WIDTH;\n"
+      "  logic [W-1:0] a;\n"
+      "endmodule\n",
+      f, std::move(cfg));
+  EXPECT_EQ(out.find(kKeywordMarker), std::string::npos);
+}
+
+// Lexes `src` and returns the kind of the first token whose spelling is
+// `word`, or kError when the token never appears.
+TokenKind KindOfWordIn(const std::string& src, const std::string& word) {
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<preprocessed>", src);
+  Lexer lexer(mgr.FileContent(fid), fid, diag, TextOrigin::kPreprocessorOutput);
+  for (const auto& tok : lexer.LexAll()) {
+    if (tok.text == word) return tok.kind;
+  }
+  return TokenKind::kError;
+}
+
+// The consequence a surviving marker has, which neither assertion above shows:
+// Lexer::ConsumeKeywordMarker reads the byte after a marker as a
+// KeywordVersion, so a value carrying a marker and a version byte would select
+// a reserved word list for every token the expansion precedes. §22.14 gives
+// `begin_keywords as the only thing that selects one. `logic` separates the two
+// lists that byte would choose between: §22.14.6 reserves it from IEEE Std
+// 1800-2005 and the IEEE Std 1364-1995 list of §22.14.2 omits it, so it lexes
+// as an identifier when the value took effect and as its keyword when it did
+// not.
+TEST(LexicalConventionPreprocessor,
+     CommandLineDefineValueCannotSelectTheReservedWordList) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"WIDTH", std::string("8") + kKeywordMarker +
+                               static_cast<char>(static_cast<uint8_t>(
+                                   KeywordVersion::kVer13641995))}};
+  auto out = Preprocess(
+      "module t;\n"
+      "  parameter W = `WIDTH;\n"
+      "  logic [W-1:0] a;\n"
+      "endmodule\n",
+      f, std::move(cfg));
+  EXPECT_EQ(KindOfWordIn(out, "logic"), TokenKind::kKwLogic);
 }
 
 }  // namespace
