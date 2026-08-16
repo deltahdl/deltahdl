@@ -75,6 +75,8 @@ class SynthLower {
   bool CheckBlockStmts(const Stmt* stmt);
   bool CheckIfSynth(const Stmt* stmt);
   bool CheckCaseSynth(const Stmt* stmt);
+  bool CheckDeclSynthesizable(const Stmt* stmt);
+  bool CheckInitializerLowerable(const Expr* expr);
 
   void MapPorts(const RtlirModule* mod, AigGraph& aig);
 

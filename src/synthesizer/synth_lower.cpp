@@ -282,6 +282,76 @@ bool SynthLower::CheckStmtSynthesizable(const Stmt* stmt) {
   if (stmt->kind == StmtKind::kCase) {
     return CheckCaseSynth(stmt);
   }
+  if (stmt->kind == StmtKind::kVarDecl ||
+      stmt->kind == StmtKind::kBlockItemDecl) {
+    return CheckDeclSynthesizable(stmt);
+  }
+  return true;
+}
+
+// §9.3.1's block item declaration used to be passed over whole. The name it
+// introduces has storage MapPorts already reserved from the module's variable
+// list, which is what LowersToNothing accounts for, and the value the
+// declaration gives that name was read nowhere under src/synthesizer/. So an
+// initializer holding one of the expression kinds NonSynthExprRule names --- a
+// function call, a cast, a system function --- was reported at once on the
+// right of an assignment and passed over in silence on a declaration.
+//
+// The declared type is answered before the initializer, because it is what the
+// design wrote. §9.7 makes `process` a built-in class and process::self() a
+// static method returning "a handle to the current process", and no hardware
+// holds one, whatever expression the initializer turns out to be.
+bool SynthLower::CheckDeclSynthesizable(const Stmt* stmt) {
+  if (stmt->var_decl_type.kind == DataTypeKind::kNamed &&
+      stmt->var_decl_type.type_name == "process") {
+    diag_.Error(stmt->range.start,
+                "a process control handle has no lowering in the synthesizer",
+                Subclause("9.7"));
+    return false;
+  }
+  if (!CheckExprSynthesizable(stmt->var_init)) return false;
+  return CheckInitializerLowerable(stmt->var_init);
+}
+
+// Whether LowerExprBit would have a lowering for every node of `expr`.
+//
+// CheckExprSynthesizable answers for §5.6.3's system function and walks the
+// operators, and the fourteen kinds NonSynthExprRule names are answered from
+// LowerExprBit instead. An initializer never reaches LowerExprBit, because
+// LowersToNothing drops the declaration before the statement is lowered, so the
+// table is asked here as well. Without it a function call written as an
+// initializer stayed silent while the identical expression on the right of an
+// assignment was reported, which is the general case behind the process
+// declaration above.
+//
+// The recursion follows the same children CheckExprSynthesizable follows, so
+// the two answer over one shape of expression rather than two.
+bool SynthLower::CheckInitializerLowerable(const Expr* expr) {
+  if (!expr) return true;
+  NonSynthRule rule = expr->kind == ExprKind::kMemberAccess
+                          ? DottedNameRule(expr)
+                          : NonSynthExprRule(expr->kind);
+  if (!rule.message.empty()) {
+    diag_.Error(expr->range.start, std::string(rule.message),
+                Subclause(rule.subclause));
+    return false;
+  }
+  if (expr->kind == ExprKind::kUnary || expr->kind == ExprKind::kBinary) {
+    return CheckInitializerLowerable(expr->lhs) &&
+           CheckInitializerLowerable(expr->rhs);
+  }
+  if (expr->kind == ExprKind::kTernary) {
+    return CheckInitializerLowerable(expr->condition) &&
+           CheckInitializerLowerable(expr->true_expr) &&
+           CheckInitializerLowerable(expr->false_expr);
+  }
+  if (expr->kind == ExprKind::kConcatenation ||
+      expr->kind == ExprKind::kReplicate) {
+    if (!CheckInitializerLowerable(expr->repeat_count)) return false;
+    for (const auto* element : expr->elements) {
+      if (!CheckInitializerLowerable(element)) return false;
+    }
+  }
   return true;
 }
 
