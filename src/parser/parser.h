@@ -13,6 +13,20 @@
 
 namespace delta {
 
+// One entry of A.5.2's `udp_declaration_port_list`, read out of the source but
+// not yet placed on the UdpDecl it belongs to. §29.3.1's rules about a UDP's
+// ports are stated over which of the two entry forms was written and where it
+// stands, so those are what an entry carries away from the port list.
+struct UdpAnsiPortEntry {
+  bool is_output = false;
+  bool is_inout = false;
+  bool declares_reg = false;
+  bool declares_initial = false;
+  char initial_value = '0';
+  std::string_view name;
+  SourceLoc loc;
+};
+
 class Parser {
  public:
   Parser(Lexer& lexer, Arena& arena, DiagEngine& diag);
@@ -159,6 +173,7 @@ class Parser {
   // Chooses between A.5.2's two port lists for the header in hand, and is what
   // both ParseUdpDecl and ParseExternUdpDecl choose on.
   bool UdpPortListIsDeclarations();
+  UdpAnsiPortEntry ParseUdpAnsiPortEntry();
   void ParseUdpAnsiHeader(UdpDecl* udp);
   void ParseUdpNonAnsiHeader(UdpDecl* udp);
   void ParseUdpInitialStatement(UdpDecl* udp);

@@ -501,59 +501,76 @@ bool Parser::UdpPortListIsDeclarations() {
 // port", and "The output port shall be the first port in the port list". Both
 // header forms answer them in the same words, the second in
 // ReconcileUdpNonAnsiPortList.
+// Reads one entry of A.5.2's `udp_declaration_port_list` without placing it, so
+// that what the entry declared is available to §29.3.1's rules before the
+// UdpDecl is written to.
+UdpAnsiPortEntry Parser::ParseUdpAnsiPortEntry() {
+  UdpAnsiPortEntry entry;
+  ParseAttributes();
+  entry.loc = CurrentLoc();
+  entry.is_inout = Check(TokenKind::kKwInout);
+  if (entry.is_inout) {
+    RejectUdpInoutPort();
+  } else if (Match(TokenKind::kKwOutput)) {
+    entry.is_output = true;
+  } else {
+    Match(TokenKind::kKwInput);
+  }
+  // A.5.2 writes the optional `reg` and the optional initial value into
+  // `udp_output_declaration` alone, so neither is read on an input entry.
+  entry.declares_reg = entry.is_output && Match(TokenKind::kKwReg);
+  RejectUdpPortDimension();
+  entry.name = Expect(TokenKind::kIdentifier, Subclause("29.3.1")).text;
+  entry.declares_initial = entry.is_output && Match(TokenKind::kEq);
+  if (entry.declares_initial) {
+    entry.initial_value =
+        ParseUdpInitialValue(TokenKind::kComma, TokenKind::kRParen);
+  }
+  return entry;
+}
+
+// Places one entry of A.5.2's `udp_declaration_port_list` on `udp`, reporting
+// §29.3.1's "UDPs have multiple input ports and exactly one output port" where
+// a second output declaration arrives. Returns whether the entry was taken as
+// the output port, which is not the same as whether it declared one.
+static bool PlaceUdpAnsiPortEntry(DiagEngine& diag, UdpDecl* udp,
+                                  const UdpAnsiPortEntry& entry) {
+  bool is_output = entry.is_output;
+  if (is_output && !udp->output_name.empty()) {
+    diag.Error(entry.loc, "UDP shall have exactly one output port",
+               Subclause("29.3.1"));
+    // Take the surplus declaration's port as an input rather than dropping it.
+    // It is a port the user wrote, and a header short one port disagrees with
+    // the table below it for a second report about one mistake.
+    is_output = false;
+  }
+  if (!is_output) {
+    udp->input_names.push_back(entry.name);
+    return false;
+  }
+  udp->output_name = entry.name;
+  if (entry.declares_reg) udp->is_sequential = true;
+  if (entry.declares_initial) {
+    udp->has_initial = true;
+    udp->initial_value = entry.initial_value;
+  }
+  return true;
+}
+
 void Parser::ParseUdpAnsiHeader(UdpDecl* udp) {
   bool have_first_port = false;
   bool first_port_is_output = false;
   SourceLoc first_port_loc{};
   do {
-    ParseAttributes();
-    SourceLoc entry_loc = CurrentLoc();
-    bool is_inout = Check(TokenKind::kKwInout);
-    bool is_output = false;
-    if (is_inout) {
-      RejectUdpInoutPort();
-    } else if (Match(TokenKind::kKwOutput)) {
-      is_output = true;
-    } else {
-      Match(TokenKind::kKwInput);
-    }
-    // A.5.2 writes the optional `reg` and the optional initial value into
-    // `udp_output_declaration` alone, so neither is read on an input entry.
-    bool declares_reg = is_output && Match(TokenKind::kKwReg);
-    RejectUdpPortDimension();
-    auto name_tok = Expect(TokenKind::kIdentifier, Subclause("29.3.1"));
-    bool declares_initial = is_output && Match(TokenKind::kEq);
-    char initial_value = udp->initial_value;
-    if (declares_initial) {
-      initial_value =
-          ParseUdpInitialValue(TokenKind::kComma, TokenKind::kRParen);
-    }
-
-    if (is_output && !udp->output_name.empty()) {
-      diag_.Error(entry_loc, "UDP shall have exactly one output port",
-                  Subclause("29.3.1"));
-      // Take the surplus declaration's port as an input rather than dropping
-      // it. It is a port the user wrote, and a header short one port disagrees
-      // with the table below it for a second report about one mistake.
-      is_output = false;
-    }
-    if (is_output) {
-      udp->output_name = name_tok.text;
-      if (declares_reg) udp->is_sequential = true;
-      if (declares_initial) {
-        udp->has_initial = true;
-        udp->initial_value = initial_value;
-      }
-    } else {
-      udp->input_names.push_back(name_tok.text);
-    }
+    UdpAnsiPortEntry entry = ParseUdpAnsiPortEntry();
+    bool is_output = PlaceUdpAnsiPortEntry(diag_, udp, entry);
     // An inout entry is not a port §29.3.1 admits, and RejectUdpInoutPort has
     // already said so, so it is not what the output's position is measured
     // against.
-    if (!have_first_port && !is_inout) {
+    if (!have_first_port && !entry.is_inout) {
       have_first_port = true;
       first_port_is_output = is_output;
-      first_port_loc = entry_loc;
+      first_port_loc = entry.loc;
     }
   } while (Match(TokenKind::kComma));
 
