@@ -1,5 +1,6 @@
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -135,6 +136,126 @@ TEST(NettypeElaboration, ResolutionFunctionStaticClassMethodAccepted) {
   sig.is_static_method = true;
   EXPECT_EQ(ValidateNettypeResolutionFunction(sig),
             NettypeResolutionRule::kConforming);
+}
+
+// §6.6.7: "While a class function method may be used for a resolution function,
+// such functions shall be class static methods as the method call occurs in a
+// context where no class object is involved in the call." The case fails unless
+// the run reports "shall be a static class method" at line 7, the `nettype`
+// declaration, under §6.6.7. Driven from source through parse + elaborate,
+// where ResolutionFunctionNonStaticClassMethodRejected above hands
+// ValidateNettypeResolutionFunction the two flags directly: this one asserts
+// that `with C::res` reaches the class method the source named, and `res`
+// breaks no other requirement §6.6.7 states, so the class-static rule is the
+// one left to report.
+TEST(NettypeElaboration, NonStaticClassMethodResolutionFunctionIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "class C;\n"
+      "  function logic [7:0] res(input logic [7:0] driver[]);\n"
+      "    return driver[0];\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  nettype logic [7:0] wt with C::res;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "resolution function 'res' of user-defined nettype "
+                            "'wt' shall be a static class method",
+                            7, "6.6.7"));
+}
+
+// §6.6.7 admits the class method that is static, so the same source with
+// `static` on `res` breaks nothing the clause states. The case fails when the
+// run reports any error, and it is what stops
+// NonStaticClassMethodResolutionFunctionIsRejected from passing on a source the
+// elaborator would reject whether `res` were static or not.
+TEST(NettypeElaboration, StaticClassMethodResolutionFunctionIsAccepted) {
+  ElabFixture f;
+  Elaborate(
+      "class C;\n"
+      "  static function logic [7:0] res(input logic [7:0] driver[]);\n"
+      "    return driver[0];\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  nettype logic [7:0] wt with C::res;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §6.6.7's Syntax 6-1 writes the with clause as `with [ package_scope |
+// class_scope ] tf_identifier`, so a qualifier that names neither a package nor
+// a class names no resolution function at all. The case fails unless the run
+// reports "names unknown package or class 'Nope'" at line 2, the `nettype`
+// declaration, under §6.6.7.
+TEST(NettypeElaboration,
+     ResolutionFunctionScopeNamingNeitherPackageNorClassRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  nettype logic [7:0] wt with Nope::res;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "resolution function of user-defined nettype 'wt' "
+                            "names unknown package or class 'Nope'",
+                            2, "6.6.7"));
+}
+
+// §6.6.7: a qualifier reaching a class that declares no function of that name
+// is a different mistake from a qualifier reaching nothing, and draws its own
+// report. The case fails unless the run reports "'C::missing' ... does not
+// exist" at line 7, the `nettype` declaration, under §6.6.7.
+TEST(NettypeElaboration, ClassResolutionFunctionMissingFromItsClassRejected) {
+  ElabFixture f;
+  Elaborate(
+      "class C;\n"
+      "  static function logic [7:0] res(input logic [7:0] driver[]);\n"
+      "    return driver[0];\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  nettype logic [7:0] wt with C::missing;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "resolution function 'C::missing' of user-defined "
+                            "nettype 'wt' does not exist",
+                            7, "6.6.7"));
+}
+
+// §6.6.7: a net of a nettype declared `with C::res` resolves through the class
+// method the with clause named, and not through a module-level function that
+// happens to share the bare name `res`. Both functions here conform to §6.6.7,
+// so nothing but the qualifier distinguishes them, and the case fails unless
+// the elaborated net's resolution function is 'C::res'. It is what the net
+// carries into the simulator, so binding the wrong one costs a wrong
+// simulation rather than a missing report.
+TEST(NettypeElaboration,
+     QualifiedResolutionFunctionDoesNotBindAnUnrelatedPlainFunction) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "class C;\n"
+      "  static function logic [7:0] res(input logic [7:0] driver[]);\n"
+      "    return driver[0];\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  function logic [7:0] res(input logic [7:0] driver[]);\n"
+      "    return driver[0];\n"
+      "  endfunction\n"
+      "  nettype logic [7:0] wt with C::res;\n"
+      "  wt n;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirNet* net = FindNet(design, "m", "n");
+  ASSERT_NE(net, nullptr);
+  EXPECT_EQ(net->resolve_func, "C::res");
 }
 
 // §6.6.7 data-type restriction: a real (or shortreal) type is one of the

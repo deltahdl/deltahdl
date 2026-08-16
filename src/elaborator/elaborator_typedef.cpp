@@ -410,14 +410,10 @@ static NettypeResolutionSig BuildNettypeResolutionSig(const ModuleItem* item,
   sig.return_type_matches_nettype = nettype_dt.kind != DataTypeKind::kNamed ||
                                     return_dt.kind != DataTypeKind::kNamed ||
                                     nettype_dt.type_name == return_dt.type_name;
-  // A lifetime keyword and a class method are not carried this far. §6.6.7's
-  // parenthetical "(or preserve no state information)" makes a `static`
-  // lifetime alone no breach, and Parser::ParseNettypeDecl in
-  // src/parser/parser_declaration.cpp keeps only the bare name out of
-  // `with C::res`, so a class method is never found here at all.
+  // §6.6.7's parenthetical "(or preserve no state information)" makes a
+  // `static` lifetime alone no breach, so the lifetime keyword is not consulted
+  // and this requirement is stated met.
   sig.is_automatic = true;
-  sig.is_class_method = false;
-  sig.is_static_method = false;
   sig.single_input_argument = fn->func_args.size() == 1;
   // The three argument requirements are stated met when there is no single
   // argument to judge, so the argument-count requirement is the one reported.
@@ -476,10 +472,105 @@ static std::string NettypeResolutionRuleMessage(
   }
 }
 
+// §6.6.7's Syntax 6-1 writes the with clause as `with [ package_scope |
+// class_scope ] tf_identifier`, so the search for a resolution function ends in
+// one of three places, and which one it was is part of the answer: §6.6.7 rules
+// that "while a class function method may be used for a resolution function,
+// such functions shall be class static methods as the method call occurs in a
+// context where no class object is involved in the call" (printed page 98 of
+// ~/LRM.pdf), so whether the function is a class method decides which
+// requirements it is held to.
+//
+// `scope_named_nothing` separates a qualifier that reaches neither a package
+// nor a class from one that reaches a scope declaring no such function. They
+// are different mistakes and get different reports.
+struct NettypeResolutionTarget {
+  const ModuleItem* fn = nullptr;
+  bool is_class_method = false;
+  bool is_static_method = false;
+  bool scope_named_nothing = false;
+};
+
+// The function a class declares under `name`, whether or not it is static.
+// §6.6.7 admits a non-static one as far as being found, and rejects it by the
+// class-static rule rather than by not finding it, which is what lets the
+// report say what is wrong with the source rather than that the name is
+// missing.
+static NettypeResolutionTarget ClassResolutionMethod(const ClassDecl* cls,
+                                                     std::string_view name) {
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
+    if (m->method->name != name) continue;
+    return {m->method, true, m->is_static, false};
+  }
+  return {nullptr, true, false, false};
+}
+
+// The function a package declares under `name`.
+static const ModuleItem* PackageResolutionFunction(const PackageDecl* pkg,
+                                                   std::string_view name) {
+  for (const auto* pi : pkg->items) {
+    if (pi->kind == ModuleItemKind::kFunctionDecl && pi->name == name)
+      return pi;
+  }
+  return nullptr;
+}
+
+// The package `unit` declares under `name`, or null.
+static const PackageDecl* FindNettypeScopePackage(const CompilationUnit* unit,
+                                                  std::string_view name) {
+  for (const auto* p : unit->packages) {
+    if (p->name == name) return p;
+  }
+  return nullptr;
+}
+
+static NettypeResolutionTarget FindNettypeResolutionFunction(
+    const ModuleItem* item, const CompilationUnit* unit,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls) {
+  if (item->nettype_resolve_scope.empty()) {
+    auto fit = func_decls.find(item->nettype_resolve_func);
+    if (fit == func_decls.end()) return {};
+    return {fit->second, false, false, false};
+  }
+  if (const ClassDecl* cls = FindClassDecl(item->nettype_resolve_scope, unit))
+    return ClassResolutionMethod(cls, item->nettype_resolve_func);
+  if (const PackageDecl* pkg =
+          FindNettypeScopePackage(unit, item->nettype_resolve_scope))
+    return {PackageResolutionFunction(pkg, item->nettype_resolve_func), false,
+            false, false};
+  return {nullptr, false, false, true};
+}
+
 void Elaborator::CheckNettypeResolutionFunction(const ModuleItem* item) {
-  auto fit = func_decls_.find(item->nettype_resolve_func);
-  if (fit == func_decls_.end() || !fit->second) return;
-  NettypeResolutionSig sig = BuildNettypeResolutionSig(item, fit->second);
+  NettypeResolutionTarget target =
+      FindNettypeResolutionFunction(item, unit_, func_decls_);
+  // An unqualified name that is not found is left alone. func_decls_ holds the
+  // functions of the design element being elaborated, so a name it does not
+  // hold may still be declared somewhere this does not see; only a qualifier
+  // says where the function was supposed to be, and so only a qualifier makes
+  // its absence something this can report.
+  if (!target.fn && item->nettype_resolve_scope.empty()) return;
+  if (target.scope_named_nothing) {
+    diag_.Error(item->loc,
+                std::format("resolution function of user-defined nettype '{}' "
+                            "names unknown package or class '{}'",
+                            item->name, item->nettype_resolve_scope),
+                Subclause("6.6.7"));
+    return;
+  }
+  if (!target.fn) {
+    diag_.Error(item->loc,
+                std::format("resolution function '{}::{}' of user-defined "
+                            "nettype '{}' does not exist",
+                            item->nettype_resolve_scope,
+                            item->nettype_resolve_func, item->name),
+                Subclause("6.6.7"));
+    return;
+  }
+  NettypeResolutionSig sig = BuildNettypeResolutionSig(item, target.fn);
+  sig.is_class_method = target.is_class_method;
+  sig.is_static_method = target.is_static_method;
   NettypeResolutionRule rule = ValidateNettypeResolutionFunction(sig);
   if (rule == NettypeResolutionRule::kConforming) return;
   diag_.Error(
@@ -494,9 +585,23 @@ void Elaborator::CheckNettypeResolutionFunction(const ModuleItem* item) {
 // canonical source; a simple nettype that renames another inherits both that
 // nettype's resolution function and its canonical name, so §6.22.6 matching
 // reduces to comparing canonical names.
+// §6.6.7: the resolution function's name as the with clause wrote it, qualifier
+// included. The bare name alone cannot tell `with C::res` from `with res`, so a
+// net of either nettype carried the same name into the simulator and two
+// nettypes resolving through same-named functions in different scopes were
+// indistinguishable there.
+static std::string_view NettypeResolveFuncName(const ModuleItem* item,
+                                               Arena& arena) {
+  if (item->nettype_resolve_scope.empty()) return item->nettype_resolve_func;
+  auto* qname =
+      arena.Create<std::string>(std::string(item->nettype_resolve_scope) +
+                                "::" + std::string(item->nettype_resolve_func));
+  return *qname;
+}
+
 void Elaborator::RegisterNettypeResolutionAndCanonical(const ModuleItem* item) {
   if (!item->nettype_resolve_func.empty()) {
-    nettype_resolve_funcs_[item->name] = item->nettype_resolve_func;
+    nettype_resolve_funcs_[item->name] = NettypeResolveFuncName(item, arena_);
     nettype_canonical_[item->name] = item->name;
     return;
   }

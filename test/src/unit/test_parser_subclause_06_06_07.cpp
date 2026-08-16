@@ -99,6 +99,43 @@ TEST(NettypeParsing, NettypeDeclWithScopedResolve) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
   EXPECT_EQ(item->nettype_resolve_func, "resolve_fn");
+  EXPECT_EQ(item->nettype_resolve_scope, "pkg");
+}
+
+// §6.6.7's Syntax 6-1 writes the with clause as
+// `with [ package_scope | class_scope ] tf_identifier`, so the class name
+// before `::` is part of the clause and not decoration. A declaration that
+// records only `res` says the same thing as `with res;` and binds to whatever
+// plain function is named `res`.
+TEST(NettypeParsing, NettypeDeclWithClassScopedResolveKeepsTheClassName) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct { real field1; bit field2; } T;\n"
+      "  nettype T wt with C::res;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* nt = FindNettypeDecl(r, "wt");
+  ASSERT_NE(nt, nullptr);
+  EXPECT_EQ(nt->nettype_resolve_scope, "C");
+  EXPECT_EQ(nt->nettype_resolve_func, "res");
+}
+
+// §6.6.7's Syntax 6-1 makes the package_scope or class_scope optional, so a
+// with clause naming a function alone has no qualifier to record. This fails
+// if the function name is written into the qualifier field.
+TEST(NettypeParsing, UnqualifiedWithClauseLeavesTheScopeEmpty) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct { real field1; bit field2; } T;\n"
+      "  nettype T wt_plain with res;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* nt = FindNettypeDecl(r, "wt_plain");
+  ASSERT_NE(nt, nullptr);
+  EXPECT_EQ(nt->nettype_resolve_func, "res");
+  EXPECT_TRUE(nt->nettype_resolve_scope.empty());
 }
 
 TEST(NettypeParsing, NettypeInPackage) {

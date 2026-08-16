@@ -463,10 +463,16 @@ ModuleItem* Parser::ParseNettypeDecl() {
                 Subclause("6.6.7"));
   }
 
+  // §6.6.7's Syntax 6-1: `with [ package_scope | class_scope ] tf_identifier`.
+  // The identifier before `::` is the package or class the function is named
+  // through, and it is kept: without it a nettype declared `with C::res` and
+  // one declared `with res` record the same function name, so the first binds
+  // to whatever plain function is called `res`.
   if (Check(TokenKind::kKwWith)) {
     Consume();
     auto func_name = Expect(TokenKind::kIdentifier, Subclause("6.6.7")).text;
     if (Match(TokenKind::kColonColon)) {
+      item->nettype_resolve_scope = func_name;
       item->nettype_resolve_func =
           Expect(TokenKind::kIdentifier, Subclause("6.6.7")).text;
     } else {
