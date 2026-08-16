@@ -607,4 +607,143 @@ TEST(NetsAndVariables, ContinuousAndAlwaysFfAssignmentsToOneVariableError) {
       "variable 'y' has both continuous and procedural assignments", 5, "6.5"));
 }
 
+// §6.5's mixture is decided by what a statement writes, not by where the
+// statement stands, so each case below writes the procedural assignment in a
+// statement position CollectProcTargets did not descend before. §9.3.2 makes a
+// par_block a statement_or_null, so a fork member is one of those positions.
+TEST(NetsAndVariables, ProceduralAssignmentInAForkMixesWithAContinuousAssign) {
+  ElabFixture f;
+  Elaborate(
+      "module top();\n"
+      "  logic x;\n"
+      "  assign x = 1'b0;\n"
+      "  initial fork\n"
+      "    x = 1'b1;\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'x' has both continuous and procedural assignments", 3, "6.5"));
+}
+
+// §18.16 makes each randcase_item's body a statement_or_null.
+TEST(NetsAndVariables, ProceduralAssignmentInARandcaseArmMixesWithAContAssign) {
+  ElabFixture f;
+  Elaborate(
+      "module top();\n"
+      "  logic x;\n"
+      "  assign x = 1'b0;\n"
+      "  initial randcase\n"
+      "    1 : x = 1'b1;\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'x' has both continuous and procedural assignments", 3, "6.5"));
+}
+
+// A.6.8 makes a for_initialization a list of variable_assignments, each of
+// which writes its target exactly as an assignment in the loop body does.
+TEST(NetsAndVariables, ProceduralAssignmentInAForInitMixesWithAContAssign) {
+  ElabFixture f;
+  Elaborate(
+      "module top();\n"
+      "  logic x;\n"
+      "  logic [7:0] i;\n"
+      "  assign x = 1'b0;\n"
+      "  initial for (x = 1'b1; i < 2; i = i + 1) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'x' has both continuous and procedural assignments", 4, "6.5"));
+}
+
+// A.6.8's for_step_assignment is the same rule at the other end of the header.
+TEST(NetsAndVariables, ProceduralAssignmentInAForStepMixesWithAContAssign) {
+  ElabFixture f;
+  Elaborate(
+      "module top();\n"
+      "  logic x;\n"
+      "  logic [7:0] i;\n"
+      "  assign x = 1'b0;\n"
+      "  initial for (i = 0; i < 2; x = 1'b1) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'x' has both continuous and procedural assignments", 4, "6.5"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so the pass arm of an immediate assertion is a statement
+// position too.
+TEST(NetsAndVariables,
+     ProceduralAssignmentInAnAssertPassArmMixesWithAContAssign) {
+  ElabFixture f;
+  Elaborate(
+      "module top();\n"
+      "  logic x;\n"
+      "  assign x = 1'b0;\n"
+      "  initial assert (1) x = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'x' has both continuous and procedural assignments", 3, "6.5"));
+}
+
+// The fail arm of the same action_block, which is a separate field of Stmt and
+// so a separate position to reach.
+TEST(NetsAndVariables,
+     ProceduralAssignmentInAnAssertFailArmMixesWithAContAssign) {
+  ElabFixture f;
+  Elaborate(
+      "module top();\n"
+      "  logic x;\n"
+      "  assign x = 1'b0;\n"
+      "  initial assert (0) else x = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'x' has both continuous and procedural assignments", 3, "6.5"));
+}
+
+// §6.5's other rule reads the same map, so a net assigned procedurally inside a
+// fork is reported for the same reason the mixture above is.
+TEST(NetsAndVariables, ProceduralAssignmentToANetInAForkIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module top();\n"
+      "  wire w;\n"
+      "  initial fork\n"
+      "    w = 1'b1;\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "net 'w' cannot be the target of a procedural assignment", 4, "6.5"));
+}
+
+// The regression against a walk that reports on every statement it newly
+// reaches: a procedural assignment inside a fork with no continuous assignment
+// beside it is the single driver §6.5 allows.
+TEST(NetsAndVariables, AProceduralAssignmentInAForkAloneIsAccepted) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top();\n"
+      "  logic x;\n"
+      "  initial fork\n"
+      "    x = 1'b1;\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

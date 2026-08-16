@@ -266,4 +266,40 @@ TEST(ForceReleaseElaboration,
                             "10.6.2"));
 }
 
+// §10.6.2's rule on what a force may name is decided by the expression, not by
+// where the statement stands, and §18.16 makes each randcase_item's body a
+// statement_or_null. ForceBitSelectVariableLhsIsError above writes the same
+// force in a begin-end block and expects the same report.
+TEST(ForceReleaseElaboration, ForceBitSelectVariableLhsInARandcaseArmIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] data;\n"
+      "  initial randcase\n"
+      "    1 : force data[3] = 1'b1;\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "bit-select or part-select of a variable is not a legal force LHS", 4,
+      "10.6.2"));
+}
+
+// The regression against a walk that reports on every force it newly reaches:
+// forcing a whole variable in a randcase arm is what §10.6.2 allows.
+TEST(ForceReleaseElaboration, ForceOfAWholeVariableInARandcaseArmIsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] data;\n"
+      "  initial randcase\n"
+      "    1 : force data = 8'hFF;\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

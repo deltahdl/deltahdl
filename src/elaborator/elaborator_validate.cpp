@@ -297,6 +297,25 @@ static void CollectLhsBaseNames(
   if (!name.empty()) out.emplace(name, loc);
 }
 
+// Records the variable each blocking or nonblocking assignment writes, for
+// §6.5's rule that "it shall be an error to have multiple continuous
+// assignments or a mixture of procedural and continuous assignments writing to
+// any term in the expansion of the longest static prefix of a variable", and
+// for §6.5's other rule that a net cannot be the target of a procedural
+// assignment. Both tests read sets that are complete only after every item has
+// been walked, so this only collects; Elaborator::ValidateMixedAssignments and
+// Elaborator::ValidateProceduralNetAssign report.
+//
+// The statement position an assignment stands in decides nothing about either
+// rule, so this descends every field of Stmt that holds a statement.
+// src/parser/ast_stmt.h declares thirteen: stmts, then_branch, else_branch,
+// for_inits, for_steps, for_body, case_items, fork_stmts, body,
+// assert_pass_stmt, assert_fail_stmt, randcase_items and rs_productions.
+// rs_productions is the one left out. It holds the statements of a randsequence
+// code block, which A.6.12 gives as `rs_code_block ::= { { data_declaration } {
+// statement_or_null } }`, and no walker anywhere in src/elaborator/ descends
+// it; #3165 covers that as its own defect rather than fixing it here for one
+// rule.
 void CollectProcTargets(const Stmt* s,
                         std::unordered_map<std::string_view, SourceLoc>& out) {
   if (!s) return;
@@ -305,11 +324,17 @@ void CollectProcTargets(const Stmt* s,
     CollectLhsBaseNames(s->lhs, s->range.start, out);
   }
   for (auto* sub : s->stmts) CollectProcTargets(sub, out);
+  for (auto* sub : s->fork_stmts) CollectProcTargets(sub, out);
+  for (auto* sub : s->for_inits) CollectProcTargets(sub, out);
+  for (auto* sub : s->for_steps) CollectProcTargets(sub, out);
   CollectProcTargets(s->then_branch, out);
   CollectProcTargets(s->else_branch, out);
   CollectProcTargets(s->body, out);
   CollectProcTargets(s->for_body, out);
+  CollectProcTargets(s->assert_pass_stmt, out);
+  CollectProcTargets(s->assert_fail_stmt, out);
   for (auto& ci : s->case_items) CollectProcTargets(ci.body, out);
+  for (auto& rc : s->randcase_items) CollectProcTargets(rc.second, out);
 }
 
 // Records the variable each force or release statement names, for §10.6.2's
@@ -461,6 +486,10 @@ static void CheckForceLhsOperand(
   }
 }
 
+// Reports §10.6.2's rule on what a force statement may name, at every statement
+// position a force can stand in. Descends the same twelve fields of Stmt as
+// CollectProcTargets above, and leaves out rs_productions for the reason stated
+// there.
 void CheckForceLhs(
     const Stmt* s, const std::unordered_set<std::string_view>& net_names,
     const std::unordered_set<std::string_view>& nettype_net_names,
@@ -474,12 +503,20 @@ void CheckForceLhs(
     CheckForceLhs(sub, net_names, nettype_net_names, diag);
   for (auto* sub : s->fork_stmts)
     CheckForceLhs(sub, net_names, nettype_net_names, diag);
+  for (auto* sub : s->for_inits)
+    CheckForceLhs(sub, net_names, nettype_net_names, diag);
+  for (auto* sub : s->for_steps)
+    CheckForceLhs(sub, net_names, nettype_net_names, diag);
   CheckForceLhs(s->then_branch, net_names, nettype_net_names, diag);
   CheckForceLhs(s->else_branch, net_names, nettype_net_names, diag);
   CheckForceLhs(s->body, net_names, nettype_net_names, diag);
   CheckForceLhs(s->for_body, net_names, nettype_net_names, diag);
+  CheckForceLhs(s->assert_pass_stmt, net_names, nettype_net_names, diag);
+  CheckForceLhs(s->assert_fail_stmt, net_names, nettype_net_names, diag);
   for (auto& ci : s->case_items)
     CheckForceLhs(ci.body, net_names, nettype_net_names, diag);
+  for (auto& rc : s->randcase_items)
+    CheckForceLhs(rc.second, net_names, nettype_net_names, diag);
 }
 
 // True when any expression of `list` reads one of the named nets.
