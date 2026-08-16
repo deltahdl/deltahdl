@@ -5,6 +5,15 @@ using namespace delta;
 
 namespace {
 
+// §13.3.2 reaches a variable of an automatic task and nothing else. Its four
+// bullets open "Because variables declared in automatic tasks are deallocated
+// at the end of the task invocation, they shall not be used in certain
+// constructs that might refer to them after that point", so every rejection
+// case below declares its task `task automatic`. A variable a static task
+// declares `automatic` is a different declaration, because §13.3.1 says
+// "Specific local variables can be declared as automatic within a static task
+// or as static within an automatic task." That variable answers to §6.21, and
+// test/src/unit/test_elaborator_subclause_06_21.cpp covers it.
 TEST(TaskBodyElaboration, AutoTaskLocalInNonblockingAssignError) {
   ElabFixture f;
   ElaborateSrc(
@@ -88,21 +97,6 @@ TEST(TaskBodyElaboration, AutoTaskStaticLocalInNonblockingOk) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-}
-
-TEST(TaskBodyElaboration, StaticTaskAutoLocalInNonblockingError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  task static t();\n"
-      "    automatic int x;\n"
-      "    x <= 1;\n"
-      "  endtask\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "automatic task variable in nonblocking assignment",
-                            4, "13.3.2"));
 }
 
 TEST(TaskBodyElaboration, AutoTaskLocalInNestedNonblockingError) {

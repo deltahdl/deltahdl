@@ -255,6 +255,41 @@ static bool ExprRefsAutoVar(
   return AnyChildExprRefsAutoVar(e, auto_vars);
 }
 
+// Which clause forbids the four uses below, and how a report names the
+// variable. §13.3.1 says "Specific local variables can be declared as
+// automatic within a static task or as static within an automatic task", so a
+// task-local variable is deallocated when the task returns for either of two
+// reasons, and the clause that forbids these uses of it differs with the
+// reason.
+//
+// A variable of an automatic task is what §13.3.2's four bullets are about:
+// they open "Because variables declared in automatic tasks are deallocated at
+// the end of the task invocation, they shall not be used in certain constructs
+// that might refer to them after that point", and reach nothing else.
+//
+// A variable a static task declares `automatic` is not one, and answers to
+// §6.21. Its first sentence forbids writing an automatic variable "with
+// nonblocking, continuous, or procedural continuous assignments", which is the
+// nonblocking assignment and the procedural continuous assignment. Its last
+// sentence, "References to automatic variables and elements or members of
+// dynamic variables shall be limited to procedural blocks", is what the other
+// two break: an intra-assignment event control defers its evaluation past the
+// statement, and $monitor keeps reading its arguments for the rest of the
+// simulation, so neither reference stays inside the block that declared the
+// variable.
+//
+// ValidateTaskBody is the only place that knows which task declared the
+// variables, so the rule travels from there rather than being fixed at a site.
+struct AutoVarRule {
+  std::string_view variable;
+  Subclause subclause;
+};
+
+constexpr AutoVarRule kAutomaticTaskVar{"automatic task variable",
+                                        Subclause("13.3.2")};
+constexpr AutoVarRule kAutomaticVarInStaticTask{"automatic variable",
+                                                Subclause("6.21")};
+
 // §13.3.2: the nonblocking-assignment restriction applies to a write into an
 // automatic task variable's own storage, including a bit-select or part-select
 // of it. A bit/part-select chain is walked down to its root name. Member access
@@ -266,12 +301,12 @@ static std::string_view NbaAutoTargetRoot(const Expr* e) {
   return {};
 }
 
-// §13.3.2: an automatic task variable shall not appear in the
-// intra-assignment event control of a nonblocking assignment, since the
-// event control can defer evaluation past the variable's lifetime.
+// An automatic task variable shall not appear in the intra-assignment event
+// control of a nonblocking assignment, since the event control can defer
+// evaluation past the variable's lifetime.
 static void CheckNbaEventControlForAutoVar(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
-    DiagEngine& diag) {
+    const AutoVarRule& rule, DiagEngine& diag) {
   bool in_event_control = ExprRefsAutoVar(s->repeat_event_count, auto_vars);
   for (const auto& ev : s->events) {
     if (ExprRefsAutoVar(ev.signal, auto_vars) ||
@@ -281,33 +316,34 @@ static void CheckNbaEventControlForAutoVar(
   }
   if (in_event_control) {
     diag.Error(s->range.start,
-               "automatic task variable in intra-assignment event control "
-               "of nonblocking assignment",
-               Subclause("13.3.2"));
+               std::format("{} in intra-assignment event control of "
+                           "nonblocking assignment",
+                           rule.variable),
+               rule.subclause);
   }
 }
 
 static void CheckTaskBodyNbaForAutoVar(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
-    DiagEngine& diag) {
+    const AutoVarRule& rule, DiagEngine& diag) {
   if (s->kind != StmtKind::kNonblockingAssign) return;
   if (s->lhs) {
     auto target = NbaAutoTargetRoot(s->lhs);
     if (!target.empty() && auto_vars.count(target) != 0) {
       diag.Error(s->range.start,
-                 "automatic task variable in nonblocking assignment",
-                 Subclause("13.3.2"));
+                 std::format("{} in nonblocking assignment", rule.variable),
+                 rule.subclause);
     }
   }
-  CheckNbaEventControlForAutoVar(s, auto_vars, diag);
+  CheckNbaEventControlForAutoVar(s, auto_vars, rule, diag);
 }
 
-// §13.3.2: an automatic task variable shall not be traced by continuous
-// monitoring system tasks such as $monitor and $dumpvars, whose tracing
-// outlives the invocation.
+// An automatic task variable shall not be traced by continuous monitoring
+// system tasks such as $monitor and $dumpvars, whose tracing outlives the
+// invocation.
 static void CheckTaskBodyMonitorTrace(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
-    DiagEngine& diag) {
+    const AutoVarRule& rule, DiagEngine& diag) {
   if (s->kind != StmtKind::kExprStmt || !s->expr ||
       s->expr->kind != ExprKind::kSystemCall ||
       (s->expr->callee != "$monitor" && s->expr->callee != "$dumpvars"))
@@ -315,8 +351,8 @@ static void CheckTaskBodyMonitorTrace(
   for (auto* a : s->expr->args) {
     if (ExprRefsAutoVar(a, auto_vars)) {
       diag.Error(s->range.start,
-                 "automatic task variable traced by system task",
-                 Subclause("13.3.2"));
+                 std::format("{} traced by system task", rule.variable),
+                 rule.subclause);
       break;
     }
   }
@@ -324,13 +360,14 @@ static void CheckTaskBodyMonitorTrace(
 
 static void CheckTaskBodyContAssign(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
-    DiagEngine& diag) {
+    const AutoVarRule& rule, DiagEngine& diag) {
   if (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign) {
     auto name = ExprIdent(s->lhs);
     if (!name.empty() && auto_vars.count(name) != 0) {
-      diag.Error(s->range.start,
-                 "automatic task variable in procedural continuous assignment",
-                 Subclause("13.3.2"));
+      diag.Error(
+          s->range.start,
+          std::format("{} in procedural continuous assignment", rule.variable),
+          rule.subclause);
     }
   }
   if (s->kind == StmtKind::kAssign && s->lhs &&
@@ -343,14 +380,14 @@ static void CheckTaskBodyContAssign(
 
 static void CheckTaskBodyStmtSelf(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
-    DiagEngine& diag) {
+    const AutoVarRule& rule, DiagEngine& diag) {
   if (s->kind == StmtKind::kReturn && s->expr) {
     diag.Error(s->range.start, "task returns a value", Subclause("13.3"));
   }
 
-  CheckTaskBodyNbaForAutoVar(s, auto_vars, diag);
-  CheckTaskBodyMonitorTrace(s, auto_vars, diag);
-  CheckTaskBodyContAssign(s, auto_vars, diag);
+  CheckTaskBodyNbaForAutoVar(s, auto_vars, rule, diag);
+  CheckTaskBodyMonitorTrace(s, auto_vars, rule, diag);
+  CheckTaskBodyContAssign(s, auto_vars, rule, diag);
 
   if (s->kind == StmtKind::kFork) {
     for (auto* sub : s->fork_stmts) CheckNoReturnInFork(sub, diag);
@@ -359,16 +396,17 @@ static void CheckTaskBodyStmtSelf(
 
 static void CheckTaskBodyStmt(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
-    DiagEngine& diag) {
+    const AutoVarRule& rule, DiagEngine& diag) {
   if (!s) return;
-  CheckTaskBodyStmtSelf(s, auto_vars, diag);
-  for (auto* sub : s->stmts) CheckTaskBodyStmt(sub, auto_vars, diag);
-  for (auto* sub : s->fork_stmts) CheckTaskBodyStmt(sub, auto_vars, diag);
-  CheckTaskBodyStmt(s->then_branch, auto_vars, diag);
-  CheckTaskBodyStmt(s->else_branch, auto_vars, diag);
-  CheckTaskBodyStmt(s->body, auto_vars, diag);
-  CheckTaskBodyStmt(s->for_body, auto_vars, diag);
-  for (auto& ci : s->case_items) CheckTaskBodyStmt(ci.body, auto_vars, diag);
+  CheckTaskBodyStmtSelf(s, auto_vars, rule, diag);
+  for (auto* sub : s->stmts) CheckTaskBodyStmt(sub, auto_vars, rule, diag);
+  for (auto* sub : s->fork_stmts) CheckTaskBodyStmt(sub, auto_vars, rule, diag);
+  CheckTaskBodyStmt(s->then_branch, auto_vars, rule, diag);
+  CheckTaskBodyStmt(s->else_branch, auto_vars, rule, diag);
+  CheckTaskBodyStmt(s->body, auto_vars, rule, diag);
+  CheckTaskBodyStmt(s->for_body, auto_vars, rule, diag);
+  for (auto& ci : s->case_items)
+    CheckTaskBodyStmt(ci.body, auto_vars, rule, diag);
 }
 
 static void CollectAutoVarNames(const Stmt* s, bool task_is_auto,
@@ -439,8 +477,10 @@ static void ValidateTaskBody(const ModuleItem* item, DiagEngine& diag) {
   for (auto* s : item->func_body_stmts) {
     CollectAutoVarNames(s, is_auto, auto_vars);
   }
+  const AutoVarRule& rule =
+      is_auto ? kAutomaticTaskVar : kAutomaticVarInStaticTask;
   for (auto* s : item->func_body_stmts) {
-    CheckTaskBodyStmt(s, auto_vars, diag);
+    CheckTaskBodyStmt(s, auto_vars, rule, diag);
   }
 }
 

@@ -179,6 +179,144 @@ TEST(ScopeAndLifetimeElaboration, StaticVarForceInTaskSucceeds) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §6.21 is the clause for this report, not §13.3.2. §6.21 says "Automatic
+// variables and elements of dynamically sized array variables shall not be
+// written with nonblocking, continuous, or procedural continuous assignments",
+// and that sentence is about how a variable was declared rather than about
+// which task declared it. §13.3.2's four bullets open "Because variables
+// declared in automatic tasks are deallocated at the end of the task
+// invocation", so they reach a variable of an automatic task only, and `drive`
+// carries the `static` keyword. §13.3.1 is what makes the declaration legal
+// there: "Specific local variables can be declared as automatic within a static
+// task or as static within an automatic task."
+TEST(ScopeAndLifetimeElaboration, StaticTaskAutoVarNonblockingIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module nba_holder;\n"
+      "  task static drive();\n"
+      "    automatic int pulse;\n"
+      "    pulse <= 1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic variable in nonblocking assignment", 4,
+                            "6.21"));
+}
+
+// The sentence broken here is §6.21's last one: "References to automatic
+// variables and elements or members of dynamic variables shall be limited to
+// procedural blocks." An intra-assignment event control holds the reference to
+// `gate` until the event fires, which is after the statement that named it has
+// finished. §13.3.2 has a bullet for the same construct, "They shall not be
+// referenced in intra-assignment event controls of nonblocking assignments",
+// but its subject is a variable declared in an automatic task and `sync` is a
+// static one.
+TEST(ScopeAndLifetimeElaboration,
+     StaticTaskAutoVarNonblockingEventControlIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module evc_holder;\n"
+      "  logic ready;\n"
+      "  task static sync();\n"
+      "    automatic int gate;\n"
+      "    ready <= @(gate) 1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic variable in intra-assignment event "
+                            "control of nonblocking assignment",
+                            5, "6.21"));
+}
+
+// $monitor keeps reading its arguments for the remainder of the simulation, so
+// naming `sample` in one places a reference to an automatic variable outside
+// the block that declared it, which §6.21's "References to automatic variables
+// ... shall be limited to procedural blocks" forbids. The citation is §6.21
+// rather than §13.3.2 because `probe` is declared `task static`, and §13.3.2's
+// bullet "They shall not be traced with system tasks such as $monitor and
+// $dumpvars" governs variables of automatic tasks.
+TEST(ScopeAndLifetimeElaboration, StaticTaskAutoVarMonitorIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module mon_holder;\n"
+      "  task static probe();\n"
+      "    automatic int sample;\n"
+      "    $monitor(\"%d\", sample);\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic variable traced by system task", 4,
+                            "6.21"));
+}
+
+// §6.21 bars a procedural continuous assignment over an automatic variable in
+// the same sentence that bars a nonblocking one, and `force` is a procedural
+// continuous assignment. The message says "automatic variable" rather than
+// "automatic task variable" because `level` is not a variable of an automatic
+// task: `hold` is static, and §13.3.1 permits the `automatic` keyword on a
+// local inside it.
+TEST(ScopeAndLifetimeElaboration, StaticTaskAutoVarForceIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module frc_holder;\n"
+      "  task static hold();\n"
+      "    automatic int level;\n"
+      "    force level = 1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic variable in procedural continuous "
+                            "assignment",
+                            4, "6.21"));
+}
+
+// `assign` is the other procedural continuous assignment statement, and §6.21
+// reaches it through the same sentence that reaches `force`. It is pinned apart
+// from StaticTaskAutoVarForceIsError so that a change routing only one of the
+// two statement kinds to the check shows up. §13.3.2's own bullet names both,
+// "They shall not be referenced by assign or force procedural continuous
+// assignments", and applies to neither statement here, since `latch_it` is a
+// static task.
+TEST(ScopeAndLifetimeElaboration, StaticTaskAutoVarProcAssignIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module pca_holder;\n"
+      "  task static latch_it();\n"
+      "    automatic int keep;\n"
+      "    assign keep = 1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic variable in procedural continuous "
+                            "assignment",
+                            4, "6.21"));
+}
+
+// §6.21 accepts this: "Variables declared inside a static task, function, or
+// block are local in scope and default to a static lifetime", so `total` is
+// static and no restriction on automatic variables reaches it. This is the
+// input that makes the five rejections above mean something. Without it a test
+// over `automatic int` passes whether the elaborator reads the declaration's
+// lifetime or assumes one from the task's.
+TEST(ScopeAndLifetimeElaboration, StaticTaskDefaultLifetimeVarNonblockingOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module dfl_holder;\n"
+      "  task static bump();\n"
+      "    int total;\n"
+      "    total <= 1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(ScopeAndLifetimeElaboration, AutoVarNonblockingInInitialIsError) {
   ElabFixture f;
   ElaborateSrc(
