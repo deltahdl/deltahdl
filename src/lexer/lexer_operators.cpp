@@ -4,20 +4,50 @@
 
 namespace delta {
 
+// Report the first position at or after `p` holding something other than white
+// space. §5.3 gives white space as blanks, tabs, newlines and formfeeds, which
+// is the set std::isspace answers for. Nothing is consumed, so a caller can ask
+// what stands after the white space and still decline to step over it.
+uint32_t Lexer::SkipWhitespaceFrom(uint32_t p) const {
+  while (p < source_.size() &&
+         std::isspace(static_cast<unsigned char>(source_[p]))) {
+    ++p;
+  }
+  return p;
+}
+
+// Decide what the apostrophe at the current position opens.
+//
+// The left brace and left parenthesis are looked for past any white space.
+// §5.3 rules that white space "shall be ignored except when they serve to
+// separate other lexical tokens", A.8.4 writes the cast as
+// `casting_type ' ( expression )` and A.6.7.1 writes `assignment_pattern ::=
+// ' { expression { , expression } }`, so the apostrophe and the bracket after
+// it are two terminals apiece and `int ' (x)` and `' {1, 2}` are legal.
+//
+// The single-bit forms are looked for at the next character only. A.8.7 writes
+// `unbased_unsigned_literal ::= '0 | '1 | 'x | 'X | 'z | 'Z`, six terminals
+// whole, so no white space stands inside one and `' 0` remains the error it is.
+// §5.7.1 forbids white space before the base format character in the same way,
+// which is why Lexer::ApostropheStartsBaseSpecifier reads past it only to let
+// Lexer::LexBasedNumber report the breach.
 Token Lexer::LexApostrophe() {
   char next = PeekChar();
-  if (next == '{') {
+  uint32_t after_space = SkipWhitespaceFrom(pos_ + 1);
+  char bracket = after_space < source_.size() ? source_[after_space] : '\0';
+  if (bracket == '{') {
     auto loc = MakeLoc();
     uint32_t start = pos_;
-    Advance();
-    Advance();
+    while (pos_ <= after_space) {
+      Advance();
+    }
     return MakeOp(TokenKind::kApostropheLBrace, loc, start);
   }
   if (next == '0' || next == '1' || next == 'x' || next == 'X' || next == 'z' ||
       next == 'Z') {
     return LexNumber();
   }
-  if (next == '(') {
+  if (bracket == '(') {
     auto loc = MakeLoc();
     uint32_t start = pos_;
     Advance();

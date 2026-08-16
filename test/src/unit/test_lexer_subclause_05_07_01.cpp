@@ -291,6 +291,17 @@ TEST(IntegerLiteralLexing, UnbasedUnsizedZeroKeepsItsOwnTokenKind) {
   EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
 }
 
+// A.8.7 writes `unbased_unsigned_literal ::= '0 | '1 | 'x | 'X | 'z | 'Z`, and
+// each of those six alternatives is a single terminal of the grammar. No white
+// space stands inside a terminal, so `' 0` is not an unbased unsigned literal
+// and the apostrophe reaches Lexer::LexOperator, which reports it. Widening the
+// lookahead in Lexer::LexApostrophe so that `int ' (x)` lexes as the cast of
+// A.8.4 must leave this rejection standing.
+TEST(IntegerLiteralLexing, UnbasedUnsizedZeroRejectsWhitespaceAfterApostrophe) {
+  EXPECT_TRUE(ReportedError(LexDiagnostics("' 0"), "unexpected character '''",
+                            1, "5.2"));
+}
+
 // §5.7.1 writes "The unsigned number token shall immediately follow the base
 // format, optionally preceded by white space", and its Example 1 gives the
 // size-less `'h 837FF` as a hexadecimal number. That white space stands after

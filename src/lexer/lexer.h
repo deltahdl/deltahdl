@@ -93,6 +93,7 @@ class Lexer {
 
   void SkipWhitespaceAndComments();
   bool SkipSpacesAndTabs();
+  uint32_t SkipWhitespaceFrom(uint32_t p) const;
   void ConsumeKeywordMarker();
   uint32_t SkipLineComment();
   uint32_t SkipBlockComment(SourceLoc start_loc);

@@ -143,6 +143,25 @@ TEST(CastOperatorParsing, IntCastAstFields) {
   ASSERT_NE(rhs->lhs, nullptr);
 }
 
+// A.8.4 writes the cast production as `cast ::= casting_type ' ( expression )`,
+// where the apostrophe and the `(` are separate terminals of the grammar. §5.3
+// rules that white space "shall be ignored except when they serve to separate
+// other lexical tokens", and a space between two terminals separates nothing
+// that was not already separate. `int ' (x)` is therefore the same cast as
+// `int'(x)` and parses to an ExprKind::kCast node.
+TEST(CastOperatorParsing, IntCastWithWhitespaceAroundApostrophe) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial y = int ' (x);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCast);
+}
+
 TEST(CastOperatorParsing, IntCastFromRealVar) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
