@@ -2,7 +2,7 @@
 
 #include <cstdio>
 #include <ctime>
-#include <ios>
+#include <iosfwd>
 
 #include "simulator/evaluation.h"
 #include "simulator/variable.h"
