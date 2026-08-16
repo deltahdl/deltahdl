@@ -43,6 +43,7 @@ class Parser {
   friend struct ParserPortHelpers;
   friend struct ParserAssertHelpers;
   friend struct ParserClassHelpers;
+  friend struct ParserClassOverrideHelpers;
   // Expect reports through the diagnostic engine and is reached from nowhere
   // but this class, so the only way to ask what it reports is from inside it.
   // Defined in test/src/unit/test_non_lrm_parser_expect.cpp.
