@@ -21,6 +21,29 @@
 # ============================================================
 ---
 CheckOptions:
+  # misc-include-cleaner emits two diagnostics and cannot be told to emit one:
+  # an include no symbol in the file uses, and a symbol the file reaches through
+  # a header some other header pulled in. IgnoreHeaders silences both for the
+  # headers it names, so what it names decides which of the two this repository
+  # runs the check for.
+  #
+  # Every header whose name ends in .h is ignored, which is every header under
+  # src/ and lib/. Their transitive use is deliberate: parser/ast.h says so in
+  # its own first line, holding the sub-headers "in dependency order so that
+  # #include "parser/ast.h" continues to provide" what a caller expects.
+  #
+  # Six standard headers are ignored by name -- utility, cstddef, string_view,
+  # cstdint, vector and string. Each is reached transitively across most of the
+  # tree, through the project headers above, for std::move, size_t, the sized
+  # integer types and the three containers; naming them silences 584 reports
+  # that would each add an include to a file that already compiles.
+  #
+  # Nothing else is ignored, and that is the point: the eleven headers #3116
+  # counted 71 unused includes of -- optional, unordered_set, unordered_map,
+  # sstream, set, map, deque, bitset, queue, functional and memory -- are all
+  # still reported, as is algorithm, which turned out to carry more unused
+  # includes than any of them.
+  misc-include-cleaner.IgnoreHeaders: '.*\.h$;.*utility$;.*cstddef$;.*string_view$;.*cstdint$;.*vector$;.*[^_]string$'
   readability-function-cognitive-complexity.Threshold: 15
   readability-function-size.LineThreshold: 200
   readability-function-size.NestingThreshold: 4
