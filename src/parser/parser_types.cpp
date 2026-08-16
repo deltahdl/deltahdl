@@ -258,22 +258,34 @@ std::vector<DataType> Parser::ParseTypeParamList() {
 void Parser::ParseNetStrength(DataType& dtype) {
   if (dtype.kind == DataTypeKind::kTrireg) {
     dtype.charge_strength = ParseChargeStrength();
-    return;
+    // §A.2.1.3 writes the two strengths as alternatives, `net_type
+    // [ drive_strength | charge_strength ]`, so a charge strength is the whole
+    // of the strength specification and nothing further belongs to it. Reading
+    // none is not the end of the specification, because §A.2.2.1 lists trireg
+    // among the net types and §6.3.2 restricts a drive strength only to a
+    // declaration that places a continuous assignment on the net. So fall
+    // through to the drive strength parse below, which ParseChargeStrength
+    // left the position for by restoring it.
+    if (dtype.charge_strength != 0) return;
+  } else {
+    if (!dtype.is_net || !Check(TokenKind::kLParen)) return;
+    // §6.3.2.1: the charge strength specification shall be used only with
+    // trireg nets. Read the specification here and report the rule it breaks,
+    // so the declarator list parses on and the report names the rule rather
+    // than the identifier the list did not find. The strength is not recorded
+    // on the type, because a net that may not carry one has none.
+    SourceLoc charge_loc = CurrentLoc();
+    if (ParseChargeStrength() != 0) {
+      diag_.Error(charge_loc,
+                  "charge strength can only be used with trireg nets",
+                  Subclause("6.3.2.1"));
+      return;
+    }
   }
-  if (!dtype.is_net || !Check(TokenKind::kLParen)) return;
-  // §6.3.2.1: the charge strength specification shall be used only with trireg
-  // nets. Read the specification here and report the rule it breaks, so the
-  // declarator list parses on and the report names the rule rather than the
-  // identifier the list did not find. The strength is not recorded on the type,
-  // because a net that may not carry one has none. ParseChargeStrength restores
-  // the position and returns 0 when the parenthesis opens anything else, so a
-  // drive strength still reaches the parse below.
-  SourceLoc charge_loc = CurrentLoc();
-  if (ParseChargeStrength() != 0) {
-    diag_.Error(charge_loc, "charge strength can only be used with trireg nets",
-                Subclause("6.3.2.1"));
-    return;
-  }
+  // Both paths above reach here with the position on whatever token they
+  // declined to read as a charge strength, which is a parenthesis on the
+  // non-trireg path and anything at all on the trireg one.
+  if (!Check(TokenKind::kLParen)) return;
   auto saved = lexer_.SavePos();
   Consume();
   if (IsStrengthToken(CurrentToken().kind)) {
