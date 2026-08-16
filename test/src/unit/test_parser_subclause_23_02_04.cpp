@@ -503,10 +503,10 @@ TEST(ModuleItemsParsing, ErrorUnclosedGenerateRegion) {
       "    wire w;\n"
       "endmodule\n");
   // §27.3 owns the generate region and expects its `endgenerate`. The region
-  // swallows the `endmodule` as a stray item first, so the keyword the region
-  // wants is missing at the end of the source, on line 5.
-  EXPECT_TRUE(
-      ReportedError(r.diags, "expected 'endgenerate', got EOF", 5, "27.3"));
+  // stops at the `endmodule` that closes the module holding it and leaves that
+  // keyword for §23.2, so the report stands on line 4.
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'endgenerate', got 'endmodule'",
+                            4, "27.3"));
 }
 
 // A net_alias module item is terminated by ';'.

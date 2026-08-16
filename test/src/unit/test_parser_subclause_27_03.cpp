@@ -49,10 +49,58 @@ TEST(GenerateRegion, MissingEndgenerateRejected) {
       "  generate\n"
       "    wire w;\n"
       "endmodule\n");
-  // The region swallows `endmodule` as a stray item first, so the report for
-  // the missing `endgenerate` stands at the end of the source, on line 5.
+  // The region stops at the `endmodule` that closes the module holding it, so
+  // the report for the missing `endgenerate` stands on that keyword, line 4.
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'endgenerate', got 'endmodule'",
+                            4, "27.3"));
+}
+
+// The `endmodule` the region stops at is left for Parser::ParseModuleDecl, so
+// the module finds the keyword it needs and reports nothing of its own. One
+// missing `endgenerate` draws one report.
+TEST(GenerateRegion,
+     MissingEndgenerateLeavesTheEnclosingEndmoduleToItsOwnProduction) {
+  auto r = Parse(
+      "module m;\n"
+      "  generate\n"
+      "    wire w;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'endgenerate', got 'endmodule'",
+                            4, "27.3"));
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
+// A.4.2 gives `generate_region ::= generate { generate_item } endgenerate`, so
+// a generate_block inside one is followed by the `endgenerate` closing the
+// region when its own `end` is missing. The §27.3 report names that keyword.
+TEST(GenerateRegion, MissingEndInAGenerateBlockNamesTheEndgenerate) {
+  auto r = Parse(
+      "module m;\n"
+      "  generate\n"
+      "    if (1) begin\n"
+      "      wire w;\n"
+      "  endgenerate\n"
+      "endmodule\n");
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected 'endgenerate', got EOF", 5, "27.3"));
+      ReportedError(r.diags, "expected 'end', got 'endgenerate'", 5, "27.3"));
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
+// A.4.2 gives `case_generate_construct ::= case ( constant_expression )
+// case_generate_item { case_generate_item } endcase` and puts a generate_block
+// in each case_generate_item, so a block left open in a case item is followed
+// by the `endcase` closing the construct.
+TEST(GenerateCaseConstruct, MissingEndInACaseItemNamesTheEndcase) {
+  auto r = Parse(
+      "module m;\n"
+      "  case (1)\n"
+      "    0: begin\n"
+      "      wire w;\n"
+      "  endcase\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'end', got 'endcase'", 5, "27.3"));
+  EXPECT_EQ(r.diags.size(), 1u);
 }
 
 TEST(GenerateRegion, OptionalRegionKeywordsProduceSameItems) {
