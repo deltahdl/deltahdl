@@ -168,6 +168,16 @@ Stmt* Parser::ParseStmt() {
 }
 
 Stmt* Parser::ParseStmtBody(std::string_view prefix_label) {
+  // §14.7: a clocking block is a declaration inside a module, interface,
+  // checker or program, never a statement, so one standing where a statement
+  // belongs is rejected before the switch rather than read as an expression.
+  // The three positions the sentence names are the ones that reach here.
+  if (AtClockingDecl()) {
+    RejectClockingDecl(
+        "a clocking block shall not be declared inside a function, task, or "
+        "procedural block");
+    return arena_.Create<Stmt>();
+  }
   switch (CurrentToken().kind) {
     case TokenKind::kKwBegin:
       return ParseBlockStmt(prefix_label);

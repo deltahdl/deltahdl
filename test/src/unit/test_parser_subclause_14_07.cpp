@@ -92,7 +92,7 @@ TEST(ClockingScopeParse, DefaultClockingInPackageRejected) {
 }
 
 TEST(ClockingScopeParse, InAnonymousProgramInPackageAccepted) {
-  // §24.9 permits an anonymous program inside a package; a clocking block
+  // §24.6 permits an anonymous program inside a package; a clocking block
   // there lives in a program scope, so §14.7's package prohibition does not
   // apply.
   EXPECT_TRUE(
@@ -105,24 +105,28 @@ TEST(ClockingScopeParse, InAnonymousProgramInPackageAccepted) {
               "endpackage\n"));
 }
 
+// §14.7: clocking blocks "cannot be declared inside functions, tasks, or
+// packages or outside all declarations in a compilation unit". A module
+// declaration precedes the clocking block so that the line the report names is
+// the `clocking` keyword rather than the first line of the source, which any
+// report standing at the start of the file would also name.
 TEST(ClockingScopeParse, AtCompilationUnitScopeRejected) {
-  // §14.7: a clocking block shall not be declared outside all declarations in
-  // a compilation unit.
-  // No report of the §14.7 rule exists at this scope: `clocking` opens no
-  // top-level declaration, so Parser::ParseTopLevel rejects it under §3.12.1.
   auto r = Parse(
+      "module m;\n"
+      "endmodule\n"
       "clocking cb @(posedge clk);\n"
       "  input data;\n"
       "endclocking\n");
-  EXPECT_TRUE(
-      ReportedError(r.diags, "expected top-level declaration", 1, "3.12.1"));
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "a clocking block shall not be declared outside all declarations in a "
+      "compilation unit",
+      3, "14.7"));
 }
 
+// §14.7 names the function among the scopes a clocking block cannot be
+// declared in.
 TEST(ClockingScopeParse, InFunctionRejected) {
-  // §14.7: a clocking block shall not be declared inside a function.
-  // No report of the §14.7 rule exists inside a subroutine: a function body
-  // holds statements, so Parser::ParsePrimaryExpr reads the `clocking` on
-  // line 3 as the start of an expression and reports §11.2.
   auto r = Parse(
       "module m;\n"
       "  function void f();\n"
@@ -131,13 +135,37 @@ TEST(ClockingScopeParse, InFunctionRejected) {
       "    endclocking\n"
       "  endfunction\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "a clocking block shall not be declared inside a function, task, or "
+      "procedural block",
+      3, "14.7"));
 }
 
+// One mistake draws one report. Parser::RejectClockingDecl reads the
+// declaration through its `endclocking` and discards it, so the function body
+// resumes at `endfunction` and nothing is left for a second rule to reject.
+// Before this, the tokens were read as an expression and drew a §11.2 report
+// that a source failing any other way would draw just as readily.
+TEST(ClockingScopeParse, InFunctionReportsExactlyOneError) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void f();\n"
+      "    clocking cb @(posedge clk);\n"
+      "      input data;\n"
+      "    endclocking\n"
+      "  endfunction\n"
+      "endmodule\n");
+  uint32_t errors = 0;
+  for (const auto& diag : r.diags) {
+    if (diag.severity == DiagSeverity::kError) ++errors;
+  }
+  EXPECT_EQ(errors, 1U);
+}
+
+// §14.7 names the task alongside the function. Both reach the same rejection,
+// because a task body and a function body both hold statements.
 TEST(ClockingScopeParse, InTaskRejected) {
-  // §14.7: a clocking block shall not be declared inside a task.
-  // As in InFunctionRejected: a task body holds statements, so the `clocking`
-  // on line 3 is read as the start of an expression and reported under §11.2.
   auto r = Parse(
       "module m;\n"
       "  task t();\n"
@@ -146,13 +174,17 @@ TEST(ClockingScopeParse, InTaskRejected) {
       "    endclocking\n"
       "  endtask\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "a clocking block shall not be declared inside a function, task, or "
+      "procedural block",
+      3, "14.7"));
 }
 
+// §14.7: "Multiple clocking blocks cannot be nested." The inner block stands
+// where a clocking_item belongs, and is rejected under the nesting rule rather
+// than read as a malformed clocking_item.
 TEST(ClockingScopeParse, NestedClockingRejected) {
-  // §14.7: multiple clocking blocks cannot be nested.
-  // The inner `clocking` stands where a clocking_item belongs, so
-  // Parser::ParseClockingDirection reports §14.3 rather than §14.7.
   auto r = Parse(
       "module m;\n"
       "  clocking outer @(posedge clk);\n"
@@ -161,34 +193,46 @@ TEST(ClockingScopeParse, NestedClockingRejected) {
       "    endclocking\n"
       "  endclocking\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedError(r.diags, "expected clocking direction", 3, "14.3"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "multiple clocking blocks cannot be nested", 3, "14.7"));
 }
 
+// §14.7: "A clocking block can only be declared inside a module, interface,
+// checker, or program". A class is none of the four.
 TEST(ClockingScopeParse, InClassRejected) {
-  // §14.7: a clocking block may be declared only inside a module, interface,
-  // checker, or program. A class is none of these, so a clocking block in a
-  // class body is not accepted.
-  // No report of the §14.7 rule exists in a class body: `clocking` opens no
-  // class member, so Parser::ParseClassMembers falls through to the property
-  // form and asks for the property name under §8.5, naming the `clocking`
-  // keyword it found there.
   auto r = Parse(
       "class c;\n"
       "  clocking cb @(posedge clk);\n"
       "    input data;\n"
       "  endclocking\n"
       "endclass\n");
-  EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got 'clocking'", 2, "8.5"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a clocking block shall not be declared inside a class", 2,
+      "14.7"));
 }
 
+// One mistake draws one report in a class body too: the class body resumes at
+// `endclass` rather than asking for a property name under §8.5 and then
+// rejecting each remaining token of the discarded declaration.
+TEST(ClockingScopeParse, InClassReportsExactlyOneError) {
+  auto r = Parse(
+      "class c;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endclass\n");
+  uint32_t errors = 0;
+  for (const auto& diag : r.diags) {
+    if (diag.severity == DiagSeverity::kError) ++errors;
+  }
+  EXPECT_EQ(errors, 1U);
+}
+
+// §14.7 makes a clocking block a declaration in one of four scopes, never a
+// procedural statement, so an initial block is not one of the places it may
+// stand. This is the third position that reaches the statement rejection,
+// beside the function and the task above.
 TEST(ClockingScopeParse, InProceduralBlockRejected) {
-  // §14.7: a clocking block is a declaration at module/interface/checker/
-  // program level, not a procedural statement, so it cannot appear inside an
-  // initial block.
-  // As in InFunctionRejected: the `clocking` on line 3 stands where a
-  // statement belongs and is read as the start of an expression, so the
-  // report is the §11.2 one.
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -197,7 +241,28 @@ TEST(ClockingScopeParse, InProceduralBlockRejected) {
       "    endclocking\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "a clocking block shall not be declared inside a function, task, or "
+      "procedural block",
+      3, "14.7"));
+}
+
+// §14.7 permits a clocking block anywhere inside a module, and a generate block
+// is inside one, so none of the rejections above may reach it. The `global`
+// form is the one §14.14 bars from a generate block, and
+// GlobalClockingParse.GlobalClockingInGenerateBlockIsError in
+// test/src/unit/test_parser_subclause_14_14.cpp holds that separate rule.
+TEST(ClockingScopeParse, InGenerateBlockAccepted) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic clk;\n"
+              "  if (1) begin : g\n"
+              "    clocking cb @(posedge clk);\n"
+              "      input clk;\n"
+              "    endclocking\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ClockingScopeParse, MultipleBlocksInModule) {

@@ -558,6 +558,15 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
     Match(TokenKind::kSemicolon);
     return;
   }
+  // §14.7: a class is none of the four scopes a clocking block may be declared
+  // in, so one written as a class member is rejected here rather than falling
+  // through to the class property form, which would ask for a property name.
+  if (AtClockingDecl()) {
+    RejectClockingDecl(
+        "a clocking block shall not be declared inside a class; it can only be "
+        "declared inside a module, interface, checker, or program");
+    return;
+  }
   auto* member = arena_.Create<ClassMember>();
   member->loc = CurrentLoc();
   bool proto = ParseClassQualifiers(member);

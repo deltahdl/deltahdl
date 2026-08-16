@@ -496,6 +496,20 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
     return;
   }
   if (TryParseCuScopeItem(unit)) return;
+  ReportUnexpectedTopLevelToken();
+}
+
+// The current token opens no top-level declaration. §14.7 names one such token
+// outright — a clocking block "cannot be declared ... outside all declarations
+// in a compilation unit" — so that rule is reported before the general §3.12.1
+// one, which says only that the token was not expected here.
+void Parser::ReportUnexpectedTopLevelToken() {
+  if (AtClockingDecl()) {
+    RejectClockingDecl(
+        "a clocking block shall not be declared outside all declarations in a "
+        "compilation unit");
+    return;
+  }
   diag_.Error(CurrentLoc(), "expected top-level declaration",
               Subclause("3.12.1"));
   Consume();

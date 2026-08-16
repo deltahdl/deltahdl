@@ -48,6 +48,7 @@ class Parser {
   friend struct ParserExpectAccess;
 
   void ParseTopLevel(CompilationUnit* unit);
+  void ReportUnexpectedTopLevelToken();
   bool TryParsePrimaryTopLevel(CompilationUnit* unit);
   bool TryParseAnonymousProgram(CompilationUnit* unit);
   void ParseExternTopLevel(CompilationUnit* unit);
@@ -445,6 +446,8 @@ class Parser {
                           const std::vector<Attribute>& attrs);
 
   ModuleItem* ParseClockingDecl();
+  bool AtClockingDecl();
+  void RejectClockingDecl(std::string_view message);
   void ParseClockingItemList(ModuleItem* item);
   void ParseClockingItem(ModuleItem* item);
   void ParseClockingDefaultSkews(ModuleItem* item);

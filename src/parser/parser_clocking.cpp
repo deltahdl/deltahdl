@@ -76,7 +76,7 @@ ModuleItem* Parser::ParseClockingDecl() {
 
   // §14.7: a clocking block can only be declared inside a module, interface,
   // checker, or program; it shall not be declared inside a package. An
-  // anonymous program (§24.9) may legally appear in a package, and a clocking
+  // anonymous program (§24.6) may legally appear in a package, and a clocking
   // block within that program is itself in a program scope, so the package
   // restriction does not apply there.
   if (package_body_depth_ > 0 && !in_anonymous_program_) {
@@ -128,8 +128,40 @@ ModuleItem* Parser::ParseClockingDecl() {
   return item;
 }
 
+// True when the next tokens open a clocking_declaration (Syntax 14-1): the bare
+// `clocking` keyword, or `default` or `global` followed by it. Both `default`
+// and `global` open other declarations as well, so deciding needs the token
+// behind them; the lexer position is restored either way.
+bool Parser::AtClockingDecl() {
+  if (Check(TokenKind::kKwClocking)) return true;
+  if (!Check(TokenKind::kKwDefault) && !Check(TokenKind::kKwGlobal)) {
+    return false;
+  }
+  auto saved = lexer_.SavePos();
+  Consume();
+  bool is_clocking = Check(TokenKind::kKwClocking);
+  lexer_.RestorePos(saved);
+  return is_clocking;
+}
+
+// §14.7 rules that a clocking block "can only be declared inside a module,
+// interface, checker, or program", and that "Multiple clocking blocks cannot be
+// nested". Reports `message` at the `clocking` keyword, then reads the
+// declaration with Parser::ParseClockingDecl and discards it, so the enclosing
+// body resumes after `endclocking` instead of reporting the same tokens again
+// under whatever rule its own fallback happens to name. `message` states where
+// the block was found, which differs at every call site.
+void Parser::RejectClockingDecl(std::string_view message) {
+  diag_.Error(CurrentLoc(), std::string(message), Subclause("14.7"));
+  ParseClockingDecl();
+}
+
 void Parser::ParseClockingItemList(ModuleItem* item) {
   while (!Check(TokenKind::kKwEndclocking) && !AtEnd()) {
+    if (AtClockingDecl()) {
+      RejectClockingDecl("multiple clocking blocks cannot be nested");
+      continue;
+    }
     auto before = lexer_.SavePos().pos;
     ParseClockingItem(item);
     // Guard against a non-clocking_item token (e.g. a missing endclocking, so
