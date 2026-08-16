@@ -620,6 +620,22 @@ Expr* Parser::MakeMemberAccess(Expr* base) {
       IsMethodKeyword(CurrentToken().kind)
           ? Consume()
           : ExpectIdentifier(Subclause(is_scope ? "23.7.1" : "23.7"));
+  // §8.12: "It shall be illegal to use a typed constructor call for a shallow
+  // copy (see 8.8)." A.2.4 gives class_new the two alternatives
+  // `[ class_scope ] new [ ( list_of_arguments ) ]` and `new expression`, and
+  // only the second takes the copy source, so no legal parse puts an identifier
+  // after a class-scoped `new`. Consuming that source leaves the caller a
+  // well-formed scope resolution instead of an identifier standing where a
+  // terminator belongs, which is what drew the §12.3 report this replaces.
+  // `is_scope` is required because `super.new` is §8.17 and a `.new` member
+  // select is not a typed constructor call.
+  if (is_scope && member_tok.kind == TokenKind::kKwNew && CheckIdentifier()) {
+    diag_.Error(CurrentLoc(),
+                "a typed constructor call cannot take a shallow-copy source; "
+                "drop the class scope to copy an object with 'new'",
+                Subclause("8.12"));
+    ParseExpr();
+  }
   auto* member_id = arena_.Create<Expr>();
   member_id->kind = ExprKind::kIdentifier;
   member_id->text = member_tok.text;

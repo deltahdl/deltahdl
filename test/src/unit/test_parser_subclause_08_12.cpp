@@ -83,15 +83,13 @@ TEST(ClassAssignRenameParsing, DeepChainedMemberAccess) {
               "endmodule\n"));
 }
 
-// §8.12: it shall be illegal to use a typed constructor call for a shallow
-// copy. The plain shallow-copy form `new src` reads the trailing source-object
-// identifier as the object to copy, but a typed constructor call `C::new`
-// parses as a scope-resolved reference to the class's `new`; the grammar
-// provides no way to attach a copy-source argument to it. So `C::new src` has
-// no valid parse, and the trailing identifier is rejected -- the illegality is
-// enforced structurally at parse time rather than by a later semantic check.
-// The plain `c2 = new c1;` form (covered by ShallowCopyNewIdentifier) parses
-// cleanly, isolating the difference to the `C::` typed prefix.
+// §8.12 (printed page 188): "It shall be illegal to use a typed constructor
+// call for a shallow copy (see 8.8)." A.2.4 gives class_new the alternatives
+// `[ class_scope ] new [ ( list_of_arguments ) ]` and `new expression`, so the
+// copy source belongs to the alternative carrying no class scope. The plain
+// `c2 = new c1;` form is accepted by
+// ClassAssignRenameParsing.ShallowCopyNewIdentifier, which isolates the `C::`
+// prefix as the difference.
 TEST(ClassAssignRenameParsing, TypedConstructorShallowCopyRejected) {
   auto r = Parse(
       "class C;\n"
@@ -104,11 +102,68 @@ TEST(ClassAssignRenameParsing, TypedConstructorShallowCopyRejected) {
       "    c2 = C::new c1;\n"
       "  end\n"
       "endmodule\n");
-  // `C::new` completes the expression, so `c1` stands where the statement
-  // terminator belongs and Parser::ParseAssignmentOrExprStmt files the report
-  // under §12.3, the subclause stating that a statement ends in a semicolon.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a typed constructor call cannot take a shallow-copy source", 8,
+      "8.12"));
+}
+
+TEST(ClassAssignRenameParsing,
+     TypedConstructorShallowCopyReportsExactlyOneError) {
+  // Parser::MakeMemberAccess consumes the copy source, so the statement still
+  // finds its semicolon. `c1` used to stand where the terminator belongs and
+  // Parser::ParseAssignmentOrExprStmt reported it a second time under §12.3.
+  auto r = Parse(
+      "class C;\n"
+      "  int x;\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    C c1, c2;\n"
+      "    c1 = new;\n"
+      "    c2 = C::new c1;\n"
+      "  end\n"
+      "endmodule\n");
+  uint32_t errors = 0;
+  for (const auto& d : r.diags) {
+    if (d.severity == DiagSeverity::kError) errors++;
+  }
+  EXPECT_EQ(errors, 1U);
+}
+
+TEST(ClassAssignRenameParsing,
+     TypedConstructorShallowCopyInDeclarationRejected) {
+  // A declaration initializer reaches the expression parser from
+  // Parser::ParseBlockVarDecls rather than from
+  // Parser::ParseAssignmentOrExprStmt, so the assignment form above does not
+  // answer for it. ClassAssignRenameParsing.ShallowCopyInDeclaration accepts
+  // the same declaration written without the class scope.
+  auto r = Parse(
+      "class C;\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c1;\n"
+      "  initial begin\n"
+      "    C c2 = C::new c1;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a typed constructor call cannot take a shallow-copy source", 6,
+      "8.12"));
+}
+
+TEST(ClassAssignRenameParsing, TypedConstructorCallWithArgumentAccepted) {
+  // §8.8 (printed page 186): "Arguments may be passed to a typed constructor
+  // call if appropriate, just as for an ordinary constructor." Without this
+  // case the §8.12 report above is satisfied by refusing every class-scoped
+  // `new`, since the copy source is the only thing that makes one illegal.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected ';', got identifier", 8, "12.3"));
+      ParseOk("class C;\n"
+              "  int x;\n"
+              "endclass\n"
+              "module m;\n"
+              "  C c2;\n"
+              "  initial c2 = C::new(1);\n"
+              "endmodule\n"));
 }
 
 }  // namespace
