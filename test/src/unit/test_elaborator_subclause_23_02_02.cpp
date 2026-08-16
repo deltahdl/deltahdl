@@ -1,4 +1,6 @@
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -319,6 +321,41 @@ TEST(PortDeclaration, UnpackedArrayOfStructPortElaborates) {
   EXPECT_EQ(design->top_modules[0]->ports[0].type_kind, DataTypeKind::kStruct);
 }
 
+// Elaborate a one-module source declaring one port, and expect that port's
+// single unpacked dimension to read back with the bounds `left` and `right`.
+//
+// The four cases that call this differ only in the dimension each declares, and
+// stating the readback once is what leaves that difference the whole of each
+// case.
+void ExpectSolePortUnpackedBounds(const char* src, int64_t left,
+                                  int64_t right) {
+  SCOPED_TRACE(src);
+  ElabFixture f;
+  auto* design = ElaborateSrc(src, f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules[0]->ports.size(), 1u);
+  const auto& port = design->top_modules[0]->ports[0];
+  ASSERT_EQ(port.unpacked_dims.size(), 1u);
+  EXPECT_EQ(port.unpacked_dims[0].left, left);
+  EXPECT_EQ(port.unpacked_dims[0].right, right);
+}
+
+// The same for a source whose dimension is written as a size: expect the port
+// to record one unpacked dimension holding `size` elements.
+void ExpectSolePortUnpackedSize(const char* src, uint32_t size) {
+  SCOPED_TRACE(src);
+  ElabFixture f;
+  auto* design = ElaborateSrc(src, f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules[0]->ports.size(), 1u);
+  const auto& port = design->top_modules[0]->ports[0];
+  EXPECT_EQ(port.num_unpacked_dims, 1u);
+  ASSERT_EQ(port.unpacked_dim_sizes.size(), 1u);
+  EXPECT_EQ(port.unpacked_dim_sizes[0], size);
+}
+
 // §7.4.2: "Unpacked arrays shall be declared by specifying the element address
 // range(s) after the declared identifier", so `[1:4]` addresses elements 1
 // through 4. §11.5.2 makes those bounds decide what a select reads: "the
@@ -327,20 +364,12 @@ TEST(PortDeclaration, UnpackedArrayOfStructPortElaborates) {
 // of any kind, so this port and one declared `[0:3]` read back identically
 // after elaboration and `mem[1]` reaches a different element of each.
 TEST(PortDeclaration, UnpackedArrayPortRecordsItsAddressBounds) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
+  ExpectSolePortUnpackedBounds(
       "module m(\n"
       "  input logic [7:0] mem [1:4]\n"
       ");\n"
       "endmodule\n",
-      f, "m");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_EQ(design->top_modules[0]->ports.size(), 1u);
-  const auto& port = design->top_modules[0]->ports[0];
-  ASSERT_EQ(port.unpacked_dims.size(), 1u);
-  EXPECT_EQ(port.unpacked_dims[0].left, 1);
-  EXPECT_EQ(port.unpacked_dims[0].right, 4);
+      1, 4);
 }
 
 // §7.4.2: "[size] shall mean the same as [0:size-1]", so this port holds the
@@ -348,20 +377,12 @@ TEST(PortDeclaration, UnpackedArrayPortRecordsItsAddressBounds) {
 // than 1 through 4. RtlirPort records size 4 for both and no bound of any
 // kind, so the two declarations are indistinguishable once elaborated.
 TEST(PortDeclaration, UnpackedArrayPortDistinguishesTheSizeFormFromARange) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
+  ExpectSolePortUnpackedBounds(
       "module m(\n"
       "  input logic [7:0] mem [4]\n"
       ");\n"
       "endmodule\n",
-      f, "m");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_EQ(design->top_modules[0]->ports.size(), 1u);
-  const auto& port = design->top_modules[0]->ports[0];
-  ASSERT_EQ(port.unpacked_dims.size(), 1u);
-  EXPECT_EQ(port.unpacked_dims[0].left, 0);
-  EXPECT_EQ(port.unpacked_dims[0].right, 3);
+      0, 3);
 }
 
 // §7.4.2 on the two indices of a range specification: "The first value may be
@@ -371,20 +392,12 @@ TEST(PortDeclaration, UnpackedArrayPortDistinguishesTheSizeFormFromARange) {
 // declaration reads back exactly as `[1:4]` does and the order written is
 // lost.
 TEST(PortDeclaration, DescendingUnpackedArrayPortRecordsItsDeclaredOrder) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
+  ExpectSolePortUnpackedBounds(
       "module m(\n"
       "  input logic [7:0] mem [4:1]\n"
       ");\n"
       "endmodule\n",
-      f, "m");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_EQ(design->top_modules[0]->ports.size(), 1u);
-  const auto& port = design->top_modules[0]->ports[0];
-  ASSERT_EQ(port.unpacked_dims.size(), 1u);
-  EXPECT_EQ(port.unpacked_dims[0].left, 4);
-  EXPECT_EQ(port.unpacked_dims[0].right, 1);
+      4, 1);
 }
 
 // §7.4.2: "A fixed-size unpacked dimension may also be specified by a single
@@ -397,20 +410,12 @@ TEST(PortDeclaration, DescendingUnpackedArrayPortRecordsItsDeclaredOrder) {
 // for each dimension" -- because the synthesizer is never told the name is an
 // array, and it lowers `mem[2]` as a §11.5.1 bit-select of the one element.
 TEST(PortDeclaration, ParameterSizedUnpackedArrayPortFolds) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
+  ExpectSolePortUnpackedSize(
       "module m #(parameter int N = 4) (\n"
       "  input logic [7:0] mem [N]\n"
       ");\n"
       "endmodule\n",
-      f, "m");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_EQ(design->top_modules[0]->ports.size(), 1u);
-  const auto& port = design->top_modules[0]->ports[0];
-  EXPECT_EQ(port.num_unpacked_dims, 1u);
-  ASSERT_EQ(port.unpacked_dim_sizes.size(), 1u);
-  EXPECT_EQ(port.unpacked_dim_sizes[0], 4u);
+      4);
 }
 
 // The bound form of the same declaration. §7.4.2: "Each fixed-size unpacked
@@ -422,20 +427,12 @@ TEST(PortDeclaration, ParameterSizedUnpackedArrayPortFolds) {
 // address for each dimension" is again never reached, and the synthesizer
 // lowers `mem[2]` as a §11.5.1 bit-select of the one element.
 TEST(PortDeclaration, ParameterBoundedUnpackedArrayPortFolds) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
+  ExpectSolePortUnpackedBounds(
       "module m #(parameter int N = 4) (\n"
       "  input logic [7:0] mem [1:N]\n"
       ");\n"
       "endmodule\n",
-      f, "m");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_EQ(design->top_modules[0]->ports.size(), 1u);
-  const auto& port = design->top_modules[0]->ports[0];
-  ASSERT_EQ(port.unpacked_dims.size(), 1u);
-  EXPECT_EQ(port.unpacked_dims[0].left, 1);
-  EXPECT_EQ(port.unpacked_dims[0].right, 4);
+      1, 4);
 }
 
 // The same size expression on a non-ANSI port, whose parameter is declared in
@@ -448,17 +445,12 @@ TEST(PortDeclaration, ParameterBoundedUnpackedArrayPortFolds) {
 // supplying an address for each dimension" is never reached, and the
 // synthesizer lowers `mem[2]` as a §11.5.1 bit-select of the one element.
 TEST(PortDeclaration, BodyParameterSizedUnpackedArrayPortFolds) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
+  ExpectSolePortUnpackedSize(
       "module m(mem);\n"
       "  parameter int N = 4;\n"
       "  input logic [7:0] mem [N];\n"
       "endmodule\n",
-      f, "m");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_EQ(design->top_modules[0]->ports.size(), 1u);
-  EXPECT_EQ(design->top_modules[0]->ports[0].num_unpacked_dims, 1u);
+      4);
 }
 
 }  // namespace
