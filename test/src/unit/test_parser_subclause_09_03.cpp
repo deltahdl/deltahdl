@@ -289,8 +289,8 @@ TEST(BlockStatementParsing,
 }
 
 // §9.3 head negative: the same source, with nothing else left unterminated, and
-// the count is the claim rather than the report. A fork that swallowed the
-// `endcase` drew the §11.2 "expected expression" report on it and then left
+// the count is what this case adds. A fork that swallowed the `endcase` drew
+// the §11.2 "expected expression" report on it and then left
 // Parser::ParseCaseStmt to report the `endcase` missing under §12.5, three
 // reports for one missing join keyword.
 TEST(BlockStatementParsing,
@@ -303,6 +303,10 @@ TEST(BlockStatementParsing,
       "           a = 1;\n"
       "    endcase\n"
       "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "expected join, join_any or join_none to close the parallel block", 6,
+      "9.3.2"));
   EXPECT_EQ(r.diags.size(), 1u);
 }
 
