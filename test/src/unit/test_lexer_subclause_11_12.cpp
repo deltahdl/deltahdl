@@ -6,15 +6,14 @@ using namespace delta;
 
 namespace {
 
+// §5.6 rules that a keyword may not be used as a user-defined identifier, and
+// §11.12 makes `let` one. This fails when `let` lexes as anything other than
+// TokenKind::kKwLet, which covers the kIdentifier §5.6 rules out and every
+// other keyword kind a wrong lookup could return.
 TEST(LetKeywordLexing, LetKeyword) {
   auto r = LexOne("let");
   EXPECT_EQ(r.token.kind, TokenKind::kKwLet);
   EXPECT_EQ(r.token.text, "let");
-}
-
-TEST(LetKeywordLexing, LetIsNotIdentifier) {
-  auto r = LexOne("let");
-  EXPECT_NE(r.token.kind, TokenKind::kIdentifier);
 }
 
 TEST(LetKeywordLexing, LetPrefixIsIdentifier) {
@@ -23,15 +22,14 @@ TEST(LetKeywordLexing, LetPrefixIsIdentifier) {
   EXPECT_EQ(r.token.text, "letter");
 }
 
+// §5.6 rules that a keyword may not be used as a user-defined identifier, and
+// §11.12 makes `untyped` one. This fails when `untyped` lexes as anything
+// other than TokenKind::kKwUntyped, which covers the kIdentifier §5.6 rules
+// out and every other keyword kind a wrong lookup could return.
 TEST(LetKeywordLexing, UntypedKeyword) {
   auto r = LexOne("untyped");
   EXPECT_EQ(r.token.kind, TokenKind::kKwUntyped);
   EXPECT_EQ(r.token.text, "untyped");
-}
-
-TEST(LetKeywordLexing, UntypedIsNotIdentifier) {
-  auto r = LexOne("untyped");
-  EXPECT_NE(r.token.kind, TokenKind::kIdentifier);
 }
 
 TEST(LetKeywordLexing, UntypedPrefixIsIdentifier) {

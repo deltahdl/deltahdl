@@ -385,10 +385,14 @@ TEST(NumberTokenLexing, ErrorUnderscoreLeadingDigitValue) {
       "5.7.1"));
 }
 
+// A.8.7 writes `unbased_unsigned_literal ::= '0 | '1 | 'x | 'X | 'z | 'Z`, six
+// terminals whole, so no white space stands inside one and `' 1` is no
+// literal. Lexer::LexApostrophe leaves the apostrophe to Lexer::LexOperator,
+// which reports it. The case fails if the lexer accepts `' 1` as a literal, or
+// rejects it under some other rule than the §5.2 unexpected character.
 TEST(NumberTokenLexing, WhitespaceAfterApostropheNotUnbasedUnsized) {
-  auto tokens = Lex("' 1 ");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_NE(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral);
+  auto diags = LexDiagnostics("' 1 ");
+  EXPECT_TRUE(ReportedError(diags, "unexpected character '''", 1, "5.2"));
 }
 
 TEST(NumberTokenLexing, ErrorUnderscoreLeadingDigitValueHex) {
@@ -470,10 +474,15 @@ TEST(NumberTokenLexing, RealFracExpNoSign) {
   EXPECT_EQ(r.token.text, "1.5e10");
 }
 
+// A.8.7 lists `'0`, `'1`, `'x`, `'X`, `'z` and `'Z` and nothing else, so `'?`
+// is no unbased unsigned literal even though §5.7.1 admits ? as a value digit
+// after a base specifier. Lexer::LexApostrophe leaves the apostrophe to
+// Lexer::LexOperator, which reports it. The case fails if the lexer accepts
+// `'?` as a literal, or rejects it under some other rule than the §5.2
+// unexpected character.
 TEST(NumberTokenLexing, ApostropheQuestionNotUnbasedUnsized) {
-  auto tokens = Lex("'? ");
-  ASSERT_GE(tokens.size(), 1u);
-  EXPECT_NE(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral);
+  auto diags = LexDiagnostics("'? ");
+  EXPECT_TRUE(ReportedError(diags, "unexpected character '''", 1, "5.2"));
 }
 
 TEST(NumberTokenLexing, ErrorOctalValueLeadingUnderscore) {

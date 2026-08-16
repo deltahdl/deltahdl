@@ -213,10 +213,17 @@ TEST(IdentifierLexing, SimpleIdentAllowsTrailingUnderscores) {
   EXPECT_EQ(tokens[0].text, "foo___");
 }
 
+// §5.6 bars a digit from starting a simple identifier, so `9abc` is two
+// tokens: an integer literal ending at the digit, then the identifier the
+// letters spell. This fails if the lexer takes the whole of `9abc` as one
+// token, and it fails if the letters are dropped with the literal.
 TEST(IdentifierLexing, SimpleIdentFirstCharCannotBeDigit) {
   auto tokens = Lex("9abc");
-  ASSERT_GE(tokens.size(), 1u);
-  EXPECT_NE(tokens[0].kind, TokenKind::kIdentifier);
+  ASSERT_GE(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[0].text, "9");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].text, "abc");
 }
 
 TEST(IdentifierLexing, EscapedIdentifierTerminatedByTab) {

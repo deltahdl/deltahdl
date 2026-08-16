@@ -57,10 +57,21 @@ TEST(TimeLiteralLexing, SpaceSeparatesNumberAndUnit) {
   EXPECT_EQ(tokens[1].text, "ns");
 }
 
+// §5.8 gives the time unit as one of s, ms, us, ns, ps and fs, so `ns` followed
+// by more identifier characters is not one. Lexer::TryLexTimeSuffix() requires
+// a word boundary after the two-character suffix, so it declines `nsec` whole
+// rather than matching its `ns` prefix and stopping. The test fails if the
+// lexer takes that prefix, which leaves tokens[0] the time literal `1ns` and
+// tokens[1] the identifier `ec`, and it fails if `1nsec` is lexed as one token
+// of any kind.
 TEST(TimeLiteralLexing, NotTimeLiteralIfMoreChars) {
-  auto r = LexOne("1nsec ");
+  auto tokens = Lex("1nsec ");
+  ASSERT_GE(tokens.size(), 2u);
 
-  EXPECT_NE(r.token.kind, TokenKind::kTimeLiteral);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[0].text, "1");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].text, "nsec");
 }
 
 TEST(TimeLiteralLexing, ExponentFormatIsNotTimeLiteral) {

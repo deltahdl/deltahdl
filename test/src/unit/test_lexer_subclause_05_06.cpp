@@ -39,20 +39,39 @@ TEST(LexicalConventionLexing, SimpleIdentMixed) {
   EXPECT_EQ(r.token.text, "abc_123$xyz");
 }
 
+// §5.6: "The first character of a simple identifier shall not be a digit or
+// $". The lexer does not report `42abc`, it splits it: Lexer::Next() sends a
+// leading digit to Lexer::LexNumber(), which stops at `a` and yields the
+// integer literal `42`, and the identifier scan then takes `abc`. This fails
+// if the digit run is folded into one identifier token, or if the text of
+// either token moves the boundary between them.
 TEST(LexicalConventionLexing, DigitStartIsNumber) {
-  auto r = LexOne("42abc ");
-
-  EXPECT_NE(r.token.kind, TokenKind::kIdentifier);
+  auto tokens = Lex("42abc ");
+  ASSERT_GE(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[0].text, "42");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].text, "abc");
 }
 
+// §5.6 bars the leading $ from a simple identifier, and §5.6.3 rules that "A
+// name following the $ is interpreted as a system task or a system function".
+// This fails if `$abc` comes back as anything but the system identifier, or if
+// its text drops the `$` that decides the interpretation.
 TEST(LexicalConventionLexing, DollarStartIsNotIdentifier) {
   auto r = LexOne("$abc ");
-  EXPECT_NE(r.token.kind, TokenKind::kIdentifier);
+  EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(r.token.text, "$abc");
 }
 
+// §5.6: "A keyword (see 5.6.2) may not be used as a user-defined identifier."
+// Lexer::LexIdentifier() scans the word and hands it to LookupKeyword(), so
+// `module` comes back under its own kind rather than as an identifier. This
+// fails if the keyword table stops covering `module` for the version in force.
 TEST(LexicalConventionLexing, KeywordIsNotIdentifier) {
   auto r = LexOne("module ");
-  EXPECT_NE(r.token.kind, TokenKind::kIdentifier);
+  EXPECT_EQ(r.token.kind, TokenKind::kKwModule);
+  EXPECT_EQ(r.token.text, "module");
 }
 
 TEST(LexicalConventionLexing, CaseSensitive) {

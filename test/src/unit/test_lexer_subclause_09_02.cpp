@@ -44,13 +44,28 @@ TEST(StructuredProcedureLexing, AlwaysFFKeyword) {
   EXPECT_EQ(r.token.text, "always_ff");
 }
 
+// §5.6 rules that a keyword may not be used as a user-defined identifier, and
+// §9.2 makes these six the keywords of the structured procedures. Each source
+// is paired with the one TokenKind §9.2 gives it, so the test fails when a
+// keyword lexes as an identifier and equally when it lexes as another keyword:
+// a table mapping all six onto one enumerator goes red here.
 TEST(StructuredProcedureLexing, KeywordsAreNotIdentifiers) {
-  const char* keywords[] = {"initial",      "always",    "always_comb",
-                            "always_latch", "always_ff", "final"};
-  for (const auto* kw : keywords) {
-    std::string src = std::string(kw) + " ";
+  struct KeywordCase {
+    const char* text;
+    TokenKind kind;
+  };
+  const KeywordCase keywords[] = {
+      {"initial", TokenKind::kKwInitial},
+      {"always", TokenKind::kKwAlways},
+      {"always_comb", TokenKind::kKwAlwaysComb},
+      {"always_latch", TokenKind::kKwAlwaysLatch},
+      {"always_ff", TokenKind::kKwAlwaysFF},
+      {"final", TokenKind::kKwFinal},
+  };
+  for (const auto& kw : keywords) {
+    std::string src = std::string(kw.text) + " ";
     auto r = LexOne(src);
-    EXPECT_NE(r.token.kind, TokenKind::kIdentifier) << kw;
+    EXPECT_EQ(r.token.kind, kw.kind) << kw.text;
   }
 }
 
