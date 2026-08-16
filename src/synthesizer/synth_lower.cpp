@@ -104,24 +104,6 @@ NonSynthRule NonSynthExprRule(ExprKind kind) {
   }
 }
 
-// The signal of the first event-control term naming an event variable, or null
-// when no term names one. Waiting on a named event blocks the process until
-// something triggers it, and there is no hardware net to sense.
-static const Expr* NamedEventTrigger(const RtlirProcess& proc,
-                                     const RtlirModule* mod) {
-  for (const auto& ev : proc.sensitivity) {
-    const Expr* sig = ev.signal;
-    if (!sig || sig->kind != ExprKind::kIdentifier) continue;
-    for (const auto& var : mod->variables) {
-      if (var.name == sig->text) {
-        if (var.is_event) return sig;
-        break;
-      }
-    }
-  }
-  return nullptr;
-}
-
 // The first initial or final procedure the module declares, or null when it
 // declares neither. Which one comes first decides where the report below
 // stands, so a module holding several is reported at one it actually holds.
@@ -180,13 +162,13 @@ bool SynthLower::CheckSynthesizable(const RtlirModule* mod) {
       continue;
     }
     has_synth_content = true;
-    if (const Expr* ev = NamedEventTrigger(proc, mod)) {
+    if (const Expr* ev = NamedEventTerm(proc.sensitivity, mod)) {
       diag_.Error(ev->range.start,
                   "named event in event control is not synthesizable",
                   Subclause("15.5.2"));
       return false;
     }
-    if (!CheckStmtSynthesizable(proc.body)) return false;
+    if (!CheckStmtSynthesizable(proc.body, mod)) return false;
   }
   // An initial procedure executes once and a final procedure executes at the
   // end of simulation time, so neither describes hardware. Either is tolerated

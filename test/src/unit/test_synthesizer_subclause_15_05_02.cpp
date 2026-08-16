@@ -8,16 +8,15 @@ using namespace delta;
 
 namespace {
 
-// §15.5.2's report reaches a named event named in the sensitivity list an
-// `always` construct is built from, and not one named by an event control
-// standing as a statement inside the block. SynthLower::CheckSynthesizable
-// reads the list through NamedEventTrigger and reaches the statement through
-// CheckStmtSynthesizable, which knows the kind and not what the kind waits on,
-// so the source below draws the §9.4.2 report for an event control instead.
-// The case names that report rather than claiming coverage of §15.5.2 it does
-// not have.
+// §15.5.2's report reaches a named event whether the wait is written as the
+// sensitivity list an `always` construct is built from or as an event control
+// standing as a statement inside the block. SynthLower::CheckStmtSynthesizable
+// asks NamedEventTerm about the terms of a StmtKind::kEventControl before
+// NonSynthStmtRule, whose §9.4.2 entry covers every event control including
+// the edge-sensitive ones this synthesizer does lower into flip-flops. The
+// report stands at the event identifier.
 TEST(NamedEventWaitSynthesis,
-     NamedEventInEventControlStatementDrawsTheEventControlReport) {
+     NamedEventInEventControlStatementIsRejectedByName) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module m;\n"
@@ -30,14 +29,14 @@ TEST(NamedEventWaitSynthesis,
   auto* aig = synth.Lower(mod);
   EXPECT_EQ(aig, nullptr);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "event control is not synthesizable", 4, "9.4.2"));
+                            "named event in event control is not synthesizable",
+                            4, "15.5.2"));
 }
 
 // The bare `@ev` form of the event control reaches the same report as the
 // parenthesized `@(ev)` above, so neither spelling is the one that escapes
 // §15.5.2's report while the other is caught.
-TEST(NamedEventWaitSynthesis,
-     BareNamedEventControlStatementDrawsTheEventControlReport) {
+TEST(NamedEventWaitSynthesis, BareNamedEventControlStatementIsRejectedByName) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module m;\n"
@@ -50,7 +49,8 @@ TEST(NamedEventWaitSynthesis,
   auto* aig = synth.Lower(mod);
   EXPECT_EQ(aig, nullptr);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "event control is not synthesizable", 4, "9.4.2"));
+                            "named event in event control is not synthesizable",
+                            4, "15.5.2"));
 }
 
 // An `always` whose body is the null statement still has its sensitivity list

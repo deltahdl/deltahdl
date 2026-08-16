@@ -11,6 +11,33 @@
 
 namespace delta {
 
+// The signal of the first event-control term naming an event variable, or null
+// when no term names one. §15.5.2 rules that the `@` operator on a named event
+// blocks the process until something triggers it, so there is no hardware net
+// to sense.
+//
+// Stated over a list of terms rather than over a process, because the two
+// places that ask are an `always` construct's own sensitivity list and an event
+// control written as a statement inside it. Asked of the process alone, the
+// statement form fell through to §9.4.2's entry in NonSynthStmtRule and was
+// told that an event control is not synthesizable -- the subclause of the
+// construct rather than of what it waits on, which sends the reader looking for
+// a clock where the source names an event variable.
+const Expr* NamedEventTerm(const std::vector<EventExpr>& events,
+                           const RtlirModule* mod) {
+  for (const auto& ev : events) {
+    const Expr* sig = ev.signal;
+    if (!sig || sig->kind != ExprKind::kIdentifier) continue;
+    for (const auto& var : mod->variables) {
+      if (var.name == sig->text) {
+        if (var.is_event) return sig;
+        break;
+      }
+    }
+  }
+  return nullptr;
+}
+
 bool SynthLower::CheckExprSynthesizable(const Expr* expr) {
   if (!expr) return true;
   if (expr->kind == ExprKind::kSystemCall) {
@@ -98,8 +125,21 @@ static NonSynthRule NonSynthStmtRule(StmtKind kind) {
   }
 }
 
-bool SynthLower::CheckStmtSynthesizable(const Stmt* stmt) {
+bool SynthLower::CheckStmtSynthesizable(const Stmt* stmt,
+                                        const RtlirModule* mod) {
   if (!stmt) return true;
+  // Before NonSynthStmtRule, whose §9.4.2 entry covers every event control
+  // including the edge-sensitive ones this synthesizer does lower into
+  // flip-flops. A term naming an event variable breaks a different rule and
+  // gets the report the sensitivity-list form already gets.
+  if (stmt->kind == StmtKind::kEventControl) {
+    if (const Expr* ev = NamedEventTerm(stmt->events, mod)) {
+      diag_.Error(ev->range.start,
+                  "named event in event control is not synthesizable",
+                  Subclause("15.5.2"));
+      return false;
+    }
+  }
   NonSynthRule rule = NonSynthStmtRule(stmt->kind);
   if (!rule.message.empty()) {
     diag_.Error(stmt->range.start, std::string(rule.message),
@@ -114,13 +154,13 @@ bool SynthLower::CheckStmtSynthesizable(const Stmt* stmt) {
     return CheckExprSynthesizable(stmt->rhs);
   }
   if (stmt->kind == StmtKind::kBlock) {
-    return CheckBlockStmts(stmt);
+    return CheckBlockStmts(stmt, mod);
   }
   if (stmt->kind == StmtKind::kIf) {
-    return CheckIfSynth(stmt);
+    return CheckIfSynth(stmt, mod);
   }
   if (stmt->kind == StmtKind::kCase) {
-    return CheckCaseSynth(stmt);
+    return CheckCaseSynth(stmt, mod);
   }
   if (stmt->kind == StmtKind::kVarDecl ||
       stmt->kind == StmtKind::kBlockItemDecl) {
@@ -202,22 +242,22 @@ bool SynthLower::CheckInitializerOperands(const Expr* expr) {
   return true;
 }
 
-bool SynthLower::CheckBlockStmts(const Stmt* stmt) {
+bool SynthLower::CheckBlockStmts(const Stmt* stmt, const RtlirModule* mod) {
   for (const auto* s : stmt->stmts) {
-    if (!CheckStmtSynthesizable(s)) return false;
+    if (!CheckStmtSynthesizable(s, mod)) return false;
   }
   return true;
 }
 
-bool SynthLower::CheckIfSynth(const Stmt* stmt) {
+bool SynthLower::CheckIfSynth(const Stmt* stmt, const RtlirModule* mod) {
   return CheckExprSynthesizable(stmt->condition) &&
-         CheckStmtSynthesizable(stmt->then_branch) &&
-         CheckStmtSynthesizable(stmt->else_branch);
+         CheckStmtSynthesizable(stmt->then_branch, mod) &&
+         CheckStmtSynthesizable(stmt->else_branch, mod);
 }
 
-bool SynthLower::CheckCaseSynth(const Stmt* stmt) {
+bool SynthLower::CheckCaseSynth(const Stmt* stmt, const RtlirModule* mod) {
   for (const auto& ci : stmt->case_items) {
-    if (!CheckStmtSynthesizable(ci.body)) return false;
+    if (!CheckStmtSynthesizable(ci.body, mod)) return false;
   }
   return true;
 }

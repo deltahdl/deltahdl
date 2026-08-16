@@ -52,6 +52,14 @@ struct NonSynthRule {
 // report the identical expression draws on the right of an assignment.
 NonSynthRule NonSynthExprRule(ExprKind kind);
 
+// The signal of the first term of `events` naming an event variable of `mod`,
+// or null when none does. Defined in synth_lower_check.cpp; both the check of
+// an `always` construct's sensitivity list and the check of an event control
+// written as a statement ask it, so the two cannot come to disagree about which
+// identifiers name events.
+const Expr* NamedEventTerm(const std::vector<EventExpr>& events,
+                           const RtlirModule* mod);
+
 class SynthLower {
  public:
   SynthLower(Arena& arena, DiagEngine& diag);
@@ -70,7 +78,7 @@ class SynthLower {
   uint32_t LowerInsideRangeMatch(const Expr* sel_expr, const Expr* range,
                                  AigGraph& aig, uint32_t width);
 
-  bool CheckStmtSynthesizable(const Stmt* stmt);
+  bool CheckStmtSynthesizable(const Stmt* stmt, const RtlirModule* mod);
   bool CheckExprSynthesizable(const Expr* expr);
 
  private:
@@ -80,9 +88,9 @@ class SynthLower {
   bool CheckElementsSynthesizable(const Expr* expr);
 
   bool CheckSynthesizable(const RtlirModule* mod);
-  bool CheckBlockStmts(const Stmt* stmt);
-  bool CheckIfSynth(const Stmt* stmt);
-  bool CheckCaseSynth(const Stmt* stmt);
+  bool CheckBlockStmts(const Stmt* stmt, const RtlirModule* mod);
+  bool CheckIfSynth(const Stmt* stmt, const RtlirModule* mod);
+  bool CheckCaseSynth(const Stmt* stmt, const RtlirModule* mod);
   bool CheckDeclSynthesizable(const Stmt* stmt);
   bool CheckInitializerLowerable(const Expr* expr);
   bool CheckInitializerOperands(const Expr* expr);

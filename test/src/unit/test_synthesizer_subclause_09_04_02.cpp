@@ -106,4 +106,30 @@ TEST(EventControlSynthesis, EventControlStmtIsRejectedByName) {
                             "event control is not synthesizable", 6, "9.4.2"));
 }
 
+// §9.4.2 covers every event control, including the edge-sensitive ones this
+// synthesizer does lower into flip-flops, so an event control statement whose
+// terms name no event variable keeps this report. §15.5.2's report belongs to
+// the `@` operator applied to a named event, which has no net to sense, and
+// SynthLower::CheckStmtSynthesizable asks NamedEventTerm about the terms of the
+// statement before falling through to NonSynthStmtRule. The module declares an
+// event variable the statement does not wait on: a check that read the module's
+// variables rather than the statement's terms would answer §15.5.2 here, and
+// this case is what goes red when it does.
+TEST(EventControlSynthesis,
+     EdgeTermEventControlStmtKeepsTheEventControlReport) {
+  SynthFixture f;
+  auto* mod = ElaborateSrc(f,
+                           "module m;\n"
+                           "  event ev;\n"
+                           "  reg clk;\n"
+                           "  reg x;\n"
+                           "  always begin @(posedge clk) x = 0; end\n"
+                           "endmodule");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  EXPECT_EQ(synth.Lower(mod), nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "event control is not synthesizable", 5, "9.4.2"));
+}
+
 }  // namespace
