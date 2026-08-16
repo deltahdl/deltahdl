@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -73,44 +74,68 @@ TEST(CovergroupDeclParsing, CovergroupDecl_InClass) {
               "endclass\n"));
 }
 
-TEST(CovergroupDeclParsing, CovergroupDecl_WithExtends) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup child extends parent;\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
-TEST(CovergroupDeclParsing, CoverGroup_ExtendsWithBody) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup child extends parent;\n"
-              "    coverpoint z;\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
-TEST(CovergroupDeclParsing, CoverGroup_ExtendsASTVerification) {
+// A.2.11 gives covergroup_declaration two alternatives and no others: the
+// first names the covergroup and carries an optional port list and coverage
+// event, the second writes `covergroup extends covergroup_identifier ;` and
+// ends at the semicolon. Neither does both, so a name followed by `extends` is
+// a production the grammar does not have.
+TEST(CovergroupDeclParsing, NamedCovergroupWithExtendsIsRejected) {
   auto r = Parse(
       "module m;\n"
-      "  covergroup child_cg extends parent_cg;\n"
-      "    coverpoint z;\n"
-      "  endgroup : child_cg\n"
+      "  covergroup child extends parent;\n"
+      "  endgroup\n"
       "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCovergroupDecl);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "child_cg");
-  EXPECT_EQ(item->covergroup_extends_base, "parent_cg");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "a covergroup that declares its own name cannot also extend a base", 2,
+      "A.2.11"));
+}
+
+TEST(CovergroupDeclParsing, DerivedCovergroupTakesNoPortList) {
+  // §19.4.1 (printed page 581): "If the base covergroup has a list of arguments
+  // specified, the derived covergroup implicitly has the same list of
+  // arguments." So the derived one declares none of its own.
+  auto r = Parse(
+      "module m;\n"
+      "  covergroup extends base_cg (int x);\n"
+      "  endgroup\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a covergroup that extends a base declares no port list", 2,
+      "A.2.11"));
+}
+
+TEST(CovergroupDeclParsing, DerivedCovergroupTakesNoCoverageEvent) {
+  // §19.4.1 (printed page 581): "If the base covergroup has a coverage event
+  // specified, the derived covergroup shall use that coverage event." The
+  // second alternative admits no coverage_event, and this is the half of that
+  // rule the port-list case above cannot reach.
+  auto r = Parse(
+      "module m;\n"
+      "  covergroup extends base_cg @(posedge clk);\n"
+      "  endgroup\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a covergroup that extends a base declares no port list", 2,
+      "A.2.11"));
+}
+
+TEST(CovergroupDeclParsing, CovergroupDeclWithPortListAndNoExtends) {
+  // The first alternative does carry `[ ( [ tf_port_list ] ) ]`, so a fix that
+  // took the port list away from both alternatives instead of one goes red
+  // here rather than passing the two rejections above.
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg (int x);\n"
+              "  endgroup\n"
+              "endmodule\n"));
 }
 
 // covergroup_declaration's second alternative: `covergroup extends base ;`
 // names no new covergroup of its own. The parser takes the identifier that
 // follows `extends` as both the declared name and the inherited base, so a
-// derived covergroup written this way resolves under the base's name. This
-// branch is distinct from the `covergroup child extends parent ;` form, which
-// supplies a fresh name before `extends`.
+// derived covergroup written this way resolves under the base's name, which is
+// what §19.4.1 describes.
 TEST(CovergroupDeclParsing, CovergroupExtendsWithoutOwnName) {
   auto r = Parse(
       "module m;\n"

@@ -640,6 +640,27 @@ void Parser::ParseSampleFormalList(
   if (Check(TokenKind::kRParen)) Consume();
 }
 
+// Reports a port list or a coverage event written on a derived covergroup.
+// A.2.11 gives covergroup_declaration two alternatives, and the second,
+// `covergroup extends covergroup_identifier ;`, ends at the semicolon: the
+// optional `( tf_port_list )` and `coverage_event` belong to the first
+// alternative alone. §19.4.1 (printed page 581) says why the derived one needs
+// neither: "If the base covergroup has a list of arguments specified, the
+// derived covergroup implicitly has the same list of arguments", and "If the
+// base covergroup has a coverage event specified, the derived covergroup shall
+// use that coverage event." The token is left where it stands, so the shared
+// tail of Parser::ParseCovergroupDecl consumes it and one report covers the
+// whole declaration.
+void Parser::RejectDerivedCovergroupTail() {
+  if (Check(TokenKind::kLParen) || Check(TokenKind::kAt) ||
+      Check(TokenKind::kAtAt) || Check(TokenKind::kKwWith)) {
+    diag_.Error(CurrentLoc(),
+                "a covergroup that extends a base declares no port list and no "
+                "coverage event; it inherits the base's",
+                Subclause("A.2.11"));
+  }
+}
+
 void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kCovergroupDecl;
@@ -656,11 +677,23 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
     auto base = Expect(TokenKind::kIdentifier, Subclause("19.4.1"));
     item->name = base.text;
     item->covergroup_extends_base = base.text;
+    RejectDerivedCovergroupTail();
   } else {
     item->name = Expect(TokenKind::kIdentifier, Subclause("19.3")).text;
-    if (Match(TokenKind::kKwExtends)) {
-      item->covergroup_extends_base =
-          ExpectIdentifier(Subclause("19.4.1")).text;
+    // A.2.11's first alternative names the covergroup and carries no `extends`,
+    // and its second carries `extends` and names nothing of its own. No
+    // alternative does both, so an `extends` after a name is a production the
+    // grammar does not have. The base is read and discarded rather than
+    // recorded, because §19.4.1 gives the derived covergroup the base's own
+    // name and says nothing about what a fresh one would mean.
+    if (Check(TokenKind::kKwExtends)) {
+      diag_.Error(CurrentLoc(),
+                  "a covergroup that declares its own name cannot also extend "
+                  "a base; a derived covergroup is written "
+                  "'covergroup extends base;'",
+                  Subclause("A.2.11"));
+      Consume();
+      ExpectIdentifier(Subclause("19.4.1"));
     }
   }
 

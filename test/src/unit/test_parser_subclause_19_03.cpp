@@ -83,7 +83,7 @@ TEST(CovergroupParsing, CovergroupWithNoCoverageEvent) {
 TEST(CovergroupParsing, CovergroupExtendsInClass) {
   EXPECT_TRUE(ParseOk(R"(
     class C;
-      covergroup cg extends base_cg;
+      covergroup extends base_cg;
         coverpoint x;
       endgroup
     endclass

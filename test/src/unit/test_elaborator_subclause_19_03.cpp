@@ -13,23 +13,7 @@ TEST(CovergroupExtendsScope, ExtendsInModuleError) {
   ElabFixture f;
   ElabOk(
       "module m;\n"
-      "  covergroup cg extends base_cg;\n"
-      "  endgroup\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "a covergroup may only use 'extends' inside a class", 2, "19.3"));
-}
-
-// §19.3 (footnote 29): the named `covergroup child extends parent ;` spelling
-// is the same extends form and is likewise illegal outside a class.
-TEST(CovergroupExtendsScope, NamedExtendsInModuleError) {
-  ElabFixture f;
-  ElabOk(
-      "module m;\n"
-      "  covergroup child extends parent;\n"
-      "    coverpoint x;\n"
+      "  covergroup extends base_cg;\n"
       "  endgroup\n"
       "endmodule\n",
       f);
@@ -62,7 +46,7 @@ TEST(CovergroupExtendsScope, ExtendsInsideClassOk) {
              "  endgroup\n"
              "endclass\n"
              "class Derived extends Base;\n"
-             "  covergroup cg extends cg;\n"
+             "  covergroup extends cg;\n"
              "  endgroup\n"
              "endclass\n"
              "module m; endmodule\n"));
