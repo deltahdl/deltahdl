@@ -7,6 +7,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
@@ -440,6 +441,84 @@ static bool HasCycleDelay(const Stmt* s) {
   return false;
 }
 
+// One statement tree written in a module, together with the item that holds it.
+// The location is the item's, which is where a report about the whole tree
+// stands.
+struct ProceduralRoot {
+  const ModuleItem* item = nullptr;
+  const Stmt* body = nullptr;
+};
+
+// Every statement tree of `items`, including those a generate construct or a
+// subroutine holds rather than a process.
+//
+// §14.11 (printed page 361) states that "if no default clocking has been
+// specified for the current module, interface, checker, or program, then the
+// compiler shall issue an error", and §14.12 (printed page 361) makes one
+// clocking block the default "for all cycle delay operations within a given
+// module, interface, program, or checker". Neither rule is stated against a
+// process, and neither is the sentence that "cycle delay timing controls shall
+// not be legal for use in intra-assignment delays". So a ## written in a
+// generate block or in a task or function body of a module is judged by the
+// same default clocking as one written in an always block beside it, and a walk
+// that reads ModuleItem::body off the items of the module reaches only the
+// last of those.
+//
+// A generate construct holds its items in gen_body, in gen_else->gen_body and
+// in the body of each entry of gen_case_items, which is the shape
+// ValidateConstFuncCallsInGenerate walks at
+// src/elaborator/elaborator_validate_funcchecks.cpp:886. A task or a function
+// holds a vector of statements in func_body_stmts rather than the single body a
+// process holds, so each of those is a root of its own.
+static void CollectProceduralRoots(const std::vector<ModuleItem*>& items,
+                                   std::vector<ProceduralRoot>& out);
+
+// The statements of a task or function body, each a root of its own.
+static void CollectSubroutineRoots(const ModuleItem* item,
+                                   std::vector<ProceduralRoot>& out) {
+  for (const auto* stmt : item->func_body_stmts) {
+    if (stmt) out.push_back({item, stmt});
+  }
+}
+
+// The roots of every item a generate construct holds, in its then body, its
+// else body and each of its case arms.
+static void CollectGenerateRoots(const ModuleItem* item,
+                                 std::vector<ProceduralRoot>& out) {
+  CollectProceduralRoots(item->gen_body, out);
+  if (item->gen_else) CollectProceduralRoots(item->gen_else->gen_body, out);
+  for (const auto& ci : item->gen_case_items) {
+    CollectProceduralRoots(ci.body, out);
+  }
+}
+
+static void CollectProceduralRoots(const std::vector<ModuleItem*>& items,
+                                   std::vector<ProceduralRoot>& out) {
+  for (const auto* item : items) {
+    switch (item->kind) {
+      case ModuleItemKind::kAlwaysBlock:
+      case ModuleItemKind::kAlwaysCombBlock:
+      case ModuleItemKind::kAlwaysFFBlock:
+      case ModuleItemKind::kAlwaysLatchBlock:
+      case ModuleItemKind::kInitialBlock:
+      case ModuleItemKind::kFinalBlock:
+        if (item->body) out.push_back({item, item->body});
+        break;
+      case ModuleItemKind::kFunctionDecl:
+      case ModuleItemKind::kTaskDecl:
+        CollectSubroutineRoots(item, out);
+        break;
+      case ModuleItemKind::kGenerateIf:
+      case ModuleItemKind::kGenerateCase:
+      case ModuleItemKind::kGenerateFor:
+        CollectGenerateRoots(item, out);
+        break;
+      default:
+        break;
+    }
+  }
+}
+
 void Elaborator::ValidateCycleDelayDefaultClocking(const ModuleDecl* decl) {
   bool has_default = false;
   for (const auto* item : decl->items) {
@@ -450,18 +529,17 @@ void Elaborator::ValidateCycleDelayDefaultClocking(const ModuleDecl* decl) {
     }
   }
   if (has_default) return;
-  for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock ||
-                   item->kind == ModuleItemKind::kFinalBlock;
-    if (is_proc && item->body && HasCycleDelay(item->body)) {
-      diag_.Error(item->loc,
-                  "cycle delay (##) requires a default clocking block",
-                  Subclause("14.11"));
-    }
+  std::vector<ProceduralRoot> roots;
+  CollectProceduralRoots(decl->items, roots);
+  // A subroutine contributes one root per statement of its body, so a second ##
+  // in the same task would otherwise earn a second report at the same location.
+  const ModuleItem* reported = nullptr;
+  for (const auto& root : roots) {
+    if (root.item == reported || !HasCycleDelay(root.body)) continue;
+    reported = root.item;
+    diag_.Error(root.item->loc,
+                "cycle delay (##) requires a default clocking block",
+                Subclause("14.11"));
   }
 }
 
@@ -510,22 +588,20 @@ void Elaborator::ValidateIntraAssignCycleDelay(const ModuleDecl* decl) {
   const ClockvarPredicate kTargetsWritable = [this](const Expr* e) {
     return ExprTargetsWritableClockvar(e);
   };
-  for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock ||
-                   item->kind == ModuleItemKind::kFinalBlock;
-    if (is_proc && item->body) {
-      if (const Stmt* hit =
-              FindIntraAssignCycleDelay(item->body, kTargetsWritable)) {
-        diag_.Error(hit->range.start,
-                    "cycle delay (##) is not a legal intra-assignment delay "
-                    "in a blocking or nonblocking assignment",
-                    Subclause("14.11"));
-      }
-    }
+  std::vector<ProceduralRoot> roots;
+  CollectProceduralRoots(decl->items, roots);
+  // One report per item, as for the missing default clocking above: a
+  // subroutine contributes one root per statement of its body.
+  const ModuleItem* reported = nullptr;
+  for (const auto& root : roots) {
+    if (root.item == reported) continue;
+    const Stmt* hit = FindIntraAssignCycleDelay(root.body, kTargetsWritable);
+    if (hit == nullptr) continue;
+    reported = root.item;
+    diag_.Error(hit->range.start,
+                "cycle delay (##) is not a legal intra-assignment delay "
+                "in a blocking or nonblocking assignment",
+                Subclause("14.11"));
   }
 }
 

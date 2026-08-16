@@ -413,4 +413,129 @@ TEST(CycleDelayElab, SynchronousDriveWithCycleDelayNoError) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §14.11: "if no default clocking has been specified for the current module,
+// interface, checker, or program, then the compiler shall issue an error". The
+// sentence is stated against the module, not against a process, so an always
+// block that a generate if holds is judged by the same default clocking as one
+// written beside it. The report stands at the always keyword on line 3, the
+// location of the process item holding the cycle delay. A walk that reads
+// ModuleItem::body off the items of the module reaches no generate item's
+// gen_body, so the nested ## is accepted silently.
+TEST(CycleDelayElab, GenerateBlockWithoutDefaultClockingErrors) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  if (1) begin : g\n"
+      "    always begin\n"
+      "      ##5;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) requires a default clocking block", 3, "14.11"));
+}
+
+// §14.11: the same sentence -- "if no default clocking has been specified for
+// the current module, interface, checker, or program, then the compiler shall
+// issue an error" -- reaches a generate loop's body as readily as a generate
+// if's, and a loop is a different ModuleItemKind, so one walk has to cover
+// both. The report stands at the always keyword on line 3. Without that walk
+// the elaborator accepts the nested ## silently.
+TEST(CycleDelayElab, GenerateLoopWithoutDefaultClockingErrors) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  for (genvar i = 0; i < 2; i = i + 1) begin : g\n"
+      "    always begin\n"
+      "      ##5;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) requires a default clocking block", 3, "14.11"));
+}
+
+// §14.11: "cycle delay timing controls shall not be legal for use in
+// intra-assignment delays in either blocking or nonblocking assignment
+// statements". The sentence names no process, so an assignment in a task body
+// breaks the rule exactly as one in an initial block does. The report stands at
+// the assignment on line 6. A default clocking is present so the
+// missing-default-clocking rule stays silent. A walk that reads
+// ModuleItem::body reaches no subroutine's func_body_stmts, so the ## in the
+// task is accepted silently.
+TEST(CycleDelayElab, IntraAssignCycleDelayInTaskErrors) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  default clocking cb @(posedge clk);\n"
+      "    output data;\n"
+      "  endclocking\n"
+      "  task t;\n"
+      "    q = ##2 d;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) is not a legal intra-assignment delay", 6, "14.11"));
+}
+
+// §14.11: the same sentence -- "cycle delay timing controls shall not be legal
+// for use in intra-assignment delays in either blocking or nonblocking
+// assignment statements" -- covers a function body, and the subclause asserted
+// here is what distinguishes the rule that fired. §13.4 separately forbids a
+// time-controlling statement in a function, and the function-body checker in
+// src/elaborator/elaborator_validate_funcbody.cpp reports that one under
+// "13.4", so a §14.11 walk that never reached func_body_stmts would leave this
+// case with no 14.11 report at all. The report stands at the assignment on line
+// 6.
+TEST(CycleDelayElab, IntraAssignCycleDelayInFunctionErrors) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  default clocking cb @(posedge clk);\n"
+      "    output data;\n"
+      "  endclocking\n"
+      "  function void fn();\n"
+      "    q = ##2 d;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) is not a legal intra-assignment delay", 6, "14.11"));
+}
+
+// §14.11/§14.16: the intra-assignment prohibition reaches a task body, and the
+// synchronous-drive exemption has to travel with it. §14.16 makes a leading
+// cycle delay on a write to a clocking output variable a synchronous drive
+// rather than an intra-assignment delay, so this source is legal wherever the
+// drive is written. A walk that reached func_body_stmts while dropping the
+// clockvar test would reject a design the standard permits. There is no report
+// to name, so the assertion is that the source was accepted.
+TEST(CycleDelayElab, SynchronousDriveInTaskNoError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  default clocking cb @(posedge clk);\n"
+      "    output data;\n"
+      "  endclocking\n"
+      "  logic d;\n"
+      "  task t;\n"
+      "    cb.data <= ##2 d;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
