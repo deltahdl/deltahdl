@@ -270,4 +270,119 @@ TEST(SpecparamElaboration, SpecparamAssignedFromLocalparamSucceeds) {
   EXPECT_TRUE(found);
 }
 
+// The seven cases below reach a specparam through a child link of Expr other
+// than lhs and rhs. §6.20.5 forbids a parameter or localparam assigned a
+// constant expression that includes a specify parameter, and forbids a
+// specparam in the range specification of a declaration, whatever expression
+// form the reference is written in. Each case names the link it covers, so a
+// walk that stops following one of them fails exactly that case.
+
+// Covers Expr::condition.
+TEST(SpecparamElaboration, SpecparamInAParameterConditionalIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  specparam delay = 50;\n"
+      "  localparam lp = delay ? 1 : 0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameter references specparam 'delay'", 3,
+                            "6.20.5"));
+}
+
+// Covers Expr::args.
+TEST(SpecparamElaboration, SpecparamInAParameterCallArgumentIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  specparam delay = 50;\n"
+      "  function int f(int a); return a + 1; endfunction\n"
+      "  localparam lp = f(delay);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameter references specparam 'delay'", 4,
+                            "6.20.5"));
+}
+
+// Covers Expr::elements.
+TEST(SpecparamElaboration, SpecparamInAParameterConcatenationIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  specparam delay = 50;\n"
+      "  localparam lp = {delay, 1'b0};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameter references specparam 'delay'", 3,
+                            "6.20.5"));
+}
+
+// Covers Expr::repeat_count.
+TEST(SpecparamElaboration, SpecparamAsAParameterReplicationCountIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  specparam delay = 50;\n"
+      "  localparam lp = {delay{1'b0}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameter references specparam 'delay'", 3,
+                            "6.20.5"));
+}
+
+// Covers Expr::index, and Expr::base with it. `arr` is declared [63:0] so that
+// bit 50 is within it and Elaborator::ValidatePartSelectBounds has nothing to
+// report, leaving §6.20.5 the only rule the source breaks.
+TEST(SpecparamElaboration, SpecparamAsAParameterIndexIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  specparam delay = 50;\n"
+      "  logic [63:0] arr;\n"
+      "  localparam lp = arr[delay];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameter references specparam 'delay'", 4,
+                            "6.20.5"));
+}
+
+// Covers Expr::args reached from a declaration range, which is the second of
+// the two §6.20.5 rules and the other caller of the walk, so the message and
+// the location are those of CheckSpecparamInRange rather than of
+// Elaborator::ValidateSpecparamInParams.
+TEST(SpecparamElaboration, SpecparamInADeclarationRangeCallIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  specparam width = 8;\n"
+      "  function int f(int a); return a; endfunction\n"
+      "  logic [f(width)-1:0] data;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "specparam 'width' may not appear in a declaration "
+                            "range specification",
+                            4, "6.20.5"));
+}
+
+// An ordinary parameter in the conditional the first case above rejects. What
+// §6.20.5 forbids is a specify parameter, so a walk that reports every
+// identifier it reaches through a newly followed link fails here.
+TEST(SpecparamElaboration, ParameterInAConditionalStillSucceeds) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top();\n"
+      "  parameter width = 8;\n"
+      "  localparam lp = width ? 1 : 0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
