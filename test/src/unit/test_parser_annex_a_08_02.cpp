@@ -281,7 +281,7 @@ TEST(SubroutineCallSyntaxParsing, ErrorVoidCastMissingOpenParen) {
       "endmodule\n");
   // The parser never reaches the cast: an apostrophe not followed by '(' or a
   // base is no token of §5.6, so Lexer::LexOperator at
-  // src/lexer/lexer_operators.cpp:406 rejects the character itself. §6.24.1
+  // src/lexer/lexer_operators.cpp:396 rejects the character itself. §6.24.1
   // owns the cast operator's parentheses and has no report of its own here.
   EXPECT_TRUE(ReportedError(r.diags, "unexpected character '''", 3, "5.2"));
 }

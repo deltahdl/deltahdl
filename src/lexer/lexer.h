@@ -125,6 +125,7 @@ class Lexer {
 
   Token LexUnbasedUnsized(SourceLoc loc, uint32_t start);
   Token LexBasedNumber(SourceLoc loc, uint32_t start);
+  bool ApostropheStartsBaseSpecifier(uint32_t apostrophe_pos) const;
   void ValidateDecimalXZ(SourceLoc loc, char base_letter, uint32_t digit_start);
   void ValidateBaseDigits(SourceLoc loc, char base_letter,
                           uint32_t digit_start);

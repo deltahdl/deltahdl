@@ -230,4 +230,85 @@ TEST(IntegerLiteralLexing, ColumnAfterNumberAndTwoSpacesIsUnchanged) {
   EXPECT_EQ(tokens[1].loc.column, 4u);
 }
 
+// §5.7.1 composes a based literal of "up to three tokens—an optional size
+// constant, an apostrophe character (') followed by a base format character,
+// and the digits representing the value of the number", so a literal written
+// with no size constant is still a based literal. The sentence "The apostrophe
+// character and the base format character shall not be separated by any white
+// space" therefore governs `' h99` exactly as it governs `8' h99`.
+TEST(IntegerLiteralLexing, SizelessLiteralRejectsWhitespaceBeforeBaseFormat) {
+  EXPECT_TRUE(ReportedError(LexDiagnostics("' h99"),
+                            "white space shall not separate the apostrophe "
+                            "from the base format character",
+                            1, "5.7.1"));
+}
+
+// §5.7.1: the base format character is the letter, not the optional s/S signed
+// marker, so writing the marker tight against the apostrophe does not satisfy
+// the sentence. `'s h99` separates the apostrophe from the `h` by white space
+// and is rejected under the same rule as `' h99`.
+TEST(IntegerLiteralLexing,
+     SizelessSignedLiteralRejectsWhitespaceBeforeBaseFormat) {
+  EXPECT_TRUE(ReportedError(LexDiagnostics("'s h99"),
+                            "white space shall not separate the apostrophe "
+                            "from the base format character",
+                            1, "5.7.1"));
+}
+
+// §5.7.1 leaves `' h99` a based literal that breaks one of its rules, so the
+// lexer reports the white space and then lexes what was written: one
+// kIntLiteral token followed by the end of file, rather than the apostrophe
+// operator and identifier the source splits into when the apostrophe is left
+// to Lexer::LexOperator.
+TEST(IntegerLiteralLexing,
+     SizelessLiteralWithSpaceBeforeBaseLexesOneIntLiteral) {
+  auto tokens = Lex("' h99");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
+}
+
+// A.8.4 writes the cast production as `casting_type ' ( expression )`, where
+// the apostrophe is a token of its own and no base format character follows
+// it. Reading white space past the apostrophe to enforce §5.7.1 must not take
+// this form with it, and the size constant §5.7.1 makes optional is absent
+// here too, so the apostrophe stays a kApostrophe token with nothing before it.
+TEST(IntegerLiteralLexing, SizelessCastApostropheBeforeParenIsItsOwnToken) {
+  auto tokens = Lex("'(x)");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kApostrophe);
+}
+
+// §5.7.1 writes "An unsized unsigned single-bit value can be specified by
+// preceding the single-bit value with an apostrophe ('), but without the base
+// specifier", giving `'0`, `'1`, `'X`, `'x`, `'Z` and `'z`. They carry no base
+// format character at all, so the sentence "The apostrophe character and the
+// base format character shall not be separated by any white space" says nothing
+// about them, and routing `' h99` to Lexer::LexBasedNumber must leave `'0`
+// lexing as one kUnbasedUnsizedLiteral token.
+TEST(IntegerLiteralLexing, UnbasedUnsizedZeroKeepsItsOwnTokenKind) {
+  auto r = LexOne("'0");
+  EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
+}
+
+// §5.7.1 writes "The unsigned number token shall immediately follow the base
+// format, optionally preceded by white space", and its Example 1 gives the
+// size-less `'h 837FF` as a hexadecimal number. That white space stands after
+// the base format rather than before it, so the same route that reports the
+// separation §5.7.1 forbids must take this literal without a word: one
+// kIntLiteral spanning it, and nothing reported.
+TEST(IntegerLiteralLexing, SizelessLiteralAllowsWhitespaceBeforeDigits) {
+  EXPECT_TRUE(LexDiagnostics("'h 837FF").empty());
+}
+
+// The same literal of §5.7.1's Example 1, read for what it lexes to. The white
+// space before the digits is inside the literal rather than ending it, so the
+// digits belong to the number and not to an identifier after it.
+TEST(IntegerLiteralLexing, SizelessLiteralSpansTheDigitsAfterTheWhitespace) {
+  auto tokens = Lex("'h 837FF");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
+}
+
 }  // namespace

@@ -4,11 +4,6 @@
 
 namespace delta {
 
-static bool IsBaseSpecifier(char c) {
-  return c == 'h' || c == 'H' || c == 'd' || c == 'D' || c == 'b' || c == 'B' ||
-         c == 'o' || c == 'O';
-}
-
 Token Lexer::LexApostrophe() {
   char next = PeekChar();
   if (next == '{') {
@@ -29,13 +24,8 @@ Token Lexer::LexApostrophe() {
     return MakeOp(TokenKind::kApostrophe, loc, start);
   }
 
-  if (IsBaseSpecifier(next)) {
+  if (ApostropheStartsBaseSpecifier(pos_)) {
     return LexBasedNumber(MakeLoc(), pos_);
-  }
-  if (next == 's' || next == 'S') {
-    if (pos_ + 2 < source_.size() && IsBaseSpecifier(source_[pos_ + 2])) {
-      return LexBasedNumber(MakeLoc(), pos_);
-    }
   }
   return LexOperator();
 }

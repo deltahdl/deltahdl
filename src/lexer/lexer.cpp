@@ -144,40 +144,40 @@ bool PragmaAlreadyRecorded(const PragmaVec& recorded, SourceLoc loc) {
   return false;
 }
 
-// Decide whether the apostrophe at `apostrophe_pos` opens a size-prefixed
-// integer literal. The grammar requires the apostrophe to be followed by an
-// optional s/S signed marker and one of the base letters d/D/b/B/o/O/h/H.
-// Anything else — most importantly a left parenthesis or left brace — keeps the
-// apostrophe a separate token so that size'(expr) and size'{...}
-// cast/assignment-pattern forms tokenize correctly.
+}  // namespace
+
+// Decide whether the apostrophe at `apostrophe_pos` opens a based integer
+// literal. §5.7.1 makes the size constant optional, so both callers ask this:
+// Lexer::LexNumber of the apostrophe that follows a size, as in 8'h99, and
+// Lexer::LexApostrophe of an apostrophe written without one, as in 'h99. The
+// grammar requires an optional s/S signed marker and then one of the base
+// letters d/D/b/B/o/O/h/H. Anything else — most importantly a left
+// parenthesis or left brace — keeps the apostrophe a separate token so that
+// the '(expr) and '{...} cast and assignment-pattern forms tokenize
+// correctly.
 //
 // Spaces and tabs standing before the signed marker or before the base letter
-// are read past, so that `8' h99` reaches Lexer::LexBasedNumber and is reported
-// there against the §5.7.1 sentence forbidding white space between the
-// apostrophe and the base format character. Reading past white space decides
-// nothing on its own: what follows it still has to be a base letter. So the
-// answer stays false for `4'(x)` and `4' (x)`, for `4'{...}` and `4' {...}`,
-// and for the §5.7.1 unsized single-bit forms '0, '1, 'x and 'z, since a left
-// parenthesis, a left brace, a digit, an x and a z are none of them base
-// letters.
-bool ApostropheStartsBaseSpecifier(std::string_view source,
-                                   uint32_t apostrophe_pos) {
-  auto skip_spaces_and_tabs = [&source](uint32_t p) {
-    while (p < source.size() && (source[p] == ' ' || source[p] == '\t')) {
+// are read past, so that `8' h99` and `' h99` reach Lexer::LexBasedNumber and
+// are reported there against the §5.7.1 sentence forbidding white space
+// between the apostrophe and the base format character. What follows the white
+// space still has to be a base letter, so the answer stays false for `'(x)`
+// and `4' (x)`, for `'{...}` and `4' {...}`, and for the unsized single-bit
+// forms '0, '1, 'x and 'z.
+bool Lexer::ApostropheStartsBaseSpecifier(uint32_t apostrophe_pos) const {
+  auto skip_spaces_and_tabs = [this](uint32_t p) {
+    while (p < source_.size() && (source_[p] == ' ' || source_[p] == '\t')) {
       ++p;
     }
     return p;
   };
   uint32_t look = skip_spaces_and_tabs(apostrophe_pos + 1);
-  if (look < source.size() && (source[look] == 's' || source[look] == 'S')) {
+  if (look < source_.size() && (source_[look] == 's' || source_[look] == 'S')) {
     look = skip_spaces_and_tabs(look + 1);
   }
-  char base = (look < source.size()) ? source[look] : '\0';
+  char base = (look < source_.size()) ? source_[look] : '\0';
   return base == 'd' || base == 'D' || base == 'b' || base == 'B' ||
          base == 'o' || base == 'O' || base == 'h' || base == 'H';
 }
-
-}  // namespace
 
 Lexer::Lexer(std::string_view source, uint32_t file_id, DiagEngine& diag)
     : source_(source), file_id_(file_id), diag_(diag) {}
@@ -784,8 +784,7 @@ Token Lexer::LexNumber() {
   uint32_t column_before_ws = column_;
   SkipSpacesAndTabs();
 
-  if (!AtEnd() && Current() == '\'' &&
-      ApostropheStartsBaseSpecifier(source_, pos_)) {
+  if (!AtEnd() && Current() == '\'' && ApostropheStartsBaseSpecifier(pos_)) {
     return LexBasedNumber(loc, start);
   }
   pos_ = before_ws;
