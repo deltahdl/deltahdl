@@ -40,7 +40,7 @@ Longer: [clang-format](docs/claude/clang-format.md).
 
 Commit straight to `main`. There is no pull-request cycle, so CI is the only review buffer there is.
 
-Stage each file by explicit path. `git add -A` and `git add .` sweep untracked scratch directories into history.
+Stage each file by explicit path. `git add -A` and `git add .` sweep untracked scratch directories into history. Never name a removed path to `git add`, which stages none of its paths when one of them matches nothing on disk. Read the index back with `git status --porcelain` before committing.
 
 `Closes #N`, `Fixes #N` and their variants close the issue the moment the commit lands, brackets or not. Write the closing form as `Closes #N`, one per line: a keyword binds to a single `#N`, so a comma-separated list closes only its first issue. Write `Refs #N` or `See #N` when the commit only mentions an issue.
 
