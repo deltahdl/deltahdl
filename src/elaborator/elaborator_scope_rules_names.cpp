@@ -28,6 +28,25 @@ bool IsBuiltinTypeKeyword(std::string_view name) {
   return false;
 }
 
+// True for a call whose arguments name something other than a value the
+// enclosing scope declares, so that none of them is checked against it:
+//
+//   - an array manipulation method carrying a `with` clause. §7.12 gives
+//     `q.sum(x) with (x * 10)` the iterator name `x` through that argument, and
+//     §7.12.4 lets a second argument rename the index method, so both are
+//     declared at the call rather than read from the module.
+//   - randomize(). §18.11 rules that the arguments "designate the complete set
+//     of random variables" of the calling object, so each names a property of
+//     the object's class. Recognized in both the bare and the method-call form,
+//     as Parser::CheckRandomizeArgList recognizes it.
+bool CallArgsNameNoValue(const Expr* e) {
+  if (e->kind != ExprKind::kCall) return false;
+  if (e->with_expr != nullptr) return true;
+  if (e->callee == "randomize") return true;
+  return e->lhs != nullptr && e->lhs->kind == ExprKind::kMemberAccess &&
+         e->lhs->rhs != nullptr && e->lhs->rhs->text == "randomize";
+}
+
 }  // namespace
 
 // The operands of `e` that a value read could name. Three kinds of node hold an
@@ -63,7 +82,9 @@ static void CollectBareIdentOperands(const Expr* e,
   CollectBareIdents(e->true_expr, out);
   CollectBareIdents(e->false_expr, out);
   CollectBareIdents(e->repeat_count, out);
-  for (const auto* a : e->args) CollectBareIdents(a, out);
+  if (!CallArgsNameNoValue(e)) {
+    for (const auto* a : e->args) CollectBareIdents(a, out);
+  }
   for (const auto* el : e->elements) CollectBareIdents(el, out);
 }
 
