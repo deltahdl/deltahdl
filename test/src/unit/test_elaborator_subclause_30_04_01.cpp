@@ -96,10 +96,13 @@ TEST(SpecifyTerminalElaboration, RefPortAsTerminalErrors) {
       "  endspecify\n"
       "endmodule\n",
       f);
+  // §25.6 is where "A ref port cannot be used as a terminal in a specify block"
+  // is written, so this report names §25.6 rather than the two module path
+  // restrictions of §30.4.1, which mention no ref port.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "ref port 'r' cannot be used as a terminal in a specify block", 3,
-      "30.4.1"));
+      "25.6"));
 }
 
 TEST(SpecifyTerminalElaboration, RefPortAsDestinationErrors) {
@@ -114,11 +117,12 @@ TEST(SpecifyTerminalElaboration, RefPortAsDestinationErrors) {
       "endmodule\n",
       f);
   // The ref-port prohibition is checked before the direction rule the comment
-  // above describes, so this is what the destination side actually reports.
+  // above describes, so this is what the destination side actually reports, and
+  // it names §25.6, the subclause that sentence is written in.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "ref port 'r' cannot be used as a terminal in a specify block", 3,
-      "30.4.1"));
+      "25.6"));
 }
 
 TEST(SpecifyTerminalElaboration, UnconnectedSourceErrors) {

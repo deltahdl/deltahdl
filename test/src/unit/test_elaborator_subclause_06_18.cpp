@@ -321,9 +321,10 @@ TEST(UserDefinedTypeElaboration, UnresolvedForwardTypedefInModule_Error) {
       "endmodule\n",
       f);
   // Elaborator::ValidateForwardTypedefsInScope and
-  // Elaborator::ValidateForwardClassTypedefs emit this sentence word for word;
-  // the subclause is what separates them, and a forward typedef inside a module
-  // is the §6.18 one.
+  // Elaborator::ValidateForwardClassTypedefs emit this sentence word for word,
+  // both under §6.18. They walk disjoint item lists: the first a ModuleDecl's
+  // items, the second the compilation unit's. This forward typedef is inside a
+  // module, so only the first reaches it.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "forward typedef 'color_e' is never resolved by a "
                             "definition in the same scope",

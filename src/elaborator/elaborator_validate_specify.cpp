@@ -149,12 +149,17 @@ void CheckIfacePathTerminal(const IfaceTerminal& ift, const SpecifyTerminal& t,
 void CheckPathTerminalPort(const PortDecl* p, const SpecifyTerminal& t,
                            SourceLoc loc, const TerminalRole& tr,
                            DiagEngine& diag) {
+  // §25.6 is where "A ref port cannot be used as a terminal in a specify
+  // block" is written, and it states it once for both roles the block has:
+  // the same paragraph names the module paths and the timing checks together.
+  // §30.4.1 is the two module path restrictions, which name no ref port and
+  // are what the direction and net reports below enforce.
   if (p->direction == Direction::kRef) {
     diag.Error(loc,
                std::format("ref port '{}' cannot be used as a "
                            "terminal in a specify block",
                            t.name),
-               Subclause("30.4.1"));
+               Subclause("25.6"));
     return;
   }
   if (p->direction != tr.allowed_dir && p->direction != Direction::kInout) {
@@ -247,7 +252,7 @@ void CheckTimingTerminal(const SpecifyTerminal& t, SourceLoc loc,
                std::format("ref port '{}' cannot be used as a "
                            "terminal in a specify block",
                            t.name),
-               Subclause("31.2"));
+               Subclause("25.6"));
   }
 }
 

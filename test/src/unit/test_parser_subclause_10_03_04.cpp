@@ -112,10 +112,10 @@ TEST(DriveStrengthParsing, TwoStrength0KeywordsIsError) {
       "  assign (strong0, weak0) w = 1'b1;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(ReportedError(r.diags,
-                            "drive_strength requires one strength0 keyword and "
-                            "one strength1 keyword",
-                            3, "10.3.4"));
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "drive_strength on a continuous assignment requires one strength0", 3,
+      "10.3.4"));
 }
 
 // The mirror case: two strength-1 keywords leave the strength-0 slot unfilled.
@@ -126,10 +126,10 @@ TEST(DriveStrengthParsing, TwoStrength1KeywordsIsError) {
       "  assign (strong1, pull1) w = 1'b1;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(ReportedError(r.diags,
-                            "drive_strength requires one strength0 keyword and "
-                            "one strength1 keyword",
-                            3, "10.3.4"));
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "drive_strength on a continuous assignment requires one strength0", 3,
+      "10.3.4"));
 }
 
 // §10.3.4: on a net declaration the strength follows the net-type keyword and

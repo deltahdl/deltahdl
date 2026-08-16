@@ -329,7 +329,7 @@ static void CheckTaskBodyContAssign(
     auto name = ExprIdent(s->lhs);
     if (!name.empty() && auto_vars.count(name) != 0) {
       diag.Error(s->range.start,
-                 "automatic variable in procedural continuous assignment",
+                 "automatic task variable in procedural continuous assignment",
                  Subclause("13.3.2"));
     }
   }
@@ -622,7 +622,7 @@ static void CheckAutoVarWritesInProc(
     auto name = ExprIdent(s->lhs);
     if (!name.empty() && auto_vars.count(name) != 0) {
       diag.Error(s->range.start,
-                 "automatic variable in procedural continuous assignment",
+                 "automatic block variable in procedural continuous assignment",
                  Subclause("6.21"));
     }
   }

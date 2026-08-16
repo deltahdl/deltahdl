@@ -223,11 +223,12 @@ TEST(SpecifyRefTerminalRejected, RefPortRejectedAsPathSource) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  // The site that rejects a ref port terminal reports under §30.4.1.
+  // §25.6 states the prohibition once for both roles the specify block has, so
+  // the path-terminal site reports the subclause the sentence is written in.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "ref port 'r' cannot be used as a "
                             "terminal in a specify block",
-                            3, "30.4.1"));
+                            3, "25.6"));
 }
 
 // §25.6: a ref port cannot be used as a terminal in a specify block.
@@ -242,11 +243,12 @@ TEST(SpecifyRefTerminalRejected, RefPortRejectedAsPathDestination) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  // The site that rejects a ref port terminal reports under §30.4.1.
+  // §25.6 states the prohibition once for both roles the specify block has, so
+  // the path-terminal site reports the subclause the sentence is written in.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "ref port 'r' cannot be used as a "
                             "terminal in a specify block",
-                            3, "30.4.1"));
+                            3, "25.6"));
 }
 
 // §25.6: a ref port cannot be used as a terminal in a specify block. Terminal
@@ -261,11 +263,13 @@ TEST(SpecifyRefTerminalRejected, RefPortRejectedAsTimingCheckTerminal) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  // The site that rejects a ref port timing-check terminal reports under §31.2.
+  // §25.6 states the prohibition once for both roles the specify block has, so
+  // the timing-check terminal site reports the same subclause the path-terminal
+  // sites above do.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "ref port 'r' cannot be used as a "
                             "terminal in a specify block",
-                            3, "31.2"));
+                            3, "25.6"));
 }
 
 }  // namespace

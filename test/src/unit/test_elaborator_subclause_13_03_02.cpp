@@ -136,7 +136,8 @@ TEST(TaskBodyElaboration, AutoTaskLocalInForceError) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "automatic variable in procedural continuous assignment", 4, "13.3.2"));
+      "automatic task variable in procedural continuous assignment", 4,
+      "13.3.2"));
 }
 
 // §13.3.2: an automatic task variable shall not be the target of a procedural
@@ -153,7 +154,8 @@ TEST(TaskBodyElaboration, AutoTaskLocalInProceduralAssignError) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "automatic variable in procedural continuous assignment", 4, "13.3.2"));
+      "automatic task variable in procedural continuous assignment", 4,
+      "13.3.2"));
 }
 
 // §13.3.2: a static-task local may legally be forced; it is not deallocated.

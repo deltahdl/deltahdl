@@ -174,12 +174,16 @@ TEST(VectorSpecification, ConstantFunctionCallRange) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
+// A vector's range bound that is x or z is reported under §7.4.1, which states
+// the prohibition for "each packed dimension in a packed array declaration"
+// and so covers the one range a vector has. These two cases belong in this
+// file because the spelling under test is a vector's.
 TEST(VectorSpecification, XInRangeIsError) {
   ElabFixture f;
   Elaborate("module m; logic [1'bx:0] a; endmodule\n", f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "packed dimension range shall not contain x or z",
-                            1, "6.9.1"));
+                            1, "7.4.1"));
 }
 
 TEST(VectorSpecification, ZInRangeIsError) {
@@ -187,7 +191,7 @@ TEST(VectorSpecification, ZInRangeIsError) {
   Elaborate("module m; logic [1'bz:0] a; endmodule\n", f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "packed dimension range shall not contain x or z",
-                            1, "6.9.1"));
+                            1, "7.4.1"));
 }
 
 }  // namespace

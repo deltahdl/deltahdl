@@ -679,7 +679,15 @@ void Elaborator::ValidateForwardClassTypedefs() {
                   std::format("forward typedef '{}' is never resolved by a "
                               "definition in the same scope",
                               item->name),
-                  Subclause("8.27"));
+                  // §6.18 is the rule: "The actual data type definition of a
+                  // forward typedef declaration shall be resolved within the
+                  // same local scope or generate block." §8.27 restates it for
+                  // a forward class declaration and says so, opening "As with
+                  // other forward typedefs as described in 6.18". This loop
+                  // selects every forward form Parser::ParseTypedef leaves
+                  // implicit, a forward struct and a bare typedef included, so
+                  // §6.18 is the only clause covering what it reports.
+                  Subclause("6.18"));
     }
   }
 }

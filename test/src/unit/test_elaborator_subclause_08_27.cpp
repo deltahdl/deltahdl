@@ -37,13 +37,17 @@ TEST(ClassObjectElaboration, ForwardTypedefInterfaceClassOk) {
              "endmodule\n"));
 }
 
-// Elaborator::ValidateForwardClassTypedefs in
-// src/elaborator/elaborator_validate_classes.cpp is the site for a
-// compilation-unit forward typedef, and it passes Subclause("8.27"). A
-// scope-local one is reached instead by the site in
-// src/elaborator/elaborator_scope_rules_enclosing.cpp, whose message reads the
-// same but which passes Subclause("6.18"); the subclause is what tells the two
-// apart, so it is asserted alongside the message and the line.
+// §6.18 carries the rule: "The actual data type definition of a forward typedef
+// declaration shall be resolved within the same local scope or generate block."
+// §8.27 restates it for a forward class declaration and says so, opening "As
+// with other forward typedefs as described in 6.18", so both sites pass
+// Subclause("6.18"). Elaborator::ValidateForwardClassTypedefs in
+// src/elaborator/elaborator_validate_classes.cpp walks the compilation unit's
+// items and Elaborator::ValidateForwardTypedefsInScope in
+// src/elaborator/elaborator_scope_rules_enclosing.cpp walks a ModuleDecl's
+// items; the two lists are disjoint, and that is what tells the two sites
+// apart. This source declares its forward typedef at compilation-unit scope, so
+// only the first site reaches it.
 TEST(ClassObjectElaboration, UnresolvedForwardTypedefClassError) {
   ElabFixture f;
   ElabOk(
@@ -56,7 +60,7 @@ TEST(ClassObjectElaboration, UnresolvedForwardTypedefClassError) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "is never resolved by a definition in the same scope", 1, "8.27"));
+      "is never resolved by a definition in the same scope", 1, "6.18"));
 }
 
 // §8.27: the bare `typedef C2;` form is equivalent to `typedef class C2;` and
@@ -75,7 +79,7 @@ TEST(ClassObjectElaboration, UnresolvedBareForwardTypedefClassError) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "is never resolved by a definition in the same scope", 1, "8.27"));
+      "is never resolved by a definition in the same scope", 1, "6.18"));
 }
 
 TEST(ClassObjectElaboration, ForwardTypedefParameterizedClassOk) {

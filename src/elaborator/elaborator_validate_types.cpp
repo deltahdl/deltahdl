@@ -860,13 +860,21 @@ static bool HasPredefinedWidth(DataTypeKind kind) {
 }
 
 void Elaborator::ValidatePackedDimRange(const DataType& dtype, SourceLoc loc) {
+  // §7.4.1 states this for "each packed dimension in a packed array
+  // declaration", which covers the first dimension as squarely as the fifth,
+  // so the dimension a range was written on does not change the clause. §6.9.1
+  // states the same prohibition over a narrower subject, one range on a reg,
+  // logic or bit vector, and §7.4 makes that subject a one-dimensional packed
+  // array rather than a second rule. Nothing here reads the type kind or the
+  // dimension count, so §7.4.1 is the clause true of every declaration these
+  // three reports reach.
   if (dtype.packed_dim_left && ExprContainsXZ(dtype.packed_dim_left)) {
     diag_.Error(loc, "packed dimension range shall not contain x or z",
-                Subclause("6.9.1"));
+                Subclause("7.4.1"));
   }
   if (dtype.packed_dim_right && ExprContainsXZ(dtype.packed_dim_right)) {
     diag_.Error(loc, "packed dimension range shall not contain x or z",
-                Subclause("6.9.1"));
+                Subclause("7.4.1"));
   }
   for (const auto& [left, right] : dtype.extra_packed_dims) {
     if (ExprContainsXZ(left) || ExprContainsXZ(right)) {

@@ -1,4 +1,4 @@
-"""Report every subclause citation in src/ that names no clause."""
+"""Report a citation in src/ naming no clause, and a message naming two."""
 
 import sys
 

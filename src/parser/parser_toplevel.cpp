@@ -542,8 +542,8 @@ bool Parser::TryParseStrengthSpec(uint8_t& str0, uint8_t& str1) {
 
   if (str0 == 0 || str1 == 0) {
     diag_.Error(loc,
-                "drive_strength requires one strength0 keyword and "
-                "one strength1 keyword",
+                "drive_strength on a UDP instance requires one strength0 "
+                "keyword and one strength1 keyword",
                 Subclause("28.3.2"));
   }
   return true;

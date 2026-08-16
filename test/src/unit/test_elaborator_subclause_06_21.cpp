@@ -136,11 +136,14 @@ TEST(ScopeAndLifetimeElaboration, AutomaticVarForceInTaskIsError) {
       f);
   // The report stands under §13.3.2, not §6.21:
   // Elaborator::ValidateFunctionBody routes a task body to
-  // CheckTaskBodyContAssign, which names §13.3.2 for the same sentence
-  // CheckAutoVarWritesInProc names §6.21 for in a procedural block.
+  // CheckTaskBodyContAssign, which enforces the §13.3.2 sentence about
+  // variables declared in automatic tasks. CheckAutoVarWritesInProc enforces a
+  // different sentence, the §6.21 one about automatic variables in a procedural
+  // block, and each message names the construct its own sentence is scoped to.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "automatic variable in procedural continuous assignment", 4, "13.3.2"));
+      "automatic task variable in procedural continuous assignment", 4,
+      "13.3.2"));
 }
 
 TEST(ScopeAndLifetimeElaboration, AutomaticVarProceduralAssignInTaskIsError) {
@@ -153,10 +156,13 @@ TEST(ScopeAndLifetimeElaboration, AutomaticVarProceduralAssignInTaskIsError) {
       "  endtask\n"
       "endmodule\n",
       f);
-  // CheckTaskBodyContAssign again, so §13.3.2 rather than §6.21.
+  // CheckTaskBodyContAssign again, so the §13.3.2 sentence rather than the
+  // §6.21 one, and the message says "task variable" rather than "block
+  // variable".
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "automatic variable in procedural continuous assignment", 4, "13.3.2"));
+      "automatic task variable in procedural continuous assignment", 4,
+      "13.3.2"));
 }
 
 TEST(ScopeAndLifetimeElaboration, StaticVarForceInTaskSucceeds) {
@@ -200,7 +206,8 @@ TEST(ScopeAndLifetimeElaboration, AutoVarForceInInitialIsError) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "automatic variable in procedural continuous assignment", 4, "6.21"));
+      "automatic block variable in procedural continuous assignment", 4,
+      "6.21"));
 }
 
 TEST(ScopeAndLifetimeElaboration, AutoVarProcAssignInAlwaysIsError) {
@@ -216,7 +223,8 @@ TEST(ScopeAndLifetimeElaboration, AutoVarProcAssignInAlwaysIsError) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "automatic variable in procedural continuous assignment", 5, "6.21"));
+      "automatic block variable in procedural continuous assignment", 5,
+      "6.21"));
 }
 
 TEST(ScopeAndLifetimeElaboration, StaticVarNonblockingInInitialOk) {

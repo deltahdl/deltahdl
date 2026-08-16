@@ -114,12 +114,13 @@ TEST(SpecifyTerminalElaboration, RefPortRejectedAsInputIdentifier) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  // The same sentence is emitted for a timing-check terminal under §31.2; this
-  // names §30.4.1, the module-path rule the case is about.
+  // §25.6 states the ref-port prohibition once for both roles the specify block
+  // has, so a module path terminal reports the same subclause a timing-check
+  // terminal does, and it is the subclause the sentence is written in.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "ref port 'v' cannot be used as a terminal in a specify block", 3,
-      "30.4.1"));
+      "25.6"));
 }
 
 TEST(SpecifyTerminalElaboration, RefPortRejectedAsOutputIdentifier) {
@@ -131,12 +132,13 @@ TEST(SpecifyTerminalElaboration, RefPortRejectedAsOutputIdentifier) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  // The same sentence is emitted for a timing-check terminal under §31.2; this
-  // names §30.4.1, the module-path rule the case is about.
+  // §25.6 states the ref-port prohibition once for both roles the specify block
+  // has, so a module path terminal reports the same subclause a timing-check
+  // terminal does, and it is the subclause the sentence is written in.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "ref port 'v' cannot be used as a terminal in a specify block", 3,
-      "30.4.1"));
+      "25.6"));
 }
 
 // The first alternative of each production — input_identifier ::=

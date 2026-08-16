@@ -242,8 +242,8 @@ void Parser::ParseDriveStrength(uint8_t& s0, uint8_t& s1) {
 
   if (s0 == 0 || s1 == 0) {
     diag_.Error(loc,
-                "drive_strength requires one strength0 keyword and "
-                "one strength1 keyword",
+                "drive_strength on a continuous assignment requires one "
+                "strength0 keyword and one strength1 keyword",
                 Subclause("10.3.4"));
   }
 }

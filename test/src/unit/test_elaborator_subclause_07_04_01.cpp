@@ -117,11 +117,12 @@ TEST(PackedArrayValidation, PackedDimElaboratesWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
-// The rule that catches an x or z in the first packed dimension is §6.9.1, not
-// §7.4.1: Elaborator::ValidatePackedDimRange in
-// src/elaborator/elaborator_validate_types.cpp reports the left and right
-// bounds of the first dimension under §6.9.1, and only the bounds of a second
-// or later dimension under §7.4.1.
+// §7.4.1 states that the bounds of "each packed dimension in a packed array
+// declaration" may be "any integer value—positive, negative, or zero, with no
+// unknown (x) or high-impedance (z) bits", so it governs the first dimension
+// exactly as it governs a later one. These two cases put the x and the z in
+// the first dimension; XzInExtraPackedDim_Rejected puts one in a later
+// dimension.
 TEST(PackedArrayValidation, XzInPackedDimLeft_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -131,7 +132,7 @@ TEST(PackedArrayValidation, XzInPackedDimLeft_Rejected) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "packed dimension range shall not contain x or z",
-                            2, "6.9.1"));
+                            2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, XzInPackedDimRight_Rejected) {
@@ -143,7 +144,7 @@ TEST(PackedArrayValidation, XzInPackedDimRight_Rejected) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "packed dimension range shall not contain x or z",
-                            2, "6.9.1"));
+                            2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, XzInExtraPackedDim_Rejected) {
@@ -387,8 +388,8 @@ TEST(PackedArrayValidation, PackedDimLocalparamBoundWidth) {
 
 // §7.4.1: "Integer types with predefined widths shall not have packed array
 // dimensions declared. These types are byte, shortint, int, longint, integer,
-// and time." The subclause on the report is what tells this rejection from
-// §6.9.1's rule about a range bound that is x or z, which the same bracketed
+// and time." The message on the report is what tells this rejection from the
+// x-or-z rule §7.4.1 states for a range bound, which the same bracketed
 // dimension breaches when its bounds rather than its type are at fault. This
 // case reaches the check through ElabOk, which preprocesses the source first,
 // where PackedDimOnInt_Rejected reaches it through ElaborateSrc.
