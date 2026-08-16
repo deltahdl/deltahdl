@@ -843,4 +843,97 @@ bool Parser::ScanConstraintBodyToken(ClassMember* member, int& depth,
   return LeafClosesQualifier(t);
 }
 
+// §8.20's dynamic override specifiers, read one at a time so that what is
+// wrong with a sequence can be said in the sequence's own terms.
+//
+// The order is the grammar's, and the grammar is what a conforming source is
+// measured against. `dynamic_override_specifiers ::=
+// [ initial_or_extends_specifier ] [ final_specifier ]` is printed twice, in
+// Syntax 8-1 (printed page 181) and again in A.2.7 (printed page 1187), and
+// Annex A is titled "(normative) Formal syntax". §8.20 Example 3 prints the
+// opposite order, `virtual function :final :extends void f2();` under the
+// comment "OK: f2 shall not be overridden in subclasses of A" (printed page
+// 198), and no sentence anywhere in §8.20 or Syntax 8-1 says which order is
+// meant: the clause's rule for the pair is "final may be combined with either
+// initial or extends" (printed page 197), which names no order. The example is
+// illustrative and does not derive from the normative grammar, so the grammar
+// decides and the example is reported rather than followed.
+//
+// It is reported for what it is. Reading the specifiers in a loop is the point:
+// before it, `:final :extends` took `final` in the first position and left
+// `extends` standing where the name belongs, so Parser::ParseFuncName reported
+// a missing method name under §13.4 and told a reader nothing about the order.
+//
+// Three rules, all from the one production. At most one final_specifier. At
+// most one initial_or_extends_specifier, whose case of two different specifiers
+// the clause states in its own words -- "initial and extends are mutually
+// exclusive; specifying both in a method declaration shall result in an error"
+// -- and so keeps the message #3107 gave it. And final_specifier last.
+//
+// What a report leaves behind differs with what was wrong. A repeat is not
+// recorded, so ModuleItem::is_method_initial and ModuleItem::is_method_extends
+// cannot both end up true and Elaborator::ValidateOneMethodOverride is never
+// handed a pair the clause forbids. A misordered pair is recorded in full,
+// because each specifier is legal and means what it says; only the order is
+// not, and dropping one would hide a second defect behind the first. Either
+// way the specifier is consumed, which is what leaves the method name where
+// Parser::ParseFuncName expects it.
+//
+// A colon followed by anything else is left where it stands rather than
+// consumed, because the loop would otherwise eat every colon it met.
+void Parser::ParseDynamicOverrideSpecifiers(ModuleItem* item) {
+  bool saw_initial = false;
+  bool saw_extends = false;
+  bool saw_final = false;
+  while (Check(TokenKind::kColon)) {
+    auto saved = lexer_.SavePos();
+    Consume();
+    TokenKind spec = CurrentToken().kind;
+    if (spec != TokenKind::kKwInitial && spec != TokenKind::kKwExtends &&
+        spec != TokenKind::kKwFinal) {
+      lexer_.RestorePos(saved);
+      return;
+    }
+    auto spec_tok = Consume();
+
+    if (spec == TokenKind::kKwFinal) {
+      if (saw_final) {
+        diag_.Error(spec_tok.loc,
+                    "a method takes at most one ':final' specifier",
+                    Subclause("8.20"));
+        continue;
+      }
+      saw_final = true;
+      if (item) item->is_method_final = true;
+      continue;
+    }
+
+    if (saw_initial || saw_extends) {
+      bool changes_specifier =
+          spec == TokenKind::kKwExtends ? saw_initial : saw_extends;
+      diag_.Error(spec_tok.loc,
+                  changes_specifier
+                      ? "':initial' and ':extends' are mutually exclusive"
+                      : "a method takes at most one ':initial' or ':extends' "
+                        "specifier",
+                  Subclause("8.20"));
+      continue;
+    }
+
+    if (saw_final) {
+      diag_.Error(spec_tok.loc,
+                  "':final' is written after ':initial' or ':extends', not "
+                  "before it",
+                  Subclause("8.20"));
+    }
+    if (spec == TokenKind::kKwInitial) {
+      saw_initial = true;
+      if (item) item->is_method_initial = true;
+    } else {
+      saw_extends = true;
+      if (item) item->is_method_extends = true;
+    }
+  }
+}
+
 }  // namespace delta

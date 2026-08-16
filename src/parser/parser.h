@@ -333,7 +333,6 @@ class Parser {
   // Returns true and fills dt when an aggregate keyword was consumed.
   bool TryParseInlineAggregateType(DataType& dt);
   void ParseDynamicOverrideSpecifiers(ModuleItem* item);
-  void ParseOneOverrideSpecifier(ModuleItem* item);
   Direction ParseArgDirection(FunctionArg& arg, Direction sticky_dir,
                               bool* was_explicit = nullptr);
   void ParseFuncName(ModuleItem* item);
