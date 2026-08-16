@@ -87,6 +87,7 @@ Checks: >-
   cppcoreguidelines-avoid-goto,
   cppcoreguidelines-init-variables,
   cppcoreguidelines-slicing,
+  misc-include-cleaner,
   misc-redundant-expression,
   misc-unused-parameters,
   modernize-use-auto,
