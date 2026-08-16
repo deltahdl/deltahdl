@@ -746,4 +746,89 @@ TEST(NetsAndVariables, AProceduralAssignmentInAForkAloneIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements and §6.5 reads what they write exactly as it reads a begin-end
+// block's.
+TEST(NetsAndVariables,
+     ProceduralAssignmentInARandsequenceMixesWithAContAssign) {
+  ElabFixture f;
+  Elaborate(
+      "module top();\n"
+      "  logic x;\n"
+      "  assign x = 1'b0;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { x = 1'b1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'x' has both continuous and procedural assignments", 3, "6.5"));
+}
+
+// A.6.12's `rs_rule ::= rs_production_list [ := weight_specification [
+// rs_code_block ] ]` puts a second code block after the weight, which the
+// parser keeps in RsRule::weight_code rather than in RsProd::code_stmts. A walk
+// that reads only the production's own block leaves this one unreached.
+TEST(NetsAndVariables,
+     ProceduralAssignmentInARandsequenceWeightBlockMixesWithAContAssign) {
+  ElabFixture f;
+  Elaborate(
+      "module top();\n"
+      "  logic x;\n"
+      "  assign x = 1'b0;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : a := 5 { x = 1'b1; };\n"
+      "      a : { ; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'x' has both continuous and procedural assignments", 3, "6.5"));
+}
+
+// §6.5's other rule reads the same map, so a net assigned procedurally inside a
+// randsequence code block is reported for the same reason the mixture above is.
+TEST(NetsAndVariables, ProceduralAssignmentToANetInARandsequenceIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module top();\n"
+      "  wire w;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { w = 1'b1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "net 'w' cannot be the target of a procedural assignment", 5, "6.5"));
+}
+
+// The regression against a walk that reports on every statement it newly
+// reaches: a procedural assignment in a randsequence code block with no
+// continuous assignment beside it is the single driver §6.5 allows.
+TEST(NetsAndVariables, AProceduralAssignmentInARandsequenceAloneIsAccepted) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top();\n"
+      "  logic x;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { x = 1'b1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

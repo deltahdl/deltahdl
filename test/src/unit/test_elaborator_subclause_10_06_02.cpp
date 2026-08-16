@@ -302,4 +302,26 @@ TEST(ForceReleaseElaboration, ForceOfAWholeVariableInARandcaseArmIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a force in a randsequence production's code block is the same force
+// ForceBitSelectVariableLhsIsError above writes in a begin-end block, and
+// §10.6.2 rules on it the same way.
+TEST(ForceReleaseElaboration, ForceBitSelectVariableLhsInARandsequenceIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] data;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { force data[3] = 1'b1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "bit-select or part-select of a variable is not a legal force LHS", 5,
+      "10.6.2"));
+}
+
 }  // namespace

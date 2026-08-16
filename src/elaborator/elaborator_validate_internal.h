@@ -24,6 +24,37 @@ namespace delta {
 using TypeMap = std::unordered_map<std::string_view, DataTypeKind>;
 using NameSet = std::unordered_set<std::string_view>;
 
+// Hands `visit` every statement one rs_rule of a randsequence production holds.
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }` and reaches one from two places in an rs_rule: an rs_prod may be a code
+// block, whose statements the parser puts in RsProd::code_stmts, and a
+// weight_specification may be followed by one, whose statements go in
+// RsRule::weight_code. Both hold ordinary procedural statements, so a walker
+// whose rule reaches a statement reaches these.
+template <typename Visit>
+void ForEachRandsequenceRuleStmt(const RsRule& rule, Visit visit) {
+  for (const auto* sub : rule.weight_code) visit(sub);
+  for (const auto& prod : rule.prods) {
+    for (const auto* sub : prod.code_stmts) visit(sub);
+  }
+}
+
+// Hands `visit` every statement a randsequence statement holds, which is the
+// only thing Stmt::rs_productions carries that is a statement at all. Call it
+// from a walker that descends the other statement-holding fields of Stmt, so
+// that a rule holds inside a randsequence as it holds outside one. The nesting
+// is split across two functions because writing all four loops in one carries
+// it past the readability-function-cognitive-complexity threshold of 15 that
+// etc/clang_tidy/src.yml sets.
+template <typename Visit>
+void ForEachRandsequenceStmt(const Stmt* s, Visit visit) {
+  for (const auto& production : s->rs_productions) {
+    for (const auto& rule : production.rules) {
+      ForEachRandsequenceRuleStmt(rule, visit);
+    }
+  }
+}
+
 // Parses the size prefix of an integer literal's text (the digits before the
 // base tick "'"). Returns that width when present and positive, otherwise the
 // default unsized-literal width of 32. Defined in elaborator_validate.cpp.

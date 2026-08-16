@@ -310,12 +310,9 @@ static void CollectLhsBaseNames(
 // rule, so this descends every field of Stmt that holds a statement.
 // src/parser/ast_stmt.h declares thirteen: stmts, then_branch, else_branch,
 // for_inits, for_steps, for_body, case_items, fork_stmts, body,
-// assert_pass_stmt, assert_fail_stmt, randcase_items and rs_productions.
-// rs_productions is the one left out. It holds the statements of a randsequence
-// code block, which A.6.12 gives as `rs_code_block ::= { { data_declaration } {
-// statement_or_null } }`, and no walker anywhere in src/elaborator/ descends
-// it; #3165 covers that as its own defect rather than fixing it here for one
-// rule.
+// assert_pass_stmt, assert_fail_stmt, randcase_items and rs_productions. The
+// last holds the statements of a randsequence code block and is reached through
+// ForEachRandsequenceStmt, which reads the two places an rs_rule holds them.
 void CollectProcTargets(const Stmt* s,
                         std::unordered_map<std::string_view, SourceLoc>& out) {
   if (!s) return;
@@ -335,6 +332,8 @@ void CollectProcTargets(const Stmt* s,
   CollectProcTargets(s->assert_fail_stmt, out);
   for (auto& ci : s->case_items) CollectProcTargets(ci.body, out);
   for (auto& rc : s->randcase_items) CollectProcTargets(rc.second, out);
+  ForEachRandsequenceStmt(
+      s, [&out](const Stmt* sub) { CollectProcTargets(sub, out); });
 }
 
 // Records the variable each force or release statement names, for §10.6.2's
@@ -487,9 +486,8 @@ static void CheckForceLhsOperand(
 }
 
 // Reports §10.6.2's rule on what a force statement may name, at every statement
-// position a force can stand in. Descends the same twelve fields of Stmt as
-// CollectProcTargets above, and leaves out rs_productions for the reason stated
-// there.
+// position a force can stand in. Descends the same thirteen fields of Stmt as
+// CollectProcTargets above.
 void CheckForceLhs(
     const Stmt* s, const std::unordered_set<std::string_view>& net_names,
     const std::unordered_set<std::string_view>& nettype_net_names,
@@ -517,6 +515,9 @@ void CheckForceLhs(
     CheckForceLhs(ci.body, net_names, nettype_net_names, diag);
   for (auto& rc : s->randcase_items)
     CheckForceLhs(rc.second, net_names, nettype_net_names, diag);
+  ForEachRandsequenceStmt(s, [&](const Stmt* sub) {
+    CheckForceLhs(sub, net_names, nettype_net_names, diag);
+  });
 }
 
 // True when any expression of `list` reads one of the named nets.
