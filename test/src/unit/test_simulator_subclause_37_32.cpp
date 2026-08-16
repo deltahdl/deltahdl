@@ -14,18 +14,11 @@ namespace {
 // relations. These tests observe the production helpers in class_object.cpp and
 // the shared vpiAutomatic lifetime model from §37.3.7.
 
-// C1: the two typespec forms are modeled distinctly.
-TEST(ClassTypespec, KindDistinguishesLexicalAndSpecialization) {
-  ClassTypespecInfo lexical;
-  lexical.kind = ClassTypespecKind::kLexical;
-  ClassTypespecInfo spec;
-  spec.kind = ClassTypespecKind::kSpecialization;
-
-  EXPECT_NE(static_cast<int>(lexical.kind), static_cast<int>(spec.kind));
-}
-
-// C2: a lexical-only typespec does not support the member-collection relations;
-// a specialization does.
+// C1 + C2: §37.32 rules that a class typespec represents either a lexical
+// construct or a class specialization, and that the member-collection relations
+// are unsupported on one representing only a lexical construct. The two forms
+// are modeled distinctly here, in that VpiClassTypespecSupportsMembers is what
+// tells them apart: this fails when either form answers the other's way.
 TEST(ClassTypespec, LexicalTypespecDoesNotSupportMembers) {
   ClassTypespecInfo lexical;
   lexical.kind = ClassTypespecKind::kLexical;
