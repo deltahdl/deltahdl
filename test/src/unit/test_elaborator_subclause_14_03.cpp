@@ -177,7 +177,7 @@ TEST(ClockingBlockElab, NegativeParameterOutputSkewRejected) {
   // The skew is written on the output of clocking signal 'a', and naming the
   // output half is what this case claims that
   // ClockingBlockElab.NegativeConstantInputSkewRejected does not.
-  // MakeClockingSignal in src/parser/parser_clocking.cpp:26 stores an
+  // MakeClockingSignal in src/parser/parser_clocking.cpp stores an
   // output-only signal's skew in ClockingSignalDecl::skew_delay and leaves
   // out_skew_delay null, so the role a report names reads sig.direction rather
   // than the field the skew arrived in.

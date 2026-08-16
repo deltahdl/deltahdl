@@ -173,8 +173,9 @@ TEST(ModuleAndHierarchyParsing, ErrorNestedModuleMissingEndmodule) {
       "    wire w;\n"
       "endmodule\n");
   // The one `endmodule` closes `inner`, so `outer` runs to end of file and
-  // src/parser/parser.cpp:658 reports the missing keyword under §23.2, the
-  // subclause that owns module_declaration's terminator.
+  // Parser::ParseModuleDecl in src/parser/parser.cpp reports the missing
+  // keyword under §23.2, the subclause that owns module_declaration's
+  // terminator.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected 'endmodule', got EOF", 5, "23.2"));
 }

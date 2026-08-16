@@ -87,8 +87,8 @@ TEST(SystemVerilog2009KeywordElaboration, AddedLetDeclarationsReachTheDesign) {
 
   ElabFixture included;
   // `let` is an ordinary identifier under 1800-2005, so it heads the file
-  // where no top-level production can take it and Parser::ParseTopLevel
-  // reports at src/parser/parser.cpp:499.
+  // where no top-level production can take it and
+  // Parser::ReportUnexpectedTopLevelToken in src/parser/parser.cpp reports.
   ElaborateWithPreprocessorAllowingParseErrors(InSv2005(kSrc), included, "m");
   EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
                             "expected top-level declaration", LineInRegion(1),
@@ -130,8 +130,8 @@ TEST(SystemVerilog2009KeywordElaboration, AddedCheckerElementIsInstantiable) {
 
   ElabFixture included;
   // `checker` is an ordinary identifier under 1800-2005, so it heads the file
-  // where no top-level production can take it and Parser::ParseTopLevel
-  // reports at src/parser/parser.cpp:499.
+  // where no top-level production can take it and
+  // Parser::ReportUnexpectedTopLevelToken in src/parser/parser.cpp reports.
   ElaborateWithPreprocessorAllowingParseErrors(InSv2005(kSrc), included, "m");
   EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
                             "expected top-level declaration", LineInRegion(1),
@@ -201,8 +201,8 @@ TEST(SystemVerilog2009KeywordElaboration,
 
   // The addition leg: neither source exists under the included lists. `global`
   // is an ordinary identifier under 1800-2005, so the clocking block reads as
-  // one name followed by a keyword and the parser reports at
-  // src/parser/parser_items.cpp:712 rather than the elaborator.
+  // one name followed by a keyword and Parser::ParsePlainVarDecl in
+  // src/parser/parser_items.cpp reports rather than the elaborator.
   for (const auto& src : {kOne, kReference}) {
     ElabFixture included;
     ElaborateWithPreprocessorAllowingParseErrors(InSv2005(src), included, "m");
@@ -257,9 +257,9 @@ TEST(SystemVerilog2009KeywordElaboration,
 
   ElabFixture included;
   // `restrict` is an ordinary identifier under 1800-2005, so `restrict
-  // property` reads as a name followed by a keyword and the parser reports at
-  // src/parser/parser_items.cpp:712, the same site the `global clocking` leg
-  // above reaches.
+  // property` reads as a name followed by a keyword and
+  // Parser::ParsePlainVarDecl in src/parser/parser_items.cpp reports, the same
+  // site the `global clocking` leg above reaches.
   ElaborateWithPreprocessorAllowingParseErrors(InSv2005(kSrc), included, "m");
   EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
                             "expected ';', got 'property'", LineInRegion(4),

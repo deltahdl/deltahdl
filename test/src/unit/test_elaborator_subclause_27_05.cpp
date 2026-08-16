@@ -542,7 +542,7 @@ TEST(GenerateElaboration, ImportedParameterReachesItsOwnModulesGenerateIf) {
 // 16 on a's x says the import still reaches the module that wrote it, so the
 // case cannot pass by resolving no typedef anywhere. 0 on b's y is what
 // EvalTypeWidth answers for a DataTypeKind::kNamed it could not resolve
-// (src/elaborator/type_eval.cpp:192), and it is not the 1 that
+// (in src/elaborator/type_eval.cpp), and it is not the 1 that
 // RtlirVariable::width defaults to, so it says the declaration was elaborated
 // and its type went unresolved rather than that the block was dropped.
 //

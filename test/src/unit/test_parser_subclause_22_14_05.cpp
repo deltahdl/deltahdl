@@ -205,8 +205,8 @@ TEST(CompilerDirectiveParsing, Verilog2005AddedWordTypesEveryDeclarationForm) {
 
   // §6.8 owns both reports. A packed dimension is where the declaration was
   // meant to end, so with the word an ordinary identifier
-  // Parser::ParsePlainVarDecl reads it as a variable of an implicit type and
-  // demands the semicolon at src/parser/parser_items.cpp:712.
+  // Parser::ParsePlainVarDecl in src/parser/parser_items.cpp reads it as a
+  // variable of an implicit type and demands the semicolon.
   auto assigned =
       ParseWithPreprocessor(In2001("module m;\n"
                                    "  reg   [7:0] src;\n"

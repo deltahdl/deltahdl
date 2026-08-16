@@ -17,8 +17,8 @@ class TestReportedSubclauses:
     ) -> None:
         """reported_subclauses() should list what the diagnostics named.
 
-        DiagEngine::Emit at src/common/diagnostic.cpp:47 appends the subclause
-        of IEEE 1800-2023 a diagnostic enforces to its message, as (§11.4.14).
+        DiagEngine::Emit in src/common/diagnostic.cpp appends the subclause of
+        IEEE 1800-2023 a diagnostic enforces to its message, as (§11.4.14).
         """
         stderr = (
             "a.sv:1:1: error: enum has an x assignment (§6.19)\n"
@@ -31,8 +31,9 @@ class TestReportedSubclauses:
     ) -> None:
         """A report built with Subclause::None() enforces no rule of the standard.
 
-        src/common/diagnostic.h:26 reserves it for a fact about the run, such
-        as a file that cannot be opened, and 26 sites under src/ use it.
+        Subclause::None in src/common/diagnostic.h reserves it for a fact about
+        the run, such as a file that cannot be opened, and 26 sites under src/
+        use it.
         """
         stderr = "a.sv:1:1: error: cannot open include file 'x.svh'\n"
         assert rst.reported_subclauses(stderr) == []

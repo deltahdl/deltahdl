@@ -285,7 +285,7 @@ BuildSpecializationSubst(const ClassDecl* cls,
 // repeated name leaves the last argument standing. Both of those are types
 // nobody wrote, which is what the reports stand in place of.
 //
-// ResolveNamedInstParams at src/elaborator/elaborator_module_inst.cpp:436 makes
+// ResolveNamedInstParams in src/elaborator/elaborator_module_inst.cpp makes
 // the first of these reports for a module instance, and the wording here
 // follows it so that the two forms of one rule read alike.
 static void ValidateSpecializationArgNames(const ClassDecl* cls,

@@ -616,8 +616,8 @@ TEST(KeywordVersionPreprocessing, EndKeywordsInIncludedFileClosesRegion) {
 // That text is written straight after the version byte, because
 // Preprocessor::HandleBeginKeywords and Preprocessor::HandleEndKeywords in
 // src/preprocessor/preprocessor_directives.cpp write the keyword marker and the
-// version byte and nothing else. Lexer::ConsumeKeywordMarker at
-// src/lexer/lexer.cpp:436 consumes a newline only when one follows the version
+// version byte and nothing else. Lexer::ConsumeKeywordMarker in
+// src/lexer/lexer.cpp consumes a newline only when one follows the version
 // byte, which is what keeps the text on the marker's own line lexable.
 TEST(KeywordVersionPreprocessing, SourceOnTheDirectiveLineIsOrdinarySource) {
   PreprocFixture f;

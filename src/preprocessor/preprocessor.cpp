@@ -103,8 +103,8 @@ std::string Preprocessor::Preprocess(uint32_t file_id) {
   auto content = src_mgr_.FileContent(file_id);
   // The table accumulates across calls rather than starting afresh, because a
   // driver given several source files concatenates what each call returns:
-  // src/main.cpp:393 appends to one string, so the origins of the whole of it
-  // are what describe the text the lexer is handed.
+  // PreprocessSources in src/main.cpp appends to one string, so the origins of
+  // the whole of it are what describe the text the lexer is handed.
   recording_origins_ = true;
   auto output = ProcessSource(content, file_id, 0);
   recording_origins_ = false;
@@ -116,8 +116,8 @@ void Preprocessor::NoteOutputLine(uint32_t file_id, uint32_t line) {
   // §22.12's `line directive sets the line number and file name of the lines
   // after it, so an origin for one of those names what the directive said
   // rather than where the text stands. The arithmetic is the one
-  // Preprocessor::TryPredefinedMacro answers `__LINE__ with at
-  // src/preprocessor/preprocessor_inline.cpp:46, so a report and a `__LINE__
+  // Preprocessor::TryPredefinedMacro answers `__LINE__ with in
+  // src/preprocessor/preprocessor_inline.cpp, so a report and a `__LINE__
   // on the same line agree. The directive's own line is not one of the lines
   // after it and keeps the position it really has.
   if (has_line_override_ && line > line_override_src_line_) {
@@ -779,9 +779,10 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
 
   // Every path text takes into the Preprocessor arrives here -- Preprocess for
   // a file named on the command line, ProcessIncludeFile for a `include, and
-  // the protected-envelope cleartext at
-  // src/preprocessor/preprocessor_protect_keys.cpp:835 -- so this is the one
-  // place that has to hold for the marker to mean what Lexer takes it to mean.
+  // the protected-envelope cleartext Preprocessor::DecryptDataBlock in
+  // src/preprocessor/preprocessor_protect_keys.cpp hands over -- so this is
+  // the one place that has to hold for the marker to mean what Lexer takes it
+  // to mean.
   std::string without_markers;
   if (src.find(kKeywordMarker) != std::string_view::npos) {
     without_markers = BlankKeywordMarkers(src, [&](uint32_t line,

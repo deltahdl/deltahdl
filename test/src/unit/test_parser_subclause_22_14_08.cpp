@@ -601,8 +601,8 @@ TEST(CompilerDirectiveParsing,
   EXPECT_EQ(qualified, 2u);
 
   // §3.12.1 owns the report: with `checker` an ordinary identifier the first
-  // line heads nothing the compilation unit admits, and Parser::ParseTopLevel
-  // says so at src/parser/parser.cpp:499.
+  // line heads nothing the compilation unit admits, and
+  // Parser::ReportUnexpectedTopLevelToken says so in src/parser/parser.cpp.
   auto included = ParseWithPreprocessor(In("1800-2005", kSrc));
   EXPECT_TRUE(ReportedError(included.diags, "expected top-level declaration",
                             LineInRegion(1), "3.12.1"));

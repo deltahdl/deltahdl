@@ -213,7 +213,7 @@ def test_rejection_naming_a_different_clause_reports_fail(
     """A file rejected under a clause it is not tagged with is reported FAIL.
 
     The corpus tags the file ``6.19``, and the stub rejects it naming §7.3, in
-    the ``(§7.3)`` form ``DiagEngine::Emit`` at ``src/common/diagnostic.cpp:47``
+    the ``(§7.3)`` form ``DiagEngine::Emit`` in ``src/common/diagnostic.cpp``
     appends to a message. A rejection enforcing some other rule of the standard
     is not the file exercising the clause it was written for, so scoring it a
     pass would report the corpus as covering §6.19 when nothing did.

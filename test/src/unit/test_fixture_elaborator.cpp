@@ -25,8 +25,8 @@ namespace {
 
 // A data declaration with no terminating semicolon. Parser::ParseDataDecl
 // reaches Expect(TokenKind::kSemicolon) with `endmodule` current, and
-// Parser::Expect reports at src/parser/parser.cpp:138-148, so the source is
-// rejected for certain and for one reason.
+// Parser::Expect in src/parser/parser.cpp reports, so the source is rejected
+// for certain and for one reason.
 //
 // It stands in for the shapes that actually cost coverage, which were subtler:
 // DpiDeclElab.PureVsContextDifferenceUnderSameLinkageIsError wrote a DPI

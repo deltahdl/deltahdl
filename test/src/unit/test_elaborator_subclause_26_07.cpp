@@ -64,7 +64,7 @@ TEST(StdBuiltinPackage, UnknownScopeResolutionBaseIsRejected) {
   // is specific to the built-in package, not a blanket pass for every
   // `base ::` prefix.
   // The rejection is reported under §26.3, not §26.7: the base is diagnosed by
-  // ReportUnknownScopeBases in src/elaborator/elaborator_scope_rules.cpp:844.
+  // ReportUnknownScopeBases in src/elaborator/elaborator_scope_rules.cpp.
   ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"

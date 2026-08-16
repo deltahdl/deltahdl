@@ -9,8 +9,8 @@ namespace {
 // assignment by ordered list or assignment by name. The two forms shall not be
 // mixed; the assignments for a particular instance shall be entirely by order
 // or entirely by name. The parser enforces this while reading the #(...) list,
-// and src/parser/parser_inst.cpp:146 files that report under §23.3.2 rather
-// than under this file's own subclause.
+// and Parser::ParseParamValueAssignment in src/parser/parser_inst.cpp files
+// that report under §23.3.2 rather than under this file's own subclause.
 
 TEST(ModuleInstanceParameterValueAssignment, OrderedFollowedByNamedIsRejected) {
   auto r = Parse("module top; child #(8, .B(4)) u0(); endmodule\n");

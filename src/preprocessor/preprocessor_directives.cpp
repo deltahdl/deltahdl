@@ -280,10 +280,10 @@ void Preprocessor::HandleBeginKeywords(std::string_view rest, SourceLoc loc,
   }
   keyword_version_stack_.push_back({*version, loc});
   // The marker and the version byte are the whole of this line's output.
-  // RunPreprocLoop ends the directive's line at
-  // src/preprocessor/preprocessor.cpp:611 as it ends every other line, so a
-  // newline written here would be a second one and would put every line below
-  // the directive one line further down than the user wrote it.
+  // RunPreprocLoop in src/preprocessor/preprocessor.cpp ends the directive's
+  // line as it ends every other line, so a newline written here would be a
+  // second one and would put every line below the directive one line further
+  // down than the user wrote it.
   output += kKeywordMarker;
   output += static_cast<char>(static_cast<uint8_t>(*version));
 }

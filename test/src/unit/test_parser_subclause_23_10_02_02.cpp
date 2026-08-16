@@ -21,7 +21,8 @@ TEST(ModuleInstanceParameterAssignment, NamedParameterRequiresParentheses) {
 
 TEST(ModuleInstanceParameterAssignment, MixedOrderedThenNamedRejected) {
   auto r = Parse("module m; sub #(8, .B(4)) u0(a); endmodule\n");
-  // src/parser/parser_inst.cpp:146 files the ordered/named mix under §23.3.2.
+  // Parser::ParseParamValueAssignment in src/parser/parser_inst.cpp files the
+  // ordered/named mix under §23.3.2.
   EXPECT_TRUE(ReportedError(
       r.diags, "ordered and named parameter value assignments cannot be mixed",
       1, "23.3.2"));

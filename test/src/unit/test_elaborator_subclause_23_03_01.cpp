@@ -15,9 +15,10 @@ TEST(TopLevelModules, EmptySourceTopNotFoundReturnsNull) {
   Elaborator elab(f.arena, f.diag, cu);
   auto* design = elab.Elaborate("top");
   EXPECT_EQ(design, nullptr);
-  // src/elaborator/elaborator.cpp:575 states a fact about the run rather than a
-  // rule a construct breaks, so it carries SourceLoc::None() (line 0) and
-  // Subclause::None() (empty).
+  // The top-module-not-found report in
+  // Elaborator::Elaborate(std::string_view) in src/elaborator/elaborator.cpp
+  // states a fact about the run rather than a rule a construct breaks, so it
+  // carries SourceLoc::None() (line 0) and Subclause::None() (empty).
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(), "top module 'top' not found", 0, ""));
 }
@@ -51,8 +52,9 @@ TEST(TopLevelModules, NonexistentTopIsError) {
       "module b; endmodule\n",
       f, "nonexistent");
   EXPECT_EQ(design, nullptr);
-  // As above: src/elaborator/elaborator.cpp:575 reports at SourceLoc::None()
-  // under Subclause::None().
+  // As above: the top-module-not-found report in
+  // Elaborator::Elaborate(std::string_view) in src/elaborator/elaborator.cpp
+  // stands at SourceLoc::None() under Subclause::None().
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "top module 'nonexistent' not found", 0, ""));
 }
@@ -96,7 +98,8 @@ TEST(TopLevelModules, DesignWithNoTopLevelModuleIsError) {
       "endmodule\n",
       f, "", /*auto_top=*/true);
   EXPECT_EQ(design, nullptr);
-  // src/elaborator/elaborator.cpp:564 reports at SourceLoc::None() (line 0),
+  // The no-top-level-module report in Elaborator::Elaborate(std::string_view)
+  // in src/elaborator/elaborator.cpp stands at SourceLoc::None() (line 0),
   // which NoTopLevelModuleReportStandsAtNoPosition below fixes as correct.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "design contains no top-level module", 0,

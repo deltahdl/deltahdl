@@ -78,8 +78,8 @@ TEST(ExternalConstraintBlocks, BlockSameNameAsPrototypeRejected) {
              "endmodule\n",
              f));
   // The rule that rejects this source is the constraint-name uniqueness rule of
-  // 18.5, reported by ValidateOneClassConstraintNames in
-  // src/elaborator/elaborator_validate_class_constraints.cpp:137 under
+  // 18.5, reported by ClassConstraintValidator::ValidateOneClassConstraintNames
+  // in src/elaborator/elaborator_validate_class_constraints.cpp under
   // Subclause("18.5"), not one of the 18.5.1 completion reports.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),

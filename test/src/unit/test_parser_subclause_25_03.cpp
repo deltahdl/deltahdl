@@ -327,7 +327,8 @@ TEST(InterfaceItemsParsing, InvalidTokenInBodyIsError) {
       "  123bad\n"
       "endinterface\n");
   // The body item dispatcher is shared with module bodies, so
-  // src/parser/parser_items.cpp:633 files the report under §23.2.4.
+  // Parser::ParseTypedItemOrInst in src/parser/parser_items.cpp files the
+  // report under §23.2.4.
   EXPECT_TRUE(
       ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
 }
@@ -452,7 +453,8 @@ TEST(InterfaceInstantiationGrammar, ParamsWithEmptyPorts) {
 TEST(InterfaceInstantiationGrammar, MissingSemicolonIsError) {
   auto r = Parse("module m; my_if u0() endmodule\n");
   // An interface instantiation is read by the module instantiation parser, so
-  // src/parser/parser_inst.cpp:99 files the missing ';' under §23.3.2.
+  // Parser::ParseModuleInstList in src/parser/parser_inst.cpp files the
+  // missing ';' under §23.3.2.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "23.3.2"));
 }

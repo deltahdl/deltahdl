@@ -390,16 +390,16 @@ TEST(Preprocessor, Line_LibrarySearchUnaffectedByOverride) {
 // buffer they have never seen.
 //
 // What answers for the rule is SourceManager::FormatLoc, because that is what
-// DiagEngine::Emit prints at src/common/diagnostic.cpp:42. The report's own
+// DiagEngine::Emit in src/common/diagnostic.cpp prints. The report's own
 // SourceLoc still stands in the preprocessed text and every other assertion in
 // this tree still reads it as such; only what a position is printed as
 // changes.
 
 // Preprocesses `src` registered under `path`, registers the output with the
 // origins the preprocessor recorded, and parses it -- the sequence
-// src/main.cpp:393 and :420 run. The parse is what provokes a report from a
-// stage below the preprocessor, which is the half of a run that had no file
-// name of its own.
+// PreprocessSources and ParseSource in src/main.cpp run. The parse is what
+// provokes a report from a stage below the preprocessor, which is the half of
+// a run that had no file name of its own.
 static void PreprocessAndParseUnder(const std::string& path,
                                     const std::string& src, PreprocFixture& f,
                                     Arena& arena, PreprocConfig cfg = {}) {
@@ -415,7 +415,7 @@ static void PreprocessAndParseUnder(const std::string& path,
 }
 
 // Where the first error of the run is printed, formatted as
-// src/common/diagnostic.cpp:42 formats it.
+// DiagEngine::Emit in src/common/diagnostic.cpp formats it.
 static std::string FirstErrorLocation(PreprocFixture& f) {
   for (const auto& d : f.diag.Diagnostics()) {
     if (d.severity == DiagSeverity::kError) return f.mgr.FormatLoc(d.loc);
@@ -437,7 +437,7 @@ TEST(Preprocessor, ReportAfterPreprocessingNamesTheFileItWasWrittenIn) {
                           f, arena);
 
   // The third line opens no top-level declaration, so Parser::ParseTopLevel
-  // reports it at src/parser/parser.cpp:498, standing at its first column.
+  // in src/parser/parser.cpp reports it, standing at its first column.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "expected top-level declaration", 3, "3.12.1"));
   EXPECT_EQ(FirstErrorLocation(f), "design.sv:3:1");

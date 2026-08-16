@@ -115,8 +115,9 @@ TEST(InterfaceItemsParsing, ExternForkjoinFunctionIsError) {
       "  extern forkjoin function int compute();\n"
       "endinterface\n");
   // `forkjoin` commits the item to a task_declaration, so the rejection is
-  // src/parser/parser_declaration.cpp:782 failing to find the `task` keyword
-  // and is filed under §13.3, naming the `function` that stands there instead.
+  // Parser::ParseTaskDecl in src/parser/parser_declaration.cpp failing to find
+  // the `task` keyword and is filed under §13.3, naming the `function` that
+  // stands there instead.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected 'task', got 'function'", 2, "13.3"));
 }

@@ -164,14 +164,14 @@ TEST(KeywordVersionExampleLexing, RegionDoesNotReachBackOverEarlierSource) {
 // was written on, and so is the declaration on the line below it.
 //
 // This is the half of the directive's output that a newline count does not
-// reach. Preprocessor::ProcessKeywordsDirective hands what follows the
-// specifier to OutputText at src/preprocessor/preprocessor_lines.cpp:664,
-// which appends it straight after the version byte, so that text now shares
-// the marker's line instead of starting the line below. Lexer::Advance counts
-// a newline it moves over at src/lexer/lexer.cpp:187, and
-// Lexer::ConsumeKeywordMarker at :442 consumes one only when a newline
-// actually follows the version byte, so the two agree: the marker line costs
-// the counter one line, whatever is written on it.
+// reach. Preprocessor::ProcessKeywordsDirective in
+// src/preprocessor/preprocessor_lines.cpp hands what follows the specifier to
+// OutputText, which appends it straight after the version byte, so that text
+// now shares the marker's line instead of starting the line below.
+// Lexer::Advance in src/lexer/lexer.cpp counts a newline it moves over, and
+// Lexer::ConsumeKeywordMarker in src/lexer/lexer.cpp consumes one only when a
+// newline actually follows the version byte, so the two agree: the marker line
+// costs the counter one line, whatever is written on it.
 TEST(KeywordVersionExampleLexing, DeclarationsKeepTheLineTheyWereWrittenOn) {
   PreprocFixture f;
   auto out = Preprocess(

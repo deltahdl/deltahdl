@@ -617,9 +617,9 @@ TEST(ClockingBlockParse, ErrorMissingClockingEvent) {
       "    input data;\n"
       "  endclocking\n"
       "endmodule\n");
-  // §14.3 owns the clocking_event, so Parser::ParseClockingDecl demands its
-  // '@' at src/parser/parser_clocking.cpp:110 and the ';' closing the header
-  // is what stands there.
+  // §14.3 owns the clocking_event, so Parser::ParseClockingDecl in
+  // src/parser/parser_clocking.cpp demands its '@' and the ';' closing the
+  // header is what stands there.
   EXPECT_TRUE(ReportedError(r.diags, "expected '@', got ';'", 2, "14.3"));
 }
 

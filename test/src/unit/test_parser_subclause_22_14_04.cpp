@@ -285,7 +285,7 @@ TEST(CompilerDirectiveParsing, NoconfigCannotWriteAConfigDeclaration) {
   // Dropping the words from the reserved list takes the construct with them.
   // §3.12.1 owns the report: with `config` an ordinary identifier, line 3 of
   // the source heads nothing the compilation unit admits and
-  // Parser::ParseTopLevel says so at src/parser/parser.cpp:499.
+  // Parser::ReportUnexpectedTopLevelToken says so in src/parser/parser.cpp.
   auto dropped = ParseWithPreprocessor(InNoconfig(kSrc));
   EXPECT_TRUE(ReportedError(dropped.diags, "expected top-level declaration",
                             LineInRegion(3), "3.12.1"));
@@ -304,8 +304,8 @@ TEST(CompilerDirectiveParsing, NoconfigFreesTheWordThatOpensAConfiguration) {
                                      "  design lib.top;\n"
                                      "endconfig\n")));
   // §3.12.1 owns the report: with `config` an ordinary identifier the first
-  // line heads nothing the compilation unit admits, and Parser::ParseTopLevel
-  // says so at src/parser/parser.cpp:499.
+  // line heads nothing the compilation unit admits, and
+  // Parser::ReportUnexpectedTopLevelToken says so in src/parser/parser.cpp.
   auto dropped =
       ParseWithPreprocessor(InNoconfig("config c;\n"
                                        "  design lib.top;\n"
@@ -403,7 +403,7 @@ TEST(CompilerDirectiveParsing, NoconfigExcludedWordNamesAModule) {
   // §6.8 owns the report on the instance name, not §23.3.2: an instantiation
   // is recognized by the identifier following the module name, so
   // Parser::ParseImplicitTypeOrInst hands `sub` to Parser::ParsePlainVarDecl
-  // instead and that demands a semicolon at src/parser/parser_items.cpp:712.
+  // instead and that demands a semicolon in src/parser/parser_items.cpp.
   auto as_instance =
       ParseWithPreprocessor(In2001("module sub;\nendmodule\n"
                                    "module top;\n  sub library ();\n"
@@ -428,7 +428,7 @@ TEST(CompilerDirectiveParsing, NoconfigKeptAdditionCannotNameAModule) {
   // §6.8 owns the report on the instance name, not §23.3.2: an instantiation
   // is recognized by the identifier that follows the module name, so
   // Parser::ParseImplicitTypeOrInst hands `sub` to Parser::ParsePlainVarDecl
-  // instead and that demands a semicolon at src/parser/parser_items.cpp:712.
+  // instead and that demands a semicolon in src/parser/parser_items.cpp.
   auto as_instance =
       ParseWithPreprocessor(InNoconfig("module sub;\nendmodule\n"
                                        "module top;\n  sub localparam ();\n"
@@ -454,8 +454,8 @@ TEST(CompilerDirectiveParsing, WordOutsideNoconfigListIsNotAKeyword) {
   EXPECT_TRUE(ParseWithPreprocessorOk("module m;\n  uwire w;\nendmodule\n"));
 
   // §6.8 owns this one instead: a packed dimension is where the declaration
-  // was meant to end, so Parser::ParsePlainVarDecl demands the semicolon at
-  // src/parser/parser_items.cpp:712.
+  // was meant to end, so Parser::ParsePlainVarDecl in
+  // src/parser/parser_items.cpp demands the semicolon.
   auto as_type =
       ParseWithPreprocessor(InNoconfig("module m;\n"
                                        "  logic [7:0] v;\n"

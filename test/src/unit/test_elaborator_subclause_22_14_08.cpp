@@ -133,8 +133,8 @@ TEST(SystemVerilog2012KeywordElaboration, AddedInterconnectNetsReachTheDesign) {
 
   ElabFixture included;
   // `interconnect` is an ordinary identifier under 1800-2009, so the header
-  // is read as a non-ANSI port list and the parser reports at
-  // src/parser/parser_port.cpp:854.
+  // is read as a non-ANSI port list and Parser::ParseNonAnsiPortList in
+  // src/parser/parser_port.cpp reports.
   ElaborateWithPreprocessorAllowingParseErrors(In("1800-2009", kSrc), included,
                                                "m");
   EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
@@ -196,9 +196,9 @@ TEST(SystemVerilog2012KeywordElaboration,
 
   ElabFixture included;
   // `nettype` is an ordinary identifier under 1800-2009, so the declaration
-  // is read as a variable named by it and the parser reports at
-  // src/parser/parser_items.cpp:712, naming the `logic` that follows where the
-  // declaration's ';' must be.
+  // is read as a variable named by it and Parser::ParsePlainVarDecl in
+  // src/parser/parser_items.cpp reports, naming the `logic` that follows where
+  // the declaration's ';' must be.
   ElaborateWithPreprocessorAllowingParseErrors(In("1800-2009", kSrc), included,
                                                "m");
   EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
@@ -274,8 +274,8 @@ TEST(SystemVerilog2012KeywordElaboration,
 
   ElabFixture included;
   // `implements` is an ordinary identifier under 1800-2009, so the class
-  // header is read as ending after its name and the parser reports at
-  // src/parser/parser_class.cpp:301.
+  // header is read as ending after its name and Parser::ParseClassDecl in
+  // src/parser/parser_class.cpp reports.
   ElaborateWithPreprocessorAllowingParseErrors(In("1800-2009", kSrc), included,
                                                "m");
   EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
@@ -308,8 +308,8 @@ TEST(SystemVerilog2012KeywordElaboration, AddedSoftQualifierReachesTheDesign) {
 
   ElabFixture union_included;
   // `soft` is an ordinary identifier under 1800-2009, so it lands on the
-  // union tag check and the parser reports at
-  // src/parser/parser_declaration.cpp:218.
+  // union tag check and Parser::ParseStructOrUnionType in
+  // src/parser/parser_declaration.cpp reports.
   ElaborateWithPreprocessorAllowingParseErrors(In("1800-2009", kUnion),
                                                union_included, "m");
   EXPECT_TRUE(ReportedError(union_included.diag.Diagnostics(),
@@ -509,8 +509,8 @@ TEST(SystemVerilog2012KeywordElaboration,
 
   ElabFixture included;
   // `checker` is an ordinary identifier under 1800-2005, so it heads the file
-  // where no top-level production can take it and Parser::ParseTopLevel
-  // reports at src/parser/parser.cpp:499.
+  // where no top-level production can take it and
+  // Parser::ReportUnexpectedTopLevelToken in src/parser/parser.cpp reports.
   ElaborateWithPreprocessorAllowingParseErrors(In("1800-2005", kSrc), included,
                                                "m");
   EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),

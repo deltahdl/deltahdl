@@ -116,7 +116,7 @@ TEST(SystemVerilog2005KeywordElaboration, AddedTypeWordsQualifyConstants) {
   ElabFixture included;
   // Under "1364-2005" the type words this source is built from are ordinary
   // identifiers, so the parameter declaration loses its type and its name at
-  // once and the parser reports at src/parser/parser_types.cpp:695. The
+  // once and Parser::ParseParamDecl in src/parser/parser_types.cpp reports. The
   // rejection is the parser's, so the source is not required to parse.
   ElaborateWithPreprocessorAllowingParseErrors(In2005(kSrc), included, "t");
   EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),

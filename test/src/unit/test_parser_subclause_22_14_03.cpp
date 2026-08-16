@@ -317,8 +317,8 @@ TEST(CompilerDirectiveParsing, WordOutsideVerilog2001ListIsNotAKeyword) {
   EXPECT_TRUE(ParseWithPreprocessorOk("module m;\n  uwire w;\nendmodule\n"));
 
   // §6.8 owns this one instead: a packed dimension is where the declaration
-  // was meant to end, so Parser::ParsePlainVarDecl demands the semicolon at
-  // src/parser/parser_items.cpp:712.
+  // was meant to end, so Parser::ParsePlainVarDecl in
+  // src/parser/parser_items.cpp demands the semicolon.
   auto as_type =
       ParseWithPreprocessor(In2001("module m;\n  logic [7:0] v;\n"
                                    "endmodule\n"));
@@ -352,7 +352,7 @@ TEST(CompilerDirectiveParsing, Verilog2001AdditionCannotNameAModule) {
   // §6.8 owns the report on the instance name, not §23.3.2: an instantiation
   // is recognized by the identifier that follows the module name, so
   // Parser::ParseImplicitTypeOrInst hands `sub` to Parser::ParsePlainVarDecl
-  // instead and that demands a semicolon at src/parser/parser_items.cpp:712.
+  // instead and that demands a semicolon in src/parser/parser_items.cpp.
   auto as_instance =
       ParseWithPreprocessor(In2001("module sub;\nendmodule\n"
                                    "module top;\n  sub localparam ();\n"

@@ -403,7 +403,7 @@ TEST(PackageImport, UnresolvedReferenceIsError) {
 //
 // The four cases below read the elaborated declaration back rather than
 // asserting that elaboration succeeded, because nothing reports an unresolved
-// named type: EvalTypeWidth at src/elaborator/type_eval.cpp:192 answers 0 for a
+// named type: EvalTypeWidth in src/elaborator/type_eval.cpp answers 0 for a
 // DataTypeKind::kNamed it could not resolve and the run carries on. An
 // acceptance assertion therefore holds whether the import was applied or not,
 // which is what PackageImport.WildcardImportedIntoModule above still is.
@@ -511,7 +511,7 @@ TEST(PackageImport, BodyImportedEnumTypedefNamesTheEnumType) {
 // import still reaches the module that wrote it, so the test cannot pass by
 // importing nothing anywhere. 0 on b's y is what EvalTypeWidth answers for a
 // DataTypeKind::kNamed it could not resolve
-// (src/elaborator/type_eval.cpp:192), and it is not the 1 that
+// (in src/elaborator/type_eval.cpp), and it is not the 1 that
 // RtlirVariable::width defaults to, so it says the declaration was elaborated
 // and its type went unresolved rather than that nothing ran.
 //

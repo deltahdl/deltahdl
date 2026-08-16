@@ -675,8 +675,8 @@ Stmt* Parser::ParseForStmt() {
 }
 
 // Answers whether tk closes a construct a par_block can stand inside. The
-// first seven are the keywords Parser::Synchronize enumerates at
-// src/parser/parser.cpp:157; endtask and endfunction join them because §9.3.2
+// first seven are the keywords Parser::Synchronize enumerates in
+// src/parser/parser.cpp; endtask and endfunction join them because §9.3.2
 // makes a par_block a statement_or_null, so a fork can stand in a task or a
 // function body. endcase and endgenerate join them because a case item's body
 // is a statement_or_null and a generate region holds an initial block. The
@@ -726,9 +726,9 @@ Stmt* Parser::ParseForkStmt(std::string_view prefix_label) {
   } else {
     // Leave the token for the enclosing production, which is what lets an
     // enclosing begin find its end and a module find its endmodule. Leave
-    // stmt->join_kind at the TokenKind::kKwJoin default declared at
-    // src/parser/ast_stmt.h:176 rather than recording a token §9.3.2 does not
-    // admit as a join_keyword.
+    // stmt->join_kind at the TokenKind::kKwJoin default the declaration of
+    // Stmt::join_kind in src/parser/ast_stmt.h gives rather than recording a
+    // token §9.3.2 does not admit as a join_keyword.
     diag_.Error(
         CurrentLoc(),
         "expected join, join_any or join_none to close the parallel block",

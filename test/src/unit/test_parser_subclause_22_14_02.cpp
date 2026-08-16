@@ -353,7 +353,7 @@ TEST(CompilerDirectiveParsing, ConstantKeywordsOutsideTheListAreIdentifiers) {
   // §23.3.2 owns both reports, not §22.14: with the word an ordinary
   // identifier the two names read as a module name and an instance name, so
   // Parser::ParseImplicitTypeOrInst hands them to Parser::ParseModuleInstList
-  // and that demands the port connection list at src/parser/parser_inst.cpp:78.
+  // and that demands the port connection list in src/parser/parser_inst.cpp.
   auto as_localparam =
       ParseWithPreprocessor(In1995("module m;\n"
                                    "  localparam Q = 8;\n"
@@ -412,9 +412,9 @@ TEST(CompilerDirectiveParsing, ReservedWordsAreMatchedCaseSensitively) {
 // list.
 TEST(CompilerDirectiveParsing, ReservedWordCannotNameAVariable) {
   // §6.8 owns the report, not §22.14: the word stands where
-  // Parser::ParseVarDeclList reads the declared name of a variable at
-  // src/parser/parser_types.cpp:584, and the report names the word that stands
-  // there, so each of the two words below is separately covered.
+  // Parser::ParseVarDeclList in src/parser/parser_types.cpp reads the declared
+  // name of a variable, and the report names the word that stands there, so
+  // each of the two words below is separately covered.
   auto as_wire = ParseWithPreprocessor(In1995(VarDecl("wire")));
   EXPECT_TRUE(ReportedError(as_wire.diags, "expected identifier, got 'wire'",
                             LineInRegion(2), "6.8"));
@@ -426,7 +426,7 @@ TEST(CompilerDirectiveParsing, ReservedWordCannotNameAVariable) {
 
 TEST(CompilerDirectiveParsing, ReservedWordCannotNameAModule) {
   // §23.2.1 owns the report on the module name: the word stands where
-  // Parser::ParseModuleDecl reads it at src/parser/parser.cpp:652.
+  // Parser::ParseModuleDecl in src/parser/parser.cpp reads it.
   auto r = ParseWithPreprocessor(In1995("module always;\nendmodule\n"));
   EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got 'always'",
                             LineInRegion(1), "23.2.1"));
@@ -439,8 +439,8 @@ TEST(CompilerDirectiveParsing, ReservedWordCannotNameAModule) {
 TEST(CompilerDirectiveParsing, WordOutsideVerilog1995ListIsNotAKeyword) {
   // §6.8 owns this report: with `logic` an ordinary identifier the packed
   // dimension is where the declaration was meant to end, so
-  // Parser::ParsePlainVarDecl demands the semicolon at
-  // src/parser/parser_items.cpp:712.
+  // Parser::ParsePlainVarDecl in src/parser/parser_items.cpp demands the
+  // semicolon.
   auto as_type =
       ParseWithPreprocessor(In1995("module m;\n"
                                    "  logic [7:0] v;\n"

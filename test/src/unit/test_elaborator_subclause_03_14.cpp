@@ -3,8 +3,8 @@
 
 namespace {
 
-// Every report named below stands at line 1 because
-// src/elaborator/elaborator_validate_types.cpp:37-45 anchors the
+// Every report named below stands at line 1 because CheckTimescaleOrder in
+// src/elaborator/elaborator_validate_types.cpp anchors the
 // precision-no-coarser-than-unit report on the design element's range.start,
 // which is the module/package/interface/program keyword, and not on the
 // timeprecision statement that broke the rule.

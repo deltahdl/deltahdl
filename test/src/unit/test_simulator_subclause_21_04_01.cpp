@@ -427,9 +427,9 @@ TEST(ReadmemAssocSim, StringIndexRejectedArrayUntouched) {
           "  end\n"
           "endmodule\n",
       f);
-  // The task name is part of the substring because
-  // src/simulator/eval_systask_writemem.cpp:213 words its own report the same
-  // way from "$writemem" onwards.
+  // The task name is part of the substring because EvalWritemem in
+  // src/simulator/eval_systask_writemem.cpp words its own report the same way
+  // from "$writemem" onwards.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "$readmemh: associative array index must be of an integral type", 4,

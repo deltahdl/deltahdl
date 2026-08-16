@@ -161,7 +161,7 @@ static uint32_t PatternBitLit(const LowerCtx& ctx, const DecodedPattern& pat,
 }
 
 // True for the value range §11.4.13 writes as `[lo:hi]`.
-// Parser::ParseInsideValueRange at src/parser/expr_parser_patterns.cpp:65
+// Parser::ParseInsideValueRange in src/parser/expr_parser_patterns.cpp
 // builds it as an ExprKind::kSelect carrying both bounds and no base, which is
 // what tells it from a bit-select or part-select of a signal. Compared bit for
 // bit it would answer no run of bits, and so constant false at every position,

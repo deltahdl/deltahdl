@@ -359,10 +359,10 @@ TEST(BlockStatementParsing,
 
 // §9.3 head negative: a token that is not one of join, join_any and join_none
 // never becomes the block's terminator in the AST. Stmt::join_kind keeps the
-// TokenKind::kKwJoin default declared at src/parser/ast_stmt.h:176, so
-// src/simulator/stmt_exec.cpp:346 and
-// src/elaborator/elaborator_validate_funcbody.cpp:119 read a join_keyword
-// §9.3.2 admits rather than the `end` that stopped the parse.
+// TokenKind::kKwJoin default declared in src/parser/ast_stmt.h, so ExecFork in
+// src/simulator/stmt_exec.cpp and CheckRefArgsInForkBlocks in
+// src/elaborator/elaborator_validate_funcbody.cpp read a join_keyword §9.3.2
+// admits rather than the `end` that stopped the parse.
 TEST(BlockStatementParsing, ParallelMalformedTerminatorDoesNotBecomeAJoinKind) {
   auto r = Parse(
       "module m;\n"

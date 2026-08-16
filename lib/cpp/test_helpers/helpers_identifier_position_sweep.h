@@ -34,25 +34,25 @@ struct PositionReport {
 // Which report each position of kIdentifierPositions draws, traced through the
 // parser. Five of the eight put the word where an identifier is demanded and
 // draw "expected identifier, got " from the Expect or ExpectIdentifier call
-// that reads the name: Parser::ParseModuleDecl at src/parser/parser.cpp:652
-// under §23.2.1, Parser::ParsePortDecl at src/parser/parser_port.cpp:908 under
-// §23.2.2.2, Parser::ParseTaskDecl at src/parser/parser_declaration.cpp:792
-// under §13.3, Parser::ParseFuncName at src/parser/parser_declaration.cpp:710
-// under §13.4, Parser::ParseGenvarDecl at src/parser/parser.cpp:786 under
-// §27.4, and Parser::ParseBlockStmt at src/parser/parser_stmt.cpp:492 under
+// that reads the name: Parser::ParseModuleDecl in src/parser/parser.cpp
+// under §23.2.1, Parser::ParsePortDecl in src/parser/parser_port.cpp under
+// §23.2.2.2, Parser::ParseTaskDecl in src/parser/parser_declaration.cpp
+// under §13.3, Parser::ParseFuncName in src/parser/parser_declaration.cpp
+// under §13.4, Parser::ParseGenvarDecl in src/parser/parser.cpp under
+// §27.4, and Parser::ParseBlockStmt in src/parser/parser_stmt.cpp under
 // §9.3.4. The tail of that sentence is left off, because a port whose word is
 // itself a data type -- "input wire logic" -- is read as the type and the
 // report then stands at the comma rather than at the word.
 //
 // The other two are reached by no identifier slot at all. A gate instance name
-// is optional, so ParseGateInstanceTail at src/parser/parser_toplevel.cpp:19,
-// reached from Parser::ParseOneGateInstance at :375, is told there is no
-// identifier, takes the instance to be unnamed and demands the terminal list
-// under §28.3.6. A module instantiation is recognized by the identifier that
-// follows the module name, so Parser::ParseImplicitTypeOrInst hands "ch" to
-// Parser::ParsePlainVarDecl instead, which reads it as a variable declaration
-// of an implicit type and demands the semicolon at
-// src/parser/parser_items.cpp:712 under §6.8.
+// is optional, so ParseGateInstanceTail in src/parser/parser_toplevel.cpp,
+// reached from the call in Parser::ParseOneGateInstance in that same file, is
+// told there is no identifier, takes the instance to be unnamed and demands
+// the terminal list under §28.3.6. A module instantiation is recognized by the
+// identifier that follows the module name, so Parser::ParseImplicitTypeOrInst
+// hands "ch" to Parser::ParsePlainVarDecl in src/parser/parser_items.cpp
+// instead, which reads it as a variable declaration of an implicit type and
+// demands the semicolon under §6.8.
 inline PositionReport ReportForPosition(const IdentifierPosition& p) {
   const std::string_view what(p.what);
   if (what == "design element") {

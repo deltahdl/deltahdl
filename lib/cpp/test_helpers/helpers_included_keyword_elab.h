@@ -272,8 +272,8 @@ inline void ExpectTable224DeclarationsElaborate(const char* spec) {
   ElabFixture included;
   // Under "1364-2005" every SystemVerilog word this source is built from is an
   // ordinary identifier, so `package` at its head reaches no top-level
-  // production and Parser::ParseTopLevel reports "expected top-level
-  // declaration" at src/parser/parser.cpp:499. That report is this leg's
+  // production and Parser::ParseTopLevel in src/parser/parser.cpp reports
+  // "expected top-level declaration". That report is this leg's
   // subject, so the source is not required to parse.
   ElaborateWithPreprocessorAllowingParseErrors(In2005(kSrc), included, "m");
   EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),

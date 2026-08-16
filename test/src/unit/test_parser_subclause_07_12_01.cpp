@@ -218,12 +218,12 @@ TEST(AggregateTypeParsing, ArrayLocatorUniqueIndexWithClause) {
 // Covers Parser::ParseWithClauseRange in src/parser/expr_parser_calls.cpp,
 // which builds the ExprKind::kSelect that the bracketed form of a §7.12.1 with
 // clause hangs on with_expr. It assigned no range.start before this commit, so
-// the §7.12.2 report at src/simulator/eval_array.cpp:625 that stands at
-// `expr->with_expr->range.start` printed "<unknown location>" instead of a
-// file, line and column, while the parenthesized form `with (item > 1)` printed
-// a real position. Parser::ParseWithClause consumes the `[`, so the range this
-// function builds begins where its first bound begins: `1`, at column 27 of
-// line 3.
+// the §7.12.2 report in CheckOrderingWithClause in
+// src/simulator/eval_array.cpp that stands at `expr->with_expr->range.start`
+// printed "<unknown location>" instead of a file, line and column, while the
+// parenthesized form `with (item > 1)` printed a real position.
+// Parser::ParseWithClause consumes the `[`, so the range this function builds
+// begins where its first bound begins: `1`, at column 27 of line 3.
 TEST(AggregateTypeParsing, ArrayRangeWithClauseStartsAtItsFirstBound) {
   auto r = Parse(
       "module t;\n"

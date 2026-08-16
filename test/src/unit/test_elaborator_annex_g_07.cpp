@@ -43,8 +43,8 @@ TEST(WeakReferenceStdPackageElaborator, BuiltInClassNeedsNoUserDefinition) {
 // built-in integer argument is rejected at elaboration.
 TEST(WeakReferenceStdPackageElaborator, TypeParameterRejectsNonClassType) {
   // A weak_reference declared inside a procedural block is a kVarDecl
-  // statement, so ValidateLocalWeakRefDecls answers for it
-  // (src/elaborator/elaborator_scope_rules.cpp:133-146) and reports at the
+  // statement, so ValidateLocalWeakRefDecls in
+  // src/elaborator/elaborator_scope_rules.cpp answers for it and reports at the
   // declaration statement. The same rule reaches a class member and a
   // subroutine argument through different walks, and all four sites cite
   // §8.30.1, which is the subclause carrying the sentence they enforce. This

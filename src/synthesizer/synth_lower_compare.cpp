@@ -170,8 +170,8 @@ uint32_t SynthLower::CompareAtLeast(const Expr* lhs, const Expr* rhs,
 
 // True for a bound that names no value the netlist can compare against.
 // §11.4.13 admits `$` as a bound, which stands for the extreme of the
-// expression's range rather than for a number, and Parser::ParsePrimary at
-// src/parser/expr_parser.cpp:537 hands it over as an identifier written `$`.
+// expression's range rather than for a number, and Parser::ParsePrimaryExpr in
+// src/parser/expr_parser.cpp hands it over as an identifier written `$`.
 static bool IsUnboundedRangeBound(const Expr* bound) {
   return bound == nullptr ||
          (bound->kind == ExprKind::kIdentifier && bound->text == "$");

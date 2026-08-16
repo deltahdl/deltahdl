@@ -178,7 +178,8 @@ TEST(ProgramItemsParsing, ProgramTimeunitAfterOtherItemRejected) {
       "  timeunit 1ns;\n"
       "endprogram\n");
   // §3.14.2.2 owns the placement rule for a later timeunit, so
-  // src/parser/parser_items.cpp:101 files the report there rather than §24.3.
+  // ValidateTimeScopeAfterParse in src/parser/parser_items.cpp files the report
+  // there rather than §24.3.
   EXPECT_TRUE(ReportedError(r.diags,
                             "timeunit as a later item requires a matching "
                             "prior declaration in the same time scope",
@@ -755,8 +756,9 @@ TEST(ProgramDeclaration, AnsiHeaderPackageImportWithoutPortListFails) {
       "endpackage\n"
       "program prg import pkg::*;\n"
       "endprogram\n");
-  // The three ansi headers share one report, filed under §23.2.1 at
-  // src/parser/parser_port.cpp:704 rather than under this file's §24.3.
+  // The three ansi headers share one report, filed under §23.2.1 by
+  // Parser::ParseParamsPortsAndSemicolon in src/parser/parser_port.cpp rather
+  // than under this file's §24.3.
   EXPECT_TRUE(ReportedError(r.diags,
                             "package_import_declaration in ansi header must be "
                             "followed by parameter_port_list or "

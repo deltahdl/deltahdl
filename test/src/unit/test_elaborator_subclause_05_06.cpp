@@ -74,9 +74,10 @@ TEST(IdentifierElaboration, CaseMismatchedReferenceFailsToResolve) {
 
 // §5.6: "If an identifier exceeds the implementation-specific length limit, an
 // error shall be reported." The limit "shall be at least 1024 characters", and
-// src/lexer/lexer.cpp:546 sets it at exactly 1024. The report is the lexer's
-// because the limit is a rule about the token, so the subclause is asserted
-// here rather than an elaborator report being added for it.
+// Lexer::LexIdentifier in src/lexer/lexer.cpp sets it at exactly 1024. The
+// report is the lexer's because the limit is a rule about the token, so the
+// subclause is asserted here rather than an elaborator report being added for
+// it.
 TEST(IdentifierElaboration, IdentifierExceedingMaxLengthReportsError) {
   ElabFixture f;
   std::string long_id(1025, 'a');

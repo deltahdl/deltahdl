@@ -181,11 +181,11 @@ TEST(Verilog2005KeywordElaboration, AddedWordCannotNameAnElaboratedVariable) {
 // diagnostic sends the user to a line of their own source, and a directive that
 // wrote two lines of preprocessed output where the source had one would send
 // them one line past it. Preprocessor::HandleBeginKeywords writes the keyword
-// marker and the version byte alone, and RunPreprocLoop ends that line at
-// src/preprocessor/preprocessor.cpp:611 as it ends every other line, so the
-// declaration is reported on the line In wrote it, which LineInRegion(3) gives.
-// Counting newlines in the preprocessed text does not show the offset reaching
-// the user; this does.
+// marker and the version byte alone, and RunPreprocLoop in
+// src/preprocessor/preprocessor.cpp ends that line as it ends every other, so
+// the declaration is reported on the line In wrote it, which LineInRegion(3)
+// gives. Counting newlines in the preprocessed text does not show the offset
+// reaching the user; this does.
 TEST(Verilog2005KeywordElaboration, ReservedWordDeeperInARegionKeepsItsLine) {
   ASSERT_EQ(std::size(kTable223), 1u);
   const char* added = kTable223[0];

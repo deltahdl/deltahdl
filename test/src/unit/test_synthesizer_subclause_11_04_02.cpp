@@ -72,8 +72,8 @@ TEST(IncrementSynthesis, PostfixIncrementLowersAsABlockingAssignment) {
 
 // §11.4.2 names `++i` and `i++` as one pair of operators, and the two spellings
 // reach the synthesizer by different routes: `Parser::ParsePrefixExpr` builds
-// `++y` as an `ExprKind::kUnary`, while `MakePostfixUnary` at
-// src/parser/expr_parser.cpp:452 builds `y++` as an `ExprKind::kPostfixUnary`.
+// `++y` as an `ExprKind::kUnary`, while `MakePostfixUnary` in
+// src/parser/expr_parser.cpp builds `y++` as an `ExprKind::kPostfixUnary`.
 // A lowering that reads only the postfix kind drops this one and passes the
 // test above.
 TEST(IncrementSynthesis, PrefixIncrementLowersAsABlockingAssignment) {
@@ -127,9 +127,9 @@ TEST(IncrementSynthesis, IncrementOfABitSelectIsReportedRatherThanDropped) {
 // The lowering §11.4.2 asks for belongs to the four increment and decrement
 // operators and to nothing else an expression statement can hold. `t()` is such
 // a statement, and it arrives at `SynthLower::LowerStmt` with nothing said
-// about it: `Parser::ParseAssignmentOrExprNoSemi` at
-// src/parser/parser_stmt.cpp:793 builds a `StmtKind::kExprStmt` for it,
-// `ValidateCombLatchProcess` at src/elaborator/elaborator_process.cpp:303
+// about it: `Parser::ParseAssignmentOrExprNoSemi` in
+// src/parser/parser_stmt.cpp builds a `StmtKind::kExprStmt` for it,
+// `ValidateCombLatchProcess` in src/elaborator/elaborator_process.cpp
 // leaves it in the process body because `StmtBlocks` answers false for an
 // expression statement, and `SynthLower::CheckExprSynthesizable` returns true
 // for the `ExprKind::kCall` it holds, which only an `ExprKind::kSystemCall`

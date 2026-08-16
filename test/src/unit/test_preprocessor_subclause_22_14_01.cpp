@@ -187,8 +187,8 @@ TEST(KeywordVersionExamplePreproc,
 // ordinary lines', and this fails when the output holds a different number.
 // Preprocessor::HandleBeginKeywords in
 // src/preprocessor/preprocessor_directives.cpp appended a newline of its own
-// after the marker byte and the version byte, and RunPreprocLoop at
-// src/preprocessor/preprocessor.cpp:611 ends the directive's line as it ends
+// after the marker byte and the version byte, and RunPreprocLoop in
+// src/preprocessor/preprocessor.cpp ends the directive's line as it ends
 // every other line, so the output held five and every line below the directive
 // was reported one further down than it stands in the source.
 //
@@ -196,7 +196,7 @@ TEST(KeywordVersionExamplePreproc,
 // HandleBeginKeywords: HandleEndKeywords never runs, so a correction made to
 // that handler alone leaves this case failing. The open region draws no report
 // here because Preprocessor::ReportUnterminatedKeywordRegions is called from
-// src/main.cpp:397 alone, and the Preprocess of
+// PreprocessSources in src/main.cpp alone, and the Preprocess of
 // lib/cpp/test_fixtures/fixture_preprocessor.h does not call it.
 TEST(KeywordVersionExamplePreproc, BeginKeywordsLineIsOneLineOfOutput) {
   const std::string kSrc =

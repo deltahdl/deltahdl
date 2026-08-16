@@ -78,11 +78,11 @@ void CheckClockingOutputBinding(const ClockingSignalDecl& sig,
 
 // §14.3: the skew a report names for a clocking signal reads the signal's
 // direction rather than the field the skew was parsed into.
-// ParseClockingDirection in src/parser/parser_clocking.cpp:152 parses an
-// output-only signal's one skew into `in_delay`, and MakeClockingSignal at :26
-// stores that in ClockingSignalDecl::skew_delay and leaves out_skew_delay null,
-// so `output #P a;` arrives in the input slot and would otherwise be reported
-// as an input skew.
+// Parser::ParseClockingDirection in src/parser/parser_clocking.cpp parses an
+// output-only signal's one skew into `in_delay`, and MakeClockingSignal in the
+// same file stores that in ClockingSignalDecl::skew_delay and leaves
+// out_skew_delay null, so `output #P a;` arrives in the input slot and would
+// otherwise be reported as an input skew.
 static std::string ClockingSignalSkewRole(const ClockingSignalDecl& sig,
                                           bool from_out_field) {
   std::string_view half =
@@ -461,8 +461,8 @@ struct ProceduralRoot {
 //
 // A generate construct holds its items in gen_body, in gen_else->gen_body and
 // in the body of each entry of gen_case_items, which is the shape
-// ValidateConstFuncCallsInGenerate walks at
-// src/elaborator/elaborator_validate_funcchecks.cpp:886. A task or a function
+// ValidateConstFuncCallsInGenerate walks in
+// src/elaborator/elaborator_validate_funcchecks.cpp. A task or a function
 // holds a vector of statements in func_body_stmts rather than the single body a
 // process holds, so each of those is a root of its own.
 static void CollectProceduralRoots(const std::vector<ModuleItem*>& items,

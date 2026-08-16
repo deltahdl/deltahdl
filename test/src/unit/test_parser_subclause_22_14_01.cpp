@@ -159,7 +159,7 @@ TEST(KeywordVersionExampleParsing, VerilogRegionRejectsTheInterface) {
   for (const char* specifier : {"1364-2005", "1364-2001", "1364-1995"}) {
     // §3.12.1 owns the report: with `interface` an ordinary identifier again,
     // the declaration heads nothing the compilation unit admits and
-    // Parser::ParseTopLevel says so at src/parser/parser.cpp:499.
+    // Parser::ReportUnexpectedTopLevelToken says so in src/parser/parser.cpp.
     auto r = ParseWithPreprocessor(Guarded(specifier, kInterface));
     EXPECT_TRUE(ReportedError(r.diags, "expected top-level declaration",
                               LineInRegion(1), "3.12.1"))

@@ -86,8 +86,9 @@ inline ParseResult ParseWithPreprocessor(const std::string& src) {
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
   auto pp = preproc.Preprocess(fid);
-  // Registered with its origins, as src/main.cpp:420 registers it, so a report
-  // this fixture provokes is formatted the way the binary formats it.
+  // Registered with its origins, as the AddPreprocessedFile call in
+  // ParseSource in src/main.cpp registers it, so a report this fixture
+  // provokes is formatted the way the binary formats it.
   auto pp_fid = result.mgr.AddPreprocessedFile("<preprocessed>", pp,
                                                preproc.LineOrigins());
   Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag,

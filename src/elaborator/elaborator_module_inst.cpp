@@ -30,11 +30,11 @@ static DataType TypeParamOverrideToDataType(const Expr* expr,
 // The specialization arguments written on a parameterized class name, in the
 // form DataType::type_params holds them in.
 //
-// Parser::ParseParameterizedScope at src/parser/expr_parser.cpp:689 records
+// Parser::ParseParameterizedScope in src/parser/expr_parser.cpp records
 // `Buf#(byte)` onto the identifier node as has_param_spec, arg_names and
 // elements, because an override value is parsed as an expression. That is a
-// different shape from the DataType vector Parser::ParseTypeParamList at
-// src/parser/parser_types.cpp:257 builds for the declaration `Buf#(byte) v;`,
+// different shape from the DataType vector Parser::ParseTypeParamList in
+// src/parser/parser_types.cpp builds for the declaration `Buf#(byte) v;`,
 // which is the shape ResolveParameterizedType substitutes from. Each argument
 // is a type written where an expression was parsed, so it converts through the
 // same route the override value itself takes.
@@ -75,16 +75,16 @@ static void FillDefaultSpecializationArgs(std::vector<DataType>& args,
 // §8.23 names a type parameter assignment as one of the contexts in which a
 // class scope resolution may prefix a type name, so `.T(Frame::payload_t)`
 // denotes the typedef `payload_t` declared in class `Frame`. The parse is a
-// kMemberAccess with is_scope_resolution set, from Parser::MakeMemberAccess at
-// src/parser/expr_parser.cpp:622. When the class and its typedef are visible
+// kMemberAccess with is_scope_resolution set, from Parser::MakeMemberAccess in
+// src/parser/expr_parser.cpp. When the class and its typedef are visible
 // the override binds to the type the typedef aliases; type_ref_expr is dropped
-// for the reason ResolveClassScopedTypeRef drops it at
-// src/elaborator/elaborator_validate_struct_types.cpp:124, namely that the
+// for the reason ResolveClassScopedTypeRef drops it in
+// src/elaborator/elaborator_validate_struct_types.cpp, namely that the
 // alias has already been resolved and a leftover `type(...)` argument would be
 // resolved a second time against the child's scope. When they are not visible
 // the two halves of the name are kept in the shape Parser::ParseNamedType
 // writes the declaration form `Frame::payload_t` in
-// (src/parser/parser_types.cpp:308-309), so whatever resolves a named type
+// (src/parser/parser_types.cpp), so whatever resolves a named type
 // later still has both. Returns a DataType left at kImplicit when the node is
 // not a scope resolution over two identifiers.
 //
@@ -138,7 +138,7 @@ static DataType ClassScopedOverrideToDataType(const Expr* expr,
 // True when `expr` is a packed dimension written on a type rather than a select
 // of a value. §7.4.1 writes a packed dimension as the range [msb:lsb], which
 // Parser::ParseSelectExpr records as index and index_end with neither
-// part-select flag set (src/parser/expr_parser.cpp:923-940); a bit select
+// part-select flag set (src/parser/expr_parser.cpp); a bit select
 // leaves index_end null and a +:/-: part select sets one of the flags, and
 // neither of those names a type.
 static bool IsPackedDimSelect(const Expr* expr) {
@@ -149,7 +149,7 @@ static bool IsPackedDimSelect(const Expr* expr) {
 
 // Peels the packed dimensions off `expr`, appending each to `sels` and
 // returning the node they were written on. Parser::ParseSelectExpr hangs each
-// select off the expression it follows (src/parser/expr_parser.cpp:736), so the
+// select off the expression it follows (src/parser/expr_parser.cpp), so the
 // first dimension written is the innermost node and `sels` comes out in the
 // reverse of written order.
 static const Expr* PeelPackedDimSelects(const Expr* expr,
@@ -185,8 +185,8 @@ static void PrependWrittenPackedDims(DataType& dt,
 
 // The type named by the head of a type-parameter override, once its packed
 // dimensions have been peeled off: a name (a keyword type, which
-// Parser::ParseCastOrTypedPattern hands over as an identifier at
-// src/parser/expr_parser.cpp:581-587, a typedef, or a class), or a class scope
+// Parser::ParseCastOrTypedPattern hands over as an identifier in
+// src/parser/expr_parser.cpp, a typedef, or a class), or a class scope
 // resolution. Anything else leaves the DataType at kImplicit.
 static DataType OverrideHeadToDataType(const Expr* head,
                                        const CompilationUnit* unit,
@@ -213,7 +213,7 @@ static DataType OverrideHeadToDataType(const Expr* head,
 // §6.20.3: convert the value of an instance parameter value assignment that
 // binds a type parameter into the DataType it names.
 // Parser::ParseParamValueEntry parses that value with ParseExpr
-// (src/parser/parser_inst.cpp:122 and :128) because the parse cannot know which
+// in src/parser/parser_inst.cpp because the parse cannot know which
 // of the child's parameters are type parameters, so the type has to be read
 // back off the expression node the parse left. A returned DataType still at
 // DataTypeKind::kImplicit means the value names no type, which is what lets the

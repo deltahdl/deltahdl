@@ -261,8 +261,8 @@ TEST(ScopeRulesElaboration,
 // written inside a fork into Stmt::fork_stmts on a StmtKind::kFork node, which
 // that guard never compares against itself.
 //
-// One source covers all three closing keywords. Parser::ParseForkStmt at
-// src/parser/parser_stmt.cpp:644 records the closing keyword in
+// One source covers all three closing keywords. Parser::ParseForkStmt in
+// src/parser/parser_stmt.cpp records the closing keyword in
 // Stmt::join_kind and pushes the declarations into Stmt::fork_stmts whether
 // join, join_any or join_none closes the block, so the three shapes differ in
 // Stmt::join_kind alone and a case per keyword would hand the walk one input

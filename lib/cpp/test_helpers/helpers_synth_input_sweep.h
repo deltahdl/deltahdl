@@ -14,11 +14,11 @@
 // `values - 1` and expects the output word to carry `expected(v)`.
 
 // Drive the values 0 to `values - 1` through the netlist `src` lowers to, and
-// expect the output word to carry `expected(v)`. `SynthLower::MapPorts` at
-// src/synthesizer/synth_lower.cpp:261 walks `mod->ports` in declaration order
+// expect the output word to carry `expected(v)`. `SynthLower::MapPorts` in
+// src/synthesizer/synth_lower.cpp walks `mod->ports` in declaration order
 // and allocates one AIG input per bit, low bit first, so bit i of the driven
 // word is bit i of the module's input storage.
-// `SynthLower::RegisterOutputs` at src/synthesizer/synth_lower.cpp:756 emits
+// `SynthLower::RegisterOutputs` in src/synthesizer/synth_lower.cpp emits
 // each output port's bits the same way, so bit j of the word `EvalAigOutputs`
 // answers is bit j of the module's output storage.
 //

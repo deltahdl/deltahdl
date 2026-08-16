@@ -52,7 +52,8 @@ TEST(BehaviorOfRandomizationMethods, PreRandomizeCannotBlock) {
              f));
   // The rule 18.6.3 states for pre_randomize() is enforced by the general
   // prohibition on a time-controlling statement in a function, which
-  // src/elaborator/elaborator_validate_funcbody.cpp:146-148 reports under
+  // CheckFuncBodyTimeControl in
+  // src/elaborator/elaborator_validate_funcbody.cpp reports under
   // §13.4; that is the report this source provokes.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
@@ -73,7 +74,8 @@ TEST(BehaviorOfRandomizationMethods, PostRandomizeCannotBlock) {
              "endmodule\n",
              f));
   // As in PreRandomizeCannotBlock, the report is the §13.4 one from
-  // src/elaborator/elaborator_validate_funcbody.cpp:146-148.
+  // CheckFuncBodyTimeControl in
+  // src/elaborator/elaborator_validate_funcbody.cpp.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "time-controlling statement is not allowed inside a function", 3,
@@ -149,8 +151,8 @@ TEST(BehaviorOfRandomizationMethods, PreRandomizeWithEventControlCannotBlock) {
              "module m;\n"
              "endmodule\n",
              f));
-  // Again the §13.4 report from
-  // src/elaborator/elaborator_validate_funcbody.cpp:146-148, which covers the
+  // Again the §13.4 report from CheckFuncBodyTimeControl in
+  // src/elaborator/elaborator_validate_funcbody.cpp, which covers the
   // event control as well as the delay.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),

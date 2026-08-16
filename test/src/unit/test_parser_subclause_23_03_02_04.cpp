@@ -104,8 +104,8 @@ TEST(WildcardPortConnectionParsing, WildcardAppearsAtMostOnce) {
       "module top;\n"
       "  sub u1(.*, .clk(c), .*);\n"
       "endmodule\n");
-  // src/parser/parser_inst.cpp:178 files this report under §23.3.2, the parent
-  // of the subclause this file is named for.
+  // Parser::ParsePortConnection in src/parser/parser_inst.cpp files this report
+  // under §23.3.2, the parent of the subclause this file is named for.
   EXPECT_TRUE(ReportedError(r.diags,
                             ".* port connection shall appear at most once in a "
                             "port connection list",
@@ -117,8 +117,9 @@ TEST(WildcardPortConnectionParsing, WildcardCannotMixWithPositional) {
       "module top;\n"
       "  sub u1(a, .*);\n"
       "endmodule\n");
-  // src/parser/parser_inst.cpp:69 files the ordered/named mix under §23.3.2,
-  // the parent of the subclause this file is named for.
+  // Parser::ParseModuleInstList in src/parser/parser_inst.cpp files the
+  // ordered/named mix under §23.3.2, the parent of the subclause this file is
+  // named for.
   EXPECT_TRUE(ReportedError(
       r.diags, "ordered and named port connections cannot be mixed", 2,
       "23.3.2"));

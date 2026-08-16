@@ -209,8 +209,8 @@ TEST(CycleDelayElab, CheckerInitialCycleDelayRejectedWithDefaultClocking) {
   ASSERT_NE(design, nullptr);
   // The rejection this case records is §17.5's, not §14.11's: the default
   // clocking above silences ValidateCycleDelayDefaultClocking, and what is left
-  // is the checker-initial rule reported at
-  // src/elaborator/elaborator_items_udp.cpp:363-368.
+  // is the checker-initial rule reported by CheckCheckerBodyItemRules in
+  // src/elaborator/elaborator_items_udp.cpp.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "an initial procedure in checker 'chk' may use only an event control", 6,

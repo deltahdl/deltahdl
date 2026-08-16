@@ -159,7 +159,8 @@ TEST(ExternModuleParsing, NestedExternModuleDecl) {
 TEST(ExternModuleParsing, ErrorMissingSemicolon) {
   auto r = Parse("extern module m(input a)\n");
   // The header terminator is shared with module_ansi_header, so
-  // src/parser/parser_port.cpp:729 files it under §23.2.1 rather than §23.5.
+  // Parser::ParseParamsPortsAndSemicolon in src/parser/parser_port.cpp files
+  // it under §23.2.1 rather than §23.5.
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got EOF", 2, "23.2.1"));
 }
 

@@ -348,16 +348,16 @@ jobs:
           exit $fail
   # This job fails when a file anywhere under src/ hands DiagEngine::Error or
   # DiagEngine::Warning an empty location: {}, SourceLoc{} or SourceLoc().
-  # SourceManager::FormatLoc renders one as "<unknown location>" at
-  # src/common/source_mgr.cpp:31, and DiagEngine::Emit then skips the source
+  # SourceManager::FormatLoc in src/common/source_mgr.cpp renders one as
+  # "<unknown location>", and DiagEngine::Emit then skips the source
   # line and the caret because there is no line to quote. A report given one
   # tells somebody whose source description was rejected what went wrong and
   # not where, and a source description holding several of the construct under
   # test produces one sentence with nothing to tell the failures apart.
   #
   # A report about the run rather than about a construct written in a source
-  # description says so with SourceLoc::None(), declared at
-  # src/common/source_loc.h:27. That value is what lets this job cover the
+  # description says so with SourceLoc::None(), declared in
+  # src/common/source_loc.h. That value is what lets this job cover the
   # whole tree rather than src/simulator alone: a source description that
   # cannot be read has no position to stand at, and before #3006 the only way
   # to say so read the same as passing nothing.
@@ -442,8 +442,9 @@ jobs:
   #     as readily as FindDiag does: test_elaborator_subclause_35_05_02.cpp and
   #     test_elaborator_subclause_33_05_03.cpp each declared one, as
   #     EXPECT_TRUE(LexHasErrors("…")) hid five assertions from #3017;
-  #   diags.front().subclause, which lib/cpp/test_fixtures/fixture_parser.h:44-46
-  #     documents as the wrong report to read when a source is rejected twice.
+  #   diags.front().subclause, which the comment on FindDiag in
+  #     lib/cpp/test_fixtures/fixture_parser.h documents as the wrong report to
+  #     read when a source is rejected twice.
   #
   # A count is worse than the boolean it replaces rather than better:
   # ASSERT_EQ(diags.size(), 1u) states how many reports a run made and nothing

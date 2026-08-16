@@ -521,7 +521,7 @@ TEST(ValueParameters, BitSelectOfRealParameterRejected) {
 
 // §6.20.2 forbids a hierarchical reference in a value parameter's default, and
 // CheckParamMapHierRefs in
-// src/elaborator/elaborator_validate_queries_dims.cpp:621 stands that report at
+// src/elaborator/elaborator_validate_queries_dims.cpp stands that report at
 // the default expression's range.start. Here the default is a conditional
 // expression, and Parser::TryParseSpecialInfix in src/parser/expr_parser.cpp
 // left every ExprKind::kTernary without a position before this commit, so the
@@ -545,7 +545,7 @@ TEST(ValueParameters, HierarchicalReferenceInConditionalDefaultNamesItsLine) {
 // §6.20.2: "A parameter constant can have a type specification and a range
 // specification", so a parameter's value is a constant expression. A class
 // #() parameter port whose default names a module variable has no constant
-// value, and RecordClassParam in src/elaborator/elaborator_resolve.cpp:250
+// value, and RecordClassParam in src/elaborator/elaborator_resolve.cpp
 // stands the report at that default expression's range.start -- the `v` on
 // line 4. Before that report the parameter was left out of the scope
 // altogether, which read to every later consumer as a name it could not see

@@ -151,7 +151,7 @@ inline void ExpectConfigurationWordsParse(const char* spec) {
 
   // The companion list leaves `config` an ordinary identifier, so the
   // declaration heading line 3 of the source above is no top-level declaration
-  // at all and Parser::ParseTopLevel says so at src/parser/parser.cpp:499.
+  // at all and Parser::ParseTopLevel in src/parser/parser.cpp says so.
   auto dropped = ParseWithPreprocessor(InNoconfig(kSrc));
   EXPECT_TRUE(ReportedError(dropped.diags, "expected top-level declaration",
                             LineInRegion(3), "3.12.1"));
@@ -282,7 +282,7 @@ inline void ExpectTable224ConstructsParse(const char* spec) {
 
   // "1364-2005" reserves none of the words the source above is written in, so
   // `package` on its first line heads no top-level declaration and
-  // Parser::ParseTopLevel says so at src/parser/parser.cpp:499.
+  // Parser::ParseTopLevel in src/parser/parser.cpp says so.
   auto before = ParseWithPreprocessor(In2005(kSrc));
   EXPECT_TRUE(ReportedError(before.diags, "expected top-level declaration",
                             LineInRegion(1), "3.12.1"));
@@ -304,11 +304,11 @@ inline void ExpectKeywordTableIsReservedAtParse(const char* spec,
     ++swept;
 
     // VarDecl heads its declaration with `reg`, so the list is a variable
-    // declaration and Parser::ParseVarDeclList reads the name under §6.8 --
-    // the choice against §6.7 is made at src/parser/parser_types.cpp:568.
-    // The report names the entry itself, because ParseDataType takes the
-    // signing before the packed dimensions at
-    // src/parser/parser_types.cpp:430 and so consumes nothing after `[7:0]`.
+    // declaration and Parser::ParseVarDeclList in src/parser/parser_types.cpp
+    // reads the name under §6.8 -- that function makes the choice against
+    // §6.7. The report names the entry itself, because Parser::ParseDataType
+    // in src/parser/parser_types.cpp takes the signing before the packed
+    // dimensions and so consumes nothing after `[7:0]`.
     auto reserved = ParseWithPreprocessor(In(spec, VarDecl(word)));
     EXPECT_TRUE(ReportedError(
         reserved.diags, std::string("expected identifier, got '") + word + "'",

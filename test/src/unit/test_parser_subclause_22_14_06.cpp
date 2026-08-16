@@ -202,8 +202,8 @@ TEST(CompilerDirectiveParsing,
                             LineInRegion(1), "23.2.2.2"));
 
   // §6.8 owns the third: a packed dimension is where the declaration was meant
-  // to end, so Parser::ParsePlainVarDecl demands the semicolon at
-  // src/parser/parser_items.cpp:712.
+  // to end, so Parser::ParsePlainVarDecl in src/parser/parser_items.cpp
+  // demands the semicolon.
   auto in_body =
       ParseWithPreprocessor(In2005("module ch (a, y);\n"
                                    "  input  [7:0] a;\n"
@@ -463,8 +463,8 @@ TEST(CompilerDirectiveParsing,
       nullptr);
 
   // §3.12.1 owns the report: with `package` an ordinary identifier the first
-  // line heads nothing the compilation unit admits, and Parser::ParseTopLevel
-  // says so at src/parser/parser.cpp:499.
+  // line heads nothing the compilation unit admits, and
+  // Parser::ReportUnexpectedTopLevelToken says so in src/parser/parser.cpp.
   auto before = ParseWithPreprocessor(In2005(kSrc));
   EXPECT_TRUE(ReportedError(before.diags, "expected top-level declaration",
                             LineInRegion(1), "3.12.1"));

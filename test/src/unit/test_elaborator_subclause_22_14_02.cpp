@@ -138,9 +138,9 @@ TEST(Verilog1995KeywordElaboration, ConstantWidthFromLiteralAndFromParameter) {
 TEST(Verilog1995KeywordElaboration, WordOutsideTheListIsNotADataType) {
   ElabFixture in_region;
   // `logic` is an ordinary identifier under 1364-1995, so the declaration is
-  // read as one name followed by another and the parser reports at
-  // src/parser/parser_items.cpp:712. The rejection this case rests on is the
-  // parser's, which is why the source is not required to parse.
+  // read as one name followed by another and Parser::ParsePlainVarDecl in
+  // src/parser/parser_items.cpp reports. The rejection this case rests on is
+  // the parser's, which is why the source is not required to parse.
   ElaborateWithPreprocessorAllowingParseErrors(In1995("module t;\n"
                                                       "  logic [7:0] v;\n"
                                                       "endmodule\n"),

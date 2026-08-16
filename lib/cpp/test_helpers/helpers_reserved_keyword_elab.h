@@ -48,14 +48,14 @@ inline void ExpectKeywordTableIsReserved(const char* spec,
     ElabFixture reserved;
     // Being reserved is what the parser enforces: the word lexes as a keyword
     // token and the declaration's name slot wants an identifier, so
-    // Parser::ExpectIdentifier reports at src/parser/parser_inst.cpp:387 by way
-    // of ParseVarDeclList at src/parser/parser_types.cpp:584. That report is
+    // Parser::ExpectIdentifier in src/parser/parser_inst.cpp reports by way of
+    // Parser::ParseVarDeclList in src/parser/parser_types.cpp. That report is
     // this leg's subject, so the source is not required to parse.
     ElaborateWithPreprocessorAllowingParseErrors(In(spec, VarDecl(word)),
                                                  reserved, "m");
     // The report names the entry itself. VarDecl heads the declaration with
-    // `reg`, and Parser::ParseDataType takes the signing before the packed
-    // dimensions at src/parser/parser_types.cpp:430, so nothing after `[7:0]`
+    // `reg`, and Parser::ParseDataType in src/parser/parser_types.cpp takes
+    // the signing before the packed dimensions, so nothing after `[7:0]`
     // is consumed and the word stands where the name is demanded -- `signed`
     // and `unsigned` included.
     EXPECT_TRUE(
@@ -126,9 +126,10 @@ inline void ExpectWordsNameObjectsButAreNotTypes(
     ElabFixture as_type;
     // The word heads no data type, so ParseImplicitTypeOrInst reads it as the
     // name of a plain variable and the packed dimension that follows is where
-    // the declaration was meant to end: Parser::Expect reports "expected ';',
-    // got '['" at src/parser/parser_items.cpp:712. The rejection is the
-    // parser's, so the source is not required to parse.
+    // the declaration was meant to end: the semicolon demand in
+    // Parser::ParsePlainVarDecl in src/parser/parser_items.cpp reports
+    // "expected ';', got '['". The rejection is the parser's, so the source is
+    // not required to parse.
     ElaborateWithPreprocessorAllowingParseErrors(
         In(spec,
            std::string("module m;\n  ") + word + " [7:0] v;\nendmodule\n"),
@@ -161,9 +162,12 @@ inline void ExpectDeclsFailInRegionButElaborateOutside(
     ElabFixture in_region;
     // Inside the region the declaration's head word is a plain identifier, so
     // the parser reports rather than the elaborator: "expected ';', got '['"
-    // at src/parser/parser_items.cpp:712 for a declaration carrying a packed
-    // dimension, and "expected '(', got ';'" at src/parser/parser_inst.cpp:78
-    // for one read as a module instantiation instead.
+    // from the semicolon demand in Parser::ParsePlainVarDecl in
+    // src/parser/parser_items.cpp for a declaration carrying a packed
+    // dimension, and "expected '(', got ';'" from the port list's opening
+    // parenthesis demand in Parser::ParseModuleInstList in
+    // src/parser/parser_inst.cpp for one read as a module instantiation
+    // instead.
     ElaborateWithPreprocessorAllowingParseErrors(In(spec, src), in_region, "t");
     // Which of the two the declaration draws is decided by the packed
     // dimension it carries: with one, the dimension is where the declaration

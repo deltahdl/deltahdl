@@ -68,7 +68,7 @@ inline std::string InSv2012(const std::string& body) {
 // source `In` built, because the fixtures re-lex that output as a file of its
 // own. The two agree line for line: Preprocessor::HandleBeginKeywords writes
 // the keyword marker and the version byte and nothing else, and RunPreprocLoop
-// ends the directive's line at src/preprocessor/preprocessor.cpp:611 as it
+// in src/preprocessor/preprocessor.cpp ends the directive's line as it
 // ends every other line. So the lines `In` writes above the body are the whole
 // of the offset.
 inline uint32_t LineInRegion(uint32_t body_line) {

@@ -141,8 +141,8 @@ TEST(CompilerDirectiveParsing, SystemVerilog2009AddedCheckerOpensAnElement) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 
   // §3.12.1 owns the report: with `checker` an ordinary identifier the first
-  // line heads nothing the compilation unit admits, and Parser::ParseTopLevel
-  // says so at src/parser/parser.cpp:499.
+  // line heads nothing the compilation unit admits, and
+  // Parser::ReportUnexpectedTopLevelToken says so in src/parser/parser.cpp.
   auto before = ParseWithPreprocessor(InSv2005(kSrc));
   EXPECT_TRUE(ReportedError(before.diags, "expected top-level declaration",
                             LineInRegion(1), "3.12.1"));
@@ -214,7 +214,7 @@ TEST(CompilerDirectiveParsing, SystemVerilog2009AddedLetOpensDeclarations) {
 
   // §3.12.1 owns the report: with `let` an ordinary identifier the
   // compilation-unit form on the first line heads nothing, and
-  // Parser::ParseTopLevel says so at src/parser/parser.cpp:499.
+  // Parser::ReportUnexpectedTopLevelToken says so in src/parser/parser.cpp.
   auto before = ParseWithPreprocessor(InSv2005(kSrc));
   EXPECT_TRUE(ReportedError(before.diags, "expected top-level declaration",
                             LineInRegion(1), "3.12.1"));

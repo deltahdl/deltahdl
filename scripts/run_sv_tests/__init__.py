@@ -285,9 +285,9 @@ _SUBCLAUSE_RE = re.compile(r"\(§(\d+(?:\.\d+)*)\)")
 def reported_subclauses(stderr: str) -> list[str]:
     """List every subclause named by a diagnostic in *stderr*, in the order written.
 
-    ``DiagEngine::Emit`` at ``src/common/diagnostic.cpp:47`` appends the
-    subclause of IEEE 1800-2023 a diagnostic enforces to the end of its
-    message, as ``(§11.4.14)``. A report constructed with
+    ``DiagEngine::Emit`` in ``src/common/diagnostic.cpp`` appends the subclause
+    of IEEE 1800-2023 a diagnostic enforces to the end of its message, as
+    ``(§11.4.14)``. A report constructed with
     ``Subclause::None()`` states a fact about the run rather than a breach of
     the standard, so it names nothing and contributes nothing here.
     """

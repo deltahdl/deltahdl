@@ -44,8 +44,8 @@ TEST(PackageImportInHeader, ConstantVisibleInParameterDefault) {
 }
 
 // The declared width is what says the header import reached the body
-// declaration. Nothing reports an unresolved named type -- EvalTypeWidth at
-// src/elaborator/type_eval.cpp:192 answers 0 for a DataTypeKind::kNamed it
+// declaration. Nothing reports an unresolved named type -- EvalTypeWidth in
+// src/elaborator/type_eval.cpp answers 0 for a DataTypeKind::kNamed it
 // could not resolve and the run carries on -- so an assertion that elaboration
 // succeeded holds whether pkg::nibble_t was registered or not. 4 is also not
 // the 1 that RtlirVariable::width defaults to.

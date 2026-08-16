@@ -44,7 +44,7 @@ TEST(RealDataType, ShortrealHasSinglePrecision) {
 // Nothing above it covers that path. ShortrealHasSinglePrecision reads through
 // `rs = s`, the one decode that is already width-aware, so it passes whatever
 // the formatter does. VariableDeclaration.ShortrealDefaultIsZero in
-// test/src/unit/test_simulator_subclause_06_08.cpp:159 asserts on the value 0,
+// test/src/unit/test_simulator_subclause_06_08.cpp asserts on the value 0,
 // whose float pattern and double pattern are both an all-zero word, so it holds
 // under either decoding and can never fail on this.
 //

@@ -109,8 +109,9 @@ inline RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
 inline CompilationUnit* PreprocessAndParseCu(ElabFixture& f, uint32_t fid,
                                              Preprocessor& preproc) {
   auto pp = preproc.Preprocess(fid);
-  // Registered with its origins, as src/main.cpp:420 registers it, so a report
-  // this fixture provokes is formatted the way the binary formats it.
+  // Registered with its origins, as the AddPreprocessedFile call in
+  // ParseSource in src/main.cpp registers it, so a report this fixture
+  // provokes is formatted the way the binary formats it.
   auto pp_fid =
       f.mgr.AddPreprocessedFile("<preprocessed>", pp, preproc.LineOrigins());
   Lexer lexer(f.mgr.FileContent(pp_fid), pp_fid, f.diag,

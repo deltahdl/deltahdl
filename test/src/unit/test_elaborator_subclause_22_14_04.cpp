@@ -56,8 +56,8 @@ TEST(NoconfigKeywordElaboration, ExcludedWordsNameElaboratedVariables) {
 
     ElabFixture reserved;
     // A reserved word in a declaration's name slot is a keyword token where an
-    // identifier is required, so the parser reports at
-    // src/parser/parser_inst.cpp:387 and the source does not parse.
+    // identifier is required, so Parser::ExpectIdentifier in
+    // src/parser/parser_inst.cpp reports and the source does not parse.
     ElaborateWithPreprocessorAllowingParseErrors(In2001(decl), reserved, "t");
     // The report names the keyword it found, so each of the ten is asserted on
     // its own word rather than on a sentence all ten share.
@@ -81,7 +81,8 @@ TEST(NoconfigKeywordElaboration, KeptAdditionsCannotNameElaboratedVariables) {
 
     ElabFixture reserved;
     // As above: the word is still a keyword token here, so the report this
-    // leg rests on is the parser's, at src/parser/parser_inst.cpp:387.
+    // leg rests on is the parser's, from Parser::ExpectIdentifier in
+    // src/parser/parser_inst.cpp.
     ElaborateWithPreprocessorAllowingParseErrors(InNoconfig(decl), reserved,
                                                  "t");
     EXPECT_TRUE(
@@ -269,8 +270,8 @@ TEST(NoconfigKeywordElaboration, ExcludedWordNamesAGenvarDrivingAGenerateLoop) {
   // what the parser enforces, so this leg reaches its subject through a source
   // that does not parse. `incdir` is the first of the two the parser reaches:
   // it is a keyword token in the name slot of a parameter declaration, so
-  // Parser::ParseParamDecl reports through Parser::Expect at
-  // src/parser/parser_types.cpp:688 under §6.20.1.
+  // Parser::ParseParamDecl in src/parser/parser_types.cpp reports through
+  // Parser::Expect under §6.20.1.
   ElabFixture reserved;
   ElaborateWithPreprocessorAllowingParseErrors(
       In2001("module t;\n"
