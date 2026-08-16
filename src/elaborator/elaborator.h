@@ -366,8 +366,6 @@ class Elaborator : public ElaboratorData {
 
   void ResolveTypeRef(ModuleItem* item, const RtlirModule* mod);
 
-  bool ResolveParameterizedType(DataType& dtype);
-
   void ValidateArrayInitPattern(const ModuleItem* item);
   void ValidateStructInitPattern(const ModuleItem* item);
 

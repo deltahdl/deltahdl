@@ -368,4 +368,101 @@ TEST(ParameterOverride, TypeParameterOverriddenByPackageScopedTypeName) {
   ExpectVariableWidth(SoleChildInstance(design), "data", 16u);
 }
 
+// §8.25 (printed page 204) states that "a generic class is not a type; only a
+// concrete specialization represents a type", and that two specializations are
+// the same type only when all their parameters are the same. So Buf#(byte) and
+// Buf#(shortint) name different types, and the elem_t of the first is a byte.
+// The width is read back because an override that dropped the #(byte) would
+// still name a type and so would be reported nowhere: the child's variable
+// would take the class's own default of int, 32 bits, or the child's declared
+// default of longint, 64.
+TEST(ParameterOverride,
+     TypeParameterOverriddenByClassSpecializationScopedName) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class Buf #(type T = int);\n"
+      "  typedef T elem_t;\n"
+      "endclass\n"
+      "module child #(parameter type P = longint)();\n"
+      "  P data;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.P(Buf#(byte)::elem_t)) u0();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ExpectVariableWidth(SoleChildInstance(design), "data", 8u);
+}
+
+// §23.10.2.1 assigns a parameter by position rather than by name, and
+// ResolvePositionalInstParams in src/elaborator/elaborator_module_inst.cpp
+// selects the override through a separate path from the named form. The
+// specialization has to survive that path too, giving 8 rather than the child's
+// declared default of 64.
+TEST(ParameterOverride,
+     TypeParameterOverriddenByClassSpecializationInOrderedAssignment) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class Buf #(type T = int);\n"
+      "  typedef T elem_t;\n"
+      "endclass\n"
+      "module child #(parameter type P = longint)();\n"
+      "  P data;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(Buf#(byte)::elem_t) u0();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ExpectVariableWidth(SoleChildInstance(design), "data", 8u);
+}
+
+// A second argument to the same class, so that reaching 8 bits above cannot be
+// done by reading any one type and calling it the answer. §8.25 (printed page
+// 204) makes Buf#(shortint) a distinct type from Buf#(byte), and its elem_t is
+// 16 bits.
+TEST(ParameterOverride, TypeParameterOverriddenByASecondClassSpecialization) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class Buf #(type T = int);\n"
+      "  typedef T elem_t;\n"
+      "endclass\n"
+      "module child #(parameter type P = longint)();\n"
+      "  P data;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.P(Buf#(shortint)::elem_t)) u0();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ExpectVariableWidth(SoleChildInstance(design), "data", 16u);
+}
+
+// §8.25.1 (printed page 205) states that "the default specialization of a
+// parameterized class is the specialization of the parameterized class with an
+// empty parameter override list", and that outside the class the explicit
+// specialization form is what a scope resolution shall be written with. So
+// Buf#()::elem_t names elem_t with T at the int its declaration gives, 32 bits,
+// and neither the child's declared default of 64 nor a failure to name a type.
+TEST(ParameterOverride, TypeParameterOverriddenByDefaultClassSpecialization) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class Buf #(type T = int);\n"
+      "  typedef T elem_t;\n"
+      "endclass\n"
+      "module child #(parameter type P = longint)();\n"
+      "  P data;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.P(Buf#()::elem_t)) u0();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ExpectVariableWidth(SoleChildInstance(design), "data", 32u);
+}
+
 }  // namespace

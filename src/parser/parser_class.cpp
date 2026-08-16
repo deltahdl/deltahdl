@@ -289,7 +289,8 @@ ClassDecl* Parser::ParseClassDecl() {
     bool is_lp_group = false;
     while (!Check(TokenKind::kRParen) && !AtEnd()) {
       ParseParamPortDecl(decl->params, decl->type_param_names,
-                         decl->localparam_port_names, is_lp_group);
+                         decl->localparam_port_names, is_lp_group,
+                         &decl->param_types);
       Match(TokenKind::kComma);
     }
     Expect(TokenKind::kRParen, Subclause("8.25"));

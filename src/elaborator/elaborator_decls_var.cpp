@@ -600,7 +600,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
 
   ResolveTypeRef(item, mod);
 
-  ResolveParameterizedType(item->data_type);
+  ResolveParameterizedType(item->data_type, unit_);
 
   std::string_view adopted_array_typedef =
       AdoptTypedefArrayDims(item, typedefs_, td_array_dims_);

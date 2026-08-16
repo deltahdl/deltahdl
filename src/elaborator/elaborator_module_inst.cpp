@@ -22,6 +22,52 @@
 
 namespace delta {
 
+static DataType TypeParamOverrideToDataType(const Expr* expr,
+                                            const CompilationUnit* unit);
+
+// The specialization arguments written on a parameterized class name, in the
+// form DataType::type_params holds them in.
+//
+// Parser::ParseParameterizedScope at src/parser/expr_parser.cpp:689 records
+// `Buf#(byte)` onto the identifier node as has_param_spec, arg_names and
+// elements, because an override value is parsed as an expression. That is a
+// different shape from the DataType vector Parser::ParseTypeParamList at
+// src/parser/parser_types.cpp:257 builds for the declaration `Buf#(byte) v;`,
+// which is the shape ResolveParameterizedType substitutes from. Each argument
+// is a type written where an expression was parsed, so it converts through the
+// same route the override value itself takes.
+static std::vector<DataType> OverrideSpecializationArgs(
+    const Expr* name, const CompilationUnit* unit) {
+  std::vector<DataType> args;
+  args.reserve(name->elements.size());
+  for (size_t i = 0; i < name->elements.size(); ++i) {
+    DataType arg = TypeParamOverrideToDataType(name->elements[i], unit);
+    if (i < name->arg_names.size()) arg.param_arg_name = name->arg_names[i];
+    args.push_back(arg);
+  }
+  return args;
+}
+
+// Fills the arguments an override list leaves out from the class's own
+// defaults.
+//
+// §8.25.1 (printed page 205) states that "the default specialization of a
+// parameterized class is the specialization of the parameterized class with an
+// empty parameter override list", so `Buf#()::elem_t` names elem_t with every
+// parameter of Buf at the default its declaration gives, and a list shorter
+// than the parameter list leaves the rest there the same way. A named argument
+// binds to a formal by name rather than by position, which the positional fill
+// here would get wrong, so a list carrying one is left as it was written.
+static void FillDefaultSpecializationArgs(std::vector<DataType>& args,
+                                          const ClassDecl* cls) {
+  for (const auto& arg : args) {
+    if (!arg.param_arg_name.empty()) return;
+  }
+  for (size_t i = args.size(); i < cls->param_types.size(); ++i) {
+    args.push_back(cls->param_types[i]);
+  }
+}
+
 // §8.23 names a type parameter assignment as one of the contexts in which a
 // class scope resolution may prefix a type name, so `.T(Frame::payload_t)`
 // denotes the typedef `payload_t` declared in class `Frame`. The parse is a
@@ -37,6 +83,15 @@ namespace delta {
 // (src/parser/parser_types.cpp:308-309), so whatever resolves a named type
 // later still has both. Returns a DataType left at kImplicit when the node is
 // not a scope resolution over two identifiers.
+//
+// A prefix written with `#(...)` is a specialization instead of a plain class
+// name. §8.25 (printed page 204) states that "a generic class is not a type;
+// only a concrete specialization represents a type", and that two
+// specializations are the same type only when all their parameters are the
+// same, so `Buf#(byte)::elem_t` and `Buf#(shortint)::elem_t` are different
+// types and neither is what the unspecialized `Buf` would give. Such a prefix
+// therefore builds the named type ResolveParameterizedType substitutes into
+// rather than reading the member's declared type as it stands.
 static DataType ClassScopedOverrideToDataType(const Expr* expr,
                                               const CompilationUnit* unit) {
   DataType dt;
@@ -44,6 +99,22 @@ static DataType ClassScopedOverrideToDataType(const Expr* expr,
     return dt;
   }
   if (expr->rhs == nullptr || expr->rhs->kind != ExprKind::kIdentifier) {
+    return dt;
+  }
+  if (expr->lhs->has_param_spec) {
+    const auto* cls = FindClassDecl(expr->lhs->text, unit);
+    if (cls == nullptr) return dt;
+    dt.kind = DataTypeKind::kNamed;
+    dt.scope_name = expr->lhs->text;
+    dt.type_name = expr->rhs->text;
+    dt.type_params = OverrideSpecializationArgs(expr->lhs, unit);
+    FillDefaultSpecializationArgs(dt.type_params, cls);
+    // A specialization whose arguments do not reach the member leaves the
+    // override naming no type, which ResolveChildTypeParam reports against
+    // §23.10.2. Answering with the member's declared type instead would bind
+    // the parameter to the unspecialized class, which is the silence that
+    // report stands in place of.
+    if (!ResolveParameterizedType(dt, unit)) return DataType{};
     return dt;
   }
   const DataType* resolved =

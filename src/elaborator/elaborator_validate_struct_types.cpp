@@ -236,9 +236,9 @@ const DataType* FindClassScopedTypedefType(std::string_view cls_name,
   return &td->typedef_type;
 }
 
-bool Elaborator::ResolveParameterizedType(DataType& dtype) {
+bool ResolveParameterizedType(DataType& dtype, const CompilationUnit* unit) {
   if (dtype.scope_name.empty() || dtype.type_params.empty()) return false;
-  const auto* cls = FindClassDecl(dtype.scope_name, unit_);
+  const auto* cls = FindClassDecl(dtype.scope_name, unit);
   if (!cls) return false;
   std::unordered_map<std::string_view, const DataType*> subst;
   for (size_t i = 0; i < cls->params.size() && i < dtype.type_params.size();

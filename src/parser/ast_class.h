@@ -237,6 +237,14 @@ struct ClassDecl {
   std::vector<InterfaceRef> implements_types;
   std::vector<ClassMember*> members;
   std::vector<std::pair<std::string_view, Expr*>> params;
+  // The data type of each entry of params, in the same order: a value
+  // parameter's declared type, and a type parameter's default type (kImplicit
+  // when it has none). §8.25.1 defines the default specialization C#() as the
+  // one with an empty override list, so its arguments are these defaults, and a
+  // type parameter records its default nowhere else -- params holds an Expr*,
+  // and a default type is not an expression. ModuleDecl::param_types is the
+  // same list for a module's parameter_port_list.
+  std::vector<DataType> param_types;
   std::unordered_set<std::string_view> type_param_names;
   std::unordered_set<std::string_view> localparam_port_names;
 };

@@ -176,6 +176,17 @@ const ClassDecl* FindClassDecl(std::string_view name,
 const DataType* FindClassScopedTypedefType(std::string_view cls_name,
                                            std::string_view type_name,
                                            const CompilationUnit* unit);
+
+// §8.25: rewrites `dtype` in place when it names a member of a specialization
+// of a parameterized class, substituting the arguments DataType::type_params
+// carries for the class's own parameters. Returns false, leaving `dtype`
+// untouched, when it carries no arguments, when its scope_name reaches no
+// visible class, or when the member it names does not alias one of the
+// substituted parameters. Both the declared form `C#(int)::T v;` and the
+// override form `child #(.P(C#(int)::T)) u();` resolve through this, so a
+// caller outside Elaborator passes the compilation unit rather than reading it
+// off a member. Defined in elaborator_validate_struct_types.cpp.
+bool ResolveParameterizedType(DataType& dtype, const CompilationUnit* unit);
 bool IsRealType(DataTypeKind k);
 
 // §11.5.2 fixes how many addresses a select may carry before §11.5.1 judges it:
