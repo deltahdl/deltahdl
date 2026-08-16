@@ -675,15 +675,33 @@ Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
   // stepping over it draws no report.
   SkipSpacesAndTabs();
   uint32_t before_digits = pos_;
-  while (!AtEnd() &&
-         (std::isxdigit(static_cast<unsigned char>(Current())) ||
-          Current() == '_' || Current() == 'x' || Current() == 'z' ||
-          Current() == 'X' || Current() == 'Z' || Current() == '?')) {
+  // §5.7.1: "The third token, an unsigned number, shall consist of digits that
+  // are legal for the specified base format." A letter or digit that is illegal
+  // for the base is still written where the value token belongs, so the run
+  // covers every alphanumeric character and Lexer::ValidateBaseDigits judges
+  // what it collected against the base. Ending the run at the first character
+  // no base accepts would hand that function a span it can never reject for a
+  // hexadecimal literal, and would leave `4'hG` reported as a literal carrying
+  // no value at all.
+  while (!AtEnd() && (std::isalnum(static_cast<unsigned char>(Current())) ||
+                      Current() == '_' || Current() == '?')) {
     Advance();
   }
   if (pos_ == before_digits) {
-    diag_.Error(loc, "missing value digits after base specifier",
-                Subclause("5.7.1"));
+    if (!AtEnd() && (Current() == '+' || Current() == '-')) {
+      // §5.7.1: "A plus or minus operator between the base format and the
+      // number is an illegal syntax", which Example 3 writes as `8 'd -6`. The
+      // sign is no part of the value token, so a literal written with one
+      // arrives here with an empty value run, and the character that stopped
+      // the run is what says which sentence the source broke.
+      diag_.Error(loc,
+                  "plus or minus operator between the base format and the "
+                  "number is illegal syntax",
+                  Subclause("5.7.1"));
+    } else {
+      diag_.Error(loc, "missing value digits after base specifier",
+                  Subclause("5.7.1"));
+    }
   }
   if (pos_ > before_digits && source_[before_digits] == '_') {
     diag_.Error(loc, "underscore cannot be first character of number value",

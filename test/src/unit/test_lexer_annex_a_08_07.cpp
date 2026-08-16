@@ -374,8 +374,8 @@ TEST(NumberTokenLexing, ErrorOctalDigitOutOfRange) {
 
 TEST(NumberTokenLexing, ErrorHexDigitOutOfRange) {
   auto diags = LexDiagnostics("8'hG ");
-  EXPECT_TRUE(ReportedError(diags, "missing value digits after base specifier",
-                            1, "5.7.1"));
+  EXPECT_TRUE(
+      ReportedError(diags, "illegal digit for specified base", 1, "5.7.1"));
 }
 
 TEST(NumberTokenLexing, ErrorUnderscoreLeadingDigitValue) {
@@ -402,8 +402,14 @@ TEST(NumberTokenLexing, ErrorUnderscoreLeadingDigitValueHex) {
       "5.7.1"));
 }
 
+// A.8.7 gives `decimal_number` the alternative `[ size ] decimal_base
+// unsigned_number`, and its other three alternatives require an
+// unsigned_number, an x_digit or a z_digit just as squarely, so no
+// decimal_number is written without a value. `8'd;` is that source. `8'd-6`
+// does carry a value and breaches the separate §5.7.1 sentence about a sign
+// between the base format and the number, so it cannot stand for this rule.
 TEST(NumberTokenLexing, ErrorDecimalNoValueDigits) {
-  auto diags = LexDiagnostics("8'd-6");
+  auto diags = LexDiagnostics("8'd;");
   EXPECT_TRUE(ReportedError(diags, "missing value digits after base specifier",
                             1, "5.7.1"));
 }

@@ -89,28 +89,49 @@ TEST(IntegerLiteralLexing, RejectIllegalOctalDigit) {
                             "illegal digit for specified base", 1, "5.7.1"));
 }
 
+// §5.7.1 rules that "The third token, an unsigned number, shall consist of
+// digits that are legal for the specified base format", and `G` is legal for no
+// base. This case is what makes the 'h'/'H' arm of Lexer::ValidateBaseDigits
+// reachable: it goes red if the value run in Lexer::LexBasedNumber stops at `G`
+// instead of collecting it, because the literal is then reported as one with no
+// value at all.
 TEST(IntegerLiteralLexing, RejectIllegalHexDigit) {
-  // The report is the missing-value one rather than the illegal-digit one the
-  // name leads a reader to expect. The value-digit loop in
-  // Lexer::LexBasedNumber accepts only std::isxdigit characters, `_`, x, X, z,
-  // Z and ?, so `G` ends the run before it starts and Lexer::ValidateBaseDigits
-  // is handed an empty span. That loop and the 'h'/'H' case of
-  // Lexer::ValidateBaseDigits accept exactly the same characters, so no source
-  // reaches that case with a digit it rejects.
   EXPECT_TRUE(ReportedError(LexDiagnostics("4'hG"),
-                            "missing value digits after base specifier", 1,
-                            "5.7.1"));
+                            "illegal digit for specified base", 1, "5.7.1"));
 }
 
+// §5.7.1 rules that "The hexadecimal digits a to f shall be case insensitive",
+// so `g` is illegal in the case `G` is illegal in. The two cases are decided by
+// one std::isxdigit call, and this one goes red for a rejection written to read
+// uppercase offenders alone.
+TEST(IntegerLiteralLexing, RejectIllegalLowercaseHexDigit) {
+  EXPECT_TRUE(ReportedError(LexDiagnostics("4'hg"),
+                            "illegal digit for specified base", 1, "5.7.1"));
+}
+
+// §5.7.1 gives a based literal three tokens, the third of which is the value,
+// so an illegal digit written in the value belongs to the literal rather than
+// starting an identifier after it. `4'hG` is therefore one kIntLiteral spanning
+// the whole source, and this fails if the value run stops at `G` and leaves it
+// to Lexer::LexIdentifier.
+TEST(IntegerLiteralLexing, IllegalHexDigitLexesOneIntLiteral) {
+  auto tokens = Lex("4'hG");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[0].text, "4'hG");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
+}
+
+// §5.7.1 rules that "A plus or minus operator between the base format and the
+// number is an illegal syntax", and its Example 3 writes `8 'd -6` as illegal
+// syntax. This fails when the sign is reported as the neighbouring sentence of
+// the same subclause, which is what a literal carrying no value token at all
+// breaches.
 TEST(IntegerLiteralLexing, RejectSignBetweenBaseAndDigits) {
-  // §5.7.1 rules that "A plus or minus operator between the base format and the
-  // number is an illegal syntax", and the report names the neighbouring
-  // sentence of the same subclause instead: `-` is not a character the
-  // value-digit loop in Lexer::LexBasedNumber accepts, so the literal is
-  // rejected for carrying no value digits at all.
   EXPECT_TRUE(ReportedError(LexDiagnostics("8'd-6"),
-                            "missing value digits after base specifier", 1,
-                            "5.7.1"));
+                            "plus or minus operator between the base format "
+                            "and the number is illegal syntax",
+                            1, "5.7.1"));
 }
 
 TEST(IntegerLiteralLexing, RejectDecimalMultiDigitWithX) {
@@ -162,16 +183,17 @@ TEST(IntegerLiteralLexing, RejectIllegalDecimalDigit) {
 // §5.7.1: a plus or minus sign between the base format and the value digits is
 // illegal. The minus form is covered elsewhere; this pins the plus form.
 TEST(IntegerLiteralLexing, RejectPlusBetweenBaseAndDigits) {
-  // As with the minus form above, `+` ends the value-digit run in
-  // Lexer::LexBasedNumber before it begins, so the report names the missing
-  // value digits rather than the sign.
   EXPECT_TRUE(ReportedError(LexDiagnostics("8'd+6"),
-                            "missing value digits after base specifier", 1,
-                            "5.7.1"));
+                            "plus or minus operator between the base format "
+                            "and the number is illegal syntax",
+                            1, "5.7.1"));
 }
 
 // §5.7.1: the value is a required token of a based literal — a base format with
-// no following value digits is malformed.
+// no following value digits is malformed. `8'h;` is the one source in this file
+// that really carries no value token, so this is the case that keeps the report
+// alive: a lexer answering every breach of the value token with the sign or
+// illegal-digit message satisfies the cases above and fails only here.
 TEST(IntegerLiteralLexing, RejectMissingValueDigits) {
   EXPECT_TRUE(ReportedError(LexDiagnostics("8'h;"),
                             "missing value digits after base specifier", 1,
