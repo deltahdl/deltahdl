@@ -524,18 +524,53 @@ TEST(TaskAndFunctionParsing,
   EXPECT_FALSE(item->func_args[1].is_ref_static);
 }
 
+// §13.3 Syntax 13-1 gives `task_declaration ::= task [
+// dynamic_override_specifiers ] [ lifetime ] task_body_declaration`, so nothing
+// may precede `task`. A.1.9 puts `virtual` in `method_qualifier`, which reaches
+// a task_declaration only through `class_method`, and §8.20 states the same in
+// prose: "A method of a class may be identified with the keyword virtual."
+// Where the qualifier does belong is
+// VirtualMethodParsing.VirtualTaskExtendsSpecifier in
+// test/src/unit/test_parser_subclause_08_20.cpp, which declares one in a class.
 TEST(TaskAndFunctionParsing, VirtualTaskAtModuleScopeRejected) {
   auto r = Parse(
       "module m;\n"
       "  virtual task t;\n"
       "  endtask\n"
       "endmodule\n");
-  // No report of the §13.3 rule exists: `virtual` outside a class body is only
-  // the head of a virtual interface type, so Parser::ParseVirtualInterfaceType
-  // asks for the interface name and reports §25.9 at the `task` that stands
-  // there.
-  EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got 'task'", 2, "25.9"));
+  EXPECT_TRUE(ReportedError(r.diags, "'virtual' is a class method qualifier", 2,
+                            "13.3"));
+}
+
+// One mistake draws one report. Parser::RejectMisplacedMethodQualifier consumes
+// the qualifier and lets Parser::ParseTaskDecl read the declaration, so the
+// module body resumes at `endmodule` rather than rejecting the remaining tokens
+// again. Before this the tokens reached Parser::ParseDataType, which read the
+// `virtual` as the head of a §25.9 virtual interface type.
+TEST(TaskAndFunctionParsing, VirtualTaskAtModuleScopeReportsExactlyOneError) {
+  auto r = Parse(
+      "module m;\n"
+      "  virtual task t;\n"
+      "  endtask\n"
+      "endmodule\n");
+  uint32_t errors = 0;
+  for (const auto& diag : r.diags) {
+    if (diag.severity == DiagSeverity::kError) ++errors;
+  }
+  EXPECT_EQ(errors, 1U);
+}
+
+// A.1.9 gives `method_qualifier ::= [ pure ] virtual | class_item_qualifier`,
+// so `pure virtual` breaks the same §13.3 rule. A.1.9 pairs that spelling with
+// a method_prototype rather than a task_body_declaration, so this source ends
+// the declaration at its `;` and writes no `endtask`.
+TEST(TaskAndFunctionParsing, PureVirtualTaskAtModuleScopeRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  pure virtual task t;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "'virtual' is a class method qualifier", 2,
+                            "13.3"));
 }
 
 TEST(TaskAndFunctionParsing, FunctionFormalArgDataTypeInherited) {

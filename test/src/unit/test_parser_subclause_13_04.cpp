@@ -1,6 +1,7 @@
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -460,6 +461,32 @@ TEST(FunctionDeclParsing, FuncArgDataTypeInheritedFromPrevious) {
   ASSERT_EQ(item->func_args.size(), 2u);
   EXPECT_EQ(item->func_args[0].data_type.kind, DataTypeKind::kInt);
   EXPECT_EQ(item->func_args[1].data_type.kind, DataTypeKind::kInt);
+}
+
+// §13.4 Syntax 13-2 gives `function_declaration ::= function [
+// dynamic_override_specifiers ] [ lifetime ] function_body_declaration`, so
+// nothing may precede `function`. A.1.9 reaches a function_declaration from a
+// `virtual` only through `class_method`, exactly as it does a task_declaration,
+// which is why §13.4 owns this report and §13.3 owns the task one asserted by
+// TaskAndFunctionParsing.VirtualTaskAtModuleScopeRejected in
+// test/src/unit/test_parser_subclause_13_03.cpp.
+//
+// Only the two-keyword sequence is rejected, so the legal reading of a
+// module-scope `virtual` stands: §25.9 Syntax 25-3 gives `data_type ::= virtual
+// [ interface ] interface_identifier ...`.
+// InterfaceParsing.VirtualInterfaceDecl and
+// InterfaceParsing.VirtualInterfaceNoKeyword in
+// test/src/unit/test_parser_subclause_25_09.cpp assert both spellings of that
+// declaration, and the same file parses a module-scope function whose formal
+// carries the type, which is the nearest legal source to this one.
+TEST(FunctionDeclParsing, VirtualFunctionAtModuleScopeRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  virtual function void f();\n"
+      "  endfunction\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "'virtual' is a class method qualifier", 2,
+                            "13.4"));
 }
 
 }  // namespace

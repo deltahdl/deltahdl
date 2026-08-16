@@ -251,6 +251,42 @@ bool Parser::IsAtClassDecl() {
   return result;
 }
 
+// True when a method qualifier stands on a subroutine declared outside a class
+// body. §13.3 Syntax 13-1 and §13.4 Syntax 13-2 admit no qualifier before
+// `task` or `function`, and A.1.9 gives `method_qualifier ::= [ pure ] virtual
+// | class_item_qualifier`, which reaches those two declarations only through
+// `class_method`. Peeks only, and restores the lexer position: a `virtual`
+// before an identifier or `interface` is the §25.9 virtual interface type and a
+// `virtual` before `class` is a virtual class, neither of which this claims.
+bool Parser::AtMisplacedMethodQualifier() {
+  if (!Check(TokenKind::kKwPure) && !Check(TokenKind::kKwVirtual)) return false;
+  auto saved = lexer_.SavePos();
+  Match(TokenKind::kKwPure);
+  bool on_subroutine =
+      Match(TokenKind::kKwVirtual) &&
+      (Check(TokenKind::kKwTask) || Check(TokenKind::kKwFunction));
+  lexer_.RestorePos(saved);
+  return on_subroutine;
+}
+
+// Reports the qualifier and then reads the declaration it stands on, so the
+// enclosing body resumes after `endtask` or `endfunction` rather than rejecting
+// the rest of the declaration a second time. The subclause is the one owning
+// the declaration the qualifier was written on. A.1.9 gives `pure virtual` a
+// method_prototype rather than a body, so that spelling is read as a prototype.
+void Parser::RejectMisplacedMethodQualifier(std::vector<ModuleItem*>& items) {
+  SourceLoc loc = CurrentLoc();
+  bool is_prototype = Match(TokenKind::kKwPure);
+  Match(TokenKind::kKwVirtual);
+  bool is_task = Check(TokenKind::kKwTask);
+  diag_.Error(loc,
+              "'virtual' is a class method qualifier, so it may appear only on "
+              "a method declared inside a class",
+              is_task ? Subclause("13.3") : Subclause("13.4"));
+  items.push_back(is_task ? ParseTaskDecl(is_prototype)
+                          : ParseFunctionDecl(is_prototype));
+}
+
 bool Parser::TryParseDeclKeywordItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwTypedef)) {
     items.push_back(ParseTypedef());
@@ -258,6 +294,10 @@ bool Parser::TryParseDeclKeywordItem(std::vector<ModuleItem*>& items) {
   }
   if (Check(TokenKind::kKwNettype)) {
     items.push_back(ParseNettypeDecl());
+    return true;
+  }
+  if (AtMisplacedMethodQualifier()) {
+    RejectMisplacedMethodQualifier(items);
     return true;
   }
   if (Check(TokenKind::kKwFunction)) {
