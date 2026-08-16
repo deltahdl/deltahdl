@@ -405,7 +405,15 @@ void Elaborator::ValidateImplementsInterfaceMethods(const ClassDecl* cls) {
     auto iface_key = MakeSpecKey(iref.name, iref.type_params);
     if (!seen.insert(iface_key).second) continue;
     const auto* iface = FindClassDecl(iref.name, unit_);
-    if (!iface) continue;
+    // §8.26 poses the obligation to implement a pure virtual method only for an
+    // interface class: "the Fifo class is also implementing the PutImp and
+    // GetImp interface classes so it shall provide implementations for the put
+    // and get methods" (printed page 209 of ~/LRM.pdf). A name that resolves to
+    // anything else is already rejected under §8.26.2 by
+    // ValidateRegularClassInheritance in
+    // src/elaborator/elaborator_validate_class_overrides.cpp, so reporting it
+    // here as well would call a virtual class an interface class.
+    if (!iface || !iface->is_interface) continue;
     CheckInterfaceMethods(cls, {iface, iref.name}, unit_, cu_param_scope_,
                           diag_);
   }

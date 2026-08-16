@@ -1,3 +1,5 @@
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -292,6 +294,41 @@ TEST(ExtendsVsImplementsRestrictions, ClassImplementsVirtualClassError) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "cannot implement non-interface class", 4,
                             "8.26.2"));
+}
+
+// §8.26.2: naming a non-interface class after 'implements' breaks that
+// subclause and nothing else, so the report above is the only one the source
+// draws. §8.26 poses the obligation to provide an implementation for a pure
+// virtual method only where an interface class is implemented (printed page 209
+// of ~/LRM.pdf), and VBase is a virtual class, so a report saying C fails to
+// implement 'foo' "from interface 'VBase'" states something false about the
+// source and names a clause the source does not break.
+//
+// The assertion is about what was not reported, which ReportedError cannot say:
+// it answers whether some recorded error matches, and passes whether or not a
+// second one stands beside it. So the case above holds that the §8.26.2 report
+// is present and this one holds that the §8.26 report is absent; a fix that
+// suppressed both would satisfy only one of the two.
+TEST(ExtendsVsImplementsRestrictions,
+     ImplementsNonInterfaceReportsOnlyTheImplementsRule) {
+  ElabFixture f;
+  ElabOk(
+      "virtual class VBase;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "class C implements VBase;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  bool claimed_unimplemented = false;
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.message.find("does not implement pure virtual method") !=
+        std::string::npos) {
+      claimed_unimplemented = true;
+    }
+  }
+  EXPECT_FALSE(claimed_unimplemented);
 }
 
 // §8.26.2: the same prohibition applies when the implementing subject is itself
