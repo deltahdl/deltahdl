@@ -610,6 +610,25 @@ void Lexer::ValidateDecimalXZ(SourceLoc loc, char base_letter,
   }
 }
 
+// Reports which sentence of §5.7.1 a based literal broke when its value run
+// collected nothing, given a lexer positioned at the character that stopped the
+// run. `loc` is the start of the literal, which is where both reports stand.
+void Lexer::ReportMissingValueToken(SourceLoc loc) {
+  if (!AtEnd() && (Current() == '+' || Current() == '-')) {
+    // §5.7.1: "A plus or minus operator between the base format and the number
+    // is an illegal syntax", which Example 3 writes as `8 'd -6`. The sign is
+    // no part of the value token, so a literal written with one arrives here
+    // with an empty run and the sign still unread.
+    diag_.Error(loc,
+                "plus or minus operator between the base format and the number "
+                "is illegal syntax",
+                Subclause("5.7.1"));
+    return;
+  }
+  diag_.Error(loc, "missing value digits after base specifier",
+              Subclause("5.7.1"));
+}
+
 void Lexer::ValidateBaseDigits(SourceLoc loc, char base_letter,
                                uint32_t digit_start) {
   for (uint32_t i = digit_start; i < pos_; ++i) {
@@ -688,20 +707,7 @@ Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
     Advance();
   }
   if (pos_ == before_digits) {
-    if (!AtEnd() && (Current() == '+' || Current() == '-')) {
-      // §5.7.1: "A plus or minus operator between the base format and the
-      // number is an illegal syntax", which Example 3 writes as `8 'd -6`. The
-      // sign is no part of the value token, so a literal written with one
-      // arrives here with an empty value run, and the character that stopped
-      // the run is what says which sentence the source broke.
-      diag_.Error(loc,
-                  "plus or minus operator between the base format and the "
-                  "number is illegal syntax",
-                  Subclause("5.7.1"));
-    } else {
-      diag_.Error(loc, "missing value digits after base specifier",
-                  Subclause("5.7.1"));
-    }
+    ReportMissingValueToken(loc);
   }
   if (pos_ > before_digits && source_[before_digits] == '_') {
     diag_.Error(loc, "underscore cannot be first character of number value",
