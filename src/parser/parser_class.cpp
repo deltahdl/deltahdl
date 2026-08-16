@@ -462,6 +462,48 @@ void Parser::ValidateConstructorQualifiers(ClassMember* member) {
   }
 }
 
+// Reports a method body written after a `pure virtual` prototype, and discards
+// it. §8.21 (printed page 199) states the rule as a definition rather than as
+// an error: a pure virtual method "shall be indicated with the keyword pure
+// together with not providing a method body". Syntax 8-1 (printed page 180)
+// says the same in the grammar, admitting only
+// `pure virtual { class_item_qualifier } method_prototype ;`, and a prototype
+// ends at the port list. An empty body still counts, because §8.21's own NOTE
+// rules that "A method without a statement body is still a legal, callable
+// method". The body's `endfunction` or `endtask` is not the next token when the
+// body holds statements, so this scans for it and restores the lexer position
+// when there is none. The scan stops at `endclass` and at a further `function`
+// or `task`, past which the keyword found would close something else. The body
+// is discarded rather than parsed, which is what keeps what it declares out of
+// the class: Parser::ParseClassMembers would otherwise read `int x = 1;` as a
+// class property and report the rest under §8.5.
+void Parser::RejectPureVirtualMethodBody(const ClassMember* member,
+                                         bool is_func) {
+  if (!member->is_pure_virtual) return;
+  TokenKind terminator =
+      is_func ? TokenKind::kKwEndfunction : TokenKind::kKwEndtask;
+  auto saved = lexer_.SavePos();
+  bool found = false;
+  while (!AtEnd() && !Check(TokenKind::kKwEndclass) &&
+         !Check(TokenKind::kKwFunction) && !Check(TokenKind::kKwTask)) {
+    if (Check(terminator)) {
+      found = true;
+      break;
+    }
+    Consume();
+  }
+  if (!found) {
+    lexer_.RestorePos(saved);
+    return;
+  }
+  diag_.Error(member->method->loc,
+              "a pure virtual method shall not have a body; 'pure' is "
+              "indicated by not providing one",
+              Subclause("8.21"));
+  Consume();
+  if (Match(TokenKind::kColon)) Match(TokenKind::kIdentifier);
+}
+
 bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
                                         ClassMember* member, bool proto) {
   bool is_func = Check(TokenKind::kKwFunction);
@@ -474,6 +516,7 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
     ValidateClassMethod(member);
     if (is_func) ValidateConstructorQualifiers(member);
     if (proto && !member->is_pure_virtual) member->method->is_extern = true;
+    RejectPureVirtualMethodBody(member, is_func);
     members.push_back(member);
     return true;
   }

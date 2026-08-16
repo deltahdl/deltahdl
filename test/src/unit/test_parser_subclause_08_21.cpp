@@ -139,10 +139,13 @@ TEST(AbstractClassParsing, MultiplePureVirtualMethods) {
   EXPECT_TRUE(r.cu->classes[0]->members[1]->is_pure_virtual);
 }
 
-// 8.21: a pure virtual method is indicated by the 'pure' keyword *together
-// with* not providing a method body. 'pure' forces the parser to accept only
-// the prototype, so a supplied body has no valid member position and is
-// rejected -- the negative form of the "no method body" requirement.
+// §8.21 (printed page 199): a pure virtual method "shall be indicated with the
+// keyword pure together with not providing a method body". Syntax 8-1 (printed
+// page 180) says it in the grammar, admitting only `pure virtual
+// { class_item_qualifier } method_prototype ;`, and a prototype ends at the
+// port list. The report stands at the method declaration on line 2, not inside
+// the body. The four accepting cases above keep this one from being satisfied
+// by a parser that refused every `pure virtual` declaration.
 TEST(PureVirtualMethodParsing, PureVirtualWithBodyRejected) {
   auto r = Parse(
       "virtual class Base;\n"
@@ -150,12 +153,70 @@ TEST(PureVirtualMethodParsing, PureVirtualWithBodyRejected) {
       "    return;\n"
       "  endfunction\n"
       "endclass\n");
-  // `pure` makes Parser::ParseFunctionDecl take the prototype alone, so the
-  // body's first statement is read as a class member and Parser::
-  // ParseClassMembers files the report under §8.5, the class property
-  // declaration, naming the `return` keyword that stands in the name slot.
-  EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got 'return'", 3, "8.5"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a pure virtual method shall not have a body", 2, "8.21"));
+}
+
+TEST(PureVirtualMethodParsing, PureVirtualWithBodyReportsExactlyOneError) {
+  // The body is discarded through its `endfunction`, so nothing inside it is
+  // read as a class member. Its first statement used to be, and
+  // Parser::ParseClassMembers reported the `return` under §8.5.
+  auto r = Parse(
+      "virtual class Base;\n"
+      "  pure virtual function void display();\n"
+      "    return;\n"
+      "  endfunction\n"
+      "endclass\n");
+  uint32_t errors = 0;
+  for (const auto& d : r.diags) {
+    if (d.severity == DiagSeverity::kError) errors++;
+  }
+  EXPECT_EQ(errors, 1U);
+}
+
+TEST(PureVirtualMethodParsing, PureVirtualTaskWithBodyRejected) {
+  // Parser::ParseTaskDecl is a separate function from
+  // Parser::ParseFunctionDecl, so the function form does not answer for the
+  // task form, and the body ends at `endtask` rather than `endfunction`.
+  auto r = Parse(
+      "virtual class Base;\n"
+      "  pure virtual task run();\n"
+      "    return;\n"
+      "  endtask\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a pure virtual method shall not have a body", 2, "8.21"));
+}
+
+TEST(PureVirtualMethodParsing, PureVirtualWithEmptyBodyRejected) {
+  // §8.21's NOTE rules that "A method without a statement body is still a
+  // legal, callable method", so an empty body is a body. `endfunction` is the
+  // only evidence one was written, which is what a check reading a single
+  // token after the prototype has to get right.
+  auto r = Parse(
+      "virtual class Base;\n"
+      "  pure virtual function void display();\n"
+      "  endfunction\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a pure virtual method shall not have a body", 2, "8.21"));
+}
+
+TEST(PureVirtualMethodParsing, PureVirtualWithDeclarationBodyAddsNoProperty) {
+  // A body opening with a declaration parses as a class property, so the class
+  // used to gain an `x` the source declared inside a method. A body opening
+  // with `return` cannot fail that way, so the case above would pass a fix that
+  // reported the rule and still absorbed the declaration.
+  auto r = Parse(
+      "virtual class Base;\n"
+      "  pure virtual function void display();\n"
+      "    int x = 1;\n"
+      "  endfunction\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a pure virtual method shall not have a body", 2, "8.21"));
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->members.size(), 1u);
 }
 
 }  // namespace
