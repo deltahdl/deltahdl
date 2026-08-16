@@ -17,6 +17,8 @@
 #include "parser/library_map.h"
 #include "parser/parser.h"
 #include "preprocessor/preprocessor.h"
+#include "preprocessor/protect_cli.h"
+#include "preprocessor/protect_processing.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -62,6 +64,8 @@ struct CliOptions {
   bool werror = false;
   bool show_version = false;
   bool show_help = false;
+  // §34.3.1's encrypting mode, and the keys it needs.
+  delta::ProtectCliOptions protect;
 };
 
 void PrintVersion() {
@@ -86,6 +90,13 @@ void PrintHelp() {
             << "  +incdir+<path>       Include directory\n"
             << "  -Wall -Werror        Warning controls\n"
             << "  --version / --help   Info\n\n"
+            << "Protected envelopes:\n"
+            << "  --encrypt            Encrypt the `pragma protect envelopes "
+               "and write the text\n"
+            << "  --protect-key <key>  Key every region is encrypted under\n"
+            << "  --protect-named-key <owner>:<name>=<key>\n"
+            << "                       Key selecting the regions naming it "
+               "(repeatable)\n\n"
             << "Simulation:\n"
             << "  --vcd <file>         Dump VCD waveforms\n"
             << "  --fst <file>         Dump FST waveforms\n"
@@ -285,6 +296,7 @@ bool TryParseSingleArg(std::string_view arg, int& i, int argc,
   if (TryParseSimArg(arg, i, argc, argv, opts)) return true;
   if (TryParseSynthArg(arg, i, argc, argv, opts)) return true;
   if (TryParseLibArg(arg, i, argc, argv, opts)) return true;
+  if (delta::TryParseProtectArg(arg, i, argc, argv, opts.protect)) return true;
   return false;
 }
 
@@ -589,6 +601,29 @@ int RunSimulation(const CliOptions& opts, delta::CompilationUnit* cu,
 
 }  // namespace
 
+// §34.3.1's encrypting mode over the sources named on the command line: each
+// text's encryption envelopes come back decryption envelopes, and everything
+// outside them comes back as it was written. The produced text goes to standard
+// output, one source after another, which is what lets an author redirect it
+// into the file they mean to ship.
+//
+// The engine the run already holds is handed to EncryptEnvelopes, so the four
+// conditions §34.5.1, §34.5.15 and §34.5.27 make an error in an input file are
+// printed and decide the status. The transformation reads each text to its end
+// whatever it found, so a breach costs the report rather than the text, and the
+// text is still written; the status is what says it was not clean.
+int RunEnvelopeEncryption(const CliOptions& opts, delta::SourceManager& src_mgr,
+                          delta::DiagEngine& diag) {
+  for (const auto& path : opts.source_files) {
+    auto content = ReadFile(path);
+    if (content.empty()) return 1;
+    auto file_id = src_mgr.AddFile(path, content);
+    std::cout << delta::EncryptEnvelopes(content, opts.protect.exchange_key,
+                                         opts.protect.keys, &diag, file_id);
+  }
+  return diag.HasErrors() ? 1 : 0;
+}
+
 int main(int argc, char* argv[]) {
   CliOptions opts;
   if (!ParseArgs(argc, argv, opts)) {
@@ -607,6 +642,10 @@ int main(int argc, char* argv[]) {
   delta::DiagEngine diag(src_mgr);
   if (opts.werror) {
     diag.SetWarningsAsErrors(true);
+  }
+
+  if (opts.protect.encrypt) {
+    return RunEnvelopeEncryption(opts, src_mgr, diag);
   }
 
   auto pp = PreprocessSources(opts, src_mgr, diag);
