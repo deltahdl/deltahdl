@@ -49,6 +49,30 @@ struct ParserAssertHelpers {
       p.Expect(TokenKind::kSemicolon, Subclause("16.3"));
     }
   }
+
+  // §16.3 Syntax 16-1 ends every `cover` form in `statement_or_null` where the
+  // `assert` and `assume` forms end in `action_block`, so a `cover` takes a
+  // pass statement and has no fail statement. Reports an `else` written after
+  // one, and reads the statement behind it so the enclosing body never sees the
+  // arm and reports it a second time as a token it did not expect. `semicolon`
+  // is the subclause the closing `;` is expected under, which differs between
+  // the two forms that read a cover tail.
+  static void ParseCoverTail(Parser& p, Stmt* stmt, Subclause semicolon) {
+    if (p.Check(TokenKind::kSemicolon)) {
+      p.Expect(TokenKind::kSemicolon, semicolon);
+    } else if (!p.Check(TokenKind::kKwElse)) {
+      stmt->assert_pass_stmt = p.ParseStmt();
+    }
+    if (!p.Check(TokenKind::kKwElse)) return;
+    p.diag_.Error(p.CurrentLoc(),
+                  "cover has no fail statement; the else arm belongs to assert "
+                  "and assume",
+                  Subclause("16.3"));
+    p.Expect(TokenKind::kKwElse, Subclause("16.3"));
+    // Read the fail statement rather than leaving it, and discard it: §16.3
+    // gives a cover nowhere to keep one, and Stmt::assert_fail_stmt stays null.
+    p.ParseStmt();
+  }
 };
 
 static void SkipBalancedPropertySpec(Lexer& lexer) {
@@ -118,12 +142,7 @@ Stmt* Parser::ParseImmediateCover() {
 
   ParserAssertHelpers::ParseDeferral(*this, stmt);
   ParserAssertHelpers::ParseAssertedExpr(*this, stmt);
-
-  if (!Check(TokenKind::kSemicolon)) {
-    stmt->assert_pass_stmt = ParseStmt();
-  } else {
-    Expect(TokenKind::kSemicolon, Subclause("16.3"));
-  }
+  ParserAssertHelpers::ParseCoverTail(*this, stmt, Subclause("16.3"));
 
   return stmt;
 }
@@ -315,11 +334,7 @@ ModuleItem* Parser::ParseCoverProperty() {
     Expect(TokenKind::kLParen, Subclause("16.4"));
     stmt->assert_expr = ParseExpr();
     Expect(TokenKind::kRParen, Subclause("16.4"));
-    if (!Check(TokenKind::kSemicolon)) {
-      stmt->assert_pass_stmt = ParseStmt();
-    } else {
-      Expect(TokenKind::kSemicolon, Subclause("16.4"));
-    }
+    ParserAssertHelpers::ParseCoverTail(*this, stmt, Subclause("16.4"));
     return WrapStmtAsItem(arena_, stmt, item->loc);
   }
 

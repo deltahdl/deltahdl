@@ -631,13 +631,14 @@ TEST(AssertionStatementSyntaxParsing, ErrorCoverMissingExpression) {
 TEST(AssertionStatementSyntaxParsing, ErrorCoverWithElseClause) {
   auto r = Parse(
       "module m;\n"
-      "  initial cover(1) $display(\"hit\"); else $display(\"miss\");\n"
+      "  initial cover(1) $display(\"hit\");\n"
+      "  else $display(\"miss\");\n"
       "endmodule\n");
-  // The cover form takes a pass statement and no else, so the else is left
-  // standing as a module item and §23.2.4 is what reports it. No report names
-  // the §16.3 rule that a cover has no fail statement.
-  EXPECT_TRUE(
-      ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
+  // A.6.10 gives simple_immediate_cover_statement `statement_or_null` where the
+  // assert and assume forms take `action_block`, and `action_block` is the only
+  // production carrying `else`. §16.3 is the prose behind it and is what the
+  // report names.
+  EXPECT_TRUE(ReportedError(r.diags, "cover has no fail statement", 3, "16.3"));
 }
 
 TEST(AssertionStatementSyntaxParsing, AssumeWithPassActionOnly) {
@@ -687,23 +688,23 @@ TEST(AssertionStatementSyntaxParsing, ErrorDeferredCoverHashNonZero) {
 TEST(AssertionStatementSyntaxParsing, ErrorDeferredCoverHash0WithElseClause) {
   auto r = Parse(
       "module m;\n"
-      "  initial cover #0 (1) $display(\"hit\"); else $display(\"miss\");\n"
+      "  initial cover #0 (1) $display(\"hit\");\n"
+      "  else $display(\"miss\");\n"
       "endmodule\n");
-  // As for the undeferred cover: the else is left standing as a module item
-  // and §23.2.4 is what reports it.
-  EXPECT_TRUE(
-      ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
+  // deferred_immediate_cover_statement ends in `statement_or_null` as the
+  // undeferred form does, so the same §16.3 report answers for it.
+  EXPECT_TRUE(ReportedError(r.diags, "cover has no fail statement", 3, "16.3"));
 }
 
 TEST(AssertionStatementSyntaxParsing, ErrorDeferredCoverFinalWithElseClause) {
   auto r = Parse(
       "module m;\n"
-      "  initial cover final (1) $display(\"hit\"); else $display(\"miss\");\n"
+      "  initial cover final (1) $display(\"hit\");\n"
+      "  else $display(\"miss\");\n"
       "endmodule\n");
-  // As for the undeferred cover: the else is left standing as a module item
-  // and §23.2.4 is what reports it.
-  EXPECT_TRUE(
-      ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
+  // The `cover final` alternative of deferred_immediate_cover_statement ends in
+  // `statement_or_null` too, so the same §16.3 report answers for it.
+  EXPECT_TRUE(ReportedError(r.diags, "cover has no fail statement", 3, "16.3"));
 }
 
 // procedural_assertion_statement has three alternatives; the immediate one is

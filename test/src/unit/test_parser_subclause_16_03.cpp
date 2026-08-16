@@ -128,15 +128,36 @@ TEST(ImmediateAssertionStatementParsing, AssertInsideAlwaysComb) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §16.3 Syntax 16-1 ends simple_immediate_cover_statement in
+// `statement_or_null` where the assert and assume forms end in `action_block`,
+// and `action_block` is the only production carrying `else`. The else stands on
+// a line of its own so that the line the assertion names is the else and not
+// the cover above it.
 TEST(ImmediateAssertionStatementParsing, CoverWithElseClauseRejected) {
   auto r = Parse(
       "module m;\n"
-      "  initial cover(c) hit = 1; else miss = 1;\n"
+      "  initial cover(c) hit = 1;\n"
+      "  else miss = 1;\n"
       "endmodule\n");
-  // §16.3 gives cover no else arm, so the else is left standing in the module
-  // body and §23.2.4 reports it there; the parser writes nothing under §16.3.
-  EXPECT_TRUE(
-      ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
+  EXPECT_TRUE(ReportedError(r.diags, "cover has no fail statement", 3, "16.3"));
+}
+
+// One mistake draws one report. The parser reads the else and the statement
+// behind it, so nothing is left for the module body to reject a second time
+// under §23.2.4. That the pass statement §16.3 does permit is still read is
+// ImmediateAssertionStatementParsing.CoverPassActionOnly above.
+TEST(ImmediateAssertionStatementParsing, CoverWithElseReportsExactlyOneError) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial cover(c) hit = 1;\n"
+      "  else miss = 1;\n"
+      "endmodule\n");
+  ASSERT_TRUE(ReportedError(r.diags, "cover has no fail statement", 3, "16.3"));
+  uint32_t errors = 0;
+  for (const auto& diag : r.diags) {
+    if (diag.severity == DiagSeverity::kError) ++errors;
+  }
+  EXPECT_EQ(errors, 1U);
 }
 
 TEST(ImmediateAssertionStatementParsing, AssertMissingExpressionRejected) {
