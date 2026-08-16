@@ -342,6 +342,10 @@ TEST(UdpPortDeclaration, RegDeclNotNamingOutputRejected) {
       r.diags, "UDP reg declaration shall name the output port", 3, "29.3.2"));
 }
 
+// §29.3.2: "Sequential UDPs shall contain a reg declaration for the output
+// port". The rows are A.5.3's `sequential_entry`, three fields separated by two
+// colons, and the output declaration says nothing about a reg, so the two
+// disagree. The report stands at the first row that says so.
 TEST(UdpPortDeclaration, SequentialUdpWithoutRegRejected) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
@@ -352,18 +356,16 @@ TEST(UdpPortDeclaration, SequentialUdpWithoutRegRejected) {
       "    1 r : ? : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  // Without the reg the primitive is combinational, so the row's current-state
-  // field is read as its output field and §29.3.6 reports the `?` there. The
-  // parser has no report of its own for the missing reg.
-  EXPECT_TRUE(ReportedError(
-      r.diags, "UDP output field shall be 0, 1, or x (- is sequential only)", 5,
-      "29.3.6"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "sequential UDP shall declare its output port reg",
+                            5, "29.3.2"));
 }
 
-// §29.3.2: a combinational UDP shall not carry a reg declaration. The reg
-// commits the primitive to the sequential form (an internal state with a
-// current-state field per row), which is irreconcilable with the plain
-// input:output rows of a combinational state table, so the parser rejects it.
+// §29.3.2: "Combinational UDPs cannot contain a reg declaration." The rows are
+// A.5.3's `combinational_entry`, two fields separated by one colon, and the
+// output is declared reg, so the two disagree. The EXPECT_FALSE is what holds
+// the report to one per UDP: the second row breaks the rule exactly as the
+// first does, and a report per row would stand there too.
 TEST(UdpPortDeclaration, CombinationalUdpWithRegRejected) {
   auto r = Parse(
       "primitive c(output reg y, input a);\n"
@@ -372,13 +374,12 @@ TEST(UdpPortDeclaration, CombinationalUdpWithRegRejected) {
       "    1 : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  // The reg makes the primitive sequential, so the row's output field is read
-  // as its current-state field and the `;` closing the row lands in the output
-  // field, which §29.3.6 reports. The parser has no report of its own for a
-  // combinational table under a reg output.
   EXPECT_TRUE(ReportedError(
-      r.diags, "UDP output field shall be 0, 1, or x (- is sequential only)", 3,
-      "29.3.6"));
+      r.diags, "combinational UDP shall not declare its output port reg", 3,
+      "29.3.2"));
+  EXPECT_FALSE(ReportedError(
+      r.diags, "combinational UDP shall not declare its output port reg", 4,
+      "29.3.2"));
 }
 
 // §29.3.2: the same prohibition holds when the reg is written as a separate
@@ -395,12 +396,9 @@ TEST(UdpPortDeclaration, CombinationalUdpWithSeparateRegRejected) {
       "    1 : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  // Same route as CombinationalUdpWithRegRejected: the reg makes the rows read
-  // as sequential ones, and §29.3.6 reports the `;` that lands in the output
-  // field.
   EXPECT_TRUE(ReportedError(
-      r.diags, "UDP output field shall be 0, 1, or x (- is sequential only)", 6,
-      "29.3.6"));
+      r.diags, "combinational UDP shall not declare its output port reg", 6,
+      "29.3.2"));
 }
 
 // §29.3.2: the output port declaration is the keyword `output` followed by one
@@ -437,6 +435,50 @@ TEST(UdpPortDeclaration, InputDeclWithoutNameRejected) {
       "endprimitive\n");
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got ';'", 3, "29.3.2"));
+}
+
+// The same missing reg as SequentialUdpWithoutRegRejected, written so that
+// nothing but the reg is wrong with the source. That case puts `?` in the
+// current-state field, and Table 29-1 bars `?` from an output field, so a
+// parser reading the row as combinational rejects it under §29.3.6 whether it
+// enforces §29.3.2 or not. `0` is legal in both fields, which leaves the
+// missing reg as the only thing to report.
+TEST(UdpPortDeclaration,
+     SequentialTableWithoutRegRejectedWhenTheStateFieldIsALegalOutputSymbol) {
+  auto r = Parse(
+      "primitive dff(q, d, clk);\n"
+      "  output q;\n"
+      "  input d, clk;\n"
+      "  table\n"
+      "    0 r : 0 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "sequential UDP shall declare its output port reg",
+                            5, "29.3.2"));
+}
+
+// One missing reg is one mistake however many rows stand under it. Every row
+// here disagrees with the output declaration, so a report per row would stand
+// at lines 5, 6 and 7; the EXPECT_FALSE on line 6 is what fails then.
+TEST(UdpPortDeclaration,
+     SequentialTableWithoutRegReportsAtTheFirstOffendingRow) {
+  auto r = Parse(
+      "primitive dff(q, d, clk);\n"
+      "  output q;\n"
+      "  input d, clk;\n"
+      "  table\n"
+      "    0 r : 0 : 0;\n"
+      "    1 r : 0 : 1;\n"
+      "    1 r : 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "sequential UDP shall declare its output port reg",
+                            5, "29.3.2"));
+  EXPECT_FALSE(ReportedError(r.diags,
+                             "sequential UDP shall declare its output port reg",
+                             6, "29.3.2"));
 }
 
 }  // namespace

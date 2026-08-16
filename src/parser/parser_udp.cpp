@@ -277,10 +277,16 @@ static void ValidateUdpRowInputTransitions(DiagEngine& diag,
   ValidateUdpRowNoDashInput(diag, row, row_loc);
 }
 
-static void ValidateUdpRowStateAndOutput(DiagEngine& diag, UdpDecl* udp,
+// `row_is_sequential` says whether the row was written as A.5.3's
+// `sequential_entry`, which is what decides where its fields are. Table 29-1
+// permits `-` only in the output field of a sequential UDP, and a current-state
+// field exists only in that form, so a row read as the other form has neither
+// rule to answer.
+static void ValidateUdpRowStateAndOutput(DiagEngine& diag,
+                                         bool row_is_sequential,
                                          const UdpTableRow& row,
                                          SourceLoc row_loc) {
-  if (udp->is_sequential) {
+  if (row_is_sequential) {
     char cs = row.current_state;
     if (cs == '-') {
       diag.Error(row_loc, "- shall not appear in the current-state field",
@@ -295,7 +301,7 @@ static void ValidateUdpRowStateAndOutput(DiagEngine& diag, UdpDecl* udp,
   {
     char out = row.output;
     bool ok = (out == '0' || out == '1' || out == 'x' || out == 'X');
-    if (udp->is_sequential && out == '-') ok = true;
+    if (row_is_sequential && out == '-') ok = true;
     if (!ok) {
       diag.Error(row_loc,
                  "UDP output field shall be 0, 1, or x (- is sequential only)",
@@ -313,17 +319,37 @@ static void ValidateUdpRowStateAndOutput(DiagEngine& diag, UdpDecl* udp,
   }
 }
 
-static void ValidateUdpTableRow(DiagEngine& diag, UdpDecl* udp,
+static void ValidateUdpTableRow(DiagEngine& diag, bool row_is_sequential,
                                 const UdpTableRow& row, SourceLoc row_loc) {
   if (UdpRowContainsZ(row)) {
     diag.Error(row_loc, "UDP table row shall not contain z",
                Subclause("29.3.5"));
   }
   ValidateUdpRowInputTransitions(diag, row, row_loc);
-  ValidateUdpRowStateAndOutput(diag, udp, row, row_loc);
+  ValidateUdpRowStateAndOutput(diag, row_is_sequential, row, row_loc);
 }
 
-void Parser::ParseUdpTableRow(UdpDecl* udp) {
+// §29.3.2 requires a UDP's two statements about its own form to agree:
+// "Sequential UDPs shall contain a reg declaration for the output port" and
+// "Combinational UDPs cannot contain a reg declaration". `udp->is_sequential`
+// carries the first statement, the presence of a reg; `row_is_sequential`
+// carries the second, the form the table entry was written in. Reports once per
+// UDP, at the first row that disagrees, since one missing or surplus reg is one
+// mistake however many rows stand under it.
+static void ValidateUdpRowAgainstRegDecl(DiagEngine& diag, const UdpDecl* udp,
+                                         bool row_is_sequential,
+                                         SourceLoc row_loc,
+                                         bool& already_reported) {
+  if (row_is_sequential == udp->is_sequential || already_reported) return;
+  already_reported = true;
+  diag.Error(row_loc,
+             row_is_sequential
+                 ? "sequential UDP shall declare its output port reg"
+                 : "combinational UDP shall not declare its output port reg",
+             Subclause("29.3.2"));
+}
+
+void Parser::ParseUdpTableRow(UdpDecl* udp, bool& reg_mismatch_reported) {
   UdpTableRow row;
   SourceLoc row_loc = CurrentLoc();
   while (!Check(TokenKind::kColon) && !AtEnd()) {
@@ -349,22 +375,35 @@ void Parser::ParseUdpTableRow(UdpDecl* udp) {
     }
   }
   Expect(TokenKind::kColon, Subclause("29.3.4"));
-  if (udp->is_sequential) {
-    row.current_state = UdpCharFromToken(Consume());
-    Expect(TokenKind::kColon, Subclause("29.3.4"));
+  // A.5.3 tells the two entry forms apart by how many fields follow that colon:
+  // `combinational_entry ::= level_input_list : output_symbol ;` writes one,
+  // and `sequential_entry ::= seq_input_list : current_state : next_state ;`
+  // writes two. Read the count off the row rather than off udp->is_sequential,
+  // which records only how the output port was declared. The two are separate
+  // statements about the same UDP, and comparing them is what
+  // ValidateUdpRowAgainstRegDecl below does.
+  char first_field = UdpCharFromToken(Consume());
+  bool row_is_sequential = Match(TokenKind::kColon);
+  if (row_is_sequential) {
+    row.current_state = first_field;
+    row.output = UdpCharFromToken(Consume());
+  } else {
+    row.output = first_field;
   }
-  row.output = UdpCharFromToken(Consume());
   Expect(TokenKind::kSemicolon, Subclause("29.3.4"));
 
-  ValidateUdpTableRow(diag_, udp, row, row_loc);
+  ValidateUdpRowAgainstRegDecl(diag_, udp, row_is_sequential, row_loc,
+                               reg_mismatch_reported);
+  ValidateUdpTableRow(diag_, row_is_sequential, row, row_loc);
 
   udp->table.push_back(row);
 }
 
 void Parser::ParseUdpTable(UdpDecl* udp) {
   Expect(TokenKind::kKwTable, Subclause("29.3.4"));
+  bool reg_mismatch_reported = false;
   while (!Check(TokenKind::kKwEndtable) && !AtEnd()) {
-    ParseUdpTableRow(udp);
+    ParseUdpTableRow(udp, reg_mismatch_reported);
   }
   if (udp->table.empty()) {
     diag_.Error(CurrentLoc(), "UDP table shall contain at least one entry",
