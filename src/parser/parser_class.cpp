@@ -36,6 +36,7 @@ struct ParserClassHelpers {
 
 ModuleDecl* Parser::ParseInterfaceDecl() {
   auto* decl = arena_.Create<ModuleDecl>();
+  TypeNameScope type_scope(*this);
   decl->decl_kind = ModuleDeclKind::kInterface;
   decl->range.start = CurrentLoc();
   bool non_ansi = ParserClassHelpers::ParseHead(
@@ -175,6 +176,7 @@ void Parser::ParseModportDecl(std::vector<ModportDecl*>& out) {
 
 ModuleDecl* Parser::ParseProgramDecl() {
   auto* decl = arena_.Create<ModuleDecl>();
+  TypeNameScope type_scope(*this);
   decl->decl_kind = ModuleDeclKind::kProgram;
   decl->range.start = CurrentLoc();
   bool non_ansi = ParserClassHelpers::ParseHead(
@@ -281,7 +283,12 @@ ClassDecl* Parser::ParseClassDecl() {
   Match(TokenKind::kKwAutomatic);
   Match(TokenKind::kKwStatic);
   decl->name = Expect(TokenKind::kIdentifier, Subclause("8.3")).text;
+  // The class's own name is registered before the guard, so it outlives the
+  // class body: §8.3 makes a class a type, and a class declared at compilation
+  // unit scope is one throughout the unit. What the guard scopes is everything
+  // the body declares, including the type parameters of the #() list below.
   known_types_.insert(decl->name);
+  TypeNameScope type_scope(*this);
 
   if (Check(TokenKind::kHash)) {
     Consume();

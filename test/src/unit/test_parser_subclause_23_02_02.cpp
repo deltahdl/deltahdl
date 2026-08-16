@@ -115,14 +115,19 @@ TEST(PortDeclaration, EnumAsPortType) {
   EXPECT_EQ(mod->ports[0].data_type.enum_members.size(), 3u);
 }
 
-// §23.2.2: a port may name a user-defined (typedef) data type. Here byte_t is
-// declared in a prior design element and reused as a named-type port; it parses
-// as a named-kind port that remembers the type name (distinct from the port
-// name that follows it).
+// §23.2.2: a port may name a user-defined (typedef) data type. It parses as a
+// named-kind port that remembers the type name, distinct from the port name
+// that follows it.
+//
+// byte_t is declared at compilation-unit scope, which §3.12.1 makes visible in
+// every design element of the unit. It used to be declared inside a preceding
+// module, which §23.9 makes a scope of its own: the source parsed only because
+// the parser kept one set of type names for the whole file, and this case
+// asserted that leak rather than the §23.2.2 rule it is named for.
 TEST(PortDeclaration, TypedefNamedAsPortType) {
   auto r = Parse(
+      "typedef logic [7:0] byte_t;\n"
       "module d;\n"
-      "  typedef logic [7:0] byte_t;\n"
       "endmodule\n"
       "module m(\n"
       "  input byte_t p\n"

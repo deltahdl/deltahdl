@@ -297,9 +297,7 @@ TEST(ExternModuleElaboration, PortSignednessMismatchErrors) {
 
 TEST(ExternModuleElaboration, ParamKindMismatchErrors) {
   ElabFixture f;
-  // The source does not parse, which is the whole point of the case and of
-  // #3071; the permissive helper records that.
-  ElaborateSrcAllowingParseErrors(
+  ElaborateSrc(
       "extern module m #(parameter type TP = logic)\n"
       "  (input logic a, output logic b);\n"
       "module m #(parameter TP = 1)\n"
@@ -307,12 +305,11 @@ TEST(ExternModuleElaboration, ParamKindMismatchErrors) {
       "  assign b = a;\n"
       "endmodule\n",
       f, "m");
-  // The source never reaches the §23.5 parameter-kind rule. The extern
-  // declaration's type parameter puts 'TP' into the parser's known_types_,
-  // which is never erased, so `parameter TP = 1` parses 'TP' as the parameter's
-  // data type and then reports the missing name under §6.20.2. See #3071.
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "expected identifier, got '='", 3, "6.20.2"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "module 'm' parameter 'TP' at position 0 does not match "
+                    "the parameter kind of the extern declaration",
+                    3, "23.5"));
 }
 
 TEST(ExternModuleElaboration, MatchingTypeParamNoError) {

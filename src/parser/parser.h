@@ -586,6 +586,50 @@ class Parser {
   std::unordered_set<std::string_view> known_types_;
   std::unordered_set<std::string_view> known_nettypes_;
   std::unordered_set<std::string_view> known_udps_;
+
+  // §23.9 lists the elements that define a new scope: "Modules, Interfaces,
+  // Programs, Checkers, Packages, Classes, Tasks, Functions, begin-end blocks
+  // (named or unnamed), fork-join blocks (named or unnamed), Generate blocks"
+  // (printed page 761 of ~/LRM.pdf). A type name declared inside one is a type
+  // name there and not in the design element after it. Constructing this
+  // records what known_types_ and known_nettypes_ held on the way in;
+  // destroying it puts both back. §6.6.7's ParseNettypeDecl fills the two
+  // together, and a nettype name decides how `#` after an identifier is read,
+  // so restoring one without the other leaves the leak for that reading.
+  //
+  // The six design elements of that list are what the parser guards. The five
+  // that remain -- a task, a function, a begin-end block, a fork-join block and
+  // a generate block -- are scopes by the same sentence and are not guarded
+  // yet, so a typedef written inside one is still a type name in the design
+  // element that contains it.
+  //
+  // A destructor rather than a save and a restore written at each site, because
+  // a parse function has more than one exit and error recovery takes some of
+  // them. A restore missed on one path reintroduces the leak for one kind of
+  // declaration while every test for the others stays green.
+  //
+  // Nothing guards the compilation unit itself. §3.12.1 makes a declaration at
+  // that scope visible in every design element of the unit, which is what
+  // leaving the outermost set alone gives, and it is why the built-in class
+  // names the constructor seeds stay visible throughout.
+  class TypeNameScope {
+   public:
+    explicit TypeNameScope(Parser& p)
+        : parser_(p),
+          saved_types_(p.known_types_),
+          saved_nettypes_(p.known_nettypes_) {}
+    ~TypeNameScope() {
+      parser_.known_types_ = std::move(saved_types_);
+      parser_.known_nettypes_ = std::move(saved_nettypes_);
+    }
+    TypeNameScope(const TypeNameScope&) = delete;
+    TypeNameScope& operator=(const TypeNameScope&) = delete;
+
+   private:
+    Parser& parser_;
+    std::unordered_set<std::string_view> saved_types_;
+    std::unordered_set<std::string_view> saved_nettypes_;
+  };
   ModuleDecl* current_module_ = nullptr;
   PackageDecl* current_package_ = nullptr;
   CompilationUnit* current_compilation_unit_ = nullptr;

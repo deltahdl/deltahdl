@@ -606,6 +606,7 @@ void Parser::ParseExternTopLevel(CompilationUnit* unit) {
     return;
   }
   if (Check(TokenKind::kKwInterface)) {
+    TypeNameScope type_scope(*this);
     auto* decl = arena_.Create<ModuleDecl>();
     decl->decl_kind = ModuleDeclKind::kInterface;
     decl->is_extern = true;
@@ -618,6 +619,7 @@ void Parser::ParseExternTopLevel(CompilationUnit* unit) {
     return;
   }
   if (Check(TokenKind::kKwProgram)) {
+    TypeNameScope type_scope(*this);
     auto* decl = arena_.Create<ModuleDecl>();
     decl->decl_kind = ModuleDeclKind::kProgram;
     decl->is_extern = true;
@@ -639,6 +641,11 @@ void Parser::ParseExternTopLevel(CompilationUnit* unit) {
 }
 
 ModuleDecl* Parser::ParseExternModuleDecl() {
+  // §23.5's extern declaration carries the module's parameter port list, so a
+  // `parameter type` written there is registered exactly as the definition's
+  // own would be. Without the guard the extern header alone is enough to make
+  // the name a type for the definition that follows it.
+  TypeNameScope type_scope(*this);
   auto* mod = arena_.Create<ModuleDecl>();
   mod->is_extern = true;
   mod->range.start = CurrentLoc();
@@ -655,6 +662,10 @@ ModuleDecl* Parser::ParseExternModuleDecl() {
 
 ModuleDecl* Parser::ParseModuleDecl() {
   auto* mod = arena_.Create<ModuleDecl>();
+  // §23.9 makes a module a scope. The guard stands before the parameter port
+  // list is read, so a `parameter type` declared there is a type name in this
+  // module's body and in nothing after it.
+  TypeNameScope type_scope(*this);
   auto loc = CurrentLoc();
   if (!Match(TokenKind::kKwMacromodule)) {
     Expect(TokenKind::kKwModule, Subclause("23.2.1"));
@@ -713,6 +724,13 @@ bool Parser::TryParsePackageBodyItem(std::vector<ModuleItem*>& items) {
 }
 
 PackageDecl* Parser::ParsePackageDecl() {
+  // No TypeNameScope here, although §23.9 makes a package a scope like the
+  // five design elements that carry one. §26.3 lets an importing scope refer to
+  // a package's type declarations by their bare names, and the parser decides
+  // what is a type name from known_types_ alone, with nothing that tracks which
+  // imports are in force. Restoring the set on the way out would therefore make
+  // `import p::*;` followed by `T x;` stop parsing as a declaration, which is
+  // a larger change than a scope guard and needs an import-aware type table.
   auto* pkg = arena_.Create<PackageDecl>();
   pkg->range.start = CurrentLoc();
   Expect(TokenKind::kKwPackage, Subclause("26.2"));

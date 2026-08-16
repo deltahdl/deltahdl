@@ -4,6 +4,7 @@ namespace delta {
 
 ModuleDecl* Parser::ParseCheckerDecl() {
   auto* decl = arena_.Create<ModuleDecl>();
+  TypeNameScope type_scope(*this);
   decl->decl_kind = ModuleDeclKind::kChecker;
   decl->range.start = CurrentLoc();
   Expect(TokenKind::kKwChecker, Subclause("17.2"));
