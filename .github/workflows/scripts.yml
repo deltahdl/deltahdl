@@ -169,28 +169,6 @@ jobs:
           --verbose
           ${{ github.workspace }}/test/lib/python/
           ${{ github.workspace }}/test/scripts/
-  # A report names the subclause of IEEE 1800-2023 whose rule it enforces, and
-  # this fails on either of two things being wrong about those names.
-  #
-  # It fails when one of them is a subclause the standard does not have. Two
-  # elaborator reports cited §6.20.3.1 until #3068 and nothing said so, because
-  # a unit test over a diagnostic reads the string the emission site passes,
-  # which is the value under suspicion.
-  #
-  # It fails when one message is reported under two subclauses. Five were until
-  # #3119, so one sentence sent a reader to a different clause depending on
-  # which site emitted it, and a test naming that message could not say which
-  # rule it covered.
-  #
-  # It judges no citation to be the wrong clause for its rule. That is a
-  # reading of the standard and stays a reviewer's job; what the second check
-  # answers is whether two sites agree with each other.
-  assert-subclause-citations:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - name: Assert every citation names a clause and every message one rule
-        run: PYTHONPATH=.:scripts python3 -m assert_subclause_citations
   copy-paste-source:
     runs-on: ubuntu-24.04
     steps:
@@ -796,7 +774,11 @@ on:
       # is a change this workflow has to observe. Its own file is watched
       # because the yamllint job lints it, and the dependency graph because
       # test-lib-cli reads it as the record of which identifiers the
-      # --subclause argument has to admit.
+      # --subclause argument has to admit. src/ is deliberately absent: a job
+      # reading that tree has to run on a push that changes it, and this list
+      # would start all of this workflow's jobs on every such push, so
+      # assert-subclause-citations runs in .github/workflows/deltahdl.yml
+      # instead. #3156 records the measurement.
       - .github/workflows/scripts.yml
       - docs/dependency_graph.json
       - lib/python/**
