@@ -539,4 +539,71 @@ TEST(ArrayIndexingAndSlicing,
                  "dst", {0xA0u, 0xB0u});
 }
 
+// §7.4.5 (printed page 156): "A single element of a packed or unpacked array
+// can be selected using an indexed name", stated with `bit [3:0] [7:0] j;` and
+// `k = j[2]; // select a single 8-bit element from j`. A module port carries
+// packed dimensions the same way a variable or a net does, so an index on a
+// port declared with more than one of them names an element and not a bit. The
+// select sits inside the instantiated module and the parent reads back what it
+// drives, so Lowerer::CreateChildModulePorts in src/simulator/lowerer_child.cpp
+// is the path that records the element width. 32'hDEADBEEF tells the two
+// readings apart: element 1 is 8'hBE, while bit 1 is 1.
+TEST(ArrayIndexingAndSlicing, PortSingleIndexSelectsAPackedElement) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module leaf(input bit [3:0][7:0] data, output [7:0] q);\n"
+      "  assign q = data[1];\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic [31:0] src;\n"
+      "  wire [7:0] r;\n"
+      "  leaf u (.data(src), .q(r));\n"
+      "  initial src = 32'hDEADBEEF;\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xBEu);
+}
+
+// §7.4.5 with the indexed name on the left of the assignment, which is a
+// separate write path: `p[1] = 8'hAB` on `output bit [3:0][7:0] p` writes the
+// element at index 1, meaning bits 15 through 8. The other bits are the
+// two-state default of 0 that Table 6-7 gives a `bit` with no initializer, so
+// the connected 32-bit net reads 32'h0000_AB00. A bit-select write would leave
+// 32'h0000_0002 instead.
+TEST(ArrayIndexingAndSlicing, PortSingleIndexTargetWritesAPackedElement) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module leaf(output bit [3:0][7:0] p);\n"
+      "  initial p[1] = 8'hAB;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  wire [31:0] r;\n"
+      "  leaf u (.p(r));\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x0000AB00u);
+}
+
+// §7.4.5 reaches a net declared with more than one packed dimension in the same
+// words, since a net is declared with packed dimensions exactly as a variable
+// is. Lowerer::RegisterModuleNets in src/simulator/lowerer_register.cpp has
+// recorded the element width for a net all along, and no other case reads it:
+// `w[1]` on `wire [3:0][7:0] w` holding 32'hDEADBEEF is 8'hBE rather than the 1
+// a bit select would give.
+TEST(ArrayIndexingAndSlicing, NetSingleIndexSelectsAPackedElement) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  wire [3:0][7:0] w;\n"
+      "  wire [7:0] r;\n"
+      "  assign w = 32'hDEADBEEF;\n"
+      "  assign r = w[1];\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xBEu);
+}
+
 }  // namespace
