@@ -15,7 +15,8 @@ const RtlirModule* PreprocessAndElaborate(SynthFixture& f,
   Preprocessor preproc(f.src_mgr, f.diag, {});
   auto pp = preproc.Preprocess(fid);
   auto pp_fid = f.src_mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(f.src_mgr.FileContent(pp_fid), pp_fid, f.diag);
+  Lexer lexer(f.src_mgr.FileContent(pp_fid), pp_fid, f.diag,
+              TextOrigin::kPreprocessorOutput);
   Parser parser(lexer, f.arena, f.diag);
   auto* cu = parser.Parse();
   if (!cu || cu->modules.empty()) return nullptr;

@@ -27,7 +27,8 @@ ParseResult ParseAndTagCells(const std::string& src) {
   Preprocessor preproc(result.mgr, diag, {});
   auto preprocessed = preproc.Preprocess(fid);
   auto pp_fid = result.mgr.AddFile("<preprocessed>", preprocessed);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
+  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag,
+              TextOrigin::kPreprocessorOutput);
   Parser parser(lexer, result.arena, diag);
   result.cu = parser.Parse();
   MarkCellModules(result.cu, preproc.CellModuleNames());

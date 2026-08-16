@@ -21,7 +21,8 @@ RtlirDesign* PreprocElaborate(const std::string& src, SimFixture& f) {
   Preprocessor preproc(f.mgr, f.diag, {});
   auto pp = preproc.Preprocess(fid);
   auto pp_fid = f.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(f.mgr.FileContent(pp_fid), pp_fid, f.diag);
+  Lexer lexer(f.mgr.FileContent(pp_fid), pp_fid, f.diag,
+              TextOrigin::kPreprocessorOutput);
   Parser parser(lexer, f.arena, f.diag);
   auto* cu = parser.Parse();
   // What a `timescale directive said is read by the preprocessor and consumed

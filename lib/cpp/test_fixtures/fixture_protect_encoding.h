@@ -49,8 +49,15 @@ inline constexpr std::string_view kSecondDesign =
 // character that would end the value a block travels as, and a byte that cannot
 // be printed at all, so a block recording it holds bytes no source line could
 // carry until the writing has been applied.
+//
+// The unprintable byte is 0x02 rather than kKeywordMarker, which is 0x01. A
+// source file may not hold that one: Preprocessor::ProcessSource reports it
+// under §5.2 and blanks it, so that a keyword-version marker in preprocessed
+// text is one the Preprocessor wrote. Text awaiting sealing is read by
+// ProcessSource like any other, and the claim here is about a byte that cannot
+// be printed, which 0x02 makes as well as 0x01 did.
 inline constexpr std::string_view kAwkwardDesign =
-    "module sealed_q; // \" \x01\nendmodule\n";
+    "module sealed_q; // \" \x02\nendmodule\n";
 
 // Where a reading meets the block an envelope carries. Everything a block is
 // read under has to stand ahead of this, so a directive written here is the
@@ -118,7 +125,11 @@ inline constexpr std::string_view kDesignationInQuotedPrintable =
 // the table that admits such data. Written under any other scheme these bytes
 // would be an escape or an alphabet member; written under this one they are the
 // data.
-inline constexpr std::string_view kUnprintableDesignation = "acme\x01public";
+//
+// The byte is 0x02 rather than kKeywordMarker, for the reason given above
+// kAwkwardDesign: this designation is written into a source line raw, and no
+// source line may carry 0x01.
+inline constexpr std::string_view kUnprintableDesignation = "acme\x02public";
 
 // An identifier no row of Table 34-2 names and this implementation does not
 // define either, so it stands for no writing at all.

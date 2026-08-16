@@ -186,7 +186,7 @@ TEST(KeywordVersionPreprocessing, ResetallDoesNotAffectKeywordVersion) {
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", out);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Lexer lexer(mgr.FileContent(fid), fid, diag, TextOrigin::kPreprocessorOutput);
   auto tokens = lexer.LexAll();
 
   bool found_logic = false;
@@ -225,7 +225,7 @@ TEST(KeywordVersionPreprocessing, LexerSeesKeywordAfterEndKeywords) {
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", out);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Lexer lexer(mgr.FileContent(fid), fid, diag, TextOrigin::kPreprocessorOutput);
   auto tokens = lexer.LexAll();
 
   std::vector<TokenKind> logic_kinds;
@@ -356,7 +356,8 @@ TEST(KeywordVersionPreprocessing, EffectCrossesIncludeBoundary) {
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto out_fid = mgr.AddFile("<test>", out);
-  Lexer lexer(mgr.FileContent(out_fid), out_fid, diag);
+  Lexer lexer(mgr.FileContent(out_fid), out_fid, diag,
+              TextOrigin::kPreprocessorOutput);
   auto tokens = lexer.LexAll();
 
   bool found_logic = false;
@@ -376,7 +377,7 @@ std::vector<TokenKind> KindsOf(const std::string& preprocessed,
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", preprocessed);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Lexer lexer(mgr.FileContent(fid), fid, diag, TextOrigin::kPreprocessorOutput);
   std::vector<TokenKind> kinds;
   for (const auto& tok : lexer.LexAll()) {
     if (tok.text == text) kinds.push_back(tok.kind);
@@ -761,7 +762,8 @@ TEST(KeywordVersionPreprocessing, VersionDoesNotChangeOtherTokens) {
     SourceManager mgr;
     DiagEngine diag(mgr);
     auto fid = mgr.AddFile("<test>", src);
-    Lexer lexer(mgr.FileContent(fid), fid, diag);
+    Lexer lexer(mgr.FileContent(fid), fid, diag,
+                TextOrigin::kPreprocessorOutput);
     std::vector<std::pair<TokenKind, std::string>> out;
     for (const auto& tok : lexer.LexAll()) {
       out.emplace_back(tok.kind, std::string(tok.text));

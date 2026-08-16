@@ -113,7 +113,8 @@ inline CompilationUnit* PreprocessAndParseCu(ElabFixture& f, uint32_t fid,
   // this fixture provokes is formatted the way the binary formats it.
   auto pp_fid =
       f.mgr.AddPreprocessedFile("<preprocessed>", pp, preproc.LineOrigins());
-  Lexer lexer(f.mgr.FileContent(pp_fid), pp_fid, f.diag);
+  Lexer lexer(f.mgr.FileContent(pp_fid), pp_fid, f.diag,
+              TextOrigin::kPreprocessorOutput);
   Parser parser(lexer, f.arena, f.diag);
   return parser.Parse();
 }

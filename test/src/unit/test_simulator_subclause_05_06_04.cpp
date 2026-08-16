@@ -44,7 +44,8 @@ TEST(CompilerDirectiveSimulation, MacroDoesNotLeakBetweenCus) {
   Preprocessor pp2(f2.mgr, f2.diag, {});
   auto preprocessed = pp2.Preprocess(fid);
   auto fid2 = f2.mgr.AddFile("<preprocessed>", preprocessed);
-  Lexer lexer(f2.mgr.FileContent(fid2), fid2, f2.diag);
+  Lexer lexer(f2.mgr.FileContent(fid2), fid2, f2.diag,
+              TextOrigin::kPreprocessorOutput);
   Parser parser(lexer, f2.arena, f2.diag);
   parser.Parse();
   EXPECT_TRUE(ReportedError(f2.diag.Diagnostics(), "undefined macro 'LEAK'", 3,

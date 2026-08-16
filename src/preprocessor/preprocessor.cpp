@@ -713,12 +713,65 @@ bool Preprocessor::TookAnnouncedValue(std::string_view line, SourceLoc loc,
   return TakeDigestBlockValue(line, loc);
 }
 
+// Report every kKeywordMarker byte in a source file and return the text with
+// each one replaced by a space.
+//
+// §5.2 makes a source file a stream of lexical tokens and lists the seven kinds
+// there are; §5.3 gives white space its characters. The byte begins none of
+// them, which is the report. It has to go as well as be reported, because the
+// Preprocessor writes that same byte to introduce a keyword-version change and
+// Lexer reads every one it finds in preprocessed text: a byte left in place
+// would set the reserved word list to whatever followed it, which is the whole
+// of the language's keywords rather than a diagnostic.
+//
+// A space is what replaces it so that every later line, column and offset is
+// the one the user wrote. §5.3 makes a space a token separator, so the
+// substitution cannot join two tokens that the byte held apart.
+//
+// Every byte is read, including the ones inside a comment or a string literal.
+// Exempting those would mean deciding where they start, and the byte being
+// looked for is the one that decides which words are keywords, so a text
+// holding it is a text whose tokens are not yet known. The report is filed
+// either way, so no run that reaches the Lexer carries a blanked byte.
+static std::string ReportAndBlankKeywordMarkers(std::string_view src,
+                                                uint32_t file_id,
+                                                DiagEngine& diag) {
+  std::string out(src);
+  uint32_t line = 1;
+  uint32_t column = 1;
+  for (char& c : out) {
+    if (c == kKeywordMarker) {
+      diag.Error({file_id, line, column},
+                 "unexpected character 0x01 in source text", Subclause("5.2"));
+      c = ' ';
+    }
+    if (c == '\n') {
+      line++;
+      column = 1;
+    } else {
+      column++;
+    }
+  }
+  return out;
+}
+
 std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
                                         int depth) {
   if (depth > kMaxIncludeDepth) {
     diag_.Error({file_id, 1, 1}, "include depth exceeds maximum of 15",
                 Subclause::None());
     return "";
+  }
+
+  // Every path text takes into the Preprocessor arrives here -- Preprocess for
+  // a file named on the command line, ProcessIncludeFile for a `include, and
+  // the protected-envelope cleartext at
+  // src/preprocessor/preprocessor_protect_keys.cpp:835 -- so this is the one
+  // place that has to hold for the marker to mean what Lexer takes it to mean.
+  std::string without_markers;
+  if (src.find(kKeywordMarker) != std::string_view::npos) {
+    without_markers = ReportAndBlankKeywordMarkers(src, file_id, diag_);
+    src = without_markers;
   }
 
   uint32_t line_num = 0;

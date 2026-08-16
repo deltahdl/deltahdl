@@ -11,9 +11,22 @@
 
 namespace delta {
 
+// Where the text a Lexer is given came from, which is what decides whether a
+// kKeywordMarker byte in it is a keyword-version marker or a byte the user
+// wrote. The two cannot be told apart by value, because the marker is carried
+// in the text rather than beside it.
+//
+// kPreprocessorOutput says Preprocessor::ProcessSource produced this text, so
+// every marker in it is one HandleBeginKeywords or HandleEndKeywords wrote:
+// ProcessSource reports and blanks every marker byte its input held.
+// kUserSource says the text is a file as the user wrote it, where §5.2 lists no
+// lexical token the byte can begin and LexOperator reports it.
+enum class TextOrigin : std::uint8_t { kUserSource, kPreprocessorOutput };
+
 class Lexer {
  public:
-  Lexer(std::string_view source, uint32_t file_id, DiagEngine& diag);
+  Lexer(std::string_view source, uint32_t file_id, DiagEngine& diag,
+        TextOrigin origin = TextOrigin::kUserSource);
 
   Token Next();
   Token Peek();
@@ -160,6 +173,7 @@ class Lexer {
   uint32_t column_ = 1;
   uint32_t file_id_;
   DiagEngine& diag_;
+  TextOrigin origin_;
   bool has_peeked_ = false;
   bool in_attribute_ = false;
   Token peeked_;

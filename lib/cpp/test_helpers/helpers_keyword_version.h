@@ -101,7 +101,7 @@ inline TokenKind KindInRegion(const std::string& version,
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", out);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Lexer lexer(mgr.FileContent(fid), fid, diag, TextOrigin::kPreprocessorOutput);
   for (const auto& tok : lexer.LexAll()) {
     if (tok.text == word) return tok.kind;
   }
@@ -122,7 +122,7 @@ inline TokenKind KindAfterSpecifier(const std::string& spec,
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", out);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Lexer lexer(mgr.FileContent(fid), fid, diag, TextOrigin::kPreprocessorOutput);
   for (const auto& tok : lexer.LexAll()) {
     if (tok.text == word) return tok.kind;
   }

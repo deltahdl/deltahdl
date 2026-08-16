@@ -438,7 +438,8 @@ delta::CompilationUnit* ParseSource(
   // position with no origin recorded falls back to.
   auto file_id =
       src_mgr.AddPreprocessedFile("<preprocessed>", source, line_origins);
-  delta::Lexer lexer(source, file_id, diag);
+  delta::Lexer lexer(source, file_id, diag,
+                     delta::TextOrigin::kPreprocessorOutput);
   delta::Parser parser(lexer, arena, diag);
   return parser.Parse();
 }

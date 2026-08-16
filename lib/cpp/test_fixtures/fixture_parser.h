@@ -90,7 +90,8 @@ inline ParseResult ParseWithPreprocessor(const std::string& src) {
   // this fixture provokes is formatted the way the binary formats it.
   auto pp_fid = result.mgr.AddPreprocessedFile("<preprocessed>", pp,
                                                preproc.LineOrigins());
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
+  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag,
+              TextOrigin::kPreprocessorOutput);
   Parser parser(lexer, result.arena, diag);
   result.cu = parser.Parse();
   result.cu->default_nettype = preproc.DefaultNetType();

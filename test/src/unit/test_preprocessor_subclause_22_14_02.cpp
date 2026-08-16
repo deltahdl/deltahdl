@@ -31,7 +31,7 @@ TokenKind KindOfWordIn(const std::string& src, const std::string& word) {
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<preprocessed>", src);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Lexer lexer(mgr.FileContent(fid), fid, diag, TextOrigin::kPreprocessorOutput);
   for (const auto& tok : lexer.LexAll()) {
     if (tok.text == word) return tok.kind;
   }
@@ -60,8 +60,8 @@ TokenKind KindUnderDefaultList(const std::string& word) {
 }
 
 // The directive selects this list by handing the lexer a marker naming the
-// version. This specifier is the one whose version byte is zero, so the byte
-// the preprocessor writes is an embedded NUL — source following it has to keep
+// version. The byte written after the marker is the value of
+// KeywordVersion::kVer13641995 itself, and source following it has to keep
 // lexing normally for the list to take effect at all, which is what the tokens
 // checked at the end show.
 TEST(KeywordVersionPreprocessing, Verilog1995DirectiveEmitsItsVersionMarker) {
@@ -78,7 +78,6 @@ TEST(KeywordVersionPreprocessing, Verilog1995DirectiveEmitsItsVersionMarker) {
   ASSERT_LT(pos + 1, out.size());
   EXPECT_EQ(static_cast<KeywordVersion>(out[pos + 1]),
             KeywordVersion::kVer13641995);
-  EXPECT_EQ(out[pos + 1], '\0');
 
   EXPECT_EQ(KindOfWordIn(out, "reg"), TokenKind::kKwReg);
   EXPECT_EQ(KindOfWordIn(out, "logic"), TokenKind::kIdentifier);

@@ -33,7 +33,7 @@ TokenKind KindOfWordIn(const std::string& src, const std::string& word) {
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<preprocessed>", src);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Lexer lexer(mgr.FileContent(fid), fid, diag, TextOrigin::kPreprocessorOutput);
   for (const auto& tok : lexer.LexAll()) {
     if (tok.text == word) return tok.kind;
   }

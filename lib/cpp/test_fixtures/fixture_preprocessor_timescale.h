@@ -82,7 +82,8 @@ inline ParseResult31402 ParseTimescale31402(const std::string& src) {
   result.has_preproc_timescale = preproc.HasTimescale();
   result.preproc_global_precision = preproc.GlobalPrecision();
   auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
+  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag,
+              TextOrigin::kPreprocessorOutput);
   Parser parser(lexer, result.arena, diag);
   result.cu = parser.Parse();
   RecordDiagnostics(diag, result);

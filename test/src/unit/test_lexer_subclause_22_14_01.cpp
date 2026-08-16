@@ -27,7 +27,7 @@ std::vector<TokenKind> PreprocessAndLexKinds(
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<preprocessed>", out);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Lexer lexer(mgr.FileContent(fid), fid, diag, TextOrigin::kPreprocessorOutput);
   auto tokens = lexer.LexAll();
 
   std::vector<TokenKind> kinds(words.size(), TokenKind::kError);
@@ -148,7 +148,7 @@ TEST(KeywordVersionExampleLexing, RegionDoesNotReachBackOverEarlierSource) {
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<preprocessed>", out);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Lexer lexer(mgr.FileContent(fid), fid, diag, TextOrigin::kPreprocessorOutput);
   auto tokens = lexer.LexAll();
 
   std::vector<TokenKind> logic_kinds;
@@ -183,7 +183,7 @@ TEST(KeywordVersionExampleLexing, DeclarationsKeepTheLineTheyWereWrittenOn) {
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<preprocessed>", out);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Lexer lexer(mgr.FileContent(fid), fid, diag, TextOrigin::kPreprocessorOutput);
   auto tokens = lexer.LexAll();
 
   uint32_t first_line = 0;

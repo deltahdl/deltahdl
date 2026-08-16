@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
+#include "lexer/keywords.h"
 
 using namespace delta;
 
@@ -68,6 +72,37 @@ TEST(LexicalConventionPreprocessor, TabsAndFormfeedsAsWhitespace) {
   PreprocFixture f;
   Preprocess("module\tt\f;\flogic\ta\t;\tendmodule\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §5.2 makes a source file a stream of lexical tokens and lists the seven kinds
+// there are; kKeywordMarker, the byte 0x01, begins none of them, so a source
+// holding one is rejected at the character it stands on.
+TEST(LexicalConventionPreprocessor, KeywordMarkerByteInSourceTextIsReported) {
+  PreprocFixture f;
+  Preprocess(
+      "module t;\n"
+      "  logic \x01 a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unexpected character 0x01 in source text", 2,
+                            "5.2"));
+}
+
+// What that report protects. The Preprocessor writes kKeywordMarker itself to
+// introduce a keyword-version change, and Lexer reads the byte after every
+// marker it finds as a KeywordVersion, so a 0x01 the user wrote that survived
+// into the output would set the reserved word list to whatever byte followed
+// it instead of being diagnosed.
+TEST(LexicalConventionPreprocessor,
+     KeywordMarkerByteIsBlankedFromPreprocessedText) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "module t;\n"
+      "  logic \x01 a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out.find(kKeywordMarker), std::string::npos);
 }
 
 }  // namespace

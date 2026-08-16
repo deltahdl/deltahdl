@@ -22,7 +22,8 @@ inline uint64_t RunPreprocessedSim(SimFixture& f, uint32_t fid,
                                    CuPropagation prop = CuPropagation::kNone) {
   auto preprocessed = pp.Preprocess(fid);
   auto fid2 = f.mgr.AddFile("<preprocessed>", preprocessed);
-  Lexer lexer(f.mgr.FileContent(fid2), fid2, f.diag);
+  Lexer lexer(f.mgr.FileContent(fid2), fid2, f.diag,
+              TextOrigin::kPreprocessorOutput);
   Parser parser(lexer, f.arena, f.diag);
   auto* cu = parser.Parse();
   if (prop == CuPropagation::kDefaultNetType) {

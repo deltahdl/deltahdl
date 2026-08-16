@@ -14,7 +14,8 @@ static ParseResult ParseWithIncludes(IncludeTestDir& tmp,
   Preprocessor preproc(result.mgr, diag, {});
   auto pp = preproc.Preprocess(fid);
   auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
+  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag,
+              TextOrigin::kPreprocessorOutput);
   Parser parser(lexer, result.arena, diag);
   result.cu = parser.Parse();
   result.cu->default_nettype = preproc.DefaultNetType();

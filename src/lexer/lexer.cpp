@@ -146,8 +146,9 @@ bool PragmaAlreadyRecorded(const PragmaVec& recorded, SourceLoc loc) {
 
 }  // namespace
 
-Lexer::Lexer(std::string_view source, uint32_t file_id, DiagEngine& diag)
-    : source_(source), file_id_(file_id), diag_(diag) {}
+Lexer::Lexer(std::string_view source, uint32_t file_id, DiagEngine& diag,
+             TextOrigin origin)
+    : source_(source), file_id_(file_id), diag_(diag), origin_(origin) {}
 
 char Lexer::Current() const {
   if (AtEnd()) {
@@ -384,7 +385,12 @@ void Lexer::SkipWhitespaceAndComments() {
       Advance();
       continue;
     }
-    if (Current() == kKeywordMarker) {
+    // Only the Preprocessor writes a keyword-version marker, so only its output
+    // may be read for one. In a file the user wrote, the same byte is a
+    // character §5.2 gives no lexical token to begin, and leaving it here sends
+    // it to LexOperator, which reports it as any other such character.
+    if (Current() == kKeywordMarker &&
+        origin_ == TextOrigin::kPreprocessorOutput) {
       ConsumeKeywordMarker();
       continue;
     }

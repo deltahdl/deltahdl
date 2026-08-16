@@ -30,11 +30,16 @@ struct LexAllResult {
   bool has_errors;
 };
 
-inline std::vector<Token> Lex(const std::string& src) {
+// Pass TextOrigin::kPreprocessorOutput for a src that hand-writes a
+// kKeywordMarker byte: such a test stands in for the Preprocessor and has to
+// say so, because a marker in text the Preprocessor did not produce is a byte
+// the user wrote, which the Lexer reports as an unexpected character.
+inline std::vector<Token> Lex(const std::string& src,
+                              TextOrigin origin = TextOrigin::kUserSource) {
   static SourceManager mgr;
   auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Lexer lexer(mgr.FileContent(fid), fid, diag, origin);
   return lexer.LexAll();
 }
 

@@ -408,7 +408,8 @@ static void PreprocessAndParseUnder(const std::string& path,
   auto out = pp.Preprocess(fid);
   auto out_fid =
       f.mgr.AddPreprocessedFile("<preprocessed>", out, pp.LineOrigins());
-  Lexer lexer(f.mgr.FileContent(out_fid), out_fid, f.diag);
+  Lexer lexer(f.mgr.FileContent(out_fid), out_fid, f.diag,
+              TextOrigin::kPreprocessorOutput);
   Parser parser(lexer, arena, f.diag);
   parser.Parse();
 }

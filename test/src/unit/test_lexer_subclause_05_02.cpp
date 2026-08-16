@@ -1,7 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cstdint>
+#include <string>
+
 #include "fixture_lexer.h"
 #include "helpers_reported_error.h"
+#include "lexer/keywords.h"
 
 using namespace delta;
 
@@ -328,6 +333,46 @@ TEST(CompilerDirectiveLexing, BacktickMidLineIsError) {
 TEST(CompilerDirectiveLexing, BacktickAtEofIsError) {
   EXPECT_TRUE(
       ReportedError(LexDiagnostics("`"), "unexpected character '`'", 1, "5.2"));
+}
+
+// The two cases below hand the Lexer the byte the Preprocessor writes to
+// introduce a keyword-version change. §5.2 gives it no lexical token to begin,
+// exactly as it gives the grave accent none, so the same report answers for it:
+// a byte carries no mark of who wrote it, and a Lexer reading a file the user
+// wrote has no version marker to find in it.
+TEST(LexicalConventionLexing, KeywordMarkerByteInUserSourceIsUnexpected) {
+  std::string src = "a ";
+  src += kKeywordMarker;
+  src += " b";
+  EXPECT_TRUE(ReportedError(
+      LexDiagnostics(src),
+      std::string("unexpected character '") + kKeywordMarker + "'", 1, "5.2"));
+}
+
+// What the report is worth, which the report alone does not say. The byte is
+// followed here by a well-formed version, so a Lexer that took it for a marker
+// would leave §22.14's reserved word list set to the oldest one there is for
+// the whole of the rest of the file, and would say nothing about having done
+// so.
+//
+// The version and the word are chosen together so that the assertion can fail.
+// `logic` is reserved from IEEE Std 1800-2005 (§22.14.6) and is not among the
+// IEEE Std 1364-1995 keywords (§22.14.2), so it is a keyword under the default
+// list and an identifier under the one the byte pair selects. A word reserved
+// by both, or a version whose list matches the default, would leave this
+// passing whether the version changed or not.
+TEST(LexicalConventionLexing,
+     KeywordMarkerByteInUserSourceLeavesKeywordsAlone) {
+  std::string src;
+  src += kKeywordMarker;
+  src += static_cast<char>(static_cast<uint8_t>(KeywordVersion::kVer13641995));
+  src += " logic";
+  auto tokens = Lex(src);
+  auto logic = std::find_if(tokens.begin(), tokens.end(), [](const Token& tok) {
+    return tok.text == "logic";
+  });
+  ASSERT_NE(logic, tokens.end());
+  EXPECT_EQ(logic->kind, TokenKind::kKwLogic);
 }
 
 TEST(LexicalConventionLexing, BlockCommentSpanningMultipleLinesAsSeparator) {

@@ -22,7 +22,8 @@ TEST(NameSpaceElaboration, SameNameDifferentModulesElab) {
   Preprocessor preproc(mgr, diag, {});
   auto pp = preproc.Preprocess(fid);
   auto pp_fid = mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(mgr.FileContent(pp_fid), pp_fid, diag);
+  Lexer lexer(mgr.FileContent(pp_fid), pp_fid, diag,
+              TextOrigin::kPreprocessorOutput);
   Parser parser(lexer, arena, diag);
   auto* cu = parser.Parse();
   ASSERT_FALSE(diag.HasErrors());

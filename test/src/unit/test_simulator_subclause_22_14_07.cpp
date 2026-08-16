@@ -47,7 +47,8 @@ std::string RunSystemVerilog2009Output(const std::string& body) {
   Preprocessor pp(f.mgr, f.diag, {});
   auto preprocessed = pp.Preprocess(fid);
   auto pp_fid = f.mgr.AddFile("<preprocessed>", preprocessed);
-  Lexer lexer(f.mgr.FileContent(pp_fid), pp_fid, f.diag);
+  Lexer lexer(f.mgr.FileContent(pp_fid), pp_fid, f.diag,
+              TextOrigin::kPreprocessorOutput);
   Parser parser(lexer, f.arena, f.diag);
   auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);

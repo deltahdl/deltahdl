@@ -19,7 +19,7 @@ TEST(KeywordVersionLexing, KeywordVersionMarkerRestoresToDefault) {
       static_cast<char>(static_cast<uint8_t>(KeywordVersion::kVer18002023));
   input += '\n';
   input += "logic";
-  auto tokens = Lex(input);
+  auto tokens = Lex(input, TextOrigin::kPreprocessorOutput);
   ASSERT_GE(tokens.size(), 3);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[1].kind, TokenKind::kKwLogic);
@@ -70,7 +70,7 @@ TEST(KeywordVersionLexing, MarkerAtInputStart) {
       static_cast<char>(static_cast<uint8_t>(KeywordVersion::kVer13641995));
   input += '\n';
   input += "module m; endmodule";
-  auto tokens = Lex(input);
+  auto tokens = Lex(input, TextOrigin::kPreprocessorOutput);
   bool found_module = false;
   for (const auto& tok : tokens) {
     if (tok.text == "module") {
@@ -129,7 +129,7 @@ TEST(KeywordVersionLexing, MarkerAppliesToAllFollowingTokens) {
   input += "byte interface;\n";
   input += "shortint longint;\n";
 
-  auto tokens = Lex(input);
+  auto tokens = Lex(input, TextOrigin::kPreprocessorOutput);
   size_t identifiers = 0;
   for (const auto& tok : tokens) {
     if (tok.kind == TokenKind::kIdentifier) ++identifiers;
@@ -149,7 +149,7 @@ TEST(KeywordVersionLexing, ConsecutiveMarkersSwitchVersion) {
       static_cast<char>(static_cast<uint8_t>(KeywordVersion::kVer18002023));
   input += '\n';
   input += "logic";
-  auto tokens = Lex(input);
+  auto tokens = Lex(input, TextOrigin::kPreprocessorOutput);
   bool found_logic = false;
   for (const auto& tok : tokens) {
     if (tok.text == "logic") {
