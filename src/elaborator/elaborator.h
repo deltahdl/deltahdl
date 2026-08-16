@@ -455,8 +455,11 @@ class Elaborator : public ElaboratorData {
 
   void ValidateAssocIndexType(const ModuleItem* item);
 
-  void TrackVarArrayInfo(const ModuleItem* item, RtlirVariable& var,
-                         const ScopeMap& scope);
+  void TrackVarArrayInfo(
+      const ModuleItem* item, RtlirVariable& var, const ScopeMap& scope,
+      std::unordered_map<std::string_view, VarArrayInfo>& out);
+  void RecordNetArrayShape(ModuleItem* item, const RtlirNet& net,
+                           RtlirModule* mod);
 
   void ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope);
 

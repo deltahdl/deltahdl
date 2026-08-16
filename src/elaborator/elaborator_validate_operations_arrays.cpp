@@ -272,9 +272,19 @@ AddressedDims CountAddressedDims(const Expr* base) {
 void Elaborator::CheckArrayElementPartSelectNode(const Expr* e) {
   AddressedDims addressed = CountAddressedDims(e->base);
   if (addressed.array_name.empty()) return;
-  auto it = var_array_info_.find(addressed.array_name);
-  if (it == var_array_info_.end()) return;
-  const auto& info = it->second;
+  // §11.5.2 states this rule of net and variable arrays alike, so a net array's
+  // dimensions are consulted as well. They are held in their own map because
+  // every other reader of var_array_info_ is a rule written about variables.
+  const VarArrayInfo* found = nullptr;
+  if (auto it = var_array_info_.find(addressed.array_name);
+      it != var_array_info_.end()) {
+    found = &it->second;
+  } else if (auto nit = net_array_info_.find(addressed.array_name);
+             nit != net_array_info_.end()) {
+    found = &nit->second;
+  }
+  if (found == nullptr) return;
+  const auto& info = *found;
   if (info.is_dynamic || info.is_assoc) return;
   // Every dimension addressed: a part-select of the one element that addressing
   // selected, which this rule does not reach.

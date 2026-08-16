@@ -563,6 +563,30 @@ static void ValidateNetDeclDataType(
   ValidateNetDataTypeIs4State(item->data_type, typedefs, diag, item->loc);
 }
 
+// Records what a select written on this net may reach. §11.5.2 draws no
+// distinction between a net and a variable -- a select of an array element is
+// "addressed in the same manner as net and variable bit-selects and
+// part-selects" -- so the net gets the same VarSelectShape a variable gets, and
+// its dimensions go to net_array_info_ for the one slice rule that reads them.
+// They are kept out of var_array_info_ deliberately: that map is read by rules
+// written about variables, and §7.6's array assignment comparison reports a
+// mismatch between `logic [7:0] v[4]` and `wire [7:0] w[4]` when it sees one,
+// because VarArrayInfo::elem_type holds the net kind for a wire while §6.7.1
+// makes a net's default data type logic. What elem_type should mean for a net
+// is unread, so no rule that consults it is given one.
+void Elaborator::RecordNetArrayShape(ModuleItem* item, const RtlirNet& net,
+                                     RtlirModule* mod) {
+  RecordVarSelectShape(item, typedefs_, var_select_shapes_);
+  if (item->unpacked_dims.empty()) return;
+  RtlirVariable dims;
+  dims.width = net.width;
+  dims.is_signed = net.is_signed;
+  ComputeUnpackedDims(
+      item->unpacked_dims, dims,
+      {{typedefs_, class_names_}, BuildParamScope(mod), diag_, item->loc});
+  TrackVarArrayInfo(item, dims, BuildParamScope(mod), net_array_info_);
+}
+
 void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   // §6.23: a net declared with a type_reference data type (e.g. `wire type(x)
   // y`) resolves the referenced object's width/signedness before the net is
@@ -575,10 +599,19 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
       "net", diag_);
   net_names_.insert(item->name);
   var_types_[item->name] = item->data_type.kind;
-  if (!item->data_type.packed_dim_left)
-    scalar_var_names_.insert(item->name);
-  else if (item->unpacked_dims.empty())
-    packed_array_vars_.insert(item->name);
+  // §7.4.2: "Unpacked arrays can be made of any data type", and "Elements of
+  // net arrays can be used in the same fashion as a scalar or vector net". A
+  // net carrying an unpacked dimension is therefore neither a scalar nor a
+  // packed array for select legality, exactly as RegisterVarDeclNames already
+  // decides for a variable, because §11.5.2 makes an index on one an array
+  // element select rather than a bit-select. Testing only the packed dimension
+  // made `wire w [3:0]` a scalar, so every `w[1]` drew §11.5.1's scalar report.
+  if (item->unpacked_dims.empty()) {
+    if (!item->data_type.packed_dim_left)
+      scalar_var_names_.insert(item->name);
+    else
+      packed_array_vars_.insert(item->name);
+  }
   RtlirNet net;
   net.name = ScopedName(item->name);
 
@@ -646,6 +679,8 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   }
 
   ApplyTriregNetDefaults(item, net, unit_, BuildParamScope(mod));
+
+  RecordNetArrayShape(item, net, mod);
 
   net.attrs = ResolveAttributes(item->attrs, diag_);
   mod->nets.push_back(net);

@@ -105,8 +105,9 @@ static void CollectUnpackedDimSizes(
   }
 }
 
-void Elaborator::TrackVarArrayInfo(const ModuleItem* item, RtlirVariable& var,
-                                   const ScopeMap& scope) {
+void Elaborator::TrackVarArrayInfo(
+    const ModuleItem* item, RtlirVariable& var, const ScopeMap& scope,
+    std::unordered_map<std::string_view, VarArrayInfo>& out) {
   if (item->unpacked_dims.empty()) return;
   VarArrayInfo info{item->data_type.kind,
                     var.unpacked_size,
@@ -126,7 +127,7 @@ void Elaborator::TrackVarArrayInfo(const ModuleItem* item, RtlirVariable& var,
   }
   CollectUnpackedDimSizes(item->unpacked_dims, info.declared_dims,
                           info.dim_sizes, scope);
-  var_array_info_[item->name] = info;
+  out[item->name] = info;
   // §7.4.2: carry full per-dimension extents to the simulator only when every
   // dimension is a fixed const size — queue/dynamic/assoc dims fall short of
   // the declared count, so the single-dimension unpacked_size/lo stays in
@@ -454,7 +455,7 @@ static bool IsStringVar(const DataType& dtype, const TypedefMap& typedefs) {
 // character of a string variable may be selected for reading or writing by
 // indexing the variable", so the address after a string's own reaches a
 // character, whose own bits are selectable.
-static void RecordVarSelectShape(
+void RecordVarSelectShape(
     const ModuleItem* item, const TypedefMap& typedefs,
     std::unordered_map<std::string_view, VarSelectShape>& shapes) {
   const DataType& dtype = item->data_type;
@@ -673,7 +674,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   ValidateUnpackedDimRange(item->unpacked_dims, item->loc);
   InferDynArraySize(item->unpacked_dims, item->init_expr, var);
 
-  TrackVarArrayInfo(item, var, BuildParamScope(mod));
+  TrackVarArrayInfo(item, var, BuildParamScope(mod), var_array_info_);
 
   var.attrs = ResolveAttributes(item->attrs, diag_, BuildParamScope(mod));
   mod->variables.push_back(var);

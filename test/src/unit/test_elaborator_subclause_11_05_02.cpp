@@ -186,16 +186,75 @@ TEST(ArrayAddressingElaboration,
       "  assign result = threed_array[14][1][3:0];\n"
       "endmodule\n",
       f);
-  // The report names §11.5.1's scalar rule, not §11.5.2's slice ordering.
-  // Elaborator::ElaborateNetDecl records a net with no packed dimension in
-  // scalar_var_names_, and Elaborator::TrackVarArrayInfo runs only for a
-  // kVarDecl, so a net array reaches neither
-  // Elaborator::CheckArrayElementPartSelectNode nor
-  // Elaborator::ValidatePartSelectBounds and every index written on
-  // threed_array is rejected as a select of a scalar.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "slice's first index must address a more significant element", 4,
+      "11.5.2"));
+}
+
+// The accepting twin of the case above, on one declaration with the slice's
+// direction the only difference. Without it a check refusing every slice of a
+// net array would pass the rejection above, since before this a net array could
+// not be indexed at all.
+TEST(ArrayAddressingElaboration,
+     AscendingSliceOfAnAscendingNetDimensionIsLegal) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  wire threed_array [0:255][0:255][0:7];\n"
+             "  wire [3:0] result;\n"
+             "  assign result = threed_array[14][1][0:3];\n"
+             "endmodule\n"));
+}
+
+// §7.4.2: "Unpacked arrays can be made of any data type", and "Elements of net
+// arrays can be used in the same fashion as a scalar or vector net" — the
+// clause names connecting module instance ports inside loop generate constructs
+// as what net arrays are for. Indexing one was refused outright, because
+// Elaborator::ElaborateNetDecl asked only whether the net carried a packed
+// dimension and so made `wire w [3:0]` a scalar. The range is written [3:0]
+// rather than [0:3] because on a range starting at zero an index and a storage
+// offset are the same number, so code confusing the two answers correctly.
+TEST(ArrayAddressingElaboration, IndexingAnUnpackedNetArrayIsLegal) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  wire w [3:0];\n"
+             "  wire x;\n"
+             "  assign x = w[1];\n"
+             "endmodule\n"));
+}
+
+// §11.5.1: "A bit-select or part-select of a scalar ... shall be illegal." A
+// net with no dimension at all is still a scalar, which is what stops the fix
+// above from emptying scalar_var_names_ for every net. No test named a scalar
+// net before, so the rule was pinned for variables alone.
+TEST(ArrayAddressingElaboration, IndexingAScalarNetIsStillIllegal) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  wire s;\n"
+      "  wire x;\n"
+      "  assign x = s[0];\n"
+      "endmodule\n",
+      f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select or part-select of a scalar is illegal",
                             4, "11.5.1"));
+}
+
+// §7.6's array assignment comparison reads var_array_info_, which holds
+// variables alone, so a net array assigned from a variable array is judged
+// exactly as it was before this change. This is the case that went red when the
+// net's dimensions were recorded in that map instead of net_array_info_:
+// VarArrayInfo::elem_type is the net kind for a wire and kLogic for the
+// variable, and §6.7.1 makes a net's default data type logic, so the mismatch
+// it reported was not one.
+TEST(ArrayAddressingElaboration, AssigningAVariableArrayToANetArrayIsLegal) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic [7:0] v[4];\n"
+             "  wire [7:0] w[4];\n"
+             "  assign w = v;\n"
+             "endmodule\n"));
 }
 
 // §7.4.2: a dimension declared by a size alone is the range [0:size-1], which

@@ -529,6 +529,7 @@ void Elaborator::ResetItemElaborationState() {
   proc_assign_targets_.clear();
   var_types_.clear();
   var_array_info_.clear();
+  net_array_info_.clear();
   specparam_names_.clear();
   enum_var_names_.clear();
   enum_member_names_.clear();
@@ -582,6 +583,7 @@ struct ItemElaborationStateSaver {
   decltype(Elaborator::proc_assign_targets_) proc_assign_targets;
   decltype(Elaborator::var_types_) var_types;
   decltype(Elaborator::var_array_info_) var_array_info;
+  decltype(Elaborator::net_array_info_) net_array_info;
   decltype(Elaborator::specparam_names_) specparam_names;
   decltype(Elaborator::enum_var_names_) enum_var_names;
   decltype(Elaborator::enum_member_names_) enum_member_names;
@@ -653,6 +655,7 @@ struct ItemElaborationStateSaver {
     proc_assign_targets = std::move(e.proc_assign_targets_);
     var_types = std::move(e.var_types_);
     var_array_info = std::move(e.var_array_info_);
+    net_array_info = std::move(e.net_array_info_);
     specparam_names = std::move(e.specparam_names_);
     enum_var_names = std::move(e.enum_var_names_);
     enum_member_names = std::move(e.enum_member_names_);
@@ -716,6 +719,7 @@ struct ItemElaborationStateSaver {
     e.proc_assign_targets_ = std::move(proc_assign_targets);
     e.var_types_ = std::move(var_types);
     e.var_array_info_ = std::move(var_array_info);
+    e.net_array_info_ = std::move(net_array_info);
     e.specparam_names_ = std::move(specparam_names);
     e.enum_var_names_ = std::move(enum_var_names);
     e.enum_member_names_ = std::move(enum_member_names);

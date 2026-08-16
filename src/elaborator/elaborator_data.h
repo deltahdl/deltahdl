@@ -129,6 +129,13 @@ class ElaboratorData {
   std::unordered_map<std::string_view, SourceLoc> proc_assign_targets_;
   std::unordered_map<std::string_view, DataTypeKind> var_types_;
   std::unordered_map<std::string_view, VarArrayInfo> var_array_info_;
+  // §11.5.2: the unpacked dimensions of a net array, kept apart from
+  // var_array_info_ because that map is read by rules written about variables
+  // -- §7.6's array assignment comparison among them -- which have never seen a
+  // net and decide nothing correct about one. Only
+  // Elaborator::CheckArrayElementPartSelectNode reads this, for the one rule
+  // §11.5.2 states of net and variable arrays alike.
+  std::unordered_map<std::string_view, VarArrayInfo> net_array_info_;
   std::unordered_map<std::string_view, const ModuleItem*> dpi_import_decls_;
 
   std::unordered_set<std::string_view> packed_array_vars_;
