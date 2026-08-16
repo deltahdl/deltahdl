@@ -150,11 +150,27 @@ bool PragmaAlreadyRecorded(const PragmaVec& recorded, SourceLoc loc) {
 // Anything else — most importantly a left parenthesis or left brace — keeps the
 // apostrophe a separate token so that size'(expr) and size'{...}
 // cast/assignment-pattern forms tokenize correctly.
+//
+// Spaces and tabs standing before the signed marker or before the base letter
+// are read past, so that `8' h99` reaches Lexer::LexBasedNumber and is reported
+// there against the §5.7.1 sentence forbidding white space between the
+// apostrophe and the base format character. Reading past white space decides
+// nothing on its own: what follows it still has to be a base letter. So the
+// answer stays false for `4'(x)` and `4' (x)`, for `4'{...}` and `4' {...}`,
+// and for the §5.7.1 unsized single-bit forms '0, '1, 'x and 'z, since a left
+// parenthesis, a left brace, a digit, an x and a z are none of them base
+// letters.
 bool ApostropheStartsBaseSpecifier(std::string_view source,
                                    uint32_t apostrophe_pos) {
-  uint32_t look = apostrophe_pos + 1;
+  auto skip_spaces_and_tabs = [&source](uint32_t p) {
+    while (p < source.size() && (source[p] == ' ' || source[p] == '\t')) {
+      ++p;
+    }
+    return p;
+  };
+  uint32_t look = skip_spaces_and_tabs(apostrophe_pos + 1);
   if (look < source.size() && (source[look] == 's' || source[look] == 'S')) {
-    ++look;
+    look = skip_spaces_and_tabs(look + 1);
   }
   char base = (look < source.size()) ? source[look] : '\0';
   return base == 'd' || base == 'D' || base == 'b' || base == 'B' ||
@@ -433,6 +449,18 @@ void Lexer::SkipWhitespaceAndComments() {
   }
 }
 
+// Consume the run of spaces and tabs at the current position and report
+// whether there was one. Callers that must know whether white space stood at a
+// point in the source read the result; callers that only need to step over it
+// discard it.
+bool Lexer::SkipSpacesAndTabs() {
+  uint32_t before = pos_;
+  while (!AtEnd() && (Current() == ' ' || Current() == '\t')) {
+    Advance();
+  }
+  return pos_ != before;
+}
+
 void Lexer::ConsumeKeywordMarker() {
   Advance();
   if (!AtEnd()) {
@@ -619,8 +647,22 @@ void Lexer::ValidateBaseDigits(SourceLoc loc, char base_letter,
 Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
   Advance();
 
+  // §5.7.1: "The apostrophe character and the base format character shall not
+  // be separated by any white space." The optional s/S signed marker stands
+  // between them, so white space is forbidden on either side of it. Read the
+  // literal as it was written whatever the answer, so that one token still
+  // spans it, and report the sentence once even when both places carry white
+  // space.
+  bool space_before_sign = SkipSpacesAndTabs();
   if (!AtEnd() && (Current() == 's' || Current() == 'S')) {
     Advance();
+  }
+  bool space_before_base = SkipSpacesAndTabs();
+  if (space_before_sign || space_before_base) {
+    diag_.Error(loc,
+                "white space shall not separate the apostrophe from the base "
+                "format character",
+                Subclause("5.7.1"));
   }
   char base_letter = '\0';
   if (!AtEnd()) {
@@ -628,9 +670,10 @@ Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
     Advance();
   }
 
-  while (!AtEnd() && (Current() == ' ' || Current() == '\t')) {
-    Advance();
-  }
+  // §5.7.1: "The unsigned number token shall immediately follow the base
+  // format, optionally preceded by white space." This white space is legal, so
+  // stepping over it draws no report.
+  SkipSpacesAndTabs();
   uint32_t before_digits = pos_;
   while (!AtEnd() &&
          (std::isxdigit(static_cast<unsigned char>(Current())) ||
@@ -739,9 +782,7 @@ Token Lexer::LexNumber() {
   // and every later one on the line past where it is written.
   uint32_t before_ws = pos_;
   uint32_t column_before_ws = column_;
-  while (!AtEnd() && (Current() == ' ' || Current() == '\t')) {
-    Advance();
-  }
+  SkipSpacesAndTabs();
 
   if (!AtEnd() && Current() == '\'' &&
       ApostropheStartsBaseSpecifier(source_, pos_)) {

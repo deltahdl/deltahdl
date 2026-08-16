@@ -26,14 +26,47 @@ TEST(IntegerLiteralLexing, SpaceBreaksNumberIntoTwo) {
 
 TEST(IntegerLiteralLexing, RejectWhitespaceBetweenApostropheAndBase) {
   // §5.7.1 states "The apostrophe character and the base format character shall
-  // not be separated by any white space", and no site in src/lexer/lexer.cpp
-  // reports that sentence. ApostropheStartsBaseSpecifier reads past the
-  // apostrophe, finds a space where a base letter must stand and returns false,
-  // so Lexer::LexNumber ends the number at `8` and the apostrophe reaches
-  // Lexer::LexApostrophe, which falls through to Lexer::LexOperator. The report
-  // the source actually gets is that function's §5.2 unexpected-character one.
+  // not be separated by any white space". `8' h99` writes a space between the
+  // apostrophe and the `h`, and the report stands at the start of the number
+  // token, which is line 1 here.
   EXPECT_TRUE(ReportedError(LexDiagnostics("8' h99"),
-                            "unexpected character '''", 1, "5.2"));
+                            "white space shall not separate the apostrophe "
+                            "from the base format character",
+                            1, "5.7.1"));
+}
+
+// §5.7.1: the base format character is the letter, so the `s` marker written
+// tight against the apostrophe does not satisfy the sentence. `8's h99` still
+// separates the apostrophe from the `h` by white space and is rejected under
+// the same rule as `8' h99`.
+TEST(IntegerLiteralLexing, RejectWhitespaceBetweenApostropheAndBaseAfterSign) {
+  EXPECT_TRUE(ReportedError(LexDiagnostics("8's h99"),
+                            "white space shall not separate the apostrophe "
+                            "from the base format character",
+                            1, "5.7.1"));
+}
+
+// §5.7.1 leaves `8' h99` a based literal that breaks one of its rules, so the
+// lexer reports the white space and then lexes what was written: one
+// kIntLiteral token followed by the end of file, rather than the number,
+// operator and identifier the source splits into when the apostrophe is left
+// to Lexer::LexApostrophe.
+TEST(IntegerLiteralLexing, WhitespaceBeforeBaseStillLexesOneIntLiteral) {
+  auto tokens = Lex("8' h99");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
+}
+
+// §6.24.1 writes a cast as `size'(expr)`, where the apostrophe is a token of
+// its own and no base specifier follows it. Reading white space past the
+// apostrophe to enforce §5.7.1 must not take this form with it: `4` stays an
+// integer literal and the apostrophe stays a kApostrophe token.
+TEST(IntegerLiteralLexing, ApostropheBeforeCastParenIsItsOwnToken) {
+  auto tokens = Lex("4'(x)");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kApostrophe);
 }
 
 TEST(IntegerLiteralLexing, IllegalBaseLetterDoesNotFormBasedLiteral) {

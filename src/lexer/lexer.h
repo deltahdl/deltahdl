@@ -92,6 +92,7 @@ class Lexer {
   SourceLoc MakeLoc() const;
 
   void SkipWhitespaceAndComments();
+  bool SkipSpacesAndTabs();
   void ConsumeKeywordMarker();
   uint32_t SkipLineComment();
   uint32_t SkipBlockComment(SourceLoc start_loc);
