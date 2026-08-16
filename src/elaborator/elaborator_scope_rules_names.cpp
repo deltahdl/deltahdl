@@ -30,6 +30,43 @@ bool IsBuiltinTypeKeyword(std::string_view name) {
 
 }  // namespace
 
+// The operands of `e` that a value read could name. Three kinds of node hold an
+// identifier-shaped child that names something other than a value, and each is
+// left out:
+//
+//   - the callee of a call, which Parser::ParseCallExpr writes into lhs. §23.9
+//     rules that the search for "a task, function, named block, or generate
+//     block ... continues to search higher level modules until found", so a
+//     callee is not held to the module boundary a variable read is held to.
+//   - the slice size or type of a §11.4.14.2 streaming concatenation, which
+//     Parser::ParseStreamingConcat writes into lhs. `{<< 8 {a}}` puts the 8
+//     there as an identifier node, and it names a width rather than a value.
+//   - the member name of a §7.3.2 tagged union expression, which
+//     Parser::ParseTaggedExpr writes into rhs. `tagged Valid x` names a member
+//     of the union type there, not a declaration of the enclosing scope.
+//
+// Expr::with_expr is left out whatever the node is. §7.12.1 binds the iterator
+// name an array method's `with` clause reads -- `q.sum() with (item)` declares
+// `item` at the call -- and §18.7 resolves the names of an inline constraint
+// block against the object being randomized, so neither is a name the enclosing
+// module declares.
+static void CollectBareIdentOperands(const Expr* e,
+                                     std::vector<const Expr*>& out) {
+  bool lhs_names_no_value =
+      e->kind == ExprKind::kCall || e->kind == ExprKind::kStreamingConcat;
+  if (!lhs_names_no_value) CollectBareIdents(e->lhs, out);
+  if (e->kind != ExprKind::kTagged) CollectBareIdents(e->rhs, out);
+  CollectBareIdents(e->base, out);
+  CollectBareIdents(e->index, out);
+  CollectBareIdents(e->index_end, out);
+  CollectBareIdents(e->condition, out);
+  CollectBareIdents(e->true_expr, out);
+  CollectBareIdents(e->false_expr, out);
+  CollectBareIdents(e->repeat_count, out);
+  for (const auto* a : e->args) CollectBareIdents(a, out);
+  for (const auto* el : e->elements) CollectBareIdents(el, out);
+}
+
 // Collects standalone identifier operands of `e`, deliberately NOT descending
 // into member-access subtrees (so the base of `a.b`, `s.field`, `$root.x`, or
 // `pkg::x` is never collected) and skipping scope-prefixed identifiers. Only
@@ -48,18 +85,7 @@ void CollectBareIdents(const Expr* e, std::vector<const Expr*>& out) {
     }
     return;
   }
-  CollectBareIdents(e->lhs, out);
-  CollectBareIdents(e->rhs, out);
-  CollectBareIdents(e->base, out);
-  CollectBareIdents(e->index, out);
-  CollectBareIdents(e->index_end, out);
-  CollectBareIdents(e->condition, out);
-  CollectBareIdents(e->true_expr, out);
-  CollectBareIdents(e->false_expr, out);
-  CollectBareIdents(e->repeat_count, out);
-  CollectBareIdents(e->with_expr, out);
-  for (const auto* a : e->args) CollectBareIdents(a, out);
-  for (const auto* el : e->elements) CollectBareIdents(el, out);
+  CollectBareIdentOperands(e, out);
 }
 
 // The packages a module imports by wildcard. §26.3 makes every name such a
