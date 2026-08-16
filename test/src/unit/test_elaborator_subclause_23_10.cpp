@@ -237,6 +237,29 @@ TEST(ParameterOverride,
   ExpectVariableWidth(SoleChildInstance(design), "data", 16u);
 }
 
+// §7.4.1 (printed page 153) allows more than one packed dimension on a vector
+// type and declares `bit [0:3] [7:0] packedArray;` as its example, so
+// `logic [3:0][7:0]` is a data type §6.20.3 lets a type parameter take. Its
+// width is the product of the two ranges, 32, which is what separates both
+// dimensions reaching the child from only the first doing so: an override
+// carrying `[3:0]` alone would read back as 4, and no override at all as 8
+// (byte).
+TEST(ParameterOverride,
+     TypeParameterOverriddenByTwoPackedDimensionsInNamedAssignment) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter type T = byte)();\n"
+      "  T data;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.T(logic [3:0][7:0])) u0();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ExpectVariableWidth(SoleChildInstance(design), "data", 32u);
+}
+
 // §6.20.1: a type parameter with no default is an error only when no override
 // is supplied at instantiation. A §8.23 class-scoped override supplies one, so
 // the instantiation elaborates and the child's variable is 8 bits wide (byte).

@@ -592,7 +592,13 @@ Expr* Parser::ParseCastOrTypedPattern() {
   id->text = type_tok.text;
   id->range.start = type_tok.loc;
 
-  if (Check(TokenKind::kLBracket)) return ParseSelectExpr(id);
+  // §7.4.1 (printed page 153) allows more than one packed dimension on a
+  // vector type, declaring `bit [0:3] [7:0] packedArray;` as its example, so a
+  // keyword base takes every bracketed range written on it rather than the
+  // first alone. Parser::ParseIdentifierPostfixChain already loops this way for
+  // a name base, which is why `word_t [3:0][7:0]` parses and, until this loop,
+  // `logic [3:0][7:0]` left its second range for the caller to trip over.
+  while (Check(TokenKind::kLBracket)) id = ParseSelectExpr(id);
   return id;
 }
 
