@@ -195,6 +195,43 @@ TEST(GenerateIfConstruct, IfElseBlocksParse) {
   EXPECT_FALSE(mod->items[0]->gen_else->gen_body.empty());
 }
 
+// A.4.2 gives `if_generate_construct ::= if ( constant_expression )
+// generate_block [ else generate_block ]`, so the `else` is what follows the
+// first block when its own `end` is missing, and no generate_item begins with
+// that keyword. The §27.3 report names it.
+TEST(GenerateIfConstruct, MissingEndBeforeElseNamesTheElseKeyword) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (1) begin\n"
+      "    wire w;\n"
+      "  else begin\n"
+      "    wire x;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'end', got 'else'", 4, "27.3"));
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
+// The `else` the first block stops at is left for Parser::ParseGenerateIf, so
+// the else branch is read as its own generate_block instead of being absorbed
+// into the branch before it.
+TEST(GenerateIfConstruct, MissingEndBeforeElseStillReadsTheElseBranch) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (1) begin\n"
+      "    wire w;\n"
+      "  else begin\n"
+      "    wire x;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1u);
+  ASSERT_EQ(mod->items[0]->gen_body.size(), 1u);
+  ASSERT_NE(mod->items[0]->gen_else, nullptr);
+  EXPECT_EQ(mod->items[0]->gen_else->gen_body.size(), 1u);
+}
+
 // Syntax 27-1: loop_generate_construct ::=
 //   for ( genvar_initialization ; genvar_expression ; genvar_iteration )
 //   generate_block

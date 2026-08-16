@@ -102,8 +102,12 @@ class Parser {
   void ParseParamsPortsAndSemicolon(ModuleDecl& decl);
 
   void ParseGenerateRegion(std::vector<ModuleItem*>& items);
+  // else_may_follow says whether A.4.2 lets an `else` stand after the
+  // generate_block being read, which is true of the first generate_block of an
+  // if_generate_construct and of no other position the production admits. It
+  // decides whether the item loop stops at an `else` or hands it on as an item.
   void ParseGenerateBody(std::vector<ModuleItem*>& body,
-                         std::string_view& out_label);
+                         std::string_view& out_label, bool else_may_follow);
   ModuleItem* ParseGenerateFor();
   ModuleItem* ParseGenerateIf();
   void ParseGenerateCaseLabel(GenerateCaseItem& ci);

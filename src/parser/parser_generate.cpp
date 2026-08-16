@@ -27,16 +27,29 @@ static bool ClosesGenerateRegionEnclosure(TokenKind tk) {
 //
 // `else` is left out although A.4.2 writes it between the two generate_blocks
 // of if_generate_construct, because it continues that production rather than
-// closing one, and asking for it needs to know an if_generate_construct is
-// open. #3164 records the reports a generate block left open before an `else`
-// still draws.
+// closing one. EndsGenerateBlockItems below asks for it separately.
 static bool ClosesGenerateBlockEnclosure(TokenKind tk) {
   return ClosesGenerateRegionEnclosure(tk) || tk == TokenKind::kKwEndgenerate ||
          tk == TokenKind::kKwEndcase;
 }
 
+// Answers whether tk ends the items of a generate_block by something other than
+// the `end` Parser::ParseGenerateBody tests first. else_may_follow says whether
+// A.4.2 lets an `else` stand after the block being read, which is true of the
+// first generate_block of an if_generate_construct and of no other position the
+// production admits: there the `else` is what comes after a well-formed block,
+// and no generate_item begins with that keyword. It is asked only where the
+// caller says an `else` can stand, because elsewhere a stray `else` is a token
+// the loop has to consume to make progress, and Parser::ParseGenerateCase's own
+// loop would spin on one left in front of it.
+static bool EndsGenerateBlockItems(TokenKind tk, bool else_may_follow) {
+  return ClosesGenerateBlockEnclosure(tk) ||
+         (else_may_follow && tk == TokenKind::kKwElse);
+}
+
 void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
-                               std::string_view& out_label) {
+                               std::string_view& out_label,
+                               bool else_may_follow) {
   struct DepthGuard {
     int& d;
     explicit DepthGuard(int& d) : d(d) { ++d; }
@@ -87,12 +100,13 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
   // open before an `endgenerate` swallowed it and then the `endmodule` behind
   // it, and the report below could only ever fire at end of input.
   while (!Check(TokenKind::kKwEnd) && !AtEnd() &&
-         !ClosesGenerateBlockEnclosure(CurrentToken().kind)) {
+         !EndsGenerateBlockItems(CurrentToken().kind, else_may_follow)) {
     ParseModuleItem(body);
   }
-  // Leave the token for the enclosing production when it is one of the closers,
-  // which is what lets the generate region find its endgenerate and the case
-  // construct its endcase. Expect reports without consuming, so it survives.
+  // Leave the token for the enclosing production when the loop stopped on one,
+  // which is what lets the generate region find its endgenerate, the case
+  // construct its endcase and the if_generate_construct its else branch. Expect
+  // reports without consuming, so it survives.
   Expect(TokenKind::kKwEnd, Subclause("27.3"));
   if (Match(TokenKind::kColon)) Match(TokenKind::kIdentifier);
 }
@@ -137,7 +151,9 @@ ModuleItem* Parser::ParseGenerateFor() {
   Expect(TokenKind::kSemicolon, Subclause("27.4"));
   item->gen_step = ParseAssignmentOrExprNoSemi();
   Expect(TokenKind::kRParen, Subclause("27.4"));
-  ParseGenerateBody(item->gen_body, item->name);
+  // A.4.2 ends loop_generate_construct with its generate_block, so no `else`
+  // follows this one.
+  ParseGenerateBody(item->gen_body, item->name, false);
   return item;
 }
 
@@ -149,7 +165,9 @@ ModuleItem* Parser::ParseGenerateIf() {
   Expect(TokenKind::kLParen, Subclause("27.5"));
   item->gen_cond = ParseExpr();
   Expect(TokenKind::kRParen, Subclause("27.5"));
-  ParseGenerateBody(item->gen_body, item->name);
+  // This is the one position A.4.2 lets an `else` follow a generate_block, so
+  // a block left open before one is reported here rather than swallowing it.
+  ParseGenerateBody(item->gen_body, item->name, true);
   if (!Match(TokenKind::kKwElse)) return item;
   if (Check(TokenKind::kKwIf)) {
     item->gen_else = ParseGenerateIf();
@@ -157,7 +175,9 @@ ModuleItem* Parser::ParseGenerateIf() {
     auto* else_item = arena_.Create<ModuleItem>();
     else_item->kind = ModuleItemKind::kGenerateIf;
     else_item->loc = CurrentLoc();
-    ParseGenerateBody(else_item->gen_body, else_item->name);
+    // A.4.2 ends if_generate_construct with the else branch, so no second
+    // `else` follows this block.
+    ParseGenerateBody(else_item->gen_body, else_item->name, false);
     item->gen_else = else_item;
   }
   return item;
@@ -187,7 +207,9 @@ ModuleItem* Parser::ParseGenerateCase() {
   while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
     GenerateCaseItem ci;
     ParseGenerateCaseLabel(ci);
-    ParseGenerateBody(ci.body, ci.label);
+    // A.4.2 ends case_generate_item with its generate_block, so no `else`
+    // follows this one.
+    ParseGenerateBody(ci.body, ci.label, false);
     item->gen_case_items.push_back(std::move(ci));
   }
   Expect(TokenKind::kKwEndcase, Subclause("27.5"));
