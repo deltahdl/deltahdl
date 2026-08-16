@@ -386,9 +386,12 @@ TEST(BlockStatementSyntaxParsing, SeqBlockMissingEndRejected) {
       "  initial begin\n"
       "    a = 1;\n"
       "endmodule\n");
-  // §9.3.1 owns seq_block, and Parser::ParseBlockStmt demands its `end` at
-  // end-of-input.
-  EXPECT_TRUE(ReportedError(r.diags, "expected 'end', got EOF", 5, "9.3.1"));
+  // §9.3.1 owns seq_block, and Parser::ParseBlockStmt demands its `end` at the
+  // `endmodule` that closes the construct the block stands in. It demanded it
+  // at end-of-input on line 5 until the block's statement loop was given the
+  // stop set, having swallowed the `endmodule` looking for a statement.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'end', got 'endmodule'", 4, "9.3.1"));
 }
 
 // par_block requires a join_keyword to close; terminating a fork with end

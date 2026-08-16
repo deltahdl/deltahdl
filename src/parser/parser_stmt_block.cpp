@@ -90,6 +90,56 @@ bool Parser::RejectMisplacedStmtLabel() {
   return false;
 }
 
+// Answers whether tk closes a construct a block can stand inside. §9.3.1 makes
+// a seq_block a statement_or_null and §9.3.2 makes a par_block one, so both
+// kinds reach the same enclosing constructs and both loops below stop at the
+// same tokens.
+//
+// The first seven are the keywords Parser::Synchronize enumerates in
+// src/parser/parser.cpp. endtask and endfunction join them because a block can
+// stand in a task or a function body. endcase joins them because a case item's
+// body is a statement_or_null. endgenerate joins them because a generate region
+// holds an initial block: A.4.2 gives `generate_region ::= generate
+// { generate_item } endgenerate` and no generate_item is a statement, so a
+// block reaches one through the initial, always or final construct that holds
+// it rather than directly.
+//
+// The three join keywords are here because §9.3.2 gives `par_block ::= fork
+// [ : block_identifier ] { block_item_declaration } { statement_or_null }
+// join_keyword`, so a seq_block left open inside a fork is closed by one of
+// them and by no `end` at all. Parser::ParseForkStmt tests them first as its
+// own terminators, so the three entries decide nothing there.
+//
+// `end` is here for the same reason in reverse: it closes the seq_block a
+// par_block can stand inside. Parser::ParseBlockStmt tests it first as its own
+// terminator, so that entry decides nothing there.
+//
+// Seven of the nineteen `end` keywords Table B.1 lists are left out, each
+// settled against Annex A: endspecify (A.7.1's specify_item reaches no
+// statement), endclocking (A.6.11's clocking_item reaches none), endproperty
+// (A.2.10's property_expr reaches none), endgroup (A.2.11's
+// coverage_spec_or_option reaches none), endconfig (A.1.5's
+// config_rule_statement is configuration vocabulary), and endprimitive with
+// endtable (A.5.3's udp_initial_statement takes `output_port_identifier =
+// init_val ;` rather than a statement). endsequence is the one left out that a
+// statement does reach, through A.6.12's `rs_code_block ::= { {
+// data_declaration } { statement_or_null } }`; #3162 records why it is not
+// here.
+static bool ClosesEnclosingConstruct(TokenKind tk) {
+  static constexpr TokenKind kClosers[] = {
+      TokenKind::kKwEnd,         TokenKind::kKwEndmodule,
+      TokenKind::kKwEndpackage,  TokenKind::kKwEndinterface,
+      TokenKind::kKwEndprogram,  TokenKind::kKwEndchecker,
+      TokenKind::kKwEndclass,    TokenKind::kKwEndtask,
+      TokenKind::kKwEndfunction, TokenKind::kKwEndcase,
+      TokenKind::kKwEndgenerate, TokenKind::kKwJoin,
+      TokenKind::kKwJoinAny,     TokenKind::kKwJoinNone};
+  for (TokenKind closer : kClosers) {
+    if (tk == closer) return true;
+  }
+  return false;
+}
+
 Stmt* Parser::ParseBlockStmt(std::string_view prefix_label) {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kBlock;
@@ -99,7 +149,16 @@ Stmt* Parser::ParseBlockStmt(std::string_view prefix_label) {
   if (Match(TokenKind::kColon)) {
     stmt->label = ExpectIdentifier(Subclause("9.3.4")).text;
   }
-  while (!Check(TokenKind::kKwEnd) && !AtEnd()) {
+  // Stop at a token that closes an enclosing construct as well as at `end`, for
+  // the reason Parser::ParseForkStmt below stops at one: without it
+  // Parser::ParsePrimaryExpr consumes the token as a failed expression under
+  // §11.2, so `begin` left open before an `endcase` drew that report on the
+  // `endcase`, another on the `endmodule` behind it, the §9.3.1 report below at
+  // end of input rather than at the token at fault, and the enclosing case
+  // statement's own §12.5 report for the `endcase` it never saw. Four reports
+  // for one missing `end`.
+  while (!Check(TokenKind::kKwEnd) && !AtEnd() &&
+         !ClosesEnclosingConstruct(CurrentToken().kind)) {
     if (IsBlockVarDeclStart()) {
       ParseBlockVarDecls(stmt->stmts);
     } else if (!RejectMisplacedStmtLabel()) {
@@ -109,32 +168,14 @@ Stmt* Parser::ParseBlockStmt(std::string_view prefix_label) {
       }
     }
   }
+  // Leave the token for the enclosing production when it is one of the closers,
+  // which is what lets the case statement find its endcase and the module its
+  // endmodule. Expect reports without consuming, so the closer survives.
   Expect(TokenKind::kKwEnd, Subclause("9.3.1"));
 
   ParserStmtBlockHelpers::MatchEndBlockLabel(*this, stmt->label, prefix_label);
   stmt->range.end = CurrentLoc();
   return stmt;
-}
-
-// Answers whether tk closes a construct a par_block can stand inside. The
-// first seven are the keywords Parser::Synchronize enumerates in
-// src/parser/parser.cpp; endtask and endfunction join them because §9.3.2
-// makes a par_block a statement_or_null, so a fork can stand in a task or a
-// function body. endcase and endgenerate join them because a case item's body
-// is a statement_or_null and a generate region holds an initial block. The
-// eight other `end` keywords were read against Annex A and left out.
-static bool ClosesEnclosingConstruct(TokenKind tk) {
-  static constexpr TokenKind kClosers[] = {
-      TokenKind::kKwEnd,         TokenKind::kKwEndmodule,
-      TokenKind::kKwEndpackage,  TokenKind::kKwEndinterface,
-      TokenKind::kKwEndprogram,  TokenKind::kKwEndchecker,
-      TokenKind::kKwEndclass,    TokenKind::kKwEndtask,
-      TokenKind::kKwEndfunction, TokenKind::kKwEndcase,
-      TokenKind::kKwEndgenerate};
-  for (TokenKind closer : kClosers) {
-    if (tk == closer) return true;
-  }
-  return false;
 }
 
 Stmt* Parser::ParseForkStmt(std::string_view prefix_label) {

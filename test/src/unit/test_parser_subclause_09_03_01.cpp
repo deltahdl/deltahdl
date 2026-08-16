@@ -258,9 +258,12 @@ TEST(SequentialBlockParsing, MissingEndKeywordProducesParseError) {
       "  initial begin\n"
       "    a = 1;\n"
       "endmodule\n");
-  // The block swallows `endmodule` looking for a statement, so ParseBlockStmt
-  // asks for `end` at the EOF that follows, on line 5.
-  EXPECT_TRUE(ReportedError(r.diags, "expected 'end', got EOF", 5, "9.3.1"));
+  // The block's statement loop stops at `endmodule` without consuming it, so
+  // ParseBlockStmt asks for `end` at that token, on line 4. It asked at the EOF
+  // on line 5 until the loop was given the stop set, the block having swallowed
+  // the `endmodule` looking for a statement.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'end', got 'endmodule'", 4, "9.3.1"));
 }
 
 TEST(BlockItemDeclParsing, LocalParamAsBlockItem) {

@@ -158,10 +158,93 @@ TEST(BlockStatementParsing, SequentialMissingEndIsError) {
       "    a = 1'b1;\n"
       "endmodule\n");
   // §9.3.1 owns the begin-end delimiter rule, so ParseBlockStmt files the
-  // missing `end` under it; §9.3 has no report of its own. The block swallows
-  // `endmodule` looking for a statement, so the report stands at the EOF that
-  // follows, on line 6.
-  EXPECT_TRUE(ReportedError(r.diags, "expected 'end', got EOF", 6, "9.3.1"));
+  // missing `end` under it; §9.3 has no report of its own. The block's
+  // statement loop stops at `endmodule` without consuming it, so the report
+  // stands on line 5 at the token at fault. It stood at the EOF on line 6 until
+  // the loop was given the stop set, the block having swallowed the
+  // `endmodule` looking for a statement.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'end', got 'endmodule'", 5, "9.3.1"));
+}
+
+// §9.3 head negative: a sequential block standing as a case item's statement is
+// closed by `end` and not by `endcase`. §9.3.1 makes a seq_block a
+// statement_or_null and §12.5's case_item takes one, so the block reaches
+// Parser::ParseCaseStmt's item loop, and `endcase` is a distinct exit from the
+// block's statement loop and a distinct token from `end`.
+TEST(BlockStatementParsing, SequentialInACaseItemClosedByEndcaseNamesTheEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial\n"
+      "    case (x)\n"
+      "      1: begin\n"
+      "           a = 1;\n"
+      "    endcase\n"
+      "endmodule\n");
+  // The block's statement loop stops at `endcase` without consuming it, so the
+  // report stands on line 6 and Parser::ParseCaseStmt still finds the `endcase`
+  // it expects under §12.5.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'end', got 'endcase'", 6, "9.3.1"));
+}
+
+// §9.3 head negative: the same source, with nothing else left unterminated, and
+// the count is what this case adds. A block that swallowed the `endcase` drew
+// the §11.2 "expected expression" report on it, the same on the `endmodule`
+// behind it, its own §9.3.1 report at end of input rather than at the token at
+// fault, and then left Parser::ParseCaseStmt to report the `endcase` missing
+// under §12.5: four reports for one missing `end`.
+TEST(BlockStatementParsing,
+     SequentialMissingEndLeavesTheEnclosingEndcaseToItsOwnProduction) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial\n"
+      "    case (x)\n"
+      "      1: begin\n"
+      "           a = 1;\n"
+      "    endcase\n"
+      "endmodule\n");
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
+// §9.3 head negative: a sequential block standing inside a parallel block is
+// closed by `end` and not by the fork's join keyword. §9.3.2 gives
+// `par_block ::= fork [ : block_identifier ] { block_item_declaration }
+// { statement_or_null } join_keyword`, so a seq_block left open there is
+// followed by a token that is not an `end` at all.
+TEST(BlockStatementParsing, SequentialInsideAForkClosedByJoinNamesTheEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial fork\n"
+      "    begin\n"
+      "      a = 1;\n"
+      "  join\n"
+      "endmodule\n");
+  // The block's statement loop stops at `join` without consuming it, so the
+  // report stands on line 5 and Parser::ParseForkStmt still finds the join
+  // keyword it expects under §9.3.2.
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'end', got 'join'", 5, "9.3.1"));
+}
+
+// §9.3 head negative: a sequential block reaches a generate region through the
+// initial block that holds it, Parser::ParseGenerateRegion reading module items
+// and an initial block being one. A bare `begin` written straight into a
+// generate region is a different production -- §27.3's generate_block, read by
+// Parser::ParseGenerateBody -- so `initial` is what puts a seq_block there.
+TEST(BlockStatementParsing,
+     SequentialInAGenerateRegionClosedByEndgenerateNamesTheEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  generate\n"
+      "    initial begin\n"
+      "      a = 1;\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  // The block's statement loop stops at `endgenerate` without consuming it, so
+  // the report stands on line 5 and Parser::ParseGenerateRegion still finds the
+  // `endgenerate` it expects under §27.3.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'end', got 'endgenerate'", 5, "9.3.1"));
 }
 
 // §9.3 head: the parallel block is delimited by fork and one of join, join_any,
