@@ -359,8 +359,9 @@ TEST(StatementLabelParsing, MismatchedEndLabelOnLabeledBeginIsError) {
       "    end : wrong\n"
       "endmodule\n");
   // §9.3.4 owns the rule that a name after end must match the block name, and
-  // ParserStmtHelpers::MatchEndBlockLabel files the report under it; §9.3.5
-  // contributes only the equivalence that makes `blk` the block name here.
+  // ParserStmtBlockHelpers::MatchEndBlockLabel files the report under it;
+  // §9.3.5 contributes only the equivalence that makes `blk` the block name
+  // here.
   EXPECT_TRUE(ReportedError(r.diags,
                             "end label 'wrong' does not match block name "
                             "'blk'",

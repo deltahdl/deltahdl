@@ -39,6 +39,7 @@ class Parser {
   friend void ParseGateInstanceTail(Parser& p, ModuleItem* item, bool has_name);
   // File-local CPD-dedup helpers (defined static in their respective TUs).
   friend struct ParserStmtHelpers;
+  friend struct ParserStmtBlockHelpers;
   friend struct ParserPortHelpers;
   friend struct ParserAssertHelpers;
   friend struct ParserClassHelpers;

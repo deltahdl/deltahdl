@@ -56,6 +56,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/expr_parser_aux.cpp
     parser/expr_parser_patterns.cpp
     parser/parser_stmt.cpp
+    parser/parser_stmt_block.cpp
     parser/parser_stmt_loop.cpp
     parser/parser_assert.cpp
     parser/parser_sequence_property_decl.cpp
