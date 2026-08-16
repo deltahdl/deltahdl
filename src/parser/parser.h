@@ -222,6 +222,7 @@ class Parser {
   RsCaseItem ParseRsCaseItem();
   void ParseCovergroupDecl(std::vector<ModuleItem*>& items);
   void RejectDerivedCovergroupTail();
+  void RejectNamedCovergroupExtends();
   // Scan state shared by the tf_port-style formal-list scanners
   // (ParseCovergroupFormalList / ParseSampleFormalList). A single
   // classification step is performed by StepTfPortFormalScan.

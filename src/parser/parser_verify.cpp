@@ -661,6 +661,25 @@ void Parser::RejectDerivedCovergroupTail() {
   }
 }
 
+// Reports an `extends` written after a covergroup has named itself. A.2.11's
+// first alternative names the covergroup and carries no `extends`, and its
+// second carries `extends` and names nothing of its own; no alternative does
+// both, so a name followed by `extends` is a production the grammar does not
+// have. The base is read and discarded rather than recorded, because §19.4.1
+// (printed page 580) gives the derived covergroup the base's own name -- "a
+// derived covergroup with name covergroup_identifier is defined" -- and says
+// nothing about what a fresh one would mean.
+void Parser::RejectNamedCovergroupExtends() {
+  if (!Check(TokenKind::kKwExtends)) return;
+  diag_.Error(CurrentLoc(),
+              "a covergroup that declares its own name cannot also extend a "
+              "base; a derived covergroup is written 'covergroup extends "
+              "base;'",
+              Subclause("A.2.11"));
+  Consume();
+  ExpectIdentifier(Subclause("19.4.1"));
+}
+
 void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kCovergroupDecl;
@@ -680,21 +699,7 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
     RejectDerivedCovergroupTail();
   } else {
     item->name = Expect(TokenKind::kIdentifier, Subclause("19.3")).text;
-    // A.2.11's first alternative names the covergroup and carries no `extends`,
-    // and its second carries `extends` and names nothing of its own. No
-    // alternative does both, so an `extends` after a name is a production the
-    // grammar does not have. The base is read and discarded rather than
-    // recorded, because §19.4.1 gives the derived covergroup the base's own
-    // name and says nothing about what a fresh one would mean.
-    if (Check(TokenKind::kKwExtends)) {
-      diag_.Error(CurrentLoc(),
-                  "a covergroup that declares its own name cannot also extend "
-                  "a base; a derived covergroup is written "
-                  "'covergroup extends base;'",
-                  Subclause("A.2.11"));
-      Consume();
-      ExpectIdentifier(Subclause("19.4.1"));
-    }
+    RejectNamedCovergroupExtends();
   }
 
   known_types_.insert(item->name);
