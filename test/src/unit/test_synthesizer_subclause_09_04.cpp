@@ -30,7 +30,12 @@ TEST(ProceduralTimingControlSynthesis, TimingControlStmtIsRejectedByName) {
   stmt->kind = StmtKind::kTimingControl;
   stmt->range.start = SourceLoc{fid, 2, 3};
   SynthLower synth(f.arena, f.diag);
-  EXPECT_FALSE(synth.CheckStmtSynthesizable(stmt));
+  // The module is what CheckStmtSynthesizable asks which identifiers name
+  // events of, and only for a kEventControl. A kTimingControl reaches
+  // NonSynthStmtRule without consulting it, so an empty module is enough and
+  // says the statement kind under test does not depend on one.
+  RtlirModule mod;
+  EXPECT_FALSE(synth.CheckStmtSynthesizable(stmt, &mod));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "procedural timing control is not synthesizable", 2,
                             "9.4"));
