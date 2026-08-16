@@ -2,6 +2,31 @@
 
 namespace delta {
 
+// Answers whether the token standing after `new` opens a shallow-copy source.
+// A.2.4 gives class_new the two alternatives
+// `[ class_scope ] new [ ( list_of_arguments ) ]` and `new expression`, and
+// footnote 23 on that production requires the second's expression to "evaluate
+// to an object handle". Two tokens can open one. An identifier can name a
+// handle variable, and `this` is one outright: §8.11 says "The this keyword
+// denotes a predefined object handle that refers to the object that was used to
+// invoke the subroutine that this is used within".
+//
+// No third token is admitted, because the two that remain belong to the other
+// productions. A '(' after `new` is the first alternative's list_of_arguments,
+// which is what distinguishes the two alternatives at all. A '[' is
+// dynamic_array_new, `new [ expression ] [ ( expression ) ]` in A.2.4, and
+// Parser::ParseNewExpr reads it before asking this.
+//
+// Parser::ParseNewExpr and Parser::MakeMemberAccess both ask, and have to
+// agree: the first decides what `new` takes as a copy source, and the second
+// reports §8.12's "It shall be illegal to use a typed constructor call for a
+// shallow copy" over the same source when a class scope precedes the `new`. A
+// source one admits and the other does not is either accepted with the class
+// scope or left standing where a statement terminator belongs.
+bool Parser::StartsShallowCopySource() {
+  return CheckIdentifier() || Check(TokenKind::kKwThis);
+}
+
 Expr* Parser::ParseStreamingConcat(TokenKind dir) {
   auto loc = CurrentLoc();
   Consume();

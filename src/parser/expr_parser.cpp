@@ -366,7 +366,7 @@ Expr* Parser::ParseNewExpr() {
     ParseParenList(expr->args);
   }
 
-  if (CheckIdentifier()) expr->lhs = ParseExpr();
+  if (StartsShallowCopySource()) expr->lhs = ParseExpr();
   return expr;
 }
 
@@ -629,13 +629,17 @@ Expr* Parser::MakeMemberAccess(Expr* base) {
   // §8.12: "It shall be illegal to use a typed constructor call for a shallow
   // copy (see 8.8)." A.2.4 gives class_new the two alternatives
   // `[ class_scope ] new [ ( list_of_arguments ) ]` and `new expression`, and
-  // only the second takes the copy source, so no legal parse puts an identifier
+  // only the second takes the copy source, so no legal parse puts a copy source
   // after a class-scoped `new`. Consuming that source leaves the caller a
-  // well-formed scope resolution instead of an identifier standing where a
+  // well-formed scope resolution instead of an operand standing where a
   // terminator belongs, which is what drew the §12.3 report this replaces.
   // `is_scope` is required because `super.new` is §8.17 and a `.new` member
-  // select is not a typed constructor call.
-  if (is_scope && member_tok.kind == TokenKind::kKwNew && CheckIdentifier()) {
+  // select is not a typed constructor call. What counts as a copy source is
+  // Parser::StartsShallowCopySource in src/parser/expr_parser_aux.cpp, which
+  // Parser::ParseNewExpr asks as well, so `C::new this` is reported here rather
+  // than accepted there.
+  if (is_scope && member_tok.kind == TokenKind::kKwNew &&
+      StartsShallowCopySource()) {
     diag_.Error(CurrentLoc(),
                 "a typed constructor call cannot take a shallow-copy source; "
                 "drop the class scope to copy an object with 'new'",

@@ -507,6 +507,7 @@ class Parser {
   void ParseNamedArg(Expr* call);
   void ParseTrailingNamedArgs(Expr* call);
   Expr* ParseMemberAccessChain(Token tok);
+  bool StartsShallowCopySource();
   Expr* MakeMemberAccess(Expr* base);
   void ParseParamValueAssignment(Expr* base);
   Expr* ParseParameterizedScope(Expr* base);
