@@ -253,9 +253,12 @@ TEST(BlockStatementSyntaxParsing, UnterminatedSeqBlockErrors) {
       "  initial begin\n"
       "    a = 1;\n"
       "endmodule\n");
-  // The seq_block body runs until `end`, so `endmodule` is taken as a statement
-  // and reaches ParsePrimaryExpr, whose report is filed under §11.2.
-  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 4, "11.2"));
+  // A.6.3 closes seq_block with `end`, and §9.3.1 owns that delimiter, so
+  // Parser::ParseBlockStmt demands it at the `endmodule` where its statement
+  // loop stops. The `endmodule` was taken as a statement and drew §11.2's
+  // "expected expression" until that loop was given the stop set.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'end', got 'endmodule'", 4, "9.3.1"));
 }
 
 TEST(BlockStatementSyntaxParsing, UnterminatedParBlockErrors) {
@@ -282,9 +285,11 @@ TEST(BlockStatementSyntaxParsing, BeginWithJoinTerminatorErrors) {
       "    a = 1;\n"
       "  join\n"
       "endmodule\n");
-  // A seq_block ends only at `end`, so `join` is taken as a statement and
-  // reaches ParsePrimaryExpr, whose report is filed under §11.2.
-  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 4, "11.2"));
+  // A seq_block ends only at `end`, and A.6.3 gives `join` to par_block, so
+  // Parser::ParseBlockStmt demands its own delimiter at the `join` where its
+  // statement loop stops. The `join` was taken as a statement and drew §11.2's
+  // "expected expression" until that loop was given the stop set.
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'end', got 'join'", 4, "9.3.1"));
 }
 
 TEST(BlockStatementSyntaxParsing, ForkWithEndTerminatorErrors) {

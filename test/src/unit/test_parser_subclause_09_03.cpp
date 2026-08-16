@@ -204,6 +204,8 @@ TEST(BlockStatementParsing,
       "           a = 1;\n"
       "    endcase\n"
       "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'end', got 'endcase'", 6, "9.3.1"));
   EXPECT_EQ(r.diags.size(), 1u);
 }
 
