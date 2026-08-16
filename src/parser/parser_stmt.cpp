@@ -678,14 +678,17 @@ Stmt* Parser::ParseForStmt() {
 // first seven are the keywords Parser::Synchronize enumerates at
 // src/parser/parser.cpp:157; endtask and endfunction join them because §9.3.2
 // makes a par_block a statement_or_null, so a fork can stand in a task or a
-// function body.
+// function body. endcase and endgenerate join them because a case item's body
+// is a statement_or_null and a generate region holds an initial block. The
+// eight other `end` keywords were read against Annex A and left out.
 static bool ClosesEnclosingConstruct(TokenKind tk) {
   static constexpr TokenKind kClosers[] = {
-      TokenKind::kKwEnd,        TokenKind::kKwEndmodule,
-      TokenKind::kKwEndpackage, TokenKind::kKwEndinterface,
-      TokenKind::kKwEndprogram, TokenKind::kKwEndchecker,
-      TokenKind::kKwEndclass,   TokenKind::kKwEndtask,
-      TokenKind::kKwEndfunction};
+      TokenKind::kKwEnd,         TokenKind::kKwEndmodule,
+      TokenKind::kKwEndpackage,  TokenKind::kKwEndinterface,
+      TokenKind::kKwEndprogram,  TokenKind::kKwEndchecker,
+      TokenKind::kKwEndclass,    TokenKind::kKwEndtask,
+      TokenKind::kKwEndfunction, TokenKind::kKwEndcase,
+      TokenKind::kKwEndgenerate};
   for (TokenKind closer : kClosers) {
     if (tk == closer) return true;
   }

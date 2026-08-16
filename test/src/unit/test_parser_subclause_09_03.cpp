@@ -264,6 +264,70 @@ TEST(BlockStatementParsing, ParallelInATaskClosedByEndtaskNamesTheJoinKeyword) {
       "9.3.2"));
 }
 
+// §9.3 head negative: a fork standing as a case item's statement is closed by a
+// join keyword and not by `endcase`. §12.5's case_item takes a
+// statement_or_null, so a fork reaches Parser::ParseCaseStmt's item loop, and
+// `endcase` is a distinct exit from the fork's statement loop and a distinct
+// token from `end`.
+TEST(BlockStatementParsing,
+     ParallelInACaseItemClosedByEndcaseNamesTheJoinKeyword) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial\n"
+      "    case (x)\n"
+      "      1: fork\n"
+      "           a = 1;\n"
+      "    endcase\n"
+      "endmodule\n");
+  // The fork's statement loop stops at `endcase` without consuming it, so the
+  // report stands on line 6 and Parser::ParseCaseStmt still finds the `endcase`
+  // it expects under §12.5.
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "expected join, join_any or join_none to close the parallel block", 6,
+      "9.3.2"));
+}
+
+// §9.3 head negative: the same source, with nothing else left unterminated, and
+// the count is the claim rather than the report. A fork that swallowed the
+// `endcase` drew the §11.2 "expected expression" report on it and then left
+// Parser::ParseCaseStmt to report the `endcase` missing under §12.5, three
+// reports for one missing join keyword.
+TEST(BlockStatementParsing,
+     ParallelMissingJoinLeavesTheEnclosingEndcaseToItsOwnProduction) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial\n"
+      "    case (x)\n"
+      "      1: fork\n"
+      "           a = 1;\n"
+      "    endcase\n"
+      "endmodule\n");
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
+// §9.3 head negative: a fork standing in a generate region is closed by a join
+// keyword and not by `endgenerate`. Parser::ParseGenerateRegion reads module
+// items and an initial block is one, so a fork reaches Parser::ParseForkStmt
+// with `endgenerate` where the join keyword belongs.
+TEST(BlockStatementParsing,
+     ParallelInAGenerateRegionClosedByEndgenerateNamesTheJoinKeyword) {
+  auto r = Parse(
+      "module m;\n"
+      "  generate\n"
+      "    initial fork\n"
+      "      a = 1;\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  // The fork's statement loop stops at `endgenerate` without consuming it, so
+  // the report stands on line 5 and Parser::ParseGenerateRegion still finds the
+  // `endgenerate` it expects under §27.3.
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "expected join, join_any or join_none to close the parallel block", 5,
+      "9.3.2"));
+}
+
 // §9.3 head negative: an unterminated parallel block leaves the token that
 // closes the enclosing construct where it stands. The `end` on line 5 belongs
 // to the sequential block of §9.3.1, so Parser::ParseForkStmt reports and does
