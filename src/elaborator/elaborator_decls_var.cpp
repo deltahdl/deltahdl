@@ -454,7 +454,7 @@ static bool IsStringVar(const DataType& dtype, const TypedefMap& typedefs) {
 // character of a string variable may be selected for reading or writing by
 // indexing the variable", so the address after a string's own reaches a
 // character, whose own bits are selectable.
-static void RecordVarSelectShape(
+void RecordVarSelectShape(
     const ModuleItem* item, const TypedefMap& typedefs,
     std::unordered_map<std::string_view, VarSelectShape>& shapes) {
   const DataType& dtype = item->data_type;

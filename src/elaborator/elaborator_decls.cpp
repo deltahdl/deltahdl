@@ -575,10 +575,25 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
       "net", diag_);
   net_names_.insert(item->name);
   var_types_[item->name] = item->data_type.kind;
-  if (!item->data_type.packed_dim_left)
-    scalar_var_names_.insert(item->name);
-  else if (item->unpacked_dims.empty())
-    packed_array_vars_.insert(item->name);
+  // §7.4.2: "Unpacked arrays can be made of any data type", and "Elements of
+  // net arrays can be used in the same fashion as a scalar or vector net". So a
+  // net carrying an unpacked dimension is neither a scalar nor a packed array
+  // for select legality, exactly as RegisterVarDeclNames already decides for a
+  // variable: §11.5.2 makes an index on one an array element select rather than
+  // a bit-select. Testing only the packed dimension made `wire w [3:0];` a
+  // scalar, so every `w[1]` drew §11.5.1's scalar report and no way was left to
+  // write what §7.4.2 admits.
+  if (item->unpacked_dims.empty()) {
+    if (!item->data_type.packed_dim_left)
+      scalar_var_names_.insert(item->name);
+    else
+      packed_array_vars_.insert(item->name);
+  }
+  // §11.5.2 delegates a select of an array element to §11.5.1 "in the same
+  // manner as net and variable bit-selects and part-selects", drawing no
+  // distinction between the two, so a net is given the same shape a variable
+  // gets and CheckElementSelectNode judges both alike.
+  RecordVarSelectShape(item, typedefs_, var_select_shapes_);
   RtlirNet net;
   net.name = ScopedName(item->name);
 
@@ -646,6 +661,24 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   }
 
   ApplyTriregNetDefaults(item, net, unit_, BuildParamScope(mod));
+
+  // §11.5.2 sends a slice of a net array to the same rule it sends a variable
+  // array's to, drawing no distinction between the two, and
+  // Elaborator::CheckArrayElementPartSelectNode reads var_array_info_ to apply
+  // it. A net reached that map through nothing, so the clause's own example --
+  // `wire threed_array[0:255][0:255][0:7]` sliced `[3:0]` -- went unjudged. The
+  // dimensions are computed by the helpers the variable path uses, so the two
+  // agree on what a dimension is; the RtlirVariable is the carrier they take
+  // and nothing but the dimensions is read back off it.
+  if (!item->unpacked_dims.empty()) {
+    RtlirVariable dims;
+    dims.width = net.width;
+    dims.is_signed = net.is_signed;
+    ComputeUnpackedDims(
+        item->unpacked_dims, dims,
+        {{typedefs_, class_names_}, BuildParamScope(mod), diag_, item->loc});
+    TrackVarArrayInfo(item, dims, BuildParamScope(mod));
+  }
 
   net.attrs = ResolveAttributes(item->attrs, diag_);
   mod->nets.push_back(net);

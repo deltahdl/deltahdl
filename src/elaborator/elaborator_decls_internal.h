@@ -1,14 +1,26 @@
 #pragma once
 
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
 
 namespace delta {
+
+// §11.5.1/§11.5.2: records how many addresses a name admits before a select
+// reaches a bit, and what that bit sits in. Shared by the variable and net
+// declaration paths, because §11.5.2 delegates both to §11.5.1 in one sentence
+// -- bit-selects and part-selects of array elements "shall be addressed in the
+// same manner as net and variable bit-selects and part-selects" -- so a net
+// array and a variable array are judged by one rule and need one shape.
+void RecordVarSelectShape(
+    const ModuleItem* item, const TypedefMap& typedefs,
+    std::unordered_map<std::string_view, VarSelectShape>& shapes);
 
 // §7.8: the set of user-defined type names an unpacked dimension may name as a
 // user-defined associative index — the typedef table and the set of class
