@@ -538,6 +538,7 @@ void Elaborator::ResetItemElaborationState() {
   class_var_types_.clear();
   var_init_names_.clear();
   output_port_targets_.clear();
+  force_release_targets_.clear();
   nettype_net_names_.clear();
   interconnect_names_.clear();
   scalar_var_names_.clear();
@@ -590,6 +591,7 @@ struct ItemElaborationStateSaver {
   decltype(Elaborator::class_var_types_) class_var_types;
   decltype(Elaborator::var_init_names_) var_init_names;
   decltype(Elaborator::output_port_targets_) output_port_targets;
+  decltype(Elaborator::force_release_targets_) force_release_targets;
   decltype(Elaborator::nettype_net_names_) nettype_net_names;
   decltype(Elaborator::interconnect_names_) interconnect_names;
   decltype(Elaborator::scalar_var_names_) scalar_var_names;
@@ -660,6 +662,7 @@ struct ItemElaborationStateSaver {
     class_var_types = std::move(e.class_var_types_);
     var_init_names = std::move(e.var_init_names_);
     output_port_targets = std::move(e.output_port_targets_);
+    force_release_targets = std::move(e.force_release_targets_);
     nettype_net_names = std::move(e.nettype_net_names_);
     interconnect_names = std::move(e.interconnect_names_);
     scalar_var_names = std::move(e.scalar_var_names_);
@@ -722,6 +725,7 @@ struct ItemElaborationStateSaver {
     e.class_var_types_ = std::move(class_var_types);
     e.var_init_names_ = std::move(var_init_names);
     e.output_port_targets_ = std::move(output_port_targets);
+    e.force_release_targets_ = std::move(force_release_targets);
     e.nettype_net_names_ = std::move(nettype_net_names);
     e.interconnect_names_ = std::move(interconnect_names);
     e.scalar_var_names_ = std::move(scalar_var_names);

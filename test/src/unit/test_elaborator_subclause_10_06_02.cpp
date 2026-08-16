@@ -125,7 +125,12 @@ TEST(ForceReleaseElaboration, ForcePartSelectUserNettypeNetIsError) {
                             "nettype is not a legal force LHS", 4, "10.6.2"));
 }
 
-TEST(ForceReleaseElaboration, ForceOnMixedAssignmentVariableIsError) {
+// §10.6.2 (printed page 257): "A force or release statement shall not be
+// applied to a variable that is being assigned by a mixture of continuous and
+// procedural assignments." §6.5 rejects the mixture itself and its report
+// stands at the continuous assignment on line 3, so naming that report proves
+// nothing about the force; this names §10.6.2's own, at the force on line 6.
+TEST(ForceReleaseElaboration, ForceOnAMixedAssignmentVariableNamesItsOwnRule) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -137,11 +142,45 @@ TEST(ForceReleaseElaboration, ForceOnMixedAssignmentVariableIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  // The rejection is §6.5's mixed-assignment rule, reported at the continuous
-  // assignment, not a §10.6.2 rule about the force LHS.
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "variable 'x' has both continuous and procedural assignments", 3, "6.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "force or release applied to variable 'x'", 6,
+                            "10.6.2"));
+}
+
+TEST(ForceReleaseElaboration,
+     ForceOnAVariableWithOnlyAContinuousAssignmentIsAccepted) {
+  // §6.5 (printed page 91): "A force statement is neither a continuous nor a
+  // procedural assignment." So a lone force beside a continuous assignment is
+  // no mixture, and this is what stops the rule from rejecting every force on a
+  // continuously assigned variable.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic x;\n"
+      "  assign x = 1'b0;\n"
+      "  initial force x = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ForceReleaseElaboration,
+     ForceOnAVariableWithOnlyProceduralAssignmentsIsAccepted) {
+  // The other edge of the same rule: procedural assignments alone are no
+  // mixture either, so the force stands.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic x;\n"
+      "  initial begin\n"
+      "    x = 1'b0;\n"
+      "    force x = 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ForceReleaseElaboration, ForceConcatWithBitSelectVariableIsError) {
@@ -207,10 +246,10 @@ TEST(ForceReleaseElaboration, ForceConcatWithNetBitSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The prohibition covers force AND release: a release applied to a variable
-// driven by both a continuous and a procedural assignment is rejected the same
-// way the force position is.
-TEST(ForceReleaseElaboration, ReleaseOnMixedAssignmentVariableIsError) {
+// §10.6.2 names both statements, so a check reading only StmtKind::kForce
+// leaves this red while the force case above passes.
+TEST(ForceReleaseElaboration,
+     ReleaseOnAMixedAssignmentVariableNamesItsOwnRule) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -222,11 +261,9 @@ TEST(ForceReleaseElaboration, ReleaseOnMixedAssignmentVariableIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  // The rejection is §6.5's mixed-assignment rule, reported at the continuous
-  // assignment, not a §10.6.2 rule about the release operand.
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "variable 'x' has both continuous and procedural assignments", 3, "6.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "force or release applied to variable 'x'", 6,
+                            "10.6.2"));
 }
 
 }  // namespace

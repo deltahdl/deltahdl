@@ -41,6 +41,9 @@ void CheckNbaDynamicArrayTarget(
     DiagEngine& diag);
 void CollectProcTargets(const Stmt* s,
                         std::unordered_map<std::string_view, SourceLoc>& out);
+
+void CollectForceReleaseTargets(
+    const Stmt* s, std::unordered_map<std::string_view, SourceLoc>& out);
 void CheckInterconnectProcContAssign(
     const Stmt* s,
     const std::unordered_set<std::string_view>& interconnect_names,

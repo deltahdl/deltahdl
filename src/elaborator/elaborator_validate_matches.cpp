@@ -133,6 +133,7 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
   bool is_proc = IsProceduralItem(item->kind);
   if (is_proc && item->body) {
     CollectProcTargets(item->body, proc_assign_targets_);
+    CollectForceReleaseTargets(item->body, force_release_targets_);
 
     CheckInterconnectProcContAssign(item->body, interconnect_names_, diag_);
     CheckInterconnectProceduralRead(item->body, interconnect_names_, diag_);
@@ -442,7 +443,35 @@ void Elaborator::ValidateMatchesIfPredicateType(const ModuleDecl* decl) {
   }
 }
 
+// §10.6.2 (printed page 257): "A force or release statement shall not be
+// applied to a variable that is being assigned by a mixture of continuous and
+// procedural assignments." This is a second rule over a source §6.5 already
+// rejects, and it names the statement the author has to change rather than the
+// assignment, so both reports are emitted and neither suppresses the other.
+// A force can never itself create the mixture it may not be applied over: §6.5
+// (printed page 91) rules that "A force statement is neither a continuous nor a
+// procedural assignment", which is why CollectProcTargets counts only
+// StmtKind::kBlockingAssign and StmtKind::kNonblockingAssign.
+static void ReportForceOverMixedAssignments(
+    const std::unordered_map<std::string_view, SourceLoc>& force_targets,
+    const std::unordered_map<std::string_view, SourceLoc>& cont_targets,
+    const std::unordered_map<std::string_view, SourceLoc>& proc_targets,
+    DiagEngine& diag) {
+  for (const auto& [name, loc] : force_targets) {
+    if (cont_targets.count(name) != 0 && proc_targets.count(name) != 0) {
+      diag.Error(loc,
+                 std::format("force or release applied to variable '{}', which "
+                             "is assigned by a mixture of continuous and "
+                             "procedural assignments",
+                             name),
+                 Subclause("10.6.2"));
+    }
+  }
+}
+
 void Elaborator::ValidateMixedAssignments() {
+  ReportForceOverMixedAssignments(force_release_targets_, cont_assign_targets_,
+                                  proc_assign_targets_, diag_);
   for (const auto& [name, loc] : cont_assign_targets_) {
     if (proc_assign_targets_.find(name) != proc_assign_targets_.end()) {
       diag_.Error(loc,

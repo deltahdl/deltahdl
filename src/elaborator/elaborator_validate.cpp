@@ -312,6 +312,30 @@ void CollectProcTargets(const Stmt* s,
   for (auto& ci : s->case_items) CollectProcTargets(ci.body, out);
 }
 
+// Records the variable each force or release statement names, for §10.6.2's
+// rule that neither "shall be applied to a variable that is being assigned by
+// a mixture of continuous and procedural assignments". The rule reads sets that
+// are complete only after every item has been walked, so the test itself is
+// left to Elaborator::ValidateMixedAssignments and this only collects. Uses the
+// same CollectLhsBaseNames as CollectProcTargets, which descends a
+// concatenation, because §10.6.2 admits "a concatenation of these" as a force
+// target and the rule holds of each operand. Descends fork_stmts as
+// CheckForceLhs does, since §9.3.2 makes a par_block a statement_or_null.
+void CollectForceReleaseTargets(
+    const Stmt* s, std::unordered_map<std::string_view, SourceLoc>& out) {
+  if (!s) return;
+  if (s->kind == StmtKind::kForce || s->kind == StmtKind::kRelease) {
+    CollectLhsBaseNames(s->lhs, s->range.start, out);
+  }
+  for (auto* sub : s->stmts) CollectForceReleaseTargets(sub, out);
+  for (auto* sub : s->fork_stmts) CollectForceReleaseTargets(sub, out);
+  CollectForceReleaseTargets(s->then_branch, out);
+  CollectForceReleaseTargets(s->else_branch, out);
+  CollectForceReleaseTargets(s->body, out);
+  CollectForceReleaseTargets(s->for_body, out);
+  for (auto& ci : s->case_items) CollectForceReleaseTargets(ci.body, out);
+}
+
 void CheckInterconnectProcContAssign(
     const Stmt* s,
     const std::unordered_set<std::string_view>& interconnect_names,

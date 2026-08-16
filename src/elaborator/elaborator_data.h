@@ -147,6 +147,12 @@ class ElaboratorData {
   std::unordered_map<std::string_view, std::string_view> class_var_types_;
   std::unordered_set<std::string_view> var_init_names_;
   std::unordered_map<std::string_view, SourceLoc> output_port_targets_;
+  // §10.6.2: the variable each force or release statement names, with that
+  // statement's own location. Read after every item has been walked, because
+  // the rule tests the name against the continuous and procedural assignments
+  // the whole module makes, and neither set is complete while one item is
+  // being elaborated.
+  std::unordered_map<std::string_view, SourceLoc> force_release_targets_;
   std::unordered_set<std::string_view> nettype_net_names_;
   std::unordered_set<std::string_view> nettype_names_;
   std::unordered_map<std::string_view, std::string_view> nettype_resolve_funcs_;
