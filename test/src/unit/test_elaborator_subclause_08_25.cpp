@@ -317,4 +317,47 @@ TEST(ParameterizedClassElaboration,
   ExpectVariableWidth(FindModule(design, "m"), "v", 8u);
 }
 
+// §23.10.2.2 states that "the name of the parameter shall be the name specified
+// in the instantiated module", and §8.25 applies the same parameter override
+// rules to a class specialization, so `.Nope` names no parameter of Buf and the
+// specialization is illegal. An elaborator that drops an argument whose name it
+// cannot find accepts the source and leaves T2 at its declared default of bit,
+// giving v 1 bit rather than saying the name is wrong.
+TEST(ParameterizedClassElaboration,
+     NamedArgumentNamingNoClassParameterIsError) {
+  ElabFixture f;
+  ElabOk(
+      "class Buf #(type T1 = int, type T2 = bit);\n"
+      "  typedef T2 elem_t;\n"
+      "endclass\n"
+      "module m;\n"
+      "  Buf#(.Nope(byte))::elem_t v;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class 'Buf' has no parameter 'Nope'", 5,
+                            "23.10.2.2"));
+}
+
+// §23.10.2.2 states that "once a parameter is assigned a value, there shall not
+// be another assignment to this parameter name", so naming T2 twice in one
+// specialization is illegal. An elaborator that lets each named argument
+// overwrite the last accepts the source and gives T2 shortint, making v 16 bits
+// from whichever argument was written last rather than reporting the repeat.
+TEST(ParameterizedClassElaboration, NamedClassParameterAssignedTwiceIsError) {
+  ElabFixture f;
+  ElabOk(
+      "class Buf #(type T1 = int, type T2 = bit);\n"
+      "  typedef T2 elem_t;\n"
+      "endclass\n"
+      "module m;\n"
+      "  Buf#(.T2(byte), .T2(shortint))::elem_t v;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameter 'T2' of class 'Buf' is assigned more "
+                            "than once",
+                            5, "23.10.2.2"));
+}
+
 }  // namespace

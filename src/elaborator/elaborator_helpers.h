@@ -185,8 +185,12 @@ const DataType* FindClassScopedTypedefType(std::string_view cls_name,
 // substituted parameters. Both the declared form `C#(int)::T v;` and the
 // override form `child #(.P(C#(int)::T)) u();` resolve through this, so a
 // caller outside Elaborator passes the compilation unit rather than reading it
-// off a member. Defined in elaborator_validate_struct_types.cpp.
-bool ResolveParameterizedType(DataType& dtype, const CompilationUnit* unit);
+// off a member. `loc` is where the specialization was written, and is the
+// position of the §23.10.2.2 reports the arguments earn: a named argument
+// carrying a name the class does not declare, and one assigning a name a second
+// argument already assigned. Defined in elaborator_validate_struct_types.cpp.
+bool ResolveParameterizedType(DataType& dtype, const CompilationUnit* unit,
+                              DiagEngine& diag, SourceLoc loc);
 bool IsRealType(DataTypeKind k);
 
 // §11.5.2 fixes how many addresses a select may carry before §11.5.1 judges it:

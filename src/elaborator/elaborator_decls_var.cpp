@@ -71,10 +71,15 @@ static void ValidateWeakReferenceTypeParam(
 // specialization arguments §8.25 makes the type depend on along with it.
 // Only the three fields that say which type it is are taken, so a qualifier or
 // a dimension written on the declaration itself survives.
+//
+// The declaration is passed whole rather than as its DataType because the
+// specialization earns §23.10.2.2 reports about the names its arguments carry,
+// and ModuleItem::loc is where those stand.
 static void ResolveDeclaredTypeName(
-    DataType& dtype, const CompilationUnit* unit, const TypedefMap& typedefs,
-    const std::unordered_set<std::string_view>& class_names) {
-  ResolveParameterizedType(dtype, unit);
+    ModuleItem* item, const CompilationUnit* unit, const TypedefMap& typedefs,
+    const std::unordered_set<std::string_view>& class_names, DiagEngine& diag) {
+  DataType& dtype = item->data_type;
+  ResolveParameterizedType(dtype, unit, diag, item->loc);
   if (dtype.kind != DataTypeKind::kNamed) return;
   if (class_names.count(dtype.type_name) > 0) return;
   auto it = typedefs.find(dtype.type_name);
@@ -635,7 +640,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
 
   ResolveTypeRef(item, mod);
 
-  ResolveDeclaredTypeName(item->data_type, unit_, typedefs_, class_names_);
+  ResolveDeclaredTypeName(item, unit_, typedefs_, class_names_, diag_);
 
   std::string_view adopted_array_typedef =
       AdoptTypedefArrayDims(item, typedefs_, td_array_dims_);

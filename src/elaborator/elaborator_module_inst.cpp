@@ -23,7 +23,8 @@
 namespace delta {
 
 static DataType TypeParamOverrideToDataType(const Expr* expr,
-                                            const CompilationUnit* unit);
+                                            const CompilationUnit* unit,
+                                            DiagEngine& diag, SourceLoc loc);
 
 // The specialization arguments written on a parameterized class name, in the
 // form DataType::type_params holds them in.
@@ -37,11 +38,13 @@ static DataType TypeParamOverrideToDataType(const Expr* expr,
 // is a type written where an expression was parsed, so it converts through the
 // same route the override value itself takes.
 static std::vector<DataType> OverrideSpecializationArgs(
-    const Expr* name, const CompilationUnit* unit) {
+    const Expr* name, const CompilationUnit* unit, DiagEngine& diag,
+    SourceLoc loc) {
   std::vector<DataType> args;
   args.reserve(name->elements.size());
   for (size_t i = 0; i < name->elements.size(); ++i) {
-    DataType arg = TypeParamOverrideToDataType(name->elements[i], unit);
+    DataType arg =
+        TypeParamOverrideToDataType(name->elements[i], unit, diag, loc);
     if (i < name->arg_names.size()) arg.param_arg_name = name->arg_names[i];
     args.push_back(arg);
   }
@@ -93,7 +96,8 @@ static void FillDefaultSpecializationArgs(std::vector<DataType>& args,
 // therefore builds the named type ResolveParameterizedType substitutes into
 // rather than reading the member's declared type as it stands.
 static DataType ClassScopedOverrideToDataType(const Expr* expr,
-                                              const CompilationUnit* unit) {
+                                              const CompilationUnit* unit,
+                                              DiagEngine& diag, SourceLoc loc) {
   DataType dt;
   if (expr->lhs == nullptr || expr->lhs->kind != ExprKind::kIdentifier) {
     return dt;
@@ -107,14 +111,14 @@ static DataType ClassScopedOverrideToDataType(const Expr* expr,
     dt.kind = DataTypeKind::kNamed;
     dt.scope_name = expr->lhs->text;
     dt.type_name = expr->rhs->text;
-    dt.type_params = OverrideSpecializationArgs(expr->lhs, unit);
+    dt.type_params = OverrideSpecializationArgs(expr->lhs, unit, diag, loc);
     FillDefaultSpecializationArgs(dt.type_params, cls);
     // A specialization whose arguments do not reach the member leaves the
     // override naming no type, which ResolveChildTypeParam reports against
     // §23.10.2. Answering with the member's declared type instead would bind
     // the parameter to the unspecialized class, which is the silence that
     // report stands in place of.
-    if (!ResolveParameterizedType(dt, unit)) return DataType{};
+    if (!ResolveParameterizedType(dt, unit, diag, loc)) return DataType{};
     return dt;
   }
   const DataType* resolved =
@@ -184,7 +188,8 @@ static void PrependWrittenPackedDims(DataType& dt,
 // src/parser/expr_parser.cpp:581-587, a typedef, or a class), or a class scope
 // resolution. Anything else leaves the DataType at kImplicit.
 static DataType OverrideHeadToDataType(const Expr* head,
-                                       const CompilationUnit* unit) {
+                                       const CompilationUnit* unit,
+                                       DiagEngine& diag, SourceLoc loc) {
   if (head == nullptr) return DataType{};
   if (head->kind == ExprKind::kIdentifier) {
     DataType dt = TypeNameToDataType(head->text);
@@ -194,12 +199,12 @@ static DataType OverrideHeadToDataType(const Expr* head,
     // `D` names none when D leaves a parameter without a default, and the
     // arguments are what the declaration the override reaches is judged on.
     if (head->has_param_spec) {
-      dt.type_params = OverrideSpecializationArgs(head, unit);
+      dt.type_params = OverrideSpecializationArgs(head, unit, diag, loc);
     }
     return dt;
   }
   if (head->kind == ExprKind::kMemberAccess && head->is_scope_resolution) {
-    return ClassScopedOverrideToDataType(head, unit);
+    return ClassScopedOverrideToDataType(head, unit, diag, loc);
   }
   return DataType{};
 }
@@ -213,10 +218,11 @@ static DataType OverrideHeadToDataType(const Expr* head,
 // DataTypeKind::kImplicit means the value names no type, which is what lets the
 // caller tell an assignment it cannot use from an absent one.
 static DataType TypeParamOverrideToDataType(const Expr* expr,
-                                            const CompilationUnit* unit) {
+                                            const CompilationUnit* unit,
+                                            DiagEngine& diag, SourceLoc loc) {
   std::vector<const Expr*> sels;
   const Expr* head = PeelPackedDimSelects(expr, sels);
-  DataType dt = OverrideHeadToDataType(head, unit);
+  DataType dt = OverrideHeadToDataType(head, unit, diag, loc);
   if (dt.kind == DataTypeKind::kImplicit) return dt;
   PrependWrittenPackedDims(dt, sels);
   return dt;
@@ -285,7 +291,7 @@ static std::optional<DataType> ResolveChildTypeParam(
   std::string_view pname = child_decl->params[i].first;
   const Expr* ov = FindTypeParamOverrideExpr(item, child_decl, pname);
   if (ov != nullptr) {
-    DataType resolved = TypeParamOverrideToDataType(ov, unit);
+    DataType resolved = TypeParamOverrideToDataType(ov, unit, diag, item->loc);
     if (resolved.kind != DataTypeKind::kImplicit) return resolved;
     diag.Error(item->loc,
                std::format("parameter value assignment for type parameter '{}' "

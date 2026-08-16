@@ -273,10 +273,51 @@ BuildSpecializationSubst(const ClassDecl* cls,
   return subst;
 }
 
-bool ResolveParameterizedType(DataType& dtype, const CompilationUnit* unit) {
+// Reports a named argument of a specialization carrying a name the class does
+// not declare, and one assigning a name a second argument already assigned.
+//
+// §23.10.2.2 (printed page 767) states that "the name of the parameter shall be
+// the name specified in the instantiated module", and that "once a parameter is
+// assigned a value, there shall not be another assignment to this parameter
+// name". §8.25 (printed page 204) instantiates a specialization "using the same
+// parameter override rules (see 23.10)". Neither report changes what
+// BuildSpecializationSubst goes on to substitute: an unrecognized name binds no
+// parameter, so the one it was written for keeps its declared default, and a
+// repeated name leaves the last argument standing. Both of those are types
+// nobody wrote, which is what the reports stand in place of.
+//
+// ResolveNamedInstParams at src/elaborator/elaborator_module_inst.cpp:436 makes
+// the first of these reports for a module instance, and the wording here
+// follows it so that the two forms of one rule read alike.
+static void ValidateSpecializationArgNames(const ClassDecl* cls,
+                                           const std::vector<DataType>& args,
+                                           DiagEngine& diag, SourceLoc loc) {
+  std::unordered_set<std::string_view> declared;
+  for (const auto& [pname, pexpr] : cls->params) declared.insert(pname);
+  std::unordered_set<std::string_view> assigned;
+  for (const auto& arg : args) {
+    if (arg.param_arg_name.empty()) continue;
+    if (declared.count(arg.param_arg_name) == 0) {
+      diag.Error(loc,
+                 std::format("class '{}' has no parameter '{}'", cls->name,
+                             arg.param_arg_name),
+                 Subclause("23.10.2.2"));
+    } else if (!assigned.insert(arg.param_arg_name).second) {
+      diag.Error(loc,
+                 std::format("parameter '{}' of class '{}' is assigned more "
+                             "than once",
+                             arg.param_arg_name, cls->name),
+                 Subclause("23.10.2.2"));
+    }
+  }
+}
+
+bool ResolveParameterizedType(DataType& dtype, const CompilationUnit* unit,
+                              DiagEngine& diag, SourceLoc loc) {
   if (dtype.scope_name.empty() || dtype.type_params.empty()) return false;
   const auto* cls = FindClassDecl(dtype.scope_name, unit);
   if (!cls) return false;
+  ValidateSpecializationArgNames(cls, dtype.type_params, diag, loc);
   auto subst = BuildSpecializationSubst(cls, dtype.type_params);
 
   // The scope resolution operator applied to a specialization may name a type

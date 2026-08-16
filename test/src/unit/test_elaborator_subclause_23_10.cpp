@@ -581,4 +581,30 @@ TEST(ParameterOverride,
   ExpectVariableWidth(SoleChildInstance(design), "data", 8u);
 }
 
+// The same named form with a name Buf does not declare.
+// ClassScopedOverrideToDataType in src/elaborator/elaborator_module_inst.cpp
+// reaches the substitution by a route separate from a declaration's, which is
+// why the case is written here as well as in
+// test/src/unit/test_elaborator_subclause_08_25.cpp. Without the rule the
+// child's P silently becomes bit, T2's declared default, rather than a report
+// naming the parameter that does not exist.
+TEST(ParameterOverride,
+     NamedSpecializationArgumentNamingNoClassParameterIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class Buf #(type T1 = int, type T2 = bit);\n"
+      "  typedef T2 elem_t;\n"
+      "endclass\n"
+      "module child #(parameter type P = longint)();\n"
+      "  P data;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.P(Buf#(.Nope(byte))::elem_t)) u0();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class 'Buf' has no parameter 'Nope'", 8,
+                            "23.10.2.2"));
+}
+
 }  // namespace
