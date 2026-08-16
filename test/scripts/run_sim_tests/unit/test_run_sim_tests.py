@@ -28,6 +28,37 @@ def _run_over_streams(
     return outcome
 
 
+def _run_over_case(
+    rst: ModuleType, tmp_path: Path, stem: str, returncode: int,
+) -> tuple[list[str], tuple[bool, str]]:
+    """Run run_test() over a stub deltahdl and return its command and outcome.
+
+    The .sv file and the .expected file are written for the caller and are made
+    to agree, so a test says only which optional sibling files the case carries
+    and what status the stub exits with. The command line comes back so that a
+    test about .args can read what the stub was asked to run, and the outcome
+    comes back so that a test about .exit can read what run_test decided.
+    """
+    sv = tmp_path / f"{stem}.sv"
+    sv.write_text("module m; endmodule\n")
+    expected_path = tmp_path / f"{stem}.expected"
+    expected_path.write_text("ran\n")
+
+    seen: list[str] = []
+
+    def fake_run(cmd: list[str], **_: object) -> MagicMock:
+        seen.extend(cmd)
+        stub = MagicMock()
+        stub.stdout = "ran\n"
+        stub.stderr = ""
+        stub.returncode = returncode
+        return stub
+
+    with patch.object(rst.subprocess, "run", side_effect=fake_run):
+        outcome: tuple[bool, str] = rst.run_test(sv, expected_path)
+    return seen, outcome
+
+
 class TestCollectTests:
     """Tests for the collect_tests() function."""
 
@@ -155,3 +186,60 @@ class TestRunTest:
             "test/src/e2e/reject.sv:3:1: error: rejected\n",
         )
         assert result == (True, "")
+
+
+class TestCaseArguments:
+    """Tests for the arguments a case names in its .args file."""
+
+    def test_passes_the_named_arguments_after_the_source_path(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should pass a case's .args lines after its source path."""
+        (tmp_path / "opt.args").write_text("--lint-only\n--top\nm\n")
+        cmd, _ = _run_over_case(rst, tmp_path, "opt", 0)
+        assert cmd == [
+            str(rst.BINARY), str(tmp_path / "opt.sv"),
+            "--lint-only", "--top", "m",
+        ]
+
+    def test_a_blank_line_names_no_argument(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should pass no empty argument for a blank .args line."""
+        (tmp_path / "blank.args").write_text("--lint-only\n\n--synth\n")
+        cmd, _ = _run_over_case(rst, tmp_path, "blank", 0)
+        assert cmd[2:] == ["--lint-only", "--synth"]
+
+    def test_a_case_without_an_args_file_runs_the_source_path_alone(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should build a two-element command with no .args file."""
+        cmd, _ = _run_over_case(rst, tmp_path, "plain", 0)
+        assert cmd == [str(rst.BINARY), str(tmp_path / "plain.sv")]
+
+
+class TestExpectedStatus:
+    """Tests for the exit status a case names in its .exit file."""
+
+    def test_a_matching_status_passes_the_case(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should pass when the status matches the .exit file."""
+        (tmp_path / "refused.exit").write_text("2\n")
+        _, outcome = _run_over_case(rst, tmp_path, "refused", 2)
+        assert outcome == (True, "")
+
+    def test_a_differing_status_fails_the_case(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should fail when the status differs from the .exit file."""
+        (tmp_path / "silent.exit").write_text("1\n")
+        _, (ok, detail) = _run_over_case(rst, tmp_path, "silent", 0)
+        assert not ok and "expected exit status 1, got 0" in detail
+
+    def test_a_case_without_an_exit_file_judges_the_text_alone(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should pass a matching text whatever the status was."""
+        _, outcome = _run_over_case(rst, tmp_path, "loose", 3)
+        assert outcome == (True, "")

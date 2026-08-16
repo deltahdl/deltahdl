@@ -35,6 +35,40 @@ def visible_output(result: subprocess.CompletedProcess[str]) -> str:
     return combined.replace(f"{REPO_ROOT}{os.sep}", "")
 
 
+def case_arguments(sv_path: Path) -> list[str]:
+    """Return the arguments a case named in the .args file beside its source.
+
+    A case whose subject is an option has nowhere else to name it, because the
+    source path is otherwise the whole command line deltahdl is given. The file
+    holds one argument per line, so an argument may hold a space without being
+    quoted, and a blank line names no argument rather than an empty one.
+
+    The file is optional and an absent one names no arguments, which runs
+    deltahdl on the source path alone. That is what every case did before the
+    file existed, so a case that carries only a .expected is unaffected.
+    """
+    args_path = sv_path.with_suffix(".args")
+    if not args_path.exists():
+        return []
+    return [line for line in args_path.read_text().splitlines() if line]
+
+
+def expected_status(sv_path: Path) -> int | None:
+    """Return the status a case named in the .exit file beside its source.
+
+    Comparing printed text alone passes a run that printed what it should and
+    exited non-zero anyway, so a case whose subject is the exit status needs a
+    file to name the status in. It holds that one number.
+
+    Returns None where the file is absent, which leaves the case judged on its
+    printed text alone.
+    """
+    status_path = sv_path.with_suffix(".exit")
+    if not status_path.exists():
+        return None
+    return int(status_path.read_text().strip())
+
+
 def collect_tests() -> list[tuple[Path, Path]]:
     """Collect all .sv files that have a matching .expected file."""
     tests: list[tuple[Path, Path]] = []
@@ -46,11 +80,24 @@ def collect_tests() -> list[tuple[Path, Path]]:
 
 
 def run_test(sv_path: Path, expected_path: Path) -> tuple[bool, str]:
-    """Run deltahdl on a .sv file and compare what it printed to .expected."""
+    """Run deltahdl on a .sv file and compare what it printed to .expected.
+
+    A case is a .sv file and a .expected file of the same stem, and the
+    .expected file is what makes the .sv file a case at all. Two further files
+    of that stem are optional: .args names the arguments to pass after the
+    source path, and .exit names the status the run has to exit with. A case
+    that carries neither is judged on its printed text alone.
+
+    The arguments go after the source path because deltahdl parses an option
+    wherever it stands: ParseArgs in src/main.cpp loops over the whole of argv
+    and imposes no order between an option and a source file. Putting them
+    after leaves the source path in the position it has always held, which is
+    the first one after the program name.
+    """
     expected_text = expected_path.read_text()
     try:
         result = subprocess.run(
-            [str(BINARY), str(sv_path)],
+            [str(BINARY), str(sv_path), *case_arguments(sv_path)],
             capture_output=True,
             text=True,
             timeout=30,
@@ -60,9 +107,12 @@ def run_test(sv_path: Path, expected_path: Path) -> tuple[bool, str]:
         return False, "TIMEOUT"
 
     actual = visible_output(result)
-    if actual.rstrip("\n") == expected_text.rstrip("\n"):
-        return True, ""
-    return False, f"expected:\n{expected_text}got:\n{actual}"
+    if actual.rstrip("\n") != expected_text.rstrip("\n"):
+        return False, f"expected:\n{expected_text}got:\n{actual}"
+    status = expected_status(sv_path)
+    if status is not None and result.returncode != status:
+        return False, f"expected exit status {status}, got {result.returncode}"
+    return True, ""
 
 
 def main() -> None:
