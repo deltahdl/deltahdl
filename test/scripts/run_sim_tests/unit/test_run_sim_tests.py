@@ -6,6 +6,28 @@ from types import ModuleType
 from unittest.mock import MagicMock, patch
 
 
+def _run_over_streams(
+    rst: ModuleType, tmp_path: Path, out: str, err: str, expected: str,
+) -> tuple[bool, str]:
+    """Run run_test() over a stub deltahdl writing out and err to its streams.
+
+    The .sv file is written for the caller and the .expected file is given the
+    expected text, so a test says only what the two streams hold and what the
+    recording of them says.
+    """
+    sv = tmp_path / "streams.sv"
+    sv.write_text("module streams; endmodule\n")
+    expected_path = tmp_path / "streams.expected"
+    expected_path.write_text(expected)
+
+    stub = MagicMock()
+    stub.stdout = out
+    stub.stderr = err
+    with patch.object(rst.subprocess, "run", return_value=stub):
+        outcome: tuple[bool, str] = rst.run_test(sv, expected_path)
+    return outcome
+
+
 class TestCollectTests:
     """Tests for the collect_tests() function."""
 
@@ -51,6 +73,7 @@ class TestRunTest:
 
         mock_result = MagicMock()
         mock_result.stdout = "Hello, World!\n"
+        mock_result.stderr = ""
         with patch.object(rst.subprocess, "run", return_value=mock_result):
             result = rst.run_test(sv, expected)
         assert result == (True, "")
@@ -66,6 +89,7 @@ class TestRunTest:
 
         mock_result = MagicMock()
         mock_result.stdout = "wrong output\n"
+        mock_result.stderr = ""
         with patch.object(rst.subprocess, "run", return_value=mock_result):
             ok, detail = rst.run_test(sv, expected)
         assert not ok and "expected output" in detail and "wrong output" in detail
@@ -81,6 +105,7 @@ class TestRunTest:
 
         mock_result = MagicMock()
         mock_result.stdout = "output\n"
+        mock_result.stderr = ""
         with patch.object(rst.subprocess, "run", return_value=mock_result):
             result = rst.run_test(sv, expected)
         assert result == (True, "")
@@ -100,3 +125,33 @@ class TestRunTest:
         ):
             result = rst.run_test(sv, expected)
         assert result == (False, "TIMEOUT")
+
+    def test_matches_a_diagnostic_written_only_to_standard_error(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should compare a report deltahdl wrote to standard error."""
+        result = _run_over_streams(
+            rst, tmp_path, "", "error: syntax error\n", "error: syntax error\n",
+        )
+        assert result == (True, "")
+
+    def test_compares_standard_output_ahead_of_standard_error(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should compare both streams, standard output first."""
+        result = _run_over_streams(
+            rst, tmp_path, "displayed\n", "error: rejected\n",
+            "displayed\nerror: rejected\n",
+        )
+        assert result == (True, "")
+
+    def test_matches_a_reported_path_named_relative_to_the_repository(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should cut the repository root off a path a report names."""
+        named = rst.REPO_ROOT / "test" / "src" / "e2e" / "reject.sv"
+        result = _run_over_streams(
+            rst, tmp_path, "", f"{named}:3:1: error: rejected\n",
+            "test/src/e2e/reject.sv:3:1: error: rejected\n",
+        )
+        assert result == (True, "")

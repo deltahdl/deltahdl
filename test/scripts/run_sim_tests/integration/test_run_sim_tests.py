@@ -24,6 +24,7 @@ class TestCollectAndRunPipeline:
             expected_text = expected_path.read_text().rstrip("\n")
             mock_result = MagicMock()
             mock_result.stdout = expected_text + "\n"
+            mock_result.stderr = ""
             with patch.object(
                 rst.subprocess, "run", return_value=mock_result
             ):
@@ -43,6 +44,7 @@ class TestCollectAndRunPipeline:
         fail_count = 0
         for sv, expected_path in pairs:
             mock_result = MagicMock()
+            mock_result.stderr = ""
             if sv.stem == "hello":
                 mock_result.stdout = "Hello, World!\n"
             else:
@@ -86,6 +88,7 @@ class TestMain:
             with open(expected_path, encoding="utf-8") as f:
                 mock = MagicMock()
                 mock.stdout = f.read()
+                mock.stderr = ""
             return mock
 
         def run() -> None:
@@ -120,6 +123,7 @@ class TestMain:
         def fake_run(_cmd: list[str], **_: Any) -> MagicMock:
             mock = MagicMock()
             mock.stdout = "wrong output\n"
+            mock.stderr = ""
             return mock
 
         def run() -> None:
