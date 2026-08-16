@@ -477,32 +477,96 @@ static void ValidateUdpInitialHeader(DiagEngine& diag, const UdpDecl* udp,
   }
 }
 
-// Parses the ANSI-style header that begins with the output port declaration
-// (output [reg] name [= initial], {input name}). Consumes through the closing
-// parenthesis and the terminating semicolon.
-void Parser::ParseUdpAnsiOutputHeader(UdpDecl* udp) {
-  Consume();
-  if (Match(TokenKind::kKwReg)) {
-    udp->is_sequential = true;
-  }
-  RejectUdpPortDimension();
-  udp->output_name = Expect(TokenKind::kIdentifier, Subclause("29.3.1")).text;
-  if (Match(TokenKind::kEq)) {
-    udp->has_initial = true;
-    udp->initial_value =
-        ParseUdpInitialValue(TokenKind::kComma, TokenKind::kRParen);
-  }
-  while (Match(TokenKind::kComma)) {
+// Says whether the parenthesized port list is A.5.2's
+// `udp_declaration_port_list` rather than its `udp_port_list`. The two lists
+// differ in what they hold and not in what order they hold it: the first holds
+// `udp_output_declaration` and `udp_input_declaration` entries, each introduced
+// by a direction keyword, and the second holds bare port identifiers. Choosing
+// on the keyword rather than on `output` alone is what lets §29.3.1's "The
+// output port shall be the first port in the port list" be reported against a
+// list that declares its ports in the wrong order, rather than the leading
+// `input` being reported as a port identifier gone missing. `inout` counts
+// because §29.3.1 permits no such port on a UDP at all, so a list holding one
+// is a declaration list with an illegal entry and never a list of names. `reg`
+// does not: A.5.2 gives it no place at the head of an entry, only inside
+// `udp_reg_declaration`, which is a `udp_port_declaration` written in the body.
+bool Parser::UdpPortListIsDeclarations() {
+  return Check(TokenKind::kKwOutput) || Check(TokenKind::kKwInput) ||
+         Check(TokenKind::kKwInout);
+}
+
+// Parses A.5.2's `udp_declaration_port_list` through the closing parenthesis
+// and the semicolon after it, reporting §29.3.1's two rules over the entries as
+// they were written: "UDPs have multiple input ports and exactly one output
+// port", and "The output port shall be the first port in the port list". Both
+// header forms answer them in the same words, the second in
+// ReconcileUdpNonAnsiPortList.
+void Parser::ParseUdpAnsiHeader(UdpDecl* udp) {
+  bool have_first_port = false;
+  bool first_port_is_output = false;
+  SourceLoc first_port_loc{};
+  do {
     ParseAttributes();
-    if (Check(TokenKind::kKwInout)) {
+    SourceLoc entry_loc = CurrentLoc();
+    bool is_inout = Check(TokenKind::kKwInout);
+    bool is_output = false;
+    if (is_inout) {
       RejectUdpInoutPort();
+    } else if (Match(TokenKind::kKwOutput)) {
+      is_output = true;
     } else {
       Match(TokenKind::kKwInput);
     }
+    // A.5.2 writes the optional `reg` and the optional initial value into
+    // `udp_output_declaration` alone, so neither is read on an input entry.
+    bool declares_reg = is_output && Match(TokenKind::kKwReg);
     RejectUdpPortDimension();
-    udp->input_names.push_back(
-        Expect(TokenKind::kIdentifier, Subclause("29.3.1")).text);
+    auto name_tok = Expect(TokenKind::kIdentifier, Subclause("29.3.1"));
+    bool declares_initial = is_output && Match(TokenKind::kEq);
+    char initial_value = udp->initial_value;
+    if (declares_initial) {
+      initial_value =
+          ParseUdpInitialValue(TokenKind::kComma, TokenKind::kRParen);
+    }
+
+    if (is_output && !udp->output_name.empty()) {
+      diag_.Error(entry_loc, "UDP shall have exactly one output port",
+                  Subclause("29.3.1"));
+      // Take the surplus declaration's port as an input rather than dropping
+      // it. It is a port the user wrote, and a header short one port disagrees
+      // with the table below it for a second report about one mistake.
+      is_output = false;
+    }
+    if (is_output) {
+      udp->output_name = name_tok.text;
+      if (declares_reg) udp->is_sequential = true;
+      if (declares_initial) {
+        udp->has_initial = true;
+        udp->initial_value = initial_value;
+      }
+    } else {
+      udp->input_names.push_back(name_tok.text);
+    }
+    // An inout entry is not a port §29.3.1 admits, and RejectUdpInoutPort has
+    // already said so, so it is not what the output's position is measured
+    // against.
+    if (!have_first_port && !is_inout) {
+      have_first_port = true;
+      first_port_is_output = is_output;
+      first_port_loc = entry_loc;
+    }
+  } while (Match(TokenKind::kComma));
+
+  // Held back until the whole list is read, and reported only where an output
+  // was declared somewhere in it, so a list declaring none draws
+  // ValidateUdpHeader's report about the missing output and not a second one
+  // about where it should have stood.
+  if (have_first_port && !first_port_is_output && !udp->output_name.empty()) {
+    diag_.Error(first_port_loc,
+                "UDP output port shall be the first port in the port list",
+                Subclause("29.3.1"));
   }
+
   Expect(TokenKind::kRParen, Subclause("29.3.1"));
   Expect(TokenKind::kSemicolon, Subclause("29.3.1"));
 }
@@ -565,11 +629,8 @@ UdpDecl* Parser::ParseUdpDecl() {
     ParseUdpPortDecls(udp);
   } else {
     ParseAttributes();
-    if (Check(TokenKind::kKwInout)) {
-      RejectUdpInoutPort();
-    }
-    if (Check(TokenKind::kKwOutput)) {
-      ParseUdpAnsiOutputHeader(udp);
+    if (UdpPortListIsDeclarations()) {
+      ParseUdpAnsiHeader(udp);
     } else {
       ParseUdpNonAnsiHeader(udp);
     }
@@ -596,36 +657,21 @@ UdpDecl* Parser::ParseExternUdpDecl() {
 
   Expect(TokenKind::kLParen, Subclause("29.3.1"));
   ParseAttributes();
-  if (Check(TokenKind::kKwInout)) {
-    RejectUdpInoutPort();
-  }
-  if (Check(TokenKind::kKwOutput)) {
-    Consume();
-    if (Match(TokenKind::kKwReg)) {
-      udp->is_sequential = true;
-    }
-    RejectUdpPortDimension();
-    udp->output_name = Expect(TokenKind::kIdentifier, Subclause("29.3.1")).text;
-    while (Match(TokenKind::kComma)) {
-      ParseAttributes();
-      if (Check(TokenKind::kKwInout)) {
-        RejectUdpInoutPort();
-      } else {
-        Match(TokenKind::kKwInput);
-      }
-      RejectUdpPortDimension();
-      udp->input_names.push_back(
-          Expect(TokenKind::kIdentifier, Subclause("29.3.1")).text);
-    }
+  if (UdpPortListIsDeclarations()) {
+    ParseUdpAnsiHeader(udp);
   } else {
+    // A.5.1 gives `extern udp_nonansi_declaration` no `udp_port_declaration`
+    // and no `udp_body`, so A.5.2's `udp_port_list` is the whole prototype: its
+    // first name is the output port and the rest are inputs, and no separate
+    // declarations exist to reconcile that order against.
     udp->output_name = Expect(TokenKind::kIdentifier, Subclause("29.3.1")).text;
     while (Match(TokenKind::kComma)) {
       udp->input_names.push_back(
           Expect(TokenKind::kIdentifier, Subclause("29.3.1")).text);
     }
+    Expect(TokenKind::kRParen, Subclause("29.3.1"));
+    Expect(TokenKind::kSemicolon, Subclause("29.3.1"));
   }
-  Expect(TokenKind::kRParen, Subclause("29.3.1"));
-  Expect(TokenKind::kSemicolon, Subclause("29.3.1"));
   udp->range.end = CurrentLoc();
   ValidateUdpHeader(udp);
   return udp;

@@ -156,7 +156,10 @@ class Parser {
   void ParseGateDelay(Expr*& d1, Expr*& d2, Expr*& d3);
 
   UdpDecl* ParseUdpDecl();
-  void ParseUdpAnsiOutputHeader(UdpDecl* udp);
+  // Chooses between A.5.2's two port lists for the header in hand, and is what
+  // both ParseUdpDecl and ParseExternUdpDecl choose on.
+  bool UdpPortListIsDeclarations();
+  void ParseUdpAnsiHeader(UdpDecl* udp);
   void ParseUdpNonAnsiHeader(UdpDecl* udp);
   void ParseUdpInitialStatement(UdpDecl* udp);
   UdpDecl* ParseExternUdpDecl();

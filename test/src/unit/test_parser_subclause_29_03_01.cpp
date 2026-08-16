@@ -123,16 +123,21 @@ TEST(UdpDeclGrammar, UdpWithDuplicateOutputsRejected) {
                             3, "29.3.1"));
 }
 
+// §29.3.1: "UDPs have multiple input ports and exactly one output port". The
+// header is A.5.2's `udp_declaration_port_list`, whose entries are port
+// declarations, so a second `output` is a second output declaration rather than
+// a port name gone missing. The header is written over three lines because the
+// report's line is what says which `output` was named: on one line a report
+// about the first satisfies the assertion too.
 TEST(UdpDeclGrammar, UdpDuplicateOutputInAnsiHeaderRejected) {
   auto r = Parse(
-      "primitive p(output a, output b, input c);\n"
+      "primitive p(output a,\n"
+      "            output b,\n"
+      "            input c);\n"
       "  table 0 0 : 0; endtable\n"
       "endprimitive\n");
-  // Parser::ParseUdpAnsiOutputHeader takes every port after the first as an
-  // input, so the second `output` keyword is rejected as a missing port
-  // identifier under §29.3.1 rather than named as a duplicate output.
-  EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got 'output'", 1, "29.3.1"));
+  EXPECT_TRUE(ReportedError(r.diags, "UDP shall have exactly one output port",
+                            2, "29.3.1"));
 }
 
 TEST(UdpDeclGrammar, UdpInoutPortInAnsiHeaderRejected) {
@@ -227,19 +232,63 @@ TEST(UdpDeclGrammar, UdpOutputNotFirstInNonAnsiPortListRejected) {
       "29.3.1"));
 }
 
+// §29.3.1: "The output port shall be the first port in the port list." A header
+// beginning `input` holds port declarations, so it is A.5.2's
+// `udp_declaration_port_list` with its entries in the wrong order rather than a
+// `udp_port_list` whose first name is missing. The report stands at the
+// misplaced port, on a line of its own so that the assertion cannot be
+// satisfied by a report about the output declaration below it.
 TEST(UdpDeclGrammar, UdpOutputNotFirstInAnsiHeaderRejected) {
-  // §29.3.1: the output port shall be the first port in the port list. This
-  // covers the declaration-style (ANSI) header form, where an input port is
-  // written ahead of the output declaration.
   auto r = Parse(
-      "primitive p(input a, output o);\n"
+      "primitive p(input a,\n"
+      "            output o);\n"
       "  table 0 : 0; endtable\n"
       "endprimitive\n");
-  // A header whose first port is not `output` takes the non-ANSI path in
-  // Parser::ParseUdpDecl, so the leading `input` keyword is rejected as a
-  // missing port identifier under §29.3.1.
-  EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got 'input'", 1, "29.3.1"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP output port shall be the first port in the port list", 1,
+      "29.3.1"));
+}
+
+// The same header read for what it leaves behind. Reading it as A.5.2's
+// `udp_port_list` put the `input` keyword's own spelling where the output port
+// belongs and the `output` keyword's among the inputs, so the ports the user
+// declared are what says the header was read as the declarations it is.
+TEST(UdpDeclGrammar,
+     UdpAnsiHeaderWithOutputSecondStillReadsItsPortsAsDeclarations) {
+  auto r = Parse(
+      "primitive p(input a,\n"
+      "            output o);\n"
+      "  table 0 : 0; endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->udps.size(), 1u);
+  auto* udp = r.cu->udps[0];
+  EXPECT_EQ(udp->output_name, "o");
+  ASSERT_EQ(udp->input_names.size(), 1u);
+  EXPECT_EQ(udp->input_names[0], "a");
+}
+
+// §29.3.1's one-output rule holds over `extern udp_ansi_declaration` as much as
+// over the full declaration. A.5.1 gives that form no `udp_body`, so the header
+// is the only place the rule can be reported.
+TEST(UdpDeclGrammar, ExternUdpDuplicateOutputRejected) {
+  auto r = Parse(
+      "extern primitive p(output a,\n"
+      "                   output b);\n");
+  EXPECT_TRUE(ReportedError(r.diags, "UDP shall have exactly one output port",
+                            2, "29.3.1"));
+}
+
+// The output-first rule for the same prototype form. With no `udp_body` there
+// are no separate port declarations for ReconcileUdpNonAnsiPortList to compare
+// the list against, so nothing else in the source can name this rule.
+TEST(UdpDeclGrammar, ExternUdpOutputNotFirstRejected) {
+  auto r = Parse(
+      "extern primitive p(input a,\n"
+      "                   output o);\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP output port shall be the first port in the port list", 1,
+      "29.3.1"));
 }
 
 TEST(UdpDeclGrammar, UdpHeaderWithoutStateTableRejected) {

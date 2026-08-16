@@ -373,7 +373,7 @@ TEST(UdpDeclGrammar, MissingSemicolonAfterPortListIsError) {
       "    1 : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  // §29.3.1 owns the UDP header, so Parser::ParseUdpAnsiOutputHeader files the
+  // §29.3.1 owns the UDP header, so Parser::ParseUdpAnsiHeader files the
   // missing semicolon there rather than under A.5.1.
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'table'", 2, "29.3.1"));
 }
