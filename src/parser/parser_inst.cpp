@@ -266,6 +266,46 @@ static bool IsDriveStrengthToken(TokenKind k) {
   }
 }
 
+// Report a drive strength written after the delay, given a parser positioned
+// where the delay ended and `delay` holding whatever the delay parse produced.
+// §10.3.4 rules that the strength specification "shall immediately follow the
+// keyword (either the keyword for the net type or `assign`) and precede any
+// delay specified", and the grammar writes that order into both constructs the
+// sentence names: `continuous_assign ::= assign [ drive_strength ] [ delay3 ]
+// list_of_net_assignments ;` in §A.6.1, and `net_declaration ::= net_type
+// [ drive_strength | charge_strength ] [ vectored | scalared ]
+// data_type_or_implicit [ delay3 ] list_of_net_decl_assignments ;` in §A.2.1.3.
+// A parenthesis opening a strength at this point therefore stands after the
+// delay, whichever of the two keywords began the construct.
+//
+// A null `delay` means no delay was written, so nothing here is out of order
+// and the parenthesis belongs to whatever follows.
+//
+// The misplaced specification is consumed rather than left where it stands, so
+// that the rest of the construct still parses and the run names §10.3.4 once
+// instead of reporting the strength keyword as a missing expression or the
+// parenthesis as a missing net name. Nothing records it: §10.3.4 gives a
+// strength in this position no meaning to record.
+void Parser::ReportDriveStrengthAfterDelay(const Expr* delay) {
+  if (delay == nullptr || !Check(TokenKind::kLParen)) {
+    return;
+  }
+  auto saved = lexer_.SavePos();
+  auto loc = CurrentLoc();
+  Consume();
+  if (!IsDriveStrengthToken(CurrentToken().kind)) {
+    // A parenthesis after a delay can legitimately open an assignment target,
+    // so the parser has to see this one again.
+    lexer_.RestorePos(saved);
+    return;
+  }
+  diag_.Error(loc, "drive strength shall precede any delay specified",
+              Subclause("10.3.4"));
+  uint8_t s0 = 0, s1 = 0;
+  ParseDriveStrength(s0, s1);
+  Expect(TokenKind::kRParen, Subclause("10.3.4"));
+}
+
 void Parser::ParseContinuousAssign(std::vector<ModuleItem*>& items) {
   auto loc = CurrentLoc();
   Expect(TokenKind::kKwAssign, Subclause("10.3"));
@@ -286,6 +326,7 @@ void Parser::ParseContinuousAssign(std::vector<ModuleItem*>& items) {
   Expr* delay_fall = nullptr;
   Expr* delay_decay = nullptr;
   ParseGateDelay(delay, delay_fall, delay_decay);
+  ReportDriveStrengthAfterDelay(delay);
 
   do {
     auto* item = arena_.Create<ModuleItem>();

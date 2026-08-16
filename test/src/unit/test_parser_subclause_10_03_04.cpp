@@ -149,9 +149,11 @@ TEST(DriveStrengthParsing, NetDeclStrengthBeforeDelay) {
   EXPECT_NE(item->net_delay, nullptr);
 }
 
-// §10.3.4: the drive strength shall precede any delay specified. Writing the
-// strength after the delay violates that order; the parser rejects it because
-// the strength keywords then appear where the assignment target is expected.
+// §10.3.4: the strength specification "shall immediately follow the keyword
+// (either the keyword for the net type or `assign`) and precede any delay
+// specified", which §A.6.1 writes as `assign [ drive_strength ] [ delay3 ]
+// list_of_net_assignments ;`. The report stands at the strength's own opening
+// parenthesis on line 3, which is the token in the wrong place.
 TEST(DriveStrengthParsing, StrengthAfterDelayIsError) {
   auto r = Parse(
       "module m;\n"
@@ -159,26 +161,26 @@ TEST(DriveStrengthParsing, StrengthAfterDelayIsError) {
       "  assign #5 (pull0, pull1) a = b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // Nothing reports the ordering rule: the strength is past the point
-  // Parser::ParseContinuousAssign reads one, so `pull0` reaches the expression
-  // parser as the assignment target and is rejected under §11.2 on line 3.
-  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "drive strength shall precede any delay specified",
+                            3, "10.3.4"));
 }
 
-// §10.3.4: the strength shall precede any delay on a net declaration too, where
-// it follows the net-type keyword. Writing the delay first leaves the strength
-// where the net name is expected, so the parser rejects it. This is the
-// net-declaration counterpart of StrengthAfterDelayIsError and exercises the
-// separate net-declaration parse path (ParseNetStrength), not the assign path.
+// §10.3.4 names the net-type keyword alongside `assign`, and §A.2.1.3 writes
+// the same order into `net_declaration ::= net_type [ drive_strength |
+// charge_strength ] [ vectored | scalared ] data_type_or_implicit [ delay3 ]
+// list_of_net_decl_assignments ;`. This case reaches the rule through
+// Parser::ParseVarDeclList, where the net delay is read, rather than through
+// Parser::ParseContinuousAssign, so it is not redundant with the case above.
 TEST(DriveStrengthParsing, NetDeclDelayBeforeStrengthIsError) {
   auto r = Parse(
       "module m;\n"
       "  wire #5 (strong1, strong0) w = 1'b1;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // Parser::ParseVarDeclList asks for the net name where the '(' stands, and
-  // files that under §6.7, the net declaration; §10.3.4 has no report here.
-  EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got '('", 2, "6.7"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "drive strength shall precede any delay specified",
+                            2, "10.3.4"));
 }
 
 }  // namespace

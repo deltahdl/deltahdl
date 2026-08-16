@@ -566,7 +566,13 @@ void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
   // §6.7 states the net declaration and §6.8 the variable declaration, and this
   // list is one or the other according to the type that heads it.
   Subclause subclause(actual_dtype.is_net ? "6.7" : "6.8");
-  if (actual_dtype.is_net || nettype_named) ParseGateDelay(nd1, nd2, nd3);
+  if (actual_dtype.is_net || nettype_named) {
+    ParseGateDelay(nd1, nd2, nd3);
+    // §10.3.4 puts the drive strength before the delay on a net declaration as
+    // well as on an `assign`, so a strength standing here breaks the same rule.
+    // Parser::ParseNetStrength read the legal position, back in ParseDataType.
+    ReportDriveStrengthAfterDelay(nd1);
+  }
   bool first = true;
   do {
     auto* item = arena_.Create<ModuleItem>();
