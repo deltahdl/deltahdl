@@ -1,7 +1,10 @@
 #include "simulator/sim_context.h"
 
 #include <algorithm>
+#include <memory>
+#include <random>
 #include <sstream>
+#include <unordered_map>
 
 #include "common/diagnostic.h"
 #include "simulator/coverage.h"

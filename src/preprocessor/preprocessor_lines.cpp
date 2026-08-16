@@ -1,8 +1,5 @@
-#include <algorithm>
 #include <cctype>
 #include <cstdint>
-#include <fstream>
-#include <sstream>
 
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/preprocessor_internal.h"

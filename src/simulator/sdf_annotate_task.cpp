@@ -1,10 +1,9 @@
-#include <algorithm>
-#include <array>
 #include <cctype>
 #include <cmath>
 #include <cstddef>
 #include <fstream>
-#include <initializer_list>
+#include <ios>
+#include <ostream>
 #include <sstream>
 #include <string>
 #include <string_view>

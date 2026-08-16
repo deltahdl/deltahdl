@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <format>
+#include <unordered_map>
 #include <vector>
 
 #include "common/arena.h"

@@ -1,5 +1,7 @@
 #include "simulator/net.h"
 
+#include <algorithm>
+
 #include "common/arena.h"
 #include "simulator/scheduler.h"
 #include "simulator/variable.h"

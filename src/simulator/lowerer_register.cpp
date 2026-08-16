@@ -1,9 +1,7 @@
 #include "simulator/lowerer_register.h"
 
-#include <algorithm>
 #include <string>
 #include <string_view>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 

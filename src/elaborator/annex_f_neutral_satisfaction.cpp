@@ -1,6 +1,5 @@
 #include "elaborator/annex_f_neutral_satisfaction.h"
 
-#include <algorithm>
 #include <cstddef>
 #include <memory>
 #include <utility>

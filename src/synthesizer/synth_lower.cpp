@@ -2,6 +2,7 @@
 
 #include <string>
 #include <string_view>
+#include <unordered_map>
 
 #include "elaborator/elaborator_helpers.h"
 #include "synthesizer/synth_pattern.h"

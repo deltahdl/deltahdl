@@ -1,4 +1,4 @@
-#include <unordered_set>
+#include <unordered_map>
 
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"

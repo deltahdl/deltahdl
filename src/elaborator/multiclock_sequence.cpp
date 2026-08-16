@@ -1,6 +1,7 @@
 #include "elaborator/multiclock_sequence.h"
 
 #include <cstddef>
+#include <optional>
 
 namespace delta {
 

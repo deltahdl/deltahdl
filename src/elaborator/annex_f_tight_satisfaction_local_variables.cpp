@@ -1,7 +1,6 @@
 #include "elaborator/annex_f_tight_satisfaction_local_variables.h"
 
 #include <cstddef>
-#include <memory>
 #include <set>
 #include <string>
 #include <utility>

@@ -1,6 +1,7 @@
 #include "simulator/eval_array.h"
 
 #include <algorithm>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>

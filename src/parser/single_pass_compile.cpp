@@ -1,6 +1,8 @@
 #include "parser/single_pass_compile.h"
 
+#include <filesystem>
 #include <fstream>
+#include <ios>
 #include <sstream>
 #include <string>
 #include <string_view>

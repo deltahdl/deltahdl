@@ -1,7 +1,7 @@
-#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <format>
+#include <initializer_list>
 #include <optional>
 #include <string_view>
 #include <unordered_map>

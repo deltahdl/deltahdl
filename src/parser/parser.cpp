@@ -1,5 +1,7 @@
 #include "parser/parser.h"
 
+#include <algorithm>
+
 #include "common/types.h"
 #include "parser/time_resolve.h"
 

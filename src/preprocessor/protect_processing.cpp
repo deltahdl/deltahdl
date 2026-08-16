@@ -1,6 +1,5 @@
 #include "preprocessor/protect_processing.h"
 
-#include <algorithm>
 #include <cctype>
 #include <cstddef>
 #include <cstdint>

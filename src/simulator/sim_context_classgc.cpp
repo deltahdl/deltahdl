@@ -1,4 +1,5 @@
-#include <algorithm>
+#include <unordered_map>
+#include <unordered_set>
 
 #include "common/diagnostic.h"
 #include "simulator/process.h"

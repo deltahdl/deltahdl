@@ -1,5 +1,7 @@
 #include "elaborator/sensitivity.h"
 
+#include <unordered_set>
+
 #include "common/arena.h"
 #include "elaborator/const_eval.h"
 #include "parser/ast.h"

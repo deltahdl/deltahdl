@@ -1,6 +1,6 @@
+#include <algorithm>
 #include <format>
 #include <unordered_map>
-#include <unordered_set>
 
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"

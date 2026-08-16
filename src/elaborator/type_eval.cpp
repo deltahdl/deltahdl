@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <string>
+#include <unordered_set>
 
 #include "common/arena.h"
 #include "elaborator/const_eval.h"

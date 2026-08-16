@@ -1,3 +1,6 @@
+#include <functional>
+#include <unordered_set>
+
 #include "parser/parser.h"
 
 namespace delta {

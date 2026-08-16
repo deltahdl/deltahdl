@@ -1,6 +1,5 @@
 #include "elaborator/annex_f_vacuity_local_variables.h"
 
-#include <algorithm>
 #include <cstddef>
 #include <memory>
 

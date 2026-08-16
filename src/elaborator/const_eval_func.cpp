@@ -1,6 +1,8 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <optional>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "elaborator/const_eval.h"

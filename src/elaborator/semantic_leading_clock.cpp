@@ -1,7 +1,5 @@
 #include "elaborator/semantic_leading_clock.h"
 
-#include <algorithm>
-#include <set>
 #include <string>
 #include <string_view>
 

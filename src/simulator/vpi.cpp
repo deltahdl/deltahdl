@@ -1,6 +1,5 @@
 #include "simulator/vpi.h"
 
-#include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstdarg>
@@ -9,6 +8,7 @@
 #include <cstdio>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "common/types.h"

@@ -1,5 +1,3 @@
-#include <optional>
-
 #include "parser/parser.h"
 
 namespace delta {

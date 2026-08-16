@@ -1,10 +1,8 @@
 #include "preprocessor/preprocessor.h"
 
-#include <algorithm>
 #include <cctype>
 #include <cstdint>
-#include <fstream>
-#include <sstream>
+#include <functional>
 
 #include "preprocessor/preprocessor_internal.h"
 #include "preprocessor/protect_pragma_line.h"

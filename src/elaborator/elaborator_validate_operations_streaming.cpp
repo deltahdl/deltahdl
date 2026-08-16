@@ -1,7 +1,10 @@
 #include <charconv>
 #include <format>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <system_error>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "common/diagnostic.h"

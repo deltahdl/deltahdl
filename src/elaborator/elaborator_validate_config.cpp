@@ -1,7 +1,6 @@
 #include <algorithm>
 #include <cmath>
 #include <format>
-#include <functional>
 #include <map>
 #include <string>
 #include <unordered_map>

@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <format>
-#include <functional>
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>

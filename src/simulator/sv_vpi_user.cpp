@@ -2,6 +2,8 @@
 
 #include "simulator/sv_vpi_user.h"
 
+#include <optional>
+
 #include "simulator/vpi_coverage.h"
 
 vpiHandle vpi_register_assertion_cb(vpiHandle assertion, PLI_INT32 reason,

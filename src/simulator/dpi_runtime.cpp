@@ -1,8 +1,8 @@
 #include "simulator/dpi_runtime.h"
 
-#include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <list>
 #include <map>
 #include <string>

@@ -1,8 +1,9 @@
 #include "elaborator/const_eval.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <unordered_set>
+#include <optional>
 
 #include "elaborator/const_eval_internal.h"
 #include "lexer/token.h"
