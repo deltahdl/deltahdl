@@ -9,6 +9,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -560,80 +561,6 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
 
 namespace {
 
-// A built-in data-type keyword (logic, bit, int, ...) parsed in expression
-// position — e.g. the type argument of `$bits(logic [7:0])` — is materialized
-// as a `kIdentifier` node carrying the keyword text (see
-// ParseCastOrTypedPattern). Such a node is a type reference, not a value read,
-// so it must never be checked against the value namespace. Mirrors
-// IsCastTypeToken in the expression parser.
-bool IsBuiltinTypeKeyword(std::string_view name) {
-  static constexpr std::string_view kTypeKeywords[] = {
-      "logic",   "bit",      "byte",   "int",       "shortint", "longint",
-      "integer", "reg",      "real",   "shortreal", "realtime", "time",
-      "signed",  "unsigned", "string", "const",     "void"};
-  for (auto kw : kTypeKeywords) {
-    if (name == kw) return true;
-  }
-  return false;
-}
-
-// Collects standalone identifier operands of `e`, deliberately NOT descending
-// into member-access subtrees (so the base of `a.b`, `s.field`, `$root.x`, or
-// `pkg::x` is never collected) and skipping scope-prefixed identifiers. Only
-// the plain `kIdentifier` reads that must resolve to a local declaration
-// survive.
-void CollectBareIdents(const Expr* e, std::vector<const Expr*>& out) {
-  if (!e) return;
-  if (e->kind == ExprKind::kMemberAccess) return;
-  if (e->kind == ExprKind::kIdentifier) {
-    if (e->scope_prefix.empty() && !IsBuiltinTypeKeyword(e->text)) {
-      out.push_back(e);
-    }
-    return;
-  }
-  CollectBareIdents(e->lhs, out);
-  CollectBareIdents(e->rhs, out);
-  CollectBareIdents(e->base, out);
-  CollectBareIdents(e->index, out);
-  CollectBareIdents(e->index_end, out);
-  CollectBareIdents(e->condition, out);
-  CollectBareIdents(e->true_expr, out);
-  CollectBareIdents(e->false_expr, out);
-  CollectBareIdents(e->repeat_count, out);
-  CollectBareIdents(e->with_expr, out);
-  for (const auto* a : e->args) CollectBareIdents(a, out);
-  for (const auto* el : e->elements) CollectBareIdents(el, out);
-}
-
-// True when the module contains a non-std wildcard import or a generate
-// construct, in which case a bare identifier may legally resolve to an imported
-// name or a generated/genvar name the elaborated module's symbol table does not
-// list. Skipping such modules keeps the unresolved-reference check free of
-// false positives.
-bool ModuleSkipsUnresolvedCheck(const ModuleDecl* decl,
-                                const RtlirModule* mod) {
-  // A wildcard import can make ANY name declared in the imported package
-  // locally visible, and the module symbol table does not enumerate those
-  // names, so a bare read cannot be proven unresolved -- skip to avoid false
-  // positives. The auto-injected `import std::*` (see elaborator_module.cpp)
-  // brings in only the small, known std package and must not disable the check.
-  // An EXPLICIT import, by contrast, imports exactly the one named symbol
-  // (§26.3): the check can still run, consulting that finite set of names (see
-  // ValidateUnresolvedReferences), so a reference to a *sibling* package member
-  // that was not imported is correctly rejected.
-  for (const auto& imp : mod->imports) {
-    if (imp.is_wildcard && imp.package_name != "std") return true;
-  }
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kGenerateFor ||
-        item->kind == ModuleItemKind::kGenerateIf ||
-        item->kind == ModuleItemKind::kGenerateCase) {
-      return true;
-    }
-  }
-  return false;
-}
-
 // §6.16/§6.22.5: a string and an integral or real type are type-incompatible —
 // no implicit or explicit cast bridges them — so a direct procedural assignment
 // between a string variable and a numeric variable is an error. The check is
@@ -697,74 +624,22 @@ void CheckStringNumericAssigns(
     CheckStringNumericAssigns(ci.body, var_types, diag);
 }
 
-// Over-approximated set of names that are local to a procedural block: block
-// (begin/end) variable declarations, for-loop control variables, and foreach
-// index variables. Collected flat across the whole block tree without tracking
-// scope boundaries — that can only ever SUPPRESS a diagnostic, never raise one,
-// so a missed boundary is always safe.
-void CollectProcLocalNames(const Stmt* s,
-                           std::unordered_set<std::string_view>& names) {
-  if (!s) return;
-  if (s->kind == StmtKind::kVarDecl && !s->var_name.empty()) {
-    names.insert(s->var_name);
+// §23.9: reports every collected read that names no declaration the reference
+// can reach.
+template <typename Pred>
+void ReportUnresolvedRefs(const std::vector<const Expr*>& refs, Pred declared,
+                          DiagEngine& diag) {
+  for (const auto* e : refs) {
+    if (declared(e->text)) continue;
+    diag.Error(e->range.start,
+               std::format("reference to unresolved identifier '{}'", e->text),
+               Subclause("23.9"));
   }
-  for (auto v : s->foreach_vars) names.insert(v);
-  for (const auto* sub : s->stmts) CollectProcLocalNames(sub, names);
-  for (const auto* sub : s->fork_stmts) CollectProcLocalNames(sub, names);
-  CollectProcLocalNames(s->then_branch, names);
-  CollectProcLocalNames(s->else_branch, names);
-  CollectProcLocalNames(s->body, names);
-  CollectProcLocalNames(s->for_body, names);
-  for (const auto* fi : s->for_inits) {
-    if (fi && fi->lhs && fi->lhs->kind == ExprKind::kIdentifier) {
-      names.insert(fi->lhs->text);
-    }
-    CollectProcLocalNames(fi, names);
-  }
-  for (const auto* fs : s->for_steps) CollectProcLocalNames(fs, names);
-  for (const auto& ci : s->case_items) CollectProcLocalNames(ci.body, names);
 }
 
-// Collects the RHS Expr of every procedural blocking/nonblocking assignment
-// whose ENTIRE rhs is a single bare identifier that is not a literal (null/$),
-// a builtin type keyword, or a block-local name. The caller then rejects any
-// that resolve to no declaration. Restricting to a single-identifier rhs is
-// what keeps this free of false positives: every other identifier-shaped rhs
-// primary that is NOT a value read (a call/tag/stream-size operand, a
-// member/scoped reference) only ever appears INSIDE a larger expression, so it
-// is never the whole rhs.
-void CollectProcSingleIdentRhs(
-    const Stmt* s, const std::unordered_set<std::string_view>& locals,
-    std::vector<const Expr*>& out) {
-  if (!s) return;
-  if (s->kind == StmtKind::kBlockingAssign ||
-      s->kind == StmtKind::kNonblockingAssign) {
-    const Expr* r = s->rhs;
-    if (r && r->kind == ExprKind::kIdentifier && r->scope_prefix.empty() &&
-        r->text != "null" && r->text != "$" && !IsBuiltinTypeKeyword(r->text) &&
-        locals.count(r->text) == 0) {
-      out.push_back(r);
-    }
-  }
-  for (const auto* sub : s->stmts) CollectProcSingleIdentRhs(sub, locals, out);
-  for (const auto* sub : s->fork_stmts)
-    CollectProcSingleIdentRhs(sub, locals, out);
-  CollectProcSingleIdentRhs(s->then_branch, locals, out);
-  CollectProcSingleIdentRhs(s->else_branch, locals, out);
-  CollectProcSingleIdentRhs(s->body, locals, out);
-  CollectProcSingleIdentRhs(s->for_body, locals, out);
-  for (const auto* fi : s->for_inits)
-    CollectProcSingleIdentRhs(fi, locals, out);
-  for (const auto* fs : s->for_steps)
-    CollectProcSingleIdentRhs(fs, locals, out);
-  for (const auto& ci : s->case_items)
-    CollectProcSingleIdentRhs(ci.body, locals, out);
-}
-
-// §6.5/§23.6: rejects an unresolved bare identifier read on a procedural
-// assignment RHS. Block-local names are gathered first so the single-identifier
-// check never flags a block-scoped declaration; `declared` resolves a name
-// against the module/CU scope.
+// §23.9: rejects an unresolved bare identifier read on a procedural assignment
+// RHS. Block-local names are gathered first so a block-scoped declaration is
+// never flagged; `declared` resolves a name against the module/CU scope.
 template <typename Pred>
 void ReportProcUnresolved(const ModuleDecl* decl, Pred declared,
                           DiagEngine& diag) {
@@ -775,14 +650,49 @@ void ReportProcUnresolved(const ModuleDecl* decl, Pred declared,
   std::vector<const Expr*> refs;
   for (const auto* item : decl->items) {
     if (IsProcBodyItem(item->kind)) {
-      CollectProcSingleIdentRhs(item->body, locals, refs);
+      CollectProcRhsIdents(item->body, locals, refs);
     }
   }
-  for (const auto* e : refs) {
-    if (declared(e->text)) continue;
-    diag.Error(e->range.start,
-               std::format("reference to unresolved identifier '{}'", e->text),
-               Subclause("23.9"));
+  ReportUnresolvedRefs(refs, declared, diag);
+}
+
+// §23.9: rejects an unresolved bare identifier read in the initializer of a
+// variable or net declaration. §6.8 writes the initializer as part of the
+// declaration rather than as a statement, so no procedural walk reaches it, and
+// `int q = v;` read a name the module does not declare with nothing said.
+template <typename Pred>
+void ReportDeclInitUnresolved(const ModuleDecl* decl, Pred declared,
+                              DiagEngine& diag) {
+  std::vector<const Expr*> refs;
+  for (const auto* item : decl->items) {
+    bool is_data_decl = item->kind == ModuleItemKind::kVarDecl ||
+                        item->kind == ModuleItemKind::kNetDecl;
+    if (!is_data_decl || item->init_expr == nullptr) continue;
+    CollectBareIdents(item->init_expr, refs);
+  }
+  ReportUnresolvedRefs(refs, declared, diag);
+}
+
+// §23.9: rejects an unresolved bare identifier read in a task or function body.
+// §23.9 lists a task and a function among the scopes an identifier is searched
+// upward from, and rules that the search "shall stop at a module boundary" when
+// the item is a variable, so a subroutine body is held to the boundary exactly
+// as a procedural block of the same module is.
+template <typename Pred>
+void ReportSubroutineUnresolved(const ModuleDecl* decl, Pred declared,
+                                DiagEngine& diag) {
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kTaskDecl &&
+        item->kind != ModuleItemKind::kFunctionDecl) {
+      continue;
+    }
+    std::unordered_set<std::string_view> locals;
+    CollectSubroutineLocalNames(item, locals);
+    std::vector<const Expr*> refs;
+    for (const auto* stmt : item->func_body_stmts) {
+      CollectProcRhsIdents(stmt, locals, refs);
+    }
+    ReportUnresolvedRefs(refs, declared, diag);
   }
 }
 
@@ -901,50 +811,70 @@ static std::unordered_set<std::string_view> ExplicitlyImportedNames(
   return explicit_imported;
 }
 
+// True where any of `pkgs` declares `name`. §26.3 makes every name a
+// wildcard-imported package declares directly visible, so a bare read of one
+// resolves without the package qualifier.
+static bool AnyPackageProvidesName(
+    const CompilationUnit* unit,
+    std::unordered_map<std::string_view, std::unordered_set<std::string_view>>&
+        provided_cache,
+    const std::vector<std::string_view>& pkgs, std::string_view name) {
+  for (auto pkg : pkgs) {
+    if (PackageProvidesName(unit, provided_cache, pkg, name)) return true;
+  }
+  return false;
+}
+
 // Report every bare identifier read by a continuous assignment that names
 // nothing visible in the module.
 template <typename Declared>
 static void ReportContAssignUnresolved(const ModuleDecl* decl,
                                        const Declared& declared,
                                        DiagEngine& diag) {
+  std::vector<const Expr*> refs;
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kContAssign) continue;
-    std::vector<const Expr*> refs;
     CollectBareIdents(item->assign_rhs, refs);
-    for (const auto* e : refs) {
-      if (declared(e->text)) continue;
-      diag.Error(
-          e->range.start,
-          std::format("reference to unresolved identifier '{}'", e->text),
-          Subclause("23.9"));
-    }
   }
+  ReportUnresolvedRefs(refs, declared, diag);
 }
 
 void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
                                               const RtlirModule* mod) {
   if (!mod) return;
 
-  // §6.16/§6.22.5: string<->numeric procedural assignments are
-  // type-incompatible independent of any package imports, so check them before
-  // the import-aware bare-name gate below (which skips modules that carry a
-  // non-std wildcard import).
+  // §6.16/§6.22.5: a string and an integral or real type are
+  // type-incompatible whatever a module imports, so this check answers on its
+  // own and is stated before the §23.9 reads below.
   for (const auto* item : decl->items) {
     if (IsProcBodyItem(item->kind)) {
       CheckStringNumericAssigns(item->body, var_types_, diag_);
     }
   }
 
-  if (ModuleSkipsUnresolvedCheck(decl, mod)) return;
-
   std::unordered_set<std::string_view> explicit_imported =
       ExplicitlyImportedNames(mod);
-  auto declared = [this, &explicit_imported](std::string_view n) {
-    return IsDeclaredNameForRhs(n) || explicit_imported.count(n) != 0;
+  // §26.3 makes every name a wildcard-imported package declares directly
+  // visible, and §23.9 makes a generate block a scope whose declarations the
+  // module's own symbol table does not list. Both used to skip the whole
+  // module, which silenced the check on every other name of it; each is now a
+  // set of names the check consults instead.
+  std::vector<std::string_view> wildcard_packages =
+      WildcardImportedPackages(mod);
+  std::unordered_set<std::string_view> generate_names;
+  CollectModuleGenerateNames(decl->items, generate_names);
+  auto declared = [this, &explicit_imported, &wildcard_packages,
+                   &generate_names](std::string_view n) {
+    return IsDeclaredNameForRhs(n) || explicit_imported.count(n) != 0 ||
+           generate_names.count(n) != 0 ||
+           AnyPackageProvidesName(unit_, pkg_provided_names_, wildcard_packages,
+                                  n);
   };
 
   ReportContAssignUnresolved(decl, declared, diag_);
   ReportProcUnresolved(decl, declared, diag_);
+  ReportDeclInitUnresolved(decl, declared, diag_);
+  ReportSubroutineUnresolved(decl, declared, diag_);
 
   // §26.3: a `pkg::x` scope prefix must name a known package (or a class/type
   // for static-member / type-scope access). cu_scope_names_ holds packages,

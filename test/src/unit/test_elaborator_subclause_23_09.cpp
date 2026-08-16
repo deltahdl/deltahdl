@@ -334,4 +334,143 @@ TEST(ScopeRulesElaboration, SameLocalNameInForkAndEnclosingBlockOk) {
              "endmodule\n"));
 }
 
+// §23.9: "if the item is a variable, it shall stop at a module boundary". `v`
+// is declared in `top` and read in `child`, so the upward search from `child`
+// ends at the module boundary and the read names nothing. The elaborator is
+// silent on this shape today because the collector that gathers bare reads
+// takes a single identifier standing alone as the whole right-hand side, and
+// here `v` sits inside the larger expression `v + 0`.
+TEST(ScopeRulesElaboration,
+     DirectVariableReadInExpressionStopsAtModuleBoundary) {
+  ElabFixture f;
+  ElabOk(
+      "module child;\n"
+      "  integer r;\n"
+      "  initial begin\n"
+      "    r = v + 0;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  integer v;\n"
+      "  child u1();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "unresolved identifier 'v'",
+                            4, "23.9"));
+}
+
+// §23.9: "if the item is a variable, it shall stop at a module boundary". The
+// read is the initializer of a module-item declaration rather than a statement,
+// and `v` is declared only in `top`, so the search from `child` stops at the
+// boundary. The elaborator is silent on this shape today because a declaration
+// initializer is visited by no collector: the walk gathers reads from
+// statements and never descends into the expression a declaration carries.
+TEST(ScopeRulesElaboration,
+     DirectVariableReadInDeclarationInitializerStopsAtModuleBoundary) {
+  ElabFixture f;
+  ElabOk(
+      "module child;\n"
+      "  int q = v;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  integer v;\n"
+      "  child u1();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "unresolved identifier 'v'",
+                            2, "23.9"));
+}
+
+// §23.9: "if the item is a variable, it shall stop at a module boundary". The
+// rule holds for a read written in a task body as much as for one written in an
+// initial procedure, since the boundary the search stops at is the module's and
+// not the statement's. The elaborator is silent on this shape today because a
+// task body is a context the module-item walk does not enter: it reaches the
+// task's declaration and stops there rather than walking the statements inside.
+TEST(ScopeRulesElaboration, DirectVariableReadInTaskBodyStopsAtModuleBoundary) {
+  ElabFixture f;
+  ElabOk(
+      "module child;\n"
+      "  integer r;\n"
+      "  task t();\n"
+      "    r = v;\n"
+      "  endtask\n"
+      "endmodule\n"
+      "module top;\n"
+      "  integer v;\n"
+      "  child u1();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "unresolved identifier 'v'",
+                            4, "23.9"));
+}
+
+// §23.9: "if the item is a variable, it shall stop at a module boundary". The
+// read stands in an initial procedure written directly in `child`, beside a for
+// generate construct that has nothing to do with it, and `v` is declared only
+// in `top`. The elaborator is silent on this shape today because a module
+// holding a generate construct is skipped whole: the presence of the generate
+// item takes the whole module out of the walk, so the reads written outside it
+// are never collected either.
+TEST(ScopeRulesElaboration,
+     DirectVariableReadStopsAtModuleBoundaryInModuleHoldingGenerateFor) {
+  ElabFixture f;
+  ElabOk(
+      "module child;\n"
+      "  integer r;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 2; i = i + 1) begin : g\n"
+      "    wire w;\n"
+      "  end\n"
+      "  initial r = v;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  integer v;\n"
+      "  child u1();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "unresolved identifier 'v'",
+                            7, "23.9"));
+}
+
+// §23.9 stops the upward search for a variable at the module boundary, and a
+// name a wildcard import supplies is not reached by that search at all: §26.3
+// makes `pv` a candidate for the bare name in `m` without `pv` being declared
+// in any scope the search walks. This holds the widening honest on the import
+// half, where a collector that reports every bare name it cannot find in an
+// enclosing scope would reject a legal source.
+TEST(ScopeRulesElaboration, BareNameSuppliedByAWildcardImportIsStillAccepted) {
+  EXPECT_TRUE(
+      ElabOk("package p;\n"
+             "  int pv;\n"
+             "endpackage\n"
+             "module m;\n"
+             "  import p::*;\n"
+             "  integer r;\n"
+             "  initial begin\n"
+             "    r = pv + 0;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// §23.9 stops the upward search at the module boundary, not below it: a
+// generate block is a scope inside the module, so a name declared there is
+// found by a search starting inside that block and `r` is found by continuing
+// upward to the module. This holds the widening honest on the generate half,
+// where a collector that reads a module's declarations alone would take `gv`
+// for a name nothing declares.
+TEST(ScopeRulesElaboration, BareNameDeclaredInAGenerateBlockIsStillAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  integer r;\n"
+             "  genvar i;\n"
+             "  for (i = 0; i < 2; i = i + 1) begin : g\n"
+             "    integer gv;\n"
+             "    initial begin\n"
+             "      r = gv + 0;\n"
+             "    end\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
 }  // namespace
