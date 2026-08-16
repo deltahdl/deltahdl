@@ -160,9 +160,22 @@ static uint32_t PatternBitLit(const LowerCtx& ctx, const DecodedPattern& pat,
   return ctx.synth.LowerExprBit(pat.pat, ctx.aig, b);
 }
 
+// True for the value range §11.4.13 writes as `[lo:hi]`.
+// Parser::ParseInsideValueRange at src/parser/expr_parser_patterns.cpp:65
+// builds it as an ExprKind::kSelect carrying both bounds and no base, which is
+// what tells it from a bit-select or part-select of a signal. Compared bit for
+// bit it would answer no run of bits, and so constant false at every position,
+// making the item match exactly where the selector is zero.
+static bool IsValueRange(const Expr* pat) {
+  return pat->kind == ExprKind::kSelect && pat->base == nullptr;
+}
+
 uint32_t BuildPatternMatch(const Expr* sel_expr, const Expr* pat,
                            const LowerCtx& ctx, uint32_t sel_width,
                            TokenKind case_kind) {
+  if (IsValueRange(pat)) {
+    return ctx.synth.LowerInsideRangeMatch(sel_expr, pat, ctx.aig, sel_width);
+  }
   DecodedPattern dp{pat, PatternBits{},
                     (case_kind != TokenKind::kKwCase) &&
                         (pat->kind == ExprKind::kIntegerLiteral)};

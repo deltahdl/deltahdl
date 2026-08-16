@@ -51,6 +51,16 @@ class SynthLower {
 
   uint32_t LowerExprBit(const Expr* expr, AigGraph& aig, uint32_t bit);
 
+  // §11.4.13: the literal answering whether `sel_expr` lies within the value
+  // range `range`, both bounds included. `range` is the baseless
+  // ExprKind::kSelect Parser::ParseInsideValueRange builds for `[lo:hi]`.
+  // Reports the range and answers constant false for a bound with no value to
+  // compare against: the `$` §11.4.13 admits, and the `+/-` and `+%-` forms,
+  // whose second operand is a tolerance rather than an upper bound. Public
+  // because BuildPatternMatch reaches it through LowerCtx::synth.
+  uint32_t LowerInsideRangeMatch(const Expr* sel_expr, const Expr* range,
+                                 AigGraph& aig, uint32_t width);
+
   bool CheckStmtSynthesizable(const Stmt* stmt);
   bool CheckExprSynthesizable(const Expr* expr);
 

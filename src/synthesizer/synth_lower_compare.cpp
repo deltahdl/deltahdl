@@ -168,6 +168,53 @@ uint32_t SynthLower::CompareAtLeast(const Expr* lhs, const Expr* rhs,
   return carry;
 }
 
+// True for a bound that names no value the netlist can compare against.
+// §11.4.13 admits `$` as a bound, which stands for the extreme of the
+// expression's range rather than for a number, and Parser::ParsePrimary at
+// src/parser/expr_parser.cpp:537 hands it over as an identifier written `$`.
+static bool IsUnboundedRangeBound(const Expr* bound) {
+  return bound == nullptr ||
+         (bound->kind == ExprKind::kIdentifier && bound->text == "$");
+}
+
+uint32_t SynthLower::LowerInsideRangeMatch(const Expr* sel_expr,
+                                           const Expr* range, AigGraph& aig,
+                                           uint32_t width) {
+  // §11.4.13 writes three value ranges. Only `[lo:hi]` states two bounds; the
+  // `[expr +/- expr]` and `[expr +%- expr]` forms state a centre and a
+  // tolerance, which Parser::ParseInsideValueRange records by setting Expr::op
+  // to the operator it read. Comparing against the tolerance as though it were
+  // an upper bound would answer a range the source did not write.
+  if (range->op != TokenKind::kEof) {
+    ReportExprUnlowered(range,
+                        "a value range written with a tolerance has no "
+                        "lowering in the synthesizer",
+                        Subclause("11.4.13"));
+    return AigGraph::kConstFalse;
+  }
+  if (IsUnboundedRangeBound(range->index) ||
+      IsUnboundedRangeBound(range->index_end)) {
+    ReportExprUnlowered(range,
+                        "a value range bounded by '$' has no lowering in the "
+                        "synthesizer",
+                        Subclause("11.4.13"));
+    return AigGraph::kConstFalse;
+  }
+  // §11.4.13 rules that the membership operator is true where the expression
+  // equals one of the values the range holds, which for `[lo:hi]` is where it
+  // is at least lo and at most hi. Both halves are the §11.4.4 comparison
+  // CompareAtLeast answers, the upper one with the operands exchanged, which is
+  // how LowerCompareMatch builds `a <= b` out of `b >= a`.
+  bool is_signed = IsSignedSignal(sel_expr->text) &&
+                   IsSignedSignal(range->index->text) &&
+                   IsSignedSignal(range->index_end->text);
+  uint32_t at_least =
+      CompareAtLeast(sel_expr, range->index, aig, width, is_signed);
+  uint32_t at_most =
+      CompareAtLeast(range->index_end, sel_expr, aig, width, is_signed);
+  return aig.AddAnd(at_least, at_most);
+}
+
 void SynthLower::ReportWildcardUnlowered(const Expr* expr) {
   // §11.4.6 rules that the x and z values of the right operand act as
   // wildcards, and the digits of a literal are the only place this synthesizer

@@ -761,6 +761,14 @@ void SynthLower::LowerCaseStmt(const Stmt* stmt, AigGraph& aig) {
   auto result_bits = signal_bits_;
 
   uint32_t sel_width = SignalWidth(stmt->condition->text);
+  // §12.5.4 rules that "the inside operator uses asymmetric wildcard matching
+  // (see 11.4.6)" and that each case_item_expression is its right operand.
+  // §11.4.6 makes both the x and the z of that operand wildcards, which is the
+  // pair TokenKind::kKwCasex asks BuildPatternMatch to read out of an item's
+  // own digits. The asymmetry needs nothing further: the digits are read from
+  // the item, and a selector arrives as AIG literals carrying no x or z at all.
+  TokenKind item_kind =
+      stmt->case_inside ? TokenKind::kKwCasex : stmt->case_kind;
   for (const auto& ci : stmt->case_items) {
     if (ci.is_default) continue;
     signal_bits_ = base_bits;
@@ -771,7 +779,7 @@ void SynthLower::LowerCaseStmt(const Stmt* stmt, AigGraph& aig) {
     LowerCtx ctx{aig, *this};
     for (const auto* pat : ci.patterns) {
       match = aig.AddOr(match, BuildPatternMatch(stmt->condition, pat, ctx,
-                                                 sel_width, stmt->case_kind));
+                                                 sel_width, item_kind));
     }
     MuxCaseBits(result_bits, case_bits, match, aig);
   }
