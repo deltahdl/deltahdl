@@ -166,4 +166,73 @@ TEST(StringLenElaboration, LenOfAnIntegerParameterDoesNotFold) {
       "localparam 'N' initializer is not a constant expression", 3, "6.20.4"));
 }
 
+// §6.16 rules that "A string variable shall not contain the special character
+// "\0". Assigning the value 0 to a string character shall be ignored." So the
+// value of "a\0b" is the two characters "ab", and §6.16.1's count of them is 2.
+//
+// 2 is the number the run time already answers, because Lowerer::LowerParams
+// packs the parameter through StripStringZeros in src/simulator/lowerer.cpp.
+// Before this case the fold answered 3 and the same expression gave different
+// answers in the two places it can be asked.
+TEST(StringLenElaboration, LenIgnoresANulEscapeInTheInitializer) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam string S = \"a\\0b\";\n"
+      "  localparam int N = S.len();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const RtlirParamDecl* n = nullptr;
+  for (const auto& param : design->top_modules[0]->params) {
+    if (param.name == "N") n = &param;
+  }
+  ASSERT_NE(n, nullptr);
+  EXPECT_TRUE(n->is_resolved);
+  EXPECT_EQ(n->resolved_value, 2);
+}
+
+// The same rule reached through the other escape form. §5.6's hex escape and
+// its octal escape are decoded by separate branches of ConstDecodeEscape in
+// src/elaborator/const_eval.cpp, so a repair written into one branch would
+// leave the other counting a character the string does not have.
+TEST(StringLenElaboration, LenIgnoresAHexNulEscapeInTheInitializer) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam string S = \"a\\x00b\";\n"
+      "  localparam int N = S.len();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const RtlirParamDecl* n = nullptr;
+  for (const auto& param : design->top_modules[0]->params) {
+    if (param.name == "N") n = &param;
+  }
+  ASSERT_NE(n, nullptr);
+  EXPECT_TRUE(n->is_resolved);
+  EXPECT_EQ(n->resolved_value, 2);
+}
+
+// An initializer of nothing but the forbidden character. §6.16 rules that "An
+// empty string has zero length", and this is the input where keeping the zero
+// bytes and dropping them differ by the whole of the answer rather than by one.
+TEST(StringLenElaboration, LenOfAnAllNulInitializerIsZero) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam string S = \"\\0\\0\";\n"
+      "  localparam int N = S.len();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const RtlirParamDecl* n = nullptr;
+  for (const auto& param : design->top_modules[0]->params) {
+    if (param.name == "N") n = &param;
+  }
+  ASSERT_NE(n, nullptr);
+  EXPECT_TRUE(n->is_resolved);
+  EXPECT_EQ(n->resolved_value, 0);
+}
+
 }  // namespace

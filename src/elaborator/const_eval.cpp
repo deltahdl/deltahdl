@@ -439,15 +439,23 @@ static bool ConstDecodeEscape(std::string_view text, size_t& i, uint8_t& out) {
 }
 
 // Returns the characters a string literal denotes, with the quotes removed and
-// each escape replaced by the one character it stands for. §6.16 rules that
-// "strings can be of arbitrary length and no truncation occurs" (printed page
-// 112 of IEEE 1800-2023), while the packed form ConstEvalStringLiteral computes
-// keeps only the low 64 bits. A string of more than eight characters is
-// therefore no longer recoverable from that packed value, which is why the
-// characters are kept separately from it. Returns std::nullopt for an
-// expression that is not a string literal. A string literal of no characters
-// returns an empty string rather than std::nullopt, which is what lets §6.16.1
-// -- "if str is "", then str.len() returns 0" -- be answered.
+// each escape replaced by the one character it stands for, except that a zero
+// byte contributes no character at all. §6.16 rules that "A string variable
+// shall not contain the special character "\0". Assigning the value 0 to a
+// string character shall be ignored" (printed page 112 of IEEE 1800-2023), so
+// the value of "a\0b" is the two characters "ab" and its length is 2. Dropping
+// the character rather than reporting it is what the second sentence says to
+// do, and src/simulator/eval_string.cpp does the same thing to the run-time
+// value in StripStringZeros and in StringWriteByte.
+//
+// §6.16 also rules that "strings can be of arbitrary length and no truncation
+// occurs", while the packed form ConstEvalStringLiteral computes keeps only the
+// low 64 bits. A string of more than eight characters is therefore no longer
+// recoverable from that packed value, which is why the characters are kept
+// separately from it. Returns std::nullopt for an expression that is not a
+// string literal. A string literal of no characters returns an empty string
+// rather than std::nullopt, which is what lets §6.16.1 -- "if str is "", then
+// str.len() returns 0" -- be answered.
 std::optional<std::string> ConstEvalString(const Expr* expr) {
   if (!expr || expr->kind != ExprKind::kStringLiteral) return std::nullopt;
   std::string_view text = expr->text;
@@ -465,6 +473,10 @@ std::optional<std::string> ConstEvalString(const Expr* expr) {
     } else {
       byte = static_cast<uint8_t>(text[i]);
     }
+    // §6.16: the character a zero byte would be is the one a string variable
+    // "shall not contain", and it is dropped here rather than at each reader so
+    // that the length, a substr, a getc and an index all see the same value.
+    if (byte == 0) continue;
     chars.push_back(static_cast<char>(byte));
   }
   return chars;
