@@ -1,3 +1,6 @@
+#include <set>
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
@@ -202,98 +205,61 @@ TEST(GenerateElaboration, GenerateIfElseIfChainSelectsFinalElse) {
   EXPECT_FALSE(found_one);
 }
 
-// §27.5: a chain of four alternatives puts a second `else if` past the first,
-// so selecting it proves the else branch is followed as far as its own
-// condition rather than only one step. Without that, SEL = 2 yields alt_one.
-TEST(GenerateElaboration, GenerateIfElseIfChainSelectsSecondElseIf) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module top #(parameter SEL = 2) ();\n"
-      "  if (SEL == 0) begin\n"
-      "    logic [7:0] alt_zero;\n"
-      "  end else if (SEL == 1) begin\n"
-      "    logic [7:0] alt_one;\n"
-      "  end else if (SEL == 2) begin\n"
-      "    logic [7:0] alt_two;\n"
-      "  end else begin\n"
-      "    logic [7:0] alt_last;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  bool found_zero = false, found_one = false, found_two = false,
-       found_last = false;
-  for (const auto& v : mod->variables) {
-    if (v.name == "alt_zero") found_zero = true;
-    if (v.name == "alt_one") found_one = true;
-    if (v.name == "alt_two") found_two = true;
-    if (v.name == "alt_last") found_last = true;
-  }
-  EXPECT_TRUE(found_two);
-  EXPECT_FALSE(found_zero);
-  EXPECT_FALSE(found_one);
-  EXPECT_FALSE(found_last);
+// A chain of four alternatives, each declaring one variable, for the selector
+// given. Four puts a second `else if` past the first, so which one is selected
+// says whether the else branch is followed as far as its own condition or only
+// one step.
+//
+// Built here rather than written out per case because `pmd cpd
+// --minimum-tokens 100`, which the copy-paste-test job runs over test/src/,
+// reports a run repeated at that length, and two copies of this source are
+// already 112 tokens.
+static std::string FourAlternativeChain(int sel) {
+  return "module top #(parameter SEL = " + std::to_string(sel) +
+         ") ();\n"
+         "  if (SEL == 0) begin\n"
+         "    logic [7:0] alt_zero;\n"
+         "  end else if (SEL == 1) begin\n"
+         "    logic [7:0] alt_one;\n"
+         "  end else if (SEL == 2) begin\n"
+         "    logic [7:0] alt_two;\n"
+         "  end else begin\n"
+         "    logic [7:0] alt_last;\n"
+         "  end\n"
+         "endmodule\n";
 }
 
-// §27.5: the final else of a four-alternative chain is reached only after two
-// `else if` conditions have both been evaluated and both answered false.
+// Every name the elaborated module's variables carry. §27.5 instantiates "at
+// most one" of the alternative generate blocks and each alternative declares
+// one variable, so the whole set states both how many blocks were instantiated
+// and which, where a name-at-a-time scan states only that the expected one is
+// present and leaves a second block free to be there too.
+static std::set<std::string> VariableNames(const RtlirModule* mod) {
+  std::set<std::string> names;
+  for (const auto& v : mod->variables) names.insert(std::string(v.name));
+  return names;
+}
+
+// §27.5: selecting the second `else if` needs both the first `else if`
+// condition evaluated and answered false and the second evaluated and answered
+// true. Reaching the else branch only one step deep yields alt_one instead.
+TEST(GenerateElaboration, GenerateIfElseIfChainSelectsSecondElseIf) {
+  ElabFixture f;
+  auto* design = Elaborate(FourAlternativeChain(2), f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  EXPECT_EQ(VariableNames(mod), (std::set<std::string>{"alt_two"}));
+}
+
+// §27.5: the final else of a four-alternative chain is reached only after both
+// `else if` conditions have been evaluated and both answered false.
 TEST(GenerateElaboration,
      GenerateIfElseIfChainSelectsFinalElseOfFourAlternatives) {
   ElabFixture f;
-  auto* design = Elaborate(
-      "module top #(parameter SEL = 3) ();\n"
-      "  if (SEL == 0) begin\n"
-      "    logic [7:0] alt_zero;\n"
-      "  end else if (SEL == 1) begin\n"
-      "    logic [7:0] alt_one;\n"
-      "  end else if (SEL == 2) begin\n"
-      "    logic [7:0] alt_two;\n"
-      "  end else begin\n"
-      "    logic [7:0] alt_last;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto* design = Elaborate(FourAlternativeChain(3), f);
   ASSERT_NE(design, nullptr);
   auto* mod = design->top_modules[0];
-  bool found_zero = false, found_one = false, found_two = false,
-       found_last = false;
-  for (const auto& v : mod->variables) {
-    if (v.name == "alt_zero") found_zero = true;
-    if (v.name == "alt_one") found_one = true;
-    if (v.name == "alt_two") found_two = true;
-    if (v.name == "alt_last") found_last = true;
-  }
-  EXPECT_TRUE(found_last);
-  EXPECT_FALSE(found_zero);
-  EXPECT_FALSE(found_one);
-  EXPECT_FALSE(found_two);
-}
-
-// §27.5 instantiates "at most one" of the alternative generate blocks, which is
-// a separate claim from which one it picks: a chain that elaborated the
-// selected block and a further one would satisfy every name check above.
-// One variable is declared per alternative, so the count of
-// RtlirModule::variables is the count of blocks instantiated.
-TEST(GenerateElaboration,
-     GenerateIfElseIfChainInstantiatesExactlyOneAlternative) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module top #(parameter SEL = 2) ();\n"
-      "  if (SEL == 0) begin\n"
-      "    logic [7:0] alt_zero;\n"
-      "  end else if (SEL == 1) begin\n"
-      "    logic [7:0] alt_one;\n"
-      "  end else if (SEL == 2) begin\n"
-      "    logic [7:0] alt_two;\n"
-      "  end else begin\n"
-      "    logic [7:0] alt_last;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  EXPECT_EQ(mod->variables.size(), 1u);
+  EXPECT_EQ(VariableNames(mod), (std::set<std::string>{"alt_last"}));
 }
 
 TEST(GenerateElaboration, GenerateCaseMultiplePatternsPerItem) {
