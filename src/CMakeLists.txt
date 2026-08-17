@@ -44,6 +44,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     lexer/lexer.cpp
     lexer/string_escape.cpp
     parser/parser.cpp
+    parser/parser_timeunit.cpp
     parser/parser_port.cpp
     parser/parser_dpi_validate.cpp
     parser/parser_declaration.cpp
