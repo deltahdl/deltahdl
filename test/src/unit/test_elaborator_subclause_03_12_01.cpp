@@ -343,6 +343,118 @@ const RtlirModule* SoleTopModule(RtlirDesign* design) {
   return design->top_modules[0];
 }
 
+TEST(CompilationUnitScopeAcrossCommandLineFiles,
+     PackageImportedInOneFileResolvesATypeDeclaredInAnother) {
+  // §26.3: an import declaration "allows identifiers declared within packages
+  // to be visible within the current scope without a package name qualifier",
+  // and §26.3 requires only that "The compilation of a package shall precede
+  // the compilation of scopes in which the package is imported", which a
+  // command line naming the package's file first satisfies. The import put
+  // nothing back while the package's own entry stayed with the parse that read
+  // it, so `byte_t b;` was read as an instantiation of a module called byte_t.
+  ScratchDir tmp;
+  tmp.Write("lib.map", kLibMap);
+  auto pkg = tmp.Write("src/pkg.sv",
+                       "package p;\n"
+                       "  typedef logic [7:0] byte_t;\n"
+                       "endpackage\n");
+  auto top = tmp.Write("src/top.sv",
+                       "module top;\n"
+                       "  import p::*;\n"
+                       "  byte_t b;\n"
+                       "endmodule\n");
+
+  CommandLineHarness h;
+  const auto* mod =
+      SoleTopModule(CompileCommandLineAndElaborate(h, tmp, {pkg, top}, ""));
+  EXPECT_FALSE(h.diag.HasErrors());
+  ASSERT_NE(mod, nullptr);
+  ASSERT_EQ(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 8u);
+}
+
+TEST(CompilationUnitScopeAcrossCommandLineFiles,
+     ExplicitPackageImportResolvesATypeDeclaredInAnotherFile) {
+  // §26.3's explicit form, which hands over the one name it writes rather than
+  // every name the package declared. Parser::ApplyImportedTypeNames reaches it
+  // by a different arm from the wildcard, so a repair carrying only one of them
+  // would leave this reading as an instantiation.
+  ScratchDir tmp;
+  tmp.Write("lib.map", kLibMap);
+  auto pkg = tmp.Write("src/pkg.sv",
+                       "package p;\n"
+                       "  typedef logic [7:0] byte_t;\n"
+                       "endpackage\n");
+  auto top = tmp.Write("src/top.sv",
+                       "module top;\n"
+                       "  import p::byte_t;\n"
+                       "  byte_t b;\n"
+                       "endmodule\n");
+
+  CommandLineHarness h;
+  const auto* mod =
+      SoleTopModule(CompileCommandLineAndElaborate(h, tmp, {pkg, top}, ""));
+  EXPECT_FALSE(h.diag.HasErrors());
+  ASSERT_NE(mod, nullptr);
+  ASSERT_EQ(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 8u);
+}
+
+TEST(CompilationUnitScopeAcrossCommandLineFiles,
+     ScopedPackageTypeNameResolvesAcrossFiles) {
+  // The same type reached by its qualified name instead, which needs no import
+  // and so no package entry. It is here to separate the two: a repair that
+  // carried the package entries would be credited with this case whether it
+  // worked or not, and this says the qualified spelling was never the one that
+  // failed.
+  ScratchDir tmp;
+  tmp.Write("lib.map", kLibMap);
+  auto pkg = tmp.Write("src/pkg.sv",
+                       "package p;\n"
+                       "  typedef logic [7:0] byte_t;\n"
+                       "endpackage\n");
+  auto top = tmp.Write("src/top.sv",
+                       "module top;\n"
+                       "  p::byte_t b;\n"
+                       "endmodule\n");
+
+  CommandLineHarness h;
+  const auto* mod =
+      SoleTopModule(CompileCommandLineAndElaborate(h, tmp, {pkg, top}, ""));
+  EXPECT_FALSE(h.diag.HasErrors());
+  ASSERT_NE(mod, nullptr);
+  ASSERT_EQ(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 8u);
+}
+
+TEST(CompilationUnitScopeAcrossCommandLineFiles,
+     ClassExtendedInOneFileTakesTheTypeNamesOfABaseInAnother) {
+  // §8.13's extends clause gives a derived class the names its base declared,
+  // and Parser::ParseClassDecl puts them back from the entry it kept when the
+  // base's body closed. That entry is the class half of the same scope the
+  // package half above is in, so it crosses for the same reason and was lost
+  // for the same reason.
+  ScratchDir tmp;
+  tmp.Write("lib.map", kLibMap);
+  auto base = tmp.Write("src/base.sv",
+                        "class B;\n"
+                        "  typedef int t;\n"
+                        "endclass\n");
+  auto derived = tmp.Write("src/derived.sv",
+                           "class D extends B;\n"
+                           "  t x;\n"
+                           "endclass\n"
+                           "module top;\n"
+                           "endmodule\n");
+
+  CommandLineHarness h;
+  const auto* mod = SoleTopModule(
+      CompileCommandLineAndElaborate(h, tmp, {base, derived}, ""));
+  EXPECT_FALSE(h.diag.HasErrors());
+  ASSERT_NE(mod, nullptr);
+  EXPECT_EQ(mod->name, "top");
+}
+
 }  // namespace
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,

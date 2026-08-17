@@ -82,9 +82,9 @@ class SinglePassCompiler {
     CompilationUnit* parsed = nullptr;
     std::vector<WrittenCell> cells;
     // What the compilation-unit scope held when this description's parse
-    // finished. Kept so that skipping a recompile contributes the same type
-    // names to the files after it that compiling would have.
-    ScopeTypeNames cu_type_names;
+    // finished. Kept so that skipping a recompile contributes the same names to
+    // the files after it that compiling would have.
+    CompilationUnitScopeNames cu_scope;
   };
 
   // True when every cell `prior` wrote is still the cell its library holds
@@ -106,10 +106,10 @@ class SinglePassCompiler {
   // §3.12.1 case a): the compilation-unit scope the command line has built up
   // so far. Every description is parsed knowing it, because whether an
   // identifier names a type decides how the declaration after it parses, and a
-  // typedef or class one file wrote outside every design element is a type name
-  // in the next. CompileCommandLine empties it, since a new command line is a
-  // new compilation unit.
-  ScopeTypeNames cu_type_names_;
+  // typedef, class or package one file declared is what a later file's
+  // declaration, extends clause or import refers to. CompileCommandLine empties
+  // it, since a new command line is a new compilation unit.
+  CompilationUnitScopeNames cu_scope_;
 };
 
 }  // namespace delta

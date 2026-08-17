@@ -44,19 +44,26 @@ class Parser {
   // compilation-unit scope from one file's parse to the next: without them a
   // later file reads `byte_t b;` as an instantiation of a module called byte_t,
   // because whether an identifier names a type decides how the declaration
-  // after it parses.
+  // after it parses, and `import p::*;` puts nothing back because the parse has
+  // never heard of p.
   //
-  // Call AdoptCompilationUnitTypeNames before Parse and read
-  // CompilationUnitTypeNames after it. What it answers with is the
-  // compilation-unit scope and nothing narrower: every design element's own
-  // type names were taken back out by its TypeNameScope at its closing keyword,
-  // which is what makes the set safe to carry into a file that never saw that
-  // design element.
-  void AdoptCompilationUnitTypeNames(const ScopeTypeNames& names) {
-    AdoptTypeNames(names);
+  // Call AdoptCompilationUnitScope before Parse and read CompilationUnitScope
+  // after it. What the second answers with is the compilation-unit scope and
+  // nothing narrower: every design element's own type names were taken back out
+  // by its TypeNameScope at its closing keyword, which is what makes the set
+  // safe to carry into a file that never saw that design element. The package
+  // and class entries are what §26.3's import declaration and §8.13's extends
+  // clause put back, and they are kept past their scope's closing keyword for
+  // exactly that reason, so they are carried whole.
+  void AdoptCompilationUnitScope(const CompilationUnitScopeNames& names) {
+    AdoptTypeNames(names.own);
+    package_types_.insert(names.packages.begin(), names.packages.end());
+    class_types_.insert(names.classes.begin(), names.classes.end());
   }
-  ScopeTypeNames CompilationUnitTypeNames() const {
-    return ScopeTypeNames{known_types_, known_nettypes_};
+  CompilationUnitScopeNames CompilationUnitScope() const {
+    return CompilationUnitScopeNames{
+        ScopeTypeNames{known_types_, known_nettypes_}, package_types_,
+        class_types_};
   }
 
  private:
