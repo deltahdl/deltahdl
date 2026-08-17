@@ -1,5 +1,7 @@
 #include "simulator/lowerer.h"
 
+#include <algorithm>
+#include <cstring>
 #include <string>
 #include <string_view>
 #include <unordered_set>

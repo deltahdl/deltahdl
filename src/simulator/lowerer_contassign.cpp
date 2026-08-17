@@ -15,6 +15,7 @@
 // ScheduleProcess, which src/simulator/lowerer.h declares because §9.2's
 // procedures and §10.3's assignments are started the same way.
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <unordered_set>
@@ -32,6 +33,7 @@
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
+#include "simulator/stmt_exec.h"
 
 namespace delta {
 
