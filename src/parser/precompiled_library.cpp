@@ -96,6 +96,11 @@ void DiscardPartialRecord(const std::filesystem::path& path,
   std::filesystem::resize_file(path, previous_size, ec);
 }
 
+// Records which library the record's declarations were compiled into, on every
+// kind of declaration AppendCellDeclarations moves. The two lists have to
+// agree: a cell reaches a bind through FindNamedInLibrary, which matches on the
+// library name as well as the cell name, so a declaration moved onto the target
+// without a library tag is a declaration no bind can name.
 void TagCells(CompilationUnit& cu, std::string_view library, Arena& arena) {
   auto* buf = static_cast<char*>(arena.Allocate(library.size(), 1));
   std::copy_n(library.data(), library.size(), buf);
@@ -103,6 +108,7 @@ void TagCells(CompilationUnit& cu, std::string_view library, Arena& arena) {
   for (auto* m : cu.modules) m->library = view;
   for (auto* i : cu.interfaces) i->library = view;
   for (auto* p : cu.programs) p->library = view;
+  for (auto* c : cu.checkers) c->library = view;
   for (auto* u : cu.udps) u->library = view;
   for (auto* p : cu.packages) p->library = view;
   for (auto* c : cu.configs) c->library = view;

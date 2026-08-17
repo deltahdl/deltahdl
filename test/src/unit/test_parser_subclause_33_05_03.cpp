@@ -48,6 +48,17 @@ TEST(SeparateCompilationTool, SaveFailsWhenLocationUnwritable) {
   EXPECT_FALSE(fs::exists(path, ec));
 }
 
+// Every cell kind, which §33.2.1 makes every design element §3.2 defines: "a
+// cell is a design element (see 3.2)", and §3.2 names a module, program,
+// interface, checker, package, primitive and configuration. The checker is
+// declared here because it is a cell like the other six and was reaching no
+// loaded unit at all, which left this case asserting six of the seven kinds its
+// name claims.
+//
+// The library tag is asserted for each kind alongside the count. A bind reaches
+// a cell by library name as well as by cell name, so a declaration that arrived
+// untagged is a declaration no design can instantiate, and the count alone does
+// not tell the two apart.
 TEST(SeparateCompilationTool, AllCellKindsRoundTrip) {
   ScratchDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
@@ -58,6 +69,9 @@ TEST(SeparateCompilationTool, AllCellKindsRoundTrip) {
                                "endinterface\n"
                                "program p;\n"
                                "endprogram\n"
+                               "checker chk;\n"
+                               "  logic flag = 0;\n"
+                               "endchecker\n"
                                "primitive u(output o, input a);\n"
                                "  table\n"
                                "    0 : 0;\n"
@@ -80,12 +94,14 @@ TEST(SeparateCompilationTool, AllCellKindsRoundTrip) {
   ASSERT_EQ(target.modules.size(), 1u);
   ASSERT_EQ(target.interfaces.size(), 1u);
   ASSERT_EQ(target.programs.size(), 1u);
+  ASSERT_EQ(target.checkers.size(), 1u);
   ASSERT_EQ(target.udps.size(), 1u);
   ASSERT_EQ(target.packages.size(), 1u);
   ASSERT_EQ(target.configs.size(), 1u);
   EXPECT_EQ(target.modules[0]->library, "rtlLib");
   EXPECT_EQ(target.interfaces[0]->library, "rtlLib");
   EXPECT_EQ(target.programs[0]->library, "rtlLib");
+  EXPECT_EQ(target.checkers[0]->library, "rtlLib");
   EXPECT_EQ(target.udps[0]->library, "rtlLib");
   EXPECT_EQ(target.packages[0]->library, "rtlLib");
   EXPECT_EQ(target.configs[0]->library, "rtlLib");

@@ -159,14 +159,33 @@ inline void MarkCellModules(CompilationUnit* cu,
   }
 }
 
-// §33.2.1: the design elements that count as cells -- modules, primitives,
-// interfaces, programs, packages, and configurations. Moving them from one
-// compilation unit onto another is what makes a separately parsed source
-// description part of the unit a design is bound against, so every path that
-// assembles a unit out of more than one parse shares this step rather than
-// restating which element kinds a library holds. Nothing is copied: the
-// declarations stay in the arena that parsed them and the target gains
+// Every design element §3.2 defines, which is what §33.2.1 makes a cell.
+// Moving them from one compilation unit onto another is what makes a separately
+// parsed source description part of the unit a design is bound against, so
+// every path that assembles a unit out of more than one parse shares this step
+// rather than restating which element kinds a library holds. Nothing is copied:
+// the declarations stay in the arena that parsed them and the target gains
 // pointers to them.
+//
+// §33.2.1 rules that "a library is a named collection of cells" and that "a
+// cell is a design element (see 3.2), such as a module, primitive, interface,
+// program, package, or configuration". Its six are introduced by "such as", and
+// the definition it defers to is §3.2's, which names seven: "a SystemVerilog
+// module (see Clause 23), program (see Clause 24), interface (see Clause 25),
+// checker (see Clause 17), package (see Clause 26), primitive (see Clause 28)
+// or configuration (see Clause 33)". Reading §33.2.1's examples as the whole
+// set is what left the checker out of this function.
+//
+// The lists CompilationUnit holds that are not moved are left behind on
+// purpose, for two different reasons. `classes`, `cu_items`, `bind_directives`
+// and `external_constraints` hold what a source declared outside every design
+// element, and §3.12.1 rules that "items defined in the compilation-unit scope
+// cannot be accessed by name from outside the compilation unit", so they stay
+// with the unit that parsed them. `libraries` and `lib_includes` stay because
+// they are not a source description's to contribute: §33.3.1 has the library
+// map file "automatically read by the parser prior to parsing any source files
+// specified on the command line", and Syntax 33-2 gives library_declaration and
+// include_statement only in library_text.
 inline void AppendCellDeclarations(CompilationUnit& target,
                                    const CompilationUnit& src) {
   target.modules.insert(target.modules.end(), src.modules.begin(),
@@ -175,6 +194,8 @@ inline void AppendCellDeclarations(CompilationUnit& target,
                            src.interfaces.end());
   target.programs.insert(target.programs.end(), src.programs.begin(),
                          src.programs.end());
+  target.checkers.insert(target.checkers.end(), src.checkers.begin(),
+                         src.checkers.end());
   target.udps.insert(target.udps.end(), src.udps.begin(), src.udps.end());
   target.packages.insert(target.packages.end(), src.packages.begin(),
                          src.packages.end());
