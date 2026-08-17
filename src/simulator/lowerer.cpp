@@ -16,6 +16,7 @@
 #include "parser/ast.h"
 #include "simulator/awaiters.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer_child.h"
 #include "simulator/lowerer_register.h"
@@ -631,6 +632,45 @@ void Lowerer::LowerParams(const RtlirModule* mod) {
       rvar->value = MakeLogic4VecVal(arena_, 64, bits);
       rvar->value.is_real = true;
       ctx_.RegisterRealVariable(*full);
+      continue;
+    }
+    // §6.16: a parameter declared string holds a value of arbitrary length, and
+    // the subclause rules that for it "no truncation occurs". Neither half of
+    // the lowering below can honour that. EvalTypeWidth gives kString no width,
+    // so decl_width is 0 and the fallback takes 32, keeping four characters of
+    // the ten in §6.16's own example `parameter string default_name = "John
+    // Smith"`; and resolved_value is 64 bits, which is why the characters are
+    // read from resolved_string instead. StringToLogic4Vec packs one byte per
+    // character with the leftmost character in the most significant byte, and
+    // StripStringZeros drops the "\0" §6.16 forbids a string to contain,
+    // leaving a value exactly as wide as the characters need. Registering the
+    // variable as a string is the same second half the real arm above has,
+    // because what reads a string reads SimContext::IsStringVariable rather
+    // than the width.
+    //
+    // from_override excludes a parameter whose value an override replaced,
+    // because for such a parameter resolved_string holds the characters of the
+    // declaration's own initializer and not the ones it now has.
+    // Elaborator::ParamList carries an int64_t, so no override path records
+    // characters at all: Elaborator::ElaborateParamPortList already withholds
+    // RecordStringParamValue from an overridden parameter at
+    // elaborator_module.cpp, while Elaborator::ElaborateParamDecl records it
+    // unconditionally and a defparam then overwrites resolved_value alone. The
+    // fallback below reads resolved_value, which every override does write, so
+    // an overridden string parameter keeps the value its override gave it.
+    // #3177 is what makes those characters survive.
+    if (p.is_string_value && !p.from_override) {
+      auto chars = StripStringZeros(
+          StringToLogic4Vec(arena_, p.resolved_string), arena_);
+      auto* svar = ctx_.CreateVariable(*full, chars.width);
+      svar->value = chars;
+      ctx_.RegisterStringVariable(*full);
+      // §21.7.5: Table 21-11 gives string no row, and §21.7.2.3 rules that a
+      // $var's size "specifies how many bits are in the variable", which no
+      // size states for a value whose length §6.16 lets vary. SimContext
+      // decides that by the declared kind, so without this the parameter is
+      // dumped with a $var size that follows its character count.
+      ctx_.SetVcdVarKind(*full, DataTypeKind::kString);
       continue;
     }
     // Use declared width if parameter has explicit type, else 32 (§10.8

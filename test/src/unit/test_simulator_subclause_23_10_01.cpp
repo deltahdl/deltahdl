@@ -55,4 +55,31 @@ TEST(DefparamSimulation, LastDefparamVisibleAtRuntime) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
+// A defparam over a string parameter declared as a module item, which is the
+// one shape where Elaborator::ElaborateParamDecl has already recorded the
+// declaration's own characters in RtlirParamDecl::resolved_string by the time
+// the defparam replaces resolved_value. Lowerer::LowerParams reads
+// resolved_string for a string parameter, so a lowering that read it here
+// would run the design with "abc" -- the value the defparam overrode -- and
+// report nothing.
+TEST(DefparamSimulation, OverriddenStringParameterVisibleAtRuntime) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child;\n"
+      "  parameter string P = \"abc\";\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u();\n"
+      "  defparam u.P = \"xyz\";\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("u.P");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(Logic4VecToString(var->value), "xyz");
+}
+
 }  // namespace

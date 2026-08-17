@@ -482,4 +482,57 @@ TEST(StringDataType, RelationalLessThanWithStringLiteralOperand) {
   EXPECT_EQ(r->value.ToUint64(), 1u);
 }
 
+// §6.16 (printed page 112): "When using the string data type instead of an
+// integral variable, strings can be of arbitrary length and no truncation
+// occurs." The source is the declaration §6.16 gives as its own example,
+// `parameter string default_name = "John Smith"`, and ten characters is long
+// enough to fail both ways the value used to be cut: the §11.10 fold into
+// RtlirParamDecl::resolved_value keeps the low eight, and the 32-bit fallback
+// in Lowerer::LowerParams kept four of those, printing `mith`.
+TEST(StringDataType,
+     StringParameterLongerThanFourCharactersKeepsEveryCharacter) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  parameter string NAME = \"John Smith\";\n"
+      "  initial $display(\"%s\", NAME);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "John Smith\n");
+}
+
+// §6.16: five characters is the first length the 32-bit fallback truncated, so
+// this is the case that goes red the moment the boundary moves by one
+// character. Every string parameter the other §6.16 simulator tests declare is
+// four characters or fewer -- "cat", "ff", "7.5", "p.vc" -- and at that length
+// a lowering that truncates to 32 bits and one that does not produce the same
+// value, so none of them can fail whether the behaviour exists or not.
+TEST(StringDataType,
+     StringParameterOfExactlyFiveCharactersKeepsEveryCharacter) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  parameter string S = \"hello\";\n"
+      "  initial $display(\"%s\", S);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "hello\n");
+}
+
+// §6.16: a string parameter has to be known to be a string at run time and not
+// merely be wide enough to hold one, because SimContext::IsStringVariable is
+// what every string operation consults. A lowering that took the width from the
+// characters without registering the variable would satisfy both length
+// assertions above and still leave the value a packed number.
+TEST(StringDataType, StringParameterIsRegisteredAsAStringVariable) {
+  SimFixture f;
+  auto* p = RunAndFindVar(
+      "module m;\n"
+      "  parameter string NAME = \"John Smith\";\n"
+      "endmodule\n",
+      f, "NAME");
+  ASSERT_NE(p, nullptr);
+  EXPECT_TRUE(f.ctx.IsStringVariable("NAME"));
+}
+
 }  // namespace
