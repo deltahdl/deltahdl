@@ -89,6 +89,22 @@ class TestCollectTests:
             pairs = rst.collect_tests()
         assert not pairs
 
+    def test_every_e2e_source_has_an_expected_file(self, rst: ModuleType) -> None:
+        """Every source in the real e2e directory should be a case.
+
+        collect_tests skips a .sv with no .expected beside it, which is what
+        lets a shared file sit in the directory without being run as a case.
+        The skip is silent, so a source meant as a case and left unpaired
+        asserts nothing and reads as covered. This is the claim that keeps the
+        directory holding nothing the skip could hide, and it is over TEST_DIR
+        itself rather than a fixture because the directory is its subject.
+        """
+        unpaired = [
+            sv.name for sv in sorted(rst.TEST_DIR.glob("*.sv"))
+            if not sv.with_suffix(".expected").exists()
+        ]
+        assert not unpaired
+
 
 class TestRunTest:
     """Tests for the run_test() function."""
