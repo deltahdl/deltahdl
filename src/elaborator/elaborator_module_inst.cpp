@@ -753,19 +753,31 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   // rather than again. The name is registered under the generate prefix that
   // tells those scopes apart; outside a generate block ScopedName hands the
   // name back unchanged, so a repeat at module level is still a redeclaration.
+  //
+  // The same subclause makes each instance of the block "a separate scope and a
+  // new level of hierarchy", so the record of the instantiation has to carry
+  // the scoped name as well as the redeclaration check does. Taking the raw
+  // name for RtlirModuleInst::inst_name and for current_inst_path_ gave every
+  // iteration one name and one instance path, which is what
+  // Lowerer::LowerChildModules keys an instance's declarations on. ScopedName
+  // is asked for the name once and answers all three. The empty check guards
+  // it: ScopedName("") returns the generate prefix itself, which would name an
+  // unnamed instantiation after the block holding it.
+  std::string_view scoped_inst_name =
+      item->inst_name.empty() ? item->inst_name : ScopedName(item->inst_name);
   if (!item->inst_name.empty() &&
-      !declared_names_.insert(ScopedName(item->inst_name)).second) {
+      !declared_names_.insert(scoped_inst_name).second) {
     diag_.Error(item->loc,
                 std::format("redeclaration of '{}'", item->inst_name),
                 Subclause("23.9"));
   }
   RtlirModuleInst inst;
   inst.module_name = item->inst_module;
-  inst.inst_name = item->inst_name;
+  inst.inst_name = scoped_inst_name;
 
   std::string saved_inst_path = current_inst_path_;
   if (!current_inst_path_.empty()) current_inst_path_.push_back('.');
-  current_inst_path_.append(item->inst_name.data(), item->inst_name.size());
+  current_inst_path_.append(scoped_inst_name.data(), scoped_inst_name.size());
 
   // §23.4: a name that resolves out of nested_module_decls_ names a module
   // declared inside this one, which sees this module's names.

@@ -592,4 +592,92 @@ TEST(GenerateElaboration,
                                    "genblk2_5_v"}));
 }
 
+// Every name the module's child instances carry, gathered the way
+// VariableNames above gathers the declarations and for the same reason: two
+// instances that collapse onto one name leave one entry here whichever order
+// the iterations were elaborated in, so the set states both that the names are
+// distinct and what each one is.
+static std::set<std::string> InstanceNames(const RtlirModule* mod) {
+  std::set<std::string> names;
+  for (const auto& child : mod->children)
+    names.insert(std::string(child.inst_name));
+  return names;
+}
+
+// §27.4: a generate block "comprises a separate scope and a new level of
+// hierarchy when it is instantiated", and a named loop generate block "is a
+// declaration of an array of generate block instances" whose "index values in
+// this array are the values assumed by the genvar during elaboration". A module
+// instantiated in the block body is therefore a different instance in every
+// iteration, and RtlirModuleInst::inst_name is where the flattened design has
+// to say so.
+//
+// Recording the name the source wrote gave both iterations `u`, so the two
+// children of `top` shared a name and a hierarchical path and nothing told them
+// apart. GenerateForCreatesInstances above asserts the instance count and not
+// the names, which is why it passed throughout.
+//
+// The loop runs over 4 and 5 rather than 0 and 1 so that no index equals the
+// storage offset of the child it names: at 0 and 1 an implementation writing
+// the offset where §27.4 requires the genvar value would produce the same two
+// names.
+TEST(GenerateElaboration, LoopGenerateBlockNamesEachIterationsInstanceApart) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module sub; endmodule\n"
+      "module top();\n"
+      "  genvar i;\n"
+      "  generate\n"
+      "    for (i = 4; i < 6; i = i + 1) begin : blk\n"
+      "      sub u();\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->children.size(), 2u);
+  EXPECT_EQ(InstanceNames(mod), (std::set<std::string>{"blk_4_u", "blk_5_u"}));
+}
+
+// §27.4: the index alone does not identify an instance, because two loop
+// generate constructs written side by side over one genvar declare two arrays
+// and each "comprises a separate scope". So the block name has to reach the
+// instance name as well as the index does: with the index alone, `blk_a`'s `u`
+// and `blk_b`'s `u` at one iteration are one name, and with the name alone the
+// two iterations of one block are.
+//
+// This is the instance-side counterpart of
+// SiblingNamedBlocksOverOneGenvarNameTheirDeclarationsApart above, which asks
+// the same question of the variable declarations. The indices are 4 and 5 for
+// the reason that case gives.
+TEST(GenerateElaboration,
+     SiblingNamedBlocksOverOneGenvarNameTheirInstancesApart) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module sub; endmodule\n"
+      "module top();\n"
+      "  genvar i;\n"
+      "  generate\n"
+      "    for (i = 4; i < 6; i = i + 1) begin : blk_a\n"
+      "      sub u();\n"
+      "    end\n"
+      "    for (i = 4; i < 6; i = i + 1) begin : blk_b\n"
+      "      sub u();\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->children.size(), 4u);
+  EXPECT_EQ(InstanceNames(mod),
+            (std::set<std::string>{"blk_a_4_u", "blk_a_5_u", "blk_b_4_u",
+                                   "blk_b_5_u"}));
+}
+
 }  // namespace

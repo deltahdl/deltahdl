@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -14,11 +15,18 @@ RtlirParamDecl* FindParamInModule(RtlirModule* mod,
   return nullptr;
 }
 
-RtlirParamDecl* FindParamUnderChild(RtlirModule* parent,
-                                    std::string_view inst_name,
-                                    std::string_view param_name) {
+// The parameter `param_name` of the first child of `parent` that instantiates
+// `module_name`. Selecting the instance by the module it instantiates rather
+// than by its instance name is what keeps a case about what a defparam reaches
+// independent of how a generate block spells the names of the instances inside
+// it: §27.4 gives a generate block a scope of its own, and the name an instance
+// inside one carries in the flattened design is not the simple name the source
+// wrote.
+RtlirParamDecl* FindParamUnderChildOfModule(RtlirModule* parent,
+                                            std::string_view module_name,
+                                            std::string_view param_name) {
   for (auto& child : parent->children) {
-    if (child.inst_name == inst_name && child.resolved) {
+    if (child.module_name == module_name && child.resolved) {
       RtlirParamDecl* p = FindParamInModule(child.resolved, param_name);
       if (p != nullptr) {
         return p;
@@ -112,7 +120,30 @@ TEST(ElaborationOrder, GenerateDrivesFurtherGenerateEvaluationOnNextIteration) {
   EXPECT_EQ(i1->children[0].module_name, "leaf");
 }
 
-TEST(ElaborationOrder, DefparamResolvesTargetCreatedByGenerate) {
+// §27.5: "If the generate block selected for instantiation is not named, it
+// still creates a scope; but the declarations within it cannot be referenced
+// using hierarchical names other than from within the hierarchy instantiated by
+// the generate block itself."
+//
+// `i1` sits inside an unnamed conditional generate block in `outer`, and the
+// defparam is written in `top`, outside the hierarchy that block instantiates.
+// So `u.i1.P` is not a legal hierarchical reference to that parameter and shall
+// not reach it: `P` keeps the 5 its declaration gives it, not the 99 the
+// defparam writes.
+//
+// The elaborator does not reject the source. Elaborator::ResolveDefparamPath
+// (src/elaborator/elaborator_defparam.cpp:84) answers nullptr for a path no
+// child instance matches, Elaborator::ApplyDefparams (:240) skips such a
+// defparam without recording it as applied, and
+// Elaborator::WarnUnresolvedDefparams (:370) then reports every unapplied
+// assignment as a warning under §23.10.1. A warning is not an error, so
+// f.has_errors stays false and ReportedWarning is what names the report.
+//
+// This case asserted the opposite until the instance name inside a generate
+// block carried the block's scope: with `i1` recorded under the simple name the
+// source wrote, the path descended into the block from outside and the override
+// landed.
+TEST(ElaborationOrder, DefparamCannotReachIntoAnUnnamedGenerateBlock) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module inner #(parameter int P = 5)();\n"
@@ -131,10 +162,12 @@ TEST(ElaborationOrder, DefparamResolvesTargetCreatedByGenerate) {
   EXPECT_FALSE(f.has_errors);
   auto* u = design->top_modules[0]->children[0].resolved;
   ASSERT_NE(u, nullptr);
-  RtlirParamDecl* p = FindParamUnderChild(u, "i1", "P");
+  RtlirParamDecl* p = FindParamUnderChildOfModule(u, "inner", "P");
   ASSERT_NE(p, nullptr);
   EXPECT_TRUE(p->is_resolved);
-  EXPECT_EQ(p->resolved_value, 99);
+  EXPECT_EQ(p->resolved_value, 5);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), "defparam target not found",
+                              10, "23.10.1"));
 }
 
 TEST(ElaborationOrder, DesignWithoutGeneratesTerminatesInSinglePass) {
