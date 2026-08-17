@@ -1,0 +1,88 @@
+---
+description: >-
+  Put the googletest archive that test/CMakeLists.txt pins into a directory an
+  actions/cache entry restores, and export DELTAHDL_GOOGLETEST_URL so that the
+  CMake configure which follows reads that copy instead of asking github.com
+  for it. Every job that configures the test tree fetches the same pinned
+  tarball, so without this a push asks github.com for one file once per job
+  and a rate-limit fails a job before it runs a single check. Nothing is
+  pinned here: both the URL and the SHA256 are read out of test/CMakeLists.txt,
+  which is where they are written.
+name: Fetch googletest
+runs:
+  steps:
+    - id: pin
+      name: Read the googletest pin out of test/CMakeLists.txt
+      run: |
+        set -euo pipefail
+        # awk rather than sed because this runs on macOS too, where a sed
+        # script that puts several commands inside one brace group has to be
+        # written across several lines to be accepted.
+        quoted_line_under() {
+          awk -v name="$1" \
+            '$0 == "set(" name {
+               getline
+               gsub(/^ *"|"\)$/, "")
+               print
+               exit
+             }' test/CMakeLists.txt
+        }
+        url=$(quoted_line_under DELTAHDL_GOOGLETEST_URL_DEFAULT)
+        sha=$(quoted_line_under DELTAHDL_GOOGLETEST_SHA256)
+        # An empty match would otherwise cache an empty directory and fetch
+        # nothing, and the configure would fail much later against a URL that
+        # is the empty string, saying nothing about why.
+        if [ -z "${url}" ] || [ -z "${sha}" ]; then
+          echo "::error::test/CMakeLists.txt no longer spells the" \
+            "googletest pin the way this action reads it"
+          exit 1
+        fi
+        echo "sha256=${sha}" >>"${GITHUB_OUTPUT}"
+        echo "url=${url}" >>"${GITHUB_OUTPUT}"
+      shell: bash
+    - name: Restore the googletest archive
+      uses: actions/cache@v5
+      with:
+        key: googletest-${{ steps.pin.outputs.sha256 }}
+        path: .deps
+    - env:
+        EXPECTED_SHA256: ${{ steps.pin.outputs.sha256 }}
+        UPSTREAM_URL: ${{ steps.pin.outputs.url }}
+      name: Download the googletest archive if the cache did not hold it
+      run: |
+        set -euo pipefail
+        archive="${GITHUB_WORKSPACE}/.deps/googletest-${EXPECTED_SHA256}.tar.gz"
+        mkdir -p "$(dirname "${archive}")"
+        # sha256sum ships with coreutils and shasum with perl, and the runners
+        # do not agree on which is present.
+        verify() {
+          if command -v sha256sum >/dev/null 2>&1; then
+            echo "${EXPECTED_SHA256}  ${archive}" | sha256sum --check --status
+          else
+            echo "${EXPECTED_SHA256}  ${archive}" | shasum -a 256 --check --status
+          fi
+        }
+        # A truncated or otherwise wrong cache entry would fail every job that
+        # restored it, and would keep failing until the entry aged out, so
+        # discard it here and fetch the archive again instead.
+        if [ -f "${archive}" ] && ! verify; then
+          echo "::warning::the cached googletest archive is not" \
+            "${EXPECTED_SHA256}; fetching it again"
+          rm -f "${archive}"
+        fi
+        # curl retries 408, 429, 500, 502, 503 and 504 under --retry, and
+        # --retry-all-errors adds the transport failures a degraded github.com
+        # also returns. CMake cannot stand in for this: its download step
+        # retries the six curl transport codes at
+        # Modules/ExternalProject/download.cmake.in:103 and no HTTP status at
+        # all, which is why the 429 and the 503 that failed run 32039919698
+        # were never retried.
+        if [ ! -f "${archive}" ]; then
+          curl --fail --location --silent --show-error \
+            --retry 8 --retry-all-errors --retry-delay 5 --retry-max-time 600 \
+            --output "${archive}" "${UPSTREAM_URL}"
+        fi
+        verify
+        echo "DELTAHDL_GOOGLETEST_URL=file://${archive}" >>"${GITHUB_ENV}"
+      shell: bash
+  using: composite

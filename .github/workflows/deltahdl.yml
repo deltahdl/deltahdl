@@ -717,6 +717,8 @@ jobs:
       # report a lifetime average. Zero them so the figure describes this run.
       - name: Reset ccache statistics
         run: ccache --zero-stats
+      - name: Fetch googletest
+        uses: ./.github/actions/fetch-googletest
       - name: Build
         run: |
           cmake -B build \
@@ -829,6 +831,8 @@ jobs:
       # report a lifetime average. Zero them so the figure describes this run.
       - name: Reset ccache statistics
         run: ccache --zero-stats
+      - name: Fetch googletest
+        uses: ./.github/actions/fetch-googletest
       # The generator chosen here is the one every coverage shard inherits, and
       # a shard asks for its whole slice in one cmake --build naming 137
       # targets. Make takes those as 137 separate goals and re-checks a build
@@ -940,6 +944,8 @@ jobs:
       # report a lifetime average. Zero them so the figure describes this run.
       - name: Reset ccache statistics
         run: ccache --zero-stats
+      - name: Fetch googletest
+        uses: ./.github/actions/fetch-googletest
       - name: Build
         run: |
           cmake -B build \
@@ -1003,6 +1009,8 @@ jobs:
       # report a lifetime average. Zero them so the figure describes this run.
       - name: Reset ccache statistics
         run: ccache --zero-stats
+      - name: Fetch googletest
+        uses: ./.github/actions/fetch-googletest
       - name: Build
         run: |
           cmake -B build \
@@ -1075,6 +1083,8 @@ jobs:
       # report a lifetime average. Zero them so the figure describes this run.
       - name: Reset ccache statistics
         run: ccache --zero-stats
+      - name: Fetch googletest
+        uses: ./.github/actions/fetch-googletest
       - name: Build
         run: |
           cmake -B build \
@@ -1146,6 +1156,8 @@ jobs:
       # report a lifetime average. Zero them so the figure describes this run.
       - name: Reset ccache statistics
         run: ccache --zero-stats
+      - name: Fetch googletest
+        uses: ./.github/actions/fetch-googletest
       - name: Build
         run: |
           cmake -B build \
@@ -1267,6 +1279,8 @@ jobs:
           path: .ctcache
           restore-keys: |
             ctcache-src-
+      - name: Fetch googletest
+        uses: ./.github/actions/fetch-googletest
       - name: Generate compile_commands.json
         run: |
           cmake -B build \
@@ -1316,6 +1330,8 @@ jobs:
           path: .ctcache
           restore-keys: |
             ctcache-test-${{ matrix.shard }}-
+      - name: Fetch googletest
+        uses: ./.github/actions/fetch-googletest
       - name: Generate compile_commands.json
         run: |
           cmake -B build \

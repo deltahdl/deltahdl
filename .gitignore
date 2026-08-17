@@ -5,6 +5,7 @@
 .cache/
 .claude/scheduled_tasks.lock
 .coverage
+.deps/
 .DS_Store
 .idea/
 .mypy_cache/

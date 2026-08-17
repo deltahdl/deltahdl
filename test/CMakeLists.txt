@@ -1,8 +1,32 @@
 include(FetchContent)
+
+# The pinned googletest archive, and the only place either value is written.
+# .github/actions/fetch-googletest reads both out of this file by matching the
+# variable name and taking the quoted string on the line below it, so keep each
+# value alone on the line under its set().
+set(DELTAHDL_GOOGLETEST_URL_DEFAULT
+    "https://github.com/google/googletest/archive/refs/tags/v1.17.0.tar.gz")
+set(DELTAHDL_GOOGLETEST_SHA256
+    "65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27c")
+
+# Every job that configures this tree fetches that same archive, so a run asks
+# github.com for one file once per job and a rate-limit fails a job before it
+# runs a single check. .github/actions/fetch-googletest downloads it once,
+# keeps it in a cache entry keyed on the SHA256 above, and names the restored
+# copy in DELTAHDL_GOOGLETEST_URL. A build that sets nothing in its environment
+# fetches exactly what it fetched before. URL_HASH verifies either form: given
+# a file:// archive, ExternalProject hashes it in a verify step and stops the
+# configure with a fatal error when it does not match.
+if(DEFINED ENV{DELTAHDL_GOOGLETEST_URL})
+    set(DELTAHDL_GOOGLETEST_URL "$ENV{DELTAHDL_GOOGLETEST_URL}")
+else()
+    set(DELTAHDL_GOOGLETEST_URL "${DELTAHDL_GOOGLETEST_URL_DEFAULT}")
+endif()
+
 FetchContent_Declare(
     googletest
-    URL https://github.com/google/googletest/archive/refs/tags/v1.17.0.tar.gz
-    URL_HASH SHA256=65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27c
+    URL "${DELTAHDL_GOOGLETEST_URL}"
+    URL_HASH "SHA256=${DELTAHDL_GOOGLETEST_SHA256}"
     # Apply the upstream fix for googletest issue #4762: gtest-printers.h converts
     # char8_t/char16_t to char32_t implicitly, which the newer clang rejects under
     # -Wcharacter-conversion. main makes the cast explicit (static_cast); v1.17.0
