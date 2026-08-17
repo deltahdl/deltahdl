@@ -167,6 +167,16 @@ struct GenerateCaseItem {
   bool is_default = false;
   std::vector<ModuleItem*> body;
 
+  // §27.6 gave this generate block its name -- "All unnamed generate blocks
+  // will be given the name genblk<n>" -- rather than the source writing one.
+  // §23.6 rules that objects declared in an unnamed generate block "can be
+  // referenced by hierarchical names only from within the block and within any
+  // hierarchy instantiated by the block", so a path written outside must not
+  // reach through the name even though elaboration has one to spell. The name
+  // is assigned into the field the source would have filled, so nothing
+  // downstream can tell the two apart without this.
+  bool name_is_generated = false;
+
   // True when the block held in body was written with the `begin` and `end`
   // keywords, false when it was written as a single item without them. A.4.2
   // gives `generate_block ::= generate_item | [ generate_block_identifier : ]
@@ -320,6 +330,16 @@ struct ModuleItem {
   // gen_else, and records its block on that item's field rather than on this
   // one.
   bool gen_body_has_begin_end = false;
+
+  // §27.6 gave this generate block its name -- "All unnamed generate blocks
+  // will be given the name genblk<n>" -- rather than the source writing one.
+  // §23.6 rules that objects declared in an unnamed generate block "can be
+  // referenced by hierarchical names only from within the block and within any
+  // hierarchy instantiated by the block", so a path written outside must not
+  // reach through the name even though elaboration has one to spell. The name
+  // is assigned into the field the source would have filled, so nothing
+  // downstream can tell the two apart without this.
+  bool name_is_generated = false;
   ModuleItem* gen_else = nullptr;
   std::vector<GenerateCaseItem> gen_case_items;
 

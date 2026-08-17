@@ -258,6 +258,7 @@ void Elaborator::ApplyBindInstance(BindDirective* bd, RtlirModule* target) {
   RtlirModuleInst inst;
   inst.module_name = item->inst_module;
   inst.inst_name = item->inst_name;
+  inst.simple_inst_name = item->inst_name;
   inst.resolved = resolved;
   inst.is_bound = true;
 

@@ -389,7 +389,11 @@ class Elaborator : public ElaboratorOperationRules {
   // the block carries, which §27.6 has already supplied where the source wrote
   // none, and `has_begin_end` says whether the block was written with the
   // `begin` and `end` keywords, which decides whether it is directly nested.
+  // `name_is_generated` says §27.6 assigned `block_name` rather than the
+  // source writing it, which §23.6 makes the difference between a block a
+  // hierarchical name can reach into and one it cannot.
   void ElaborateConditionalGenerateBlock(std::string_view block_name,
+                                         bool name_is_generated,
                                          const std::vector<ModuleItem*>& body,
                                          bool has_begin_end, RtlirModule* mod,
                                          const ScopeMap& scope);
@@ -438,7 +442,8 @@ class Elaborator : public ElaboratorOperationRules {
 
   void ReportUnresolvedDefparams(RtlirModule* mod, const ModuleDecl* decl);
 
-  void ReportUnresolvedDefparamSite(RtlirModule* mod, const DefparamSite& site);
+  void ReportUnresolvedDefparamSite(RtlirModule* mod, const DefparamSite& site,
+                                    const ScopeMap& mod_scope);
 
   void VerifyEarlyResolvedDefparams();
 
@@ -447,16 +452,16 @@ class Elaborator : public ElaboratorOperationRules {
 
   void ProcessPendingGenerate(const PendingGenerate& pg);
 
-  // Resolves a defparam's hierarchical path from `root`. `prefix` is the
-  // generate block instance the statement was written in, and only the leading
-  // component of the path is read under it: every later component names an
-  // instance inside a real child module, which no generate prefix reaches.
-  // Passing a non-empty prefix is therefore what confines the statement to its
-  // own block, which is how §23.10.1's rule that it "shall not change a
-  // parameter value outside that hierarchy" is enforced.
-  RtlirParamDecl* ResolveDefparamPath(RtlirModule* root, const Expr* path_expr,
-                                      std::string_view prefix,
-                                      RtlirModule** out_mod = nullptr);
+  // Resolves a §23.6 hierarchical path, already read into steps, against the
+  // instances elaborated under `root`. `writer` is the generate block instance
+  // the defparam statement stands in, and the path starts there: §23.10.1
+  // rules that a defparam "in or under a generate block instance shall not
+  // change a parameter value outside that hierarchy", and a path that reaches
+  // outside is one no sequence of steps from `writer` arrives at, so the rule
+  // holds by construction rather than by a check that could be skipped.
+  RtlirParamDecl* ResolveDefparamSteps(RtlirModule* root, const HierPath& path,
+                                       const HierPath& writer,
+                                       RtlirModule** out_mod = nullptr);
 
   void RecomputeDependentParams(RtlirModule* mod);
 

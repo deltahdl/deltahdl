@@ -1,7 +1,6 @@
 #include <cstddef>
 #include <optional>
 #include <set>
-#include <string>
 #include <string_view>
 #include <tuple>
 #include <unordered_set>
@@ -15,16 +14,37 @@
 
 namespace delta {
 
-static void CollectPathComponents(const Expr* expr,
-                                  std::vector<std::string_view>& out) {
+// Reads `expr` into the steps of §23.6's Syntax 23-7, folding each instance
+// select against `scope`. Returns false when the expression is not a path at
+// all, or when a select does not fold: §23.6 rules that the select "shall
+// evaluate to one of the legal index values of the array", so one that does not
+// names no instance and the caller reports the path as reaching nothing.
+//
+// The select is folded here rather than at the point of comparison because a
+// defparam standing in a loop generate block may write its own genvar --
+// §23.10.1's example is `defparam somename[i+1].my_flop.xyz = i` -- and `scope`
+// carries that binding only while the block instance is being applied.
+static bool CollectPathSteps(const Expr* expr, const ScopeMap& scope,
+                             HierPath& out) {
   if (expr->kind == ExprKind::kMemberAccess) {
-    CollectPathComponents(expr->lhs, out);
-    out.push_back(expr->rhs->text);
-    return;
+    if (!CollectPathSteps(expr->lhs, scope, out)) return false;
+    out.push_back({expr->rhs->text, false, 0});
+    return true;
+  }
+  if (expr->kind == ExprKind::kSelect) {
+    if (!CollectPathSteps(expr->base, scope, out)) return false;
+    if (out.empty()) return false;
+    auto index = ConstEvalInt(expr->index, scope);
+    if (!index) return false;
+    out.back().has_index = true;
+    out.back().index = *index;
+    return true;
   }
   if (expr->kind == ExprKind::kIdentifier) {
-    out.push_back(expr->text);
+    out.push_back({expr->text, false, 0});
+    return true;
   }
+  return false;
 }
 
 static bool RhsContainsHierarchicalRef(const Expr* e);
@@ -63,53 +83,82 @@ static bool RhsContainsHierarchicalRef(const Expr* e) {
   return AnyListChildContainsHierarchicalRef(e);
 }
 
-// The child instance of `mod` named `name`, or nullptr if it has none resolved.
-static RtlirModule* ResolvedChildNamed(RtlirModule* mod,
-                                       std::string_view name) {
+// True when a step of a path a source wrote names the same generate block
+// instance a step recorded on a declaration does.
+static bool SameHierStep(const HierStep& written, const HierStep& recorded) {
+  if (written.name != recorded.name) return false;
+  if (written.has_index != recorded.has_index) return false;
+  return !written.has_index || written.index == recorded.index;
+}
+
+// The module `mod` instantiates as `name` inside exactly the generate block
+// instances `blocks` names, or nullptr when it instantiates no such thing.
+static RtlirModule* ChildUnderBlocks(RtlirModule* mod, std::string_view name,
+                                     const HierPath& blocks) {
   for (auto& child : mod->children) {
-    if (child.inst_name == name && child.resolved) return child.resolved;
+    if (!child.resolved) continue;
+    if (child.simple_inst_name != name) continue;
+    if (child.gen_block_path.size() != blocks.size()) continue;
+    bool same = true;
+    for (size_t i = 0; i < blocks.size(); ++i) {
+      if (!SameHierStep(blocks[i], child.gen_block_path[i])) {
+        same = false;
+        break;
+      }
+    }
+    if (same) return child.resolved;
   }
   return nullptr;
 }
 
-// Follows the leading (all-but-last) components of a defparam path from `root`
-// down the instance hierarchy. Returns the module reached, or nullptr if any
-// component names no resolved child instance.
+// Follows every step of `path` but the last down the instance hierarchy from
+// `root`, starting inside the generate block instances `writer` names. Returns
+// the module the last step is declared in, or nullptr when no such module was
+// elaborated.
 //
-// `prefix` applies to the first component alone. Elaborator::ScopedName
-// flattened a generate block's own instances into the enclosing module under
-// that prefix, so a statement written inside the block reaches them by it and
-// reaches nothing else: a name that resolves only without the prefix is outside
-// the block, which §23.10.1 forbids the statement from changing.
-static RtlirModule* DescendDefparamPath(
-    RtlirModule* root, const std::vector<std::string_view>& parts,
-    std::string_view prefix) {
+// A step names a generate block instance or a module instance, and §23.6 makes
+// it exactly one of the two: "each node in the hierarchical name tree shall be
+// a separate scope with respect to identifiers", and a module holds its blocks
+// and its instances in one scope, so no step can name both. Reading a step as
+// an instance first is therefore a decision rather than a guess, and a step
+// that names no instance is a block: it is remembered and the instance it
+// qualifies is looked for one step further on.
+//
+// A step carrying an instance select is never read as an instance. §23.6 admits
+// one over an instance array as well as over a loop generate block, but nothing
+// records which element of an array a child is, so such a step would match
+// every element alike.
+static RtlirModule* DescendDefparamPath(RtlirModule* root, const HierPath& path,
+                                        const HierPath& writer) {
   RtlirModule* cur = root;
-  for (size_t i = 0; i + 1 < parts.size(); ++i) {
-    std::string_view name = parts[i];
-    std::string scoped;
-    if (i == 0 && !prefix.empty()) {
-      scoped = std::string(prefix) + std::string(name);
-      name = scoped;
+  HierPath blocks = writer;
+  for (size_t i = 0; i + 1 < path.size(); ++i) {
+    RtlirModule* next = path[i].has_index
+                            ? nullptr
+                            : ChildUnderBlocks(cur, path[i].name, blocks);
+    if (next != nullptr) {
+      cur = next;
+      blocks.clear();
+      continue;
     }
-    cur = ResolvedChildNamed(cur, name);
-    if (!cur) return nullptr;
+    blocks.push_back(path[i]);
   }
-  return cur;
+  // Leftover steps named generate block instances that nothing was instantiated
+  // in, so the path reached a scope rather than a module and names no
+  // parameter.
+  return blocks.empty() ? cur : nullptr;
 }
 
-RtlirParamDecl* Elaborator::ResolveDefparamPath(RtlirModule* root,
-                                                const Expr* path_expr,
-                                                std::string_view prefix,
-                                                RtlirModule** out_mod) {
-  std::vector<std::string_view> parts;
-  CollectPathComponents(path_expr, parts);
-  if (parts.size() < 2) return nullptr;
+RtlirParamDecl* Elaborator::ResolveDefparamSteps(RtlirModule* root,
+                                                 const HierPath& path,
+                                                 const HierPath& writer,
+                                                 RtlirModule** out_mod) {
+  if (path.size() < 2) return nullptr;
 
-  RtlirModule* cur = DescendDefparamPath(root, parts, prefix);
+  RtlirModule* cur = DescendDefparamPath(root, path, writer);
   if (!cur) return nullptr;
 
-  auto param_name = parts.back();
+  auto param_name = path.back().name;
   for (auto& p : cur->params) {
     if (p.name == param_name) {
       if (out_mod) *out_mod = cur;
@@ -249,7 +298,7 @@ auto Elaborator::CollectDefparamSites(RtlirModule* mod,
   std::vector<DefparamSite> sites;
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kDefparam) continue;
-    sites.push_back({item, {}, {}});
+    sites.push_back({item, {}, {}, {}});
   }
   auto it = generate_defparams_.find(mod);
   if (it != generate_defparams_.end())
@@ -263,8 +312,10 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
     auto key = std::make_tuple(mod, site.item, idx, site.prefix);
     if (applied_defparams_.count(key)) continue;
     const auto& [path_expr, val_expr] = site.item->defparam_assigns[idx];
+    HierPath path;
+    if (!CollectPathSteps(path_expr, scope, path)) continue;
     RtlirModule* target_mod = nullptr;
-    auto* param = ResolveDefparamPath(mod, path_expr, site.prefix, &target_mod);
+    auto* param = ResolveDefparamSteps(mod, path, site.path, &target_mod);
     if (!param) continue;
     DefparamOverride ovr{param, val_expr, scope, site.item->loc};
     DefparamAppliedRecord rec{applied_defparams_, key};
@@ -278,7 +329,7 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
     RecomputeDependentParams(target_mod);
     applied_defparams_.insert(key);
     early_defparam_resolutions_.push_back(
-        {mod, path_expr, param, site.item->loc, site.prefix});
+        {mod, path, site.path, param, site.item->loc});
   }
 }
 
@@ -305,7 +356,7 @@ void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
 
 void Elaborator::VerifyEarlyResolvedDefparams() {
   for (const auto& rec : early_defparam_resolutions_) {
-    auto* now = ResolveDefparamPath(rec.root, rec.path_expr, rec.prefix);
+    auto* now = ResolveDefparamSteps(rec.root, rec.path, rec.writer_path);
     if (now != nullptr && now != rec.resolved) {
       diag_.Error(rec.loc,
                   "defparam hierarchical name resolves differently after "
@@ -357,10 +408,10 @@ static void CheckDefparamItemEarlyAmbiguity(
     const std::unordered_set<std::string_view>& block_names,
     const std::unordered_set<std::string_view>& top_names) {
   for (const auto& assign : item->defparam_assigns) {
-    std::vector<std::string_view> parts;
-    CollectPathComponents(assign.first, parts);
+    HierPath parts;
+    if (!CollectPathSteps(assign.first, {}, parts)) continue;
     if (parts.size() < 2) continue;
-    auto lead = parts.front();
+    auto lead = parts.front().name;
     if (block_names.count(lead) && top_names.count(lead)) {
       diag.Error(item->loc,
                  "defparam hierarchical name would resolve differently once "
@@ -404,13 +455,18 @@ void Elaborator::ApplyDefparamsRecursively(RtlirModule* mod) {
 // parameter value outside that hierarchy", and is an error. Anything else named
 // nothing at all, and stays the warning it was.
 void Elaborator::ReportUnresolvedDefparamSite(RtlirModule* mod,
-                                              const DefparamSite& site) {
+                                              const DefparamSite& site,
+                                              const ScopeMap& mod_scope) {
+  ScopeMap scope = mod_scope;
+  for (const auto& [name, value] : site.consts) scope[name] = value;
   for (size_t idx = 0; idx < site.item->defparam_assigns.size(); ++idx) {
     auto key = std::make_tuple(mod, site.item, idx, site.prefix);
     if (applied_defparams_.count(key)) continue;
     const Expr* path_expr = site.item->defparam_assigns[idx].first;
-    if (!site.prefix.empty() &&
-        ResolveDefparamPath(mod, path_expr, {}) != nullptr) {
+    HierPath path;
+    bool read = CollectPathSteps(path_expr, scope, path);
+    if (!site.path.empty() && read &&
+        ResolveDefparamSteps(mod, path, {}) != nullptr) {
       diag_.Error(site.item->loc,
                   "defparam in a generate block shall not change a parameter "
                   "value outside that block",
@@ -424,8 +480,10 @@ void Elaborator::ReportUnresolvedDefparamSite(RtlirModule* mod,
 
 void Elaborator::ReportUnresolvedDefparams(RtlirModule* mod,
                                            const ModuleDecl* decl) {
+  ParamRangeRegistryGuard param_range_guard(mod);
+  ScopeMap mod_scope = BuildParamScope(mod);
   for (const auto& site : CollectDefparamSites(mod, decl)) {
-    ReportUnresolvedDefparamSite(mod, site);
+    ReportUnresolvedDefparamSite(mod, site, mod_scope);
   }
 }
 

@@ -206,6 +206,37 @@ using GenBlockConsts = std::vector<std::pair<std::string_view, int64_t>>;
 // reach the instance's own declaration.
 using GenBlockPrefix = std::string_view;
 
+// §23.6: one step of a hierarchical path name, which Syntax 23-7 writes as
+// `identifier constant_bit_select`. §23.6 forms such a name "by concatenating
+// the names of the modules, module instance names, generate blocks, tasks,
+// functions, assertion labels, named assertion action blocks, or named blocks
+// that contain it", so a generate block instance is a step of one. §27.4
+// indexes a loop generate block's instances "by adding the '[genvar value]' to
+// the end of the generate block identifier", which is what `index` holds, and
+// §23.6 requires the select "if the array name is not the last path element in
+// the hierarchical name", so `has_index` distinguishes a loop generate block
+// from a conditional one rather than merely recording whether one was written.
+//
+// A step of an unnamed generate block has an empty `name`. §27.6 gives such a
+// block the name genblk<n>, but §23.6 rules that what it declares "can be
+// referenced by hierarchical names only from within the block", and no written
+// identifier is empty, so the step matches nothing a path outside can spell.
+struct HierStep {
+  std::string_view name;
+  bool has_index = false;
+  int64_t index = 0;
+};
+
+// §23.6: a hierarchical path name as a sequence of its steps. Two things are
+// spelled this way. A path a source wrote ends in the object it names, and the
+// generate block instances enclosing a declaration are the steps between its
+// module and it, outermost first and empty for a declaration of the module
+// itself. Comparing the two is what resolves the first, which the flattened
+// name a declaration is stored under cannot do: `g_u` is what both `g.u` and a
+// module-level instance named `g_u` are spelled as, and §23.6 makes them
+// different scopes.
+using HierPath = std::vector<HierStep>;
+
 struct RtlirContAssign {
   Expr* lhs = nullptr;
   Expr* rhs = nullptr;
@@ -338,6 +369,15 @@ struct RtlirPortBinding {
 struct RtlirModuleInst {
   std::string_view module_name;
   std::string_view inst_name;
+  // §23.6: the instance's name as the source wrote it, and the generate block
+  // instances between it and the module holding it. RtlirModuleInst::inst_name
+  // concatenates the two into one identifier, because the simulator keys an
+  // instance's storage on a single flat string (Lowerer::LowerChildModules in
+  // src/simulator/lowerer_child.cpp), and the steps cannot be recovered from it
+  // -- a block named `g` holding `u` and a module-level instance named `g_u`
+  // produce the same string. A hierarchical path is read against these two.
+  std::string_view simple_inst_name;
+  HierPath gen_block_path;
   struct RtlirModule* resolved = nullptr;
   std::vector<RtlirPortBinding> port_bindings;
   std::vector<ResolvedAttribute> attrs;

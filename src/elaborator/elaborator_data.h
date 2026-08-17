@@ -306,6 +306,10 @@ class ElaboratorData {
     const ModuleItem* item;
     std::string_view prefix;
     GenBlockConsts consts;
+    // §23.6: the generate block instances the statement stands in, which is
+    // where a path written in it starts. `prefix` says the same thing as one
+    // string and is kept because applied_defparams_ needs a key it can hash.
+    HierPath path;
   };
 
   // The defparam statements that generate block instances contributed to each
@@ -327,12 +331,14 @@ class ElaboratorData {
 
   struct EarlyDefparamResolution {
     RtlirModule* root;
-    const Expr* path_expr;
+    // The path as it was read the first time, steps and folded instance
+    // selects alike, so that Elaborator::VerifyEarlyResolvedDefparams resolves
+    // it again from the same answer rather than re-folding a select whose
+    // genvar binding is no longer in scope.
+    HierPath path;
+    HierPath writer_path;
     RtlirParamDecl* resolved;
     SourceLoc loc;
-    // The prefix the path was first resolved under, so that
-    // Elaborator::VerifyEarlyResolvedDefparams resolves it again the same way.
-    std::string_view prefix;
   };
   std::vector<EarlyDefparamResolution> early_defparam_resolutions_;
 
@@ -340,6 +346,10 @@ class ElaboratorData {
       deferred_subroutine_map_;
 
   std::string gen_prefix_;
+  // §23.6: the generate block instances currently being elaborated into,
+  // outermost first. Maintained beside gen_prefix_, which flattens the same
+  // information into a string no reader can split back into steps.
+  HierPath gen_block_path_;
 
   // §20.10.1: the constant bindings (genvars, and any localparams introduced
   // by the enclosing generate blocks) in effect while a generate body is being

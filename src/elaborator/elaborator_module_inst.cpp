@@ -774,6 +774,12 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   RtlirModuleInst inst;
   inst.module_name = item->inst_module;
   inst.inst_name = scoped_inst_name;
+  // §23.6 reads a hierarchical name one step at a time, and the two fields
+  // below are the steps this instance answers with. inst_name is the two of
+  // them run together, which is the name the flattened design stores but not a
+  // name any path can be matched against.
+  inst.simple_inst_name = item->inst_name;
+  inst.gen_block_path = gen_block_path_;
 
   std::string saved_inst_path = current_inst_path_;
   if (!current_inst_path_.empty()) current_inst_path_.push_back('.');

@@ -164,7 +164,7 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
         // are properties of this instance, and the shared body AST records
         // neither.
         generate_defparams_[mod].push_back(
-            {item, InternedGenPrefix(), gen_loop_consts_});
+            {item, InternedGenPrefix(), gen_loop_consts_, gen_block_path_});
         break;
       default:
         ElaborateGenerateBlockItem(item, mod);
@@ -208,15 +208,19 @@ static bool IsDirectlyNestedBlock(const std::vector<ModuleItem*>& body,
 // declaration of an array of generate block instances", so a conditional
 // generate block contributes its name alone.
 void Elaborator::ElaborateConditionalGenerateBlock(
-    std::string_view block_name, const std::vector<ModuleItem*>& body,
-    bool has_begin_end, RtlirModule* mod, const ScopeMap& scope) {
+    std::string_view block_name, bool name_is_generated,
+    const std::vector<ModuleItem*>& body, bool has_begin_end, RtlirModule* mod,
+    const ScopeMap& scope) {
   if (IsDirectlyNestedBlock(body, has_begin_end)) {
     ElaborateGenerateItems(body, mod, scope);
     return;
   }
   std::string saved_prefix = gen_prefix_;
   gen_prefix_ = std::format("{}{}_", saved_prefix, block_name);
+  gen_block_path_.push_back(
+      {name_is_generated ? std::string_view{} : block_name, false, 0});
   ElaborateGenerateItems(body, mod, scope);
+  gen_block_path_.pop_back();
   gen_prefix_ = saved_prefix;
 }
 
@@ -234,7 +238,8 @@ void Elaborator::ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,
     return;
   }
   if (*cond) {
-    ElaborateConditionalGenerateBlock(item->name, item->gen_body,
+    ElaborateConditionalGenerateBlock(item->name, item->name_is_generated,
+                                      item->gen_body,
                                       item->gen_body_has_begin_end, mod, scope);
     return;
   }
@@ -269,8 +274,9 @@ void Elaborator::ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,
     return;
   }
   ElaborateConditionalGenerateBlock(
-      item->gen_else->name, item->gen_else->gen_body,
-      item->gen_else->gen_body_has_begin_end, mod, scope);
+      item->gen_else->name, item->gen_else->name_is_generated,
+      item->gen_else->gen_body, item->gen_else->gen_body_has_begin_end, mod,
+      scope);
 }
 
 static bool MatchesCasePattern(const std::vector<Expr*>& patterns,
@@ -300,14 +306,15 @@ void Elaborator::ElaborateGenerateCase(ModuleItem* item, RtlirModule* mod,
       continue;
     }
     if (MatchesCasePattern(ci.patterns, *selector, scope)) {
-      ElaborateConditionalGenerateBlock(ci.label, ci.body, ci.has_begin_end,
-                                        mod, scope);
+      ElaborateConditionalGenerateBlock(ci.label, ci.name_is_generated, ci.body,
+                                        ci.has_begin_end, mod, scope);
       return;
     }
   }
   if (default_item == nullptr) return;
-  ElaborateConditionalGenerateBlock(default_item->label, default_item->body,
-                                    default_item->has_begin_end, mod, scope);
+  ElaborateConditionalGenerateBlock(
+      default_item->label, default_item->name_is_generated, default_item->body,
+      default_item->has_begin_end, mod, scope);
 }
 
 static bool IsGenerateConstruct(ModuleItemKind k) {
@@ -372,12 +379,17 @@ static void NameGenerateBlocksInScope(const std::vector<ModuleItem*>& items,
   }
 }
 
-// Name one generate block, then walk what it holds.
-static void NameGenerateBlock(std::string_view& block_name,
+// Name one generate block, then walk what it holds. `generated` records
+// whether the §27.6 name was taken, because §23.6 lets a hierarchical name
+// written outside the block reach into it only when the source named it.
+static void NameGenerateBlock(std::string_view& block_name, bool& generated,
                               const std::vector<ModuleItem*>& body,
                               bool has_begin_end, std::string_view name,
                               Arena& arena) {
-  if (block_name.empty()) block_name = name;
+  if (block_name.empty()) {
+    block_name = name;
+    generated = true;
+  }
   if (IsDirectlyNestedBlock(body, has_begin_end)) {
     NameConstructBlocks(body[0], name, arena);
     return;
@@ -393,21 +405,26 @@ static void NameConstructBlocks(ModuleItem* it, std::string_view name,
   if (!IsConditionalGenerateConstruct(it->kind)) {
     // §27.5: direct nesting "does not apply in any way to loop generate
     // constructs", so a loop generate block is a scope whatever it holds.
-    if (it->name.empty()) it->name = name;
+    if (it->name.empty()) {
+      it->name = name;
+      it->name_is_generated = true;
+    }
     NameGenerateBlocksInScope(it->gen_body, {}, arena);
     return;
   }
-  NameGenerateBlock(it->name, it->gen_body, it->gen_body_has_begin_end, name,
-                    arena);
+  NameGenerateBlock(it->name, it->name_is_generated, it->gen_body,
+                    it->gen_body_has_begin_end, name, arena);
   for (auto& alt : it->gen_case_items) {
-    NameGenerateBlock(alt.label, alt.body, alt.has_begin_end, name, arena);
+    NameGenerateBlock(alt.label, alt.name_is_generated, alt.body,
+                      alt.has_begin_end, name, arena);
   }
   if (it->gen_else == nullptr) return;
   if (it->gen_else->gen_cond != nullptr) {
     NameConstructBlocks(it->gen_else, name, arena);
     return;
   }
-  NameGenerateBlock(it->gen_else->name, it->gen_else->gen_body,
+  NameGenerateBlock(it->gen_else->name, it->gen_else->name_is_generated,
+                    it->gen_else->gen_body,
                     it->gen_else->gen_body_has_begin_end, name, arena);
 }
 
@@ -849,11 +866,17 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
   // elaborated, so the entry is retargeted at the top of every iteration.
   size_t const_depth = gen_loop_consts_.size();
   gen_loop_consts_.emplace_back(genvar_name, opening->init_value);
+  // §27.4 indexes this block's instances by the genvar value, so the step is
+  // retargeted beside the localparam at the top of every iteration.
+  gen_block_path_.push_back(
+      {item->name_is_generated ? std::string_view{} : item->name, true,
+       opening->init_value});
 
   auto close_loop = [&] {
     gen_prefix_ = saved_prefix;
     active_loop_genvars_.erase(genvar_name);
     gen_loop_consts_.resize(const_depth);
+    gen_block_path_.pop_back();
   };
 
   std::unordered_set<int64_t> seen_values;
@@ -900,6 +923,7 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
     gen_prefix_ = std::format("{}{}_{}_", saved_prefix, item->name,
                               loop_scope[genvar_name]);
     gen_loop_consts_[const_depth].second = loop_scope[genvar_name];
+    gen_block_path_.back().index = loop_scope[genvar_name];
     ElaborateGenerateItems(item->gen_body, mod, loop_scope);
 
     // Stop the loop when the genvar cannot advance, which

@@ -1,3 +1,4 @@
+#include <string>
 #include <string_view>
 
 #include "common/types.h"
@@ -196,9 +197,12 @@ TEST(DefparamElaboration, RhsRejectsHierarchicalReference) {
 
 // §23.10.1: "Each instantiation of a generate block is considered to be a
 // separate hierarchy scope", so a statement standing in `g2` reaches only what
-// `g2` holds. The elaborator flattens `g1`'s contents to `g1_u`, and `g1.u`
-// therefore names nothing `g2` can reach: the containment rule leaves the
-// statement with no target rather than letting it cross into the sibling.
+// `g2` holds. `g1.u` is a name §23.6 defines and the design holds, and it is
+// outside `g2`, so the statement is refused rather than merely left with
+// nothing to bind to. This asserted the "target not found" warning while the
+// path could not be read at all: the elaborator compared `g1` against the
+// flattened instance name `g1_u`, so a statement reaching a real sibling and
+// one naming nothing produced the same report.
 TEST(DefparamElaboration, DefparamInGenerateCannotTargetSiblingScope) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -217,8 +221,10 @@ TEST(DefparamElaboration, DefparamInGenerateCannotTargetSiblingScope) {
   auto* u = ChildInstantiatedAs(design->top_modules[0], "g1_u");
   ASSERT_NE(u, nullptr);
   EXPECT_EQ(u->params[0].resolved_value, 5);
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), "defparam target not found",
-                              8, "23.10.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "defparam in a generate block shall not change a "
+                            "parameter value outside that block",
+                            8, "23.10.1"));
 }
 
 // §23.10.1 bars a defparam in a generate block from changing a parameter
@@ -458,6 +464,163 @@ TEST(DefparamElaboration, ReplacesEveryCharacterOfAStringParameter) {
   EXPECT_EQ(u->params[0].name, "NAME");
   EXPECT_TRUE(u->params[0].is_string_value);
   EXPECT_EQ(u->params[0].resolved_string, "configured");
+}
+
+// §23.10.1 lets a defparam change a parameter "in any module, interface, or
+// program instance throughout the design using the hierarchical name of the
+// parameter", and §27.5 makes a named generate block one of the names such a
+// path is built from: "if the generate block selected for instantiation is
+// named, then this name declares a generate block instance and is the name for
+// the scope it creates. Normal rules for hierarchical naming apply." Its
+// Example 1 writes the gate instantiated inside a block named u1 as
+// `test.u1.g1`, so `g.u.P` names the child's parameter and the override lands.
+//
+// The design records that child as `g_u`, so comparing the written `g` against
+// an instance name found nothing and the override was dropped with a warning.
+TEST(DefparamElaboration,
+     ReachesAParameterInsideANamedConditionalGenerateBlock) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter int P = 5)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    child u();\n"
+      "  end\n"
+      "  defparam g.u.P = 99;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* u = ChildInstantiatedAs(design->top_modules[0], "g_u");
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(u->params[0].resolved_value, 99);
+  EXPECT_TRUE(u->params[0].is_resolved);
+}
+
+// The same source, asserting that nothing is reported as unresolved. Separate
+// from the value because the two can disagree: Elaborator::ApplyDefparamSite
+// and Elaborator::ReportUnresolvedDefparamSite decide independently, off one
+// applied-set key, so a path that resolves and sets the value while the key is
+// never inserted would warn about an override that landed.
+TEST(DefparamElaboration, NamedGenerateBlockPathReportsNoUnresolvedTarget) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child #(parameter int P = 5)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    child u();\n"
+      "  end\n"
+      "  defparam g.u.P = 99;\n"
+      "endmodule\n",
+      f);
+  for (const auto& d : f.diag.Diagnostics()) {
+    EXPECT_EQ(d.message.find("defparam target not found"), std::string::npos)
+        << "the path named a parameter, so nothing is left unresolved";
+  }
+}
+
+// §27.4: a named loop generate block "is a declaration of an array of generate
+// block instances", whose "index values in this array are the values assumed by
+// the genvar during elaboration", and §27.4 writes the resulting hierarchical
+// names as `B1[0].B2[0].B3[0].N3`. So `b[1]` selects the second block instance
+// and `b[1].u.P` names the parameter in it alone.
+//
+// Index 1 rather than 0, because an implementation that discards the select and
+// takes the first block instance answers index 0 correctly. Asserting the other
+// instance keeps its default is the other half of that: without it a change
+// applying the override to every instance would pass.
+TEST(DefparamElaboration, ReachesAParameterInOneIterationOfALoopGenerateBlock) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter int P = 5)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 2; i = i + 1) begin : b\n"
+      "    child u();\n"
+      "  end\n"
+      "  defparam b[1].u.P = 99;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* first = ChildInstantiatedAs(design->top_modules[0], "b_0_u");
+  ASSERT_NE(first, nullptr);
+  EXPECT_EQ(first->params[0].resolved_value, 5);
+  auto* second = ChildInstantiatedAs(design->top_modules[0], "b_1_u");
+  ASSERT_NE(second, nullptr);
+  EXPECT_EQ(second->params[0].resolved_value, 99);
+}
+
+// §23.6 makes each node of a hierarchical name "a separate scope with respect
+// to identifiers", so the `u` inside block instance `b[0]` and the `u` declared
+// beside the block are two objects and `b[0].u.P` names the first.
+//
+// This is the half of the defect that wrote the wrong parameter rather than
+// none. The select was dropped while the path was being read, leaving the
+// components `u` and `P`, which resolved against the enclosing module and
+// overrode the instance the source never named. The two do not collide in
+// declared_names_, which holds `u` and `b_0_u`, so nothing reported it.
+TEST(DefparamElaboration,
+     LoopGenerateBlockIndexDoesNotSelectAModuleLevelSibling) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter int P = 5)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u();\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 2; i = i + 1) begin : b\n"
+      "    child u();\n"
+      "  end\n"
+      "  defparam b[0].u.P = 99;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* sibling = ChildInstantiatedAs(design->top_modules[0], "u");
+  ASSERT_NE(sibling, nullptr);
+  EXPECT_EQ(sibling->params[0].resolved_value, 5);
+  auto* inside = ChildInstantiatedAs(design->top_modules[0], "b_0_u");
+  ASSERT_NE(inside, nullptr);
+  EXPECT_EQ(inside->params[0].resolved_value, 99);
+}
+
+// §27.6 gives every unnamed generate block the name genblk<n>, and §23.6 still
+// refuses a path written outside it: objects declared in one "can be referenced
+// by hierarchical names only from within the block and within any hierarchy
+// instantiated by the block". So `u.genblk1.i1.P` names nothing, even though
+// the elaborator spells that block genblk1 and reaches what it holds under
+// exactly that prefix.
+//
+// This is what tells a name the source wrote from one §27.6 assigned. The two
+// are the same field by the time a generate block is elaborated, so without
+// ModuleItem::name_is_generated a path resolved through both alike.
+TEST(DefparamElaboration, GeneratedNameOfAnUnnamedGenerateBlockIsNotAPathStep) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module inner #(parameter int P = 5)();\n"
+      "endmodule\n"
+      "module outer;\n"
+      "  if (1) begin\n"
+      "    inner i1();\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  outer u();\n"
+      "  defparam u.genblk1.i1.P = 99;\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  auto* outer = ChildInstantiatedAs(design->top_modules[0], "u");
+  ASSERT_NE(outer, nullptr);
+  auto* inner = ChildInstantiatedAs(outer, "genblk1_i1");
+  ASSERT_NE(inner, nullptr);
+  EXPECT_EQ(inner->params[0].resolved_value, 5);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), "defparam target not found",
+                              10, "23.10.1"));
 }
 
 }  // namespace
