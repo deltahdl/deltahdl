@@ -193,8 +193,8 @@ void RegisterPackageParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
 // Whether `e` mentions any name in `names`, at any depth. Every identifier the
 // expression carries is compared, whatever node holds it, so a type parameter
 // named by a `type` operator or a cast counts as a mention.
-static bool ExprMentionsAny(const Expr* e,
-                            const std::unordered_set<std::string_view>& names) {
+bool ExprMentionsAny(const Expr* e,
+                     const std::unordered_set<std::string_view>& names) {
   if (!e) return false;
   if (!e->text.empty() && names.count(e->text)) return true;
   if (!e->callee.empty() && names.count(e->callee)) return true;
@@ -252,8 +252,7 @@ struct ClassParamRegistration {
 
 // Every parameter name `cls` declares: its type parameters, its #() parameter
 // ports and its body parameter declarations.
-static std::unordered_set<std::string_view> ClassParamNames(
-    const ClassDecl* cls) {
+std::unordered_set<std::string_view> ClassParamNames(const ClassDecl* cls) {
   std::unordered_set<std::string_view> names = cls->type_param_names;
   for (const auto& [pname, pexpr] : cls->params) names.insert(pname);
   for (const auto* m : cls->members) {

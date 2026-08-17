@@ -78,23 +78,24 @@ static std::string MakeSpecKey(std::string_view name,
       // single diamond and its inherited names would wrongly collapse instead
       // of colliding.
       //
-      // The fold is given the compilation-unit parameter scope, so a named
-      // constant keys by its value: `I#(2)` and `I#(A)` with
+      // The fold is given the parameter scope of whatever declared the class,
+      // so a named constant keys by its value: `I#(2)` and `I#(A)` with
       // `localparam int A = 2` are one specialization, which §8.26.6.3 requires
       // because uniqueness is of the parameterization and not of how it was
-      // spelled.
-      //
-      // "v?" remains for the two arguments that still do not fold. One names a
-      // parameter declared in a module, an interface, a program or a checker:
-      // Elaborator::ValidateInterfaceClassRules runs from
+      // spelled. ScopeParamValues is what puts a parameter declared in a
+      // module, an interface, a program or a checker into that scope, which the
+      // compilation-unit scope alone does not hold: this validation runs from
       // Elaborator::RunPreElaborationClassValidations, before any of those is
-      // elaborated, and Elaborator::cu_param_scope_ holds only
-      // compilation-unit, package and qualified class parameters at that point.
-      // The other names the class's own formal value parameter, which has no
-      // value until the class is specialized. Two parameterizations that share
-      // "v?" are read here as one specialization, and that stays the safer of
-      // the two errors: splitting them -- by source position, say -- would
-      // report a name collision between a parameterization and itself.
+      // elaborated.
+      //
+      // "v?" remains for the argument naming the class's own formal value
+      // parameter, which has no value until the class is itself specialized.
+      // Two parameterizations that share "v?" are read here as one
+      // specialization, and that stays the safer of the two errors: splitting
+      // them -- by source position, say -- would report a name collision
+      // between a parameterization and itself. Every other unfoldable argument
+      // is reported by ValidateSpecializationArgsInInheritance rather than
+      // reaching this branch quietly.
       if (auto v = ConstEvalInt(dt.type_ref_expr, scope))
         key += 'v' + std::to_string(*v);
       else
@@ -483,17 +484,17 @@ static bool VirtualClassAddressesPrototype(const ClassDecl* cls,
 // class's `implements` clause create the obligation here; a prototype inherited
 // through a base class is the implementing base's responsibility.
 void Elaborator::ValidateVirtualClassInterfaceObligations(
-    const ClassDecl* cls) {
+    const ClassDecl* cls, const ScopeMap& params) {
   if (!cls->is_virtual || cls->is_interface || cls->implements_types.empty())
     return;
   std::unordered_set<std::string> seen_iface;
   TypeSubst outer;
-  ClassLookup look{unit_, cu_param_scope_};
+  ClassLookup look{unit_, params};
   for (const auto& iref : cls->implements_types) {
     const auto* iface = FindClassDecl(iref.name, unit_);
     if (!iface || !iface->is_interface) continue;
-    auto spec = MakeIfaceSpec(iface, iref.name, iref.type_params, outer,
-                              cu_param_scope_);
+    auto spec =
+        MakeIfaceSpec(iface, iref.name, iref.type_params, outer, params);
     if (!seen_iface.insert(spec.key).second) continue;
     IfaceMethodMap iface_methods;
     std::unordered_set<std::string> visited;
@@ -685,10 +686,11 @@ CollectImplementedTypedefOwners(const ClassDecl* cls, const ClassLookup& look) {
   return owning_iface;
 }
 
-void Elaborator::ValidateImplementsTypeAccess(const ClassDecl* cls) {
+void Elaborator::ValidateImplementsTypeAccess(const ClassDecl* cls,
+                                              const ScopeMap& params) {
   if (cls->is_interface || cls->implements_types.empty()) return;
 
-  ClassLookup look{unit_, cu_param_scope_};
+  ClassLookup look{unit_, params};
   std::unordered_map<std::string_view, std::string_view> owning_iface =
       CollectImplementedTypedefOwners(cls, look);
   if (owning_iface.empty()) return;
@@ -787,9 +789,82 @@ std::vector<ClassScope> DeclaredClassScopes(const CompilationUnit* unit) {
   return scopes;
 }
 
+// The values a specialization argument written in `scope` can name. These
+// validations run before any module, interface, program or checker is
+// elaborated, so a parameter declared in one has no value anywhere the
+// compilation-unit scope reaches and has to be folded here from the items
+// themselves. §6.20.1 lets a parameter's value depend on one declared before
+// it, so the items are folded in the order they were written and each result is
+// layered under its own name for the ones that follow.
+//
+// The compilation-unit scope is the base because §8.26.6.3 puts no restriction
+// on where a specialization argument's value comes from, so one written inside
+// a module may still name a compilation-unit or package constant. Re-folding
+// the compilation-unit scope's own items over it costs a repeat of what
+// RegisterCuScopeItems already computed and reaches the same values.
+//
+// A parameter whose value does not fold is absent, which leaves an argument
+// naming it exactly as unfoldable as it was.
+static ScopeMap ScopeParamValues(const ClassScope& scope,
+                                 const ScopeMap& cu_params) {
+  ScopeMap values = cu_params;
+  if (scope.items == nullptr) return values;
+  for (const auto* item : *scope.items) {
+    if (item == nullptr || item->kind != ModuleItemKind::kParamDecl) continue;
+    if (item->init_expr == nullptr) continue;
+    if (auto value = ConstEvalInt(item->init_expr, values))
+      values[item->name] = *value;
+  }
+  return values;
+}
+
+// §8.25 rules that instances of a parameterized class are instantiated "using
+// the same parameter override rules (see 23.10)" (printed page 203 of IEEE
+// 1800-2023), and §23.10.2 gives a parameter override a constant expression as
+// its value. Reports a value argument of an extends or implements clause that
+// is not one, with the message and subclause
+// Elaborator::ValidateSpecializationArgsConstant already gives the same rule
+// for the declaration form, so one rule reads one way wherever it is broken.
+//
+// An argument mentioning one of `cls`'s own parameter names is left alone. Such
+// a value is computable only once `cls` is itself specialized, so it is not a
+// constant expression that failed to fold, and Elaborator::RecordClassParam
+// draws the same distinction with the same test for a class parameter's own
+// initializer.
+static void ReportNonConstantSpecializationArgs(
+    std::string_view base_name, const std::vector<DataType>& type_params,
+    const ScopeMap& scope, const std::unordered_set<std::string_view>& formals,
+    DiagEngine& diag) {
+  for (const auto& dt : type_params) {
+    if (!dt.type_name.empty() || dt.type_ref_expr == nullptr) continue;
+    if (ConstEvalInt(dt.type_ref_expr, scope)) continue;
+    if (ExprMentionsAny(dt.type_ref_expr, formals)) continue;
+    diag.Error(dt.type_ref_expr->range.start,
+               std::format("class '{}' parameter override is not a constant "
+                           "expression",
+                           base_name),
+               Subclause("23.10.2"));
+  }
+}
+
+static void ValidateSpecializationArgsInInheritance(const ClassDecl* cls,
+                                                    const ScopeMap& scope,
+                                                    DiagEngine& diag) {
+  auto formals = ClassParamNames(cls);
+  ReportNonConstantSpecializationArgs(
+      cls->base_class, cls->base_class_type_params, scope, formals, diag);
+  for (const auto& iref : cls->extends_interfaces)
+    ReportNonConstantSpecializationArgs(iref.name, iref.type_params, scope,
+                                        formals, diag);
+  for (const auto& iref : cls->implements_types)
+    ReportNonConstantSpecializationArgs(iref.name, iref.type_params, scope,
+                                        formals, diag);
+}
+
 void Elaborator::ValidateInterfaceClassRules() {
-  ClassLookup look{unit_, cu_param_scope_};
   for (const auto& scope : DeclaredClassScopes(unit_)) {
+    ScopeMap params = ScopeParamValues(scope, cu_param_scope_);
+    ClassLookup look{unit_, params};
     for (const auto* cls : scope.classes) {
       if (cls->is_interface) {
         ValidateInterfaceClassMembers(cls);
@@ -797,13 +872,15 @@ void Elaborator::ValidateInterfaceClassRules() {
       } else {
         ValidateRegularClassInheritance(cls, scope);
         ValidateImplementsInterfaceMethods(cls);
-        ValidateVirtualClassInterfaceObligations(cls);
-        ValidateImplementsTypeAccess(cls);
+        ValidateVirtualClassInterfaceObligations(cls, params);
+        ValidateImplementsTypeAccess(cls, params);
       }
 
       ValidateMethodNameConflicts(cls, look, diag_);
 
       ValidateParamTypeConflicts(cls, look, diag_);
+
+      ValidateSpecializationArgsInInheritance(cls, params, diag_);
     }
   }
 }

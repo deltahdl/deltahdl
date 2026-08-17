@@ -402,4 +402,62 @@ TEST(ParameterizedClassElaboration,
              "endmodule\n"));
 }
 
+// The same rule over an extends clause rather than a declaration. §8.25 rules
+// that instances of a parameterized class are instantiated "using the same
+// parameter override rules (see 23.10)" (printed page 203), and §23.10.2 gives
+// an override a constant expression, so the module variable `v` is not a legal
+// argument of `C#(v)` wherever the specialization is written.
+// Elaborator::ValidateSpecializationArgsConstant reports the declaration form
+// at elaborator_decls_var.cpp and reaches no inheritance clause, so nothing
+// said this source was wrong: the class silently took C's own default of 1 in
+// place of the value the source wrote.
+TEST(ParameterizedClassElaboration, NonConstantValueArgumentInExtendsIsError) {
+  ElabFixture f;
+  ElabOk(
+      "class C #(int P = 1);\n"
+      "  int data;\n"
+      "endclass\n"
+      "module m;\n"
+      "  int v;\n"
+      "  class D extends C#(v);\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class 'C' parameter override is not a constant", 6,
+                            "23.10.2"));
+}
+
+// §6.20.1 gives a class's own formal value parameter no value until the class
+// is specialized, so `N` here is not an argument that failed to be constant and
+// the report above must not fire on it. Without this case the obvious
+// implementation of that report -- reject every argument that does not fold --
+// passes every other test in this file and rejects a legal source.
+TEST(ParameterizedClassElaboration, ForwardedFormalValueArgumentInExtendsOk) {
+  EXPECT_TRUE(
+      ElabOk("class C #(int P = 1);\n"
+             "  int data;\n"
+             "endclass\n"
+             "class D #(int N = 4) extends C#(N);\n"
+             "endclass\n"));
+}
+
+// The false positive the report must not produce, and the reason the fold and
+// the report are one change. `K` is declared in the module the class is
+// declared in, which is a scope Elaborator::cu_param_scope_ does not hold, so a
+// report added without ScopeParamValues rejects this legal source. K is 4
+// rather than C's own default of 1, so the argument has a value distinct from
+// what accepting it silently would leave behind.
+TEST(ParameterizedClassElaboration, ModuleLocalparamValueArgumentInExtendsOk) {
+  EXPECT_TRUE(
+      ElabOk("class C #(int P = 1);\n"
+             "  int data;\n"
+             "endclass\n"
+             "module m;\n"
+             "  localparam int K = 4;\n"
+             "  class D extends C#(K);\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
 }  // namespace

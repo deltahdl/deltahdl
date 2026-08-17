@@ -183,6 +183,18 @@ std::string_view ExprIdent(const Expr* e);
 const ClassDecl* FindClassDecl(std::string_view name,
                                const CompilationUnit* unit);
 
+// Whether any identifier or callee anywhere in `e` is one of `names`. A caller
+// that has failed to fold an expression asks this to tell a value it cannot
+// compute yet from one it can never compute.
+bool ExprMentionsAny(const Expr* e,
+                     const std::unordered_set<std::string_view>& names);
+
+// Every parameter name `cls` declares: its type parameters, its #() parameter
+// ports and its body parameter declarations. §6.20.1 gives such a name no value
+// until the class is specialized, so an expression mentioning one is not a
+// constant expression that failed to fold.
+std::unordered_set<std::string_view> ClassParamNames(const ClassDecl* cls);
+
 // §8.23: the type that the class-scoped name `cls_name::type_name` denotes,
 // where `cls_name` names a class and `type_name` names a typedef declared in
 // its body. Returns null when no such class is visible or the class declares no

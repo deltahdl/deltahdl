@@ -314,6 +314,75 @@ TEST(InterfaceClassDiamond, SameSpecializationInsideAModuleOk) {
 // specialization key builder folds without consulting a parameter scope. That
 // test therefore passes whether the scope is consulted or not, and this one
 // does not.
+// The same source as TwoLocalparamArgumentsAreTwoSpecializations with the
+// localparams moved into the module, which is the one variable that test holds
+// fixed. §8.26.6.3 rules that "each unique parameterization of a parameterized
+// interface class is an interface class specialization" (printed page 214) and
+// makes no exception for where the argument's value is declared, so
+// IntfBase#(A) and IntfBase#(B) are two specializations here as much as at
+// compilation-unit scope and SIZE collides under §8.26.6.2.
+//
+// Elaborator::ValidateInterfaceClassRules runs before any module is elaborated,
+// so A and B have a value only where the module's own items are folded. Without
+// that fold both arguments key as "v?", the two parameterizations read as one
+// diamond, and the conflict this asserts is not reported at all.
+TEST(InterfaceClassSpecialization,
+     TwoModuleLocalparamArgumentsAreTwoSpecializations) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  localparam int A = 1;\n"
+      "  localparam int B = 2;\n"
+      "  interface class IntfBase #(int P = 1);\n"
+      "    parameter SIZE = 8;\n"
+      "  endclass\n"
+      "  interface class IntfExt1 extends IntfBase#(A);\n"
+      "    pure virtual function bit funcExt1();\n"
+      "  endclass\n"
+      "  interface class IntfExt2 extends IntfBase#(B);\n"
+      "    pure virtual function bit funcExt2();\n"
+      "  endclass\n"
+      "  interface class IntfFinal extends IntfExt1, IntfExt2;\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "is inherited from multiple interface classes and must be overridden", 13,
+      "8.26.6.2"));
+}
+
+// The other direction, and the reason the fold has to compute the value rather
+// than merely notice that the argument is a name. §8.26.6.3 makes uniqueness a
+// property of the parameterization, so IntfBase#(2) and IntfBase#(A) with
+// `localparam int A = 2` are one specialization, SIZE is inherited once, and
+// the source is legal. An implementation that split every argument it could not
+// fold
+// -- or that keyed a name by its spelling -- reports a conflict here while
+// still passing the test above.
+TEST(InterfaceClassSpecialization,
+     AModuleLocalparamAndAnEqualLiteralAreOneSpecialization) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam int A = 2;\n"
+      "  interface class IntfBase #(int P = 1);\n"
+      "    parameter SIZE = 8;\n"
+      "  endclass\n"
+      "  interface class IntfExt1 extends IntfBase#(2);\n"
+      "    pure virtual function bit funcExt1();\n"
+      "  endclass\n"
+      "  interface class IntfExt2 extends IntfBase#(A);\n"
+      "    pure virtual function bit funcExt2();\n"
+      "  endclass\n"
+      "  interface class IntfFinal extends IntfExt1, IntfExt2;\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(InterfaceClassSpecialization,
      TwoLocalparamArgumentsAreTwoSpecializations) {
   ElabFixture f;
