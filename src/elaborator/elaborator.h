@@ -645,6 +645,15 @@ class Elaborator : public ElaboratorData {
 
   void WalkStmtsForConstAssign(const Stmt* s);
 
+  // §18.17: the statements a randsequence production holds, which the walk over
+  // Stmt's own members does not reach.
+  void WalkRandsequenceForConstAssign(const Stmt* s);
+
+  // §6.20: reports a procedural write whose left-hand side reaches a constant,
+  // naming the constant it reaches. `loc` is where the assignment stands, since
+  // that is what somebody whose source was rejected has to find.
+  void ReportConstAssignTarget(const Expr* lhs, SourceLoc loc);
+
   void CheckEnumAssignStmt(const Stmt* s);
 
   // §6.19.3: strong typing also applies when an actual argument is bound to an
