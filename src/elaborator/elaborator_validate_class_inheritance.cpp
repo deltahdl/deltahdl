@@ -57,7 +57,8 @@ static bool MethodSignaturesCompatible(const ModuleItem* a,
 }
 
 static std::string MakeSpecKey(std::string_view name,
-                               const std::vector<DataType>& type_params) {
+                               const std::vector<DataType>& type_params,
+                               const ScopeMap& scope) {
   if (type_params.empty()) return std::string(name);
   std::string key(name);
   key += "#(";
@@ -69,22 +70,32 @@ static std::string MakeSpecKey(std::string_view name,
     } else if (dt.type_ref_expr != nullptr) {
       // A value parameter argument (e.g. `#(2)`) folds no type name and parses
       // as an implicit-typed slot carrying the value expression. §8.26.6.3
-      // makes each distinct parameterization a distinct specialization, so two
-      // different constant values must yield different keys; otherwise a
-      // value-parameterized base reached through two paths with different
-      // arguments would be mistaken for a single diamond and its inherited
-      // names would wrongly collapse instead of colliding.
-      // The fold is given no ScopeMap, so it succeeds only for an argument
-      // written as a literal: `extends C#(K)` with K a localparam yields "v?"
-      // as surely as `extends C#(v)` with v a variable does. Every argument
-      // that does not fold therefore shares one key, and two parameterizations
-      // that share a key are read here as one specialization.
+      // rules that "Each unique parameterization of a parameterized interface
+      // class is an interface class specialization", and that different
+      // specializations are not a diamond, so two different constant values
+      // must yield different keys; otherwise a value-parameterized base reached
+      // through two paths with different arguments would be mistaken for a
+      // single diamond and its inherited names would wrongly collapse instead
+      // of colliding.
       //
-      // Splitting them instead -- by source position, say -- would report a
-      // name collision between two parameterizations that are in fact the same
-      // one, which is the worse of the two errors, so the shared key stays
-      // until a scope reaches this function.
-      if (auto v = ConstEvalInt(dt.type_ref_expr))
+      // The fold is given the compilation-unit parameter scope, so a named
+      // constant keys by its value: `I#(2)` and `I#(A)` with
+      // `localparam int A = 2` are one specialization, which §8.26.6.3 requires
+      // because uniqueness is of the parameterization and not of how it was
+      // spelled.
+      //
+      // "v?" remains for the two arguments that still do not fold. One names a
+      // parameter declared in a module, an interface, a program or a checker:
+      // Elaborator::ValidateInterfaceClassRules runs from
+      // Elaborator::RunPreElaborationClassValidations, before any of those is
+      // elaborated, and Elaborator::cu_param_scope_ holds only
+      // compilation-unit, package and qualified class parameters at that point.
+      // The other names the class's own formal value parameter, which has no
+      // value until the class is specialized. Two parameterizations that share
+      // "v?" are read here as one specialization, and that stays the safer of
+      // the two errors: splitting them -- by source position, say -- would
+      // report a name collision between a parameterization and itself.
+      if (auto v = ConstEvalInt(dt.type_ref_expr, scope))
         key += 'v' + std::to_string(*v);
       else
         key += "v?";
@@ -103,6 +114,18 @@ static std::string MakeSpecKey(std::string_view name,
 struct IfaceSpec {
   std::string key;
   TypeSubst subst;
+};
+
+// What every step of an inheritance walk has to answer two questions with:
+// where a class name is declared, and what a constant name is worth. §3.12
+// makes the compilation unit what a class name is looked up in. §11.2.1 makes
+// a specialization's value argument a constant expression and lists
+// "parameters" among the operands one consists of, so keying a specialization
+// by its argument needs the values those parameters were given. The two travel
+// together because a parent is resolved and keyed at the same step.
+struct ClassLookup {
+  const CompilationUnit* unit;
+  const ScopeMap& params;
 };
 
 using IfaceMethodMap =
@@ -132,12 +155,12 @@ static std::vector<std::string_view> TypeParamNames(const ClassDecl* cls) {
 // own formal T to int in turn.
 static IfaceSpec MakeIfaceSpec(const ClassDecl* iface, std::string_view name,
                                const std::vector<DataType>& args,
-                               const TypeSubst& outer) {
+                               const TypeSubst& outer, const ScopeMap& scope) {
   std::vector<DataType> resolved;
   resolved.reserve(args.size());
   for (const auto& arg : args) resolved.push_back(ResolveType(arg, outer));
   IfaceSpec spec;
-  spec.key = MakeSpecKey(name, resolved);
+  spec.key = MakeSpecKey(name, resolved, scope);
   auto formals = TypeParamNames(iface);
   for (size_t i = 0; i < formals.size() && i < resolved.size(); ++i) {
     spec.subst.emplace(formals[i], resolved[i]);
@@ -148,12 +171,12 @@ static IfaceSpec MakeIfaceSpec(const ClassDecl* iface, std::string_view name,
 // Calls `fn` once per interface class `cls` inherits from directly, with the
 // type arguments it was named with.
 static void ForEachInterfaceParent(
-    const ClassDecl* cls, const CompilationUnit* unit,
+    const ClassDecl* cls, const ClassLookup& look,
     const std::function<void(const ClassDecl*, std::string_view,
                              const std::vector<DataType>&)>& fn);
 
 static void CollectInterfacePureVirtualMethods(
-    const ClassDecl* iface, const IfaceSpec& spec, const CompilationUnit* unit,
+    const ClassDecl* iface, const IfaceSpec& spec, const ClassLookup& look,
     IfaceMethodMap& out, std::unordered_set<std::string>& visited) {
   if (!visited.insert(spec.key).second) return;
   for (const auto* m : iface->members) {
@@ -161,14 +184,14 @@ static void CollectInterfacePureVirtualMethods(
     if (!m->method) continue;
     out[m->method->name].push_back({spec, m->method});
   }
-  ForEachInterfaceParent(iface, unit,
-                         [&](const ClassDecl* parent, std::string_view name,
-                             const std::vector<DataType>& args) {
-                           CollectInterfacePureVirtualMethods(
-                               parent,
-                               MakeIfaceSpec(parent, name, args, spec.subst),
-                               unit, out, visited);
-                         });
+  ForEachInterfaceParent(
+      iface, look,
+      [&](const ClassDecl* parent, std::string_view name,
+          const std::vector<DataType>& args) {
+        CollectInterfacePureVirtualMethods(
+            parent, MakeIfaceSpec(parent, name, args, spec.subst, look.params),
+            look, out, visited);
+      });
 }
 
 static void CollectImplementedInterfaces(const ClassDecl* cls,
@@ -188,7 +211,7 @@ static void CollectImplementedInterfaces(const ClassDecl* cls,
 // Gathers the pure virtual methods contributed by every interface in scope for
 // `cls`, keyed by method name, into `iface_methods`.
 static void CollectInScopeInterfaceMethods(const ClassDecl* cls,
-                                           const CompilationUnit* unit,
+                                           const ClassLookup& look,
                                            IfaceMethodMap& iface_methods) {
   std::unordered_set<std::string> visited;
   // The class naming the interfaces binds no type parameters of its own into
@@ -196,24 +219,25 @@ static void CollectInScopeInterfaceMethods(const ClassDecl* cls,
   // parameterization that is not in scope here.
   TypeSubst outer;
   if (cls->is_interface) {
-    ForEachInterfaceParent(cls, unit,
-                           [&](const ClassDecl* parent, std::string_view name,
-                               const std::vector<DataType>& args) {
-                             CollectInterfacePureVirtualMethods(
-                                 parent,
-                                 MakeIfaceSpec(parent, name, args, outer), unit,
-                                 iface_methods, visited);
-                           });
+    ForEachInterfaceParent(
+        cls, look,
+        [&](const ClassDecl* parent, std::string_view name,
+            const std::vector<DataType>& args) {
+          CollectInterfacePureVirtualMethods(
+              parent, MakeIfaceSpec(parent, name, args, outer, look.params),
+              look, iface_methods, visited);
+        });
   } else {
     std::vector<InterfaceRef> all_ifaces;
-    CollectImplementedInterfaces(cls, unit, all_ifaces);
+    CollectImplementedInterfaces(cls, look.unit, all_ifaces);
     std::unordered_set<std::string> seen_iface;
     for (const auto& iref : all_ifaces) {
-      const auto* iface = FindClassDecl(iref.name, unit);
+      const auto* iface = FindClassDecl(iref.name, look.unit);
       if (!iface || !iface->is_interface) continue;
-      auto spec = MakeIfaceSpec(iface, iref.name, iref.type_params, outer);
+      auto spec =
+          MakeIfaceSpec(iface, iref.name, iref.type_params, outer, look.params);
       if (!seen_iface.insert(spec.key).second) continue;
-      CollectInterfacePureVirtualMethods(iface, spec, unit, iface_methods,
+      CollectInterfacePureVirtualMethods(iface, spec, look, iface_methods,
                                          visited);
     }
   }
@@ -312,13 +336,13 @@ static void DiagnoseImplSignatureMismatches(const ClassDecl* cls,
 }
 
 static void ValidateMethodNameConflicts(const ClassDecl* cls,
-                                        const CompilationUnit* unit,
+                                        const ClassLookup& look,
                                         DiagEngine& diag) {
   IfaceMethodMap iface_methods;
-  CollectInScopeInterfaceMethods(cls, unit, iface_methods);
+  CollectInScopeInterfaceMethods(cls, look, iface_methods);
   DiagnoseInterfaceSignatureConflicts(cls, iface_methods, diag);
   if (!cls->is_interface) {
-    DiagnoseImplSignatureMismatches(cls, iface_methods, unit, diag);
+    DiagnoseImplSignatureMismatches(cls, iface_methods, look.unit, diag);
   }
 }
 
@@ -412,7 +436,7 @@ void Elaborator::ValidateImplementsInterfaceMethods(const ClassDecl* cls) {
   if (all_ifaces.empty()) return;
   std::unordered_set<std::string> seen;
   for (const auto& iref : all_ifaces) {
-    auto iface_key = MakeSpecKey(iref.name, iref.type_params);
+    auto iface_key = MakeSpecKey(iref.name, iref.type_params, cu_param_scope_);
     if (!seen.insert(iface_key).second) continue;
     const auto* iface = FindClassDecl(iref.name, unit_);
     // §8.26 poses the obligation to implement a pure virtual method only for an
@@ -464,14 +488,16 @@ void Elaborator::ValidateVirtualClassInterfaceObligations(
     return;
   std::unordered_set<std::string> seen_iface;
   TypeSubst outer;
+  ClassLookup look{unit_, cu_param_scope_};
   for (const auto& iref : cls->implements_types) {
     const auto* iface = FindClassDecl(iref.name, unit_);
     if (!iface || !iface->is_interface) continue;
-    auto spec = MakeIfaceSpec(iface, iref.name, iref.type_params, outer);
+    auto spec = MakeIfaceSpec(iface, iref.name, iref.type_params, outer,
+                              cu_param_scope_);
     if (!seen_iface.insert(spec.key).second) continue;
     IfaceMethodMap iface_methods;
     std::unordered_set<std::string> visited;
-    CollectInterfacePureVirtualMethods(iface, spec, unit_, iface_methods,
+    CollectInterfacePureVirtualMethods(iface, spec, look, iface_methods,
                                        visited);
     for (const auto& entry : iface_methods) {
       std::string_view method_name = entry.first;
@@ -505,17 +531,17 @@ static void CollectOwnParamTypeNames(
 // base class (if it is an interface) followed by each extends-interface that is
 // an interface. The spec key encodes the parent's type parameters.
 static void ForEachInterfaceParent(
-    const ClassDecl* cls, const CompilationUnit* unit,
+    const ClassDecl* cls, const ClassLookup& look,
     const std::function<void(const ClassDecl*, std::string_view,
                              const std::vector<DataType>&)>& fn) {
   if (!cls->base_class.empty()) {
-    const auto* base = FindClassDecl(cls->base_class, unit);
+    const auto* base = FindClassDecl(cls->base_class, look.unit);
     if (base && base->is_interface) {
       fn(base, cls->base_class, cls->base_class_type_params);
     }
   }
   for (const auto& ref : cls->extends_interfaces) {
-    const auto* ext = FindClassDecl(ref.name, unit);
+    const auto* ext = FindClassDecl(ref.name, look.unit);
     if (ext && ext->is_interface) {
       fn(ext, ref.name, ref.type_params);
     }
@@ -524,17 +550,17 @@ static void ForEachInterfaceParent(
 
 static void CollectEffectiveParamTypeNames(const ClassDecl* iface,
                                            const std::string& spec_key,
-                                           const CompilationUnit* unit,
+                                           const ClassLookup& look,
                                            NameOriginMap& out);
 
 // Merges the effective param/type names of `parent` into `out`, skipping names
 // already owned locally (recorded in `own_names`).
 static void MergeInheritedParamTypeNames(
     const ClassDecl* parent, const std::string& parent_key,
-    const CompilationUnit* unit,
+    const ClassLookup& look,
     const std::unordered_set<std::string_view>& own_names, NameOriginMap& out) {
   NameOriginMap parent_map;
-  CollectEffectiveParamTypeNames(parent, parent_key, unit, parent_map);
+  CollectEffectiveParamTypeNames(parent, parent_key, look, parent_map);
   for (const auto& [name, origins] : parent_map) {
     if (own_names.count(name)) continue;
     for (const auto& o : origins) out[name].insert(o);
@@ -543,33 +569,33 @@ static void MergeInheritedParamTypeNames(
 
 static void CollectEffectiveParamTypeNames(const ClassDecl* iface,
                                            const std::string& spec_key,
-                                           const CompilationUnit* unit,
+                                           const ClassLookup& look,
                                            NameOriginMap& out) {
   std::unordered_set<std::string_view> own_names;
   CollectOwnParamTypeNames(iface, own_names);
   for (auto n : own_names) out[n].insert(spec_key);
-  ForEachInterfaceParent(iface, unit,
+  ForEachInterfaceParent(iface, look,
                          [&](const ClassDecl* parent, std::string_view name,
                              const std::vector<DataType>& args) {
-                           MergeInheritedParamTypeNames(parent,
-                                                        MakeSpecKey(name, args),
-                                                        unit, own_names, out);
+                           MergeInheritedParamTypeNames(
+                               parent, MakeSpecKey(name, args, look.params),
+                               look, own_names, out);
                          });
 }
 
 static void ValidateParamTypeConflicts(const ClassDecl* cls,
-                                       const CompilationUnit* unit,
+                                       const ClassLookup& look,
                                        DiagEngine& diag) {
   if (!cls->is_interface) return;
   std::unordered_set<std::string_view> own_names;
   CollectOwnParamTypeNames(cls, own_names);
   NameOriginMap inherited;
-  ForEachInterfaceParent(cls, unit,
+  ForEachInterfaceParent(cls, look,
                          [&](const ClassDecl* parent, std::string_view name,
                              const std::vector<DataType>& args) {
                            MergeInheritedParamTypeNames(
-                               parent, MakeSpecKey(name, args), unit, own_names,
-                               inherited);
+                               parent, MakeSpecKey(name, args, look.params),
+                               look, own_names, inherited);
                          });
   for (const auto& [name, origins] : inherited) {
     if (origins.size() > 1) {
@@ -589,17 +615,17 @@ static void ValidateParamTypeConflicts(const ClassDecl* cls,
 // reach only through the class scope resolution operator on the interface
 // (§8.26.3).
 static void CollectInterfaceTypedefNames(
-    const ClassDecl* iface, const CompilationUnit* unit,
+    const ClassDecl* iface, const ClassLookup& look,
     std::unordered_set<std::string_view>& out,
     std::unordered_set<const ClassDecl*>& visited) {
   if (!visited.insert(iface).second) return;
   for (const auto* m : iface->members) {
     if (m->kind == ClassMemberKind::kTypedef) out.insert(m->name);
   }
-  ForEachInterfaceParent(iface, unit,
+  ForEachInterfaceParent(iface, look,
                          [&](const ClassDecl* parent, std::string_view,
                              const std::vector<DataType>&) {
-                           CollectInterfaceTypedefNames(parent, unit, out,
+                           CollectInterfaceTypedefNames(parent, look, out,
                                                         visited);
                          });
 }
@@ -646,15 +672,14 @@ static bool IsCompilationUnitTypeName(std::string_view name,
 // declare, mapped to the interface the class reaches it through. The first
 // interface to supply a name owns it.
 static std::unordered_map<std::string_view, std::string_view>
-CollectImplementedTypedefOwners(const ClassDecl* cls,
-                                const CompilationUnit* unit) {
+CollectImplementedTypedefOwners(const ClassDecl* cls, const ClassLookup& look) {
   std::unordered_map<std::string_view, std::string_view> owning_iface;
   for (const auto& iref : cls->implements_types) {
-    const auto* iface = FindClassDecl(iref.name, unit);
+    const auto* iface = FindClassDecl(iref.name, look.unit);
     if (!iface || !iface->is_interface) continue;
     std::unordered_set<std::string_view> names;
     std::unordered_set<const ClassDecl*> visited;
-    CollectInterfaceTypedefNames(iface, unit, names, visited);
+    CollectInterfaceTypedefNames(iface, look, names, visited);
     for (auto n : names) owning_iface.emplace(n, iref.name);
   }
   return owning_iface;
@@ -663,8 +688,9 @@ CollectImplementedTypedefOwners(const ClassDecl* cls,
 void Elaborator::ValidateImplementsTypeAccess(const ClassDecl* cls) {
   if (cls->is_interface || cls->implements_types.empty()) return;
 
+  ClassLookup look{unit_, cu_param_scope_};
   std::unordered_map<std::string_view, std::string_view> owning_iface =
-      CollectImplementedTypedefOwners(cls, unit_);
+      CollectImplementedTypedefOwners(cls, look);
   if (owning_iface.empty()) return;
 
   std::unordered_set<std::string_view> visible;
@@ -762,6 +788,7 @@ std::vector<ClassScope> DeclaredClassScopes(const CompilationUnit* unit) {
 }
 
 void Elaborator::ValidateInterfaceClassRules() {
+  ClassLookup look{unit_, cu_param_scope_};
   for (const auto& scope : DeclaredClassScopes(unit_)) {
     for (const auto* cls : scope.classes) {
       if (cls->is_interface) {
@@ -774,9 +801,9 @@ void Elaborator::ValidateInterfaceClassRules() {
         ValidateImplementsTypeAccess(cls);
       }
 
-      ValidateMethodNameConflicts(cls, unit_, diag_);
+      ValidateMethodNameConflicts(cls, look, diag_);
 
-      ValidateParamTypeConflicts(cls, unit_, diag_);
+      ValidateParamTypeConflicts(cls, look, diag_);
     }
   }
 }

@@ -302,4 +302,98 @@ TEST(InterfaceClassDiamond, SameSpecializationInsideAModuleOk) {
              "endmodule\n"));
 }
 
+// §8.26.6.3 rules that "Each unique parameterization of a parameterized
+// interface class is an interface class specialization", and that different
+// specializations of one parameterized interface class inherited by the same
+// interface class are not a diamond. IntfBase#(A) and IntfBase#(B) are
+// therefore different interface class types, so the parameter SIZE inherited
+// through both collides and must be resolved. The named constants are the
+// point of this test: it makes the same claim as
+// DifferentValueSpecializationsNotDiamondError above, which writes its
+// arguments as the literals 1 and 2, and a literal is the one form the
+// specialization key builder folds without consulting a parameter scope. That
+// test therefore passes whether the scope is consulted or not, and this one
+// does not.
+TEST(InterfaceClassSpecialization,
+     TwoLocalparamArgumentsAreTwoSpecializations) {
+  ElabFixture f;
+  ElabOk(
+      "localparam int A = 1;\n"
+      "localparam int B = 2;\n"
+      "interface class IntfBase #(int P = 1);\n"
+      "  parameter SIZE = 8;\n"
+      "endclass\n"
+      "interface class IntfExt1 extends IntfBase#(A);\n"
+      "  pure virtual function bit funcExt1();\n"
+      "endclass\n"
+      "interface class IntfExt2 extends IntfBase#(B);\n"
+      "  pure virtual function bit funcExt2();\n"
+      "endclass\n"
+      "interface class IntfFinal extends IntfExt1, IntfExt2;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "is inherited from multiple interface classes and must be overridden", 12,
+      "8.26.6.2"));
+}
+
+// §8.26.6.3 rules that where inherited parameters "originate from the same
+// interface class ... only one copy of SIZE shall be inherited ... so it shall
+// not be considered a conflict". This is the boundary that rules out keying a
+// specialization by the source position of its argument: two extends clauses
+// naming the one localparam A are the one parameterization, and splitting them
+// would report a conflict between a parameterization and itself. This test
+// passes both before and after the change asked for by
+// InterfaceClassSpecialization.TwoLocalparamArgumentsAreTwoSpecializations,
+// and it is here to keep that fix from over-splitting.
+TEST(InterfaceClassSpecialization,
+     OneLocalparamArgumentReachedTwiceIsOneSpecialization) {
+  EXPECT_TRUE(
+      ElabOk("localparam int A = 1;\n"
+             "interface class IntfBase #(int P = 1);\n"
+             "  parameter SIZE = 8;\n"
+             "endclass\n"
+             "interface class IntfExt1 extends IntfBase#(A);\n"
+             "  pure virtual function bit funcExt1();\n"
+             "endclass\n"
+             "interface class IntfExt2 extends IntfBase#(A);\n"
+             "  pure virtual function bit funcExt2();\n"
+             "endclass\n"
+             "interface class IntfFinal extends IntfExt1, IntfExt2;\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// §8.26.6.3 makes a specialization unique by its parameterization, not by how
+// the argument was spelled, so the literal 2 and a localparam equal to 2 name
+// the one specialization of IntfBase and the parameter SIZE reached through
+// both merges to a single copy. This fails today in the opposite direction
+// from
+// InterfaceClassSpecialization.TwoLocalparamArgumentsAreTwoSpecializations:
+// the literal folds to the key fragment v2 and the localparam does not fold at
+// all, so the two keys differ and a conflict is reported between two
+// parameterizations that are in fact the same one.
+TEST(InterfaceClassSpecialization,
+     ALiteralAndALocalparamOfEqualValueAreOneSpecialization) {
+  EXPECT_TRUE(
+      ElabOk("localparam int A = 2;\n"
+             "interface class IntfBase #(int P = 1);\n"
+             "  parameter SIZE = 8;\n"
+             "endclass\n"
+             "interface class IntfExt1 extends IntfBase#(2);\n"
+             "  pure virtual function bit funcExt1();\n"
+             "endclass\n"
+             "interface class IntfExt2 extends IntfBase#(A);\n"
+             "  pure virtual function bit funcExt2();\n"
+             "endclass\n"
+             "interface class IntfFinal extends IntfExt1, IntfExt2;\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 }  // namespace
