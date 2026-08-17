@@ -37,4 +37,21 @@ TEST(StringParamOverride,
             "resolvers\n");
 }
 
+// The positional form of the same override. §23.10.2.1 resolves an ordered
+// list at a site of its own from the named one, so a repair reaching only the
+// named path would leave this displaying "mith".
+TEST(StringParamOverride,
+     APositionalOverrideNamingAnotherParameterKeepsEveryCharacter) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child #(parameter string NAME = \"x\") ();\n"
+                       "  initial $display(\"%s\", NAME);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  parameter string WANTED = \"John Smith\";\n"
+                       "  child #(WANTED) u();\n"
+                       "endmodule\n",
+                       f),
+            "John Smith\n");
+}
+
 }  // namespace

@@ -235,4 +235,29 @@ TEST(StringLenElaboration, LenOfAnAllNulInitializerIsZero) {
   EXPECT_EQ(n->resolved_value, 0);
 }
 
+// §11.2.1 lists "parameters" among the operands a constant expression consists
+// of, so `B = A` is one and B holds A's ten characters. len() folding to 10 is
+// what says the characters were recorded: StringParamLength answers nothing at
+// all unless RtlirParamDecl::is_string_value is set, so before this the call
+// did not fold rather than folding wrong.
+TEST(StringLenElaboration,
+     LenOfAParameterInitializedFromAnotherParameterFoldsToTheCharacterCount) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter string A = \"John Smith\";\n"
+      "  parameter string B = A;\n"
+      "  localparam int N = B.len();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const RtlirParamDecl* n = nullptr;
+  for (const auto& param : design->top_modules[0]->params) {
+    if (param.name == "N") n = &param;
+  }
+  ASSERT_NE(n, nullptr);
+  EXPECT_TRUE(n->is_resolved);
+  EXPECT_EQ(n->resolved_value, 10);
+}
+
 }  // namespace

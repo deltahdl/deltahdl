@@ -222,6 +222,13 @@ static void ReplaceStringParamValue(RtlirParamDecl& pd, const Expr* val_expr,
 }
 
 void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
+  // §6.16: a defparam's right-hand side is written in the module holding the
+  // defparam statement, so that module's parameters are what a name in it
+  // means, and registering it is what lets ConstEvalString read the characters
+  // of one. ApplyDefparamsRecursively runs outside every module, so without
+  // this no module is registered and a defparam naming a string parameter
+  // recovers nothing.
+  ParamRangeRegistryGuard param_range_guard(mod);
   ScopeMap scope = BuildParamScope(mod);
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kDefparam) continue;

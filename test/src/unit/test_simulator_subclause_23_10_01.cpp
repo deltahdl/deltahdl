@@ -107,4 +107,30 @@ TEST(DefparamSimulation, OverriddenStringParameterLongerThanEightCharacters) {
   EXPECT_EQ(Logic4VecToString(var->value), "John Smith");
 }
 
+// §23.10.1: a defparam's right-hand side is a constant expression, and §11.2.1
+// makes a parameter one. The name is written in the module holding the defparam
+// statement, so that module's parameters are what supplies the characters.
+// Before this the fold failed, ReplaceStringParamValue cleared is_string_value,
+// and the lowering fell back to the packed number.
+TEST(DefparamSimulation, ADefparamNamingAnotherParameterKeepsEveryCharacter) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child;\n"
+      "  parameter string P = \"abc\";\n"
+      "endmodule\n"
+      "module top;\n"
+      "  parameter string WANTED = \"John Smith\";\n"
+      "  child u();\n"
+      "  defparam u.P = WANTED;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("u.P");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(Logic4VecToString(var->value), "John Smith");
+}
+
 }  // namespace

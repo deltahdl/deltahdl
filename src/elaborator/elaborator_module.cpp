@@ -824,8 +824,19 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
     // Only where the value came from `pval`, the declaration's own initializer.
     // An overridden parameter no longer has that value, and ApplyParamOverride
     // has already recorded the characters of the one that replaced it.
-    if (pval && has_param_type && !pd.from_override)
+    //
+    // §6.16: registering this module is what lets a string parameter port
+    // written in terms of an earlier one read that one's characters, since
+    // ConstEvalString resolves a name against the registered module's
+    // parameters. It is opened around this call alone rather than around the
+    // loop, because ApplyParamOverride above folds an expression written in the
+    // instantiating parent, and the parent's registration -- live from the item
+    // loop this instantiation is an item of -- is the one that expression's
+    // names mean something in.
+    if (pval && has_param_type && !pd.from_override) {
+      ParamRangeRegistryGuard param_range_guard(mod);
       RecordStringParamValue(pd, pval, param_type, arena_);
+    }
     CheckTypeParamValueAssignable(decl, i, pval, scope, tp_ctx);
     mod->params.push_back(pd);
   }

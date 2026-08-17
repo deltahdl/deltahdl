@@ -72,4 +72,23 @@ TEST(StringParamOverride,
   EXPECT_TRUE(f.ctx.IsStringVariable("u.NAME"));
 }
 
+// §23.10.2 admits a constant expression as an instance parameter value
+// assignment, and §11.2.1 makes a parameter one of the operands such an
+// expression consists of. The name is written in the instantiating module, so
+// its characters are the parent's to supply; a fold that took only a literal
+// left NAME holding the packed number and displayed "mith".
+TEST(StringParamOverride,
+     ANamedOverrideNamingAnotherParameterKeepsEveryCharacter) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child #(parameter string NAME = \"x\") ();\n"
+                       "  initial $display(\"%s\", NAME);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  parameter string WANTED = \"John Smith\";\n"
+                       "  child #(.NAME(WANTED)) u();\n"
+                       "endmodule\n",
+                       f),
+            "John Smith\n");
+}
+
 }  // namespace

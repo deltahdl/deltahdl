@@ -86,9 +86,20 @@ std::optional<int64_t> ConstEvalInt(const Expr* expr, const ScopeMap& scope);
 std::optional<double> ConstEvalReal(const Expr* expr);
 std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope);
 
-// §6.16: the characters of a constant string expression, with the quotes
-// removed and each escape replaced by the one character it stands for. Empty
-// for an expression that is not a string literal.
+// §6.16: the characters of a constant string expression -- a string literal
+// with its quotes removed and each escape replaced by the one character it
+// stands for, a parameter of the module a live ParamRangeRegistryGuard
+// registered, or a concatenation or replication of those, which Table 6-9
+// defines over string operands. §6.16 rules that "strings can be of arbitrary
+// length and no truncation occurs", which is why the characters are answered
+// separately from the §11.10 packed number ConstEvalStringLiteral computes:
+// that keeps only the low 64 bits, so a value of more than eight characters is
+// no longer recoverable from it.
+//
+// A string literal of no characters answers an empty string rather than
+// std::nullopt, which is what lets §6.16.1 -- "if str is "", then str.len()
+// returns 0" -- be answered. Empty for every other expression, and for a name
+// the registered module declares no string parameter under.
 std::optional<std::string> ConstEvalString(const Expr* expr);
 
 bool IsConstantExpr(const Expr* expr, const ScopeMap& scope);

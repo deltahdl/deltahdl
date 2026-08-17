@@ -535,4 +535,51 @@ TEST(StringDataType, StringParameterIsRegisteredAsAStringVariable) {
   EXPECT_TRUE(f.ctx.IsStringVariable("NAME"));
 }
 
+// §11.2.1 lists "parameters" among the operands a constant expression consists
+// of, so `parameter string B = A;` is one, and §6.16 rules that with the string
+// type "strings can be of arbitrary length and no truncation occurs". A fold
+// that took only a literal left B holding the §11.10 packed number instead,
+// which is 32 bits wide because a string carries no declared width, so exactly
+// the last four characters survived and this printed "mith".
+TEST(StringDataType,
+     AParameterInitializedFromAnotherStringParameterKeepsEveryCharacter) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  parameter string A = \"John Smith\";\n"
+                       "  parameter string B = A;\n"
+                       "  initial $display(\"%s\", B);\n"
+                       "endmodule\n",
+                       f),
+            "John Smith\n");
+}
+
+// Table 6-9 of §6.16 defines concatenation over string operands, so this is a
+// second kind of constant string expression rather than the identifier case
+// restated: a repair that resolved only a name would leave this truncated.
+TEST(StringDataType,
+     AParameterInitializedFromAStringConcatenationKeepsEveryCharacter) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  parameter string B = {\"John\", \" Smith\"};\n"
+                       "  initial $display(\"%s\", B);\n"
+                       "endmodule\n",
+                       f),
+            "John Smith\n");
+}
+
+// Table 6-9 defines replication in the row below concatenation, and gives the
+// result as "M concatenated copies of the inner concatenation". Three copies of
+// two characters is six, which is more than the four a packed 32-bit value
+// holds, so a truncating fold cannot reach this answer.
+TEST(StringDataType,
+     AParameterInitializedFromAStringReplicationKeepsEveryCharacter) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  parameter string B = {3{\"ab\"}};\n"
+                       "  initial $display(\"%s\", B);\n"
+                       "endmodule\n",
+                       f),
+            "ababab\n");
+}
+
 }  // namespace

@@ -7,6 +7,7 @@
 #include <string>
 
 #include "elaborator/const_eval_internal.h"
+#include "elaborator/rtlir.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 
@@ -438,24 +439,6 @@ static bool ConstDecodeEscape(std::string_view text, size_t& i, uint8_t& out) {
   return true;
 }
 
-// Returns the characters a string literal denotes, with the quotes removed and
-// each escape replaced by the one character it stands for, except that a zero
-// byte contributes no character at all. §6.16 rules that "A string variable
-// shall not contain the special character "\0". Assigning the value 0 to a
-// string character shall be ignored" (printed page 112 of IEEE 1800-2023), so
-// the value of "a\0b" is the two characters "ab" and its length is 2. Dropping
-// the character rather than reporting it is what the second sentence says to
-// do, and src/simulator/eval_string.cpp does the same thing to the run-time
-// value in StripStringZeros and in StringWriteByte.
-//
-// §6.16 also rules that "strings can be of arbitrary length and no truncation
-// occurs", while the packed form ConstEvalStringLiteral computes keeps only the
-// low 64 bits. A string of more than eight characters is therefore no longer
-// recoverable from that packed value, which is why the characters are kept
-// separately from it. Returns std::nullopt for an expression that is not a
-// string literal. A string literal of no characters returns an empty string
-// rather than std::nullopt, which is what lets §6.16.1 -- "if str is "", then
-// str.len() returns 0" -- be answered.
 // The text a string literal's quotes enclose. §5.9 gives the literal two
 // spellings, and the triple-quoted one carries three quote characters at each
 // end rather than one.
@@ -469,10 +452,17 @@ static std::string_view StringLiteralBody(std::string_view text) {
   return text;
 }
 
-std::optional<std::string> ConstEvalString(const Expr* expr) {
-  if (!expr || expr->kind != ExprKind::kStringLiteral) return std::nullopt;
+// The characters one string literal denotes, with the quotes removed and each
+// escape replaced by the one character it stands for, except that a zero byte
+// contributes no character at all. §6.16 rules that "A string variable shall
+// not contain the special character "\0". Assigning the value 0 to a string
+// character shall be ignored" (printed page 112 of IEEE 1800-2023), so the
+// value of "a\0b" is the two characters "ab" and its length is 2. Dropping the
+// character rather than reporting it is what the second sentence says to do,
+// and src/simulator/eval_string.cpp does the same thing to the run-time value
+// in StripStringZeros and in StringWriteByte.
+static std::string StringLiteralChars(const Expr* expr) {
   std::string_view text = StringLiteralBody(expr->text);
-
   std::string chars;
   for (size_t i = 0; i < text.size(); ++i) {
     uint8_t byte = 0;
@@ -482,13 +472,90 @@ std::optional<std::string> ConstEvalString(const Expr* expr) {
     } else {
       byte = static_cast<uint8_t>(text[i]);
     }
-    // §6.16: the character a zero byte would be is the one a string variable
-    // "shall not contain", and it is dropped here rather than at each reader so
-    // that the length, a substr, a getc and an index all see the same value.
     if (byte == 0) continue;
     chars.push_back(static_cast<char>(byte));
   }
   return chars;
+}
+
+// The characters a name stands for, where it names a parameter of the module a
+// live ParamRangeRegistryGuard registered. §11.2.1 lists "parameters" among the
+// operands a constant expression consists of, so `parameter string B = A;` is a
+// constant expression whose value is A's characters.
+//
+// The registered module rather than a ScopeMap is what answers this, for the
+// reason StringParamLength in src/elaborator/const_eval_builtin_method.cpp
+// gives for reading the same field: a ScopeMap maps a name to an int64_t and
+// drops RtlirParamDecl::resolved_string on the way, so a string value cannot be
+// recovered from one. Empty for a name the module declares no parameter under
+// and for a parameter that took a value of some other type.
+static std::optional<std::string> StringParamChars(const Expr* expr) {
+  const RtlirModule* mod = RegisteredModule();
+  if (mod == nullptr) return std::nullopt;
+  for (const auto& param : mod->params) {
+    if (param.name != expr->text) continue;
+    if (!param.is_string_value) return std::nullopt;
+    return std::string(param.resolved_string);
+  }
+  return std::nullopt;
+}
+
+// The resolved parameters of the registered module as a scope, so a replication
+// multiplier written as a parameter name folds. §6.16's Table 6-9 makes the
+// multiplier an "expression of integral type", which ConstEvalInt answers.
+static ScopeMap RegisteredModuleScope() {
+  ScopeMap scope;
+  const RtlirModule* mod = RegisteredModule();
+  if (mod == nullptr) return scope;
+  for (const auto& param : mod->params) {
+    if (param.is_resolved) scope[param.name] = param.resolved_value;
+  }
+  return scope;
+}
+
+// §6.16's Table 6-9 (printed page 114) gives concatenation over string
+// operands: "Each operand can be a string literal or an expression of string
+// type ... the result of the concatenation shall be of string type." Empty
+// where any operand does not fold, since a concatenation missing an operand has
+// no characters.
+static std::optional<std::string> ConcatenatedStringChars(const Expr* expr) {
+  std::string chars;
+  for (const Expr* element : expr->elements) {
+    auto part = ConstEvalString(element);
+    if (!part) return std::nullopt;
+    chars += *part;
+  }
+  return chars;
+}
+
+// §6.16's Table 6-9 on the same page gives replication: "the result of the
+// replication shall be M concatenated copies of the inner concatenation (where
+// M is the value of multiplier)". A multiplier of zero gives the empty string,
+// which the table states outright.
+static std::optional<std::string> ReplicatedStringChars(const Expr* expr) {
+  auto count = ConstEvalInt(expr->repeat_count, RegisteredModuleScope());
+  if (!count || *count < 0) return std::nullopt;
+  auto inner = ConcatenatedStringChars(expr);
+  if (!inner) return std::nullopt;
+  std::string chars;
+  for (int64_t i = 0; i < *count; ++i) chars += *inner;
+  return chars;
+}
+
+std::optional<std::string> ConstEvalString(const Expr* expr) {
+  if (expr == nullptr) return std::nullopt;
+  switch (expr->kind) {
+    case ExprKind::kStringLiteral:
+      return StringLiteralChars(expr);
+    case ExprKind::kIdentifier:
+      return StringParamChars(expr);
+    case ExprKind::kConcatenation:
+      return ConcatenatedStringChars(expr);
+    case ExprKind::kReplicate:
+      return ReplicatedStringChars(expr);
+    default:
+      return std::nullopt;
+  }
 }
 
 // §11.10: a string literal operand is a constant number formed from the 8-bit
