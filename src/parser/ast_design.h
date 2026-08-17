@@ -211,20 +211,45 @@ inline void AppendCellDeclarations(CompilationUnit& target,
 // scope is not a package, it can contain any item that can be defined within a
 // package (see 26.2) and bind constructs as well (see 23.11)". The parser
 // leaves those in `cu_items`, `classes`, `bind_directives` and
-// `external_constraints`, and this moves all four onto `target`. Nothing is
-// copied, exactly as in AppendCellDeclarations: the declarations stay in the
-// arena that parsed them.
+// `external_constraints`, and leaves the time unit and precision the scope
+// declared in `cu_time_unit`, `cu_time_prec`, their two magnitudes and the two
+// `has_` flags guarding them. This moves all of it onto `target`. The four
+// lists are not copied, exactly as in AppendCellDeclarations: the declarations
+// stay in the arena that parsed them.
+//
+// The time unit travels with the compilation-unit declarations rather than with
+// the cells because §3.14.2.2 is what puts it in this scope: "There shall be at
+// most one time unit and one time precision for any module, program, package,
+// or interface definition or in any compilation-unit scope."
 //
 // This exists beside AppendCellDeclarations because §3.12.1 states two use
 // models a tool has to offer and they want opposite answers about these four
-// lists. Case a) is "all files on a given compilation command line make a
-// single compilation unit (in which case the declarations within those files
-// are accessible following normal visibility rules throughout the entire set of
-// files)", so a caller merging a command line calls both functions. Case b) is
-// "each file is a separate compilation unit (in which case the declarations in
-// each compilation-unit scope are accessible only within its corresponding
-// file)", so a caller reading a separately compiled source description back
-// calls AppendCellDeclarations alone and this not at all.
+// lists and about the time unit. Case a) is "all files on a given compilation
+// command line make a single compilation unit (in which case the declarations
+// within those files are accessible following normal visibility rules
+// throughout the entire set of files)", so a caller merging a command line
+// calls both functions and the time unit one file declared is the merged unit's
+// too. Case b) is "each file is a separate compilation unit (in which case the
+// declarations in each compilation-unit scope are accessible only within its
+// corresponding file)", so a caller reading a separately compiled source
+// description back calls AppendCellDeclarations alone and this not at all,
+// which is what leaves that file's time unit behind with its declarations.
+//
+// A `target` that already declares a time unit keeps it, and the precision is
+// decided the same way and separately: the file that declared it first is the
+// one the merged unit reports, which is the rule MergeCompilationUnitScope in
+// src/parser/scope_type_names.h states for the names of the same scope.
+// §3.14.2.2 makes the choice unobservable in conforming source, because a
+// repeat "shall match the previous declaration within the current time scope"
+// and so gives the same answer whichever declaration is kept. A repeat that
+// does not match is an error, and CheckCuTimeunitConsistency in
+// src/parser/parser.cpp reports it within one file, by comparing the members
+// against a snapshot taken before the declaration was parsed. It cannot report
+// it across two, because each file is parsed by its own Parser into its own
+// CompilationUnit and so snapshots a unit holding no earlier file's
+// declaration; this function merges the two without comparing them. Each half
+// is taken only under `src`'s own flag, so a file declaring nothing cannot put
+// the struct default over what an earlier file declared.
 //
 // The libraries the design elements were tagged with do not enter into it. A
 // compilation-unit declaration belongs to no library and is given no library
@@ -242,6 +267,16 @@ inline void AppendCompilationUnitDeclarations(CompilationUnit& target,
   target.external_constraints.insert(target.external_constraints.end(),
                                      src.external_constraints.begin(),
                                      src.external_constraints.end());
+  if (src.has_cu_timeunit && !target.has_cu_timeunit) {
+    target.cu_time_unit = src.cu_time_unit;
+    target.cu_time_unit_magnitude = src.cu_time_unit_magnitude;
+    target.has_cu_timeunit = true;
+  }
+  if (src.has_cu_timeprecision && !target.has_cu_timeprecision) {
+    target.cu_time_prec = src.cu_time_prec;
+    target.cu_time_prec_magnitude = src.cu_time_prec_magnitude;
+    target.has_cu_timeprecision = true;
+  }
 }
 
 }  // namespace delta

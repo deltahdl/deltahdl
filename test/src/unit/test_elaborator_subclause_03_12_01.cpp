@@ -824,3 +824,80 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
   EXPECT_TRUE(
       ReportedError(h.diag.Diagnostics(), "expected ';', got '('", 3, "6.8"));
 }
+
+TEST(CompilationUnitScopeAcrossCommandLineFiles,
+     ASkippedRecompileCarriesTheCompilationUnitTimeunit) {
+  // Two command lines off one SinglePassCompiler, each naming src/only.sv and
+  // nothing else, and each compiled into a compilation unit of its own. The
+  // first takes SinglePassCompiler::MapIntoLibrary, which parses the
+  // description and appends its declarations at
+  // src/parser/single_pass_compile.cpp:179-180. The second finds that
+  // description already compiled from this same text with its cell still held
+  // in rtlLib, so SinglePassCompiler::CompileSource takes the reuse path and
+  // appends the declarations of that same parse at
+  // src/parser/single_pass_compile.cpp:210-211 without parsing anything.
+  //
+  // §3.14.2.2 puts a timeunit declaration written outside every design element
+  // in the compilation-unit scope -- "There shall be at most one time unit and
+  // one time precision for any module, program, package, or interface
+  // definition or in any compilation-unit scope" -- and §20.4.1 makes that
+  // scope's time unit the $unit argument's, which is what
+  // RtlirDesign::cu_timescale holds. One description declares it, so the two
+  // runs have to report it alike: a carry written into MapIntoLibrary alone
+  // would make a design's time unit turn on whether this run compiled the file
+  // or an earlier one did, which is the difference §3.12.1 case a) leaves no
+  // room for.
+  //
+  // `timeunit 100ps / 10fs;` is §3.14.2.2's own example, and each of its four
+  // values differs from the one a compilation unit that declared nothing
+  // leaves: TimeScale in src/common/types.h starts at 1 ns / 1 ns. The unit
+  // and the precision also name different units, so a carry that wrote one of
+  // them into the other fails here as well.
+  ScratchDir tmp;
+  tmp.Write("lib.map", kLibMap);
+  auto only = tmp.Write("src/only.sv",
+                        "timeunit 100ps / 10fs;\n"
+                        "module top;\n"
+                        "endmodule\n");
+
+  // The library map is loaded once for both command lines, since
+  // LibraryMap::LoadMapFile adds every declaration the file holds each time it
+  // is called.
+  CommandLineHarness h;
+  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
+  ASSERT_TRUE(h.compiler.CompileCommandLine({only}, h.unit));
+  Elaborator first_elab(h.arena, h.diag, &h.unit);
+  auto* first = first_elab.Elaborate("top");
+  ASSERT_NE(first, nullptr);
+  const LibraryCell* compiled = h.libs.CellInLibrary("rtlLib", "top");
+  ASSERT_NE(compiled, nullptr);
+  auto compiled_file_id = compiled->loc.file_id;
+
+  // The second command line is given a compilation unit of its own, which
+  // SinglePassCompiler::CompileCommandLine in src/parser/single_pass_compile.h
+  // requires: "Pass a compilation unit that no earlier command line has already
+  // been compiled into."
+  CompilationUnit second_unit;
+  ASSERT_TRUE(h.compiler.CompileCommandLine({only}, second_unit));
+  // That the second run reused the first parse rather than making another one.
+  // SourceManager::AddFile hands back a file identifier one higher than the
+  // last on every call, and MapIntoLibrary is what calls it, so top still
+  // standing in the file the first run registered says nothing parsed the
+  // description again.
+  const LibraryCell* reused = h.libs.CellInLibrary("rtlLib", "top");
+  ASSERT_NE(reused, nullptr);
+  ASSERT_EQ(reused->loc.file_id, compiled_file_id);
+
+  Elaborator second_elab(h.arena, h.diag, &second_unit);
+  auto* second = second_elab.Elaborate("top");
+  ASSERT_NE(second, nullptr);
+  EXPECT_FALSE(h.diag.HasErrors());
+  EXPECT_EQ(first->cu_timescale.unit, TimeUnit::kPs);
+  EXPECT_EQ(first->cu_timescale.magnitude, 100);
+  EXPECT_EQ(first->cu_timescale.precision, TimeUnit::kFs);
+  EXPECT_EQ(first->cu_timescale.prec_magnitude, 10);
+  EXPECT_EQ(second->cu_timescale.unit, TimeUnit::kPs);
+  EXPECT_EQ(second->cu_timescale.magnitude, 100);
+  EXPECT_EQ(second->cu_timescale.precision, TimeUnit::kFs);
+  EXPECT_EQ(second->cu_timescale.prec_magnitude, 10);
+}
