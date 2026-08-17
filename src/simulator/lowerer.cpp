@@ -648,18 +648,17 @@ void Lowerer::LowerParams(const RtlirModule* mod) {
     // because what reads a string reads SimContext::IsStringVariable rather
     // than the width.
     //
-    // from_override excludes a parameter whose value an override replaced,
-    // because for such a parameter resolved_string holds the characters of the
-    // declaration's own initializer and not the ones it now has.
-    // Elaborator::ParamList carries an int64_t, so no override path records
-    // characters at all: Elaborator::ElaborateParamPortList already withholds
-    // RecordStringParamValue from an overridden parameter at
-    // elaborator_module.cpp, while Elaborator::ElaborateParamDecl records it
-    // unconditionally and a defparam then overwrites resolved_value alone. The
-    // fallback below reads resolved_value, which every override does write, so
-    // an overridden string parameter keeps the value its override gave it.
-    // #3177 is what makes those characters survive.
-    if (p.is_string_value && !p.from_override) {
+    // An overridden parameter is read here too, because is_string_value being
+    // set says resolved_string holds the value the parameter has now rather
+    // than the one it was declared with. ApplyParamOverride records the
+    // characters for §23.10.2's two instance forms and for a configuration, on
+    // a parameter whose is_string_value is still clear and whose declared
+    // initializer Elaborator::ElaborateParamPortList then withholds; an
+    // override that is not a string literal therefore leaves the flag clear.
+    // Elaborator::ApplyDefparams records them for §23.10.1's defparam, where
+    // the declaration's own characters are already recorded by then, so it
+    // clears the flag itself when the right-hand side is not a string literal.
+    if (p.is_string_value) {
       auto chars = StripStringZeros(
           StringToLogic4Vec(arena_, p.resolved_string), arena_);
       auto* svar = ctx_.CreateVariable(*full, chars.width);

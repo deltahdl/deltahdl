@@ -26,6 +26,7 @@ struct ClassScope;
 
 class Arena;
 class DiagEngine;
+struct Expr;
 struct RtlirDesign;
 struct RtlirModule;
 struct RtlirVariable;
@@ -34,7 +35,28 @@ struct RtlirParamDecl;
 
 class Elaborator : public ElaboratorData {
  public:
-  using ParamList = std::vector<std::pair<std::string_view, int64_t>>;
+  // §23.10.2: a module instance parameter value assignment "supplies values for
+  // particular instances of a module to any parameters that have been specified
+  // in the definition of that module", and this is what one override is worth
+  // between the fold that reads it and the RtlirParamDecl that receives it.
+  //
+  // The value is carried twice because one form of it cannot express the other.
+  // `value` is the §11.10 packed number, which is what every integral parameter
+  // reads and what ConvertOverrideValue coerces to the declared width.
+  // `value_expr` is the expression that number was folded from, which is what a
+  // parameter declared string needs: §6.16 gives such a parameter a value of
+  // arbitrary length, and an int64_t holds eight characters of one. Keeping the
+  // expression rather than a second folded form lets RecordStringParamValue
+  // recover the characters with the ConstEvalString it already calls for a
+  // declaration's own initializer, so both ends of the override path spell a
+  // string value the same way.
+  struct ParamOverride {
+    std::string_view name;
+    int64_t value = 0;
+    const Expr* value_expr = nullptr;
+  };
+
+  using ParamList = std::vector<ParamOverride>;
 
   Elaborator(Arena& arena, DiagEngine& diag, CompilationUnit* unit);
 

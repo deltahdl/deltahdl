@@ -172,6 +172,13 @@ bool TryFoldRealParamValue(RtlirParamDecl& pd, const Expr* init,
 void RecordStringParamValue(RtlirParamDecl& pd, const Expr* init,
                             const DataType* dtype, Arena& arena);
 
+// The same recording without the check on the declared type, for a caller that
+// already knows the parameter holds a string value and is replacing the
+// characters rather than establishing them. Returns false, leaving `pd`
+// untouched, when `init` does not fold to a constant string -- which tells such
+// a caller that the characters it meant to replace are still the old ones.
+bool RecordStringParamChars(RtlirParamDecl& pd, const Expr* init, Arena& arena);
+
 std::string_view ExprIdent(const Expr* e);
 const ClassDecl* FindClassDecl(std::string_view name,
                                const CompilationUnit* unit);

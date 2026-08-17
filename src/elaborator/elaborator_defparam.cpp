@@ -224,6 +224,18 @@ void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
       param->resolved_value = *value;
       param->is_resolved = true;
       param->from_override = true;
+      // §6.16: a defparam replaces the whole of the parameter's value, and for
+      // one declared string that value is characters rather than the §11.10
+      // packed number resolved_value holds. Elaborator::ElaborateParamDecl has
+      // already recorded the declaration's own characters by the time a
+      // defparam lands, so they are replaced here or the value the defparam
+      // overrode is what Lowerer::LowerParams reads. Clearing is_string_value
+      // where the right-hand side is not a string literal is what sends the
+      // lowering to resolved_value, which EvalDefparamOverride did write, in
+      // preference to characters that are no longer the parameter's.
+      if (param->is_string_value &&
+          !RecordStringParamChars(*param, val_expr, arena_))
+        param->is_string_value = false;
 
       RecomputeDependentParams(target_mod);
       applied_defparams_.insert(key);

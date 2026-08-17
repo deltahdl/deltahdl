@@ -376,7 +376,7 @@ void DropParamOverride(Elaborator::ParamList& child_params,
   Elaborator::ParamList kept;
   kept.reserve(child_params.size());
   for (const auto& e : child_params) {
-    if (e.first != pname) kept.push_back(e);
+    if (e.name != pname) kept.push_back(e);
   }
   child_params.swap(kept);
 }
@@ -393,7 +393,7 @@ void ResetAllConfigParams(const ModuleDecl* child_decl,
     locked.push_back(dname);
     if (dexpr) {
       if (auto val = ConstEvalInt(dexpr)) {
-        child_params.push_back({dname, *val});
+        child_params.push_back({dname, *val, dexpr});
       }
     }
   }
@@ -424,7 +424,7 @@ void ResolvePositionalInstParams(const ModuleItem* item,
     auto* pexpr = item->inst_params[i].second;
     if (!pexpr) continue;
     auto val = ConstEvalInt(pexpr, parent_scope);
-    if (val) child_params.push_back({targets[i], *val});
+    if (val) child_params.push_back({targets[i], *val, pexpr});
   }
 }
 
@@ -450,7 +450,7 @@ void ResolveNamedInstParams(const ModuleItem* item,
     }
     if (!pexpr) continue;
     auto val = ConstEvalInt(pexpr, parent_scope);
-    if (val) child_params.push_back({pname, *val});
+    if (val) child_params.push_back({pname, *val, pexpr});
   }
 }
 
@@ -531,7 +531,7 @@ void ApplyConfigOverrideParams(
     DropParamOverride(child_params, pname);
     if (pexpr) {
       if (auto val = ConstEvalInt(pexpr, scope)) {
-        child_params.push_back({pname, *val});
+        child_params.push_back({pname, *val, pexpr});
       }
     }
     locked.push_back(pname);

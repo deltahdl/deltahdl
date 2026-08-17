@@ -83,4 +83,28 @@ TEST(DefparamSimulation, OverriddenStringParameterVisibleAtRuntime) {
   EXPECT_EQ(Logic4VecToString(var->value), "xyz");
 }
 
+// Ten characters is past what EvalDefparamOverride's int64_t can carry, so this
+// case separates the recording of the override's own characters from the §11.10
+// packed fold beside it. The three-character case above passes on the packed
+// value alone and says nothing about a longer one.
+TEST(DefparamSimulation, OverriddenStringParameterLongerThanEightCharacters) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child;\n"
+      "  parameter string P = \"abc\";\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u();\n"
+      "  defparam u.P = \"John Smith\";\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("u.P");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(Logic4VecToString(var->value), "John Smith");
+}
+
 }  // namespace

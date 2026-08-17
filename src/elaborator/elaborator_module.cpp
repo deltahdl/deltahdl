@@ -1,7 +1,6 @@
 #include <cmath>
 #include <cstdlib>
 #include <format>
-#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -17,14 +16,14 @@
 
 namespace delta {
 
-static std::optional<int64_t> FindParamOverride(
+static const Elaborator::ParamOverride* FindParamOverride(
     const Elaborator::ParamList& params, std::string_view name) {
-  for (const auto& [oname, oval] : params) {
-    if (oname == name) {
-      return oval;
+  for (const auto& ovr : params) {
+    if (ovr.name == name) {
+      return &ovr;
     }
   }
-  return std::nullopt;
+  return nullptr;
 }
 
 // §6.20.3: follow typedef and type-parameter substitutions to decide whether a
@@ -140,17 +139,28 @@ bool TryFoldRealParamValue(RtlirParamDecl& pd, const Expr* init,
 // returns. Does not touch resolved_value, which the §11.10 packed fold has
 // already written and which the rest of the elaborator reads. The characters
 // are copied into `arena` because resolved_string is a std::string_view and
-// outlives the std::string ConstEvalString returns. Does nothing for a
-// parameter of any other declared type, because §5.13 associates `len()` with
-// `string` alone.
-void RecordStringParamValue(RtlirParamDecl& pd, const Expr* init,
-                            const DataType* dtype, Arena& arena) {
-  if (!dtype || dtype->kind != DataTypeKind::kString) return;
+// outlives the std::string ConstEvalString returns. Returns false, having
+// changed nothing, when `init` is not a string literal, which is the answer a
+// caller replacing an already-recorded value needs.
+bool RecordStringParamChars(RtlirParamDecl& pd, const Expr* init,
+                            Arena& arena) {
   auto chars = ConstEvalString(init);
-  if (!chars) return;
+  if (!chars) return false;
   pd.resolved_string = {arena.AllocString(chars->c_str(), chars->size()),
                         chars->size()};
   pd.is_string_value = true;
+  return true;
+}
+
+// The same recording where the declared type decides whether it happens at all.
+// Does nothing for a parameter of any other declared type, because §5.13
+// associates `len()` with `string` alone, which is what leaves a string literal
+// initializing or overriding an integral parameter the §11.10 packed number
+// §11.10 makes it.
+void RecordStringParamValue(RtlirParamDecl& pd, const Expr* init,
+                            const DataType* dtype, Arena& arena) {
+  if (!dtype || dtype->kind != DataTypeKind::kString) return;
+  RecordStringParamChars(pd, init, arena);
 }
 
 int64_t ConvertOverrideValue(int64_t value, const RtlirParamDecl& pd) {
@@ -444,14 +454,23 @@ static void ReportParamsMissingValue(const ModuleDecl* decl,
 
 // Apply an instantiation override (if any) to a parameter, coercing the value
 // to the declared width per §6.20.2. Returns true when an override was applied.
+//
+// §6.16 is why `dtype` is here. A parameter declared string takes a value of
+// arbitrary length, which the coerced int64_t above cannot hold past eight
+// characters, so the override's own expression is folded a second time with the
+// characters as the answer. RecordStringParamValue does nothing unless `dtype`
+// is string, which is what keeps a string literal overriding an integral
+// parameter the §11.10 packed number it is there.
 static bool ApplyParamOverride(RtlirParamDecl& pd,
                                const Elaborator::ParamList& params,
-                               std::string_view pname) {
-  auto override_val = FindParamOverride(params, pname);
-  if (!override_val) return false;
-  pd.resolved_value = ConvertOverrideValue(*override_val, pd);
+                               std::string_view pname, const DataType* dtype,
+                               Arena& arena) {
+  const auto* ovr = FindParamOverride(params, pname);
+  if (!ovr) return false;
+  pd.resolved_value = ConvertOverrideValue(ovr->value, pd);
   pd.is_resolved = true;
   pd.from_override = true;
+  RecordStringParamValue(pd, ovr->value_expr, dtype, arena);
   return true;
 }
 
@@ -790,10 +809,10 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
                           decl->type_param_names.count(pname) == 0;
     RtlirParamDecl pd = BuildParamDeclShell(
         decl, i, {typedefs_, scope, real_param_names_}, has_param_type);
-    ApplyParamOverride(pd, params, pname);
+    const DataType* param_type =
+        has_param_type ? &decl->param_types[i] : nullptr;
+    ApplyParamOverride(pd, params, pname, param_type, arena_);
     if (!pd.is_resolved && pval) {
-      const DataType* param_type =
-          has_param_type ? &decl->param_types[i] : nullptr;
       bool refers_to_unbounded = pval->kind == ExprKind::kIdentifier &&
                                  RefersToUnboundedParam(mod, pval->text);
       bool contains_dollar = ContainsDollarSubexpr(pval);
@@ -803,12 +822,10 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
       ResolveUnresolvedParamValue(pd, val, scope, diag_);
     }
     // Only where the value came from `pval`, the declaration's own initializer.
-    // ApplyParamOverride takes its value from Elaborator::ParamList, which is a
-    // vector of int64_t and carries no characters, so recording `pval` for an
-    // overridden parameter would record the length of a value the parameter no
-    // longer has.
+    // An overridden parameter no longer has that value, and ApplyParamOverride
+    // has already recorded the characters of the one that replaced it.
     if (pval && has_param_type && !pd.from_override)
-      RecordStringParamValue(pd, pval, &decl->param_types[i], arena_);
+      RecordStringParamValue(pd, pval, param_type, arena_);
     CheckTypeParamValueAssignable(decl, i, pval, scope, tp_ctx);
     mod->params.push_back(pd);
   }
