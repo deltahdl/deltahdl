@@ -5,10 +5,11 @@
 namespace delta {
 
 // §6.16: whether one of the string methods writes the string it is called on.
-// Six of the fifteen do -- §6.16.2's putc replaces a character, and §6.16.10
-// through §6.16.14's itoa, hextoa, octtoa, bintoa and realtoa each store a
+// Six of the eighteen do -- §6.16.2's putc replaces a character, and §6.16.11
+// through §6.16.15's itoa, hextoa, octtoa, bintoa and realtoa each store a
 // converted number into the string -- and the rest answer a value and leave
-// their object alone.
+// their object alone. Eighteen counts methods rather than subclauses, of which
+// §6.16 has fifteen: §6.16.9 defines atoi, atohex, atooct and atobin together.
 //
 // The question has two askers, which is why it is not answered inside either.
 // The simulator dispatches these six to the helpers that perform the write, and
