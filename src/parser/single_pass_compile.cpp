@@ -147,9 +147,21 @@ CompileOutcome SinglePassCompiler::MapIntoLibrary(const std::string& path,
   // Every cell the description declares goes into the library, whether or not
   // the design being built instantiates it. Only a module collides with
   // another module of its name loudly enough to warn about (§33.3.1.1).
+  //
+  // All seven design element kinds, in the order AppendCellDeclarations in
+  // src/parser/ast_design.h moves them. §33.2.1 rules that "a library is a
+  // named collection of cells" and that "a cell is a design element (see 3.2),
+  // such as a module, primitive, interface, program, package, or
+  // configuration"; its six are introduced by "such as", and §3.2 names seven:
+  // "a SystemVerilog module (see Clause 23), program (see Clause 24), interface
+  // (see Clause 25), checker (see Clause 17), package (see Clause 26),
+  // primitive (see Clause 28) or configuration (see Clause 33)". The two lists
+  // read the same way down the page because they answer the same question, and
+  // the checker went missing from this one while the other had it.
   WriteCellsOfKind(parsed->modules, /*is_module=*/true, sink);
   WriteCellsOfKind(parsed->interfaces, /*is_module=*/false, sink);
   WriteCellsOfKind(parsed->programs, /*is_module=*/false, sink);
+  WriteCellsOfKind(parsed->checkers, /*is_module=*/false, sink);
   WriteCellsOfKind(parsed->udps, /*is_module=*/false, sink);
   WriteCellsOfKind(parsed->packages, /*is_module=*/false, sink);
   WriteCellsOfKind(parsed->configs, /*is_module=*/false, sink);

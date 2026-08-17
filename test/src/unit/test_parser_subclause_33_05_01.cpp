@@ -502,4 +502,97 @@ TEST(SinglePassPrecompile, MultiCellDescriptionRedoneWhenOneCellIsTaken) {
   EXPECT_EQ(h.compiler.CompileSource(pair, again), CompileOutcome::kCompiled);
 }
 
+// ---------------------------------------------------------------------------
+// Claim: every design element a description declares is a cell of the library
+// that description maps to, and §3.2 says which kinds those are.
+// ---------------------------------------------------------------------------
+
+// §33.2.1: "A library is a named collection of cells. A cell is a design
+// element (see 3.2), such as a module, primitive, interface, program, package,
+// or configuration." The six it names are introduced by "such as" and §3.2 is
+// what the definition defers to, which names seven: "A design element is a
+// SystemVerilog module (see Clause 23), program (see Clause 24), interface (see
+// Clause 25), checker (see Clause 17), package (see Clause 26), primitive (see
+// Clause 28) or configuration (see Clause 33)." The checker is the kind reading
+// §33.2.1's examples as the whole set leaves out, so it gets a case of its own.
+TEST(SinglePassPrecompile, CheckerIsWrittenIntoTheLibraryItsDescriptionMapsTo) {
+  ScratchDir tmp;
+  tmp.Write("lib.map", "library chkLib checked/*.sv;\n");
+  auto src = tmp.Write("checked/chk.sv",
+                       "checker watchdog;\n"
+                       "endchecker\n");
+
+  CompileHarness h;
+  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
+  ASSERT_TRUE(h.compiler.CompileCommandLine({src}, h.unit));
+  EXPECT_NE(h.libs.CellInLibrary("chkLib", "watchdog"), nullptr);
+}
+
+// One description declaring all seven kinds §3.2 names, so the next kind left
+// out of the write goes red here rather than waiting for a case of its own.
+TEST(SinglePassPrecompile, EveryDesignElementKindIsWrittenIntoTheLibrary) {
+  ScratchDir tmp;
+  tmp.Write("lib.map", "library everyLib every/*.sv;\n");
+  auto src = tmp.Write("every/all_kinds.sv",
+                       "module top_cell;\n"
+                       "endmodule\n"
+                       "program test_prog;\n"
+                       "endprogram\n"
+                       "interface bus_if;\n"
+                       "endinterface\n"
+                       "checker watchdog;\n"
+                       "endchecker\n"
+                       "package util_pkg;\n"
+                       "endpackage\n"
+                       "primitive inv_prim(output o, input a);\n"
+                       "  table\n"
+                       "    0 : 1;\n"
+                       "    1 : 0;\n"
+                       "  endtable\n"
+                       "endprimitive\n"
+                       "config cfg_all;\n"
+                       "  design top_cell;\n"
+                       "endconfig\n");
+
+  CompileHarness h;
+  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
+  ASSERT_TRUE(h.compiler.CompileCommandLine({src}, h.unit));
+  EXPECT_NE(h.libs.CellInLibrary("everyLib", "top_cell"), nullptr);
+  EXPECT_NE(h.libs.CellInLibrary("everyLib", "test_prog"), nullptr);
+  EXPECT_NE(h.libs.CellInLibrary("everyLib", "bus_if"), nullptr);
+  EXPECT_NE(h.libs.CellInLibrary("everyLib", "watchdog"), nullptr);
+  EXPECT_NE(h.libs.CellInLibrary("everyLib", "util_pkg"), nullptr);
+  EXPECT_NE(h.libs.CellInLibrary("everyLib", "inv_prim"), nullptr);
+  EXPECT_NE(h.libs.CellInLibrary("everyLib", "cfg_all"), nullptr);
+}
+
+// A description whose cells are never written records nothing for
+// SinglePassCompiler::CellsStillHeldInLibraries to consult, and that function
+// answers true over an empty record, so the description is called up to date
+// without anything about it having been examined. A second description takes
+// the checker's name away here, which is the displacement
+// MultiCellDescriptionRedoneWhenOneCellIsTaken above builds on for modules: it
+// is what makes the answer kCompiled rather than kSkipped, and it can only do
+// so once the checker is a cell the record holds.
+TEST(SinglePassPrecompile,
+     CheckerOnlyDescriptionIsRedoneWhenItsCheckerIsTaken) {
+  ScratchDir tmp;
+  tmp.Write("lib.map", "library chkLib checked/*.sv;\n");
+  auto first = tmp.Write("checked/first.sv",
+                         "checker watchdog;\n"
+                         "endchecker\n");
+  auto rival = tmp.Write("checked/rival.sv",
+                         "checker watchdog;\n"
+                         "  logic flag = 0;\n"
+                         "endchecker\n");
+
+  CompileHarness h;
+  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
+  ASSERT_EQ(h.compiler.CompileSource(first, h.unit), CompileOutcome::kCompiled);
+  ASSERT_EQ(h.compiler.CompileSource(rival, h.unit), CompileOutcome::kCompiled);
+
+  CompilationUnit again;
+  EXPECT_EQ(h.compiler.CompileSource(first, again), CompileOutcome::kCompiled);
+}
+
 }  // namespace
