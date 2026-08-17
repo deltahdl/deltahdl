@@ -136,11 +136,30 @@ bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
   // on the left side of a continuous assignment gets an implicit scalar net of
   // the default net type. It shares the implicit-net constructor with the
   // port-expression case; here the width is scalar and the net is unsigned.
+  //
+  // The redeclaration key carries the generate prefix and net_names_ does not,
+  // which is what Elaborator::ElaborateNetDecl does for an explicit net at
+  // src/elaborator/elaborator_decls.cpp:598 and :600. §6.10 settles the first:
+  // "if the implicit net is declared by a reference in a generate block, then
+  // the net is implicitly declared only in that generate block". The name this
+  // reference declares therefore belongs to the block, and a declaration of it
+  // in another block or in the module is a different scope rather than a
+  // redeclaration of this one.
+  //
+  // net_names_ answers a different question -- whether a simple name written
+  // in this module names a net rather than a variable -- and every one of its
+  // readers looks it up by the identifier the source wrote.
+  // Elaborator::ValidateContAssignIdentLhs in
+  // src/elaborator/elaborator_cont_assign.cpp is the closest: it passes `name`
+  // here and then reads net_names_ back with that same `name`, so a prefixed
+  // entry would make it treat the net it just created as a variable and report
+  // a second assignment to it under §10.3.2.
+  std::string_view scoped = ScopedName(name);
   RtlirNet net =
-      MakeImplicitPortNet(ScopedName(name), /*port_width=*/1,
-                          /*port_is_signed=*/false, unit_->default_nettype);
+      MakeImplicitPortNet(scoped, /*port_width=*/1, /*port_is_signed=*/false,
+                          unit_->default_nettype);
   mod->nets.push_back(net);
-  declared_names_.insert(name);
+  declared_names_.insert(scoped);
   net_names_.insert(name);
   return true;
 }

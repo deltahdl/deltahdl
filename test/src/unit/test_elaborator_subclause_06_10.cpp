@@ -384,4 +384,106 @@ TEST(ImplicitDeclaration, PrimitiveTerminalForbiddenUnderNone) {
                             "implicit net 'y' forbidden by", 2, "22.8"));
 }
 
+// §6.10: "The implicit net declaration shall belong to the scope in which the
+// net reference appears. For example, if the implicit net is declared by a
+// reference in a generate block, then the net is implicitly declared only in
+// that generate block." A generate block "comprises a separate scope and a new
+// level of hierarchy when it is instantiated" (§27.4, printed page 821), so the
+// implicit 'w' below is a declaration of block 'a' and of nothing else, and the
+// generate block instance array named 'w' beside it is declared in top. §27.4's
+// rule that a block array name shall not conflict with another declaration
+// therefore has nothing to fire on.
+//
+// The elaborator recorded the implicit net under its bare name while naming the
+// net itself under the generate prefix, so the bare 'w' outlived block 'a' and
+// Elaborator::OpenGenerateForLoop found it: the array was rejected and neither
+// of its instances was elaborated.
+TEST(ImplicitDeclaration, ImplicitNetInAGenerateBlockIsNotAModuleScopeName) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  genvar i;\n"
+      "  generate\n"
+      "    for (i = 0; i < 1; i = i + 1) begin : a\n"
+      "      assign w = 1'b1;\n"
+      "    end\n"
+      "    for (i = 0; i < 2; i = i + 1) begin : w\n"
+      "      logic x;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  bool w0 = false;
+  bool w1 = false;
+  for (const auto& v : mod->variables) {
+    if (v.name == "w_0_x") w0 = true;
+    if (v.name == "w_1_x") w1 = true;
+  }
+  EXPECT_TRUE(w0) << "generate block array 'w' instance 0 not elaborated";
+  EXPECT_TRUE(w1) << "generate block array 'w' instance 1 not elaborated";
+}
+
+// §6.10 assumes an implicit net only for an identifier that "has not been
+// declared previously in the scope", and §23.9 leaves the explicit declaration
+// that follows it a second declaration of one name in one scope. This is the
+// case the fix above must not lose: recording the implicit net under its bare
+// name meant the explicit 'wire w' inside the same block was keyed under the
+// block's prefix, matched nothing, and was accepted.
+TEST(ImplicitDeclaration, ExplicitNetAfterImplicitInOneGenerateBlockIsRedecl) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  generate\n"
+      "    if (1) begin : a\n"
+      "      assign w = 1'b1;\n"
+      "      wire w;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'w'", 5, "23.9"));
+}
+
+// §6.10 with §27.4: each iteration of a loop generate block is its own scope,
+// so the one reference in the shared body declares one implicit net per
+// iteration and each carries that iteration's prefix. Nothing is named by the
+// bare 'w'.
+//
+// The absence of a report is the other half of the claim. Elaborator::
+// ValidateContAssignIdentLhs reads net_names_ back with the identifier the
+// source wrote, so recording the implicit net there under the prefix instead
+// would make the second iteration's assignment look like a second assignment to
+// a variable and draw §10.3.2.
+TEST(ImplicitDeclaration, ImplicitNetInALoopGenerateBlockIsNamedPerIteration) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  genvar i;\n"
+      "  generate\n"
+      "    for (i = 0; i < 2; i = i + 1) begin : b\n"
+      "      assign w = 1'b1;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  int b0 = 0;
+  int b1 = 0;
+  int bare = 0;
+  for (const auto& n : mod->nets) {
+    if (n.name == "b_0_w") ++b0;
+    if (n.name == "b_1_w") ++b1;
+    if (n.name == "w") ++bare;
+  }
+  EXPECT_EQ(b0, 1) << "iteration 0 should hold one implicit net";
+  EXPECT_EQ(b1, 1) << "iteration 1 should hold one implicit net";
+  EXPECT_EQ(bare, 0) << "no net belongs to top under the bare name";
+}
+
 }  // namespace
