@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <iterator>
 
 #include "fixture_lexer.h"
 #include "lexer/keywords.h"

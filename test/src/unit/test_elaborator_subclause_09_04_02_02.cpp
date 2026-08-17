@@ -1,3 +1,5 @@
+#include <unordered_set>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"

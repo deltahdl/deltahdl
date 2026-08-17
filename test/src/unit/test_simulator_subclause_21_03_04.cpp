@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <fstream>
+#include <ios>
 
 #include "builders_systask.h"
 #include "fixture_simulator.h"

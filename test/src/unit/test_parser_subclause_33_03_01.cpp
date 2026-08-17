@@ -7,6 +7,7 @@
 #include <fstream>
 #include <initializer_list>
 #include <string>
+#include <system_error>
 #include <vector>
 
 #include "common/arena.h"

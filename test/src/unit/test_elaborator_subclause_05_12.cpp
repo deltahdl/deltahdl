@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <optional>
 
 #include "fixture_elaborator.h"
 

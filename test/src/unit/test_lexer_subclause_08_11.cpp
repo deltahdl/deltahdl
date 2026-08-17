@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <optional>
+
 #include "fixture_lexer.h"
 #include "lexer/keywords.h"
 

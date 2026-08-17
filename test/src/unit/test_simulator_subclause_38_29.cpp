@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdarg>
+#include <cstdio>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"

@@ -2,6 +2,8 @@
 
 #include <filesystem>
 #include <fstream>
+#include <ios>
+#include <system_error>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"

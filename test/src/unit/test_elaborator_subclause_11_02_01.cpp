@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
 #include "helpers_reported_error.h"

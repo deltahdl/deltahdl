@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <string>
+#include <system_error>
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"

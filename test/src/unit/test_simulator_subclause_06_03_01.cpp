@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdio>
+
 #include "common/arena.h"
 #include "common/types.h"
 #include "fixture_simulator.h"

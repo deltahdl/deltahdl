@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <iterator>
+
 #include "simulator/sv_vpi_user.h"
 
 namespace {

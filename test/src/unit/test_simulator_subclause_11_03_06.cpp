@@ -1,3 +1,5 @@
+#include <initializer_list>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

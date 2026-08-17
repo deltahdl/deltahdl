@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <optional>
+
 #include "elaborator/multiclock_sequence.h"
 
 using namespace delta;
