@@ -91,4 +91,127 @@ TEST(ModuleScopeParse, CompilationUnitTypedefIsATypeInEveryModule) {
   }
 }
 
+// §23.9's list of scopes runs past the design elements above: "Tasks,
+// Functions, begin-end blocks (named or unnamed), fork-join blocks (named or
+// unnamed), Generate blocks". A type name declared in one of those five is not
+// a type name in the module after it, and the five cases below each declare one
+// and then reuse the identifier outside the scope that declared it.
+//
+// Every case writes `localparam T = 1;` for the reuse, because A.2.1.1 gives a
+// parameter declaration an optional data type: with T no longer a type name the
+// declaration names T and leaves its type implicit, and with T still one the
+// parser reads T as the type and reports `expected identifier` at the `=`. So
+// the assertion is that the parse succeeded and produced a parameter named T,
+// which is the arrangement the four cases above already use across a module
+// boundary. Here the boundary is inside one module, since §23.9 scopes a module
+// too and a leak across `endmodule` would be caught by those cases instead.
+TEST(ModuleScopeParse, TaskTypedefNameIsNotATypeAfterItsTask) {
+  auto r = Parse(
+      "module m;\n"
+      "  task t; typedef int T; endtask\n"
+      "  localparam T = 1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* item = FindItemByName(r.cu->modules[0]->items, "T");
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kImplicit);
+}
+
+TEST(ModuleScopeParse, FunctionTypedefNameIsNotATypeAfterItsFunction) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int f; typedef int T; f = 0; endfunction\n"
+      "  localparam T = 1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* item = FindItemByName(r.cu->modules[0]->items, "T");
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kImplicit);
+}
+
+// The unnamed form, which §23.9's parenthetical makes a scope as much as the
+// named one.
+TEST(ModuleScopeParse, BlockTypedefNameIsNotATypeAfterItsBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin typedef int T; end\n"
+      "  localparam T = 1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* item = FindItemByName(r.cu->modules[0]->items, "T");
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kImplicit);
+}
+
+// A.6.3 gives a par_block its own block_item_declaration list, so the typedef
+// stands directly between `fork` and `join`.
+TEST(ModuleScopeParse, ForkTypedefNameIsNotATypeAfterItsFork) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial fork typedef int T; join\n"
+      "  localparam T = 1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* item = FindItemByName(r.cu->modules[0]->items, "T");
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kImplicit);
+}
+
+// The generate block, not the generate region around it: §23.9 lists the block
+// and §27.3 makes the region no scope at all, so the typedef goes inside the
+// `begin` of the conditional generate construct and the reuse after
+// `endgenerate`.
+TEST(ModuleScopeParse, GenerateBlockTypedefNameIsNotATypeAfterIt) {
+  auto r = Parse(
+      "module m;\n"
+      "  generate if (1) begin typedef int T; end endgenerate\n"
+      "  localparam T = 1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* item = FindItemByName(r.cu->modules[0]->items, "T");
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kImplicit);
+}
+
+// The other edge of the same boundary. §23.9 scopes the name to the task rather
+// than withdrawing it, so `T x;` in the task that declared T is a variable of
+// the named type T. This case fails if the registration is dropped instead of
+// scoped, which the five above would not notice.
+TEST(ModuleScopeParse, TaskTypedefIsStillATypeInsideItsOwnTask) {
+  auto r = Parse(
+      "module m;\n"
+      "  task t;\n"
+      "    typedef int T;\n"
+      "    T x;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* task = FindItemByName(r.cu->modules[0]->items, "t");
+  ASSERT_NE(task, nullptr);
+  const Stmt* decl = nullptr;
+  for (const auto* s : task->func_body_stmts) {
+    if (s->kind == StmtKind::kVarDecl && s->var_name == "x") decl = s;
+  }
+  ASSERT_NE(decl, nullptr);
+  EXPECT_EQ(decl->var_decl_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(decl->var_decl_type.type_name, "T");
+}
+
 }  // namespace

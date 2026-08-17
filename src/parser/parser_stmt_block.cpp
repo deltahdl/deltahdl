@@ -141,6 +141,11 @@ static bool ClosesEnclosingConstruct(TokenKind tk) {
 }
 
 Stmt* Parser::ParseBlockStmt(std::string_view prefix_label) {
+  // §23.9 makes a begin-end block a scope "(named or unnamed)", so a typedef
+  // written between `begin` and `end` is not a type name after the `end`. This
+  // one function parses both forms, the name being the optional `: name` below,
+  // so the guard covers both without asking which was written.
+  TypeNameScope type_scope(*this);
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kBlock;
   stmt->range.start = CurrentLoc();
@@ -182,6 +187,10 @@ Stmt* Parser::ParseBlockStmt(std::string_view prefix_label) {
 }
 
 Stmt* Parser::ParseForkStmt(std::string_view prefix_label) {
+  // §23.9 makes a fork-join block a scope "(named or unnamed)", and this one
+  // function parses both forms and all three join keywords, so the guard here
+  // covers every one of them.
+  TypeNameScope type_scope(*this);
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kFork;
   stmt->range.start = CurrentLoc();

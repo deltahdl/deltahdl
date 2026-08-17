@@ -603,16 +603,25 @@ class Parser {
   // together, and a nettype name decides how `#` after an identifier is read,
   // so restoring one without the other leaves the leak for that reading.
   //
-  // Four of that list are guarded: a module, an interface, a program and a
-  // checker, plus the extern headers of the first three. A package and a class
+  // Nine of that list are guarded: a module, an interface, a program and a
+  // checker, plus the extern headers of the first three, at ParseModuleDecl,
+  // ParseInterfaceDecl, ParseProgramDecl, ParseCheckerDecl and
+  // ParseExternModuleDecl; and a task, a function, a begin-end block, a
+  // fork-join block and a generate block, at ParseTaskDecl, ParseFunctionDecl,
+  // ParseBlockStmt, ParseForkStmt and ParseGenerateBody. A package and a class
   // are not, because §26.3 and §8.26 let an importing or a derived scope name
   // their type declarations without a prefix and the parser has no table of
   // which imports or bases are in force; ParsePackageDecl and ParseClassDecl
-  // each say so where the guard would have gone. The remaining five -- a task,
-  // a function, a begin-end block, a fork-join block and a generate block --
-  // are scopes by the same sentence and are not guarded either, so a typedef
-  // written inside one is still a type name in the design element containing
-  // it.
+  // each say so where the guard would have gone.
+  //
+  // The last five are guarded for the same reason as the first four, and §23.9
+  // is what says a name inside them is never wanted outside. Its search runs
+  // upward and only upward: Figure 23-2 on printed page 762 gives block G the
+  // scopes containing it and denies it the scopes beside it, and a hierarchical
+  // path reaches a variable, a task, a function or a named block rather than a
+  // type. A data type is written as a bare or a package-scoped name, so a type
+  // declared in one of these five has no spelling that reaches it from outside,
+  // the named generate block included.
   //
   // A destructor rather than a save and a restore written at each site, because
   // a parse function has more than one exit and error recovery takes some of

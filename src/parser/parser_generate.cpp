@@ -56,6 +56,15 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
     ~DepthGuard() { --d; }
   } guard(generate_block_depth_);
 
+  // §23.9 makes a generate block a scope, so a typedef inside one is not a type
+  // name in the module after it. The guard stands here rather than after the
+  // `begin` below, because §27.5 makes a conditional generate body that is a
+  // single item an implicit generate block, which is the bare-item branch that
+  // returns before that `begin` is ever looked for. Parser::ParseGenerateRegion
+  // has no guard of its own: §27.3's generate region is not on §23.9's list,
+  // and an item written straight into one belongs to the enclosing module.
+  TypeNameScope type_scope(*this);
+
   if (Match(TokenKind::kSemicolon)) return;
 
   // Detect an optional `label :` prefix that introduces a named generate

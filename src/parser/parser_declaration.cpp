@@ -736,6 +736,11 @@ void Parser::ParseFuncBody(ModuleItem* item) {
 }
 
 ModuleItem* Parser::ParseFunctionDecl(bool prototype_only) {
+  // §23.9 makes a function a scope, so a typedef in its body is not a type name
+  // after `endfunction`. The guard opens before the tf_port_list rather than in
+  // ParseFuncBody, because §13.4 declares the formal arguments in the
+  // function's own scope too.
+  TypeNameScope type_scope(*this);
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kFunctionDecl;
   item->loc = CurrentLoc();
@@ -759,6 +764,10 @@ ModuleItem* Parser::ParseFunctionDecl(bool prototype_only) {
 }
 
 ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
+  // §23.9 makes a task a scope, and §13.3 declares its formal arguments in it,
+  // so the guard opens before the tf_port_list exactly as ParseFunctionDecl's
+  // does.
+  TypeNameScope type_scope(*this);
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kTaskDecl;
   item->loc = CurrentLoc();
