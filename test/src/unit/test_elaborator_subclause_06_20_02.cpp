@@ -692,4 +692,65 @@ TEST(ValueParameters, HierarchicalVariableReferenceInParameterValueIsReported) {
       "parameter 'K' value contains a hierarchical reference", 2, "6.20.2"));
 }
 
+// §6.20.2 states three rules in three consecutive sentences, and this is the
+// middle one: "Package references are allowed." It sits between what a value
+// parameter may be set to and the sentence forbidding hierarchical names, and
+// it was the untested one, so `p::N` was rejected under the sentence three
+// words after it. Sharing a width or a depth through a package parameter is
+// what §26.2 packages are ordinarily for.
+TEST(ValueParameters, PackageParameterReferenceInParameterValueIsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  parameter int N = 4;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  parameter int K = p::N;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §6.20.2's first sentence names parameter, localparam and specparam together,
+// so the localparam spelling of the source above is admitted by the same
+// sentence and rejected by the same defect.
+TEST(ValueParameters, PackageParameterReferenceInLocalparamValueIsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  parameter int N = 4;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  localparam int K = p::N;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The value, because acceptance alone would pass an elaborator that admitted
+// the reference and then read nothing through it. K is 4 rather than 0, so a
+// reference resolved to nothing is a different number from a reference
+// resolved.
+TEST(ValueParameters, PackageParameterReferenceResolvesItsValue) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  parameter int N = 4;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  parameter int K = p::N;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const RtlirParamDecl* k = nullptr;
+  for (const auto& param : design->top_modules[0]->params) {
+    if (param.name == "K") k = &param;
+  }
+  ASSERT_NE(k, nullptr);
+  EXPECT_TRUE(k->is_resolved);
+  EXPECT_EQ(k->resolved_value, 4);
+}
+
 }  // namespace

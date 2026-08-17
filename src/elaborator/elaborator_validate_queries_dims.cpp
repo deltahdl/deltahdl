@@ -531,36 +531,6 @@ void Elaborator::ValidateSpecparamInDeclRange(const ModuleDecl* decl) {
   }
 }
 
-// §8.23: a class scope resolution `Class::PARAM` whose target is a class value
-// parameter or local parameter is a legal constant-expression operand, not a
-// hierarchical reference. (A class parameter is a public constant of the
-// class.)
-// §8.25: whether a class declares `name` as a parameter -- either a body
-// parameter/localparam member or one of its #() parameter ports.
-static bool ClassDeclaresParam(const ClassDecl* cls, std::string_view name) {
-  for (const auto* m : cls->members) {
-    if (m->kind == ClassMemberKind::kProperty && m->is_param && m->name == name)
-      return true;
-  }
-  for (const auto& [pname, pexpr] : cls->params) {
-    (void)pexpr;
-    if (pname == name) return true;
-  }
-  return false;
-}
-
-static bool ScopeResolutionRefersToClassParam(const CompilationUnit* unit,
-                                              const Expr* e) {
-  if (unit == nullptr || !e->is_scope_resolution) return false;
-  if (!e->lhs || e->lhs->kind != ExprKind::kIdentifier) return false;
-  if (!e->rhs || e->rhs->kind != ExprKind::kIdentifier) return false;
-  for (const auto* cls : unit->classes) {
-    if (cls->name != e->lhs->text) continue;
-    if (ClassDeclaresParam(cls, e->rhs->text)) return true;
-  }
-  return false;
-}
-
 static bool ExprContainsHierRef(const Expr* e, const CompilationUnit* unit);
 
 // True when any expression of `list` contains a hierarchical reference.
@@ -577,12 +547,19 @@ static bool ExprContainsHierRef(const Expr* e, const CompilationUnit* unit) {
   // §6.20.2 rules that a value parameter's expression may hold literals, value
   // parameters or local parameters, genvars, enumerated names, or a constant
   // function of these, that "Package references are allowed", and that
-  // "Hierarchical names are not allowed". What the hierarchical name reaches
-  // does not enter into it, so a dotted name is a breach whether it names
-  // another module's parameter or one of its variables. Only the scoped names
-  // the clause admits are exempted below.
-  if (e->kind == ExprKind::kMemberAccess)
-    return !ScopeResolutionRefersToClassParam(unit, e);
+  // "Hierarchical names are not allowed". The parser builds one kMemberAccess
+  // node for both spellings and records which was written, so which spelling it
+  // is decides this and what the name reaches does not: a dotted name is a
+  // breach whether it names another module's parameter or one of its variables,
+  // and a `::` name is not a hierarchical name at all. §26.3 gives `::` a
+  // package prefix and §8.23 a class one, and neither is the dotted path §23.6
+  // calls a hierarchical name.
+  //
+  // A `::` prefix naming nothing declared is not exempted here so much as not
+  // this rule's business: what is wrong with such a source is the name, which
+  // §26.3 reports, and §6.20.4 reports the initializer that is not a constant
+  // expression as a result.
+  if (e->kind == ExprKind::kMemberAccess) return !e->is_scope_resolution;
   for (const Expr* sub :
        {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr}) {
     if (ExprContainsHierRef(sub, unit)) return true;
