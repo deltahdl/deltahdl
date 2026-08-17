@@ -190,28 +190,6 @@ void RegisterPackageParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
   }
 }
 
-// Whether `e` mentions any name in `names`, at any depth. Every identifier the
-// expression carries is compared, whatever node holds it, so a type parameter
-// named by a `type` operator or a cast counts as a mention.
-bool ExprMentionsAny(const Expr* e,
-                     const std::unordered_set<std::string_view>& names) {
-  if (!e) return false;
-  if (!e->text.empty() && names.count(e->text)) return true;
-  if (!e->callee.empty() && names.count(e->callee)) return true;
-  for (const Expr* child :
-       {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr, e->base,
-        e->index, e->index_end, e->with_expr}) {
-    if (ExprMentionsAny(child, names)) return true;
-  }
-  for (const Expr* arg : e->args) {
-    if (ExprMentionsAny(arg, names)) return true;
-  }
-  for (const Expr* elem : e->elements) {
-    if (ExprMentionsAny(elem, names)) return true;
-  }
-  return false;
-}
-
 // §8.23: a class value parameter or local parameter is a public element and a
 // constant expression, reachable from outside the class via the class scope
 // resolution operator (Class::PARAM). Record each such parameter under its
@@ -249,18 +227,6 @@ struct ClassParamRegistration {
   Arena& arena;
   DiagEngine& diag;
 };
-
-// Every parameter name `cls` declares: its type parameters, its #() parameter
-// ports and its body parameter declarations.
-std::unordered_set<std::string_view> ClassParamNames(const ClassDecl* cls) {
-  std::unordered_set<std::string_view> names = cls->type_param_names;
-  for (const auto& [pname, pexpr] : cls->params) names.insert(pname);
-  for (const auto* m : cls->members) {
-    if (m->kind == ClassMemberKind::kProperty && m->is_param)
-      names.insert(m->name);
-  }
-  return names;
-}
 
 static void RecordClassParam(std::string_view pname, const Expr* pexpr,
                              ClassParamRegistration& reg) {
@@ -410,6 +376,40 @@ void RegisterCuClasses(
 }
 
 }  // namespace
+
+// Whether `e` mentions any name in `names`, at any depth. Every identifier the
+// expression carries is compared, whatever node holds it, so a type parameter
+// named by a `type` operator or a cast counts as a mention.
+bool ExprMentionsAny(const Expr* e,
+                     const std::unordered_set<std::string_view>& names) {
+  if (!e) return false;
+  if (!e->text.empty() && names.count(e->text)) return true;
+  if (!e->callee.empty() && names.count(e->callee)) return true;
+  for (const Expr* child :
+       {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr, e->base,
+        e->index, e->index_end, e->with_expr}) {
+    if (ExprMentionsAny(child, names)) return true;
+  }
+  for (const Expr* arg : e->args) {
+    if (ExprMentionsAny(arg, names)) return true;
+  }
+  for (const Expr* elem : e->elements) {
+    if (ExprMentionsAny(elem, names)) return true;
+  }
+  return false;
+}
+
+// Every parameter name `cls` declares: its type parameters, its #() parameter
+// ports and its body parameter declarations.
+std::unordered_set<std::string_view> ClassParamNames(const ClassDecl* cls) {
+  std::unordered_set<std::string_view> names = cls->type_param_names;
+  for (const auto& [pname, pexpr] : cls->params) names.insert(pname);
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kProperty && m->is_param)
+      names.insert(m->name);
+  }
+  return names;
+}
 
 UdpDecl* FindUdpInLibrary(std::string_view library, std::string_view cell,
                           CompilationUnit* unit) {
