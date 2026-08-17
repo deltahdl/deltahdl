@@ -592,6 +592,55 @@ static void CheckElementSelectNode(const Expr* e, const SelectShapeMap& shapes,
   }
 }
 
+// Whether `fn` holds for any child expression of `e`. Expr in
+// src/parser/ast_expr.h carries thirteen links to other expressions, and this
+// is the one place they are enumerated: a walk that names some of them answers
+// a question about part of the tree while reading as though it answered it
+// about all of it. ExprContainsIdent below followed lhs and rhs alone, which is
+// what made §6.20.5's two specparam checks accept a specparam reached through a
+// call argument, a conditional, a concatenation, a replication count or an
+// index. The three §11.5.1 walks below followed lhs, rhs, base and index alone,
+// which is what made a select of a real variable, a real parameter or a scalar
+// legal in every one of the other nine positions.
+//
+// Extend this when Expr gains a child link, and move it to
+// elaborator_validate_internal.h when a walk outside this file needs it. What
+// it leaves out on purpose is everything that names something rather than
+// holding an expression: `callee` and `scope_prefix` name a subroutine and a
+// package, `arg_names` and `with_restrict_ids` are identifier lists, and
+// `inline_constraint` is a ClassMember.
+template <typename Fn>
+static bool AnyExprChild(const Expr* e, Fn&& fn) {
+  for (const Expr* child :
+       {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr, e->base,
+        e->index, e->index_end, e->with_expr, e->repeat_count}) {
+    if (fn(child)) return true;
+  }
+  for (const Expr* child : e->args) {
+    if (fn(child)) return true;
+  }
+  for (const Expr* child : e->elements) {
+    if (fn(child)) return true;
+  }
+  for (const Expr* child : e->pattern_keys) {
+    if (fn(child)) return true;
+  }
+  return false;
+}
+
+// Runs `fn` over every child expression of `e`, for what it does rather than
+// for an answer. It enumerates nothing itself: it asks AnyExprChild a question
+// no child answers, so a walk written to report on a subtree reads the same
+// list of children as a walk written to search one, and the two cannot come to
+// disagree about what a child is.
+template <typename Fn>
+static void ForEachExprChild(const Expr* e, Fn&& fn) {
+  AnyExprChild(e, [&fn](const Expr* child) {
+    fn(child);
+    return false;
+  });
+}
+
 void CheckRealSelect(const Expr* e, const TypeMap& types,
                      const SelectOperands& operands, DiagEngine& diag) {
   if (!e) return;
@@ -602,10 +651,9 @@ void CheckRealSelect(const Expr* e, const TypeMap& types,
     // §11.5.1's sentence are reported from here.
     CheckElementSelectNode(e, operands.shapes, diag);
   }
-  CheckRealSelect(e->lhs, types, operands, diag);
-  CheckRealSelect(e->rhs, types, operands, diag);
-  CheckRealSelect(e->base, types, operands, diag);
-  CheckRealSelect(e->index, types, operands, diag);
+  ForEachExprChild(e, [&](const Expr* child) {
+    CheckRealSelect(child, types, operands, diag);
+  });
 }
 
 static void CheckScalarSelectNode(const Expr* e, const NameSet& scalars,
@@ -623,10 +671,8 @@ void CheckScalarSelect(const Expr* e, const NameSet& scalars,
   if (!e) return;
   if (e->kind == ExprKind::kSelect && e->base)
     CheckScalarSelectNode(e, scalars, diag);
-  CheckScalarSelect(e->lhs, scalars, diag);
-  CheckScalarSelect(e->rhs, scalars, diag);
-  CheckScalarSelect(e->base, scalars, diag);
-  CheckScalarSelect(e->index, scalars, diag);
+  ForEachExprChild(
+      e, [&](const Expr* child) { CheckScalarSelect(child, scalars, diag); });
 }
 
 static void CheckIndexedPartSelectWidthNode(const Expr* e,
@@ -656,10 +702,9 @@ void CheckIndexedPartSelectWidth(const Expr* e, const ScopeMap& scope,
   if (!e) return;
   if (e->kind == ExprKind::kSelect && e->base)
     CheckIndexedPartSelectWidthNode(e, scope, diag);
-  CheckIndexedPartSelectWidth(e->lhs, scope, diag);
-  CheckIndexedPartSelectWidth(e->rhs, scope, diag);
-  CheckIndexedPartSelectWidth(e->base, scope, diag);
-  CheckIndexedPartSelectWidth(e->index, scope, diag);
+  ForEachExprChild(e, [&](const Expr* child) {
+    CheckIndexedPartSelectWidth(child, scope, diag);
+  });
 }
 
 void CheckScalarSelectStmt(const Stmt* s, const NameSet& scalars,
@@ -702,40 +747,6 @@ void CheckIndexedPartSelectWidthStmt(const Stmt* s, const ScopeMap& scope,
   ForEachChildStmt(s, [&](const Stmt* sub) {
     CheckIndexedPartSelectWidthStmt(sub, scope, diag);
   });
-}
-
-// Whether `fn` holds for any child expression of `e`. Expr in
-// src/parser/ast_expr.h carries thirteen links to other expressions, and this
-// is the one place they are enumerated: a walk that names some of them answers
-// a question about part of the tree while reading as though it answered it
-// about all of it. ExprContainsIdent below followed lhs and rhs alone, which is
-// what made §6.20.5's two specparam checks accept a specparam reached through a
-// call argument, a conditional, a concatenation, a replication count or an
-// index.
-//
-// Extend this when Expr gains a child link, and move it to
-// elaborator_validate_internal.h when a second walk needs it. What it leaves
-// out on purpose is everything that names something rather than holding an
-// expression: `callee` and `scope_prefix` name a subroutine and a package,
-// `arg_names` and `with_restrict_ids` are identifier lists, and
-// `inline_constraint` is a ClassMember.
-template <typename Fn>
-static bool AnyExprChild(const Expr* e, Fn&& fn) {
-  for (const Expr* child :
-       {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr, e->base,
-        e->index, e->index_end, e->with_expr, e->repeat_count}) {
-    if (fn(child)) return true;
-  }
-  for (const Expr* child : e->args) {
-    if (fn(child)) return true;
-  }
-  for (const Expr* child : e->elements) {
-    if (fn(child)) return true;
-  }
-  for (const Expr* child : e->pattern_keys) {
-    if (fn(child)) return true;
-  }
-  return false;
 }
 
 bool ExprContainsIdent(const Expr* e, std::string_view name) {

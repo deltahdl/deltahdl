@@ -398,3 +398,187 @@ TEST(SelectElaboration, PartSelectInARandsequenceCodeBlockIsLegal) {
       f);
   EXPECT_FALSE(f.has_errors);
 }
+
+// §11.5.1 says where a select may stand by saying nothing about it: "A
+// bit-select or part-select of a scalar, or of a real variable or real
+// parameter, shall be illegal." The sentence bars the operand, so it bars the
+// operand wherever an expression may be written, and §11.5 writes out several
+// of those places -- "A concatenation of other operands (including nested
+// concatenations) can be specified as an operand" and "A function call is an
+// operand".
+//
+// The cases below stand in the positions CheckRealSelect, CheckScalarSelect and
+// CheckIndexedPartSelectWidth in src/elaborator/elaborator_validate.cpp did not
+// reach. Each walk recursed through `lhs`, `rhs`, `base` and `index` and named
+// no other link, so a select written under the conditional operator, in a call
+// argument, inside a concatenation or in the second bound of a part-select was
+// judged by nothing. Every source here but the one control was accepted.
+
+// The conditional operator's first operand, which reaches the select through
+// `condition`. §11.4.11 gives the operator three expressions and makes this one
+// the test; §11.5.1 bars a bit-select of a real variable in it as in any other.
+TEST(RealSelect, BitSelectOfARealInAConditionalConditionIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real r;\n"
+      "  real v;\n"
+      "  assign v = r[0] ? 1.0 : 2.0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real variable is illegal", 4,
+                            "11.5.1"));
+}
+
+// The conditional operator's second operand, reached through `true_expr`. It is
+// a separate link from `condition`, so a fix that walks one and not the other
+// leaves this case unjudged.
+TEST(RealSelect, BitSelectOfARealInAConditionalTrueArmIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real r;\n"
+      "  real v;\n"
+      "  logic c;\n"
+      "  assign v = c ? r[0] : 1.0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real variable is illegal", 5,
+                            "11.5.1"));
+}
+
+// The conditional operator's third operand, reached through `false_expr`, which
+// is a third link again.
+TEST(RealSelect, BitSelectOfARealInAConditionalFalseArmIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real r;\n"
+      "  real v;\n"
+      "  logic c;\n"
+      "  assign v = c ? 1.0 : r[0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real variable is illegal", 5,
+                            "11.5.1"));
+}
+
+// A call argument, reached through `args`. §11.5 makes the call itself an
+// operand -- "A function call is an operand" -- and the argument inside it is
+// an expression like any other, so §11.5.1 bars this select too.
+TEST(RealSelect, BitSelectOfARealInACallArgumentIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real r;\n"
+      "  real v;\n"
+      "  function automatic real ident(input real a);\n"
+      "    ident = a;\n"
+      "  endfunction\n"
+      "  assign v = ident(r[0]);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real variable is illegal", 7,
+                            "11.5.1"));
+}
+
+// A concatenation element, reached through `elements`. §11.5 makes the
+// concatenation an operand and its elements operands in turn, so §11.5.1
+// reaches inside one. Written as a part-select so that the message the report
+// names is the part-select form: a walk that newly reaches the node still has
+// to choose between §11.5.1's two constructs from the fields of that node.
+TEST(RealSelect, PartSelectOfARealInAConcatenationNamesPartSelect) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real r;\n"
+      "  logic [4:0] y;\n"
+      "  assign y = {r[3:0], 1'b0};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "part-select of a real variable is illegal", 4,
+                            "11.5.1"));
+}
+
+// The second bound of a non-indexed part-select, reached through `index_end`.
+// §11.5.1 gives that form as `vect[msb_expr:lsb_expr]`, and the walk followed
+// `index` alone, so the msb bound was searched for a further select and the lsb
+// bound was not. The bound written here is not a constant either, which draws
+// its own report; the one this case names is the §11.5.1 report about the real
+// operand.
+TEST(RealSelect, BitSelectOfARealInAPartSelectBoundIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real r;\n"
+      "  logic [7:0] d;\n"
+      "  logic [3:0] y;\n"
+      "  assign y = d[3:r[0]];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real variable is illegal", 5,
+                            "11.5.1"));
+}
+
+// §11.5.1 bars a bit-select of a real variable or a scalar and no other, so a
+// bit-select of a vector is legal in the conditional operator's second operand
+// exactly as it is legal on an assignment. This is what fails when a walk that
+// newly reaches a position reports every select it finds there rather than the
+// selects §11.5.1 names.
+TEST(RealSelect, BitSelectOfAVectorInAConditionalTrueArmIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic [7:0] v;\n"
+      "  logic c;\n"
+      "  logic y;\n"
+      "  assign y = c ? v[0] : 1'b0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The scalar half of §11.5.1's sentence in an unwalked position.
+// CheckScalarSelect in src/elaborator/elaborator_validate.cpp is written in the
+// same four-link shape as CheckRealSelect, so it has the same gap, and a fix
+// applied to the real walk alone leaves this case accepted.
+TEST(SelectElaboration, ScalarBitSelectInAConditionalTrueArmIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic s;\n"
+      "  logic c;\n"
+      "  logic y;\n"
+      "  assign y = c ? s[0] : 1'b0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select or part-select of a scalar is illegal",
+                            5, "11.5.1"));
+}
+
+// §11.5.1's rule on the indexed part-select in an unwalked position: "the
+// width_expr shall be a positive constant integer expression".
+// CheckIndexedPartSelectWidth in src/elaborator/elaborator_validate.cpp is the
+// third walk written in the four-link shape, and a concatenation element is a
+// position none of the three reached.
+TEST(SelectElaboration, IndexedPartSelectWidthInAConcatenationIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic [15:0] data;\n"
+      "  integer w;\n"
+      "  logic [8:0] y;\n"
+      "  assign y = {data[0+:w], 1'b0};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "indexed part-select width must be a constant expression", 5, "11.5.1"));
+}
