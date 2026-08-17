@@ -603,6 +603,18 @@ bool IsStaticDeferredAssertion(const ModuleItem* item) {  // §16.4.3
 
 }  // namespace
 
+// The instance range is what makes the widths a question at all, so an item
+// carrying none is left alone: §28.3.6's rule is about "the bit length of each
+// single-instance port or terminal in the instantiated module or primitive"
+// against the length of an array, and there is no array here to measure
+// against.
+void Elaborator::CheckInstanceArrayTerminals(const ModuleItem* item,
+                                             const RtlirModule* mod) {
+  if (!HasInstanceArrayRange(item)) return;
+  CheckGateInstanceArrayTerminalWidths(item, mod, BuildParamScope(mod),
+                                       interconnect_names_, diag_);
+}
+
 void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   if (ElaborateDeclItem(item, mod)) return;
   ElaborateBehavioralItem(item, mod);
@@ -639,10 +651,7 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       CheckGateInstNameDiagnostics(item, declared_names_, diag_);
       CreateImplicitNetsForTerminals(item->gate_terminals, item->loc,
                                      make_implicit_net);
-      if (HasInstanceArrayRange(item)) {
-        CheckGateInstanceArrayTerminalWidths(item, mod, BuildParamScope(mod),
-                                             interconnect_names_, diag_);
-      }
+      CheckInstanceArrayTerminals(item, mod);
       ValidateBidirectionalSwitchConnections(item, mod, diag_,
                                              nettype_canonical_);
       ValidatePrimitiveOutputTerminalWidths(item, mod, BuildParamScope(mod),
@@ -654,14 +663,9 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       CheckUdpInstNameDiagnostics(item, declared_names_, diag_);
       CreateImplicitNetsForTerminals(item->gate_terminals, item->loc,
                                      make_implicit_net);
-      // §29.8: "The terminal connection rules remain the same as outlined in
-      // 28.3.6", so an array of primitive instances is held to the terminal
-      // widths CheckGateInstanceArrayTerminalWidths checks for an array of
-      // gates, and is checked before ElaborateUdpInst expands it.
-      if (HasInstanceArrayRange(item)) {
-        CheckGateInstanceArrayTerminalWidths(item, mod, BuildParamScope(mod),
-                                             interconnect_names_, diag_);
-      }
+      // Checked before ElaborateUdpInst expands the array, so a terminal the
+      // widths rule rejects is reported rather than expanded.
+      CheckInstanceArrayTerminals(item, mod);
       ElaborateUdpInst(item, mod);
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       return true;

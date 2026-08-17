@@ -270,6 +270,15 @@ class Elaborator : public ElaboratorOperationRules {
 
   void ElaborateModuleInst(ModuleItem* item, RtlirModule* mod);
 
+  // §28.3.6: reports a terminal of an instance array whose bit-length is
+  // neither one nor the instance-array length, and does nothing where `item`
+  // carries no instance range. The two item kinds that can carry one ask this
+  // together because §29.8 puts them under one rule: an array of user-defined
+  // primitive instances connects its terminals by "the terminal connection
+  // rules ... outlined in 28.3.6", the rules an array of gates connects by.
+  void CheckInstanceArrayTerminals(const ModuleItem* item,
+                                   const RtlirModule* mod);
+
   // §29.8: records on `mod` every instance of a user-defined primitive that one
   // instantiation writes, so that the primitive drives the nets its output
   // terminals name. An instantiation written with the optional range §29.8
