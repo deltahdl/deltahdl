@@ -141,8 +141,13 @@ class Parser {
   // generate_block being read, which is true of the first generate_block of an
   // if_generate_construct and of no other position the production admits. It
   // decides whether the item loop stops at an `else` or hands it on as an item.
+  // out_has_begin_end is set true when the block read was the `begin`/`end`
+  // form of A.4.2's generate_block and false when it was the single
+  // generate_item form or the null block `;`, which is the distinction §27.5
+  // rests on and which is not recoverable from the items alone.
   void ParseGenerateBody(std::vector<ModuleItem*>& body,
-                         std::string_view& out_label, bool else_may_follow);
+                         std::string_view& out_label, bool& out_has_begin_end,
+                         bool else_may_follow);
   ModuleItem* ParseGenerateFor();
   ModuleItem* ParseGenerateIf();
   void ParseGenerateCaseLabel(GenerateCaseItem& ci);

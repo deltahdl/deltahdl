@@ -61,4 +61,28 @@ TEST(LoopGenerateParsing, GenvarDeclaredInsideGenerateRegion) {
               "endmodule\n"));
 }
 
+TEST(LoopGenerateParsing, ForBodySingleItemRecordsNoBeginEnd) {
+  // A.4.2 ends loop_generate_construct with a generate_block, which is either a
+  // single generate_item or a begin-end block, and gen_body_has_begin_end says
+  // which was written here as it does for a conditional generate construct.
+  // §27.5, printed page 825, rules that direct nesting "does not apply in any
+  // way to loop generate constructs", so the field is recorded in this position
+  // without that rule bearing on it: a loop generate block is a scope whether
+  // or not begin and end were written.
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i;\n"
+      "  generate\n"
+      "    for (i = 0; i < 2; i = i + 1) wire w;\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_GE(mod->items.size(), 2);
+  auto* loop = mod->items[1];
+  ASSERT_EQ(loop->kind, ModuleItemKind::kGenerateFor);
+  EXPECT_FALSE(loop->gen_body_has_begin_end);
+}
+
 }  // namespace

@@ -167,6 +167,18 @@ struct GenerateCaseItem {
   bool is_default = false;
   std::vector<ModuleItem*> body;
 
+  // True when the block held in body was written with the `begin` and `end`
+  // keywords, false when it was written as a single item without them. A.4.2
+  // gives `generate_block ::= generate_item | [ generate_block_identifier : ]
+  // begin [ : generate_block_identifier ] { generate_item } end
+  // [ : generate_block_identifier ]`, so the two forms are told apart only
+  // while the block is being parsed. §27.5 needs the distinction afterwards:
+  // "If a generate block in a conditional generate construct consists of only
+  // one item that is itself a conditional generate construct and if that item
+  // is not surrounded by begin-end keywords, then this generate block is not
+  // treated as a separate scope."
+  bool has_begin_end = false;
+
   std::string_view label;
 };
 
@@ -294,6 +306,20 @@ struct ModuleItem {
   Expr* gen_cond = nullptr;
   Stmt* gen_step = nullptr;
   std::vector<ModuleItem*> gen_body;
+  // True when the block held in this item's own gen_body was written with the
+  // `begin` and `end` keywords, false when it was written as a single item
+  // without them. A.4.2 gives `generate_block ::= generate_item |
+  // [ generate_block_identifier : ] begin [ : generate_block_identifier ]
+  // { generate_item } end [ : generate_block_identifier ]`, so the two forms
+  // are told apart only while the block is being parsed. §27.5 needs the
+  // distinction afterwards: "If a generate block in a conditional generate
+  // construct consists of only one item that is itself a conditional generate
+  // construct and if that item is not surrounded by begin-end keywords, then
+  // this generate block is not treated as a separate scope." The else branch
+  // of an if_generate_construct is its own ModuleItem, reached through
+  // gen_else, and records its block on that item's field rather than on this
+  // one.
+  bool gen_body_has_begin_end = false;
   ModuleItem* gen_else = nullptr;
   std::vector<GenerateCaseItem> gen_case_items;
 
