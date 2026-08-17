@@ -295,7 +295,7 @@ void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
                 item->kind != ModuleItemKind::kUdpInst)) {
     return;
   }
-  const bool is_udp = item->kind == ModuleItemKind::kUdpInst;
+  const bool kIsUdp = item->kind == ModuleItemKind::kUdpInst;
 
   // An instance array measures nothing here, for a primitive instance as for a
   // gate instance. §28.3.6 makes a terminal wider than one bit the distributed
@@ -310,10 +310,10 @@ void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
   if (item->inst_range_left || item->inst_range_right) return;
 
   const auto& terms = item->gate_terminals;
-  const std::vector<size_t> outs =
-      is_udp ? UdpOutputTerminalIndices(terms.size())
+  const std::vector<size_t> kOuts =
+      kIsUdp ? UdpOutputTerminalIndices(terms.size())
              : OutputOrInoutTerminalIndices(item->gate_kind, terms.size());
-  for (size_t i : outs) {
+  for (size_t i : kOuts) {
     auto* t = terms[i];
     if (!t) continue;
     uint32_t w = StructuralNetExprWidth(t, mod, scope);
@@ -323,12 +323,12 @@ void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
     // instance is told about both, because §28.3.6 puts "the output or
     // bidirectional terminals" first together and several gate types connect a
     // bidirectional one.
-    const char* terminal = is_udp ? "user-defined primitive output terminal"
-                                  : "primitive output or inout terminal";
+    const char* kTerminal = kIsUdp ? "user-defined primitive output terminal"
+                                   : "primitive output or inout terminal";
     diag.Error(item->loc,
                std::format("{} must be a 1-bit net or structural net "
                            "expression (got width {})",
-                           terminal, w),
+                           kTerminal, w),
                Subclause("4.9.6"));
   }
 }
