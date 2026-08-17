@@ -212,4 +212,74 @@ TEST(LocalparamElaboration, StickyLocalparamPortRejectsInstanceOverride) {
                             "23.10.2.2"));
 }
 
+// §6.20.4: a localparam "can be assigned constant expressions (see 11.2.1)",
+// and §11.2.1 does not list a variable among the operands one consists of. The
+// initializer here is a bare identifier naming a variable, which is the
+// simplest spelling of the rule and the one that shows the check tests the
+// expression rather than its ExprKind.
+TEST(LocalparamElaboration, NonConstantIdentifierInitializerIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int v;\n"
+      "  localparam int N = v;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "localparam 'N' initializer is not a constant expression", 3, "6.20.4"));
+}
+
+// §6.20.4: the operand rules of §11.2.1 reach through the operators of
+// Table 11-1, so a variable is no more constant inside a binary expression than
+// alone. This is the commonest spelling of a non-constant initializer, and a
+// check written for bare identifiers alone would leave it unreported.
+TEST(LocalparamElaboration, NonConstantBinaryInitializerIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int v;\n"
+      "  localparam int N = v + 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "localparam 'N' initializer is not a constant expression", 3, "6.20.4"));
+}
+
+// §6.20.4 with §8.25: a class specialization's override is a constant
+// expression, so `C#(v)::P` with `v` a variable names no parameter that has a
+// value. ConstEvalMemberAccessFull refuses to fold such an override rather than
+// returning the class's own default, and this is the report that refusal has to
+// reach.
+TEST(LocalparamElaboration, SpecializationOverrideThatDoesNotFoldIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C #(int P = 1);\n"
+      "endclass\n"
+      "module m;\n"
+      "  int v;\n"
+      "  localparam int N = C#(v)::P;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "localparam 'N' initializer is not a constant expression", 5, "6.20.4"));
+}
+
+// §6.20.4: a localparam is "assigned constant expressions ... containing
+// parameters", so an initializer naming another parameter is exactly what the
+// clause permits. This is what the check above must not reject.
+TEST(LocalparamElaboration, ConstantIdentifierInitializerIsAccepted) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  localparam int K = 4;\n"
+      "  localparam int N = K;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

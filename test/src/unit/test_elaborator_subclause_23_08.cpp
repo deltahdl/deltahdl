@@ -25,10 +25,18 @@ TEST(UpwardNameReferenceElaboration, UpwardNetReferenceResolves) {
              "endmodule\n"));
 }
 
+// §23.8: the upward reference is read in a procedural assignment rather than in
+// a localparam initializer, because §6.20.2 rules that a value parameter "can
+// only be set to an expression of literals, value parameters or local
+// parameters, genvars, enumerated names, or a constant function of these" and
+// states that "Hierarchical names are not allowed". The vehicle a §23.8 case
+// uses has to be one the vehicle's own clause permits, and every other case in
+// this file reads its upward name the same way.
 TEST(UpwardNameReferenceElaboration, UpwardParameterReferenceResolves) {
   EXPECT_TRUE(
       ElabOk("module child;\n"
-             "  localparam int K = parent.P;\n"
+             "  integer k;\n"
+             "  initial k = parent.P;\n"
              "endmodule\n"
              "module parent;\n"
              "  parameter int P = 8;\n"

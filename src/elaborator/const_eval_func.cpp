@@ -795,6 +795,16 @@ static bool IsConstantMemberAccessExpr(const Expr* expr,
   if (builtin.value_or(false)) return true;
   if (expr->lhs && expr->rhs && expr->lhs->kind == ExprKind::kIdentifier &&
       expr->rhs->kind == ExprKind::kIdentifier) {
+    // §8.25 sends a specialization's overrides to §23.10's rules, and §23.10.2
+    // gives a parameter override a constant expression, so `C#(v)::P` is a
+    // constant expression only where every override is one. The compound key
+    // below is written by RecordClassParam from the class's own defaults, so
+    // asking it alone would answer for `C#()::P` whatever the arguments were.
+    // Parser::ParseParameterizedScope records the overrides in `elements` on
+    // the scope's base and sets has_param_spec there, so that is what is read.
+    if (expr->lhs->has_param_spec &&
+        !AllElementsConstant(expr->lhs->elements, scope))
+      return false;
     std::string compound =
         std::string(expr->lhs->text) + "." + std::string(expr->rhs->text);
     return scope.count(compound) > 0;
@@ -813,6 +823,11 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
     case ExprKind::kTimeLiteral:
       return true;
     case ExprKind::kIdentifier:
+      // §6.20.7 lists "as the value assigned to a parameter" among the contexts
+      // $ may appear in and gives `parameter r2 = $;` as its example, so $ is a
+      // constant that names no declaration. Asking `scope` about it would
+      // answer no, because nothing puts $ in a ScopeMap and nothing should.
+      if (expr->text == "$") return true;
       return scope.count(expr->text) > 0;
     case ExprKind::kUnary:
       return IsConstantExpr(expr->lhs, scope);

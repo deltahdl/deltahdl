@@ -628,8 +628,17 @@ void CheckParamMapHierRefs(const ModuleDecl* decl, const CompilationUnit* unit,
 }
 
 // Validate one parameter declaration item: it must carry a default value, its
-// value may not contain a hierarchical reference, and a localparam initialized
-// with an assignment pattern must be a constant expression in param_scope.
+// value may not contain a hierarchical reference, and a localparam's
+// initializer must be a constant expression in param_scope.
+//
+// §6.20.4 rules that local parameters "can be assigned constant expressions
+// (see 11.2.1)", and §11.2.1 gives the operands a constant expression consists
+// of. Neither rule mentions how the expression is written, so the check below
+// tests the expression rather than its ExprKind. The first guard below keeps
+// §6.20.3's type parameters out, which Syntax 6-6 gives their own production
+// taking a data type where a param_assignment takes a
+// constant_param_expression, so there is no value for IsConstantExpr to answer
+// about.
 void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
                            const CompilationUnit* unit, DiagEngine& diag) {
   if (item->data_type.kind == DataTypeKind::kVoid &&
@@ -651,9 +660,7 @@ void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
                Subclause("6.20.2"));
   }
 
-  if (item->is_localparam &&
-      item->init_expr->kind == ExprKind::kAssignmentPattern &&
-      !IsConstantExpr(item->init_expr, param_scope)) {
+  if (item->is_localparam && !IsConstantExpr(item->init_expr, param_scope)) {
     diag.Error(item->loc,
                std::format("localparam '{}' initializer is not a constant "
                            "expression",

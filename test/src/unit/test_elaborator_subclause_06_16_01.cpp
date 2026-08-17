@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -139,9 +140,12 @@ TEST(StringLenElaboration, LenOfAStringParameterPortFoldsToTheCharacterCount) {
 // built-in method and there is no length to fold: `N` stays unresolved.
 //
 // Without this, a fix that answered len() for every parameter whatever its
-// declared type would satisfy all five. This asserts no diagnostic, because
-// nothing in the program reports this case; the claim is only that the value
-// does not fold.
+// declared type would satisfy all five.
+//
+// §6.20.4 reports the declaration as well, because a call that names no
+// built-in method is not one of the operands §11.2.1 lists and so `S.len()` is
+// not a constant expression. Both claims are asserted here: which rule rejects
+// the source, and that the value behind it did not fold.
 TEST(StringLenElaboration, LenOfAnIntegerParameterDoesNotFold) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -157,6 +161,9 @@ TEST(StringLenElaboration, LenOfAnIntegerParameterDoesNotFold) {
   }
   ASSERT_NE(n, nullptr);
   EXPECT_FALSE(n->is_resolved);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "localparam 'N' initializer is not a constant expression", 3, "6.20.4"));
 }
 
 }  // namespace
