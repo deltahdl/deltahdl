@@ -624,4 +624,75 @@ TEST(ValueParameters, ClassParamDefaultComputedFromTypeParamIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §6.20.2: "Hierarchical names are not allowed." The sentence admits no
+// exception for a hierarchical name whose target happens to be a parameter, so
+// `parent.P` is a breach of it although `P` is a parameter of `parent`. What
+// the clause rules out is the target's being reached hierarchically. Reading
+// the parameter from the declaration of `parent` rather than from an
+// elaborated instance of it is what makes the value wrong: an instance
+// override of `P` supplied under §23.10.2 does not reach `K`, so two instances
+// of `child` under differently-overridden parents would take the same `K`.
+TEST(ValueParameters,
+     HierarchicalParameterReferenceInParameterValueIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child;\n"
+      "  parameter int K = parent.P;\n"
+      "endmodule\n"
+      "module parent;\n"
+      "  parameter int P = 8;\n"
+      "  child c1();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "parameter 'K' value contains a hierarchical reference", 2, "6.20.2"));
+}
+
+// §6.20.2 names `parameter`, `localparam` and `specparam` in one sentence, so
+// the localparam spelling of the source above breaks the same rule and draws
+// the same report. §6.20.4 also rules that a local parameter is assigned a
+// constant expression, and a hierarchical name is not one, but reporting both
+// tells the author the same thing twice under two clause numbers.
+// ValidateOneValueParam in
+// src/elaborator/elaborator_validate_queries_dims.cpp returns after the
+// §6.20.2 report for that reason, so what stands here is the rule that names
+// what is wrong with the initializer.
+TEST(ValueParameters,
+     HierarchicalParameterReferenceInLocalparamValueIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child;\n"
+      "  localparam int K = parent.P;\n"
+      "endmodule\n"
+      "module parent;\n"
+      "  parameter int P = 8;\n"
+      "  child c1();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "parameter 'K' value contains a hierarchical reference", 2, "6.20.2"));
+}
+
+// §6.20.2 on a hierarchical name whose target is a variable rather than a
+// parameter. This arm of the rule was already enforced, and it is here so that
+// a repair of the parameter arm is written as widening the rule rather than as
+// deleting the check that carries it.
+TEST(ValueParameters, HierarchicalVariableReferenceInParameterValueIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child;\n"
+      "  parameter int K = parent.v;\n"
+      "endmodule\n"
+      "module parent;\n"
+      "  integer v;\n"
+      "  child c1();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "parameter 'K' value contains a hierarchical reference", 2, "6.20.2"));
+}
+
 }  // namespace

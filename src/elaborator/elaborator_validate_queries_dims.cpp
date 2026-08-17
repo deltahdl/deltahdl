@@ -531,28 +531,6 @@ void Elaborator::ValidateSpecparamInDeclRange(const ModuleDecl* decl) {
   }
 }
 
-// §11.2.1/§23.8: a hierarchical reference whose target is a parameter is a
-// legal constant-expression operand. `base.member` is such a reference when a
-// module named `base` declares `member` as a parameter (an upward or
-// named-module reference to a constant). References to nets/variables (e.g. a
-// child instance's signal, `s.x`) are not constants and remain forbidden.
-static bool MemberAccessRefersToModuleParam(const CompilationUnit* unit,
-                                            const Expr* e) {
-  if (unit == nullptr || e->is_scope_resolution) return false;
-  if (!e->lhs || e->lhs->kind != ExprKind::kIdentifier) return false;
-  if (!e->rhs || e->rhs->kind != ExprKind::kIdentifier) return false;
-  for (const auto* m : unit->modules) {
-    if (m->name != e->lhs->text) continue;
-    for (const auto* item : m->items) {
-      if (item->kind == ModuleItemKind::kParamDecl &&
-          item->name == e->rhs->text) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
 // §8.23: a class scope resolution `Class::PARAM` whose target is a class value
 // parameter or local parameter is a legal constant-expression operand, not a
 // hierarchical reference. (A class parameter is a public constant of the
@@ -596,8 +574,14 @@ static bool AnyExprContainsHierRef(const std::vector<Expr*>& list,
 
 static bool ExprContainsHierRef(const Expr* e, const CompilationUnit* unit) {
   if (!e) return false;
+  // §6.20.2 rules that a value parameter's expression may hold literals, value
+  // parameters or local parameters, genvars, enumerated names, or a constant
+  // function of these, that "Package references are allowed", and that
+  // "Hierarchical names are not allowed". What the hierarchical name reaches
+  // does not enter into it, so a dotted name is a breach whether it names
+  // another module's parameter or one of its variables. Only the scoped names
+  // the clause admits are exempted below.
   if (e->kind == ExprKind::kMemberAccess) {
-    if (MemberAccessRefersToModuleParam(unit, e)) return false;
     if (ScopeResolutionRefersToClassParam(unit, e)) return false;
     return true;
   }
@@ -665,6 +649,11 @@ void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
                            "reference",
                            item->name),
                Subclause("6.20.2"));
+    // A hierarchical name is also not a constant expression, so the §6.20.4
+    // check below would report the same initializer a second time under a
+    // second clause number. §6.20.2 is the rule that names what is wrong with
+    // it, so it is the one report the author gets.
+    return;
   }
 
   if ((item->is_localparam || parameter_is_local) &&
