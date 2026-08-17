@@ -456,13 +456,22 @@ static bool ConstDecodeEscape(std::string_view text, size_t& i, uint8_t& out) {
 // string literal. A string literal of no characters returns an empty string
 // rather than std::nullopt, which is what lets §6.16.1 -- "if str is "", then
 // str.len() returns 0" -- be answered.
+// The text a string literal's quotes enclose. §5.9 gives the literal two
+// spellings, and the triple-quoted one carries three quote characters at each
+// end rather than one.
+static std::string_view StringLiteralBody(std::string_view text) {
+  if (text.size() >= 6 && text.substr(0, 3) == "\"\"\"") {
+    return text.substr(3, text.size() - 6);
+  }
+  if (text.size() >= 2 && text.front() == '"') {
+    return text.substr(1, text.size() - 2);
+  }
+  return text;
+}
+
 std::optional<std::string> ConstEvalString(const Expr* expr) {
   if (!expr || expr->kind != ExprKind::kStringLiteral) return std::nullopt;
-  std::string_view text = expr->text;
-  if (text.size() >= 6 && text.substr(0, 3) == "\"\"\"")
-    text = text.substr(3, text.size() - 6);
-  else if (text.size() >= 2 && text.front() == '"')
-    text = text.substr(1, text.size() - 2);
+  std::string_view text = StringLiteralBody(expr->text);
 
   std::string chars;
   for (size_t i = 0; i < text.size(); ++i) {
