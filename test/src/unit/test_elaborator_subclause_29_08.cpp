@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <set>
+#include <string>
 
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -317,6 +318,126 @@ TEST(UdpInstanceElaboration, InstanceArrayTerminalOfAWrongWidthIsReported) {
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "gate or primitive array terminal width does not match", 10, "28.3.6"));
+}
+
+// §29.8 puts a primitive instance inside a module "in the same manner as
+// gates", and §27.3 rules that an instance of a generate block "brings the
+// objects, behavioral constructs, and module instances within the block into
+// existence", so a loop generate construct holding one instantiation leaves one
+// RtlirUdpInst per iteration. §27.4 says what tells those instances apart:
+// "Within the generate block of a loop generate construct, there is an implicit
+// localparam declaration ... its value within each instance of the generate
+// block is the value of the loop index at the time the instance was
+// elaborated", usable "anywhere within the generate block that a normal
+// parameter with an integer value can be used". A terminal written
+// `y_out_v[row]` is such a use, so the value that terminal resolves against has
+// to reach the instance, and RtlirUdpInst::gen_block_consts
+// (src/elaborator/rtlir.h:261) is where it rides: the iterations share one body
+// AST, so nothing in the AST distinguishes them.
+//
+// Both assertions are needed. The count alone passes a loop whose two instances
+// were elaborated with one localparam value between them, which is what two
+// instances driving the same bit look like, and the values alone say nothing
+// about how many instances the loop left.
+//
+// The genvar runs 5 to 6 so that no value it takes is also an index into
+// RtlirModule::udp_insts, which are 0 and 1, and the terminal is declared
+// `[7:4]` so that no value it takes is also a storage offset within the
+// terminal, which are 1 and 2. An implementation that stamped the iteration's
+// ordinal, or the offset the terminal select resolved to, reads back a value
+// this case does not accept.
+//
+// This is the case #3201 was filed on: Elaborator::ElaborateGenerateBlockItem
+// (src/elaborator/elaborator_generate.cpp:80) stamps RtlirModule::processes and
+// RtlirModule::assigns and not RtlirModule::udp_insts, so both instances carry
+// an empty gen_block_consts and the set below holds nothing.
+TEST(UdpInstanceElaboration, GenerateLoopStampsEachInstanceWithItsIndex) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "primitive p_row1(output y_out, input y_in);\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module row_top;\n"
+      "  wire [7:4] y_out_v, y_in_v;\n"
+      "  genvar row;\n"
+      "  generate\n"
+      "    for (row = 5; row < 7; row = row + 1) begin : row_blk\n"
+      "      p_row1 u_row(y_out_v[row], y_in_v[row]);\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f, "row_top");
+  auto* mod = TopModule(design);
+  ASSERT_NE(mod, nullptr);
+  ASSERT_EQ(mod->udp_insts.size(), 2U);
+  std::set<int64_t> index_values;
+  for (const auto& inst : mod->udp_insts) {
+    ASSERT_EQ(inst.gen_block_consts.size(), 1U);
+    EXPECT_EQ(inst.gen_block_consts[0].first, "row");
+    index_values.insert(inst.gen_block_consts[0].second);
+  }
+  EXPECT_EQ(index_values, (std::set<int64_t>{5, 6}));
+}
+
+// §27.4: a generate block "comprises a separate scope and a new level of
+// hierarchy when it is instantiated", so the `c_local` this block declares
+// belongs to the block instance rather than to `col_top`, and the elaborator
+// names it under a prefix that identifies the instance. The body AST is shared
+// across instances and still writes the simple name `c_local`, so the terminal
+// of the primitive instance can only reach that declaration through the prefix
+// the instance carries, which is RtlirUdpInst::gen_block_prefix
+// (src/elaborator/rtlir.h:262). Lowerer::LowerUdpInst
+// (src/simulator/lowerer_udp.cpp:321) copies it to Process::gen_prefix, and
+// SimContext (src/simulator/sim_context.cpp:111) prepends it to a name before
+// looking the name up.
+//
+// The assertion is that the prefix, followed by the simple name the body wrote,
+// is the name the block instance's own declaration got. Stating it that way
+// rather than against a spelling asserts what the prefix is for: §27.4 fixes
+// that a named block instance has its own scope, and fixes nothing about how a
+// flattened design spells the prefix. ASSERT_NE above it states the premise the
+// equality rests on, that the declaration was named under a prefix at all,
+// which is what would otherwise let an unprefixed declaration and an unstamped
+// instance agree on the empty string.
+//
+// This is the second half of the case #3201 was filed on: with
+// Elaborator::ElaborateGenerateBlockItem not stamping RtlirModule::udp_insts,
+// gen_block_prefix is empty and the primitive drives a name no instance of the
+// block declares.
+TEST(UdpInstanceElaboration, GenerateBlockPrefixNamesTheInstanceDeclarations) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "primitive p_col1(output c_out, input c_in);\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module col_top;\n"
+      "  wire c_in_s;\n"
+      "  genvar col;\n"
+      "  generate\n"
+      "    for (col = 9; col < 10; col = col + 1) begin : col_blk\n"
+      "      wire c_local;\n"
+      "      p_col1 u_col(c_local, c_in_s);\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f, "col_top");
+  auto* mod = TopModule(design);
+  ASSERT_NE(mod, nullptr);
+  ASSERT_EQ(mod->udp_insts.size(), 1U);
+  const RtlirNet* block_net = nullptr;
+  for (const auto& net : mod->nets) {
+    if (net.name.ends_with("c_local")) block_net = &net;
+  }
+  ASSERT_NE(block_net, nullptr);
+  ASSERT_NE(block_net->name, "c_local");
+  EXPECT_EQ(std::string(mod->udp_insts[0].gen_block_prefix) + "c_local",
+            std::string(block_net->name));
 }
 
 }  // namespace

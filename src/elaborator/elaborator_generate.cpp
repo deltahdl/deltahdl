@@ -66,13 +66,35 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   cu_param_scope_ = std::move(saved_cu_param_scope);
 }
 
+// Stamp one generate block instance's loop-index values and name prefix onto
+// everything appended to `items` at or after index `first`. Every vector an
+// item can append to is stamped the same way, so this states the rule once and
+// each vector is one call: a vector added to RtlirModule later needs a call
+// added here and nothing else. RtlirModule::udp_insts is the vector that went
+// unstamped when it was added, which left each instance of a loop body with an
+// empty prefix and no genvar binding.
+template <typename Item>
+static void StampGenBlockInstance(std::vector<Item>& items, size_t first,
+                                  const GenBlockConsts& consts,
+                                  GenBlockPrefix prefix) {
+  for (size_t i = first; i < items.size(); ++i) {
+    items[i].gen_block_consts = consts;
+    items[i].gen_block_prefix = prefix;
+  }
+}
+
 // §27.4: what an ordinary item elaborates to belongs to one instance of the
 // generate block, but every instance shares the one body AST. Stamp this
 // instance's loop-index values onto whatever the item produced, which is the
-// only place the instances can still be told apart. A process and a continuous
-// assignment both reach simulation as their own thread, and the clause admits
-// the parameter "anywhere within the generate block that a normal parameter
-// with an integer value can be used", so both carry it.
+// only place the instances can still be told apart. A process, a continuous
+// assignment and a user-defined primitive instance each reach simulation as
+// their own thread, and the clause admits the parameter "anywhere within the
+// generate block that a normal parameter with an integer value can be used", so
+// all three carry it. Lowerer::LowerUdpInst in src/simulator/lowerer_udp.cpp
+// gives an RtlirUdpInst a Process of its own for the reason
+// Lowerer::LowerContAssign in src/simulator/lowerer_contassign.cpp gives one to
+// an RtlirContAssign, which is why RtlirUdpInst carries the same two members as
+// RtlirContAssign.
 //
 // The block's own declarations are named under the generate prefix while the
 // shared body still calls them by their simple names, so the prefix rides along
@@ -81,16 +103,12 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
                                             RtlirModule* mod) {
   size_t first_proc = mod->processes.size();
   size_t first_assign = mod->assigns.size();
+  size_t first_udp = mod->udp_insts.size();
   ElaborateItem(item, mod);
   GenBlockPrefix prefix = InternedGenPrefix();
-  for (size_t i = first_proc; i < mod->processes.size(); ++i) {
-    mod->processes[i].gen_block_consts = gen_loop_consts_;
-    mod->processes[i].gen_block_prefix = prefix;
-  }
-  for (size_t i = first_assign; i < mod->assigns.size(); ++i) {
-    mod->assigns[i].gen_block_consts = gen_loop_consts_;
-    mod->assigns[i].gen_block_prefix = prefix;
-  }
+  StampGenBlockInstance(mod->processes, first_proc, gen_loop_consts_, prefix);
+  StampGenBlockInstance(mod->assigns, first_assign, gen_loop_consts_, prefix);
+  StampGenBlockInstance(mod->udp_insts, first_udp, gen_loop_consts_, prefix);
 }
 
 void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
