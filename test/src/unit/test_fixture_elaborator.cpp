@@ -171,4 +171,20 @@ TEST(ElaboratorFixture, ElaborateWithPreprocessorHonoursAutoTop) {
   EXPECT_EQ(design->top_modules.size(), 2u);
 }
 
+// The same question of ElabOk that
+// ElaborateSrcStillElaboratesAPackageOnlySource asks of the other helper.
+// §3.12.1 rules that the compilation-unit scope "can contain any item that can
+// be defined within a package (see 26.2) and bind constructs as well", so a
+// source declaring only a class is legal and has something to elaborate. ElabOk
+// answered false for it before the elaborator ran, which is the answer a
+// rejected source gets, so a case asserting such a source elaborates could not
+// pass and was given no reason: the parse guard above names its input through
+// ADD_FAILURE and this refusal named nothing.
+TEST(ElaboratorFixture, ElabOkAcceptsAClassOnlySource) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  int data;\n"
+             "endclass\n"));
+}
+
 }  // namespace
