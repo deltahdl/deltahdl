@@ -84,8 +84,9 @@ TEST(GateArrayConnection, ParameterizedArrayRangeTooFewBitsIsError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "gate array terminal width does not match", 5,
-                            "28.3.6"));
+                            "gate or primitive array terminal width does not "
+                            "match",
+                            5, "28.3.6"));
 }
 
 TEST(GateArrayConnection, TooFewBitsOnArrayPortIsError) {
@@ -98,8 +99,9 @@ TEST(GateArrayConnection, TooFewBitsOnArrayPortIsError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "gate array terminal width does not match", 4,
-                            "28.3.6"));
+                            "gate or primitive array terminal width does not "
+                            "match",
+                            4, "28.3.6"));
 }
 
 // §28.3.6: the terminal-connection rules name *too many* bits as an error just
@@ -120,8 +122,9 @@ TEST(GateArrayConnection, TooManyBitsOnArrayPortIsError) {
   // GateArrayConnection.TooFewBitsOnArrayPortIsError; the source is what tells
   // the two cases apart.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "gate array terminal width does not match", 4,
-                            "28.3.6"));
+                            "gate or primitive array terminal width does not "
+                            "match",
+                            4, "28.3.6"));
 }
 
 // §28.3.6: an interconnect terminal connected to an instance array must have a
@@ -137,8 +140,9 @@ TEST(GateArrayConnection, ScalarInterconnectCannotBroadcastAcrossArray) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "interconnect terminal of a gate instance array", 4,
-                            "28.3.6"));
+                            "interconnect terminal of a gate or primitive "
+                            "instance array",
+                            4, "28.3.6"));
 }
 
 TEST(GateArrayConnection, InterconnectWidthEqualToArrayLengthElaborates) {

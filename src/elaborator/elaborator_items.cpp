@@ -452,11 +452,15 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
 
 namespace {
 
-// §28.3.6: validates the per-terminal bit-lengths of a gate/switch instance
-// array whose instance range has already been confirmed present. `scope` is the
-// caller's parameter scope used to evaluate the range bounds. An interconnect
-// terminal must match the instance-array length exactly; an ordinary terminal
-// must be either scalar-width (broadcast) or equal to the array length.
+// §28.3.6: validates the per-terminal bit-lengths of a gate, switch or
+// user-defined primitive instance array whose instance range has already been
+// confirmed present. `scope` is the caller's parameter scope used to evaluate
+// the range bounds. An interconnect terminal must match the instance-array
+// length exactly; an ordinary terminal must be either scalar-width (broadcast)
+// or equal to the array length. §29.8 puts an array of primitive instances
+// under the same rule -- "The terminal connection rules remain the same as
+// outlined in 28.3.6" -- so the reports name a primitive as well as a gate,
+// and cite 28.3.6, which is where the rule is stated.
 void CheckGateInstanceArrayTerminalWidths(
     const ModuleItem* item, const RtlirModule* mod, const ScopeMap& scope,
     const std::unordered_set<std::string_view>& interconnect_names,
@@ -465,8 +469,8 @@ void CheckGateInstanceArrayTerminalWidths(
   auto rhi = ConstEvalInt(item->inst_range_right, scope);
   if (!lhi || !rhi) {
     diag.Error(item->loc,
-               "gate or switch instance range bound is not a constant "
-               "expression",
+               "gate, switch or primitive instance range bound is not a "
+               "constant expression",
                Subclause("28.3.5"));
     return;
   }
@@ -479,8 +483,8 @@ void CheckGateInstanceArrayTerminalWidths(
     if (is_interconnect) {
       if (w != array_len) {
         diag.Error(item->loc,
-                   "interconnect terminal of a gate instance array "
-                   "must have a bit-length equal to the instance-array "
+                   "interconnect terminal of a gate or primitive instance "
+                   "array must have a bit-length equal to the instance-array "
                    "length",
                    Subclause("28.3.6"));
         break;
@@ -489,8 +493,8 @@ void CheckGateInstanceArrayTerminalWidths(
     }
     if (w != 1 && w != array_len) {
       diag.Error(item->loc,
-                 "gate array terminal width does not match either "
-                 "the per-instance port width or the instance-array "
+                 "gate or primitive array terminal width does not match "
+                 "either the per-instance port width or the instance-array "
                  "length",
                  Subclause("28.3.6"));
       break;
@@ -650,6 +654,14 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       CheckUdpInstNameDiagnostics(item, declared_names_, diag_);
       CreateImplicitNetsForTerminals(item->gate_terminals, item->loc,
                                      make_implicit_net);
+      // §29.8: "The terminal connection rules remain the same as outlined in
+      // 28.3.6", so an array of primitive instances is held to the terminal
+      // widths CheckGateInstanceArrayTerminalWidths checks for an array of
+      // gates, and is checked before ElaborateUdpInst expands it.
+      if (HasInstanceArrayRange(item)) {
+        CheckGateInstanceArrayTerminalWidths(item, mod, BuildParamScope(mod),
+                                             interconnect_names_, diag_);
+      }
       ElaborateUdpInst(item, mod);
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       return true;

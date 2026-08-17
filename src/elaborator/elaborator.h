@@ -270,9 +270,15 @@ class Elaborator : public ElaboratorOperationRules {
 
   void ElaborateModuleInst(ModuleItem* item, RtlirModule* mod);
 
-  // §29.8: records one instance of a user-defined primitive on `mod`, so that
-  // the primitive drives the net its output terminal names.
-  void ElaborateUdpInst(const ModuleItem* item, RtlirModule* mod);
+  // §29.8: records on `mod` every instance of a user-defined primitive that one
+  // instantiation writes, so that the primitive drives the nets its output
+  // terminals name. An instantiation written with the optional range §29.8
+  // admits is one instance per array element.
+  void ElaborateUdpInst(ModuleItem* item, RtlirModule* mod);
+
+  // §29.8: appends the one instance of a user-defined primitive that the
+  // terminal list currently held on `item` describes.
+  void ElaborateOneUdpInst(const ModuleItem* item, RtlirModule* mod);
 
   UdpDecl* FindUdpByName(std::string_view name) const;
 

@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -96,6 +97,32 @@ void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
                 const ProcessBuildEnv& env);
 
 void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena);
+
+// §28.3.6: expands an instance array written with a range into one instance per
+// array element, calling `elaborate_element` once for each with `item` holding
+// that element's own terminal list -- a terminal as wide as the array replaced
+// by its [p] bit-select, so the LSB reaches the element at the right-hand index
+// of the range, and a single-bit terminal left as it stands so every element
+// sees it. The whole terminal list is restored before returning, so `item` is
+// left as the caller passed it.
+//
+// The array length is taken from the widest terminal rather than from the
+// range bounds. The two are the same number for a source that satisfies
+// §28.3.6, and CheckGateInstanceArrayTerminalWidths
+// (src/elaborator/elaborator_items.cpp) has already reported a terminal that is
+// neither scalar nor array-length by the time this is called.
+//
+// Returns false, having called `elaborate_element` no times, when every
+// terminal is single-bit: there is then nothing to distribute, and the caller
+// elaborates `item` as the one instance it already is.
+//
+// Shared because §29.8 makes this one rule for two kinds of instance -- an
+// array of user-defined primitive instances connects its terminals by "the
+// terminal connection rules ... outlined in 28.3.6", the rules an array of
+// gates connects by.
+bool ExpandInstanceArray(
+    ModuleItem* item, const RtlirModule* mod, Arena& arena,
+    const std::function<void(ModuleItem*)>& elaborate_element);
 
 // §6.7.1: "Certain restrictions apply to the data type of a net. A valid data
 // type for a net shall be one of the following: a) A 4-state integral type ...

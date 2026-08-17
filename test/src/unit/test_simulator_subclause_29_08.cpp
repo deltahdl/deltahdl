@@ -243,4 +243,47 @@ TEST(UdpInstanceSim, SequentialInstanceKeepsOneStateForTheRun) {
             "1");
 }
 
+// §29.8: "An optional range may be specified for an array of UDP instances",
+// and "The terminal connection rules remain the same as outlined in 28.3.6".
+// `udp_and g [3:0] (y, a, b)` is therefore four instances of udp_and, and
+// §28.3.6 connects element p to bit p of every terminal whose width is the
+// array length while broadcasting a single-bit terminal to all four.
+//
+// The first run drives a and b to different values on different bits. Its
+// expected 1000 is reached only by four evaluations of the table, each on one
+// element's own input bits: an instance array that elaborates to nothing leaves
+// y at zzzz, one evaluation over the whole vector drives the four output bits
+// from a single table row rather than from four, and an expansion pairing
+// element p with bit 3-p of one terminal drives 0001.
+//
+// The second run holds b at one bit, which §28.3.6 broadcasts, so y takes a
+// unchanged. Its 1100 differs from the first run's 1000, so no one constant
+// satisfies both.
+//
+// Both values are read after Scheduler::Run has returned, which is strictly
+// after every event this design schedules, so §4.7's rule that active events
+// "can be taken off the Active or Reactive event region and processed in any
+// order" does not decide what is read.
+TEST(UdpInstanceSim, InstanceArrayDrivesEachOutputBitFromItsOwnElement) {
+  EXPECT_EQ(SettledValue(std::string(kAndPrimitive) +
+                             "module m;\n"
+                             "  reg [3:0] a, b;\n"
+                             "  wire [3:0] y;\n"
+                             "  udp_and g [3:0] (y, a, b);\n"
+                             "  initial begin a = 4'b1100; b = 4'b1010; end\n"
+                             "endmodule\n",
+                         "y"),
+            "1000");
+  EXPECT_EQ(SettledValue(std::string(kAndPrimitive) +
+                             "module m;\n"
+                             "  reg [3:0] a;\n"
+                             "  reg b;\n"
+                             "  wire [3:0] y;\n"
+                             "  udp_and g [3:0] (y, a, b);\n"
+                             "  initial begin a = 4'b1100; b = 1'b1; end\n"
+                             "endmodule\n",
+                         "y"),
+            "1100");
+}
+
 }  // namespace

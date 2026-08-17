@@ -102,7 +102,8 @@ TEST(GateArrayElaboration, NonConstantRangeBoundIsError) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "gate or switch instance range bound is not a constant", 4, "28.3.5"));
+      "gate, switch or primitive instance range bound is not a constant", 4,
+      "28.3.5"));
 }
 
 TEST(GateArrayElaboration, ParameterTypedRangeBoundIsAccepted) {

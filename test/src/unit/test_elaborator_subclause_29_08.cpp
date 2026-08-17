@@ -1,5 +1,9 @@
+#include <cstdint>
+#include <set>
+
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -233,6 +237,86 @@ TEST(UdpInstanceElaboration, GateInstanceInTheSameModuleStaysInAssigns) {
   ASSERT_NE(mod->assigns[0].lhs, nullptr);
   EXPECT_EQ(mod->udp_insts[0].output->text, "x_out");
   EXPECT_EQ(mod->assigns[0].lhs->text, "g_out");
+}
+
+// §29.8: "An optional range may be specified for an array of UDP instances",
+// and "Instances of UDPs are specified inside modules in the same manner as
+// gates (see 28.3)", so the four-element range below shall leave four entries
+// in RtlirModule::udp_insts rather than one. §28.3.6 says which bit each
+// element connects to: "If bit lengths are different, each instance shall get a
+// part-select of the port expression, of a bit length equal to the instance
+// port bit length", so the four elements take the four distinct bits of the
+// 4-bit terminal `r_out_v`.
+//
+// Both assertions are needed. The count alone passes an expansion that
+// connected the whole vector to all four instances, which is what the four
+// instances of one unexpanded terminal would look like, and the set of bits
+// alone passes a count of any size. The instance range is `[7:4]` and the
+// terminal is declared `[3:0]` so that no array index is also a bit position:
+// an implementation that used the instance's own index as the bit position
+// reads back bits 4 through 7, which are not bits of this terminal at all.
+//
+// This is the case #3199 was filed on: with the kUdpInst arm returning without
+// appending anything when the instance carries a range,
+// RtlirModule::udp_insts is empty and no bit of `r_out_v` is driven.
+TEST(UdpInstanceElaboration, InstanceArrayExpandsToOneInstancePerElement) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "primitive p_arr1(output r_out, input r_in);\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module arr_top;\n"
+      "  wire [3:0] r_out_v, r_in_v;\n"
+      "  p_arr1 u_arr [7:4] (r_out_v, r_in_v);\n"
+      "endmodule\n",
+      f, "arr_top");
+  auto* mod = TopModule(design);
+  ASSERT_NE(mod, nullptr);
+  ASSERT_EQ(mod->udp_insts.size(), 4U);
+  std::set<uint64_t> output_bits;
+  for (const auto& inst : mod->udp_insts) {
+    ASSERT_NE(inst.output, nullptr);
+    ASSERT_EQ(inst.output->kind, ExprKind::kSelect);
+    ASSERT_NE(inst.output->base, nullptr);
+    ASSERT_NE(inst.output->index, nullptr);
+    EXPECT_EQ(inst.output->base->text, "r_out_v");
+    output_bits.insert(inst.output->index->int_val);
+  }
+  EXPECT_EQ(output_bits, (std::set<uint64_t>{0, 1, 2, 3}));
+}
+
+// §29.8: "The terminal connection rules remain the same as outlined in 28.3.6",
+// and §28.3.6 rules that "Too many or too few bits to connect to all the
+// instances shall be considered an error". The array below has four elements,
+// so its output terminal is either 1 bit and broadcast to each element or 4
+// bits and distributed across them; the 3-bit `w_out_v` is neither, and the
+// three surplus-or-missing bits connect to nothing.
+//
+// The report is named through ReportedError so the case cannot pass on some
+// other rejection of this source -- an unexpanded array reports nothing at all
+// today, and a source rejected for a different reason would satisfy a bare
+// "were there errors" question.
+TEST(UdpInstanceElaboration, InstanceArrayTerminalOfAWrongWidthIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "primitive p_wide1(output w_out, input w_in);\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module wide_top;\n"
+      "  wire [2:0] w_out_v;\n"
+      "  wire w_in_s;\n"
+      "  p_wide1 u_wide [7:4] (w_out_v, w_in_s);\n"
+      "endmodule\n",
+      f, "wide_top");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "gate or primitive array terminal width does not match", 10, "28.3.6"));
 }
 
 }  // namespace

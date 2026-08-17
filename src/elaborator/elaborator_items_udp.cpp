@@ -162,13 +162,35 @@ void Elaborator::ReclassifyForwardUdpInstances(const ModuleDecl* decl) {
   }
 }
 
-// §29.8: records one instance of a user-defined primitive on `mod`, so that the
-// primitive drives the net its output terminal names. "Instances of UDPs are
-// specified inside modules in the same manner as gates (see 28.3)", and a gate
-// instance reaches simulation as the RtlirContAssign ElaborateGateInst
-// (src/elaborator/elaborator_gates.cpp:635) appends; a primitive instance
-// reaches it as the RtlirUdpInst appended here. Append nothing and no
-// instance's output terminal has a driver.
+// §29.8: records on `mod` every instance of a user-defined primitive that one
+// instantiation writes, so that the primitive drives the nets its output
+// terminals name. "Instances of UDPs are specified inside modules in the same
+// manner as gates (see 28.3)", and a gate instance reaches simulation as the
+// RtlirContAssign ElaborateGateInst (src/elaborator/elaborator_gates.cpp)
+// appends; a primitive instance reaches it as the RtlirUdpInst
+// Elaborator::ElaborateOneUdpInst appends. Append nothing and no instance's
+// output terminal has a driver.
+void Elaborator::ElaborateUdpInst(ModuleItem* item, RtlirModule* mod) {
+  // §29.8: "An optional range may be specified for an array of UDP instances",
+  // and "The terminal connection rules remain the same as outlined in 28.3.6",
+  // so such a range is expanded here into one instance per array element the
+  // way ElaborateGateInst (src/elaborator/elaborator_gates.cpp) expands the
+  // range on an array of gates. ExpandInstanceArray
+  // (src/elaborator/elaborator_helpers.h) is that one expansion, and it answers
+  // false where every terminal is single-bit, leaving the range to record the
+  // one instance it describes.
+  if (item->inst_range_left != nullptr && item->inst_range_right != nullptr &&
+      ExpandInstanceArray(item, mod, arena_, [this, mod](ModuleItem* element) {
+        ElaborateOneUdpInst(element, mod);
+      }))
+    return;
+
+  ElaborateOneUdpInst(item, mod);
+}
+
+// §29.8: appends the one RtlirUdpInst that the terminal list currently held on
+// `item` describes -- a single instance, or one element of an expanded instance
+// array.
 //
 // Resolve the declaration here rather than record the name for a later pass.
 // Elaborator::FindUdpByName answers the library search order §33.6 defines
@@ -195,19 +217,10 @@ void Elaborator::ReclassifyForwardUdpInstances(const ModuleDecl* decl) {
 // (src/elaborator/elaborator_generate.cpp:80) stamps §27.4's loop-index values
 // onto RtlirModule::processes and RtlirModule::assigns after the item is
 // elaborated, and it does not stamp RtlirModule::udp_insts.
-void Elaborator::ElaborateUdpInst(const ModuleItem* item, RtlirModule* mod) {
+void Elaborator::ElaborateOneUdpInst(const ModuleItem* item, RtlirModule* mod) {
   const UdpDecl* decl = FindUdpByName(item->inst_module);
   if (decl == nullptr) return;
   if (item->gate_terminals.empty()) return;
-
-  // §29.8: "An optional range may be specified for an array of UDP instances."
-  // Such an array is not expanded into one instance per element here, so it
-  // elaborates to nothing until #3199 expands it, and the single-instance form
-  // below would otherwise record it as one instance connected to the whole
-  // vector.
-  if (item->inst_range_left != nullptr || item->inst_range_right != nullptr) {
-    return;
-  }
 
   RtlirUdpInst inst;
   inst.decl = decl;

@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <format>
+#include <functional>
 #include <unordered_map>
 #include <vector>
 
@@ -600,7 +601,7 @@ static void ElaborateOneGate(ModuleItem* item, RtlirModule* mod, Arena& arena) {
 // The terminal list one element of an instance array connects to: a terminal
 // as wide as the array takes its [p] bit-select, and a single-bit terminal is
 // broadcast unchanged.
-static std::vector<Expr*> GateArrayElementTerminals(
+static std::vector<Expr*> InstanceArrayElementTerminals(
     const std::vector<Expr*>& terms, const RtlirModule* mod, Arena& arena,
     uint32_t array_len, uint32_t p) {
   std::vector<Expr*> bit_terms;
@@ -611,13 +612,9 @@ static std::vector<Expr*> GateArrayElementTerminals(
   return bit_terms;
 }
 
-// Expand an instance array into one scalar primitive per element. The array
-// length is taken from the widest terminal, which the terminal-width check has
-// already confirmed equals the instance-array length for every distributed
-// terminal. False means every terminal is single-bit, leaving the instance to
-// elaborate as one gate.
-static bool ElaborateGateInstArray(ModuleItem* item, RtlirModule* mod,
-                                   Arena& arena) {
+bool ExpandInstanceArray(
+    ModuleItem* item, const RtlirModule* mod, Arena& arena,
+    const std::function<void(ModuleItem*)>& elaborate_element) {
   uint32_t array_len = 0;
   for (auto* t : item->gate_terminals)
     array_len = std::max(array_len, LookupLhsWidth(t, mod));
@@ -625,8 +622,8 @@ static bool ElaborateGateInstArray(ModuleItem* item, RtlirModule* mod,
   std::vector<Expr*> saved = item->gate_terminals;
   for (uint32_t p = 0; p < array_len; ++p) {
     item->gate_terminals =
-        GateArrayElementTerminals(saved, mod, arena, array_len, p);
-    ElaborateOneGate(item, mod, arena);
+        InstanceArrayElementTerminals(saved, mod, arena, array_len, p);
+    elaborate_element(item);
   }
   item->gate_terminals = saved;
   return true;
@@ -634,18 +631,15 @@ static bool ElaborateGateInstArray(ModuleItem* item, RtlirModule* mod,
 
 void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
   // §28.3.6: an instance array whose terminals carry more than one bit is
-  // expanded into one scalar primitive per array element. A terminal whose
-  // width equals the array length is distributed — element p connects to its
-  // [p] bit-select, the LSB reaching the element at the right-hand index —
-  // while a single-bit terminal is broadcast to every element. Rebuilding each
-  // element from these bit-selects reproduces the per-element connection for
-  // every gate family, including the control-driven three-state and MOS
-  // switches whose vector control would otherwise collapse to one scalar
-  // condition shared across the whole array. The array length is taken from the
-  // widest terminal, which the terminal-width check has already confirmed
-  // equals the instance-array length for every distributed terminal.
+  // expanded into one scalar primitive per array element. Rebuilding each
+  // element from bit-selects reproduces the per-element connection for every
+  // gate family, including the control-driven three-state and MOS switches
+  // whose vector control would otherwise collapse to one scalar condition
+  // shared across the whole array.
   if (item->inst_range_left && item->inst_range_right &&
-      ElaborateGateInstArray(item, mod, arena))
+      ExpandInstanceArray(item, mod, arena, [mod, &arena](ModuleItem* element) {
+        ElaborateOneGate(element, mod, arena);
+      }))
     return;
 
   ElaborateOneGate(item, mod, arena);
