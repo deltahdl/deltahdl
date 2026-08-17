@@ -753,4 +753,64 @@ TEST(ValueParameters, PackageParameterReferenceResolvesItsValue) {
   EXPECT_EQ(k->resolved_value, 4);
 }
 
+// §6.20.2 forbids a hierarchical name, and a method call is not one. §23.6
+// makes a hierarchical name one qualified by the scope it is declared in, while
+// `NAME.len()` is §13.5's `expression.method(...)` written on a parameter of
+// this very module. §11.2.1 admits "a constant function of these" and §6.16.1
+// associates len() with string, so the source is legal and was rejected.
+TEST(ValueParameters, MethodCallOnAStringParameterIsAcceptedInAParameterValue) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter string NAME = \"abc\";\n"
+      "  parameter int W = NAME.len();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The value, because acceptance alone would pass an elaborator that admitted
+// the call and read nothing through it. "abc" is three characters, and 3 is not
+// what an unresolved parameter holds.
+TEST(ValueParameters, MethodCallOnAStringParameterResolvesItsValue) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter string NAME = \"abc\";\n"
+      "  parameter int W = NAME.len();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const RtlirParamDecl* w = nullptr;
+  for (const auto& param : design->top_modules[0]->params) {
+    if (param.name == "W") w = &param;
+  }
+  ASSERT_NE(w, nullptr);
+  EXPECT_TRUE(w->is_resolved);
+  EXPECT_EQ(w->resolved_value, 3);
+}
+
+// The arm where the call really is illegal. §5.13 associates len() with string
+// alone, so `S.len()` over an integer S is not a constant expression and
+// §6.20.4 is the rule it breaks. That report already stood; what this asserts
+// is that §6.20.2's no longer stands beside it, naming a hierarchical name the
+// source does not contain. Reporting the right rule and reporting any rule are
+// what this case separates.
+TEST(ValueParameters, MethodCallOnANonStringParameterReportsOnly6_20_4) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  localparam int S = 3;\n"
+      "  localparam int N = S.len();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "localparam 'N' initializer is not a constant expression", 3, "6.20.4"));
+  for (const auto& d : f.diag.Diagnostics()) {
+    EXPECT_NE(d.subclause, "6.20.2") << d.message;
+  }
+}
+
 }  // namespace

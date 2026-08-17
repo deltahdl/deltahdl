@@ -559,6 +559,23 @@ static bool ExprContainsHierRef(const Expr* e, const CompilationUnit* unit) {
   // this rule's business: what is wrong with such a source is the name, which
   // §26.3 reports, and §6.20.4 reports the initializer that is not a constant
   // expression as a result.
+
+  // §13.5: a method call is written `expression.method(...)`, and the parser
+  // records it as a kCall whose callee is the kMemberAccess naming the method.
+  // The dot in that node separates an expression from the method invoked on it
+  // rather than qualifying a name by the scope it is declared in, which is what
+  // §23.6 makes a hierarchical name, so the call is judged by the expression it
+  // is called on and by its arguments and not by the callee itself. Without
+  // this, `S.len()` on a string parameter of this very module was reported as a
+  // hierarchical reference, naming a rule the source did not break and one its
+  // author could not act on. A call written on a hierarchical name is still
+  // reported, because the expression underneath the callee is where that name
+  // is and it is still walked.
+  if (e->kind == ExprKind::kCall && e->lhs != nullptr &&
+      e->lhs->kind == ExprKind::kMemberAccess) {
+    return ExprContainsHierRef(e->lhs->lhs, unit) ||
+           AnyExprContainsHierRef(e->args, unit);
+  }
   if (e->kind == ExprKind::kMemberAccess) return !e->is_scope_resolution;
   for (const Expr* sub :
        {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr}) {
@@ -628,11 +645,12 @@ void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
 
   // The §6.20.4 check below is not skipped when the §6.20.2 one above has
   // already reported, although a hierarchical name is not a constant
-  // expression either. ExprContainsHierRef answers true for every
-  // ExprKind::kMemberAccess it does not recognise, which includes a method
-  // call on a parameter such as `S.len()`, and that is not a hierarchical name
-  // at all. Skipping the §6.20.4 report where the §6.20.2 one fired would
-  // therefore replace a correct report with a wrong one on those sources.
+  // expression either. The two answer different questions about the same
+  // initializer -- whether it names something hierarchically, and whether it is
+  // a constant expression -- and a source can break the second while keeping
+  // the first, as `localparam int N = S.len();` over an integer S does. Folding
+  // them into one report was tried in 3dc382ad0 and lost the §6.20.4 report on
+  // exactly those sources.
   if ((item->is_localparam || parameter_is_local) &&
       !IsConstantExpr(item->init_expr, param_scope)) {
     diag.Error(item->loc,
