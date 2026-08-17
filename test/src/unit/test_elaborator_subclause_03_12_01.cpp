@@ -9,6 +9,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "fixture_scratch_dir.h"
+#include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
 #include "parser/ast.h"
 #include "parser/library_map.h"
@@ -322,6 +323,18 @@ struct CommandLineHarness {
 // the design elements among them have somewhere to go.
 constexpr const char* kLibMap = "library rtlLib src/*.sv;\n";
 
+// Compiles `files` as one command line into `h` and elaborates nothing,
+// answering whether every description compiled. A case reading an item back
+// through this one is reading what the parser built: after elaboration,
+// Elaborator::ReclassifyForwardUdpInstances has rewritten every module
+// instantiation whose name turns out to be a primitive into a primitive
+// instance, so the kind read there is the same whichever parse produced it.
+bool CompileCommandLineOnly(CommandLineHarness& h, const ScratchDir& tmp,
+                            const std::vector<fs::path>& files) {
+  if (!h.libs.LoadMapFile(tmp.dir / "lib.map")) return false;
+  return h.compiler.CompileCommandLine(files, h.unit);
+}
+
 // Compiles `files` as one command line into `h` and elaborates the compilation
 // unit that produced, returning the design or nullptr. The design outlives the
 // elaborator because it is arena-allocated, and the arena is the harness's.
@@ -329,8 +342,7 @@ RtlirDesign* CompileCommandLineAndElaborate(CommandLineHarness& h,
                                             const ScratchDir& tmp,
                                             const std::vector<fs::path>& files,
                                             std::string_view top) {
-  if (!h.libs.LoadMapFile(tmp.dir / "lib.map")) return nullptr;
-  if (!h.compiler.CompileCommandLine(files, h.unit)) return nullptr;
+  if (!CompileCommandLineOnly(h, tmp, files)) return nullptr;
   Elaborator elab(h.arena, h.diag, &h.unit);
   return elab.Elaborate(top);
 }
@@ -342,6 +354,53 @@ const RtlirModule* SoleTopModule(RtlirDesign* design) {
   if (design == nullptr || design->top_modules.size() != 1u) return nullptr;
   return design->top_modules[0];
 }
+
+// The one item of the module `module_name` that stands as a primitive
+// instance, or nullptr where no module of that name was parsed, where it holds
+// no such item, or where it holds more than one. The last of those is a source
+// description no case here writes, and answering nullptr for it keeps "the
+// instance" from naming whichever came first.
+const ModuleItem* SoleUdpInstance(const CompilationUnit& unit,
+                                  std::string_view module_name) {
+  const ModuleItem* found = nullptr;
+  for (const auto* decl : unit.modules) {
+    if (decl->name != module_name) continue;
+    for (const auto* item : decl->items) {
+      if (item->kind != ModuleItemKind::kUdpInst) continue;
+      if (found != nullptr) return nullptr;
+      found = item;
+    }
+  }
+  return found;
+}
+
+// The primitive the cases below declare in the first file of their command
+// line and instantiate in the second. A.1.2 admits udp_declaration only as a
+// description at the outermost level, so it is written outside every design
+// element, which is what makes §3.12.1 case a) the rule that carries its name
+// to the next file. Three ports, so that a case reading gate_terminals back
+// reads a count no other arm of Parser::ParseImplicitTypeOrInst leaves there: a
+// module instantiation puts its connections in inst_ports and a data
+// declaration puts nothing anywhere near it.
+constexpr const char* kAndPrimitive =
+    "primitive myudp(output q, input d, clk);\n"
+    "  table\n"
+    "    0 0 : 0;\n"
+    "    0 1 : 0;\n"
+    "    1 0 : 0;\n"
+    "    1 1 : 1;\n"
+    "  endtable\n"
+    "endprimitive\n";
+
+// The same declaration with one input, for the strength case alone, whose
+// instance §29.8 writes with two terminals.
+constexpr const char* kInverterPrimitive =
+    "primitive myudp(output q, input d);\n"
+    "  table\n"
+    "    0 : 1;\n"
+    "    1 : 0;\n"
+    "  endtable\n"
+    "endprimitive\n";
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,
      PackageImportedInOneFileResolvesATypeDeclaredInAnother) {
@@ -598,4 +657,170 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
     }
   }
   EXPECT_TRUE(found);
+}
+
+TEST(CompilationUnitScopeAcrossCommandLineFiles,
+     PrimitiveDeclaredInOneFileParsesAsAPrimitiveInstanceInAnother) {
+  // src/prim.sv declares myudp and src/top.sv writes `myudp u (q, d, clk);`,
+  // which is §29.8's udp_instantiation. The item is read before anything is
+  // elaborated, because Elaborator::ReclassifyForwardUdpInstances turns a
+  // module instantiation whose name turns out to name a primitive into a
+  // primitive instance, so a kind read afterwards says nothing about which
+  // parse produced it. gate_inst_name is where Parser::ParseOneUdpInstance
+  // writes the instance name and inst_name is where Parser::ParseModuleInstList
+  // writes it, so the two together say which of them ran.
+  ScratchDir tmp;
+  tmp.Write("lib.map", kLibMap);
+  auto prim = tmp.Write("src/prim.sv", kAndPrimitive);
+  auto top = tmp.Write("src/top.sv",
+                       "module top;\n"
+                       "  wire q, d, clk;\n"
+                       "  myudp u (q, d, clk);\n"
+                       "endmodule\n");
+
+  CommandLineHarness h;
+  ASSERT_TRUE(CompileCommandLineOnly(h, tmp, {prim, top}));
+  EXPECT_FALSE(h.diag.HasErrors());
+  const auto* inst = SoleUdpInstance(h.unit, "top");
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(inst->inst_module, "myudp");
+  EXPECT_EQ(inst->gate_inst_name, "u");
+  EXPECT_TRUE(inst->inst_name.empty());
+  EXPECT_EQ(inst->gate_terminals.size(), 3u);
+}
+
+TEST(CompilationUnitScopeAcrossCommandLineFiles,
+     UnnamedPrimitiveInstanceParsesInAFileAfterTheDeclaration) {
+  // `myudp (q, d, clk);`, which §29.8 permits: its udp_instance is
+  // `[ name_of_instance ] ( output_terminal , input_terminal
+  // { , input_terminal } )`, and the prose says "The instance name is
+  // optional, just as for gates." A parse that has not been told myudp names a
+  // primitive reaches neither instantiation arm of
+  // Parser::ParseImplicitTypeOrInst, since both want an identifier or a `#`
+  // after the name, so the item falls to Parser::ParsePlainVarDecl and the file
+  // does not parse. Nothing recovers this one during elaboration: there is no
+  // module instantiation left for Elaborator::ReclassifyForwardUdpInstances to
+  // reclassify. The item is read back as a primitive instance with no instance
+  // name and three terminals.
+  ScratchDir tmp;
+  tmp.Write("lib.map", kLibMap);
+  auto prim = tmp.Write("src/prim.sv", kAndPrimitive);
+  auto top = tmp.Write("src/top.sv",
+                       "module top;\n"
+                       "  wire q, d, clk;\n"
+                       "  myudp (q, d, clk);\n"
+                       "endmodule\n");
+
+  CommandLineHarness h;
+  const auto* mod =
+      SoleTopModule(CompileCommandLineAndElaborate(h, tmp, {prim, top}, ""));
+  EXPECT_FALSE(h.diag.HasErrors());
+  ASSERT_NE(mod, nullptr);
+  const auto* inst = SoleUdpInstance(h.unit, "top");
+  ASSERT_NE(inst, nullptr);
+  EXPECT_TRUE(inst->gate_inst_name.empty());
+  EXPECT_EQ(inst->gate_terminals.size(), 3u);
+}
+
+TEST(CompilationUnitScopeAcrossCommandLineFiles,
+     GateDelayOnAPrimitiveInstanceSurvivesTheFileThatDeclaredIt) {
+  // `myudp #5 u (q, d, clk);`, whose `#5` is the [ delay2 ] §29.8 writes
+  // between the primitive's name and its instance. Parser::ParseUdpInstList
+  // reads it into gate_delay; Parser::ParseModuleInstList reads the same `#5`
+  // as a parameter value assignment and puts it in inst_params, and
+  // Elaborator::ReclassifyForwardUdpInstances moves the ports across without
+  // moving that back. The instance then elaborates with no delay and no report,
+  // which is why this case reads both fields: the delay is where §29.8 puts it,
+  // and the parameter list it would otherwise sit in is empty. An unwritten
+  // delay leaves gate_delay null, so 5 is a value the two readings cannot
+  // share.
+  ScratchDir tmp;
+  tmp.Write("lib.map", kLibMap);
+  auto prim = tmp.Write("src/prim.sv", kAndPrimitive);
+  auto top = tmp.Write("src/top.sv",
+                       "module top;\n"
+                       "  wire q, d, clk;\n"
+                       "  myudp #5 u (q, d, clk);\n"
+                       "endmodule\n");
+
+  CommandLineHarness h;
+  const auto* mod =
+      SoleTopModule(CompileCommandLineAndElaborate(h, tmp, {prim, top}, ""));
+  EXPECT_FALSE(h.diag.HasErrors());
+  ASSERT_NE(mod, nullptr);
+  const auto* inst = SoleUdpInstance(h.unit, "top");
+  ASSERT_NE(inst, nullptr);
+  EXPECT_TRUE(inst->inst_params.empty());
+  ASSERT_NE(inst->gate_delay, nullptr);
+  EXPECT_EQ(inst->gate_delay->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(inst->gate_delay->int_val, 5u);
+}
+
+TEST(CompilationUnitScopeAcrossCommandLineFiles,
+     DriveStrengthOnAPrimitiveInstanceParsesInAFileAfterTheDeclaration) {
+  // `myudp (strong1, weak0) u (q, d);`. §29.8 writes the drive_strength after
+  // the primitive's name -- `udp_identifier [ drive_strength ] [ delay2 ]
+  // udp_instance { , udp_instance } ;` -- and Parser::TryParseStrengthSpec
+  // reads it there, inside Parser::ParseUdpInstList alone. A parse that has not
+  // been told myudp names a primitive reaches no arm that admits a `(` after
+  // the name at all, so the file does not parse. The two strengths differ from
+  // each other and from the 0 an unwritten strength leaves: 4 for strong1 in
+  // Parser::ParseStrength1, 2 for weak0 in Parser::ParseStrength0. An item that
+  // took one of them for the other therefore fails here.
+  ScratchDir tmp;
+  tmp.Write("lib.map", kLibMap);
+  auto prim = tmp.Write("src/prim.sv", kInverterPrimitive);
+  auto top = tmp.Write("src/top.sv",
+                       "module top;\n"
+                       "  wire q, d;\n"
+                       "  myudp (strong1, weak0) u (q, d);\n"
+                       "endmodule\n");
+
+  CommandLineHarness h;
+  const auto* mod =
+      SoleTopModule(CompileCommandLineAndElaborate(h, tmp, {prim, top}, ""));
+  EXPECT_FALSE(h.diag.HasErrors());
+  ASSERT_NE(mod, nullptr);
+  const auto* inst = SoleUdpInstance(h.unit, "top");
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(inst->gate_inst_name, "u");
+  EXPECT_EQ(inst->gate_terminals.size(), 2u);
+  EXPECT_EQ(inst->drive_strength1, 4);
+  EXPECT_EQ(inst->drive_strength0, 2);
+}
+
+TEST(CompilationUnitScopeAcrossCommandLineFiles,
+     PrimitiveNameDoesNotReachTheNextCommandLine) {
+  // The other direction: §3.12.1 case a) makes one command line one
+  // compilation unit and not all of them, so the primitive declared on the
+  // first command line is no primitive name to the second.
+  // SinglePassCompiler::CompileCommandLine empties the scope it carries at the
+  // start of each command line, and the unnamed form is what says whether that
+  // still holds once a primitive name travels in it: `myudp (q, d, clk);`
+  // parses only where the name is known to name a primitive, and where it is
+  // not, Parser::ParsePlainVarDecl reads myudp as the variable and reports the
+  // `;` it wanted at the `(` under §6.8. The named form would parse as a module
+  // instantiation and report nothing, so it cannot tell the two apart.
+  ScratchDir tmp;
+  tmp.Write("lib.map", kLibMap);
+  auto prim = tmp.Write("src/prim.sv", kAndPrimitive);
+  auto top = tmp.Write("src/top.sv",
+                       "module top;\n"
+                       "  wire q, d, clk;\n"
+                       "  myudp (q, d, clk);\n"
+                       "endmodule\n");
+
+  // The second command line is given a compilation unit of its own, which
+  // SinglePassCompiler::CompileCommandLine in src/parser/single_pass_compile.h
+  // requires: "Pass a compilation unit that no earlier command line has already
+  // been compiled into." The library map is loaded once for the same reason,
+  // since LibraryMap::LoadMapFile adds every declaration the file holds each
+  // time it is called.
+  CommandLineHarness h;
+  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
+  ASSERT_TRUE(h.compiler.CompileCommandLine({prim}, h.unit));
+  CompilationUnit second;
+  EXPECT_FALSE(h.compiler.CompileCommandLine({top}, second));
+  EXPECT_TRUE(
+      ReportedError(h.diag.Diagnostics(), "expected ';', got '('", 3, "6.8"));
 }

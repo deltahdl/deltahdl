@@ -5,6 +5,10 @@ namespace delta {
 void Parser::AdoptTypeNames(const ScopeTypeNames& names) {
   known_types_.insert(names.types.begin(), names.types.end());
   known_nettypes_.insert(names.nettypes.begin(), names.nettypes.end());
+  // Empty for every caller but AdoptCompilationUnitScope, since A.1.2 admits
+  // udp_declaration only as a description and so neither ApplyImportedTypeNames
+  // nor AdoptBaseClassTypeNames has a primitive name to hand over.
+  known_udps_.insert(names.udps.begin(), names.udps.end());
 }
 
 // Applies §26.3's rule that an import declaration "allows identifiers declared

@@ -54,7 +54,10 @@ class Parser {
   // safe to carry into a file that never saw that design element. The package
   // and class entries are what §26.3's import declaration and §8.13's extends
   // clause put back, and they are kept past their scope's closing keyword for
-  // exactly that reason, so they are carried whole.
+  // exactly that reason, so they are carried whole. known_udps_ is the whole
+  // compilation-unit scope already, because TypeNameScope below saves and
+  // restores known_types_ and known_nettypes_ alone and nothing else narrows
+  // it.
   void AdoptCompilationUnitScope(const CompilationUnitScopeNames& names) {
     AdoptTypeNames(names.own);
     package_types_.insert(names.packages.begin(), names.packages.end());
@@ -62,8 +65,8 @@ class Parser {
   }
   CompilationUnitScopeNames CompilationUnitScope() const {
     return CompilationUnitScopeNames{
-        ScopeTypeNames{known_types_, known_nettypes_}, package_types_,
-        class_types_};
+        ScopeTypeNames{known_types_, known_nettypes_, known_udps_},
+        package_types_, class_types_};
   }
 
  private:
