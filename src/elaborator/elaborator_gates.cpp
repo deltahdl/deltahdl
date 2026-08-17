@@ -323,12 +323,12 @@ void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
     // instance is told about both, because §28.3.6 puts "the output or
     // bidirectional terminals" first together and several gate types connect a
     // bidirectional one.
-    const char* kTerminal = kIsUdp ? "user-defined primitive output terminal"
-                                   : "primitive output or inout terminal";
+    const char* terminal = kIsUdp ? "user-defined primitive output terminal"
+                                  : "primitive output or inout terminal";
     diag.Error(item->loc,
                std::format("{} must be a 1-bit net or structural net "
                            "expression (got width {})",
-                           kTerminal, w),
+                           terminal, w),
                Subclause("4.9.6"));
   }
 }
