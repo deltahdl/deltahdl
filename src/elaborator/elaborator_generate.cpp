@@ -37,6 +37,13 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   ScopeMap saved_cu_param_scope = std::move(cu_param_scope_);
   typedefs_ = pg.typedefs;
   cu_param_scope_ = pg.cu_param_scope;
+  // §23.9 judges a declaration against the scope it is written in, and a
+  // generate block's enclosing scope is the module Elaborator::ElaborateModule
+  // has already returned from. Install that module's names, which
+  // Elaborator::ElaborateModule captured into module_declared_names_ before
+  // ItemElaborationStateSaver::Restore took them out of declared_names_.
+  auto saved_declared_names = std::move(declared_names_);
+  declared_names_ = std::move(module_declared_names_[pg.mod]);
   auto scope = BuildParamScope(pg.mod);
   switch (pg.item->kind) {
     case ModuleItemKind::kGenerateIf:
@@ -64,6 +71,21 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
     saved_typedefs.insert_or_assign(name, dtype);
   typedefs_ = std::move(saved_typedefs);
   cu_param_scope_ = std::move(saved_cu_param_scope);
+  // Write what this generate declared back into the module's entry rather than
+  // dropping it. §27.4 puts two generate block instance arrays of one module in
+  // one scope, so a name one generate construct of a module declared has to be
+  // visible to the next generate construct of the same module; each is a
+  // separate entry in pending_generates_, so a snapshot taken per entry would
+  // hide the first from the second.
+  //
+  // The entry is looked up by key again rather than held in a reference across
+  // the switch above. Elaborating a generate block reaches
+  // Elaborator::ElaborateModuleInst and so re-enters
+  // Elaborator::ElaborateModule for a module instantiated inside the block,
+  // which inserts into module_declared_names_ and can rehash it, and a
+  // reference taken before that would dangle.
+  module_declared_names_[pg.mod] = std::move(declared_names_);
+  declared_names_ = std::move(saved_declared_names);
 }
 
 // Stamp one generate block instance's loop-index values and name prefix onto

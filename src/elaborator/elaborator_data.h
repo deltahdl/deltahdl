@@ -119,6 +119,26 @@ class ElaboratorData {
   bool has_pending_enclosing_scope_ = false;
 
   std::unordered_set<std::string_view> declared_names_;
+  // §23.9: the declared names of each elaborated module scope, keyed by the
+  // module they belong to. A generate construct is elaborated after every
+  // module has returned, by which point ItemElaborationStateSaver::Restore
+  // (src/elaborator/elaborator_module.cpp) has taken the module's own names
+  // back out of declared_names_, so the names a generate block is judged
+  // against are captured as its module returns. One entry is shared by every
+  // generate construct of that module and by no other module's, which is what
+  // §23.9 asks for: a generate block is a scope inside its module (§27.4
+  // printed page 821, §27.5 printed page 824), so a name declared in another
+  // module decides nothing about it.
+  //
+  // The key is one elaborated module scope rather than one module declaration.
+  // Elaborator::ElaborateModule creates a fresh RtlirModule per call
+  // (src/elaborator/elaborator_module.cpp:847) and
+  // Elaborator::ElaborateModuleInst calls it once per instance
+  // (src/elaborator/elaborator_module_inst.cpp:799), so instantiating one
+  // module twice yields two keys and neither instance's names are offered to
+  // the other.
+  std::unordered_map<const RtlirModule*, std::unordered_set<std::string_view>>
+      module_declared_names_;
   // §27.4: genvar names of the loop generate constructs currently being
   // elaborated. Used to reject a nested loop generate construct that reuses an
   // enclosing loop's genvar, which is illegal because the inner reference names

@@ -911,6 +911,12 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   global_clocking_in_scope_ = saved_global_clocking_in_scope;
   current_library_ = std::move(saved_library);
   enclosing_scope_names_ = std::move(saved_enclosing);
+  // declared_names_ holds this module's complete set of declared names at this
+  // point, and the Restore below takes it back to what the caller had. The
+  // generate constructs this module queued are elaborated after that, by
+  // Elaborator::ProcessPendingGenerate, and §23.9 judges what they declare
+  // against the scope they were written in, so keep the set here for them.
+  module_declared_names_[mod] = declared_names_;
   saved_item_state.Restore(*this);
   return mod;
 }

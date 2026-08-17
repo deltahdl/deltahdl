@@ -1,9 +1,48 @@
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
 
 namespace {
+
+// §27.4, printed page 821: "It shall be an error if the name of a generate
+// block instance array conflicts with any other declaration, including any
+// other generate block instance array." The two cases below ask that of a
+// module-level declaration that is neither a net, a variable nor a port, and
+// they differ in that declaration alone, so the source and the report are
+// stated once here and each case supplies the one line that changes.
+//
+// `module_level_decl` is written at line 4 of the source, so the `for` whose
+// array name collides always stands at line 6 and the report always stands
+// there. `module child;` is declared for the instance case to instantiate and
+// left uninstantiated by the others.
+//
+// Elaborator::RegisterGenerateForArrayName in
+// src/elaborator/elaborator_generate.cpp is the emission site: it formats
+// "generate block array '{}' conflicts with an existing declaration in the
+// same scope" and passes Subclause("23.9").
+void ExpectLoopArrayNameConflictsWith(const std::string& module_level_decl) {
+  ElabFixture f;
+  ElabOk(
+      "module child;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  " +
+          module_level_decl +
+          "\n"
+          "  genvar i;\n"
+          "  for (i = 0; i < 2; i = i + 1) begin : a\n"
+          "    wire w;\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "generate block array 'a' conflicts with an "
+                            "existing declaration in the same scope",
+                            6, "23.9"));
+}
 
 // §23.9: an identifier shall be used to declare only one item within a
 // scope. Two nets sharing a name in the same module scope is illegal.
@@ -471,6 +510,93 @@ TEST(ScopeRulesElaboration, BareNameDeclaredInAGenerateBlockIsStillAccepted) {
              "    end\n"
              "  end\n"
              "endmodule\n"));
+}
+
+// §23.9 lists "Generate blocks" among "the following elements define a new
+// scope in SystemVerilog", and rules that "An identifier shall be used to
+// declare only one item within a scope". Each module opens its own scope, so a
+// generate block in one module and a generate block in another declare their
+// names in two scopes that share nothing, and the same name in both is legal.
+//
+// A generate construct is not elaborated where it is written:
+// Elaborator::ElaborateItems queues it into pending_generates_ and
+// Elaborator::ResolveDefparamsAndGenerates drains every module's queue together
+// once every module has been elaborated. This case fails while the set that
+// judges a declaration belongs to the design rather than to a module, because
+// module `b`'s `w` then finds module `a`'s entry still there and is reported as
+// a redeclaration of a net in a module that is not its own.
+TEST(ScopeRulesElaboration,
+     GenerateBlockDeclarationNamesDoNotCollideAcrossModules) {
+  EXPECT_TRUE(
+      ElabOk("module a;\n"
+             "  if (1) begin : g\n"
+             "    wire w;\n"
+             "  end\n"
+             "endmodule\n"
+             "module b;\n"
+             "  if (1) begin : g\n"
+             "    wire w;\n"
+             "  end\n"
+             "endmodule\n"
+             "module top;\n"
+             "  a u_a();\n"
+             "  b u_b();\n"
+             "endmodule\n"));
+}
+
+// §23.9 gives each instance of a generate block its own scope, so one module
+// instantiated twice declares its generate block's names once per instance
+// rather than twice in one scope.
+//
+// This is the same rule as the case above reached without a second module.
+// Elaborator::ElaborateModuleInst calls Elaborator::ElaborateModule once per
+// instance and each call queues that module's generate constructs again, so a
+// design-wide set is offered `g` and `w` twice and rejects the second
+// instantiation. Elaborator::ElaborateModule builds a fresh RtlirModule per
+// call, which is what tells the two instances' name sets apart.
+TEST(ScopeRulesElaboration,
+     RepeatedInstantiationDoesNotRedeclareGenerateBlockNames) {
+  EXPECT_TRUE(
+      ElabOk("module child;\n"
+             "  if (1) begin : g\n"
+             "    wire w;\n"
+             "  end\n"
+             "endmodule\n"
+             "module top;\n"
+             "  child u1();\n"
+             "  child u2();\n"
+             "endmodule\n"));
+}
+
+// §27.4, printed page 821, rules that "It shall be an error if the name of a
+// generate block instance array conflicts with any other declaration". A module
+// instance name is such a declaration, and `a` names both the instance of
+// `child` and the loop generate block array.
+//
+// Elaborator::ElaborateModuleInst records an instance name in declared_names_
+// and nowhere else: IsNameDeclared in src/elaborator/elaborator_items.cpp reads
+// RtlirModule::variables, RtlirModule::nets and RtlirModule::ports, and an
+// instance is in none of them. This case is therefore silent while the generate
+// construct runs after ItemElaborationStateSaver::Restore has taken the
+// module's own declarations back out of the set, and it is the half of the
+// defect that loses a report rather than the half that invents one.
+TEST(ScopeRulesElaboration,
+     GenerateBlockArrayNameConflictingWithAnInstanceNameErrors) {
+  ExpectLoopArrayNameConflictsWith("child a();");
+}
+
+// §27.4 makes the same conflict an error against a function name, which is a
+// declaration of the enclosing module like any other.
+//
+// A second case is needed because CheckFunctionDeclDiagnostics in
+// src/elaborator/elaborator_items.cpp is a different insertion site from
+// Elaborator::ElaborateModuleInst, and it is the one that keeps a fix from
+// being written against module instances alone. A function name reaches
+// declared_names_ and nothing IsNameDeclared reads, so it is invisible to the
+// array-name check for exactly the reason the instance name is.
+TEST(ScopeRulesElaboration,
+     GenerateBlockArrayNameConflictingWithAFunctionNameErrors) {
+  ExpectLoopArrayNameConflictsWith("function void a(); endfunction");
 }
 
 }  // namespace
