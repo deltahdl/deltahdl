@@ -634,11 +634,18 @@ struct AnyChangeAwaiter {
     auto* proc = ctx.CurrentProcess();
     auto* ctx_ptr = &ctx;
     auto fin = finished;
+    // Resumes this suspension at most once. Every watcher armed here shares one
+    // guard, so the first named variable to change retires the watchers armed
+    // on the others. The guard is created per suspension rather than held as a
+    // member: a coroutine that re-arms this awaiter after resuming needs a
+    // guard that is still clear, and the watchers of the earlier suspension
+    // need one that stays set.
+    auto consumed = std::make_shared<bool>(false);
     for (auto name : var_names) {
       auto* var = ctx.FindVariable(name);
       if (!var) continue;
       var->prev_value = var->value;
-      var->AddWatcher([h, proc, ctx_ptr, fin]() mutable {
+      var->AddWatcher([h, proc, ctx_ptr, fin, consumed]() mutable {
         // A wait/@* re-suspension arms a fresh watcher on every awaited signal,
         // but watchers are cleared only from the signal that actually fired.
         // Watchers stranded on the other signals accumulate; once one of them
@@ -652,6 +659,15 @@ struct AnyChangeAwaiter {
           return true;
         }
         if (proc && !proc->active) return true;
+        // A sibling variable armed by the same suspension already resumed this
+        // await, so the coroutine is now suspended somewhere else. Resuming it
+        // here would complete whatever await it moved to instead of this one:
+        // when that is a delay, the value takes effect at the change time
+        // rather than after the delay §28.16 gives it. Retire this stale
+        // watcher. The frame is still alive at this point, so done() above
+        // cannot tell the two suspension points apart.
+        if (*consumed) return true;
+        *consumed = true;
         EventAwaiter::ResumeMaybeReactive(h, proc, *ctx_ptr);
         return true;
       });
