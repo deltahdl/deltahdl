@@ -200,31 +200,33 @@ TEST(TypeParameterElab, RestrictedClassTypeParamConformsOk) {
 
 // §6.20.3: a name that no class declaration defines conforms to a `class`
 // restriction no more than a built-in type does, so the assignment is an error.
-// The name has to be one the parser reads as a type and the elaborator finds no
-// class behind, and §3.12.1's compilation-unit typedef is both: it is visible
-// in every design element of the unit, and it names an int. A name that is
-// declared nowhere at all cannot stand here instead, because
-// Parser::ParseDataType in src/parser/parser_types.cpp reads an identifier as a
-// type only when an earlier declaration registered it, and reads any other
-// identifier as an expression -- which is TypeParamSetToValueIsError's rule
-// rather than this one.
-//
-// The typedef stood in `class Cfg;` until Parser::ParseClassDecl in
-// src/parser/parser_class.cpp began scoping a class's type names, which §23.9
-// requires and which leaves the bare `my_type` reaching no declaration at all.
+// The name has to answer two questions at once, and §19.3's covergroup is what
+// answers both. Parser::ParseDataType in src/parser/parser_types.cpp reads an
+// identifier as a type only when an earlier declaration registered it, and
+// Parser::ParseCovergroupDecl in src/parser/parser_verify.cpp registers a
+// covergroup name; a name declared nowhere at all reads as an expression
+// instead, which is TypeParamSetToValueIsError's rule rather than this one. And
+// the name has to reach no data type either, so that CheckTypeParamIsClass in
+// src/elaborator/elaborator_items.cpp gets past its first branch, which answers
+// for a resolved concrete type. A typedef of a built-in -- `typedef int
+// my_type;` -- is registered but resolves, and so takes that first branch and
+// reports a type that is not a class, which is
+// RestrictedClassTypeParamMismatchIsError's rule. A covergroup name resolves to
+// no data type and no ClassDecl, so it is the case this test is for.
 TEST(TypeParameterElab, ClassTypeParamAssignedUndeclaredNameIsError) {
   ElabFixture f;
   ElaborateSrc(
-      "typedef int my_type;\n"
       "module m;\n"
-      "  parameter type class C = my_type;\n"
+      "  covergroup cg;\n"
+      "  endgroup\n"
+      "  parameter type class C = cg;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "type parameter 'C' is restricted to a class type "
-                            "but is assigned 'my_type', which no class "
-                            "declaration defines",
-                            3, "6.20.3"));
+                            "but is assigned 'cg', which no class declaration "
+                            "defines",
+                            4, "6.20.3"));
 }
 
 // §6.20.3: the built-in classes §15.x predefines conform to a `class`
