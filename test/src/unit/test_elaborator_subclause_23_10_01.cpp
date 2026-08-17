@@ -253,4 +253,32 @@ TEST(DefparamElaboration, CannotOverrideLocalparamNames23_10_1) {
                             "23.10.1"));
 }
 
+// §23.10.1's defparam reaches a parameter through Elaborator::ApplyDefparams,
+// which writes RtlirParamDecl directly and shares no code with the instance
+// assignment of §23.10.2, so the characters §6.16 forbids truncating have to be
+// asserted on this path separately. "configured" is ten characters, past the
+// eight resolved_value holds. The declaration's own default is five, so a
+// defparam that replaced the number without replacing the characters leaves
+// "unset" here.
+TEST(DefparamElaboration, ReplacesEveryCharacterOfAStringParameter) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child;\n"
+      "  parameter string NAME = \"unset\";\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u();\n"
+      "  defparam u.NAME = \"configured\";\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* u = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(u, nullptr);
+  ASSERT_EQ(u->params.size(), 1u);
+  EXPECT_EQ(u->params[0].name, "NAME");
+  EXPECT_TRUE(u->params[0].is_string_value);
+  EXPECT_EQ(u->params[0].resolved_string, "configured");
+}
+
 }  // namespace

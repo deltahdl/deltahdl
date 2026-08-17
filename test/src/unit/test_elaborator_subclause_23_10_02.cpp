@@ -210,4 +210,62 @@ TEST(ModuleInstanceParameterValueAssignment,
   EXPECT_EQ(u0->params[1].resolved_value, 50);
 }
 
+// §6.16 rules that for the string data type "no truncation occurs", and
+// §23.10.2 puts an overridden parameter's value under that rule as much as a
+// declared one. "configured" is ten characters, which is past both the eight
+// RtlirParamDecl::resolved_value can hold and the four the 32-bit lowering
+// keeps, so this asserts the characters reached the elaborated parameter rather
+// than that some wider number did. is_string_value is asserted beside them
+// because it is what every later reader consults before touching
+// resolved_string.
+TEST(ModuleInstanceParameterValueAssignment,
+     StringParameterOverrideReplacesEveryCharacter) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter string NAME = \"unset\") ();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.NAME(\"configured\")) u0();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* u0 = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(u0, nullptr);
+  ASSERT_EQ(u0->params.size(), 1u);
+  EXPECT_EQ(u0->params[0].name, "NAME");
+  EXPECT_TRUE(u0->params[0].is_string_value);
+  EXPECT_EQ(u0->params[0].resolved_string, "configured");
+}
+
+// §6.16.1's len() over an overridden parameter, which does not follow from the
+// characters being stored. StringParamLength reads resolved_string only after
+// is_string_value passes, so an override that carried the characters without
+// setting the flag leaves len() unfolded and `N` at its unresolved 0. Ten is
+// also unreachable from the packed value of "configured", which §11.10 makes
+// wider than the 64 bits resolved_value holds, and from the five characters of
+// the declaration's own default.
+TEST(ModuleInstanceParameterValueAssignment,
+     LenOfAnOverriddenStringParameterFoldsToTheOverridesCharacterCount) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter string NAME = \"unset\") ();\n"
+      "  localparam int N = NAME.len();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.NAME(\"configured\")) u0();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* u0 = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(u0, nullptr);
+  const RtlirParamDecl* n = nullptr;
+  for (const auto& param : u0->params) {
+    if (param.name == "N") n = &param;
+  }
+  ASSERT_NE(n, nullptr);
+  EXPECT_TRUE(n->is_resolved);
+  EXPECT_EQ(n->resolved_value, 10);
+}
+
 }  // namespace
