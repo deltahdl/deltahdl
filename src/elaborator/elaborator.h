@@ -165,6 +165,14 @@ class Elaborator : public ElaboratorData {
 
   RtlirModule* ElaborateModule(const ModuleDecl* decl, const ParamList& params);
 
+  // §6.20.2: resolves each parameter of `decl`'s parameter port list against
+  // `params`, the overrides the instantiation supplied, and appends the result
+  // to mod->params. Each is resolved against a scope rebuilt from the
+  // parameters already appended, so one parameter port may be written in terms
+  // of an earlier one.
+  void ElaborateParamPortList(const ModuleDecl* decl, const ParamList& params,
+                              RtlirModule* mod);
+
   void ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod);
 
   static bool HasParamPortWithoutDefault(const ModuleDecl* decl);

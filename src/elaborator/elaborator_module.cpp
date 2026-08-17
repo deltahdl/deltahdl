@@ -779,6 +779,41 @@ struct ItemElaborationStateSaver {
   }
 };
 
+void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
+                                        const ParamList& params,
+                                        RtlirModule* mod) {
+  TypeParamValueCtx tp_ctx{typedefs_, class_names_, diag_};
+  for (size_t i = 0; i < decl->params.size(); ++i) {
+    const auto& [pname, pval] = decl->params[i];
+    auto scope = BuildParamScope(mod);
+    bool has_param_type = i < decl->param_types.size() &&
+                          decl->type_param_names.count(pname) == 0;
+    RtlirParamDecl pd = BuildParamDeclShell(
+        decl, i, {typedefs_, scope, real_param_names_}, has_param_type);
+    ApplyParamOverride(pd, params, pname);
+    if (!pd.is_resolved && pval) {
+      const DataType* param_type =
+          has_param_type ? &decl->param_types[i] : nullptr;
+      bool refers_to_unbounded = pval->kind == ExprKind::kIdentifier &&
+                                 RefersToUnboundedParam(mod, pval->text);
+      bool contains_dollar = ContainsDollarSubexpr(pval);
+      ParamValueExpr val{
+          pval,           pname,     refers_to_unbounded, contains_dollar,
+          has_param_type, param_type};
+      ResolveUnresolvedParamValue(pd, val, scope, diag_);
+    }
+    // Only where the value came from `pval`, the declaration's own initializer.
+    // ApplyParamOverride takes its value from Elaborator::ParamList, which is a
+    // vector of int64_t and carries no characters, so recording `pval` for an
+    // overridden parameter would record the length of a value the parameter no
+    // longer has.
+    if (pval && has_param_type && !pd.from_override)
+      RecordStringParamValue(pd, pval, &decl->param_types[i], arena_);
+    CheckTypeParamValueAssignable(decl, i, pval, scope, tp_ctx);
+    mod->params.push_back(pd);
+  }
+}
+
 RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
                                          const ParamList& params) {
   auto* mod = arena_.Create<RtlirModule>();
@@ -824,36 +859,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   ImportedEnumCtx enum_ctx{unit_, arena_, typedefs_, enum_member_names_};
   RegisterImportedEnumLiterals(decl, mod, enum_ctx);
 
-  TypeParamValueCtx tp_ctx{typedefs_, class_names_, diag_};
-  for (size_t i = 0; i < decl->params.size(); ++i) {
-    const auto& [pname, pval] = decl->params[i];
-    auto scope = BuildParamScope(mod);
-    bool has_param_type = i < decl->param_types.size() &&
-                          decl->type_param_names.count(pname) == 0;
-    RtlirParamDecl pd = BuildParamDeclShell(
-        decl, i, {typedefs_, scope, real_param_names_}, has_param_type);
-    ApplyParamOverride(pd, params, pname);
-    if (!pd.is_resolved && pval) {
-      const DataType* param_type =
-          has_param_type ? &decl->param_types[i] : nullptr;
-      bool refers_to_unbounded = pval->kind == ExprKind::kIdentifier &&
-                                 RefersToUnboundedParam(mod, pval->text);
-      bool contains_dollar = ContainsDollarSubexpr(pval);
-      ParamValueExpr val{
-          pval,           pname,     refers_to_unbounded, contains_dollar,
-          has_param_type, param_type};
-      ResolveUnresolvedParamValue(pd, val, scope, diag_);
-    }
-    // Only where the value came from `pval`, the declaration's own initializer.
-    // ApplyParamOverride takes its value from Elaborator::ParamList, which is a
-    // vector of int64_t and carries no characters, so recording `pval` for an
-    // overridden parameter would record the length of a value the parameter no
-    // longer has.
-    if (pval && has_param_type && !pd.from_override)
-      RecordStringParamValue(pd, pval, &decl->param_types[i], arena_);
-    CheckTypeParamValueAssignable(decl, i, pval, scope, tp_ctx);
-    mod->params.push_back(pd);
-  }
+  ElaborateParamPortList(decl, params, mod);
 
   ReportParamsMissingValue(decl, mod, diag_);
 
