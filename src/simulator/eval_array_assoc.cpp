@@ -34,6 +34,14 @@
 
 namespace delta {
 
+// The index-type spec of an associative array (§7.8): how an index expression
+// is reduced to a stored key. Mirrors the AssocArrayObject index fields.
+struct AssocKeySpec {
+  uint32_t index_width = 64;
+  bool is_wildcard = false;
+  bool is_signed = true;
+};
+
 static std::string Vec2Str(const Logic4Vec& vec) {
   uint32_t nbytes = vec.width / 8;
   std::string result;

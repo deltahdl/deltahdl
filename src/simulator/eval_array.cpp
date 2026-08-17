@@ -32,14 +32,6 @@ struct WithIterEnv {
   Arena& arena;
 };
 
-// The index-type spec of an associative array (§7.8): how an index expression
-// is reduced to a stored key. Mirrors the AssocArrayObject index fields.
-struct AssocKeySpec {
-  uint32_t index_width = 64;
-  bool is_wildcard = false;
-  bool is_signed = true;
-};
-
 static std::vector<uint64_t> CollectElements(std::string_view var_name,
                                              const ArrayInfo& info,
                                              SimContext& ctx) {
