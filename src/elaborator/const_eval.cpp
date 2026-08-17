@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstring>
 #include <optional>
+#include <string>
 
 #include "elaborator/const_eval_internal.h"
 #include "lexer/token.h"
@@ -437,20 +438,25 @@ static bool ConstDecodeEscape(std::string_view text, size_t& i, uint8_t& out) {
   return true;
 }
 
-// §11.10: a string literal operand is a constant number formed from the 8-bit
-// ASCII code of each character, one byte per character, packed with the first
-// character in the most-significant position. This lets a string literal fold
-// in constant expressions (e.g. a parameter/localparam initializer). The folded
-// value keeps the low 64 bits, matching the low word of the equivalent vector.
-std::optional<ConstVal> ConstEvalStringLiteral(const Expr* expr) {
+// Returns the characters a string literal denotes, with the quotes removed and
+// each escape replaced by the one character it stands for. §6.16 rules that
+// "strings can be of arbitrary length and no truncation occurs" (printed page
+// 112 of IEEE 1800-2023), while the packed form ConstEvalStringLiteral computes
+// keeps only the low 64 bits. A string of more than eight characters is
+// therefore no longer recoverable from that packed value, which is why the
+// characters are kept separately from it. Returns std::nullopt for an
+// expression that is not a string literal. A string literal of no characters
+// returns an empty string rather than std::nullopt, which is what lets §6.16.1
+// -- "if str is "", then str.len() returns 0" -- be answered.
+std::optional<std::string> ConstEvalString(const Expr* expr) {
+  if (!expr || expr->kind != ExprKind::kStringLiteral) return std::nullopt;
   std::string_view text = expr->text;
   if (text.size() >= 6 && text.substr(0, 3) == "\"\"\"")
     text = text.substr(3, text.size() - 6);
   else if (text.size() >= 2 && text.front() == '"')
     text = text.substr(1, text.size() - 2);
 
-  uint64_t value = 0;
-  uint32_t nbytes = 0;
+  std::string chars;
   for (size_t i = 0; i < text.size(); ++i) {
     uint8_t byte = 0;
     if (text[i] == '\\' && i + 1 < text.size()) {
@@ -459,10 +465,23 @@ std::optional<ConstVal> ConstEvalStringLiteral(const Expr* expr) {
     } else {
       byte = static_cast<uint8_t>(text[i]);
     }
-    value = (value << 8) | byte;
-    ++nbytes;
+    chars.push_back(static_cast<char>(byte));
   }
-  uint32_t width = nbytes == 0 ? 8u : nbytes * 8u;
+  return chars;
+}
+
+// §11.10: a string literal operand is a constant number formed from the 8-bit
+// ASCII code of each character, one byte per character, packed with the first
+// character in the most-significant position. This lets a string literal fold
+// in constant expressions (e.g. a parameter/localparam initializer). The folded
+// value keeps the low 64 bits, matching the low word of the equivalent vector.
+std::optional<ConstVal> ConstEvalStringLiteral(const Expr* expr) {
+  auto chars = ConstEvalString(expr);
+  if (!chars) return std::nullopt;
+  uint64_t value = 0;
+  for (char c : *chars) value = (value << 8) | static_cast<uint8_t>(c);
+  uint32_t width =
+      chars->empty() ? 8u : static_cast<uint32_t>(chars->size()) * 8u;
   return ConstVal{static_cast<int64_t>(value), width, false};
 }
 

@@ -253,6 +253,15 @@ struct RtlirParamDecl {
   // parameter's value and resolved_value is not meaningful.
   double resolved_real = 0.0;
   bool is_real_value = false;
+  // §6.16: a parameter declared with a string type takes a value of arbitrary
+  // length. §6.16 rules that "strings can be of arbitrary length and no
+  // truncation occurs", and resolved_value is 64 bits, so a value of more than
+  // eight characters cannot be read back from it. resolved_string holds the
+  // characters when is_string_value is set. resolved_value is still written for
+  // such a parameter, because §11.10 packs a string literal into a constant
+  // number and that is the form the rest of the elaborator reads.
+  std::string_view resolved_string;
+  bool is_string_value = false;
   bool is_resolved = false;
   bool is_localparam = false;
   bool from_override = false;

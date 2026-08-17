@@ -413,10 +413,11 @@ TEST(ConstExpr, BuiltinMethodSizeOnAnIntegerParameterNotConstant) {
 // string, and a ScopeMap holds an int64_t against each name, so `S` is not a
 // string and there is no declaration to read a length from. §11.2.1 requires a
 // constant built-in method call to be evaluated at elaboration time, so a call
-// that cannot be evaluated is not a constant expression. A string parameter
-// whose length §11.2.1 would make constant is not folded either, which is
-// tracked separately: the folder evaluates only §6.19.5.5's num() on an
-// enumeration today.
+// that cannot be evaluated is not a constant expression. The elaborator does
+// fold len() on a parameter declared `string`, which
+// test/src/unit/test_elaborator_subclause_06_16_01.cpp covers; what separates
+// this case from that one is the declared type, and a ScopeMap holds an
+// int64_t against each name and records no declared type at all.
 TEST(ConstExpr, BuiltinMethodLenOnAnIntegerParameterNotConstant) {
   EvalFixture f;
   ScopeMap scope = {{"S", 0}};

@@ -349,9 +349,10 @@ void PopulateValueParamInfo(
 // Const-evaluates a parameter's initializer against `scope` and records the
 // resolved value on `pd`. §6.20.2: a parameter declared real takes a real
 // value, and an integer-typed parameter initialized from a real constant rounds
-// to the nearest integer (ties away from zero).
+// to the nearest integer (ties away from zero). A parameter declared `string`
+// also keeps its characters, which `arena` owns (§6.16).
 void ResolveParamConstValue(RtlirParamDecl& pd, const ModuleItem* item,
-                            bool is_type, const ScopeMap& scope) {
+                            bool is_type, const ScopeMap& scope, Arena& arena) {
   // The real fold comes first, because an integer fold of a real-typed
   // parameter's initializer succeeds whenever the value happens to have no
   // fraction and would then store it as the integer it is not.
@@ -368,6 +369,8 @@ void ResolveParamConstValue(RtlirParamDecl& pd, const ModuleItem* item,
       pd.is_resolved = true;
     }
   }
+  if (!is_type)
+    RecordStringParamValue(pd, item->init_expr, &item->data_type, arena);
 }
 
 }  // namespace
@@ -440,7 +443,7 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
     }
     ValidateTypenameAsElabConstant(item->init_expr);
     auto scope = BuildParamScope(mod);
-    ResolveParamConstValue(pd, item, is_type, scope);
+    ResolveParamConstValue(pd, item, is_type, scope, arena_);
   }
   mod->params.push_back(pd);
 

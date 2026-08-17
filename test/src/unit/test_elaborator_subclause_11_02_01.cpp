@@ -261,6 +261,33 @@ TEST(ConstantExpressionElaboration, EnumNumFoldsToTheMemberCount) {
   EXPECT_EQ(n->resolved_value, 3);
 }
 
+// §11.2.1 requires the fold wherever a constant expression is required, and not
+// only where a localparam initializer asks for a value: "when used in constant
+// expressions, these function calls shall be evaluated at elaboration time". A
+// packed range is such a place, so `S.len()*8-1:0` sizes `v` at elaboration
+// time. §6.16.1 makes `S.len()` 3, so the range is [23:0] and `v` is 24 bits.
+//
+// 24 is not a default. A range whose bounds did not fold leaves the width at
+// the 1 `RtlirVariable::width` initializes to, and no other quantity in this
+// source is 24: the string is three characters and the multiplier is 8, so only
+// the folded product reaches it.
+TEST(ConstantExpressionElaboration, StringParameterLenSizesAPackedRange) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam string S = \"abc\";\n"
+      "  logic [S.len()*8-1:0] v;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const RtlirVariable* v = nullptr;
+  for (const auto& var : design->top_modules[0]->variables) {
+    if (var.name == "v") v = &var;
+  }
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->width, 24U);
+}
+
 // §11.2.1 makes `c.num()` a constant built-in method call although `c` is a
 // variable and not a constant expression. The clause rules that built-in
 // methods "whose value does not depend on the current value of the identifier

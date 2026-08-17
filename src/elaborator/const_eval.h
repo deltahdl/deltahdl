@@ -86,6 +86,11 @@ std::optional<int64_t> ConstEvalInt(const Expr* expr, const ScopeMap& scope);
 std::optional<double> ConstEvalReal(const Expr* expr);
 std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope);
 
+// §6.16: the characters of a constant string expression, with the quotes
+// removed and each escape replaced by the one character it stands for. Empty
+// for an expression that is not a string literal.
+std::optional<std::string> ConstEvalString(const Expr* expr);
+
 bool IsConstantExpr(const Expr* expr, const ScopeMap& scope);
 
 // Shared with §13.4.3: the whitelist of system functions admissible inside a

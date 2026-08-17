@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <format>
 #include <optional>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -132,6 +133,24 @@ bool TryFoldRealParamValue(RtlirParamDecl& pd, const Expr* init,
   pd.is_real_value = true;
   pd.is_resolved = true;
   return true;
+}
+
+// Records the characters of a §6.16 string parameter's value on its
+// declaration, so that a later fold can read the length §6.16.1's `len()`
+// returns. Does not touch resolved_value, which the §11.10 packed fold has
+// already written and which the rest of the elaborator reads. The characters
+// are copied into `arena` because resolved_string is a std::string_view and
+// outlives the std::string ConstEvalString returns. Does nothing for a
+// parameter of any other declared type, because §5.13 associates `len()` with
+// `string` alone.
+void RecordStringParamValue(RtlirParamDecl& pd, const Expr* init,
+                            const DataType* dtype, Arena& arena) {
+  if (!dtype || dtype->kind != DataTypeKind::kString) return;
+  auto chars = ConstEvalString(init);
+  if (!chars) return;
+  pd.resolved_string = {arena.AllocString(chars->c_str(), chars->size()),
+                        chars->size()};
+  pd.is_string_value = true;
 }
 
 int64_t ConvertOverrideValue(int64_t value, const RtlirParamDecl& pd) {
@@ -825,6 +844,13 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
           has_param_type, param_type};
       ResolveUnresolvedParamValue(pd, val, scope, diag_);
     }
+    // Only where the value came from `pval`, the declaration's own initializer.
+    // ApplyParamOverride takes its value from Elaborator::ParamList, which is a
+    // vector of int64_t and carries no characters, so recording `pval` for an
+    // overridden parameter would record the length of a value the parameter no
+    // longer has.
+    if (pval && has_param_type && !pd.from_override)
+      RecordStringParamValue(pd, pval, &decl->param_types[i], arena_);
     CheckTypeParamValueAssignable(decl, i, pval, scope, tp_ctx);
     mod->params.push_back(pd);
   }

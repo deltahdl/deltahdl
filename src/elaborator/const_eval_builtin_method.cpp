@@ -103,6 +103,37 @@ std::optional<int64_t> EnumMemberCount(const Expr* operand) {
   return static_cast<int64_t>(it->second.size());
 }
 
+// §6.16.1: "str.len() returns the length of the string, i.e., the number of
+// characters in the string" (printed page 114). The count is taken from
+// RtlirParamDecl::resolved_string rather than from
+// RtlirParamDecl::resolved_value, because §6.16 rules that "strings can be of
+// arbitrary length and no truncation occurs" while resolved_value is 64 bits.
+// §11.10 packs a string literal one byte per character, so a value of more
+// than eight characters has already lost bytes, and a length computed from it
+// would be wrong for exactly the strings §6.16 admits.
+//
+// Empty for an operand that is not a bare identifier, for a name the installed
+// module declares no parameter under, and for a parameter that took a value of
+// some other type. §5.13 rules that "a built-in method can only be associated
+// with a particular data type", and it associates len() with string alone.
+//
+// Unlike num() on an enumeration, this value depends on the current value of
+// the identifier, so §11.2.1 admits it only under its first rule, which
+// requires the identifier itself to be a constant expression. A parameter is
+// one: §11.2.1 lists "parameters" among the operands a constant expression
+// consists of.
+std::optional<int64_t> StringParamLength(const Expr* operand) {
+  if (!operand || operand->kind != ExprKind::kIdentifier) return std::nullopt;
+  const RtlirModule* mod = RegisteredModule();
+  if (!mod) return std::nullopt;
+  for (const auto& param : mod->params) {
+    if (param.name != operand->text) continue;
+    if (!param.is_string_value) return std::nullopt;
+    return static_cast<int64_t>(param.resolved_string.size());
+  }
+  return std::nullopt;
+}
+
 }  // namespace
 
 std::optional<ConstVal> ConstEvalBuiltinMethodFull(const Expr* expr) {
@@ -113,6 +144,20 @@ std::optional<ConstVal> ConstEvalBuiltinMethodFull(const Expr* expr) {
   // list written on one of these names it as something other than the built-in
   // method.
   if (expr->kind == ExprKind::kCall && !expr->args.empty()) return std::nullopt;
+  if (member->rhs->text == "len") {
+    auto length = StringParamLength(member->lhs);
+    if (!length) return std::nullopt;
+    // §6.16.1 gives the prototype `function int len();`, which §6.11.1 makes a
+    // 32-bit signed integer.
+    return ConstVal{*length, 32, true};
+  }
+  // The third name IsBuiltinMethodName admits, size, stops here and is never
+  // folded. §7.5 gives size() on a dynamic array and §7.9 gives num() and
+  // size() on an associative array, and this file answers a built-in method
+  // from the declaration behind its operand: RtlirParamDecl records an
+  // integer, a real and a string, and no array, so there is no element count
+  // here to read. Leaving size unfolded is what keeps it from being answered
+  // wrongly, since a declaration this file cannot read is not one it can count.
   if (member->rhs->text != "num") return std::nullopt;
   auto count = EnumMemberCount(member->lhs);
   if (!count) return std::nullopt;
@@ -139,10 +184,11 @@ std::optional<bool> BuiltinMethodCallIsConstant(const Expr* expr,
   // declared as. §5.13 rules that "a built-in method can only be associated
   // with a particular data type", and it associates none with an integer, so a
   // ScopeMap-constant identifier carries no built-in method for the rule to
-  // admit. What that leaves unfolded is a built-in method on a constant operand
-  // of some other type, `len()` on a string parameter being the one such case
-  // §6.16 defines; reporting it is what tells its author the value was not
-  // computed.
+  // admit. The folder answers `len()` on a string parameter from the characters
+  // recorded on its declaration rather than from a ScopeMap, so that call is
+  // admitted here. What remains unfolded is a built-in method whose operand's
+  // declaration carries no value the folder can read; reporting it is what
+  // tells its author the value was not computed.
   return ConstEvalBuiltinMethodFull(expr).has_value();
 }
 

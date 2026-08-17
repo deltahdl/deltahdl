@@ -161,6 +161,17 @@ bool ParamExpectsIntegerValue(const RtlirParamDecl& pd, const DataType& dtype);
 bool TryFoldRealParamValue(RtlirParamDecl& pd, const Expr* init,
                            const DataType& dtype, const ScopeMap& scope);
 
+// §6.16: records on `pd` the characters of a string parameter's value, so that
+// a later fold can read the length §6.16.1's `len()` returns. Leaves
+// resolved_value alone, which the §11.10 packed fold has already written and
+// which the rest of the elaborator reads. The characters are copied into
+// `arena` because resolved_string is a std::string_view. Leaves `pd`
+// untouched, and its is_string_value flag clear, when `dtype` is not `string`
+// -- §5.13 associates `len()` with `string` alone -- or `init` does not fold to
+// a constant string.
+void RecordStringParamValue(RtlirParamDecl& pd, const Expr* init,
+                            const DataType* dtype, Arena& arena);
+
 std::string_view ExprIdent(const Expr* e);
 const ClassDecl* FindClassDecl(std::string_view name,
                                const CompilationUnit* unit);
