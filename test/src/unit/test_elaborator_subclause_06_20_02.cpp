@@ -651,13 +651,10 @@ TEST(ValueParameters,
 
 // §6.20.2 names `parameter`, `localparam` and `specparam` in one sentence, so
 // the localparam spelling of the source above breaks the same rule and draws
-// the same report. §6.20.4 also rules that a local parameter is assigned a
-// constant expression, and a hierarchical name is not one, but reporting both
-// tells the author the same thing twice under two clause numbers.
-// ValidateOneValueParam in
-// src/elaborator/elaborator_validate_queries_dims.cpp returns after the
-// §6.20.2 report for that reason, so what stands here is the rule that names
-// what is wrong with the initializer.
+// the same report. §6.20.4's report stands beside it, because a hierarchical
+// name is not a constant expression either; what this case asserts is that the
+// clause naming what is wrong with the initializer is one of the two, which it
+// was not before this commit.
 TEST(ValueParameters,
      HierarchicalParameterReferenceInLocalparamValueIsReported) {
   ElabFixture f;

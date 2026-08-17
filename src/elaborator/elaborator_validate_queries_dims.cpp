@@ -581,10 +581,8 @@ static bool ExprContainsHierRef(const Expr* e, const CompilationUnit* unit) {
   // does not enter into it, so a dotted name is a breach whether it names
   // another module's parameter or one of its variables. Only the scoped names
   // the clause admits are exempted below.
-  if (e->kind == ExprKind::kMemberAccess) {
-    if (ScopeResolutionRefersToClassParam(unit, e)) return false;
-    return true;
-  }
+  if (e->kind == ExprKind::kMemberAccess)
+    return !ScopeResolutionRefersToClassParam(unit, e);
   for (const Expr* sub :
        {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr}) {
     if (ExprContainsHierRef(sub, unit)) return true;
@@ -649,13 +647,15 @@ void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
                            "reference",
                            item->name),
                Subclause("6.20.2"));
-    // A hierarchical name is also not a constant expression, so the §6.20.4
-    // check below would report the same initializer a second time under a
-    // second clause number. §6.20.2 is the rule that names what is wrong with
-    // it, so it is the one report the author gets.
-    return;
   }
 
+  // The §6.20.4 check below is not skipped when the §6.20.2 one above has
+  // already reported, although a hierarchical name is not a constant
+  // expression either. ExprContainsHierRef answers true for every
+  // ExprKind::kMemberAccess it does not recognise, which includes a method
+  // call on a parameter such as `S.len()`, and that is not a hierarchical name
+  // at all. Skipping the §6.20.4 report where the §6.20.2 one fired would
+  // therefore replace a correct report with a wrong one on those sources.
   if ((item->is_localparam || parameter_is_local) &&
       !IsConstantExpr(item->init_expr, param_scope)) {
     diag.Error(item->loc,
