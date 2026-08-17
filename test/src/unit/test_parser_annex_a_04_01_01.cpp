@@ -288,10 +288,25 @@ TEST(ModuleInstantiationGrammar, ErrorMissingInstanceName) {
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got '('", 1, "6.8"));
 }
 
-TEST(ModuleInstantiationGrammar, ErrorMissingPortParentheses) {
+// A.4.1.1's hierarchical_instance makes the parenthesized
+// list_of_port_connections no part of optional, so `sub u0;` is not one -- but
+// it is what a data declaration of an undeclared type spells too, and this
+// parser holds no table of module names to tell them apart. The item recorded
+// is the data declaration, and the report belongs to the elaborator:
+// ModuleInstantiationElaboration.PortlessInstanceWithoutParensIsReported in
+// test/src/unit/test_elaborator_subclause_23_03_02.cpp asserts the §23.3.2 one
+// where the name is a module, and
+// UserDefinedTypeElaboration.NameThatIsNeitherTypeNorModuleIsReportedAsAnUndeclaredType
+// in test/src/unit/test_elaborator_subclause_06_18.cpp the §6.18 one where it
+// is nothing, which is what `sub` is here.
+TEST(ModuleInstantiationGrammar, MissingPortParenthesesLeavesADataDeclaration) {
   auto r = Parse("module m; sub u0; endmodule\n");
-  // §23.3.2 owns the hierarchical_instance shape the parser enforces here.
-  EXPECT_TRUE(ReportedError(r.diags, "expected '(', got ';'", 1, "23.3.2"));
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->data_type.type_name, "sub");
+  EXPECT_TRUE(item->type_name_undeclared_at_parse);
 }
 
 // module_instantiation is terminated by a semicolon; omitting it is an error.

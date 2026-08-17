@@ -61,13 +61,30 @@ TEST(ModuleInstantiationParser, InstanceArrayWithUnpackedDimensionParses) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ModuleInstantiationParser, PortlessInstanceWithoutParensRejected) {
+// §23.3.2 requires the port connection list and its parentheses, and this
+// parser is not what refuses `child u0;` for want of them. The same two
+// identifiers and semicolon spell a data declaration whose type_identifier
+// §6.18 says should have been declared first, and telling the two apart takes
+// the module names, which the parser does not hold: it never sees the
+// declarations of other files, and §23.3.1 lets a module be instantiated above
+// its own. So the shape is recorded as the data declaration, flagged, and
+// ModuleInstantiationElaboration.PortlessInstanceWithoutParensIsReported in
+// test/src/unit/test_elaborator_subclause_23_03_02.cpp asserts the §23.3.2
+// report the elaborator then makes about this same source.
+TEST(ModuleInstantiationParser,
+     PortlessInstanceWithoutParensIsLeftToElaborate) {
   auto r = Parse(
       "module child; endmodule\n"
       "module top;\n"
       "  child u0;\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedError(r.diags, "expected '(', got ';'", 3, "23.3.2"));
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[1]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "u0");
+  EXPECT_EQ(item->data_type.type_name, "child");
+  EXPECT_TRUE(item->type_name_undeclared_at_parse);
 }
 
 // §23.3.2: positional and named connections cannot be mixed, but the three

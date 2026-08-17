@@ -2,6 +2,7 @@
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "lexer/token.h"
 
 using namespace delta;
@@ -162,6 +163,28 @@ TEST(ModuleInstantiationElaboration, EmptyParensOnPortlessModuleElaborates) {
   EXPECT_FALSE(f.has_errors);
   ASSERT_EQ(design->top_modules[0]->children.size(), 1u);
   EXPECT_NE(design->top_modules[0]->children[0].resolved, nullptr);
+}
+
+// §23.3.2 gives module_instantiation a parenthesized list_of_port_connections,
+// which A.4.1.1's hierarchical_instance makes no part of optional, so `child
+// u0;` is not one however few ports child has. The report is the elaborator's
+// rather than the parser's because the two identifiers and semicolon are also
+// what a data declaration of an undeclared type spells, and the module names
+// that tell the two apart are the elaborator's. Which is why this case is here
+// rather than in test/src/unit/test_parser_subclause_23_03_02.cpp, where it
+// stood while the parser answered it.
+TEST(ModuleInstantiationElaboration, PortlessInstanceWithoutParensIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child; endmodule\n"
+      "module top;\n"
+      "  child u0;\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "instantiation of module 'child' has no port "
+                            "connection list",
+                            3, "23.3.2"));
 }
 
 }  // namespace

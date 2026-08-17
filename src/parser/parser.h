@@ -421,6 +421,10 @@ class Parser {
   void ParseScopedTypeOrInst(const Token& name_tok,
                              std::vector<ModuleItem*>& items);
   bool LooksLikeScopedInstTail();
+  // True where the tokens after the leading identifier are one more identifier
+  // and a semicolon and nothing else, which is the shape §6.18's undeclared
+  // type_identifier and a port-list-less instantiation share.
+  bool LooksLikeUndeclaredTypeDecl();
   void ParsePlainVarDecl(const Token& name_tok,
                          std::vector<ModuleItem*>& items);
   ModuleItem* ParseModuleInst(const Token& module_tok);

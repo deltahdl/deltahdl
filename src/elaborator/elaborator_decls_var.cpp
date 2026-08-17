@@ -656,6 +656,31 @@ static std::string_view AdoptTypedefArrayDims(
   return typedef_name;
 }
 
+void Elaborator::ReportUndeclaredTypeName(const ModuleItem* item) {
+  if (!item->type_name_undeclared_at_parse) return;
+  std::string_view name = item->data_type.type_name;
+  // §23.3.2 gives module_instantiation its parenthesized list_of_port_
+  // connections, so a name that does turn out to be a module was written as an
+  // instantiation with that list left off.
+  if (FindModuleInScope(name) != nullptr) {
+    diag_.Error(
+        item->loc,
+        std::format("instantiation of module '{}' has no port connection list",
+                    name),
+        Subclause("23.3.2"));
+    return;
+  }
+  // §6.18: "The declaration of a user-defined data type shall precede any
+  // reference to its type_identifier." A type declared below this reference and
+  // a type declared nowhere at all both breach it, and the sentence draws no
+  // distinction between them: neither declaration precedes the reference.
+  diag_.Error(item->loc,
+              std::format("declaration of type '{}' does not precede this "
+                          "reference to it",
+                          name),
+              Subclause("6.18"));
+}
+
 void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   // §27.4: "The genvar is used as an integer during elaboration to evaluate the
   // generate loop and create instances of the generate block, but it does not
@@ -665,6 +690,8 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   // from here -- it binds the index value per iteration into its own scope --
   // so nothing downstream needs the declaration to survive.
   if (item->is_genvar) return;
+
+  ReportUndeclaredTypeName(item);
 
   ResolveTypeRef(item, mod);
 

@@ -753,6 +753,17 @@ void Parser::ParsePlainVarDecl(const Token& name_tok,
   items.push_back(item);
 }
 
+bool Parser::LooksLikeUndeclaredTypeDecl() {
+  auto saved = lexer_.SavePos();
+  bool pair = CheckIdentifier();
+  if (pair) {
+    Consume();
+    pair = Check(TokenKind::kSemicolon);
+  }
+  lexer_.RestorePos(saved);
+  return pair;
+}
+
 void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
   auto name_tok = Consume();
 
@@ -776,6 +787,24 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
     RejectInstInProgram(name_tok.loc,
                         "primitive instances not allowed in programs");
     ParseUdpInstList(name_tok, items);
+    return;
+  }
+  // Two bare identifiers and a semicolon, which A.4.1.1 does not admit as a
+  // hierarchical_instance whatever the first name turns out to be: the port
+  // connection list and its parentheses are not optional there. Reading the
+  // shape as an instantiation is what made a reference breaching §6.18 -- "The
+  // declaration of a user-defined data type shall precede any reference to its
+  // type_identifier" -- come back as a missing port connection list under
+  // §23.3.2. Recording it as the data declaration it also spells lets the parse
+  // finish with the name kept, and Elaborator::ReportUndeclaredTypeName decides
+  // which of the two the source meant, because the module names the answer
+  // turns on are the elaborator's and not this parser's.
+  if (LooksLikeUndeclaredTypeDecl()) {
+    auto start = items.size();
+    ParseVarDeclList(items, MakeNamedType(name_tok.text));
+    for (auto i = start; i < items.size(); ++i) {
+      items[i]->type_name_undeclared_at_parse = true;
+    }
     return;
   }
   if (CheckIdentifier() || Check(TokenKind::kHash)) {

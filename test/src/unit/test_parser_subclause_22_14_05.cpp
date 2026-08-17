@@ -144,17 +144,21 @@ TEST(CompilerDirectiveParsing, Verilog2005AddedWordOpensANetDeclaration) {
   }
   EXPECT_TRUE(signed_seen);
 
-  // Under the list this version extends the same declarations are not
-  // declarations at all. §23.3.2 owns the report, not §6.7: with the word an
-  // ordinary identifier the two names read as a module name and an instance
-  // name, so Parser::ParseModuleInstList is looking for the port connection
-  // list when it reaches the semicolon.
+  // Under the list this version extends the same declaration is a declaration
+  // of something else. §6.7's net declaration needs the word to be a keyword;
+  // with it an ordinary identifier the line declares scalar_net of a type
+  // called uwire, and §6.18 is what refuses that at elaboration, because no
+  // declaration of such a type precedes the reference. The item is where the
+  // parse records which of the two readings it took.
   auto earlier =
       ParseWithPreprocessor(In2001("module m;\n"
                                    "  uwire scalar_net;\n"
                                    "endmodule\n"));
-  EXPECT_TRUE(ReportedError(earlier.diags, "expected '(', got ';'",
-                            LineInRegion(2), "23.3.2"));
+  ASSERT_NE(earlier.cu, nullptr);
+  auto* earlier_item = earlier.cu->modules[0]->items[0];
+  EXPECT_EQ(earlier_item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(earlier_item->data_type.type_name, "uwire");
+  EXPECT_TRUE(earlier_item->type_name_undeclared_at_parse);
 }
 
 // The declaration forms the test above does not reach. A net declaration may

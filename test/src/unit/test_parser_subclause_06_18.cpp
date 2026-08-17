@@ -261,16 +261,31 @@ TEST(DataTypeParsing, InterfacePortTypedef) {
   EXPECT_EQ(td->typedef_type.type_name, "data_t");
 }
 
-TEST(DataTypeParsing, TypeReferenceBeforeDeclarationRejected) {
+// §6.18 rules that "The declaration of a user-defined data type shall precede
+// any reference to its type_identifier". `my_type x;` written above the typedef
+// breaches it, and the breach is not the parser's to report: the same two
+// identifiers and semicolon are what a module instantiation missing its port
+// connection list spells, this parser holds no table of module names, and a
+// module may be instantiated above its own declaration. What the parser records
+// is the data declaration the shape also spells, with the type name kept, so
+// that the elaborator has the name to report about.
+// UserDefinedTypeElaboration.TypeReferenceBeforeItsDeclarationIsReported in
+// test/src/unit/test_elaborator_subclause_06_18.cpp is where the §6.18 report
+// is asserted.
+TEST(DataTypeParsing, TypeReferenceBeforeDeclarationParsesAsADataDeclaration) {
   auto r = Parse(
       "module m;\n"
       "  my_type x;\n"
       "  typedef int my_type;\n"
       "endmodule\n");
-  // `my_type` is not yet a known type name, so `my_type x` reads as the
-  // §23.3.2 module instantiation it also spells, and the report is the port
-  // connection list that instantiation requires. §6.18 has none of its own.
-  EXPECT_TRUE(ReportedError(r.diags, "expected '(', got ';'", 2, "23.3.2"));
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "x");
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(item->data_type.type_name, "my_type");
+  EXPECT_TRUE(item->type_name_undeclared_at_parse);
 }
 
 }  // namespace

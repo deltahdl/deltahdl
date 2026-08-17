@@ -344,13 +344,21 @@ TEST(CompilerDirectiveParsing, SystemVerilog2005AddedProcessWordsOpenBlocks) {
   EXPECT_NE(FindItemByKind(items, ModuleItemKind::kAlwaysLatchBlock), nullptr);
   EXPECT_NE(FindItemByKind(items, ModuleItemKind::kFinalBlock), nullptr);
 
-  // §23.3.2 owns the report. The header survives, because "input logic clk"
-  // reads as a port of a user-defined type; the first body declaration does
-  // not, because "logic combo" reads as a module name and an instance name and
-  // Parser::ParseModuleInstList wants the port connection list.
+  // The header survives, because "input logic clk" reads as a port of a
+  // user-defined type; the body declaration is read the same way, as a variable
+  // whose type_identifier is spelled logic. §6.18 refuses it at elaboration,
+  // since no such type is declared. Finding the declaration under that reading
+  // is what says the word carried no keyword meaning under this list.
   auto before = ParseWithPreprocessor(In2005(kSrc));
-  EXPECT_TRUE(ReportedError(before.diags, "expected '(', got ';'",
-                            LineInRegion(2), "23.3.2"));
+  ASSERT_NE(before.cu, nullptr);
+  bool read_as_a_named_type = false;
+  for (auto* item : before.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kVarDecl &&
+        item->data_type.type_name == "logic") {
+      read_as_a_named_type = true;
+    }
+  }
+  EXPECT_TRUE(read_as_a_named_type);
 }
 
 // The words that open a statement rather than a declaration or a process. The

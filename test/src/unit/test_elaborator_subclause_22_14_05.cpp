@@ -47,13 +47,14 @@ TEST(Verilog2005KeywordElaboration, AddedWordBuildsNetsOfItsOwnType) {
   EXPECT_TRUE(n->is_signed);
 
   // Under "1364-2001" the word is an ordinary identifier, so `uwire
-  // scalar_net;` is read as a module instantiation and the parser reports the
-  // missing port connection list under §23.3.2. §22.14.5 itself states only
-  // which words are reserved -- "This version includes the identifiers listed
-  // in versions 1364-1995 (see Table 22-1) and 1364-2001 (see Table 22-2) plus
-  // the additional identifiers listed in Table 22-3" -- and the keyword table
-  // in src/lexer/keywords.cpp carries that out by choosing a token kind, which
-  // files no diagnostic of its own.
+  // scalar_net;` declares scalar_net of a type called uwire, and §6.18 -- "The
+  // declaration of a user-defined data type shall precede any reference to its
+  // type_identifier" -- is what refuses it, because nothing declares that type.
+  // §22.14.5 itself states only which words are reserved -- "This version
+  // includes the identifiers listed in versions 1364-1995 (see Table 22-1) and
+  // 1364-2001 (see Table 22-2) plus the additional identifiers listed in Table
+  // 22-3" -- and the keyword table in src/lexer/keywords.cpp carries that out
+  // by choosing a token kind, which files no diagnostic of its own.
   //
   // The line named here and in the cases below comes from LineInRegion in
   // lib/cpp/test_helpers/helpers_keyword_version.h rather than from a literal.
@@ -62,12 +63,14 @@ TEST(Verilog2005KeywordElaboration, AddedWordBuildsNetsOfItsOwnType) {
   // the source as written, because the region's opening directive occupies one
   // line of preprocessed output and not two.
   ElabFixture earlier;
-  ElaborateWithPreprocessorAllowingParseErrors(In2001("module m;\n"
-                                                      "  uwire scalar_net;\n"
-                                                      "endmodule\n"),
-                                               earlier, "m");
-  EXPECT_TRUE(ReportedError(earlier.diag.Diagnostics(), "expected '(', got ';'",
-                            LineInRegion(2), "23.3.2"));
+  ElaborateWithPreprocessor(In2001("module m;\n"
+                                   "  uwire scalar_net;\n"
+                                   "endmodule\n"),
+                            earlier, "m");
+  EXPECT_TRUE(ReportedError(earlier.diag.Diagnostics(),
+                            "declaration of type 'uwire' does not precede this "
+                            "reference to it",
+                            LineInRegion(2), "6.18"));
 }
 
 // The same net type on a module port, so the addition is observed across a

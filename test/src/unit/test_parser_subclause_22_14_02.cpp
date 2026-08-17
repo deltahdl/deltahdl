@@ -369,8 +369,18 @@ TEST(CompilerDirectiveParsing, ConstantKeywordsOutsideTheListAreIdentifiers) {
              "    end\n"
              "  endgenerate\n"
              "endmodule\n"));
-  EXPECT_TRUE(ReportedError(as_genvar.diags, "expected '(', got ';'",
-                            LineInRegion(2), "23.3.2"));
+  // With the word an ordinary identifier, `genvar i` is a declaration of i
+  // whose type_identifier is called genvar, which is what a declaration of the
+  // word's own name would look like and not the genvar declaration §27.4 gives
+  // the keyword. §6.18 refuses it at elaboration, since nothing declares that
+  // type; the parser's answer is the item, and the item is what says the word
+  // carried no keyword meaning here.
+  ASSERT_NE(as_genvar.cu, nullptr);
+  auto* genvar_item = as_genvar.cu->modules[0]->items[0];
+  EXPECT_EQ(genvar_item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_FALSE(genvar_item->is_genvar);
+  EXPECT_EQ(genvar_item->data_type.type_name, "genvar");
+  EXPECT_TRUE(genvar_item->type_name_undeclared_at_parse);
 
   auto r =
       ParseWithPreprocessor(In1995("module m;\n"

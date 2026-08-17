@@ -185,6 +185,15 @@ class Elaborator : public ElaboratorData {
 
   ModuleDecl* FindModuleInScope(std::string_view name) const;
 
+  // §6.18: reports a declaration the parser recorded as two bare identifiers
+  // and a semicolon whose first name it had not yet seen declared as a type.
+  // The shape is a data declaration whose type_identifier breaches "The
+  // declaration of a user-defined data type shall precede any reference to its
+  // type_identifier" and a module instantiation missing its port connection
+  // list both, and which of the two it is turns on whether the name is a
+  // module, which the parser does not know and this does.
+  void ReportUndeclaredTypeName(const ModuleItem* item);
+
   RtlirModule* ElaborateModule(const ModuleDecl* decl, const ParamList& params);
 
   // §6.20.2: resolves each parameter of `decl`'s parameter port list against

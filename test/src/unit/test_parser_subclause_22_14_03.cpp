@@ -306,14 +306,19 @@ TEST(CompilerDirectiveParsing,
 // same source outside the region, which is what shows the region and not some
 // unrelated limitation is doing the rejecting.
 TEST(CompilerDirectiveParsing, WordOutsideVerilog2001ListIsNotAKeyword) {
-  // §23.3.2 owns the report: with the word an ordinary identifier the two
-  // names read as a module name and an instance name, so
-  // Parser::ParseModuleInstList is looking for the port connection list.
+  // With the word an ordinary identifier, `uwire w` declares w of a type called
+  // uwire rather than opening a net of that type, and §6.18 is what refuses it
+  // at elaboration, since nothing declares such a type. The parser records the
+  // declaration and the type name it rests on, which is what says the word
+  // carried no keyword meaning here.
   auto as_net =
       ParseWithPreprocessor(In2001("module m;\n  uwire w;\n"
                                    "endmodule\n"));
-  EXPECT_TRUE(ReportedError(as_net.diags, "expected '(', got ';'",
-                            LineInRegion(2), "23.3.2"));
+  ASSERT_NE(as_net.cu, nullptr);
+  auto* as_net_item = as_net.cu->modules[0]->items[0];
+  EXPECT_EQ(as_net_item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(as_net_item->data_type.type_name, "uwire");
+  EXPECT_TRUE(as_net_item->type_name_undeclared_at_parse);
   EXPECT_TRUE(ParseWithPreprocessorOk("module m;\n  uwire w;\nendmodule\n"));
 
   // §6.8 owns this one instead: a packed dimension is where the declaration

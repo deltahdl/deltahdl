@@ -222,6 +222,17 @@ struct ModuleItem {
   // time", so the elaborator must be able to tell the two apart.
   bool is_genvar = false;
 
+  // §6.18: set where the declaration was written as two bare identifiers and a
+  // semicolon and the first named nothing the parser had yet seen declared as a
+  // type. §6.18 rules that "The declaration of a user-defined data type shall
+  // precede any reference to its type_identifier", and that shape is the one a
+  // reference breaching it shares with a module instantiation written without
+  // its port connection list. The parser cannot tell the two apart: it holds no
+  // table of module names, and a module may be instantiated above its own
+  // declaration. Elaborator::ReportUndeclaredTypeName decides and reports,
+  // because the elaborator is what knows the module names.
+  bool type_name_undeclared_at_parse = false;
+
   DataTypeKind forward_type_kind = DataTypeKind::kImplicit;
 
   bool is_rand = false;

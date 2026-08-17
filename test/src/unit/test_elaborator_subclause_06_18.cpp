@@ -435,4 +435,72 @@ TEST(UserDefinedTypeElaboration, FixedArrayTypedefStillSizesTheVariable) {
   EXPECT_FALSE(vars[0].is_dynamic);
 }
 
+// ---------------------------------------------------------------------------
+// Claim: "The declaration of a user-defined data type shall precede any
+// reference to its type_identifier."
+//
+// The three cases below are the ones the parser cannot answer, because
+// `my_type x;` is the two identifiers and semicolon a module instantiation
+// missing its port connection list also spells, and the parser holds no table
+// of module names. Each asserts the §6.18 report rather than the §23.3.2 one
+// the missing port connection list would draw.
+// ---------------------------------------------------------------------------
+
+// The typedef stands below the declaration that references it, so the type is
+// resolvable by the time the module is elaborated and the variable takes the
+// right width. §6.18 is breached all the same: what the sentence forbids is the
+// order, not the failure to resolve.
+TEST(UserDefinedTypeElaboration, TypeReferenceBeforeItsDeclarationIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  my_type x;\n"
+      "  typedef int my_type;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of type 'my_type' does not precede "
+                            "this reference to it",
+                            2, "6.18"));
+}
+
+// A name declared nowhere at all. §6.18 draws no distinction between a
+// declaration written below the reference and one never written: neither
+// precedes the reference. Reporting it as an unknown module instead would name
+// a construct the source does not contain, since nothing here is instantiated.
+TEST(UserDefinedTypeElaboration,
+     NameThatIsNeitherTypeNorModuleIsReportedAsAnUndeclaredType) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  nosuch x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of type 'nosuch' does not precede "
+                            "this reference to it",
+                            2, "6.18"));
+}
+
+// The type is declared, in a package the module never imports, so no
+// declaration of it precedes the reference in the scope the reference stands
+// in. This is the case a repair keyed on the declaration coming later in the
+// same file would miss.
+TEST(UserDefinedTypeElaboration,
+     TypeDeclaredInAPackageNeverImportedIsStillAnUndeclaredTypeReference) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  typedef int my_type;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  my_type x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of type 'my_type' does not precede "
+                            "this reference to it",
+                            5, "6.18"));
+}
+
 }  // namespace
