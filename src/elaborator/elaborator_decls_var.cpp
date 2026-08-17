@@ -681,6 +681,17 @@ void Elaborator::ReportUndeclaredTypeName(const ModuleItem* item) {
               Subclause("6.18"));
 }
 
+bool Elaborator::ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod) {
+  if (item->data_type.kind != DataTypeKind::kNamed) return false;
+  if (nettype_names_.count(item->data_type.type_name) == 0) return false;
+  item->data_type.is_net = true;
+  item->kind = ModuleItemKind::kNetDecl;
+  nettype_net_names_.insert(item->name);
+  ElaborateNetDecl(item, mod);
+  TagUserNettypeNet(item, mod->nets.back(), nettype_resolve_funcs_);
+  return true;
+}
+
 void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   // §27.4: "The genvar is used as an integer during elaboration to evaluate the
   // generate loop and create instances of the generate block, but it does not
@@ -700,15 +711,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   std::string_view adopted_array_typedef =
       AdoptTypedefArrayDims(item, typedefs_, td_array_dims_);
 
-  if (item->data_type.kind == DataTypeKind::kNamed &&
-      nettype_names_.count(item->data_type.type_name)) {
-    item->data_type.is_net = true;
-    item->kind = ModuleItemKind::kNetDecl;
-    nettype_net_names_.insert(item->name);
-    ElaborateNetDecl(item, mod);
-    TagUserNettypeNet(item, mod->nets.back(), nettype_resolve_funcs_);
-    return;
-  }
+  if (ElaborateUserNettypeNet(item, mod)) return;
 
   if (item->is_automatic) {
     diag_.Error(item->loc,

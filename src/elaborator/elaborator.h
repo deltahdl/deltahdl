@@ -223,6 +223,13 @@ class Elaborator : public ElaboratorData {
   void ElaborateAssertPropertyItem(ModuleItem* item, RtlirModule* mod);
   void ElaborateParamDecl(ModuleItem* item, RtlirModule* mod);
   void ElaborateNetDecl(ModuleItem* item, RtlirModule* mod);
+  // §6.6.7: elaborates a declaration whose named data type is a user-defined
+  // nettype as the net it declares, answering true when it was one. A nettype
+  // name reaches ElaborateVarDecl because the parser reads `mynet w;` as a
+  // variable declaration of a named type, and it is here rather than there to
+  // keep that function inside the statement count clang-tidy holds it to.
+  bool ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod);
+
   void ElaborateVarDecl(ModuleItem* item, RtlirModule* mod);
   // §23.2.2.1: reconciles the signedness of a non-ANSI port with its separate
   // net or variable declaration -- `signed` on either side makes both signed.

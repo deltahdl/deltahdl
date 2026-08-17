@@ -160,24 +160,25 @@ inline void ExpectDeclsFailInRegionButElaborateOutside(
     std::string src = std::string("module t;\n  ") + decl + "\nendmodule\n";
 
     ElabFixture in_region;
-    // Inside the region the declaration's head word is a plain identifier, so
-    // the parser reports rather than the elaborator: "expected ';', got '['"
-    // from the semicolon demand in Parser::ParsePlainVarDecl in
-    // src/parser/parser_items.cpp for a declaration carrying a packed
-    // dimension, and "expected '(', got ';'" from the port list's opening
-    // parenthesis demand in Parser::ParseModuleInstList in
-    // src/parser/parser_inst.cpp for one read as a module instantiation
-    // instead.
     ElaborateWithPreprocessorAllowingParseErrors(In(spec, src), in_region, "t");
-    // Which of the two the declaration draws is decided by the packed
-    // dimension it carries: with one, the dimension is where the declaration
-    // was meant to end, and without one the two names read as a module name
-    // and an instance name.
+    // Inside the region the declaration's head word is a plain identifier, and
+    // the packed dimension it carries decides which rule then refuses it. With
+    // one, the dimension is where the declaration was meant to end, so
+    // Parser::ParsePlainVarDecl in src/parser/parser_items.cpp demands the
+    // semicolon under §6.8. Without one, the head word and the name read as a
+    // data declaration whose type_identifier is that head word, and §6.18 --
+    // "The declaration of a user-defined data type shall precede any reference
+    // to its type_identifier" -- refuses it at elaboration, because inside the
+    // region the word declares no type.
     const bool has_packed_dim =
         std::string_view(decl).find('[') != std::string_view::npos;
-    const char* message =
-        has_packed_dim ? "expected ';', got '['" : "expected '(', got ';'";
-    const char* subclause = has_packed_dim ? "6.8" : "23.3.2";
+    std::string_view head_word(decl);
+    head_word = head_word.substr(0, head_word.find(' '));
+    const std::string named_type_message =
+        "declaration of type '" + std::string(head_word) + "' does not precede";
+    const std::string_view message =
+        has_packed_dim ? "expected ';', got '['" : named_type_message;
+    const char* subclause = has_packed_dim ? "6.8" : "6.18";
     EXPECT_TRUE(ReportedError(in_region.diag.Diagnostics(), message,
                               LineInRegion(2), subclause))
         << decl;
