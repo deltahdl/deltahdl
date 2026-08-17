@@ -172,13 +172,15 @@ inline void ExpectDeclsFailInRegionButElaborateOutside(
     // region the word declares no type.
     const bool has_packed_dim =
         std::string_view(decl).find('[') != std::string_view::npos;
-    std::string_view head_word(decl);
-    head_word = head_word.substr(0, head_word.find(' '));
-    const std::string named_type_message =
-        "declaration of type '" + std::string(head_word) + "' does not precede";
-    const std::string_view message =
-        has_packed_dim ? "expected ';', got '['" : named_type_message;
-    const char* subclause = has_packed_dim ? "6.8" : "6.18";
+    std::string message = "expected ';', got '['";
+    const char* subclause = "6.8";
+    if (!has_packed_dim) {
+      std::string_view head_word(decl);
+      head_word = head_word.substr(0, head_word.find(' '));
+      message = "declaration of type '" + std::string(head_word) +
+                "' does not precede";
+      subclause = "6.18";
+    }
     EXPECT_TRUE(ReportedError(in_region.diag.Diagnostics(), message,
                               LineInRegion(2), subclause))
         << decl;
