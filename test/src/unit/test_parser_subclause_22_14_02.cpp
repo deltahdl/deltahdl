@@ -340,9 +340,10 @@ TEST(CompilerDirectiveParsing,
 // The constant-declaration keywords split across the list boundary: `parameter`
 // is a Table 22-1 word and still declares a constant, while `localparam`,
 // `genvar`, and `generate` arrived in a later standard and so carry no keyword
-// meaning here. Both halves matter — the words are rejected in the keyword
-// position and accepted in the identifier position, which is what distinguishes
-// "not reserved" from "not understood".
+// meaning here. Both halves matter — in the keyword position the later words
+// build no constant or genvar declaration but an ordinary data_declaration
+// naming them as its undeclared type, and in the identifier position they name
+// variables. That is what distinguishes "not reserved" from "not understood".
 TEST(CompilerDirectiveParsing, ConstantKeywordsOutsideTheListAreIdentifiers) {
   EXPECT_TRUE(
       Parses1995("module m;\n"
@@ -350,16 +351,29 @@ TEST(CompilerDirectiveParsing, ConstantKeywordsOutsideTheListAreIdentifiers) {
                  "  reg [P-1:0] v;\n"
                  "endmodule\n"));
 
-  // §23.3.2 owns both reports, not §22.14: with the word an ordinary
-  // identifier the two names read as a module name and an instance name, so
-  // Parser::ParseImplicitTypeOrInst hands them to Parser::ParseModuleInstList
-  // and that demands the port connection list in src/parser/parser_inst.cpp.
+  // With the word an ordinary identifier, `localparam Q = 8;` is a
+  // data_declaration of Q whose type_identifier is called localparam, and not
+  // the parameter_declaration §6.20.2 gives the keyword. It is no
+  // instantiation either: A.4.1.1 writes `hierarchical_instance ::=
+  // name_of_instance ( [ list_of_port_connections ] )`, so a declarator that
+  // reaches `=` without a `(` cannot be one, while A.2.4 admits
+  // `variable_identifier = expression` as a variable_decl_assignment. §6.18
+  // refuses the type at elaboration, since nothing declares it; the parser's
+  // answer is the item, and the item is what says the word carried no keyword
+  // meaning here.
   auto as_localparam =
       ParseWithPreprocessor(In1995("module m;\n"
                                    "  localparam Q = 8;\n"
                                    "endmodule\n"));
-  EXPECT_TRUE(ReportedError(as_localparam.diags, "expected '(', got '='",
-                            LineInRegion(2), "23.3.2"));
+  ASSERT_NE(as_localparam.cu, nullptr);
+  EXPECT_FALSE(as_localparam.has_errors);
+  ASSERT_EQ(as_localparam.cu->modules[0]->items.size(), 1u);
+  auto* localparam_item = as_localparam.cu->modules[0]->items[0];
+  EXPECT_EQ(localparam_item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(localparam_item->name, "Q");
+  EXPECT_FALSE(localparam_item->is_localparam);
+  EXPECT_EQ(localparam_item->data_type.type_name, "localparam");
+  EXPECT_TRUE(localparam_item->type_name_undeclared_at_parse);
 
   auto as_genvar = ParseWithPreprocessor(
       In1995("module m;\n"
@@ -443,9 +457,10 @@ TEST(CompilerDirectiveParsing, ReservedWordCannotNameAModule) {
 }
 
 // Negative from the other direction: a word Table 22-1 omits is not reserved,
-// so it cannot act as a keyword either. `logic` as a data type and
-// `always_comb` as a block header both fail under this list, though both are
-// accepted under the default one.
+// so it cannot act as a keyword either. `logic` as a data type is rejected
+// under this list, and `always_comb` as a process header becomes a variable
+// declaration naming it as a type, though both open the constructs their
+// keywords name under the default list.
 TEST(CompilerDirectiveParsing, WordOutsideVerilog1995ListIsNotAKeyword) {
   // §6.8 owns this report: with `logic` an ordinary identifier the packed
   // dimension is where the declaration was meant to end, so
@@ -462,16 +477,28 @@ TEST(CompilerDirectiveParsing, WordOutsideVerilog1995ListIsNotAKeyword) {
                               "  logic [7:0] v;\n"
                               "endmodule\n"));
 
-  // §23.3.2 owns this one instead: two identifiers read as a module name and
-  // an instance name, so Parser::ParseModuleInstList is looking for the port
-  // connection list.
+  // The other word is not rejected but re-read: with `always_comb` an ordinary
+  // identifier the line is a data_declaration of r whose type_identifier is
+  // called always_comb, and not the always_comb procedure §9.2.2.2 gives the
+  // keyword. A.4.1.1 writes `hierarchical_instance ::= name_of_instance (
+  // [ list_of_port_connections ] )`, so a declarator reaching `=` without a `(`
+  // is no instantiation either, and A.2.4 admits exactly this shape as a
+  // variable_decl_assignment. §6.18 refuses the undeclared type at elaboration;
+  // the item the parser records is what says the word carried no keyword
+  // meaning here, and the statement it would have headed is gone.
   auto as_process =
       ParseWithPreprocessor(In1995("module m;\n"
                                    "  reg r;\n"
                                    "  always_comb r = 1'b0;\n"
                                    "endmodule\n"));
-  EXPECT_TRUE(ReportedError(as_process.diags, "expected '(', got '='",
-                            LineInRegion(3), "23.3.2"));
+  ASSERT_NE(as_process.cu, nullptr);
+  EXPECT_FALSE(as_process.has_errors);
+  ASSERT_EQ(as_process.cu->modules[0]->items.size(), 2u);
+  auto* process_item = as_process.cu->modules[0]->items[1];
+  EXPECT_EQ(process_item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(process_item->name, "r");
+  EXPECT_EQ(process_item->data_type.type_name, "always_comb");
+  EXPECT_TRUE(process_item->type_name_undeclared_at_parse);
 }
 
 }  // namespace

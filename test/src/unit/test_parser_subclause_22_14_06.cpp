@@ -178,17 +178,43 @@ TEST(CompilerDirectiveParsing,
   }
   EXPECT_TRUE(typed_in_body);
 
-  // None of the three forms can be written under the union of everything this
-  // version includes, where the words introduce nothing. Each of the three
-  // draws a different report, because what an ordinary identifier followed by
-  // a second name reads as depends on what comes after it. §23.3.2 owns the
-  // first, where `int counted` reads as a module name and an instance name and
-  // Parser::ParseModuleInstList wants the port connection list.
+  // None of the three forms means under the union of everything this version
+  // includes what it means here, where the words introduce nothing. What each
+  // reads as depends on what follows the ordinary identifier that heads it, so
+  // the three are shown one at a time.
+  //
+  // The first is not rejected at all. A.4.1.1 gives `hierarchical_instance ::=
+  // name_of_instance ( [ list_of_port_connections ] )` and §23.3.2 repeats it
+  // in prose -- "The parentheses shall be required on all module
+  // instantiations, even when the instantiated module does not have ports" --
+  // so `int counted = 21;` cannot be an instantiation, and A.2.4 admits it as
+  // a variable_decl_assignment carrying its own initializer. So
+  // Parser::ParseImplicitTypeOrInst builds a data declaration whose
+  // type_identifier is the undeclared name `int`, and §6.18 -- "The
+  // declaration of a user-defined data type shall precede any reference to its
+  // type_identifier" -- is what refuses it, at elaboration, which no parse
+  // reaches. The tree is what says the words carried no keyword meaning: the
+  // declared name is `counted` and `int` is a type nothing declared, where
+  // under "1800-2005" above `int` is the type and nothing is undeclared.
   auto initialized =
       ParseWithPreprocessor(In2005("module m;\n  int counted = 21;\n"
                                    "endmodule\n"));
-  EXPECT_TRUE(ReportedError(initialized.diags, "expected '(', got '='",
-                            LineInRegion(2), "23.3.2"));
+  ASSERT_NE(initialized.cu, nullptr);
+  EXPECT_FALSE(initialized.has_errors);
+  ASSERT_EQ(initialized.cu->modules.size(), 1u);
+  bool named_by_an_undeclared_type = false;
+  for (auto* item : initialized.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kVarDecl || item->name != "counted")
+      continue;
+    named_by_an_undeclared_type = true;
+    EXPECT_EQ(item->data_type.kind, DataTypeKind::kNamed);
+    EXPECT_EQ(item->data_type.type_name, "int");
+    EXPECT_TRUE(item->type_name_undeclared_at_parse);
+    // The initializer is what makes this a declaration form of its own, so it
+    // survives the reading that leaves the type undeclared.
+    EXPECT_NE(item->init_expr, nullptr);
+  }
+  EXPECT_TRUE(named_by_an_undeclared_type);
 
   // §23.2.2.2 owns the second: `logic` is read as the first port's own name
   // and `[7:0]` as its unpacked dimension, which leaves `a` where
@@ -311,13 +337,17 @@ TEST(CompilerDirectiveParsing,
     EXPECT_TRUE(found) << name;
   }
 
-  // §23.3.2 owns the report: with `typedef` and `logic` both ordinary
-  // identifiers the first line reads as a module instantiation carrying an
-  // instance range, and Parser::ParseModuleInstList wants the port connection
-  // list where the declared name stands.
+  // §6.8 owns the report: with `typedef` and `logic` both ordinary identifiers
+  // the first line is a data declaration and not an instantiation, because
+  // A.4.1.1 requires the parenthesized list_of_port_connections and no `(`
+  // follows the declarator. `typedef` is read as the type_identifier, `logic`
+  // as the declarator and `[7:0]` as the variable_dimension A.2.4 lets a
+  // declarator carry, which leaves the declared name `byte_t` standing where
+  // Parser::ParseVarDeclList wants the semicolon that ends the
+  // list_of_variable_decl_assignments.
   auto before = ParseWithPreprocessor(In2005(kSrc));
-  EXPECT_TRUE(ReportedError(before.diags, "expected '(', got identifier",
-                            LineInRegion(2), "23.3.2"));
+  EXPECT_TRUE(ReportedError(before.diags, "expected ';', got identifier",
+                            LineInRegion(2), "6.8"));
 }
 
 // The words that open a process. Each of the three inferred always forms and
@@ -412,12 +442,32 @@ TEST(CompilerDirectiveParsing,
   ASSERT_NE(fn, nullptr);
   EXPECT_EQ(fn->name, "twice");
 
-  // §23.3.2 owns the report: "int arr [0:3]" reads as a module name, an
-  // instance name and an instance range, and Parser::ParseModuleInstList wants
-  // the port connection list after it.
+  // §6.8 owns the report, and it stands at the fourth declaration rather than
+  // the first. `int arr [0:3];` is not an instantiation, because A.4.1.1 gives
+  // `hierarchical_instance ::= name_of_instance ( [ list_of_port_connections ]
+  // )` and no `(` follows the dimension; A.2.4 admits it as a
+  // variable_decl_assignment whose variable_dimension is `[0:3]`, of a type
+  // named by the undeclared `int`, which is the reading the tree is checked
+  // for below. §6.18 refuses that reference at elaboration, which no parse
+  // reaches. `logic [1:0] sel;` is refused here, because what follows the
+  // leading name is a packed dimension and not a declarator:
+  // Parser::ParsePlainVarDecl reads `logic` as the variable itself and wants
+  // the semicolon that ends the declaration where the dimension opens.
   auto before = ParseWithPreprocessor(In2005(kSrc));
-  EXPECT_TRUE(ReportedError(before.diags, "expected '(', got ';'",
-                            LineInRegion(2), "23.3.2"));
+  ASSERT_NE(before.cu, nullptr);
+  ASSERT_EQ(before.cu->modules.size(), 1u);
+  bool array_of_an_undeclared_type = false;
+  for (auto* item : before.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kVarDecl || item->name != "arr") continue;
+    array_of_an_undeclared_type = true;
+    EXPECT_EQ(item->data_type.kind, DataTypeKind::kNamed);
+    EXPECT_EQ(item->data_type.type_name, "int");
+    EXPECT_TRUE(item->type_name_undeclared_at_parse);
+    EXPECT_EQ(item->unpacked_dims.size(), 1u);
+  }
+  EXPECT_TRUE(array_of_an_undeclared_type);
+  EXPECT_TRUE(ReportedError(before.diags, "expected ';', got '['",
+                            LineInRegion(5), "6.8"));
 }
 
 // The words that open a design element, which is the outermost syntactic

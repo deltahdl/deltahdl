@@ -441,7 +441,8 @@ TEST(CompilerDirectiveParsing, NoconfigKeptAdditionCannotNameAModule) {
 // so a word a later list introduces carries no keyword meaning here either.
 // `uwire` is the sharpest case, being the sole addition of the very next
 // version. Each case is paired with the same source outside the region, which
-// is what shows the region and not some unrelated limitation is rejecting it.
+// is what places the difference in the reserved word list this version puts in
+// force rather than in some unrelated limitation of the parser.
 TEST(CompilerDirectiveParsing, WordOutsideNoconfigListIsNotAKeyword) {
   // The word being an ordinary identifier here, the declaration it opens is one
   // of a variable whose type_identifier is spelled uwire, and no such type is
@@ -469,13 +470,49 @@ TEST(CompilerDirectiveParsing, WordOutsideNoconfigListIsNotAKeyword) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("module m;\n  logic [7:0] v;\nendmodule\n"));
 
-  auto as_process =
+  // The word being an ordinary identifier here as well, what it heads is a
+  // data_declaration and not a process: A.2.4 writes variable_decl_assignment
+  // as `variable_identifier { variable_dimension } [ = expression ]`, so `r =
+  // 1'b0` is a declarator with an initializer. No `(` follows it, and A.4.1.1
+  // requires the parenthesized list_of_port_connections of every
+  // hierarchical_instance, so Parser::LooksLikeUndeclaredTypeDecl in
+  // src/parser/parser_items.cpp reads a variable whose type_identifier is
+  // spelled always_comb -- a type declared nowhere, which is what §6.18 refuses
+  // at elaboration. The parse is what this case reads, so it names the type the
+  // word was read as and the initializer kept with it.
+  auto as_decl =
       ParseWithPreprocessor(InNoconfig("module m;\n"
                                        "  reg r;\n"
                                        "  always_comb r = 1'b0;\n"
                                        "endmodule\n"));
-  EXPECT_TRUE(ReportedError(as_process.diags, "expected '(', got '='",
-                            LineInRegion(3), "23.3.2"));
+  ASSERT_NE(as_decl.cu, nullptr);
+  EXPECT_FALSE(as_decl.has_errors);
+  ASSERT_EQ(as_decl.cu->modules.size(), 1u);
+  auto& decl_items = as_decl.cu->modules[0]->items;
+  ASSERT_EQ(decl_items.size(), 2u);
+  EXPECT_EQ(decl_items[1]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(decl_items[1]->name, "r");
+  EXPECT_EQ(decl_items[1]->data_type.type_name, "always_comb");
+  EXPECT_TRUE(decl_items[1]->type_name_undeclared_at_parse);
+  ASSERT_NE(decl_items[1]->init_expr, nullptr);
+  EXPECT_EQ(decl_items[1]->init_expr->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(decl_items[1]->init_expr->text, "1'b0");
+
+  // The same source outside the region, where the word keeps its keyword role
+  // and the very same characters are an always_comb procedure. Reading both
+  // back is what places the difference in the reserved word list this version
+  // puts in force rather than in anything else about the source.
+  auto outside = ParseWithPreprocessor(
+      "module m;\n"
+      "  reg r;\n"
+      "  always_comb r = 1'b0;\n"
+      "endmodule\n");
+  ASSERT_NE(outside.cu, nullptr);
+  EXPECT_FALSE(outside.has_errors);
+  ASSERT_EQ(outside.cu->modules.size(), 1u);
+  auto& outside_items = outside.cu->modules[0]->items;
+  ASSERT_EQ(outside_items.size(), 2u);
+  EXPECT_EQ(outside_items[1]->kind, ModuleItemKind::kAlwaysCombBlock);
 }
 
 // Words neither table lists are ordinary identifiers under this version too,

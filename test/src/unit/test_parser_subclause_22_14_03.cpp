@@ -304,7 +304,7 @@ TEST(CompilerDirectiveParsing,
 // case -- it is the sole word the very next version adds, so it is the closest
 // reserved word to this list without being in it. Each case is paired with the
 // same source outside the region, which is what shows the region and not some
-// unrelated limitation is doing the rejecting.
+// unrelated limitation decides the reading.
 TEST(CompilerDirectiveParsing, WordOutsideVerilog2001ListIsNotAKeyword) {
   // With the word an ordinary identifier, `uwire w` declares w of a type called
   // uwire rather than opening a net of that type, and §6.18 is what refuses it
@@ -332,13 +332,36 @@ TEST(CompilerDirectiveParsing, WordOutsideVerilog2001ListIsNotAKeyword) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("module m;\n  logic [7:0] v;\nendmodule\n"));
 
+  // The word being an ordinary identifier, `always_comb r = 1'b0;` opens no
+  // process: it declares r of a type called always_comb, which is A.2.4's
+  // `variable_decl_assignment ::= variable_identifier { variable_dimension }
+  // [ = expression ]`. It cannot be an instantiation either, because A.4.1.1
+  // gives `hierarchical_instance ::= name_of_instance ( [ list_of_port_
+  // connections ] )` and §23.3.2 states in prose that "The parentheses shall be
+  // required on all module instantiations", while this source holds no `(`.
+  // §6.18 is what refuses the type name, at elaboration, since nothing declares
+  // it. The paired source outside the region is the same three lines read as
+  // the process the word opens where it is a keyword.
   auto as_process =
       ParseWithPreprocessor(In2001("module m;\n"
                                    "  reg r;\n"
                                    "  always_comb r = 1'b0;\n"
                                    "endmodule\n"));
-  EXPECT_TRUE(ReportedError(as_process.diags, "expected '(', got '='",
-                            LineInRegion(3), "23.3.2"));
+  ASSERT_NE(as_process.cu, nullptr);
+  EXPECT_FALSE(as_process.has_errors);
+  ASSERT_GE(as_process.cu->modules[0]->items.size(), 2U);
+  auto* as_process_item = as_process.cu->modules[0]->items[1];
+  EXPECT_EQ(as_process_item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(as_process_item->name, "r");
+  EXPECT_EQ(as_process_item->data_type.type_name, "always_comb");
+  EXPECT_NE(as_process_item->init_expr, nullptr);
+  EXPECT_TRUE(as_process_item->type_name_undeclared_at_parse);
+
+  auto outside = ParseWithPreprocessor(
+      "module m;\n  reg r;\n  always_comb r = 1'b0;\nendmodule\n");
+  ASSERT_NE(outside.cu, nullptr);
+  EXPECT_TRUE(
+      HasAlwaysOfKind(outside.cu->modules[0]->items, AlwaysKind::kAlwaysComb));
 }
 
 // A word this version reserves cannot name a module or an instance either --
