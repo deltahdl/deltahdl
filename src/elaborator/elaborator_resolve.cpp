@@ -341,6 +341,7 @@ struct CuScope {
   std::unordered_set<std::string_view>& class_names;
   std::unordered_set<std::string_view>& parameterized_classes;
   ScopeMap& param_scope;
+  DiagEngine& diag;
 };
 
 // Classifies one compilation-unit item, recording it in the appropriate
@@ -355,6 +356,25 @@ void ClassifyCuScopeItem(ModuleItem* item, CuScope& scope) {
     if (!item->class_decl->params.empty())
       scope.parameterized_classes.insert(item->class_decl->name);
   } else if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
+    // §6.20.4 lets a local parameter be declared in compilation-unit scope, and
+    // rules that `parameter` written there means `localparam`, so the
+    // initializer must be a constant expression however it was spelled. Report
+    // the breach rather than only leaving the name out of the scope: a name
+    // with no value makes every later expression reading it non-constant too,
+    // and the report those produce stands at a different declaration and names
+    // a different parameter.
+    //
+    // The report asks IsConstantExpr while the scope keeps the ConstEvalInt
+    // fold, because the two answer different questions: an initializer this
+    // elaborator cannot fold to an integer is not thereby a non-constant
+    // expression, and a real-valued one folds to neither.
+    if (!IsConstantExpr(item->init_expr, scope.param_scope)) {
+      scope.diag.Error(item->loc,
+                       std::format("localparam '{}' initializer is not a "
+                                   "constant expression",
+                                   item->name),
+                       Subclause("6.20.4"));
+    }
     auto val = ConstEvalInt(item->init_expr, scope.param_scope);
     if (val) {
       scope.param_scope[item->name] = *val;
@@ -428,8 +448,9 @@ bool CellUseOverrideApplies(std::string_view src_lib, std::string_view name,
 
 void Elaborator::RegisterCuScopeItems() {
   RegisterBuiltinClassNames(class_names_);
-  CuScope cu_scope{cu_scope_names_, typedefs_, class_names_,
-                   parameterized_class_names_, cu_param_scope_};
+  CuScope cu_scope{cu_scope_names_, typedefs_,
+                   class_names_,    parameterized_class_names_,
+                   cu_param_scope_, diag_};
   for (auto* item : unit_->cu_items) {
     ClassifyCuScopeItem(item, cu_scope);
   }

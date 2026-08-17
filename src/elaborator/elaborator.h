@@ -657,6 +657,7 @@ class Elaborator : public ElaboratorData {
   void ApplyClassMethodAutomaticDefault();
 
   void DefaultPackageTaskFuncLifetimes();
+  void ValidatePackageValueParams();
 
   void ValidateChainingConstructors();
   void ValidateOneClassChainingCtor(const ClassDecl* cls);

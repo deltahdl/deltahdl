@@ -65,6 +65,15 @@ void CollectItemInstantiations(const ModuleItem* item,
 // §23.3.1: the top-level modules of a compilation unit are the modules present
 // in the source but not instantiated by any other module. Returns them in
 // source order; used when no explicit top module is named.
+//
+// Only unit->modules is read, and that is why an interface, program or checker
+// nothing instantiates is elaborated by no run and so validated by none.
+// §23.3.1 makes a top-level module implicitly instantiated, and it says that of
+// modules alone; an interface reaches Elaborator::ElaborateModule only through
+// Elaborator::FindModule, whose CollectModuleCandidates appends
+// unit->interfaces, unit->programs and unit->checkers. A design element that is
+// never instantiated contributes nothing to the elaborated design, so the
+// asymmetry is deliberate rather than an omission here.
 std::vector<ModuleDecl*> CollectAutoTopModules(const CompilationUnit* unit) {
   std::unordered_set<std::string_view> instantiated;
   for (const auto* mod : unit->modules)
@@ -397,6 +406,10 @@ void Elaborator::RunPreElaborationValidations() {
   ApplyClassMethodAutomaticDefault();
 
   DefaultPackageTaskFuncLifetimes();
+
+  // After RegisterCuScopeItems above, which is what fills cu_param_scope_ with
+  // the compilation-unit and package parameters the check folds against.
+  ValidatePackageValueParams();
 
   RunPreElaborationClassValidations();
 

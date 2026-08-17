@@ -282,4 +282,176 @@ TEST(LocalparamElaboration, ConstantIdentifierInitializerIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §6.20.4: "local parameters can be declared in a generate block, package,
+// class body, or compilation-unit scope. In these contexts, the parameter
+// keyword shall be a synonym for the localparam keyword." The nine cases below
+// vary the scope the declaration sits in while holding the initializer fixed at
+// the bare identifier NonConstantIdentifierInitializerIsReported uses, because
+// the scope is what the check was keyed on: it read a module's top-level items
+// alone, so every case above passes whether or not any other scope is reached.
+
+// A conditional generate block. Its items are in ModuleItem::gen_body rather
+// than in the module's item list, which is what the module-level loop reads.
+TEST(LocalparamElaboration, NonConstantInitializerInAGenerateBlockIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int v;\n"
+      "  if (1) begin\n"
+      "    localparam int N = v;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "localparam 'N' initializer is not a constant expression", 4, "6.20.4"));
+}
+
+// The else arm, which Parser::ParseGenerateIf hangs off ModuleItem::gen_else as
+// a second generate item rather than storing beside the then arm. A walk that
+// read gen_body alone would leave this declaration unvisited.
+TEST(LocalparamElaboration,
+     NonConstantInitializerInAGenerateElseArmIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int v;\n"
+      "  if (0) begin\n"
+      "    localparam int A = 1;\n"
+      "  end else begin\n"
+      "    localparam int B = v;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "localparam 'B' initializer is not a constant expression", 6, "6.20.4"));
+}
+
+// A case arm, whose items are in ModuleItem::gen_case_items[].body and in
+// neither of the two vectors the cases above reach.
+TEST(LocalparamElaboration,
+     NonConstantInitializerInAGenerateCaseArmIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int v;\n"
+      "  localparam int S = 0;\n"
+      "  case (S)\n"
+      "    0: begin\n"
+      "      localparam int N = v;\n"
+      "    end\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "localparam 'N' initializer is not a constant expression", 6, "6.20.4"));
+}
+
+// A package, which is not a module and is elaborated through no module's item
+// pass at all.
+TEST(LocalparamElaboration, NonConstantInitializerInAPackageIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  int v;\n"
+      "  localparam int N = v;\n"
+      "endpackage\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "localparam 'N' initializer is not a constant expression", 3, "6.20.4"));
+}
+
+// The synonym half of the clause, which no other case here reads: the
+// declaration says `parameter`, and in a package that word means `localparam`,
+// so the constant-expression rule applies to it. A check keyed on the
+// `localparam` keyword alone passes every case above and misses this one.
+TEST(LocalparamElaboration,
+     NonConstantPackageParameterIsReportedAsALocalparam) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  int v;\n"
+      "  parameter int N = v;\n"
+      "endpackage\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "localparam 'N' initializer is not a constant expression", 3, "6.20.4"));
+}
+
+// Compilation-unit scope, where the declaration was previously dropped from the
+// elaborator's constant scope without a word when its initializer did not fold.
+TEST(LocalparamElaboration,
+     NonConstantInitializerAtCompilationUnitScopeIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "int v;\n"
+      "localparam int N = v;\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "localparam 'N' initializer is not a constant expression", 2, "6.20.4"));
+}
+
+// §6.20.1 lets a declaration read one made before it in the same block, and the
+// scope a generate body is folded against is not the module's. Without this
+// case a walk that judged every body declaration against the module's
+// parameters alone would report N and pass all six cases above.
+TEST(LocalparamElaboration, ConstantInitializerInAGenerateBlockIsAccepted) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  if (1) begin\n"
+      "    localparam int K = 4;\n"
+      "    localparam int N = K + 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §27.4 makes the loop index an implicit localparam of the block, so an
+// initializer reading it is a constant expression. The index is in no scope the
+// module holds, so a walk that did not bind it would reject this source.
+TEST(LocalparamElaboration, GenvarInitializerInAGenerateLoopIsAccepted) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  genvar g;\n"
+      "  for (g = 0; g < 2; g = g + 1) begin : b\n"
+      "    localparam int L = g + 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The same §6.20.1 dependence inside a package. A package parameter is recorded
+// in the compilation-unit scope under its "p.K" key alone (§26.3), so a check
+// folding K's bare name against that scope would reject N here.
+TEST(LocalparamElaboration, PackageLocalparamReadingAnEarlierOneIsAccepted) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "package p;\n"
+      "  localparam int K = 4;\n"
+      "  localparam int N = K + 1;\n"
+      "endpackage\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

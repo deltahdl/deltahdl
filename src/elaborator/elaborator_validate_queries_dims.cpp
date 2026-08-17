@@ -639,8 +639,15 @@ void CheckParamMapHierRefs(const ModuleDecl* decl, const CompilationUnit* unit,
 // taking a data type where a param_assignment takes a
 // constant_param_expression, so there is no value for IsConstantExpr to answer
 // about.
+//
+// `parameter_is_local` is for the scopes §6.20.4 lists after that rule, where
+// it says "the parameter keyword shall be a synonym for the localparam
+// keyword". A declaration in one of them is held to the constant-expression
+// rule whether it was written `parameter` or `localparam`, and only the caller
+// knows which scope the item was declared in.
 void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
-                           const CompilationUnit* unit, DiagEngine& diag) {
+                           const CompilationUnit* unit, DiagEngine& diag,
+                           bool parameter_is_local = false) {
   if (item->data_type.kind == DataTypeKind::kVoid &&
       item->typedef_type.kind != DataTypeKind::kImplicit)
     return;
@@ -660,7 +667,8 @@ void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
                Subclause("6.20.2"));
   }
 
-  if (item->is_localparam && !IsConstantExpr(item->init_expr, param_scope)) {
+  if ((item->is_localparam || parameter_is_local) &&
+      !IsConstantExpr(item->init_expr, param_scope)) {
     diag.Error(item->loc,
                std::format("localparam '{}' initializer is not a constant "
                            "expression",
@@ -669,17 +677,111 @@ void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
   }
 }
 
+// What a generate body's parameter declarations are validated against, which is
+// everything ValidateOneValueParam needs and cannot read off the item.
+struct GenerateParamCtx {
+  const CompilationUnit* unit;
+  DiagEngine& diag;
+};
+
+void ValidateValueParamsInGenerateBody(const std::vector<ModuleItem*>& items,
+                                       ScopeMap scope,
+                                       const GenerateParamCtx& ctx);
+
+// The three shapes a generate construct holds items in: the body of a loop or
+// of an `if` arm, the `else` arm, and the arms of a `case`.
+//
+// The `else` arm is walked as an item rather than as its gen_body, because
+// Parser::ParseGenerateIf builds `else if` out of a nested kGenerateIf item;
+// reading gen_else->gen_body alone would stop at the first arm and leave every
+// later one unvisited.
+void ValidateValueParamsInGenerate(const ModuleItem* item,
+                                   const ScopeMap& scope,
+                                   const GenerateParamCtx& ctx) {
+  ScopeMap body_scope = scope;
+  // §27.4: the loop index is an implicit localparam of the generate block, so
+  // an initializer reading it is a constant expression. Bind the name here,
+  // because Elaborator::BuildParamScope holds a module's parameters alone and
+  // the loop has not been elaborated yet. The value bound is not the index:
+  // IsConstantExpr asks only whether the name names a constant, and which
+  // index each instance of the block gets is settled when the loop is
+  // elaborated, in Elaborator::ElaborateGenerateFor.
+  if (item->kind == ModuleItemKind::kGenerateFor && item->gen_init &&
+      item->gen_init->lhs)
+    body_scope[item->gen_init->lhs->text] = 0;
+  ValidateValueParamsInGenerateBody(item->gen_body, body_scope, ctx);
+  if (item->gen_else) ValidateValueParamsInGenerate(item->gen_else, scope, ctx);
+  for (const auto& ci : item->gen_case_items)
+    ValidateValueParamsInGenerateBody(ci.body, scope, ctx);
+}
+
+// §6.20.4 lets a local parameter be declared in a generate block, and rules
+// that `parameter` written there means `localparam`, so every value parameter
+// a body declares is held to the constant-expression rule.
+void ValidateValueParamsInGenerateBody(const std::vector<ModuleItem*>& items,
+                                       ScopeMap scope,
+                                       const GenerateParamCtx& ctx) {
+  for (const auto* item : items) {
+    if (item->kind == ModuleItemKind::kParamDecl) {
+      ValidateOneValueParam(item, scope, ctx.unit, ctx.diag, true);
+      // §6.20.1 lets a later declaration in the block read an earlier one, so
+      // bind the name whatever the check above decided about it. Binding only
+      // the ones that passed would report every declaration downstream of a
+      // breach as well, for a breach none of them committed.
+      scope[item->name] = 0;
+      continue;
+    }
+    if (item->kind == ModuleItemKind::kGenerateIf ||
+        item->kind == ModuleItemKind::kGenerateCase ||
+        item->kind == ModuleItemKind::kGenerateFor)
+      ValidateValueParamsInGenerate(item, scope, ctx);
+  }
+}
+
 }  // namespace
 
 void Elaborator::ValidateValueParams(const ModuleDecl* decl,
                                      const RtlirModule* mod) {
   ScopeMap param_scope = BuildParamScope(mod);
+  GenerateParamCtx ctx{unit_, diag_};
   for (const auto* item : decl->items) {
-    if (item->kind != ModuleItemKind::kParamDecl) continue;
-    ValidateOneValueParam(item, param_scope, unit_, diag_);
+    if (item->kind == ModuleItemKind::kParamDecl) {
+      ValidateOneValueParam(item, param_scope, unit_, diag_);
+      continue;
+    }
+    // A generate construct keeps its items in ModuleItem::gen_body rather than
+    // in decl->items, so descending is what reaches the declarations §6.20.4
+    // permits inside one. Parser::ParseGenerateRegion parses a bare
+    // `generate ... endgenerate` straight into decl->items, so a declaration
+    // written there is already reached by the loop above.
+    if (item->kind == ModuleItemKind::kGenerateIf ||
+        item->kind == ModuleItemKind::kGenerateCase ||
+        item->kind == ModuleItemKind::kGenerateFor)
+      ValidateValueParamsInGenerate(item, param_scope, ctx);
   }
 
   CheckParamMapHierRefs(decl, unit_, diag_);
+}
+
+// §6.20.4 lets a local parameter be declared in a package, and rules that
+// `parameter` written there means `localparam`, so a package's value
+// parameters are held to the constant-expression rule exactly as a module's
+// local ones are. Elaborator::ValidateValueParams never sees them: a package is
+// not a module and is not elaborated through Elaborator::ElaborateItems.
+void Elaborator::ValidatePackageValueParams() {
+  for (const auto* pkg : unit_->packages) {
+    // RegisterPackageParams records a package parameter in cu_param_scope_
+    // under its "package.name" key alone (§26.3), so a declaration reading a
+    // bare name an earlier declaration in the same package introduced is not
+    // constant against that scope by itself. Bind each name as the walk
+    // reaches it, for the §6.20.1 reason the generate-body walk binds them.
+    ScopeMap scope = cu_param_scope_;
+    for (const auto* item : pkg->items) {
+      if (item->kind != ModuleItemKind::kParamDecl) continue;
+      ValidateOneValueParam(item, scope, unit_, diag_, true);
+      scope[item->name] = 0;
+    }
+  }
 }
 
 }  // namespace delta
