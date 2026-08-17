@@ -439,7 +439,10 @@ TEST(ParameterizedClassElaboration, ForwardedFormalValueArgumentInExtendsOk) {
              "  int data;\n"
              "endclass\n"
              "class D #(int N = 4) extends C#(N);\n"
-             "endclass\n"));
+             "endclass\n"
+             "module m;\n"
+             "  D d;\n"
+             "endmodule\n"));
 }
 
 // The false positive the report must not produce, and the reason the fold and
