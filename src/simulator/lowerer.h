@@ -31,6 +31,15 @@ struct RtlirVariable;
 struct Variable;
 struct Process;
 
+// §4.4: puts a lowered process on the scheduler, as an evaluation event at
+// time zero in the process's own region, so that it runs once when the
+// simulation starts. Every kind of process is started this way -- the
+// structured procedures of §9.2 and the continuous assignments of §10.3 alike
+// -- which is why it is declared here rather than kept file-local:
+// src/simulator/lowerer.cpp defines it and src/simulator/lowerer_contassign.cpp
+// is its second caller.
+void ScheduleProcess(Process* proc, SimContext& ctx);
+
 class Lowerer {
  public:
   Lowerer(SimContext& ctx, Arena& arena, DiagEngine& diag);

@@ -191,6 +191,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/statement_assign_nonblocking.cpp
     simulator/lowerer.cpp
     simulator/lowerer_child.cpp
+    simulator/lowerer_contassign.cpp
     simulator/lowerer_register.cpp
     simulator/lowerer_process.cpp
     simulator/lowerer_inst.cpp
