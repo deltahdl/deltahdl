@@ -15,7 +15,7 @@ static bool IsEqualityOp(TokenKind op) {
          op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion;
 }
 
-void Elaborator::CheckAssocOperandInBinaryExpr(const Expr* e) {
+void ElaboratorOperationRules::CheckAssocOperandInBinaryExpr(const Expr* e) {
   if (!e) return;
   if (e->kind == ExprKind::kBinary && !IsEqualityOp(e->op)) {
     for (const Expr* side : {e->lhs, e->rhs}) {
@@ -40,7 +40,7 @@ void Elaborator::CheckAssocOperandInBinaryExpr(const Expr* e) {
   for (const auto* el : e->elements) CheckAssocOperandInBinaryExpr(el);
 }
 
-void Elaborator::WalkStmtsForAssocOperand(const Stmt* s) {
+void ElaboratorOperationRules::WalkStmtsForAssocOperand(const Stmt* s) {
   if (!s) return;
   CheckAssocOperandInBinaryExpr(s->rhs);
   CheckAssocOperandInBinaryExpr(s->expr);
@@ -54,7 +54,7 @@ void Elaborator::WalkStmtsForAssocOperand(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForAssocOperand(ci.body);
 }
 
-void Elaborator::ValidateAssocOperandInExpr(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateAssocOperandInExpr(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (IsProceduralItemKind(item->kind)) {
       WalkStmtsForAssocOperand(item->body);
@@ -102,7 +102,7 @@ void ScanArrayPatternElems(
 }
 }  // namespace
 
-void Elaborator::CheckArrayPatternElemTypeInAssign(const Stmt* s) {
+void ElaboratorOperationRules::CheckArrayPatternElemTypeInAssign(const Stmt* s) {
   if (!s->lhs || !s->rhs) return;
   if (s->lhs->kind != ExprKind::kIdentifier) return;
   if (s->rhs->kind != ExprKind::kAssignmentPattern) return;
@@ -116,7 +116,7 @@ void Elaborator::CheckArrayPatternElemTypeInAssign(const Stmt* s) {
 // §10.10.1: the element-type rule also governs a pattern that initializes the
 // array in its declaration (`int A9[1:9] = '{A3, ...};`), an assignment-like
 // context the procedural walk above never reaches.
-void Elaborator::CheckArrayPatternElemTypeInInit(const ModuleItem* item) {
+void ElaboratorOperationRules::CheckArrayPatternElemTypeInInit(const ModuleItem* item) {
   if (!item->init_expr) return;
   if (item->init_expr->kind != ExprKind::kAssignmentPattern) return;
   auto it = var_array_info_.find(item->name);
@@ -126,7 +126,7 @@ void Elaborator::CheckArrayPatternElemTypeInInit(const ModuleItem* item) {
   ScanArrayPatternElems(item->init_expr, var_array_info_, diag_);
 }
 
-void Elaborator::WalkStmtsForArrayPatternElemType(const Stmt* s) {
+void ElaboratorOperationRules::WalkStmtsForArrayPatternElemType(const Stmt* s) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign) {
@@ -140,7 +140,7 @@ void Elaborator::WalkStmtsForArrayPatternElemType(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForArrayPatternElemType(ci.body);
 }
 
-void Elaborator::ValidateArrayPatternElemType(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateArrayPatternElemType(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (IsProceduralItemKind(item->kind)) {
       WalkStmtsForArrayPatternElemType(item->body);
@@ -149,7 +149,7 @@ void Elaborator::ValidateArrayPatternElemType(const ModuleDecl* decl) {
   }
 }
 
-void Elaborator::CheckReplicateTargetingArrayInAssign(const Stmt* s) {
+void ElaboratorOperationRules::CheckReplicateTargetingArrayInAssign(const Stmt* s) {
   if (!s->lhs || !s->rhs) return;
   if (s->lhs->kind != ExprKind::kIdentifier) return;
   if (s->rhs->kind != ExprKind::kReplicate) return;
@@ -163,7 +163,7 @@ void Elaborator::CheckReplicateTargetingArrayInAssign(const Stmt* s) {
 // §10.10.1: unpacked array concatenations forbid replication. The ban holds
 // when the replication initializes the array in its declaration
 // (`int A9[1:9] = {9{1}};`), not only in a procedural assignment.
-void Elaborator::CheckReplicateTargetingArrayInit(const ModuleItem* item) {
+void ElaboratorOperationRules::CheckReplicateTargetingArrayInit(const ModuleItem* item) {
   if (!item->init_expr) return;
   if (item->init_expr->kind != ExprKind::kReplicate) return;
   if (var_array_info_.find(item->name) == var_array_info_.end()) return;
@@ -172,7 +172,7 @@ void Elaborator::CheckReplicateTargetingArrayInit(const ModuleItem* item) {
               Subclause("10.10.1"));
 }
 
-void Elaborator::WalkStmtsForReplicateTargetingArray(const Stmt* s) {
+void ElaboratorOperationRules::WalkStmtsForReplicateTargetingArray(const Stmt* s) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign) {
@@ -186,7 +186,7 @@ void Elaborator::WalkStmtsForReplicateTargetingArray(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForReplicateTargetingArray(ci.body);
 }
 
-void Elaborator::ValidateReplicateTargetingArray(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateReplicateTargetingArray(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (IsProceduralItemKind(item->kind)) {
       WalkStmtsForReplicateTargetingArray(item->body);
@@ -254,7 +254,7 @@ AddressedDims CountAddressedDims(const Expr* base) {
 // direction whichever way it runs — on logic [0:31] b_vect, b_vect[0 +: 8] is
 // b_vect[0:7] and b_vect[15 -: 8] is b_vect[8:15] — so an indexed range cannot
 // be written backwards.
-void Elaborator::CheckArrayElementPartSelectNode(const Expr* e) {
+void ElaboratorOperationRules::CheckArrayElementPartSelectNode(const Expr* e) {
   AddressedDims addressed = CountAddressedDims(e->base);
   if (addressed.array_name.empty()) return;
   // §11.5.2 states this rule of net and variable arrays alike, so a net array's
@@ -293,7 +293,7 @@ void Elaborator::CheckArrayElementPartSelectNode(const Expr* e) {
   }
 }
 
-void Elaborator::WalkExprForArrayElementPartSelect(const Expr* e) {
+void ElaboratorOperationRules::WalkExprForArrayElementPartSelect(const Expr* e) {
   if (!e) return;
   if (e->kind == ExprKind::kSelect &&
       (e->index_end || e->is_part_select_plus || e->is_part_select_minus)) {
@@ -311,7 +311,7 @@ void Elaborator::WalkExprForArrayElementPartSelect(const Expr* e) {
   for (auto* arg : e->args) WalkExprForArrayElementPartSelect(arg);
 }
 
-void Elaborator::WalkStmtsForArrayElementPartSelect(const Stmt* s) {
+void ElaboratorOperationRules::WalkStmtsForArrayElementPartSelect(const Stmt* s) {
   if (!s) return;
   WalkExprForArrayElementPartSelect(s->rhs);
   WalkExprForArrayElementPartSelect(s->lhs);
@@ -326,7 +326,7 @@ void Elaborator::WalkStmtsForArrayElementPartSelect(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForArrayElementPartSelect(ci.body);
 }
 
-void Elaborator::ValidateArrayElementPartSelect(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateArrayElementPartSelect(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
@@ -339,7 +339,7 @@ void Elaborator::ValidateArrayElementPartSelect(const ModuleDecl* decl) {
   }
 }
 
-void Elaborator::CheckArrayConcatNestingInAssign(const Stmt* s) {
+void ElaboratorOperationRules::CheckArrayConcatNestingInAssign(const Stmt* s) {
   if (!s->lhs || !s->rhs) return;
   if (s->lhs->kind != ExprKind::kIdentifier) return;
   if (s->rhs->kind != ExprKind::kConcatenation) return;
@@ -372,7 +372,7 @@ static bool NullItemIsLegalForElemType(DataTypeKind k) {
          k == DataTypeKind::kVirtualInterface || k == DataTypeKind::kNamed;
 }
 
-void Elaborator::CheckNullItemInArrayConcatAssign(const Stmt* s) {
+void ElaboratorOperationRules::CheckNullItemInArrayConcatAssign(const Stmt* s) {
   if (!s->lhs || !s->rhs) return;
   if (s->lhs->kind != ExprKind::kIdentifier) return;
   if (s->rhs->kind != ExprKind::kConcatenation) return;
@@ -396,7 +396,7 @@ void Elaborator::CheckNullItemInArrayConcatAssign(const Stmt* s) {
 // assignment-like context that the procedural walk never reaches. A nested
 // `{...}` whose self-determined width matches the target element is a
 // vector/string concatenation and stays legal, mirroring the procedural check.
-void Elaborator::CheckArrayConcatNestingInInit(const ModuleItem* item) {
+void ElaboratorOperationRules::CheckArrayConcatNestingInInit(const ModuleItem* item) {
   if (!item->init_expr) return;
   if (item->init_expr->kind != ExprKind::kConcatenation) return;
   auto it = var_array_info_.find(item->name);
@@ -417,7 +417,7 @@ void Elaborator::CheckArrayConcatNestingInInit(const ModuleItem* item) {
   }
 }
 
-void Elaborator::WalkStmtsForArrayConcatNesting(const Stmt* s) {
+void ElaboratorOperationRules::WalkStmtsForArrayConcatNesting(const Stmt* s) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign) {
@@ -432,7 +432,7 @@ void Elaborator::WalkStmtsForArrayConcatNesting(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForArrayConcatNesting(ci.body);
 }
 
-void Elaborator::ValidateUnpackedArrayConcatNesting(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateUnpackedArrayConcatNesting(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (IsProceduralItemKind(item->kind)) {
       WalkStmtsForArrayConcatNesting(item->body);
@@ -458,7 +458,7 @@ void CheckConcatElementsForUnsized(const Expr* concat, DiagEngine& diag) {
 }
 }  // namespace
 
-void Elaborator::WalkExprForUnsizedInConcat(const Expr* expr) {
+void ElaboratorOperationRules::WalkExprForUnsizedInConcat(const Expr* expr) {
   if (!expr) return;
   if (expr->kind == ExprKind::kConcatenation) {
     CheckConcatElementsForUnsized(expr, diag_);
@@ -483,7 +483,7 @@ void Elaborator::WalkExprForUnsizedInConcat(const Expr* expr) {
   for (auto* arg : expr->args) WalkExprForUnsizedInConcat(arg);
 }
 
-void Elaborator::WalkStmtsForUnsizedInConcat(const Stmt* s) {
+void ElaboratorOperationRules::WalkStmtsForUnsizedInConcat(const Stmt* s) {
   if (!s) return;
 
   bool is_array_concat_rhs = s->rhs &&
@@ -509,7 +509,7 @@ void Elaborator::WalkStmtsForUnsizedInConcat(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForUnsizedInConcat(ci.body);
 }
 
-void Elaborator::ValidateUnsizedInConcat(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateUnsizedInConcat(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
@@ -526,7 +526,7 @@ void Elaborator::ValidateUnsizedInConcat(const ModuleDecl* decl) {
   }
 }
 
-void Elaborator::CheckVarInitUnsizedInConcat(const ModuleItem* item) {
+void ElaboratorOperationRules::CheckVarInitUnsizedInConcat(const ModuleItem* item) {
   if (!item->init_expr) return;
   // §10.10: when the initializer of an array variable is a `{...}`
   // concatenation, it is an unpacked array concatenation where unsized integer
@@ -549,7 +549,7 @@ static bool IsSelectOnConcat(const Expr* expr) {
   return base && base->kind == ExprKind::kConcatenation;
 }
 
-void Elaborator::CheckSelectOnConcatLvalue(const Expr* lhs) {
+void ElaboratorOperationRules::CheckSelectOnConcatLvalue(const Expr* lhs) {
   if (!lhs) return;
   if (IsSelectOnConcat(lhs)) {
     diag_.Error(lhs->range.start,
@@ -561,7 +561,7 @@ void Elaborator::CheckSelectOnConcatLvalue(const Expr* lhs) {
   }
 }
 
-void Elaborator::WalkStmtsForSelectOnConcatLvalue(const Stmt* s) {
+void ElaboratorOperationRules::WalkStmtsForSelectOnConcatLvalue(const Stmt* s) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign || s->kind == StmtKind::kAssign ||
@@ -576,7 +576,7 @@ void Elaborator::WalkStmtsForSelectOnConcatLvalue(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForSelectOnConcatLvalue(ci.body);
 }
 
-void Elaborator::ValidateSelectOnConcatLvalue(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateSelectOnConcatLvalue(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
@@ -599,7 +599,7 @@ static bool ExprContainsReplicate(const Expr* expr) {
   return false;
 }
 
-void Elaborator::CheckReplicateLvalue(const Expr* lhs) {
+void ElaboratorOperationRules::CheckReplicateLvalue(const Expr* lhs) {
   if (!lhs) return;
   if (ExprContainsReplicate(lhs)) {
     diag_.Error(lhs->range.start,
@@ -609,7 +609,7 @@ void Elaborator::CheckReplicateLvalue(const Expr* lhs) {
   }
 }
 
-void Elaborator::WalkStmtsForReplicateLvalue(const Stmt* s) {
+void ElaboratorOperationRules::WalkStmtsForReplicateLvalue(const Stmt* s) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign || s->kind == StmtKind::kAssign ||
@@ -624,7 +624,7 @@ void Elaborator::WalkStmtsForReplicateLvalue(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForReplicateLvalue(ci.body);
 }
 
-void Elaborator::ValidateReplicateLvalue(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateReplicateLvalue(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
@@ -670,7 +670,7 @@ void CheckReplicateRepeatCount(const Expr* replicate, const ScopeMap& scope,
 }
 }  // namespace
 
-void Elaborator::WalkExprForReplicateMultiplier(const Expr* expr) {
+void ElaboratorOperationRules::WalkExprForReplicateMultiplier(const Expr* expr) {
   if (!expr) return;
   if (expr->kind == ExprKind::kReplicate) {
     CheckReplicateRepeatCount(expr, replicate_multiplier_scope_, diag_);
@@ -768,7 +768,7 @@ static void WalkStmtsForZeroReplicateStandalone(const Stmt* s,
     WalkStmtsForZeroReplicateStandalone(ci.body, scope, diag);
 }
 
-void Elaborator::WalkStmtsForReplicateMultiplier(const Stmt* s) {
+void ElaboratorOperationRules::WalkStmtsForReplicateMultiplier(const Stmt* s) {
   if (!s) return;
   WalkExprForReplicateMultiplier(s->rhs);
   WalkExprForReplicateMultiplier(s->lhs);
@@ -783,7 +783,7 @@ void Elaborator::WalkStmtsForReplicateMultiplier(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForReplicateMultiplier(ci.body);
 }
 
-void Elaborator::ValidateReplicateMultiplier(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateReplicateMultiplier(const ModuleDecl* decl) {
   const ScopeMap& scope = replicate_multiplier_scope_;
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);

@@ -85,7 +85,7 @@ static bool CheckArrayCompareOp(const Expr* expr, const NameMap& types,
   return true;
 }
 
-void Elaborator::CheckAggregateCompareOp(const Expr* expr) {
+void ElaboratorOperationRules::CheckAggregateCompareOp(const Expr* expr) {
   if (!expr->lhs || !expr->rhs) return;
   auto l_name = AggregateOperandName(expr->lhs);
   auto r_name = AggregateOperandName(expr->rhs);
@@ -116,7 +116,7 @@ void Elaborator::CheckAggregateCompareOp(const Expr* expr) {
               Subclause("6.22.2"));
 }
 
-void Elaborator::WalkExprForAggregateCompare(const Expr* expr) {
+void ElaboratorOperationRules::WalkExprForAggregateCompare(const Expr* expr) {
   if (!expr) return;
   if (expr->kind == ExprKind::kBinary &&
       (expr->op == TokenKind::kEqEq || expr->op == TokenKind::kBangEq)) {
@@ -131,7 +131,7 @@ void Elaborator::WalkExprForAggregateCompare(const Expr* expr) {
   for (auto* arg : expr->args) WalkExprForAggregateCompare(arg);
 }
 
-void Elaborator::WalkStmtsForAggregateCompare(const Stmt* s) {
+void ElaboratorOperationRules::WalkStmtsForAggregateCompare(const Stmt* s) {
   if (!s) return;
   WalkExprForAggregateCompare(s->rhs);
   WalkExprForAggregateCompare(s->lhs);
@@ -146,7 +146,7 @@ void Elaborator::WalkStmtsForAggregateCompare(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForAggregateCompare(ci.body);
 }
 
-void Elaborator::ValidateAggregateComparisons(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateAggregateComparisons(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
@@ -162,7 +162,7 @@ void Elaborator::ValidateAggregateComparisons(const ModuleDecl* decl) {
 // or case-inequality comparison shall only be compared with another type
 // reference. Reject any such comparison whose other operand is a value
 // expression rather than a kTypeRef node.
-void Elaborator::CheckTypeRefCompareOp(const Expr* expr) {
+void ElaboratorOperationRules::CheckTypeRefCompareOp(const Expr* expr) {
   if (!expr->lhs || !expr->rhs) return;
   bool lhs_is_type = expr->lhs->kind == ExprKind::kTypeRef;
   bool rhs_is_type = expr->rhs->kind == ExprKind::kTypeRef;
@@ -181,7 +181,7 @@ void Elaborator::CheckTypeRefCompareOp(const Expr* expr) {
 // that never resolves to a built-in or a table entry (for instance a plain
 // variable used as `type(v)`) is left unresolved so the caller does not fold
 // it.
-std::optional<DataType> Elaborator::ResolveTypeRefOperandType(
+std::optional<DataType> ElaboratorOperationRules::ResolveTypeRefOperandType(
     const Expr* op) const {
   if (!op || op->kind != ExprKind::kTypeRef) return std::nullopt;
   DataType dt;
@@ -212,7 +212,7 @@ std::optional<DataType> Elaborator::ResolveTypeRefOperandType(
 // comparison to 0/1 so it can drive an elaboration-time selection (e.g. a
 // generate-if). Returns nullopt when this is not a two-type-reference
 // comparison or either operand's type cannot be resolved.
-std::optional<int64_t> Elaborator::EvalConstTypeRefCompare(
+std::optional<int64_t> ElaboratorOperationRules::EvalConstTypeRefCompare(
     const Expr* expr) const {
   if (!expr || expr->kind != ExprKind::kBinary) return std::nullopt;
   bool is_equality =
@@ -230,7 +230,7 @@ std::optional<int64_t> Elaborator::EvalConstTypeRefCompare(
   return (matched != is_negated) ? 1 : 0;
 }
 
-void Elaborator::WalkExprForTypeRefCompare(const Expr* expr) {
+void ElaboratorOperationRules::WalkExprForTypeRefCompare(const Expr* expr) {
   if (!expr) return;
   if (expr->kind == ExprKind::kBinary) {
     bool is_equality =
@@ -259,7 +259,7 @@ void Elaborator::WalkExprForTypeRefCompare(const Expr* expr) {
   for (auto* arg : expr->args) WalkExprForTypeRefCompare(arg);
 }
 
-void Elaborator::WalkStmtsForTypeRefCompare(const Stmt* s) {
+void ElaboratorOperationRules::WalkStmtsForTypeRefCompare(const Stmt* s) {
   if (!s) return;
   WalkExprForTypeRefCompare(s->rhs);
   WalkExprForTypeRefCompare(s->lhs);
@@ -274,7 +274,7 @@ void Elaborator::WalkStmtsForTypeRefCompare(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForTypeRefCompare(ci.body);
 }
 
-void Elaborator::ValidateTypeRefComparisons(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateTypeRefComparisons(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
@@ -341,7 +341,7 @@ static bool TypeRefArgSelectsDynamicElement(
          (it->second.is_dynamic || it->second.is_assoc || it->second.is_queue);
 }
 
-bool Elaborator::TypeRefArgUsesDynamicElement(const Expr* e) const {
+bool ElaboratorOperationRules::TypeRefArgUsesDynamicElement(const Expr* e) const {
   if (!e) return false;
   if (TypeRefArgSelectsDynamicElement(e, var_array_info_)) return true;
   const Expr* const kChildren[] = {e->lhs,       e->rhs,       e->base,
@@ -359,7 +359,7 @@ bool Elaborator::TypeRefArgUsesDynamicElement(const Expr* e) const {
   return false;
 }
 
-void Elaborator::CheckTypeRefArgInner(const Expr* inner, SourceLoc loc) {
+void ElaboratorOperationRules::CheckTypeRefArgInner(const Expr* inner, SourceLoc loc) {
   if (!inner) return;
   if (TypeRefArgHasMemberAccess(inner)) {
     diag_.Error(loc,
@@ -376,7 +376,7 @@ void Elaborator::CheckTypeRefArgInner(const Expr* inner, SourceLoc loc) {
   }
 }
 
-void Elaborator::WalkExprForTypeRefArg(const Expr* expr) {
+void ElaboratorOperationRules::WalkExprForTypeRefArg(const Expr* expr) {
   if (!expr) return;
   if (expr->kind == ExprKind::kTypeRef) {
     CheckTypeRefArgInner(expr->lhs, expr->range.start);
@@ -390,7 +390,7 @@ void Elaborator::WalkExprForTypeRefArg(const Expr* expr) {
   for (auto* arg : expr->args) WalkExprForTypeRefArg(arg);
 }
 
-void Elaborator::WalkStmtsForTypeRefArg(const Stmt* s) {
+void ElaboratorOperationRules::WalkStmtsForTypeRefArg(const Stmt* s) {
   if (!s) return;
   WalkExprForTypeRefArg(s->lhs);
   WalkExprForTypeRefArg(s->rhs);
@@ -408,7 +408,7 @@ void Elaborator::WalkStmtsForTypeRefArg(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForTypeRefArg(ci.body);
 }
 
-void Elaborator::ValidateTypeRefArgs(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateTypeRefArgs(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->data_type.type_ref_expr) {
       CheckTypeRefArgInner(item->data_type.type_ref_expr, item->loc);
@@ -428,7 +428,7 @@ void Elaborator::ValidateTypeRefArgs(const ModuleDecl* decl) {
 // tagged union, reject a tag name that is not declared in that union. Shared by
 // the assignment-target and declaration-initializer positions, both of which
 // supply the expression type from the target variable's declared type.
-void Elaborator::CheckTaggedMemberName(std::string_view var_name,
+void ElaboratorOperationRules::CheckTaggedMemberName(std::string_view var_name,
                                        const Expr* rhs) {
   if (!rhs || rhs->kind != ExprKind::kTagged) return;
   if (!rhs->rhs || rhs->rhs->kind != ExprKind::kIdentifier) return;
@@ -453,12 +453,12 @@ void Elaborator::CheckTaggedMemberName(std::string_view var_name,
               Subclause("11.9"));
 }
 
-void Elaborator::CheckTaggedExprMember(const Expr* lhs, const Expr* rhs) {
+void ElaboratorOperationRules::CheckTaggedExprMember(const Expr* lhs, const Expr* rhs) {
   if (!lhs || lhs->kind != ExprKind::kIdentifier) return;
   CheckTaggedMemberName(lhs->text, rhs);
 }
 
-void Elaborator::WalkStmtsForTaggedExpr(const Stmt* s) {
+void ElaboratorOperationRules::WalkStmtsForTaggedExpr(const Stmt* s) {
   if (!s) return;
   if ((s->kind == StmtKind::kBlockingAssign ||
        s->kind == StmtKind::kNonblockingAssign) &&
@@ -473,7 +473,7 @@ void Elaborator::WalkStmtsForTaggedExpr(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForTaggedExpr(ci.body);
 }
 
-void Elaborator::ValidateTaggedUnionMembers(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateTaggedUnionMembers(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     // §11.9: a declaration initializer is another position where the tagged
     // expression's type is known (from the declared variable), so the member
@@ -537,7 +537,7 @@ static bool IsUnaryIllegalOnReal(TokenKind op) {
   }
 }
 
-void Elaborator::WalkExprForRealOps(const Expr* expr) {
+void ElaboratorOperationRules::WalkExprForRealOps(const Expr* expr) {
   if (!expr) return;
   if (expr->kind == ExprKind::kBinary) {
     bool lhs_real = expr->lhs && IsRealVar(expr->lhs, var_types_);
@@ -577,7 +577,7 @@ void Elaborator::WalkExprForRealOps(const Expr* expr) {
   for (auto* arg : expr->args) WalkExprForRealOps(arg);
 }
 
-void Elaborator::WalkStmtsForRealOps(const Stmt* s) {
+void ElaboratorOperationRules::WalkStmtsForRealOps(const Stmt* s) {
   if (!s) return;
   WalkExprForRealOps(s->rhs);
   WalkExprForRealOps(s->lhs);
@@ -592,7 +592,7 @@ void Elaborator::WalkStmtsForRealOps(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForRealOps(ci.body);
 }
 
-void Elaborator::ValidateRealOperatorRestrictions(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateRealOperatorRestrictions(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
@@ -632,13 +632,13 @@ bool IsSigningCast(const Expr* cast) {
 // that reinterpret an operand as a packed vector -- the size cast and the
 // signing cast -- require an integral operand. A real variable or a real
 // literal used directly as such an operand is rejected here at elaboration.
-bool Elaborator::CastOperandIsReal(const Expr* operand) const {
+bool ElaboratorOperationRules::CastOperandIsReal(const Expr* operand) const {
   if (!operand) return false;
   if (operand->kind == ExprKind::kRealLiteral) return true;
   return IsRealVar(operand, var_types_);
 }
 
-void Elaborator::CheckCastExpr(const Expr* expr) {
+void ElaboratorOperationRules::CheckCastExpr(const Expr* expr) {
   if (!expr || expr->kind != ExprKind::kCast) return;
 
   if (IsSizeCastForm(expr)) {

@@ -15,7 +15,7 @@
 
 namespace delta {
 
-void Elaborator::WalkExprForCast(const Expr* expr) {
+void ElaboratorOperationRules::WalkExprForCast(const Expr* expr) {
   if (!expr) return;
   CheckCastExpr(expr);
   WalkExprForCast(expr->lhs);
@@ -30,7 +30,7 @@ void Elaborator::WalkExprForCast(const Expr* expr) {
   for (auto* arg : expr->args) WalkExprForCast(arg);
 }
 
-void Elaborator::WalkStmtsForCast(const Stmt* s) {
+void ElaboratorOperationRules::WalkStmtsForCast(const Stmt* s) {
   if (!s) return;
   WalkExprForCast(s->rhs);
   WalkExprForCast(s->lhs);
@@ -45,7 +45,7 @@ void Elaborator::WalkStmtsForCast(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForCast(ci.body);
 }
 
-void Elaborator::ValidateCastOperations(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateCastOperations(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
@@ -79,7 +79,7 @@ static bool IsAssignOp(TokenKind op) {
   }
 }
 
-void Elaborator::WalkExprForAssignInExpr(const Expr* expr,
+void ElaboratorOperationRules::WalkExprForAssignInExpr(const Expr* expr,
                                          bool in_event_or_cont) {
   if (!expr) return;
   if (expr->kind == ExprKind::kBinary && IsAssignOp(expr->op)) {
@@ -100,7 +100,7 @@ void Elaborator::WalkExprForAssignInExpr(const Expr* expr,
   for (auto* arg : expr->args) WalkExprForAssignInExpr(arg, in_event_or_cont);
 }
 
-void Elaborator::WalkStmtsForAssignInExpr(const Stmt* s) {
+void ElaboratorOperationRules::WalkStmtsForAssignInExpr(const Stmt* s) {
   if (!s) return;
 
   if (s->kind == StmtKind::kAssign && s->rhs) {
@@ -114,7 +114,7 @@ void Elaborator::WalkStmtsForAssignInExpr(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForAssignInExpr(ci.body);
 }
 
-void Elaborator::ValidateAssignInExprRestrictions(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateAssignInExprRestrictions(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (IsProceduralItemKind(item->kind)) {
       for (const auto& ev : item->sensitivity) {
@@ -496,7 +496,7 @@ void Elaborator::ValidateAlias(const ModuleItem* item, RtlirModule* mod) {
                           AliasExpansionCtx{mod, scoped, param_scope});
 }
 
-void Elaborator::CheckAssocConcatTargetInAssign(const Stmt* s) {
+void ElaboratorOperationRules::CheckAssocConcatTargetInAssign(const Stmt* s) {
   if (!s->lhs || !s->rhs) return;
   if (s->lhs->kind != ExprKind::kIdentifier) return;
   if (s->rhs->kind != ExprKind::kConcatenation) return;
@@ -508,7 +508,7 @@ void Elaborator::CheckAssocConcatTargetInAssign(const Stmt* s) {
               Subclause("10.10"));
 }
 
-void Elaborator::WalkStmtsForAssocConcatTarget(const Stmt* s) {
+void ElaboratorOperationRules::WalkStmtsForAssocConcatTarget(const Stmt* s) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign) {
@@ -522,7 +522,7 @@ void Elaborator::WalkStmtsForAssocConcatTarget(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForAssocConcatTarget(ci.body);
 }
 
-void Elaborator::ValidateAssocConcatTarget(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateAssocConcatTarget(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (IsProceduralItemKind(item->kind)) {
       WalkStmtsForAssocConcatTarget(item->body);

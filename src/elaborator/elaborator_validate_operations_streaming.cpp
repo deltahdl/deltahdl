@@ -16,7 +16,7 @@
 
 namespace delta {
 
-bool Elaborator::ConcatContainsStringElement(const Expr* expr) {
+bool ElaboratorOperationRules::ConcatContainsStringElement(const Expr* expr) {
   if (!expr) return false;
   if (expr->kind == ExprKind::kIdentifier) {
     auto it = var_types_.find(expr->text);
@@ -31,7 +31,7 @@ bool Elaborator::ConcatContainsStringElement(const Expr* expr) {
   return false;
 }
 
-void Elaborator::CheckStringConcatLvalue(const Expr* lhs) {
+void ElaboratorOperationRules::CheckStringConcatLvalue(const Expr* lhs) {
   if (!lhs) return;
   if (lhs->kind != ExprKind::kConcatenation) return;
   if (ConcatContainsStringElement(lhs)) {
@@ -42,7 +42,7 @@ void Elaborator::CheckStringConcatLvalue(const Expr* lhs) {
   }
 }
 
-void Elaborator::WalkStmtsForStringConcatLvalue(const Stmt* s) {
+void ElaboratorOperationRules::WalkStmtsForStringConcatLvalue(const Stmt* s) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign || s->kind == StmtKind::kAssign ||
@@ -57,7 +57,7 @@ void Elaborator::WalkStmtsForStringConcatLvalue(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForStringConcatLvalue(ci.body);
 }
 
-void Elaborator::ValidateStringConcatLvalue(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateStringConcatLvalue(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
@@ -152,7 +152,7 @@ void CheckStreamingSliceSize(const Expr* slice, DiagEngine& diag,
 
 }  // namespace
 
-void Elaborator::WalkExprForStreamingContext(const Expr* expr,
+void ElaboratorOperationRules::WalkExprForStreamingContext(const Expr* expr,
                                              bool is_valid_context) {
   if (!expr) return;
   if (expr->kind == ExprKind::kStreamingConcat) {
@@ -195,7 +195,7 @@ void Elaborator::WalkExprForStreamingContext(const Expr* expr,
 // can recognise from the variable-type map (real family, event, chandle,
 // virtual interface). Targets we cannot type-check from a simple identifier
 // (selects, member accesses) are left to type-aware downstream checks.
-void Elaborator::CheckStreamingSourceTargetType(const Expr* lhs,
+void ElaboratorOperationRules::CheckStreamingSourceTargetType(const Expr* lhs,
                                                 const Expr* rhs) {
   if (!lhs || !rhs) return;
   if (rhs->kind != ExprKind::kStreamingConcat) return;
@@ -222,7 +222,7 @@ void Elaborator::CheckStreamingSourceTargetType(const Expr* lhs,
 // the variable-type map (real family, event, chandle, virtual interface). A
 // source that is itself a streaming_concatenation is allowed, and any source we
 // cannot type-check from a simple identifier is left to downstream checks.
-void Elaborator::CheckStreamingUnpackSourceType(const Expr* lhs,
+void ElaboratorOperationRules::CheckStreamingUnpackSourceType(const Expr* lhs,
                                                 const Expr* rhs) {
   if (!lhs || !rhs) return;
   if (lhs->kind != ExprKind::kStreamingConcat) return;
@@ -242,7 +242,7 @@ void Elaborator::CheckStreamingUnpackSourceType(const Expr* lhs,
   }
 }
 
-void Elaborator::WalkStmtsForStreamingContext(const Stmt* s) {
+void ElaboratorOperationRules::WalkStmtsForStreamingContext(const Stmt* s) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign || s->kind == StmtKind::kAssign ||
@@ -266,7 +266,7 @@ void Elaborator::WalkStmtsForStreamingContext(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForStreamingContext(ci.body);
 }
 
-void Elaborator::ValidateStreamingConcatContext(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateStreamingConcatContext(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
@@ -384,7 +384,7 @@ void CheckBitStreamCastUnpackedOperand(const BitStreamCast& cast,
 
 }  // namespace
 
-void Elaborator::CheckBitStreamCastExpr(const Expr* expr) {
+void ElaboratorOperationRules::CheckBitStreamCastExpr(const Expr* expr) {
   if (!expr || expr->kind != ExprKind::kCast) return;
   auto target = expr->text;
   if (target.empty()) return;
@@ -436,7 +436,7 @@ void Elaborator::CheckBitStreamCastExpr(const Expr* expr) {
   CheckBitStreamCastUnpackedOperand(cast, ctx);
 }
 
-void Elaborator::WalkExprForBitStreamCast(const Expr* expr) {
+void ElaboratorOperationRules::WalkExprForBitStreamCast(const Expr* expr) {
   if (!expr) return;
   CheckBitStreamCastExpr(expr);
   WalkExprForBitStreamCast(expr->lhs);
@@ -451,7 +451,7 @@ void Elaborator::WalkExprForBitStreamCast(const Expr* expr) {
   for (const auto* arg : expr->args) WalkExprForBitStreamCast(arg);
 }
 
-void Elaborator::WalkStmtsForBitStreamCast(const Stmt* s) {
+void ElaboratorOperationRules::WalkStmtsForBitStreamCast(const Stmt* s) {
   if (!s) return;
   WalkExprForBitStreamCast(s->lhs);
   WalkExprForBitStreamCast(s->rhs);
@@ -465,7 +465,7 @@ void Elaborator::WalkStmtsForBitStreamCast(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForBitStreamCast(ci.body);
 }
 
-void Elaborator::ValidateBitStreamCast(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateBitStreamCast(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
