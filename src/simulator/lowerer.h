@@ -17,6 +17,7 @@ class DiagEngine;
 class SimContext;
 struct ModuleItem;
 struct RtlirContAssign;
+struct RtlirUdpInst;
 struct PackageDecl;
 struct RtlirDesign;
 struct RtlirModule;
@@ -71,6 +72,13 @@ class Lowerer {
                     uint32_t program_block_id);
   void InstallGenBlockConsts(const GenBlockConsts& consts, Process* p);
   void LowerContAssign(const RtlirContAssign& ca, bool from_program);
+  // §29.8: creates the process that drives one user-defined primitive
+  // instance's output terminal from the state table §29.3.4 defines.
+  // `from_program` says the instance sits in a program, whose drives are
+  // reactive (§24.3.1); LowerContAssign takes it for the same reason, since
+  // §29.8 instantiates a UDP "in the same manner as gates". Defined in
+  // src/simulator/lowerer_udp.cpp.
+  void LowerUdpInst(const RtlirUdpInst& inst, bool from_program);
   void LowerSequenceMonitors(const RtlirModule* mod);
   void LowerClassDecl(const ClassDecl* cls);
   void LowerImports(const RtlirModule* mod);

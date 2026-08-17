@@ -270,6 +270,10 @@ class Elaborator : public ElaboratorOperationRules {
 
   void ElaborateModuleInst(ModuleItem* item, RtlirModule* mod);
 
+  // §29.8: records one instance of a user-defined primitive on `mod`, so that
+  // the primitive drives the net its output terminal names.
+  void ElaborateUdpInst(const ModuleItem* item, RtlirModule* mod);
+
   UdpDecl* FindUdpByName(std::string_view name) const;
 
   // §33.4.1.4/§33.4.1.6: applies a cell selection clause's use expansion to a

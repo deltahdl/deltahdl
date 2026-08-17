@@ -113,6 +113,12 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     for (const auto& ca : child.resolved->assigns) {
       LowerContAssign(ca, child.resolved->is_program);
     }
+    // §29.8: a primitive instance written in this child drives its output
+    // terminal wherever the child sits, so it is lowered under the child's
+    // prefix beside the child's continuous assignments.
+    for (const auto& udp_inst : child.resolved->udp_insts) {
+      LowerUdpInst(udp_inst, child.resolved->is_program);
+    }
 
     LowerChildModules(child.resolved);
 

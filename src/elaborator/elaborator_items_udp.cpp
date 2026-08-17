@@ -162,6 +162,67 @@ void Elaborator::ReclassifyForwardUdpInstances(const ModuleDecl* decl) {
   }
 }
 
+// §29.8: records one instance of a user-defined primitive on `mod`, so that the
+// primitive drives the net its output terminal names. "Instances of UDPs are
+// specified inside modules in the same manner as gates (see 28.3)", and a gate
+// instance reaches simulation as the RtlirContAssign ElaborateGateInst
+// (src/elaborator/elaborator_gates.cpp:635) appends; a primitive instance
+// reaches it as the RtlirUdpInst appended here. Append nothing and no
+// instance's output terminal has a driver.
+//
+// Resolve the declaration here rather than record the name for a later pass.
+// Elaborator::FindUdpByName answers the library search order §33.6 defines
+// under the configuration in force at this point of the walk, and that
+// configuration is not readable from the RtlirModule afterwards. Where it
+// answers nullptr the name reaches no primitive, so nothing is appended and
+// nothing is reported: the unresolved name is already reported elsewhere, and a
+// second report would name the same source position twice.
+//
+// §29.8's `udp_instance` production puts the output terminal first --
+// `[ name_of_instance ] ( output_terminal , input_terminal { , input_terminal }
+// )` -- so ModuleItem::gate_terminals splits at index 1. ModuleItem::gate_kind
+// is not consulted, because Parser::ParseOneUdpInstance
+// (src/parser/parser_udp.cpp:6) never writes it for a primitive instance.
+//
+// §29.8 admits two delays and no more: "Only two delays may be specified
+// because z is not supported for UDPs". ModuleItem::gate_delay and
+// ModuleItem::gate_delay_fall are therefore carried and
+// ModuleItem::gate_delay_decay is not.
+//
+// RtlirUdpInst::gen_block_consts and RtlirUdpInst::gen_block_prefix are left at
+// their defaults, which is what the gate path leaves on the RtlirContAssign it
+// appends. Elaborator::ElaborateGenerateBlockItem
+// (src/elaborator/elaborator_generate.cpp:80) stamps §27.4's loop-index values
+// onto RtlirModule::processes and RtlirModule::assigns after the item is
+// elaborated, and it does not stamp RtlirModule::udp_insts.
+void Elaborator::ElaborateUdpInst(const ModuleItem* item, RtlirModule* mod) {
+  const UdpDecl* decl = FindUdpByName(item->inst_module);
+  if (decl == nullptr) return;
+  if (item->gate_terminals.empty()) return;
+
+  // §29.8: "An optional range may be specified for an array of UDP instances."
+  // Such an array is not expanded into one instance per element here, so it
+  // elaborates to nothing until #3199 expands it, and the single-instance form
+  // below would otherwise record it as one instance connected to the whole
+  // vector.
+  if (item->inst_range_left != nullptr || item->inst_range_right != nullptr) {
+    return;
+  }
+
+  RtlirUdpInst inst;
+  inst.decl = decl;
+  inst.name = item->gate_inst_name;
+  inst.loc = item->loc;
+  inst.output = item->gate_terminals.front();
+  inst.inputs.assign(item->gate_terminals.begin() + 1,
+                     item->gate_terminals.end());
+  inst.delay = item->gate_delay;
+  inst.delay_fall = item->gate_delay_fall;
+  inst.drive_strength0 = item->drive_strength0;
+  inst.drive_strength1 = item->drive_strength1;
+  mod->udp_insts.push_back(inst);
+}
+
 namespace {
 
 // §25.9: returns the constant parameter-override values of a module instance

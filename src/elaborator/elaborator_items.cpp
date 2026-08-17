@@ -650,6 +650,7 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       CheckUdpInstNameDiagnostics(item, declared_names_, diag_);
       CreateImplicitNetsForTerminals(item->gate_terminals, item->loc,
                                      make_implicit_net);
+      ElaborateUdpInst(item, mod);
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       return true;
     case ModuleItemKind::kSpecparam:
