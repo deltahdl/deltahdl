@@ -205,6 +205,22 @@ static std::optional<int64_t> EvalDefparamOverride(
   return ConvertOverrideValue(*val, *ovr.param);
 }
 
+// §6.16: a defparam replaces the whole of the parameter's value, and for one
+// declared string that value is characters rather than the §11.10 packed number
+// resolved_value holds. Elaborator::ElaborateParamDecl has already recorded the
+// declaration's own characters by the time a defparam lands, so they are
+// replaced here or the value the defparam overrode is what Lowerer::LowerParams
+// reads. Clearing is_string_value where the right-hand side is not a string
+// literal is what sends the lowering to resolved_value, which
+// EvalDefparamOverride did write, in preference to characters that are no
+// longer the parameter's. Does nothing for a parameter that never held a string
+// value.
+static void ReplaceStringParamValue(RtlirParamDecl& pd, const Expr* val_expr,
+                                    Arena& arena) {
+  if (!pd.is_string_value) return;
+  if (!RecordStringParamChars(pd, val_expr, arena)) pd.is_string_value = false;
+}
+
 void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
   ScopeMap scope = BuildParamScope(mod);
   for (const auto* item : decl->items) {
@@ -224,19 +240,7 @@ void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
       param->resolved_value = *value;
       param->is_resolved = true;
       param->from_override = true;
-      // §6.16: a defparam replaces the whole of the parameter's value, and for
-      // one declared string that value is characters rather than the §11.10
-      // packed number resolved_value holds. Elaborator::ElaborateParamDecl has
-      // already recorded the declaration's own characters by the time a
-      // defparam lands, so they are replaced here or the value the defparam
-      // overrode is what Lowerer::LowerParams reads. Clearing is_string_value
-      // where the right-hand side is not a string literal is what sends the
-      // lowering to resolved_value, which EvalDefparamOverride did write, in
-      // preference to characters that are no longer the parameter's.
-      if (param->is_string_value &&
-          !RecordStringParamChars(*param, val_expr, arena_))
-        param->is_string_value = false;
-
+      ReplaceStringParamValue(*param, val_expr, arena_);
       RecomputeDependentParams(target_mod);
       applied_defparams_.insert(key);
       early_defparam_resolutions_.push_back({mod, path_expr, param, item->loc});
