@@ -3,6 +3,7 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -586,12 +587,39 @@ class Parser {
   // it.
   void SynchronizeWithProgress();
 
+  // The type names and the nettype names one scope declared, as one value.
+  // §6.6.7's nettype declaration registers a name in both known_types_ and
+  // known_nettypes_ below, so anything that carries a scope's type names to
+  // another scope has to carry both or lose the nettype half.
+  struct ScopeTypeNames {
+    std::unordered_set<std::string_view> types;
+    std::unordered_set<std::string_view> nettypes;
+  };
+
+  // Makes every name of `names` a type name where the parser now stands.
+  void AdoptTypeNames(const ScopeTypeNames& names);
+  // Applies one package_import_item to what the parser reads as a type name.
+  void ApplyImportedTypeNames(const ImportItem& item);
+  // Makes the type names of the classes `decl` derives from type names in its
+  // own body.
+  void AdoptBaseClassTypeNames(const ClassDecl* decl);
+
   Lexer& lexer_;
   Arena& arena_;
   DiagEngine& diag_;
   std::unordered_set<std::string_view> known_types_;
   std::unordered_set<std::string_view> known_nettypes_;
   std::unordered_set<std::string_view> known_udps_;
+
+  // What each package and each class declared, keyed by its own name and kept
+  // after that scope has closed. known_types_ answers what is a type name where
+  // the parser stands; these two answer what §26.3's import declaration and
+  // §8.13's extends clause can put back into it. They are maps rather than more
+  // saved sets because a package's names reach a module that named the package,
+  // which is not a containment relation and so is not what TypeNameScope below
+  // expresses.
+  std::unordered_map<std::string_view, ScopeTypeNames> package_types_;
+  std::unordered_map<std::string_view, ScopeTypeNames> class_types_;
 
   // §23.9 lists the elements that define a new scope: "Modules, Interfaces,
   // Programs, Checkers, Packages, Classes, Tasks, Functions, begin-end blocks
@@ -603,16 +631,17 @@ class Parser {
   // together, and a nettype name decides how `#` after an identifier is read,
   // so restoring one without the other leaves the leak for that reading.
   //
-  // Nine of that list are guarded: a module, an interface, a program and a
-  // checker, plus the extern headers of the first three, at ParseModuleDecl,
+  // All eleven of that list are guarded: a module, an interface, a program and
+  // a checker, plus the extern headers of the first three, at ParseModuleDecl,
   // ParseInterfaceDecl, ParseProgramDecl, ParseCheckerDecl and
-  // ParseExternModuleDecl; and a task, a function, a begin-end block, a
-  // fork-join block and a generate block, at ParseTaskDecl, ParseFunctionDecl,
-  // ParseBlockStmt, ParseForkStmt and ParseGenerateBody. A package and a class
-  // are not, because §26.3 and §8.26 let an importing or a derived scope name
-  // their type declarations without a prefix and the parser has no table of
-  // which imports or bases are in force; ParsePackageDecl and ParseClassDecl
-  // each say so where the guard would have gone.
+  // ParseExternModuleDecl; a task, a function, a begin-end block, a fork-join
+  // block and a generate block, at ParseTaskDecl, ParseFunctionDecl,
+  // ParseBlockStmt, ParseForkStmt and ParseGenerateBody; and a package and a
+  // class, at ParsePackageDecl and ParseClassDecl. The last two guards are what
+  // package_types_ and class_types_ above exist for. Closing either scope takes
+  // its type names out of known_types_, and §26.3's import declaration and
+  // §8.13's extends clause are what put them back, in the scopes the standard
+  // says they are visible in and in no others.
   //
   // The last five are guarded for the same reason as the first four, and §23.9
   // is what says a name inside them is never wanted outside. Its search runs
@@ -644,6 +673,23 @@ class Parser {
     }
     TypeNameScope(const TypeNameScope&) = delete;
     TypeNameScope& operator=(const TypeNameScope&) = delete;
+
+    // The names registered since this scope opened, which is what the scope's
+    // own body declared. Call it before the scope closes: ParsePackageDecl and
+    // ParseClassDecl each record the answer so that an import declaration or an
+    // extends clause elsewhere can put those names back. A name declared by a
+    // scope nested in this one is absent, because that scope's own guard
+    // restored it away before this one is asked.
+    ScopeTypeNames NamesAddedSoFar() const {
+      ScopeTypeNames added;
+      for (auto name : parser_.known_types_) {
+        if (saved_types_.count(name) == 0) added.types.insert(name);
+      }
+      for (auto name : parser_.known_nettypes_) {
+        if (saved_nettypes_.count(name) == 0) added.nettypes.insert(name);
+      }
+      return added;
+    }
 
    private:
     Parser& parser_;

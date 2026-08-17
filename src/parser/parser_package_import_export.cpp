@@ -2,6 +2,39 @@
 
 namespace delta {
 
+void Parser::AdoptTypeNames(const ScopeTypeNames& names) {
+  known_types_.insert(names.types.begin(), names.types.end());
+  known_nettypes_.insert(names.nettypes.begin(), names.nettypes.end());
+}
+
+// Applies §26.3's rule that an import declaration "allows identifiers declared
+// within packages to be visible within the current scope without a package name
+// qualifier" to what the parser reads as a type name. A wildcard item hands
+// over every type name the package declared; an explicit item hands over the
+// one it names, and only when that name is a type, because §26.3's own example
+// imports the enumeration type teeth_t without importing the literal FALSE.
+//
+// The names land in known_types_ and known_nettypes_, so the TypeNameScope of
+// the design element holding the import is what takes them away again at its
+// closing keyword, and that is what keeps the import from reaching the module
+// after it. A package declared later in the file is absent from package_types_
+// and hands over nothing, which §26.3 admits: "The compilation of a package
+// shall precede the compilation of scopes in which the package is imported."
+void Parser::ApplyImportedTypeNames(const ImportItem& item) {
+  auto it = package_types_.find(item.package_name);
+  if (it == package_types_.end()) return;
+  if (item.is_wildcard) {
+    AdoptTypeNames(it->second);
+    return;
+  }
+  if (it->second.types.count(item.item_name) != 0) {
+    known_types_.insert(item.item_name);
+  }
+  if (it->second.nettypes.count(item.item_name) != 0) {
+    known_nettypes_.insert(item.item_name);
+  }
+}
+
 ModuleItem* Parser::ParseImportItem() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kImportDecl;
@@ -32,6 +65,10 @@ ModuleItem* Parser::ParseImportItem() {
     item->import_item.item_name =
         Expect(TokenKind::kIdentifier, Subclause("26.3")).text;
   }
+  // Not on the `$unit` path above, which returns before reaching here: §26.3
+  // gives an import declaration a package_identifier, and that path has already
+  // reported the compilation unit standing where one belongs.
+  ApplyImportedTypeNames(item->import_item);
   return item;
 }
 

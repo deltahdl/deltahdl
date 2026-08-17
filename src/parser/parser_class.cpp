@@ -269,6 +269,32 @@ void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
   } while (Match(TokenKind::kComma));
 }
 
+// Makes the type names of the classes decl derives from type names in decl's
+// own body. §8.13 gives a subclass "the members of the base class", and §8.26.3
+// gives an extending interface class the parameters and typedefs of the
+// interface class it extends.
+//
+// decl->implements_types is read here as well, although §8.26.3 rules that
+// "Parameters and typedefs within an interface class are inherited by extending
+// interface classes, but are not inherited by implementing interface classes",
+// and gives `class ClassA implements IntfC; t1_t t1_i;` as an error on printed
+// page 210. That rule decides whether a reference is legal, and this table
+// decides only how the tokens group.
+// Elaborator::CheckImplementsTypeAccessOfType in
+// src/elaborator/elaborator_validate_class_inheritance.cpp is what reports the
+// illegal reference against §8.26.3, and it can only report a declaration the
+// parser read as one. Leaving implements out here would replace that report
+// with Parser::ParseModuleInstList asking for a missing `(` under §23.3.2.
+void Parser::AdoptBaseClassTypeNames(const ClassDecl* decl) {
+  auto adopt = [&](std::string_view base) {
+    auto it = class_types_.find(base);
+    if (it != class_types_.end()) AdoptTypeNames(it->second);
+  };
+  adopt(decl->base_class);
+  for (const auto& iface : decl->extends_interfaces) adopt(iface.name);
+  for (const auto& iface : decl->implements_types) adopt(iface.name);
+}
+
 ClassDecl* Parser::ParseClassDecl() {
   auto* decl = arena_.Create<ClassDecl>();
   decl->range.start = CurrentLoc();
@@ -283,19 +309,15 @@ ClassDecl* Parser::ParseClassDecl() {
   Match(TokenKind::kKwAutomatic);
   Match(TokenKind::kKwStatic);
   decl->name = Expect(TokenKind::kIdentifier, Subclause("8.3")).text;
-  // §8.3 makes a class a type, so its own name is registered here and is a type
-  // name wherever the declaration is written.
-  //
-  // No TypeNameScope over the body, although §23.9 makes a class a scope. §8.26
-  // gives an interface class type declarations that the interface classes
-  // extending it and the classes implementing it name without a prefix, and
-  // §8.24 does the same down an ordinary inheritance chain. The parser decides
-  // what is a type name from known_types_ alone, with nothing that tracks which
-  // base a class extends, so restoring the set at `endclass` makes a derived
-  // class stop parsing its base's type names. That is the same shape as the
-  // package case in Parser::ParsePackageDecl, and it needs an
-  // inheritance-aware type table rather than a scope guard.
+  // §8.3 makes a class a type, so its own name is registered here, ahead of the
+  // scope below, and is a type name wherever the declaration is written.
   known_types_.insert(decl->name);
+
+  // §23.9 makes a class a scope, so a typedef in its body is not a type name
+  // after `endclass`. The guard opens ahead of the parameter port list, because
+  // §8.26.3 counts a type parameter among the names an extending class
+  // inherits, and what the body declared goes into class_types_ below.
+  TypeNameScope type_scope(*this);
 
   if (Check(TokenKind::kHash)) {
     Consume();
@@ -315,6 +337,7 @@ ClassDecl* Parser::ParseClassDecl() {
   if (Match(TokenKind::kKwImplements)) ParseClassExtendsClause(decl, true);
   Expect(TokenKind::kSemicolon, Subclause("8.3"));
 
+  AdoptBaseClassTypeNames(decl);
   ++class_body_depth_;
   while (!Check(TokenKind::kKwEndclass) && !AtEnd()) {
     if (Match(TokenKind::kSemicolon)) continue;
@@ -324,6 +347,7 @@ ClassDecl* Parser::ParseClassDecl() {
     if (lexer_.SavePos().pos == before) Consume();
   }
   --class_body_depth_;
+  class_types_[decl->name] = type_scope.NamesAddedSoFar();
   Expect(TokenKind::kKwEndclass, Subclause("8.3"));
   MatchEndLabel(decl->name);
   decl->range.end = CurrentLoc();

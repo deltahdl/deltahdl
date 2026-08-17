@@ -726,13 +726,11 @@ bool Parser::TryParsePackageBodyItem(std::vector<ModuleItem*>& items) {
 }
 
 PackageDecl* Parser::ParsePackageDecl() {
-  // No TypeNameScope here, although §23.9 makes a package a scope like the
-  // five design elements that carry one. §26.3 lets an importing scope refer to
-  // a package's type declarations by their bare names, and the parser decides
-  // what is a type name from known_types_ alone, with nothing that tracks which
-  // imports are in force. Restoring the set on the way out would therefore make
-  // `import p::*;` followed by `T x;` stop parsing as a declaration, which is
-  // a larger change than a scope guard and needs an import-aware type table.
+  // §23.9 makes a package a scope, so a typedef in its body is not a type name
+  // after `endpackage`. What the body declared goes into package_types_ below
+  // instead, because §26.3 gives an importing scope those names without a
+  // package qualifier and ApplyImportedTypeNames is what hands them back.
+  TypeNameScope type_scope(*this);
   auto* pkg = arena_.Create<PackageDecl>();
   pkg->range.start = CurrentLoc();
   Expect(TokenKind::kKwPackage, Subclause("26.2"));
@@ -765,6 +763,7 @@ PackageDecl* Parser::ParsePackageDecl() {
   }
   --package_body_depth_;
   current_package_ = prev_package;
+  package_types_[pkg->name] = type_scope.NamesAddedSoFar();
   Expect(TokenKind::kKwEndpackage, Subclause("26.2"));
   MatchEndLabel(pkg->name);
   pkg->range.end = CurrentLoc();

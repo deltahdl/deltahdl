@@ -214,4 +214,202 @@ TEST(ModuleScopeParse, TaskTypedefIsStillATypeInsideItsOwnTask) {
   EXPECT_EQ(decl->var_decl_type.type_name, "T");
 }
 
+// The two remaining scopes of §23.9's eleven, a package and a class, differ
+// from the nine above in that the standard hands their type names to another
+// scope by name. §26.3 gives an importing scope a package's "without a package
+// name qualifier", and §8.13 gives a subclass "the members of the base class".
+// So each is stated twice below: the name is gone where nothing brought it in,
+// and present where something did. A guard that only takes names away turns
+// every legal import into a parse failure, which is what the first pair of
+// cases would not notice on its own.
+//
+// The taking-away cases reuse the `localparam T = 1;` arrangement of the five
+// above, for the reason given there.
+TEST(ModuleScopeParse, PackageTypedefNameIsNotATypeInALaterModule) {
+  auto r = Parse(
+      "package p;\n"
+      "  typedef int T;\n"
+      "endpackage\n"
+      "module m #(parameter T = 1) (); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  ASSERT_EQ(r.cu->modules[0]->params.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->params[0].first, "T");
+  EXPECT_TRUE(r.cu->modules[0]->type_param_names.empty());
+}
+
+TEST(ModuleScopeParse, PackageTypedefIsATypeInAModuleThatImportsIt) {
+  auto r = Parse(
+      "package p;\n"
+      "  typedef int T;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import p::*;\n"
+      "  T x;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* item = FindItemByName(r.cu->modules[0]->items, "x");
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(item->data_type.type_name, "T");
+}
+
+// §23.9 makes the importing module a scope of its own, so the import reaches to
+// that module's `endmodule` and no further. This is the case that fails when
+// the import is applied by putting the name back and nothing takes it away
+// again, which the two cases above would both still pass.
+TEST(ModuleScopeParse, PackageImportDoesNotReachAModuleThatDidNotImport) {
+  auto r = Parse(
+      "package p;\n"
+      "  typedef int T;\n"
+      "endpackage\n"
+      "module a;\n"
+      "  import p::*;\n"
+      "  T x;\n"
+      "endmodule\n"
+      "module b;\n"
+      "  localparam T = 1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 2u);
+  auto* x = FindItemByName(r.cu->modules[0]->items, "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->data_type.kind, DataTypeKind::kNamed);
+  auto* t = FindItemByName(r.cu->modules[1]->items, "T");
+  ASSERT_NE(t, nullptr);
+  EXPECT_EQ(t->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(t->data_type.kind, DataTypeKind::kImplicit);
+}
+
+// §26.3's explicit form: "An explicit import only imports the symbols
+// specifically referenced by the import." The package declares two typedefs and
+// the module names one, so U has to stay an ordinary identifier in a module
+// that took T.
+TEST(ModuleScopeParse, ExplicitPackageImportTakesOnlyTheNameItWrites) {
+  auto r = Parse(
+      "package p;\n"
+      "  typedef int T;\n"
+      "  typedef int U;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import p::T;\n"
+      "  T x;\n"
+      "  localparam U = 1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* x = FindItemByName(r.cu->modules[0]->items, "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(x->data_type.type_name, "T");
+  auto* u = FindItemByName(r.cu->modules[0]->items, "U");
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(u->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(u->data_type.kind, DataTypeKind::kImplicit);
+}
+
+// §26.4: "Package items that are imported as part of a module, interface, or
+// program header are visible throughout the module, interface, or program,
+// including in parameter and port declarations." The port list is read before
+// the body, so this fails whenever the import is applied later than the header.
+TEST(ModuleScopeParse, PackageImportInAModuleHeaderIsATypeInThePortList) {
+  auto r = Parse(
+      "package p;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "endpackage\n"
+      "module m import p::*; (input byte_t a); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "a");
+  EXPECT_EQ(r.cu->modules[0]->ports[0].data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].data_type.type_name, "byte_t");
+}
+
+// §6.6.7's nettype declaration registers its name as a nettype as well as a
+// type, and a nettype name is what decides that the `#` after an identifier is
+// a delay control rather than a type parameter list. So the import has to carry
+// both registrations, and this case fails when it carries only the type half.
+TEST(ModuleScopeParse, PackageNettypeIsANettypeInAModuleThatImportsIt) {
+  auto r = Parse(
+      "package p;\n"
+      "  nettype logic [7:0] nt;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import p::*;\n"
+      "  nt #5 w;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* w = FindItemByName(r.cu->modules[0]->items, "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(w->data_type.type_name, "nt");
+}
+
+TEST(ModuleScopeParse, ClassTypedefNameIsNotATypeInALaterModule) {
+  auto r = Parse(
+      "class C;\n"
+      "  typedef int T;\n"
+      "endclass\n"
+      "module m #(parameter T = 1) (); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  ASSERT_EQ(r.cu->modules[0]->params.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->params[0].first, "T");
+  EXPECT_TRUE(r.cu->modules[0]->type_param_names.empty());
+}
+
+// §8.13 gives a subclass the members of its base class, the base's typedefs
+// among them, so the guard on the class body has to hand C's names to D.
+TEST(ModuleScopeParse, BaseClassTypedefIsATypeInADerivedClass) {
+  auto r = Parse(
+      "class C;\n"
+      "  typedef int T;\n"
+      "endclass\n"
+      "class D extends C;\n"
+      "  T x;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+  const ClassMember* x = nullptr;
+  for (const auto* member : r.cu->classes[1]->members) {
+    if (member->name == "x") x = member;
+  }
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(x->data_type.type_name, "T");
+}
+
+// The other edge of the class boundary. §8.3 makes a class a type, so the name
+// the declaration introduces is a type name in the scope holding it rather than
+// one of the names `endclass` withdraws. This case fails if the guard is opened
+// before that registration instead of after it.
+TEST(ModuleScopeParse, ClassNameIsStillATypeAfterItsOwnDeclaration) {
+  auto r = Parse(
+      "class C;\n"
+      "endclass\n"
+      "module m;\n"
+      "  C h;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* h = FindItemByName(r.cu->modules[0]->items, "h");
+  ASSERT_NE(h, nullptr);
+  EXPECT_EQ(h->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(h->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(h->data_type.type_name, "C");
+}
+
 }  // namespace

@@ -200,21 +200,22 @@ TEST(TypeParameterElab, RestrictedClassTypeParamConformsOk) {
 
 // §6.20.3: a name that no class declaration defines conforms to a `class`
 // restriction no more than a built-in type does, so the assignment is an error.
-// The name is `Cfg::my_type` written unqualified: §8.23 makes a class-scoped
-// typedef reachable through the class name, and RegisterClassTypedefs in
-// src/elaborator/elaborator_resolve.cpp records it under that qualified key
-// alone, so the bare name reaches no typedef and no class. A name that is
+// The name has to be one the parser reads as a type and the elaborator finds no
+// class behind, and §3.12.1's compilation-unit typedef is both: it is visible
+// in every design element of the unit, and it names an int. A name that is
 // declared nowhere at all cannot stand here instead, because
 // Parser::ParseDataType in src/parser/parser_types.cpp reads an identifier as a
 // type only when an earlier declaration registered it, and reads any other
 // identifier as an expression -- which is TypeParamSetToValueIsError's rule
 // rather than this one.
+//
+// The typedef stood in `class Cfg;` until Parser::ParseClassDecl in
+// src/parser/parser_class.cpp began scoping a class's type names, which §23.9
+// requires and which leaves the bare `my_type` reaching no declaration at all.
 TEST(TypeParameterElab, ClassTypeParamAssignedUndeclaredNameIsError) {
   ElabFixture f;
   ElaborateSrc(
-      "class Cfg;\n"
-      "  typedef int my_type;\n"
-      "endclass\n"
+      "typedef int my_type;\n"
       "module m;\n"
       "  parameter type class C = my_type;\n"
       "endmodule\n",
@@ -223,7 +224,7 @@ TEST(TypeParameterElab, ClassTypeParamAssignedUndeclaredNameIsError) {
                             "type parameter 'C' is restricted to a class type "
                             "but is assigned 'my_type', which no class "
                             "declaration defines",
-                            5, "6.20.3"));
+                            3, "6.20.3"));
 }
 
 // §6.20.3: the built-in classes §15.x predefines conform to a `class`

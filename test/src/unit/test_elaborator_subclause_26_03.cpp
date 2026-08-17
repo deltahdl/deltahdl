@@ -507,23 +507,23 @@ TEST(PackageImport, BodyImportedEnumTypedefNamesTheEnumType) {
 // module 'b' is a scope with no import in it. word_t is declared nowhere 'b'
 // can see, so 'b' has to be told nothing about q whatever 'a' imported.
 //
-// The two widths are one claim each and both are needed. 16 on a's x says the
-// import still reaches the module that wrote it, so the test cannot pass by
-// importing nothing anywhere. 0 on b's y is what EvalTypeWidth answers for a
-// DataTypeKind::kNamed it could not resolve
-// (in src/elaborator/type_eval.cpp), and it is not the 1 that
-// RtlirVariable::width defaults to, so it says the declaration was elaborated
-// and its type went unresolved rather than that nothing ran.
+// Both claims are needed. 16 on a's x says the import still reaches the module
+// that wrote it, so the test cannot pass by importing nothing anywhere. A
+// parameter named word_t in 'b' says the identifier reached that module as an
+// ordinary name: A.10.3 lets a parameter declaration leave its data type
+// implicit, so `localparam word_t = 1;` names word_t where word_t is not a type
+// and gives word_t as the type of a parameter with no name where it is, which
+// no parse accepts.
 //
 // Both modules have to be elaborated for the question to arise, which is what
 // auto_top asks for: with a single named top, 'a' is never elaborated and there
 // is nothing for 'b' to inherit.
 //
-// f.has_errors is deliberately not asserted. §6.18 requires a type identifier
-// to be declared, so `word_t y;` in 'b' is illegal and a run that reported it
-// would be more correct than this one; nothing in deltahdl reports an
-// unresolved named type today, and the width says what the elaborator did
-// either way.
+// 'b' declared `word_t y;` until Parser::ParsePackageDecl in
+// src/parser/parser.cpp began scoping a package's type names. §6.18 requires a
+// type identifier to be declared, so that declaration was illegal and this case
+// asserted the width the elaborator happened to leave on it. The parameter says
+// the same thing about the same boundary and says it about a legal source.
 TEST(PackageImport, ImportedTypedefDoesNotReachAnotherModule) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -535,16 +535,15 @@ TEST(PackageImport, ImportedTypedefDoesNotReachAnotherModule) {
       "  word_t x;\n"
       "endmodule\n"
       "module b;\n"
-      "  word_t y;\n"
+      "  localparam word_t = 1;\n"
       "endmodule\n",
       f, "", true);
   ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
   const auto* x = FindVar(design, "a", "x");
   ASSERT_NE(x, nullptr);
   EXPECT_EQ(x->width, 16u);
-  const auto* y = FindVar(design, "b", "y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->width, 0u);
+  EXPECT_NE(FindParam(design, "b", "word_t"), nullptr);
 }
 
 // The same claim for the parameter an import carries rather than the typedef.
