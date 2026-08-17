@@ -11,8 +11,6 @@
 // or hand-scheduling a tick. A real value is displayed with %g, which renders
 // the natural decimal form (1.6, 3.2) so the preserved fraction is directly
 // observable.
-#include <sstream>
-
 #include "fixture_simulator.h"
 
 using namespace delta;

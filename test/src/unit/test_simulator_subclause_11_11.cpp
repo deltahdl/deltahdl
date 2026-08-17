@@ -1,5 +1,6 @@
 #include <iostream>
 #include <sstream>
+#include <streambuf>
 #include <string>
 
 #include "fixture_simulator.h"

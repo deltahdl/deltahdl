@@ -1,4 +1,3 @@
-#include <sstream>
 #include <string>
 
 #include "fixture_simulator.h"

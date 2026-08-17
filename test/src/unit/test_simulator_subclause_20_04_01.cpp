@@ -9,9 +9,6 @@
 // full pipeline (parse -> elaborate -> lower -> run), reading the returned
 // order back through $display so the production selection and Table 20-2
 // encoding are observed end to end rather than from a hand-seeded context.
-#include <iostream>
-#include <sstream>
-
 #include "fixture_simulator.h"
 
 using namespace delta;

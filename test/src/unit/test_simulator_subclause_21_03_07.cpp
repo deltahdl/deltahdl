@@ -1,7 +1,4 @@
 #include <cstdio>
-#include <fstream>
-#include <iostream>
-#include <sstream>
 
 #include "fixture_simulator.h"
 #include "helpers_temp_file.h"

@@ -20,9 +20,6 @@
 // vector-index input form.
 #include <cstdio>
 #include <fstream>
-#include <iostream>
-#include <iterator>
-#include <sstream>
 #include <string>
 
 #include "fixture_simulator.h"

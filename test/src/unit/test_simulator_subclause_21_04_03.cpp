@@ -12,9 +12,6 @@
 // context. The data files are real scratch files written before each run.
 #include <cstdio>
 #include <fstream>
-#include <iostream>
-#include <iterator>
-#include <sstream>
 #include <string>
 
 #include "fixture_simulator.h"

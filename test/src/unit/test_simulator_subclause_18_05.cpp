@@ -1,10 +1,8 @@
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "helpers_scheduler.h"

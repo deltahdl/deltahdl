@@ -20,8 +20,6 @@
 // full pipeline, injecting the invocation's plusargs through the production
 // intake API (SimContext::AddPlusArg) before the run and observing $display
 // output.
-#include <iostream>
-#include <sstream>
 #include <string>
 
 #include "fixture_simulator.h"

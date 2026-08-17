@@ -18,10 +18,6 @@
 // that never reaches the write task. Typedef'd enums carry their ordinals
 // correctly and are the forms used below.
 #include <cstdio>
-#include <fstream>
-#include <iostream>
-#include <iterator>
-#include <sstream>
 #include <string>
 
 #include "fixture_simulator.h"

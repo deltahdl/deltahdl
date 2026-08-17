@@ -1,7 +1,4 @@
-#include <algorithm>
 #include <cctype>
-#include <iterator>
-#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>

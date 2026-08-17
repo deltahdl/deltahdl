@@ -18,7 +18,6 @@
 // pipeline (parse → elaborate → lower → run), reading the q_stat_value output
 // back through $display — rather than hand-building a system-call node and
 // invoking the evaluator against a stubbed scheduler.
-#include <sstream>
 #include <string>
 #include <vector>
 

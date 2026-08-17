@@ -1,5 +1,6 @@
 #include <iostream>
 #include <sstream>
+#include <streambuf>
 
 #include "builders_systask.h"
 #include "fixture_simulator.h"

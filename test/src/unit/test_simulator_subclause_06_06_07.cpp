@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <functional>
+#include <initializer_list>
 #include <vector>
 
 #include "common/arena.h"

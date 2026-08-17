@@ -13,8 +13,6 @@
 // -> lower -> run), reading the loaded elements back with $display.
 #include <cstdio>
 #include <fstream>
-#include <iostream>
-#include <sstream>
 #include <string>
 
 #include "fixture_simulator.h"

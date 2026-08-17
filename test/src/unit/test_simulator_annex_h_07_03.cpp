@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <cstdlib>
 
 #include "helpers_open_array_natural_order.h"
 #include "simulator/svdpi.h"

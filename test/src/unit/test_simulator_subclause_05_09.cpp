@@ -1,5 +1,4 @@
 #include <cstdint>
-#include <cstring>
 #include <string>
 
 #include "fixture_simulator.h"

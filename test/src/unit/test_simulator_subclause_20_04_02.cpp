@@ -9,9 +9,6 @@
 // on). These tests build the timescale from real source and drive it through
 // the full pipeline (parse -> elaborate -> lower -> run), capturing the line
 // $printtimescale writes to stdout, rather than hand-seeding a context.
-#include <iostream>
-#include <sstream>
-
 #include "fixture_simulator.h"
 
 using namespace delta;

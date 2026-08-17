@@ -21,8 +21,6 @@
 // expectation of zero would be asserting that the load had touched it.
 #include <cstdio>
 #include <fstream>
-#include <iostream>
-#include <sstream>
 #include <string>
 #include <vector>
 

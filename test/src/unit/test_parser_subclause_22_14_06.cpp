@@ -1,5 +1,4 @@
 #include <cstddef>
-#include <iterator>
 #include <string>
 
 #include "fixture_parser.h"

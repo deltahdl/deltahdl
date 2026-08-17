@@ -10,7 +10,6 @@
 // pipeline (parse → elaborate → lower → run), reading each status back through
 // $display, rather than hand-building a system-call node and calling the
 // evaluator in isolation.
-#include <sstream>
 #include <string>
 #include <vector>
 

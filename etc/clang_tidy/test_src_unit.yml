@@ -11,6 +11,13 @@
 # ============================================================
 ---
 CheckOptions:
+  # Copied unchanged from etc/clang_tidy/src.yml, where the comment above it
+  # states what each entry buys. The test tree reaches the same project headers
+  # through the same parser/ast.h and the same six standard headers, so the same
+  # value applies here: every header ending in .h is ignored, and utility,
+  # cstddef, string_view, cstdint, vector and string are ignored by name in the
+  # spelling an #include would use.
+  misc-include-cleaner.IgnoreHeaders: '.*\.h$;<utility>$;<cstddef>$;<string_view>$;<cstdint>$;<vector>$;<string>$'
   readability-function-cognitive-complexity.IgnoreMacros: true
   readability-function-cognitive-complexity.Threshold: 15
   # TEST OVERRIDE (src: 200)
@@ -74,6 +81,7 @@ Checks: >-
   cppcoreguidelines-avoid-goto,
   cppcoreguidelines-init-variables,
   cppcoreguidelines-slicing,
+  misc-include-cleaner,
   misc-redundant-expression,
   misc-unused-parameters,
   modernize-use-auto,

@@ -1,5 +1,6 @@
 #include <iostream>
 #include <sstream>
+#include <streambuf>
 
 #include "fixture_simulator.h"
 #include "parser/ast.h"

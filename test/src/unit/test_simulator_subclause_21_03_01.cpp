@@ -1,7 +1,9 @@
 #include <cstdio>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <sstream>
+#include <streambuf>
 #include <string>
 
 #include "builders_ast.h"

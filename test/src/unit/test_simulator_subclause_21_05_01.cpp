@@ -14,10 +14,6 @@
 // round trip through the matching read task — the two faces of "identical
 // treatment" — rather than hand-building array state on a bare context.
 #include <cstdio>
-#include <fstream>
-#include <iostream>
-#include <iterator>
-#include <sstream>
 #include <string>
 
 #include "fixture_simulator.h"

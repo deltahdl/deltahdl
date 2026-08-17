@@ -1,5 +1,3 @@
-#include <cstring>
-
 #include "builders_ast.h"
 #include "common/arena.h"
 #include "common/types.h"

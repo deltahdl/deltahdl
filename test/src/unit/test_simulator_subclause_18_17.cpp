@@ -1,7 +1,4 @@
-#include <algorithm>
 #include <cstdint>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "fixture_simulator.h"

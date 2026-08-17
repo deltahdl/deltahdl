@@ -14,7 +14,6 @@
 // and drive each module through the full pipeline (parse → elaborate → lower →
 // run), reading results back through $display — rather than hand-building a
 // system-call node and calling the evaluator in isolation.
-#include <sstream>
 #include <string>
 #include <vector>
 

@@ -1,5 +1,4 @@
 #include <cstdint>
-#include <cstring>
 
 #include "builders_ast.h"
 #include "common/types.h"

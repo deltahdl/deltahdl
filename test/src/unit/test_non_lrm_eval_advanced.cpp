@@ -1,5 +1,3 @@
-#include <cstring>
-
 #include "fixture_simulator.h"
 #include "lexer/token.h"
 #include "parser/ast.h"

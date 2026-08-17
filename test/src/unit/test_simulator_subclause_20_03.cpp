@@ -11,8 +11,6 @@
 // default 1 ns unit / 1 ns precision leaves the tick count unscaled so each
 // function's value equals the elapsed delay, isolating the "current time"
 // claim this head owns.
-#include <sstream>
-
 #include "fixture_simulator.h"
 
 using namespace delta;

@@ -1,5 +1,7 @@
 #include <cstring>
+#include <iostream>
 #include <sstream>
+#include <streambuf>
 
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"

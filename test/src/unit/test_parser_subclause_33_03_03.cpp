@@ -19,10 +19,8 @@
 #include <gtest/gtest.h>
 #include <unistd.h>
 
-#include <atomic>
 #include <cstdint>
 #include <filesystem>
-#include <fstream>
 #include <string>
 
 #include "common/arena.h"

@@ -7,7 +7,6 @@
 // run), reading back what $random prints through $display rather than
 // hand-building a system-call node and calling the evaluator in isolation.
 #include <set>
-#include <sstream>
 #include <string>
 #include <vector>
 

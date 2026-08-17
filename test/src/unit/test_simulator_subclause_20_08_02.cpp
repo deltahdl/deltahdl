@@ -16,7 +16,6 @@
 // the C function is exactly the "matches C" requirement.
 #include <cmath>
 #include <cstdio>
-#include <sstream>
 
 #include "fixture_simulator.h"
 

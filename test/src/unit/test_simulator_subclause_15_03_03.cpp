@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <coroutine>
 #include <vector>
 
 #include "fixture_simulator.h"
