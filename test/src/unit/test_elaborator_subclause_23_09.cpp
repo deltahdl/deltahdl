@@ -599,4 +599,99 @@ TEST(ScopeRulesElaboration,
   ExpectLoopArrayNameConflictsWith("function void a(); endfunction");
 }
 
+// §27.4, printed page 821: a generate block "comprises a separate scope and a
+// new level of hierarchy when it is instantiated", so an item written once in
+// a loop generate body is elaborated once per iteration into a different scope
+// each time and declares its name afresh rather than a second time in one
+// scope. §23.9 forbids only a second declaration within one scope, so the three
+// cases below are conforming sources and shall elaborate.
+//
+// The three differ in the item the loop body holds and in nothing else, because
+// three separate functions in src/elaborator/elaborator_items.cpp record the
+// name -- CheckGateInstNameDiagnostics, CheckUdpInstNameDiagnostics and
+// CheckFunctionDeclDiagnostics -- and a fix reaching one leaves the others
+// rejecting a legal source. So the module and the loop are stated once here and
+// each case supplies the item and whatever declaration the item needs ahead of
+// the module.
+//
+// The genvar runs 4 to 5 rather than 0 to 1 so that its value is never the
+// ordinal of the block instance the iteration creates, which are 0 and 1. An
+// index that equalled the ordinal would make a body keyed by the ordinal and a
+// body keyed by the genvar value produce the same key, and the case would pass
+// whichever the elaborator used.
+void ExpectLoopBodyItemDeclaresItsNameOncePerIteration(
+    const std::string& prelude, const std::string& loop_body_item) {
+  EXPECT_TRUE(ElabOk(prelude +
+                     "module m;\n"
+                     "  logic [7:0] d;\n"
+                     "  wire [7:0] y;\n"
+                     "  genvar i;\n"
+                     "  for (i = 4; i < 6; i = i + 1) begin : b\n"
+                     "    " +
+                     loop_body_item +
+                     "\n"
+                     "  end\n"
+                     "endmodule\n"));
+}
+
+// The gate instance form, which reaches CheckGateInstNameDiagnostics.
+TEST(ScopeRulesElaboration, LoopGenerateGateInstanceNameRepeatsPerIteration) {
+  ExpectLoopBodyItemDeclaresItsNameOncePerIteration(
+      "", "and g (y[i], d[i], d[i]);");
+}
+
+// The UDP instance form, which reaches CheckUdpInstNameDiagnostics rather than
+// the gate one because Parser::ParseUdpInstList is taken for an instance whose
+// type name the parser has already seen declared as a primitive. This is the
+// shape test/src/e2e/udp_generate.sv is written in, which is the real source
+// the bare-name record rejects.
+TEST(ScopeRulesElaboration, LoopGenerateUdpInstanceNameRepeatsPerIteration) {
+  ExpectLoopBodyItemDeclaresItsNameOncePerIteration(
+      "primitive udp_inv (y, a);\n"
+      "  output y;\n"
+      "  input a;\n"
+      "  table\n"
+      "    0 : 1 ;\n"
+      "    1 : 0 ;\n"
+      "  endtable\n"
+      "endprimitive\n",
+      "udp_inv g (y[i], d[i]);");
+}
+
+// The function declaration form, which reaches CheckFunctionDeclDiagnostics.
+TEST(ScopeRulesElaboration, LoopGenerateFunctionNameRepeatsPerIteration) {
+  ExpectLoopBodyItemDeclaresItsNameOncePerIteration(
+      "", "function int fn(); return 0; endfunction");
+}
+
+// The task form. Elaborator::ElaborateItem sends kTaskDecl to the same
+// CheckFunctionDeclDiagnostics as kFunctionDecl, by falling through one case
+// label to the next, so this reaches the same record the case above does. It is
+// written anyway: the two kinds share that code only for as long as the
+// fallthrough stands, and nothing else would report splitting them.
+TEST(ScopeRulesElaboration, LoopGenerateTaskNameRepeatsPerIteration) {
+  ExpectLoopBodyItemDeclaresItsNameOncePerIteration("", "task tk(); endtask");
+}
+
+// §23.9 still rules that "An identifier shall be used to declare only one item
+// within a scope", so two gate instances sharing a name directly in one module
+// scope are illegal however a name inside a generate block is keyed. This case
+// is what a fix that deleted the check rather than scoping its key would break.
+//
+// src/elaborator/elaborator_items.cpp is the emission site:
+// CheckGateInstNameDiagnostics formats "redeclaration of '{}'" from
+// ModuleItem::gate_inst_name and passes Subclause("23.9").
+TEST(ScopeRulesElaboration, DuplicateGateInstanceNamesInOneScopeRejected) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  wire a, b, o1, o2;\n"
+      "  and g (o1, a, b);\n"
+      "  and g (o2, a, b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'g'", 4, "23.9"));
+}
+
 }  // namespace

@@ -503,11 +503,13 @@ void CheckGateInstanceArrayTerminalWidths(
 }
 
 // Emits the redeclaration and dynamic-override-specifier diagnostics for a
-// function or task declaration item. Records the name in `declared_names`.
+// function or task declaration item. Records `scoped_name` in
+// `declared_names`, which is the name keyed by the scope the declaration
+// stands in, and reports the name the source wrote.
 void CheckFunctionDeclDiagnostics(
-    const ModuleItem* item,
+    const ModuleItem* item, std::string_view scoped_name,
     std::unordered_set<std::string_view>& declared_names, DiagEngine& diag) {
-  if (!item->name.empty() && !declared_names.insert(item->name).second) {
+  if (!item->name.empty() && !declared_names.insert(scoped_name).second) {
     diag.Error(item->loc, std::format("redeclaration of '{}'", item->name),
                Subclause("23.9"));
   }
@@ -522,9 +524,12 @@ void CheckFunctionDeclDiagnostics(
 }
 
 // Emits the gate-instance name-conflict and redeclaration diagnostics. Records
-// the instance name in `declared_names`.
+// `scoped_inst_name` in `declared_names`, which is the instance name keyed by
+// the scope the gate instance stands in, and reports the name the source
+// wrote. The conflict with the output net is a comparison between two names
+// the source wrote, so it reads item->gate_inst_name on both sides.
 void CheckGateInstNameDiagnostics(
-    const ModuleItem* item,
+    const ModuleItem* item, std::string_view scoped_inst_name,
     std::unordered_set<std::string_view>& declared_names, DiagEngine& diag) {
   if (!item->gate_inst_name.empty() && !item->gate_terminals.empty() &&
       item->gate_terminals[0] &&
@@ -537,20 +542,21 @@ void CheckGateInstNameDiagnostics(
                Subclause("23.9"));
   }
   if (!item->gate_inst_name.empty() &&
-      !declared_names.insert(item->gate_inst_name).second) {
+      !declared_names.insert(scoped_inst_name).second) {
     diag.Error(item->loc,
                std::format("redeclaration of '{}'", item->gate_inst_name),
                Subclause("23.9"));
   }
 }
 
-// Emits the UDP-instance redeclaration diagnostic and records the instance
-// name.
+// Emits the UDP-instance redeclaration diagnostic and records
+// `scoped_inst_name`, the instance name keyed by the scope the UDP instance
+// stands in. The report names the instance as the source wrote it.
 void CheckUdpInstNameDiagnostics(
-    const ModuleItem* item,
+    const ModuleItem* item, std::string_view scoped_inst_name,
     std::unordered_set<std::string_view>& declared_names, DiagEngine& diag) {
   if (!item->gate_inst_name.empty() &&
-      !declared_names.insert(item->gate_inst_name).second) {
+      !declared_names.insert(scoped_inst_name).second) {
     diag.Error(item->loc,
                std::format("redeclaration of '{}'", item->gate_inst_name),
                Subclause("23.9"));
@@ -653,7 +659,19 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       ElaborateNettypeDecl(item, mod);
       return true;
     case ModuleItemKind::kGateInst:
-      CheckGateInstNameDiagnostics(item, declared_names_, diag_);
+      // §27.4: a generate block "comprises a separate scope and a new level of
+      // hierarchy when it is instantiated", so a gate instance written in a
+      // loop generate body declares its name afresh in each iteration rather
+      // than again, and is keyed by the generate prefix that tells those
+      // scopes apart. Outside a generate block ScopedName hands the name back
+      // unchanged, so a repeat at module level is still a redeclaration. The
+      // empty check guards it: ScopedName("") returns the prefix itself, which
+      // would key an unnamed gate instance under the block's own name.
+      CheckGateInstNameDiagnostics(item,
+                                   item->gate_inst_name.empty()
+                                       ? item->gate_inst_name
+                                       : ScopedName(item->gate_inst_name),
+                                   declared_names_, diag_);
       CreateImplicitNetsForTerminals(item->gate_terminals, item->loc,
                                      make_implicit_net);
       CheckInstanceTerminalWidths(item, mod);
@@ -663,7 +681,13 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       return true;
     case ModuleItemKind::kUdpInst:
-      CheckUdpInstNameDiagnostics(item, declared_names_, diag_);
+      // §27.4 keys the instance name by the generate block instance it stands
+      // in, as the kGateInst case above does and for the same reason.
+      CheckUdpInstNameDiagnostics(item,
+                                  item->gate_inst_name.empty()
+                                      ? item->gate_inst_name
+                                      : ScopedName(item->gate_inst_name),
+                                  declared_names_, diag_);
       CreateImplicitNetsForTerminals(item->gate_terminals, item->loc,
                                      make_implicit_net);
       // Checked before ElaborateUdpInst expands the array, so a terminal the
@@ -733,7 +757,12 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       return true;
     case ModuleItemKind::kFunctionDecl:
     case ModuleItemKind::kTaskDecl:
-      CheckFunctionDeclDiagnostics(item, declared_names_, diag_);
+      // §27.4 keys the name by the generate block instance the declaration
+      // stands in, as the kGateInst case in Elaborator::ElaborateDeclItem does
+      // and for the same reason.
+      CheckFunctionDeclDiagnostics(
+          item, item->name.empty() ? item->name : ScopedName(item->name),
+          declared_names_, diag_);
       ValidateFunctionBody(item);
       ValidateFunctionArgDefaultsScope(item);
       mod->function_decls.push_back(item);
