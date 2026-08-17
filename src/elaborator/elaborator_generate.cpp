@@ -139,6 +139,52 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
   gen_const_scope_ = saved_gen_const_scope;
 }
 
+// §27.5: "a conditional generate construct" is the if generate construct and
+// the case generate construct, and the clause rules on page 825 that direct
+// nesting "applies only to conditional generate constructs nested in
+// conditional generate constructs. It does not apply in any way to loop
+// generate constructs."
+static bool IsConditionalGenerateConstruct(ModuleItemKind k) {
+  return k == ModuleItemKind::kGenerateIf || k == ModuleItemKind::kGenerateCase;
+}
+
+// §27.5: "If a generate block in a conditional generate construct consists of
+// only one item that is itself a conditional generate construct and if that
+// item is not surrounded by begin-end keywords, then this generate block is not
+// treated as a separate scope. The generate construct within this block is said
+// to be directly nested. The generate blocks of the directly nested construct
+// are treated as if they belong to the outer construct."
+static bool IsDirectlyNestedBlock(const std::vector<ModuleItem*>& body,
+                                  bool has_begin_end) {
+  return !has_begin_end && body.size() == 1 &&
+         IsConditionalGenerateConstruct(body[0]->kind);
+}
+
+// §27.5: elaborate the generate block a conditional generate construct
+// selected. A directly nested block "is not treated as a separate scope", so
+// its items are elaborated under the prefix already in force and no scope is
+// opened for it. Otherwise the block creates a scope, named or not -- "If the
+// generate block selected for instantiation is named, then this name declares a
+// generate block instance and is the name for the scope it creates. If the
+// generate block selected for instantiation is not named, it still creates a
+// scope", and AssignGenerateBlockNames has already given the unnamed one the
+// name §27.6 assigns it. The block's own name is the whole of the scope name:
+// §27.4 gives an index only to a loop generate block, whose name "is a
+// declaration of an array of generate block instances", so a conditional
+// generate block contributes its name alone.
+void Elaborator::ElaborateConditionalGenerateBlock(
+    std::string_view block_name, const std::vector<ModuleItem*>& body,
+    bool has_begin_end, RtlirModule* mod, const ScopeMap& scope) {
+  if (IsDirectlyNestedBlock(body, has_begin_end)) {
+    ElaborateGenerateItems(body, mod, scope);
+    return;
+  }
+  std::string saved_prefix = gen_prefix_;
+  gen_prefix_ = std::format("{}{}_", saved_prefix, block_name);
+  ElaborateGenerateItems(body, mod, scope);
+  gen_prefix_ = saved_prefix;
+}
+
 void Elaborator::ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,
                                      const ScopeMap& scope) {
   // §6.23: a comparison of two type references is a constant expression, so it
@@ -153,7 +199,8 @@ void Elaborator::ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,
     return;
   }
   if (*cond) {
-    ElaborateGenerateItems(item->gen_body, mod, scope);
+    ElaborateConditionalGenerateBlock(item->name, item->gen_body,
+                                      item->gen_body_has_begin_end, mod, scope);
     return;
   }
   if (item->gen_else == nullptr) return;
@@ -176,11 +223,19 @@ void Elaborator::ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,
   // instantiated the nested then-branch without ever evaluating its
   // condition, so every selector past the first alternative built the wrong
   // block and the final else was unreachable.
+  //
+  // Recursing opens no scope for the else branch itself, which is what §27.5
+  // requires of it: the branch holds one item that is itself a conditional
+  // generate construct and no begin-end keywords surround it, so it is directly
+  // nested, and "the generate blocks of the directly nested construct are
+  // treated as if they belong to the outer construct".
   if (item->gen_else->gen_cond != nullptr) {
     ElaborateGenerateIf(item->gen_else, mod, scope);
     return;
   }
-  ElaborateGenerateItems(item->gen_else->gen_body, mod, scope);
+  ElaborateConditionalGenerateBlock(
+      item->gen_else->name, item->gen_else->gen_body,
+      item->gen_else->gen_body_has_begin_end, mod, scope);
 }
 
 static bool MatchesCasePattern(const std::vector<Expr*>& patterns,
@@ -200,20 +255,24 @@ void Elaborator::ElaborateGenerateCase(ModuleItem* item, RtlirModule* mod,
                   Subclause("27.5"));
     return;
   }
-  const std::vector<ModuleItem*>* default_body = nullptr;
+  // Hold the default alternative itself rather than its body, because the scope
+  // it opens is named by its own label and shaped by its own begin-end
+  // keywords, and neither is reachable from the body alone.
+  const GenerateCaseItem* default_item = nullptr;
   for (const auto& ci : item->gen_case_items) {
     if (ci.is_default) {
-      default_body = &ci.body;
+      default_item = &ci;
       continue;
     }
     if (MatchesCasePattern(ci.patterns, *selector, scope)) {
-      ElaborateGenerateItems(ci.body, mod, scope);
+      ElaborateConditionalGenerateBlock(ci.label, ci.body, ci.has_begin_end,
+                                        mod, scope);
       return;
     }
   }
-  if (default_body) {
-    ElaborateGenerateItems(*default_body, mod, scope);
-  }
+  if (default_item == nullptr) return;
+  ElaborateConditionalGenerateBlock(default_item->label, default_item->body,
+                                    default_item->has_begin_end, mod, scope);
 }
 
 static bool IsGenerateConstruct(ModuleItemKind k) {
@@ -238,6 +297,12 @@ static std::string_view GenerateBlockName(
   return {buf, candidate.size()};
 }
 
+// Declared here because NameConstructBlocks and NameGenerateBlocksInScope call
+// each other: a scope numbers the constructs it holds, and a construct's blocks
+// are each a scope in their own right.
+static void NameConstructBlocks(ModuleItem* it, std::string_view name,
+                                Arena& arena);
+
 // §27.6: "Each generate construct in a given scope is assigned a number. The
 // number will be 1 for the construct that appears textually first in that
 // scope and will increase by 1 for each subsequent generate construct in that
@@ -258,22 +323,57 @@ static void NameGenerateBlocksInScope(const std::vector<ModuleItem*>& items,
     if (!it->name.empty()) used.insert(it->name);
   }
 
+  // The §27.6 name is computed for every construct and not only for the unnamed
+  // ones, because one construct has more than one block and each of them needs
+  // the name independently: a named then-block must not stop the unnamed else
+  // block beside it from taking the construct's number.
   int64_t n = 0;
   for (auto* it : items) {
     if (!IsGenerateConstruct(it->kind)) continue;
     ++n;
-    if (it->name.empty()) {
-      it->name = GenerateBlockName(n, used, arena);
-      used.insert(it->name);
-    }
-    NameGenerateBlocksInScope(it->gen_body, {}, arena);
-    if (it->gen_else != nullptr) {
-      NameGenerateBlocksInScope(it->gen_else->gen_body, {}, arena);
-    }
-    for (const auto& alt : it->gen_case_items) {
-      NameGenerateBlocksInScope(alt.body, {}, arena);
-    }
+    std::string_view name = GenerateBlockName(n, used, arena);
+    used.insert(name);
+    NameConstructBlocks(it, name, arena);
   }
+}
+
+// Name one generate block, then walk what it holds.
+static void NameGenerateBlock(std::string_view& block_name,
+                              const std::vector<ModuleItem*>& body,
+                              bool has_begin_end, std::string_view name,
+                              Arena& arena) {
+  if (block_name.empty()) block_name = name;
+  if (IsDirectlyNestedBlock(body, has_begin_end)) {
+    NameConstructBlocks(body[0], name, arena);
+    return;
+  }
+  NameGenerateBlocksInScope(body, {}, arena);
+}
+
+// Name every block of one construct, and of any construct directly nested in
+// it, which §27.5 rules belong to the outer construct and therefore share its
+// number rather than taking one of their own.
+static void NameConstructBlocks(ModuleItem* it, std::string_view name,
+                                Arena& arena) {
+  if (!IsConditionalGenerateConstruct(it->kind)) {
+    // §27.5: direct nesting "does not apply in any way to loop generate
+    // constructs", so a loop generate block is a scope whatever it holds.
+    if (it->name.empty()) it->name = name;
+    NameGenerateBlocksInScope(it->gen_body, {}, arena);
+    return;
+  }
+  NameGenerateBlock(it->name, it->gen_body, it->gen_body_has_begin_end, name,
+                    arena);
+  for (auto& alt : it->gen_case_items) {
+    NameGenerateBlock(alt.label, alt.body, alt.has_begin_end, name, arena);
+  }
+  if (it->gen_else == nullptr) return;
+  if (it->gen_else->gen_cond != nullptr) {
+    NameConstructBlocks(it->gen_else, name, arena);
+    return;
+  }
+  NameGenerateBlock(it->gen_else->name, it->gen_else->gen_body,
+                    it->gen_else->gen_body_has_begin_end, name, arena);
 }
 
 void Elaborator::AssignGenerateBlockNames(const ModuleDecl* decl) {

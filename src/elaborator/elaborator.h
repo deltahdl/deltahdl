@@ -384,6 +384,16 @@ class Elaborator : public ElaboratorOperationRules {
   void ElaborateGenerateCase(ModuleItem* item, RtlirModule* mod,
                              const ScopeMap& scope);
 
+  // §27.5: elaborate the one generate block a conditional generate construct
+  // selected, opening the scope that block creates. `block_name` is the name
+  // the block carries, which §27.6 has already supplied where the source wrote
+  // none, and `has_begin_end` says whether the block was written with the
+  // `begin` and `end` keywords, which decides whether it is directly nested.
+  void ElaborateConditionalGenerateBlock(std::string_view block_name,
+                                         const std::vector<ModuleItem*>& body,
+                                         bool has_begin_end, RtlirModule* mod,
+                                         const ScopeMap& scope);
+
   // §27.4: a loop generate construct's genvar, once its header has been
   // checked -- the genvar name and the constant value its control variable
   // starts at.
