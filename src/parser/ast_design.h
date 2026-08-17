@@ -126,8 +126,25 @@ struct CompilationUnit {
   TimeUnit cu_time_prec = TimeUnit::kNs;
   int cu_time_unit_magnitude = 1;
   int cu_time_prec_magnitude = 1;
+  // Where each of the two was declared, written by ApplyCuTimeUnit in
+  // src/parser/parser_timeunit.cpp at the same moment as the flag above it and
+  // holding the position of the declaration's leading timeunit/timeprecision
+  // keyword. §3.14.2.2 rules that a repeat "shall match the previous
+  // declaration within the current time scope", so a report about a repeat that
+  // does not match stands at the repeat. Within one file
+  // CheckCuTimeunitConsistency in src/parser/parser.cpp is handed that position
+  // by its caller, because it runs while the declaration is being parsed.
+  // Across two files of one command line -- §3.12.1 case a) -- the two
+  // declarations first meet in AppendCompilationUnitDeclarations below, by
+  // which time both parses are over, so the position has to travel with the
+  // value it belongs to. Each is meaningful only under its flag: a unit that
+  // declared nothing leaves the default SourceLoc here, which is what
+  // SourceLoc::None() in src/common/source_loc.h returns, so a reader that
+  // ignores the flag reports at no position at all.
   bool has_cu_timeunit = false;
+  SourceLoc cu_timeunit_loc;
   bool has_cu_timeprecision = false;
+  SourceLoc cu_timeprecision_loc;
 
   TimeScale preproc_timescale;
   bool has_preproc_timescale = false;
@@ -247,9 +264,13 @@ inline void AppendCellDeclarations(CompilationUnit& target,
 // against a snapshot taken before the declaration was parsed. It cannot report
 // it across two, because each file is parsed by its own Parser into its own
 // CompilationUnit and so snapshots a unit holding no earlier file's
-// declaration; this function merges the two without comparing them. Each half
-// is taken only under `src`'s own flag, so a file declaring nothing cannot put
-// the struct default over what an earlier file declared.
+// declaration. This function does not compare them either: it is inline in a
+// header and has no DiagEngine to report through, so a caller merging a
+// command line calls ReportCuTimescaleConflict in
+// src/parser/single_pass_compile.cpp first, while `target` still holds only
+// what the files before this one declared. Each half is taken only under
+// `src`'s own flag, so a file declaring nothing cannot put the struct default
+// over what an earlier file declared.
 //
 // The libraries the design elements were tagged with do not enter into it. A
 // compilation-unit declaration belongs to no library and is given no library
@@ -271,11 +292,16 @@ inline void AppendCompilationUnitDeclarations(CompilationUnit& target,
     target.cu_time_unit = src.cu_time_unit;
     target.cu_time_unit_magnitude = src.cu_time_unit_magnitude;
     target.has_cu_timeunit = true;
+    // The position comes over with the value, so a third source description
+    // conflicting with this one is reported against the declaration the merged
+    // unit actually holds rather than against a position no file wrote.
+    target.cu_timeunit_loc = src.cu_timeunit_loc;
   }
   if (src.has_cu_timeprecision && !target.has_cu_timeprecision) {
     target.cu_time_prec = src.cu_time_prec;
     target.cu_time_prec_magnitude = src.cu_time_prec_magnitude;
     target.has_cu_timeprecision = true;
+    target.cu_timeprecision_loc = src.cu_timeprecision_loc;
   }
 }
 

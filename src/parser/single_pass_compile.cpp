@@ -79,6 +79,48 @@ void WriteCellsOfKind(const std::vector<Decl*>& decls, bool is_module,
   }
 }
 
+// §3.14.2.2: "There shall be at most one time unit and one time precision for
+// any module, program, package, or interface definition or in any
+// compilation-unit scope... The timeunit and timeprecision declarations can be
+// repeated as later items, but shall match the previous declaration within the
+// current time scope." §3.12.1 case a) rules that "all files on a given
+// compilation command line make a single compilation unit", which is the use
+// model this compiler implements, so a compilation-unit timeunit in a second
+// file of one command line is such a repeat and has to match the first file's.
+//
+// `target` is what the descriptions before this one built up and `src` is the
+// description just compiled, so this must run before
+// AppendCompilationUnitDeclarations in src/parser/ast_design.h carries the
+// first-wins value over. CheckCuTimeunitConsistency in src/parser/parser.cpp
+// makes the same two reports for a repeat within one file; the messages are
+// repeated here verbatim so that one rule reads one way whichever file the
+// second declaration was written in.
+//
+// The magnitude is compared as well as the unit, because 1ps and 10ps are both
+// TimeUnit::kPs and differ only in cu_time_unit_magnitude, and §3.14.2.2 asks
+// whether the declarations match rather than whether their units do. The two
+// halves are asked independently, since a description can repeat a matching
+// time unit and a conflicting precision.
+void ReportCuTimescaleConflict(DiagEngine& diag, const CompilationUnit& target,
+                               const CompilationUnit& src) {
+  if (target.has_cu_timeunit && src.has_cu_timeunit &&
+      (target.cu_time_unit != src.cu_time_unit ||
+       target.cu_time_unit_magnitude != src.cu_time_unit_magnitude)) {
+    // The later declaration is the one the report stands at, because it is the
+    // repeat that failed to match rather than the declaration it failed to
+    // match.
+    diag.Error(src.cu_timeunit_loc, "timeunit does not match prior declaration",
+               Subclause("3.14.2.2"));
+  }
+  if (target.has_cu_timeprecision && src.has_cu_timeprecision &&
+      (target.cu_time_prec != src.cu_time_prec ||
+       target.cu_time_prec_magnitude != src.cu_time_prec_magnitude)) {
+    diag.Error(src.cu_timeprecision_loc,
+               "timeprecision does not match prior declaration",
+               Subclause("3.14.2.2"));
+  }
+}
+
 }  // namespace
 
 SinglePassCompiler::SinglePassCompiler(LibraryMap& lib_map, SourceManager& mgr,
@@ -177,6 +219,7 @@ CompileOutcome SinglePassCompiler::MapIntoLibrary(const std::string& path,
   // description itself, since the unit built here is the only one elaboration
   // reads.
   AppendCellDeclarations(unit, *parsed);
+  ReportCuTimescaleConflict(diag_, unit, *parsed);
   AppendCompilationUnitDeclarations(unit, *parsed);
   // The parse started from cu_scope_, so what it ends holding is that scope
   // plus whatever this description added to it.
@@ -208,6 +251,11 @@ CompileOutcome SinglePassCompiler::CompileSource(
     // contributes to the unit does not turn on whether this run compiled it or
     // an earlier one did.
     AppendCellDeclarations(unit, *prior->second.parsed);
+    // §3.14.2.2 is checked here as well as in MapIntoLibrary, or a conflicting
+    // compilation-unit timeunit would be reported only when this run was the
+    // one that compiled the description. What a description is worth to the
+    // unit does not turn on that, and neither does whether it conforms.
+    ReportCuTimescaleConflict(diag_, unit, *prior->second.parsed);
     AppendCompilationUnitDeclarations(unit, *prior->second.parsed);
     MergeCompilationUnitScope(cu_scope_, prior->second.cu_scope);
     return CompileOutcome::kSkipped;

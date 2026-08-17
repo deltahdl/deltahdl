@@ -9,13 +9,21 @@
 // merged unit AppendCompilationUnitDeclarations in src/parser/ast_design.h
 // assembled out of the command line.
 //
-// Every case declares picoseconds, and a magnitude other than 1. `cu_time_unit`
-// and `cu_time_prec` are both initialized to TimeUnit::kNs and both magnitudes
-// to 1 in `struct CompilationUnit` at src/parser/ast_design.h, and TimeScale in
+// The cases from ConflictingCompilationUnitTimeunitsAcrossFilesAreReported
+// onwards write a declaration into each of two files of one command line and
+// read a report back rather than a value, because §3.12.1 case a) puts those
+// two declarations in one time scope and §3.14.2.2 requires the second to match
+// the first.
+//
+// Every case declares picoseconds, which is what tells a declaration that
+// reached the design from one that did not. `cu_time_unit` and `cu_time_prec`
+// are both initialized to TimeUnit::kNs and both magnitudes to 1 in `struct
+// CompilationUnit` at src/parser/ast_design.h, and TimeScale in
 // src/common/types.h has the same four defaults, so a case declaring `timeunit
 // 1ns;` reports the right answer whether the declaration was carried or
-// dropped. §3.14.2.2 admits the magnitude: its own example writes `timeunit
-// 100ps;`.
+// dropped. The cases that read a magnitude back declare one other than 1 for
+// the same reason. §3.14.2.2 admits the magnitude: its own example writes
+// `timeunit 100ps;`.
 
 #include <gtest/gtest.h>
 
@@ -30,6 +38,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_scratch_dir.h"
+#include "helpers_reported_error.h"
 #include "parser/ast.h"
 #include "parser/library_map.h"
 #include "parser/single_pass_compile.h"
@@ -195,4 +204,171 @@ TEST(SinglePassCompileTimescale,
   EXPECT_FALSE(h.diag.HasErrors());
   ASSERT_NE(design, nullptr);
   EXPECT_EQ(design->global_time_precision, TimeUnit::kPs);
+}
+
+// The cases below put a compilation-unit declaration in each of two files of
+// one command line. §3.12.1 case a) makes the two one compilation unit -- "All
+// files on a given compilation command line make a single compilation unit (in
+// which case the declarations within those files are accessible following
+// normal visibility rules throughout the entire set of files)" -- so the two
+// declarations stand in one time scope, and §3.14.2.2 rules on the pair: "The
+// timeunit and timeprecision declarations can be repeated as later items, but
+// shall match the previous declaration within the current time scope."
+//
+// The declaration in src/first.sv stands on line 1 of that file and the one in
+// src/second.sv on line 2 of its own, so the line a report stands at says which
+// of the two declarations it names. Two declarations on one line number are
+// what a case cannot tell apart, and the standard leaves room for the second
+// file to open with something: §3.14.2.2 requires only that "the timeunit and
+// timeprecision declarations shall precede any other items in the current time
+// scope", and a comment is no item.
+
+// The declaration src/first.sv carries, one per case: the time unit for three
+// of them and the time precision for the one that is about the precision. The
+// file holds no design element, so nothing but the declaration crosses to the
+// other file.
+constexpr const char* kFirstFileTimeunitPs = "timeunit 1ps;\n";
+constexpr const char* kFirstFileTimeprecisionPs = "timeprecision 1ps;\n";
+
+// Writes src/first.sv, src/second.sv and the library map into `tmp`, and
+// answers the command line naming the two sources in that order.
+std::vector<fs::path> TwoFileCommandLine(ScratchDir& tmp, const char* first,
+                                         const char* second) {
+  tmp.Write("lib.map", kLibMap);
+  return {tmp.Write("src/first.sv", first), tmp.Write("src/second.sv", second)};
+}
+
+// Compiles `files` as one command line into `h` and elaborates nothing,
+// answering nothing about whether the command line compiled. A case reading a
+// report back through ReportedError is not answered by the outcome: whether a
+// report about the second file's declaration leaves that file failed turns on
+// where in SinglePassCompiler::CompileSource the report stands, and §3.14.2.2
+// rules that the report is made rather than what it costs the compile.
+void CompileTwoFileCommandLine(CommandLineHarness& h, const ScratchDir& tmp,
+                               const std::vector<fs::path>& files) {
+  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
+  h.compiler.CompileCommandLine(files, h.unit);
+}
+
+TEST(SinglePassCompileTimescale,
+     ConflictingCompilationUnitTimeunitsAcrossFilesAreReported) {
+  // `timeunit 1ps;` in one file of a command line and `timeunit 1ns;` in
+  // another, which §3.14.2.2 forbids: the repeat "shall match the previous
+  // declaration within the current time scope", and §3.12.1 case a) is what
+  // makes the two files one time scope. What the source description costs is a
+  // run at the wrong tick size with nothing said, since §3.14.2.3 case c) makes
+  // the compilation unit's time unit the fallback for every design element
+  // declaring none of its own and the two readings are a factor of a thousand
+  // apart.
+  //
+  // CheckCuTimeunitConsistency in src/parser/parser.cpp already makes this
+  // exact report within one file, so the message and the subclause are the ones
+  // it uses rather than a second wording for one rule. The line is the second
+  // declaration's, which is the one the source description has to change to
+  // conform, and it is line 2 of src/second.sv where the first declaration
+  // stands on line 1 of src/first.sv.
+  ScratchDir tmp;
+  constexpr const char* kSecondFile =
+      "// The later of the two declarations follows this line.\n"
+      "timeunit 1ns;\n"
+      "module top;\n"
+      "endmodule\n";
+
+  CommandLineHarness h;
+  CompileTwoFileCommandLine(
+      h, tmp, TwoFileCommandLine(tmp, kFirstFileTimeunitPs, kSecondFile));
+  EXPECT_TRUE(ReportedError(
+      h.diag.Diagnostics(), "timeunit does not match prior declaration",
+      LineHolding(kSecondFile, "timeunit 1ns;"), "3.14.2.2"));
+}
+
+TEST(SinglePassCompileTimescale,
+     ConflictingCompilationUnitTimeprecisionsAcrossFilesAreReported) {
+  // The precision half of the same rule, which §3.14.2.2 states of both at
+  // once: "There shall be at most one time unit and one time precision for any
+  // module, program, package, or interface definition or in any
+  // compilation-unit scope."
+  //
+  // This is a separate case from the time unit rather than the same one twice.
+  // CheckCuTimeunitConsistency in src/parser/parser.cpp reaches the two through
+  // different branches, reading cu_time_prec and cu_time_prec_magnitude under
+  // has_cu_timeprecision where the unit half reads cu_time_unit and
+  // cu_time_unit_magnitude under has_cu_timeunit, so a comparison written
+  // across files for one of them would leave a case asserting only the other
+  // green.
+  ScratchDir tmp;
+  constexpr const char* kSecondFile =
+      "// The later of the two precision declarations follows this line.\n"
+      "timeprecision 1ns;\n"
+      "module top;\n"
+      "endmodule\n";
+
+  CommandLineHarness h;
+  CompileTwoFileCommandLine(
+      h, tmp, TwoFileCommandLine(tmp, kFirstFileTimeprecisionPs, kSecondFile));
+  EXPECT_TRUE(ReportedError(
+      h.diag.Diagnostics(), "timeprecision does not match prior declaration",
+      LineHolding(kSecondFile, "timeprecision 1ns;"), "3.14.2.2"));
+}
+
+TEST(SinglePassCompileTimescale,
+     AMatchingCompilationUnitTimeunitInASecondFileIsAccepted) {
+  // Both files declare `timeunit 1ps;`, which §3.14.2.2 permits: "The timeunit
+  // and timeprecision declarations can be repeated as later items, but shall
+  // match the previous declaration within the current time scope." A repeat
+  // that matches is a conforming source description, so a comparison across
+  // files that reported every second declaration rather than every differing
+  // one fails here while passing the two cases above.
+  //
+  // The assertion is over every diagnostic the run recorded rather than over
+  // DiagEngine::HasErrors(), because a report about a declaration the standard
+  // permits is wrong whichever severity it carries.
+  //
+  // Both files declare picoseconds and not nanoseconds. `cu_time_unit` is
+  // initialized to TimeUnit::kNs in `struct CompilationUnit` at
+  // src/parser/ast_design.h, so a case declaring nanoseconds reads back the
+  // same value whether the declaration crossed to the elaborated design or was
+  // dropped on the way, and could not fail.
+  ScratchDir tmp;
+  constexpr const char* kSecondFile =
+      "// The repeat of the first file's declaration follows this line.\n"
+      "timeunit 1ps;\n"
+      "module top;\n"
+      "endmodule\n";
+
+  CommandLineHarness h;
+  auto* design = CompileCommandLineAndElaborate(
+      h, tmp, TwoFileCommandLine(tmp, kFirstFileTimeunitPs, kSecondFile), "");
+  EXPECT_TRUE(h.diag.Diagnostics().empty());
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(design->cu_timescale.unit, TimeUnit::kPs);
+}
+
+TEST(SinglePassCompileTimescale, ConflictingMagnitudesInOneUnitAreReported) {
+  // `timeunit 1ps;` against `timeunit 10ps;`, which name one time unit and
+  // differ only in the magnitude. §3.14.2.2 requires the repeat to "match the
+  // previous declaration", and a declaration is the time literal §5.8 admits
+  // rather than the unit alone, so these two do not match and the second is
+  // reported.
+  //
+  // The pair is what separates a comparison of cu_time_unit from a comparison
+  // of the declaration. Both files leave cu_time_unit at TimeUnit::kPs and only
+  // cu_time_unit_magnitude differs, so a comparison of the unit alone passes
+  // both conflict cases above and fails only here. What it costs is the same
+  // factor a comparison catching it would have caught: §3.14.2.3 case c) hands
+  // the compilation unit's time unit to every design element declaring none,
+  // and ten picoseconds is not one.
+  ScratchDir tmp;
+  constexpr const char* kSecondFile =
+      "// The declaration that differs in magnitude follows this line.\n"
+      "timeunit 10ps;\n"
+      "module top;\n"
+      "endmodule\n";
+
+  CommandLineHarness h;
+  CompileTwoFileCommandLine(
+      h, tmp, TwoFileCommandLine(tmp, kFirstFileTimeunitPs, kSecondFile));
+  EXPECT_TRUE(ReportedError(
+      h.diag.Diagnostics(), "timeunit does not match prior declaration",
+      LineHolding(kSecondFile, "timeunit 10ps;"), "3.14.2.2"));
 }
