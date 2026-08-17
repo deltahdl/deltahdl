@@ -464,6 +464,35 @@ TEST(UserDefinedTypeElaboration, TypeReferenceBeforeItsDeclarationIsReported) {
                             2, "6.18"));
 }
 
+// A list of declarators references the type_identifier once. A.2.1.3 writes
+// `data_declaration ::= [ const ] [ var ] [ lifetime ] data_type_or_implicit
+// list_of_variable_decl_assignments ;`, putting the type ahead of the whole
+// list, so §6.18's "any reference to its type_identifier" is one reference here
+// and earns one report however many names follow. Parser::ParseVarDeclList
+// builds one ModuleItem per declarator and marks every one of them as
+// undeclared at parse, so the count is what holds the report to the declaration
+// rather than to the names; the ReportedError beside it is what says which rule
+// the one report enforces, which a count states nothing about on its own.
+TEST(UserDefinedTypeElaboration,
+     TypeReferenceBeforeItsDeclarationInAListIsReportedOnce) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  my_type a, b, c;\n"
+      "  typedef int my_type;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of type 'my_type' does not precede "
+                            "this reference to it",
+                            2, "6.18"));
+  int reports = 0;
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.message.find("does not precede") != std::string::npos) ++reports;
+  }
+  EXPECT_EQ(reports, 1);
+}
+
 // A name declared nowhere at all. §6.18 draws no distinction between a
 // declaration written below the reference and one never written: neither
 // precedes the reference. Reporting it as an unknown module instead would name

@@ -288,4 +288,133 @@ TEST(DataTypeParsing, TypeReferenceBeforeDeclarationParsesAsADataDeclaration) {
   EXPECT_TRUE(item->type_name_undeclared_at_parse);
 }
 
+// The six cases below cover the rest of A.2.4's variable_decl_assignment after
+// a type name the parser has not yet met. The case above covers the sole
+// declarator with no dimension and no initializer, which was for a time the
+// only shape read as a declaration; A.2.3 gives
+// `list_of_variable_decl_assignments ::= variable_decl_assignment { ,
+// variable_decl_assignment }`, so the comma list, the initializer and the
+// dimensions are the same data_declaration. None of them can be an
+// instantiation: A.4.1.1 gives
+// `hierarchical_instance ::= name_of_instance ( [ list_of_port_connections ] )`
+// and §23.3.2 states it in prose -- "The parentheses shall be required on all
+// module instantiations, even when the instantiated module does not have
+// ports." -- and not one of the four sources contains a `(`.
+//
+// Each case asserts the node the parser built and not merely that nothing was
+// reported, because the behaviour these replace reported an error and built a
+// kModuleInst, so an assertion on the report alone would pass on a repair that
+// silenced the report and left the wrong node.
+TEST(ParserUndeclaredTypeDecl, ACommaSeparatedListIsADataDeclaration) {
+  // §6.18 prints `intP a, b;` as its own example of using a named type, so this
+  // is the shape the clause itself writes.
+  auto r = Parse(
+      "module m;\n"
+      "  my_type a, b;\n"
+      "  typedef int my_type;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 2U);
+  auto* first = r.cu->modules[0]->items[0];
+  auto* second = r.cu->modules[0]->items[1];
+  EXPECT_EQ(first->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(first->name, "a");
+  EXPECT_EQ(second->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(second->name, "b");
+  EXPECT_EQ(second->data_type.type_name, "my_type");
+  EXPECT_TRUE(second->type_name_undeclared_at_parse);
+}
+
+TEST(ParserUndeclaredTypeDecl, AnInitializerIsADataDeclaration) {
+  // `[ = expression ]` of A.2.4. The `=` used to reach ParsePortConnection,
+  // where ParseExpr reported "expected expression" under §11.2 and consumed it.
+  auto r = Parse(
+      "module m;\n"
+      "  my_type a = 0;\n"
+      "  typedef int my_type;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "a");
+  EXPECT_EQ(item->data_type.type_name, "my_type");
+  EXPECT_NE(item->init_expr, nullptr);
+  EXPECT_TRUE(item->type_name_undeclared_at_parse);
+}
+
+TEST(ParserUndeclaredTypeDecl, AnUnpackedDimensionIsADataDeclaration) {
+  // `{ variable_dimension }` of A.2.4. This is the case that used to build a
+  // kModuleInst carrying [3:0] as an instance range, so the assertion on the
+  // dimension is what tells the two readings apart.
+  auto r = Parse(
+      "module m;\n"
+      "  my_type a [3:0];\n"
+      "  typedef int my_type;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "a");
+  EXPECT_EQ(item->unpacked_dims.size(), 1U);
+  EXPECT_TRUE(item->type_name_undeclared_at_parse);
+}
+
+TEST(ParserUndeclaredTypeDecl, AnUnsizedDimensionIsADataDeclaration) {
+  // A.2.5's `unsized_dimension ::= [ ]`, which A.2.4 admits on the
+  // dynamic_array_variable_identifier alternative. Parser::ParseUnpackedDims
+  // records it as a null dimension, so the size alone would not distinguish it
+  // from the sized case above.
+  auto r = Parse(
+      "module m;\n"
+      "  my_type a [];\n"
+      "  typedef int my_type;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  ASSERT_EQ(item->unpacked_dims.size(), 1U);
+  EXPECT_EQ(item->unpacked_dims[0], nullptr);
+}
+
+// The two cases below hold the boundary from the instantiation side. Without
+// them a repair reading every undeclared name as a type would pass all four
+// cases above and stop the parser recognising an instantiation at all.
+TEST(ParserUndeclaredTypeDecl, ANamedInstanceWithPortsIsStillAnInstantiation) {
+  // The port-connection list A.4.1.1 requires, and §23.3.2 permits the module
+  // to be "one declared later", so the parser cannot settle this by looking for
+  // a declaration.
+  auto r = Parse(
+      "module m;\n"
+      "  my_mod u (x, y);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  EXPECT_EQ(item->inst_module, "my_mod");
+  EXPECT_EQ(item->inst_name, "u");
+}
+
+TEST(ParserUndeclaredTypeDecl,
+     AnInstanceWithARangeAndPortsIsStillAnInstantiation) {
+  // A.4.1.1 puts `{ unpacked_dimension }` in name_of_instance, so an array of
+  // instances wears the same brackets as a declarator's dimension and is told
+  // from it only by the `(` that follows. This is the case that decides the
+  // dimensions must be skipped before the `(` is looked for.
+  auto r = Parse(
+      "module m;\n"
+      "  my_mod u [3:0] (x, y);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  EXPECT_EQ(item->inst_name, "u");
+  EXPECT_NE(item->inst_range_left, nullptr);
+}
+
 }  // namespace

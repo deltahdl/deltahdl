@@ -753,15 +753,24 @@ void Parser::ParsePlainVarDecl(const Token& name_tok,
   items.push_back(item);
 }
 
+// Whether the item beginning with an identifier this parser holds no
+// declaration for is a data declaration rather than an instantiation. A.4.1.1
+// gives `hierarchical_instance ::= name_of_instance ( [ list_of_port_
+// connections ] )`, and §23.3.2 repeats it in prose: "The parentheses shall be
+// required on all module instantiations, even when the instantiated module does
+// not have ports." So a declarator reaching `;`, `=` or `,` -- or the end of
+// its dimensions -- without a `(` cannot be an instance, whatever the leading
+// name turns out to name, and every variable_decl_assignment A.2.4 admits has
+// that shape.
+//
+// LooksLikeScopedInstTail answers this same question for the `pkg :: type_id`
+// form, and it is called rather than restated so that the bare and the scoped
+// form cannot come to disagree about which sources A.4.1.1 admits. The leading
+// CheckIdentifier is what holds `t;` and `t = 3;` out: those carry no
+// declarator at all, and ParsePlainVarDecl reads their one name as the variable
+// rather than as its type.
 bool Parser::LooksLikeUndeclaredTypeDecl() {
-  auto saved = lexer_.SavePos();
-  bool pair = CheckIdentifier();
-  if (pair) {
-    Consume();
-    pair = Check(TokenKind::kSemicolon);
-  }
-  lexer_.RestorePos(saved);
-  return pair;
+  return CheckIdentifier() && !LooksLikeScopedInstTail();
 }
 
 void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
@@ -789,11 +798,11 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
     ParseUdpInstList(name_tok, items);
     return;
   }
-  // Two bare identifiers and a semicolon, which A.4.1.1 does not admit as a
-  // hierarchical_instance whatever the first name turns out to be: the port
-  // connection list and its parentheses are not optional there. Reading the
-  // shape as an instantiation is what made a reference breaching §6.18 -- "The
-  // declaration of a user-defined data type shall precede any reference to its
+  // A declarator with no port-connection list after it, which A.4.1.1 does not
+  // admit as a hierarchical_instance whatever the leading name turns out to be:
+  // the parentheses are not optional there. Reading the shape as an
+  // instantiation is what made a reference breaching §6.18 -- "The declaration
+  // of a user-defined data type shall precede any reference to its
   // type_identifier" -- come back as a missing port connection list under
   // §23.3.2. Recording it as the data declaration it also spells lets the parse
   // finish with the name kept, and Elaborator::ReportUndeclaredTypeName decides

@@ -658,6 +658,14 @@ static std::string_view AdoptTypedefArrayDims(
 
 void Elaborator::ReportUndeclaredTypeName(const ModuleItem* item) {
   if (!item->type_name_undeclared_at_parse) return;
+  // One report per declaration rather than per declarator. A.2.1.3 gives
+  // `data_declaration ::= [ const ] [ var ] [ lifetime ] data_type_or_implicit
+  // list_of_variable_decl_assignments ;`, so `my_type a, b, c;` writes the
+  // type_identifier once however many names follow it, and §6.18 is breached by
+  // that one reference. Parser::ParseVarDeclList builds one ModuleItem per
+  // declarator and marks each of them, so without this the source would be
+  // reported as many times as it declares names.
+  if (!item->first_in_decl_list) return;
   std::string_view name = item->data_type.type_name;
   // §23.3.2 gives module_instantiation its parenthesized list_of_port_
   // connections, so a name that does turn out to be a module was written as an
