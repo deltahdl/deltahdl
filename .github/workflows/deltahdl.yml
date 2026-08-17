@@ -2433,8 +2433,16 @@ jobs:
   # the changed paths whether the lint was necessary stood there, and the same
   # argument condemns them: on a push that touched neither this file nor
   # etc/clang_tidy/, this job skipped, and a skip reports neither green nor
-  # red. Linting two paths on every run costs one runner and answers the
+  # red. Linting three paths on every run costs one runner and answers the
   # question in the run graph.
+  #
+  # .github/actions/*/action.yml is linted here rather than in one of the other
+  # two workflows holding a yamllint job, because this is the workflow whose
+  # on: push: paths: watches .github/actions/**, and the only one whose jobs
+  # call those actions. A composite action is expanded when a job reaches its
+  # uses: step, so a malformed action.yml otherwise fails every calling job
+  # after each has spent its checkout and its cache restore, rather than
+  # failing one lint in seconds.
   yamllint:
     runs-on: ubuntu-latest
     steps:
@@ -2461,6 +2469,7 @@ jobs:
           yamllint --strict \
             --config-data \
             "{extends: default, rules: {$RULES}}" \
+            .github/actions/*/action.yml \
             .github/workflows/deltahdl.yml \
             etc/clang_tidy/*.yml
 name: deltahdl

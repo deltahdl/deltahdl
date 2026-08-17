@@ -6,9 +6,9 @@ description: >-
   clang-format, lld, llvm-cov, llvm-profdata) plus the compiler-rt profile
   runtime. Nothing is pinned in this file: a caller that passes no major gets
   the latest LLVM stable release, discovered at run time.
-name: Install LLVM
 inputs:
   major:
+    default: ''
     description: >-
       LLVM major version to install. Pass the major output of an earlier call
       to install exactly what that call installed, which is what two jobs
@@ -17,8 +17,10 @@ inputs:
       objects with a different compiler. Left empty, the newest stable major
       is discovered at run time and nothing is pinned.
     required: false
-    default: ''
   packages:
+    default: >-
+      clang-@MAJOR@ clang-tidy-@MAJOR@ clang-format-@MAJOR@ lld-@MAJOR@
+      llvm-@MAJOR@ libclang-rt-@MAJOR@-dev
     description: >-
       Space-separated apt package names to install, with @MAJOR@ standing for
       the major version. Only what is named here arrives, the install passing
@@ -29,9 +31,7 @@ inputs:
       executable, and apt fetches it only as a recommendation of
       libclang-common-@MAJOR@-dev.
     required: false
-    default: >-
-      clang-@MAJOR@ clang-tidy-@MAJOR@ clang-format-@MAJOR@ lld-@MAJOR@
-      llvm-@MAJOR@ libclang-rt-@MAJOR@-dev
+name: Install LLVM
 outputs:
   major:
     description: >-
@@ -40,12 +40,12 @@ outputs:
     value: ${{ steps.install.outputs.major }}
 runs:
   steps:
-    - id: install
-      name: Install stable LLVM/Clang from apt.llvm.org
-      env:
+    - env:
+        GH_TOKEN: ${{ github.token }}
         INPUT_MAJOR: ${{ inputs.major }}
         INPUT_PACKAGES: ${{ inputs.packages }}
-        GH_TOKEN: ${{ github.token }}
+      id: install
+      name: Install stable LLVM/Clang from apt.llvm.org
       run: |
         . /etc/os-release
         major="${INPUT_MAJOR}"
