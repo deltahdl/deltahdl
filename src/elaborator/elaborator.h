@@ -655,6 +655,12 @@ class Elaborator : public ElaboratorOperationRules {
   // that is what somebody whose source was rejected has to find.
   void ReportConstAssignTarget(const Expr* lhs, SourceLoc loc);
 
+  // §6.20: the same report for a call statement that writes its object, which
+  // §6.16 gives six of the string methods. A call is not an assignment and no
+  // lvalue walk reaches it, so it is asked about separately and answered the
+  // same way, the object being what ReportConstAssignTarget is handed.
+  void ReportConstMutatingMethodCall(const Expr* call, SourceLoc loc);
+
   void CheckEnumAssignStmt(const Stmt* s);
 
   // §6.19.3: strong typing also applies when an actual argument is bound to an

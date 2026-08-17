@@ -186,4 +186,74 @@ TEST(ConstAssignElaboration, AWriteToAVariableThroughABitSelectIsAccepted) {
              "endmodule\n"));
 }
 
+// §6.16.2's putc "replaces the ith character in str with the given integral
+// value", so the call writes S, and §6.20 says a constant never changes. A call
+// is not an assignment, so no walk over left-hand sides reaches it: at run time
+// a parameter is an ordinary variable with no flag marking it constant, and the
+// write reached StringWriteByte with nothing left to refuse it.
+TEST(ConstAssignElaboration, APutcOnAStringParameterIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  parameter string S = \"abc\";\n"
+      "  initial S.putc(0, \"X\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment to constant 'S'",
+                            3, "6.20"));
+}
+
+// §6.16.10's itoa "stores the ASCII decimal representation of i into str". It
+// reaches a different helper from putc, so a repair naming one method would
+// leave the other five.
+TEST(ConstAssignElaboration, AnItoaOnAStringParameterIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  parameter string S = \"abc\";\n"
+      "  initial S.itoa(7);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment to constant 'S'",
+                            3, "6.20"));
+}
+
+// The last of the six, over the second of §6.20's three constant kinds, so the
+// pair that is not the first of each is covered too.
+TEST(ConstAssignElaboration, ARealtoaOnAStringLocalparamIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  localparam string S = \"abc\";\n"
+      "  initial S.realtoa(1.5);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment to constant 'S'",
+                            3, "6.20"));
+}
+
+// The same call over an ordinary string variable, which is what the method is
+// for. Without this a repair could report every mutating call and pass the
+// three cases above.
+TEST(ConstAssignElaboration, APutcOnAStringVariableIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module top;\n"
+             "  string s = \"abc\";\n"
+             "  initial s.putc(0, \"X\");\n"
+             "endmodule\n"));
+}
+
+// §6.16.3's getc "returns the ASCII code of the ith character in str" and
+// writes nothing, so it stays legal on a constant. This is what keeps the check
+// on whether the method writes its object rather than on whether a string
+// method was called on a constant at all.
+TEST(ConstAssignElaboration, AGetcOnAStringParameterIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module top;\n"
+             "  parameter string S = \"abc\";\n"
+             "  byte b;\n"
+             "  initial b = S.getc(0);\n"
+             "endmodule\n"));
+}
+
 }  // namespace

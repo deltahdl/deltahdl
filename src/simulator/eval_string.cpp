@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/string_methods.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -342,6 +343,10 @@ static bool DispatchReturningMethod(std::string_view method,
 
 static bool DispatchMutatingMethod(std::string_view method,
                                    const StringMethodArgs& a, Logic4Vec& out) {
+  // The six names are StringMethodWritesItsObject's, so that the elaborator's
+  // §6.20 refusal of one of these calls on a constant and the write carried out
+  // here can never be about different sets of methods.
+  if (!StringMethodWritesItsObject(method)) return false;
   if (method == "putc") {
     StringPutc(a.var, a.str, a.call_expr, a.ctx, a.arena);
     out = MakeLogic4VecVal(a.arena, 1, 0);
