@@ -1,3 +1,7 @@
+#include <filesystem>
+#include <string_view>
+#include <vector>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,6 +15,7 @@
 #include "parser/single_pass_compile.h"
 
 using namespace delta;
+namespace fs = std::filesystem;
 
 TEST(CompilationUnitElaboration, ElabModuleWithCuFunction) {
   EXPECT_TRUE(
@@ -317,6 +322,27 @@ struct CommandLineHarness {
 // the design elements among them have somewhere to go.
 constexpr const char* kLibMap = "library rtlLib src/*.sv;\n";
 
+// Compiles `files` as one command line into `h` and elaborates the compilation
+// unit that produced, returning the design or nullptr. The design outlives the
+// elaborator because it is arena-allocated, and the arena is the harness's.
+RtlirDesign* CompileCommandLineAndElaborate(CommandLineHarness& h,
+                                            const ScratchDir& tmp,
+                                            const std::vector<fs::path>& files,
+                                            std::string_view top) {
+  if (!h.libs.LoadMapFile(tmp.dir / "lib.map")) return nullptr;
+  if (!h.compiler.CompileCommandLine(files, h.unit)) return nullptr;
+  Elaborator elab(h.arena, h.diag, &h.unit);
+  return elab.Elaborate(top);
+}
+
+// The module `top` of a design that came out as exactly one top module, or
+// nullptr. Both typedef cases and the class case read the compilation-unit
+// scope through it.
+const RtlirModule* SoleTopModule(RtlirDesign* design) {
+  if (design == nullptr || design->top_modules.size() != 1u) return nullptr;
+  return design->top_modules[0];
+}
+
 }  // namespace
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,
@@ -333,16 +359,10 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
                        "endmodule\n");
 
   CommandLineHarness h;
-  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
-  ASSERT_TRUE(h.compiler.CompileCommandLine({types, top}, h.unit));
-  ASSERT_FALSE(h.diag.HasErrors());
-
-  Elaborator elab(h.arena, h.diag, &h.unit);
-  auto* design = elab.Elaborate("");
-  ASSERT_NE(design, nullptr);
+  const auto* mod =
+      SoleTopModule(CompileCommandLineAndElaborate(h, tmp, {types, top}, ""));
   EXPECT_FALSE(h.diag.HasErrors());
-  ASSERT_EQ(design->top_modules.size(), 1u);
-  auto* mod = design->top_modules[0];
+  ASSERT_NE(mod, nullptr);
   ASSERT_EQ(mod->variables.size(), 1u);
   EXPECT_EQ(mod->variables[0].name, "b");
   EXPECT_EQ(mod->variables[0].width, 8u);
@@ -364,16 +384,10 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
                         "endmodule\n");
 
   CommandLineHarness h;
-  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
-  ASSERT_TRUE(h.compiler.CompileCommandLine({only}, h.unit));
-  ASSERT_FALSE(h.diag.HasErrors());
-
-  Elaborator elab(h.arena, h.diag, &h.unit);
-  auto* design = elab.Elaborate("");
-  ASSERT_NE(design, nullptr);
+  const auto* mod =
+      SoleTopModule(CompileCommandLineAndElaborate(h, tmp, {only}, ""));
   EXPECT_FALSE(h.diag.HasErrors());
-  ASSERT_EQ(design->top_modules.size(), 1u);
-  auto* mod = design->top_modules[0];
+  ASSERT_NE(mod, nullptr);
   ASSERT_EQ(mod->variables.size(), 1u);
   EXPECT_EQ(mod->variables[0].name, "b");
   EXPECT_EQ(mod->variables[0].width, 8u);
@@ -397,15 +411,11 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
                        "endmodule\n");
 
   CommandLineHarness h;
-  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
-  ASSERT_TRUE(h.compiler.CompileCommandLine({cls, top}, h.unit));
-  ASSERT_FALSE(h.diag.HasErrors());
-
-  Elaborator elab(h.arena, h.diag, &h.unit);
-  auto* design = elab.Elaborate("");
-  ASSERT_NE(design, nullptr);
+  const auto* mod =
+      SoleTopModule(CompileCommandLineAndElaborate(h, tmp, {cls, top}, ""));
   EXPECT_FALSE(h.diag.HasErrors());
-  ASSERT_EQ(design->top_modules.size(), 1u);
+  ASSERT_NE(mod, nullptr);
+  EXPECT_EQ(mod->name, "top");
 }
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,
@@ -429,12 +439,7 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
                          "endmodule\n");
 
   CommandLineHarness h;
-  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
-  ASSERT_TRUE(h.compiler.CompileCommandLine({cls, block}, h.unit));
-  ASSERT_FALSE(h.diag.HasErrors());
-
-  Elaborator elab(h.arena, h.diag, &h.unit);
-  ASSERT_NE(elab.Elaborate(""), nullptr);
+  ASSERT_NE(CompileCommandLineAndElaborate(h, tmp, {cls, block}, ""), nullptr);
   EXPECT_FALSE(h.diag.HasErrors());
   ASSERT_EQ(h.unit.classes.size(), 1u);
   const ClassMember* proto = nullptr;
@@ -468,12 +473,7 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
                        "endmodule\n");
 
   CommandLineHarness h;
-  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
-  ASSERT_TRUE(h.compiler.CompileCommandLine({probe, top}, h.unit));
-  ASSERT_FALSE(h.diag.HasErrors());
-
-  Elaborator elab(h.arena, h.diag, &h.unit);
-  auto* design = elab.Elaborate("top");
+  auto* design = CompileCommandLineAndElaborate(h, tmp, {probe, top}, "top");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(h.diag.HasErrors());
   auto it = design->all_modules.find("cpu");

@@ -125,6 +125,13 @@ CompileOutcome SinglePassCompiler::MapIntoLibrary(const std::string& path,
   uint32_t fid = mgr_.AddFile(path, text);
   Lexer lexer(mgr_.FileContent(fid), fid, diag_);
   Parser parser(lexer, arena_, diag_);
+  // The compilation-unit scope the descriptions before this one on the command
+  // line built up, because §3.12.1 case a) makes their declarations "accessible
+  // following normal visibility rules throughout the entire set of files" and
+  // a type name has to be known while the file is parsed rather than after it.
+  // `byte_t b;` parses as an instantiation of a module called byte_t until the
+  // parser is told byte_t is a type.
+  parser.AdoptCompilationUnitTypeNames(cu_type_names_);
   // Errors already on the engine belong to descriptions compiled earlier in
   // the run, so it is the errors this parse adds that decide its outcome.
   uint32_t errors_before = diag_.ErrorCount();
@@ -158,6 +165,10 @@ CompileOutcome SinglePassCompiler::MapIntoLibrary(const std::string& path,
   // reads.
   AppendCellDeclarations(unit, *parsed);
   AppendCompilationUnitDeclarations(unit, *parsed);
+  // The parse started from cu_type_names_, so what it ends holding is that set
+  // plus whatever this description added to the compilation-unit scope.
+  entry.cu_type_names = parser.CompilationUnitTypeNames();
+  cu_type_names_ = entry.cu_type_names;
   compiled_[path] = std::move(entry);
   return CompileOutcome::kCompiled;
 }
@@ -185,6 +196,10 @@ CompileOutcome SinglePassCompiler::CompileSource(
     // an earlier one did.
     AppendCellDeclarations(unit, *prior->second.parsed);
     AppendCompilationUnitDeclarations(unit, *prior->second.parsed);
+    cu_type_names_.types.insert(prior->second.cu_type_names.types.begin(),
+                                prior->second.cu_type_names.types.end());
+    cu_type_names_.nettypes.insert(prior->second.cu_type_names.nettypes.begin(),
+                                   prior->second.cu_type_names.nettypes.end());
     return CompileOutcome::kSkipped;
   }
   return MapIntoLibrary(path, std::move(text), unit);
@@ -196,6 +211,10 @@ bool SinglePassCompiler::CompileCommandLine(
   // line, so meeting one of those names again is a recompile rather than two
   // descriptions of one cell within a single run (§33.3.1.1).
   lib_map_.BeginNewInvocation();
+  // A command line is a compilation unit (§3.12.1 case a)), so its
+  // compilation-unit scope starts empty however many command lines this
+  // compiler has already run.
+  cu_type_names_ = ScopeTypeNames{};
   std::unordered_set<std::string> named;
   bool ok = true;
   for (const auto& file : files) {

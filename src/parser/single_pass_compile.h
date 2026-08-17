@@ -6,6 +6,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "parser/scope_type_names.h"
+
 namespace delta {
 
 class Arena;
@@ -79,6 +81,10 @@ class SinglePassCompiler {
     std::string text;
     CompilationUnit* parsed = nullptr;
     std::vector<WrittenCell> cells;
+    // What the compilation-unit scope held when this description's parse
+    // finished. Kept so that skipping a recompile contributes the same type
+    // names to the files after it that compiling would have.
+    ScopeTypeNames cu_type_names;
   };
 
   // True when every cell `prior` wrote is still the cell its library holds
@@ -97,6 +103,13 @@ class SinglePassCompiler {
   DiagEngine& diag_;
   bool skip_up_to_date_ = true;
   std::unordered_map<std::string, CompiledSource> compiled_;
+  // §3.12.1 case a): the compilation-unit scope the command line has built up
+  // so far. Every description is parsed knowing it, because whether an
+  // identifier names a type decides how the declaration after it parses, and a
+  // typedef or class one file wrote outside every design element is a type name
+  // in the next. CompileCommandLine empties it, since a new command line is a
+  // new compilation unit.
+  ScopeTypeNames cu_type_names_;
 };
 
 }  // namespace delta

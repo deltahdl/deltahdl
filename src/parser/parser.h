@@ -11,6 +11,7 @@
 #include "common/diagnostic.h"
 #include "lexer/lexer.h"
 #include "parser/ast.h"
+#include "parser/scope_type_names.h"
 
 namespace delta {
 
@@ -34,6 +35,29 @@ class Parser {
 
   CompilationUnit* Parse();
   CompilationUnit* ParseLibraryText();
+
+  // §3.12.1 case a) has "all files on a given compilation command line make a
+  // single compilation unit (in which case the declarations within those files
+  // are accessible following normal visibility rules throughout the entire set
+  // of files)", and one parser reads one file. These two are how a caller
+  // building that single compilation unit out of several files hands the
+  // compilation-unit scope from one file's parse to the next: without them a
+  // later file reads `byte_t b;` as an instantiation of a module called byte_t,
+  // because whether an identifier names a type decides how the declaration
+  // after it parses.
+  //
+  // Call AdoptCompilationUnitTypeNames before Parse and read
+  // CompilationUnitTypeNames after it. What it answers with is the
+  // compilation-unit scope and nothing narrower: every design element's own
+  // type names were taken back out by its TypeNameScope at its closing keyword,
+  // which is what makes the set safe to carry into a file that never saw that
+  // design element.
+  void AdoptCompilationUnitTypeNames(const ScopeTypeNames& names) {
+    AdoptTypeNames(names);
+  }
+  ScopeTypeNames CompilationUnitTypeNames() const {
+    return ScopeTypeNames{known_types_, known_nettypes_};
+  }
 
  private:
   // Shared gate/UDP instance-tail parser (see parser_instance_internal.h).
@@ -586,15 +610,6 @@ class Parser {
   // Synchronize() halts on a foreign block-closing keyword without consuming
   // it.
   void SynchronizeWithProgress();
-
-  // The type names and the nettype names one scope declared, as one value.
-  // §6.6.7's nettype declaration registers a name in both known_types_ and
-  // known_nettypes_ below, so anything that carries a scope's type names to
-  // another scope has to carry both or lose the nettype half.
-  struct ScopeTypeNames {
-    std::unordered_set<std::string_view> types;
-    std::unordered_set<std::string_view> nettypes;
-  };
 
   // Makes every name of `names` a type name where the parser now stands.
   void AdoptTypeNames(const ScopeTypeNames& names);
