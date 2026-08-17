@@ -535,4 +535,37 @@ TEST(SeparateCompilationBinding, CellNotPrecompiledStandsAtItsInstantiation) {
                             "cell 'gone' was not precompiled", 4, "33.5.3"));
 }
 
+// A source description whose compilation-unit scope holds a typedef beside the
+// cell it declares. §3.12.1 is what makes the two travel differently.
+constexpr const char* kLeafBesideACuTypedef =
+    "typedef logic [7:0] byte_t;\n"
+    "module leaf;\n"
+    "endmodule\n";
+
+// ---------------------------------------------------------------------------
+// Claim: a cell reaches a later run through its precompiled form, and the
+// compilation-unit scope it was compiled beside does not.
+// ---------------------------------------------------------------------------
+
+TEST(SeparateCompilationBinding,
+     CompilationUnitDeclarationDoesNotCrossAPrecompiledRecord) {
+  // §3.12.1 case b): "each file is a separate compilation unit (in which case
+  // the declarations in each compilation-unit scope are accessible only within
+  // its corresponding file)". A precompiled record was written by a compiler
+  // invocation of its own, so the unit it is read into is not the unit it was
+  // compiled in, and the typedef the description wrote outside every design
+  // element stays behind. The cell does cross, which is the whole point of
+  // precompiling it.
+  ScratchDir tmp;
+  auto path = tmp.dir / "rtlLib.dpl";
+  Precompile(kLeafBesideACuTypedef, "rtlLib", path);
+
+  BindHarness h;
+  CompilationUnit target;
+  ASSERT_TRUE(PrecompiledLibrary::Load(path, target, h.mgr, h.arena, h.diag));
+  ASSERT_EQ(target.modules.size(), 1u);
+  EXPECT_EQ(target.modules[0]->name, "leaf");
+  EXPECT_TRUE(target.cu_items.empty());
+}
+
 }  // namespace

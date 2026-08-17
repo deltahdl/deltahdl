@@ -147,7 +147,17 @@ CompileOutcome SinglePassCompiler::MapIntoLibrary(const std::string& path,
   WriteCellsOfKind(parsed->packages, /*is_module=*/false, sink);
   WriteCellsOfKind(parsed->configs, /*is_module=*/false, sink);
 
+  // The cells and the compilation-unit scope both, because this compiler is
+  // §3.12.1 case a): "all files on a given compilation command line make a
+  // single compilation unit (in which case the declarations within those files
+  // are accessible following normal visibility rules throughout the entire set
+  // of files)". A typedef, class, bind or out-of-block constraint this
+  // description wrote outside every design element is such a declaration, and
+  // dropping it would hide it from the rest of the command line and from this
+  // description itself, since the unit built here is the only one elaboration
+  // reads.
   AppendCellDeclarations(unit, *parsed);
+  AppendCompilationUnitDeclarations(unit, *parsed);
   compiled_[path] = std::move(entry);
   return CompileOutcome::kCompiled;
 }
@@ -169,8 +179,12 @@ CompileOutcome SinglePassCompiler::CompileSource(
   if (reusable) {
     // Not recompiling a cell is not the same as dropping it: the parse the
     // earlier compile produced is what this unit gains, so the design still
-    // binds against the cell.
+    // binds against the cell. Its compilation-unit scope comes over for the
+    // same reason, and out of the same parse, so what a description
+    // contributes to the unit does not turn on whether this run compiled it or
+    // an earlier one did.
     AppendCellDeclarations(unit, *prior->second.parsed);
+    AppendCompilationUnitDeclarations(unit, *prior->second.parsed);
     return CompileOutcome::kSkipped;
   }
   return MapIntoLibrary(path, std::move(text), unit);

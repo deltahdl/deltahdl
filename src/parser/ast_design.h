@@ -181,10 +181,13 @@ inline void MarkCellModules(CompilationUnit* cu,
 // and `external_constraints` hold what a source declared outside every design
 // element, and §3.12.1 rules that "items defined in the compilation-unit scope
 // cannot be accessed by name from outside the compilation unit", so they stay
-// with the unit that parsed them. `libraries` and `lib_includes` stay because
-// they are not a source description's to contribute: §33.3.1 has the library
-// map file "automatically read by the parser prior to parsing any source files
-// specified on the command line", and Syntax 33-2 gives library_declaration and
+// with the unit that parsed them. That is the answer §3.12.1 case b) wants, so
+// a caller assembling one unit out of several source descriptions on one
+// command line -- case a) -- calls AppendCompilationUnitDeclarations below as
+// well. `libraries` and `lib_includes` stay because they are not a source
+// description's to contribute: §33.3.1 has the library map file "automatically
+// read by the parser prior to parsing any source files specified on the
+// command line", and Syntax 33-2 gives library_declaration and
 // include_statement only in library_text.
 inline void AppendCellDeclarations(CompilationUnit& target,
                                    const CompilationUnit& src) {
@@ -201,6 +204,44 @@ inline void AppendCellDeclarations(CompilationUnit& target,
                          src.packages.end());
   target.configs.insert(target.configs.end(), src.configs.begin(),
                         src.configs.end());
+}
+
+// Everything a source description declared outside every design element, which
+// §3.12.1 puts in the compilation-unit scope: "although the compilation-unit
+// scope is not a package, it can contain any item that can be defined within a
+// package (see 26.2) and bind constructs as well (see 23.11)". The parser
+// leaves those in `cu_items`, `classes`, `bind_directives` and
+// `external_constraints`, and this moves all four onto `target`. Nothing is
+// copied, exactly as in AppendCellDeclarations: the declarations stay in the
+// arena that parsed them.
+//
+// This exists beside AppendCellDeclarations because §3.12.1 states two use
+// models a tool has to offer and they want opposite answers about these four
+// lists. Case a) is "all files on a given compilation command line make a
+// single compilation unit (in which case the declarations within those files
+// are accessible following normal visibility rules throughout the entire set of
+// files)", so a caller merging a command line calls both functions. Case b) is
+// "each file is a separate compilation unit (in which case the declarations in
+// each compilation-unit scope are accessible only within its corresponding
+// file)", so a caller reading a separately compiled source description back
+// calls AppendCellDeclarations alone and this not at all.
+//
+// The libraries the design elements were tagged with do not enter into it. A
+// compilation-unit declaration belongs to no library and is given no library
+// name to carry: LibraryMap::TagCompilationUnit in src/parser/library_map.cpp
+// tags the seven design element lists and none of these four.
+inline void AppendCompilationUnitDeclarations(CompilationUnit& target,
+                                              const CompilationUnit& src) {
+  target.cu_items.insert(target.cu_items.end(), src.cu_items.begin(),
+                         src.cu_items.end());
+  target.classes.insert(target.classes.end(), src.classes.begin(),
+                        src.classes.end());
+  target.bind_directives.insert(target.bind_directives.end(),
+                                src.bind_directives.begin(),
+                                src.bind_directives.end());
+  target.external_constraints.insert(target.external_constraints.end(),
+                                     src.external_constraints.begin(),
+                                     src.external_constraints.end());
 }
 
 }  // namespace delta
