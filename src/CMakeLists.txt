@@ -285,6 +285,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     lexer/lexer_numbers.cpp
     lexer/lexer_operators.cpp
     parser/expr_parser_calls.cpp
+    parser/expr_parser_literals.cpp
     parser/parser_package_import_export.cpp
     parser/parser_udp.cpp
     simulator/constraint_solver_eval.cpp
