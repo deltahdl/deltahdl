@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -201,6 +202,170 @@ TEST(PortConnectionElab, PrimitiveOutputPartSelectWidthFromParameter) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kOneBitTerminal, 4, "4.9.6"));
+}
+
+// The rest of this file covers the same rule for a user-defined primitive
+// instance rather than a gate instance. §4.9.6 states it for both in one
+// sentence -- "Primitive terminals, including UDP terminals, are different from
+// module ports. Primitive output and inout terminals shall be connected
+// directly to 1-bit nets or 1-bit structural net expressions" -- and §29.8 adds
+// of a UDP instantiation that "The terminal connection rules remain the same as
+// outlined in 28.3.6".
+//
+// The report a UDP instance provokes names its output terminal alone, because
+// §29.3.1 rules that "UDPs have multiple input ports and exactly one output
+// port; bidirectional inout ports are not permitted on UDPs". That is different
+// wording from the gate report kOneBitTerminal above matches, so the two cases
+// below spell out their own, width included: a run that measured an input
+// terminal or the vector's bounds instead of the output terminal's width
+// reports a different number, and matching the number is what tells those
+// apart.
+//
+// These are the cases #3200 was filed on. ValidatePrimitiveOutputTerminalWidths
+// (src/elaborator/elaborator_gates.cpp) returned at once on any item that was
+// not a ModuleItemKind::kGateInst, and the kUdpInst arm of
+// Elaborator::ElaborateDeclItem (src/elaborator/elaborator_items.cpp) did not
+// call it, so a primitive instance with a four-bit output terminal elaborated
+// in silence -- while UdpEvalState (src/simulator/udp_eval.h) answers one of
+// '0', '1' and 'x', so one bit is all the instance ever drives.
+
+// The top module of a design ElaborateSrc built, or nullptr when the elaborator
+// rooted none. Each case below names its own top, so a design that reached the
+// assertions holds exactly that one.
+RtlirModule* TopModule(RtlirDesign* design) {
+  if (design == nullptr || design->top_modules.empty()) return nullptr;
+  return design->top_modules[0];
+}
+
+// §4.9.6: the output terminal of the primitive instance below is connected to a
+// four-bit net, which is neither a 1-bit net nor a 1-bit structural net
+// expression, so the source shall be rejected. The width is 4 while the net is
+// declared `[3:0]`, so a run reporting a bound rather than the width says 3 and
+// fails here.
+TEST(PortConnectionElab, PrimitiveInstanceWithAWideOutputTerminalIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "primitive p_wide4(output q_out, input i_a, input i_b);\n"
+      "  table\n"
+      "    0 0 : 0;\n"
+      "    0 1 : 0;\n"
+      "    1 0 : 0;\n"
+      "    1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module wide4_top;\n"
+      "  wire [3:0] q_bus;\n"
+      "  wire i_a_s, i_b_s;\n"
+      "  p_wide4 u_wide4(q_bus, i_a_s, i_b_s);\n"
+      "endmodule\n",
+      f, "wide4_top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "user-defined primitive output terminal must be a "
+                            "1-bit net or structural net expression (got "
+                            "width 4)",
+                            12, "4.9.6"));
+}
+
+// §4.9.6 admits a 1-bit *structural net expression* (see 23.3.3) as a primitive
+// output terminal, and a ranged part-select spanning more than one bit is not
+// one, so the source shall be rejected. The select is `[4:2]` of a `[7:0]`
+// net: the width 3 is neither bound, and it is not the declared width 8, so a
+// run that read a bound or the whole net instead of the span reports a
+// different number and fails here.
+TEST(PortConnectionElab, PrimitiveInstanceWithAWideOutputSelectIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "primitive p_sel3(output q_out, input i_a, input i_b);\n"
+      "  table\n"
+      "    0 0 : 0;\n"
+      "    0 1 : 1;\n"
+      "    1 0 : 1;\n"
+      "    1 1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module sel3_top;\n"
+      "  wire [7:0] q_bus;\n"
+      "  wire i_a_s, i_b_s;\n"
+      "  p_sel3 u_sel3(q_bus[4:2], i_a_s, i_b_s);\n"
+      "endmodule\n",
+      f, "sel3_top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "user-defined primitive output terminal must be a "
+                            "1-bit net or structural net expression (got "
+                            "width 3)",
+                            12, "4.9.6"));
+}
+
+// The conforming case of the same rule: a scalar net is the 1-bit net §4.9.6
+// requires, so the design shall elaborate and the instance shall reach
+// RtlirModule::udp_insts (src/elaborator/rtlir.h) driving that net. Reading the
+// recorded instance back is what separates "accepted" from "dropped without a
+// report", and it is what fails if the widened check starts rejecting a source
+// the standard allows.
+TEST(PortConnectionElab, PrimitiveInstanceWithAScalarOutputTerminalIsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "primitive p_scal1(output q_out, input i_a, input i_b);\n"
+      "  table\n"
+      "    0 0 : 0;\n"
+      "    0 1 : 0;\n"
+      "    1 0 : 0;\n"
+      "    1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module scal1_top;\n"
+      "  wire q_scalar;\n"
+      "  wire i_a_s, i_b_s;\n"
+      "  p_scal1 u_scal1(q_scalar, i_a_s, i_b_s);\n"
+      "endmodule\n",
+      f, "scal1_top");
+  auto* mod = TopModule(design);
+  ASSERT_NE(mod, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(mod->udp_insts.size(), 1U);
+  ASSERT_NE(mod->udp_insts[0].output, nullptr);
+  EXPECT_EQ(mod->udp_insts[0].output->text, "q_scalar");
+}
+
+// An instance array is the one place a terminal wider than one bit satisfies
+// §4.9.6, so the four-bit terminal below shall draw no report. §28.3.6 rules
+// that "If bit lengths are different, each instance shall get a part-select of
+// the port expression, of a bit length equal to the instance port bit length",
+// and §29.8 rules that "The terminal connection rules remain the same as
+// outlined in 28.3.6", so each of the four elements connects to one bit and the
+// whole terminal is not the width the rule measures.
+// ValidatePrimitiveOutputTerminalWidths returns early on an instance array for
+// that reason, and this case says the early return still holds now that its
+// kind guard admits a primitive instance: a check that measured the terminal
+// anyway would reject this source with the §4.9.6 report the two cases above
+// look for.
+//
+// The instance range is `[7:4]` and the terminal is declared `[3:0]` so that no
+// array index is also a bit position of the terminal, and the four recorded
+// instances are asserted alongside the absence of errors so that an expansion
+// that dropped the array cannot pass.
+TEST(PortConnectionElab,
+     PrimitiveInstanceArrayWithAWideOutputTerminalIsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "primitive p_arr4(output q_out, input i_a, input i_b);\n"
+      "  table\n"
+      "    0 0 : 0;\n"
+      "    0 1 : 0;\n"
+      "    1 0 : 0;\n"
+      "    1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module arr4_top;\n"
+      "  wire [3:0] q_bus;\n"
+      "  wire i_a_s, i_b_s;\n"
+      "  p_arr4 u_arr4 [7:4] (q_bus, i_a_s, i_b_s);\n"
+      "endmodule\n",
+      f, "arr4_top");
+  auto* mod = TopModule(design);
+  ASSERT_NE(mod, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(mod->udp_insts.size(), 4U);
 }
 
 }  // namespace

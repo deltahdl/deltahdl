@@ -270,29 +270,65 @@ static uint32_t StructuralNetExprWidth(const Expr* t, const RtlirModule* mod,
   }
 }
 
+// §29.8's `udp_instance ::= [ name_of_instance ] ( output_terminal ,
+// input_terminal { , input_terminal } )` production puts the output terminal
+// first, and §29.3.1 rules that "UDPs have multiple input ports and exactly one
+// output port; bidirectional inout ports are not permitted on UDPs", so index 0
+// is the whole answer. OutputOrInoutTerminalIndices cannot answer it:
+// Parser::ParseOneUdpInstance (src/parser/parser_udp.cpp) never writes
+// ModuleItem::gate_kind, so a primitive instance carries the GateKind::kAnd its
+// declaration at src/parser/ast_module.h:302 defaults to, and the {0} that
+// enumerator's default arm returns says nothing about a primitive.
+static std::vector<size_t> UdpOutputTerminalIndices(size_t nterms) {
+  return (nterms >= 1) ? std::vector<size_t>{0} : std::vector<size_t>{};
+}
+
 void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
                                            const RtlirModule* mod,
                                            const ScopeMap& scope,
                                            DiagEngine& diag) {
-  if (!item || item->kind != ModuleItemKind::kGateInst) return;
+  // §4.9.6 states the rule this enforces for both kinds: "Primitive terminals,
+  // including UDP terminals, are different from module ports. Primitive output
+  // and inout terminals shall be connected directly to 1-bit nets or 1-bit
+  // structural net expressions."
+  if (!item || (item->kind != ModuleItemKind::kGateInst &&
+                item->kind != ModuleItemKind::kUdpInst)) {
+    return;
+  }
+  const bool is_udp = item->kind == ModuleItemKind::kUdpInst;
 
+  // An instance array measures nothing here, for a primitive instance as for a
+  // gate instance. §28.3.6 makes a terminal wider than one bit the distributed
+  // connection -- "each instance shall get a part-select of the port
+  // expression, of a bit length equal to the instance port bit length" -- so
+  // the single bit §4.9.6 requires is what one element connects to, and the
+  // whole terminal is not the width to measure. §29.8 rules of an array of
+  // user-defined primitive instances that "The terminal connection rules remain
+  // the same as outlined in 28.3.6", so the same reading holds for a kUdpInst
+  // item. CheckGateInstanceArrayTerminalWidths (src/elaborator/
+  // elaborator_items.cpp) is what checks these terminals instead.
   if (item->inst_range_left || item->inst_range_right) return;
 
   const auto& terms = item->gate_terminals;
-  for (size_t i : OutputOrInoutTerminalIndices(item->gate_kind, terms.size())) {
+  const std::vector<size_t> outs =
+      is_udp ? UdpOutputTerminalIndices(terms.size())
+             : OutputOrInoutTerminalIndices(item->gate_kind, terms.size());
+  for (size_t i : outs) {
     auto* t = terms[i];
     if (!t) continue;
     uint32_t w = StructuralNetExprWidth(t, mod, scope);
     if (w == 0 || w == 1) continue;
-    // §4.9.6 states this rule: "Primitive output and inout terminals shall be
-    // connected directly to 1-bit nets or 1-bit structural net expressions."
-    // §28.3.6 states the terminal order and the instance-array bit-length
-    // rules and says nothing about the width of one terminal.
+    // A primitive instance is told about its output terminal alone, because
+    // §29.3.1 permits a UDP no inout terminal and exactly one output. A gate
+    // instance is told about both, because §28.3.6 puts "the output or
+    // bidirectional terminals" first together and several gate types connect a
+    // bidirectional one.
+    const char* terminal = is_udp ? "user-defined primitive output terminal"
+                                  : "primitive output or inout terminal";
     diag.Error(item->loc,
-               std::format("primitive output or inout terminal must be a "
-                           "1-bit net or structural net expression (got "
-                           "width {})",
-                           w),
+               std::format("{} must be a 1-bit net or structural net "
+                           "expression (got width {})",
+                           terminal, w),
                Subclause("4.9.6"));
   }
 }

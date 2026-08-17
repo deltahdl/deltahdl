@@ -270,13 +270,17 @@ class Elaborator : public ElaboratorOperationRules {
 
   void ElaborateModuleInst(ModuleItem* item, RtlirModule* mod);
 
-  // §28.3.6: reports a terminal of an instance array whose bit-length is
-  // neither one nor the instance-array length, and does nothing where `item`
-  // carries no instance range. The two item kinds that can carry one ask this
-  // together because §29.8 puts them under one rule: an array of user-defined
-  // primitive instances connects its terminals by "the terminal connection
-  // rules ... outlined in 28.3.6", the rules an array of gates connects by.
-  void CheckInstanceArrayTerminals(const ModuleItem* item,
+  // Reports a gate or user-defined primitive instance whose terminals are the
+  // wrong width, under whichever of the two rules the instance is held to.
+  // §28.3.6 rules the terminal of an instance array, whose bit-length shall be
+  // either one or the instance-array length. §4.9.6 rules the output or inout
+  // terminal of a single instance, which "shall be connected directly to 1-bit
+  // nets or 1-bit structural net expressions". Both kinds of instance ask this
+  // together because §29.8 puts them under one rule: a user-defined primitive
+  // instance connects its terminals by "the terminal connection rules ...
+  // outlined in 28.3.6", the rules a gate instance connects by, and §4.9.6
+  // states its rule of "Primitive terminals, including UDP terminals".
+  void CheckInstanceTerminalWidths(const ModuleItem* item,
                                    const RtlirModule* mod);
 
   // §29.8: records on `mod` every instance of a user-defined primitive that one

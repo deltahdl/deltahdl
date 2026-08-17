@@ -603,16 +603,21 @@ bool IsStaticDeferredAssertion(const ModuleItem* item) {  // §16.4.3
 
 }  // namespace
 
-// The instance range is what makes the widths a question at all, so an item
-// carrying none is left alone: §28.3.6's rule is about "the bit length of each
-// single-instance port or terminal in the instantiated module or primitive"
-// against the length of an array, and there is no array here to measure
-// against.
-void Elaborator::CheckInstanceArrayTerminals(const ModuleItem* item,
+// The instance range is what makes §28.3.6's widths a question at all, so an
+// item carrying none is left alone by CheckGateInstanceArrayTerminalWidths: its
+// rule is about "the bit length of each single-instance port or terminal in the
+// instantiated module or primitive" against the length of an array, and there
+// is no array here to measure against.
+// ValidatePrimitiveOutputTerminalWidths asks the complementary question, so it
+// is asked of every item, and one ScopeMap answers both.
+void Elaborator::CheckInstanceTerminalWidths(const ModuleItem* item,
                                              const RtlirModule* mod) {
-  if (!HasInstanceArrayRange(item)) return;
-  CheckGateInstanceArrayTerminalWidths(item, mod, BuildParamScope(mod),
-                                       interconnect_names_, diag_);
+  ScopeMap scope = BuildParamScope(mod);
+  if (HasInstanceArrayRange(item)) {
+    CheckGateInstanceArrayTerminalWidths(item, mod, scope, interconnect_names_,
+                                         diag_);
+  }
+  ValidatePrimitiveOutputTerminalWidths(item, mod, scope, diag_);
 }
 
 void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
@@ -651,11 +656,9 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       CheckGateInstNameDiagnostics(item, declared_names_, diag_);
       CreateImplicitNetsForTerminals(item->gate_terminals, item->loc,
                                      make_implicit_net);
-      CheckInstanceArrayTerminals(item, mod);
+      CheckInstanceTerminalWidths(item, mod);
       ValidateBidirectionalSwitchConnections(item, mod, diag_,
                                              nettype_canonical_);
-      ValidatePrimitiveOutputTerminalWidths(item, mod, BuildParamScope(mod),
-                                            diag_);
       ElaborateGateInst(item, mod, arena_);
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       return true;
@@ -665,7 +668,7 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
                                      make_implicit_net);
       // Checked before ElaborateUdpInst expands the array, so a terminal the
       // widths rule rejects is reported rather than expanded.
-      CheckInstanceArrayTerminals(item, mod);
+      CheckInstanceTerminalWidths(item, mod);
       ElaborateUdpInst(item, mod);
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       return true;
