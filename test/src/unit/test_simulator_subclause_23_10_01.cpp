@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
