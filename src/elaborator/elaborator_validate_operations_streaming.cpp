@@ -57,7 +57,8 @@ void ElaboratorOperationRules::WalkStmtsForStringConcatLvalue(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForStringConcatLvalue(ci.body);
 }
 
-void ElaboratorOperationRules::ValidateStringConcatLvalue(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateStringConcatLvalue(
+    const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
@@ -152,8 +153,8 @@ void CheckStreamingSliceSize(const Expr* slice, DiagEngine& diag,
 
 }  // namespace
 
-void ElaboratorOperationRules::WalkExprForStreamingContext(const Expr* expr,
-                                             bool is_valid_context) {
+void ElaboratorOperationRules::WalkExprForStreamingContext(
+    const Expr* expr, bool is_valid_context) {
   if (!expr) return;
   if (expr->kind == ExprKind::kStreamingConcat) {
     if (!is_valid_context) {
@@ -196,7 +197,7 @@ void ElaboratorOperationRules::WalkExprForStreamingContext(const Expr* expr,
 // virtual interface). Targets we cannot type-check from a simple identifier
 // (selects, member accesses) are left to type-aware downstream checks.
 void ElaboratorOperationRules::CheckStreamingSourceTargetType(const Expr* lhs,
-                                                const Expr* rhs) {
+                                                              const Expr* rhs) {
   if (!lhs || !rhs) return;
   if (rhs->kind != ExprKind::kStreamingConcat) return;
   if (lhs->kind == ExprKind::kStreamingConcat) return;
@@ -223,7 +224,7 @@ void ElaboratorOperationRules::CheckStreamingSourceTargetType(const Expr* lhs,
 // source that is itself a streaming_concatenation is allowed, and any source we
 // cannot type-check from a simple identifier is left to downstream checks.
 void ElaboratorOperationRules::CheckStreamingUnpackSourceType(const Expr* lhs,
-                                                const Expr* rhs) {
+                                                              const Expr* rhs) {
   if (!lhs || !rhs) return;
   if (lhs->kind != ExprKind::kStreamingConcat) return;
   if (rhs->kind == ExprKind::kStreamingConcat) return;
@@ -266,7 +267,8 @@ void ElaboratorOperationRules::WalkStmtsForStreamingContext(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForStreamingContext(ci.body);
 }
 
-void ElaboratorOperationRules::ValidateStreamingConcatContext(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateStreamingConcatContext(
+    const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {

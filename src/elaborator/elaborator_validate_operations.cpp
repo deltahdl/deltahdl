@@ -146,7 +146,8 @@ void ElaboratorOperationRules::WalkStmtsForAggregateCompare(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForAggregateCompare(ci.body);
 }
 
-void ElaboratorOperationRules::ValidateAggregateComparisons(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateAggregateComparisons(
+    const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
@@ -274,7 +275,8 @@ void ElaboratorOperationRules::WalkStmtsForTypeRefCompare(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForTypeRefCompare(ci.body);
 }
 
-void ElaboratorOperationRules::ValidateTypeRefComparisons(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateTypeRefComparisons(
+    const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
@@ -341,7 +343,8 @@ static bool TypeRefArgSelectsDynamicElement(
          (it->second.is_dynamic || it->second.is_assoc || it->second.is_queue);
 }
 
-bool ElaboratorOperationRules::TypeRefArgUsesDynamicElement(const Expr* e) const {
+bool ElaboratorOperationRules::TypeRefArgUsesDynamicElement(
+    const Expr* e) const {
   if (!e) return false;
   if (TypeRefArgSelectsDynamicElement(e, var_array_info_)) return true;
   const Expr* const kChildren[] = {e->lhs,       e->rhs,       e->base,
@@ -359,7 +362,8 @@ bool ElaboratorOperationRules::TypeRefArgUsesDynamicElement(const Expr* e) const
   return false;
 }
 
-void ElaboratorOperationRules::CheckTypeRefArgInner(const Expr* inner, SourceLoc loc) {
+void ElaboratorOperationRules::CheckTypeRefArgInner(const Expr* inner,
+                                                    SourceLoc loc) {
   if (!inner) return;
   if (TypeRefArgHasMemberAccess(inner)) {
     diag_.Error(loc,
@@ -429,7 +433,7 @@ void ElaboratorOperationRules::ValidateTypeRefArgs(const ModuleDecl* decl) {
 // the assignment-target and declaration-initializer positions, both of which
 // supply the expression type from the target variable's declared type.
 void ElaboratorOperationRules::CheckTaggedMemberName(std::string_view var_name,
-                                       const Expr* rhs) {
+                                                     const Expr* rhs) {
   if (!rhs || rhs->kind != ExprKind::kTagged) return;
   if (!rhs->rhs || rhs->rhs->kind != ExprKind::kIdentifier) return;
 
@@ -453,7 +457,8 @@ void ElaboratorOperationRules::CheckTaggedMemberName(std::string_view var_name,
               Subclause("11.9"));
 }
 
-void ElaboratorOperationRules::CheckTaggedExprMember(const Expr* lhs, const Expr* rhs) {
+void ElaboratorOperationRules::CheckTaggedExprMember(const Expr* lhs,
+                                                     const Expr* rhs) {
   if (!lhs || lhs->kind != ExprKind::kIdentifier) return;
   CheckTaggedMemberName(lhs->text, rhs);
 }
@@ -473,7 +478,8 @@ void ElaboratorOperationRules::WalkStmtsForTaggedExpr(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForTaggedExpr(ci.body);
 }
 
-void ElaboratorOperationRules::ValidateTaggedUnionMembers(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateTaggedUnionMembers(
+    const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     // §11.9: a declaration initializer is another position where the tagged
     // expression's type is known (from the declared variable), so the member
@@ -592,7 +598,8 @@ void ElaboratorOperationRules::WalkStmtsForRealOps(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForRealOps(ci.body);
 }
 
-void ElaboratorOperationRules::ValidateRealOperatorRestrictions(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateRealOperatorRestrictions(
+    const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {

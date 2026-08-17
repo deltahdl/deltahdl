@@ -80,7 +80,7 @@ static bool IsAssignOp(TokenKind op) {
 }
 
 void ElaboratorOperationRules::WalkExprForAssignInExpr(const Expr* expr,
-                                         bool in_event_or_cont) {
+                                                       bool in_event_or_cont) {
   if (!expr) return;
   if (expr->kind == ExprKind::kBinary && IsAssignOp(expr->op)) {
     if (in_event_or_cont) {
@@ -114,7 +114,8 @@ void ElaboratorOperationRules::WalkStmtsForAssignInExpr(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForAssignInExpr(ci.body);
 }
 
-void ElaboratorOperationRules::ValidateAssignInExprRestrictions(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateAssignInExprRestrictions(
+    const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (IsProceduralItemKind(item->kind)) {
       for (const auto& ev : item->sensitivity) {
@@ -522,7 +523,8 @@ void ElaboratorOperationRules::WalkStmtsForAssocConcatTarget(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForAssocConcatTarget(ci.body);
 }
 
-void ElaboratorOperationRules::ValidateAssocConcatTarget(const ModuleDecl* decl) {
+void ElaboratorOperationRules::ValidateAssocConcatTarget(
+    const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (IsProceduralItemKind(item->kind)) {
       WalkStmtsForAssocConcatTarget(item->body);
