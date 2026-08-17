@@ -141,4 +141,42 @@ TEST(LoopGenerateIndexSim, BlockLocalDeclarationHidesTheModuleLevelName) {
   EXPECT_EQ(outer->value.ToUint64(), 99u);
 }
 
+// §27.4: a named generate block "is a declaration of an array of generate
+// block instances", and "the index values in this array are the values assumed
+// by the genvar during elaboration". Two sibling blocks written over one genvar
+// are therefore two distinct arrays, and since each instance "comprises a
+// separate scope and a new level of hierarchy when it is instantiated", `a`'s
+// `x` at index 4 and `b`'s `x` at index 4 are different objects.
+//
+// Every instance writes its block's constant before any instance reads one
+// back, so a run that gave the two blocks one object leaves both reads holding
+// whichever write ran last, rather than each block's own constant. The loop
+// runs 4 to 5 while the array it reports through is read at 0 to 3, so no index
+// equals the offset of the element it selects.
+TEST(LoopGenerateIndexSim, SiblingBlocksOverOneGenvarKeepSeparateVariables) {
+  SimFixture f;
+  RunModuleArray(f,
+                 "module t;\n"
+                 "  logic [7:0] out [0:3];\n"
+                 "  genvar i;\n"
+                 "  generate\n"
+                 "    for (i = 4; i < 6; i = i + 1) begin : a\n"
+                 "      logic [7:0] x;\n"
+                 "      initial begin\n"
+                 "        x = 8'd10;\n"
+                 "        #1 out[i - 4] = x;\n"
+                 "      end\n"
+                 "    end\n"
+                 "    for (i = 4; i < 6; i = i + 1) begin : b\n"
+                 "      logic [7:0] x;\n"
+                 "      initial begin\n"
+                 "        x = 8'd20;\n"
+                 "        #1 out[i - 2] = x;\n"
+                 "      end\n"
+                 "    end\n"
+                 "  endgenerate\n"
+                 "endmodule\n",
+                 "out", {10u, 10u, 20u, 20u});
+}
+
 }  // namespace

@@ -1,3 +1,4 @@
+#include <set>
 #include <string>
 
 #include "fixture_elaborator.h"
@@ -22,9 +23,9 @@ TEST(GenerateElaboration, GenerateForCreatesVars) {
 
   auto* mod = design->top_modules[0];
   EXPECT_EQ(mod->variables.size(), 3u);
-  EXPECT_EQ(mod->variables[0].name, "i_0_x");
-  EXPECT_EQ(mod->variables[1].name, "i_1_x");
-  EXPECT_EQ(mod->variables[2].name, "i_2_x");
+  EXPECT_EQ(mod->variables[0].name, "genblk1_0_x");
+  EXPECT_EQ(mod->variables[1].name, "genblk1_1_x");
+  EXPECT_EQ(mod->variables[2].name, "genblk1_2_x");
 }
 
 TEST(GenerateElaboration, GenerateForZeroIterations) {
@@ -61,8 +62,8 @@ TEST(GenerateElaboration, GenerateForWithAssign) {
   auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->variables.size(), 2u);
   EXPECT_EQ(mod->assigns.size(), 2u);
-  EXPECT_EQ(mod->variables[0].name, "i_0_w");
-  EXPECT_EQ(mod->variables[1].name, "i_1_w");
+  EXPECT_EQ(mod->variables[0].name, "genblk1_0_w");
+  EXPECT_EQ(mod->variables[1].name, "genblk1_1_w");
 }
 
 TEST(GenerateElaboration, GenerateForCreatesInstances) {
@@ -454,6 +455,141 @@ TEST(GenerateElaboration, GenerateForGenvarXZReportsNameWhichHalfOfTheHeader) {
       step);
   EXPECT_TRUE(ReportedError(step.diag.Diagnostics(), kIterationMsg, 3, "27.4"));
   EXPECT_FALSE(ReportedError(step.diag.Diagnostics(), kInitMsg, 3, "27.4"));
+}
+
+// Every name the module's variable declarations carry. A set rather than the
+// order elaboration produced, because what §27.4 fixes about two sibling
+// generate block instance arrays is that their declarations are distinct
+// objects: two declarations that collapse onto one name leave one entry here
+// whichever order the blocks were visited in.
+static std::set<std::string> VariableNames(const RtlirModule* mod) {
+  std::set<std::string> names;
+  for (const auto& var : mod->variables) names.insert(std::string(var.name));
+  return names;
+}
+
+// §27.4: a named generate block "is a declaration of an array of generate block
+// instances", and "the index values in this array are the values assumed by the
+// genvar during elaboration". What identifies an instance is therefore the
+// block and the index, not the genvar. Two loop generate constructs written
+// side by side over one genvar declare two arrays, and §27.4 rules that a
+// generate block "comprises a separate scope", so `blk_a`'s `v` and `blk_b`'s
+// `v` are two declarations and the flattened design has to spell them apart.
+//
+// Naming the flattened declaration after the genvar gave both arrays the prefix
+// `i_4_`, so the four declarations collapsed onto two names and one instance's
+// `v` answered a reference from the other.
+//
+// The loop runs over 4 and 5 rather than 0 and 1 so that no index equals the
+// storage offset of the variable it names: at 0 and 1 an implementation that
+// wrote the offset where §27.4 requires the genvar value would produce the same
+// four names.
+TEST(GenerateElaboration,
+     SiblingNamedBlocksOverOneGenvarNameTheirDeclarationsApart) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top();\n"
+      "  genvar i;\n"
+      "  generate\n"
+      "    for (i = 4; i < 6; i = i + 1) begin : blk_a\n"
+      "      logic [7:0] v;\n"
+      "    end\n"
+      "    for (i = 4; i < 6; i = i + 1) begin : blk_b\n"
+      "      logic [7:0] v;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->variables.size(), 4u);
+  EXPECT_EQ(VariableNames(mod),
+            (std::set<std::string>{"blk_a_4_v", "blk_a_5_v", "blk_b_4_v",
+                                   "blk_b_5_v"}));
+}
+
+// §27.4: the same rule reaches the continuous assignments inside the two
+// blocks. The body AST is shared across instances and writes the simple name
+// the block declared, so an assignment reaches its own instance's declaration
+// only through RtlirContAssign::gen_block_prefix (src/elaborator/rtlir.h:226).
+// Two sibling arrays over one genvar are separate scopes, so the two
+// assignments cannot carry one prefix. Spelling the prefix from the genvar gave
+// both of them `i_4_`, and a prefix that does not say which block an assignment
+// came from resolves a simple name written in both blocks to one declaration.
+//
+// The assertion is that the prefixes differ rather than that they read some
+// spelling, because §27.4 fixes that the scopes are separate and fixes nothing
+// about how a flattened design spells a prefix. ASSERT_FALSE on emptiness
+// states the premise the inequality rests on, that both assignments were
+// stamped at all: two unstamped assignments agree on the empty string and would
+// otherwise be reported as differing from nothing.
+TEST(GenerateElaboration,
+     SiblingNamedBlocksOverOneGenvarStampDistinctContAssignPrefixes) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top();\n"
+      "  genvar i;\n"
+      "  generate\n"
+      "    for (i = 4; i < 5; i = i + 1) begin : blk_a\n"
+      "      logic [7:0] a;\n"
+      "      assign a = 8'd11;\n"
+      "    end\n"
+      "    for (i = 4; i < 5; i = i + 1) begin : blk_b\n"
+      "      logic [7:0] b;\n"
+      "      assign b = 8'd22;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->assigns.size(), 2u);
+  std::string first(mod->assigns[0].gen_block_prefix);
+  std::string second(mod->assigns[1].gen_block_prefix);
+  ASSERT_FALSE(first.empty());
+  ASSERT_FALSE(second.empty());
+  EXPECT_NE(first, second);
+}
+
+// §27.6: "All unnamed generate blocks will be given the name genblk<n> where
+// <n> is the number assigned to its enclosing generate construct", numbering
+// the constructs of a scope from 1 in textual order. That naming is applied by
+// Elaborator::AssignGenerateBlockNames before elaboration, so the two unnamed
+// constructs here are `genblk1` and `genblk2`, and the §27.4 rule that
+// separates two named sibling arrays separates these two as well.
+//
+// This is the case that says the separation does not depend on the source
+// having written a label: with the prefix spelled from the genvar both unnamed
+// blocks were `i_4_` and `i_5_` and their `v` declarations collapsed onto two
+// names. The indices are 4 and 5 for the reason the named case gives.
+TEST(GenerateElaboration,
+     SiblingUnnamedBlocksOverOneGenvarNameTheirDeclarationsApart) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top();\n"
+      "  genvar i;\n"
+      "  generate\n"
+      "    for (i = 4; i < 6; i = i + 1) begin\n"
+      "      logic [7:0] v;\n"
+      "    end\n"
+      "    for (i = 4; i < 6; i = i + 1) begin\n"
+      "      logic [7:0] v;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->variables.size(), 4u);
+  EXPECT_EQ(VariableNames(mod),
+            (std::set<std::string>{"genblk1_4_v", "genblk1_5_v", "genblk2_4_v",
+                                   "genblk2_5_v"}));
 }
 
 }  // namespace

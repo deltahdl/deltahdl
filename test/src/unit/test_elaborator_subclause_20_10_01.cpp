@@ -235,8 +235,11 @@ TEST(ElabSeverityTask, MessageRecordsHierarchicalScope) {
 }
 
 // §20.10.1 claim 13 — a call inside a generate-for block sits inside a
-// nested scope; the hierarchical scope name shall reflect the generate
-// block prefix in addition to the module name.
+// nested scope, so the hierarchical scope name is the module name joined to
+// the generate block's own name and index. The loop below is the first
+// generate construct in `top` and carries no name, so §27.6 names it
+// genblk1, and §27.4 indexes the instance by the value the genvar assumed,
+// which is 0. The scope is therefore `top.genblk1_0` and nothing else.
 TEST(ElabSeverityTask, GenerateScopeAppearsInMessageScope) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -247,8 +250,7 @@ TEST(ElabSeverityTask, GenerateScopeAppearsInMessageScope) {
       "endmodule\n",
       ef);
   ASSERT_NE(design, nullptr);
-  EXPECT_NE(design->last_elab_severity_scope.find("top"), std::string::npos);
-  EXPECT_NE(design->last_elab_severity_scope.find('i'), std::string::npos);
+  EXPECT_EQ(design->last_elab_severity_scope, "top.genblk1_0");
 }
 
 // §20.10.1 claim 14 — the tool-specific message shall include the

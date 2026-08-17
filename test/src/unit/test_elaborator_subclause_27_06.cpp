@@ -209,4 +209,88 @@ TEST(GenerateBlockNaming, RepeatedCollisionAddsMoreLeadingZeros) {
   EXPECT_EQ(second->name, "genblk002");
 }
 
+// §27.6: "Each generate construct in a given scope is assigned a number. The
+// number will be 1 for the construct that appears textually first in that
+// scope and will increase by 1 for each subsequent generate construct in that
+// scope." A construct carrying an explicit name takes its number all the same,
+// which is what the standard's own example records when it names the construct
+// written after `begin : g1` genblk4 rather than genblk3. The name reaches the
+// elaborated declarations through the loop generate block's prefix
+// `<enclosing><block-name>_<genvar-value>_`, so the second construct's `b` is
+// named genblk2_4_b and not genblk1_4_b.
+//
+// The loop runs over 4 and 5 so that no index equals the storage offset of the
+// variable it produces.
+TEST(GenerateBlockNaming, NamedLoopConstructConsumesNumberForNextBlock) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  for (genvar i = 4; i < 6; i = i + 1) begin : first\n"
+      "    logic a;\n"
+      "  end\n"
+      "  for (genvar j = 4; j < 6; j = j + 1) begin\n"
+      "    logic b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.design, nullptr);
+  auto* mod = r.design->top_modules[0];
+  ASSERT_EQ(mod->variables.size(), 4u);
+  EXPECT_EQ(mod->variables[0].name, "first_4_a");
+  EXPECT_EQ(mod->variables[1].name, "first_5_a");
+  EXPECT_EQ(mod->variables[2].name, "genblk2_4_b");
+  EXPECT_EQ(mod->variables[3].name, "genblk2_5_b");
+}
+
+// §27.6: "If such a name would conflict with an explicitly declared name, then
+// leading zeros are added in front of the number until the name does not
+// conflict." The parameter genblk1 is one of the explicitly declared names
+// Elaborator::AssignGenerateBlockNames seeds the conflict set with, so the sole
+// construct in the scope -- number 1 -- is named genblk01, and its declarations
+// are elaborated under that name rather than under genblk1.
+//
+// The loop runs over 4 and 5 so that no index equals the storage offset of the
+// variable it produces.
+TEST(GenerateBlockNaming, LeadingZeroNameAppliesToBlockDeclarations) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  parameter genblk1 = 0;\n"
+      "  for (genvar i = 4; i < 6; i = i + 1) begin\n"
+      "    logic x;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.design, nullptr);
+  auto* mod = r.design->top_modules[0];
+  ASSERT_EQ(mod->variables.size(), 2u);
+  EXPECT_EQ(mod->variables[0].name, "genblk01_4_x");
+  EXPECT_EQ(mod->variables[1].name, "genblk01_5_x");
+}
+
+// §27.6 numbers the constructs of "a given scope", and §27.4 rules that a
+// generate block "comprises a separate scope and a new level of hierarchy when
+// it is instantiated", so the count starts again inside one: §27.6 writes the
+// first nested construct of a block named g1 as top.g1[0].genblk1. The inner
+// construct here is therefore genblk1 and not genblk2, even though the outer
+// construct took number 1 in the module's scope. Each instance of the outer
+// block contributes its own index to the prefix, so the inner block's `y` is
+// named <outer>_<outer index>_genblk1_<inner index>_y.
+//
+// Both loops run over 4 and 5 so that no index equals the storage offset of the
+// variable it produces.
+TEST(GenerateBlockNaming, NestedConstructNumberingRestartsInBlockScope) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  for (genvar i = 4; i < 6; i = i + 1) begin : outer\n"
+      "    for (genvar j = 4; j < 6; j = j + 1) begin\n"
+      "      logic y;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.design, nullptr);
+  auto* mod = r.design->top_modules[0];
+  ASSERT_EQ(mod->variables.size(), 4u);
+  EXPECT_EQ(mod->variables[0].name, "outer_4_genblk1_4_y");
+  EXPECT_EQ(mod->variables[1].name, "outer_4_genblk1_5_y");
+  EXPECT_EQ(mod->variables[2].name, "outer_5_genblk1_4_y");
+  EXPECT_EQ(mod->variables[3].name, "outer_5_genblk1_5_y");
+}
+
 }  // namespace

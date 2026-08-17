@@ -198,29 +198,65 @@ static bool IsGenerateConstruct(ModuleItemKind k) {
          k == ModuleItemKind::kGenerateCase;
 }
 
-void Elaborator::AssignGenerateBlockNames(const ModuleDecl* decl) {
-  std::unordered_set<std::string_view> used;
-  for (const auto& port : decl->ports) used.insert(port.name);
-  for (const auto& p : decl->params) used.insert(p.first);
-  for (auto* it : decl->items) {
+// §27.6: "All unnamed generate blocks will be given the name genblk<n> where
+// <n> is the number assigned to its enclosing generate construct. If such a
+// name would conflict with an explicitly declared name, then leading zeros are
+// added in front of the number until the name does not conflict."
+static std::string_view GenerateBlockName(
+    int64_t n, const std::unordered_set<std::string_view>& used, Arena& arena) {
+  std::string digits = std::to_string(n);
+  std::string candidate = "genblk" + digits;
+  while (used.count(candidate)) {
+    digits.insert(digits.begin(), '0');
+    candidate = "genblk" + digits;
+  }
+  auto* buf = arena.AllocString(candidate.c_str(), candidate.size());
+  return {buf, candidate.size()};
+}
+
+// §27.6: "Each generate construct in a given scope is assigned a number. The
+// number will be 1 for the construct that appears textually first in that
+// scope and will increase by 1 for each subsequent generate construct in that
+// scope." A construct that carries a name still takes a number, which is why
+// the standard's own example names the construct written after `begin : g1`
+// genblk4 rather than genblk3.
+//
+// The count restarts in each scope, so this recurses into the body of every
+// construct it numbers. §27.4 rules that a generate block "comprises a
+// separate scope and a new level of hierarchy when it is instantiated", and
+// §27.6 writes the first nested construct of a block named g1 as
+// top.g1[0].genblk1. Each alternative of a conditional construct is walked on
+// its own, since only one of them is ever instantiated.
+static void NameGenerateBlocksInScope(const std::vector<ModuleItem*>& items,
+                                      std::unordered_set<std::string_view> used,
+                                      Arena& arena) {
+  for (auto* it : items) {
     if (!it->name.empty()) used.insert(it->name);
   }
 
   int64_t n = 0;
-  for (auto* it : decl->items) {
+  for (auto* it : items) {
     if (!IsGenerateConstruct(it->kind)) continue;
     ++n;
-    if (!it->name.empty()) continue;
-    std::string digits = std::to_string(n);
-    std::string candidate = "genblk" + digits;
-    while (used.count(candidate)) {
-      digits.insert(digits.begin(), '0');
-      candidate = "genblk" + digits;
+    if (it->name.empty()) {
+      it->name = GenerateBlockName(n, used, arena);
+      used.insert(it->name);
     }
-    auto* buf = arena_.AllocString(candidate.c_str(), candidate.size());
-    it->name = std::string_view(buf, candidate.size());
-    used.insert(it->name);
+    NameGenerateBlocksInScope(it->gen_body, {}, arena);
+    if (it->gen_else != nullptr) {
+      NameGenerateBlocksInScope(it->gen_else->gen_body, {}, arena);
+    }
+    for (const auto& alt : it->gen_case_items) {
+      NameGenerateBlocksInScope(alt.body, {}, arena);
+    }
   }
+}
+
+void Elaborator::AssignGenerateBlockNames(const ModuleDecl* decl) {
+  std::unordered_set<std::string_view> used;
+  for (const auto& port : decl->ports) used.insert(port.name);
+  for (const auto& p : decl->params) used.insert(p.first);
+  NameGenerateBlocksInScope(decl->items, std::move(used), arena_);
 }
 
 // §27.5: gather the block names introduced by the alternatives of a single
@@ -691,7 +727,18 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
       return;
     }
 
-    gen_prefix_ = std::format("{}{}_{}_", saved_prefix, genvar_name,
+    // §27.4: a named generate block "is a declaration of an array of generate
+    // block instances", and "the index values in this array are the values
+    // assumed by the genvar during elaboration". What tells one instance from
+    // another is therefore the block and the index, and not the genvar: two
+    // sibling blocks written over one genvar are two distinct arrays, and
+    // §27.4 rules that each comprises "a separate scope", so a declaration in
+    // one is a different object from the same-named declaration in the other.
+    // Spelling the prefix from genvar_name gave both of them one name.
+    // AssignGenerateBlockNames has already given an unnamed block the name
+    // §27.6 assigns it, so item->name is set whether or not the source wrote
+    // one.
+    gen_prefix_ = std::format("{}{}_{}_", saved_prefix, item->name,
                               loop_scope[genvar_name]);
     gen_loop_consts_[const_depth].second = loop_scope[genvar_name];
     ElaborateGenerateItems(item->gen_body, mod, loop_scope);
