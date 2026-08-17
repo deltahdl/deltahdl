@@ -630,9 +630,51 @@ struct AnyChangeAwaiter {
 
   bool await_ready() const noexcept { return false; }
 
+  // Arms the change watcher one named variable carries for one suspension.
+  // Factored out of await_suspend for the reason
+  // EventAwaiter::AttachEventVarWatcher is factored out of its own: the watcher
+  // body is three guards deep inside a loop inside a lambda, which
+  // readability-function-cognitive-complexity in etc/clang_tidy/src.yml counts
+  // against the function holding it.
+  //
+  // `fin` and `consumed` answer different questions and both are needed. `fin`
+  // and h.done() ask whether the frame is still there; `consumed` asks whether
+  // this suspension is still the one the frame is waiting at.
+  void AttachChangeWatcher(Variable* var, std::coroutine_handle<> h,
+                           Process* proc, const std::shared_ptr<bool>& fin,
+                           const std::shared_ptr<bool>& consumed) {
+    auto* ctx_ptr = &ctx;
+    var->prev_value = var->value;
+    var->AddWatcher([h, proc, ctx_ptr, fin, consumed]() mutable {
+      // A wait/@* re-suspension arms a fresh watcher on every awaited signal,
+      // but watchers are cleared only from the signal that actually fired.
+      // Watchers stranded on the other signals accumulate; once one of them
+      // resumes the coroutine to completion, the rest would resume an
+      // already-finished (or freed) frame -> undefined behavior / SEGFAULT.
+      // Drop any such watcher: by the shared guard when present (frame may
+      // already be freed), otherwise by the still-alive frame's done() flag.
+      if (fin) {
+        if (*fin) return true;
+      } else if (h.done()) {
+        return true;
+      }
+      if (proc && !proc->active) return true;
+      // A sibling variable armed by the same suspension already resumed this
+      // await, so the coroutine is now suspended somewhere else. Resuming it
+      // here would complete whatever await it moved to instead of this one:
+      // when that is a delay, the value takes effect at the change time rather
+      // than after the delay §28.16 gives it. Retire this stale watcher. The
+      // frame is still alive at this point, so done() above cannot tell the two
+      // suspension points apart.
+      if (*consumed) return true;
+      *consumed = true;
+      EventAwaiter::ResumeMaybeReactive(h, proc, *ctx_ptr);
+      return true;
+    });
+  }
+
   void await_suspend(std::coroutine_handle<> h) {
     auto* proc = ctx.CurrentProcess();
-    auto* ctx_ptr = &ctx;
     auto fin = finished;
     // Resumes this suspension at most once. Every watcher armed here shares one
     // guard, so the first named variable to change retires the watchers armed
@@ -644,33 +686,7 @@ struct AnyChangeAwaiter {
     for (auto name : var_names) {
       auto* var = ctx.FindVariable(name);
       if (!var) continue;
-      var->prev_value = var->value;
-      var->AddWatcher([h, proc, ctx_ptr, fin, consumed]() mutable {
-        // A wait/@* re-suspension arms a fresh watcher on every awaited signal,
-        // but watchers are cleared only from the signal that actually fired.
-        // Watchers stranded on the other signals accumulate; once one of them
-        // resumes the coroutine to completion, the rest would resume an
-        // already-finished (or freed) frame -> undefined behavior / SEGFAULT.
-        // Drop any such watcher: by the shared guard when present (frame may
-        // already be freed), otherwise by the still-alive frame's done() flag.
-        if (fin) {
-          if (*fin) return true;
-        } else if (h.done()) {
-          return true;
-        }
-        if (proc && !proc->active) return true;
-        // A sibling variable armed by the same suspension already resumed this
-        // await, so the coroutine is now suspended somewhere else. Resuming it
-        // here would complete whatever await it moved to instead of this one:
-        // when that is a delay, the value takes effect at the change time
-        // rather than after the delay §28.16 gives it. Retire this stale
-        // watcher. The frame is still alive at this point, so done() above
-        // cannot tell the two suspension points apart.
-        if (*consumed) return true;
-        *consumed = true;
-        EventAwaiter::ResumeMaybeReactive(h, proc, *ctx_ptr);
-        return true;
-      });
+      AttachChangeWatcher(var, h, proc, fin, consumed);
     }
   }
 
