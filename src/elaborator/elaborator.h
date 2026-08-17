@@ -418,11 +418,27 @@ class Elaborator : public ElaboratorOperationRules {
 
   void CheckConditionalGenerateNaming(const ModuleDecl* decl);
 
+  // Every defparam statement belonging to `mod`: the ones ModuleDecl::items
+  // holds directly, then the ones each generate block instance elaborated into
+  // `mod` contributed. Elaborator::ApplyDefparams and
+  // Elaborator::ReportUnresolvedDefparams both read this one list, so the keys
+  // they build out of it agree and a statement one applied is not one the other
+  // reports as having reached nothing.
+  std::vector<DefparamSite> CollectDefparamSites(RtlirModule* mod,
+                                                 const ModuleDecl* decl) const;
+
   void ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl);
+
+  void ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
+                         const ScopeMap& scope);
 
   void ApplyDefparamsRecursively(RtlirModule* mod);
 
   void WarnUnresolvedDefparams(RtlirModule* mod);
+
+  void ReportUnresolvedDefparams(RtlirModule* mod, const ModuleDecl* decl);
+
+  void ReportUnresolvedDefparamSite(RtlirModule* mod, const DefparamSite& site);
 
   void VerifyEarlyResolvedDefparams();
 
@@ -431,7 +447,15 @@ class Elaborator : public ElaboratorOperationRules {
 
   void ProcessPendingGenerate(const PendingGenerate& pg);
 
+  // Resolves a defparam's hierarchical path from `root`. `prefix` is the
+  // generate block instance the statement was written in, and only the leading
+  // component of the path is read under it: every later component names an
+  // instance inside a real child module, which no generate prefix reaches.
+  // Passing a non-empty prefix is therefore what confines the statement to its
+  // own block, which is how §23.10.1's rule that it "shall not change a
+  // parameter value outside that hierarchy" is enforced.
   RtlirParamDecl* ResolveDefparamPath(RtlirModule* root, const Expr* path_expr,
+                                      std::string_view prefix,
                                       RtlirModule** out_mod = nullptr);
 
   void RecomputeDependentParams(RtlirModule* mod);

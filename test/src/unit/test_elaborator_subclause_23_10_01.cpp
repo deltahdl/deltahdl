@@ -1,3 +1,5 @@
+#include <string_view>
+
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -8,6 +10,19 @@
 using namespace delta;
 
 namespace {
+
+// The module instantiated as `inst_name` directly under `parent`, or nullptr
+// when `parent` instantiates nothing by that name. The elaborator flattens a
+// generate block into the names of what it holds, so an instance written as
+// `u` inside `begin : b` at genvar value 0 is instantiated as `b_0_u`, and a
+// case reading children by position cannot say which block instance it got.
+RtlirModule* ChildInstantiatedAs(RtlirModule* parent,
+                                 std::string_view inst_name) {
+  for (auto& child : parent->children) {
+    if (child.inst_name == inst_name) return child.resolved;
+  }
+  return nullptr;
+}
 
 TEST(DefparamElaboration, OverridesDefaultValue) {
   ElabFixture f;
@@ -36,7 +51,8 @@ TEST(DefparamElaboration, NotFoundWarns) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_GT(f.diag.WarningCount(), 0u);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), "defparam target not found",
+                              5, "23.10.1"));
 }
 
 TEST(DefparamElaboration, MultipleAssignmentsInOneStatement) {
@@ -130,6 +146,11 @@ TEST(DefparamElaboration, RhsRejectsNonConstantExpression) {
                             6, "23.10.1"));
 }
 
+// §23.10.1: "a defparam statement in a hierarchy in or under a generate block
+// instance (see Clause 27) or an array of instances shall not change a
+// parameter value outside that hierarchy." `u` is instantiated by `top` and
+// not by block `g`, so the statement inside `g` is refused and `P` keeps the
+// value its own declaration gave it.
 TEST(DefparamElaboration, DefparamInGenerateBlockCannotEscapeScope) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -145,7 +166,12 @@ TEST(DefparamElaboration, DefparamInGenerateBlockCannotEscapeScope) {
   ASSERT_NE(design, nullptr);
   auto* u = design->top_modules[0]->children[0].resolved;
   ASSERT_NE(u, nullptr);
-  EXPECT_NE(u->params[0].resolved_value, 99);
+  EXPECT_EQ(u->params[0].resolved_value, 5);
+  EXPECT_TRUE(u->params[0].is_resolved);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "defparam in a generate block shall not change a "
+                            "parameter value outside that block",
+                            6, "23.10.1"));
 }
 
 TEST(DefparamElaboration, RhsRejectsHierarchicalReference) {
@@ -168,6 +194,11 @@ TEST(DefparamElaboration, RhsRejectsHierarchicalReference) {
                             9, "23.10.1"));
 }
 
+// §23.10.1: "Each instantiation of a generate block is considered to be a
+// separate hierarchy scope", so a statement standing in `g2` reaches only what
+// `g2` holds. The elaborator flattens `g1`'s contents to `g1_u`, and `g1.u`
+// therefore names nothing `g2` can reach: the containment rule leaves the
+// statement with no target rather than letting it cross into the sibling.
 TEST(DefparamElaboration, DefparamInGenerateCannotTargetSiblingScope) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -183,15 +214,163 @@ TEST(DefparamElaboration, DefparamInGenerateCannotTargetSiblingScope) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  bool saw_99 = false;
-  for (auto& c : design->top_modules[0]->children) {
-    if (c.resolved != nullptr) {
-      for (auto& p : c.resolved->params) {
-        if (p.name == "P" && p.resolved_value == 99) saw_99 = true;
-      }
-    }
-  }
-  EXPECT_FALSE(saw_99);
+  auto* u = ChildInstantiatedAs(design->top_modules[0], "g1_u");
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(u->params[0].resolved_value, 5);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), "defparam target not found",
+                              8, "23.10.1"));
+}
+
+// §23.10.1 bars a defparam in a generate block from changing a parameter
+// "outside that hierarchy" and bars nothing inside it, so a statement whose
+// target is instantiated by the block that holds it takes effect.
+TEST(DefparamElaboration, AppliesInsideTheGenerateBlockThatHoldsIt) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter int P = 5)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    child u();\n"
+      "    defparam u.P = 99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules[0]->children.size(), 1u);
+  auto* u = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(u->params[0].resolved_value, 99);
+  EXPECT_TRUE(u->params[0].is_resolved);
+}
+
+// §23.10.1: "Each instantiation of a generate block is considered to be a
+// separate hierarchy scope", so every iteration of the loop applies its own
+// statement to its own instance. The clause's example writes the genvar on the
+// right-hand side -- `defparam somename[i+1].my_flop.xyz = i ;` -- which is why
+// the two instances are asserted to hold different values.
+TEST(DefparamElaboration, AppliesOncePerLoopGenerateBlockInstance) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter int P = 5)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 2; i = i + 1) begin : b\n"
+      "    child u();\n"
+      "    defparam u.P = i;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules[0]->children.size(), 2u);
+  auto* first = ChildInstantiatedAs(design->top_modules[0], "b_0_u");
+  ASSERT_NE(first, nullptr);
+  EXPECT_EQ(first->params[0].resolved_value, 0);
+  auto* second = ChildInstantiatedAs(design->top_modules[0], "b_1_u");
+  ASSERT_NE(second, nullptr);
+  EXPECT_EQ(second->params[0].resolved_value, 1);
+}
+
+// §23.10.1 reads on the generate block instance a statement stands in, and an
+// else arm §27.5 selected is a block instance like any other, so the statement
+// it holds reaches the instance beside it.
+TEST(DefparamElaboration, AppliesInsideAnElseGenerateBlock) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter int P = 5)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  if (0) begin : g1\n"
+      "    child u();\n"
+      "  end else begin : g2\n"
+      "    child u();\n"
+      "    defparam u.P = 77;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* u = ChildInstantiatedAs(design->top_modules[0], "g2_u");
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(u->params[0].resolved_value, 77);
+  EXPECT_TRUE(u->params[0].is_resolved);
+}
+
+// The alternative a case generate selects is a generate block instance too, so
+// §23.10.1 lets the statement it holds reach what that alternative
+// instantiated.
+TEST(DefparamElaboration, AppliesInsideAGenerateCaseAlternative) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter int P = 5)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  parameter int SEL = 1;\n"
+      "  case (SEL)\n"
+      "    0: begin : g0\n"
+      "      child u();\n"
+      "    end\n"
+      "    1: begin : g1\n"
+      "      child u();\n"
+      "      defparam u.P = 33;\n"
+      "    end\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* u = ChildInstantiatedAs(design->top_modules[0], "g1_u");
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(u->params[0].resolved_value, 33);
+  EXPECT_TRUE(u->params[0].is_resolved);
+}
+
+// §27.5 instantiates the alternative the condition selects and no other, so a
+// defparam in the arm that was not selected is nowhere in the elaborated
+// design: it changes nothing, and there is nothing for it to be reported
+// about. That is why a zero count of warnings is the claim here.
+TEST(DefparamElaboration, IsNotAppliedFromAnUnselectedAlternative) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter int P = 5)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  if (0) begin : g1\n"
+      "    child u();\n"
+      "    defparam u.P = 99;\n"
+      "  end else begin : g2\n"
+      "    child u();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules[0]->children.size(), 1u);
+  auto* u = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(u->params[0].resolved_value, 5);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// A target that names nothing anywhere breaches no rule of §23.10.1: there is
+// no parameter outside the block for the statement to change, so it stays the
+// warning a target that was not found draws outside a generate block.
+TEST(DefparamElaboration, TargetMissingInsideAGenerateBlockWarns) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    defparam nosuch.P = 3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), "defparam target not found",
+                              3, "23.10.1"));
 }
 
 TEST(DefparamElaboration, DefparamCannotTargetOtherArrayInstance) {

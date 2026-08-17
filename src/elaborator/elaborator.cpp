@@ -527,6 +527,7 @@ RtlirDesign* Elaborator::ElaborateTops(
   auto* design = arena_.Create<RtlirDesign>();
   pending_generates_.clear();
   applied_defparams_.clear();
+  generate_defparams_.clear();
   early_defparam_resolutions_.clear();
 
   if (!ElaborateTopModules(top_decls, design)) return nullptr;

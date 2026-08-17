@@ -293,7 +293,36 @@ class ElaboratorData {
   };
   std::vector<PendingGenerate> pending_generates_;
 
-  std::set<std::tuple<RtlirModule*, const ModuleItem*, size_t>>
+  // One defparam statement together with where it was written. `prefix` and
+  // `consts` are empty for a statement among a module's own items, and hold the
+  // generate block instance's Elaborator::ScopedName prefix and loop-index
+  // bindings for one written inside a block. §23.10.1 needs both: the prefix
+  // decides which hierarchy the statement is allowed to reach, since the clause
+  // rules that a defparam "in or under a generate block instance ... shall not
+  // change a parameter value outside that hierarchy", and the bindings are what
+  // its right-hand side reads when it names a genvar, as the clause's own
+  // example does with `defparam somename[i+1].my_flop.xyz = i`.
+  struct DefparamSite {
+    const ModuleItem* item;
+    std::string_view prefix;
+    GenBlockConsts consts;
+  };
+
+  // The defparam statements that generate block instances contributed to each
+  // module. ModuleDecl::items does not hold them, and a walk of the AST could
+  // not tell one in a selected block from one in an alternative §27.5 left out
+  // of the model. Elaborator::ElaborateGenerateItems records an entry as it
+  // elaborates each block instance, so what is here is exactly what was
+  // instantiated.
+  std::unordered_map<RtlirModule*, std::vector<DefparamSite>>
+      generate_defparams_;
+
+  // Keyed by the block instance's prefix as well as the statement, because the
+  // one body AST is shared by every iteration of a loop generate block: without
+  // the prefix, applying the statement for the first iteration would mark it
+  // handled for all the rest.
+  std::set<
+      std::tuple<RtlirModule*, const ModuleItem*, size_t, std::string_view>>
       applied_defparams_;
 
   struct EarlyDefparamResolution {
@@ -301,6 +330,9 @@ class ElaboratorData {
     const Expr* path_expr;
     RtlirParamDecl* resolved;
     SourceLoc loc;
+    // The prefix the path was first resolved under, so that
+    // Elaborator::VerifyEarlyResolvedDefparams resolves it again the same way.
+    std::string_view prefix;
   };
   std::vector<EarlyDefparamResolution> early_defparam_resolutions_;
 

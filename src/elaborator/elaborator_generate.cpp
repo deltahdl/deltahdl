@@ -153,6 +153,19 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
       case ModuleItemKind::kGenerateFor:
         ElaborateGenerateFor(item, mod, scope);
         break;
+      case ModuleItemKind::kDefparam:
+        // §23.10.1: a defparam belongs to the block instance it was written in,
+        // and Elaborator::ApplyDefparams reads ModuleDecl::items, which holds
+        // only a module's own. Record it here rather than descending the AST
+        // from there, because this runs for the blocks §27.5 instantiated into
+        // the model and for no others, so an alternative that was not selected
+        // contributes nothing without having to be recognised as unselected.
+        // The prefix and the loop-index bindings are captured now because both
+        // are properties of this instance, and the shared body AST records
+        // neither.
+        generate_defparams_[mod].push_back(
+            {item, InternedGenPrefix(), gen_loop_consts_});
+        break;
       default:
         ElaborateGenerateBlockItem(item, mod);
         break;

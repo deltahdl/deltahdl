@@ -1,5 +1,7 @@
+#include <cstddef>
 #include <optional>
 #include <set>
+#include <string>
 #include <string_view>
 #include <tuple>
 #include <unordered_set>
@@ -61,34 +63,50 @@ static bool RhsContainsHierarchicalRef(const Expr* e) {
   return AnyListChildContainsHierarchicalRef(e);
 }
 
+// The child instance of `mod` named `name`, or nullptr if it has none resolved.
+static RtlirModule* ResolvedChildNamed(RtlirModule* mod,
+                                       std::string_view name) {
+  for (auto& child : mod->children) {
+    if (child.inst_name == name && child.resolved) return child.resolved;
+  }
+  return nullptr;
+}
+
 // Follows the leading (all-but-last) components of a defparam path from `root`
 // down the instance hierarchy. Returns the module reached, or nullptr if any
 // component names no resolved child instance.
+//
+// `prefix` applies to the first component alone. Elaborator::ScopedName
+// flattened a generate block's own instances into the enclosing module under
+// that prefix, so a statement written inside the block reaches them by it and
+// reaches nothing else: a name that resolves only without the prefix is outside
+// the block, which §23.10.1 forbids the statement from changing.
 static RtlirModule* DescendDefparamPath(
-    RtlirModule* root, const std::vector<std::string_view>& parts) {
+    RtlirModule* root, const std::vector<std::string_view>& parts,
+    std::string_view prefix) {
   RtlirModule* cur = root;
   for (size_t i = 0; i + 1 < parts.size(); ++i) {
-    bool found = false;
-    for (auto& child : cur->children) {
-      if (child.inst_name == parts[i] && child.resolved) {
-        cur = child.resolved;
-        found = true;
-        break;
-      }
+    std::string_view name = parts[i];
+    std::string scoped;
+    if (i == 0 && !prefix.empty()) {
+      scoped = std::string(prefix) + std::string(name);
+      name = scoped;
     }
-    if (!found) return nullptr;
+    cur = ResolvedChildNamed(cur, name);
+    if (!cur) return nullptr;
   }
   return cur;
 }
 
 RtlirParamDecl* Elaborator::ResolveDefparamPath(RtlirModule* root,
                                                 const Expr* path_expr,
+                                                std::string_view prefix,
                                                 RtlirModule** out_mod) {
   std::vector<std::string_view> parts;
   CollectPathComponents(path_expr, parts);
   if (parts.size() < 2) return nullptr;
 
-  RtlirModule* cur = DescendDefparamPath(root, parts);
+  RtlirModule* cur = DescendDefparamPath(root, parts, prefix);
   if (!cur) return nullptr;
 
   auto param_name = parts.back();
@@ -164,7 +182,8 @@ struct DefparamOverride {
 // The bookkeeping for which defparam assignments have been handled: the
 // applied-set keyed by (module, item, assignment index) plus the key naming
 // this particular assignment.
-using DefparamAppliedKey = std::tuple<RtlirModule*, const ModuleItem*, size_t>;
+using DefparamAppliedKey =
+    std::tuple<RtlirModule*, const ModuleItem*, size_t, std::string_view>;
 struct DefparamAppliedRecord {
   std::set<DefparamAppliedKey>& applied;
   const DefparamAppliedKey& key;
@@ -221,6 +240,48 @@ static void ReplaceStringParamValue(RtlirParamDecl& pd, const Expr* val_expr,
   if (!RecordStringParamChars(pd, val_expr, arena)) pd.is_string_value = false;
 }
 
+// Trailing return type: DefparamSite is a protected member of ElaboratorData,
+// which the class scope opened by the Elaborator:: qualifier reaches and
+// namespace scope does not.
+auto Elaborator::CollectDefparamSites(RtlirModule* mod,
+                                      const ModuleDecl* decl) const
+    -> std::vector<DefparamSite> {
+  std::vector<DefparamSite> sites;
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kDefparam) continue;
+    sites.push_back({item, {}, {}});
+  }
+  auto it = generate_defparams_.find(mod);
+  if (it != generate_defparams_.end())
+    sites.insert(sites.end(), it->second.begin(), it->second.end());
+  return sites;
+}
+
+void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
+                                   const ScopeMap& scope) {
+  for (size_t idx = 0; idx < site.item->defparam_assigns.size(); ++idx) {
+    auto key = std::make_tuple(mod, site.item, idx, site.prefix);
+    if (applied_defparams_.count(key)) continue;
+    const auto& [path_expr, val_expr] = site.item->defparam_assigns[idx];
+    RtlirModule* target_mod = nullptr;
+    auto* param = ResolveDefparamPath(mod, path_expr, site.prefix, &target_mod);
+    if (!param) continue;
+    DefparamOverride ovr{param, val_expr, scope, site.item->loc};
+    DefparamAppliedRecord rec{applied_defparams_, key};
+    auto value = EvalDefparamOverride(diag_, ovr, rec);
+    if (!value) continue;
+
+    param->resolved_value = *value;
+    param->is_resolved = true;
+    param->from_override = true;
+    ReplaceStringParamValue(*param, val_expr, arena_);
+    RecomputeDependentParams(target_mod);
+    applied_defparams_.insert(key);
+    early_defparam_resolutions_.push_back(
+        {mod, path_expr, param, site.item->loc, site.prefix});
+  }
+}
+
 void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
   // §6.16: a defparam's right-hand side is written in the module holding the
   // defparam statement, so that module's parameters are what a name in it
@@ -229,35 +290,22 @@ void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
   // this no module is registered and a defparam naming a string parameter
   // recovers nothing.
   ParamRangeRegistryGuard param_range_guard(mod);
-  ScopeMap scope = BuildParamScope(mod);
-  for (const auto* item : decl->items) {
-    if (item->kind != ModuleItemKind::kDefparam) continue;
-    for (size_t idx = 0; idx < item->defparam_assigns.size(); ++idx) {
-      auto key = std::make_tuple(mod, item, idx);
-      if (applied_defparams_.count(key)) continue;
-      const auto& [path_expr, val_expr] = item->defparam_assigns[idx];
-      RtlirModule* target_mod = nullptr;
-      auto* param = ResolveDefparamPath(mod, path_expr, &target_mod);
-      if (!param) continue;
-      DefparamOverride ovr{param, val_expr, scope, item->loc};
-      DefparamAppliedRecord rec{applied_defparams_, key};
-      auto value = EvalDefparamOverride(diag_, ovr, rec);
-      if (!value) continue;
-
-      param->resolved_value = *value;
-      param->is_resolved = true;
-      param->from_override = true;
-      ReplaceStringParamValue(*param, val_expr, arena_);
-      RecomputeDependentParams(target_mod);
-      applied_defparams_.insert(key);
-      early_defparam_resolutions_.push_back({mod, path_expr, param, item->loc});
-    }
+  ScopeMap mod_scope = BuildParamScope(mod);
+  for (const auto& site : CollectDefparamSites(mod, decl)) {
+    // §27.4 opens a localparam sharing the loop index's name in each instance
+    // of a loop generate block, and §23.10.1's own example reads it on a
+    // right-hand side. The module's parameters are rebuilt on every pass
+    // because an earlier defparam may have changed one, so the block's bindings
+    // are laid over that rather than kept in place of it.
+    ScopeMap scope = mod_scope;
+    for (const auto& [name, value] : site.consts) scope[name] = value;
+    ApplyDefparamSite(mod, site, scope);
   }
 }
 
 void Elaborator::VerifyEarlyResolvedDefparams() {
   for (const auto& rec : early_defparam_resolutions_) {
-    auto* now = ResolveDefparamPath(rec.root, rec.path_expr);
+    auto* now = ResolveDefparamPath(rec.root, rec.path_expr, rec.prefix);
     if (now != nullptr && now != rec.resolved) {
       diag_.Error(rec.loc,
                   "defparam hierarchical name resolves differently after "
@@ -349,28 +397,42 @@ void Elaborator::ApplyDefparamsRecursively(RtlirModule* mod) {
   }
 }
 
-// Emits a "target not found" warning for every defparam assignment in `decl`
-// (belonging to `mod`) that was never recorded as applied.
-static void WarnUnresolvedDefparamsInDecl(
-    DiagEngine& diag, RtlirModule* mod, const ModuleDecl* decl,
-    const std::set<std::tuple<RtlirModule*, const ModuleItem*, size_t>>&
-        applied) {
-  for (const auto* item : decl->items) {
-    if (item->kind != ModuleItemKind::kDefparam) continue;
-    for (size_t idx = 0; idx < item->defparam_assigns.size(); ++idx) {
-      auto key = std::make_tuple(mod, item, idx);
-      if (!applied.count(key)) {
-        diag.Warning(item->loc, "defparam target not found",
-                     Subclause("23.10.1"));
-      }
+// Reports every assignment of one defparam statement that was never applied.
+// §23.10.1 gives two reasons for that and they are different diagnoses. A
+// statement inside a generate block whose target exists but lies outside the
+// block breaks the clause's rule that such a statement "shall not change a
+// parameter value outside that hierarchy", and is an error. Anything else named
+// nothing at all, and stays the warning it was.
+void Elaborator::ReportUnresolvedDefparamSite(RtlirModule* mod,
+                                              const DefparamSite& site) {
+  for (size_t idx = 0; idx < site.item->defparam_assigns.size(); ++idx) {
+    auto key = std::make_tuple(mod, site.item, idx, site.prefix);
+    if (applied_defparams_.count(key)) continue;
+    const Expr* path_expr = site.item->defparam_assigns[idx].first;
+    if (!site.prefix.empty() &&
+        ResolveDefparamPath(mod, path_expr, {}) != nullptr) {
+      diag_.Error(site.item->loc,
+                  "defparam in a generate block shall not change a parameter "
+                  "value outside that block",
+                  Subclause("23.10.1"));
+      continue;
     }
+    diag_.Warning(site.item->loc, "defparam target not found",
+                  Subclause("23.10.1"));
+  }
+}
+
+void Elaborator::ReportUnresolvedDefparams(RtlirModule* mod,
+                                           const ModuleDecl* decl) {
+  for (const auto& site : CollectDefparamSites(mod, decl)) {
+    ReportUnresolvedDefparamSite(mod, site);
   }
 }
 
 void Elaborator::WarnUnresolvedDefparams(RtlirModule* mod) {
   if (!mod) return;
   if (auto* decl = FindModule(mod->name)) {
-    WarnUnresolvedDefparamsInDecl(diag_, mod, decl, applied_defparams_);
+    ReportUnresolvedDefparams(mod, decl);
   }
   for (auto& child : mod->children) {
     WarnUnresolvedDefparams(child.resolved);
