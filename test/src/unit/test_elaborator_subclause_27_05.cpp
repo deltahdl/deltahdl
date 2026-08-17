@@ -161,6 +161,141 @@ TEST(GenerateElaboration, GenerateIfElseIfChainSelectsMiddle) {
   EXPECT_FALSE(found_other);
 }
 
+// §27.5 selects "at most one generate block from a set of alternative generate
+// blocks based on constant expressions evaluated during elaboration", and an
+// `else if` puts one of those constant expressions on the else branch. The four
+// cases below fix SEL at values that only the alternative past the first
+// `else if` answers, which is what GenerateIfElseIfChainSelectsMiddle above
+// cannot do: SEL = 1 there selects the first `else if`, the one alternative
+// reached whether the nested condition is evaluated or ignored.
+//
+// Elaborator::ElaborateGenerateIf in src/elaborator/elaborator_generate.cpp
+// elaborated item->gen_else->gen_body for every else branch, and
+// Parser::ParseGenerateIf at src/parser/parser_generate.cpp:181-182 makes
+// gen_else the nested kGenerateIf itself for an `else if`, so that body was the
+// nested construct's then-branch. Every chain therefore instantiated its first
+// `else if` block whenever the leading condition was false, and no alternative
+// past it -- including the final else -- was reachable at all.
+TEST(GenerateElaboration, GenerateIfElseIfChainSelectsFinalElse) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top #(parameter SEL = 2) ();\n"
+      "  if (SEL == 0) begin\n"
+      "    logic [7:0] zero;\n"
+      "  end else if (SEL == 1) begin\n"
+      "    logic [7:0] one;\n"
+      "  end else begin\n"
+      "    logic [7:0] other;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  bool found_zero = false, found_one = false, found_other = false;
+  for (const auto& v : mod->variables) {
+    if (v.name == "zero") found_zero = true;
+    if (v.name == "one") found_one = true;
+    if (v.name == "other") found_other = true;
+  }
+  EXPECT_TRUE(found_other);
+  EXPECT_FALSE(found_zero);
+  EXPECT_FALSE(found_one);
+}
+
+// §27.5: a chain of four alternatives puts a second `else if` past the first,
+// so selecting it proves the else branch is followed as far as its own
+// condition rather than only one step. Without that, SEL = 2 yields alt_one.
+TEST(GenerateElaboration, GenerateIfElseIfChainSelectsSecondElseIf) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top #(parameter SEL = 2) ();\n"
+      "  if (SEL == 0) begin\n"
+      "    logic [7:0] alt_zero;\n"
+      "  end else if (SEL == 1) begin\n"
+      "    logic [7:0] alt_one;\n"
+      "  end else if (SEL == 2) begin\n"
+      "    logic [7:0] alt_two;\n"
+      "  end else begin\n"
+      "    logic [7:0] alt_last;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  bool found_zero = false, found_one = false, found_two = false,
+       found_last = false;
+  for (const auto& v : mod->variables) {
+    if (v.name == "alt_zero") found_zero = true;
+    if (v.name == "alt_one") found_one = true;
+    if (v.name == "alt_two") found_two = true;
+    if (v.name == "alt_last") found_last = true;
+  }
+  EXPECT_TRUE(found_two);
+  EXPECT_FALSE(found_zero);
+  EXPECT_FALSE(found_one);
+  EXPECT_FALSE(found_last);
+}
+
+// §27.5: the final else of a four-alternative chain is reached only after two
+// `else if` conditions have both been evaluated and both answered false.
+TEST(GenerateElaboration,
+     GenerateIfElseIfChainSelectsFinalElseOfFourAlternatives) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top #(parameter SEL = 3) ();\n"
+      "  if (SEL == 0) begin\n"
+      "    logic [7:0] alt_zero;\n"
+      "  end else if (SEL == 1) begin\n"
+      "    logic [7:0] alt_one;\n"
+      "  end else if (SEL == 2) begin\n"
+      "    logic [7:0] alt_two;\n"
+      "  end else begin\n"
+      "    logic [7:0] alt_last;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  bool found_zero = false, found_one = false, found_two = false,
+       found_last = false;
+  for (const auto& v : mod->variables) {
+    if (v.name == "alt_zero") found_zero = true;
+    if (v.name == "alt_one") found_one = true;
+    if (v.name == "alt_two") found_two = true;
+    if (v.name == "alt_last") found_last = true;
+  }
+  EXPECT_TRUE(found_last);
+  EXPECT_FALSE(found_zero);
+  EXPECT_FALSE(found_one);
+  EXPECT_FALSE(found_two);
+}
+
+// §27.5 instantiates "at most one" of the alternative generate blocks, which is
+// a separate claim from which one it picks: a chain that elaborated the
+// selected block and a further one would satisfy every name check above.
+// One variable is declared per alternative, so the count of
+// RtlirModule::variables is the count of blocks instantiated.
+TEST(GenerateElaboration,
+     GenerateIfElseIfChainInstantiatesExactlyOneAlternative) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top #(parameter SEL = 2) ();\n"
+      "  if (SEL == 0) begin\n"
+      "    logic [7:0] alt_zero;\n"
+      "  end else if (SEL == 1) begin\n"
+      "    logic [7:0] alt_one;\n"
+      "  end else if (SEL == 2) begin\n"
+      "    logic [7:0] alt_two;\n"
+      "  end else begin\n"
+      "    logic [7:0] alt_last;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  EXPECT_EQ(mod->variables.size(), 1u);
+}
+
 TEST(GenerateElaboration, GenerateCaseMultiplePatternsPerItem) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -494,6 +629,41 @@ TEST(GenerateElaboration,
       f, "", true);
   EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
                               "generate-if condition is not constant", 8,
+                              "27.5"));
+}
+
+// §27.5 requires every alternative of a conditional generate construct to be
+// selected on a constant expression, and the condition an `else if` carries is
+// one of them, so a non-constant one there is reported exactly as a
+// non-constant leading condition is. The source is the one above -- W is
+// imported by module a and so names nothing in module b, per §26.3 -- with the
+// non-constant condition moved onto the else branch behind a leading `if (0)`
+// that folds. Elaborator::ElaborateGenerateIf reaches it by recursing into
+// item->gen_else, and the report stands at the nested `if` on line 10 because
+// Parser::ParseGenerateIf takes that node's loc at the `if` token
+// (src/parser/parser_generate.cpp:172) after consuming the `else`.
+//
+// What this fails on is the else branch being instantiated without its
+// condition read, which produced no report at all and built g1 regardless of W.
+TEST(GenerateElaboration, GenerateIfNonConstantElseIfConditionIsWarned) {
+  ElabFixture f;
+  ElaborateWithPreprocessor(
+      "package p;\n"
+      "  parameter int W = 1;\n"
+      "endpackage\n"
+      "module a;\n"
+      "  import p::*;\n"
+      "endmodule\n"
+      "module b;\n"
+      "  if (0) begin : g0\n"
+      "    logic y;\n"
+      "  end else if (W == 1) begin : g1\n"
+      "    logic x;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "", true);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "generate-if condition is not constant", 10,
                               "27.5"));
 }
 

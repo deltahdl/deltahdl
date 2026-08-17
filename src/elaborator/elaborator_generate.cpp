@@ -154,9 +154,33 @@ void Elaborator::ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,
   }
   if (*cond) {
     ElaborateGenerateItems(item->gen_body, mod, scope);
-  } else if (item->gen_else) {
-    ElaborateGenerateItems(item->gen_else->gen_body, mod, scope);
+    return;
   }
+  if (item->gen_else == nullptr) return;
+
+  // §27.5: a conditional generate construct selects "at most one generate
+  // block from a set of alternative generate blocks based on constant
+  // expressions evaluated during elaboration", and an `else if` puts one of
+  // those expressions on the else branch. Annex A.4.2 gives
+  // if_generate_construct ::= if ( constant_expression ) generate_block
+  // [ else generate_block ], so an `else if` is the else branch taking the
+  // bare generate_item alternative of generate_block, and what stands there is
+  // a nested if_generate_construct selecting among the alternatives that
+  // remain. Elaborate it as one, so that its condition is read.
+  //
+  // Parser::ParseGenerateIf tells the two forms apart already:
+  // src/parser/parser_generate.cpp:181-182 makes gen_else the nested
+  // kGenerateIf itself, carrying its own gen_cond, while :184-190 makes a
+  // plain else a synthesized kGenerateIf whose gen_cond is null and whose
+  // gen_body holds that block's items. Reaching into gen_body for both
+  // instantiated the nested then-branch without ever evaluating its
+  // condition, so every selector past the first alternative built the wrong
+  // block and the final else was unreachable.
+  if (item->gen_else->gen_cond != nullptr) {
+    ElaborateGenerateIf(item->gen_else, mod, scope);
+    return;
+  }
+  ElaborateGenerateItems(item->gen_else->gen_body, mod, scope);
 }
 
 static bool MatchesCasePattern(const std::vector<Expr*>& patterns,
