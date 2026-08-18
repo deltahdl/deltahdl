@@ -122,18 +122,26 @@ void Preprocessor::CheckKeyKeyname(const PragmaKeywordExpression& expr,
 // does one whose value is a parenthesized list of further expressions, those
 // qualifying a value rather than being one. Neither is a designation this has
 // anything to say about.
-void Preprocessor::CheckKeyDesignation(const PragmaKeywordExpression& expr,
-                                       SourceLoc loc) {
-  if (!expr.has_value || expr.value.empty()) return;
-  if (!IsProtectKeyDesignationKeyword(expr.keyword)) return;
+void Preprocessor::CheckDataKeyDesignationValue(std::string_view keyword,
+                                                std::string_view value,
+                                                SourceLoc loc) {
+  if (value.empty()) return;
+  if (!IsProtectKeyDesignationKeyword(keyword)) return;
   ProtectKeywordValue owner = protect_keywords_.ValueOf(kDataKeyownerKeyword);
-  std::string_view picked = ProtectPragmaValueBody(expr.value);
-  if (!protect_key_designations_.Record(owner.value, expr.keyword, picked)) {
+  if (!protect_key_designations_.Record(owner.value, keyword, value)) {
     diag_.Error(loc,
                 "protect pragma writes one value against two of the names that "
                 "designate a key of the data_keyowner in effect",
                 Subclause("34.5.10"));
   }
+}
+
+void Preprocessor::CheckKeyDesignation(const PragmaKeywordExpression& expr,
+                                       SourceLoc loc) {
+  if (!expr.has_value || expr.value.empty()) return;
+  if (!IsProtectKeyDesignationKeyword(expr.keyword)) return;
+  CheckDataKeyDesignationValue(expr.keyword, ProtectPragmaValueBody(expr.value),
+                               loc);
   // §34.5.13 asks something further of the two designations that are still
   // unique for the entity: a name given to one of its keys and a public key one
   // of them is refer to the same key wherever a region wrote both. The name

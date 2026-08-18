@@ -328,6 +328,11 @@ bool Preprocessor::TakeDataDecryptKeyValue(std::string_view line,
   data_decrypt_key_value_next_ = false;
   std::string key;
   if (!ReadEncodedProtectValue(Trim(line), loc, &key)) return true;
+  // §34.5.10.2: a decryption key recovered here is one of the three
+  // designations the values of which are unique for the data_keyowner in
+  // effect, so it is held to that whether it was written against the keyword
+  // or, as §34.5.14.1 writes it, on the line beneath the keyword.
+  CheckDataKeyDesignationValue(kDataDecryptKeyKeyword, key, loc);
   data_decrypt_key_ = std::move(key);
   return true;
 }
@@ -406,6 +411,11 @@ bool Preprocessor::TakeDataPublicKeyValue(std::string_view line,
   std::string value;
   if (!ReadEncodedProtectValue(Trim(line), loc, &value)) return true;
   protect_keywords_.Apply(kDataPublicKeyKeyword, value);
+  // §34.5.10.2: the public key just read designates a key of the data_keyowner
+  // in effect, so it is held to being unique for that entity like the name
+  // beside it. §34.5.13.1 writes it on the line beneath its keyword, which is
+  // why the expression-shaped check does not see it.
+  CheckDataKeyDesignationValue(kDataPublicKeyKeyword, value, loc);
   CheckDataDesignationAgreement(loc);
   return true;
 }

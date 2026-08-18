@@ -244,8 +244,12 @@ std::string ProtectKeyKeynameDirective(std::string_view keyname) {
 
 std::string ProtectDataKeyownerDirective(std::string_view keyowner) {
   std::string text;
-  AppendKeywordDirective(text, kDataKeyownerKeyword,
-                         ProtectPragmaValueBody(keyowner));
+  // §34.5.10.2: the data_keyowner is unchanged in the output file, and a value
+  // is what it was written as rather than what it means -- rewriting a bare
+  // identifier as a string changes the pragma_value the source wrote. The
+  // digest and key keyowners beside it are written the same way for the same
+  // reason.
+  AppendKeywordDirectiveAsWritten(text, kDataKeyownerKeyword, keyowner);
   return text;
 }
 
