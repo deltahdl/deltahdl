@@ -56,6 +56,12 @@ Logic4Vec MakeRealVec(Arena& arena, double val, uint32_t width);
 int64_t AssocIntKey(const Logic4Vec& val, bool is_wildcard,
                     uint32_t index_width, bool is_signed = true);
 
+// §7.8.2 — the map key a string associative-array index evaluates to. The
+// index arrives as a vector holding the characters most significant first, and
+// the key is those characters in order with the null padding a wider vector
+// carries dropped.
+std::string AssocStringKey(const Logic4Vec& val);
+
 // §7.4.5/§11.5.1 — the contiguous run of positions a two-operand select
 // addresses, returned as {first position, count}. Three forms share that shape
 // and differ only in what the second operand means. A non-indexed part-select

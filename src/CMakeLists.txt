@@ -181,6 +181,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_expr_cast.cpp
     simulator/eval_enum.cpp
     simulator/eval_array.cpp
+    simulator/assoc_element.cpp
     simulator/eval_array_assoc.cpp
     simulator/eval_string.cpp
     simulator/eval_math.cpp

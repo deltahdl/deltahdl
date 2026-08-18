@@ -307,19 +307,6 @@ static Logic4Vec AssocDefault(const AssocArrayObject* aa, Arena& arena) {
                        : MakeLogic4VecVal(arena, aa->elem_width, 0);
 }
 
-static std::string ExtractStringKey(const Logic4Vec& key) {
-  uint32_t nb = key.width / 8;
-  std::string s;
-  s.reserve(nb);
-  for (uint32_t i = nb; i > 0; --i) {
-    uint32_t bi = i - 1;
-    auto ch = static_cast<char>(
-        (key.words[(bi * 8) / 64].aval >> ((bi * 8) % 64)) & 0xFF);
-    if (ch != 0) s.push_back(ch);
-  }
-  return s;
-}
-
 // `loc` is where the index was written, which the report names: the array
 // object carries no position and the name is a string.
 static void WarnAssocMiss(const AssocArrayObject* aa, std::string_view name,
@@ -334,7 +321,7 @@ static void WarnAssocMiss(const AssocArrayObject* aa, std::string_view name,
 static Logic4Vec AssocReadStr(AssocArrayObject* aa, const Expr* idx_expr,
                               std::string_view name, SimContext& ctx,
                               Arena& arena) {
-  auto s = ExtractStringKey(EvalExpr(idx_expr, ctx, arena));
+  auto s = AssocStringKey(EvalExpr(idx_expr, ctx, arena));
   auto it = aa->str_data.find(s);
   if (it != aa->str_data.end()) return it->second;
   WarnAssocMiss(aa, name, ctx, idx_expr->range.start);

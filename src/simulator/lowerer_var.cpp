@@ -379,6 +379,26 @@ static void ApplyStructMemberDefaults(std::string_view name,
   }
 }
 
+// §7.8.7: an element allocated by a write starts at the initial value its
+// type gives it, which for a struct is its members' initializers rather than
+// zero. LowerVar has already deposited those onto the variable it created
+// under this name, which models one element of the array, so the pattern is
+// read back from there rather than evaluated a second time.
+static void RecordAssocElemInit(std::string_view name, const RtlirVariable& var,
+                                AssocArrayObject* aa, SimContext& ctx) {
+  if (!var.dtype || var.dtype->struct_members.empty()) return;
+  if (var.dtype->kind == DataTypeKind::kUnion) return;
+  bool any_init = false;
+  for (const auto& m : var.dtype->struct_members) {
+    if (m.init_expr) any_init = true;
+  }
+  if (!any_init) return;
+  auto* elem = ctx.FindVariable(name);
+  if (!elem) return;
+  aa->has_elem_init = true;
+  aa->elem_init = elem->value;
+}
+
 void Lowerer::LowerVarAggregate(std::string_view name,
                                 const RtlirVariable& var) {
   if (var.is_queue) {
@@ -405,6 +425,7 @@ void Lowerer::LowerVarAggregate(std::string_view name,
         AssocArraySpec{var.assoc_index_width, var.is_wildcard_index,
                        var.is_4state, var.is_index_signed});
     InitAssocDefault(var.init_expr, aa);
+    RecordAssocElemInit(name, var, aa, ctx_);
   } else {
     CreateArrayElements(name, var, ctx_, arena_);
   }

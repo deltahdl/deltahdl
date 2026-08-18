@@ -278,4 +278,221 @@ TEST(AssocArrayAllocation, RefArgToNonexistentStringKeyAllocates) {
   EXPECT_EQ(v, 8u);
 }
 
+// §7.8.7's own example. b[2] does not exist when the member write executes, so
+// the element is allocated holding the initial values its members declare and
+// the write then updates x. The read of b[2].x observes the update.
+TEST(AssocArrayAllocation, MemberWriteAllocatesElementThenUpdatesTheMember) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct { int x = 1; int y = 2; } xy_t;\n"
+      "  xy_t b[int];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    b[2].x = 5;\n"
+      "    result = b[2].x;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 5u);
+}
+
+// The other half of the same example: y is not written, so it holds the value
+// the element type initializes it to rather than zero. This is what separates
+// §7.8.7's allocation value from Table 7-1's nonexistent-entry value.
+TEST(AssocArrayAllocation, MemberWriteLeavesTheOtherMemberAtItsInitialValue) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct { int x = 1; int y = 2; } xy_t;\n"
+      "  xy_t b[int];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    b[2].x = 5;\n"
+      "    result = b[2].y;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 2u);
+}
+
+TEST(AssocArrayAllocation, MemberWriteAllocatesExactlyOneEntry) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct { int x = 1; int y = 2; } xy_t;\n"
+      "  xy_t b[int];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    b[2].x = 5;\n"
+      "    result = b.num();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 1u);
+}
+
+// A second member write finds the element already allocated, so it updates its
+// own member and leaves the one the first write set.
+TEST(AssocArrayAllocation, MemberWriteToExistingElementKeepsTheOtherMember) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct { int x = 1; int y = 2; } xy_t;\n"
+      "  xy_t b[int];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    b[2].x = 5;\n"
+      "    b[2].y = 7;\n"
+      "    result = b[2].x;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 5u);
+}
+
+// §7.8.7 allocates for a write, not for a read: reading a member of an element
+// that does not exist leaves the array empty. §7.8.6 governs what that read
+// yields.
+TEST(AssocArrayAllocation, MemberReadOfNonexistentElementAllocatesNothing) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct { int x = 1; int y = 2; } xy_t;\n"
+      "  xy_t b[int];\n"
+      "  int unused;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    unused = b[9].x;\n"
+      "    result = b.num();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0u);
+}
+
+// §7.8.7: a bit within an element is still a target of an assignment, so the
+// element is allocated. The other bits hold the 2-state element type's initial
+// value, which is what makes the whole element read back as 8'h04.
+TEST(AssocArrayAllocation, BitSelectWriteAllocatesElement) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  bit [7:0] aa[int];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[3][2] = 1'b1;\n"
+      "    result = aa[3];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 4u);
+}
+
+TEST(AssocArrayAllocation, PartSelectWriteAllocatesElement) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  bit [15:0] aa[int];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[3][7:0] = 8'hAB;\n"
+      "    result = aa[3];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0xABu);
+}
+
+// The entry the bit-select write allocated is an entry of the array, not a
+// variable standing beside it named "aa[3]".
+TEST(AssocArrayAllocation, BitSelectWriteAllocatesExactlyOneEntry) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  bit [7:0] aa[int];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[3][2] = 1'b1;\n"
+      "    result = aa.num();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 1u);
+}
+
+TEST(AssocArrayAllocation, PartSelectWriteToExistingElementKeepsItsOtherBits) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  bit [15:0] aa[int];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[3] = 16'hFF00;\n"
+      "    aa[3][3:0] = 4'hA;\n"
+      "    result = aa[3];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0xFF0Au);
+}
+
+// §7.8.7: a nonblocking assignment's target is an element of the array, so the
+// update allocates it there rather than writing past it.
+TEST(AssocArrayAllocation, NonblockingAssignAllocatesElement) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[5] <= 7;\n"
+      "    #1;\n"
+      "    result = aa[5];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 7u);
+}
+
+TEST(AssocArrayAllocation, NonblockingAssignAllocatesExactlyOneEntry) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[5] <= 7;\n"
+      "    #1;\n"
+      "    result = aa.num();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 1u);
+}
+
+TEST(AssocArrayAllocation, NonblockingAssignAllocatesStringKeyedElement) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[string];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[\"k\"] <= 4;\n"
+      "    #1;\n"
+      "    result = aa[\"k\"];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 4u);
+}
+
+// §7.8.7 allocates a referenced element with the array's user-specified initial
+// value. The task reads its formal without writing it, so the value observed is
+// the one the entry was allocated holding rather than one a later read of the
+// array could have supplied.
+TEST(AssocArrayAllocation, RefArgAllocatesWithTheUserSpecifiedDefault) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[int] = '{default:9};\n"
+      "  int result;\n"
+      "  task automatic grab(ref int x);\n"
+      "    result = x;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    grab(aa[7]);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 9u);
+}
+
 }  // namespace

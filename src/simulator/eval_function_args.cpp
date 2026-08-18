@@ -6,6 +6,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
+#include "simulator/assoc_element.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -103,21 +104,25 @@ static bool TryBindAssocElementRef(const Expr* expr, int arg_index,
   binding.assoc = aa;
   binding.is_string_key = aa->is_string_key;
   binding.local_var = var;
+  // §7.8.7: an element passed by reference is allocated when it does not
+  // exist, holding the initial value the array gives a new element. The key it
+  // is allocated under is the one an assignment to that element would use, so
+  // that both statements reach one entry.
   if (aa->is_string_key) {
-    binding.str_key =
-        FormatValueAsString(EvalExpr(call_arg->index, ctx, arena));
+    binding.str_key = AssocStringKey(EvalExpr(call_arg->index, ctx, arena));
     auto it = aa->str_data.find(binding.str_key);
     if (it == aa->str_data.end()) {
-      aa->str_data[binding.str_key] = MakeLogic4Vec(arena, aa->elem_width);
+      aa->str_data[binding.str_key] = AssocAllocValue(aa, arena);
       it = aa->str_data.find(binding.str_key);
     }
     var->value = it->second;
   } else {
     binding.int_key =
-        static_cast<int64_t>(EvalExpr(call_arg->index, ctx, arena).ToUint64());
+        AssocIntKey(EvalExpr(call_arg->index, ctx, arena), aa->is_wildcard,
+                    aa->index_width, aa->is_index_signed);
     auto it = aa->int_data.find(binding.int_key);
     if (it == aa->int_data.end()) {
-      aa->int_data[binding.int_key] = MakeLogic4Vec(arena, aa->elem_width);
+      aa->int_data[binding.int_key] = AssocAllocValue(aa, arena);
       it = aa->int_data.find(binding.int_key);
     }
     var->value = it->second;

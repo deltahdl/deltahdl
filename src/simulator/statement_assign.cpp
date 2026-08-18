@@ -12,6 +12,7 @@
 #include "common/packed_range.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
+#include "simulator/assoc_element.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_expr_internal.h"
@@ -264,6 +265,10 @@ static bool WriteVariableField(std::string_view base_name,
 
 bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
                       SimContext& ctx) {
+  // §7.8.7: `b[2].x = 5` names a member of an associative array element, which
+  // the name built below cannot reach because the select contributes nothing
+  // to it. Allocate the element and write the member through the array.
+  if (TryWriteAssocMemberField(lhs, rhs_val, ctx, ctx.GetArena())) return true;
   std::string name;
   BuildLhsName(lhs, name);
   auto dot = name.find('.');

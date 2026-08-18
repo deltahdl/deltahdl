@@ -119,6 +119,15 @@ struct AssocArrayObject {
   bool is_index_signed = true;
   bool has_default = false;
   Logic4Vec default_value;
+  // §7.8.7: the value an element allocated by a write starts at when the
+  // declaration carried no '{default:...}, recorded only when the element type
+  // supplies one of its own. A struct whose members carry initializers is the
+  // case the subclause gives: `typedef struct {int x=1,y=2;} xy_t;
+  // xy_t b[int];` allocates b[2] holding 1 and 2. Table 7-1 (see §7.4.5)
+  // governs what a read of a nonexistent entry yields and is a separate
+  // question; it names no struct type, so a read still yields x or 0.
+  bool has_elem_init = false;
+  Logic4Vec elem_init;
   uint32_t Size() const;
 };
 

@@ -470,6 +470,19 @@ int64_t AssocIntKey(const Logic4Vec& val, bool is_wildcard,
   return static_cast<int64_t>(raw);
 }
 
+std::string AssocStringKey(const Logic4Vec& val) {
+  uint32_t nb = val.width / 8;
+  std::string s;
+  s.reserve(nb);
+  for (uint32_t i = nb; i > 0; --i) {
+    uint32_t bi = i - 1;
+    auto ch = static_cast<char>(
+        (val.words[(bi * 8) / 64].aval >> ((bi * 8) % 64)) & 0xFF);
+    if (ch != 0) s.push_back(ch);
+  }
+  return s;
+}
+
 static uint64_t EvalRelationalOp(TokenKind op, uint64_t lv, uint64_t rv) {
   switch (op) {
     case TokenKind::kLt:

@@ -10,6 +10,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
+#include "simulator/assoc_element.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_string.h"
@@ -54,6 +55,11 @@ static bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
   }
   if (TryQueueIndexedWrite(lhs, rhs_val, ctx, arena)) return true;
   if (TryAssocIndexedWrite(lhs, rhs_val, ctx, arena)) return true;
+  // §7.8.7: `aa[3][7:0] = v` targets bits of an associative array element, so
+  // the element is allocated and written. TryResolveCompoundElement below
+  // would otherwise fabricate a plain variable named "aa[3]" and divert the
+  // write into it, leaving the array untouched.
+  if (TryWriteAssocElementBits(lhs, rhs_val, ctx, arena)) return true;
   if (auto* compound = TryResolveCompoundElement(lhs, ctx, arena)) {
     WriteVar(compound, rhs_val, arena);
     return true;
@@ -802,6 +808,10 @@ static void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx,
       auto result = EvalBinaryOp(base_op, elem->value, actual_rhs, arena);
       WriteVar(elem, result, arena);
     } else {
+      // §7.8.7: a compound assignment reads and writes in one statement, so a
+      // nonexistent associative array element is allocated with its initial
+      // value before the read below rather than by the write after it.
+      AllocateAssocEntryForModify(stmt->lhs, ctx, arena);
       auto lhs_val = EvalExpr(stmt->lhs, ctx, arena);
       auto result = EvalBinaryOp(base_op, lhs_val, actual_rhs, arena);
       TrySelectBlockingAssign(stmt->lhs, result, ctx, arena);

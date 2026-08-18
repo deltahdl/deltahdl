@@ -8,6 +8,7 @@
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
+#include "simulator/assoc_element.h"
 #include "simulator/class_object.h"
 #include "simulator/clocking.h"
 #include "simulator/eval_array.h"
@@ -122,6 +123,10 @@ struct IncDecResult {
 
 static IncDecResult EvalIncDec(const Expr* expr, SimContext& ctx,
                                Arena& arena) {
+  // §7.8.7: an increment reads and writes in one statement, so a nonexistent
+  // associative array element is allocated with its initial value before the
+  // read below rather than by the write after it.
+  AllocateAssocEntryForModify(expr->lhs, ctx, arena);
   auto old_val = EvalExpr(expr->lhs, ctx, arena);
   Logic4Vec new_val;
   if (old_val.is_real) {
@@ -661,6 +666,12 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec vif_out;
   if (TryVirtualInterfaceMember(expr, ctx, arena, vif_out)) return vif_out;
 
+  // §7.8.7: `b[2].x` reads a member of an associative array element, which the
+  // name built below cannot reach because the select contributes nothing to it.
+  Logic4Vec assoc_member;
+  if (TryEvalAssocMemberField(expr, ctx, arena, assoc_member))
+    return assoc_member;
+
   std::string name;
   BuildMemberName(expr, name);
   auto resolved = StripRootPrefix(name);
@@ -914,6 +925,9 @@ bool IsCompoundAssignOp(TokenKind op) {
 }
 
 Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
+  // §7.8.7: as in EvalIncDec, the element this reads and writes is allocated
+  // before the read.
+  AllocateAssocEntryForModify(expr->lhs, ctx, arena);
   auto lhs_val = EvalExpr(expr->lhs, ctx, arena);
   auto rhs_val = EvalExpr(expr->rhs, ctx, arena);
   auto base_op = CompoundAssignBaseOp(expr->op);

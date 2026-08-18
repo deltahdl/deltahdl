@@ -421,17 +421,7 @@ bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
   auto* aa = ctx.FindAssocArray(lhs->base->text);
   if (!aa || !lhs->index) return false;
   if (aa->is_string_key) {
-    auto key_vec = EvalExpr(lhs->index, ctx, arena);
-    uint32_t nb = key_vec.width / 8;
-    std::string s;
-    s.reserve(nb);
-    for (uint32_t i = nb; i > 0; --i) {
-      uint32_t bi = i - 1;
-      auto ch = static_cast<char>(
-          (key_vec.words[(bi * 8) / 64].aval >> ((bi * 8) % 64)) & 0xFF);
-      if (ch != 0) s.push_back(ch);
-    }
-    aa->str_data[s] = rhs_val;
+    aa->str_data[AssocStringKey(EvalExpr(lhs->index, ctx, arena))] = rhs_val;
   } else {
     auto key_val = EvalExpr(lhs->index, ctx, arena);
     if (HasUnknownBits(key_val)) {
