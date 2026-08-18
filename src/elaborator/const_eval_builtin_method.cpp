@@ -129,9 +129,11 @@ std::optional<int64_t> StringParamLength(const Expr* operand) {
   for (const auto& param : mod->params) {
     if (param.name != operand->text) continue;
     // §23.9 puts a parameter a generate block declares in a scope of its own,
-    // and this reader cannot apply that rule: RegisteredModule() names a module
-    // and nothing about where inside it this call stands. #3225 carries what a
-    // correct answer needs.
+    // so a call written outside that block is not naming it however the names
+    // agree. RegisteredGenPrefixes() is where the call stands.
+    if (!ParamVisibleFromScopes(param.gen_block_prefix,
+                                RegisteredGenPrefixes()))
+      continue;
     if (!param.is_string_value) return std::nullopt;
     return static_cast<int64_t>(param.resolved_string.size());
   }

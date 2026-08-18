@@ -163,8 +163,9 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
         // The prefix and the loop-index bindings are captured now because both
         // are properties of this instance, and the shared body AST records
         // neither.
-        generate_defparams_[mod].push_back(
-            {item, InternedGenPrefix(), gen_loop_consts_, gen_block_path_});
+        generate_defparams_[mod].push_back({item, InternedGenPrefix(),
+                                            gen_prefix_scopes_,
+                                            gen_loop_consts_, gen_block_path_});
         break;
       default:
         ElaborateGenerateBlockItem(item, mod);

@@ -4,6 +4,7 @@
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
@@ -48,30 +49,49 @@ ParamClassRegistryGuard::~ParamClassRegistryGuard() {
 // ParamRangeRegistryGuard. Null unless a guard is live.
 static const RtlirModule* g_param_range_module = nullptr;
 
+// §23.9: the generate block prefixes in force where the expression being folded
+// stands, outermost first. Installed by RegisteredGenScopeGuard and cleared
+// whenever a module is installed, because a module is entered at its own level
+// and an expression among its own items stands in no generate block.
+static std::vector<std::string_view> g_param_range_prefixes;
+
 ParamRangeRegistryGuard::ParamRangeRegistryGuard(const RtlirModule* mod)
-    : prev_(g_param_range_module) {
+    : prev_(g_param_range_module),
+      prev_scopes_(std::move(g_param_range_prefixes)) {
   g_param_range_module = mod;
+  g_param_range_prefixes.clear();
 }
 
 ParamRangeRegistryGuard::~ParamRangeRegistryGuard() {
   g_param_range_module = prev_;
+  g_param_range_prefixes = std::move(prev_scopes_);
+}
+
+RegisteredGenScopeGuard::RegisteredGenScopeGuard(
+    const std::vector<std::string_view>& scopes)
+    : prev_(std::move(g_param_range_prefixes)) {
+  g_param_range_prefixes = scopes;
+}
+
+RegisteredGenScopeGuard::~RegisteredGenScopeGuard() {
+  g_param_range_prefixes = std::move(prev_);
 }
 
 const RtlirModule* RegisteredModule() { return g_param_range_module; }
+
+const std::vector<std::string_view>& RegisteredGenPrefixes() {
+  return g_param_range_prefixes;
+}
 
 std::optional<PackedRange> RegisteredParamRange(std::string_view name) {
   if (!g_param_range_module) return std::nullopt;
   for (const auto& pd : g_param_range_module->params) {
     if (pd.name != name) continue;
     // §23.9 puts a parameter a generate block declares in a scope of its own,
-    // and this reader cannot apply that rule. RegisteredModule() names a module
-    // and nothing about where inside it the select stands, so the only test
-    // available here treats every block-local parameter as invisible -- which
-    // is wrong for a select written inside the block that declared it, where
-    // §23.9 has an identifier "declared locally" name the local item. #3225
-    // carries what a correct answer needs, which is a reference position in the
-    // registry. Until then this reader answers by name alone, as it did before
-    // #3223.
+    // so a select written outside that block is not addressing it however the
+    // names agree. RegisteredGenPrefixes() is where the select stands.
+    if (!ParamVisibleFromScopes(pd.gen_block_prefix, RegisteredGenPrefixes()))
+      continue;
     if (!pd.has_decl_range_bounds) return std::nullopt;
     return PackedRange{pd.decl_range_left, pd.decl_range_right};
   }

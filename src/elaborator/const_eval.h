@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <vector>
 
 #include "common/packed_range.h"
 
@@ -77,6 +78,32 @@ class ParamRangeRegistryGuard {
 
  private:
   const RtlirModule* prev_;
+  std::vector<std::string_view> prev_scopes_;
+};
+
+// §23.9 lists "Generate blocks" among the elements that "define a new scope",
+// so which of the registered module's parameters an expression may name depends
+// on where in that module it stands. ParamRangeRegistryGuard installs the
+// module and nothing more, which is not enough: matching by name alone lets a
+// parameter one block declares answer an expression written anywhere in the
+// module, and refusing every block-local parameter denies a block its own,
+// which §23.9 grants by ruling that an identifier "declared locally" names the
+// local item.
+//
+// This guard installs the generate block prefixes in force where the expression
+// stands, outermost first, for the readers to hand to ParamVisibleFromScopes.
+// A ParamRangeRegistryGuard clears them when it installs a module, so an
+// expression among a module's own items needs no guard of this kind. The
+// prefixes are borrowed and must outlive the guard.
+class RegisteredGenScopeGuard {
+ public:
+  explicit RegisteredGenScopeGuard(const std::vector<std::string_view>& scopes);
+  ~RegisteredGenScopeGuard();
+  RegisteredGenScopeGuard(const RegisteredGenScopeGuard&) = delete;
+  RegisteredGenScopeGuard& operator=(const RegisteredGenScopeGuard&) = delete;
+
+ private:
+  std::vector<std::string_view> prev_;
 };
 
 std::optional<int64_t> ConstEvalInt(const Expr* expr);

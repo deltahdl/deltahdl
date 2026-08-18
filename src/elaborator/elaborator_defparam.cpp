@@ -298,7 +298,7 @@ auto Elaborator::CollectDefparamSites(RtlirModule* mod,
   std::vector<DefparamSite> sites;
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kDefparam) continue;
-    sites.push_back({item, {}, {}, {}});
+    sites.push_back({item, {}, {}, {}, {}});
   }
   auto it = generate_defparams_.find(mod);
   if (it != generate_defparams_.end())
@@ -341,14 +341,19 @@ void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
   // this no module is registered and a defparam naming a string parameter
   // recovers nothing.
   ParamRangeRegistryGuard param_range_guard(mod);
-  ScopeMap mod_scope = BuildParamScope(mod);
   for (const auto& site : CollectDefparamSites(mod, decl)) {
+    // §23.9: a statement written in a generate block reads that block's
+    // declarations as well as the module's, and one written among the module's
+    // own items reads only the module's. This runs outside every module, so the
+    // prefixes come from the site rather than from what elaboration left in
+    // force, and the parameter scope is built per site rather than once.
+    RegisteredGenScopeGuard gen_scope_guard(site.scopes);
+    ScopeMap scope = BuildParamScope(mod, site.scopes);
     // §27.4 opens a localparam sharing the loop index's name in each instance
     // of a loop generate block, and §23.10.1's own example reads it on a
     // right-hand side. The module's parameters are rebuilt on every pass
     // because an earlier defparam may have changed one, so the block's bindings
     // are laid over that rather than kept in place of it.
-    ScopeMap scope = mod_scope;
     for (const auto& [name, value] : site.consts) scope[name] = value;
     ApplyDefparamSite(mod, site, scope);
   }
@@ -481,9 +486,13 @@ void Elaborator::ReportUnresolvedDefparamSite(RtlirModule* mod,
 void Elaborator::ReportUnresolvedDefparams(RtlirModule* mod,
                                            const ModuleDecl* decl) {
   ParamRangeRegistryGuard param_range_guard(mod);
-  ScopeMap mod_scope = BuildParamScope(mod);
   for (const auto& site : CollectDefparamSites(mod, decl)) {
-    ReportUnresolvedDefparamSite(mod, site, mod_scope);
+    // The same per-site scope Elaborator::ApplyDefparams builds, for the same
+    // §23.9 reason: a site is judged unresolved against the declarations it
+    // could have named, and a statement in a generate block could name that
+    // block's.
+    RegisteredGenScopeGuard gen_scope_guard(site.scopes);
+    ReportUnresolvedDefparamSite(mod, site, BuildParamScope(mod, site.scopes));
   }
 }
 

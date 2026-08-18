@@ -40,6 +40,14 @@ std::optional<ConstVal> ConstEvalSelectFull(const Expr* expr,
 // number.
 std::optional<PackedRange> RegisteredParamRange(std::string_view name);
 
+// §23.9: the generate block prefixes in force where the expression being folded
+// stands, outermost first, as a live RegisteredGenScopeGuard installed them.
+// Empty for an expression among a module's own items, which is what a
+// ParamRangeRegistryGuard leaves behind when it installs a module. A reader
+// matching a parameter by name hands this to ParamVisibleFromScopes to find out
+// whether the declaration it matched is one this expression may name.
+const std::vector<std::string_view>& RegisteredGenPrefixes();
+
 // The module a live ParamRangeRegistryGuard installed, or null when none is
 // live. A ScopeMap gives a name a value and says nothing about how it was
 // declared, so this is what a fold consults when the declaration is what

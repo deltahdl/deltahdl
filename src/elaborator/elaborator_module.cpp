@@ -834,6 +834,11 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
     // loop this instantiation is an item of -- is the one that expression's
     // names mean something in.
     if (pval && has_param_type && !pd.from_override) {
+      // §23.9 needs no scope installed beside this one. A parameter port list
+      // is processed before any of the module's items, so no generate block's
+      // parameter is in RtlirModule::params yet and no expression here stands
+      // in a block; ParamRangeRegistryGuard leaves the prefixes empty, which is
+      // what an expression among a module's own items wants.
       ParamRangeRegistryGuard param_range_guard(mod);
       RecordStringParamValue(pd, pval, param_type, arena_);
     }

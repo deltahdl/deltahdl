@@ -791,6 +791,10 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   // each fold rather than copied, so a parameter declared earlier in this item
   // list is visible to a select written later in it.
   ParamRangeRegistryGuard param_range_guard(mod);
+  // §23.9: this runs while the module is being elaborated, so a UDP instance
+  // written in a generate block reads that block's parameters as well as the
+  // module's, and gen_prefix_scopes_ is already where the instance stands.
+  RegisteredGenScopeGuard gen_scope_guard(gen_prefix_scopes_);
 
   for (auto* item : decl->items) {
     ElaborateItem(item, mod);

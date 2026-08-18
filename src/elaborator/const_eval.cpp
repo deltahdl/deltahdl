@@ -495,9 +495,11 @@ static std::optional<std::string> StringParamChars(const Expr* expr) {
   for (const auto& param : mod->params) {
     if (param.name != expr->text) continue;
     // §23.9 puts a parameter a generate block declares in a scope of its own,
-    // and this reader cannot apply that rule: RegisteredModule() names a module
-    // and nothing about where inside it this reference stands. #3225 carries
-    // what a correct answer needs.
+    // so a reference written outside that block is not naming it however the
+    // names agree. RegisteredGenPrefixes() is where the reference stands.
+    if (!ParamVisibleFromScopes(param.gen_block_prefix,
+                                RegisteredGenPrefixes()))
+      continue;
     if (!param.is_string_value) return std::nullopt;
     return std::string(param.resolved_string);
   }

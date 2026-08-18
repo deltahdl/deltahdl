@@ -305,6 +305,13 @@ class ElaboratorData {
   struct DefparamSite {
     const ModuleItem* item;
     std::string_view prefix;
+    // §23.9: the generate block prefixes the statement stands in, outermost
+    // first, which decide which of the module's parameters a name on the
+    // right-hand side may mean. `prefix` is the innermost of these flattened
+    // into one string and cannot stand in for them, because no reader can split
+    // it back into steps -- a defparam in a block nested in another has to see
+    // both blocks' parameters.
+    GenBlockPrefixes scopes;
     GenBlockConsts consts;
     // §23.6: the generate block instances the statement stands in, which is
     // where a path written in it starts. `prefix` says the same thing as one
