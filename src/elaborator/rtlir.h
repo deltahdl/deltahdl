@@ -197,14 +197,20 @@ struct RtlirVariable {
 // first. Empty outside any loop generate construct.
 using GenBlockConsts = std::vector<std::pair<std::string_view, int64_t>>;
 
-// The name prefix of the generate block instance a process or continuous
-// assignment belongs to, empty outside any generate construct. A generate
-// block "comprises a separate scope and a new level of hierarchy when it is
-// instantiated" (§27.4), and declarations in that scope are named under this
-// prefix, while the shared body AST still refers to them by their simple
-// names. Carrying the prefix is what lets a reference from inside the block
-// reach the instance's own declaration.
-using GenBlockPrefix = std::string_view;
+// The name prefixes of the generate block instances enclosing a process or
+// continuous assignment, outermost first, with the instance's own prefix last.
+// Empty outside any generate construct. A generate block "comprises a separate
+// scope and a new level of hierarchy when it is instantiated" (§27.4), and
+// declarations in that scope are named under its prefix, while the shared body
+// AST still refers to them by their simple names. Carrying the prefixes is what
+// lets a reference from inside the block reach the instance's own declaration,
+// and §23.9 is why every enclosing one comes too: the search for a name
+// "referenced directly (without a hierarchical path) within a ... generate
+// block" continues "upward until an item by that name is found or until a
+// module, interface, program, or checker boundary is encountered". The
+// innermost prefix flattens the whole path into one string, which no reader can
+// split back into the steps that search needs.
+using GenBlockPrefixes = std::vector<std::string_view>;
 
 // §23.6: one step of a hierarchical path name, which Syntax 23-7 writes as
 // `identifier constant_bit_select`. §23.6 forms such a name "by concatenating
@@ -254,7 +260,7 @@ struct RtlirContAssign {
   Expr* data_input = nullptr;
   std::vector<ResolvedAttribute> attrs;
   GenBlockConsts gen_block_consts;
-  GenBlockPrefix gen_block_prefix;
+  GenBlockPrefixes gen_block_prefixes;
 };
 
 // §29.8: one instance of a user-defined primitive, and what drives its output
@@ -290,7 +296,7 @@ struct RtlirUdpInst {
   Expr* delay = nullptr;
   Expr* delay_fall = nullptr;
   GenBlockConsts gen_block_consts;
-  GenBlockPrefix gen_block_prefix;
+  GenBlockPrefixes gen_block_prefixes;
 };
 
 struct RtlirAlias {
@@ -308,7 +314,7 @@ struct RtlirProcess {
   std::vector<EventExpr> sensitivity;
   std::vector<ResolvedAttribute> attrs;
   GenBlockConsts gen_block_consts;
-  GenBlockPrefix gen_block_prefix;
+  GenBlockPrefixes gen_block_prefixes;
 };
 
 struct RtlirParamDecl {

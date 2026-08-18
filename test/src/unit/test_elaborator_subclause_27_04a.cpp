@@ -513,7 +513,8 @@ TEST(GenerateElaboration,
 // §27.4: the same rule reaches the continuous assignments inside the two
 // blocks. The body AST is shared across instances and writes the simple name
 // the block declared, so an assignment reaches its own instance's declaration
-// only through RtlirContAssign::gen_block_prefix (src/elaborator/rtlir.h:226).
+// only through the last entry of RtlirContAssign::gen_block_prefixes
+// (src/elaborator/rtlir.h:263).
 // Two sibling arrays over one genvar are separate scopes, so the two
 // assignments cannot carry one prefix. Spelling the prefix from the genvar gave
 // both of them `i_4_`, and a prefix that does not say which block an assignment
@@ -548,10 +549,10 @@ TEST(GenerateElaboration,
 
   auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->assigns.size(), 2u);
-  std::string first(mod->assigns[0].gen_block_prefix);
-  std::string second(mod->assigns[1].gen_block_prefix);
-  ASSERT_FALSE(first.empty());
-  ASSERT_FALSE(second.empty());
+  ASSERT_FALSE(mod->assigns[0].gen_block_prefixes.empty());
+  ASSERT_FALSE(mod->assigns[1].gen_block_prefixes.empty());
+  std::string first(mod->assigns[0].gen_block_prefixes.back());
+  std::string second(mod->assigns[1].gen_block_prefixes.back());
   EXPECT_NE(first, second);
 }
 

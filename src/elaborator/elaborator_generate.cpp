@@ -96,10 +96,10 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
 template <typename Item>
 static void StampGenBlockInstance(std::vector<Item>& items, size_t first,
                                   const GenBlockConsts& consts,
-                                  GenBlockPrefix prefix) {
+                                  const GenBlockPrefixes& prefixes) {
   for (size_t i = first; i < items.size(); ++i) {
     items[i].gen_block_consts = consts;
-    items[i].gen_block_prefix = prefix;
+    items[i].gen_block_prefixes = prefixes;
   }
 }
 
@@ -125,10 +125,12 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
   size_t first_assign = mod->assigns.size();
   size_t first_udp = mod->udp_insts.size();
   ElaborateItem(item, mod);
-  GenBlockPrefix prefix = InternedGenPrefix();
-  StampGenBlockInstance(mod->processes, first_proc, gen_loop_consts_, prefix);
-  StampGenBlockInstance(mod->assigns, first_assign, gen_loop_consts_, prefix);
-  StampGenBlockInstance(mod->udp_insts, first_udp, gen_loop_consts_, prefix);
+  StampGenBlockInstance(mod->processes, first_proc, gen_loop_consts_,
+                        gen_prefix_scopes_);
+  StampGenBlockInstance(mod->assigns, first_assign, gen_loop_consts_,
+                        gen_prefix_scopes_);
+  StampGenBlockInstance(mod->udp_insts, first_udp, gen_loop_consts_,
+                        gen_prefix_scopes_);
 }
 
 void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
@@ -214,10 +216,12 @@ void Elaborator::ElaborateConditionalGenerateBlock(
   }
   std::string saved_prefix = gen_prefix_;
   gen_prefix_ = std::format("{}{}_", saved_prefix, block.name);
+  gen_prefix_scopes_.push_back(InternedGenPrefix());
   gen_block_path_.push_back(
       {block.name_is_generated ? std::string_view{} : block.name, false, 0});
   ElaborateGenerateItems(block.body, mod, scope);
   gen_block_path_.pop_back();
+  gen_prefix_scopes_.pop_back();
   gen_prefix_ = saved_prefix;
 }
 
@@ -637,12 +641,18 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
   gen_block_path_.push_back(
       {item->name_is_generated ? std::string_view{} : item->name, true,
        opening->init_value});
+  // §27.4 puts the index in this block's prefix, so the entry is a different
+  // string in every instance and is retargeted at the top of every iteration
+  // beside the localparam and the step. It is pushed empty here and read by
+  // nothing before the first iteration sets it.
+  gen_prefix_scopes_.emplace_back();
 
   auto close_loop = [&] {
     gen_prefix_ = saved_prefix;
     active_loop_genvars_.erase(genvar_name);
     gen_loop_consts_.resize(const_depth);
     gen_block_path_.pop_back();
+    gen_prefix_scopes_.pop_back();
   };
 
   std::unordered_set<int64_t> seen_values;
@@ -688,6 +698,7 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
     // one.
     gen_prefix_ = std::format("{}{}_{}_", saved_prefix, item->name,
                               loop_scope[genvar_name]);
+    gen_prefix_scopes_.back() = InternedGenPrefix();
     gen_loop_consts_[const_depth].second = loop_scope[genvar_name];
     gen_block_path_.back().index = loop_scope[genvar_name];
     ElaborateGenerateItems(item->gen_body, mod, loop_scope);

@@ -4,7 +4,9 @@
 #include <memory>
 #include <random>
 #include <sstream>
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "simulator/coverage.h"
@@ -99,18 +101,27 @@ Variable* FindVariableByPrefixWalk(const NameLookup& lookup,
 
 }  // namespace
 
-// §27.4: resolves `name` against the generate block instance the running
-// process belongs to, if it belongs to one. `inst_prefix` is the process's
-// module-instance prefix, which the block prefix sits inside. Returns nullptr
-// when there is no enclosing generate block or the block declares no such name,
-// leaving the caller to carry on with the enclosing scopes.
+// §27.4: resolves `name` against the generate block instances the running
+// process is in, if it is in any. `inst_prefix` is the process's
+// module-instance prefix, which the block prefixes sit inside. Returns nullptr
+// when there is no enclosing generate block or none of them declares such a
+// name, leaving the caller to carry on with the enclosing scopes.
+//
+// The blocks are tried innermost first because §23.9 rules that "If it is
+// declared locally, then the local item shall be used; if not, the search shall
+// continue upward until an item by that name is found or until a module,
+// interface, program, or checker boundary is encountered".
+// Process::gen_prefixes holds them outermost first, so the walk runs backwards
+// over it.
 Variable* SimContext::FindInGenerateBlock(const std::string& inst_prefix,
                                           std::string_view name) {
-  if (!current_process_ || current_process_->gen_prefix.empty()) return nullptr;
-  std::string qualified =
-      inst_prefix + current_process_->gen_prefix + std::string(name);
-  auto it = variables_.find(qualified);
-  return (it != variables_.end()) ? it->second : nullptr;
+  if (!current_process_) return nullptr;
+  const std::vector<std::string>& prefixes = current_process_->gen_prefixes;
+  for (auto it = prefixes.rbegin(); it != prefixes.rend(); ++it) {
+    auto found = variables_.find(inst_prefix + *it + std::string(name));
+    if (found != variables_.end()) return found->second;
+  }
+  return nullptr;
 }
 
 bool SimContext::AssertCheckingEnabled(uint32_t type_bit,

@@ -593,4 +593,125 @@ TEST(ImplicitDeclaration,
   EXPECT_EQ(bare, 1) << "the module's net 'w' should not be duplicated";
 }
 
+// §6.10 assumes no implicit net for an identifier declared "in any scope whose
+// declarations can be directly referenced from" the scope the assignment
+// appears in, and §23.9 rules that a generate block one level out is such a
+// scope: an identifier referenced in a generate block "shall be declared either
+// within the ... generate block locally or within a module, interface, program,
+// checker, task, function, named block, or generate block that is higher in the
+// same branch of the name tree". Block 'b' is higher in the same branch than
+// block 'a', so the reference to 'w' inside 'a' names the net 'b' declared and
+// declares nothing. The module holds one net named 'b_w' and none named
+// 'b_a_w'.
+//
+// The test fails when mod->nets holds an entry named 'b_a_w', which
+// Elaborator::MaybeCreateImplicitNet in src/elaborator/elaborator_items.cpp
+// pushes if it asks IsNameDeclared only about Elaborator::ScopedName("w") and
+// the bare "w". Those two keys are "b_a_w" and "w" here, and the net block 'b'
+// declared is held as "b_w", which neither matches, so a second net shadows it
+// and the continuous assignment drives the new one.
+TEST(
+    ImplicitDeclaration,
+    NetOfAnEnclosingConditionalGenerateBlockIsNotRedeclaredByANestedReference) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  generate\n"
+      "    if (1) begin : b\n"
+      "      wire w;\n"
+      "      if (1) begin : a\n"
+      "        assign w = 1'b1;\n"
+      "      end\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  int nested = 0;
+  int enclosing = 0;
+  for (const auto& n : mod->nets) {
+    if (n.name == "b_a_w") ++nested;
+    if (n.name == "b_w") ++enclosing;
+  }
+  EXPECT_EQ(nested, 0) << "block 'a' should declare no net of its own";
+  EXPECT_EQ(enclosing, 1) << "block 'b' net 'b_w' should not be duplicated";
+}
+
+// The same §6.10 and §23.9 reading where the enclosing scope is a loop generate
+// block, whose prefix §27.4 indexes "by adding the '[genvar value]' to the end
+// of the generate block identifier" and which the elaborator therefore spells
+// with the index in it. The reference to 'w' inside block 'a' names the 'w'
+// this iteration of block 'b' declared, so the module holds one net named
+// 'b_4_w' and none named 'b_4_a_w'.
+//
+// The genvar runs from 4 so that no value it takes is also the ordinal of the
+// instance the iteration creates, which is 0. A loop starting at zero makes the
+// two coincide, and the case then passes whether the prefix is built from the
+// index §27.4 names or from the ordinal.
+TEST(ImplicitDeclaration,
+     NetOfAnEnclosingLoopGenerateBlockIsNotRedeclaredByANestedReference) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  genvar i;\n"
+      "  generate\n"
+      "    for (i = 4; i < 5; i = i + 1) begin : b\n"
+      "      wire w;\n"
+      "      if (1) begin : a\n"
+      "        assign w = 1'b1;\n"
+      "      end\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  int nested = 0;
+  int enclosing = 0;
+  for (const auto& n : mod->nets) {
+    if (n.name == "b_4_a_w") ++nested;
+    if (n.name == "b_4_w") ++enclosing;
+  }
+  EXPECT_EQ(nested, 0) << "block 'a' should declare no net of its own";
+  EXPECT_EQ(enclosing, 1) << "block 'b' net 'b_4_w' should not be duplicated";
+}
+
+// §6.10 rules that "The implicit net declaration shall belong to the scope in
+// which the net reference appears" and that "if the implicit net is declared by
+// a reference in a generate block, then the net is implicitly declared only in
+// that generate block". Nothing declares 'w' here, so the reference in block
+// 'a' declares it, and the net belongs to 'a' rather than to 'b' or to the
+// module: one net named 'b_a_w'.
+//
+// This is what the upward walk over the enclosing blocks must not lose. A walk
+// that answered that some enclosing scope declared the name would push no net
+// at all, and one that named the net for an enclosing block would put the
+// declaration in the wrong scope.
+TEST(ImplicitDeclaration,
+     ImplicitNetInANestedGenerateBlockIsNamedForEveryEnclosingBlock) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  generate\n"
+      "    if (1) begin : b\n"
+      "      if (1) begin : a\n"
+      "        assign w = 1'b1;\n"
+      "      end\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  int count = 0;
+  for (const auto& n : mod->nets) {
+    if (n.name == "b_a_w") ++count;
+  }
+  EXPECT_EQ(count, 1) << "block 'a' should declare exactly one net 'b_a_w'";
+}
+
 }  // namespace

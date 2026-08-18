@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <format>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -67,28 +68,38 @@ static bool IsParamDeclared(std::string_view name, const RtlirModule* mod) {
 
 bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
                                         RtlirModule* mod) {
-  // Ask IsNameDeclared about both the scoped name and the bare one. §6.10
-  // assumes an implicit net for an identifier that "has not been declared
+  // Ask IsNameDeclared about one key per enclosing scope, innermost first.
+  // §6.10 assumes an implicit net for an identifier that "has not been declared
   // previously in the scope where the continuous assignment statement appears
   // or in any scope whose declarations can be directly referenced from" that
-  // scope, and RtlirModule::nets, RtlirModule::variables and RtlirModule::ports
-  // hold the string Elaborator::ScopedName produced: the scoped key answers the
-  // first half for this generate block, the bare key the second half for the
-  // enclosing module. Outside a generate block gen_prefix_ is empty and
-  // ScopedName is the identity, so the two keys are one string.
+  // scope, and §23.9 lists the scopes and fixes the order: an identifier
+  // "referenced directly (without a hierarchical path) within a ... generate
+  // block ... shall be declared either within the ... generate block locally or
+  // within a module, interface, program, checker, task, function, named block,
+  // or generate block that is higher in the same branch of the name tree", and
+  // "the search shall continue upward until an item by that name is found or
+  // until a module, interface, program, or checker boundary is encountered".
   //
-  // Dropping either one is a defect. Without the scoped key a second reference
-  // to one undeclared identifier in one generate block pushes a second net of
-  // that name, which SimContext::CreateNet in src/simulator/sim_context.cpp
-  // then registers over the first. Without the bare key a reference in a
-  // generate block to a net the module declares gains a prefixed net that
-  // shadows it, and the continuous assignment drives the new net.
+  // RtlirModule::nets, RtlirModule::variables and RtlirModule::ports hold the
+  // string Elaborator::ScopedName produced, so the key for each scope is that
+  // scope's generate prefix followed by the identifier. gen_prefix_scopes_
+  // holds those prefixes outermost first, and the module itself is the bare
+  // identifier. Outside a generate block gen_prefix_scopes_ is empty and the
+  // bare key is the only one.
   //
-  // An intermediate generate block is still unchecked: inside block 'a' nested
-  // in block 'b' the two keys are "b_a_w" and "w", and a net that 'b' declares
-  // is held as "b_w", which neither matches. Issue #3219 records that.
-  std::string_view scoped = ScopedName(name);
-  if (IsNameDeclared(scoped, mod)) return true;
+  // Dropping any of them is a defect. Without the innermost key a second
+  // reference to one undeclared identifier in one generate block pushes a
+  // second net of that name, which SimContext::CreateNet in
+  // src/simulator/sim_context.cpp then registers over the first. Without the
+  // bare key a reference in a generate block to a net the module declares gains
+  // a prefixed net that shadows it, and the continuous assignment drives the
+  // new net. Without the keys in between the same shadowing happens one block
+  // in: inside block 'a' nested in block 'b', a net that 'b' declares is held
+  // as "b_w", which neither "b_a_w" nor "w" matches.
+  for (auto it = gen_prefix_scopes_.rbegin(); it != gen_prefix_scopes_.rend();
+       ++it) {
+    if (IsNameDeclared(std::string(*it) + std::string(name), mod)) return true;
+  }
   if (IsNameDeclared(name, mod)) return true;
   // §6.10 gives an implicit net to an identifier used in a port connection or
   // on the left of a continuous assignment only when it is not declared. A
@@ -127,6 +138,7 @@ bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
   // here and then reads net_names_ back with that same `name`, so a prefixed
   // entry would make it treat the net it just created as a variable and report
   // a second assignment to it under §10.3.2.
+  std::string_view scoped = ScopedName(name);
   RtlirNet net =
       MakeImplicitPortNet(scoped, /*port_width=*/1, /*port_is_signed=*/false,
                           unit_->default_nettype);

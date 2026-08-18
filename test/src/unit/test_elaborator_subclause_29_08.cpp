@@ -388,10 +388,10 @@ TEST(UdpInstanceElaboration, GenerateLoopStampsEachInstanceWithItsIndex) {
 // names it under a prefix that identifies the instance. The body AST is shared
 // across instances and still writes the simple name `c_local`, so the terminal
 // of the primitive instance can only reach that declaration through the prefix
-// the instance carries, which is RtlirUdpInst::gen_block_prefix
-// (src/elaborator/rtlir.h:262). Lowerer::LowerUdpInst
-// (src/simulator/lowerer_udp.cpp:321) copies it to Process::gen_prefix, and
-// SimContext (src/simulator/sim_context.cpp:111) prepends it to a name before
+// the instance carries, which is the last entry of
+// RtlirUdpInst::gen_block_prefixes (src/elaborator/rtlir.h:299).
+// Lowerer::LowerUdpInst (src/simulator/lowerer_udp.cpp:321) copies the list to
+// Process::gen_prefixes, and SimContext prepends each entry to a name before
 // looking the name up.
 //
 // The assertion is that the prefix, followed by the simple name the body wrote,
@@ -405,8 +405,8 @@ TEST(UdpInstanceElaboration, GenerateLoopStampsEachInstanceWithItsIndex) {
 //
 // This is the second half of the case #3201 was filed on: with
 // Elaborator::ElaborateGenerateBlockItem not stamping RtlirModule::udp_insts,
-// gen_block_prefix is empty and the primitive drives a name no instance of the
-// block declares.
+// gen_block_prefixes is empty and the primitive drives a name no instance of
+// the block declares.
 TEST(UdpInstanceElaboration, GenerateBlockPrefixNamesTheInstanceDeclarations) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -436,8 +436,10 @@ TEST(UdpInstanceElaboration, GenerateBlockPrefixNamesTheInstanceDeclarations) {
   }
   ASSERT_NE(block_net, nullptr);
   ASSERT_NE(block_net->name, "c_local");
-  EXPECT_EQ(std::string(mod->udp_insts[0].gen_block_prefix) + "c_local",
-            std::string(block_net->name));
+  ASSERT_FALSE(mod->udp_insts[0].gen_block_prefixes.empty());
+  EXPECT_EQ(
+      std::string(mod->udp_insts[0].gen_block_prefixes.back()) + "c_local",
+      std::string(block_net->name));
 }
 
 }  // namespace

@@ -318,7 +318,8 @@ void Lowerer::LowerUdpInst(const RtlirUdpInst& inst, bool from_program) {
                        : Region::kActive;
   p->is_reactive = from_program;
   p->inst_prefix = inst_prefix_;
-  p->gen_prefix = std::string(inst.gen_block_prefix);
+  p->gen_prefixes.assign(inst.gen_block_prefixes.begin(),
+                         inst.gen_block_prefixes.end());
   InstallGenBlockConsts(inst.gen_block_consts, p);
   p->coro = MakeUdpInstCoroutine(&inst, ctx_, arena_).Release();
 

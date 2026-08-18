@@ -346,6 +346,16 @@ class ElaboratorData {
       deferred_subroutine_map_;
 
   std::string gen_prefix_;
+  // §23.9: every generate block prefix in force, outermost first, with
+  // gen_prefix_ itself last. A reference written in a nested block is resolved
+  // against each enclosing block in turn -- "the search shall continue upward
+  // until an item by that name is found or until a module, interface, program,
+  // or checker boundary is encountered" -- and gen_prefix_ alone cannot answer
+  // that, being the innermost prefix flattened into a string no reader can
+  // split back into steps. Each entry is interned in arena_ and is the whole of
+  // gen_prefix_ at that depth, so an entry and a simple name concatenate to the
+  // key Elaborator::ScopedName produced for a declaration in that block.
+  std::vector<std::string_view> gen_prefix_scopes_;
   // §23.6: the generate block instances currently being elaborated into,
   // outermost first. Maintained beside gen_prefix_, which flattens the same
   // information into a string no reader can split back into steps.

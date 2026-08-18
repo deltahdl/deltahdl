@@ -353,7 +353,8 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
   // the active stream here is the context-wide generator, which embodies the
   // module's initialization RNG for this test harness.
   p->rng_seed = ctx_.DrawSeedForChild();
-  p->gen_prefix = std::string(proc.gen_block_prefix);
+  p->gen_prefixes.assign(proc.gen_block_prefixes.begin(),
+                         proc.gen_block_prefixes.end());
   InstallGenBlockConsts(proc.gen_block_consts, p);
 
   // §16.4.4: a `disable` naming the outermost scope of a procedure flushes its

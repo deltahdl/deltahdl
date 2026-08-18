@@ -177,13 +177,19 @@ struct Process {
 
   std::string inst_prefix;
 
-  // §27.4: the name prefix of the generate block instance this process belongs
-  // to, empty outside any generate construct. A generate block "comprises a
-  // separate scope and a new level of hierarchy when it is instantiated", so
-  // its declarations are stored under this prefix while the body the instances
-  // share still names them plainly; a lookup tries it ahead of the bare name
-  // and so reaches this instance's own declaration rather than missing it.
-  std::string gen_prefix;
+  // §27.4: the name prefixes of the generate block instances this process is
+  // in, outermost first, with its own block's prefix last. Empty outside any
+  // generate construct. A generate block "comprises a separate scope and a new
+  // level of hierarchy when it is instantiated", so its declarations are stored
+  // under its prefix while the body the instances share still names them
+  // plainly; a lookup tries the prefixes ahead of the bare name and so reaches
+  // this instance's own declaration rather than missing it. §23.9 is why the
+  // enclosing ones are here too: the search for a name "referenced directly
+  // (without a hierarchical path) within a ... generate block" continues
+  // "upward until an item by that name is found or until a module, interface,
+  // program, or checker boundary is encountered", so a name a nested block does
+  // not declare is looked for in the block around it before the module.
+  std::vector<std::string> gen_prefixes;
 
   // §13.3.2: a task may be enabled more than once concurrently, and every
   // variable of an automatic task (and, more generally, every block-scoped

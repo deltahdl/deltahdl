@@ -472,7 +472,8 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
   p->is_reactive = from_program;
 
   p->inst_prefix = inst_prefix_;
-  p->gen_prefix = std::string(ca.gen_block_prefix);
+  p->gen_prefixes.assign(ca.gen_block_prefixes.begin(),
+                         ca.gen_block_prefixes.end());
   InstallGenBlockConsts(ca.gen_block_consts, p);
   ContAssignParams cap;
   cap.lhs = ca.lhs;
