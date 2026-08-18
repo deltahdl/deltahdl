@@ -17,6 +17,13 @@ struct ConstVal {
   bool is_signed;
 };
 
+// The value `width` and `is_signed` make of `value`: the bits above the width
+// are not part of the value, and the top bit of a signed value is its sign. The
+// same bit pattern therefore stands for two different numbers according to the
+// signedness, which is the difference §11.7's `$signed` and `$unsigned` exist
+// to set. Defined in const_eval.cpp.
+ConstVal NormalizeConstVal(int64_t value, uint32_t width, bool is_signed);
+
 std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
                                             const ScopeMap& scope);
 std::optional<ConstVal> ConstEvalFull(const Expr* expr, const ScopeMap& scope);

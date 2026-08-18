@@ -171,4 +171,111 @@ TEST(SignedExprSim, SystemTfCallSigned) {
   EXPECT_EQ(var->value.ToUint64(), 200u);
 }
 
+// §11.7: `regB = $unsigned(-4'sd4);` gives `8'b00001100`. This is the line of
+// the clause's example that separates a correct conversion from one that
+// widens its operand: `-4'sd4` is four bits wide, so the eight-bit target is
+// filled by zero-extending the unsigned value the conversion produced. An
+// implementation that let the operand's signedness survive would sign-extend
+// instead and leave `8'b11111100`.
+TEST(SignedExprSim, UnsignedOfNegativeSizedSignedLiteral) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] regB;\n"
+      "  initial regB = $unsigned(-4'sd4);\n"
+      "endmodule\n",
+      f, "regB");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x0Cu);
+}
+
+// §11.7 in a constant expression: a parameter's value is folded at elaboration
+// rather than evaluated at run time, and the conversion has to mean the same
+// thing in both. The four bits 1100 read unsigned are 12, so the parameter is
+// `8'b00001100` as the procedural assignment above is.
+TEST(SignedExprSim, UnsignedOfNegativeSizedSignedLiteralAsParameter) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  localparam [7:0] P = $unsigned(-4'sd4);\n"
+      "  logic [7:0] regB;\n"
+      "  initial regB = P;\n"
+      "endmodule\n",
+      f, "regB");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x0Cu);
+}
+
+// §11.7: the same for `$signed`, whose result is the operand's bits read as a
+// signed number. The four bits 1100 read signed are -4, which fills an
+// eight-bit target as `8'b11111100`.
+TEST(SignedExprSim, SignedOfFourBitVectorAsParameter) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  localparam signed [7:0] P = $signed(4'b1100);\n"
+      "  logic signed [7:0] regS;\n"
+      "  initial regS = P;\n"
+      "endmodule\n",
+      f, "regS");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xFCu);
+}
+
+// §11.7: `$unsigned(-4)` in a constant expression. `-4` is thirty-two bits
+// wide, so the eight-bit parameter keeps its low byte, `8'b11111100`. Read
+// beside the four-bit case above, this pair says the answer follows the
+// operand's width rather than the sign of the number written.
+TEST(SignedExprSim, UnsignedOfNegativeFourAsParameter) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  localparam [7:0] P = $unsigned(-4);\n"
+      "  logic [7:0] regA;\n"
+      "  initial regA = P;\n"
+      "endmodule\n",
+      f, "regA");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xFCu);
+}
+
+// §11.7: the operand is any expression, and its width is whatever that
+// expression is worth. A concatenation is four bits here, so `$signed` reads
+// those four bits as -4 and the target is filled by sign-extending them.
+TEST(SignedExprSim, SignedOfConcatenationKeepsConcatenationWidth) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [1:0] hi, lo;\n"
+      "  logic signed [7:0] regS;\n"
+      "  initial begin\n"
+      "    hi = 2'b11;\n"
+      "    lo = 2'b00;\n"
+      "    regS = $signed({hi, lo});\n"
+      "  end\n"
+      "endmodule\n",
+      f, "regS");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xFCu);
+}
+
+// §11.7: a part-select is as wide as the range it names, so `$signed` on the
+// low four bits of an eight-bit value reads four bits and not eight. Reading
+// eight would make the result 8'b10101100 rather than -4.
+TEST(SignedExprSim, SignedOfPartSelectKeepsSelectedWidth) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] v;\n"
+      "  logic signed [7:0] regS;\n"
+      "  initial begin\n"
+      "    v = 8'b10101100;\n"
+      "    regS = $signed(v[3:0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "regS");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xFCu);
+}
+
 }  // namespace

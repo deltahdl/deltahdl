@@ -16,11 +16,19 @@ namespace delta {
 
 static std::optional<ConstVal> ConstEvalSysCallFull(const Expr* expr,
                                                     const ScopeMap& scope) {
+  // §11.7: `$signed` and `$unsigned` "shall evaluate the input expression and
+  // return a one-dimensional packed array with the same number of bits and
+  // value of the input expression and the signedness defined by the function".
+  // The width carries over unchanged and only the signedness is set, so the
+  // number that width and signedness now make of the operand's bits is what the
+  // call is worth: `$unsigned(-4'sd4)` is the four bits 1100 read unsigned,
+  // which is 12, and `$signed(4'b1100)` is those same bits read signed, which
+  // is -4.
   if (expr->callee == "$signed" || expr->callee == "$unsigned") {
     if (expr->args.empty()) return std::nullopt;
     auto arg = ConstEvalFull(expr->args[0], scope);
     if (!arg) return std::nullopt;
-    return ConstVal{arg->value, arg->width, expr->callee == "$signed"};
+    return NormalizeConstVal(arg->value, arg->width, expr->callee == "$signed");
   }
   auto val = EvalConstSysCall(expr, scope);
   if (!val) return std::nullopt;

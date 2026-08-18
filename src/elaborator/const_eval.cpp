@@ -367,12 +367,16 @@ static int64_t SignExtendFromWidth(int64_t val, uint32_t width) {
   return static_cast<int64_t>(uval);
 }
 
+ConstVal NormalizeConstVal(int64_t value, uint32_t width, bool is_signed) {
+  int64_t v = TruncateToWidth(value, width);
+  if (is_signed) v = SignExtendFromWidth(v, width);
+  return ConstVal{v, width, is_signed};
+}
+
 std::optional<ConstVal> ConstEvalLiteral(const Expr* expr) {
-  uint32_t w = ConstLiteralWidth(expr);
-  bool s = IsSignedLiteral(expr->text);
-  int64_t v = TruncateToWidth(static_cast<int64_t>(expr->int_val), w);
-  if (s) v = SignExtendFromWidth(v, w);
-  return ConstVal{v, w, s};
+  return NormalizeConstVal(static_cast<int64_t>(expr->int_val),
+                           ConstLiteralWidth(expr),
+                           IsSignedLiteral(expr->text));
 }
 
 static int ConstHexDigitVal(char c) {
@@ -592,9 +596,8 @@ std::optional<ConstVal> ConstEvalUnaryFull(const Expr* expr,
   auto operand = ConstEvalFull(expr->lhs, scope);
   if (!operand) return std::nullopt;
   if (expr->op == TokenKind::kMinus) {
-    int64_t v = TruncateToWidth(-operand->value, operand->width);
-    if (operand->is_signed) v = SignExtendFromWidth(v, operand->width);
-    return ConstVal{v, operand->width, operand->is_signed};
+    return NormalizeConstVal(-operand->value, operand->width,
+                             operand->is_signed);
   }
   auto result = EvalUnary(expr->op, operand->value);
   if (!result) return std::nullopt;
