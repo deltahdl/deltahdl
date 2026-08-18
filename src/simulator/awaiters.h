@@ -137,16 +137,24 @@ struct EventAwaiter {
 
   // Arms a watcher on a named-event variable that resumes the suspended
   // coroutine (respecting active/suspended process state) once when triggered.
-  static void AttachEventVarWatcher(Variable* var, std::coroutine_handle<> h,
-                                    SimContext& ctx, Process* proc,
+  //
+  // §9.4.2.3: an `iff` qualifier on the operand gates that resume, so a trigger
+  // arriving while the condition is false leaves the process suspended and the
+  // watcher armed for the next one.
+  static void AttachEventVarWatcher(Variable* var, const Expr* iff_cond,
+                                    std::coroutine_handle<> h, SimContext& ctx,
+                                    Process* proc,
                                     const std::shared_ptr<bool>& consumed) {
     auto* ctx_ptr = &ctx;
-    var->AddWatcher([h, proc, ctx_ptr, consumed]() mutable {
+    var->AddWatcher([h, iff_cond, proc, ctx_ptr, consumed]() mutable {
       if (proc && !proc->active) return true;
       // A sibling operand of the same event control already resumed this
       // await; the coroutine has moved on, so retire this stale watcher.
       if (*consumed) return true;
       if (proc && proc->is_suspended) return false;
+      if (iff_cond &&
+          !EvalExpr(iff_cond, *ctx_ptr, ctx_ptr->GetArena()).IsTruthy())
+        return false;
       *consumed = true;
       ResumeMaybeReactive(h, proc, *ctx_ptr);
       return true;
@@ -202,7 +210,7 @@ struct EventAwaiter {
       Variable* var = ResolveSignalToVariable(ev.signal, ctx);
       if (!var) continue;
       if (var->is_event) {
-        AttachEventVarWatcher(var, h, ctx, proc, consumed);
+        AttachEventVarWatcher(var, ev.iff_condition, h, ctx, proc, consumed);
         continue;
       }
       AttachEdgeVarWatcher(var, ev, h, ResumeTarget{ctx, proc}, consumed);
@@ -236,14 +244,17 @@ struct EventAwaiter {
     return false;
   }
 
-  // Evaluates the optional iff condition for an edge-sensitive variable
-  // watcher. Returns true when there is no condition or it is non-zero;
-  // otherwise resyncs prev_value and returns false.
+  // §9.4.2.3: evaluates the optional iff condition for an edge-sensitive
+  // variable watcher. Returns true when there is no condition or the condition
+  // is true; otherwise resyncs prev_value and returns false. §12.4 decides what
+  // true means, so a condition is true when any of its bits is 1 and false when
+  // it is zero, x or z. Logic4Vec::IsTruthy answers that over the whole value,
+  // where ToUint64 reads the low 64 bits and would call a wider condition false
+  // whenever every bit it set sits above them.
   static bool IffGatePasses(Variable* var, const Expr* iff_cond,
                             SimContext& ctx) {
     if (!iff_cond) return true;
-    auto val = EvalExpr(iff_cond, ctx, ctx.GetArena());
-    if (val.ToUint64() != 0) return true;
+    if (EvalExpr(iff_cond, ctx, ctx.GetArena()).IsTruthy()) return true;
     var->prev_value = var->value;
     return false;
   }
@@ -338,10 +349,10 @@ struct EventAwaiter {
       return {false, false};
     }
     *op.prev = cur;
-    if (spec.iff_cond) {
-      auto val = EvalExpr(spec.iff_cond, target.ctx, target.ctx.GetArena());
-      if (val.ToUint64() == 0) return {false, false};
-    }
+    // §9.4.2.3 with §12.4: the guard is true when any bit of it is 1.
+    if (spec.iff_cond &&
+        !EvalExpr(spec.iff_cond, target.ctx, target.ctx.GetArena()).IsTruthy())
+      return {false, false};
     *op.consumed = true;
     return {true, true};
   }
@@ -450,14 +461,23 @@ struct RepeatEventAwaiter {
   bool await_ready() const noexcept { return count == 0; }
 
   // Arms a persistent watcher on a named-event operand. Each occurrence is
-  // forwarded to tally once the active/suspended gates pass.
+  // forwarded to tally once the active/suspended gates pass, and §9.4.2.3's
+  // `iff` qualifier gates it as it gates an edge operand: an occurrence
+  // arriving while the condition is false is not one of the occurrences the
+  // repeat is counting.
   template <typename TallyFn>
-  static void ArmEventOperand(Variable* var, const std::shared_ptr<bool>& done,
-                              Process* proc, const TallyFn& tally) {
-    var->AddWatcher([proc, done, tally]() mutable {
+  static void ArmEventOperand(Variable* var, const Expr* iff_cond,
+                              SimContext& ctx,
+                              const std::shared_ptr<bool>& done, Process* proc,
+                              const TallyFn& tally) {
+    auto* ctx_ptr = &ctx;
+    var->AddWatcher([iff_cond, ctx_ptr, proc, done, tally]() mutable {
       if (*done) return true;
       if (proc && !proc->active) return true;
       if (proc && proc->is_suspended) return false;
+      if (iff_cond &&
+          !EvalExpr(iff_cond, *ctx_ptr, ctx_ptr->GetArena()).IsTruthy())
+        return false;
       return tally();
     });
   }
@@ -487,12 +507,12 @@ struct RepeatEventAwaiter {
       var->prev_value = var->value;
       return {false, false};
     }
-    if (spec.iff_cond) {
-      auto val = EvalExpr(spec.iff_cond, target.ctx, target.ctx.GetArena());
-      if (val.ToUint64() == 0) {
-        var->prev_value = var->value;
-        return {false, false};
-      }
+    // §9.4.2.3 with §12.4: the guard is true when any bit of it is 1.
+    if (spec.iff_cond &&
+        !EvalExpr(spec.iff_cond, target.ctx, target.ctx.GetArena())
+             .IsTruthy()) {
+      var->prev_value = var->value;
+      return {false, false};
     }
     var->prev_value = var->value;
     return {true, false};
@@ -540,7 +560,7 @@ struct RepeatEventAwaiter {
       Variable* var = ResolveSignalToVariable(ev.signal, ctx);
       if (!var) continue;
       if (var->is_event) {
-        ArmEventOperand(var, done, proc, tally);
+        ArmEventOperand(var, ev.iff_condition, ctx, done, proc, tally);
         continue;
       }
       ArmEdgeOperand(var, ev, done, ResumeTarget{ctx, proc}, tally);

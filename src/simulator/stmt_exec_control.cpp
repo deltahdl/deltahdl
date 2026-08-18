@@ -889,6 +889,10 @@ static bool IsNamedEvent(const Stmt* stmt, SimContext& ctx) {
   if (stmt->events.size() != 1) return false;
   const auto& ev = stmt->events[0];
   if (ev.edge != Edge::kNone) return false;
+  // §9.4.2.3: a guarded operand goes to EventAwaiter, which evaluates the
+  // condition before resuming. NamedEventAwaiter resumes on the trigger alone,
+  // so sending `@(e iff en)` there would fire the process however `en` read.
+  if (ev.iff_condition) return false;
   if (!ev.signal || ev.signal->kind != ExprKind::kIdentifier) return false;
   auto* var = ctx.FindVariable(ev.signal->text);
   return var && var->is_event;
