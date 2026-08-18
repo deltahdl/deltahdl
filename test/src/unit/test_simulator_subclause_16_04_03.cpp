@@ -10,8 +10,8 @@
 // item) is a "static deferred assertion" and is treated as if it were the sole
 // statement of an always_comb procedure. The elaborator carries this rule by
 // synthesizing an implicit always_comb process around the assertion
-// (elaborator_items.cpp, IsStaticDeferredAssertion), so at run time the
-// assertion inherits always_comb behaviour: it is evaluated once after the
+// (elaborator_items_assertions.cpp, IsStaticDeferredAssertion), so at run time
+// the assertion inherits always_comb behaviour: it is evaluated once after the
 // initial settling and re-evaluated whenever one of the boolean's combinational
 // operands changes -- the semantics supplied by the always_comb dependency
 // (§9.2.2.2).

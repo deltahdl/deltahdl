@@ -79,6 +79,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_items.cpp
     elaborator/elaborator_items_udp.cpp
     elaborator/elaborator_items_scope.cpp
+    elaborator/elaborator_items_assertions.cpp
     elaborator/interface_syntax.cpp
     elaborator/property_rewrite.cpp
     elaborator/rewrite_algorithm.cpp

@@ -336,8 +336,9 @@ bool RestrictViolationIsSimulationError();
 // §16.14.5 (Using concurrent assertion statements outside procedural code) is
 // carried live, not by a helper here: the elaborator lowers a simple clocked
 // static concurrent assert into an always_ff clocked process
-// (elaborator_items.cpp), so its `always` semantics — a fresh evaluation
-// attempt at every leading clock edge — is observed end-to-end by the run.
+// (elaborator_items_assertions.cpp), so its `always` semantics — a fresh
+// evaluation attempt at every leading clock edge — is observed end-to-end by
+// the run.
 
 // §16.9.4: the global clocking past value-change functions compare the sampled
 // value at the global clock tick that immediately precedes the current tick

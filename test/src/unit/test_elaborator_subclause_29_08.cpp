@@ -21,9 +21,9 @@ using namespace delta;
 // RtlirUdpInst (src/elaborator/rtlir.h:247) that
 // Elaborator::ElaborateUdpInst (src/elaborator/elaborator_items_udp.cpp:198)
 // appends to RtlirModule::udp_insts. The call stands at
-// src/elaborator/elaborator_items.cpp:653, in the
+// src/elaborator/elaborator_items.cpp:683, in the
 // `case ModuleItemKind::kUdpInst:` arm of Elaborator::ElaborateDeclItem
-// (src/elaborator/elaborator_items.cpp:608). Before #3197 that arm wrote
+// (src/elaborator/elaborator_items.cpp:622). Before #3197 that arm wrote
 // nothing, so the instance drove no terminal and every assertion here would
 // read an empty RtlirModule::udp_insts.
 

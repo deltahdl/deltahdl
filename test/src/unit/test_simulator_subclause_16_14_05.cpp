@@ -14,9 +14,10 @@
 // The elaborator carries this rule for the simple clocked form. It captures the
 // leading clock in item->sensitivity and wraps the boolean as an immediate
 // assert in item->body (parser_assert.cpp), then models the module-item
-// assertion as a clocked process (elaborator_items.cpp, kAlwaysFF). At run time
-// the lowerer spawns a sensitized clocked coroutine that re-runs the assert
-// body -- and its action block -- at each leading clock edge (lowerer.cpp).
+// assertion as a clocked process (elaborator_items_assertions.cpp, kAlwaysFF).
+// At run time the lowerer spawns a sensitized clocked coroutine that re-runs
+// the assert body -- and its action block -- at each leading clock edge
+// (lowerer.cpp).
 //
 // These tests observe the rule end-to-end. The source contains no procedure
 // wrapping the assertion; the only reason its action block executes at all, and
