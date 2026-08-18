@@ -20,7 +20,6 @@ namespace {
 // under. It is spelled here because §34.5.27 forms a key block's buffer from
 // that keyword and §34.5.14 has a reader find it inside one; the keyword's own
 // definition is written elsewhere, and nothing here decides what it may say.
-constexpr std::string_view kDataMethodKeyword = "data_method";
 
 // One directive carrying one keyword and the string that keyword records.
 void AppendDirective(std::string& text, std::string_view keyword,

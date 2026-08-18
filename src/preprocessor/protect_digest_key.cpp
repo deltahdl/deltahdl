@@ -15,7 +15,6 @@ namespace {
 // under. It is spelled here because §34.5.17 settles its own default by sending
 // the reader to that keyword; the keyword's own definition is written
 // elsewhere, and nothing here decides what it may say.
-constexpr std::string_view kDataMethodKeyword = "data_method";
 
 // What the derivation of a digest's key is run over along with the key the data
 // are under, so that the two keys differ. Without it the derivation of one key

@@ -147,6 +147,20 @@ std::span<const ProtectPragmaKeyword> ProtectPragmaKeywords() {
   return kProtectPragmaKeywords;
 }
 
+// §34.5.10.1 and §34.5.11.1 are the two whose subclauses have been taken; the
+// rest of the table's `= <string>` keywords join them as theirs are.
+constexpr std::string_view kStringValuedKeywords[] = {
+    kDataKeyownerKeyword,
+    kDataMethodKeyword,
+};
+
+bool IsProtectStringValuedKeyword(std::string_view name) {
+  for (std::string_view keyword : kStringValuedKeywords) {
+    if (keyword == name) return true;
+  }
+  return false;
+}
+
 bool IsProtectPragmaKeyword(std::string_view name) {
   return FindProtectPragmaKeyword(name) != nullptr;
 }
@@ -508,17 +522,17 @@ std::string ProtectKeywordResetDirective() {
 void ProtectKeywordScope::Apply(std::string_view keyword,
                                 std::string_view value) {
   if (!IsProtectPragmaKeyword(keyword)) return;
-  // §34.5.10.1 writes a string against the name of the entity that provided the
-  // keys a region's data are under, and a string is one written thing, so a
-  // parenthesized list of further expressions is not the value that keyword is
-  // defined with. An expression writing one names no entity.
+  // A keyword defined as `keyword = <string>` is defined with one written
+  // thing, so a parenthesized list of further expressions is not the value it
+  // takes. An expression writing one states nothing for that keyword.
   //
-  // Naming none is a different thing from naming an empty one. A text that
-  // named an entity earlier is still to have its designations read against that
-  // entity's keys, and an expression naming nobody has no standing to take the
-  // name away: reading it as a request would leave a region's key looked for in
-  // a list nobody holds while the text plainly named whose keys it is under.
-  if (keyword == kDataKeyownerKeyword && IsParenthesizedPragmaValue(value)) {
+  // Stating nothing is a different thing from stating an empty value. A text
+  // that stated a value earlier is still to be read under it, and an expression
+  // stating none has no standing to take it away: reading it as a request would
+  // leave a region read under a value nothing wrote while the text plainly
+  // wrote one.
+  if (IsProtectStringValuedKeyword(keyword) &&
+      IsParenthesizedPragmaValue(value)) {
     return;
   }
   std::string_view body = ProtectPragmaValueBody(value);

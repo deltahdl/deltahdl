@@ -27,6 +27,18 @@ std::span<const ProtectPragmaKeyword> ProtectPragmaKeywords();
 // Whether `name` is one of them.
 bool IsProtectPragmaKeyword(std::string_view name);
 
+// Whether `name` is a protect pragma keyword whose own subclause defines its
+// expression as `keyword = <string>`. §22.5.1 makes a parenthesized
+// pragma_value a list of further expressions rather than one written thing, so
+// an expression writing one against such a keyword states no value for it.
+//
+// The set grows as each keyword's subclause is taken: §34.5.10.1 defines the
+// entity that provided a region's keys this way and §34.5.11.1 the algorithm
+// its data are encrypted under. A keyword whose subclause defines it with a
+// list -- §34.5.9.1's encoding is the one that does -- is not in it and never
+// will be.
+bool IsProtectStringValuedKeyword(std::string_view name);
+
 // What the table says `name` does. A name outside the table has no entry, so
 // there is nothing to say about it and the result is empty.
 std::string_view ProtectPragmaKeywordDescription(std::string_view name);
@@ -89,6 +101,12 @@ inline constexpr std::string_view kDataKeynameKeyword = "data_keyname";
 // member of one such entity's list of keys and says nothing outside it, so the
 // two names are spelled beside one another rather than apart.
 inline constexpr std::string_view kDataKeyownerKeyword = "data_keyowner";
+
+// §34.5.11.1: the tabulated name carrying the algorithm a region's data are
+// encrypted under. It is written here rather than in each file that reads it,
+// so the spelling one file writes into an envelope is the spelling another
+// reads back out of one.
+inline constexpr std::string_view kDataMethodKeyword = "data_method";
 
 // The two remaining tabulated names by which one of that entity's keys is
 // picked out: the public key a region's data were put under, and the session
