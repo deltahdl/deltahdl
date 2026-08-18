@@ -10,6 +10,7 @@
 #include "preprocessor/protect_digest_key.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope.h"
+#include "preprocessor/protect_envelope_output.h"
 #include "preprocessor/protect_key_block.h"
 #include "preprocessor/protect_key_method.h"
 #include "preprocessor/protect_keywords.h"
@@ -816,6 +817,25 @@ void Preprocessor::DecryptDataBlock(const PragmaKeywordExpression& expr,
   // Taking a copy is what lets the key be put away before it is used.
   std::string region_key(ProtectKeyInEffect());
   data_decrypt_key_.clear();
+  // §34.5.11.2: the data_method states the algorithm the data block is to be
+  // decrypted with. This implementation provides one cipher and states its own
+  // identifier for it, so a block naming any other algorithm is a block it
+  // cannot read -- and reading it under the cipher it does provide would hand
+  // back whatever those bytes happen to become rather than the design.
+  //
+  // A block naming no algorithm is left alone: the keyword has a default and an
+  // envelope this tool produced always names its own, so the ones that arrive
+  // without a name came from somewhere that took the default with them.
+  ProtectKeywordValue method = protect_keywords_.ValueOf(kDataMethodKeyword);
+  if (!method.defaulted && !method.value.empty() &&
+      method.value != kDataMethod) {
+    diag_.Error(loc,
+                "protect pragma data block states an encryption algorithm this "
+                "implementation does not provide: " +
+                    method.value,
+                Subclause("34.5.11.2"));
+    return;
+  }
   std::string cleartext;
   if (!DecryptProtectedBlock(block, region_key, &cleartext)) {
     diag_.Error(loc,
