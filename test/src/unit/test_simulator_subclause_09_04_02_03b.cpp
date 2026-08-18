@@ -146,6 +146,9 @@ TEST(ConditionalEventIffSim, IffOnNamedEventTrueResumes) {
 // throughout: the change to `a` is suppressed and the change to `b` is not, so
 // the body runs exactly once. A guard read as covering the whole list would
 // suppress both and leave the count at zero.
+//
+// The count is zeroed a time step after the operands are, because settling `b`
+// from x to 0 is itself a change of an unguarded operand and runs the body.
 TEST(ConditionalEventIffSim, IffGuardsOnlyItsOwnOperandOfAnOrList) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -153,7 +156,8 @@ TEST(ConditionalEventIffSim, IffGuardsOnlyItsOwnOperandOfAnOrList) {
       "  logic a, b, c;\n"
       "  logic [31:0] count;\n"
       "  initial begin\n"
-      "    a = 0; b = 0; c = 0; count = 0;\n"
+      "    a = 0; b = 0; c = 0;\n"
+      "    #1 count = 0;\n"
       "    #1 a = 1;\n"
       "    #1 b = 1;\n"
       "    #1 $finish;\n"

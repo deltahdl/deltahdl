@@ -142,10 +142,11 @@ struct EventAwaiter {
   // arriving while the condition is false leaves the process suspended and the
   // watcher armed for the next one.
   static void AttachEventVarWatcher(Variable* var, const Expr* iff_cond,
-                                    std::coroutine_handle<> h, SimContext& ctx,
-                                    Process* proc,
+                                    std::coroutine_handle<> h,
+                                    ResumeTarget target,
                                     const std::shared_ptr<bool>& consumed) {
-    auto* ctx_ptr = &ctx;
+    auto* ctx_ptr = &target.ctx;
+    auto* proc = target.proc;
     var->AddWatcher([h, iff_cond, proc, ctx_ptr, consumed]() mutable {
       if (proc && !proc->active) return true;
       // A sibling operand of the same event control already resumed this
@@ -210,7 +211,8 @@ struct EventAwaiter {
       Variable* var = ResolveSignalToVariable(ev.signal, ctx);
       if (!var) continue;
       if (var->is_event) {
-        AttachEventVarWatcher(var, ev.iff_condition, h, ctx, proc, consumed);
+        AttachEventVarWatcher(var, ev.iff_condition, h, ResumeTarget{ctx, proc},
+                              consumed);
         continue;
       }
       AttachEdgeVarWatcher(var, ev, h, ResumeTarget{ctx, proc}, consumed);
@@ -467,10 +469,11 @@ struct RepeatEventAwaiter {
   // repeat is counting.
   template <typename TallyFn>
   static void ArmEventOperand(Variable* var, const Expr* iff_cond,
-                              SimContext& ctx,
-                              const std::shared_ptr<bool>& done, Process* proc,
+                              ResumeTarget target,
+                              const std::shared_ptr<bool>& done,
                               const TallyFn& tally) {
-    auto* ctx_ptr = &ctx;
+    auto* ctx_ptr = &target.ctx;
+    auto* proc = target.proc;
     var->AddWatcher([iff_cond, ctx_ptr, proc, done, tally]() mutable {
       if (*done) return true;
       if (proc && !proc->active) return true;
@@ -560,7 +563,8 @@ struct RepeatEventAwaiter {
       Variable* var = ResolveSignalToVariable(ev.signal, ctx);
       if (!var) continue;
       if (var->is_event) {
-        ArmEventOperand(var, ev.iff_condition, ctx, done, proc, tally);
+        ArmEventOperand(var, ev.iff_condition, ResumeTarget{ctx, proc}, done,
+                        tally);
         continue;
       }
       ArmEdgeOperand(var, ev, done, ResumeTarget{ctx, proc}, tally);
