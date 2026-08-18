@@ -246,6 +246,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_decls_var.cpp
     elaborator/elaborator_dpi.cpp
     elaborator/elaborator_generate.cpp
+    elaborator/elaborator_generate_naming.cpp
     elaborator/elaborator_module_inst.cpp
     elaborator/elaborator_module.cpp
     elaborator/elaborator_module_ports.cpp

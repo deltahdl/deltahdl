@@ -348,9 +348,9 @@ TEST(UdpInstanceElaboration, InstanceArrayTerminalOfAWrongWidthIsReported) {
 // this case does not accept.
 //
 // This is the case #3201 was filed on: Elaborator::ElaborateGenerateBlockItem
-// (src/elaborator/elaborator_generate.cpp:80) stamps RtlirModule::processes and
-// RtlirModule::assigns and not RtlirModule::udp_insts, so both instances carry
-// an empty gen_block_consts and the set below holds nothing.
+// (src/elaborator/elaborator_generate.cpp:122) stamps RtlirModule::processes
+// and RtlirModule::assigns and not RtlirModule::udp_insts, so both instances
+// carry an empty gen_block_consts and the set below holds nothing.
 TEST(UdpInstanceElaboration, GenerateLoopStampsEachInstanceWithItsIndex) {
   ElabFixture f;
   auto* design = ElaborateSrc(

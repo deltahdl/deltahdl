@@ -214,7 +214,7 @@ void Elaborator::ElaborateUdpInst(ModuleItem* item, RtlirModule* mod) {
 // RtlirUdpInst::gen_block_consts and RtlirUdpInst::gen_block_prefix are left at
 // their defaults, which is what the gate path leaves on the RtlirContAssign it
 // appends. Elaborator::ElaborateGenerateBlockItem
-// (src/elaborator/elaborator_generate.cpp:80) stamps §27.4's loop-index values
+// (src/elaborator/elaborator_generate.cpp:122) stamps §27.4's loop-index values
 // onto RtlirModule::processes and RtlirModule::assigns after the item is
 // elaborated, and it does not stamp RtlirModule::udp_insts.
 void Elaborator::ElaborateOneUdpInst(const ModuleItem* item, RtlirModule* mod) {

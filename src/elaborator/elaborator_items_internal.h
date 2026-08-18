@@ -2,6 +2,7 @@
 
 #include <string_view>
 #include <unordered_set>
+#include <vector>
 
 #include "common/arena.h"
 #include "elaborator/rtlir.h"
@@ -40,6 +41,21 @@ NetType DataTypeToNetType(DataTypeKind kind);
 // recorded on the module. Defined once in elaborator_items.cpp; used there and
 // by the module-instantiation/port-binding and generate translation units.
 bool IsNameDeclared(std::string_view name, const RtlirModule* mod);
+
+// §27.5: "a conditional generate construct" is the if generate construct and
+// the case generate construct. Defined in elaborator_generate.cpp and shared
+// with the generate-block naming translation unit, so that the one sentence
+// deciding which constructs the direct-nesting rules reach is written once.
+bool IsConditionalGenerateConstruct(ModuleItemKind k);
+
+// §27.5: whether a generate block "consists of only one item that is itself a
+// conditional generate construct" and is "not surrounded by begin-end
+// keywords", which makes the construct within it directly nested and the block
+// no separate scope. Defined in elaborator_generate.cpp and shared with the
+// generate-block naming translation unit, which has to skip the same blocks
+// when numbering.
+bool IsDirectlyNestedBlock(const std::vector<ModuleItem*>& body,
+                           bool has_begin_end);
 
 // §6.20.5: specify parameters declared inside a specify block are named
 // constants of the enclosing module, exactly like specparams in the main module
