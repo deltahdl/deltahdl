@@ -76,8 +76,9 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   // The copy holds the functions declared among pg.mod's items, which is what
   // RecordTaskFuncNames in src/elaborator/elaborator_items_udp.cpp puts in
   // func_decls_: it walks ModuleDecl::items and does not descend into a
-  // generate construct, so a function declared inside a generate block is in
-  // no table at all and a call to one still does not fold. #3229 carries that.
+  // generate construct. A function declared inside a generate block is
+  // therefore not in this table, and Elaborator::ElaborateGenerateItems adds
+  // one to a copy of this table for the duration of the items declaring it.
   //
   // The other four tables Elaborator::ElaborateItems fills from the same
   // ModuleDecl are not copied, because no constant expression reaches them.
@@ -200,6 +201,49 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
   // directly nested block that opens no scope of its own, and each iteration of
   // a loop generate block.
   RegisteredGenScopeGuard gen_scope_guard(gen_prefix_scopes_);
+  // §27.2 rules that "all other module items, including other generate
+  // constructs, are allowed in a generate block" once port declarations,
+  // specify blocks and specparam declarations are excluded, so a function may
+  // be declared among these items. §13.4.3 has a constant function call
+  // "evaluated at elaboration time", and the folder answers such a call from
+  // the table a ConstFuncRegistryGuard installs. RecordTaskFuncNames in
+  // src/elaborator/elaborator_items_udp.cpp fills the module's table by walking
+  // ModuleDecl::items and does not descend into a generate construct, so a
+  // function declared here is in no table until this site puts it in one.
+  //
+  // The table installed here is the one already registered, copied and added
+  // to. §23.9 has the search for a directly referenced identifier "continue
+  // upward until an item by that name is found or until a module, interface,
+  // program, or checker boundary is encountered", and a generate block is not
+  // one of those boundaries, so a call written in a nested block names a
+  // function of the block enclosing it and a call written in any block names a
+  // function of the module. A name these items declare overwrites the entry
+  // they inherited, which is §23.9's identifier "declared locally".
+  //
+  // A sibling block names none of them, because the guard puts back what it
+  // found when these items are done and each block's items are one call to this
+  // function.
+  //
+  // Nothing is installed when these items declare no function, which leaves the
+  // enclosing table registered and costs a body without functions no copy.
+  //
+  // ElaboratorData::task_names_, which RecordTaskFuncNames fills from the same
+  // walk and which is short of a task declared here for the same reason, is not
+  // given the same treatment. Elaborator::ValidateFunctionBody reads it to
+  // enforce §13.4's bar on a function enabling a task, which is a check on a
+  // name rather than a fold of a value, so it is left to whatever reaches it.
+  std::unordered_map<std::string_view, const ModuleItem*> gen_func_decls;
+  std::optional<ConstFuncRegistryGuard> gen_func_guard;
+  bool declares_function = false;
+  for (const auto* item : items)
+    declares_function |= item->kind == ModuleItemKind::kFunctionDecl;
+  if (declares_function) {
+    if (const auto* outer = RegisteredConstFuncs()) gen_func_decls = *outer;
+    for (const auto* item : items)
+      if (item->kind == ModuleItemKind::kFunctionDecl)
+        gen_func_decls[item->name] = item;
+    gen_func_guard.emplace(&gen_func_decls);
+  }
   for (auto* item : items) {
     switch (item->kind) {
       case ModuleItemKind::kGenerateIf:

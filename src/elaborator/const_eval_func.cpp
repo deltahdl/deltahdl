@@ -229,6 +229,11 @@ ConstFuncRegistryGuard::~ConstFuncRegistryGuard() {
   g_const_func_registry = prev_;
 }
 
+const std::unordered_map<std::string_view, const ModuleItem*>*
+RegisteredConstFuncs() {
+  return g_const_func_registry;
+}
+
 // Control-flow outcome of interpreting one constant-function statement.
 enum class ConstFuncFlow : std::uint8_t {
   kNormal,

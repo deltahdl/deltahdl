@@ -37,6 +37,15 @@ class ConstFuncRegistryGuard {
   const std::unordered_map<std::string_view, const ModuleItem*>* prev_;
 };
 
+// The function table a live ConstFuncRegistryGuard installed, or null when none
+// is live. §23.9 has the search for a directly referenced identifier "continue
+// upward until an item by that name is found or until a module, interface,
+// program, or checker boundary is encountered", so a scope nested inside
+// another has to install what it found plus its own declarations rather than
+// its own alone. This is what such a site reads to find what it found.
+const std::unordered_map<std::string_view, const ModuleItem*>*
+RegisteredConstFuncs();
+
 // §8.25.1: an explicit specialization used as a scope-resolution prefix in a
 // constant expression (e.g. `localparam W = C#(3)::p`) must fold to the
 // parameter value in that specialization, not the class default. The folder

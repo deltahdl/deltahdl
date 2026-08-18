@@ -813,4 +813,96 @@ TEST(ConstantFunctionRulesElaboration,
   EXPECT_EQ(p->resolved_value, 12);
 }
 
+// §27.2 rules that "all other module items, including other generate
+// constructs, are allowed in a generate block" once port declarations, specify
+// blocks and specparam declarations are excluded, so a function may be declared
+// inside one. §13.4.3 has a constant function call "evaluated at elaboration
+// time" and §23.9 has an identifier "declared locally" name the local item, so
+// the triple block 'a' declares is what the call in block 'a' names and P folds
+// to 12.
+//
+// The test fails with P unresolved, which ResolvedParam reports as -1.
+// RecordTaskFuncNames in src/elaborator/elaborator_items_udp.cpp fills the
+// module's function table by walking ModuleDecl::items, and a function written
+// inside a generate construct is reached through ModuleItem::gen_items rather
+// than being one of those items, so triple is in no table at all unless
+// Elaborator::ElaborateGenerateItems puts it in one.
+//
+// 12 rather than a power of two, so a fold against some other body is a
+// different number.
+TEST(ConstantFunctionRulesElaboration,
+     ConstantFunctionDeclaredInAGenerateBlockFoldsInThatBlock) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  generate\n"
+      "    if (1) begin : a\n"
+      "      function int triple(input int n); return n * 3; endfunction\n"
+      "      localparam int P = triple(4);\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(ResolvedParam(design, "P"), 12);
+}
+
+// The control the case above needs. §23.9 lists "Generate blocks" among the
+// elements that "define a new scope", and blocks 'a' and 'b' are siblings, so
+// neither is "higher in the same branch of the name tree" than the other and
+// the triple block 'a' declares is not what a call in block 'b' names. N is
+// left with no value.
+//
+// The test fails when N is resolved, which is what a fix that recorded every
+// generate block's functions into one table for the module would leave: such a
+// fix passes the case above and answers block 'b' from block 'a' as well.
+TEST(ConstantFunctionRulesElaboration,
+     ConstantFunctionOfAGenerateBlockDoesNotFoldInASiblingBlock) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  generate\n"
+      "    if (1) begin : a\n"
+      "      function int triple(input int n); return n * 3; endfunction\n"
+      "    end\n"
+      "    if (1) begin : b\n"
+      "      localparam int N = triple(4);\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const RtlirParamDecl* n = FindParam(design, "m", "N");
+  ASSERT_NE(n, nullptr);
+  EXPECT_FALSE(n->is_resolved);
+}
+
+// The direction §23.9 does carry across a generate block boundary. The clause
+// has the search for a directly referenced identifier "continue upward until an
+// item by that name is found or until a module, interface, program, or checker
+// boundary is encountered", and a generate block is not one of those
+// boundaries, so block 'b' nested inside block 'a' names block 'a''s triple and
+// P folds to 12.
+//
+// This is the case a fresh table per block fails: block 'b' declares no
+// function of its own, so it has what it inherited or nothing.
+TEST(ConstantFunctionRulesElaboration,
+     ConstantFunctionOfAnEnclosingGenerateBlockFoldsInANestedBlock) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  generate\n"
+      "    if (1) begin : a\n"
+      "      function int triple(input int n); return n * 3; endfunction\n"
+      "      if (1) begin : b\n"
+      "        localparam int P = triple(4);\n"
+      "      end\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(ResolvedParam(design, "P"), 12);
+}
+
 }  // namespace
