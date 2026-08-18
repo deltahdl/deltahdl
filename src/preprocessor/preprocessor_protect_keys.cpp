@@ -802,22 +802,14 @@ std::string_view Preprocessor::DigestBlockKeyInEffect() const {
 void Preprocessor::DecryptDataBlock(const PragmaKeywordExpression& expr,
                                     SourceLoc loc, int depth,
                                     std::string& output) {
-  if (expr.keyword != kDataBlockKeyword) return;
-  if (!protect_envelopes_.InProtectedRegion()) return;
   // §34.5.15.1 spells the expression as the keyword standing alone, with
-  // §34.5.15.2 putting the block on the lines beneath it. This implementation
-  // writes the block as the keyword's own value and reads it back that way, so
-  // an envelope written in the spelling the standard defines carries a block it
-  // cannot reach. Saying so is what keeps such an envelope from being passed
-  // over in silence, with the design it holds never appearing and nothing
-  // accounting for its absence.
-  if (expr.value.empty()) {
-    diag_.Error(loc,
-                "protect pragma data_block written with the block on the "
-                "lines beneath it is not a spelling this implementation reads",
-                Subclause("34.5.15.1"));
-    return;
-  }
+  // §34.5.15.2 putting the block on the lines beneath it, and this
+  // implementation writes the block as the keyword's own value and reads it
+  // back that way. An expression carrying no value therefore names a block this
+  // reading cannot reach; what a tool owes an envelope written that way is
+  // #3272, and it is not a report against source the standard admits.
+  if (expr.keyword != kDataBlockKeyword || expr.value.empty()) return;
+  if (!protect_envelopes_.InProtectedRegion()) return;
   std::string block;
   if (!ReadEncodedProtectValue(ProtectPragmaValueBody(expr.value), loc,
                                &block)) {
