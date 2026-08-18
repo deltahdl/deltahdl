@@ -52,6 +52,16 @@ void DisconnectCharge(Net& net);
 
 NetStrength CombineAmbiguousStrength(NetStrength a, NetStrength b);
 
+// §28.12.3: combines a signal of known value and unambiguous strength with a
+// signal of ambiguous strength. `vu` is the unambiguous signal's value, 0 or 1,
+// and `su` the strength level it drives at. On the side of the opposite value
+// the ambiguous levels above `su` remain (rule a), those at or below it
+// disappear (rule b), and the gap those two rules open between `su` and the
+// lowest surviving level is filled back in, because the two signals are of
+// opposite value (rule c). On the side of `vu` the signals agree, so each
+// ambiguous level resolves against `su` to whichever of the two is stronger.
+NetStrength CombineAmbigWithUnambig(NetStrength ambig, uint8_t vu, uint8_t su);
+
 enum class WiredLogicKind : uint8_t { kAnd, kOr };
 
 // Pairwise per LRM §28.12.4: the per-side max/min shortcut used for

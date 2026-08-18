@@ -338,4 +338,102 @@ TEST(StrengthResolution, RuleBCompleteEliminationYieldsUnambigOne) {
   EXPECT_EQ(sn.var->value.ToUint64(), 1u);
 }
 
+// §28.12.3 through the production combiner rather than through the model beside
+// it. Net::Resolve reaches CombineAmbigWithUnambig only after two equally
+// strong drivers of opposite value have made an ambiguous signal, and such a
+// signal always runs down to highz, so the resolver cannot present an ambiguous
+// range that begins above the unambiguous level -- which is where rules b and c
+// have anything to decide. Calling the combiner directly is what puts those
+// ranges in front of it.
+
+// §28.12.3 rule c: an ambiguous 1-side range of [supply, supply] against an
+// unambiguous 0 at pull leaves a gap between pull and supply, and the signals
+// are of opposite value, so the gap belongs to the result. The range comes back
+// [strong, supply] rather than the [supply, supply] rules a and b alone would
+// leave, and rule c is the only thing that lowers the bound.
+TEST(NetStrengthAmbigUnambig, RuleCFillsTheGapOnTheOppositeValueSide) {
+  NetStrength ambig;
+  ambig.s1_hi = Strength::kSupply;
+  ambig.s1_lo = Strength::kSupply;
+  NetStrength r = CombineAmbigWithUnambig(ambig, /*vu=*/0, /*su=*/5);
+  EXPECT_EQ(r.s1_hi, Strength::kSupply);
+  EXPECT_EQ(r.s1_lo, Strength::kStrong);
+  EXPECT_EQ(r.s0_hi, Strength::kPull);
+  EXPECT_EQ(r.s0_lo, Strength::kPull);
+}
+
+// §28.12.3 rule c over more than one level: the same shape with the unambiguous
+// signal at weak leaves four levels between it and the surviving strong, and
+// every one of them is in the result. A gap fill that reached only one level
+// below the survivor would report large here.
+TEST(NetStrengthAmbigUnambig, RuleCFillsAGapOfSeveralLevels) {
+  NetStrength ambig;
+  ambig.s1_hi = Strength::kSupply;
+  ambig.s1_lo = Strength::kStrong;
+  NetStrength r = CombineAmbigWithUnambig(ambig, /*vu=*/0, /*su=*/3);
+  EXPECT_EQ(r.s1_hi, Strength::kSupply);
+  EXPECT_EQ(r.s1_lo, Strength::kLarge);
+}
+
+// §28.12.3 on the side of the unambiguous signal's own value: the two signals
+// agree, so each level the ambiguous signal might have settles against the
+// unambiguous one at whichever is stronger. Every level of [strong, supply] is
+// stronger than the weak the unambiguous signal drives at, so weak cannot be
+// the answer to any of them and the result begins at strong. This is the case
+// the resolver cannot present, and a combiner anchoring the side at the
+// unambiguous level regardless reports weak.
+TEST(NetStrengthAmbigUnambig, SameValueRangeAboveTheUnambiguousLevelKeepsIt) {
+  NetStrength ambig;
+  ambig.s0_hi = Strength::kSupply;
+  ambig.s0_lo = Strength::kStrong;
+  NetStrength r = CombineAmbigWithUnambig(ambig, /*vu=*/0, /*su=*/3);
+  EXPECT_EQ(r.s0_hi, Strength::kSupply);
+  EXPECT_EQ(r.s0_lo, Strength::kStrong);
+  EXPECT_EQ(r.s1_hi, Strength::kHighz);
+}
+
+// §28.12.3 on the same side again, with the ambiguous range straddling the
+// unambiguous level: the levels below it resolve to it and the levels above it
+// stand, so the result runs from the unambiguous level to the ambiguous top.
+// Together with the case above this fixes the lower bound at the greater of the
+// two rather than at either one of them.
+TEST(NetStrengthAmbigUnambig, SameValueRangeStraddlingTheUnambiguousLevel) {
+  NetStrength ambig;
+  ambig.s0_hi = Strength::kSupply;
+  ambig.s0_lo = Strength::kSmall;
+  NetStrength r = CombineAmbigWithUnambig(ambig, /*vu=*/0, /*su=*/3);
+  EXPECT_EQ(r.s0_hi, Strength::kSupply);
+  EXPECT_EQ(r.s0_lo, Strength::kWeak);
+}
+
+// §28.12.3 rule b in full: an ambiguous side lying entirely at or below the
+// unambiguous level disappears, so an opposite-value range that reaches only
+// weak against an unambiguous strong leaves nothing behind and the result is
+// the unambiguous signal alone.
+TEST(NetStrengthAmbigUnambig, OppositeValueRangeAtOrBelowSuDisappears) {
+  NetStrength ambig;
+  ambig.s1_hi = Strength::kWeak;
+  ambig.s1_lo = Strength::kSmall;
+  NetStrength r = CombineAmbigWithUnambig(ambig, /*vu=*/0, /*su=*/6);
+  EXPECT_EQ(r.s1_hi, Strength::kHighz);
+  EXPECT_EQ(r.s1_lo, Strength::kHighz);
+  EXPECT_EQ(r.s0_hi, Strength::kStrong);
+  EXPECT_EQ(r.s0_lo, Strength::kStrong);
+}
+
+// §28.12.3 with the unambiguous signal driving 1 rather than 0: the rules are
+// stated of the two sides by value and not by position, so the mirror of the
+// rule c case above gives the mirrored answer. A combiner reading the sides by
+// position passes the cases above and fails this one.
+TEST(NetStrengthAmbigUnambig, RulesFollowTheValueAndNotTheSide) {
+  NetStrength ambig;
+  ambig.s0_hi = Strength::kSupply;
+  ambig.s0_lo = Strength::kSupply;
+  NetStrength r = CombineAmbigWithUnambig(ambig, /*vu=*/1, /*su=*/5);
+  EXPECT_EQ(r.s0_hi, Strength::kSupply);
+  EXPECT_EQ(r.s0_lo, Strength::kStrong);
+  EXPECT_EQ(r.s1_hi, Strength::kPull);
+  EXPECT_EQ(r.s1_lo, Strength::kPull);
+}
+
 }  // namespace

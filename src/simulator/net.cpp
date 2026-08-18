@@ -269,6 +269,10 @@ static uint8_t WiredOr(uint8_t a, uint8_t b) {
   return 2;
 }
 
+// §28.12.3 rules a and b: the ambiguous levels above `su` remain in the result
+// and those at or below it disappear. A side whose whole range sits at or below
+// `su` disappears entirely, which is what leaving the outputs at their highz
+// default says.
 static void TrimAmbigSide(Strength a_lo, Strength a_hi, uint8_t su,
                           Strength& r_lo, Strength& r_hi) {
   if (static_cast<uint8_t>(a_hi) <= su) return;
@@ -278,27 +282,41 @@ static void TrimAmbigSide(Strength a_lo, Strength a_hi, uint8_t su,
   r_hi = a_hi;
 }
 
+// §28.12.3 rule c: where rules a and b leave a gap in strength levels because
+// the signals are of opposite value, the levels in the gap are part of the
+// result. The gap runs from just above `su`, the strongest level rule b
+// removed, up to the lowest level that survived, so filling it takes the lower
+// bound back down to `su` + 1.
 static void FillRuleCGap(Strength& r_lo, Strength r_hi, uint8_t su) {
   if (r_hi == Strength::kHighz) return;
   if (static_cast<uint8_t>(r_lo) <= su + 1) return;
   r_lo = static_cast<Strength>(su + 1);
 }
 
-static NetStrength CombineAmbigWithUnambig(NetStrength ambig, uint8_t vu,
-                                           uint8_t su) {
+NetStrength CombineAmbigWithUnambig(NetStrength ambig, uint8_t vu, uint8_t su) {
   NetStrength r;
-  TrimAmbigSide(ambig.s0_lo, ambig.s0_hi, su, r.s0_lo, r.s0_hi);
-  TrimAmbigSide(ambig.s1_lo, ambig.s1_hi, su, r.s1_lo, r.s1_hi);
-
-  auto s_su = static_cast<Strength>(su);
-  Strength& vu_hi = (vu == 0) ? r.s0_hi : r.s1_hi;
-  Strength& vu_lo = (vu == 0) ? r.s0_lo : r.s1_lo;
-  if (vu_hi == Strength::kHighz) vu_hi = s_su;
-  vu_lo = s_su;
+  Strength amb_vu_lo = (vu == 0) ? ambig.s0_lo : ambig.s1_lo;
+  Strength amb_vu_hi = (vu == 0) ? ambig.s0_hi : ambig.s1_hi;
+  Strength amb_opp_lo = (vu == 0) ? ambig.s1_lo : ambig.s0_lo;
+  Strength amb_opp_hi = (vu == 0) ? ambig.s1_hi : ambig.s0_hi;
 
   Strength& opp_hi = (vu == 0) ? r.s1_hi : r.s0_hi;
   Strength& opp_lo = (vu == 0) ? r.s1_lo : r.s0_lo;
+  TrimAmbigSide(amb_opp_lo, amb_opp_hi, su, opp_lo, opp_hi);
   FillRuleCGap(opp_lo, opp_hi, su);
+
+  // §28.12.3 on the side of the unambiguous signal's own value: the two signals
+  // agree there, so each level the ambiguous signal might have resolves against
+  // `su` to whichever of the two is stronger, and the range of those results is
+  // what the side contributes. A level at or below `su` therefore leaves the
+  // result as rule b says while `su` itself stays, and a level above `su`
+  // settles the combination on its own, which is why `su` cannot appear below
+  // an ambiguous range that begins above it.
+  auto s_su = static_cast<Strength>(su);
+  Strength& vu_hi = (vu == 0) ? r.s0_hi : r.s1_hi;
+  Strength& vu_lo = (vu == 0) ? r.s0_lo : r.s1_lo;
+  vu_lo = std::max(s_su, amb_vu_lo);
+  vu_hi = std::max(s_su, amb_vu_hi);
   return r;
 }
 
