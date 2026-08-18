@@ -507,8 +507,16 @@ static ScopeMap RegisteredModuleScope() {
   ScopeMap scope;
   const RtlirModule* mod = RegisteredModule();
   if (mod == nullptr) return scope;
+  // §23.9: a parameter a generate block declares belongs to that block's scope
+  // and not to the module's, and this scope has no reference position to judge
+  // it from -- RegisteredModule() names a module and nothing about where inside
+  // it an expression stands. The module's own parameters, which carry an empty
+  // RtlirParamDecl::gen_block_prefix, are the ones every expression in it can
+  // name, so they are the ones registered.
   for (const auto& param : mod->params) {
-    if (param.is_resolved) scope[param.name] = param.resolved_value;
+    if (!param.is_resolved) continue;
+    if (!param.gen_block_prefix.empty()) continue;
+    scope[param.name] = param.resolved_value;
   }
   return scope;
 }

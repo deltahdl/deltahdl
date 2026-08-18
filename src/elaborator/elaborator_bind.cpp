@@ -252,7 +252,11 @@ void Elaborator::ApplyBindInstance(BindDirective* bd, RtlirModule* target) {
   // target, so the override expressions are evaluated against the target
   // scope's resolved parameter environment.
   ParamList child_params;
-  ScopeMap target_scope = BuildParamScope(target);
+  // §23.9: the generate blocks in force here belong to the module holding the
+  // bind, and `target` is another module, so none of its block-local parameters
+  // is visible to these actuals. The empty list is what a reference among
+  // `target`'s own items sees.
+  ScopeMap target_scope = BuildParamScope(target, {});
   ResolveInstParams(item, child_decl, target_scope, child_params, diag_);
   auto* resolved = ElaborateModule(child_decl, child_params);
   RtlirModuleInst inst;

@@ -366,6 +366,17 @@ class Elaborator : public ElaboratorOperationRules {
                                   const std::vector<uint32_t>& inst_dim_sizes,
                                   uint32_t total_instances);
 
+  // §23.9: the resolved parameters of `mod` as a scope, holding those a
+  // reference standing in the generate blocks `scopes` can see -- the prefixes
+  // in force at that reference, outermost first, empty for a reference among
+  // the module's own items. A parameter one generate block declares is not
+  // visible at module level or in a sibling block, so passing the wrong list
+  // folds a constant expression against a declaration it cannot name.
+  ScopeMap BuildParamScope(const RtlirModule* mod,
+                           const std::vector<std::string_view>& scopes) const;
+
+  // The same for a reference standing where this elaboration is, which is what
+  // every site inside the module being elaborated wants.
   ScopeMap BuildParamScope(const RtlirModule* mod) const;
 
   // §6.20.7: returns true if `name` matches an already-elaborated parameter of

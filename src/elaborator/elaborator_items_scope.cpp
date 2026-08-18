@@ -1,8 +1,10 @@
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_items_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -10,6 +12,11 @@
 namespace delta {
 
 ScopeMap Elaborator::BuildParamScope(const RtlirModule* mod) const {
+  return BuildParamScope(mod, gen_prefix_scopes_);
+}
+
+ScopeMap Elaborator::BuildParamScope(
+    const RtlirModule* mod, const std::vector<std::string_view>& scopes) const {
   ScopeMap scope = cu_param_scope_;
   // §3.12.1: an explicit $unit:: prefix names the compilation-unit-scope
   // declaration and exists precisely so a same-named module-local declaration
@@ -22,10 +29,14 @@ ScopeMap Elaborator::BuildParamScope(const RtlirModule* mod) const {
     auto* key = arena_.Create<std::string>("$unit::" + std::string(name));
     scope[*key] = val;
   }
+  // §23.9 makes a generate block "a new scope", so a parameter one declares is
+  // read only by an expression written in that block or in one nested inside
+  // it. Entering it under its bare name for every expression in the module
+  // would fold it into expressions that cannot name it at all.
   for (const auto& p : mod->params) {
-    if (p.is_resolved) {
-      scope[p.name] = p.resolved_value;
-    }
+    if (!p.is_resolved) continue;
+    if (!ParamVisibleFromScopes(p.gen_block_prefix, scopes)) continue;
+    scope[p.name] = p.resolved_value;
   }
   return scope;
 }

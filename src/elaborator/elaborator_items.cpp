@@ -43,6 +43,15 @@ void Elaborator::ElaborateSpecparam(ModuleItem* item, RtlirModule* mod) {
   mod->variables.push_back(var);
 }
 
+bool ParamVisibleFromScopes(std::string_view decl_prefix,
+                            const std::vector<std::string_view>& scopes) {
+  if (decl_prefix.empty()) return true;
+  for (std::string_view scope : scopes) {
+    if (scope == decl_prefix) return true;
+  }
+  return false;
+}
+
 bool IsNameDeclared(std::string_view name, const RtlirModule* mod) {
   for (const auto& v : mod->variables) {
     if (v.name == name) return true;
@@ -73,10 +82,7 @@ static bool IsParamDeclared(std::string_view name, const RtlirModule* mod,
                             const std::vector<std::string_view>& scopes) {
   for (const auto& p : mod->params) {
     if (p.name != name) continue;
-    if (p.gen_block_prefix.empty()) return true;
-    for (std::string_view scope : scopes) {
-      if (scope == p.gen_block_prefix) return true;
-    }
+    if (ParamVisibleFromScopes(p.gen_block_prefix, scopes)) return true;
   }
   return false;
 }
