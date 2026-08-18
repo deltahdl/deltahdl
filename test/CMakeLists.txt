@@ -1,22 +1,15 @@
 include(FetchContent)
 
-# The pinned googletest archive, and the only place either value is written.
-# .github/actions/fetch-googletest reads both out of this file by matching the
-# variable name and taking the quoted string on the line below it, so keep each
-# value alone on the line under its set().
+# The googletest archive a build fetches when DELTAHDL_GOOGLETEST_URL is not
+# set in its environment. No CI job takes this path: the cache-googletest job
+# in .github/workflows/deltahdl.yml resolves the newest published googletest
+# release on every run, downloads that tarball once, and every job that
+# configures this tree names the restored copy in DELTAHDL_GOOGLETEST_URL.
+# This default states the same always-newest rule for a build that resolves
+# nothing, so it takes the head of googletest's default branch.
 set(DELTAHDL_GOOGLETEST_URL_DEFAULT
-    "https://github.com/google/googletest/archive/refs/tags/v1.17.0.tar.gz")
-set(DELTAHDL_GOOGLETEST_SHA256
-    "65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27c")
+    "https://github.com/google/googletest/archive/refs/heads/main.tar.gz")
 
-# Every job that configures this tree fetches that same archive, so a run asks
-# github.com for one file once per job and a rate-limit fails a job before it
-# runs a single check. .github/actions/fetch-googletest downloads it once,
-# keeps it in a cache entry keyed on the SHA256 above, and names the restored
-# copy in DELTAHDL_GOOGLETEST_URL. A build that sets nothing in its environment
-# fetches exactly what it fetched before. URL_HASH verifies either form: given
-# a file:// archive, ExternalProject hashes it in a verify step and stops the
-# configure with a fatal error when it does not match.
 if(DEFINED ENV{DELTAHDL_GOOGLETEST_URL})
     set(DELTAHDL_GOOGLETEST_URL "$ENV{DELTAHDL_GOOGLETEST_URL}")
 else()
@@ -26,11 +19,21 @@ endif()
 FetchContent_Declare(
     googletest
     URL "${DELTAHDL_GOOGLETEST_URL}"
-    URL_HASH "SHA256=${DELTAHDL_GOOGLETEST_SHA256}"
-    # Apply the upstream fix for googletest issue #4762: gtest-printers.h converts
-    # char8_t/char16_t to char32_t implicitly, which the newer clang rejects under
-    # -Wcharacter-conversion. main makes the cast explicit (static_cast); v1.17.0
-    # does not yet carry it, so apply that exact change to the fetched header.
+    # There is no URL_HASH because there is no pin. The archive this build
+    # compiles is whichever release googletest published most recently, so no
+    # checksum for it can be written down ahead of the release that carries it.
+    # What replaces the check is narrower: the cache-googletest job measures
+    # the SHA256 of the copy it downloaded and .github/actions/fetch-googletest
+    # checks the restored copy against that figure, which catches a cache entry
+    # that arrived damaged and does not check the archive against upstream.
+    #
+    # The sed below is the upstream fix for googletest issue #4762:
+    # gtest-printers.h converted char8_t/char16_t to char32_t implicitly, which
+    # the newer clang rejects under -Wcharacter-conversion. v1.18.0 carries the
+    # explicit static_cast already, so on that release the expression matches
+    # nothing and the file is rewritten byte for byte as it arrived. It stays
+    # for a release that predates the fix, since sed reports no error when a
+    # substitution finds nothing to do.
     PATCH_COMMAND sed -i.bak
         -e "s/ImplicitCast_<char32_t>(c)/static_cast<char32_t>(c)/"
         googletest/include/gtest/gtest-printers.h

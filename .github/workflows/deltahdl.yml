@@ -691,7 +691,7 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 200M
     name: build-asan-ubsan-shard-${{ matrix.shard }}
-    needs: [assert-coverage]
+    needs: [assert-coverage, cache-googletest]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -719,6 +719,9 @@ jobs:
         run: ccache --zero-stats
       - name: Fetch googletest
         uses: ./.github/actions/fetch-googletest
+        with:
+          sha256: ${{ needs.cache-googletest.outputs.archive-sha256 }}
+          tag: ${{ needs.cache-googletest.outputs.tag }}
       - name: Build
         run: |
           cmake -B build \
@@ -774,6 +777,7 @@ jobs:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 200M
+    needs: [cache-googletest]
     # The major this job installed, published so unit-test-coverage installs
     # the same one. .github/actions/install-llvm floats to the newest stable
     # release and each caller discovers separately, so a release landing after
@@ -833,6 +837,9 @@ jobs:
         run: ccache --zero-stats
       - name: Fetch googletest
         uses: ./.github/actions/fetch-googletest
+        with:
+          sha256: ${{ needs.cache-googletest.outputs.archive-sha256 }}
+          tag: ${{ needs.cache-googletest.outputs.tag }}
       # The generator chosen here is the one every coverage shard inherits, and
       # a shard asks for its whole slice in one cmake --build naming 137
       # targets. Make takes those as 137 separate goals and re-checks a build
@@ -922,7 +929,7 @@ jobs:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 200M
-    needs: [assert-coverage]
+    needs: [assert-coverage, cache-googletest]
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v5
@@ -946,6 +953,9 @@ jobs:
         run: ccache --zero-stats
       - name: Fetch googletest
         uses: ./.github/actions/fetch-googletest
+        with:
+          sha256: ${{ needs.cache-googletest.outputs.archive-sha256 }}
+          tag: ${{ needs.cache-googletest.outputs.tag }}
       - name: Build
         run: |
           cmake -B build \
@@ -983,7 +993,7 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 200M
     name: build-tsan-shard-${{ matrix.shard }}
-    needs: [assert-coverage]
+    needs: [assert-coverage, cache-googletest]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -1011,6 +1021,9 @@ jobs:
         run: ccache --zero-stats
       - name: Fetch googletest
         uses: ./.github/actions/fetch-googletest
+        with:
+          sha256: ${{ needs.cache-googletest.outputs.archive-sha256 }}
+          tag: ${{ needs.cache-googletest.outputs.tag }}
       - name: Build
         run: |
           cmake -B build \
@@ -1057,7 +1070,7 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 200M
     name: build-ubuntu-24-04-x86-64-clang-shard-${{ matrix.shard }}
-    needs: [assert-coverage]
+    needs: [assert-coverage, cache-googletest]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -1085,6 +1098,9 @@ jobs:
         run: ccache --zero-stats
       - name: Fetch googletest
         uses: ./.github/actions/fetch-googletest
+        with:
+          sha256: ${{ needs.cache-googletest.outputs.archive-sha256 }}
+          tag: ${{ needs.cache-googletest.outputs.tag }}
       - name: Build
         run: |
           cmake -B build \
@@ -1130,7 +1146,7 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 200M
     name: build-ubuntu-24-04-x86-64-gcc-shard-${{ matrix.shard }}
-    needs: [assert-coverage]
+    needs: [assert-coverage, cache-googletest]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -1158,6 +1174,9 @@ jobs:
         run: ccache --zero-stats
       - name: Fetch googletest
         uses: ./.github/actions/fetch-googletest
+        with:
+          sha256: ${{ needs.cache-googletest.outputs.archive-sha256 }}
+          tag: ${{ needs.cache-googletest.outputs.tag }}
       - name: Build
         run: |
           cmake -B build \
@@ -1198,6 +1217,63 @@ jobs:
       fail-fast: false
       matrix:
         shard: [0, 1, 2, 3, 4]
+  # Decides which googletest release the run builds against, and makes sure
+  # its archive is in the cache before any job that configures the test tree
+  # starts. The release is whichever one google/googletest has published most
+  # recently, resolved on every run, so a release is taken up by the first
+  # push after it lands and no file in this repository names a version. On a
+  # hit nothing is downloaded and the job is a fast no-op. A miss covers a new
+  # release and an entry GitHub evicted alike, and on one this job makes the
+  # single request to github.com the whole run needs. Before it existed each
+  # of the 22 jobs that configure the test tree made that request for itself,
+  # and 14 of them made it at once on the cold run 32057806620.
+  cache-googletest:
+    outputs:
+      archive-sha256: ${{ steps.archive.outputs.sha256 }}
+      tag: ${{ steps.release.outputs.tag }}
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        id: release
+        name: Get latest googletest release
+        run: >-
+          echo "tag=$(gh api repos/google/googletest/releases/latest
+          --jq .tag_name)"
+          >> "$GITHUB_OUTPUT"
+      - name: Restore googletest cache
+        uses: actions/cache@v5
+        with:
+          key: googletest-${{ steps.release.outputs.tag }}
+          path: .deps
+      - env:
+          TAG: ${{ steps.release.outputs.tag }}
+        id: archive
+        name: Download the googletest archive if the cache did not hold it
+        run: |
+          set -euo pipefail
+          archive="${GITHUB_WORKSPACE}/.deps/googletest-${TAG}.tar.gz"
+          mkdir -p "$(dirname "${archive}")"
+          # curl retries 408, 429, 500, 502, 503 and 504 under --retry, and
+          # --retry-all-errors adds the transport failures a degraded
+          # github.com also returns. Run 32039919698 lost
+          # clang-tidy-test-shard-00 to an HTTP 429 and then a 503, and that
+          # is the failure this download is written to ride out. CMake cannot
+          # stand in for it: its download step retries the six curl transport
+          # codes at Modules/ExternalProject/download.cmake.in:103 and no HTTP
+          # status at all.
+          if [ ! -f "${archive}" ]; then
+            curl --fail --location --silent --show-error \
+              --retry 8 --retry-all-errors --retry-delay 5 \
+              --retry-max-time 600 --output "${archive}" \
+              "https://github.com/google/googletest/archive/refs/tags/${TAG}.tar.gz"
+          fi
+          # Published so that .github/actions/fetch-googletest can check the
+          # copy it restores. This is not a pin and verifies nothing about
+          # upstream: it describes the archive this run downloaded, so what it
+          # catches is a cache entry that came back damaged.
+          echo "sha256=$(sha256sum "${archive}" | cut -d" " -f1)" \
+            >>"$GITHUB_OUTPUT"
   # Ensures sv-tests is cached for integration-test jobs. Resolves the
   # latest remote SHA on every run, then clones and saves only when the
   # cache holds no entry under that SHA. On a hit the lookup downloads
@@ -1255,6 +1331,7 @@ jobs:
   clang-tidy-src:
     env:
       CTCACHE_DIR: ${{ github.workspace }}/.ctcache
+    needs: [cache-googletest]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -1281,6 +1358,9 @@ jobs:
             ctcache-src-
       - name: Fetch googletest
         uses: ./.github/actions/fetch-googletest
+        with:
+          sha256: ${{ needs.cache-googletest.outputs.archive-sha256 }}
+          tag: ${{ needs.cache-googletest.outputs.tag }}
       - name: Generate compile_commands.json
         run: |
           cmake -B build \
@@ -1306,6 +1386,7 @@ jobs:
     env:
       CTCACHE_DIR: ${{ github.workspace }}/.ctcache
     name: clang-tidy-test-shard-${{ matrix.shard }}
+    needs: [cache-googletest]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -1332,6 +1413,9 @@ jobs:
             ctcache-test-${{ matrix.shard }}-
       - name: Fetch googletest
         uses: ./.github/actions/fetch-googletest
+        with:
+          sha256: ${{ needs.cache-googletest.outputs.archive-sha256 }}
+          tag: ${{ needs.cache-googletest.outputs.tag }}
       - name: Generate compile_commands.json
         run: |
           cmake -B build \
