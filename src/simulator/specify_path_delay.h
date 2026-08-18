@@ -13,6 +13,24 @@
 
 namespace delta {
 
+// §30.7: the three ways a module path's pulse limits may be set, ordered by the
+// precedence the standard gives them. §30.7.2 says a PATHPULSE$ specparam takes
+// precedence over the global pulse limit invocation options, and §30.7.3 says
+// SDF annotation takes precedence over both. Ordering the enumerators by that
+// precedence is what lets a setter ask whether it outranks what already stands,
+// so which source wins follows from the standard rather than from the order a
+// caller happens to apply them in.
+enum class PulseLimitSource : uint8_t {
+  // §30.7: with nothing else stated, each limit is the delay it belongs to.
+  kDefault = 0,
+  // §30.7.2: a percentage of each module path transition delay.
+  kGlobal = 1,
+  // §30.7.1: a PATHPULSE$ specparam.
+  kPathpulse = 2,
+  // §30.7.3: SDF annotation, which nothing outranks.
+  kSdf = 3,
+};
+
 struct PathDelay {
   std::string src_port;
   std::string dst_port;
@@ -27,6 +45,12 @@ struct PathDelay {
 
   uint64_t reject_limit[12] = {};
   uint64_t error_limit[12] = {};
+  // §30.7.3: which of the three sources set each limit above, so a source of
+  // lower precedence leaves it alone. The two are tracked apart because an SDF
+  // entry may state one limit and hold the other, which leaves the two standing
+  // on different sources.
+  PulseLimitSource reject_limit_source = PulseLimitSource::kDefault;
+  PulseLimitSource error_limit_source = PulseLimitSource::kDefault;
 };
 
 uint64_t ClampPathDelay(int64_t signed_value);

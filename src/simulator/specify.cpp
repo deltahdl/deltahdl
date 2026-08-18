@@ -386,14 +386,33 @@ void InitDefaultPulseLimits(PathDelay& pd) {
     pd.reject_limit[i] = pd.delays[i];
     pd.error_limit[i] = pd.delays[i];
   }
+  pd.reject_limit_source = PulseLimitSource::kDefault;
+  pd.error_limit_source = PulseLimitSource::kDefault;
 }
 
+// §30.7: whether a source may set a limit some source already set. A source
+// outranked by what already stands leaves it, so applying the three in any
+// order settles on the same limits.
+static bool PulseLimitSourceWins(PulseLimitSource standing,
+                                 PulseLimitSource source) {
+  return static_cast<uint8_t>(source) >= static_cast<uint8_t>(standing);
+}
+
+// §30.7.1: a PATHPULSE$ specparam sets the limits, and §30.7.2 puts it above
+// the global invocation options. SDF annotation outranks it (§30.7.3), so a
+// path already annotated keeps what the annotation gave it.
 void ApplyPulseControlOverride(PathDelay& pd, uint64_t reject, bool has_error,
                                uint64_t error) {
   const uint64_t kEffectiveError = has_error ? error : reject;
-  for (int i = 0; i < 12; ++i) {
-    pd.reject_limit[i] = reject;
-    pd.error_limit[i] = kEffectiveError;
+  if (PulseLimitSourceWins(pd.reject_limit_source,
+                           PulseLimitSource::kPathpulse)) {
+    for (int i = 0; i < 12; ++i) pd.reject_limit[i] = reject;
+    pd.reject_limit_source = PulseLimitSource::kPathpulse;
+  }
+  if (PulseLimitSourceWins(pd.error_limit_source,
+                           PulseLimitSource::kPathpulse)) {
+    for (int i = 0; i < 12; ++i) pd.error_limit[i] = kEffectiveError;
+    pd.error_limit_source = PulseLimitSource::kPathpulse;
   }
 }
 
@@ -412,12 +431,28 @@ void DerivePulseLimitsFromDelays(const uint64_t (&delays)[12],
   }
 }
 
+// §30.7.2: the invocation options' percentages, which both a PATHPULSE$
+// specparam and an SDF annotation outrank, so a path either of them has already
+// set keeps what it was given.
 void ApplyGlobalPulseLimits(PathDelay& pd, uint8_t reject_pct,
                             uint8_t error_pct) {
-  DerivePulseLimitsFromDelays(pd.delays, reject_pct, error_pct, pd.reject_limit,
-                              pd.error_limit);
+  uint64_t derived_reject[12];
+  uint64_t derived_error[12];
+  DerivePulseLimitsFromDelays(pd.delays, reject_pct, error_pct, derived_reject,
+                              derived_error);
+  if (PulseLimitSourceWins(pd.reject_limit_source, PulseLimitSource::kGlobal)) {
+    for (int i = 0; i < 12; ++i) pd.reject_limit[i] = derived_reject[i];
+    pd.reject_limit_source = PulseLimitSource::kGlobal;
+  }
+  if (PulseLimitSourceWins(pd.error_limit_source, PulseLimitSource::kGlobal)) {
+    for (int i = 0; i < 12; ++i) pd.error_limit[i] = derived_error[i];
+    pd.error_limit_source = PulseLimitSource::kGlobal;
+  }
 }
 
+// §30.7.3: SDF annotation of the pulse limits, which takes precedence over a
+// PATHPULSE$ specparam and over the global invocation options alike, so this
+// one writes whatever already stands.
 void ApplySdfPulseLimits(PathDelay& pd, uint64_t reject, bool has_error,
                          uint64_t error) {
   const uint64_t kEffectiveError = has_error ? error : reject;
@@ -425,6 +460,8 @@ void ApplySdfPulseLimits(PathDelay& pd, uint64_t reject, bool has_error,
     pd.reject_limit[i] = reject;
     pd.error_limit[i] = kEffectiveError;
   }
+  pd.reject_limit_source = PulseLimitSource::kSdf;
+  pd.error_limit_source = PulseLimitSource::kSdf;
 }
 
 namespace {
@@ -439,12 +476,19 @@ void ReplacePathDelayPreservingPulse(PathDelay& existing, PathDelay replacement,
     saved_reject[i] = existing.reject_limit[i];
     saved_error[i] = existing.error_limit[i];
   }
+  PulseLimitSource saved_reject_source = existing.reject_limit_source;
+  PulseLimitSource saved_error_source = existing.error_limit_source;
   existing = std::move(replacement);
+  // §30.7.3: a limit kept from the path being replaced keeps the standing of
+  // the source that set it, so a later source of lower precedence does not
+  // reach a limit it could not have reached before the replacement.
   if (retain.reject) {
     for (int i = 0; i < 12; ++i) existing.reject_limit[i] = saved_reject[i];
+    existing.reject_limit_source = saved_reject_source;
   }
   if (retain.error) {
     for (int i = 0; i < 12; ++i) existing.error_limit[i] = saved_error[i];
+    existing.error_limit_source = saved_error_source;
   }
 }
 
