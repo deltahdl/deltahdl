@@ -131,6 +131,14 @@ std::optional<int64_t> StringParamLength(const Expr* operand) {
     // §23.9 puts a parameter a generate block declares in a scope of its own,
     // so a call written outside that block is not naming it however the names
     // agree. RegisteredGenPrefixes() is where the call stands.
+    //
+    // No test reaches this line with a generate block's parameter, and the two
+    // that tried are recorded in #3226. A ParamRangeRegistryGuard has to be
+    // live for RegisteredModule() to answer at all, and of the sites that open
+    // one, the parameter port list is processed before any block's parameter
+    // exists and a defparam right-hand side never reaches here: §23.10.1 admits
+    // "only numbers and references to parameters" there, which a method call is
+    // not. The UDP instance path is the route left to try.
     if (!ParamVisibleFromScopes(param.gen_block_prefix,
                                 RegisteredGenPrefixes()))
       continue;
