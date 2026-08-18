@@ -60,9 +60,37 @@ ExecTask ExecRandcase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
+namespace {
+// §18.17.7: the implicit variables one rule declares for the value-returning
+// productions it names. `total` holds how many times the rule names each such
+// production, which decides whether its implicit variable is the scalar named
+// after the production or an element of an array indexed 1..N, and `ordinal`
+// gives each appearance its 1-based index in that array. The index is fixed by
+// where the appearance is written and not by when it generates: §18.17.7 says
+// of `if (cond) D(5) else D(20)` that the first element takes D(5)'s value and
+// the second D(20)'s, so the else branch writes the second element even when it
+// is the only branch that generated.
+struct RuleValueCapture {
+  std::unordered_map<std::string_view, int> total;
+  std::unordered_map<const RsProductionItem*, int> ordinal;
+};
+
+// §18.17.7: one appearance of a value-returning production within a rule. name
+// is the production's name, idx the 1-based ordinal of this appearance, and
+// total how many times the rule names the production: a total above one means
+// the implicit variable is the idx-th element of a 1..N array, a total of one
+// means the scalar named after the production. An idx of zero means the rule
+// declares no implicit variable for this generation.
+struct RuleProductionSlot {
+  std::string_view name;
+  int idx;
+  int total;
+};
+}  // namespace
+
 static ExecTask ExecRsProduction(const Stmt* stmt, const RsProductionItem& call,
                                  SimContext& ctx, Arena& arena,
-                                 Logic4Vec* out_value);
+                                 RuleValueCapture* cap);
 
 static const RsProduction* FindProduction(const Stmt* stmt,
                                           std::string_view name) {
@@ -81,29 +109,28 @@ static bool ProductionReturnsValue(const RsProduction* p) {
 }
 
 static ExecTask ExecRsProd(const Stmt* stmt, const RsProd& prod,
-                           SimContext& ctx, Arena& arena, Logic4Vec* out_value);
+                           SimContext& ctx, Arena& arena,
+                           RuleValueCapture* cap);
 
 static ExecTask ExecRsProdIf(const Stmt* stmt, const RsProd& prod,
                              SimContext& ctx, Arena& arena,
-                             Logic4Vec* out_value) {
+                             RuleValueCapture* cap) {
   if (EvalExpr(prod.condition, ctx, arena).ToUint64() != 0) {
-    co_return co_await ExecRsProduction(stmt, prod.if_true, ctx, arena,
-                                        out_value);
+    co_return co_await ExecRsProduction(stmt, prod.if_true, ctx, arena, cap);
   }
   if (prod.has_else) {
-    co_return co_await ExecRsProduction(stmt, prod.if_false, ctx, arena,
-                                        out_value);
+    co_return co_await ExecRsProduction(stmt, prod.if_false, ctx, arena, cap);
   }
   co_return StmtResult::kDone;
 }
 
 static ExecTask ExecRsProdRepeat(const Stmt* stmt, const RsProd& prod,
                                  SimContext& ctx, Arena& arena,
-                                 Logic4Vec* out_value) {
+                                 RuleValueCapture* cap) {
   auto count = EvalExpr(prod.repeat_count, ctx, arena).ToUint64();
   for (uint64_t i = 0; i < count; ++i) {
-    auto result = co_await ExecRsProduction(stmt, prod.repeat_item, ctx, arena,
-                                            out_value);
+    auto result =
+        co_await ExecRsProduction(stmt, prod.repeat_item, ctx, arena, cap);
     if (result == StmtResult::kBreak) co_return StmtResult::kBreak;
   }
   co_return StmtResult::kDone;
@@ -111,7 +138,7 @@ static ExecTask ExecRsProdRepeat(const Stmt* stmt, const RsProd& prod,
 
 static ExecTask ExecRsProdCase(const Stmt* stmt, const RsProd& prod,
                                SimContext& ctx, Arena& arena,
-                               Logic4Vec* out_value) {
+                               RuleValueCapture* cap) {
   // 18.17.3: evaluate the case expression once, then compare it against each
   // case item expression in the order written. Items separated by commas share
   // a production, so any pattern matching wins for that item. The first item
@@ -127,14 +154,13 @@ static ExecTask ExecRsProdCase(const Stmt* stmt, const RsProd& prod,
     }
     for (auto* pat : ci.patterns) {
       if (EvalExpr(pat, ctx, arena).ToUint64() == val) {
-        co_return co_await ExecRsProduction(stmt, ci.item, ctx, arena,
-                                            out_value);
+        co_return co_await ExecRsProduction(stmt, ci.item, ctx, arena, cap);
       }
     }
   }
   if (default_item) {
     co_return co_await ExecRsProduction(stmt, default_item->item, ctx, arena,
-                                        out_value);
+                                        cap);
   }
   co_return StmtResult::kDone;
 }
@@ -160,19 +186,18 @@ static ExecTask ExecRsProdCodeBlock(const RsProd& prod, SimContext& ctx,
 
 static ExecTask ExecRsProd(const Stmt* stmt, const RsProd& prod,
                            SimContext& ctx, Arena& arena,
-                           Logic4Vec* out_value) {
+                           RuleValueCapture* cap) {
   switch (prod.kind) {
     case RsProdKind::kCodeBlock:
       co_return co_await ExecRsProdCodeBlock(prod, ctx, arena);
     case RsProdKind::kItem:
-      co_return co_await ExecRsProduction(stmt, prod.item, ctx, arena,
-                                          out_value);
+      co_return co_await ExecRsProduction(stmt, prod.item, ctx, arena, cap);
     case RsProdKind::kIf:
-      co_return co_await ExecRsProdIf(stmt, prod, ctx, arena, out_value);
+      co_return co_await ExecRsProdIf(stmt, prod, ctx, arena, cap);
     case RsProdKind::kRepeat:
-      co_return co_await ExecRsProdRepeat(stmt, prod, ctx, arena, out_value);
+      co_return co_await ExecRsProdRepeat(stmt, prod, ctx, arena, cap);
     case RsProdKind::kCase:
-      co_return co_await ExecRsProdCase(stmt, prod, ctx, arena, out_value);
+      co_return co_await ExecRsProdCase(stmt, prod, ctx, arena, cap);
   }
   co_return StmtResult::kDone;
 }
@@ -379,23 +404,59 @@ static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
   co_return StmtResult::kDone;
 }
 
-// §18.17.7: within a rule, a variable is implicitly declared for each
-// value-returning production that appears. A production appearing once yields a
-// scalar named after the production; a production appearing more than once
-// yields an array indexed 1..N, with element i holding the value returned by
-// the i-th appearance in syntactic order. Pre-scan the rule's production items
-// to count each name's appearances so a multiply appearing value-returning
-// production can be registered as an array before any code block reads it. The
-// per-name appearance counts are returned for reuse during generation.
-static std::unordered_map<std::string_view, int> RegisterRuleProductionArrays(
-    const Stmt* stmt, const RsRule& selected, SimContext& ctx) {
-  std::unordered_map<std::string_view, int> total_count;
-  for (const auto& prod : selected.prods) {
-    if (prod.kind != RsProdKind::kItem) continue;
-    if (ProductionReturnsValue(FindProduction(stmt, prod.item.name)))
-      total_count[prod.item.name]++;
+// §18.17.7: record one appearance of a value-returning production, giving it
+// the next ordinal in the rule. Every appearance counts, including one written
+// inside an if, repeat or case production: the clause gives the code block of
+// `if (cond) D(5) else D(20)` the implicit declaration `int D[1:2]`, and the
+// code block of `B repeat(5) C B` the declarations `int B[1:2]` and `int C`.
+// A repeat counts its item once however many times it goes on to generate it.
+static void CountRuleProductionItem(const Stmt* stmt,
+                                    const RsProductionItem& item,
+                                    RuleValueCapture& cap) {
+  if (!ProductionReturnsValue(FindProduction(stmt, item.name))) return;
+  cap.ordinal[&item] = ++cap.total[item.name];
+}
+
+// §18.17.7: count the appearances of every value-returning production one
+// production of a rule names, reaching the items an if, repeat or case
+// production generates as well as an item written directly in the rule.
+static void CountRuleProductions(const Stmt* stmt, const RsProd& prod,
+                                 RuleValueCapture& cap) {
+  switch (prod.kind) {
+    case RsProdKind::kItem:
+      CountRuleProductionItem(stmt, prod.item, cap);
+      return;
+    case RsProdKind::kIf:
+      CountRuleProductionItem(stmt, prod.if_true, cap);
+      if (prod.has_else) CountRuleProductionItem(stmt, prod.if_false, cap);
+      return;
+    case RsProdKind::kRepeat:
+      CountRuleProductionItem(stmt, prod.repeat_item, cap);
+      return;
+    case RsProdKind::kCase:
+      for (const auto& ci : prod.case_items)
+        CountRuleProductionItem(stmt, ci.item, cap);
+      return;
+    case RsProdKind::kCodeBlock:
+      return;
   }
-  for (const auto& [name, n] : total_count) {
+}
+
+// §18.17.7: within a rule, a variable is implicitly declared for each
+// value-returning production the rule names. A production named once yields a
+// scalar named after the production; a production named more than once yields
+// an array indexed 1..N, with element i holding the value returned by the i-th
+// appearance in syntactic order. Count the rule's appearances so a multiply
+// appearing production can be registered as an array before any code block
+// reads an element of it.
+static RuleValueCapture BuildRuleValueCapture(const Stmt* stmt,
+                                              const RsRule& selected,
+                                              SimContext& ctx) {
+  RuleValueCapture cap;
+  for (const auto& prod : selected.prods) {
+    CountRuleProductions(stmt, prod, cap);
+  }
+  for (const auto& [name, n] : cap.total) {
     if (n <= 1) continue;
     const auto* child = FindProduction(stmt, name);
     ArrayInfo info;
@@ -405,50 +466,48 @@ static std::unordered_map<std::string_view, int> RegisterRuleProductionArrays(
     info.elem_width = w ? w : 32;
     ctx.RegisterArray(name, info);
   }
-  return total_count;
+  return cap;
 }
 
-namespace {
-// §18.17.7: one appearance of a value-returning production within a rule, for
-// which an implicit variable is declared. prod is the generated production
-// item, child its resolved declaration (it carries the return type), idx the
-// 1-based ordinal of this appearance in syntactic order, and total_count how
-// many times the production appears in the rule: a count above one means the
-// implicit variable is the idx-th element of a 1..N array, a count of one means
-// the scalar named after the production.
-struct RuleProductionSlot {
-  const RsProd& prod;
-  const RsProduction* child;
-  int idx;
-  int total_count;
-};
-}  // namespace
+// §18.17.7: the implicit variable this appearance of a production writes. An
+// appearance the rule recorded no ordinal for writes none: the top-level
+// production the randsequence statement names stands in no rule, and neither
+// does an operand of a rand join rule.
+static RuleProductionSlot SlotForAppearance(const RuleValueCapture* cap,
+                                            const RsProductionItem& call,
+                                            std::string_view name) {
+  if (cap == nullptr) return RuleProductionSlot{name, 0, 0};
+  auto ord = cap->ordinal.find(&call);
+  if (ord == cap->ordinal.end()) return RuleProductionSlot{name, 0, 0};
+  auto total = cap->total.find(name);
+  return RuleProductionSlot{name, ord->second,
+                            total == cap->total.end() ? 1 : total->second};
+}
 
-// §18.17.7: store one generated production's return value into its implicit
-// variable, immediately so later code blocks observe it. A multiply appearing
-// production stores into its 1..N indexed element for this (idx-th) appearance;
-// a singly appearing one stores into the scalar named after the production.
 // §18.17.7: create the implicit variable that holds a generated production's
-// return value. A multiply appearing production stores into its 1..N indexed
-// element for this (idx-th) appearance, whose name is built at run time and so
-// must be interned in the arena (the scope map keys on a stable string_view); a
-// singly appearing one uses the scalar named after the production.
+// return value. A production named more than once in the rule writes the
+// idx-th element of its 1..N array, whose name is built at run time and so must
+// be interned in the arena (the scope map keys on a stable string_view); a
+// production named once writes the scalar named after the production.
 static Variable* CreateRuleProductionVariable(const RuleProductionSlot& slot,
                                               uint32_t width, SimContext& ctx,
                                               Arena& arena) {
-  if (slot.total_count > 1) {
-    auto name =
-        std::string(slot.prod.item.name) + "[" + std::to_string(slot.idx) + "]";
+  if (slot.total > 1) {
+    auto name = std::string(slot.name) + "[" + std::to_string(slot.idx) + "]";
     return ctx.CreateLocalVariable(*arena.Create<std::string>(std::move(name)),
                                    width);
   }
-  return ctx.CreateLocalVariable(slot.prod.item.name, width);
+  return ctx.CreateLocalVariable(slot.name, width);
 }
 
+// §18.17.7: store one generated production's return value into its implicit
+// variable, at the moment it is generated so that a code block written to its
+// right observes the value and one written to its left does not.
 static void StoreRuleProductionValue(const RuleProductionSlot& slot,
+                                     const RsProduction* child,
                                      const Logic4Vec& ret_value,
                                      SimContext& ctx, Arena& arena) {
-  uint32_t w = EvalTypeWidth(slot.child->return_type);
+  uint32_t w = EvalTypeWidth(child->return_type);
   if (w == 0) w = ret_value.width ? ret_value.width : 32;
   Variable* var = CreateRuleProductionVariable(slot, w, ctx, arena);
   var->value = ret_value;
@@ -456,32 +515,13 @@ static void StoreRuleProductionValue(const RuleProductionSlot& slot,
 
 static ExecTask ExecRuleProds(const Stmt* stmt, const RsRule& selected,
                               SimContext& ctx, Arena& arena) {
-  std::unordered_map<std::string_view, int> total_count =
-      RegisterRuleProductionArrays(stmt, selected, ctx);
-
   // §18.17.7: only the return values of productions already generated (to the
   // left of a code block) are available. Each generation stores its value into
-  // the implicit variable immediately, so later code blocks observe it while
-  // earlier ones do not.
-  std::unordered_map<std::string_view, int> seen_count;
+  // the implicit variable as it finishes, so a later code block observes it
+  // while an earlier one does not.
+  RuleValueCapture cap = BuildRuleValueCapture(stmt, selected, ctx);
   for (const auto& prod : selected.prods) {
-    Logic4Vec ret_value;
-    const RsProduction* child = nullptr;
-    Logic4Vec* slot = nullptr;
-    if (prod.kind == RsProdKind::kItem) {
-      child = FindProduction(stmt, prod.item.name);
-      if (ProductionReturnsValue(child)) slot = &ret_value;
-    }
-
-    auto result = co_await ExecRsProd(stmt, prod, ctx, arena, slot);
-
-    if (slot != nullptr) {
-      int idx = ++seen_count[prod.item.name];
-      RuleProductionSlot prod_slot{prod, child, idx,
-                                   total_count[prod.item.name]};
-      StoreRuleProductionValue(prod_slot, ret_value, ctx, arena);
-    }
-
+    auto result = co_await ExecRsProd(stmt, prod, ctx, arena, &cap);
     if (result == StmtResult::kBreak) co_return StmtResult::kBreak;
     if (result == StmtResult::kReturn) co_return StmtResult::kDone;
   }
@@ -546,7 +586,7 @@ static void BindProductionFormals(const RsProduction* production,
 
 static ExecTask ExecRsProduction(const Stmt* stmt, const RsProductionItem& call,
                                  SimContext& ctx, Arena& arena,
-                                 Logic4Vec* out_value) {
+                                 RuleValueCapture* cap) {
   const auto* production = FindProduction(stmt, call.name);
   if (!production) co_return StmtResult::kDone;
 
@@ -557,26 +597,35 @@ static ExecTask ExecRsProduction(const Stmt* stmt, const RsProductionItem& call,
   BindProductionFormals(production, actuals, ctx, arena);
 
   // §18.17.7: returning data requires a (non-void) return type. Provide storage
-  // for this production's return value and point the engine's return slot at it
-  // so a 'return <expr>' anywhere in the production writes here, saving and
-  // restoring any enclosing production's slot for correct nesting.
+  // for this production's return value and point the engine's return slot at
+  // it, so a 'return <expr>' anywhere in the production writes here. Every
+  // production is generated with a slot of its own, a void one with none: the
+  // return statement assigns its expression to the production whose code block
+  // holds it, so a void production left holding the slot of the production that
+  // triggered it would write its own returned expression into that
+  // production's value.
   Logic4Vec ret_value;
   bool returns_value = ProductionReturnsValue(production);
-  Logic4Vec* prev_slot = nullptr;
   if (returns_value) {
     uint32_t w = EvalTypeWidth(production->return_type);
     if (w == 0) w = 32;
     ret_value = MakeLogic4VecVal(arena, w, 0);
-    prev_slot = ctx.SetRsReturnSlot(&ret_value);
   }
+  Logic4Vec* prev_slot =
+      ctx.SetRsReturnSlot(returns_value ? &ret_value : nullptr);
 
   const auto& selected = SelectRule(*production, ctx, arena);
   auto result = co_await ExecSelectedRule(stmt, selected, ctx, arena);
 
-  if (returns_value) ctx.SetRsReturnSlot(prev_slot);
+  ctx.SetRsReturnSlot(prev_slot);
   ctx.PopScope();
 
-  if (out_value != nullptr && returns_value) *out_value = ret_value;
+  // §18.17.7: the implicit variable belongs to the rule that named the
+  // production, so it is written once this production's own scope is gone.
+  RuleProductionSlot slot = SlotForAppearance(cap, call, production->name);
+  if (returns_value && slot.idx != 0) {
+    StoreRuleProductionValue(slot, production, ret_value, ctx, arena);
+  }
 
   // §18.17.6: a return aborts only the current production. Once that production
   // has finished generating, surface a normal completion so the enclosing rule

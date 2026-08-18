@@ -291,4 +291,136 @@ TEST(RandseqValuePassingSim, NestedProductionReturnValues) {
   EXPECT_EQ(r, 3u);
 }
 
+// §18.17.7: the implicit variable is declared for each value-returning
+// production the rule names, including one named inside an if production. The
+// clause's second example gives the code block of `if (cond) D(5) else D(20)`
+// the declaration `int D[1:2]`, so the true branch's generation is element 1.
+// A rule that only counted the productions written directly in it declares no
+// variable named mk at all, and the code block then reads nothing.
+TEST(RandseqValuePassingSim, IfBranchProductionWritesTheFirstImplicitElement) {
+  SimFixture f;
+  uint64_t r = RunModule(f,
+                         "module t;\n"
+                         "  int r;\n"
+                         "  int cond;\n"
+                         "  initial begin\n"
+                         "    r = 0;\n"
+                         "    cond = 1;\n"
+                         "    randsequence(main)\n"
+                         "      void main : if (cond) mk(5) else mk(20)\n"
+                         "                  { r = mk[1]; } ;\n"
+                         "      int mk (int v) : { return v; } ;\n"
+                         "    endsequence\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "r");
+  EXPECT_EQ(r, 5u);
+}
+
+// §18.17.7: the element an appearance writes is fixed by where the appearance
+// is written, not by the order in which generation reached it. Of the same
+// `if (cond) D(5) else D(20)`, the clause says the second element is assigned
+// the value returned by D(20) when cond is false — although the else branch is
+// then the only appearance that generated at all. An engine numbering the
+// elements as it generates writes element 1 here and leaves element 2 at zero.
+TEST(RandseqValuePassingSim,
+     ElseBranchProductionWritesTheSecondImplicitElement) {
+  SimFixture f;
+  uint64_t r = RunModule(f,
+                         "module t;\n"
+                         "  int r;\n"
+                         "  int cond;\n"
+                         "  initial begin\n"
+                         "    r = 0;\n"
+                         "    cond = 0;\n"
+                         "    randsequence(main)\n"
+                         "      void main : if (cond) mk(5) else mk(20)\n"
+                         "                  { r = mk[2]; } ;\n"
+                         "      int mk (int v) : { return v; } ;\n"
+                         "    endsequence\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "r");
+  EXPECT_EQ(r, 20u);
+}
+
+// §18.17.7: a repeat production names its item once however many times it
+// generates it, so the implicit variable is the scalar named after the
+// production and each generation overwrites it. The clause's second example
+// gives the code block of `B repeat(5) C B` the declarations `int B[1:2]` and
+// `int C`, the scalar for the repeated C. Three generations each increment n
+// and return it, so the scalar holds 3 rather than the 1 a single generation
+// would leave or the zero an unwritten variable would.
+TEST(RandseqValuePassingSim,
+     RepeatedProductionWritesOneScalarImplicitVariable) {
+  SimFixture f;
+  uint64_t r = RunModule(f,
+                         "module t;\n"
+                         "  int r;\n"
+                         "  int n;\n"
+                         "  initial begin\n"
+                         "    r = 0;\n"
+                         "    n = 0;\n"
+                         "    randsequence(main)\n"
+                         "      void main : repeat(3) c { r = c; } ;\n"
+                         "      int c : { n = n + 1; return n; } ;\n"
+                         "    endsequence\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "r");
+  EXPECT_EQ(r, 3u);
+}
+
+// §18.17.7: a production named by a case item is named by the rule, so it too
+// gets an implicit variable. The two productions here return different values
+// and each is named once, so each variable is a scalar; the code block reads
+// the one the case selected. A rule that only counted its directly written
+// items declares neither, and the block reads nothing.
+TEST(RandseqValuePassingSim, CaseItemProductionWritesItsImplicitVariable) {
+  SimFixture f;
+  uint64_t r = RunModule(f,
+                         "module t;\n"
+                         "  int r;\n"
+                         "  int sel;\n"
+                         "  initial begin\n"
+                         "    r = 0;\n"
+                         "    sel = 2;\n"
+                         "    randsequence(main)\n"
+                         "      void main : case (sel) 1 : p1; 2 : p2;\n"
+                         "                  endcase { r = p2; } ;\n"
+                         "      int p1 : { return 3; } ;\n"
+                         "      int p2 : { return 7; } ;\n"
+                         "    endsequence\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "r");
+  EXPECT_EQ(r, 7u);
+}
+
+// §18.17.7: the return statement assigns its expression to the production whose
+// code block holds it. `inner` declares no return type, so its `return 9` names
+// no production to assign to and `outer` keeps the zero it was generated with;
+// the code block reads outer + 1 and so distinguishes that zero from the 55 the
+// variable held before the randsequence. An engine that lets a void production
+// keep the return slot of the production that triggered it reports 10 here,
+// because inner's returned expression lands in outer's value.
+TEST(RandseqValuePassingSim,
+     VoidProductionReturnLeavesTheTriggeringValueAlone) {
+  SimFixture f;
+  uint64_t r = RunModule(f,
+                         "module t;\n"
+                         "  int r;\n"
+                         "  initial begin\n"
+                         "    r = 55;\n"
+                         "    randsequence(main)\n"
+                         "      void main : outer { r = outer + 1; } ;\n"
+                         "      int outer : inner ;\n"
+                         "      void inner : { return 9; } ;\n"
+                         "    endsequence\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "r");
+  EXPECT_EQ(r, 1u);
+}
+
 }  // namespace
