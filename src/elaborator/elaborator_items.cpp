@@ -116,6 +116,28 @@ static bool IsParamDeclared(std::string_view name, const RtlirModule* mod) {
 
 bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
                                         RtlirModule* mod) {
+  // Ask IsNameDeclared about both the scoped name and the bare one. §6.10
+  // assumes an implicit net for an identifier that "has not been declared
+  // previously in the scope where the continuous assignment statement appears
+  // or in any scope whose declarations can be directly referenced from" that
+  // scope, and RtlirModule::nets, RtlirModule::variables and RtlirModule::ports
+  // hold the string Elaborator::ScopedName produced: the scoped key answers the
+  // first half for this generate block, the bare key the second half for the
+  // enclosing module. Outside a generate block gen_prefix_ is empty and
+  // ScopedName is the identity, so the two keys are one string.
+  //
+  // Dropping either one is a defect. Without the scoped key a second reference
+  // to one undeclared identifier in one generate block pushes a second net of
+  // that name, which SimContext::CreateNet in src/simulator/sim_context.cpp
+  // then registers over the first. Without the bare key a reference in a
+  // generate block to a net the module declares gains a prefixed net that
+  // shadows it, and the continuous assignment drives the new net.
+  //
+  // An intermediate generate block is still unchecked: inside block 'a' nested
+  // in block 'b' the two keys are "b_a_w" and "w", and a net that 'b' declares
+  // is held as "b_w", which neither matches. Issue #3219 records that.
+  std::string_view scoped = ScopedName(name);
+  if (IsNameDeclared(scoped, mod)) return true;
   if (IsNameDeclared(name, mod)) return true;
   // §6.10 gives an implicit net to an identifier used in a port connection or
   // on the left of a continuous assignment only when it is not declared. A
@@ -154,7 +176,6 @@ bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
   // here and then reads net_names_ back with that same `name`, so a prefixed
   // entry would make it treat the net it just created as a variable and report
   // a second assignment to it under §10.3.2.
-  std::string_view scoped = ScopedName(name);
   RtlirNet net =
       MakeImplicitPortNet(scoped, /*port_width=*/1, /*port_is_signed=*/false,
                           unit_->default_nettype);

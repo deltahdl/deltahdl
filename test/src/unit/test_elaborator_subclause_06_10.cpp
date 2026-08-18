@@ -486,4 +486,111 @@ TEST(ImplicitDeclaration, ImplicitNetInALoopGenerateBlockIsNamedPerIteration) {
   EXPECT_EQ(bare, 0) << "no net belongs to top under the bare name";
 }
 
+// §6.10 assumes an implicit net only for an identifier that "has not been
+// declared previously in the scope where the ... assignment appears", and the
+// explicit 'wire w' inside generate block 'a' is that previous declaration.
+// Block 'a' therefore holds one net named 'a_w'.
+//
+// The test fails when mod->nets holds two entries named 'a_w'.
+// Elaborator::MaybeCreateImplicitNet in src/elaborator/elaborator_items.cpp
+// asks IsNameDeclared about the bare 'w' the source wrote, while the net it
+// pushes is named by Elaborator::ScopedName, which prepends the generate block
+// prefix 'a_'. Inside a generate block the question and the storage disagree,
+// so the declaration the guard is there to find is not found.
+TEST(ImplicitDeclaration, ExplicitNetNotDuplicatedByImplicitInAGenerateBlock) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  generate\n"
+      "    if (1) begin : a\n"
+      "      wire w;\n"
+      "      assign w = 1'b1;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  int count = 0;
+  for (const auto& n : mod->nets) {
+    if (n.name == "a_w") ++count;
+  }
+  EXPECT_EQ(count, 1) << "net 'a_w' should not be duplicated";
+}
+
+// §6.10 declares one implicit net for one undeclared identifier in one scope:
+// "The implicit net declaration shall belong to the scope in which the net
+// reference appears", and only a reference "from outside the generate block or
+// in another generate block within the same module" declares another one. Both
+// references to 'w' below stand in generate block 'a', so block 'a' holds one
+// net named 'a_w'.
+//
+// The test fails when mod->nets holds two entries named 'a_w'. Two callers of
+// Elaborator::MaybeCreateImplicitNet see this one identifier:
+// Elaborator::ValidateContAssignIdentLhs in
+// src/elaborator/elaborator_cont_assign.cpp for the continuous assignment, and
+// CreateImplicitNetsForTerminals in src/elaborator/elaborator_items.cpp for
+// the terminal list of gate instance 'g1'. The second pushes a second net
+// whenever the guard reads the bare 'w' and the net the first pushed carries
+// the prefix Elaborator::ScopedName added.
+TEST(ImplicitDeclaration,
+     TwoReferencesToOneUndeclaredNameInAGenerateBlockDeclareOneNet) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  generate\n"
+      "    if (1) begin : a\n"
+      "      assign w = 1'b1;\n"
+      "      and g1(y, w, b);\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  int count = 0;
+  for (const auto& n : mod->nets) {
+    if (n.name == "a_w") ++count;
+  }
+  EXPECT_EQ(count, 1) << "two references to 'w' should declare one net 'a_w'";
+}
+
+// §6.10 assumes no implicit net for an identifier declared "in any scope whose
+// declarations can be directly referenced from" the scope the assignment
+// appears in, and the module scope of 'top' is such a scope for generate block
+// 'a'. The reference to 'w' inside block 'a' names the module's own net and
+// declares nothing, so 'top' holds one net named 'w' and none named 'a_w'.
+//
+// The test fails when mod->nets holds an entry named 'a_w', which
+// Elaborator::MaybeCreateImplicitNet in src/elaborator/elaborator_items.cpp
+// pushes if it asks IsNameDeclared only about Elaborator::ScopedName("w") and
+// drops the bare 'w' that the module scope declared.
+TEST(ImplicitDeclaration,
+     ModuleScopeNetIsNotRedeclaredByAGenerateBlockReference) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  wire w;\n"
+      "  generate\n"
+      "    if (1) begin : a\n"
+      "      assign w = 1'b1;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  int scoped = 0;
+  int bare = 0;
+  for (const auto& n : mod->nets) {
+    if (n.name == "a_w") ++scoped;
+    if (n.name == "w") ++bare;
+  }
+  EXPECT_EQ(scoped, 0) << "block 'a' should declare no net of its own";
+  EXPECT_EQ(bare, 1) << "the module's net 'w' should not be duplicated";
+}
+
 }  // namespace
