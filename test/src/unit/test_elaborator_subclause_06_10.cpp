@@ -714,4 +714,112 @@ TEST(ImplicitDeclaration,
   EXPECT_EQ(count, 1) << "block 'a' should declare exactly one net 'b_a_w'";
 }
 
+// §6.10 assumes an implicit net for an identifier not declared "in the scope
+// where the continuous assignment statement appears or in any scope whose
+// declarations can be directly referenced from" it, and §23.9 lists "Generate
+// blocks" among the elements that "define a new scope". The localparam 'P'
+// belongs to block 'a' alone, and neither the module scope the assignment
+// stands in nor any scope it can reference directly is block 'a', so the
+// assignment declares a net named 'P'.
+//
+// The test fails when mod->nets holds no entry named 'P'. IsParamDeclared in
+// src/elaborator/elaborator_items.cpp reads RtlirModule::params, whose entries
+// Elaborator::ElaborateParamDecl names bare whatever scope declared them, so a
+// question asked with the bare 'P' is answered by block 'a''s localparam and
+// Elaborator::MaybeCreateImplicitNet returns without creating anything.
+TEST(ImplicitDeclaration,
+     ParameterOfAGenerateBlockDoesNotSuppressAModuleLevelImplicitNet) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  generate\n"
+      "    if (1) begin : a\n"
+      "      localparam P = 1;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "  assign P = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  int count = 0;
+  for (const auto& n : mod->nets) {
+    if (n.name == "P") ++count;
+  }
+  EXPECT_EQ(count, 1) << "the module scope should declare one net 'P'";
+}
+
+// The same reading where the reference stands in a sibling generate block.
+// §23.9 rules that an identifier "referenced directly (without a hierarchical
+// path)" is declared "locally or within a module, interface, program, checker,
+// task, function, named block, or generate block that is higher in the same
+// branch of the name tree", and block 'a' is not higher in block 'c''s branch:
+// they are siblings. Block 'c' therefore declares a net named 'c_P'.
+//
+// Neither block is at module level, so the case cannot pass by
+// Elaborator::ScopedName being the identity: the keys tested for the reference
+// are 'c_P' and 'P', and it is the bare one that reaches block 'a''s
+// localparam.
+TEST(ImplicitDeclaration,
+     ParameterOfAGenerateBlockDoesNotSuppressASiblingBlockImplicitNet) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  generate\n"
+      "    if (1) begin : a\n"
+      "      localparam P = 1;\n"
+      "    end\n"
+      "    if (1) begin : c\n"
+      "      assign P = 1'b1;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  int count = 0;
+  for (const auto& n : mod->nets) {
+    if (n.name == "c_P") ++count;
+  }
+  EXPECT_EQ(count, 1) << "block 'c' should declare one net 'c_P'";
+}
+
+// §6.10 assumes no implicit net for an identifier declared "in any scope whose
+// declarations can be directly referenced from" the scope the reference stands
+// in, and a parameter of the module is such a declaration for every generate
+// block in it. The reference in block 'a' names the module's parameter, so no
+// net is created under either spelling.
+//
+// This is the case the fix must not lose. §23.3.3.3 lets any expression drive
+// an input port, so a parameter named as a port actual is the expression that
+// drives it, and a scalar net created here would shadow the parameter with an
+// undriven wire and deliver zero to the port instead.
+//
+// The claim is about RtlirModule::nets and not about what the source is worth:
+// §6.20 leaves a continuous assignment naming a parameter to be rejected
+// elsewhere, and this case reads the same whether that report is made or not.
+TEST(ImplicitDeclaration,
+     ParameterOfTheModuleStillSuppressesAGenerateBlockImplicitNet) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  parameter P = 1;\n"
+      "  generate\n"
+      "    if (1) begin : a\n"
+      "      assign P = 1'b1;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  int count = 0;
+  for (const auto& n : mod->nets) {
+    if (n.name == "a_P" || n.name == "P") ++count;
+  }
+  EXPECT_EQ(count, 0) << "the module's parameter 'P' should suppress the net";
+}
+
 }  // namespace

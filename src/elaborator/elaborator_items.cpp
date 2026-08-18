@@ -56,12 +56,27 @@ bool IsNameDeclared(std::string_view name, const RtlirModule* mod) {
   return false;
 }
 
-// True when `name` is a parameter of `mod`. A parameter is a declaration of the
-// module like a net or a variable, but it is held apart from both, so the
-// implicit-net rule has to ask about it separately.
-static bool IsParamDeclared(std::string_view name, const RtlirModule* mod) {
+// True when `name` is a parameter of `mod` that a reference standing in the
+// generate blocks `scopes` can see. A parameter is a declaration of the module
+// like a net or a variable, but it is held apart from both, so the implicit-net
+// rule has to ask about it separately.
+//
+// RtlirParamDecl::name is bare whatever scope the parameter was declared in, so
+// the name alone does not answer: §23.9 lists "Generate blocks" among the
+// elements that "define a new scope", and a parameter one block declares is not
+// visible to a reference at module level or in a sibling block. Match
+// RtlirParamDecl::gen_block_prefix against the prefixes in force instead. A
+// parameter of the module itself has none and is visible throughout, which is
+// what §23.3.3.3 needs when such a parameter drives an input port from inside a
+// generate block.
+static bool IsParamDeclared(std::string_view name, const RtlirModule* mod,
+                            const std::vector<std::string_view>& scopes) {
   for (const auto& p : mod->params) {
-    if (p.name == name) return true;
+    if (p.name != name) continue;
+    if (p.gen_block_prefix.empty()) return true;
+    for (std::string_view scope : scopes) {
+      if (scope == p.gen_block_prefix) return true;
+    }
   }
   return false;
 }
@@ -107,7 +122,7 @@ bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
   // port, so a parameter named as a port actual is the expression that drives
   // it. Creating a scalar net of the same name here would instead shadow the
   // parameter with an undriven wire and deliver zero to the port.
-  if (IsParamDeclared(name, mod)) return true;
+  if (IsParamDeclared(name, mod, gen_prefix_scopes_)) return true;
   if (unit_->default_nettype == NetType::kNone) {
     diag_.Error(loc,
                 std::format("implicit net '{}' forbidden by "
@@ -414,6 +429,10 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   }
   RtlirParamDecl pd;
   pd.name = item->name;
+  // §27.4: a generate block "comprises a separate scope and a new level of
+  // hierarchy when it is instantiated", and this site elaborates a parameter
+  // written in one as readily as one written among a module's own items.
+  pd.gen_block_prefix = InternedGenPrefix();
   pd.is_type_param = is_type;
 
   pd.is_localparam = item->is_localparam || mod->has_param_port_list;

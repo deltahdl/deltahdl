@@ -319,6 +319,22 @@ struct RtlirProcess {
 
 struct RtlirParamDecl {
   std::string_view name;
+  // §23.9: the generate block prefix in force where this parameter was
+  // declared, empty for a parameter of the module itself. §23.9 lists "Generate
+  // blocks" among the elements that "define a new scope", so a parameter
+  // declared in one is not visible to a reference at module level or in a
+  // sibling block, and a reader deciding what a bare identifier names has to be
+  // able to tell the two apart.
+  //
+  // The scope is recorded here rather than folded into `name` the way
+  // Elaborator::ScopedName folds it into RtlirNet::name and RtlirVar::name,
+  // because every reader of RtlirModule::params matches a parameter by the
+  // identifier the source wrote: Elaborator::BuildParamScope and
+  // RegisteredModuleScope key a ScopeMap by it, ConstEvalString and
+  // Elaborator::ResolveDefparamSteps compare it to a name out of the AST, and
+  // ReportParamsMissingValue prints it into a §6.20.1 diagnostic. A prefixed
+  // name would answer none of them.
+  std::string_view gen_block_prefix;
   Expr* default_value = nullptr;
   int64_t resolved_value = 0;
   // §6.20.2: a parameter declared with a real type takes a real value, which
