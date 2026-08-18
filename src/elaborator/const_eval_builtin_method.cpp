@@ -128,10 +128,10 @@ std::optional<int64_t> StringParamLength(const Expr* operand) {
   if (!mod) return std::nullopt;
   for (const auto& param : mod->params) {
     if (param.name != operand->text) continue;
-    // §23.9: RegisteredModule() names a module and nothing about where inside
-    // it this call stands, so only the module's own parameters can be what the
-    // identifier names.
-    if (!ParamVisibleFromScopes(param.gen_block_prefix, {})) continue;
+    // §23.9 puts a parameter a generate block declares in a scope of its own,
+    // and this reader cannot apply that rule: RegisteredModule() names a module
+    // and nothing about where inside it this call stands. #3225 carries what a
+    // correct answer needs.
     if (!param.is_string_value) return std::nullopt;
     return static_cast<int64_t>(param.resolved_string.size());
   }
