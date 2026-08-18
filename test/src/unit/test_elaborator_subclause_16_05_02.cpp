@@ -134,7 +134,7 @@ TEST(AssertionClockGlobalClock,
   sensitivity[0].edge = Edge::kNegedge;
   sensitivity[0].signal = GlobalClockRef(f);
 
-  const std::vector<EventExpr> global_event;
+  std::vector<EventExpr> global_event;
 
   EXPECT_FALSE(SubstituteGlobalClockLeadingEvent(sensitivity, global_event));
   ASSERT_EQ(sensitivity.size(), 1u);
