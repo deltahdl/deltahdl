@@ -264,6 +264,11 @@ bool Preprocessor::TakeDigestDecryptKeyValue(std::string_view line,
   digest_decrypt_key_value_next_ = false;
   std::string key;
   if (!ReadEncodedProtectValue(Trim(line), loc, &key)) return true;
+  // §34.5.16.2: a decryption key recovered here is one of the three
+  // designations the values of which are unique for the digest_keyowner in
+  // effect, so it is held to that whether it was written against the keyword
+  // or, as §34.5.20.1 writes it, on the line beneath the keyword.
+  CheckDigestDesignationValue(kDigestDecryptKeyKeyword, key, loc);
   digest_decrypt_key_ = std::move(key);
   return true;
 }
@@ -477,6 +482,11 @@ bool Preprocessor::TakeDigestPublicKeyValue(std::string_view line,
   std::string value;
   if (!ReadEncodedProtectValue(Trim(line), loc, &value)) return true;
   protect_keywords_.Apply(kDigestPublicKeyKeyword, value);
+  // §34.5.16.2: the public key just read designates a key of the
+  // digest_keyowner in effect, so it is held to being unique for that entity
+  // like the name beside it. §34.5.19.1 writes it on the line beneath its
+  // keyword, which is why the expression-shaped check does not see it.
+  CheckDigestDesignationValue(kDigestPublicKeyKeyword, value, loc);
   CheckDigestDesignationAgreement(loc);
   return true;
 }

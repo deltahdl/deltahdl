@@ -56,6 +56,7 @@
 #include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_digest_block.h"
+#include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
 
@@ -792,6 +793,57 @@ TEST(ProtectDigestKeyownerEncryptionInput, AnEntityWithNoKeysSelectsNothing) {
   ReadUnderKeys run(encrypted, KeysForDataAndDigest());
   EXPECT_TRUE(run.Holds("module sealed_m"));
   EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kMatched);
+}
+
+// §34.5.16.2 makes the three designations unique for the entity however they
+// are spelled, and two of them are not spelled with a value against the
+// keyword: §34.5.19.1 and §34.5.20.1 write the keyword standing alone with the
+// encoded value on the line beneath it, which the cases above never reach. Such
+// a line is read only inside a protected envelope, so these two build one.
+
+// The two lines a designation is spelled over when the value stands beneath the
+// keyword.
+std::string Announces(std::string_view keyword, std::string_view value) {
+  std::string text = "`pragma protect ";
+  text.append(keyword).append("\n");
+  text.append(EncodeProtectBlock(value, DefaultProtectEncoding())).append("\n");
+  return text;
+}
+
+// §34.5.16.2: the public key announced on the line beneath its keyword is one
+// of the three, so a value it shares with the name written beside it under one
+// entity is the repetition the subclause forbids. A rule reading only the value
+// written against a keyword never sees this spelling.
+TEST(ProtectDigestDesignationUniqueness, AnAnnouncedPublicKeyIsHeldToTheRule) {
+  std::string described = Writes("digest_keyowner", kDigestOwner);
+  described += Writes("digest_keyname", kSharedValue);
+  described += Announces("digest_public_key", kSharedValue);
+  std::string src = ForeignEnvelope(described);
+  ReadUnderKeys run(src, ProtectKeyList());
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma writes one value against two of the names that "
+      "designate a key of the digest_keyowner in effect",
+      LineHolding(src, EncodeProtectBlock(std::string(kSharedValue),
+                                          DefaultProtectEncoding())),
+      "34.5.16"));
+}
+
+// §34.5.16.2: the same of the session key, which §34.5.20.1 spells the same way
+// and which reaches the rule by its own path.
+TEST(ProtectDigestDesignationUniqueness, AnAnnouncedSessionKeyIsHeldToTheRule) {
+  std::string described = Writes("digest_keyowner", kDigestOwner);
+  described += Writes("digest_keyname", kSharedValue);
+  described += Announces("digest_decrypt_key", kSharedValue);
+  std::string src = ForeignEnvelope(described);
+  ReadUnderKeys run(src, ProtectKeyList());
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma writes one value against two of the names that "
+      "designate a key of the digest_keyowner in effect",
+      LineHolding(src, EncodeProtectBlock(std::string(kSharedValue),
+                                          DefaultProtectEncoding())),
+      "34.5.16"));
 }
 
 }  // namespace

@@ -245,6 +245,11 @@ class Preprocessor {
   // data.
   void CheckDigestDesignation(const PragmaKeywordExpression& expr,
                               SourceLoc loc);
+  // §34.5.16.2: the same rule stated of a value rather than of the expression
+  // that carried it, for the two designations §34.5.19.1 and §34.5.20.1 write
+  // as a bare keyword with the value on the line beneath it.
+  void CheckDigestDesignationValue(std::string_view keyword,
+                                   std::string_view value, SourceLoc loc);
   // Holds `value`, written against `keyword`, to what §34.5.23 and §34.5.26
   // require of a designation of a key belonging to the entity that provided
   // the keys a protected region's own keys are under: unique for that entity,
