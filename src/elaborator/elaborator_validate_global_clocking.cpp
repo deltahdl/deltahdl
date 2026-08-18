@@ -6,6 +6,8 @@
 // of it to keep both files inside the 1000-line limit
 // assert-no-oversized-source-files enforces.
 
+#include <vector>
+
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/global_clocking_sampled_value.h"
@@ -225,6 +227,20 @@ const Expr* FindGclkFunctionRefInItem(const ModuleItem* item,
 
 bool Elaborator::ModuleDeclaresGlobalClocking(const ModuleDecl* decl) {
   return DeclHasGlobalClocking(decl);
+}
+
+const std::vector<EventExpr>* Elaborator::ModuleGlobalClockingEvent(
+    const ModuleDecl* decl) {
+  // §16.5.2: the event a $global_clock leading clocking event stands for. A
+  // declaration whose clocking event is absent names no event to stand for, so
+  // it is passed over as though the module declared no global clocking.
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kClockingBlock &&
+        item->is_global_clocking && !item->clocking_event.empty()) {
+      return &item->clocking_event;
+    }
+  }
+  return nullptr;
 }
 
 void Elaborator::ValidateGlobalClockReference(const ModuleDecl* decl) {

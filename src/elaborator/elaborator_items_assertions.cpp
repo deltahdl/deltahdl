@@ -7,6 +7,7 @@
 #include "elaborator/concurrent_assertion_expr.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
@@ -155,6 +156,16 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
   if (IsStaticDeferredAssertion(item)) {
     AddProcess(RtlirProcessKind::kAlwaysComb, item, mod, kEnv);
     return;
+  }
+  // §16.5.2: `assert property(@$global_clock a);` under a
+  // `global clocking @clk; endclocking` declaration is logically equivalent to
+  // `assert property(@clk a);`, so the assertion's leading clocking event is
+  // the event that declaration names. The rewrite runs before the process is
+  // built so the clock the process waits on, and the §9.2.2.4 checks the
+  // process is held to, both see the event that was substituted in.
+  if (module_global_clocking_event_ != nullptr) {
+    SubstituteGlobalClockLeadingEvent(item->sensitivity,
+                                      *module_global_clocking_event_);
   }
   // §16.14.5: a static concurrent assertion outside procedural code uses
   // `always` semantics. The parser captures the simple clocked boolean form as

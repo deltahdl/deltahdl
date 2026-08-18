@@ -911,8 +911,17 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   global_clocking_in_scope_ =
       saved_global_clocking_in_scope || ModuleDeclaresGlobalClocking(decl);
 
+  // §16.5.2: a concurrent assertion in this cell whose leading clocking event
+  // is $global_clock is clocked by the event this cell's own global clocking
+  // declaration names. The event is set here rather than inherited from the
+  // chain above, because it names a signal of the scope that declares it.
+  const std::vector<EventExpr>* saved_global_clocking_event =
+      module_global_clocking_event_;
+  module_global_clocking_event_ = ModuleGlobalClockingEvent(decl);
+
   ElaborateItems(decl, mod);
   ResolveExplicitPortTypes(decl, mod);
+  module_global_clocking_event_ = saved_global_clocking_event;
   global_clocking_in_scope_ = saved_global_clocking_in_scope;
   current_library_ = std::move(saved_library);
   enclosing_scope_names_ = std::move(saved_enclosing);

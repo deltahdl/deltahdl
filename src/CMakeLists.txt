@@ -120,6 +120,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/command_line_bind.cpp
     elaborator/overridden_sample_method.cpp
     elaborator/global_clocking_sampled_value.cpp
+    elaborator/global_clock_assertion_event.cpp
     elaborator/concurrent_assert_action.cpp
     elaborator/abort_property.cpp
     elaborator/typed_sequence_formal.cpp

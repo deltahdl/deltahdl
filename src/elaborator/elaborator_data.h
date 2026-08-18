@@ -273,6 +273,16 @@ class ElaboratorData {
   // ElaborateModule call so it tracks the ancestor chain of the current cell.
   bool global_clocking_in_scope_ = false;
 
+  // §16.5.2: the clocking event of the global clocking declaration of the
+  // module being elaborated, or null when it declares none. A concurrent
+  // assertion whose leading clocking event is $global_clock is rewritten to
+  // this event, which is what makes `assert property(@$global_clock a);`
+  // equivalent to `assert property(@clk a);`. This holds the current cell's own
+  // declaration only, unlike global_clocking_in_scope_ above: the event names a
+  // signal of the scope that declares it, so an ancestor's event cannot be
+  // written into a descendant without resolving that name there first.
+  const std::vector<EventExpr>* module_global_clocking_event_ = nullptr;
+
   // §27.5 selects a conditional generate's block "based on constant
   // expressions evaluated during elaboration", and this elaborator evaluates
   // that expression in Elaborator::ResolveDefparamsAndGenerates, after
