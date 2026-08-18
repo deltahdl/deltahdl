@@ -289,41 +289,6 @@ static bool SetupSelectNbaCallback(const NbaWrite& write, const Expr* lhs,
   return true;
 }
 
-// §7.8.7 / §11.4.2: a nonblocking assignment whose target is an associative
-// array element writes that element when the update event runs, allocating it
-// then. Returns false when the target is not such an element, and true without
-// scheduling when the index is invalid, which §7.8.6 makes a no-op rather than
-// an allocation.
-static bool ScheduleAssocElementNba(const Expr* lhs, const Logic4Vec& rhs_val,
-                                    uint64_t delay_ticks, SimContext& ctx,
-                                    Arena& arena) {
-  if (!lhs->base || lhs->base->kind != ExprKind::kIdentifier) return false;
-  if (!lhs->index || lhs->index_end) return false;
-  auto* aa = ctx.FindAssocArray(lhs->base->text);
-  if (!aa) return false;
-  auto idx = EvalExpr(lhs->index, ctx, arena);
-  if (!aa->is_string_key && HasUnknownBits(idx)) {
-    ctx.GetDiag().Warning(lhs->index->range.start,
-                          "associative array index contains x/z",
-                          Subclause("7.8.6"));
-    return true;
-  }
-  auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-  event->kind = EventKind::kUpdate;
-  if (aa->is_string_key) {
-    auto key = AssocStringKey(idx);
-    event->callback = [aa, key, rhs_val]() { aa->str_data[key] = rhs_val; };
-  } else {
-    auto key =
-        AssocIntKey(idx, aa->is_wildcard, aa->index_width, aa->is_index_signed);
-    event->callback = [aa, key, rhs_val]() { aa->int_data[key] = rhs_val; };
-  }
-  auto region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
-  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime() + SimTime{delay_ticks},
-                                   region, event);
-  return true;
-}
-
 void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
                                uint64_t delay_ticks, SimContext& ctx,
                                Arena& arena) {
@@ -335,9 +300,6 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
   }
 
   bool is_select = (stmt->lhs->kind == ExprKind::kSelect);
-  if (is_select &&
-      ScheduleAssocElementNba(stmt->lhs, rhs_val, delay_ticks, ctx, arena))
-    return;
   auto* elem = is_select ? TryResolveArrayElement(stmt->lhs, ctx) : nullptr;
   auto* var = elem ? elem : ResolveLhsVariable(stmt->lhs, ctx);
   if (!var) return;

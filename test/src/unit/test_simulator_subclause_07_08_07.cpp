@@ -428,53 +428,6 @@ TEST(AssocArrayAllocation, PartSelectWriteToExistingElementKeepsItsOtherBits) {
   EXPECT_EQ(v, 0xFF0Au);
 }
 
-// §7.8.7: a nonblocking assignment's target is an element of the array, so the
-// update allocates it there rather than writing past it.
-TEST(AssocArrayAllocation, NonblockingAssignAllocatesElement) {
-  auto v = RunAndGet(
-      "module t;\n"
-      "  int aa[int];\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    aa[5] <= 7;\n"
-      "    #1;\n"
-      "    result = aa[5];\n"
-      "  end\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(v, 7u);
-}
-
-TEST(AssocArrayAllocation, NonblockingAssignAllocatesExactlyOneEntry) {
-  auto v = RunAndGet(
-      "module t;\n"
-      "  int aa[int];\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    aa[5] <= 7;\n"
-      "    #1;\n"
-      "    result = aa.num();\n"
-      "  end\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(v, 1u);
-}
-
-TEST(AssocArrayAllocation, NonblockingAssignAllocatesStringKeyedElement) {
-  auto v = RunAndGet(
-      "module t;\n"
-      "  int aa[string];\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    aa[\"k\"] <= 4;\n"
-      "    #1;\n"
-      "    result = aa[\"k\"];\n"
-      "  end\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(v, 4u);
-}
-
 // §7.8.7 allocates a referenced element with the array's user-specified initial
 // value. The task reads its formal without writing it, so the value observed is
 // the one the entry was allocated holding rather than one a later read of the
