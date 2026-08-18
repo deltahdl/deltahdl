@@ -560,20 +560,50 @@ bool DeclaresSharedAnonymousProgramName(const ModuleItem* item) {
   }
 }
 
-void CheckAnonymousProgramScope(const std::vector<ModuleItem*>& items,
-                                DiagEngine& diag) {
-  std::unordered_map<std::string_view, const ModuleItem*> seen;
+// §24.6: one declaration judged against the shared name space -- the name it
+// declares, where it stands, and whether an anonymous program declared it.
+// Two lists hold the declarations of one compilation-unit scope, so a
+// declaration is carried here rather than compared where it is stored.
+struct SharedNameDecl {
+  std::string_view name;
+  SourceLoc loc;
+  bool from_anonymous_program;
+};
+
+// Which of two declarations the source writes first. The collision is reported
+// at the later one, so the report stands at the declaration that could not be
+// made rather than at the one it collided with.
+bool DeclaredBefore(const SharedNameDecl& a, const SharedNameDecl& b) {
+  if (a.loc.file_id != b.loc.file_id) return a.loc.file_id < b.loc.file_id;
+  if (a.loc.line != b.loc.line) return a.loc.line < b.loc.line;
+  return a.loc.column < b.loc.column;
+}
+
+std::vector<SharedNameDecl> SharedNameDecls(
+    const std::vector<ModuleItem*>& items) {
+  std::vector<SharedNameDecl> out;
   for (const auto* item : items) {
     if (item->name.empty()) continue;
     if (!DeclaresSharedAnonymousProgramName(item)) continue;
-    auto [it, inserted] = seen.try_emplace(item->name, item);
+    out.push_back({item->name, item->loc, item->from_anonymous_program});
+  }
+  return out;
+}
+
+void CheckAnonymousProgramScope(std::vector<SharedNameDecl> decls,
+                                DiagEngine& diag) {
+  std::sort(decls.begin(), decls.end(), DeclaredBefore);
+  std::unordered_map<std::string_view, bool> seen;
+  for (const auto& decl : decls) {
+    auto [it, inserted] =
+        seen.try_emplace(decl.name, decl.from_anonymous_program);
     if (inserted) continue;
-    if (item->from_anonymous_program || it->second->from_anonymous_program) {
-      diag.Error(item->loc,
+    if (decl.from_anonymous_program || it->second) {
+      diag.Error(decl.loc,
                  std::format(
                      "'{}' declared in anonymous program collides with name in "
                      "surrounding package or compilation-unit scope",
-                     item->name),
+                     decl.name),
                  Subclause("24.6"));
     }
   }
@@ -582,9 +612,20 @@ void CheckAnonymousProgramScope(const std::vector<ModuleItem*>& items,
 }  // namespace
 
 void Elaborator::ValidateAnonymousProgramNameSharing() {
-  CheckAnonymousProgramScope(unit_->cu_items, diag_);
+  // §24.6: the name space an anonymous program shares is the whole of the
+  // surrounding scope, not the part of it one list happens to hold. A class
+  // written at compilation-unit scope is kept in CompilationUnit::classes while
+  // everything else is kept among its items, so the two are judged together;
+  // a class written inside an anonymous program goes to the items and appears
+  // once.
+  std::vector<SharedNameDecl> cu = SharedNameDecls(unit_->cu_items);
+  for (const auto* cls : unit_->classes) {
+    if (cls->name.empty()) continue;
+    cu.push_back({cls->name, cls->range.start, false});
+  }
+  CheckAnonymousProgramScope(std::move(cu), diag_);
   for (const auto* pkg : unit_->packages) {
-    CheckAnonymousProgramScope(pkg->items, diag_);
+    CheckAnonymousProgramScope(SharedNameDecls(pkg->items), diag_);
   }
 }
 
