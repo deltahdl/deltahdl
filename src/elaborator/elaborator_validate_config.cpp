@@ -539,15 +539,33 @@ void Elaborator::ValidateConfigParamOverrides() {
 
 namespace {
 
+// §24.6: an item declared in an anonymous program shares the name space of the
+// package or compilation-unit scope the program stands in, so a name declared
+// there and again outside it is one name declared twice. A.1.11 lists what an
+// anonymous_program_item may be -- a task, a function, a class, an interface
+// class, a covergroup, a class constructor -- and every one of them declares a
+// name into that shared space, so every one of them is compared. Comparing only
+// the subroutines would leave a class or a covergroup unreported by this check
+// and by the §3.13 one below, which passes over an anonymous program's items
+// precisely because this check is what judges them.
+bool DeclaresSharedAnonymousProgramName(const ModuleItem* item) {
+  switch (item->kind) {
+    case ModuleItemKind::kFunctionDecl:
+    case ModuleItemKind::kTaskDecl:
+    case ModuleItemKind::kClassDecl:
+    case ModuleItemKind::kCovergroupDecl:
+      return true;
+    default:
+      return false;
+  }
+}
+
 void CheckAnonymousProgramScope(const std::vector<ModuleItem*>& items,
                                 DiagEngine& diag) {
   std::unordered_map<std::string_view, const ModuleItem*> seen;
   for (const auto* item : items) {
     if (item->name.empty()) continue;
-    if (item->kind != ModuleItemKind::kFunctionDecl &&
-        item->kind != ModuleItemKind::kTaskDecl) {
-      continue;
-    }
+    if (!DeclaresSharedAnonymousProgramName(item)) continue;
     auto [it, inserted] = seen.try_emplace(item->name, item);
     if (inserted) continue;
     if (item->from_anonymous_program || it->second->from_anonymous_program) {

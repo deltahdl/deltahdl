@@ -117,4 +117,89 @@ TEST(AnonymousProgramNameSpaceSharing,
   EXPECT_FALSE(f.has_errors);
 }
 
+// §24.6: a class is one of the items A.1.11 admits into an anonymous program,
+// and it shares the enclosing package's name space like any other. The package
+// declares C first, so the collision stands at the anonymous program's own
+// declaration. A check comparing only the subroutines reports nothing here, and
+// nothing else does either: the §3.13 compilation-unit check passes over an
+// anonymous program's items on the ground that this check judges them.
+TEST(AnonymousProgramNameSpaceSharing,
+     PackageClassAndAnonymousProgramClassSameNameIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pkg;\n"
+      "  class C; endclass\n"
+      "  program;\n"
+      "    class C; endclass\n"
+      "  endprogram\n"
+      "endpackage\n"
+      "module top; endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'C' declared in anonymous program collides with "
+                            "name in surrounding package",
+                            4, "24.6"));
+}
+
+// §24.6: the same for a class at compilation-unit scope, which reaches the
+// check by the other of its two entry points. The anonymous program declares C
+// first here, so the collision stands at the compilation-unit declaration that
+// follows it — the shared name space is shared in both directions.
+TEST(AnonymousProgramNameSpaceSharing,
+     AnonymousProgramClassAndCompilationUnitClassSameNameIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "program;\n"
+      "  class C; endclass\n"
+      "endprogram\n"
+      "class C; endclass\n"
+      "module top; endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'C' declared in anonymous program collides with "
+                            "name in surrounding package",
+                            4, "24.6"));
+}
+
+// §24.6: a covergroup is likewise an anonymous_program_item, and likewise
+// shares the name space. It reaches the check by a different item kind from the
+// class above, so neither case stands for the other.
+TEST(AnonymousProgramNameSpaceSharing,
+     PackageCovergroupAndAnonymousProgramCovergroupSameNameIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pkg;\n"
+      "  covergroup cg; endgroup\n"
+      "  program;\n"
+      "    covergroup cg; endgroup\n"
+      "  endprogram\n"
+      "endpackage\n"
+      "module top; endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'cg' declared in anonymous program collides with "
+                            "name in surrounding package",
+                            4, "24.6"));
+}
+
+// §24.6: what the shared name space forbids is one name declared twice, not a
+// class declared inside an anonymous program at all. Distinct names elaborate,
+// so the cases above report a collision rather than the anonymous program's
+// class itself.
+TEST(AnonymousProgramNameSpaceSharing,
+     DistinctClassNamesAcrossAnonymousProgramAndPackageElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package pkg;\n"
+      "  class Outer; endclass\n"
+      "  program;\n"
+      "    class Inner; endclass\n"
+      "  endprogram\n"
+      "endpackage\n"
+      "module top; endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
