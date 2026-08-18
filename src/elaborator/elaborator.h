@@ -389,13 +389,24 @@ class Elaborator : public ElaboratorOperationRules {
   // the block carries, which §27.6 has already supplied where the source wrote
   // none, and `has_begin_end` says whether the block was written with the
   // `begin` and `end` keywords, which decides whether it is directly nested.
-  // `name_is_generated` says §27.6 assigned `block_name` rather than the
-  // source writing it, which §23.6 makes the difference between a block a
+  // §27.5: one generate block of a conditional generate construct, which the
+  // construct "selects at most one of" and this elaborates. The then-branch,
+  // each case item and the final else are the same entity written three ways,
+  // and ModuleItem and GenerateCaseItem spell its name under different member
+  // names, so the four call sites assemble one of these rather than the node.
+  //
+  // `name_is_generated` says §27.6 assigned `name` rather than the source
+  // writing it, which §23.6 makes the difference between a block a
   // hierarchical name can reach into and one it cannot.
-  void ElaborateConditionalGenerateBlock(std::string_view block_name,
-                                         bool name_is_generated,
-                                         const std::vector<ModuleItem*>& body,
-                                         bool has_begin_end, RtlirModule* mod,
+  struct ConditionalGenerateBlock {
+    std::string_view name;
+    bool name_is_generated = false;
+    const std::vector<ModuleItem*>& body;
+    bool has_begin_end = false;
+  };
+
+  void ElaborateConditionalGenerateBlock(const ConditionalGenerateBlock& block,
+                                         RtlirModule* mod,
                                          const ScopeMap& scope);
 
   // §27.4: a loop generate construct's genvar, once its header has been

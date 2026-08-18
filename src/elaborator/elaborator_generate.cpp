@@ -208,18 +208,17 @@ static bool IsDirectlyNestedBlock(const std::vector<ModuleItem*>& body,
 // declaration of an array of generate block instances", so a conditional
 // generate block contributes its name alone.
 void Elaborator::ElaborateConditionalGenerateBlock(
-    std::string_view block_name, bool name_is_generated,
-    const std::vector<ModuleItem*>& body, bool has_begin_end, RtlirModule* mod,
+    const ConditionalGenerateBlock& block, RtlirModule* mod,
     const ScopeMap& scope) {
-  if (IsDirectlyNestedBlock(body, has_begin_end)) {
-    ElaborateGenerateItems(body, mod, scope);
+  if (IsDirectlyNestedBlock(block.body, block.has_begin_end)) {
+    ElaborateGenerateItems(block.body, mod, scope);
     return;
   }
   std::string saved_prefix = gen_prefix_;
-  gen_prefix_ = std::format("{}{}_", saved_prefix, block_name);
+  gen_prefix_ = std::format("{}{}_", saved_prefix, block.name);
   gen_block_path_.push_back(
-      {name_is_generated ? std::string_view{} : block_name, false, 0});
-  ElaborateGenerateItems(body, mod, scope);
+      {block.name_is_generated ? std::string_view{} : block.name, false, 0});
+  ElaborateGenerateItems(block.body, mod, scope);
   gen_block_path_.pop_back();
   gen_prefix_ = saved_prefix;
 }
@@ -238,9 +237,10 @@ void Elaborator::ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,
     return;
   }
   if (*cond) {
-    ElaborateConditionalGenerateBlock(item->name, item->name_is_generated,
-                                      item->gen_body,
-                                      item->gen_body_has_begin_end, mod, scope);
+    ElaborateConditionalGenerateBlock(
+        {item->name, item->name_is_generated, item->gen_body,
+         item->gen_body_has_begin_end},
+        mod, scope);
     return;
   }
   if (item->gen_else == nullptr) return;
@@ -274,9 +274,9 @@ void Elaborator::ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,
     return;
   }
   ElaborateConditionalGenerateBlock(
-      item->gen_else->name, item->gen_else->name_is_generated,
-      item->gen_else->gen_body, item->gen_else->gen_body_has_begin_end, mod,
-      scope);
+      {item->gen_else->name, item->gen_else->name_is_generated,
+       item->gen_else->gen_body, item->gen_else->gen_body_has_begin_end},
+      mod, scope);
 }
 
 static bool MatchesCasePattern(const std::vector<Expr*>& patterns,
@@ -306,15 +306,17 @@ void Elaborator::ElaborateGenerateCase(ModuleItem* item, RtlirModule* mod,
       continue;
     }
     if (MatchesCasePattern(ci.patterns, *selector, scope)) {
-      ElaborateConditionalGenerateBlock(ci.label, ci.name_is_generated, ci.body,
-                                        ci.has_begin_end, mod, scope);
+      ElaborateConditionalGenerateBlock(
+          {ci.label, ci.name_is_generated, ci.body, ci.has_begin_end}, mod,
+          scope);
       return;
     }
   }
   if (default_item == nullptr) return;
   ElaborateConditionalGenerateBlock(
-      default_item->label, default_item->name_is_generated, default_item->body,
-      default_item->has_begin_end, mod, scope);
+      {default_item->label, default_item->name_is_generated, default_item->body,
+       default_item->has_begin_end},
+      mod, scope);
 }
 
 static bool IsGenerateConstruct(ModuleItemKind k) {
@@ -379,16 +381,27 @@ static void NameGenerateBlocksInScope(const std::vector<ModuleItem*>& items,
   }
 }
 
-// Name one generate block, then walk what it holds. `generated` records
-// whether the §27.6 name was taken, because §23.6 lets a hierarchical name
-// written outside the block reach into it only when the source named it.
-static void NameGenerateBlock(std::string_view& block_name, bool& generated,
+// Where one generate block's name is written, and where the fact that §27.6
+// assigned it rather than the source is recorded beside it. ModuleItem and
+// GenerateCaseItem hold the pair under different member names, so it is passed
+// rather than the node holding it.
+namespace {
+struct GenerateBlockNameSlot {
+  std::string_view& name;
+  bool& is_generated;
+};
+}  // namespace
+
+// Name one generate block, then walk what it holds. The §27.6 name is recorded
+// as assigned, because §23.6 lets a hierarchical name written outside the block
+// reach into it only when the source named it.
+static void NameGenerateBlock(GenerateBlockNameSlot slot,
                               const std::vector<ModuleItem*>& body,
                               bool has_begin_end, std::string_view name,
                               Arena& arena) {
-  if (block_name.empty()) {
-    block_name = name;
-    generated = true;
+  if (slot.name.empty()) {
+    slot.name = name;
+    slot.is_generated = true;
   }
   if (IsDirectlyNestedBlock(body, has_begin_end)) {
     NameConstructBlocks(body[0], name, arena);
@@ -412,10 +425,10 @@ static void NameConstructBlocks(ModuleItem* it, std::string_view name,
     NameGenerateBlocksInScope(it->gen_body, {}, arena);
     return;
   }
-  NameGenerateBlock(it->name, it->name_is_generated, it->gen_body,
+  NameGenerateBlock({it->name, it->name_is_generated}, it->gen_body,
                     it->gen_body_has_begin_end, name, arena);
   for (auto& alt : it->gen_case_items) {
-    NameGenerateBlock(alt.label, alt.name_is_generated, alt.body,
+    NameGenerateBlock({alt.label, alt.name_is_generated}, alt.body,
                       alt.has_begin_end, name, arena);
   }
   if (it->gen_else == nullptr) return;
@@ -423,7 +436,7 @@ static void NameConstructBlocks(ModuleItem* it, std::string_view name,
     NameConstructBlocks(it->gen_else, name, arena);
     return;
   }
-  NameGenerateBlock(it->gen_else->name, it->gen_else->name_is_generated,
+  NameGenerateBlock({it->gen_else->name, it->gen_else->name_is_generated},
                     it->gen_else->gen_body,
                     it->gen_else->gen_body_has_begin_end, name, arena);
 }

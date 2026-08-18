@@ -101,4 +101,19 @@ TEST(HierarchicalNameParsing, HierarchicalReferenceWithInstanceSelect) {
               "endmodule\n"));
 }
 
+// §23.6 Syntax 23-7: `hierarchical_identifier ::= [ $root . ]
+// { identifier constant_bit_select . } identifier`, so an instance select may
+// be followed by as many members as the name has. One member after a select
+// parsed already, which is what HierarchicalReferenceWithInstanceSelect above
+// covers and why it could not fail for this: the parser read exactly one and
+// stopped, leaving the rest of the name behind.
+TEST(HierarchicalNameParsing, InstanceSelectFollowedByMoreThanOneMember) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    $display(\"%0d\", arr[3].sub.sig);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

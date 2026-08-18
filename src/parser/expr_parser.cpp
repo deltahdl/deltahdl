@@ -658,7 +658,13 @@ Expr* Parser::ParseIdentifierPostfixChain(Expr* result) {
     } else {
       result = ParseSelectExpr(result);
     }
-    if (Check(TokenKind::kDot) || Check(TokenKind::kColonColon)) {
+    // §23.6 Syntax 23-7 gives a hierarchical name as
+    // `{ identifier constant_bit_select . } identifier`, so any number of
+    // members may follow a select and not just one. Taking a single member
+    // left the rest of the name unread: `a[0].b` parsed and `a[0].b.c` stopped
+    // at the second period, which is why `defparam b[0].u.P = 99;` was
+    // reported as a defparam missing its `=`.
+    while (Check(TokenKind::kDot) || Check(TokenKind::kColonColon)) {
       result = MakeMemberAccess(result);
     }
   }
