@@ -19,13 +19,13 @@ Create seven jobs with `CronCreate`, exactly as listed below. Use `recurring: tr
 
 Neither form takes a number. If the user gave neither `subclauses` nor `sequence`, ask which form they want before creating anything.
 
-`start subclauses` solves whatever issue `next_subclause` names and nothing else. Matching is on the canonical `Satisfy IEEE 1800-2023 §<subclause>` title, so the issues the work files for itself are outside this form by construction; `start sequence` is the form that takes those. Each form selects one set, and a form reaching into the other's would make the choice between them mean nothing.
+`start subclauses` solves the issue `next_subclause` names. Where a defect this work files while solving that issue stops it from closing, the form solves the filed issue first and returns to the subclause. It leaves every other issue the work files, and `start sequence` is the form that takes those. Matching is on the canonical `Satisfy IEEE 1800-2023 §<subclause>` title, so those issues are outside this form by construction, and the one exception is bounded by the subclause in hand rather than by an issue number.
 
 `start sequence` takes every open issue above 2939, in the order `docs/claude/issue-blocked-by-sequence.md` records. 2939 belongs to this form alone: it is the boundary that defines the sequence, and it is not a floor the other form could apply.
 
 | Form | Cron | Prompt |
 | --- | --- | --- |
-| `start subclauses` | `1,11,21,31,41,51 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. Run PYTHONPATH=.:scripts python3 -m next_subclause for the subclause in force and the issue tracking it; solve that issue whatever its number, and when it closes the same command names the next. The issues it does not name are out of scope; file what this work turns up rather than taking it.` |
+| `start subclauses` | `1,11,21,31,41,51 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. Run PYTHONPATH=.:scripts python3 -m next_subclause for the subclause in force and the issue tracking it; solve that issue whatever its number, and when it closes the same command names the next. Where a defect you file while solving that issue stops it from closing, solve what you filed first and then return to the subclause. File and leave everything else: the open issues the command does not name are not this form's work.` |
 | `start sequence` | `1,11,21,31,41,51 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. Run the sequence walk in docs/claude/issue-blocked-by-sequence.md and solve the single open issue it reports as the head. When that issue closes, run the walk again for the next one.` |
 
 ### The six reminders both forms carry
@@ -62,6 +62,8 @@ Call `CronList`, then call `CronDelete` once per job it returns — all of them,
 Cron jobs fire only while the session is idle, never mid-turn, because a turn cannot be preempted. That limit is the reason this skill does not try to correct drift in the middle of a task: what it can do is restart a loop that has stalled, which is the failure it is there to catch.
 
 Neither form takes an issue number, and `start subclauses` used to. The number was a floor over the issues `next_subclause` cannot name, which put part of the sequence form's set into the subclauses form's reminder and left the caller to choose how much. Two forms are worth having only where each selects one set, so the floor went rather than acquiring a fixed value. 2939 is not that value: it is the boundary defining the sequence, and applying it here would have put the whole of the sequence in scope, which is the loosest choice the argument ever offered.
+
+The one issue the subclauses form takes beyond the subclause is bounded by that subclause and not by a number: a defect filed while solving it that stops it from closing. State such a bound by what the work in hand needs. A bound stated as a number selects issues by when they were filed, which says nothing about whether the subclause can close without them, and every wording of it read as an instruction to work the backlog.
 
 `start sequence` exists because the subclause resolver cannot reach the issues above 2939. `issue_title_for` in `lib/python/github/__init__.py` builds `Satisfy IEEE 1800-2023 §<subclause>`, and `next_subclause` looks issues up by that string alone. The issues the work files for itself are titled by the defect they describe, so no run of the command will ever name one, whatever the campaign does next. `docs/claude/issue-blocked-by-sequence.md` holds the order that does reach them: every open issue above 2939 sits in one linear sequence, exactly one is blocked by nothing open, and that one is what gets worked next.
 
