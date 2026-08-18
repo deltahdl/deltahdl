@@ -867,6 +867,12 @@ TEST(GenerateBlockScope,
 // The direction the scope test must not lose. §23.9 has an identifier "declared
 // locally" name the local item, so a defparam written inside block 'a' does
 // name block 'a''s P, and c.S takes its characters.
+//
+// The instance stands in block 'a' beside the defparam and the localparam.
+// §23.10.1 writes a defparam's target as a hierarchical path, and the path is
+// what this case is not about: with the instance left at module level the
+// defparam does not reach it from inside the block at all, so the case would
+// report nothing about which P the right-hand side named.
 TEST(GenerateBlockScope,
      StringParameterOfAGenerateBlockStillReadsInsideThatBlock) {
   ElabFixture f;
@@ -874,10 +880,10 @@ TEST(GenerateBlockScope,
       "module child #(parameter string S = \"zz\")();\n"
       "endmodule\n"
       "module top;\n"
-      "  child c();\n"
       "  generate\n"
       "    if (1) begin : a\n"
       "      localparam string P = \"abcd\";\n"
+      "      child c();\n"
       "      defparam c.S = P;\n"
       "    end\n"
       "  endgenerate\n"
