@@ -49,7 +49,7 @@ For `start sequence`, run the walk in [issue-blocked-by-sequence](../../../docs/
 
 Either way, say that seven reminders are running and give the two limits that come with them — the jobs live in this session only and are gone when it ends, and recurring jobs auto-expire after seven days.
 
-Do not begin working the issues as part of starting the reminders. Starting autopilot and doing the work are separate; the first reminder will arrive within ten minutes and start the loop, unless the user asks to begin straight away.
+Then start the first iteration in the same turn, without waiting for a reminder to arrive. Take the issue the selector just named and begin solving it under the seven prompts listed above. The one case that stops here is the case the report already names: a selector with nothing to take, or a sequence reporting anything but one head, where no jobs were created either.
 
 ## Stop
 
@@ -60,6 +60,8 @@ Call `CronList`, then call `CronDelete` once per job it returns — all of them,
 ## Notes
 
 Cron jobs fire only while the session is idle, never mid-turn, because a turn cannot be preempted. That limit is the reason this skill does not try to correct drift in the middle of a task: what it can do is restart a loop that has stalled, which is the failure it is there to catch.
+
+Starting the reminders starts the work, in the same turn. It used to end the turn instead and leave the first iteration to the first firing, which spent up to ten minutes on an idle session and needed nothing that was not in context already: this file lists all seven prompts, and invoking the skill is what reads them in. A reminder restarts a loop that has stalled, so until a first iteration has run there is no loop for one to restart.
 
 Neither form takes an issue number, and `start subclauses` used to. The number was a floor over the issues `next_subclause` cannot name, which put part of the sequence form's set into the subclauses form's reminder and left the caller to choose how much. Two forms are worth having only where each selects one set, so the floor went rather than acquiring a fixed value. 2939 is not that value: it is the boundary defining the sequence, and applying it here would have put the whole of the sequence in scope, which is the loosest choice the argument ever offered.
 
