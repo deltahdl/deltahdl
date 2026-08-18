@@ -13,6 +13,7 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/queue_bound.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
@@ -455,17 +456,10 @@ bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
   auto sz = static_cast<int64_t>(q->elements.size());
 
   if (idx == sz) {
-    bool has_room = (q->max_size < 0) ||
-                    (static_cast<int32_t>(q->elements.size()) < q->max_size);
-    if (has_room) {
-      q->elements.push_back(rhs_val);
-      q->element_ids.push_back(q->AllocateId());
-      ++q->generation;
-    } else {
-      ctx.GetDiag().Warning(lhs->range.start,
-                            "bounded queue overflow in indexed write",
-                            Subclause("7.10.5"));
-    }
+    q->elements.push_back(rhs_val);
+    q->element_ids.push_back(q->AllocateId());
+    ++q->generation;
+    EnforceQueueBound(q, "indexed write", lhs->range.start, ctx);
     return true;
   }
   if (idx >= 0 && idx < sz) {
@@ -660,19 +654,15 @@ bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     q->elements.resize(static_cast<size_t>(sz),
                        MakeLogic4VecVal(arena, q->elem_width, 0));
     CopyNewInit(stmt->rhs, q, saved, ctx);
+    EnforceQueueBound(q, "new[]", stmt->rhs->range.start, ctx);
     q->AssignFreshIds();
     ++q->generation;
     return true;
   }
   std::vector<Logic4Vec> elems;
   CollectQueueElements(stmt->rhs, ctx, arena, elems);
-  if (q->max_size > 0 && static_cast<int32_t>(elems.size()) > q->max_size) {
-    elems.resize(static_cast<size_t>(q->max_size));
-    ctx.GetDiag().Warning(stmt->rhs->range.start,
-                          "bounded queue overflow in assignment",
-                          Subclause("7.10.5"));
-  }
   q->elements = std::move(elems);
+  EnforceQueueBound(q, "assignment", stmt->rhs->range.start, ctx);
   q->AssignFreshIds();
   ++q->generation;
   return true;

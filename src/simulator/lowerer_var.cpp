@@ -13,6 +13,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/lowerer_register.h"
+#include "simulator/queue_bound.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
@@ -309,6 +310,7 @@ static bool LowerDynArrayNewInit(const Expr* init_expr, QueueObject* q,
       }
     }
   }
+  EnforceQueueBound(q, "new[]", init_expr->range.start, ctx);
   q->AssignFreshIds();
   return true;
 }
@@ -329,6 +331,8 @@ void Lowerer::LowerDynArrayInit(QueueObject* q, const RtlirVariable& var) {
   for (auto* elem : var.init_expr->elements) {
     q->elements.push_back(EvalExpr(elem, ctx_, arena_));
   }
+  EnforceQueueBound(q, "declaration initializer", var.init_expr->range.start,
+                    ctx_);
   // Every element carries an id, and the two lists are indexed together, so
   // they have to be the same length however the elements arrived. Leaving the
   // ids empty here made an initialized queue's first insert at a nonzero index

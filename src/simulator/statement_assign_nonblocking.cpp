@@ -16,6 +16,7 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
+#include "simulator/queue_bound.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
@@ -140,10 +141,12 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     auto* event = ctx.GetScheduler().GetEventPool().Acquire();
 
     event->kind = EventKind::kUpdate;
-    event->callback = [q, elems = std::move(elems)]() {
+    event->callback = [q, &ctx, loc = stmt->rhs->range.start,
+                       elems = std::move(elems)]() {
       q->elements = elems;
       q->element_ids.clear();
       ++q->generation;
+      EnforceQueueBound(q, "nonblocking assignment", loc, ctx);
     };
     ctx.GetScheduler().ScheduleEvent(slot.time, slot.region, event);
   }

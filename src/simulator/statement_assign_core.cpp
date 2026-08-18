@@ -15,6 +15,7 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
+#include "simulator/queue_bound.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
@@ -672,6 +673,7 @@ static bool TryStreamingConcatToQueueTarget(const Stmt* stmt, SimContext& ctx,
   Logic4Vec widened = RightPadStreamToWidth(stream, stream_w, total_w, arena);
   PopulateQueueFromWidenedStream(
       queue, WidenedStreamLayout{widened, n_elems, total_w, elem_w}, arena);
+  EnforceQueueBound(queue, "streaming assignment", stmt->rhs->range.start, ctx);
   return true;
 }
 

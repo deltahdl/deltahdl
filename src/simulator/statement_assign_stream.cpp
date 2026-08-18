@@ -9,6 +9,7 @@
 #include "common/diagnostic.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
+#include "simulator/queue_bound.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
@@ -653,10 +654,23 @@ static void WriteStreamElement(const StreamElemInfo& ei, const StreamView& src,
                                                src.total_width, env.arena));
 }
 
+// §7.10.5: an unpack grows a queue target to the slots its with-range names or
+// to the elements the leftover bits fill, and the bound applies to what the
+// whole unpack leaves behind rather than to each element as it arrives. Every
+// queue the target list names is therefore trimmed once the unpack has run.
+static void EnforceQueueTargetBounds(const Expr* lhs, SimContext& ctx) {
+  for (const auto* elem : lhs->elements) {
+    if (!elem || elem->kind != ExprKind::kIdentifier) continue;
+    if (auto* queue = ctx.FindQueue(elem->text))
+      EnforceQueueBound(queue, "streaming assignment", elem->range.start, ctx);
+  }
+}
+
 void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
                               SimContext& ctx, Arena& arena) {
   if (ShouldForwardResolveUnpack(lhs, ctx)) {
     UnpackStreamingConcatLhsForward(lhs, rhs_val, ctx, arena);
+    EnforceQueueTargetBounds(lhs, ctx);
     return;
   }
   std::vector<StreamElemInfo> elems;
@@ -684,6 +698,7 @@ void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
     bit_offset -= ei.width;
     WriteStreamElement(ei, src, bit_offset, StreamEnv{ctx, arena});
   }
+  EnforceQueueTargetBounds(lhs, ctx);
 }
 
 }  // namespace delta

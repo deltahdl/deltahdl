@@ -8,6 +8,7 @@
 #include "parser/ast.h"
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
+#include "simulator/queue_bound.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
 
@@ -62,17 +63,10 @@ static bool DispatchQueueEval(std::string_view method, QueueObject* q,
 static void QueuePushBack(QueueObject* q, const Expr* expr, SimContext& ctx,
                           Arena& arena) {
   auto val = EvalExpr(expr->args[0], ctx, arena);
-  bool has_room = (q->max_size < 0) ||
-                  (static_cast<int32_t>(q->elements.size()) < q->max_size);
-  if (has_room) {
-    q->elements.push_back(val);
-    q->element_ids.push_back(q->AllocateId());
-    ++q->generation;
-  } else {
-    ctx.GetDiag().Warning(expr->range.start,
-                          "bounded queue overflow in push_back",
-                          Subclause("7.10.5"));
-  }
+  q->elements.push_back(val);
+  q->element_ids.push_back(q->AllocateId());
+  ++q->generation;
+  EnforceQueueBound(q, "push_back", expr->range.start, ctx);
 }
 
 static void QueuePushFront(QueueObject* q, const Expr* expr, SimContext& ctx,
@@ -80,14 +74,7 @@ static void QueuePushFront(QueueObject* q, const Expr* expr, SimContext& ctx,
   auto val = EvalExpr(expr->args[0], ctx, arena);
   q->elements.insert(q->elements.begin(), val);
   q->element_ids.insert(q->element_ids.begin(), q->AllocateId());
-  if (q->max_size > 0 &&
-      static_cast<int32_t>(q->elements.size()) > q->max_size) {
-    q->elements.pop_back();
-    q->element_ids.pop_back();
-    ctx.GetDiag().Warning(expr->range.start,
-                          "bounded queue overflow in push_front",
-                          Subclause("7.10.5"));
-  }
+  EnforceQueueBound(q, "push_front", expr->range.start, ctx);
   ++q->generation;
 }
 
@@ -103,14 +90,7 @@ static void QueueInsertAt(QueueObject* q, const Expr* expr, SimContext& ctx,
     q->elements.insert(q->elements.begin() + static_cast<ptrdiff_t>(idx), val);
     q->element_ids.insert(q->element_ids.begin() + static_cast<ptrdiff_t>(idx),
                           q->AllocateId());
-    if (q->max_size > 0 &&
-        static_cast<int32_t>(q->elements.size()) > q->max_size) {
-      q->elements.pop_back();
-      q->element_ids.pop_back();
-      ctx.GetDiag().Warning(expr->range.start,
-                            "bounded queue overflow in insert",
-                            Subclause("7.10.5"));
-    }
+    EnforceQueueBound(q, "insert", expr->range.start, ctx);
     ++q->generation;
   }
 }
