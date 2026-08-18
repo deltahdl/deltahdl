@@ -494,6 +494,10 @@ static std::optional<std::string> StringParamChars(const Expr* expr) {
   if (mod == nullptr) return std::nullopt;
   for (const auto& param : mod->params) {
     if (param.name != expr->text) continue;
+    // §23.9: RegisteredModule() names a module and nothing about where inside
+    // it this reference stands, so only the module's own parameters can be what
+    // the identifier names.
+    if (!ParamVisibleFromScopes(param.gen_block_prefix, {})) continue;
     if (!param.is_string_value) return std::nullopt;
     return std::string(param.resolved_string);
   }

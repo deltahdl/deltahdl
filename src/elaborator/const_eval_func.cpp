@@ -63,6 +63,11 @@ std::optional<PackedRange> RegisteredParamRange(std::string_view name) {
   if (!g_param_range_module) return std::nullopt;
   for (const auto& pd : g_param_range_module->params) {
     if (pd.name != name) continue;
+    // §23.9: the registry names a module and nothing about where inside it the
+    // select stands, so only the module's own parameters are ones this name can
+    // be naming. A generate block's parameter is addressed over the range that
+    // block declared it with and reached through the block, not from here.
+    if (!ParamVisibleFromScopes(pd.gen_block_prefix, {})) continue;
     if (!pd.has_decl_range_bounds) return std::nullopt;
     return PackedRange{pd.decl_range_left, pd.decl_range_right};
   }

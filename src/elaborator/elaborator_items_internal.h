@@ -57,21 +57,6 @@ bool IsConditionalGenerateConstruct(ModuleItemKind k);
 bool IsDirectlyNestedBlock(const std::vector<ModuleItem*>& body,
                            bool has_begin_end);
 
-// §23.9: whether a parameter declared under `decl_prefix` -- the generate block
-// prefix in force where it was written, which RtlirParamDecl::gen_block_prefix
-// holds -- is visible to a reference standing in the generate blocks `scopes`.
-// §23.9 lists "Generate blocks" among the elements that "define a new scope",
-// and rules that an identifier "referenced directly (without a hierarchical
-// path)" is declared "locally or within a module, interface, program, checker,
-// task, function, named block, or generate block that is higher in the same
-// branch of the name tree", so a block's parameter reaches that block and the
-// blocks nested inside it and nothing else. A parameter of the module itself
-// carries an empty prefix and is visible throughout the module. `scopes` holds
-// the prefixes in force at the reference, outermost first, and is empty for a
-// reference among a module's own items. Defined in elaborator_items.cpp.
-bool ParamVisibleFromScopes(std::string_view decl_prefix,
-                            const std::vector<std::string_view>& scopes);
-
 // §6.20.5: specify parameters declared inside a specify block are named
 // constants of the enclosing module, exactly like specparams in the main module
 // body. Registers each ordinary specparam of the given specify-block item as a

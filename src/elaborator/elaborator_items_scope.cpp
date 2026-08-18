@@ -4,7 +4,6 @@
 
 #include "common/arena.h"
 #include "elaborator/elaborator.h"
-#include "elaborator/elaborator_items_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -44,7 +43,13 @@ ScopeMap Elaborator::BuildParamScope(
 bool Elaborator::RefersToUnboundedParam(const RtlirModule* mod,
                                         std::string_view name) const {
   for (const auto& p : mod->params) {
-    if (p.is_unbounded && p.name == name) return true;
+    if (!p.is_unbounded || p.name != name) continue;
+    // §23.9: an unbounded parameter a generate block declares is not what a
+    // reference outside that block names, so it must not make the parameter
+    // that reference initialises unbounded in its turn.
+    if (ParamVisibleFromScopes(p.gen_block_prefix, gen_prefix_scopes_)) {
+      return true;
+    }
   }
   return false;
 }

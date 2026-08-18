@@ -212,6 +212,31 @@ using GenBlockConsts = std::vector<std::pair<std::string_view, int64_t>>;
 // split back into the steps that search needs.
 using GenBlockPrefixes = std::vector<std::string_view>;
 
+// §23.9: whether a parameter declared under `decl_prefix` -- the generate block
+// prefix in force where it was written, which RtlirParamDecl::gen_block_prefix
+// holds -- is visible to a reference standing in the generate blocks `scopes`.
+// §23.9 lists "Generate blocks" among the elements that "define a new scope",
+// and rules that an identifier "referenced directly (without a hierarchical
+// path)" is declared "locally or within a module, interface, program, checker,
+// task, function, named block, or generate block that is higher in the same
+// branch of the name tree", so a block's parameter reaches that block and the
+// blocks nested inside it and nothing else. A parameter of the module itself
+// carries an empty prefix and is visible throughout the module.
+//
+// `scopes` holds the prefixes in force at the reference, outermost first. Pass
+// an empty list where the reference has no position inside the module to speak
+// of -- a reader answering about another module, or one reached through
+// RegisteredModule(), which names a module and nothing about where inside it an
+// expression stands -- which admits the module's own parameters alone.
+inline bool ParamVisibleFromScopes(std::string_view decl_prefix,
+                                   const GenBlockPrefixes& scopes) {
+  if (decl_prefix.empty()) return true;
+  for (std::string_view scope : scopes) {
+    if (scope == decl_prefix) return true;
+  }
+  return false;
+}
+
 // §23.6: one step of a hierarchical path name, which Syntax 23-7 writes as
 // `identifier constant_bit_select`. §23.6 forms such a name "by concatenating
 // the names of the modules, module instance names, generate blocks, tasks,

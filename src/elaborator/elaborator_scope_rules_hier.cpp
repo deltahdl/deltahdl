@@ -186,6 +186,21 @@ bool ModuleDeclaresMember(const RtlirModule* m, std::string_view name) {
   auto ptr_name = [](const auto* d) {
     return d ? d->name : std::string_view{};
   };
+  // §23.6 forms a hierarchical name "by concatenating the names of the modules,
+  // module instance names, generate blocks ... that contain it", so a parameter
+  // a generate block of `m` declares is named through that block and not by
+  // `inst.name`. This is asked of the parameters and of nothing else in the
+  // chain below because RtlirNet::name and RtlirVariable::name carry the prefix
+  // Elaborator::ScopedName added, so a block's net is already stored under a
+  // name no bare identifier matches, while RtlirParamDecl::name is bare
+  // whatever scope declared it.
+  auto declares_module_level_param = [&] {
+    for (const auto& p : m->params) {
+      if (p.name != name) continue;
+      if (ParamVisibleFromScopes(p.gen_block_prefix, {})) return true;
+    }
+    return false;
+  };
   return RangeHasName(
              m->ports, [](const RtlirPort& p) { return p.name; }, name) ||
          RangeHasName(
@@ -193,8 +208,7 @@ bool ModuleDeclaresMember(const RtlirModule* m, std::string_view name) {
          RangeHasName(
              m->variables, [](const RtlirVariable& v) { return v.name; },
              name) ||
-         RangeHasName(
-             m->params, [](const RtlirParamDecl& p) { return p.name; }, name) ||
+         declares_module_level_param() ||
          RangeHasName(m->function_decls, ptr_name, name) ||
          RangeHasName(m->let_decls, ptr_name, name) ||
          RangeHasName(m->sequence_decls, ptr_name, name) ||
