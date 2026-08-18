@@ -47,6 +47,19 @@ void RunRefOpThenWrite(SimFixture& f, std::vector<Stmt*> op_stmts,
   EvalExpr(call, f.ctx, f.arena);
 }
 
+// `q.<name>`, the parenthesis-less spelling of an array manipulation method
+// call that §7.12's Syntax 7-5 allows by making the argument list optional.
+// This is the spelling the simulator serves the ordering methods of a queue
+// through; #3236 tracks the parenthesized one, which reaches nothing.
+Expr* MakeMemberAccess(Arena& arena, std::string_view obj,
+                       std::string_view field) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kMemberAccess;
+  e->lhs = MakeId(arena, obj);
+  e->rhs = MakeId(arena, field);
+  return e;
+}
+
 // `q[lo:hi]`, the right-hand side of the §7.10.4 assignment forms that shorten
 // a queue.
 Expr* MakeSlice(Arena& arena, std::string_view name, Expr* lo, Expr* hi) {
@@ -373,7 +386,7 @@ TEST(QueueRefPersistence, SortLeavesRefFollowingItsElement) {
   auto* q = MakeQueue(f, "q", {30, 10, 20});
 
   RunRefOpThenWrite(
-      f, {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "sort", {}))},
+      f, {MakeExprStmt(f.arena, MakeMemberAccess(f.arena, "q", "sort"))},
       MakeSelect(f.arena, "q", 0));
 
   ASSERT_EQ(q->elements.size(), 3u);
@@ -389,7 +402,7 @@ TEST(QueueRefPersistence, RsortLeavesRefFollowingItsElement) {
   auto* q = MakeQueue(f, "q", {10, 30, 20});
 
   RunRefOpThenWrite(
-      f, {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "rsort", {}))},
+      f, {MakeExprStmt(f.arena, MakeMemberAccess(f.arena, "q", "rsort"))},
       MakeSelect(f.arena, "q", 0));
 
   ASSERT_EQ(q->elements.size(), 3u);
@@ -405,7 +418,7 @@ TEST(QueueRefPersistence, ReverseLeavesRefFollowingItsElement) {
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
   RunRefOpThenWrite(
-      f, {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "reverse", {}))},
+      f, {MakeExprStmt(f.arena, MakeMemberAccess(f.arena, "q", "reverse"))},
       MakeSelect(f.arena, "q", 0));
 
   ASSERT_EQ(q->elements.size(), 3u);
@@ -425,7 +438,7 @@ TEST(QueueRefPersistence, ShuffleLeavesRefValid) {
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
   RunRefOpThenWrite(
-      f, {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "shuffle", {}))},
+      f, {MakeExprStmt(f.arena, MakeMemberAccess(f.arena, "q", "shuffle"))},
       MakeSelect(f.arena, "q", 1));
 
   ASSERT_EQ(q->elements.size(), 3u);
