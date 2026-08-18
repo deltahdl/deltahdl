@@ -458,6 +458,21 @@ static DataTypeKind VcdEffectiveDeclKind(const RtlirVariable& var) {
   return kind;
 }
 
+// §15.3: a semaphore is a bucket of keys, and the declaration is what brings
+// the bucket into being. §15.3.1's new() sets how many keys are in it and
+// defaults that to none, so a bucket no new() has reached yet is empty and
+// every get() on it waits. Does nothing for a variable of any other type.
+static void CreateSemaphoreForVar(std::string_view name,
+                                  const RtlirVariable& var, SimContext& ctx,
+                                  Arena& arena) {
+  if (var.class_type_name != "semaphore") return;
+  auto* sem = ctx.CreateSemaphore(name, 0);
+  if (var.init_expr && var.init_expr->kind == ExprKind::kCall &&
+      var.init_expr->text == "new") {
+    sem->key_count = SemaphoreKeyArg(var.init_expr, ctx, arena, 0);
+  }
+}
+
 void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   uint32_t width = var.class_type_name.empty() ? var.width : 64;
   auto* v = ctx_.CreateVariable(name, width);
@@ -493,17 +508,7 @@ void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   if (!var.init_expr) ApplyStructMemberDefaults(name, var, v, ctx_, arena_);
   if (!var.class_type_name.empty())
     ctx_.SetVariableClassType(name, var.class_type_name);
-  // §15.3: a semaphore is a bucket of keys, and the declaration is what brings
-  // the bucket into being. §15.3.1's new() sets how many keys are in it and
-  // defaults that to none, so a bucket that no new() has reached yet is empty
-  // and every get() on it waits.
-  if (var.class_type_name == "semaphore") {
-    auto* sem = ctx_.CreateSemaphore(name, 0);
-    if (var.init_expr && var.init_expr->kind == ExprKind::kCall &&
-        var.init_expr->text == "new") {
-      sem->key_count = SemaphoreKeyArg(var.init_expr, ctx_, arena_, 0);
-    }
-  }
+  CreateSemaphoreForVar(name, var, ctx_, arena_);
 
   if (!var.enum_type_name.empty() && var.dtype) {
     RegisterEnumForCast(name, var);
