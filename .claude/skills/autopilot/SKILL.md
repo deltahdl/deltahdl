@@ -19,13 +19,13 @@ Create seven jobs with `CronCreate`, exactly as listed below. Use `recurring: tr
 
 Neither form takes a number. If the user gave neither `subclauses` nor `sequence`, ask which form they want before creating anything.
 
-`start subclauses` solves whatever issue `next_subclause` names, whatever its number. The issue tracking a subclause was opened when that subclause was catalogued rather than when the campaign reached it, so it sits below anything the work has filed since, and a floor applied to it would rule out every subclause there is to take. The floor in its prompt bounds the other direction — the issues the resolver does not name, which this work opens as it goes and which accumulate without limit. It is fixed at #2939, because that is where the work's own issues begin: #2910 through #2939 track the sv-test failures reminder :05 says to ignore, and `docs/claude/issue-blocked-by-sequence.md` puts everything above them in the sequence.
+`start subclauses` solves whatever issue `next_subclause` names and nothing else. Matching is on the canonical `Satisfy IEEE 1800-2023 §<subclause>` title, so the issues the work files for itself are outside this form by construction; `start sequence` is the form that takes those. Each form selects one set, and a form reaching into the other's would make the choice between them mean nothing.
 
-`start sequence` needs no floor at all. Everything above 2939 is in the sequence by the rule that defines it, so the walk selects the same set the floor would.
+`start sequence` takes every open issue above 2939, in the order `docs/claude/issue-blocked-by-sequence.md` records. 2939 belongs to this form alone: it is the boundary that defines the sequence, and it is not a floor the other form could apply.
 
 | Form | Cron | Prompt |
 | --- | --- | --- |
-| `start subclauses` | `1,11,21,31,41,51 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. Run PYTHONPATH=.:scripts python3 -m next_subclause for the subclause in force and the issue tracking it; solve that issue whatever its number, and when it closes the same command names the next. Among the issues it does not name, the ones above #2939 are in scope alongside it and are what this work has filed for itself; the ones at or below #2939 are not.` |
+| `start subclauses` | `1,11,21,31,41,51 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. Run PYTHONPATH=.:scripts python3 -m next_subclause for the subclause in force and the issue tracking it; solve that issue whatever its number, and when it closes the same command names the next. The issues it does not name are out of scope; file what this work turns up rather than taking it.` |
 | `start sequence` | `1,11,21,31,41,51 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. Run the sequence walk in docs/claude/issue-blocked-by-sequence.md and solve the single open issue it reports as the head. When that issue closes, run the walk again for the next one.` |
 
 ### The six reminders both forms carry
@@ -43,7 +43,7 @@ Neither form takes a number. If the user gave neither `subclauses` nor `sequence
 
 Then run the selector once and tell the user where the work stands.
 
-For `start subclauses`, run `PYTHONPATH=.:scripts python3 -m next_subclause` and name the subclause and issue it printed. If the command reports there is nothing tracked, say so; the reminders are still worth starting, because the floor still selects work.
+For `start subclauses`, run `PYTHONPATH=.:scripts python3 -m next_subclause` and name the subclause and issue it printed. If the command reports there is nothing tracked, say so and do not start the reminders: the form has nothing left to select, and every firing would report the same.
 
 For `start sequence`, run the walk in [issue-blocked-by-sequence](../../../docs/claude/issue-blocked-by-sequence.md) and name the head it reported. If it reports anything but one head, say so and do not start the reminders: the sequence is broken, and a loop taking its head would take an arbitrary one of several.
 
@@ -61,7 +61,7 @@ Call `CronList`, then call `CronDelete` once per job it returns — all of them,
 
 Cron jobs fire only while the session is idle, never mid-turn, because a turn cannot be preempted. That limit is the reason this skill does not try to correct drift in the middle of a task: what it can do is restart a loop that has stalled, which is the failure it is there to catch.
 
-Neither form takes an issue number, and `start subclauses` used to. The number was the floor, and its value was always 2939: separating the issues this work files for itself from the backlog below them is the floor's only job, and `docs/claude/issue-blocked-by-sequence.md` already fixes that boundary. An argument that never varies is one more thing to get wrong while starting the loop, and a bare number in the invocation named neither of the two things the form actually selects.
+Neither form takes an issue number, and `start subclauses` used to. The number was a floor over the issues `next_subclause` cannot name, which put part of the sequence form's set into the subclauses form's reminder and left the caller to choose how much. Two forms are worth having only where each selects one set, so the floor went rather than acquiring a fixed value. 2939 is not that value: it is the boundary defining the sequence, and applying it here would have put the whole of the sequence in scope, which is the loosest choice the argument ever offered.
 
 `start sequence` exists because the subclause resolver cannot reach the issues above 2939. `issue_title_for` in `lib/python/github/__init__.py` builds `Satisfy IEEE 1800-2023 §<subclause>`, and `next_subclause` looks issues up by that string alone. The issues the work files for itself are titled by the defect they describe, so no run of the command will ever name one, whatever the campaign does next. `docs/claude/issue-blocked-by-sequence.md` holds the order that does reach them: every open issue above 2939 sits in one linear sequence, exactly one is blocked by nothing open, and that one is what gets worked next.
 
