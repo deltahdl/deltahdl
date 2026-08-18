@@ -72,6 +72,7 @@
 
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "fixture_config_run.h"
 #include "fixture_library_design.h"
 #include "fixture_scratch_dir.h"
 #include "fixture_simulator.h"
@@ -144,16 +145,6 @@ constexpr const char* kPlainConfig =
     "  default liblist aLib rtlLib;\n"
     "endconfig\n";
 
-// The assembled compilation unit of a mapped multi-file design, carrying the
-// simulator state a run needs alongside it. What a configuration binds is read
-// here by running the design rather than by inspecting it, so the scheduler and
-// the context the lowered hierarchy runs in travel with the unit they were
-// built from.
-struct BoundDesign : LibraryDesign {
-  Scheduler scheduler{arena};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 // Writes the library map and the three source descriptions, loading the map
 // before any of them so every cell is tagged through it, and parsing the RTL
 // description first and the topping file last. An implementation reporting
@@ -166,40 +157,6 @@ bool BuildExampleDesign(ScratchDir& tmp, BoundDesign& design) {
   if (!design.Add(tmp, "adder.v", kAdderSource)) return false;
   if (!design.Add(tmp, "adder.vg", kAdderSource)) return false;
   return design.Add(tmp, "top.v", kTopSource);
-}
-
-// Parses `config_text` into the assembled unit, elaborates the configuration
-// `name` names with the search order the loaded map yields already installed,
-// lowers the bound hierarchy into the design's simulator context and runs it,
-// returning whatever the run wrote to stdout. Installing the map's order
-// leaves the configuration's clauses something to override: without it a test
-// could not tell a clause being obeyed from a map order that happened to
-// agree. The configuration file matches no path specification in the map, so
-// it falls to the default library and cannot itself supply a cell.
-std::string RunConfigured(ScratchDir& tmp, BoundDesign& design,
-                          const std::string& config_text,
-                          std::string_view name) {
-  if (!design.Add(tmp, "cfg.sv", config_text)) return "";
-  const auto* cfg = design.ConfigNamed(name);
-  if (cfg == nullptr) return "";
-  Elaborator elab(design.arena, design.diag, design.unit);
-  elab.SetLibraryDeclarationOrder(design.map.ResolveSearchOrder({}));
-  auto* elaborated = elab.Elaborate(cfg);
-  if (elaborated == nullptr) return "";
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  Lowerer lowerer(design.ctx, design.arena, design.diag);
-  lowerer.Lower(elaborated);
-  design.scheduler.Run();
-  std::cout.rdbuf(old_buf);
-  return captured.str();
-}
-
-// Whether `line` appears somewhere in `out`. The instances report at the same
-// simulation time and in no order the subclause fixes, so each claim is read
-// as the presence of its own line rather than as the whole transcript.
-bool Reports(const std::string& out, const std::string& line) {
-  return out.find(line) != std::string::npos;
 }
 
 // The text a run left in `path`, for the output commands that produce their
@@ -219,9 +176,9 @@ TEST(LibraryBindingDisplay, TopInstanceReportsItsDesignStatementBinding) {
   BoundDesign design;
   ASSERT_TRUE(BuildExampleDesign(tmp, design));
 
-  auto out = RunConfigured(tmp, design, kSelectingConfig, "cfg1");
+  auto out = RunConfiguredDesign(tmp, design, kSelectingConfig, "cfg1");
   ASSERT_FALSE(design.diag.HasErrors());
-  EXPECT_TRUE(Reports(out, "[t top rtlLib.top]"));
+  EXPECT_TRUE(ReportsLine(out, "[t top rtlLib.top]"));
 }
 
 // A child instance the default clause bound reports that clause's library
@@ -232,9 +189,9 @@ TEST(LibraryBindingDisplay, ChildBoundByTheDefaultClauseReportsThatLibrary) {
   BoundDesign design;
   ASSERT_TRUE(BuildExampleDesign(tmp, design));
 
-  auto out = RunConfigured(tmp, design, kSelectingConfig, "cfg1");
+  auto out = RunConfiguredDesign(tmp, design, kSelectingConfig, "cfg1");
   ASSERT_FALSE(design.diag.HasErrors());
-  EXPECT_TRUE(Reports(out, "[l top.a1 aLib.adder]"));
+  EXPECT_TRUE(ReportsLine(out, "[l top.a1 aLib.adder]"));
 }
 
 // Its sibling, selected by the instance clause, reports the library that
@@ -245,9 +202,9 @@ TEST(LibraryBindingDisplay, ChildBoundByAnInstanceClauseReportsThatLibrary) {
   BoundDesign design;
   ASSERT_TRUE(BuildExampleDesign(tmp, design));
 
-  auto out = RunConfigured(tmp, design, kSelectingConfig, "cfg1");
+  auto out = RunConfiguredDesign(tmp, design, kSelectingConfig, "cfg1");
   ASSERT_FALSE(design.diag.HasErrors());
-  EXPECT_TRUE(Reports(out, "[l top.a2 gateLib.adder]"));
+  EXPECT_TRUE(ReportsLine(out, "[l top.a2 gateLib.adder]"));
 }
 
 // The companion of the claim above: with the instance clause struck out that
@@ -258,10 +215,10 @@ TEST(LibraryBindingDisplay, WithoutTheClauseThatChildReportsTheDefault) {
   BoundDesign design;
   ASSERT_TRUE(BuildExampleDesign(tmp, design));
 
-  auto out = RunConfigured(tmp, design, kPlainConfig, "cfg2");
+  auto out = RunConfiguredDesign(tmp, design, kPlainConfig, "cfg2");
   ASSERT_FALSE(design.diag.HasErrors());
-  EXPECT_TRUE(Reports(out, "[l top.a2 aLib.adder]"));
-  EXPECT_FALSE(Reports(out, "gateLib"));
+  EXPECT_TRUE(ReportsLine(out, "[l top.a2 aLib.adder]"));
+  EXPECT_FALSE(ReportsLine(out, "gateLib"));
 }
 
 // The other case of the specifier is the same specifier: written into the same
@@ -271,10 +228,10 @@ TEST(LibraryBindingDisplay, UppercaseSpecifierReportsTheSameBinding) {
   BoundDesign design;
   ASSERT_TRUE(BuildExampleDesign(tmp, design));
 
-  auto out = RunConfigured(tmp, design, kSelectingConfig, "cfg1");
+  auto out = RunConfiguredDesign(tmp, design, kSelectingConfig, "cfg1");
   ASSERT_FALSE(design.diag.HasErrors());
-  EXPECT_TRUE(Reports(out, "[L top.a2 gateLib.adder]"));
-  EXPECT_TRUE(Reports(out, "[L top.a1 aLib.adder]"));
+  EXPECT_TRUE(ReportsLine(out, "[L top.a2 gateLib.adder]"));
+  EXPECT_TRUE(ReportsLine(out, "[L top.a1 aLib.adder]"));
 }
 
 // What each instance reports is its own binding, not its parent's: the cell a
@@ -286,10 +243,10 @@ TEST(LibraryBindingDisplay, DescendantsReportTheirOwnBinding) {
   BoundDesign design;
   ASSERT_TRUE(BuildExampleDesign(tmp, design));
 
-  auto out = RunConfigured(tmp, design, kSelectingConfig, "cfg1");
+  auto out = RunConfiguredDesign(tmp, design, kSelectingConfig, "cfg1");
   ASSERT_FALSE(design.diag.HasErrors());
-  EXPECT_TRUE(Reports(out, "[m top.a1.f1 aLib.m]"));
-  EXPECT_TRUE(Reports(out, "[m top.a2.f1 gateLib.m]"));
+  EXPECT_TRUE(ReportsLine(out, "[m top.a1.f1 aLib.m]"));
+  EXPECT_TRUE(ReportsLine(out, "[m top.a2.f1 gateLib.m]"));
 }
 
 // With no library map read at all, a design element still belongs to a
@@ -412,7 +369,7 @@ TEST(LibraryBindingDisplay, SeverityTaskExpandsTheSpecifier) {
       "  initial $info(\"<%l>\");\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(Reports(out, "<work.t>"));
+  EXPECT_TRUE(ReportsLine(out, "<work.t>"));
 }
 
 // The file-output family writes its text somewhere other than the standard

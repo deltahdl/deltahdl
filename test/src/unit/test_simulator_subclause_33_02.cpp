@@ -25,19 +25,10 @@
 
 #include <gtest/gtest.h>
 
-#include <iostream>
-#include <sstream>
 #include <string>
-#include <string_view>
 
-#include "elaborator/elaborator.h"
-#include "elaborator/rtlir.h"
-#include "fixture_library_design.h"
+#include "fixture_config_run.h"
 #include "fixture_scratch_dir.h"
-#include "parser/ast.h"
-#include "simulator/lowerer.h"
-#include "simulator/scheduler.h"
-#include "simulator/sim_context.h"
 
 using namespace delta;
 
@@ -99,14 +90,6 @@ constexpr const char* kPlainConfig =
     "  default liblist aLib rtlLib;\n"
     "endconfig\n";
 
-// The assembled compilation unit of a mapped multi-file design, carrying the
-// simulator state its run needs. What a configuration binds is read here by
-// running the design rather than by inspecting it.
-struct BoundDesign : LibraryDesign {
-  Scheduler scheduler{arena};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 // Writes the library map and the three source descriptions, loading the map
 // before any of them so every cell is tagged through it.
 bool BuildExampleDesign(ScratchDir& tmp, BoundDesign& design) {
@@ -115,37 +98,6 @@ bool BuildExampleDesign(ScratchDir& tmp, BoundDesign& design) {
   if (!design.Add(tmp, "adder.v", kRtlAdderSource)) return false;
   if (!design.Add(tmp, "adder.vg", kGateAdderSource)) return false;
   return design.Add(tmp, "top.v", kTopSource);
-}
-
-// Parses `config_text`, elaborates the configuration `name` names with the
-// map's search order installed, lowers the bound hierarchy and runs it,
-// returning what the run wrote to stdout. Installing the map's order leaves the
-// configuration's clauses something to override, so a clause being obeyed is
-// distinguishable from a map order that happened to agree.
-std::string RunConfigured(ScratchDir& tmp, BoundDesign& design,
-                          const std::string& config_text,
-                          std::string_view name) {
-  if (!design.Add(tmp, "cfg.sv", config_text)) return "";
-  const auto* cfg = design.ConfigNamed(name);
-  if (cfg == nullptr) return "";
-  Elaborator elab(design.arena, design.diag, design.unit);
-  elab.SetLibraryDeclarationOrder(design.map.ResolveSearchOrder({}));
-  auto* elaborated = elab.Elaborate(cfg);
-  if (elaborated == nullptr) return "";
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  Lowerer lowerer(design.ctx, design.arena, design.diag);
-  lowerer.Lower(elaborated);
-  design.scheduler.Run();
-  std::cout.rdbuf(old_buf);
-  return captured.str();
-}
-
-// Whether `line` appears in `out`. The instances report at the same simulation
-// time and in no order the subclause fixes, so each claim is read as the
-// presence of its own line.
-bool Reports(const std::string& out, const std::string& line) {
-  return out.find(line) != std::string::npos;
 }
 
 // §33.2: a configuration specifies the exact source description used to
@@ -157,9 +109,9 @@ TEST(ConfigSelectsTheRunningSource, EachInstanceRunsTheDescriptionBoundToIt) {
   ScratchDir tmp;
   BoundDesign design;
   ASSERT_TRUE(BuildExampleDesign(tmp, design));
-  std::string out = RunConfigured(tmp, design, kSelectingConfig, "cfg1");
-  EXPECT_TRUE(Reports(out, "top.a1 rtl-adder")) << out;
-  EXPECT_TRUE(Reports(out, "top.a2 gate-adder")) << out;
+  std::string out = RunConfiguredDesign(tmp, design, kSelectingConfig, "cfg1");
+  EXPECT_TRUE(ReportsLine(out, "top.a1 rtl-adder")) << out;
+  EXPECT_TRUE(ReportsLine(out, "top.a2 gate-adder")) << out;
 }
 
 // §33.2: the same design under the same default clause with the instance clause
@@ -171,10 +123,10 @@ TEST(ConfigSelectsTheRunningSource,
   ScratchDir tmp;
   BoundDesign design;
   ASSERT_TRUE(BuildExampleDesign(tmp, design));
-  std::string out = RunConfigured(tmp, design, kPlainConfig, "cfg2");
-  EXPECT_TRUE(Reports(out, "top.a1 rtl-adder")) << out;
-  EXPECT_TRUE(Reports(out, "top.a2 rtl-adder")) << out;
-  EXPECT_FALSE(Reports(out, "gate-adder")) << out;
+  std::string out = RunConfiguredDesign(tmp, design, kPlainConfig, "cfg2");
+  EXPECT_TRUE(ReportsLine(out, "top.a1 rtl-adder")) << out;
+  EXPECT_TRUE(ReportsLine(out, "top.a2 rtl-adder")) << out;
+  EXPECT_FALSE(ReportsLine(out, "gate-adder")) << out;
 }
 
 // §33.2: the source descriptions of the children are located in turn until
@@ -186,9 +138,9 @@ TEST(ConfigSelectsTheRunningSource,
   ScratchDir tmp;
   BoundDesign design;
   ASSERT_TRUE(BuildExampleDesign(tmp, design));
-  std::string out = RunConfigured(tmp, design, kSelectingConfig, "cfg1");
-  EXPECT_TRUE(Reports(out, "top.a1.s rtl-sub")) << out;
-  EXPECT_TRUE(Reports(out, "top.a2.s gate-sub")) << out;
+  std::string out = RunConfiguredDesign(tmp, design, kSelectingConfig, "cfg1");
+  EXPECT_TRUE(ReportsLine(out, "top.a1.s rtl-sub")) << out;
+  EXPECT_TRUE(ReportsLine(out, "top.a2.s gate-sub")) << out;
 }
 
 }  // namespace
