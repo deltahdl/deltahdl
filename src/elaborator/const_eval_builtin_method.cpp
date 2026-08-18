@@ -129,24 +129,11 @@ std::optional<int64_t> StringParamLength(const Expr* operand) {
   for (const auto& param : mod->params) {
     if (param.name != operand->text) continue;
     // §23.9 puts a parameter a generate block declares in a scope of its own,
-    // and no such parameter can reach this loop, so nothing is asked about one.
-    // #3226 settles it. RegisteredModule() answers only while a
-    // ParamRangeRegistryGuard is live, and neither direction is open: a call
-    // written among a module's own items is folded by
-    // Elaborator::ElaborateItems (src/elaborator/elaborator_items_udp.cpp:739),
-    // which opens a guard but runs before any generate block is processed, so
-    // no block's parameter is in RtlirModule::params yet; and a call written
-    // inside a block is folded by Elaborator::ProcessPendingGenerate
-    // (src/elaborator/elaborator_generate.cpp:33), which opens no guard at all,
-    // so RegisteredModule() is null there. The defparam sites that open the
-    // remaining guards admit "only numbers and references to parameters" per
-    // §23.10.1, which a method call is not.
-    //
-    // A test asserting the rule here would pass whether it was applied or not,
-    // which docs/tenets/tests/UNIT_TESTS.md rules out, so the rule is left
-    // unwritten rather than written where nothing holds it to account. #3227
-    // carries the missing guard that would open the second direction; this loop
-    // needs the §23.9 test back if that lands.
+    // so a call written outside that block is not naming it however the names
+    // agree. RegisteredGenPrefixes() is where the call stands.
+    if (!ParamVisibleFromScopes(param.gen_block_prefix,
+                                RegisteredGenPrefixes()))
+      continue;
     if (!param.is_string_value) return std::nullopt;
     return static_cast<int64_t>(param.resolved_string.size());
   }

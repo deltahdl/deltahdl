@@ -1,5 +1,6 @@
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -152,6 +153,39 @@ TEST(ParameterizedScopeResolutionElaboration, UnadornedScopeInsideClassOk) {
              "endclass\n"
              "module m;\n"
              "endmodule\n"));
+}
+
+// §8.25.1: the explicit specialization form denotes a specific parameter in a
+// constant-expression position, so `C#(4)::p` initializing a localparam folds
+// to 4 and not to the class default of 1. §27.4 makes a generate block "a
+// separate scope and a new level of hierarchy when it is instantiated" and
+// says nothing that would stop that at the boundary, so the same initializer
+// written inside a block folds to the same 4. The class default is written 1
+// so that a fold answering the default misses.
+//
+// This fails while Elaborator::ProcessPendingGenerate in
+// src/elaborator/elaborator_generate.cpp opens no ParamClassRegistryGuard:
+// SpecializedParamClass in src/elaborator/const_eval_func.cpp finds no
+// registry, the access does not fold at all, and W is left unresolved.
+TEST(ParameterizedScopeResolutionElaboration,
+     SpecializationParameterFoldsInsideAGenerateBlock) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class C #(parameter int p = 1);\n"
+      "endclass\n"
+      "module m;\n"
+      "  generate\n"
+      "    if (1) begin : a\n"
+      "      localparam int W = C#(4)::p;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const auto* w = FindParam(design, "m", "W");
+  ASSERT_NE(w, nullptr);
+  EXPECT_TRUE(w->is_resolved);
+  EXPECT_EQ(w->resolved_value, 4);
 }
 
 }  // namespace

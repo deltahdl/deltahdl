@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -56,6 +57,15 @@ bool IsConditionalGenerateConstruct(ModuleItemKind k);
 // when numbering.
 bool IsDirectlyNestedBlock(const std::vector<ModuleItem*>& body,
                            bool has_begin_end);
+
+// §8.25.1: the parameterized-class declarations of a compilation unit, indexed
+// by class name, for the constant folder to resolve a `C#(args)::name` access
+// against. Only a class with parameter ports can be specialized, so only those
+// are in the table. Defined in elaborator_items_udp.cpp and shared with the
+// generate translation unit, which installs the same table for the items of a
+// generate block that Elaborator::ElaborateItems installs for a module's own.
+std::unordered_map<std::string_view, const ClassDecl*> BuildParamClassRegistry(
+    const CompilationUnit* unit);
 
 // §6.20.5: specify parameters declared inside a specify block are named
 // constants of the enclosing module, exactly like specparams in the main module

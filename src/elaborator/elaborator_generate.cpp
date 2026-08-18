@@ -3,6 +3,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -42,6 +43,35 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   // ItemElaborationStateSaver::Restore took them out of declared_names_.
   auto saved_declared_names = std::move(declared_names_);
   declared_names_ = std::move(module_declared_names_[pg.mod]);
+  // §11.5.1 addresses a select on a parameter over the range that parameter
+  // was declared with, and §6.16 gives a string parameter characters a
+  // concatenation and §6.16.1's len() read back. Both answer from the module
+  // installed here, which Elaborator::ElaborateItems installs for the duration
+  // of a module's own items. §27.4 makes a generate block "a separate scope
+  // and a new level of hierarchy when it is instantiated" and says nothing
+  // that would stop either rule at that boundary, so install the same module
+  // for the block's items. Without this the folder sees no module at all here:
+  // a select is addressed over [width-1:0] and a string operation recovers no
+  // characters.
+  ParamRangeRegistryGuard param_range_guard(pg.mod);
+  // §8.25.1: the same for a constant expression that reads a specialization's
+  // parameter through the scope resolution operator, as in `localparam W =
+  // C#(4)::p`. The registry is built from the compilation unit rather than
+  // from the module, so this is the table Elaborator::ElaborateItems builds
+  // and nothing about it had to be captured when the generate was queued.
+  //
+  // Elaborator::ElaborateItems opens a ConstFuncRegistryGuard beside these two
+  // and this site does not, because ElaboratorData::func_decls_ is per-module
+  // state that no PendingGenerate carries: Elaborator::ElaborateItems fills it
+  // from the ModuleDecl it is elaborating and ItemElaborationStateSaver puts
+  // it back to what it held before that module, so pg.mod's functions are not
+  // in it here and a guard opened over it would register a table belonging to
+  // no module. A §13.4.3 constant function call written in a generate block
+  // therefore still does not fold, and #3228 carries the capture that would
+  // make it.
+  std::unordered_map<std::string_view, const ClassDecl*> param_class_registry =
+      BuildParamClassRegistry(unit_);
+  ParamClassRegistryGuard param_class_guard(&param_class_registry);
   auto scope = BuildParamScope(pg.mod);
   switch (pg.item->kind) {
     case ModuleItemKind::kGenerateIf:
@@ -142,6 +172,14 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
   // overlay is empty again once we leave the generate scope.
   ScopeMap saved_gen_const_scope = gen_const_scope_;
   gen_const_scope_ = scope;
+  // §23.9 lists "Generate blocks" among the elements that "define a new
+  // scope", so which of the module Elaborator::ProcessPendingGenerate
+  // registered the folder may name from here depends on the blocks these items
+  // stand in. Every caller sets ElaboratorData::gen_prefix_scopes_ to that
+  // before calling, so this is the one site covering the conditional block, the
+  // directly nested block that opens no scope of its own, and each iteration of
+  // a loop generate block.
+  RegisteredGenScopeGuard gen_scope_guard(gen_prefix_scopes_);
   for (auto* item : items) {
     switch (item->kind) {
       case ModuleItemKind::kGenerateIf:

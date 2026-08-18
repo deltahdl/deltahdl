@@ -224,4 +224,44 @@ TEST(GenerateBlockScope,
       << "block 'a' localparam P should reach a defparam in block 'a'";
 }
 
+// §23.9 reaches §6.16.1's len() by the same route it reaches a bare reference.
+// Blocks 'a' and 'b' are siblings, so neither is "higher in the same branch of
+// the name tree" than the other, and the P block 'b' measures is not the P
+// block 'a' declared. N is left with no value rather than with 4.
+//
+// The case became able to fail when Elaborator::ProcessPendingGenerate in
+// src/elaborator/elaborator_generate.cpp began opening a
+// ParamRangeRegistryGuard for the module. StringParamLength in
+// src/elaborator/const_eval_builtin_method.cpp answers from the registered
+// module, so before that guard existed no call written inside a block reached
+// the loop at all and the scope test there could not be observed; #3226
+// deleted the test for exactly that reason and #3227 restored it with the
+// guard.
+//
+// The test fails when N holds 4.
+TEST(GenerateBlockScope,
+     StringLengthOfAGenerateBlockParameterDoesNotFoldInASiblingBlock) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  generate\n"
+      "    if (1) begin : a\n"
+      "      localparam string P = \"abcd\";\n"
+      "    end\n"
+      "    if (1) begin : b\n"
+      "      localparam int N = P.len();\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const RtlirParamDecl* n = nullptr;
+  for (const auto& param : design->top_modules[0]->params) {
+    if (param.name == "N") n = &param;
+  }
+  ASSERT_NE(n, nullptr);
+  EXPECT_NE(n->resolved_value, 4)
+      << "block 'a' localparam P should not be measured by len() in block 'b'";
+}
+
 }  // namespace

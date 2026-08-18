@@ -1,5 +1,6 @@
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -109,6 +110,58 @@ TEST(Elaboration, IndexingAScalarLogicVarIsStillRejected) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select or part-select of a scalar is illegal",
                             4, "11.5.1"));
+}
+
+// §6.16's Table 6-9 (printed page 114) gives concatenation over string
+// operands: "Each operand can be a string literal or an expression of string
+// type ... the result of the concatenation shall be of string type." §11.2.1
+// lists "parameters" among the operands a constant expression consists of, so
+// `{P, "c"}` is one and Q holds the joined characters.
+//
+// The characters are read back rather than Q's resolved_value, which §11.10
+// packs from the same expression and would answer whether or not §6.16 gave
+// the concatenation a string result at all.
+TEST(Elaboration, StringParameterConcatenationFoldsToTheJoinedCharacters) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  localparam string P = \"ab\";\n"
+      "  localparam string Q = {P, \"c\"};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const auto* q = FindParam(design, "top", "Q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->resolved_string, "abc");
+}
+
+// The same concatenation written inside a generate block. §27.4 makes a
+// generate block "a separate scope and a new level of hierarchy when it is
+// instantiated", and §6.16 says nothing that would stop at that boundary, so
+// the block's own P is what the concatenation names and Q holds the same three
+// characters the module-level case above gives it.
+//
+// This fails while Elaborator::ProcessPendingGenerate in
+// src/elaborator/elaborator_generate.cpp opens no ParamRangeRegistryGuard:
+// StringParamChars in src/elaborator/const_eval.cpp answers from the
+// registered module, there is none for the whole of a block's body, and the
+// concatenation recovers no characters at all, leaving resolved_string empty.
+TEST(Elaboration, StringParameterConcatenationFoldsInsideAGenerateBlock) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  generate\n"
+      "    if (1) begin : a\n"
+      "      localparam string P = \"ab\";\n"
+      "      localparam string Q = {P, \"c\"};\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const auto* q = FindParam(design, "top", "Q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->resolved_string, "abc");
 }
 
 }  // namespace

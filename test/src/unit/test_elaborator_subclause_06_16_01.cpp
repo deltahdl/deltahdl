@@ -260,4 +260,40 @@ TEST(StringLenElaboration,
   EXPECT_EQ(n->resolved_value, 10);
 }
 
+// §6.16.1's len() written inside a generate block. §27.4 makes a generate
+// block "a separate scope and a new level of hierarchy when it is
+// instantiated", and §6.16.1 says nothing that would stop there, so the
+// block's own S is what the call names and N folds to 3 exactly as
+// StringLenElaboration.LenOfAStringLocalparamFoldsToTheCharacterCount above
+// has it at module level. 3 is unreachable from anything else the declaration
+// records for the reason that case gives.
+//
+// This fails while Elaborator::ProcessPendingGenerate in
+// src/elaborator/elaborator_generate.cpp opens no ParamRangeRegistryGuard:
+// StringParamLength in src/elaborator/const_eval_builtin_method.cpp answers
+// from the registered module, there is none for the whole of a block's body,
+// and the call does not fold, leaving N unresolved.
+TEST(StringLenElaboration,
+     LenOfAGenerateBlockStringLocalparamFoldsToTheCharacterCount) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  generate\n"
+      "    if (1) begin : a\n"
+      "      localparam string S = \"abc\";\n"
+      "      localparam int N = S.len();\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const RtlirParamDecl* n = nullptr;
+  for (const auto& param : design->top_modules[0]->params) {
+    if (param.name == "N") n = &param;
+  }
+  ASSERT_NE(n, nullptr);
+  EXPECT_TRUE(n->is_resolved);
+  EXPECT_EQ(n->resolved_value, 3);
+}
+
 }  // namespace
