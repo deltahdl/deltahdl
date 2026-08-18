@@ -4,10 +4,6 @@ concurrency:
   group: documentation-${{ github.ref }}
 jobs:
   jsonlint:
-    # jsonlint runs a command written in documentation.yml, so a linter is
-    # only as trustworthy as the file defining it and nothing is decided
-    # about JSON until yamllint has passed that file.
-    needs: yamllint
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -21,8 +17,6 @@ jobs:
           find docs -name '*.json' -print0 \
             | xargs -0 -n1 jsonlint --quiet
   markdownlint:
-    # Waits on yamllint for the reason given on jsonlint.
-    needs: yamllint
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
