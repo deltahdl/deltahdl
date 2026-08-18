@@ -54,13 +54,14 @@ TEST(ProceduralStatementContainmentSim, AlwaysCombRunsItsStatement) {
 
 // §12.2: `always_latch` activates automatically in the same way, and the
 // statement it contains here is a selection statement rather than a bare
-// assignment.
+// assignment. Only the latch writes `x`, since §9.2.2.2 rules that a variable
+// written by an always_latch shall be written by nothing else.
 TEST(ProceduralStatementContainmentSim, AlwaysLatchRunsItsStatement) {
   auto val = RunAndGet(
       "module m;\n"
       "  logic en;\n"
       "  logic [31:0] x, y;\n"
-      "  initial begin x = 0; en = 1; y = 5; end\n"
+      "  initial begin en = 1; y = 5; end\n"
       "  always_latch if (en) x = y;\n"
       "endmodule\n",
       "x");
