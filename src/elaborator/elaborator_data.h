@@ -285,11 +285,20 @@ class ElaboratorData {
   // into them as it queues the item, and Elaborator::ProcessPendingGenerate
   // installs them again around the fold and the elaboration of the selected
   // body, whose own declarations read typedefs_ as well.
+  //
+  // func_decls carries the same scope for §13.4.3, which has a constant
+  // function call "evaluated at elaboration time". Elaborator::ElaborateItems
+  // fills func_decls_ from the ModuleDecl it is elaborating and
+  // ItemElaborationStateSaver puts it back to what it held before that module,
+  // so the module's own functions are gone by the time
+  // Elaborator::ResolveDefparamsAndGenerates runs and only a copy taken at the
+  // queue site names them.
   struct PendingGenerate {
     ModuleItem* item;
     RtlirModule* mod;
     TypedefMap typedefs;
     ScopeMap cu_param_scope;
+    std::unordered_map<std::string_view, const ModuleItem*> func_decls;
   };
   std::vector<PendingGenerate> pending_generates_;
 

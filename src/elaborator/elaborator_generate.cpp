@@ -59,19 +59,39 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   // C#(4)::p`. The registry is built from the compilation unit rather than
   // from the module, so this is the table Elaborator::ElaborateItems builds
   // and nothing about it had to be captured when the generate was queued.
-  //
-  // Elaborator::ElaborateItems opens a ConstFuncRegistryGuard beside these two
-  // and this site does not, because ElaboratorData::func_decls_ is per-module
-  // state that no PendingGenerate carries: Elaborator::ElaborateItems fills it
-  // from the ModuleDecl it is elaborating and ItemElaborationStateSaver puts
-  // it back to what it held before that module, so pg.mod's functions are not
-  // in it here and a guard opened over it would register a table belonging to
-  // no module. A §13.4.3 constant function call written in a generate block
-  // therefore still does not fold, and #3228 carries the capture that would
-  // make it.
   std::unordered_map<std::string_view, const ClassDecl*> param_class_registry =
       BuildParamClassRegistry(unit_);
   ParamClassRegistryGuard param_class_guard(&param_class_registry);
+  // §13.4.3 has a constant function call "evaluated at elaboration time", and
+  // the two guards above do not answer it: the folder reads the function table
+  // a ConstFuncRegistryGuard installs. The table is PendingGenerate::func_decls
+  // rather than ElaboratorData::func_decls_, because that member is per-module
+  // state this site no longer holds. Elaborator::ElaborateItems fills it from
+  // the ModuleDecl it is elaborating and ItemElaborationStateSaver puts it back
+  // to what it held before that module, so pg.mod's functions are not in it
+  // here and a guard opened over it would register a table belonging to no
+  // module. Elaborator::ElaborateBehavioralItem copies it onto the entry where
+  // pg.mod's own items are what fills it.
+  //
+  // The copy holds the functions declared among pg.mod's items, which is what
+  // RecordTaskFuncNames in src/elaborator/elaborator_items_udp.cpp puts in
+  // func_decls_: it walks ModuleDecl::items and does not descend into a
+  // generate construct, so a function declared inside a generate block is in
+  // no table at all and a call to one still does not fold. #3229 carries that.
+  //
+  // The other four tables Elaborator::ElaborateItems fills from the same
+  // ModuleDecl are not copied, because no constant expression reaches them.
+  // ElaboratorData::const_names_ is read by Elaborator::ReportConstAssignTarget
+  // for §6.20 and by Elaborator::IsNameInModuleScope for §23.9,
+  // ElaboratorData::task_names_ by Elaborator::ValidateFunctionBody for §13.4,
+  // ElaboratorData::let_names_ by Elaborator::IsNameInModuleScope,
+  // ElaboratorData::sequence_names_ by Elaborator::ValidateSequenceEventArgs
+  // and Elaborator::IsDeclaredNameForRhs, and
+  // ElaboratorData::auto_task_func_names_ by
+  // Elaborator::ValidateHierRefToAutomatic for §13.3.1. Every one of those is a
+  // check on a name rather than a fold of a value, so each is left to whatever
+  // reaches it rather than fixed here.
+  ConstFuncRegistryGuard const_func_guard(&pg.func_decls);
   auto scope = BuildParamScope(pg.mod);
   switch (pg.item->kind) {
     case ModuleItemKind::kGenerateIf:

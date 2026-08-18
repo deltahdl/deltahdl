@@ -1,5 +1,6 @@
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -748,6 +749,68 @@ TEST(ConstantFunctionElaboration, BuiltinMethodOnLocalAllowed) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §13.4.3 rules that "a constant function call shall be evaluated at
+// elaboration time", and §27.4 makes a generate block "a separate scope and a
+// new level of hierarchy when it is instantiated" without exempting anything
+// written in it from that. The function is among the module's own items and
+// §23.9 makes it visible from a block below, so P folds to 8 exactly as the
+// module-level InputOnlyArgOk case folds it.
+//
+// The test fails with P unresolved, which ResolvedParam reports as -1.
+// Elaborator::ResolveDefparamsAndGenerates in src/elaborator/elaborator.cpp
+// runs after Elaborator::ElaborateModule has returned for every module, and
+// ItemElaborationStateSaver in src/elaborator/elaborator_module.cpp has taken
+// module m's functions back out of ElaboratorData::func_decls_ by then, so
+// nothing names double_val here unless PendingGenerate carried it.
+TEST(ConstantFunctionRulesElaboration,
+     ConstantFunctionCallFoldsInsideAGenerateBlock) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function int double_val(input int n); return n * 2; endfunction\n"
+      "  generate\n"
+      "    if (1) begin : a\n"
+      "      localparam int P = double_val(4);\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(ResolvedParam(design, "P"), 8);
+}
+
+// The scope the call is folded in. §23.9 stops the upward search for a directly
+// referenced identifier at "a module, interface, program, or checker boundary",
+// so the scale that block 'a' of module m2 calls is m2's own and P folds to 12
+// rather than to the 8 m1's scale would give it.
+//
+// This is the case that separates a captured function table from any table
+// built where the fold happens: both make the call fold, and only the captured
+// one makes it fold to the body §23.9 names. The two modules declare one name
+// with different bodies for exactly that reason, and neither is instantiated in
+// the other, so which of the two answers is not decided by elaboration order.
+TEST(ConstantFunctionRulesElaboration,
+     ConstantFunctionOfOneModuleDoesNotFoldInAnothersGenerateBlock) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m1;\n"
+      "  function int scale(input int n); return n * 2; endfunction\n"
+      "endmodule\n"
+      "module m2;\n"
+      "  function int scale(input int n); return n * 3; endfunction\n"
+      "  generate\n"
+      "    if (1) begin : a\n"
+      "      localparam int P = scale(4);\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const RtlirParamDecl* p = FindParam(design, "m2", "P");
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->resolved_value, 12);
 }
 
 }  // namespace

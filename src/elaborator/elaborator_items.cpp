@@ -768,7 +768,13 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       // written in. Elaborator::ResolveDefparamsAndGenerates folds the
       // condition after every module has been elaborated, and without the copy
       // it would fold against the union of every module's imports.
-      pending_generates_.push_back({item, mod, typedefs_, cu_param_scope_});
+      //
+      // func_decls_ is copied for the same reason and reaches §13.4.3 rather
+      // than §26.3: Elaborator::ElaborateItems filled it from this module's
+      // ModuleDecl before the item loop that reached here, and
+      // ItemElaborationStateSaver takes it back out when the module returns.
+      pending_generates_.push_back(
+          {item, mod, typedefs_, cu_param_scope_, func_decls_});
       return true;
     case ModuleItemKind::kFunctionDecl:
     case ModuleItemKind::kTaskDecl:
