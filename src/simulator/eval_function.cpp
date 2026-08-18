@@ -11,6 +11,7 @@
 #include "simulator/dpi.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_function_internal.h"
+#include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
@@ -609,6 +610,7 @@ static bool TryEvalWeakRefStaticCall(const Expr* expr, SimContext& ctx,
 
 static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out) {
+  if (TryEvalSemaphoreMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalProcessMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalEventTriggeredCall(expr, ctx, arena, out)) return true;
   if (TryEvalWeakRefMethodCall(expr, ctx, arena, out)) return true;

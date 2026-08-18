@@ -16,6 +16,7 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/awaiters.h"
+#include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
@@ -527,6 +528,15 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
 
   if (IsProcessAwaitCall(expr, ctx)) {
     co_return co_await ExecProcessAwait(expr, ctx, arena);
+  }
+
+  // §15.3: a process calling get() procures the keys it asks for before it can
+  // continue, and waits where it stands until enough keys are in the bucket.
+  // The wait is why this is served here and put()/try_get() are served by the
+  // expression evaluator: only a statement can suspend the process it is in.
+  if (auto* sem = SemaphoreCallTarget(expr, ctx, "get")) {
+    co_await SemaphoreGetAwaiter{*sem, SemaphoreKeyArg(expr, ctx, arena, 1)};
+    co_return StmtResult::kDone;
   }
   auto* func = SetupTaskCall(expr, ctx, arena);
   if (!func) {

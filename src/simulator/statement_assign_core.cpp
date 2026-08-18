@@ -13,6 +13,7 @@
 #include "simulator/assoc_element.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_semaphore.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
 #include "simulator/queue_bound.h"
@@ -836,6 +837,7 @@ static void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx,
 static bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                              Arena& arena) {
   if (TryVirtualInterfaceAssign(stmt, ctx)) return true;
+  if (TrySemaphoreNewAssign(stmt, ctx, arena)) return true;
   if (TryClassNewAssign(stmt, ctx, arena)) return true;
   if (TryTypedClassNewAssign(stmt, ctx, arena)) return true;
   if (TryMemberClassNewAssign(stmt, ctx, arena)) return true;

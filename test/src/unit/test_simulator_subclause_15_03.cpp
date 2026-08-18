@@ -152,4 +152,156 @@ TEST(IpcSync, SemaphoreLimitsConcurrentHoldersToKeyCount) {
   EXPECT_EQ(sem.Get(1), SemGetStatus::kBlock);
 }
 
+// The tests above drive SemaphoreObject from C++. The ones below state the
+// same rule as SystemVerilog, which is where §15.3 makes its claim: a process
+// procures its keys from the bucket before it continues, and waits where it
+// stands until enough keys have been returned.
+
+// §15.3.1 with §15.3.4: new() puts the keys it names into the bucket, and a
+// try_get() that finds them there procures them.
+TEST(SemaphoreSim, NewFillsBucketSoTryGetSucceeds) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  semaphore sem = new(2);\n"
+      "  logic [31:0] got;\n"
+      "  initial got = sem.try_get(1);\n"
+      "endmodule\n",
+      f, "got");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// §15.3.4: a try_get() that finds the bucket short of keys procures none and
+// says so, rather than waiting.
+TEST(SemaphoreSim, TryGetOnEmptyBucketProcuresNothing) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  semaphore sem = new(0);\n"
+      "  logic [31:0] got;\n"
+      "  initial got = sem.try_get(1);\n"
+      "endmodule\n",
+      f, "got");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// §15.3.1: the bucket may also be built by an assignment rather than by a
+// declaration initializer, and the keys reach it either way.
+TEST(SemaphoreSim, NewAssignmentFillsBucket) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  semaphore sem;\n"
+      "  logic [31:0] got;\n"
+      "  initial begin\n"
+      "    sem = new(3);\n"
+      "    got = sem.try_get(3);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "got");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// §15.3: a get() that finds its keys in the bucket procures them and the
+// process continues, so the statement after it runs at the time the get() was
+// reached.
+TEST(SemaphoreSim, GetProcuresAvailableKeysWithoutWaiting) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  semaphore sem = new(1);\n"
+      "  logic [31:0] took;\n"
+      "  initial begin\n"
+      "    #3 sem.get(1);\n"
+      "    took = $time;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "took");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 3u);
+}
+
+// §15.3: "all others shall wait until a sufficient number of keys are returned
+// to the bucket". The one key is held from time 0, so the second process
+// reaches its get() at time 1 and cannot pass it until the put() at time 5.
+// The time it recorded is what says it waited: a get() that did not wait would
+// have recorded 1.
+TEST(SemaphoreSim, GetWaitsUntilKeysAreReturned) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  semaphore sem = new(1);\n"
+      "  logic [31:0] took;\n"
+      "  initial begin\n"
+      "    sem.get(1);\n"
+      "    #5 sem.put(1);\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 sem.get(1);\n"
+      "    took = $time;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "took");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 5u);
+}
+
+// §15.3: the wait ends when *enough* keys are back, not when any key is. Two
+// are asked for and returned one at a time, so the waiting process passes at
+// the second put() and not the first.
+TEST(SemaphoreSim, GetWaitsForASufficientNumberOfKeys) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  semaphore sem = new(0);\n"
+      "  logic [31:0] took;\n"
+      "  initial begin\n"
+      "    #2 sem.put(1);\n"
+      "    #4 sem.put(1);\n"
+      "  end\n"
+      "  initial begin\n"
+      "    sem.get(2);\n"
+      "    took = $time;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "took");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 6u);
+}
+
+// §15.3: only as many processes as there are keys are in progress at once.
+// Each of the two processes here holds the single key across a delay, so the
+// second cannot enter until the first has returned it and the two stretches
+// cannot overlap.
+TEST(SemaphoreSim, OneKeyAdmitsOneProcessAtATime) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  semaphore sem = new(1);\n"
+      "  logic [31:0] inside;\n"
+      "  logic [31:0] overlaps;\n"
+      "  initial begin inside = 0; overlaps = 0; end\n"
+      "  initial begin\n"
+      "    sem.get(1);\n"
+      "    inside = inside + 1;\n"
+      "    if (inside > 1) overlaps = overlaps + 1;\n"
+      "    #4 inside = inside - 1;\n"
+      "    sem.put(1);\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 sem.get(1);\n"
+      "    inside = inside + 1;\n"
+      "    if (inside > 1) overlaps = overlaps + 1;\n"
+      "    inside = inside - 1;\n"
+      "    sem.put(1);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "overlaps");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
 }  // namespace
