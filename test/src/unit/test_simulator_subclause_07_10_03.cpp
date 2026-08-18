@@ -19,11 +19,16 @@
 // eval_array.cpp; whole-queue assignment discarding all ids lives in
 // statement_assign.cpp / statement_assign_core.cpp.
 
+#include <algorithm>
+#include <cstdint>
+#include <vector>
+
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_queue.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
+#include "simulator/lowerer.h"
 
 using namespace delta;
 
@@ -40,6 +45,67 @@ void RunRefOpThenWrite(SimFixture& f, std::vector<Stmt*> op_stmts,
               std::move(op_stmts));
   auto* call = MakeCall(f.arena, "test_fn", {ref_arg});
   EvalExpr(call, f.ctx, f.arena);
+}
+
+// `q[lo:hi]`, the right-hand side of the §7.10.4 assignment forms that shorten
+// a queue.
+Expr* MakeSlice(Arena& arena, std::string_view name, Expr* lo, Expr* hi) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kSelect;
+  e->base = MakeId(arena, name);
+  e->index = lo;
+  e->index_end = hi;
+  return e;
+}
+
+// `{}`, which §7.10 makes the empty queue.
+Expr* MakeEmptyConcat(Arena& arena) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kConcatenation;
+  return e;
+}
+
+// `new[size]`, the §7.5.1 form that resizes a queue.
+Expr* MakeNewSized(Arena& arena, uint64_t size) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kCall;
+  e->text = "new";
+  e->args.push_back(MakeInt(arena, size));
+  return e;
+}
+
+// What the queue `q` holds after `src` has run, together with the identities
+// its elements carried before the initial block ran. §7.10.3 says which
+// identities an operation may discard, so a test of it has to see them from
+// both sides of the operation, and the declaration initializer has run by the
+// time lowering finishes while the initial block has not.
+struct QueueAcrossRun {
+  QueueObject* q;
+  std::vector<uint64_t> ids_before;
+};
+
+QueueAcrossRun RunAndCaptureIds(const char* src, SimFixture& f) {
+  auto* design = ElaborateSrc(src, f);
+  if (!design) return {nullptr, {}};
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  auto* q = f.ctx.FindQueue("q");
+  std::vector<uint64_t> before;
+  if (q) before = q->element_ids;
+  f.scheduler.Run();
+  return {q, before};
+}
+
+// Whether any element of `q` still carries one of the identities in `before`.
+// A reference is outdated exactly when the identity it was taken on is gone,
+// so this answers whether every reference to the queue's earlier elements has
+// been outdated.
+bool AnyIdSurvives(const QueueAcrossRun& r) {
+  return std::any_of(
+      r.ids_before.begin(), r.ids_before.end(), [&](uint64_t id) {
+        return std::find(r.q->element_ids.begin(), r.q->element_ids.end(),
+                         id) != r.q->element_ids.end();
+      });
 }
 
 // Shared body for the "front-prepending op never outdates an existing ref"
@@ -292,6 +358,234 @@ TEST(QueueRefPersistence, ConcatAssignOutdatesAllRefs) {
   EXPECT_EQ(q->elements[1].ToUint64(), 20u);  // no 99: ref outdated by assign
   EXPECT_EQ(q->elements[2].ToUint64(), 30u);
   EXPECT_EQ(q->elements[3].ToUint64(), 40u);
+}
+
+// --- Rule A: an ordering method removes nothing, so every reference survives
+// ------------------
+
+// §7.10.3: sort removes no element, so a reference stays valid and follows the
+// element it was taken on to wherever that element sorted. The reference here
+// is taken on the element holding 30, which sorts from the front to the back,
+// so the write of 99 has to land at the back rather than at the index the
+// reference was taken at.
+TEST(QueueRefPersistence, SortLeavesRefFollowingItsElement) {
+  SimFixture f;
+  auto* q = MakeQueue(f, "q", {30, 10, 20});
+
+  RunRefOpThenWrite(
+      f, {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "sort", {}))},
+      MakeSelect(f.arena, "q", 0));
+
+  ASSERT_EQ(q->elements.size(), 3u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
+  EXPECT_EQ(q->elements[2].ToUint64(), 99u);
+}
+
+// §7.10.3: rsort removes no element either, and the element holding 10 moves
+// from the front to the back.
+TEST(QueueRefPersistence, RsortLeavesRefFollowingItsElement) {
+  SimFixture f;
+  auto* q = MakeQueue(f, "q", {10, 30, 20});
+
+  RunRefOpThenWrite(
+      f, {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "rsort", {}))},
+      MakeSelect(f.arena, "q", 0));
+
+  ASSERT_EQ(q->elements.size(), 3u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 30u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
+  EXPECT_EQ(q->elements[2].ToUint64(), 99u);
+}
+
+// §7.10.3: reverse removes no element, and moves the element holding 10 from
+// the front to the back.
+TEST(QueueRefPersistence, ReverseLeavesRefFollowingItsElement) {
+  SimFixture f;
+  auto* q = MakeQueue(f, "q", {10, 20, 30});
+
+  RunRefOpThenWrite(
+      f, {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "reverse", {}))},
+      MakeSelect(f.arena, "q", 0));
+
+  ASSERT_EQ(q->elements.size(), 3u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 30u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
+  EXPECT_EQ(q->elements[2].ToUint64(), 99u);
+}
+
+// §7.10.3: shuffle removes no element, so the reference taken on the element
+// holding 20 stays valid and the write of 99 replaces that element wherever it
+// landed. The permutation is not predictable, so the claim is stated as what
+// holds for every permutation: the value written is somewhere and the value it
+// replaced is nowhere. A reference outdated by the shuffle would leave 20 in
+// the queue and 99 out of it.
+TEST(QueueRefPersistence, ShuffleLeavesRefValid) {
+  SimFixture f;
+  auto* q = MakeQueue(f, "q", {10, 20, 30});
+
+  RunRefOpThenWrite(
+      f, {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "shuffle", {}))},
+      MakeSelect(f.arena, "q", 1));
+
+  ASSERT_EQ(q->elements.size(), 3u);
+  size_t wrote = 0, kept = 0;
+  for (const auto& e : q->elements) {
+    if (e.ToUint64() == 99u) ++wrote;
+    if (e.ToUint64() == 20u) ++kept;
+  }
+  EXPECT_EQ(wrote, 1u);
+  EXPECT_EQ(kept, 0u);
+}
+
+// --- Rule B: the other whole-queue assignment forms
+// ------------------
+
+// §7.10.3 with §7.10.4: `q = q[1:$]` is an assignment whose target is the
+// entire queue, so it outdates a reference to every element of the original
+// queue -- including the element holding 20, which the slice keeps. A method
+// that dropped only the elements it removed would leave that reference valid,
+// which is the difference §7.10.4 draws between the assignment form and
+// `q.pop_front()`.
+TEST(QueueRefPersistence, SliceAssignOutdatesEvenSurvivingElementRef) {
+  SimFixture f;
+  auto* q = MakeQueue(f, "q", {10, 20, 30});
+
+  RunRefOpThenWrite(f,
+                    {MakeAssign(f.arena, "q",
+                                MakeSlice(f.arena, "q", MakeInt(f.arena, 1),
+                                          MakeId(f.arena, "$")))},
+                    MakeSelect(f.arena, "q", 1));
+
+  ASSERT_EQ(q->elements.size(), 2u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 20u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 30u);
+}
+
+// §7.10.3: `q = {}` assigns the whole queue the empty queue, so every
+// reference is outdated and the write through the held one is dropped.
+TEST(QueueRefPersistence, EmptyConcatAssignOutdatesAllRefs) {
+  SimFixture f;
+  auto* q = MakeQueue(f, "q", {10, 20, 30});
+
+  RunRefOpThenWrite(f, {MakeAssign(f.arena, "q", MakeEmptyConcat(f.arena))},
+                    MakeSelect(f.arena, "q", 1));
+
+  EXPECT_EQ(q->elements.size(), 0u);
+}
+
+// §7.10.3: `q = new[2]` is an assignment whose target is the entire queue, so
+// the reference held to the element that keeps both its value and its index is
+// outdated with the rest.
+TEST(QueueRefPersistence, NewSizedAssignOutdatesAllRefs) {
+  SimFixture f;
+  auto* q = MakeQueue(f, "q", {10, 20, 30});
+
+  RunRefOpThenWrite(f, {MakeAssign(f.arena, "q", MakeNewSized(f.arena, 2))},
+                    MakeSelect(f.arena, "q", 1));
+
+  ASSERT_EQ(q->elements.size(), 2u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
+}
+
+// --- Rule B over the §11.4.14.4 streaming unpack
+// ------------------
+
+// §7.10.3: a streaming unpack that sizes a queue from the stream replaces
+// every element the queue held, so no element may carry an identity from
+// before it ran. Leaving those identities in place lets a reference taken
+// before the unpack write over an element the unpack produced.
+TEST(QueueRefPersistence, GreedyStreamUnpackOutdatesAllRefs) {
+  SimFixture f;
+  auto r = RunAndCaptureIds(
+      "module t;\n"
+      "  byte q[$] = {8'h11, 8'h22, 8'h33};\n"
+      "  logic [7:0] trailer;\n"
+      "  initial begin\n"
+      "    {>> byte {q, trailer}} = 32'hAABBCCDD;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(r.q, nullptr);
+  ASSERT_EQ(r.ids_before.size(), 3u);
+  EXPECT_FALSE(AnyIdSurvives(r));
+}
+
+// §7.10.3: the same unpack leaves one identity per element, so a reference
+// taken after it can be recorded and written back. An element with no identity
+// is unreachable by any later reference.
+TEST(QueueRefPersistence, GreedyStreamUnpackGivesEveryElementAnIdentity) {
+  SimFixture f;
+  auto r = RunAndCaptureIds(
+      "module t;\n"
+      "  byte q[$] = {8'h11, 8'h22, 8'h33};\n"
+      "  logic [7:0] trailer;\n"
+      "  initial begin\n"
+      "    {>> byte {q, trailer}} = 32'hAABBCCDD;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(r.q, nullptr);
+  EXPECT_EQ(r.q->element_ids.size(), r.q->elements.size());
+}
+
+// §7.10.3: a second queue on the left of one streaming unpack takes no bits
+// and is emptied, so every element it held is removed and every reference to
+// one is outdated. An identity left behind on an empty queue is claimed again
+// by the next element pushed onto it.
+TEST(QueueRefPersistence, SecondStreamQueueEmptiedOutdatesAllRefs) {
+  SimFixture f;
+  auto r = RunAndCaptureIds(
+      "module t;\n"
+      "  byte p[$];\n"
+      "  byte q[$] = {8'h11, 8'h22, 8'h33};\n"
+      "  initial begin\n"
+      "    {>> byte {p, q}} = 32'hAABBCCDD;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(r.q, nullptr);
+  ASSERT_EQ(r.ids_before.size(), 3u);
+  EXPECT_TRUE(r.q->element_ids.empty());
+}
+
+// §7.10.3: a with-range unpack names the slots it writes and grows the queue
+// to reach them. Growing removes nothing, so the elements already there keep
+// the identities any reference to them was taken on.
+TEST(QueueRefPersistence, WithRangeStreamUnpackKeepsExistingIdentities) {
+  SimFixture f;
+  auto r = RunAndCaptureIds(
+      "module t;\n"
+      "  byte q[$] = {8'h11, 8'h22};\n"
+      "  initial begin\n"
+      "    {<< byte {q with [0 +: 4]}} = 32'hAABBCCDD;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(r.q, nullptr);
+  ASSERT_EQ(r.ids_before.size(), 2u);
+  ASSERT_GE(r.q->element_ids.size(), 2u);
+  EXPECT_EQ(r.q->element_ids[0], r.ids_before[0]);
+  EXPECT_EQ(r.q->element_ids[1], r.ids_before[1]);
+}
+
+// §7.10.3: the elements that unpack grows onto the end are new, and each needs
+// an identity of its own. Without one the identity list is shorter than the
+// element list, and a later pop_back then discards the identity of an element
+// it did not remove -- outdating a reference the clause says survives.
+TEST(QueueRefPersistence, WithRangeStreamUnpackGivesGrownElementsIdentities) {
+  SimFixture f;
+  auto r = RunAndCaptureIds(
+      "module t;\n"
+      "  byte q[$] = {8'h11, 8'h22};\n"
+      "  initial begin\n"
+      "    {<< byte {q with [0 +: 4]}} = 32'hAABBCCDD;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(r.q, nullptr);
+  EXPECT_EQ(r.q->element_ids.size(), r.q->elements.size());
 }
 
 }  // namespace

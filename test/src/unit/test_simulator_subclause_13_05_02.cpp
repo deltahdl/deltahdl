@@ -208,7 +208,13 @@ TEST(QueueRef, SurvivesInsert) {
   EXPECT_EQ(q->elements[3].ToUint64(), 30u);
 }
 
-TEST(QueueRef, OutdatedByWholeAssign) {
+// §7.10.3: delete() removes every element, so the reference is outdated, and
+// the two elements pushed afterwards are new ones. The name of this test used
+// to say it covered a whole-queue assignment, which it never did -- Rule B is
+// covered in test_simulator_subclause_07_10_03.cpp. What it does state is that
+// an identity a delete discarded is not handed back out to a later push, which
+// would make an outdated reference write over an element pushed after it.
+TEST(QueueRef, OutdatedByDeleteAllNotReclaimedByLaterPush) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 

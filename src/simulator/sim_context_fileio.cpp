@@ -17,6 +17,11 @@ void QueueObject::AssignFreshIds() {
   for (auto& id : element_ids) id = AllocateId();
 }
 
+void QueueObject::AllocateIdsForAppended() {
+  while (element_ids.size() < elements.size())
+    element_ids.push_back(AllocateId());
+}
+
 QueueObject* SimContext::CreateQueue(std::string_view name, uint32_t elem_width,
                                      int32_t max_size, bool is_4state) {
   auto* q = arena_.Create<QueueObject>();

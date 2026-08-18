@@ -272,6 +272,11 @@ static uint32_t CollectQueueWithRangeElements(
   while (queue->elements.size() < needed) {
     queue->elements.push_back(MakeLogic4Vec(arena, queue->elem_width));
   }
+  // §7.10.3: the range names the elements this writes, so the elements outside
+  // it are neither removed nor replaced and keep the identities any reference
+  // to them was taken on. The elements grown onto the end are new and get
+  // identities of their own.
+  queue->AllocateIdsForAppended();
   uint32_t added = 0;
   for (uint32_t i = 0; i < count; ++i) {
     std::string name =
@@ -294,6 +299,9 @@ static uint32_t CollectGreedyQueueElements(const Expr* elem, QueueObject* queue,
   for (uint32_t i = 0; i < count; ++i) {
     queue->elements.push_back(MakeLogic4Vec(arena, queue->elem_width));
   }
+  // §7.10.3: the queue is the whole target of the assignment, so every element
+  // it held is gone and every reference to one of them is outdated.
+  queue->AssignFreshIds();
   uint32_t added = 0;
   for (uint32_t i = 0; i < count; ++i) {
     std::string name = std::string(elem->text) + "__q__" + std::to_string(i);
@@ -335,7 +343,11 @@ static bool TryCollectGreedyDynamicElement(const Expr* elem, StreamEnv env,
     sink.added =
         CollectGreedyQueueElements(elem, queue, fill, env.arena, sink.elems);
   } else {
+    // §7.10.3: a second queue on the left of one streaming assignment takes no
+    // bits and is emptied, which removes every element it held and so outdates
+    // every reference to one.
     queue->elements.clear();
+    queue->element_ids.clear();
   }
   return true;
 }
@@ -523,6 +535,10 @@ static void ForwardUnpackQueueWithRange(const Expr* elem, QueueObject* queue,
   uint32_t needed = start + count;
   while (queue->elements.size() < needed)
     queue->elements.push_back(MakeLogic4Vec(env.arena, queue->elem_width));
+  // §7.10.3: as in CollectQueueWithRangeElements, growing the queue removes
+  // nothing, so the elements already there keep their identities and only the
+  // new ones are given any.
+  queue->AllocateIdsForAppended();
   for (uint32_t i = 0; i < count; ++i) {
     Logic4Vec v = take(queue->elem_width);
     if (start + i < queue->elements.size()) queue->elements[start + i] = v;
