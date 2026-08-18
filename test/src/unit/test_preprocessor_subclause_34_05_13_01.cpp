@@ -77,13 +77,14 @@ struct ReadPublicKey {
 };
 
 // §34.5.13.1: the expression is the keyword and nothing else, so the keyword
-// standing alone states no value of its own. What it does state is that the
-// next line carries one, which is §34.5.13.2's rule and is read only inside a
-// protected region; here there is none, so nothing is put in effect for it.
-TEST(ProtectDataPublicKeySyntax, TheKeywordStandsAloneAndStatesNoValue) {
+// standing alone designates no key by itself. What it states is that the next
+// line carries the key's encoded value, which is §34.5.13.2's rule and is read
+// only inside a protected region; there is none here, so the keyword leaves no
+// value behind to designate anything with.
+TEST(ProtectDataPublicKeySyntax, TheKeywordStandsAloneAndDesignatesNothing) {
   ReadPublicKey run("`pragma protect data_public_key\n");
   EXPECT_FALSE(run.diag.HasErrors());
-  EXPECT_TRUE(run.ValueOf("data_public_key").defaulted);
+  EXPECT_TRUE(run.ValueOf("data_public_key").value.empty());
 }
 
 // §22.11 writes a directive's expressions as a comma-separated list, and an
@@ -118,15 +119,15 @@ TEST(ProtectDataPublicKeySyntax, AnEqualsWithNoValueAfterItIsNoExpression) {
                             "22.11"));
 }
 
-// The keyword written as an escaped identifier. §34.5.13.1 spells it as a
-// simple identifier, and an escaped one is a different token, so what stands
-// there is no pragma_keyword and the directive is no expression.
-TEST(ProtectDataPublicKeySyntax, TheKeywordAsAnEscapedIdentifierIsRejected) {
-  PreprocFixture f;
-  Preprocess("`pragma protect \\data_public_key \n", f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "malformed pragma_expression after pragma_name", 1,
-                            "22.11"));
+// §34.5.13.1 spells one name, and a name that merely opens with those
+// characters is a different one. §34.5.11 puts the keyword this longer name
+// resembles nowhere near it, so a text writing the longer one has written a
+// keyword the table does not list and nothing is put in effect for the one it
+// resembles.
+TEST(ProtectDataPublicKeySyntax, ANameMerelyOpeningWithTheKeywordIsNotIt) {
+  ReadPublicKey run("`pragma protect data_public_key_of_theirs=\"k\"\n");
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_TRUE(run.ValueOf("data_public_key").defaulted);
 }
 
 }  // namespace
