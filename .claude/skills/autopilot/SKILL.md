@@ -5,7 +5,7 @@ description: Start or stop the standing reminders that keep an autonomous issue-
 
 # Autopilot
 
-Eight recurring reminders, one per standing rule, that fire back into this session while it works through open issues on its own. Each rule gets its own reminder so that no rule can be quietly dropped from a merged block of text, and the fire times are staggered across the ten-minute period so they arrive one at a time rather than as a wall.
+Seven recurring reminders, one per standing rule, that fire back into this session while it works through open issues on its own. Each rule gets its own reminder so that no rule can be quietly dropped from a merged block of text, and the fire times are staggered across the ten-minute period so they arrive one at a time rather than as a wall.
 
 The argument selects the mode: `start <issue-number>`, `start sequence`, or `stop`.
 
@@ -13,7 +13,7 @@ The argument selects the mode: `start <issue-number>`, `start sequence`, or `sto
 
 Two forms select the work, and they differ in one reminder. `start <issue-number>` takes the subclause the dependency order points at. `start sequence` takes the issues above 2939, which the subclause resolver cannot name at all.
 
-Create eight jobs with `CronCreate`, exactly as listed below. Use `recurring: true` (the default). Take `:01` from the form the user asked for and leave the other seven verbatim. Each `cron` field is a distinct offset within the same ten-minute period, so the eight reminders never land together.
+Create seven jobs with `CronCreate`, exactly as listed below. Use `recurring: true` (the default). Take `:01` from the form the user asked for and leave the other six verbatim. Each `cron` field is a distinct offset within the same ten-minute period, so the seven reminders never land together.
 
 ### The reminder that selects the work
 
@@ -28,7 +28,7 @@ The number bounds the issues the resolver does not name, and only those. The iss
 | `start <issue-number>` | `1,11,21,31,41,51 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. Run PYTHONPATH=.:scripts python3 -m next_subclause for the subclause in force and the issue tracking it; solve that issue whatever its number, and when it closes the same command names the next. Among the issues it does not name, the ones above #{X} are in scope alongside it and are what this work has filed for itself; the ones at or below #{X} are not.` |
 | `start sequence` | `1,11,21,31,41,51 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. Run the sequence walk in docs/claude/issue-blocked-by-sequence.md and solve the single open issue it reports as the head. When that issue closes, run the walk again for the next one.` |
 
-### The seven reminders both forms carry
+### The six reminders both forms carry
 
 | Offset | Cron | Prompt |
 | --- | --- | --- |
@@ -36,7 +36,6 @@ The number bounds the issues the resolver does not name, and only those. The iss
 | :03 | `3,13,23,33,43,53 * * * *` | `REMINDER: Solve the issue with a single commit and push.` |
 | :04 | `4,14,24,34,44,54 * * * *` | `REMINDER: Solve the issue through parallel agents, without collisions.` |
 | :05 | `5,15,25,35,45,55 * * * *` | `REMINDER: After pushing, deltahdl.yml might fail at integration tests. You can ignore that.` |
-| :06 | `6,16,26,36,46,56 * * * *` | `REMINDER: Compact the conversation before you start solving an issue.` |
 | :07 | `7,17,27,37,47,57 * * * *` | `REMINDER: Do not do anything but wait while a workflow is running.` |
 | :09 | `9,19,29,39,49,59 * * * *` | `REMINDER: When you come up against a new problem, file a GitHub issue. A problem in the program — src/, lib/, scripts/, and the machinery under test/ — gets the sub-headers "Problem", "Why Unit Tests Did Not Catch It?", "Why Integration Tests Did Not Catch It?", "Why E2E Tests Did Not Catch It?", "Which Unit, Integration, or E2E regression tests would prevent this from happening again?", and "Proposed Solution". A problem in a workflow file, a linter configuration, a build file or the docs gets "Problem" and "Proposed Solution" only, and owes no tests.` |
 
@@ -48,13 +47,13 @@ For `start <issue-number>`, run `PYTHONPATH=.:scripts python3 -m next_subclause`
 
 For `start sequence`, run the walk in [issue-blocked-by-sequence](../../../docs/claude/issue-blocked-by-sequence.md) and name the head it reported. If it reports anything but one head, say so and do not start the reminders: the sequence is broken, and a loop taking its head would take an arbitrary one of several.
 
-Either way, say that eight reminders are running and give the two limits that come with them — the jobs live in this session only and are gone when it ends, and recurring jobs auto-expire after seven days.
+Either way, say that seven reminders are running and give the two limits that come with them — the jobs live in this session only and are gone when it ends, and recurring jobs auto-expire after seven days.
 
 Do not begin working the issues as part of starting the reminders. Starting autopilot and doing the work are separate; the first reminder will arrive within ten minutes and start the loop, unless the user asks to begin straight away.
 
 ## Stop
 
-Call `CronList`, then call `CronDelete` once per job it returns — all of them, not only the eight this skill created. "Delete all your reminders" means the session ends with an empty schedule. Call `CronList` again afterwards to confirm it is empty, and report how many jobs were deleted.
+Call `CronList`, then call `CronDelete` once per job it returns — all of them, not only the seven this skill created. "Delete all your reminders" means the session ends with an empty schedule. Call `CronList` again afterwards to confirm it is empty, and report how many jobs were deleted.
 
 `CronList` returning nothing is not a failure; say the schedule was already empty and stop.
 
@@ -68,7 +67,7 @@ The first reminder of either form names a command rather than an issue, and both
 
 Reminder :04 names parallel agents because that is what solves an issue here, and the collision it rules out is two agents writing one file or two agents pushing where the run needs one push. It replaced two reminders that named a list of indivisible Claude tasks. Splitting one rule across two reminders bought nothing, and the list was never what did the work.
 
-Reminder :06 fires at the boundary between issues because that is the only point where the finished issue's context is safe to drop. A loop that solves one issue after another keeps every file it read and every run it waited on, so the window it starts the next issue with is the window the last issue left rather than an empty one. Compacting there costs nothing the next issue needs.
+No reminder tells the loop to compact, because a session cannot compact itself. `/compact` is a built-in Claude Code command whose behaviour is coded into the CLI rather than a bundled skill handed to Claude, so the person at the keyboard is the only one who can run it, and the commands reference at <https://code.claude.com/docs/en/commands> names no tool, hook or flag that would let a session run it. What frees a long session's context instead is the auto-compact window at <https://code.claude.com/docs/en/model-config#set-the-auto-compact-window>, which Claude Code applies on its own as the conversation approaches the context limit. A `:06` reminder to compact before starting an issue was created and then removed for that reason: every firing of it asked for something no iteration of the loop could do, and spent a turn saying so.
 
 Reminder :05 exists because `.github/workflows/deltahdl.yml` is red on every push and that is the standing state rather than a break. `scripts/run_sv_tests/__init__.py` ends in `sys.exit(min(failed, 1))`, so the `integration-test-coverage` job fails while any sv-test does, and 146 of 830 do. Issues #2910 through #2939 track those failures. Without the reminder, `docs/claude/inheriting-a-red-gate.md` sends every iteration of the loop at the same 146 tests it was not started to fix.
 
