@@ -148,8 +148,10 @@ TEST(ProtectDataKeyownerDescription, PublicKeyRepeatingTheKeyNameIsReported) {
   described += NamesKeyName(kSharedValue);
   described += DesignatesPublicKey(kSharedValue);
   Read run(ForeignEnvelope(described));
+  // The report stands at the line the announced value is on, which is the line
+  // the designation is read from, rather than at the keyword announcing it.
   EXPECT_TRUE(
-      ReportedError(run.diag.Diagnostics(), kTwoNamesOneValue, 4, "34.5.10"));
+      ReportedError(run.diag.Diagnostics(), kTwoNamesOneValue, 5, "34.5.10"));
 }
 
 // §34.5.10.2: the same of the third designating name. §34.5.14.1 spells the
@@ -160,8 +162,10 @@ TEST(ProtectDataKeyownerDescription, DecryptKeyRepeatingTheKeyNameIsReported) {
   described += NamesKeyName(kSharedValue);
   described += DesignatesDecryptKey(kSharedValue);
   Read run(ForeignEnvelope(described));
+  // The report stands at the line the announced value is on, which is the line
+  // the designation is read from, rather than at the keyword announcing it.
   EXPECT_TRUE(
-      ReportedError(run.diag.Diagnostics(), kTwoNamesOneValue, 4, "34.5.10"));
+      ReportedError(run.diag.Diagnostics(), kTwoNamesOneValue, 5, "34.5.10"));
 }
 
 // §34.5.10.2: the values are unique for the entity specified, so two entities
