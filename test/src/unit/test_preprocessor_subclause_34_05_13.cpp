@@ -763,12 +763,12 @@ TEST(ProtectDataPublicKeyDecryptionInput,
 
   // Only the algorithm the envelope states changes; the block, the entity and
   // the designation are the ones the region was sealed with.
-  const std::string ours = "`pragma protect data_method=\"x-deltahdl-stream\"";
-  auto at = envelope.find(ours);
+  const std::string kOurs = "`pragma protect data_method=\"x-deltahdl-stream\"";
+  auto at = envelope.find(kOurs);
   ASSERT_NE(at, std::string::npos) << envelope;
   std::string theirs = "`pragma protect data_method=\"des-cbc\"";
   std::string retitled = envelope;
-  retitled.replace(at, ours.size(), theirs);
+  retitled.replace(at, kOurs.size(), theirs);
 
   ReadUnderKeys read(retitled, keys);
   EXPECT_FALSE(read.Holds("module sealed_m")) << read.text;
