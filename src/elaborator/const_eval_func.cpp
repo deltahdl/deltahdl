@@ -67,6 +67,16 @@ std::optional<PackedRange> RegisteredParamRange(std::string_view name) {
     // select stands, so only the module's own parameters are ones this name can
     // be naming. A generate block's parameter is addressed over the range that
     // block declared it with and reached through the block, not from here.
+    //
+    // No test covers this line and none can, which #3224 settles. A select
+    // needs its base to fold, and Elaborator::BuildParamScope no longer enters
+    // a block's parameter under its bare name for a reference outside the
+    // block, so the base of a select on one yields nothing before the range is
+    // ever asked for. The two string readers this rule also reaches are
+    // testable because ConstEvalString and StringParamLength read the registry
+    // with no ScopeMap in between. This line stands so that the five readers
+    // answer §23.9 alike, and it becomes reachable if a base ever folds by some
+    // other route.
     if (!ParamVisibleFromScopes(pd.gen_block_prefix, {})) continue;
     if (!pd.has_decl_range_bounds) return std::nullopt;
     return PackedRange{pd.decl_range_left, pd.decl_range_right};
