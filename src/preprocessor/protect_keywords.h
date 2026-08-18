@@ -35,7 +35,8 @@ bool IsProtectPragmaKeyword(std::string_view name);
 // The set grows as each keyword's subclause is taken: §34.5.10.1 defines the
 // entity that provided a region's keys this way, §34.5.11.1 the algorithm its
 // data are encrypted under, §34.5.12.1 the name picking that entity's key out,
-// and §34.5.16.1 the entity that provided the key its digest is under. A
+// §34.5.16.1 the entity that provided the key its digest is under, and
+// §34.5.17.1 the algorithm that key is encrypted with. A
 // keyword whose subclause defines it with a list -- §34.5.9.1's encoding is the
 // one that does -- is not in it and never will be.
 bool IsProtectStringValuedKeyword(std::string_view name);
