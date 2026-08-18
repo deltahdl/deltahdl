@@ -402,27 +402,11 @@ TEST(DefparamElaboration, DefparamCannotTargetOtherArrayInstance) {
 }
 
 // §23.10.1: defparam overrides value parameters; a localparam is local and
-// cannot be redefined by a defparam statement.
+// cannot be redefined by a defparam statement. The third argument to
+// ReportedError is the other half of the claim: the report names the subclause
+// stating the rule, so a caller learns which rule was enforced without matching
+// the wording of the message.
 TEST(DefparamElaboration, CannotOverrideLocalparam) {
-  ElabFixture f;
-  Elaborate(
-      "module child ();\n"
-      "  localparam int L = 1;\n"
-      "endmodule\n"
-      "module top;\n"
-      "  child u();\n"
-      "  defparam u.L = 5;\n"
-      "endmodule\n",
-      f, "top");
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "defparam cannot override a local parameter", 6,
-                            "23.10.1"));
-}
-
-// §23.10.1: the report that refuses a defparam aimed at a localparam names the
-// subclause stating the rule, so a caller learns which rule was enforced
-// without matching the wording of the message.
-TEST(DefparamElaboration, CannotOverrideLocalparamNames23_10_1) {
   ElabFixture f;
   Elaborate(
       "module child ();\n"
