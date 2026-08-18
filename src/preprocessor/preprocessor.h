@@ -215,6 +215,11 @@ class Preprocessor {
   void ResetDirectiveState();
   void HandlePragma(std::string_view rest, SourceLoc loc, int depth,
                     std::string& output);
+  // §22.11.1: restores the default values and state of the pragma_keywords
+  // belonging to the pragma `pragma_name names, which is what the reset and
+  // resetall pragmas do to every pragma they affect. A pragma_name this
+  // implementation does not recognise carries no such state and is left alone.
+  void ResetPragma(std::string_view pragma_name);
   void ApplyProtectKeywords(
       const std::vector<PragmaKeywordExpression>& keywords, SourceLoc loc,
       int depth, std::string& output);

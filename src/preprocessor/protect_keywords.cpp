@@ -527,6 +527,11 @@ void ProtectKeywordScope::Apply(std::string_view keyword,
   in_effect_.push_back({std::string(keyword), std::string(body)});
 }
 
+// §22.11.1: a keyword stands at its default exactly when it has no entry, so
+// dropping the entries the directives wrote leaves every keyword at the value
+// it had before any text was read.
+void ProtectKeywordScope::Reset() { in_effect_.clear(); }
+
 // A keyword no directive has written has no entry, and what stands in its
 // place is its default value.
 ProtectKeywordValue ProtectKeywordScope::ValueOf(

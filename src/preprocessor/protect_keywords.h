@@ -201,6 +201,13 @@ class ProtectKeywordScope {
   // writes one.
   ProtectKeywordValue ValueOf(std::string_view keyword) const;
 
+  // §22.11.1: puts every protect pragma keyword back to the value it had
+  // before any SystemVerilog text was processed, which is the default the
+  // table gives it. A keyword no directive has written already stands at its
+  // default, so dropping what the directives wrote is the whole of it. This is
+  // what `pragma reset protect and `pragma resetall restore.
+  void Reset();
+
   // The name of the key a digest is under at the point the reading has
   // reached.
   //

@@ -7,6 +7,7 @@
 #include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
+#include "preprocessor/standard_pragmas.h"
 
 namespace delta {
 
@@ -491,9 +492,32 @@ void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc, int depth,
       return;
     }
   }
-  if (toks.front().text == kProtectPragmaName) {
+  std::string_view name = toks.front().text;
+  if (name == kProtectPragmaName) {
     ApplyProtectKeywords(keywords, loc, depth, output);
+    return;
   }
+  // §22.11.1: the reset pragma restores the state of every pragma_name written
+  // as one of its own pragma_keywords, and resetall restores the state of every
+  // pragma_name this implementation recognises.
+  if (name == kResetPragmaName) {
+    for (const auto& expr : keywords) ResetPragma(expr.keyword);
+    return;
+  }
+  if (name == kResetallPragmaName) {
+    for (std::string_view recognized : RecognizedPragmaNames()) {
+      ResetPragma(recognized);
+    }
+  }
+}
+
+// §22.11.1: the default values a reset restores are the values the tool defines
+// before any SystemVerilog text has been processed. For the protect pragma
+// those are the defaults its keyword table gives, which is what a keyword scope
+// holding nothing reports.
+void Preprocessor::ResetPragma(std::string_view pragma_name) {
+  if (!IsRecognizedPragmaName(pragma_name)) return;
+  if (pragma_name == kProtectPragmaName) protect_keywords_.Reset();
 }
 
 bool Preprocessor::ProcessExpandedStateDirective(std::string_view line,
