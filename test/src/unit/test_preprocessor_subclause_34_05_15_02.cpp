@@ -92,17 +92,22 @@ TEST(ProtectDataBlockDescription, ReversingTheDeclaredSchemeOpensTheBlock) {
   EXPECT_NE(read.find(kSealedDesign), std::string::npos) << read;
 }
 
-// The same block with the envelope declaring a different scheme, so the reading
-// reverses an encoding the block was not written in. What that leaves is not
-// the ciphertext, so the block does not open and the design stays sealed --
-// which is what makes reversing the encoding a step rather than a formality.
-TEST(ProtectDataBlockDescription, ReversingAnotherSchemeDoesNotOpenTheBlock) {
+// §34.5.15.2, decryption input: the block is read in the encoded form and that
+// form is reversed, so the characters standing in the envelope are the block
+// and not a copy of it kept elsewhere. Changing one of them changes what the
+// reversal yields, and what that yields is no longer the ciphertext the key
+// was made for, so the design stays sealed.
+TEST(ProtectDataBlockDescription, TheEncodedCharactersAreWhatIsReversed) {
   std::string envelope = EnvelopeEncodedIn(kNamedScheme);
-  const std::string kDeclared = "enctype=\"base64\"";
-  auto at = envelope.find(kDeclared);
+  const std::string kOpening = "`pragma protect data_block=\"";
+  auto at = envelope.find(kOpening);
   ASSERT_NE(at, std::string::npos) << envelope;
+  // A character well inside the encoded run, so what is altered is the block
+  // rather than the punctuation around it.
+  auto target = at + kOpening.size() + 8;
+  ASSERT_LT(target, envelope.size());
   std::string altered = envelope;
-  altered.replace(at, kDeclared.size(), "enctype=\"uuencode\"");
+  altered[target] = (altered[target] == 'A') ? 'B' : 'A';
 
   PreprocFixture f;
   std::string read = ReadBack(altered, f);
