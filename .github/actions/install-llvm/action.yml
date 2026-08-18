@@ -118,12 +118,25 @@ runs:
         # and a bound tight enough to cut off a slow mirror that is still
         # sending turns a green run red.
         RETRY_TIMEOUT=300
+        #
+        # The attempt is teed to a file so the warning can show where the
+        # attempt stopped. The command alone does not say which host stalled:
+        # apt-get contacts every mirror the runner image lists as well as
+        # apt.llvm.org, so 'sudo apt-get ... update failed or stalled' reads as
+        # though apt.llvm.org were unreachable whichever host was. GitHub runs
+        # a `shell: bash` step with -o pipefail, which is what makes the
+        # pipeline report the command's exit status rather than tee's.
         retry() {
-          local n
+          local n log
+          log=$(mktemp)
           for n in 1 2 3 4 5; do
-            timeout -k 30 "${RETRY_TIMEOUT}" "$@" && return 0
-            echo "::warning::'$*' failed or stalled (attempt ${n});" \
-              "retrying in $((n * 5))s"
+            if timeout -k 30 "${RETRY_TIMEOUT}" "$@" 2>&1 | tee "${log}"; then
+              return 0
+            fi
+            echo "::warning::'$*' failed or stalled (attempt ${n}); the lines" \
+              "below are where that attempt stopped, and name the host it was" \
+              "waiting on; retrying in $((n * 5))s"
+            tail -n 5 "${log}"
             sudo dpkg --configure -a || true
             sleep $((n * 5))
           done
@@ -142,12 +155,32 @@ runs:
         # attempt. Without it the only bound is the `timeout` around the
         # attempt, which kills an install that had fetched most of the
         # toolchain and makes the next attempt start from nothing.
+        #
+        # Acquire::Retries is 1 because it multiplies against the same bound.
+        # Each index file costs up to that many extra tries of 30 seconds, and
+        # four dists of ten files each therefore outrun RETRY_TIMEOUT on one
+        # unreachable mirror without a single request being slow. One retry is
+        # what absorbs a transient error; the loop above is what survives an
+        # outage, and it restarts the whole command rather than one file.
         apt_opts=(
           -o Acquire::http::Timeout=30
           -o Acquire::https::Timeout=30
-          -o Acquire::Retries=3
+          -o Acquire::Retries=1
         )
-        retry sudo apt-get "${apt_opts[@]}" update
+        # The update refreshes the LLVM list alone. apt-get update otherwise
+        # refreshes every source on the runner image, which resolves the Ubuntu
+        # archive through /etc/apt/apt-mirrors.txt, and a mirror in that list
+        # that has gone quiet costs this step minutes for indices the install
+        # below does not need refreshed: the image ships them already
+        # populated. Dir::Etc::sourceparts=- is what excludes the rest of
+        # /etc/apt/sources.list.d/, and APT::Get::List-Cleanup=0 is what keeps
+        # the indices the image fetched, which the install needs to resolve the
+        # toolchain's Ubuntu dependencies.
+        retry sudo apt-get "${apt_opts[@]}" \
+          -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/llvm.list \
+          -o Dir::Etc::sourceparts=- \
+          -o APT::Get::List-Cleanup=0 \
+          update
         # Unquoted on purpose: the input is a list of package names and apt
         # has to see each as an argument of its own.
         # The install fetches and unpacks the better part of a gigabyte, which
