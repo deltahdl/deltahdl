@@ -87,9 +87,10 @@ std::string EnvelopeNaming(std::string_view identifier) {
 // A reading of `src` by a tool holding the key the region was sealed under.
 struct ReadBack {
   PreprocFixture f;
+  std::string source;
   std::string text;
 
-  explicit ReadBack(const std::string& src) {
+  explicit ReadBack(const std::string& src) : source(src) {
     PreprocConfig config;
     config.protect_key = std::string(kRegionKey);
     text = Preprocess(src, f, config);
@@ -109,7 +110,7 @@ TEST(ProtectDataMethodDescription,
      ABlockNamingARequiredCipherWeLackIsReported) {
   ReadBack run(EnvelopeNaming("des-cbc"));
   EXPECT_TRUE(ReportedError(run.f.diag.Diagnostics(), kNotProvided,
-                            LineHolding(run.text, "data_block"), "34.5.11.2"))
+                            LineHolding(run.source, "data_block"), "34.5.11.2"))
       << run.text;
   EXPECT_FALSE(run.Recovered()) << run.text;
 }
@@ -121,7 +122,7 @@ TEST(ProtectDataMethodDescription,
      ABlockNamingAnOptionalCipherWeLackIsReported) {
   ReadBack run(EnvelopeNaming("aes128-cbc"));
   EXPECT_TRUE(ReportedError(run.f.diag.Diagnostics(), kNotProvided,
-                            LineHolding(run.text, "data_block"), "34.5.11.2"))
+                            LineHolding(run.source, "data_block"), "34.5.11.2"))
       << run.text;
   EXPECT_FALSE(run.Recovered()) << run.text;
 }
@@ -131,7 +132,7 @@ TEST(ProtectDataMethodDescription,
 TEST(ProtectDataMethodDescription, ABlockNamingAnUnknownIdentifierIsReported) {
   ReadBack run(EnvelopeNaming("x-some-other-tools-cipher"));
   EXPECT_TRUE(ReportedError(run.f.diag.Diagnostics(), kNotProvided,
-                            LineHolding(run.text, "data_block"), "34.5.11.2"))
+                            LineHolding(run.source, "data_block"), "34.5.11.2"))
       << run.text;
   EXPECT_FALSE(run.Recovered()) << run.text;
 }

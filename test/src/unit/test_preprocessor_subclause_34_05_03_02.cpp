@@ -595,10 +595,16 @@ TEST(ProtectBeginProtectedDescription,
   std::string region = NamedRegionAround(SealedModel());
   ReadSource run(EncryptedUnderNames(region),
                  ReadSource::KeyConfig(kAuthorKey));
+  // §34.5.11.2 has the data_method state the algorithm a block is decrypted
+  // with, and the sealed model names a cipher of its own that this reader does
+  // not provide, so that is what the reading cannot get past -- it is met
+  // before the key is, a block under an unprovided cipher being unreadable
+  // whatever key is held. What §34.5.3.2 asks of the reading either way is that
+  // it report rather than let the design silently fail to appear.
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(),
-      "protect pragma data block cannot be decrypted with the key supplied",
-      LineHolding(region, "data_block=") - 2, "34.3.2"));
+      "states an encryption algorithm this implementation does not provide",
+      LineHolding(region, "data_block=") - 2, "34.5.11.2"));
   EXPECT_TRUE(Holds(run.text, kOuterStatement));
 }
 
