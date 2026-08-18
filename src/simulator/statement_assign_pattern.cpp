@@ -526,11 +526,17 @@ static bool CollectFromQueueElem(const Expr* expr, SimContext& ctx,
   return true;
 }
 
+// §10.10: an item of an unpacked array concatenation that is itself an unpacked
+// array "shall represent as many elements as exist in that item, arranged in
+// the same left-to-right order as they would appear in the array item itself".
+// Left to right is the order the declaration writes, so an array declared
+// `int a[3:0]` contributes a[3] first and a[0] last, and one declared
+// `int a[0:3]` contributes them the other way round.
 static void CollectFixedArrayElements(std::string_view name,
                                       const ArrayInfo& ai, SimContext& ctx,
                                       std::vector<Logic4Vec>& out) {
   for (uint32_t i = 0; i < ai.size; ++i) {
-    uint32_t idx = ai.lo + i;
+    uint32_t idx = ai.is_descending ? (ai.lo + ai.size - 1 - i) : (ai.lo + i);
     auto ename = std::string(name) + "[" + std::to_string(idx) + "]";
     auto* v = ctx.FindVariable(ename);
     if (v) out.push_back(v->value);
@@ -605,8 +611,8 @@ static bool IsPositionalPattern(const Expr* expr) {
          expr->elements[0]->kind != ExprKind::kReplicate;
 }
 
-static void CollectQueueElements(const Expr* expr, SimContext& ctx,
-                                 Arena& arena, std::vector<Logic4Vec>& out) {
+void CollectQueueElements(const Expr* expr, SimContext& ctx, Arena& arena,
+                          std::vector<Logic4Vec>& out) {
   if (expr->kind == ExprKind::kConcatenation || IsPositionalPattern(expr)) {
     for (auto* elem : expr->elements) CollectQueueItem(elem, ctx, arena, out);
     return;

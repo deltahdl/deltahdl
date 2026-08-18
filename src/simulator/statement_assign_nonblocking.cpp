@@ -118,16 +118,41 @@ static void ScheduleArrayConcatNbaElements(const Stmt* stmt,
   }
 }
 
+// §7.10.4: a right-hand side that gives a queue its elements rather than one
+// value. The subclause writes those as an unpacked array concatenation, as in
+// `q = {q, 6}`, and as a bare slice of a queue, as in `q = q[1:$]`. The second
+// carries no braces, so a test for a concatenation alone reads it as the single
+// value its elements would concatenate to and leaves the queue holding one
+// element where the slice named several.
+static bool IsQueueValuedRhs(const Expr* rhs, SimContext& ctx) {
+  if (rhs->kind == ExprKind::kConcatenation) return true;
+  if (rhs->kind != ExprKind::kSelect || !rhs->base || !rhs->index_end)
+    return false;
+  return rhs->base->kind == ExprKind::kIdentifier &&
+         ctx.FindQueue(rhs->base->text) != nullptr;
+}
+
 static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) return false;
-  if (!stmt->rhs || stmt->rhs->kind != ExprKind::kConcatenation) return false;
+  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier || !stmt->rhs)
+    return false;
 
   auto* ainfo = ctx.FindArrayInfo(stmt->lhs->text);
-  auto* q = ctx.FindQueue(stmt->lhs->text);
+  auto* q = ainfo ? nullptr : ctx.FindQueue(stmt->lhs->text);
   if (!ainfo && !q) return false;
+  if (ainfo && stmt->rhs->kind != ExprKind::kConcatenation) return false;
+  if (q && !IsQueueValuedRhs(stmt->rhs, ctx)) return false;
 
+  // §10.4.2 evaluates the right-hand side of a nonblocking assignment when the
+  // statement executes, so the elements are collected here and the event
+  // installs the value they made. A right-hand side naming the target queue
+  // therefore reads what the queue held at execution, as §7.10.4's `q = q[1:$]`
+  // requires.
   std::vector<Logic4Vec> elems;
-  CollectArrayConcatElements(stmt->rhs, ctx, arena, elems);
+  if (ainfo) {
+    CollectArrayConcatElements(stmt->rhs, ctx, arena, elems);
+  } else {
+    CollectQueueElements(stmt->rhs, ctx, arena, elems);
+  }
 
   uint64_t delay = 0;
   if (stmt->delay) delay = EvalExpr(stmt->delay, ctx, arena).ToUint64();
@@ -144,9 +169,13 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     event->callback = [q, &ctx, loc = stmt->rhs->range.start,
                        elems = std::move(elems)]() {
       q->elements = elems;
-      q->element_ids.clear();
-      ++q->generation;
       EnforceQueueBound(q, "nonblocking assignment", loc, ctx);
+      // §7.10.3: assigning the queue variable outdates every reference to the
+      // elements it held. Fresh ids do that, where clearing the list would also
+      // stop the queue recording a reference taken after the assignment, which
+      // the subclause outdates nothing of.
+      q->AssignFreshIds();
+      ++q->generation;
     };
     ctx.GetScheduler().ScheduleEvent(slot.time, slot.region, event);
   }

@@ -102,6 +102,37 @@ TEST(UnpackedArrayConcatSim, ConcatWithArrayItemsExpandsLeftToRight) {
   EXPECT_EQ(q->elements[3].ToUint64(), 40u);
 }
 
+// §10.10: an array item "shall represent as many elements as exist in that
+// item, arranged in the same left-to-right order as they would appear in the
+// array item itself". Left to right is the order the declaration writes, so
+// `int A[1:0]` contributes A[1] first. Each element is written through its own
+// subscript rather than through an assignment pattern, so that the order the
+// pattern would fill the array in cannot cancel the order the concatenation
+// expands it in and leave the same answer either way.
+TEST(UnpackedArrayConcatSim, DescendingArrayItemExpandsHighestIndexFirst) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int A[1:0];\n"
+      "  int q[$];\n"
+      "  initial begin\n"
+      "    A[1] = 10;\n"
+      "    A[0] = 20;\n"
+      "    q = {A};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* q = f.ctx.FindQueue("q");
+  ASSERT_NE(q, nullptr);
+  ASSERT_EQ(q->elements.size(), 2u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
+}
+
 TEST(UnpackedArrayConcatSim, ConcatToDynamicArray) {
   SimFixture f;
   auto* design = ElaborateSrc(

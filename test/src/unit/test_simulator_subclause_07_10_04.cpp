@@ -294,4 +294,247 @@ TEST(QueueAssign, ConcatInsertAfterPosEquivInsertPlus1) {
   ExpectQueueContents(f, "q", {10, 20, 30, 99, 40});
 }
 
+// The tests above build each right-hand side as an AST and hand it straight to
+// TryQueueBlockingAssign, which says nothing about whether a source file
+// written the way §7.10.4 writes it reaches that function. The tests below
+// state each of the subclause's forms as SystemVerilog, starting from the
+// declaration the subclause itself uses, `int q[$] = { 2, 4, 8 };`.
+
+// §7.10.4: `q = { q, 6 }` leaves what `q.push_back(6)` would leave.
+TEST(QueueAssign, SourceConcatAppendEquivPushBack) {
+  RunAndExpectQueue(
+      "module t;\n"
+      "  int q[$] = {2, 4, 8};\n"
+      "  initial q = {q, 6};\n"
+      "endmodule\n",
+      "q", {2, 4, 8, 6});
+}
+
+// §7.10.4: `q = { e, q }` leaves what `q.push_front(e)` would leave.
+TEST(QueueAssign, SourceConcatPrependEquivPushFront) {
+  RunAndExpectQueue(
+      "module t;\n"
+      "  int q[$] = {2, 4, 8};\n"
+      "  int e = 6;\n"
+      "  initial q = {e, q};\n"
+      "endmodule\n",
+      "q", {6, 2, 4, 8});
+}
+
+// §7.10.4: `q = q[1:$]` leaves what `q.pop_front()` or `q.delete(0)` would
+// leave. The right-hand side reads the queue it is assigned to, so the
+// elements it names have to be taken before the assignment writes.
+TEST(QueueAssign, SourceSliceFromOneEquivPopFront) {
+  RunAndExpectQueue(
+      "module t;\n"
+      "  int q[$] = {2, 4, 8};\n"
+      "  initial q = q[1:$];\n"
+      "endmodule\n",
+      "q", {4, 8});
+}
+
+// §7.10.4: `q = q[0:$-1]` leaves what `q.pop_back()` or
+// `q.delete(q.size-1)` would leave.
+TEST(QueueAssign, SourceSliceToLastMinusOneEquivPopBack) {
+  RunAndExpectQueue(
+      "module t;\n"
+      "  int q[$] = {2, 4, 8};\n"
+      "  initial q = q[0:$-1];\n"
+      "endmodule\n",
+      "q", {2, 4});
+}
+
+// §7.10.4: `q = { q[0:pos-1], e, q[pos:$] }` leaves what `q.insert(pos, e)`
+// would leave. `pos` is a variable, which is what §7.10.1 means by saying the
+// slice bounds "may be arbitrary integral expressions and, in particular, are
+// not required to be constant expressions".
+TEST(QueueAssign, SourceConcatInsertAtPosEquivInsert) {
+  RunAndExpectQueue(
+      "module t;\n"
+      "  int q[$] = {2, 4, 8};\n"
+      "  int e = 6;\n"
+      "  int pos = 1;\n"
+      "  initial q = {q[0:pos-1], e, q[pos:$]};\n"
+      "endmodule\n",
+      "q", {2, 6, 4, 8});
+}
+
+// §7.10.4: `q = { q[0:pos], e, q[pos+1:$] }` leaves what `q.insert(pos+1, e)`
+// would leave, one place later than the form above from the same `pos`.
+TEST(QueueAssign, SourceConcatInsertAfterPosEquivInsertPlusOne) {
+  RunAndExpectQueue(
+      "module t;\n"
+      "  int q[$] = {2, 4, 8};\n"
+      "  int e = 6;\n"
+      "  int pos = 1;\n"
+      "  initial q = {q[0:pos], e, q[pos+1:$]};\n"
+      "endmodule\n",
+      "q", {2, 4, 6, 8});
+}
+
+// §7.10.4: `q = q[2:$]` is "a new queue lacking the first two items".
+TEST(QueueAssign, SourceSliceDropsFirstTwo) {
+  RunAndExpectQueue(
+      "module t;\n"
+      "  int q[$] = {2, 4, 8, 16, 32};\n"
+      "  initial q = q[2:$];\n"
+      "endmodule\n",
+      "q", {8, 16, 32});
+}
+
+// §7.10.4: `q = q[1:$-1]` is "a new queue lacking the first and last items".
+TEST(QueueAssign, SourceSliceDropsFirstAndLast) {
+  RunAndExpectQueue(
+      "module t;\n"
+      "  int q[$] = {2, 4, 8, 16, 32};\n"
+      "  initial q = q[1:$-1];\n"
+      "endmodule\n",
+      "q", {4, 8, 16});
+}
+
+// §7.10.3: "any reference to elements of the queue will become outdated by the
+// assignment operation". A reference taken after the assignment is not one of
+// those, so it still writes back.
+TEST(QueueAssign, SourceRefTakenAfterAssignWritesBack) {
+  RunAndExpectQueue(
+      "module t;\n"
+      "  int q[$] = {2, 4, 8};\n"
+      "  function automatic void set_ref(ref int v);\n"
+      "    v = 99;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    q = {q, 6};\n"
+      "    set_ref(q[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      "q", {2, 99, 8, 6});
+}
+
+// §7.10.4 with §10.4.2: a nonblocking assignment updates the queue variable in
+// the same nine forms a blocking one does. Its right-hand side is evaluated
+// where the statement stands and the queue is written in the NBA region, which
+// changes when the queue changes and not what it is left holding.
+TEST(QueueAssignNba, ConcatAppendEquivPushBack) {
+  RunAndExpectQueue(
+      "module t;\n"
+      "  int q[$] = {2, 4, 8};\n"
+      "  initial q <= {q, 6};\n"
+      "endmodule\n",
+      "q", {2, 4, 8, 6});
+}
+
+// §7.10.4: the nonblocking spelling of `q = { e, q }`.
+TEST(QueueAssignNba, ConcatPrependEquivPushFront) {
+  RunAndExpectQueue(
+      "module t;\n"
+      "  int q[$] = {2, 4, 8};\n"
+      "  int e = 6;\n"
+      "  initial q <= {e, q};\n"
+      "endmodule\n",
+      "q", {6, 2, 4, 8});
+}
+
+// §7.10.4: the nonblocking spelling of `q = q[1:$]`. The right-hand side is a
+// slice and carries no braces, so a queue path that recognizes only a
+// concatenation reads it as the one value its elements concatenate to.
+TEST(QueueAssignNba, SliceFromOneEquivPopFront) {
+  RunAndExpectQueue(
+      "module t;\n"
+      "  int q[$] = {2, 4, 8};\n"
+      "  initial q <= q[1:$];\n"
+      "endmodule\n",
+      "q", {4, 8});
+}
+
+// §7.10.4: the nonblocking spelling of `q = q[0:$-1]`.
+TEST(QueueAssignNba, SliceToLastMinusOneEquivPopBack) {
+  RunAndExpectQueue(
+      "module t;\n"
+      "  int q[$] = {2, 4, 8};\n"
+      "  initial q <= q[0:$-1];\n"
+      "endmodule\n",
+      "q", {2, 4});
+}
+
+// §7.10.4: the nonblocking spelling of `q = { q[0:pos-1], e, q[pos:$] }`. A
+// slice written as an item of the concatenation contributes the run of
+// elements it names, not the single value they concatenate to.
+TEST(QueueAssignNba, ConcatInsertAtPosEquivInsert) {
+  RunAndExpectQueue(
+      "module t;\n"
+      "  int q[$] = {2, 4, 8};\n"
+      "  int e = 6;\n"
+      "  int pos = 1;\n"
+      "  initial q <= {q[0:pos-1], e, q[pos:$]};\n"
+      "endmodule\n",
+      "q", {2, 6, 4, 8});
+}
+
+// §7.10.4: the nonblocking spelling of `q = q[2:$]`.
+TEST(QueueAssignNba, SliceDropsFirstTwo) {
+  RunAndExpectQueue(
+      "module t;\n"
+      "  int q[$] = {2, 4, 8, 16, 32};\n"
+      "  initial q <= q[2:$];\n"
+      "endmodule\n",
+      "q", {8, 16, 32});
+}
+
+// §7.10.4: the nonblocking spelling of `q = q[1:$-1]`.
+TEST(QueueAssignNba, SliceDropsFirstAndLast) {
+  RunAndExpectQueue(
+      "module t;\n"
+      "  int q[$] = {2, 4, 8, 16, 32};\n"
+      "  initial q <= q[1:$-1];\n"
+      "endmodule\n",
+      "q", {4, 8, 16});
+}
+
+// §7.10.4: the nonblocking spelling of `q = {}`, which §7.10 makes the empty
+// queue.
+TEST(QueueAssignNba, EmptyConcatClearsQueue) {
+  RunAndExpectQueue(
+      "module t;\n"
+      "  int q[$] = {2, 4, 8};\n"
+      "  initial q <= {};\n"
+      "endmodule\n",
+      "q", {});
+}
+
+// §10.4.2: the right-hand side of a nonblocking assignment is evaluated when
+// the statement executes, so both statements below read the queue the
+// declaration left and the second one's value is what the NBA region writes.
+// A right-hand side evaluated in the NBA region instead would append 4 and
+// then append 5 to the result, leaving five elements.
+TEST(QueueAssignNba, RhsReadsQueueWhereTheStatementStands) {
+  RunAndExpectQueue(
+      "module t;\n"
+      "  int q[$] = {2, 4, 8};\n"
+      "  initial begin\n"
+      "    q <= {q, 4};\n"
+      "    q <= {q, 5};\n"
+      "  end\n"
+      "endmodule\n",
+      "q", {2, 4, 8, 5});
+}
+
+// §7.10.3: a nonblocking assignment to the queue variable outdates the
+// references the queue held, and leaves the queue able to record a reference
+// taken afterwards. A path that dropped the element identities rather than
+// replacing them would leave this write-back with nothing to land on.
+TEST(QueueAssignNba, RefTakenAfterAssignWritesBack) {
+  RunAndExpectQueue(
+      "module t;\n"
+      "  int q[$] = {2, 4, 8};\n"
+      "  function automatic void set_ref(ref int v);\n"
+      "    v = 99;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    q <= {q, 6};\n"
+      "    #1 set_ref(q[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      "q", {2, 99, 8, 6});
+}
+
 }  // namespace

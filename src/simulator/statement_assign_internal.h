@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string_view>
+#include <vector>
 
 #include "common/types.h"
 
@@ -84,6 +85,22 @@ bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind);
 // definitely as a bare number does. `default` and a simple-type key name no
 // index and are not asked about here.
 uint32_t PatternKeyIndex(const Expr* key, SimContext& ctx, Arena& arena);
+
+// §7.10.4: the elements a right-hand side contributes to a queue it is
+// assigned to. An item naming a queue or an unpacked array contributes that
+// object's elements, a queue slice contributes the run of elements it names,
+// and anything else contributes the one value it evaluates to. A right-hand
+// side that is not a concatenation is itself the single item, which is what
+// makes `q = q[1:$]` a queue of the elements the slice names rather than a
+// queue holding one value.
+//
+// Every element is copied into `out` before any caller writes it back, so a
+// right-hand side reading the queue it is assigned to is safe.
+//
+// Defined in statement_assign_pattern.cpp; also used by the nonblocking form of
+// the same assignment in statement_assign_nonblocking.cpp.
+void CollectQueueElements(const Expr* expr, SimContext& ctx, Arena& arena,
+                          std::vector<Logic4Vec>& out);
 
 // Defined in statement_assign.cpp; also used by the array-copy form of a
 // pattern assignment in statement_assign_pattern.cpp. Copies element by
