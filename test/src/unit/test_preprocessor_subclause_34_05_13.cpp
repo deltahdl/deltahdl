@@ -746,4 +746,50 @@ TEST(ProtectDataPublicKeyDecryptionInput,
   EXPECT_FALSE(read.diag.HasErrors());
 }
 
+// §34.5.13.2 names three things a decrypting tool combines to settle whether it
+// can open a block: the entity, the algorithm, and this designation. The cases
+// above vary the first and the third. This one varies the second, leaving the
+// pair that reaches the key exactly as the region wrote it and changing only
+// the cipher the envelope names to one this implementation does not provide.
+// The block stays shut, so the algorithm is part of the combination rather than
+// a note beside it -- and the report names the cipher rather than the key,
+// there being nothing wrong with the key.
+TEST(ProtectDataPublicKeyDecryptionInput,
+     TheAlgorithmJoinsTheEntityAndTheDesignation) {
+  std::string described = NamesKeyOwner(kKeyOwner);
+  described += PublicKeyDesignation(kPublicKey, BlockEncoding());
+  ProtectKeyList keys = KeyHeldUnder(kKeyOwner, kPublicKey);
+  std::string envelope = EnvelopeFor(described, keys);
+
+  // Only the algorithm the envelope states changes; the block, the entity and
+  // the designation are the ones the region was sealed with.
+  const std::string ours = "`pragma protect data_method=\"x-deltahdl-stream\"";
+  auto at = envelope.find(ours);
+  ASSERT_NE(at, std::string::npos) << envelope;
+  std::string theirs = "`pragma protect data_method=\"des-cbc\"";
+  std::string retitled = envelope;
+  retitled.replace(at, ours.size(), theirs);
+
+  ReadUnderKeys read(retitled, keys);
+  EXPECT_FALSE(read.Holds("module sealed_m")) << read.text;
+  EXPECT_TRUE(ReportedError(
+      read.diag.Diagnostics(),
+      "states an encryption algorithm this implementation does not provide",
+      LineHolding(retitled, "data_block"), "34.5.11.2"))
+      << read.text;
+}
+
+// The same envelope left as it was written, which is the pair reaching the key
+// under the algorithm this implementation does provide. Without it the case
+// above would hold of a reading that refused this region for some other reason.
+TEST(ProtectDataPublicKeyDecryptionInput,
+     TheSameEnvelopeOpensUnderTheAlgorithmItWasSealedWith) {
+  std::string described = NamesKeyOwner(kKeyOwner);
+  described += PublicKeyDesignation(kPublicKey, BlockEncoding());
+  ProtectKeyList keys = KeyHeldUnder(kKeyOwner, kPublicKey);
+  ReadUnderKeys read(EnvelopeFor(described, keys), keys);
+  EXPECT_TRUE(read.Holds("module sealed_m")) << read.text;
+  EXPECT_FALSE(read.diag.HasErrors());
+}
+
 }  // namespace
