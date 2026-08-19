@@ -81,9 +81,18 @@ constexpr std::string_view kDigestKeyMethod = "x-meridian-digest-cipher";
 // separate one such a block states for the region's digests. Two values rather
 // than one, so that a digest sealed under either is a digest the other does not
 // open and the case can say which key was reached.
-constexpr std::string_view kSessionKey = "session-key-that-opens-the-data";
+//
+// The two differ at their first character rather than at some later one.
+// CombineWithKey in src/preprocessor/protect_processing_cipher.cpp walks the
+// key alongside the bytes it combines with, taking key[n % key.size()] for
+// byte n, so a key reaches only as far into itself as the block is long. A
+// digest block here is four fingerprint bytes and a 20-byte SHA-1 digest, and
+// two keys agreeing over those 24 characters open it identically however they
+// end -- which would leave a case that seals a digest under the wrong key
+// unable to fail.
+constexpr std::string_view kSessionKey = "opens-the-data-of-this-region";
 constexpr std::string_view kDigestSessionKey =
-    "session-key-that-opens-the-digest";
+    "unseals-the-digest-of-this-region";
 
 // A key no block of these envelopes ever carries, for the readings that ask
 // whether a digest opened because the right key was reached or because any key
@@ -92,6 +101,14 @@ constexpr std::string_view kStrangersKey = "a-key-no-block-here-carries";
 
 // The design a region seals.
 constexpr std::string_view kSealedDesign = "module sealed_m; endmodule\n";
+
+// A pragma_value written as the string it is. A field a block writer copies out
+// unchanged holds the value as the source wrote it, quotation marks and all.
+std::string InQuotes(std::string_view value) {
+  std::string text = "\"";
+  text.append(value).append("\"");
+  return text;
+}
 
 std::string Writes(std::string_view keyword, std::string_view value) {
   std::string text = "`pragma protect ";
@@ -148,7 +165,12 @@ std::string BlockContentCarrying(std::string_view digest_key) {
   data.method = std::string(kDataMethod);
   data.decrypt_key = std::string(kSessionKey);
   ProtectDigestDecryption digest;
-  digest.method = std::string(kDigestKeyMethod);
+  // ProtectDigestDecryptionContent writes this field into the block exactly as
+  // it stands, which is what protect_digest_key.h asks of whoever fills it: the
+  // value is the pragma_value the source wrote, quotation marks included. An
+  // identifier holding a hyphen and put here bare goes into the block as a
+  // directive §22.11 rejects for the token the hyphen is.
+  digest.method = InQuotes(kDigestKeyMethod);
   digest.decrypt_key = std::string(digest_key);
   return ProtectKeyBlockContent(data, digest, DefaultProtectEncoding());
 }
@@ -364,13 +386,16 @@ TEST(ProtectDigestDecryptKeyDecryptionInput, TheKeyBlockYieldsTheCipherToo) {
 
 // The negative: a reader holding the wrong key for the entity the blocks were
 // written for. The key block does not open, so nothing is recovered for the
-// digest's key to be taken out of, and the digest is reported as one this
-// reading could not read rather than as one that disagreed with its block.
+// digest's key to be taken out of, and no digest is checked at all: §34.5.22
+// has a digest stand for the block it follows, and a reader that recovered no
+// block has nothing for a digest to be the digest of. That is what tells this
+// reading from the one above, where the same envelope under the right key
+// checks a digest and finds it agrees.
 TEST(ProtectDigestDecryptKeyDecryptionInput, AReaderWithoutTheKeyReachesNone) {
   ProtectKeyList strangers;
   strangers.Add(KeyOf(kProvider, kBlockKeyName, kStrangersKey));
   ReadUnderKeys run(EnvelopeWithASignedKeyBlock(), strangers);
-  EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kUnreadable);
+  EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kNotChecked);
 }
 
 }  // namespace
