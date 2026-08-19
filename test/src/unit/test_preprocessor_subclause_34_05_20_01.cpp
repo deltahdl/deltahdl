@@ -73,29 +73,38 @@ TEST_F(ProtectDigestDecryptKeySyntaxTest,
 // The three cases above observe the directive line going away, which any
 // directive the pragma handler consumes does. What §34.5.20.1 defines is the
 // spelling: the keyword stands alone, with nothing written against it, and the
-// key it announces is on the line beneath. The cases below read that back off
-// the preprocessor.
+// key it announces is on the line beneath.
+//
+// What the announcement leaves behind is spent before the envelope carrying it
+// closes -- `Preprocessor::EndAccumulatedProtectPragmas` puts a key away with
+// the block it was made for -- so the cases below observe the line being read
+// at the moment it is read. §34.5.16 has the values designating one entity's
+// digest key unique among themselves, and a key recovered from the line beneath
+// this keyword is one of them, so a text writing that same value against the
+// name of the digest's key has written one value against two of the three. The
+// report stands on the line the value was read from, which is the line the
+// keyword spoke for.
 
-// The key a protected block carries for the region's digests.
-constexpr std::string_view kCarriedKey = "veritas-digest-session-key";
+// The value a text writes in both places, so that one value stands against two
+// of the names designating one entity's key. What it is does not matter; that
+// the announced line carries it does.
+constexpr std::string_view kSharedValue = "one-value-in-two-places";
 
-// A reading of `src` with the preprocessor kept alive afterwards.
-struct ReadDigestDecryptKey {
-  SourceManager mgr;
-  DiagEngine diag{mgr};
-  Preprocessor pp{mgr, diag, PreprocConfig{}};
+// The report §34.5.16 draws from a value written against two of the three.
+constexpr std::string_view kRepetition =
+    "writes one value against two of the names that designate a key of the "
+    "digest_keyowner in effect";
 
-  explicit ReadDigestDecryptKey(const std::string& src) {
-    pp.Preprocess(mgr.AddFile("<test>", src));
-  }
+// `value` encoded as the coding scheme a text that stated none writes it.
+std::string EncodedValue(std::string_view value) {
+  return EncodeProtectBlock(value, DefaultProtectEncoding());
+}
 
-  std::string_view Carried() const { return pp.DigestDecryptKeyInEffect(); }
-};
-
-// `key` written under the coding scheme a text that stated none is read in,
-// which is what the line beneath the keyword carries.
-std::string EncodedKey(std::string_view key) {
-  return EncodeProtectBlock(key, DefaultProtectEncoding());
+// The directive §34.5.18 names the digest's key with.
+std::string NamesTheDigestKey(std::string_view value) {
+  std::string text = "`pragma protect digest_keyname=\"";
+  text.append(value).append("\"\n");
+  return text;
 }
 
 // A decryption envelope as some other tool wrote it, carrying `described`.
@@ -109,28 +118,42 @@ std::string EnvelopeCarrying(const std::string& described) {
   return text;
 }
 
+// A reading of `src`, with the diagnostics it raised kept.
+struct ReadEnvelope {
+  SourceManager mgr;
+  DiagEngine diag{mgr};
+
+  explicit ReadEnvelope(const std::string& src) {
+    Preprocessor pp(mgr, diag, PreprocConfig{});
+    pp.Preprocess(mgr.AddFile("<test>", src));
+  }
+};
+
 // §34.5.20.1: the expression is the keyword and nothing else, and what it
 // states is that the line beneath it carries the encoded value of the key that
-// opens the region's digest block. That key is what stands in effect
-// afterwards, read out of the coding scheme the text is under.
+// opens the region's digest block. That line is read as the key's value, which
+// is why writing the digest's key name there as well designates one key twice.
 TEST(ProtectDigestDecryptKeySyntax, TheKeywordSpeaksForTheLineBeneathIt) {
-  std::string described = "`pragma protect digest_decrypt_key\n";
-  described += EncodedKey(kCarriedKey) + "\n";
-  ReadDigestDecryptKey run(EnvelopeCarrying(described));
-  EXPECT_FALSE(run.diag.HasErrors());
-  EXPECT_EQ(run.Carried(), kCarriedKey);
+  std::string src = EnvelopeCarrying(NamesTheDigestKey(kSharedValue) +
+                                     "`pragma protect digest_decrypt_key\n" +
+                                     EncodedValue(kSharedValue) + "\n");
+  ReadEnvelope run(src);
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(), kRepetition,
+                            LineHolding(src, EncodedValue(kSharedValue)),
+                            "34.5.16"));
 }
 
 // The negative that makes the spelling matter: the same name written with a
 // pragma_value against it is the expression written in a spelling §34.5.20.1
-// does not define, so it says nothing about the line beneath it and no key is
-// recovered from that line.
+// does not define, so it speaks for no line and the value beneath it designates
+// nothing. The value written against it is one nothing else in the text writes,
+// so the only repetition available is the one the line below would have made.
 TEST(ProtectDigestDecryptKeySyntax, TheKeywordCarryingAValueSpeaksForNoLine) {
-  std::string described =
-      "`pragma protect digest_decrypt_key=\"stated-here\"\n";
-  described += EncodedKey(kCarriedKey) + "\n";
-  ReadDigestDecryptKey run(EnvelopeCarrying(described));
-  EXPECT_TRUE(run.Carried().empty());
+  ReadEnvelope run(EnvelopeCarrying(
+      NamesTheDigestKey(kSharedValue) +
+      "`pragma protect digest_decrypt_key=\"a-value-of-its-own\"\n" +
+      EncodedValue(kSharedValue) + "\n"));
+  EXPECT_FALSE(run.diag.HasErrors());
 }
 
 // §22.11 writes a directive's expressions as a comma-separated list, and an
@@ -139,12 +162,14 @@ TEST(ProtectDigestDecryptKeySyntax, TheKeywordCarryingAValueSpeaksForNoLine) {
 // whatever else was written on that directive.
 TEST(ProtectDigestDecryptKeySyntax,
      TheKeywordStandsAloneAmongOtherExpressions) {
-  std::string described =
-      "`pragma protect digest_keyowner=\"veritas\", digest_decrypt_key\n";
-  described += EncodedKey(kCarriedKey) + "\n";
-  ReadDigestDecryptKey run(EnvelopeCarrying(described));
-  EXPECT_FALSE(run.diag.HasErrors());
-  EXPECT_EQ(run.Carried(), kCarriedKey);
+  std::string src = EnvelopeCarrying(
+      "`pragma protect digest_keyname=\"one-value-in-two-places\", "
+      "digest_decrypt_key\n" +
+      EncodedValue(kSharedValue) + "\n");
+  ReadEnvelope run(src);
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(), kRepetition,
+                            LineHolding(src, EncodedValue(kSharedValue)),
+                            "34.5.16"));
 }
 
 // The '=' written after the keyword with nothing following it. The spelling
@@ -161,12 +186,13 @@ TEST(ProtectDigestDecryptKeySyntax, AnEqualsWithNoValueAfterItIsNoExpression) {
 // §34.5.20.1 spells one name, and a name that merely opens with those
 // characters is a different one. A text writing the longer one has written a
 // keyword §34.4 does not tabulate, so the line beneath it is announced by
-// nothing and no key comes out of it.
+// nothing and the value on it designates nothing.
 TEST(ProtectDigestDecryptKeySyntax, ANameMerelyOpeningWithTheKeywordIsNotIt) {
-  std::string described = "`pragma protect digest_decrypt_key_of_theirs\n";
-  described += EncodedKey(kCarriedKey) + "\n";
-  ReadDigestDecryptKey run(EnvelopeCarrying(described));
-  EXPECT_TRUE(run.Carried().empty());
+  ReadEnvelope run(
+      EnvelopeCarrying(NamesTheDigestKey(kSharedValue) +
+                       "`pragma protect digest_decrypt_key_of_theirs\n" +
+                       EncodedValue(kSharedValue) + "\n"));
+  EXPECT_FALSE(run.diag.HasErrors());
 }
 
 }  // namespace
