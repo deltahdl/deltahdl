@@ -112,10 +112,12 @@ void AppendClearNames(const EncryptionEnvelope& envelope,
   if (!signed_envelope && !envelope.digest_key_method.empty()) {
     text->append(ProtectDigestKeyMethodDirective(envelope.digest_key_method));
   }
-  // §34.5.18 makes the same exception for the name of the key the region's
-  // digest is under. A region that named a key for its digest named one the
-  // data's key name does not stand for, so leaving it in the block would put
-  // the one name a reader needs for the digest out of reach behind the data.
+  // §34.5.18 has the name of the key the region's digest is under written as
+  // cleartext, and the exception it states is the digital envelope mechanism
+  // rather than the digital signature the line above answers to. This
+  // implementation offers no digital envelope, so the name is always written
+  // here, on the footing §34.5.12's name stands on and not §34.5.17's
+  // identifier.
   if (!envelope.names.digest_keyname.empty()) {
     text->append(ProtectDigestKeynameDirective(envelope.names.digest_keyname));
   }

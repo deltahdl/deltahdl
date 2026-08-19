@@ -323,7 +323,14 @@ void TakeKeyDesignations(std::string_view line, uint32_t line_num,
   std::string_view keyowner =
       KeywordSingleValueOnLine(line, kDataKeyownerKeyword);
   if (!keyowner.empty()) names->data_keyowner = keyowner;
-  std::string_view digest = KeywordValueOnLine(line, kDigestKeynameKeyword);
+  // §34.5.18.1 writes the value as a string, which is one written thing, so a
+  // parenthesized list of further expressions is not the value this keyword is
+  // defined with. Taking one would put a list of somebody's subkeywords where
+  // the name of the key a region's digest is under belongs, and §34.5.18.2 has
+  // that name written onto the envelope in the clear, so the list would go out
+  // quoted as though it were the name.
+  std::string_view digest =
+      KeywordSingleValueOnLine(line, kDigestKeynameKeyword);
   if (!digest.empty()) names->digest_keyname = digest;
   // §34.5.16 names the entity that provided the key the digest is under, which
   // the digest's own key name is read against rather than the data's entity.
