@@ -148,7 +148,8 @@ std::string ProtectKeyBlockContent(const ProtectDataDecryption& data,
 
 bool SameProtectDataDecryption(const ProtectDataDecryption& a,
                                const ProtectDataDecryption& b) {
-  return a.method == b.method && a.keyname == b.keyname;
+  return a.method == b.method && a.keyname == b.keyname &&
+         a.keyowner == b.keyowner && a.public_key == b.public_key;
 }
 
 // §34.5.9 has an encrypting tool state, against the bytes subkeyword, how much

@@ -128,6 +128,13 @@ ProtectDataDecryption DataDecryptionInEffect(const RegionKeyNames& names) {
   ProtectDataDecryption data;
   data.method = kDataMethod;
   data.keyname = ProtectPragmaValueBody(names.data_keyname);
+  // §34.5.27 holds the blocks of one envelope to carrying the same data
+  // decryption pragma expressions, and §34.5.10 and §34.5.13 define two of them
+  // beside the name §34.5.12 does. They are taken here so that a region
+  // changing either between two of its blocks is a region whose blocks can be
+  // found to disagree.
+  data.keyowner = ProtectPragmaValueBody(names.data_keyowner);
+  data.public_key = names.data_public_key;
   return data;
 }
 

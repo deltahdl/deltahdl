@@ -68,6 +68,18 @@ struct ProtectDataDecryption {
   // blocks are held to agreeing on, and an agreement cannot be checked against
   // a value nothing kept.
   std::string keyname;
+  // The entity §34.5.10 names as holding that key, and the public key §34.5.13
+  // designates it by, both recorded for the reason the name above is and
+  // neither written into the buffer for the reason it is not.
+  //
+  // A name means nothing apart from the entity whose list it is a member of, so
+  // a region writing one name under two entities has asked its blocks for two
+  // different keys while writing one value; and §34.5.13 makes the public key a
+  // designation of a key in its own right, reaching one where no name was
+  // written at all. Either changing between two blocks is the change §34.5.27
+  // makes an error, and neither can be found changed unless it was kept.
+  std::string keyowner;
+  std::string public_key;
 };
 
 // Whether two requests recorded the same data decryption pragma expressions.
