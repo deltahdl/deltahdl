@@ -148,9 +148,15 @@ void TakeMethodKeywords(std::string_view line, RegionKeyReader* reader) {
   std::string_view digest_key_method =
       KeywordValueOnLine(line, kDigestKeyMethodKeyword);
   if (!digest_key_method.empty()) reader->digest_key_method = digest_key_method;
-  // §34.5.24 names the algorithm the region's own keys are encrypted under, and
-  // the reading takes it the same way.
-  std::string_view key_method = KeywordValueOnLine(line, kKeyMethodKeyword);
+  // §34.5.24 names the algorithm the region's own keys are encrypted under.
+  // §34.5.24.1 spells the expression with a string, so a parenthesized
+  // pragma_value names no algorithm and the identifier stated earlier stands:
+  // an encrypting tool that took the list would write it onto the envelope,
+  // where §22.11 admits no such expression and a reader would find the
+  // identifier it needs to open the key blocks missing. The two method keywords
+  // above are read without that question being asked, and #3277 covers them.
+  std::string_view key_method =
+      KeywordSingleValueOnLine(line, kKeyMethodKeyword);
   if (!key_method.empty()) reader->key_method = key_method;
 }
 
