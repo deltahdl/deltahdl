@@ -123,17 +123,33 @@ std::string TwoKeyBlockEnvelope(std::string_view asked) {
   return envelope;
 }
 
+// Whether `line` opens a block by naming `keyword`.
+//
+// A block is looked for by the keyword the line starts with rather than by
+// what follows it, because this tool does not write its three blocks alike:
+// §34.5.27 has a key block announced by the keyword standing alone with the
+// encoded value on the line beneath, which is how ProtectKeyBlockDirectives in
+// src/preprocessor/protect_key_block.cpp writes one, while the data block goes
+// out with its value written against the keyword. #3272 is that difference and
+// what it costs a reader; what this file is about is the order the blocks
+// stand in, which either spelling states equally well.
+bool Opens(const std::string& line, std::string_view keyword) {
+  std::string opening = "`pragma protect ";
+  opening.append(keyword);
+  return line.rfind(opening, 0) == 0;
+}
+
 // The blocks `envelope` carries, in the order it wrote them, each named by the
 // keyword that opens it. §34.5.22 has a digest block stand for the block above
 // it, so this is the arrangement the subclause asks to be read off an envelope.
 std::vector<std::string> BlocksOf(const std::string& envelope) {
   std::vector<std::string> blocks;
   for (const std::string& line : AllLines(envelope)) {
-    if (line.find("`pragma protect key_block=") != std::string::npos) {
+    if (Opens(line, "key_block")) {
       blocks.emplace_back("key");
-    } else if (line.find("`pragma protect data_block=") != std::string::npos) {
+    } else if (Opens(line, "data_block")) {
       blocks.emplace_back("data");
-    } else if (line.find("`pragma protect digest_block") != std::string::npos) {
+    } else if (Opens(line, "digest_block")) {
       blocks.emplace_back("digest");
     }
   }
