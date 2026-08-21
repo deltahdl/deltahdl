@@ -49,7 +49,7 @@
 // §34.5.1.1's and §34.5.2.1's words delimit the region an encrypting tool
 // transforms; §34.5.3.1's and §34.5.4.1's words delimit a model an earlier
 // encryption sealed already; §34.5.9.1's parenthesized value is the real syntax
-// the list form is built from; and §34.5.29.1's keyword is the one written
+// the list form is built from; and §34.5.30.1's keyword is the one written
 // beside this one where an expression list is what carries them both.
 
 #include <gtest/gtest.h>
@@ -289,10 +289,14 @@ TEST(ProtectEncryptAgentSyntax, TheExpressionLastInAListIsRead) {
 // one, which neither of the two orders above asks of it: an expression at
 // either end of a list is bounded by the directive on one side.
 //
-// The neighbours are two writings of the keyword §34.5.29.1 defines. Writing it
+// The neighbours are two writings of the keyword §34.5.30.1 defines. Writing it
 // twice is what §34.4's lexical scope settles rather than something this
 // spelling turns on, so the neighbours say nothing about the expression between
 // them beyond standing there.
+//
+// §34.5.30.2 leaves them where they are. It has a comment output in cleartext
+// ahead of the data block of the begin-end it was found in, and these stand
+// inside no begin-end at all.
 TEST(ProtectEncryptAgentSyntax, TheExpressionInTheMiddleOfAListIsRead) {
   std::string listed = "`pragma protect comment=\"rev 3\", ";
   listed.append("encrypt_agent=\"Globex Sealer 7\", comment=\"rev 4\"\n");

@@ -189,6 +189,19 @@ inline constexpr std::string_view kKeyPublicKeyKeyword = "key_public_key";
 // keys, whatever else it may do.
 bool IsProtectKeyBlockDesignationKeyword(std::string_view name);
 
+// The tabulated name that carries documentation nothing goes on to interpret.
+// §34.5.30.1 writes it with a string against it, and §34.5.30.2 has that string
+// output in cleartext immediately prior to the data block of the region it was
+// written in, even where the expression stands inside that region.
+//
+// It is tabulated apart from the two names describing the author because what
+// is done with it differs: a name and a further word about the author are read
+// for what they say, while this value is carried across unread. §34.5.30.2
+// gives the reason it is carried across at all -- a copyright notice swept into
+// the block is a notice nobody without the key can read, and the subclause
+// exists so that such a notice can be excluded from the encryption.
+inline constexpr std::string_view kCommentKeyword = "comment";
+
 // The value a protect pragma keyword has. `defaulted` marks the value §34.4
 // puts in the place of a keyword no directive has written: an envelope missing
 // a keyword is described by that keyword's default rather than left
@@ -494,6 +507,23 @@ std::string ProtectAuthorDirective(std::string_view author);
 // came back in quotes would be a different pragma_value from the one placed
 // there.
 std::string ProtectAuthorInfoDirective(std::string_view author_info);
+
+// The keyword written as a directive carrying `comment`, for standing in the
+// clear ahead of the block a region's text became.
+//
+// §34.5.30.2 has the entire comment including the beginning pragma output in
+// cleartext immediately prior to the data_block of the begin-end the comment
+// was found in, so what is written back is the expression rather than the bare
+// string it carried. A value swept into the block would be a copyright notice
+// nobody without the key could read, which is the case the subclause is written
+// for; it would also be known cleartext inside the block, which is the other
+// reason the subclause gives for keeping it out.
+//
+// `comment` is the pragma_value as the source wrote it, quotes and all where it
+// had them, and it goes back the same way, for the reason the author's name
+// does: a value written bare that came back in quotes would be a different
+// pragma_value from the one the source wrote.
+std::string ProtectCommentDirective(std::string_view comment);
 
 // The keyword written as a directive carrying `keyname`, for stating in the
 // clear which key a protected region's data are under. §34.5.12 has the name

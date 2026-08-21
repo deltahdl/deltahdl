@@ -638,15 +638,25 @@ TEST(ProtectBeginEncryptionOutput, ACommentBetweenTheDelimitersIsRecorded) {
   EXPECT_NE(DataBlockOf(with), DataBlockOf(without));
 }
 
-// A further protect pragma is text occurring between the delimiters too. The
-// keyword §34.5.30 defines carries a documentation string nothing interprets,
-// so no other subclause has claimed it out of the block, and it is recorded
-// along with the design.
+// A further protect pragma is text occurring between the delimiters too, and
+// it is recorded on the block along with the design.
+//
+// §34.5.7's encrypt_agent is the keyword written here because no subclause
+// claims it out of the block and nothing on the encrypting side reads it from
+// the text being encrypted: src/preprocessor/protect_envelope_output.cpp writes
+// the name in kEncryptAgent, which is this tool's own, so a name the region
+// wrote against the keyword reaches the output only if the block carried it.
+// §34.5.30's comment cannot make the claim, its value being one this
+// implementation lifts into the clear ahead of the block.
+//
+// The comparison is what says the block carried it: the same region without the
+// expression leaves a different block, which no reading that had dropped the
+// line on the way could produce.
 TEST(ProtectBeginEncryptionOutput, AProtectPragmaBetweenThemIsRecordedToo) {
-  std::string described = Writes("comment", "an uninterpreted string");
+  std::string described = Writes("encrypt_agent", "some-other-sealing-tool");
   std::string with = Encrypted(Region(described, kSealedDesign));
   std::string without = Encrypted(Region("", kSealedDesign));
-  EXPECT_FALSE(Holds(with, "an uninterpreted string"));
+  EXPECT_FALSE(Holds(with, "some-other-sealing-tool"));
   EXPECT_FALSE(DataBlockOf(with).empty());
   EXPECT_NE(DataBlockOf(with), DataBlockOf(without));
 }

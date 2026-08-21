@@ -74,6 +74,11 @@ namespace {
 constexpr std::string_view kAuthorName = "Ada Lovelace";
 constexpr std::string_view kOtherAuthorName = "Grace Hopper";
 
+// The documentation a region writes beside the expression naming its author.
+// It names nobody, so an envelope stating it as the author states a name no
+// directive of that envelope's region wrote.
+constexpr std::string_view kDocumentation = "rev 3";
+
 // The opening of any directive carrying the expression, for the readings that
 // ask whether an envelope names an author at all rather than which one.
 constexpr std::string_view kAnyNaming = "`pragma protect author";
@@ -252,24 +257,37 @@ TEST(ProtectAuthorDescription, AParenthesizedListSpecifiesNoName) {
 // keyword spelled out beside it. The author is recognized by the keyword the
 // directive named instead, and this directive named the other one, so what a
 // documentation string holds settles nothing either way.
+//
+// The letters are in the produced text for a reading to find, which is what
+// makes the envelope naming nobody this rule's answer rather than the
+// encryption's: §34.5.30.2 has the whole documentation directive output in
+// cleartext ahead of the data block, so the directive stands in the clear
+// exactly as the region wrote it.
 TEST(ProtectAuthorDescription, ANameInsideADocumentationStringIsNotRecognized) {
   std::string documented =
       "`pragma protect comment=\"author=\\\"Ada Lovelace\\\"\"\n";
   std::string written = Encrypted(RegionWriting(documented));
   EXPECT_TRUE(Holds(written, kBeginProtected));
+  EXPECT_TRUE(Holds(written, documented));
   EXPECT_FALSE(Holds(written, kAnyNaming));
-  EXPECT_TRUE(Holds(OpenedBlockWriting(documented), documented));
 }
 
 // The two keywords side by side on one directive, which is the position that
 // tells them apart: §22.5.1 lets one directive carry a list of expressions, and
 // the name the envelope states is the one written against this keyword rather
 // than the documentation written beside it.
+//
+// Both values stand in the clear in the produced text, §34.5.30.2 having the
+// documentation directive output there ahead of the data block, so what tells
+// them apart is the keyword each was written against. A reading that took the
+// documentation for the name would state it in this subclause's own directive,
+// which is what the second expectation looks for rather than the value
+// standing anywhere at all.
 TEST(ProtectAuthorDescription, TheNameBesideADocumentationStringIsTheName) {
   std::string written = Encrypted(RegionWriting(
-      "`pragma protect comment=\"Grace Hopper\", author=\"Ada Lovelace\"\n"));
+      "`pragma protect comment=\"rev 3\", author=\"Ada Lovelace\"\n"));
   EXPECT_TRUE(Holds(written, NamesAuthor(kAuthorName)));
-  EXPECT_FALSE(Holds(written, kOtherAuthorName));
+  EXPECT_FALSE(Holds(written, NamesAuthor(kDocumentation)));
 }
 
 // ---------------------------------------------------------------------------

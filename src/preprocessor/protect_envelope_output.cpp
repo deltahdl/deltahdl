@@ -251,6 +251,14 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   // else in the envelope that says what the data block is under: the key was
   // made for this region and travels nowhere but here.
   text.append(how.key_blocks.directives);
+  // §34.5.30 has the entire comment including the beginning pragma output in
+  // cleartext immediately prior to the data block of the begin-end it was found
+  // in. It is written here, after everything else describing the envelope,
+  // because the one expression it may not be separated from the block by is the
+  // count on the line below: §34.5.9 states that count against the block it
+  // counts, so the comment stands ahead of the count rather than between the
+  // two.
+  text.append(envelope.comment_directives);
   // §34.5.9 has an encrypting tool state, against the bytes subkeyword, how
   // much data the block about to be written stands for. The count is of the
   // block before any of the encoding was applied to it, so it is taken from

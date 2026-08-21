@@ -59,6 +59,25 @@ struct RegionKeyReader {
   // the description of the envelope rather than to the lines about to stop
   // being readable.
   std::string_view author_info;
+  // The documentation expressions the text wrote for nothing to interpret, each
+  // written back as the directive that carried it and concatenated in the order
+  // they were read, empty where the text wrote none.
+  //
+  // It is carried beside the names for the reason they are carried at all:
+  // §34.5.30.2 has the entire comment including the beginning pragma output in
+  // cleartext immediately prior to the data block, so it belongs to the
+  // description of the envelope rather than to the lines about to stop being
+  // readable.
+  //
+  // It is a string of directives rather than one value because a region may
+  // write several and each is owed its own output line. The two names above
+  // hold one value apiece and a second directive replaces the first, which is
+  // right for a name and wrong here: a region carrying two copyright notices
+  // that published only the second would encrypt the first, and being encrypted
+  // is what §34.5.30.2 exists to spare such a notice.
+  //
+  // It is owned rather than a view of the input because it is built here.
+  std::string comment_directives;
   // The identifier the text named the algorithm its digests are computed with,
   // empty where the text named none. It is carried beside the names for the
   // reason they are carried at all: §34.5.21 has the identifier unchanged in
@@ -320,6 +339,22 @@ void TakeAuthorship(std::string_view line, RegionKeyReader* reader) {
   TakeEncodingKeyword(line, reader);
 }
 
+// The documentation the region wrote for nothing to interpret, appended to
+// whatever it wrote earlier rather than replacing it.
+//
+// §34.5.30.2 has the entire comment including the beginning pragma output in
+// cleartext, so the directive is written back here rather than the value being
+// stored for somebody else to spell. §34.5.30.1 writes the value as a string,
+// which is one written thing, so a parenthesized list of further expressions is
+// not the value this keyword is defined with: taking one would publish a list
+// of somebody's subkeywords in the clear on the envelope, where a copyright
+// notice belongs.
+void TakeComment(std::string_view line, RegionKeyReader* reader) {
+  std::string_view comment = KeywordSingleValueOnLine(line, kCommentKeyword);
+  if (comment.empty()) return;
+  reader->comment_directives.append(ProtectCommentDirective(comment));
+}
+
 // The names a line designates the region's keys by: the data key and the entity
 // that provided it, the digest key and its own entity, and the key the region
 // designates for keys of its own.
@@ -394,6 +429,7 @@ void TakeKeyNames(std::string_view line, uint32_t line_num,
                   RegionKeyReader* reader) {
   if (TookAwaitedPublicKey(line, line_num, reader)) return;
   TakeAuthorship(line, reader);
+  TakeComment(line, reader);
   TakeKeyDesignations(line, line_num, reader);
   TakeMethodKeywords(line, reader);
   TakeAnnouncements(line, reader);
@@ -447,24 +483,34 @@ struct ReadRegion {
   // this rather than what a block would have recorded.
   std::string source_body;
   // The part of that text a block records. §34.5.5 keeps the author's name out
-  // of it and §34.5.6 keeps out whatever further that author offered, both
-  // being written in the clear inside the envelope instead, so a directive
-  // carrying either is held back from here.
+  // of it, §34.5.6 keeps out whatever further that author offered and §34.5.30
+  // keeps out the documentation the region wrote for nothing to interpret, all
+  // three being written in the clear inside the envelope instead, so a
+  // directive carrying any of them is held back from here.
   std::string body;
   RegionKeyReader written_inside;
 };
 
 // Whether one line of an encryption envelope's enclosed text carries one of the
-// two expressions describing the design's author: the one §34.5.5 names them
-// with, and the one §34.5.6 offers anything further about them on.
+// three expressions the envelope publishes in the clear rather than encrypting:
+// the one §34.5.5 names the design's author with, the one §34.5.6 offers
+// anything further about them on, and the one §34.5.30 carries documentation
+// nothing goes on to interpret on.
 //
-// It is the spelling §34.5.5.1 and §34.5.6.1 define that counts: the keyword
-// with a string written against it. Either keyword standing alone describes
-// nobody, and so does either carrying a parenthesized list of further
-// expressions, a list being something other than the one written thing a string
-// is. Neither subclause says anything about those spellings, so §34.5.1's rule
-// for everything else between the delimiters is what governs -- the line goes
-// into the block along with the rest.
+// §34.5.30.2 states outright what a line lifted out is spared, and it is the
+// reason all three are lifted: text swept into the block is unreadable until
+// somebody holds the key, and a copyright notice is exactly the thing an author
+// writes to be read by whoever cannot. It gives a second reason of its own --
+// such a value is known cleartext inside the block, which is what a
+// known-plaintext attack is mounted from.
+//
+// It is the spelling §34.5.5.1, §34.5.6.1 and §34.5.30.1 define that counts:
+// the keyword with a string written against it. Any of the three standing alone
+// carries nothing, and so does any of them carrying a parenthesized list of
+// further expressions, a list being something other than the one written thing
+// a string is. No subclause says anything about those spellings, so §34.5.1's
+// rule for everything else between the delimiters is what governs -- the line
+// goes into the block along with the rest.
 //
 // The two questions this file asks about each expression -- whether the line
 // carries it, and what it says -- are asked of the same spelling, so a line
@@ -476,23 +522,23 @@ struct ReadRegion {
 // A line a previously generated protected block contains carries nothing of the
 // kind either. §34.5.3 leaves the expressions of such a line uninterpreted and
 // §34.5.1 has that block travel into the larger envelope as the bytes it is
-// written with, so an expression written there describes the author of a design
-// some earlier encryption sealed rather than the author of this one.
-bool CarriesAuthorDescription(std::string_view line,
-                              bool previously_protected) {
+// written with, so an expression written there describes a design some earlier
+// encryption sealed rather than this one.
+bool LiftedIntoTheClear(std::string_view line, bool previously_protected) {
   if (previously_protected) return false;
   return !KeywordSingleValueOnLine(line, kAuthorKeyword).empty() ||
-         !KeywordSingleValueOnLine(line, kAuthorInfoKeyword).empty();
+         !KeywordSingleValueOnLine(line, kAuthorInfoKeyword).empty() ||
+         !KeywordSingleValueOnLine(line, kCommentKeyword).empty();
 }
 
 // Adds one line of enclosed text to the region being read: to the text that
 // goes back where the region cannot be encrypted, to the text a block records
-// unless §34.5.5 or §34.5.6 holds it back from there, and to what the region
-// has said about itself.
+// unless §34.5.5, §34.5.6 or §34.5.30 holds it back from there, and to what the
+// region has said about itself.
 void AppendEnvelopeLine(std::string_view line, uint32_t line_num,
                         bool previously_protected, ReadRegion* region) {
   region->source_body.append(line);
-  if (!CarriesAuthorDescription(line, previously_protected)) {
+  if (!LiftedIntoTheClear(line, previously_protected)) {
     region->body.append(line);
   }
   // What the region itself wrote is kept apart from what is merely in effect
@@ -689,6 +735,12 @@ std::string ClosedRegionText(const ReadRegion& region,
   // one written outside the region already has its own treatment there -- it is
   // copied into the output stream unchanged where it stands.
   envelope.author_info = region.written_inside.author_info;
+  // §34.5.30.2 asks for the comment found in the begin-end whose data block it
+  // is output ahead of, so it is taken from the same place for the same reason
+  // the two above are: one written outside the region is copied into the output
+  // stream unchanged where it stands, and lifting it into the envelope as well
+  // would write it out twice.
+  envelope.comment_directives = region.written_inside.comment_directives;
   envelope.names = region.written_inside.names;
   // §34.5.13 asks for this one designation in each protected block it was used
   // for, so it is taken from what stands in effect where the region closes

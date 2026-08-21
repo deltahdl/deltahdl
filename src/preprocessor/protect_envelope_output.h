@@ -130,6 +130,18 @@ struct EncryptionEnvelope {
   // envelope encloses and kept out of the data block, and a further word left
   // among the body's lines would go into the block along with them.
   std::string_view author_info;
+  // The documentation the enclosed text wrote for nothing to interpret, each
+  // expression written back as the directive that carried it and concatenated
+  // in the order they were read, empty where the text wrote none.
+  //
+  // It rides on the envelope rather than staying among the body's lines because
+  // §34.5.30.2 has the entire comment including the beginning pragma output in
+  // cleartext immediately prior to the data block, even where the expression
+  // was written inside the begin-end. The subclause says what that is for: a
+  // copyright notice included from another file into a region would otherwise
+  // be encrypted along with the design, and unreadable to everybody it was
+  // written for.
+  std::string_view comment_directives;
   // What the enclosed text said about the keys it is itself under, each name
   // empty where the text said nothing. They ride on the envelope rather than
   // staying among the body's lines because §34.5.12 has the data's key name

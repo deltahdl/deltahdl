@@ -150,8 +150,13 @@ TEST(ProtectDigestBlockSyntax, ANameMerelyOpeningWithTheKeywordIsNotIt) {
 // expression that is a keyword standing alone is one of the forms that list
 // admits. The keyword speaks for the line beneath the directive it stands in,
 // whatever else was written on that directive. §34.4 leaves the expression
-// written beside it to nothing at all, so what the case varies is the company
-// the keyword keeps rather than anything the reading acts on.
+// written beside it to nothing this reading acts on, so what the case varies is
+// the company the keyword keeps.
+//
+// §34.5.30.2 is the one rule that acts on that company, and it does not reach
+// here: it has a comment output in cleartext ahead of the data block of the
+// begin-end it was found in, and this directive is written into an envelope the
+// tool has already produced rather than into a region awaiting encryption.
 TEST(ProtectDigestBlockSyntax, TheKeywordStandsAloneAmongOtherExpressions) {
   ReadEnvelope run(EnvelopeAnnouncing(
       "`pragma protect comment=\"stands beside it\", digest_block\n"));
