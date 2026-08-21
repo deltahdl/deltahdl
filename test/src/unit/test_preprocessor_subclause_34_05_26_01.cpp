@@ -205,9 +205,15 @@ TEST(ProtectKeyPublicKeySyntax, AnEqualsWithNoValueAfterItIsNoExpression) {
 // this keyword into a protected block, so a line beneath it is key material
 // only inside one. The same two lines outside every envelope announce nothing,
 // and the line beneath is text of the design like any other.
+//
+// What is asserted about the designation is that there is none, rather than
+// that a default stands where one would be. §34.4 records the keyword as
+// written whether or not it announced anything, and #3271 records that a
+// keyword standing alone is kept as having stated an empty value, so the two
+// are not told apart here. Designating no key is what this case turns on.
 TEST(ProtectKeyPublicKeySyntax, TheAnnouncementIsReadOnlyInsideAnEnvelope) {
   ReadKeywordScope run(AnnouncesTheKey());
-  EXPECT_TRUE(run.ValueOf(kKeyPublicKeyKeyword).defaulted);
+  EXPECT_TRUE(run.ValueOf(kKeyPublicKeyKeyword).value.empty());
   EXPECT_TRUE(Holds(run.text, Encoded(kDesignatedKey))) << run.text;
 }
 
