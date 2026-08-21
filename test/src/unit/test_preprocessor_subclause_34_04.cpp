@@ -749,6 +749,12 @@ TEST(ProtectPragmaDirectives, EveryWrittenEnvelopeCarriesItsOwn) {
 // own: the lexical scope reaching into it gives way to what the envelope says,
 // so the envelope is read under the interpretation it was made under rather
 // than the one its surroundings suggest.
+//
+// What stands in effect where the reading stops answers nothing about this.
+// AResetFollowsAWrittenEnvelope above has this tool write a reset after the
+// envelope, and §34.5.31.2 has that reset put every protect pragma keyword back
+// to its default: the value written ahead of the envelope and the envelope's
+// own writing of the name are both gone by then.
 TEST(ProtectPragmaDirectives, AWrittenEnvelopeOutweighsWhatPrecedesIt) {
   std::string written = Encrypted(
       "`pragma protect begin\n"
@@ -758,10 +764,8 @@ TEST(ProtectPragmaDirectives, AWrittenEnvelopeOutweighsWhatPrecedesIt) {
 
   ReadBackWithKey run(src, kAuthorKey);
   EXPECT_FALSE(run.diag.HasErrors());
-  EXPECT_FALSE(run.ValueOf("data_method").defaulted);
-  EXPECT_NE(run.ValueOf("data_method").value, "acme-cipher");
-  EXPECT_FALSE(run.ValueOf("encrypt_agent").defaulted);
-  // The envelope really was read through, rather than skipped over.
+  // The design arriving is what shows which of the two writings governed: a
+  // block read under "acme-cipher" is a block nothing opens.
   EXPECT_NE(run.text.find("initial result = 42;"), std::string::npos);
 }
 

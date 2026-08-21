@@ -52,13 +52,9 @@ constexpr ProtectPragmaKeyword kProtectPragmaKeywords[] = {
     {"runtime_license", "states what a simulation is licensed on"},
     {kCommentKeyword,
      "carries documentation that nothing goes on to interpret"},
-    {"reset", "puts the protect pragma keywords back to their defaults"},
+    {kResetKeyword, "puts the protect pragma keywords back to their defaults"},
     {"viewport", "widens the access a decryption envelope allows into itself"},
 };
-
-// The tabulated name of the expression that puts the keywords back to their
-// defaults.
-constexpr std::string_view kResetKeyword = "reset";
 
 // The three tabulated names by which one key of a stated entity is picked out
 // of that entity's keys. They are listed together because what §34.5.10 says

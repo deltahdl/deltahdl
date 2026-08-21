@@ -202,6 +202,19 @@ bool IsProtectKeyBlockDesignationKeyword(std::string_view name);
 // exists so that such a notice can be excluded from the encryption.
 inline constexpr std::string_view kCommentKeyword = "comment";
 
+// The tabulated name that puts every protect pragma keyword back to the value
+// it had before any text was read. §34.5.31.1 writes it standing alone, with
+// nothing against it, and §34.5.31.2 says what it does by naming something else
+// that already does it: the expression is a synonym for a reset pragma
+// directive naming protect in its keyword list, which §22.11.1 defines.
+//
+// §34.5.31.2 gives the reason a text writes one. The scope of a protect pragma
+// keyword is lexical and runs to the end of the compilation input, so an author
+// who states common keywords ahead of a list of files states them over every
+// file after the last one they meant, and this is the expression that stops
+// them there.
+inline constexpr std::string_view kResetKeyword = "reset";
+
 // The value a protect pragma keyword has. `defaulted` marks the value §34.4
 // puts in the place of a keyword no directive has written: an envelope missing
 // a keyword is described by that keyword's default rather than left

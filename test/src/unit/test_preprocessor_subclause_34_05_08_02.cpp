@@ -125,6 +125,25 @@ std::string SealedModelOffering(std::string_view word) {
   return model;
 }
 
+// A region to be encrypted enclosing `model`, a model an earlier encryption
+// sealed already, with the designations reaching this region's key written
+// after that model rather than before it.
+//
+// The designations stand after the model because §34.5.31.2 makes `pragma
+// protect reset a synonym for a directive setting every protect pragma keyword
+// to its default. This tool writes that directive after every envelope it
+// produces, so a model produced by Encrypted carries one on the line past
+// §34.5.4.1's word. A designation written ahead of the model is therefore taken
+// away by that trailing directive, and the enclosing region would reach no key
+// and be copied through untransformed. §34.5.15's data_block still records the
+// region's text entire, the model included, because RegionBody writes the
+// design after the designations either way.
+std::string RegionEnclosing(const std::string& model) {
+  std::string inside(model);
+  inside.append(RegionBody(""));
+  return RegionAround(inside);
+}
+
 // `envelope` with the further word it offers replaced by `word`.
 //
 // An envelope cannot be spelled by hand for the readings that compare two of
@@ -364,9 +383,15 @@ TEST(ProtectEncryptAgentInfoDescription, AWordOutsideEveryRegionIsUntouched) {
 // so the word it offers was offered by the tool that sealed somebody else's
 // design. This envelope offers the word of the tool that sealed it, once, and
 // says nothing of the other.
+//
+// RegionEnclosing writes the designations reaching the key after the model,
+// which is what §34.5.31.2 requires of a text wrapping a model somebody sealed
+// already: the model carries a `pragma protect reset on the line past the word
+// closing it, so a designation written ahead of the model is one that directive
+// takes away.
 TEST(ProtectEncryptAgentInfoDescription, AnEnclosedModelsWordIsNotDrawnOn) {
   std::string written =
-      Encrypted(RegionWriting(SealedModelOffering(kOtherOffering)));
+      Encrypted(RegionEnclosing(SealedModelOffering(kOtherOffering)));
   EXPECT_EQ(TimesWritten(written, kAnyOffering), 1U);
   EXPECT_TRUE(Holds(written, TheGeneratedOffering()));
   EXPECT_FALSE(Holds(written, kOtherOffering));
@@ -377,7 +402,8 @@ TEST(ProtectEncryptAgentInfoDescription, AnEnclosedModelsWordIsNotDrawnOn) {
 // the offering directive standing among them included. It was carried across
 // rather than dropped, and this rule reached none of it.
 TEST(ProtectEncryptAgentInfoDescription, AnEnclosedModelsWordIsCarriedIn) {
-  std::string opened = OpenedBlockWriting(SealedModelOffering(kOtherOffering));
+  std::string opened = OpenedBlockOf(
+      Encrypted(RegionEnclosing(SealedModelOffering(kOtherOffering))));
   EXPECT_TRUE(Holds(opened, kBeginProtected));
   EXPECT_TRUE(Holds(opened, OffersFurther(kOtherOffering)));
 }
@@ -598,9 +624,15 @@ TEST(ProtectEncryptAgentInfoDescription, AForeignEnvelopeOfferingOnlyItCloses) {
 // one the enclosed model carried among its own description, which came back
 // out of this envelope's block and was read there as description, nor the one
 // this tool provided for the envelope itself.
+//
+// RegionEnclosing writes the designations reaching the key after the model, per
+// §34.5.31.2. A region designating its key ahead of the model reaches no key,
+// the model's trailing `pragma protect reset having taken the designations
+// away, and it is copied through unsealed -- so there is no envelope to read
+// back and the round trip this case is about never happens.
 TEST(ProtectEncryptAgentInfoDescription, AnEnclosedModelsWordReachesNoDesign) {
   std::string written =
-      Encrypted(RegionWriting(SealedModelOffering(kOtherOffering)));
+      Encrypted(RegionEnclosing(SealedModelOffering(kOtherOffering)));
   ReadWithTheKeys read(written);
   EXPECT_FALSE(read.diags.HasErrors());
   EXPECT_TRUE(read.Produced("module sealed_m"));

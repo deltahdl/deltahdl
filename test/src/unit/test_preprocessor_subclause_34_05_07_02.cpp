@@ -121,6 +121,24 @@ std::string SealedModelNaming(std::string_view name) {
   return model;
 }
 
+// A region enclosing `sealed`, a model an earlier encryption sealed already,
+// with the design this region seals written after it.
+//
+// The designations reaching this region's key are written after the model
+// rather than before it. §34.5.31.2 makes `pragma protect reset` put every
+// protect pragma keyword back to its default, and
+// src/preprocessor/protect_envelope_output.cpp writes that directive after the
+// word §34.5.4.1 defines, so every model this tool sealed ends with one. That
+// directive stands outside the model's own begin_protected, so §34.5.3 leaves
+// none of it uninterpreted and the encrypting half applies it. A designation
+// written ahead of the model is therefore one the model's own trailing reset
+// takes away, and the region enclosing the model would reach no key at all.
+std::string RegionEnclosingSealedModel(std::string_view sealed) {
+  std::string inside(sealed);
+  inside.append(ReachesTheKey()).append(kSealedDesign);
+  return RegionAround(inside);
+}
+
 // `envelope` with the tool it names replaced by `name`.
 //
 // An envelope cannot be spelled by hand for the readings that compare two of
@@ -310,7 +328,7 @@ TEST(ProtectEncryptAgentDescription, ANameOutsideEveryRegionStaysAsWritten) {
 // tool that sealed it, once, and says nothing of the other.
 TEST(ProtectEncryptAgentDescription, AnEnclosedSealedModelsNameIsNotDrawnOn) {
   std::string written =
-      Encrypted(RegionWriting(SealedModelNaming(kOtherAgent)));
+      Encrypted(RegionEnclosingSealedModel(SealedModelNaming(kOtherAgent)));
   EXPECT_EQ(TimesWritten(written, kAnyNaming), 1U);
   EXPECT_TRUE(Holds(written, TheGeneratedNaming()));
   EXPECT_FALSE(Holds(written, kOtherAgent));
@@ -321,7 +339,8 @@ TEST(ProtectEncryptAgentDescription, AnEnclosedSealedModelsNameIsNotDrawnOn) {
 // the naming directive standing among them included. It was carried across
 // rather than dropped, and this rule reached none of it.
 TEST(ProtectEncryptAgentDescription, AnEnclosedSealedModelsNameIsCarriedIn) {
-  std::string opened = OpenedBlockWriting(SealedModelNaming(kOtherAgent));
+  std::string opened = OpenedBlockOf(
+      Encrypted(RegionEnclosingSealedModel(SealedModelNaming(kOtherAgent))));
   EXPECT_TRUE(Holds(opened, kBeginProtected));
   EXPECT_TRUE(Holds(opened, NamesTheAgent(kOtherAgent)));
 }
@@ -517,7 +536,7 @@ TEST(ProtectEncryptAgentDescription, AForeignEnvelopeNamingOnlyAToolIsClosed) {
 // tool generated for the envelope itself.
 TEST(ProtectEncryptAgentDescription, AnEnclosedModelsNameReachesNoDesignText) {
   std::string written =
-      Encrypted(RegionWriting(SealedModelNaming(kOtherAgent)));
+      Encrypted(RegionEnclosingSealedModel(SealedModelNaming(kOtherAgent)));
   ReadWithTheKeys read(written);
   EXPECT_FALSE(read.diags.HasErrors());
   EXPECT_TRUE(read.Produced("module sealed_m"));

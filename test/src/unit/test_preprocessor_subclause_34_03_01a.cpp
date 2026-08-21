@@ -143,13 +143,6 @@ struct ReadBack {
     config.protect_key = kExchangeKey;
     return config;
   }
-
-  // The value the reading left in effect for `keyword`. An envelope states how
-  // it was made on expressions written with its block, so this is how a test
-  // asks which of two writings of one name governed the block.
-  ProtectKeywordValue ValueOf(std::string_view keyword) const {
-    return pp.ProtectKeywords().ValueOf(keyword);
-  }
 };
 
 // Whether `keywords` names `keyword`. The expressions specifying an envelope
@@ -267,12 +260,18 @@ TEST(EnvelopeEncryption, AnExpressionOnItsOwnDirectiveStillSpecifies) {
 // it stands: the author's specifies the envelope, and the one beside the block
 // is in effect where the block is, so the block is read under the description
 // it was made under rather than the one it was asked for.
+//
+// The design arriving is what shows which of the two governed: a block read
+// under the algorithm the author asked for is a block nothing opens. What
+// stands in effect where the reading stops shows nothing either way, because
+// §34.4 has a reset follow the envelope and §34.5.31.2 has that reset put every
+// protect pragma keyword back to its default -- the envelope's own writing of
+// the name along with the author's.
 TEST(EnvelopeEncryption, TheDescriptionWrittenWithTheBlockGovernsIt) {
   ReadBack run(Encrypted(kSpecifiedEnvelope));
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Names(run.envelope.envelope_keywords, "data_method"));
-  EXPECT_FALSE(run.ValueOf("data_method").defaulted);
-  EXPECT_NE(run.ValueOf("data_method").value, "x-caesar");
+  EXPECT_TRUE(Holds(run.text, "initial result = 42;"));
 }
 
 // A comment written on a delimiter's directive is not a pragma expression and

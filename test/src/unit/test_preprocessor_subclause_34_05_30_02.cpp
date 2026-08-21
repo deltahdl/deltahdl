@@ -380,15 +380,22 @@ TEST(ProtectCommentDescription, ARegionReachingNoKeyKeepsItsCommentAsWritten) {
   EXPECT_EQ(EncryptedWithoutTheKey(src), src);
 }
 
+// The designations reaching this region's key stand after the sealed model in
+// both cases below, and they have to. §34.4 has this tool write a reset after
+// every envelope it produces, and §34.5.31.2 has that reset put every protect
+// pragma keyword back to its default, so a designation written ahead of a
+// sealed model is one that model's own trailing line takes away: the region
+// would reach no key and would not be encrypted at all.
+
 // The comment output is the one this envelope's own begin-end held. §34.5.3
 // leaves the expressions of a previously generated protected block
 // uninterpreted, so a comment written inside one documents a design some
 // earlier encryption sealed: this envelope outputs the notice its own region
 // wrote, once, and says nothing about the other.
 TEST(ProtectCommentDescription, ACommentInAnEnclosedSealedModelIsNotOutput) {
-  std::string enclosed = ReachesTheKey();
+  std::string enclosed = SealedModelDocumenting(kOtherNotice);
+  enclosed.append(ReachesTheKey());
   enclosed.append(Documents(kNotice));
-  enclosed.append(SealedModelDocumenting(kOtherNotice));
   enclosed.append(kSealedDesign);
   std::string written = Encrypted(RegionAround(enclosed));
   EXPECT_EQ(TimesWritten(written, Documents(kNotice)), 1U);
@@ -402,8 +409,8 @@ TEST(ProtectCommentDescription, ACommentInAnEnclosedSealedModelIsNotOutput) {
 // dropped, and this rule reached none of it.
 TEST(ProtectCommentDescription,
      ACommentInAnEnclosedSealedModelReachesTheBlock) {
-  std::string enclosed = ReachesTheKey();
-  enclosed.append(SealedModelDocumenting(kOtherNotice));
+  std::string enclosed = SealedModelDocumenting(kOtherNotice);
+  enclosed.append(ReachesTheKey());
   enclosed.append(kSealedDesign);
   std::string recovered = OpenedBlockOf(Encrypted(RegionAround(enclosed)));
   EXPECT_TRUE(Holds(recovered, kBeginProtected));

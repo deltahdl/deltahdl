@@ -642,6 +642,23 @@ void Preprocessor::ApplyProtectKeywords(
     // not defined with, delimits nothing: nothing is put in effect for it and
     // no envelope opens or closes on it.
     if (ReportDelimiterWrittenWithValue(expr, loc)) continue;
+    // §34.5.31.2 defines this one expression by naming another that already
+    // does what it does: it is a synonym for a reset pragma directive naming
+    // protect in its keyword list, so it is answered by the same call that
+    // directive is answered by and the two spellings restore the same things.
+    //
+    // §34.5.31.1 writes the keyword standing alone, so a value written against
+    // it is not the expression the subclause defines and restores nothing. It
+    // goes on to be applied like any other keyword written in a spelling no
+    // subclause defines, which is what §34.4 does with the value written
+    // against a name its table lists.
+    //
+    // It is answered before the expression is applied so that the keyword
+    // putting the values back does not leave one of its own standing.
+    if (expr.keyword == kResetKeyword && !expr.has_value) {
+      ResetPragma(kProtectPragmaName);
+      continue;
+    }
     // Whatever the expression goes on to do to the envelopes, §34.4 puts the
     // value it writes against a reserved keyword in effect from here on: the
     // scope is the text after this point, not the envelope, the declaration or

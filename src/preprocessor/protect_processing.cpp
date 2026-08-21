@@ -355,6 +355,29 @@ void TakeComment(std::string_view line, RegionKeyReader* reader) {
   reader->comment_directives.append(ProtectCommentDirective(comment));
 }
 
+// Everything the reading has gathered, put back to what it held before the
+// reading began.
+//
+// §34.5.31.2 states this of an encrypting tool as well as of a tool that reads:
+// following the reset, every protect pragma keyword stands at its default. What
+// the reading gathers is those keywords' values -- the entities and the names
+// designating their keys, the algorithms, the coding scheme and the blocks a
+// text asked for -- so putting them back is dropping them. §34.5.31.1 writes
+// the keyword standing alone, so a value written against it is not the
+// expression that subclause defines and puts nothing back.
+//
+// The documentation gathered under §34.5.30.2 is not among them. That subclause
+// asks for the comment found in a begin-end to be output ahead of that block's
+// data, and a comment written before the reset was found there whatever the
+// reset goes on to do to the keyword: what is held here is an output already
+// owed rather than a value something later reads.
+void TakeReset(std::string_view line, RegionKeyReader* reader) {
+  if (!NamesBareKeyword(line, kResetKeyword)) return;
+  std::string documented = std::move(reader->comment_directives);
+  *reader = {};
+  reader->comment_directives = std::move(documented);
+}
+
 // The names a line designates the region's keys by: the data key and the entity
 // that provided it, the digest key and its own entity, and the key the region
 // designates for keys of its own.
@@ -428,6 +451,11 @@ void TakeAnnouncements(std::string_view line, RegionKeyReader* reader) {
 void TakeKeyNames(std::string_view line, uint32_t line_num,
                   RegionKeyReader* reader) {
   if (TookAwaitedPublicKey(line, line_num, reader)) return;
+  // The reset is answered ahead of the keywords a line may write beside it,
+  // because §34.4 reads a directive's expressions left to right and a text
+  // putting the keywords back before stating new ones is the order an author
+  // writes: what follows the reset on the line is stated after it.
+  TakeReset(line, reader);
   TakeAuthorship(line, reader);
   TakeComment(line, reader);
   TakeKeyDesignations(line, line_num, reader);

@@ -334,10 +334,20 @@ TEST(ProtectAuthorInfoDescription, ARegionOfferingNothingPlacesNoDirective) {
 // as the bytes it is written with, so what it offers was offered by some
 // earlier encryption for a design of its own: this envelope offers what its
 // region wrote, once, and says nothing about the other.
+//
+// What the region designates its key by and what it offers stand after the
+// sealed model rather than before it. §34.5.31.2 has `pragma protect reset`
+// put every protect pragma keyword back to its default, and §34.4 has an
+// encrypting tool write that directive after the word closing an envelope it
+// produced, so the model sealed here ends in one. An expression written ahead
+// of that model is one the reset takes away: the region would reach no key and
+// offer nothing, and the text would be copied through as it stands rather than
+// encrypted. AnEnclosedSealedModelsOfferingIsCarriedIn below writes its
+// enclosed text in the same order for the same reason.
 TEST(ProtectAuthorInfoDescription, AnEnclosedSealedModelsWordIsNotPlacedAgain) {
-  std::string inside = ReachesTheKey();
+  std::string inside = SealedModelStating(kOtherFurtherWord);
+  inside.append(ReachesTheKey());
   inside.append(StatesFurther(kFurtherWord));
-  inside.append(SealedModelStating(kOtherFurtherWord));
   inside.append(kSealedDesign);
   std::string written = Encrypted(RegionAround(inside));
   EXPECT_EQ(TimesWritten(written, StatesFurther(kFurtherWord)), 1U);
@@ -348,10 +358,15 @@ TEST(ProtectAuthorInfoDescription, AnEnclosedSealedModelsWordIsNotPlacedAgain) {
 // can show: the sealed model is inside the new block whole, its own delimiters
 // and the stating directive an earlier run placed inside it included. It was
 // carried across rather than dropped, and this rule reached none of it.
+//
+// The region designates its key and offers what it offers after the sealed
+// model, for the reason AnEnclosedSealedModelsWordIsNotPlacedAgain above
+// states: §34.5.31.2 has the `pragma protect reset` standing after that model
+// put every protect pragma keyword back to its default.
 TEST(ProtectAuthorInfoDescription, AnEnclosedSealedModelsOfferingIsCarriedIn) {
-  std::string inside = ReachesTheKey();
+  std::string inside = SealedModelStating(kOtherFurtherWord);
+  inside.append(ReachesTheKey());
   inside.append(StatesFurther(kFurtherWord));
-  inside.append(SealedModelStating(kOtherFurtherWord));
   inside.append(kSealedDesign);
   std::string opened = OpenedBlockOf(Encrypted(RegionAround(inside)));
   EXPECT_TRUE(Holds(opened, kBeginProtected));

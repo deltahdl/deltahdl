@@ -325,10 +325,19 @@ TEST(ProtectAuthorDescription, ARegionNamingNobodyPlacesNoDirective) {
 // the bytes it is written with, so the name it states is a name some earlier
 // encryption placed for a design of its own: this envelope states the name its
 // region wrote, once, and says nothing about the other.
+//
+// The enclosed text writes the key designations and the naming after the sealed
+// model, here and in AnEnclosedSealedModelsNameTravelsIntoTheBlock below. §34.4
+// has an encrypting tool write `pragma protect reset` after every envelope it
+// produces, so a sealed model ends with that directive standing outside the
+// block it closed. §34.5.31.2 puts every protect pragma keyword back to its
+// default following the reset, so a designation written ahead of the sealed
+// model is one that model's own trailer takes away, and the enclosing region
+// would reach no key and be copied through unencrypted.
 TEST(ProtectAuthorDescription, AnEnclosedSealedModelsNameIsNotPlacedAgain) {
-  std::string enclosed = ReachesTheKey();
+  std::string enclosed = SealedModelNaming(kOtherAuthorName);
+  enclosed.append(ReachesTheKey());
   enclosed.append(NamesAuthor(kAuthorName));
-  enclosed.append(SealedModelNaming(kOtherAuthorName));
   enclosed.append(kSealedDesign);
   std::string written = Encrypted(RegionAround(enclosed));
   EXPECT_EQ(TimesWritten(written, NamesAuthor(kAuthorName)), 1U);
@@ -340,9 +349,9 @@ TEST(ProtectAuthorDescription, AnEnclosedSealedModelsNameIsNotPlacedAgain) {
 // the naming directive an earlier run placed inside it included. It was carried
 // across rather than dropped, and this rule reached none of it.
 TEST(ProtectAuthorDescription, AnEnclosedSealedModelsNameTravelsIntoTheBlock) {
-  std::string enclosed = ReachesTheKey();
+  std::string enclosed = SealedModelNaming(kOtherAuthorName);
+  enclosed.append(ReachesTheKey());
   enclosed.append(NamesAuthor(kAuthorName));
-  enclosed.append(SealedModelNaming(kOtherAuthorName));
   enclosed.append(kSealedDesign);
   std::string opened = OpenedBlockOf(Encrypted(RegionAround(enclosed)));
   EXPECT_TRUE(Holds(opened, kBeginProtected));
