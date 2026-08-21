@@ -128,7 +128,14 @@ bool NamesBareKeyword(std::string_view line, std::string_view keyword);
 // input file is an error wherever no previously generated protected block
 // encloses it, and it is the naming of the keyword that puts a block there,
 // whether the block is written on the line after it or as the value against
-// it.
+// it. §34.5.27 states the same rule for the key block, and §34.5.22 states one
+// of the same shape: a digest_block found in an input file is a request to
+// generate a digest, so what a text wrote against the keyword decides no more
+// there than it does for the other two.
+//
+// Those three are the whole of it. A keyword whose rule turns on the line
+// beneath it is read against NamesBareKeyword above, and §34.5.22's keyword is
+// read against both, one predicate for each of the two things it does.
 bool NamesKeyword(std::string_view line, std::string_view keyword);
 
 }  // namespace delta
