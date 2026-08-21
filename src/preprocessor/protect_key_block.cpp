@@ -84,6 +84,7 @@ void ProtectKeyBlockRequests::Designate(std::string_view keyowner,
                                         uint32_t line) {
   ProtectKeyBlockRequest request;
   request.keyowner = ProtectPragmaValueBody(keyowner);
+  request.stated_keyowner = keyowner;
   request.keyname = ProtectPragmaValueBody(keyname);
   request.data = data;
   request.line = line;
@@ -98,6 +99,7 @@ void ProtectKeyBlockRequests::DesignatePublicKey(
     const ProtectDataDecryption& data, uint32_t line) {
   ProtectKeyBlockRequest request;
   request.keyowner = ProtectPragmaValueBody(keyowner);
+  request.stated_keyowner = keyowner;
   request.public_key = key;
   request.data = data;
   request.line = line;
@@ -165,7 +167,12 @@ std::string ProtectKeyBlockDirectives(const ProtectKeyBlockRequest& request,
                                       std::string_view key,
                                       const ProtectEncoding& encoding) {
   std::string text;
-  AppendDirective(text, kKeyKeyownerKeyword, request.keyowner);
+  // §34.5.23 has the entity unchanged wherever the tool writes it out, and
+  // states no exception at all, so it goes into the block's own directive in
+  // the spelling the source used rather than in the one this file quotes
+  // everything else with. §34.5.25 governs the name written beneath it, and
+  // that name joins this spelling when its own subclause is taken.
+  text.append(ProtectKeyKeyownerDirective(request.stated_keyowner));
   if (!request.keyname.empty()) {
     AppendDirective(text, kKeyKeynameKeyword, request.keyname);
   } else {

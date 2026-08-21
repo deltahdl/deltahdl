@@ -90,6 +90,17 @@ bool SameProtectDataDecryption(const ProtectDataDecryption& a,
 // the request with the designation rather than apart from it.
 struct ProtectKeyBlockRequest {
   std::string keyowner;
+  // The entity as the source spelled it, quotation marks and all where it had
+  // them, beside the body of that value the field above holds.
+  //
+  // The two are kept apart because they answer different questions. Reaching a
+  // key is a question about what the value denotes, and §34.5.12 identifies a
+  // key by the characters inside the quotation marks; writing the entity into
+  // the block's own directive is a question about what the value is, and
+  // §34.5.23 has it unchanged wherever the tool writes it out. §22.5.1 gives a
+  // pragma_value more than one spelling, so a name written bare and returned in
+  // quotes is a different pragma_value from the one the author wrote.
+  std::string stated_keyowner;
   std::string keyname;
   std::string public_key;
   ProtectDataDecryption data;

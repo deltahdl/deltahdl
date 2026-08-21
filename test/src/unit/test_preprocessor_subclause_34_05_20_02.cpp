@@ -187,6 +187,12 @@ std::string EnvelopeSealingItsDigestUnder(std::string_view digest_key,
   std::string content = BlockContentCarrying(digest_key);
   ProtectKeyBlockRequest request;
   request.keyowner = std::string(kProvider);
+  // §34.5.23 has the entity written into the block's own directive in the
+  // spelling the source used, so a request carries the value as written beside
+  // the body of it that reaches a key. This one is built here rather than read
+  // from a source, and the two spellings of a name holding no quotation marks
+  // are the same characters.
+  request.stated_keyowner = std::string(kProvider);
   request.keyname = std::string(kBlockKeyName);
   ProtectDigestBlockPolicy policy;
   policy.requested = true;
