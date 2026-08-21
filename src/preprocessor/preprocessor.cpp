@@ -720,6 +720,13 @@ void Preprocessor::EndAccumulatedProtectPragmas() {
   digest_block_value_next_ = false;
   data_decrypt_key_.clear();
   digest_decrypt_key_.clear();
+  // §34.5.22 has the digest of a key block or a data block written in the
+  // digest block immediately following that block, so the block a digest can
+  // still be owed belongs to the envelope it was recovered from. An envelope
+  // that closed without one leaves nothing for the next envelope's digest to
+  // vouch for, and a digest block that reached a block of somebody else's
+  // envelope would report an alteration of a block it never followed.
+  digest_target_ = ProtectDigestTarget();
 }
 
 // Emit an already comment-stripped active line.
