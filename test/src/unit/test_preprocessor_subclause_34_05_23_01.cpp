@@ -7,6 +7,7 @@
 #include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
 #include "helpers_protect_keys.h"
+#include "helpers_protect_keyword_value.h"
 #include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_keywords.h"
@@ -103,49 +104,21 @@ std::string NamesTheKey() {
   directive.append(kSharedKeyName).append("\"\n");
   return directive;
 }
-
-// A pragma_value written as the string §34.5.23.1 defines the expression with.
-std::string InQuotes(std::string_view value) {
-  std::string text = "\"";
-  text.append(value).append("\"");
-  return text;
-}
-
-// A reading of `src` with the preprocessor kept alive, so both what the text
-// left in effect and what that reaches among a tool's keys can be asked of it.
-struct ReadSource {
-  SourceManager mgr;
-  DiagEngine diag{mgr};
-  Preprocessor pp{mgr, diag, PreprocConfig{}};
-
-  explicit ReadSource(const std::string& src) {
-    pp.Preprocess(mgr.AddFile("<test>", src));
-    EXPECT_FALSE(diag.HasErrors()) << src;
-  }
-
-  // The entity in effect where the reading stopped.
-  ProtectKeywordValue Entity() const {
-    return pp.ProtectKeywords().ValueOf(kKeyKeyownerKeyword);
-  }
-
-  // The key §34.5.27 opens a region's key block with, reached through the
-  // entity in effect and the name written against it.
-  std::string_view KeyReached(const ProtectKeyList& keys) const {
-    return ProtectKeyBlockKey(pp.ProtectKeywords(), keys);
-  }
-};
-
 // §34.5.23.1: the expression is `key_keyowner = <string>`, and what stands in
 // effect afterwards is what was inside the quotation marks, without them.
 TEST(ProtectKeyKeyownerSyntax, TheStringAgainstTheKeywordNamesTheEntity) {
-  EXPECT_EQ(ReadSource(NamesEntity(InQuotes(kFirstEntity))).Entity().value,
+  EXPECT_EQ(ReadKeywordScope(NamesEntity(InQuotes(kFirstEntity)))
+                .ValueOf(kKeyKeyownerKeyword)
+                .value,
             kFirstEntity);
 }
 
 // §22.5.1 admits a bare identifier as a pragma_value, and one written thing is
 // what this keyword is defined with.
 TEST(ProtectKeyKeyownerSyntax, ABareIdentifierIsOneWrittenThingToo) {
-  EXPECT_EQ(ReadSource(NamesEntity(kIdentifierEntity)).Entity().value,
+  EXPECT_EQ(ReadKeywordScope(NamesEntity(kIdentifierEntity))
+                .ValueOf(kKeyKeyownerKeyword)
+                .value,
             kIdentifierEntity);
 }
 
@@ -153,7 +126,9 @@ TEST(ProtectKeyKeyownerSyntax, ABareIdentifierIsOneWrittenThingToo) {
 // be spelled: an entity named with a space in it is one written thing, and the
 // whole of it stands in effect rather than the word it opens with.
 TEST(ProtectKeyKeyownerSyntax, TheWholeOfASpaceBearingStringStandsInEffect) {
-  EXPECT_EQ(ReadSource(NamesEntity(InQuotes("Acme Corp"))).Entity().value,
+  EXPECT_EQ(ReadKeywordScope(NamesEntity(InQuotes("Acme Corp")))
+                .ValueOf(kKeyKeyownerKeyword)
+                .value,
             "Acme Corp");
 }
 
@@ -164,7 +139,8 @@ TEST(ProtectKeyKeyownerSyntax, TheWholeOfASpaceBearingStringStandsInEffect) {
 // under, so the place stays empty rather than being filled from it.
 TEST(ProtectKeyKeyownerSyntax, TheDataEntityDoesNotFillThePlaceLeftEmpty) {
   ProtectKeywordValue entity =
-      ReadSource("`pragma protect data_keyowner=\"meridian-trust\"\n").Entity();
+      ReadKeywordScope("`pragma protect data_keyowner=\"meridian-trust\"\n")
+          .ValueOf(kKeyKeyownerKeyword);
   EXPECT_TRUE(entity.defaulted);
   EXPECT_TRUE(entity.value.empty());
 }
@@ -175,15 +151,16 @@ TEST(ProtectKeyKeyownerSyntax, TheDataEntityDoesNotFillThePlaceLeftEmpty) {
 TEST(ProtectKeyKeyownerSyntax, AListLeavesTheEntityAlreadyNamed) {
   std::string src = NamesEntity(InQuotes(kFirstEntity));
   src += NamesEntity("(held_by=\"cerulean-vault\")");
-  EXPECT_EQ(ReadSource(src).Entity().value, kFirstEntity);
+  EXPECT_EQ(ReadKeywordScope(src).ValueOf(kKeyKeyownerKeyword).value,
+            kFirstEntity);
 }
 
 // The same list where no entity was named before it, which leaves the keyword
 // at its default -- what makes the case above about the list rather than about
 // the value that happened to precede it.
 TEST(ProtectKeyKeyownerSyntax, AListOnItsOwnNamesNoEntity) {
-  EXPECT_TRUE(ReadSource(NamesEntity("(held_by=\"cerulean-vault\")"))
-                  .Entity()
+  EXPECT_TRUE(ReadKeywordScope(NamesEntity("(held_by=\"cerulean-vault\")"))
+                  .ValueOf(kKeyKeyownerKeyword)
                   .defaulted);
 }
 
@@ -196,8 +173,9 @@ TEST(ProtectKeyKeyownerSyntax, AListOnItsOwnNamesNoEntity) {
 // empty value, so the two are not told apart here; naming nobody is what this
 // subclause turns on either way.
 TEST(ProtectKeyKeyownerSyntax, TheKeywordStandingAloneNamesNoEntity) {
-  EXPECT_TRUE(
-      ReadSource("`pragma protect key_keyowner\n").Entity().value.empty());
+  EXPECT_TRUE(ReadKeywordScope("`pragma protect key_keyowner\n")
+                  .ValueOf(kKeyKeyownerKeyword)
+                  .value.empty());
 }
 
 // The '=' written after the keyword with nothing following it. §34.5.23.1 has a
@@ -216,9 +194,10 @@ TEST(ProtectKeyKeyownerSyntax, AnEqualsWithNoValueAfterItIsNoExpression) {
 // keyword §34.4 does not tabulate, so nothing is put in effect for the one it
 // resembles.
 TEST(ProtectKeyKeyownerSyntax, ANameMerelyOpeningWithTheKeywordIsNotIt) {
-  EXPECT_TRUE(ReadSource("`pragma protect key_keyowners=\"meridian-trust\"\n")
-                  .Entity()
-                  .defaulted);
+  EXPECT_TRUE(
+      ReadKeywordScope("`pragma protect key_keyowners=\"meridian-trust\"\n")
+          .ValueOf(kKeyKeyownerKeyword)
+          .defaulted);
 }
 
 // What the string is for. §34.5.27 has a region's key block opened by the key
@@ -227,12 +206,14 @@ TEST(ProtectKeyKeyownerSyntax, ANameMerelyOpeningWithTheKeywordIsNotIt) {
 // key under this one name, so nothing but the entity separates the two.
 TEST(ProtectKeyKeyownerSyntax, TheEntityNamedDecidesWhichKeyIsReached) {
   ProtectKeyList keys = KeysOfBothEntities();
-  EXPECT_EQ(ReadSource(NamesEntity(InQuotes(kFirstEntity)) + NamesTheKey())
-                .KeyReached(keys),
-            kFirstEntityKey);
-  EXPECT_EQ(ReadSource(NamesEntity(InQuotes(kSecondEntity)) + NamesTheKey())
-                .KeyReached(keys),
-            kSecondEntityKey);
+  EXPECT_EQ(
+      ReadKeywordScope(NamesEntity(InQuotes(kFirstEntity)) + NamesTheKey())
+          .KeyBlockKeyReached(keys),
+      kFirstEntityKey);
+  EXPECT_EQ(
+      ReadKeywordScope(NamesEntity(InQuotes(kSecondEntity)) + NamesTheKey())
+          .KeyBlockKeyReached(keys),
+      kSecondEntityKey);
 }
 
 // The list read back where it matters. An expression naming no entity leaves
@@ -244,7 +225,7 @@ TEST(ProtectKeyKeyownerSyntax, AListLeavesTheKeyTheEntityNamedReaches) {
   std::string src = NamesEntity(InQuotes(kFirstEntity));
   src += NamesTheKey();
   src += NamesEntity("(held_by=\"cerulean-vault\")");
-  EXPECT_EQ(ReadSource(src).KeyReached(keys), kFirstEntityKey);
+  EXPECT_EQ(ReadKeywordScope(src).KeyBlockKeyReached(keys), kFirstEntityKey);
 }
 
 }  // namespace

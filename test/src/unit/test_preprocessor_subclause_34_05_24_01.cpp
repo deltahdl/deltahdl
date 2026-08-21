@@ -6,6 +6,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
+#include "helpers_protect_keyword_value.h"
 #include "helpers_reported_error.h"
 #include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
@@ -90,12 +91,6 @@ std::string StatesMethod(std::string_view value) {
 }
 
 // A pragma_value written as the string §34.5.24.1 defines the expression with.
-std::string InQuotes(std::string_view value) {
-  std::string text = "\"";
-  text.append(value).append("\"");
-  return text;
-}
-
 // The identifier in effect once `src` has been read.
 ProtectKeywordValue MethodAfter(const std::string& src) {
   SourceManager mgr;

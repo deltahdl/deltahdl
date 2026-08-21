@@ -47,6 +47,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "helpers_protect_keys.h"
+#include "helpers_protect_keyword_value.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_digest.h"
 #include "preprocessor/protect_digest_block.h"
@@ -104,12 +105,6 @@ constexpr std::string_view kSealedDesign = "module sealed_m; endmodule\n";
 
 // A pragma_value written as the string it is. A field a block writer copies out
 // unchanged holds the value as the source wrote it, quotation marks and all.
-std::string InQuotes(std::string_view value) {
-  std::string text = "\"";
-  text.append(value).append("\"");
-  return text;
-}
-
 std::string Writes(std::string_view keyword, std::string_view value) {
   std::string text = "`pragma protect ";
   text.append(keyword).append("=\"").append(value).append("\"\n");

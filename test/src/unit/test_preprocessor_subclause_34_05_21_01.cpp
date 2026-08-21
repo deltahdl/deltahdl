@@ -7,6 +7,7 @@
 #include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
 #include "fixture_program.h"
+#include "helpers_protect_keyword_value.h"
 #include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_digest.h"
@@ -104,12 +105,6 @@ std::string StatesMethod(std::string_view value) {
 }
 
 // A pragma_value written as the string §34.5.21.1 defines the expression with.
-std::string InQuotes(std::string_view value) {
-  std::string text = "\"";
-  text.append(value).append("\"");
-  return text;
-}
-
 // §34.5.21.1: the expression is `digest_method = <string>`, and what stands in
 // effect afterwards is what was inside the quotation marks, without them.
 TEST(ProtectDigestMethodSyntax, TheStringAgainstTheKeywordStatesTheAlgorithm) {

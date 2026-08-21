@@ -7,6 +7,7 @@
 #include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
 #include "helpers_protect_keys.h"
+#include "helpers_protect_keyword_value.h"
 #include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_keywords.h"
@@ -112,54 +113,21 @@ std::string NamesTheEntity() {
   directive.append(kEntity).append("\"\n");
   return directive;
 }
-
-// A pragma_value written as the string §34.5.25.1 defines the expression with.
-std::string InQuotes(std::string_view value) {
-  std::string text = "\"";
-  text.append(value).append("\"");
-  return text;
-}
-
-// A reading of `src` with the preprocessor kept alive, so both what the text
-// left in effect and what that reaches among a tool's keys can be asked of it.
-//
-// No keys are configured. §34.5.25 has a name that reaches none of the keys an
-// entity holds reported, and Preprocessor::CheckKeyKeyname asks that only where
-// the tool knows the entity at all, so a reading supplied with no keys is one
-// where the cases below vary the spelling and nothing else.
-struct ReadSource {
-  SourceManager mgr;
-  DiagEngine diag{mgr};
-  Preprocessor pp{mgr, diag, PreprocConfig{}};
-
-  explicit ReadSource(const std::string& src) {
-    pp.Preprocess(mgr.AddFile("<test>", src));
-    EXPECT_FALSE(diag.HasErrors()) << src;
-  }
-
-  // The name in effect where the reading stopped.
-  ProtectKeywordValue Name() const {
-    return pp.ProtectKeywords().ValueOf(kKeyKeynameKeyword);
-  }
-
-  // The key §34.5.27 opens a region's key block with, reached through the name
-  // in effect and the entity written beside it.
-  std::string_view KeyReached(const ProtectKeyList& keys) const {
-    return ProtectKeyBlockKey(pp.ProtectKeywords(), keys);
-  }
-};
-
 // §34.5.25.1: the expression is `key_keyname = <string>`, and what stands in
 // effect afterwards is what was inside the quotation marks, without them.
 TEST(ProtectKeyKeynameSyntax, TheStringAgainstTheKeywordNamesTheKey) {
-  EXPECT_EQ(ReadSource(NamesKey(InQuotes(kFirstKeyName))).Name().value,
+  EXPECT_EQ(ReadKeywordScope(NamesKey(InQuotes(kFirstKeyName)))
+                .ValueOf(kKeyKeynameKeyword)
+                .value,
             kFirstKeyName);
 }
 
 // §22.5.1 admits a bare identifier as a pragma_value, and one written thing is
 // what this keyword is defined with.
 TEST(ProtectKeyKeynameSyntax, ABareIdentifierIsOneWrittenThingToo) {
-  EXPECT_EQ(ReadSource(NamesKey(kIdentifierKeyName)).Name().value,
+  EXPECT_EQ(ReadKeywordScope(NamesKey(kIdentifierKeyName))
+                .ValueOf(kKeyKeynameKeyword)
+                .value,
             kIdentifierKeyName);
 }
 
@@ -167,7 +135,9 @@ TEST(ProtectKeyKeynameSyntax, ABareIdentifierIsOneWrittenThingToo) {
 // be spelled: a key named with spaces in it is one written thing, and the whole
 // of it stands in effect rather than the word it opens with.
 TEST(ProtectKeyKeynameSyntax, TheWholeOfASpaceBearingStringStandsInEffect) {
-  EXPECT_EQ(ReadSource(NamesKey(InQuotes("acme rsa key 1"))).Name().value,
+  EXPECT_EQ(ReadKeywordScope(NamesKey(InQuotes("acme rsa key 1")))
+                .ValueOf(kKeyKeynameKeyword)
+                .value,
             "acme rsa key 1");
 }
 
@@ -177,15 +147,17 @@ TEST(ProtectKeyKeynameSyntax, TheWholeOfASpaceBearingStringStandsInEffect) {
 TEST(ProtectKeyKeynameSyntax, AListLeavesTheKeyAlreadyNamed) {
   std::string src = NamesKey(InQuotes(kFirstKeyName));
   src += NamesKey("(held_by=\"meridian-trust\")");
-  EXPECT_EQ(ReadSource(src).Name().value, kFirstKeyName);
+  EXPECT_EQ(ReadKeywordScope(src).ValueOf(kKeyKeynameKeyword).value,
+            kFirstKeyName);
 }
 
 // The same list where no key was named before it, which leaves the keyword at
 // its default -- what makes the case above about the list rather than about the
 // value that happened to precede it.
 TEST(ProtectKeyKeynameSyntax, AListOnItsOwnNamesNoKey) {
-  EXPECT_TRUE(
-      ReadSource(NamesKey("(held_by=\"meridian-trust\")")).Name().defaulted);
+  EXPECT_TRUE(ReadKeywordScope(NamesKey("(held_by=\"meridian-trust\")"))
+                  .ValueOf(kKeyKeynameKeyword)
+                  .defaulted);
 }
 
 // The negative that makes the spelling matter: §34.5.25.1 writes a string
@@ -197,7 +169,9 @@ TEST(ProtectKeyKeynameSyntax, AListOnItsOwnNamesNoKey) {
 // empty value, so the two are not told apart here; naming no key is what this
 // subclause turns on either way.
 TEST(ProtectKeyKeynameSyntax, TheKeywordStandingAloneNamesNoKey) {
-  EXPECT_TRUE(ReadSource("`pragma protect key_keyname\n").Name().value.empty());
+  EXPECT_TRUE(ReadKeywordScope("`pragma protect key_keyname\n")
+                  .ValueOf(kKeyKeynameKeyword)
+                  .value.empty());
 }
 
 // The '=' written after the keyword with nothing following it. §34.5.25.1 has a
@@ -216,9 +190,10 @@ TEST(ProtectKeyKeynameSyntax, AnEqualsWithNoValueAfterItIsNoExpression) {
 // keyword §34.4 does not tabulate, so nothing is put in effect for the one it
 // resembles.
 TEST(ProtectKeyKeynameSyntax, ANameMerelyOpeningWithTheKeywordIsNotIt) {
-  EXPECT_TRUE(ReadSource("`pragma protect key_keynames=\"wrapping-2026\"\n")
-                  .Name()
-                  .defaulted);
+  EXPECT_TRUE(
+      ReadKeywordScope("`pragma protect key_keynames=\"wrapping-2026\"\n")
+          .ValueOf(kKeyKeynameKeyword)
+          .defaulted);
 }
 
 // What the string is for. §34.5.27 has a region's key block opened by the key
@@ -226,12 +201,14 @@ TEST(ProtectKeyKeynameSyntax, ANameMerelyOpeningWithTheKeywordIsNotIt) {
 // holding two keys the name is what decides which of them a reading reaches.
 TEST(ProtectKeyKeynameSyntax, TheNameDecidesWhichKeyIsReached) {
   ProtectKeyList keys = KeysOfOneEntity();
-  EXPECT_EQ(ReadSource(NamesTheEntity() + NamesKey(InQuotes(kFirstKeyName)))
-                .KeyReached(keys),
-            kFirstKey);
-  EXPECT_EQ(ReadSource(NamesTheEntity() + NamesKey(InQuotes(kSecondKeyName)))
-                .KeyReached(keys),
-            kSecondKey);
+  EXPECT_EQ(
+      ReadKeywordScope(NamesTheEntity() + NamesKey(InQuotes(kFirstKeyName)))
+          .KeyBlockKeyReached(keys),
+      kFirstKey);
+  EXPECT_EQ(
+      ReadKeywordScope(NamesTheEntity() + NamesKey(InQuotes(kSecondKeyName)))
+          .KeyBlockKeyReached(keys),
+      kSecondKey);
 }
 
 // The list read back where it matters. An expression naming no key leaves the
@@ -243,7 +220,7 @@ TEST(ProtectKeyKeynameSyntax, AListLeavesTheKeyTheNameReaches) {
   std::string src = NamesTheEntity();
   src += NamesKey(InQuotes(kFirstKeyName));
   src += NamesKey("(held_by=\"meridian-trust\")");
-  EXPECT_EQ(ReadSource(src).KeyReached(keys), kFirstKey);
+  EXPECT_EQ(ReadKeywordScope(src).KeyBlockKeyReached(keys), kFirstKey);
 }
 
 }  // namespace
