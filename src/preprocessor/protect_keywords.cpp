@@ -147,12 +147,13 @@ std::span<const ProtectPragmaKeyword> ProtectPragmaKeywords() {
   return kProtectPragmaKeywords;
 }
 
-// §34.5.10.1, §34.5.11.1, §34.5.12.1, §34.5.16.1, §34.5.17.1 and §34.5.18.1
-// are the ones whose subclauses have been taken; the rest of the table's
-// `= <string>` keywords join them as theirs are.
+// §34.5.10.1, §34.5.11.1, §34.5.12.1, §34.5.16.1, §34.5.17.1, §34.5.18.1 and
+// §34.5.21.1 are the ones whose subclauses have been taken; the rest of the
+// table's `= <string>` keywords join them as theirs are.
 constexpr std::string_view kStringValuedKeywords[] = {
     kDataKeyownerKeyword,   kDataMethodKeyword,      kDataKeynameKeyword,
     kDigestKeyownerKeyword, kDigestKeyMethodKeyword, kDigestKeynameKeyword,
+    kDigestMethodKeyword,
 };
 
 bool IsProtectStringValuedKeyword(std::string_view name) {
