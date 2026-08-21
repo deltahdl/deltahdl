@@ -45,9 +45,14 @@ struct ReadKeywordScope {
   SourceManager mgr;
   DiagEngine diag{mgr};
   Preprocessor pp{mgr, diag, PreprocConfig{}};
+  // What the reading produced. A keyword defined as standing alone speaks for
+  // the line beneath it, and what a case asks of such a keyword is whether that
+  // line was taken as the value or left as text of the design, which is a
+  // question about this rather than about the scope.
+  std::string text;
 
   explicit ReadKeywordScope(const std::string& src) {
-    pp.Preprocess(mgr.AddFile("<test>", src));
+    text = pp.Preprocess(mgr.AddFile("<test>", src));
     EXPECT_FALSE(diag.HasErrors()) << src;
   }
 
