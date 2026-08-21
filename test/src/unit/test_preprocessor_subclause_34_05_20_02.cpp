@@ -189,10 +189,11 @@ std::string EnvelopeSealingItsDigestUnder(std::string_view digest_key,
   request.keyowner = std::string(kProvider);
   // §34.5.23 has the entity written into the block's own directive in the
   // spelling the source used, so a request carries the value as written beside
-  // the body of it that reaches a key. This one is built here rather than read
-  // from a source, and the two spellings of a name holding no quotation marks
-  // are the same characters.
-  request.stated_keyowner = std::string(kProvider);
+  // the body of it that reaches a key. It goes in quoted for the reason the
+  // cipher below it does: this entity's name holds a hyphen, and a name put
+  // here bare goes into the block as a directive §22.11 rejects for the token
+  // the hyphen is.
+  request.stated_keyowner = InQuotes(kProvider);
   request.keyname = std::string(kBlockKeyName);
   ProtectDigestBlockPolicy policy;
   policy.requested = true;

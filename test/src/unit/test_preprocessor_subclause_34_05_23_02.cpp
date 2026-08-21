@@ -46,6 +46,7 @@
 #include "helpers_reported_error.h"
 #include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
+#include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
 
@@ -91,12 +92,20 @@ std::string Writes(std::string_view keyword, std::string_view value) {
   return text;
 }
 
+// `value` written under the coding scheme a text that stated none is read in.
+// The line beneath an announcing keyword carries the value encoded, and a line
+// that cannot be read out of that scheme designates nothing at all, so a case
+// writing the characters raw would reach no designation to be held to a rule.
+std::string Encoded(std::string_view value) {
+  return EncodeProtectBlock(value, DefaultProtectEncoding());
+}
+
 // The designation §34.5.26.1 writes as the keyword standing alone with the
 // value on the line beneath it. It is read only inside a previously generated
 // envelope, so the cases using it wrap their text in one.
 std::string DesignatesPublicKey(std::string_view value) {
   std::string text = "`pragma protect key_public_key\n";
-  text.append(value).append("\n");
+  text.append(Encoded(value)).append("\n");
   return text;
 }
 
@@ -165,7 +174,8 @@ TEST(ProtectKeyKeyownerDescription, OneValueAgainstBothDesignationsIsReported) {
                                     DesignatesPublicKey(kSharedValue));
   Read run(src);
   EXPECT_TRUE(ReportedError(run.diag.Diagnostics(), kBothNamesOneValue,
-                            LineCarryingOnly(src, kSharedValue), "34.5.23"));
+                            LineCarryingOnly(src, Encoded(kSharedValue)),
+                            "34.5.23"));
 }
 
 // The constraint is about the entity the values are unique for and not about
