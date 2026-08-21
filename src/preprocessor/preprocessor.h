@@ -508,8 +508,11 @@ class Preprocessor {
   //
   // Empty where no directive has named one, this subclause settling no default
   // and §34.4 filling an unwritten keyword from a default that is not there to
-  // fill it. A key block standing where nothing has been named is left unopened
-  // rather than opened under a guess.
+  // fill it.
+  //
+  // What a reading does with the answer is nothing: no key block is held to the
+  // identifier, one named or not, and #3278 records that along with what stands
+  // in the way of holding it to one.
   //
   // Like the value it is built from, it belongs to the position the reading has
   // reached rather than to any one directive, which is why it is read off the

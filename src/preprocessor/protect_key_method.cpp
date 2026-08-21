@@ -75,10 +75,16 @@ bool IsRequiredProtectEncryptionAlgorithm(std::string_view identifier) {
 
 // A directive that wrote the keyword with nothing against it named no cipher
 // any more than leaving the keyword out did, so nothing stands in effect in
-// either case and both are reported the same way. What a reader does with that
-// is decline to open a key block rather than open one under a guess: a block
-// opened under the wrong cipher yields bytes, and bytes are what a block
-// opened under the right one yields too.
+// either case and both are reported the same way.
+//
+// Nothing in a run asks this. §34.5.24 has a reader decrypt a key block under
+// the algorithm the identifier names, and this implementation opens one under
+// the single cipher it has whatever the envelope says; #3278 records that, and
+// records why the obvious remedy is not free -- the same subclause has the
+// identifier written out unchanged, so an envelope this tool produced states
+// whichever cipher its author named rather than the one its blocks are under,
+// and a reader holding a block to the stated identifier would turn away its own
+// tool's output.
 ProtectKeywordValue ProtectKeyMethodInEffect(const ProtectKeywordScope& scope) {
   ProtectKeywordValue written = scope.ValueOf(kKeyMethodKeyword);
   if (!written.defaulted && !written.value.empty()) return written;
