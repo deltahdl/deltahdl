@@ -71,6 +71,16 @@ ProtectKeyList TheKey() {
   return keys;
 }
 
+// The characters recording one envelope's sealed region: what stands between
+// the quotation marks of its data_block expression.
+std::string DataBlockOf(const std::string& envelope) {
+  constexpr std::string_view kOpening = "`pragma protect data_block=\"";
+  size_t opens = envelope.find(kOpening);
+  EXPECT_NE(opens, std::string::npos) << envelope;
+  size_t from = opens + kOpening.size();
+  return envelope.substr(from, envelope.find('"', from) - from);
+}
+
 std::string Writes(std::string_view keyword, std::string_view value) {
   std::string text = "`pragma protect ";
   text.append(keyword).append("=\"").append(value).append("\"\n");
@@ -107,12 +117,21 @@ TEST(ProtectDecryptLicenseDescription, TheLicenceIsNowhereInTheClear) {
 }
 
 // The other side of the same rule: it went into the block rather than being
-// dropped. A reading that opens the block gets the expression back with the
-// design, which is what "output unchanged except for the encryption" means.
-TEST(ProtectDecryptLicenseDescription, TheLicenceComesBackWithTheDesign) {
-  ReadSource run(EnvelopeOf(kLicense), ReadSource::KeysConfig(TheKey()));
-  EXPECT_TRUE(Holds(run.text, kSealedDesign)) << run.text;
-  EXPECT_TRUE(Holds(run.text, kLicense)) << run.text;
+// dropped. The block recovers to the expression and the design together, which
+// is what "output unchanged except for the encryption and encoding" means.
+//
+// What is opened here is the block rather than the envelope, because a reading
+// that opens an envelope goes on to read what came out of it: the recovered
+// text is source, and a protect pragma directive in it is consumed the way one
+// in any source is. The block is where the expression stands unchanged, and it
+// is the only place it could stand and still be encrypted.
+TEST(ProtectDecryptLicenseDescription,
+     TheBlockRecoversToTheLicenceAndTheDesign) {
+  std::string cleartext;
+  ASSERT_TRUE(DecryptProtectedRegion(DataBlockOf(EnvelopeOf(kLicense)), kTheKey,
+                                     &cleartext));
+  EXPECT_TRUE(Holds(cleartext, kLicense)) << cleartext;
+  EXPECT_TRUE(Holds(cleartext, kSealedDesign)) << cleartext;
 }
 
 // The contrast that says the region decided this. §34.5.5 has the author's name
