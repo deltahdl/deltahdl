@@ -148,17 +148,20 @@ std::span<const ProtectPragmaKeyword> ProtectPragmaKeywords() {
 }
 
 // §34.5.10.1, §34.5.11.1, §34.5.12.1, §34.5.16.1, §34.5.17.1, §34.5.18.1,
-// §34.5.21.1, §34.5.23.1 and §34.5.24.1 are the ones whose subclauses have been
-// taken; the rest of the table's `= <string>` keywords join them as theirs are.
+// §34.5.21.1, §34.5.23.1, §34.5.24.1 and §34.5.25.1 are the ones whose
+// subclauses have been taken; the rest of the table's `= <string>` keywords
+// join them as theirs are.
 //
 // This is the reading a consuming tool makes. #3269 covers the keywords still
 // outside the list, and #3273 the writing side, where TakeKeyDesignations in
 // src/preprocessor/protect_processing.cpp takes a list as the value of four of
-// these names and puts it on the envelope it produces.
+// these names and puts it on the envelope it produces. All four of those are in
+// this list now, which is the state #3273 describes itself as starting from.
 constexpr std::string_view kStringValuedKeywords[] = {
     kDataKeyownerKeyword,   kDataMethodKeyword,      kDataKeynameKeyword,
     kDigestKeyownerKeyword, kDigestKeyMethodKeyword, kDigestKeynameKeyword,
     kDigestMethodKeyword,   kKeyKeyownerKeyword,     kKeyMethodKeyword,
+    kKeyKeynameKeyword,
 };
 
 bool IsProtectStringValuedKeyword(std::string_view name) {
