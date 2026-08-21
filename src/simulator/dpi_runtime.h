@@ -257,6 +257,19 @@ class DpiRuntime {
                               bool is_task = false);
   void EnterNoncontextImportCall(std::string_view sv_name,
                                  bool is_task = false);
+
+  // §35.5.1.3: opens a frame for a call to `sv_name` whose context property is
+  // the one that import's own declaration carries, rather than the one the call
+  // site names. §35.5.1.3 gives an imported subroutine either the pure property
+  // or the context property or neither, and only the context property lets a
+  // subroutine reach a SystemVerilog data object other than its actual
+  // arguments. So an import declared context opens a context frame scoped to
+  // `decl_scope`, and an import declared pure opens a noncontext frame, as does
+  // one declared with neither property. A name this runtime holds no
+  // declaration for has declared neither, and opens a noncontext frame too.
+  void EnterDeclaredImportCall(std::string_view sv_name, DpiScope decl_scope,
+                               bool is_task = false);
+
   void LeaveImportCall();
   uint32_t ImportCallDepth() const;
   bool ChainRootIsContext() const;
