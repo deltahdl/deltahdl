@@ -27,6 +27,14 @@ struct DpiFunction {
   DataTypeKind return_type = DataTypeKind::kVoid;
   std::vector<DpiArg> args;
   std::function<uint64_t(const std::vector<uint64_t>&)> impl;
+  // The same foreign function, reached where it writes its arguments as well as
+  // reading them. §35.5.1.2 has the changes an imported function makes to an
+  // output or an inout formal be visible outside the call, and `impl` is handed
+  // its arguments by const reference, so a function declared with either
+  // direction needs this form to say anything through them. A function with
+  // input formals alone is complete as `impl`, which is what most imports are
+  // and what every import written before the directions were carried is.
+  std::function<uint64_t(std::vector<uint64_t>&)> arg_impl;
 };
 
 struct DpiImport {
@@ -47,6 +55,12 @@ class DpiContext {
   const DpiFunction* FindImport(std::string_view sv_name) const;
   uint64_t Call(std::string_view sv_name,
                 const std::vector<uint64_t>& args) const;
+  // Calls the import with arguments it may write, and leaves in `args` what the
+  // foreign function left there. Which of those values reaches the call site is
+  // §35.5.1.2's question rather than this one's: the answer is applied by the
+  // caller, which knows the actual each formal was written against.
+  uint64_t CallWithArgs(std::string_view sv_name,
+                        std::vector<uint64_t>& args) const;
   uint32_t ImportCount() const {
     return static_cast<uint32_t>(imports_.size());
   }

@@ -3,7 +3,13 @@
 #include <cstdint>
 #include <vector>
 
+#include "common/types.h"
+#include "fixture_simulator.h"
+#include "parser/ast.h"
+#include "simulator/dpi.h"
 #include "simulator/dpi_runtime.h"
+#include "simulator/evaluation.h"
+#include "simulator/sim_context.h"
 
 using namespace delta;
 
@@ -258,6 +264,160 @@ TEST(DpiArgumentDirections, LegacyInputOnlyCallbackLeavesActualUnchanged) {
   EXPECT_EQ(result.AsInt(), 12);
   // ...and the input actual is unchanged.
   EXPECT_EQ(actuals[0].AsInt(), 6);
+}
+
+// ---------------------------------------------------------------------------
+// The same three rules, asked of a call a design makes.
+//
+// The cases above call the foreign function through DpiRuntime, which is the
+// registry the DPI C layer in src/simulator/svdpi.cpp works against. A call
+// written in SystemVerilog does not reach it: EvalDpiCall in
+// src/simulator/eval_function.cpp evaluates the call site's actuals, calls the
+// import through the DpiContext the run holds, and is where a value the foreign
+// function wrote has to arrive if it is to be visible to the design at all.
+// §35.5.1.2 is a rule about what the calling code sees, so it is asked here of
+// the code that does the seeing.
+// ---------------------------------------------------------------------------
+
+// The import the cases below call: a foreign function of one formal, which
+// reports the value it was handed and leaves `wrote` in its place. The formal's
+// direction is all that varies between the cases, so each says which direction
+// it is about and nothing else.
+DpiFunction OneFormalImport(Direction direction, uint64_t wrote,
+                            uint64_t* seen) {
+  DpiFunction func;
+  func.c_name = "c_touch";
+  func.sv_name = "touch";
+  func.return_type = DataTypeKind::kInt;
+  func.args = {DpiArg{"a", DataTypeKind::kInt, direction}};
+  func.arg_impl = [wrote, seen](std::vector<uint64_t>& args) -> uint64_t {
+    *seen = args[0];
+    args[0] = wrote;
+    return 0;
+  };
+  return func;
+}
+
+// A design holding one variable `a`, which is handed to that import and read
+// back afterwards. Both halves of every rule below are answered off this: what
+// the foreign function was handed is `seen`, and what the call site is left
+// holding is Actual().
+struct TouchingAnActual {
+  DpiContext dpi;
+  SimFixture f;
+  uint64_t seen = 0;
+
+  TouchingAnActual(Direction direction, uint64_t wrote, uint64_t actual) {
+    dpi.RegisterImport(OneFormalImport(direction, wrote, &seen));
+    f.ctx.SetDpiContext(&dpi);
+    auto* var = f.ctx.CreateVariable("a", 32);
+    var->value = MakeLogic4VecVal(f.arena, 32, actual);
+    EvalFunctionCall(ParseExprFrom("touch(a)", f), f.ctx, f.arena);
+  }
+
+  uint64_t Actual() { return f.ctx.FindVariable("a")->value.ToUint64(); }
+};
+
+// §35.5.1.2: the actual argument written against an input formal shall not be
+// changed. The foreign function writes the formal, and the variable the call
+// site named still holds what it held before the call.
+TEST(DpiArgumentDirectionsInADesign, AnInputActualIsNotChangedByTheCall) {
+  TouchingAnActual run(Direction::kInput, 111, 5);
+  EXPECT_EQ(run.Actual(), 5U);
+}
+
+// The other half of that rule: the foreign function was handed the actual's
+// value in the first place. Without this the case above would hold of a call
+// that passed nothing at all.
+TEST(DpiArgumentDirectionsInADesign, AnInputActualReachesTheImport) {
+  TouchingAnActual run(Direction::kInput, 111, 5);
+  EXPECT_EQ(run.seen, 5U);
+}
+
+// §35.5.1.2: the changes an imported function makes to an output formal are
+// visible outside the function, so the variable the call site named holds what
+// the foreign function wrote once the call has returned.
+TEST(DpiArgumentDirectionsInADesign, AnOutputActualTakesWhatTheImportWrote) {
+  TouchingAnActual run(Direction::kOutput, 42, 900);
+  EXPECT_EQ(run.Actual(), 42U);
+}
+
+// §35.5.1.2: an imported function shall not assume anything about the initial
+// value of an output formal, that value being undetermined. So the call does
+// not hand the actual in, and a foreign function reading the formal on entry
+// does not read what the design last assigned to that variable.
+TEST(DpiArgumentDirectionsInADesign, AnOutputFormalIsNotHandedTheActual) {
+  TouchingAnActual run(Direction::kOutput, 42, 900);
+  EXPECT_NE(run.seen, 900U);
+}
+
+// §35.5.1.2: an imported function can access the initial value of an inout
+// formal. That is what separates the direction from output, which the case
+// above has arriving with the actual withheld.
+TEST(DpiArgumentDirectionsInADesign, AnInoutFormalIsHandedTheActual) {
+  TouchingAnActual run(Direction::kInout, 8, 7);
+  EXPECT_EQ(run.seen, 7U);
+}
+
+// §35.5.1.2: and the changes it makes to an inout formal are visible outside
+// the function, which is what separates the direction from input.
+TEST(DpiArgumentDirectionsInADesign, AnInoutActualTakesWhatTheImportWrote) {
+  TouchingAnActual run(Direction::kInout, 8, 7);
+  EXPECT_EQ(run.Actual(), 8U);
+}
+
+// The formal a written value belongs to is the one the call site bound it to,
+// which §35.6 lets a call name rather than count. A call binding its actuals by
+// name therefore leaves each value with the variable that formal was named
+// against, and not with the one standing in that position.
+TEST(DpiArgumentDirectionsInADesign, ANamedActualTakesItsOwnFormalsValue) {
+  DpiContext dpi;
+  SimFixture f;
+  DpiFunction func;
+  func.c_name = "c_pair";
+  func.sv_name = "pair";
+  func.return_type = DataTypeKind::kInt;
+  func.args = {DpiArg{"first", DataTypeKind::kInt, Direction::kOutput},
+               DpiArg{"second", DataTypeKind::kInt, Direction::kOutput}};
+  func.arg_impl = [](std::vector<uint64_t>& args) -> uint64_t {
+    args[0] = 11;
+    args[1] = 22;
+    return 0;
+  };
+  dpi.RegisterImport(func);
+  f.ctx.SetDpiContext(&dpi);
+  f.ctx.CreateVariable("one", 32)->value = MakeLogic4VecVal(f.arena, 32, 0);
+  f.ctx.CreateVariable("two", 32)->value = MakeLogic4VecVal(f.arena, 32, 0);
+
+  EvalFunctionCall(ParseExprFrom("pair(.second(two), .first(one))", f), f.ctx,
+                   f.arena);
+
+  EXPECT_EQ(f.ctx.FindVariable("two")->value.ToUint64(), 22U);
+}
+
+// An import declaring input formals alone is written with the reading form of
+// the implementation, which cannot change an argument at all. A design calling
+// one is answered by it as before: nothing the call copies back is a value the
+// foreign function did not write, so the result is what it computed.
+TEST(DpiArgumentDirectionsInADesign, AnImportWritingNothingYieldsItsResult) {
+  DpiContext dpi;
+  SimFixture f;
+  DpiFunction func;
+  func.c_name = "c_double";
+  func.sv_name = "twice";
+  func.return_type = DataTypeKind::kInt;
+  func.args = {DpiArg{"a", DataTypeKind::kInt, Direction::kInput}};
+  func.impl = [](const std::vector<uint64_t>& args) -> uint64_t {
+    return args[0] * 2;
+  };
+  dpi.RegisterImport(func);
+  f.ctx.SetDpiContext(&dpi);
+  f.ctx.CreateVariable("a", 32)->value = MakeLogic4VecVal(f.arena, 32, 6);
+
+  auto result =
+      EvalFunctionCall(ParseExprFrom("twice(a)", f), f.ctx, f.arena).ToUint64();
+
+  EXPECT_EQ(result, 12U);
 }
 
 }  // namespace

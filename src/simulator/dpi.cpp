@@ -30,6 +30,19 @@ uint64_t DpiContext::Call(std::string_view sv_name,
   return func->impl(args);
 }
 
+uint64_t DpiContext::CallWithArgs(std::string_view sv_name,
+                                  std::vector<uint64_t>& args) const {
+  const auto* func = FindImport(sv_name);
+  if (func == nullptr) return 0;
+  if (func->arg_impl) return func->arg_impl(args);
+  // An import written with the reading form leaves `args` as it found them, so
+  // a call site copying an output or an inout formal back reads the value it
+  // supplied. That is the same value the actual already holds, so the copy-back
+  // changes nothing and the call behaves as it did before this form existed.
+  if (func->impl) return func->impl(args);
+  return 0;
+}
+
 bool DpiContext::HasImport(std::string_view sv_name) const {
   return import_index_.count(sv_name) != 0;
 }

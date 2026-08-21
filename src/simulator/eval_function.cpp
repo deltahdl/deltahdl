@@ -15,6 +15,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
 
 namespace delta {
 
@@ -235,6 +236,12 @@ static int ResolveDpiActualIndex(const DpiFunction* import, const Expr* expr,
 
 static uint64_t EvalDpiActualForFormal(const DpiFunction* import, size_t i,
                                        const ActualBindingCtx& b) {
+  // §35.5.1.2: an imported function shall not assume anything about the initial
+  // value of an output formal, whose value is undetermined, so the actual the
+  // call site wrote is not what the foreign function is handed for one. Zero is
+  // the undetermined value supplied here, as it is for the foreign layer in
+  // DpiRuntime::UndeterminedOutputValue.
+  if (import->args[i].direction == Direction::kOutput) return 0;
   int ai = ResolveDpiActualIndex(import, b.call, i, b.positional_count);
   if (ai >= 0 && b.call->args[static_cast<size_t>(ai)] != nullptr) {
     return EvalExpr(b.call->args[static_cast<size_t>(ai)], b.ctx, b.arena)
@@ -280,6 +287,31 @@ static std::vector<uint64_t> BindDpiCallActuals(const DpiFunction* import,
   return BindDpiActualsPositional(expr, ctx, arena);
 }
 
+// §35.5.1.2: assigns to each output and inout actual what the foreign function
+// left in the formal written against it, which is what makes the change the
+// function made visible outside the call. An input formal is passed over: the
+// foreign function was handed a copy of that actual, so whatever it did to the
+// copy is discarded here and the actual is not changed. §13.5.2 has
+// WritebackOutputArgs in eval_function_args.cpp do this for a native
+// subroutine, reading the values out of the callee's local variables; a foreign
+// callee has none, so the values are read out of the vector it was called with.
+static void WritebackDpiOutputArgs(const DpiFunction* import, const Expr* expr,
+                                   const std::vector<uint64_t>& args,
+                                   SimContext& ctx, Arena& arena) {
+  size_t positional_count = expr->args.size() - expr->arg_names.size();
+  for (size_t i = 0; i < import->args.size() && i < args.size(); ++i) {
+    Direction dir = import->args[i].direction;
+    if (dir != Direction::kOutput && dir != Direction::kInout) continue;
+    int ai = ResolveDpiActualIndex(import, expr, i, positional_count);
+    if (ai < 0) continue;
+    // The width is the widest an argument travels in, so a value the foreign
+    // function wrote arrives whole and the assignment narrows it to whatever
+    // the actual holds, as an assignment to that actual would anywhere else.
+    PerformBlockingAssign(expr->args[static_cast<size_t>(ai)],
+                          MakeLogic4VecVal(arena, 64, args[i]), ctx, arena);
+  }
+}
+
 static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto* dpi = ctx.GetDpiContext();
   if (!dpi || !dpi->HasImport(expr->callee)) {
@@ -291,7 +323,10 @@ static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // arguments backed by defaults behave exactly as for native subroutine calls.
   const DpiFunction* import = dpi->FindImport(expr->callee);
   std::vector<uint64_t> args = BindDpiCallActuals(import, expr, ctx, arena);
-  uint64_t result = dpi->Call(expr->callee, args);
+  uint64_t result = dpi->CallWithArgs(expr->callee, args);
+  if (import != nullptr && !import->args.empty()) {
+    WritebackDpiOutputArgs(import, expr, args, ctx, arena);
+  }
   return MakeLogic4VecVal(arena, 32, result);
 }
 
