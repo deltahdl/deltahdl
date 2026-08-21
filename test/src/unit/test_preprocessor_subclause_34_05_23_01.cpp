@@ -74,6 +74,13 @@ constexpr std::string_view kSharedKeyName = "wrapping-2027";
 constexpr std::string_view kFirstEntityKey = "meridian-trust-wrapping-key";
 constexpr std::string_view kSecondEntityKey = "cerulean-vault-wrapping-key";
 
+// An entity whose name is spelled the way an identifier is, for the one case
+// that writes the value bare. §22.11 reads a directive as tokens, and a hyphen
+// is none of the characters an identifier holds: the two names above carry one,
+// so writing either of them bare is rejected for the token the hyphen is rather
+// than read as the value it was meant to be.
+constexpr std::string_view kIdentifierEntity = "meridiantrust";
+
 ProtectKeyList KeysOfBothEntities() {
   ProtectKeyList keys;
   keys.Add(KeyOf(kFirstEntity, kSharedKeyName, kFirstEntityKey));
@@ -138,7 +145,8 @@ TEST(ProtectKeyKeyownerSyntax, TheStringAgainstTheKeywordNamesTheEntity) {
 // §22.5.1 admits a bare identifier as a pragma_value, and one written thing is
 // what this keyword is defined with.
 TEST(ProtectKeyKeyownerSyntax, ABareIdentifierIsOneWrittenThingToo) {
-  EXPECT_EQ(ReadSource(NamesEntity(kFirstEntity)).Entity().value, kFirstEntity);
+  EXPECT_EQ(ReadSource(NamesEntity(kIdentifierEntity)).Entity().value,
+            kIdentifierEntity);
 }
 
 // The <string> operand as §22.5.1 admits it rather than as an identifier could
