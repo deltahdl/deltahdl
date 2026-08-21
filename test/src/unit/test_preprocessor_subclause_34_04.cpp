@@ -53,6 +53,7 @@
 #include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
+#include "preprocessor/protect_viewport.h"
 
 using namespace delta;
 namespace fs = std::filesystem;
@@ -202,6 +203,27 @@ TEST(ProtectPragmaDirectives, EveryTabulatedNameCarriesWhatItDoes) {
   }
 }
 
+// The source that writes one tabulated name as a source text writes it.
+//
+// Every name but one is a whole pragma expression standing alone, so the name
+// is the directive. §34.5.32.1 writes viewport with a value naming an object
+// and an access, and §34.5.32.2 has that object be one the current envelope
+// contains, so the name is reached here through the spelling that subclause
+// defines and from inside an envelope. Reaching it any other way asks §34.4's
+// question of a source §34.5.32 rejects, and the answer would be about the
+// spelling rather than about the table. What the value has to be written as is
+// read in test_preprocessor_subclause_34_05_32_01.cpp, and which envelope it
+// describes in test_preprocessor_subclause_34_05_32_02.cpp.
+std::string SourceWriting(std::string_view keyword) {
+  if (keyword != kViewportKeyword) {
+    return "`pragma protect " + std::string(keyword) + "\n";
+  }
+  return "`pragma protect begin_protected\n"
+         "`pragma protect viewport = ( object = \"top.dut.mem\" , "
+         "access = \"read-only\" )\n"
+         "`pragma protect end_protected\n";
+}
+
 // Every one of them, reached the way a source text reaches it: the name
 // written as the pragma_keyword of a protect pragma expression. Each is
 // recognized, so each comes into effect, and none of them is objected to.
@@ -213,7 +235,7 @@ TEST(ProtectPragmaDirectives, EveryTabulatedNameCarriesWhatItDoes) {
 // reset put back is read in test_preprocessor_subclause_34_05_31_02.cpp.
 TEST(ProtectPragmaDirectives, EveryTabulatedNameIsAppliedFromASource) {
   for (const ProtectPragmaKeyword& keyword : ProtectPragmaKeywords()) {
-    DirectiveRun run("`pragma protect " + std::string(keyword.name) + "\n");
+    DirectiveRun run(SourceWriting(keyword.name));
     EXPECT_FALSE(run.diag.HasErrors()) << keyword.name;
     EXPECT_EQ(run.ValueOf(keyword.name).defaulted,
               keyword.name == kResetKeyword)
