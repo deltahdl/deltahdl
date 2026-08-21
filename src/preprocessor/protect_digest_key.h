@@ -103,7 +103,22 @@ struct ProtectDigestDecryption {
   // case §34.5.17's default is what a reader fills the place from -- the cipher
   // the region's data are under, which the envelope already states in the
   // clear.
-  std::string method;
+  //
+  // It is named for the keyword §34.5.17.1 spells rather than for the shorter
+  // word beside it, because the field below names the keyword §34.5.21.1
+  // spells and the two identifiers are not the same identifier: one says how a
+  // digest is computed and the other says how the result is put under a key.
+  std::string key_method;
+  // The identifier naming the algorithm the region's digests were computed
+  // with, which is what §34.5.21.1 spells. It travels here for the reason the
+  // cipher beside it does: §34.5.21 has the identifier unchanged in the output
+  // file except where a digital signature is used, and there it is encrypted
+  // with the key_method and placed in a key block.
+  //
+  // Empty where the region stated no identifier of its own, in which case the
+  // reader is left at §34.5.21's default rather than at a value the author
+  // never wrote.
+  std::string digest_method;
 };
 
 // Those expressions written as directives, with the key on the line beneath the
@@ -115,7 +130,9 @@ struct ProtectDigestDecryption {
 // generating no digest signs nothing: there is no key made for a digest, so
 // there is nothing for the block to carry and nothing said by writing the
 // keyword with an empty line beneath it. The cipher goes in either way, that
-// being where §34.5.17 has it written whenever a signature is used.
+// being where §34.5.17 has it written whenever a signature is used, and the
+// algorithm the digests were computed under goes in beside it, that being where
+// §34.5.21 has that identifier written whenever a signature is used.
 std::string ProtectDigestDecryptionContent(
     const ProtectDigestDecryption& digest, const ProtectEncoding& encoding);
 

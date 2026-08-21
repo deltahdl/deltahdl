@@ -48,10 +48,14 @@ std::string_view KeyOfRequest(const ProtectKeyBlockRequest& request,
 // same block.
 //
 // The cipher goes in whenever the region named one, that being where §34.5.17
-// has the identifier written for every envelope carrying key blocks. The
-// digest's key goes in only where a digest was asked for: a region generating
-// no digest signs nothing, so a key written for a digest that is never produced
-// would be a key nothing is ever opened with.
+// has the identifier written for every envelope carrying key blocks, and the
+// algorithm the digests are computed under goes in on the same footing, that
+// being where §34.5.21 has that identifier written for such an envelope. Both
+// go in as the region stated them and neither goes in where the region stated
+// nothing, a block filled from a default being a block claiming the author
+// chose what this tool chose. The digest's key goes in only where a digest was
+// asked for: a region generating no digest signs nothing, so a key written for
+// a digest that is never produced would be a key nothing is ever opened with.
 std::string KeyBlockContentFor(const ProtectKeyBlockRequest& request,
                                const ProtectKeyBlocks& blocks,
                                const ProtectDigestBlockPolicy& digest,
@@ -59,7 +63,8 @@ std::string KeyBlockContentFor(const ProtectKeyBlockRequest& request,
   ProtectDataDecryption data = request.data;
   data.decrypt_key = blocks.data_key;
   ProtectDigestDecryption digest_keys;
-  digest_keys.method = digest.key_method;
+  digest_keys.key_method = digest.key_method;
+  digest_keys.digest_method = digest.stated_method;
   if (digest.requested) digest_keys.decrypt_key = blocks.digest_key;
   return ProtectKeyBlockContent(data, digest_keys, encoding);
 }

@@ -48,8 +48,22 @@ struct ProtectDigestBlockPolicy {
   // asked for none and its envelopes carry no digest.
   bool requested = false;
   // The identifier naming the algorithm the digest is computed with, which is
-  // what the keyword naming the digest algorithm specifies.
+  // what the keyword naming the digest algorithm specifies. A text that named
+  // none leaves §34.5.21's default standing here, so there is always an
+  // algorithm to compute under.
   std::string method;
+  // That same identifier as the text stated it, quotation marks and all where
+  // it had them, and empty where the text stated none.
+  //
+  // It is kept beside the resolved one because the two answer different
+  // questions. §34.5.21 has the identifier unchanged wherever it is written
+  // out, and a text that stated none has nothing to write out, so a default
+  // standing in the field above must not become an identifier the envelope
+  // claims its author chose. What reads this is the key block: §34.5.21 puts
+  // the identifier inside one wherever a digital signature is used, and a
+  // value written bare that came back in quotes is a different pragma_value
+  // from the one the author wrote.
+  std::string stated_method;
   // The identifier naming the cipher the digest is encrypted under. §34.5.22
   // sends the reader to the keyword naming that cipher and, in its absence, to
   // the cipher the region's data are under. It is recorded so that it can be

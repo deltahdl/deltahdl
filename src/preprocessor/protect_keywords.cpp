@@ -296,11 +296,12 @@ std::string ProtectKeyKeyownerDirective(std::string_view keyowner) {
 }
 
 // §34.5.21 asks for the identifier unchanged, and the exception it makes is a
-// digital signature, which this implementation does not offer. So the value
-// goes out spelled as the source spelled it rather than in whichever spelling
-// this file settles on elsewhere: §22.5.1 gives a pragma_value more than one
-// spelling, and an identifier written bare and returned in quotes is a
-// different pragma_value from the one the author wrote.
+// digital signature, where the identifier is placed in a key block instead of
+// standing here. Whichever of the two places it goes to, the value goes out
+// spelled as the source spelled it rather than in whichever spelling this file
+// settles on elsewhere: §22.5.1 gives a pragma_value more than one spelling,
+// and an identifier written bare and returned in quotes is a different
+// pragma_value from the one the author wrote.
 std::string ProtectDigestMethodDirective(std::string_view method) {
   std::string text;
   AppendKeywordDirectiveAsWritten(text, kDigestMethodKeyword, method);

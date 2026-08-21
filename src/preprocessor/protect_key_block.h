@@ -188,12 +188,15 @@ std::string ProtectGeneratedDataKey(std::string_view cleartext,
 // clear beside the block, so a copy sealed inside would tell a reader nothing
 // it could not read without the key.
 //
-// `digest` adds the pair §34.5.20 stores in a key block beside them: the key
-// that opens the region's digests, and the cipher §34.5.17 names for it. Those
-// two are in the block rather than in the clear for the reason the data's own
-// key is -- a key that opens a digest is what an alteration would have to be
-// hidden behind, so writing it beside the digest would leave the digest
-// vouching for nothing.
+// `digest` adds what §34.5.20 stores in a key block beside them: the key that
+// opens the region's digests, the cipher §34.5.17 names for it, and the
+// algorithm §34.5.21 names for computing them. The key is in the block rather
+// than in the clear for the reason the data's own key is -- a key that opens a
+// digest is what an alteration would have to be hidden behind, so writing it
+// beside the digest would leave the digest vouching for nothing. The two
+// identifiers are here because their own subclauses put them here for exactly
+// this envelope: each states that it stands in the clear except where a digital
+// signature is used, and a region carrying key blocks has one.
 //
 // It is a buffer of directives rather than of bytes because of what §34.5.27
 // has become of it at the other end: the recovered text is parsed to determine

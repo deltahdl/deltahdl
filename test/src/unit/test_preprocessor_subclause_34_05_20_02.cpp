@@ -170,7 +170,7 @@ std::string BlockContentCarrying(std::string_view digest_key) {
   // value is the pragma_value the source wrote, quotation marks included. An
   // identifier holding a hyphen and put here bare goes into the block as a
   // directive §22.11 rejects for the token the hyphen is.
-  digest.method = InQuotes(kDigestKeyMethod);
+  digest.key_method = InQuotes(kDigestKeyMethod);
   digest.decrypt_key = std::string(digest_key);
   return ProtectKeyBlockContent(data, digest, DefaultProtectEncoding());
 }

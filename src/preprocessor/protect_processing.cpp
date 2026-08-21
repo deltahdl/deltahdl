@@ -578,6 +578,13 @@ ProtectDigestBlockPolicy DigestPolicyFor(const RegionKeyReader& in_effect) {
       in_effect.digest_method.empty()
           ? std::string(kDefaultDigestMethod)
           : std::string(ProtectPragmaValueBody(in_effect.digest_method));
+  // §34.5.21 has that identifier unchanged wherever it is written out, and the
+  // key block of a signed region is one of the places it is written. It is kept
+  // as the source spelled it, and left empty where the source spelled nothing:
+  // the default filling the field above is this implementation's and not the
+  // author's, so a block claiming the author wrote it would be claiming
+  // something the text never said.
+  policy.stated_method = std::string(in_effect.digest_method);
   // §34.5.22 has the digest then encrypted under the cipher digest_key_method
   // names, and §34.5.17 fills that place from the cipher the region's data are
   // under where the text named none. The envelope this tool writes states its

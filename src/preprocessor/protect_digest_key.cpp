@@ -99,8 +99,16 @@ std::string ProtectDigestDecryptKeyDirective(std::string_view encoded_key) {
 std::string ProtectDigestDecryptionContent(
     const ProtectDigestDecryption& digest, const ProtectEncoding& encoding) {
   std::string text;
-  if (!digest.method.empty()) {
-    AppendDirectiveAsWritten(text, kDigestKeyMethodKeyword, digest.method);
+  if (!digest.key_method.empty()) {
+    AppendDirectiveAsWritten(text, kDigestKeyMethodKeyword, digest.key_method);
+  }
+  // §34.5.21 has the algorithm a region's digests were computed under written
+  // into this block wherever a digital signature is used, rather than in the
+  // clear beside it. It follows the cipher because that is the order §34.4
+  // tabulates the two names in, and it is written as the source wrote it
+  // because §34.5.21 has the identifier unchanged wherever it goes out.
+  if (!digest.digest_method.empty()) {
+    AppendDirectiveAsWritten(text, kDigestMethodKeyword, digest.digest_method);
   }
   if (!digest.decrypt_key.empty()) {
     // §34.5.9 gives this key a count of its own, and it has to be written here

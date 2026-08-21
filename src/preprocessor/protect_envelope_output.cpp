@@ -133,11 +133,14 @@ void AppendClearNames(const EncryptionEnvelope& envelope,
                           text);
   }
   // §34.5.21 makes the same exception for the identifier naming the algorithm
-  // the region's digests are computed with, and it is written ahead of the
-  // block rather than after it: what the identifier is needed for is
-  // recomputing a digest of that block, so a reader has to have it in hand by
-  // the time the block is reached.
-  if (!envelope.digest_method.empty()) {
+  // the region's digests are computed with: a digital signature has it
+  // encrypted with the key_method and placed in a key block, and a region
+  // carrying key blocks has one. A region without them states it here, and it
+  // is written ahead of the blocks rather than after them, because what the
+  // identifier is needed for is recomputing a digest of a block: a reader has
+  // to have it in hand by the time the block is reached, and a key block puts
+  // it in hand a line sooner than that.
+  if (!signed_envelope && !envelope.digest_method.empty()) {
     text->append(ProtectDigestMethodDirective(envelope.digest_method));
   }
   // §34.5.23 has the entity whose keys a region's own keys are under unchanged

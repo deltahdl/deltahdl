@@ -572,11 +572,12 @@ std::string ProtectKeyKeyownerDirective(std::string_view keyowner);
 //
 // §34.5.21 has that identifier unchanged in what an encrypting tool writes
 // out, the one exception being a digital signature, where it travels inside a
-// key block under the key method. This implementation offers no digital
-// envelope, so the exception never arises and the identifier is always written
-// as it stands. An identifier swept into the encrypted block would leave a
-// reader unable to learn how a digest is recomputed without first opening the
-// very block that digest is there to vouch for.
+// key block under the key method. A region carrying key blocks has one, and
+// its identifier is written into the block instead, so this directive is what
+// a region without them states. An identifier swept into a region's data block
+// would leave a reader unable to learn how a digest is recomputed without
+// first opening the very block that digest is there to vouch for; one written
+// into a key block is reached before the reader gets there.
 //
 // `method` is the pragma_value as the source wrote it, quotes and all where it
 // had them, and it is written back the same way. Unchanged is meant of the
