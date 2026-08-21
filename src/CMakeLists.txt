@@ -34,6 +34,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     preprocessor/protect_cli.cpp
     preprocessor/protect_processing.cpp
     preprocessor/protect_processing_cipher.cpp
+    preprocessor/protect_viewport.cpp
     preprocessor/preprocessor.cpp
     preprocessor/preprocessor_lines.cpp
     preprocessor/preprocessor_inline.cpp
@@ -41,6 +42,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     preprocessor/preprocessor_macros.cpp
     preprocessor/preprocessor_protect_keynames.cpp
     preprocessor/preprocessor_protect_keys.cpp
+    preprocessor/preprocessor_protect_viewport.cpp
     lexer/keywords.cpp
     lexer/lexer.cpp
     lexer/string_escape.cpp

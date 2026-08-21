@@ -15,6 +15,7 @@
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_keywords.h"
+#include "preprocessor/protect_viewport.h"
 
 namespace delta {
 
@@ -268,6 +269,12 @@ class Preprocessor {
   // than for its own: one says a key block begins there, and the other says the
   // encoded value of the key opening the region's data block is written there.
   void ApplyAnnouncedBlockKeywords(const PragmaKeywordExpression& expr);
+  // What §34.5.32 has one protect pragma expression do to what the envelope in
+  // force lets a tool look at. The expression describes an object of that
+  // envelope and the access asked for it, so a viewport is gathered where an
+  // envelope is open to hold it, and the two rules the subclause states about
+  // where one may stand are reported here.
+  void ApplyViewport(const PragmaKeywordExpression& expr, SourceLoc loc);
   // Finishes the run of pragma expressions gathered for the block a decryption
   // envelope carries. §34.5.4.2 has the expression closing such an envelope
   // mark where that run ends and state that what it holds suffices to open the
@@ -422,6 +429,16 @@ class Preprocessor {
   const ProtectKeywordScope& ProtectKeywords() const {
     return protect_keywords_;
   }
+  // The objects §34.5.32.2 has the envelope in force permit access to, in the
+  // order the text described them.
+  //
+  // They belong to that envelope rather than to the compilation input: the
+  // subclause has a viewport describe objects within the current protected
+  // envelope, so what one describes goes away with the envelope it was written
+  // in and is not offered to the next.
+  const std::vector<ProtectViewport>& ProtectViewports() const {
+    return protect_viewports_;
+  }
   // The key that opens the digest of whatever the reading has reached, which
   // §34.5.18 has selected by combining the entity in effect for the digest
   // with the name in effect for its key. Empty where that pair selects none of
@@ -572,6 +589,10 @@ class Preprocessor {
   bool in_block_comment_ = false;
   ProtectEnvelopeState protect_envelopes_;
   ProtectKeywordScope protect_keywords_;
+  // The viewports written since the envelope in force opened. §34.5.32.2 has
+  // each of them describe an object of that envelope, so they are gathered for
+  // as long as it stands and dropped where it ends.
+  std::vector<ProtectViewport> protect_viewports_;
   // The designations the source text has written for the keys of the entities
   // it names. They are unique for the entity they are written under, so they
   // accumulate across the whole compilation input alongside the keyword values

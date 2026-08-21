@@ -688,6 +688,7 @@ void Preprocessor::ApplyProtectKeywords(
     CheckDigestDesignation(expr, loc);
     ApplyKeyBlockKeywords(expr, loc);
     ApplyAnnouncedBlockKeywords(expr);
+    ApplyViewport(expr, loc);
     DecryptDataBlock(expr, loc, depth, output);
   }
 }
