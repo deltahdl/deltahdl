@@ -46,11 +46,11 @@ constexpr std::string_view kKeyMethodKeyword = "key_method";
 constexpr std::string_view kSecondProvider = "Vantage Optics";
 
 // The expression §34.5.31.1 defines, written on a directive of its own.
-const std::string kRestores = "`pragma protect reset\n";
+std::string Restores() { return "`pragma protect reset\n"; }
 
 // The directive §22.11.1 defines with protect in its pragma keyword list, which
 // §34.5.31.2 says the expression above is a synonym for.
-const std::string kResetPragma = "`pragma reset protect\n";
+std::string ResetPragma() { return "`pragma reset protect\n"; }
 
 // The expression itself, without the line it is written on, for counting how
 // many of them the cleartext of a produced envelope carries.
@@ -85,7 +85,7 @@ bool AllFourAreBack(const ReadKeywordScope& scope) {
 // reset that reached only the family it was written beside being the thing one
 // keyword could not tell apart.
 TEST(ProtectResetDescription, EveryKeywordTheTextWroteStandsAtItsDefault) {
-  EXPECT_TRUE(AllFourAreBack(ReadKeywordScope(StatesFour() + kRestores)));
+  EXPECT_TRUE(AllFourAreBack(ReadKeywordScope(StatesFour() + Restores())));
 }
 
 // The same text without the reset, which is what makes the case above about the
@@ -103,15 +103,15 @@ TEST(ProtectResetDescription, WithoutItThoseKeywordsAreStillStanding) {
 // a text in the same place. A reading answering one of them and not the other
 // would have one instruction mean two things.
 TEST(ProtectResetDescription, ItRestoresWhatTheResetPragmaDirectiveRestores) {
-  EXPECT_EQ(AllFourAreBack(ReadKeywordScope(StatesFour() + kRestores)),
-            AllFourAreBack(ReadKeywordScope(StatesFour() + kResetPragma)));
+  EXPECT_EQ(AllFourAreBack(ReadKeywordScope(StatesFour() + Restores())),
+            AllFourAreBack(ReadKeywordScope(StatesFour() + ResetPragma())));
 }
 
 // §34.4 gives a keyword's value the position the reading has got to, so a
 // keyword written after the reset is stated after it. Putting the values back
 // does not take away the text's standing to state them again.
 TEST(ProtectResetDescription, AKeywordWrittenAfterItIsInEffect) {
-  ReadKeywordScope scope(StatesFour() + kRestores +
+  ReadKeywordScope scope(StatesFour() + Restores() +
                          Writes(kDataKeyownerKeyword, kSecondProvider));
   EXPECT_EQ(scope.ValueOf(kDataKeyownerKeyword).value, kSecondProvider);
 }
@@ -120,7 +120,7 @@ TEST(ProtectResetDescription, AKeywordWrittenAfterItIsInEffect) {
 // decryption envelope open where the reset is written is open after it, and the
 // reset closed nothing.
 TEST(ProtectResetDescription, ADecryptionEnvelopeIsNeitherOpenedNorClosed) {
-  ReadWithTheKeys reading(std::string(kBeginProtected) + kRestores);
+  ReadWithTheKeys reading(std::string(kBeginProtected) + Restores());
   EXPECT_EQ(reading.StillOpen(), 1U);
   EXPECT_EQ(reading.Closed(), 0U);
 }
@@ -143,7 +143,7 @@ TEST(ProtectResetDescription, AnEnvelopeThisToolWroteDescribesNothingAfterIt) {
 // encrypted under, so no block records it.
 TEST(ProtectResetDescription, ARegionAfterItReachesNoNameWrittenBeforeIt) {
   std::string source = ReachesTheKey();
-  source.append(kRestores).append(RegionAround(kSealedDesign));
+  source.append(Restores()).append(RegionAround(kSealedDesign));
   EXPECT_FALSE(Holds(Encrypted(source), kBlockOpening));
 }
 
@@ -160,7 +160,7 @@ TEST(ProtectResetDescription, WithoutItThoseNamesReachTheRegion) {
 // that named its key and then reset has taken its own name away.
 TEST(ProtectResetDescription, ARegionsOwnNamesGoBackWhenItResetsAfterThem) {
   std::string inside = ReachesTheKey();
-  inside.append(kRestores).append(kSealedDesign);
+  inside.append(Restores()).append(kSealedDesign);
   EXPECT_FALSE(Holds(Encrypted(RegionAround(inside)), kBlockOpening));
 }
 
@@ -169,7 +169,7 @@ TEST(ProtectResetDescription, ARegionsOwnNamesGoBackWhenItResetsAfterThem) {
 // one at all. Names written after the reset are stated after it and reach the
 // key.
 TEST(ProtectResetDescription, NamesWrittenAfterItInsideARegionReachTheKey) {
-  std::string inside = kRestores;
+  std::string inside = Restores();
   inside.append(ReachesTheKey()).append(kSealedDesign);
   EXPECT_TRUE(Holds(Encrypted(RegionAround(inside)), kBlockOpening));
 }
@@ -179,7 +179,7 @@ TEST(ProtectResetDescription, NamesWrittenAfterItInsideARegionReachTheKey) {
 // cleartext of the envelope is the one §34.4 has follow it, so a region whose
 // own reset had been published in the clear would have left two.
 TEST(ProtectResetDescription, TheEnvelopeCarriesOnlyTheResetThatFollowsIt) {
-  std::string inside = kRestores;
+  std::string inside = Restores();
   inside.append(ReachesTheKey()).append(kSealedDesign);
   EXPECT_EQ(TimesWritten(Encrypted(RegionAround(inside)), kResetExpression),
             1U);
@@ -191,7 +191,7 @@ TEST(ProtectResetDescription, TheEnvelopeCarriesOnlyTheResetThatFollowsIt) {
 // region, which is what makes the case above about the cleartext rather than
 // about a line that was dropped.
 TEST(ProtectResetDescription, TheRegionsOwnResetIsInTheBlockWithTheRest) {
-  std::string inside = kRestores;
+  std::string inside = Restores();
   inside.append(ReachesTheKey()).append(kSealedDesign);
   EXPECT_TRUE(
       Holds(OpenedBlockOf(Encrypted(RegionAround(inside))), kResetExpression));

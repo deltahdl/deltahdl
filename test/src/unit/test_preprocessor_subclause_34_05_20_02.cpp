@@ -379,10 +379,13 @@ TEST(ProtectDigestDecryptKeyDecryptionInput, TheDigestOpensUnderTheCarriedKey) {
 
 // The other half of what the block is decrypted to find. The cipher the region
 // named for its digest's key is written nowhere on the envelope, so a reading
-// that has it in effect afterwards took it out of the block, which is where
-// §34.5.20.2 sends a reader for it.
+// that has it in effect took it out of the block, which is where §34.5.20.2
+// sends a reader for it. The reading stops where the envelope does, because
+// §34.5.31.2 has the reset this tool writes below the envelope put the cipher
+// back to its default along with everything else.
 TEST(ProtectDigestDecryptKeyDecryptionInput, TheKeyBlockYieldsTheCipherToo) {
-  ReadUnderKeys run(EnvelopeWithASignedKeyBlock(), TheBlockKey());
+  ReadUnderKeys run(ThroughEndProtected(EnvelopeWithASignedKeyBlock()),
+                    TheBlockKey());
   EXPECT_EQ(run.ValueOf("digest_key_method").value, kDigestKeyMethod);
 }
 

@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
 #include <string_view>
 
@@ -32,6 +33,25 @@ inline std::string InQuotes(std::string_view value) {
   std::string text = "\"";
   text.append(value).append("\"");
   return text;
+}
+
+// A produced envelope up to and including the end_protected line §34.5.4.1
+// closes it with.
+//
+// This tool writes a reset after that line, as the worked example in §34.3.1
+// does, and §34.5.31.2 has the reset restore every protect pragma keyword to
+// its default. A case asking what an envelope put in effect therefore asks it
+// of the text the envelope governs and stops where the envelope does: past the
+// reset every keyword reads back as defaulted whatever the envelope held, so
+// the question would be answered the same way whether a block was opened or
+// not. What the reset itself restores is read in
+// test/src/unit/test_preprocessor_subclause_34_05_31_02.cpp.
+inline std::string ThroughEndProtected(const std::string& envelope) {
+  constexpr std::string_view kEnds = "`pragma protect end_protected\n";
+  std::size_t at = envelope.rfind(kEnds);
+  EXPECT_NE(at, std::string::npos) << envelope;
+  if (at == std::string::npos) return envelope;
+  return envelope.substr(0, at + kEnds.size());
 }
 
 // A reading of one source, with the preprocessor kept alive afterwards.

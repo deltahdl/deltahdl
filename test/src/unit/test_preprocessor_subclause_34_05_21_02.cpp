@@ -43,6 +43,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "helpers_protect_keys.h"
+#include "helpers_protect_keyword_value.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_digest.h"
 #include "preprocessor/protect_digest_block.h"
@@ -356,13 +357,19 @@ TEST(ProtectDigestMethodEncryptionOutput, ASignedEnvelopeKeepsItOutOfTheClear) {
 
 // -- What a reading generates the digest under ------------------------------
 
+// The cases below read the identifier a reading was left holding, and so stop
+// where the envelope does: §34.5.31.2 has the reset this tool writes beneath an
+// envelope restore every protect pragma keyword, so a reading carried past it
+// reports the default whether the key block was opened or not.
+
 // The other half of the exception: the identifier the signed envelope kept out
 // of the clear is inside the key block, so a reader that opened the block has
 // it in effect. The value comes back as the region wrote it, without the
 // quotation marks §22.5.1 spelled it with.
 TEST(ProtectDigestMethodDecryptionInput, TheKeyBlockYieldsTheIdentifier) {
-  ReadUnderKeys run(SignedEnvelope(Writes(kIdentifierKeyword, kStated)),
-                    TheBlockKey());
+  ReadUnderKeys run(
+      ThroughEndProtected(SignedEnvelope(Writes(kIdentifierKeyword, kStated))),
+      TheBlockKey());
   EXPECT_FALSE(run.diag.HasErrors()) << run.text;
   EXPECT_FALSE(run.Identifier().defaulted);
   EXPECT_EQ(run.Identifier().value, kStated);
@@ -372,8 +379,9 @@ TEST(ProtectDigestMethodDecryptionInput, TheKeyBlockYieldsTheIdentifier) {
 // what makes the case above about the block rather than about a value standing
 // in the envelope's clear text. The reading is left at the default.
 TEST(ProtectDigestMethodDecryptionInput, AReaderWithoutTheKeyReachesNone) {
-  ReadUnderKeys run(SignedEnvelope(Writes(kIdentifierKeyword, kStated)),
-                    ProtectKeyList());
+  ReadUnderKeys run(
+      ThroughEndProtected(SignedEnvelope(Writes(kIdentifierKeyword, kStated))),
+      ProtectKeyList());
   EXPECT_TRUE(run.Identifier().defaulted);
 }
 
@@ -392,7 +400,7 @@ TEST(ProtectDigestMethodDecryptionInput, TheDigestAgreesUnderTheStatedOne) {
 // that agree for two different identifiers are what say the identifier was
 // carried rather than that one algorithm was used throughout.
 TEST(ProtectDigestMethodDecryptionInput, TheDigestAgreesUnderTheDefaultToo) {
-  ReadUnderKeys run(SignedEnvelope(""), TheBlockKey());
+  ReadUnderKeys run(ThroughEndProtected(SignedEnvelope("")), TheBlockKey());
   EXPECT_TRUE(run.Identifier().defaulted);
   EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kMatched);
 }

@@ -205,11 +205,19 @@ TEST(ProtectPragmaDirectives, EveryTabulatedNameCarriesWhatItDoes) {
 // Every one of them, reached the way a source text reaches it: the name
 // written as the pragma_keyword of a protect pragma expression. Each is
 // recognized, so each comes into effect, and none of them is objected to.
+//
+// One name comes into effect by taking values away rather than by leaving one:
+// §34.5.31.2 has the reset expression restore every protect pragma keyword to
+// its default, and the record of the reset itself is among the values it
+// restores. So the table's own row is the thing asked about here, and what the
+// reset put back is read in test_preprocessor_subclause_34_05_31_02.cpp.
 TEST(ProtectPragmaDirectives, EveryTabulatedNameIsAppliedFromASource) {
   for (const ProtectPragmaKeyword& keyword : ProtectPragmaKeywords()) {
     DirectiveRun run("`pragma protect " + std::string(keyword.name) + "\n");
     EXPECT_FALSE(run.diag.HasErrors()) << keyword.name;
-    EXPECT_FALSE(run.ValueOf(keyword.name).defaulted) << keyword.name;
+    EXPECT_EQ(run.ValueOf(keyword.name).defaulted,
+              keyword.name == kResetKeyword)
+        << keyword.name;
   }
 }
 
