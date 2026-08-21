@@ -239,6 +239,34 @@ class DpiRuntime {
   DpiArgValue CallExport(std::string_view sv_name,
                          const std::vector<DpiArgValue>& args) const;
 
+  // §35.5.2: whether a SystemVerilog compiler optimization may remove a call to
+  // the named import -- true exactly when the import is declared pure. A pure
+  // function's call can be eliminated where its result is not needed, and
+  // replaced with the value previously computed for the same values of its
+  // input arguments. A call to any other import has to be made, §35.5.1.3
+  // leaving one declared with neither special property free to have side
+  // effects such as writing to a file. A name this runtime holds no declaration
+  // for is not removable either.
+  bool ImportCallIsRemovable(std::string_view sv_name) const;
+
+  // §35.5.2: calls the named import, or answers with the value a previous call
+  // presenting these same input argument values computed. A pure function has
+  // no side effects whatsoever and its result depends solely on the values of
+  // its input arguments, so the remembered value is the value a fresh call
+  // would compute and the foreign function is not entered a second time. An
+  // import not declared pure is entered on every call however often it has been
+  // called before, and so is a name this runtime holds no declaration for.
+  //
+  // The import is entered through DpiRtFunction::impl, the form that reads its
+  // arguments without writing them, which is the only form a pure function
+  // needs: §35.5.2 admits no output or inout formal on one.
+  //
+  // Only this entry point reuses a result. CallImport and CallImportWithArgs
+  // enter the foreign function as they always did, whatever calls have been
+  // made here.
+  DpiArgValue CallImportReusingPureResult(std::string_view sv_name,
+                                          const std::vector<DpiArgValue>& args);
+
   void PushScope(DpiScope scope);
   void PopScope();
   const DpiScope* CurrentScope() const;
@@ -341,6 +369,10 @@ class DpiRuntime {
   std::unordered_map<std::string_view, size_t> import_index_;
   std::vector<DpiRtExport> exports_;
   std::unordered_map<std::string_view, size_t> export_index_;
+  // §35.5.2: the value each pure import call computed, kept under the import's
+  // name and the values its input arguments presented, so that a later call
+  // presenting the same values can be answered from it.
+  std::unordered_map<std::string, DpiArgValue> pure_results_;
   std::vector<DpiScope> scope_stack_;
   const DpiScope* current_scope_ = nullptr;
   std::vector<ImportFrame> call_chain_;

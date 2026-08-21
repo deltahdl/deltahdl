@@ -323,6 +323,79 @@ DpiArgValue DpiRuntime::CallImport(std::string_view sv_name,
   return func->impl(args);
 }
 
+namespace {
+
+// The values one call presents for its input arguments, written so that two
+// calls read the same here exactly when every argument agrees in both type and
+// value. §35.5.2 replaces a pure function's call with the value previously
+// computed for the same values of the input arguments, and this is what decides
+// which values are the same ones.
+std::string PureCallArgKey(std::string_view sv_name,
+                           const std::vector<DpiArgValue>& args) {
+  std::string key(sv_name);
+  for (const auto& arg : args) {
+    key += '|';
+    key += std::to_string(static_cast<int>(arg.type));
+    key += ':';
+    // Each branch reads the union member the argument's type wrote, so a value
+    // never stands in for a differently typed one that happens to share a
+    // representation.
+    switch (arg.type) {
+      case DataTypeKind::kString:
+        key += arg.AsString();
+        break;
+      case DataTypeKind::kReal:
+      case DataTypeKind::kShortreal:
+        key += std::to_string(arg.AsReal());
+        break;
+      case DataTypeKind::kChandle:
+        key += std::to_string(reinterpret_cast<uintptr_t>(arg.AsChandle()));
+        break;
+      case DataTypeKind::kBit:
+        key += std::to_string(static_cast<int>(arg.AsBit()));
+        break;
+      case DataTypeKind::kLogic:
+      case DataTypeKind::kReg:
+        key += std::to_string(static_cast<int>(arg.AsLogic()));
+        break;
+      case DataTypeKind::kLongint:
+      case DataTypeKind::kTime:
+        key += std::to_string(arg.AsLongint());
+        break;
+      default:
+        key += std::to_string(arg.AsInt());
+        break;
+    }
+  }
+  return key;
+}
+
+}  // namespace
+
+bool DpiRuntime::ImportCallIsRemovable(std::string_view sv_name) const {
+  const auto* func = FindImport(sv_name);
+  if (func == nullptr) return false;
+  return func->is_pure;
+}
+
+DpiArgValue DpiRuntime::CallImportReusingPureResult(
+    std::string_view sv_name, const std::vector<DpiArgValue>& args) {
+  const auto* func = FindImport(sv_name);
+  // §35.5.1.3: an import declared with neither special property can perform
+  // side effects, so its call is made every time it is written whatever an
+  // earlier call returned. §35.5.2 licenses the reuse for a pure function
+  // alone.
+  if (func == nullptr || !func->is_pure) return CallImport(sv_name, args);
+
+  std::string key = PureCallArgKey(sv_name, args);
+  auto it = pure_results_.find(key);
+  if (it != pure_results_.end()) return it->second;
+
+  DpiArgValue result = CallImport(sv_name, args);
+  pure_results_.emplace(std::move(key), result);
+  return result;
+}
+
 DpiArgValue DpiRuntime::UndeterminedOutputValue(DataTypeKind type) {
   // §35.5.1.2: the initial value of an output argument is undetermined and
   // implementation dependent. We pick a deterministic per-type zero so the
