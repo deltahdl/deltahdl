@@ -64,7 +64,9 @@ Every open issue numbered above #2939 sits in one linear sequence, ordered by Gi
 
 Give each issue one scope it can close by finishing, and never write an issue that indexes other issues. Such an issue can never leave the sequence, because what it tracks always has something left, and everything behind it waits on the whole programme. Cite another issue wherever it settles something; a citation keeps an issue self-contained, and a list of children is what is barred.
 
-Longer: [how-issues-are-written](docs/claude/how-issues-are-written.md), [issue-blocked-by-sequence](docs/claude/issue-blocked-by-sequence.md), [filing-what-a-session-finds](docs/claude/filing-what-a-session-finds.md).
+A subclause with a Syntax and a Description beneath it has an issue for each of the three, and `next_subclause` prints the parent. Find the other two by looking up the numbers around it rather than by searching titles, which has returned the parent alone while both children stood open. Close all three in the commit that satisfies them.
+
+Longer: [how-issues-are-written](docs/claude/how-issues-are-written.md), [issue-blocked-by-sequence](docs/claude/issue-blocked-by-sequence.md), [filing-what-a-session-finds](docs/claude/filing-what-a-session-finds.md), [finding-a-subclauses-issues](docs/claude/finding-a-subclauses-issues.md).
 
 ## Prose
 
