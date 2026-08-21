@@ -5,9 +5,16 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/types.h"
+#include "fixture_simulator.h"
 #include "helpers_dpi_bump_import.h"
+#include "helpers_dpi_touch_import.h"
+#include "parser/ast.h"
+#include "simulator/dpi.h"
 #include "simulator/dpi_runtime.h"
+#include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
+#include "simulator/sim_context.h"
 
 using namespace delta;
 
@@ -230,6 +237,74 @@ TEST(DpiInstantCompletion, ChangeDetectingImportCallConsumesZeroTime) {
   EXPECT_EQ(scheduled_after, scheduled_before);
   EXPECT_FALSE(sched.HasEvents());
   EXPECT_EQ(sched.CurrentTime().ticks, kCallTime);
+}
+
+// ---------------------------------------------------------------------------
+// The same rule, asked of a call a design makes.
+//
+// The cases above call the foreign function through DpiRuntime. A call written
+// in SystemVerilog does not reach it: EvalDpiCall in
+// src/simulator/eval_function.cpp is what evaluates one, and §35.5.1.2 has it
+// assign to the actual written against an output or an inout formal once the
+// foreign function returns. An assignment is the one thing in that call that
+// can put work on the calendar, so the rule is asked here of the call site that
+// makes them.
+// ---------------------------------------------------------------------------
+
+// One call to `touch(a)`, made from inside an event running at kCallTime.
+//
+// What the case reads afterwards is the state at the moment the foreign
+// function returned: the clock the call site saw, and the value the design's
+// variable held there. Reading the variable inside the event is the whole
+// point, because a value that only arrives later is exactly what a call
+// consuming simulation time would produce.
+struct CallingFromAnEvent {
+  DpiContext dpi;
+  SimFixture f;
+  uint64_t seen = 0;
+  uint64_t time_after = 0;
+  uint64_t actual_in_slot = 0;
+
+  CallingFromAnEvent(Direction direction, uint64_t wrote) {
+    RegisterTouchImport(dpi, direction, wrote, &seen);
+    f.ctx.SetDpiContext(&dpi);
+    f.ctx.CreateVariable("a", 32)->value = MakeLogic4VecVal(f.arena, 32, 5);
+    const Expr* call = ParseExprFrom("touch(a)", f);
+    Event* ev = f.scheduler.GetEventPool().Acquire();
+    ev->callback = [this, call]() {
+      EvalFunctionCall(call, f.ctx, f.arena);
+      time_after = f.scheduler.CurrentTime().ticks;
+      actual_in_slot = f.ctx.FindVariable("a")->value.ToUint64();
+    };
+    f.scheduler.ScheduleEvent({kCallTime}, Region::kActive, ev);
+    f.scheduler.Run();
+  }
+};
+
+// §35.5.1.1: an imported function consumes zero simulation time, so the clock
+// the call site reads when the call returns is the one it was called at.
+TEST(DpiInstantCompletion, ADesignsImportedCallReturnsAtTheTimeItWasMadeAt) {
+  CallingFromAnEvent run(Direction::kInput, 111);
+  EXPECT_EQ(run.time_after, kCallTime);
+}
+
+// §35.5.1.1: and it completes instantly, so what the function wrote to an
+// output argument is in the design's variable before the time slot the call was
+// made in has finished. A copy-back deferred to a later slot would leave the
+// variable holding what it held.
+TEST(DpiInstantCompletion, ADesignsOutputArgumentIsWrittenInTheCallsOwnSlot) {
+  CallingFromAnEvent run(Direction::kOutput, 77);
+  EXPECT_EQ(run.actual_in_slot, 77U);
+}
+
+// The other thing a call that finished instantly leaves behind: nothing on the
+// calendar. Writing the output argument assigns to a variable, which is the one
+// part of an imported call that can schedule anything, and the run ends with
+// the slot the call was made in rather than at a later time.
+TEST(DpiInstantCompletion, ADesignsImportedCallDefersNothingToALaterSlot) {
+  CallingFromAnEvent run(Direction::kOutput, 77);
+  EXPECT_FALSE(run.f.scheduler.HasEvents());
+  EXPECT_EQ(run.f.scheduler.CurrentTime().ticks, kCallTime);
 }
 
 }  // namespace

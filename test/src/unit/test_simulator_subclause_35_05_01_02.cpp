@@ -5,6 +5,7 @@
 
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_dpi_touch_import.h"
 #include "parser/ast.h"
 #include "simulator/dpi.h"
 #include "simulator/dpi_runtime.h"
@@ -279,25 +280,6 @@ TEST(DpiArgumentDirections, LegacyInputOnlyCallbackLeavesActualUnchanged) {
 // the code that does the seeing.
 // ---------------------------------------------------------------------------
 
-// The import the cases below call: a foreign function of one formal, which
-// reports the value it was handed and leaves `wrote` in its place. The formal's
-// direction is all that varies between the cases, so each says which direction
-// it is about and nothing else.
-DpiFunction OneFormalImport(Direction direction, uint64_t wrote,
-                            uint64_t* seen) {
-  DpiFunction func;
-  func.c_name = "c_touch";
-  func.sv_name = "touch";
-  func.return_type = DataTypeKind::kInt;
-  func.args = {DpiArg{"a", DataTypeKind::kInt, direction}};
-  func.arg_impl = [wrote, seen](std::vector<uint64_t>& args) -> uint64_t {
-    *seen = args[0];
-    args[0] = wrote;
-    return 0;
-  };
-  return func;
-}
-
 // A design holding one variable `a`, which is handed to that import and read
 // back afterwards. Both halves of every rule below are answered off this: what
 // the foreign function was handed is `seen`, and what the call site is left
@@ -308,7 +290,7 @@ struct TouchingAnActual {
   uint64_t seen = 0;
 
   TouchingAnActual(Direction direction, uint64_t wrote, uint64_t actual) {
-    dpi.RegisterImport(OneFormalImport(direction, wrote, &seen));
+    RegisterTouchImport(dpi, direction, wrote, &seen);
     f.ctx.SetDpiContext(&dpi);
     auto* var = f.ctx.CreateVariable("a", 32);
     var->value = MakeLogic4VecVal(f.arena, 32, actual);
