@@ -556,28 +556,37 @@ void CheckDpiVersionStringAgreement(
   }
 }
 
+// §35.4: the global name space of linkage names itself, which every scope's
+// declarations resolve into. What it holds is what the clause states across
+// scopes: the DPI version string each linkage name was first declared with, and
+// the SystemVerilog signature each export linkage name was first observed
+// under. ExportScopeContext carries what the clause states within one scope,
+// and is rebuilt per scope where this outlives them all.
+struct DpiGlobalNameSpace {
+  std::unordered_map<std::string_view, std::string_view>& link_version;
+  std::unordered_map<std::string_view, DpiExportSignature>& export_signatures;
+};
+
 // §35.4: validate one DPI declaration (import or export) against the global
-// linkage-name namespace. Export declarations additionally run the full
-// per-scope export battery via ValidateExportDeclaration, and import
-// declarations have their typedef-named formal arguments held to §35.5.6 here,
-// where the scope's typedefs are known; every DPI declaration, import or
-// export, contributes to the shared version-string agreement check.
-void ProcessDpiGlobalNameItem(
-    const ModuleItem* item, ExportScopeContext& scope,
-    std::unordered_map<std::string_view, DpiExportSignature>& export_signatures,
-    std::unordered_map<std::string_view, std::string_view>& link_version,
-    DiagEngine& diag) {
+// name space. Export declarations additionally run the full per-scope export
+// battery via ValidateExportDeclaration, and import declarations have their
+// typedef-named formal arguments held to §35.5.6 here, where the scope's
+// typedefs are known; every DPI declaration, import or export, contributes to
+// the shared version-string agreement check.
+void ProcessDpiGlobalNameItem(const ModuleItem* item, ExportScopeContext& scope,
+                              DpiGlobalNameSpace& global, DiagEngine& diag) {
   auto link_name = DpiLinkageName(item);
 
   if (item->kind == ModuleItemKind::kDpiExport) {
-    ValidateExportDeclaration(item, link_name, scope, export_signatures, diag);
+    ValidateExportDeclaration(item, link_name, scope, global.export_signatures,
+                              diag);
   }
 
   if (item->kind == ModuleItemKind::kDpiImport) {
     CheckImportFormalTypedefTypes(item, scope.typedefs, diag);
   }
 
-  CheckDpiVersionStringAgreement(item, link_name, link_version, diag);
+  CheckDpiVersionStringAgreement(item, link_name, global.link_version, diag);
 }
 
 // §35.5.4: check one scope's import declarations, both against each other and
@@ -603,16 +612,14 @@ void CheckDpiScopeImportDeclarations(
   }
 }
 
-// §35.4: run the global-name checks over one scope's DPI declarations.
-// export_signatures and link_version carry the rules the clause states across
-// scopes and are threaded through every call; the sets built here carry the
-// rules it states within one, and start afresh for each scope.
-void ValidateDpiScopeGlobalNames(
-    const std::vector<ModuleItem*>& items, const CompilationUnit* unit,
-    const TypedefMap& outer_typedefs,
-    std::unordered_map<std::string_view, DpiExportSignature>& export_signatures,
-    std::unordered_map<std::string_view, std::string_view>& link_version,
-    DiagEngine& diag) {
+// §35.4: run the global-name checks over one scope's DPI declarations. `global`
+// carries the rules the clause states across scopes and is the same object for
+// every scope; the sets built here carry the rules it states within one, and
+// start afresh for each.
+void ValidateDpiScopeGlobalNames(const std::vector<ModuleItem*>& items,
+                                 const CompilationUnit* unit,
+                                 const TypedefMap& outer_typedefs,
+                                 DpiGlobalNameSpace& global, DiagEngine& diag) {
   // Index this scope's SystemVerilog function and task declarations by name so
   // each export can look up the routine it names and obtain its signature for
   // the cross-scope equivalence check.
@@ -645,8 +652,7 @@ void ValidateDpiScopeGlobalNames(
         item->kind != ModuleItemKind::kDpiExport) {
       continue;
     }
-    ProcessDpiGlobalNameItem(item, scope, export_signatures, link_version,
-                             diag);
+    ProcessDpiGlobalNameItem(item, scope, global, diag);
   }
 }
 
@@ -693,18 +699,17 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
   // packages "explicitly named scopes"; and §3.12.1 gives the compilation-unit
   // scope "all declarations that lie outside any other scope", adding that it
   // "can contain any item that can be defined within a package".
+  DpiGlobalNameSpace global{link_version, export_signatures};
+
   for (const auto* mod : unit_->modules) {
     if (mod == nullptr) continue;
-    ValidateDpiScopeGlobalNames(mod->items, unit_, typedefs_, export_signatures,
-                                link_version, diag_);
+    ValidateDpiScopeGlobalNames(mod->items, unit_, typedefs_, global, diag_);
   }
   for (const auto* pkg : unit_->packages) {
     if (pkg == nullptr) continue;
-    ValidateDpiScopeGlobalNames(pkg->items, unit_, typedefs_, export_signatures,
-                                link_version, diag_);
+    ValidateDpiScopeGlobalNames(pkg->items, unit_, typedefs_, global, diag_);
   }
-  ValidateDpiScopeGlobalNames(unit_->cu_items, unit_, typedefs_,
-                              export_signatures, link_version, diag_);
+  ValidateDpiScopeGlobalNames(unit_->cu_items, unit_, typedefs_, global, diag_);
 }
 
 namespace {
