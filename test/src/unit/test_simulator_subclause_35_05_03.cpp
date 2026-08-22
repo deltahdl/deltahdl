@@ -304,4 +304,230 @@ TEST(DpiContextChain, NoncontextImportCallIsNotOptimizationBarrier) {
   EXPECT_FALSE(rt.IsImportCallOptimizationBarrier("plain_import"));
 }
 
+// ---------------------------------------------------------------------------
+// One exported subroutine, one instance per instantiated scope.
+// ---------------------------------------------------------------------------
+//
+// §35.5.3 says which export a call from an import reaches:
+//
+//   When an import invokes the svSetScope utility prior to calling the export,
+//   it sets the context explicitly. Otherwise, the context will be the context
+//   of the instantiated scope where the import declaration is located. Because
+//   imports with diverse instantiated scopes can export the same subroutine,
+//   multiple instances of such an export can exist after elaboration. Prior to
+//   any invocations of svSetScope, these export instances would have different
+//   contexts, which would reflect their imported caller's instantiated scope.
+//
+// A name is therefore not enough to say which export a call runs. Two scopes
+// can each export a subroutine of one name, and the call an import makes runs
+// the instance belonging to the chain's current scope: the import declaration's
+// instantiated scope, or whatever scope svSetScope has named since.
+//
+// DpiRuntime::FindExportInScope answers by scope and name together, and
+// DpiRuntime::CallExportFromImport asks it before it asks by name. Falling back
+// to the name is what reaches an export registered under no scope at all, which
+// is how most of this file registers one.
+
+// Two instantiated scopes exporting one name, each instance answering with its
+// own value so that a case can say which of them ran.
+struct TwoScopesExportingOneName {
+  DpiRuntime rt;
+
+  TwoScopesExportingOneName() {
+    // Registered in this order so that the name index holds top.b: a lookup by
+    // name alone reaches top.b's instance whichever scope is calling.
+    Register("top.a", 1);
+    Register("top.b", 2);
+  }
+
+  void Register(const char* scope_name, int answer) {
+    DpiRtExport exp;
+    exp.sv_name = "sv_export";
+    exp.scope_name = scope_name;
+    exp.impl = [answer](const std::vector<DpiArgValue>&) -> DpiArgValue {
+      return DpiArgValue::FromInt(answer);
+    };
+    rt.RegisterExport(exp);
+  }
+
+  // Opens a context import chain whose declaration sits in `scope_name`, calls
+  // the export from it and yields what the instance that ran answered. A call
+  // the runtime refuses yields -1, which no instance answers.
+  int CallingFrom(const char* scope_name) {
+    DpiScope decl_scope;
+    decl_scope.name = scope_name;
+    rt.EnterContextImportCall("ctx", decl_scope);
+    DpiArgValue result = DpiArgValue::FromInt(-1);
+    rt.CallExportFromImport("sv_export", {}, &result);
+    rt.LeaveImportCall();
+    return result.AsInt();
+  }
+};
+
+// §35.5.3: both instances exist once elaboration is done, so registering the
+// second does not displace the first.
+TEST(DpiExportInstances, BothScopesInstancesAreRegistered) {
+  TwoScopesExportingOneName both;
+  EXPECT_EQ(both.rt.ExportCount(), 2u);
+}
+
+// The instance a scope declares is reachable under that scope.
+TEST(DpiExportInstances, AnInstanceIsFoundUnderTheScopeThatDeclaredIt) {
+  TwoScopesExportingOneName both;
+  const auto* found = both.rt.FindExportInScope("sv_export", "top.a");
+  ASSERT_NE(found, nullptr);
+  EXPECT_EQ(found->scope_name, "top.a");
+}
+
+// And a scope that declared no export of the name has no instance of it. This
+// is what makes the lookup say something: a lookup answering for every scope
+// would satisfy the case above without telling the instances apart.
+TEST(DpiExportInstances, NoInstanceIsFoundUnderAScopeThatDeclaredNone) {
+  TwoScopesExportingOneName both;
+  EXPECT_EQ(both.rt.FindExportInScope("sv_export", "top.c"), nullptr);
+}
+
+// §35.5.3: the export instance that runs reflects the imported caller's
+// instantiated scope. A chain rooted in top.a runs top.a's instance, though the
+// name was registered afterwards from top.b.
+TEST(DpiExportInstances, TheInstanceThatRunsIsTheOneTheChainsScopeDeclares) {
+  TwoScopesExportingOneName both;
+  EXPECT_EQ(both.CallingFrom("top.a"), 1);
+}
+
+// The other scope runs its own instance, so the choice follows the caller
+// rather than always landing on one instance.
+TEST(DpiExportInstances, TheOtherScopeRunsItsOwnInstance) {
+  TwoScopesExportingOneName both;
+  EXPECT_EQ(both.CallingFrom("top.b"), 2);
+}
+
+// §35.5.3: an import that invokes svSetScope before calling the export sets the
+// context explicitly, so the instance that runs is the one the named scope
+// declares rather than the one the declaration's scope declares.
+TEST(DpiExportInstances, SvSetScopeSelectsTheInstanceInTheNamedScope) {
+  TwoScopesExportingOneName both;
+  DpiScope decl_scope;
+  decl_scope.name = "top.a";
+  both.rt.EnterContextImportCall("ctx", decl_scope);
+
+  DpiScope named;
+  named.name = "top.b";
+  both.rt.SetScope(&named);
+
+  DpiArgValue result = DpiArgValue::FromInt(-1);
+  both.rt.CallExportFromImport("sv_export", {}, &result);
+  EXPECT_EQ(result.AsInt(), 2);
+}
+
+// An export registered under no scope names no instance, and is reached from a
+// chain in any scope.
+TEST(DpiExportInstances, AnExportUnderNoScopeIsReachedFromAnyScope) {
+  DpiRuntime rt;
+  DpiRtExport exp;
+  exp.sv_name = "sv_export";
+  exp.impl = [](const std::vector<DpiArgValue>&) -> DpiArgValue {
+    return DpiArgValue::FromInt(8);
+  };
+  rt.RegisterExport(exp);
+
+  DpiScope decl_scope;
+  decl_scope.name = "top.anywhere";
+  rt.EnterContextImportCall("ctx", decl_scope);
+
+  DpiArgValue result = DpiArgValue::FromInt(-1);
+  auto status = rt.CallExportFromImport("sv_export", {}, &result);
+  ASSERT_EQ(status, DpiExportCallStatus::kOk);
+  EXPECT_EQ(result.AsInt(), 8);
+}
+
+// ---------------------------------------------------------------------------
+// What a noncontext import call leaves behind, and what it cannot become.
+// ---------------------------------------------------------------------------
+//
+// §35.5.3: "An imported subroutine not specified as context shall not access
+// any data objects from SystemVerilog other than its actual arguments. Only the
+// actual arguments can be affected (read or written) by its call." A scope such
+// a call sets is therefore not something whatever runs after it can read: the
+// call ends with the scope its caller had.
+
+// A scope a noncontext import sets does not outlive the call that set it.
+TEST(DpiContextChain, ANoncontextCallsScopeChangeDoesNotOutliveIt) {
+  DpiRuntime rt;
+  DpiScope caller;
+  caller.name = "top.caller";
+  rt.PushScope(caller);
+
+  rt.EnterNoncontextImportCall("plain_import");
+  DpiScope elsewhere;
+  elsewhere.name = "top.elsewhere";
+  rt.SetScope(&elsewhere);
+  rt.LeaveImportCall();
+
+  ASSERT_NE(rt.CurrentScope(), nullptr);
+  EXPECT_EQ(rt.CurrentScope()->name, "top.caller");
+}
+
+// And a noncontext call that sets no scope leaves the one it found. The restore
+// returns the caller's scope rather than discarding it, which a runtime
+// clearing the scope on every leave would fail.
+TEST(DpiContextChain, ANoncontextCallSettingNoScopeLeavesTheCallersScope) {
+  DpiRuntime rt;
+  DpiScope caller;
+  caller.name = "top.caller";
+  rt.PushScope(caller);
+
+  rt.EnterNoncontextImportCall("plain_import");
+  rt.LeaveImportCall();
+
+  ASSERT_NE(rt.CurrentScope(), nullptr);
+  EXPECT_EQ(rt.CurrentScope()->name, "top.caller");
+}
+
+// The caller's scope is still the caller's after a noncontext call that opened
+// and closed a scope of its own while it ran. Restoring reads the scope stack
+// afresh for exactly this reason: opening a scope can move the stack's
+// elements, so the address the caller's scope had when the call began is not
+// the address it has when the call returns.
+TEST(DpiContextChain, ANoncontextCallLeavesTheCallersScopeAfterANestedScope) {
+  DpiRuntime rt;
+  DpiScope caller;
+  caller.name = "top.caller";
+  rt.PushScope(caller);
+
+  rt.EnterNoncontextImportCall("plain_import");
+  DpiScope nested;
+  nested.name = "top.nested";
+  rt.EnterContextImportCall("ctx_inner", nested);
+  rt.LeaveImportCall();
+  rt.LeaveImportCall();
+
+  ASSERT_NE(rt.CurrentScope(), nullptr);
+  EXPECT_EQ(rt.CurrentScope()->name, "top.caller");
+}
+
+// §35.5.3: "The context characteristic of a DPI import call cannot be
+// dynamically changed after the initial call to the import subroutine in the
+// DPI supported language." Naming the export's own scope is what would let a
+// context call reach it, and it does not make this call a context one.
+TEST(DpiContextChain, SvSetScopeDoesNotMakeANoncontextCallContext) {
+  DpiRuntime rt;
+  DpiRtExport exp;
+  exp.sv_name = "sv_export";
+  exp.scope_name = "top.dut";
+  exp.impl = [](const std::vector<DpiArgValue>&) -> DpiArgValue {
+    return DpiArgValue::FromInt(5);
+  };
+  rt.RegisterExport(exp);
+
+  rt.EnterNoncontextImportCall("plain_import");
+  DpiScope named;
+  named.name = "top.dut";
+  rt.SetScope(&named);
+
+  DpiArgValue result;
+  auto status = rt.CallExportFromImport("sv_export", {}, &result);
+  EXPECT_EQ(status, DpiExportCallStatus::kNoncontextChain);
+}
+
 }  // namespace

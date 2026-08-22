@@ -293,11 +293,35 @@ uint32_t DpiRuntime::ImportCount() const {
   return static_cast<uint32_t>(imports_.size());
 }
 
+namespace {
+// §35.5.3: the key one export instance is held under -- the instantiated scope
+// declaring it and its SystemVerilog name together, since as many instances of
+// a name exist as there are scopes exporting it. The separator is a character
+// no SystemVerilog name contains, so no pair of scope and name can spell the
+// key another pair spells.
+std::string ExportInstanceKey(std::string_view sv_name,
+                              std::string_view scope_name) {
+  std::string key(scope_name);
+  key += '\0';
+  key += sv_name;
+  return key;
+}
+}  // namespace
+
 void DpiRuntime::RegisterExport(DpiRtExport exp) {
   // §35.7: exported SystemVerilog functions are always context functions.
   // Normalize the flag here so any caller that fails to set it (or sets it
   // false) still gets a context export.
   exp.is_context = true;
+  // §35.5.3: an export declared in several instantiated scopes exists as
+  // several instances once elaboration is done, one per scope. Holding this one
+  // under its scope as well as under its name leaves an instance registered
+  // earlier reachable when a second instance takes the name index. An export
+  // registered with no scope names no instance and is reachable by name alone.
+  if (!exp.scope_name.empty()) {
+    export_scope_index_[ExportInstanceKey(exp.sv_name, exp.scope_name)] =
+        exports_.size();
+  }
   export_index_[exp.sv_name] = exports_.size();
   exports_.push_back(std::move(exp));
 }
@@ -305,6 +329,13 @@ void DpiRuntime::RegisterExport(DpiRtExport exp) {
 const DpiRtExport* DpiRuntime::FindExport(std::string_view sv_name) const {
   auto it = export_index_.find(sv_name);
   if (it == export_index_.end()) return nullptr;
+  return &exports_[it->second];
+}
+
+const DpiRtExport* DpiRuntime::FindExportInScope(
+    std::string_view sv_name, std::string_view scope_name) const {
+  auto it = export_scope_index_.find(ExportInstanceKey(sv_name, scope_name));
+  if (it == export_scope_index_.end()) return nullptr;
   return &exports_[it->second];
 }
 
@@ -571,7 +602,13 @@ void DpiRuntime::EnterNoncontextImportCall(std::string_view sv_name,
   // See EnterContextImportCall: a fresh top-level chain starts with no active
   // disable episode (§35.9).
   if (call_chain_.empty()) DpiSetCurrentDisabledState(false);
-  call_chain_.push_back({sv_name, false, is_task});
+  // §35.5.3: the frame remembers the scope it was entered under so that leaving
+  // it restores that scope. A noncontext import call is not instrumented and
+  // affects only its actual arguments, so a scope set while it ran belongs to
+  // it and not to whatever runs after it returns.
+  const bool from_stack =
+      !scope_stack_.empty() && current_scope_ == &scope_stack_.back();
+  call_chain_.push_back({sv_name, false, is_task, current_scope_, from_stack});
 }
 
 void DpiRuntime::EnterDeclaredImportCall(std::string_view sv_name,
@@ -591,9 +628,25 @@ void DpiRuntime::EnterDeclaredImportCall(std::string_view sv_name,
 
 void DpiRuntime::LeaveImportCall() {
   if (call_chain_.empty()) return;
-  bool had_context = call_chain_.back().is_context;
+  const bool had_context = call_chain_.back().is_context;
+  const DpiScope* entry_scope = call_chain_.back().entry_scope;
+  const bool entry_scope_from_stack = call_chain_.back().entry_scope_from_stack;
   call_chain_.pop_back();
-  if (had_context) PopScope();
+  if (had_context) {
+    // The context frame pushed the import declaration's instantiated scope on
+    // entry, and popping it discards whatever svSetScope named while the call
+    // ran.
+    PopScope();
+    return;
+  }
+  // §35.5.3: only the actual arguments can be affected by the call of an import
+  // not specified as context, so the scope this frame was entered under is the
+  // scope its caller resumes in.
+  if (entry_scope_from_stack) {
+    current_scope_ = scope_stack_.empty() ? nullptr : &scope_stack_.back();
+    return;
+  }
+  current_scope_ = entry_scope;
 }
 
 uint32_t DpiRuntime::ImportCallDepth() const {
@@ -610,7 +663,15 @@ bool DpiRuntime::ChainRootIsContext() const {
 DpiExportCallStatus DpiRuntime::CallExportFromImport(
     std::string_view sv_name, const std::vector<DpiArgValue>& args,
     DpiArgValue* out_result) {
-  const auto* exp = FindExport(sv_name);
+  // §35.5.3: the instance of the export this call reaches is the one the
+  // chain's current scope declares -- the import declaration's instantiated
+  // scope until svSetScope names another. Where the current scope declares no
+  // instance of this name, the lookup falls back to the name alone, which is
+  // what an export registered without a scope is reachable under.
+  const auto* exp = current_scope_ != nullptr
+                        ? FindExportInScope(sv_name, current_scope_->name)
+                        : nullptr;
+  if (exp == nullptr) exp = FindExport(sv_name);
   // §35.9 item d): once an imported subroutine has entered the disabled state,
   // it is illegal for the current call to make any further calls to exported
   // subroutines. This applies whatever the chain's context property or the kind
@@ -648,7 +709,11 @@ DpiExportCallStatus DpiRuntime::CallExportFromImport(
   // around the call so that any scope changes performed by the export (or
   // by code it called) do not leak back to the import chain.
   const DpiScope* saved_scope = current_scope_;
-  DpiArgValue result = CallExport(sv_name, args);
+  // The instance selected above is entered directly rather than through
+  // CallExport, which looks the export up by name and so would enter whichever
+  // instance holds the name index rather than the one this scope declares.
+  DpiArgValue result =
+      (exp != nullptr && exp->impl) ? exp->impl(args) : DpiArgValue::FromInt(0);
   current_scope_ = saved_scope;
   if (out_result) *out_result = result;
   return DpiExportCallStatus::kOk;

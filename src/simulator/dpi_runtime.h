@@ -194,6 +194,16 @@ class DpiRuntime {
 
   void RegisterExport(DpiRtExport exp);
   const DpiRtExport* FindExport(std::string_view sv_name) const;
+
+  // §35.5.3: the instance of the export named `sv_name` that the instantiated
+  // scope `scope_name` declares, or nullptr where that scope declares no export
+  // of that name. §35.5.3 has one exported subroutine exist as several
+  // instances after elaboration, one per instantiated scope that declares it,
+  // because imports with diverse instantiated scopes can export the same
+  // subroutine. FindExport answers by name alone and cannot tell those
+  // instances apart, so it returns whichever was registered last.
+  const DpiRtExport* FindExportInScope(std::string_view sv_name,
+                                       std::string_view scope_name) const;
   bool HasExport(std::string_view sv_name) const;
   uint32_t ExportCount() const;
 
@@ -363,12 +373,30 @@ class DpiRuntime {
     // §35.8: whether the import that opened this frame is a task. A function
     // frame may not call an exported task.
     bool is_task = false;
+    // §35.5.3: the chain scope this frame was entered under. A noncontext frame
+    // pushes no scope of its own, so it restores this value on leaving rather
+    // than popping: §35.5.3 lets a call of an import not specified as context
+    // affect its actual arguments and nothing else, which a scope left behind
+    // for whatever runs next would breach.
+    //
+    // entry_scope_from_stack records that the scope at entry was the top of
+    // scope_stack_ rather than one svSetScope named, in which case leaving
+    // reads the top afresh instead of following this pointer. A PushScope made
+    // while the frame ran can move the vector's elements, and the address the
+    // top had at entry is not the address it has now.
+    const DpiScope* entry_scope = nullptr;
+    bool entry_scope_from_stack = false;
   };
 
   std::vector<DpiRtFunction> imports_;
   std::unordered_map<std::string_view, size_t> import_index_;
   std::vector<DpiRtExport> exports_;
   std::unordered_map<std::string_view, size_t> export_index_;
+  // §35.5.3: each export instance under the instantiated scope declaring it and
+  // its SystemVerilog name together, so that the instances one exported
+  // subroutine has in several scopes stay separately reachable. export_index_
+  // keys on the name alone and holds one of them.
+  std::unordered_map<std::string, size_t> export_scope_index_;
   // §35.5.2: the value each pure import call computed, kept under the import's
   // name and the values its input arguments presented, so that a later call
   // presenting the same values can be answered from it.
