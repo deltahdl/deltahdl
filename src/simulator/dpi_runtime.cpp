@@ -778,6 +778,22 @@ int DpiRuntime::ReturnFromExportUnderDisable(DpiDisableTarget target) {
   }
 }
 
+void* DpiRuntime::PackedArgRef(std::string_view sv_name,
+                               void* actual_data) const {
+  const auto* func = FindImport(sv_name);
+  // Annex H.14: the SV3.1a semantics are the deprecated ones, so every import
+  // this runtime holds no declaration for is passed its packed data in the
+  // canonical representation, as is one whose declaration did not ask for the
+  // other.
+  if (func == nullptr ||
+      func->packed_arg_passing != DpiPackedArgPassing::kSv31aReference) {
+    return nullptr;
+  }
+  // The actual is handed over as it stands. §H.14: "An implementation need not
+  // do any conversion or marshalling of data into the canonical format."
+  return actual_data;
+}
+
 bool DpiRuntime::IsDisabledState() const { return DpiCurrentDisabledState(); }
 
 bool DpiRuntime::CheckImportedSubroutineDisableReturn(

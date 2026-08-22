@@ -91,6 +91,20 @@ using DpiRtCallback =
 // output/inout positions become visible outside the call.
 using DpiRtArgCallback = std::function<DpiArgValue(std::vector<DpiArgValue>&)>;
 
+// Annex H.14: how an import's declaration has its packed data arguments passed
+// to the foreign code. IEEE Std 1800 marshals packed data into the canonical
+// representation §H.10.1.2 defines. Accellera SystemVerilog 3.1a passes it by
+// the opaque handle types svBitPackedArrRef and svLogicPackedArrRef instead —
+// a reference to the simulator's own representation — and an implementation
+// doing so "need not do any conversion or marshalling of data into the
+// canonical format". §H.14 deprecates the SV3.1a semantics and lets a simulator
+// decline them, so an import is passed its packed data in the canonical
+// representation unless its declaration selects the other.
+enum class DpiPackedArgPassing : uint8_t {
+  kCanonical,
+  kSv31aReference,
+};
+
 struct DpiRtFunction {
   std::string_view c_name;
   std::string_view sv_name;
@@ -103,6 +117,11 @@ struct DpiRtFunction {
   DpiRtArgCallback arg_impl;
   bool is_pure = false;
   bool is_context = false;
+  // Annex H.14: the argument passing semantics this declaration selects for its
+  // packed data arguments. The SV3.1a semantics are deprecated functionality a
+  // simulator need not implement, so a declaration that does not ask for them
+  // gets the canonical representation.
+  DpiPackedArgPassing packed_arg_passing = DpiPackedArgPassing::kCanonical;
 };
 
 struct DpiRtExport {
@@ -335,6 +354,19 @@ class DpiRuntime {
   // disable the task returns 0. The current thread's disabled state is updated
   // to match.
   int ReturnFromExportUnderDisable(DpiDisableTarget target);
+
+  // Annex H.14: the reference the foreign code receives for the packed data
+  // actual at `actual_data` on a call to the import `sv_name`. Under the SV3.1a
+  // semantics §H.14 describes this is the address of the simulator's own
+  // representation of the array, so no conversion or marshalling happens on
+  // either side of the call and a write the foreign code makes through the
+  // reference writes the array the caller passed. Under the IEEE Std 1800
+  // semantics there is no such reference and the result is nullptr, because
+  // packed data reaches the foreign code as the canonical copy §H.10.1.2
+  // defines. A name this runtime holds no declaration for is passed its packed
+  // data in the canonical representation, which is what a simulator declining
+  // §H.14's deprecated functionality provides.
+  void* PackedArgRef(std::string_view sv_name, void* actual_data) const;
 
   // §35.9: whether the current imported subroutine is in the disabled state —
   // the same value svIsDisabledState() reports.
