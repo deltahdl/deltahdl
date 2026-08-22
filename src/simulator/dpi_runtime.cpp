@@ -606,7 +606,7 @@ void DpiRuntime::EnterNoncontextImportCall(std::string_view sv_name,
   // it restores that scope. A noncontext import call is not instrumented and
   // affects only its actual arguments, so a scope set while it ran belongs to
   // it and not to whatever runs after it returns.
-  const bool from_stack =
+  bool from_stack =
       !scope_stack_.empty() && current_scope_ == &scope_stack_.back();
   call_chain_.push_back({sv_name, false, is_task, current_scope_, from_stack});
 }
@@ -628,9 +628,9 @@ void DpiRuntime::EnterDeclaredImportCall(std::string_view sv_name,
 
 void DpiRuntime::LeaveImportCall() {
   if (call_chain_.empty()) return;
-  const bool had_context = call_chain_.back().is_context;
+  bool had_context = call_chain_.back().is_context;
   const DpiScope* entry_scope = call_chain_.back().entry_scope;
-  const bool entry_scope_from_stack = call_chain_.back().entry_scope_from_stack;
+  bool entry_scope_from_stack = call_chain_.back().entry_scope_from_stack;
   call_chain_.pop_back();
   if (had_context) {
     // The context frame pushed the import declaration's instantiated scope on
