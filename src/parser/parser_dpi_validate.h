@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 namespace delta {
 
 class DiagEngine;
@@ -16,7 +18,7 @@ void ValidateDpiImportNoRefArgs(DiagEngine& diag, const ModuleItem* item);
 
 // §35.5.6: why a formal argument's type falls outside the set of types the
 // clause permits for a DPI subroutine, or kPermitted when it does not.
-enum class DpiFormalTypeVerdict {
+enum class DpiFormalTypeVerdict : uint8_t {
   kPermitted,
   kNotPermittedType,
   kUnpackedUnion,
