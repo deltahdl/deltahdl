@@ -337,4 +337,67 @@ TEST(DpiDisableProtocol, UndeterminedResultIsReturnTypeCorrectWhenDisabled) {
   ResetDisableState();
 }
 
+// §35.9: an imported subroutine is in the disabled state while a disable
+// "somewhere in the design targets either it or a parent". Once the chain the
+// disable was propagating through has unwound, nothing targets anything, so the
+// episode is over and svIsDisabledState() reports 0 to foreign code running
+// outside any import call.
+TEST(DpiDisableProtocol, DisabledStateEndsWhenTheImportChainUnwinds) {
+  ResetDisableState();
+  DpiRuntime rt;
+
+  rt.EnterNoncontextImportCall("outer", /*is_task=*/true);
+  rt.ReturnFromExportUnderDisable(DpiDisableTarget::kAncestor);
+  ASSERT_TRUE(rt.IsDisabledState());
+  rt.LeaveImportCall();
+
+  EXPECT_EQ(svIsDisabledState(), 0);
+}
+
+// The episode ends with the chain and not with any frame in it: an inner frame
+// popping while an outer one is still open leaves the disable propagating,
+// which is what item b) has the outer import acknowledge by its return value.
+TEST(DpiDisableProtocol, DisabledStateSurvivesAnInnerFrameLeavingTheChain) {
+  ResetDisableState();
+  DpiRuntime rt;
+
+  rt.EnterNoncontextImportCall("outer", /*is_task=*/true);
+  rt.EnterNoncontextImportCall("inner", /*is_task=*/true);
+  rt.ReturnFromExportUnderDisable(DpiDisableTarget::kAncestor);
+  rt.LeaveImportCall();
+
+  EXPECT_TRUE(rt.IsDisabledState());
+  rt.LeaveImportCall();
+  ResetDisableState();
+}
+
+// §35.9 licenses a simulator to drop an output or inout argument only "if a
+// disable is in effect". A call made after the disabled chain unwound has none
+// in effect, so its arguments are propagated as any undisabled call's are. This
+// is what the leaked state cost: the licence was taken where it did not apply.
+TEST(DpiDisableProtocol, ACallAfterADisabledChainPropagatesItsOutputArgument) {
+  ResetDisableState();
+  DpiRuntime rt;
+  DpiRtFunction func;
+  func.c_name = "c_io";
+  func.sv_name = "io";
+  func.return_type = DataTypeKind::kInt;
+  func.args = {DpiArg{"o", DataTypeKind::kInt, Direction::kOutput}};
+  func.arg_impl = [](std::vector<DpiArgValue>& a) {
+    a[0] = DpiArgValue::FromInt(222);
+    return DpiArgValue::FromInt(444);
+  };
+  rt.RegisterImport(std::move(func));
+
+  rt.EnterNoncontextImportCall("outer", /*is_task=*/true);
+  rt.ReturnFromExportUnderDisable(DpiDisableTarget::kAncestor);
+  rt.LeaveImportCall();
+
+  std::vector<DpiArgValue> actuals = {DpiArgValue::FromInt(10)};
+  DpiArgValue result = rt.CallImportWithArgs("io", actuals);
+
+  EXPECT_EQ(actuals[0].AsInt(), 222);
+  EXPECT_EQ(result.AsInt(), 444);
+}
+
 }  // namespace

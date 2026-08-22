@@ -632,6 +632,16 @@ void DpiRuntime::LeaveImportCall() {
   const DpiScope* entry_scope = call_chain_.back().entry_scope;
   bool entry_scope_from_stack = call_chain_.back().entry_scope_from_stack;
   call_chain_.pop_back();
+  // §35.9: "An imported subroutine is said to be in the disabled state when a
+  // disable statement somewhere in the design targets either it or a parent for
+  // disabling." Popping the last frame ends the chain the disable was
+  // propagating through, so no imported subroutine is in the disabled state
+  // after it and the episode is over. Leaving the flag set would have
+  // svIsDisabledState() report 1 to foreign code running outside any import
+  // call, and would have the next call's output and inout arguments dropped
+  // under a §35.9 licence to drop them that applies only while a disable is in
+  // effect.
+  if (call_chain_.empty()) DpiSetCurrentDisabledState(false);
   if (had_context) {
     // The context frame pushed the import declaration's instantiated scope on
     // entry, and popping it discards whatever svSetScope named while the call
