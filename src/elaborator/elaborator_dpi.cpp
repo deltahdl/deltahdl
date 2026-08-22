@@ -12,6 +12,7 @@
 #include "elaborator/let_construct.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
+#include "parser/parser_dpi_validate.h"
 
 namespace delta {
 
@@ -220,6 +221,37 @@ void CheckExportDynamicArrayArguments(const ModuleItem* callable,
   }
 }
 
+// §35.5.6: "The following SystemVerilog types are the only permitted types for
+// formal arguments of import and export subroutines". The clause names imports
+// and exports together, so the permitted set an exported subroutine's formals
+// are held to is the same one the import path applies, and both consult
+// ClassifyDpiFormalType for it. The dynamic array formal is a separate rule of
+// the same clause, checked by CheckExportDynamicArrayArguments.
+void CheckExportFormalTypes(const ModuleItem* callable, const ModuleItem* item,
+                            DiagEngine& diag) {
+  for (const auto& arg : callable->func_args) {
+    DpiFormalTypeVerdict verdict = ClassifyDpiFormalType(arg.data_type);
+    if (verdict == DpiFormalTypeVerdict::kPermitted) continue;
+    if (verdict == DpiFormalTypeVerdict::kUnpackedUnion) {
+      diag.Error(
+          item->loc,
+          std::format("SystemVerilog {} '{}' has an unpacked union formal "
+                      "argument '{}'; only the packed form of a union is "
+                      "permitted for DPI",
+                      ExportedSubroutineKind(callable), item->name, arg.name),
+          Subclause("35.5.6"));
+    } else {
+      diag.Error(
+          item->loc,
+          std::format("SystemVerilog {} '{}' has a formal argument '{}' whose "
+                      "type is not permitted for DPI",
+                      ExportedSubroutineKind(callable), item->name, arg.name),
+          Subclause("35.5.6"));
+    }
+    break;
+  }
+}
+
 // §35.5.5: an exported function's result type is subject to the same
 // small-value restriction as an imported function's result. §35.8 states that
 // "SystemVerilog tasks do not have return value types", so the check applies
@@ -335,6 +367,7 @@ void ValidateExportDeclaration(
   const ModuleItem* callable = callable_it->second;
   CheckExportRefArguments(callable, item, diag);
   CheckExportDynamicArrayArguments(callable, item, diag);
+  CheckExportFormalTypes(callable, item, diag);
   CheckExportResultType(callable, item, diag);
   CheckExportSignatureEquivalence(callable, link_name, item, export_signatures,
                                   diag);

@@ -36,6 +36,38 @@ static bool IsPermittedDpiFormalType(DataTypeKind kind) {
   }
 }
 
+DpiFormalTypeVerdict ClassifyDpiFormalType(const DataType& type) {
+  // §35.5.6: the listed types are the only permitted types for a formal
+  // argument, so a type whose kind is outside that set is rejected before
+  // anything else about it is looked at.
+  if (!IsPermittedDpiFormalType(type.kind)) {
+    return DpiFormalTypeVerdict::kNotPermittedType;
+  }
+  // §35.5.6: among the type-constructing forms in the permitted set, a union is
+  // allowed in its packed form only. An unpacked union is therefore not a
+  // permitted formal-argument type.
+  if (type.kind == DataTypeKind::kUnion && !type.is_packed) {
+    return DpiFormalTypeVerdict::kUnpackedUnion;
+  }
+  // §35.5.6: the clause permits a struct or a union as a type "constructed from
+  // the supported types", so an aggregate is only as permitted as its members
+  // are. Each member is decided by its own kind, and a member that is itself an
+  // inline aggregate is decided by recursing into the type parsed for it.
+  // struct_members is empty for every other kind, which ends the walk; a null
+  // nested_type marks a member that is scalar or named and is not recursed
+  // into, so the walk terminates on the parsed type it is given.
+  for (const StructMember& member : type.struct_members) {
+    if (!IsPermittedDpiFormalType(member.type_kind)) {
+      return DpiFormalTypeVerdict::kNotPermittedType;
+    }
+    if (member.nested_type != nullptr) {
+      DpiFormalTypeVerdict nested = ClassifyDpiFormalType(*member.nested_type);
+      if (nested != DpiFormalTypeVerdict::kPermitted) return nested;
+    }
+  }
+  return DpiFormalTypeVerdict::kPermitted;
+}
+
 // §35.5.5: the result type of an imported function is restricted to "small
 // values" -- a tighter set than the §35.5.6 formal-argument types. The
 // permitted results are void, the C-compatible scalar integer and real types,
@@ -102,23 +134,27 @@ void ValidateDpiImportNoRefArgs(DiagEngine& diag, const ModuleItem* item) {
 
 void ValidateDpiImportFormalTypes(DiagEngine& diag, const ModuleItem* item) {
   for (const auto& arg : item->func_args) {
-    if (!IsPermittedDpiFormalType(arg.data_type.kind)) {
-      diag.Error(item->loc,
-                 std::format("type of formal argument '{}' is not permitted "
-                             "for a DPI imported subroutine",
-                             arg.name),
-                 Subclause("35.5.6"));
-    } else if (arg.data_type.kind == DataTypeKind::kUnion &&
-               !arg.data_type.is_packed) {
-      // §35.5.6: among the type-constructing forms in the permitted set, a
-      // union is allowed in its packed form only. An unpacked union is
-      // therefore not a permitted formal-argument type.
-      diag.Error(item->loc,
-                 std::format("unpacked union formal argument '{}' is not "
-                             "permitted for a DPI imported subroutine; only "
-                             "the packed form of a union is allowed",
-                             arg.name),
-                 Subclause("35.5.6"));
+    // §35.5.6 states one set of permitted formal-argument types, so the verdict
+    // is taken from ClassifyDpiFormalType and only the wording of the report is
+    // decided here.
+    switch (ClassifyDpiFormalType(arg.data_type)) {
+      case DpiFormalTypeVerdict::kNotPermittedType:
+        diag.Error(item->loc,
+                   std::format("type of formal argument '{}' is not permitted "
+                               "for a DPI imported subroutine",
+                               arg.name),
+                   Subclause("35.5.6"));
+        break;
+      case DpiFormalTypeVerdict::kUnpackedUnion:
+        diag.Error(item->loc,
+                   std::format("unpacked union formal argument '{}' is not "
+                               "permitted for a DPI imported subroutine; only "
+                               "the packed form of a union is allowed",
+                               arg.name),
+                   Subclause("35.5.6"));
+        break;
+      case DpiFormalTypeVerdict::kPermitted:
+        break;
     }
   }
 }

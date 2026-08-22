@@ -208,4 +208,51 @@ TEST_F(DpiParseTest, DpiImportEnumArgAccepted) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
+// §35.5.6: a struct is permitted as a formal argument only where it is
+// "constructed from the supported types", and an event is not one of them. The
+// argument is rejected for the type of a member even though struct is itself a
+// permitted type-constructing form.
+TEST_F(DpiParseTest, DpiImportStructWithEventMemberRejected) {
+  Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function void f(\n"
+      "    input struct { event ev; int i; } s);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "type of formal argument 's' is not permitted for "
+                            "a DPI imported subroutine",
+                            2, "35.5.6"));
+}
+
+// §35.5.6: a struct built only from the supported types is itself a permitted
+// formal-argument type, so an inline struct of permitted members is accepted.
+TEST_F(DpiParseTest, DpiImportStructWithPermittedMembersAccepted) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function void f(\n"
+      "    input struct { int i; real r; string s; } arg);\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  ASSERT_EQ(items[0]->func_args.size(), 1u);
+  EXPECT_EQ(items[0]->func_args[0].data_type.kind, DataTypeKind::kStruct);
+  EXPECT_FALSE(diag_.HasErrors());
+}
+
+// §35.5.6: a type is constructed from the supported types at every depth, so
+// the restriction reaches a member of a member. A struct whose only member is a
+// struct holding an event is rejected.
+TEST_F(DpiParseTest, DpiImportNestedStructWithEventMemberRejected) {
+  Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function void f(\n"
+      "    input struct { struct { event ev; } inner; } s);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "type of formal argument 's' is not permitted for "
+                            "a DPI imported subroutine",
+                            2, "35.5.6"));
+}
+
 }  // namespace

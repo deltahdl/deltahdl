@@ -96,4 +96,79 @@ TEST(DpiExportFormalType,
                             4, "35.5.6"));
 }
 
+// §35.5.6: "The following SystemVerilog types are the only permitted types for
+// formal arguments of import and export subroutines". An event is not among
+// them, so an export whose subroutine takes one is rejected.
+TEST(DpiExportFormalType, ExportedFunctionWithEventArgIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      function void sv_notify(input event ev); endfunction
+      export "DPI-C" function sv_notify;
+    endmodule
+  )",
+            f, "m");
+  // The report stands at the export declaration, line 4 of the literal above,
+  // whose first line is the newline that follows R"(.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "SystemVerilog function 'sv_notify' has a formal "
+                            "argument 'ev' whose type is not permitted for DPI",
+                            4, "35.5.6"));
+}
+
+// §35.5.6: the permitted set governs the formal arguments of every DPI
+// subroutine, tasks as well as functions. The report names the word the
+// declaration used, so a user who wrote a task is not sent looking for a
+// function they never declared.
+TEST(DpiExportFormalType, ExportedTaskWithEventArgSaysTask) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      task sv_wait(input event ev); endtask
+      export "DPI-C" task sv_wait;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "SystemVerilog task 'sv_wait' has a formal "
+                            "argument 'ev' whose type is not permitted for DPI",
+                            4, "35.5.6"));
+}
+
+// §35.5.6 admits a union in its packed form only, so an exported subroutine
+// whose formal argument is an unpacked union is rejected.
+TEST(DpiExportFormalType, ExportedFunctionWithUnpackedUnionArgIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      function void sv_take(input union { byte b; int i; } u); endfunction
+      export "DPI-C" function sv_take;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "SystemVerilog function 'sv_take' has an unpacked union "
+                    "formal argument 'u'; only the packed form of a union is "
+                    "permitted for DPI",
+                    4, "35.5.6"));
+}
+
+// §35.5.6: the packed form of a union is a permitted type, so the same export
+// stands once the union is declared packed -- confirming the check keys on the
+// packing and not on the union keyword.
+TEST(DpiExportFormalType, ExportedFunctionWithPackedUnionArgIsOk) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      function void sv_take(
+          input union packed { bit [7:0] a; logic [7:0] b; } u);
+      endfunction
+      export "DPI-C" function sv_take;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
