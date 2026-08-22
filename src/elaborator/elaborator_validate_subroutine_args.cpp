@@ -168,8 +168,15 @@ static void CheckVoidCallInExpr(
   if (!expr) return;
   if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
     auto it = func_decls.find(expr->callee);
+    // §35.5.5 lets an imported function declare `void` for its result, and
+    // §35.5 makes its usage that of a native function, so §13.4.1's rule about
+    // a void function used as an operand reaches an import as well. An
+    // imported task is excluded here rather than by its result type, which
+    // §35.5.4 leaves unwritten for one.
     if (it != func_decls.end() &&
-        it->second->kind == ModuleItemKind::kFunctionDecl &&
+        (it->second->kind == ModuleItemKind::kFunctionDecl ||
+         (it->second->kind == ModuleItemKind::kDpiImport &&
+          !it->second->dpi_is_task)) &&
         it->second->return_type.kind == DataTypeKind::kVoid) {
       diag.Error(expr->range.start,
                  std::format("void function '{}' used as expression operand",
@@ -579,6 +586,12 @@ static std::unordered_map<std::string_view, const ModuleItem*> BuildAllDecls(
       func_decls;
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kTaskDecl) all_decls[item->name] = item;
+    // §35.5: "The usage of imported functions is similar as for native
+    // SystemVerilog functions", so the §13.5 checks over a call's actuals
+    // apply to a subroutine §35.5.4 declared as an import. Its formal list is
+    // in the same ModuleItem::func_args field, and each check below reads the
+    // declaration's kind where the rule turns on it.
+    if (item->kind == ModuleItemKind::kDpiImport) all_decls[item->name] = item;
   }
   return all_decls;
 }
