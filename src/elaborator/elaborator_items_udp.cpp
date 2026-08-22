@@ -531,11 +531,20 @@ void CollectNestedModulesAndCheckVif(
 }
 
 // Records task names and indexes function declarations by name.
+//
+// §35.5: "The usage of imported functions is similar as for native
+// SystemVerilog functions", so a subroutine §35.5.4 declared with the `task`
+// keyword is a task of this scope and is recorded as one. §13.4's rule that a
+// function shall not enable a task reads this set, and §35.5.1.1's note that an
+// imported task can consume time is why that rule has to reach one.
 void RecordTaskFuncNames(
     const ModuleDecl* decl, std::unordered_set<std::string_view>& task_names,
     std::unordered_map<std::string_view, const ModuleItem*>& func_decls) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kTaskDecl) {
+      task_names.insert(item->name);
+    }
+    if (item->kind == ModuleItemKind::kDpiImport && item->dpi_is_task) {
       task_names.insert(item->name);
     }
     if (item->kind == ModuleItemKind::kFunctionDecl) {
