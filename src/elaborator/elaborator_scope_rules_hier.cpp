@@ -211,6 +211,7 @@ bool ModuleDeclaresMember(const RtlirModule* m, std::string_view name) {
          declares_module_level_param() ||
          RangeHasName(m->function_decls, ptr_name, name) ||
          RangeHasName(m->let_decls, ptr_name, name) ||
+         RangeHasName(m->dpi_import_decls, ptr_name, name) ||
          RangeHasName(m->sequence_decls, ptr_name, name) ||
          RangeHasName(m->class_decls, ptr_name, name) ||
          RangeHasName(

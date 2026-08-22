@@ -171,4 +171,74 @@ TEST(DpiImportCallArgs, AnOmittedActualWithADefaultIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §35.5.4 declares an imported subroutine and §11.12 declares a let, and the
+// two are called differently: a let substitutes the expression its declaration
+// writes, and an import calls a foreign function. An import carried among the
+// let declarations is registered as a let by RegisterModuleSubroutines in
+// src/simulator/lowerer_register.cpp, and the call is then expanded as a let
+// over an expression an import declaration never writes.
+TEST(DpiImportClassification, AnImportedSubroutineIsNotALetDeclaration) {
+  ElabFixture f;
+  auto* design = Elaborate(R"(
+    module m;
+      import "DPI-C" function int sv_f(input int a);
+    endmodule
+  )",
+                           f, "m");
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  const RtlirModule* mod = design->top_modules[0];
+  bool among_lets = false;
+  for (const ModuleItem* item : mod->let_decls) {
+    if (item->kind == ModuleItemKind::kDpiImport) among_lets = true;
+  }
+  EXPECT_FALSE(among_lets);
+}
+
+// The declaration is carried rather than dropped: whatever registers a run's
+// imports has to find it. Asserted apart from the case above, which a repair
+// deleting the declaration outright would also satisfy.
+TEST(DpiImportClassification, AnImportedSubroutineIsCarriedOnItsOwnVector) {
+  ElabFixture f;
+  auto* design = Elaborate(R"(
+    module m;
+      import "DPI-C" function int sv_f(input int a);
+    endmodule
+  )",
+                           f, "m");
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  const RtlirModule* mod = design->top_modules[0];
+  bool carries_import = false;
+  for (const ModuleItem* item : mod->dpi_import_decls) {
+    if (item->kind == ModuleItemKind::kDpiImport && item->name == "sv_f") {
+      carries_import = true;
+    }
+  }
+  EXPECT_TRUE(carries_import);
+}
+
+// §11.12's let is unaffected: a module declaring one still carries it where the
+// lowerer registers lets. Without this, moving every kind out of let_decls
+// would satisfy both cases above.
+TEST(DpiImportClassification, ALetDeclarationStaysAmongTheLetDeclarations) {
+  ElabFixture f;
+  auto* design = Elaborate(R"(
+    module m;
+      let twice(x) = x + x;
+    endmodule
+  )",
+                           f, "m");
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  const RtlirModule* mod = design->top_modules[0];
+  bool carries_let = false;
+  for (const ModuleItem* item : mod->let_decls) {
+    if (item->kind == ModuleItemKind::kLetDecl && item->name == "twice") {
+      carries_let = true;
+    }
+  }
+  EXPECT_TRUE(carries_let);
+}
+
 }  // namespace

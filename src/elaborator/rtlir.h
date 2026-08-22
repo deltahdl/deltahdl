@@ -473,6 +473,14 @@ struct RtlirModule {
   std::vector<RtlirParamDecl> params;
   std::vector<ModuleItem*> function_decls;
   std::vector<ModuleItem*> let_decls;
+  // §35.5.4's imported subroutines, declared in this module. They are held
+  // apart from let_decls because §11.12's let is a substitution of the
+  // expression its declaration writes, while an imported subroutine is a call
+  // into a foreign function and carries no expression to substitute. Whatever
+  // registers a run's imports reads this; RegisterModuleSubroutines in
+  // src/simulator/lowerer_register.cpp registers let_decls and would otherwise
+  // answer an import's name with a let expansion of nothing.
+  std::vector<ModuleItem*> dpi_import_decls;
   std::vector<ModuleItem*> sequence_decls;
   std::vector<ClassDecl*> class_decls;
   std::vector<RtlirImport> imports;

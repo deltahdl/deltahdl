@@ -793,7 +793,7 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       return true;
     case ModuleItemKind::kDpiImport:
       ValidateDpiImport(item);
-      mod->let_decls.push_back(item);
+      mod->dpi_import_decls.push_back(item);
       return true;
     case ModuleItemKind::kLetDecl:
       ValidateLetDecl(item);
