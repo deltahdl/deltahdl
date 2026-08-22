@@ -751,6 +751,15 @@ DpiExportCallStatus DpiRuntime::CallExportFromImport(
   DpiArgValue result =
       (exp != nullptr && exp->impl) ? exp->impl(args) : DpiArgValue::FromInt(0);
   current_scope_ = saved_scope;
+  if (exp != nullptr && exp->is_task) {
+    // §35.8: "SystemVerilog tasks do not have return value types. The return
+    // value of an exported task is an int value that indicates if a disable is
+    // active or not on the current execution thread." The foreign caller gets
+    // that indication, not what the body handed back, which stands for no
+    // result the clause gives a task. ReturnFromExportUnderDisable sets the
+    // thread state read here.
+    result = DpiArgValue::FromInt(DpiCurrentDisabledState() ? 1 : 0);
+  }
   if (out_result) *out_result = result;
   return DpiExportCallStatus::kOk;
 }

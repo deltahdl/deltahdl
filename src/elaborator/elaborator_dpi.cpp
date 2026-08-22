@@ -428,11 +428,15 @@ void CheckExportDuplicateSvFunc(
     DiagEngine& diag) {
   auto [_func, func_inserted] = exported_sv_func_in_scope.insert(item->name);
   if (!func_inserted) {
+    // §35.8: "All aspects of exported functions described above in 35.7 apply
+    // to exported tasks." The word comes from the export declaration's own
+    // keyword, which the check below holds to what the declaration names.
+    std::string_view kind = item->dpi_is_task ? "task" : "function";
     diag.Error(item->loc,
-               std::format("SystemVerilog function '{}' is already exported in "
-                           "this scope; only one export declaration per "
-                           "function is permitted",
-                           item->name),
+               std::format("SystemVerilog {} '{}' is already exported in this "
+                           "scope; only one export declaration per {} is "
+                           "permitted",
+                           kind, item->name, kind),
                Subclause("35.7"));
   }
 }
@@ -486,11 +490,29 @@ void ValidateExportDeclaration(
     // definition is written in the scope its class is declared in and carries
     // the bare method name, so it is indexed among the scope's callables and an
     // export naming it would otherwise attach to it.
+    diag.Error(
+        item->loc,
+        std::format("SystemVerilog {} '{}' is a member of class '{}' and class "
+                    "member functions cannot be exported",
+                    ExportedSubroutineKind(callable), item->name,
+                    callable->method_class),
+        Subclause("35.7"));
+    return;
+  }
+  // §35.8: A.2.6 writes the exported-task form as `export dpi_spec_string
+  // [ c_identifier = ] task task_identifier ;` beside the function form, so an
+  // export written with `task` names a task and one written with `function`
+  // names a function. The keyword is not decoration: §35.8 gives an exported
+  // task no return value type, makes it callable from an imported task alone,
+  // and gives its call an int result the clause defines, none of which holds of
+  // an exported function.
+  if (item->dpi_is_task != (callable->kind == ModuleItemKind::kTaskDecl)) {
     diag.Error(item->loc,
-               std::format("SystemVerilog function '{}' is a member of class "
-                           "'{}' and class member functions cannot be exported",
-                           item->name, callable->method_class),
-               Subclause("35.7"));
+               std::format("DPI export declares '{}' with the '{}' keyword, "
+                           "but '{}' is a SystemVerilog {}",
+                           item->name, item->dpi_is_task ? "task" : "function",
+                           item->name, ExportedSubroutineKind(callable)),
+               Subclause("35.8"));
     return;
   }
   CheckExportRefArguments(callable, item, diag);
