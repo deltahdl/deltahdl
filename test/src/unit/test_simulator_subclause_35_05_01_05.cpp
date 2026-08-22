@@ -180,8 +180,14 @@ TEST(DpiReentrancy, ImportedTaskCallWithoutTimingControlDoesNotSuspend) {
   exp.sv_name = "exported_compute";
   exp.is_task = true;
   // No timing control: the body just computes and returns in the same slot.
-  exp.impl = [](const std::vector<DpiArgValue>& a) -> DpiArgValue {
-    return DpiArgValue::FromInt(a.empty() ? 0 : a[0].AsInt() + 1);
+  // §35.8 gives an exported task's return value to the disable indication, so
+  // the computation is recorded in `computed` rather than read back off the
+  // call: what this test needs from the body is evidence that it ran to
+  // completion inside the calling slot.
+  int32_t computed = -1;
+  exp.impl = [&computed](const std::vector<DpiArgValue>& a) -> DpiArgValue {
+    computed = a.empty() ? 0 : a[0].AsInt() + 1;
+    return DpiArgValue::FromInt(computed);
   };
   rt.RegisterExport(std::move(exp));
 
@@ -213,7 +219,11 @@ TEST(DpiReentrancy, ImportedTaskCallWithoutTimingControlDoesNotSuspend) {
   sched.ScheduleEvent({kCallTime}, Region::kActive, ev);
   sched.Run();
 
-  EXPECT_EQ(result_val, 42);
+  EXPECT_EQ(computed, 42);
+  // §35.8: "The return value of an exported task is an int value that indicates
+  // if a disable is active or not on the current execution thread." No disable
+  // is active here, so the call yields 0 whatever the body computed.
+  EXPECT_EQ(result_val, 0);
   EXPECT_EQ(time_before, kCallTime);
   EXPECT_EQ(time_after, kCallTime);
   EXPECT_FALSE(pending_after);

@@ -467,6 +467,11 @@ class DpiRuntime {
   // violation issues.
   void IssueDisableProtocolFatalError(const std::string& message);
 
+  // The status barring a call to the export `exp`, named `sv_name` in
+  // SystemVerilog, or kOk where §35.9 item d), §35.8 and §35.5.3 all permit it.
+  DpiExportCallStatus CheckExportCallPermitted(const DpiRtExport* exp,
+                                               std::string_view sv_name);
+
   struct ImportFrame {
     std::string_view sv_name;
     bool is_context = false;
