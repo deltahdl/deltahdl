@@ -179,4 +179,27 @@ TEST(DpiExportElab, ExportOfFunctionDefinedInDifferentModuleIsError) {
                             7, "35.7"));
 }
 
+// §35.7: "an export declaration is allowed only in the scope where the function
+// being exported is defined." A package body is a scope of its own, so an
+// export written there names a function that package must define, and a
+// function of that name defined in a module does not answer for it.
+TEST(DpiExportElab, ExportInAPackageOfAFunctionThePackageDoesNotDefineIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    package p;
+      export "DPI-C" function sv_f;
+    endpackage
+    module m;
+      function int sv_f(input int x);
+      endfunction
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export names 'sv_f', which is not a "
+                            "SystemVerilog function or task defined in the "
+                            "enclosing scope",
+                            3, "35.7"));
+}
+
 }  // namespace

@@ -176,4 +176,45 @@ TEST(DpiDeclElab, SignatureArgDirectionMismatchUnderSameLinkageIsError) {
                             6, "35.5.4"));
 }
 
+// §35.5.4: "For any given c_identifier ..., all declarations, regardless of
+// scope, shall have exactly the same type signature." A package body is one
+// such scope — A.1.11 makes dpi_import_export a package_item — so an import
+// declared there is compared against the declarations of its linkage name in
+// every other scope.
+TEST(DpiDeclElab, APackageImportJoinsTheSignatureAgreementForItsLinkageName) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      import "DPI-C" link = function int f(input int x);
+    endmodule
+    package p;
+      import "DPI-C" link = function int g(input bit x);
+    endpackage
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI declaration of linkage name 'link' disagrees "
+                            "with the earlier declaration's type signature",
+                            6, "35.5.4"));
+}
+
+// §35.5.4: "multiple imports of the same subroutine name into the same scope
+// are forbidden." The scope a package body makes is one scope for that rule.
+TEST(DpiDeclElab, DuplicateImportNameInOnePackageIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    package p;
+      import "DPI-C" a = function int dup(input int x);
+      import "DPI-C" b = function int dup(input int x);
+    endpackage
+    module m;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI import name 'dup' already declared in this "
+                            "scope",
+                            4, "35.5.4"));
+}
+
 }  // namespace

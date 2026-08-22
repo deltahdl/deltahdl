@@ -661,6 +661,11 @@ class Elaborator : public ElaboratorOperationRules {
   // §35.4: per-scope uniqueness for export declarations and global agreement
   // on the DPI version string across every declaration that shares a single
   // linkage identifier.
+  //
+  // Both walk each module declaration, each package body and the
+  // compilation-unit items, because A.1.11 makes a DPI import or export a
+  // package_item and each of the three is one scope for the rules stated over
+  // declarations "in the same scope".
   void ValidateDpiGlobalNameSpace();
 
   void ValidateTypenameAsElabConstant(const Expr* init);

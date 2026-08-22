@@ -141,4 +141,94 @@ TEST(DpiGlobalNameElab, ImportExportSameLinkageSameVersionStringIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §35.4's rules hold in every scope a DPI declaration can be written in. A.1.11
+// makes dpi_import_export a package_or_generate_item_declaration and so a
+// package_item, and §26.2 calls packages "explicitly named scopes", so a
+// package body is one scope for "in the same scope" exactly as a module
+// declaration is.
+TEST(DpiGlobalNameElab, DuplicateExportLinkageInOnePackageIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    package p;
+      function int sv_a(input int x);
+      endfunction
+      function int sv_b(input int x);
+      endfunction
+      export "DPI-C" link = function sv_a;
+      export "DPI-C" link = function sv_b;
+    endpackage
+    module m;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export linkage name 'link' already declared "
+                            "in this scope",
+                            8, "35.4"));
+}
+
+// §35.4: "Multiple export declarations are allowed with the same c_identifier
+// ... as long as they are in different scopes and have the equivalent type
+// signature." A package and a module are two scopes, so one export in each
+// under one linkage name is the permitted case and not the forbidden one.
+TEST(DpiGlobalNameElab, PackageAndModuleExportsOfOneLinkageAreDifferentScopes) {
+  ElabFixture f;
+  Elaborate(R"(
+    package p;
+      function int sv_a(input int x);
+      endfunction
+      export "DPI-C" link = function sv_a;
+    endpackage
+    module m;
+      function int sv_b(input int x);
+      endfunction
+      export "DPI-C" link = function sv_b;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §35.4: "all declarations using the same c_identifier shall be declared with
+// the same DPI version string syntax." The rule is stated over declarations
+// rather than over modules, so a package declaration is compared against the
+// module declarations sharing its linkage name rather than validated on its
+// own.
+TEST(DpiGlobalNameElab, APackageDeclarationJoinsTheVersionStringAgreement) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      import "DPI-C" link = function int f(input int x);
+    endmodule
+    package p;
+      import "DPI" link = function int g(input int x);
+    endpackage
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI linkage name 'link' was previously declared "
+                            "with version string",
+                            6, "35.4"));
+}
+
+// §35.4: §3.12.1 gives the compilation-unit scope "all declarations that lie
+// outside any other scope" and says it "can contain any item that can be
+// defined within a package", so a DPI declaration written outside every module
+// and package is in a scope of its own and is held to the same rules.
+TEST(DpiGlobalNameElab,
+     ACompilationUnitDeclarationJoinsTheVersionStringAgreement) {
+  ElabFixture f;
+  Elaborate(R"(
+    import "DPI" link = function int g(input int x);
+    module m;
+      import "DPI-C" link = function int f(input int x);
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI linkage name 'link' was previously declared "
+                            "with version string",
+                            2, "35.4"));
+}
+
 }  // namespace

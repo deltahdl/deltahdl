@@ -143,11 +143,13 @@ DpiExportSignature BuildDpiExportSignature(const ModuleItem* callable) {
 }
 
 // §35.5.4: "multiple imports of the same subroutine name into the same scope
-// are forbidden." We treat each module declaration as one scope, so this scans
-// a single module's items for repeated DPI import subroutine names.
-void CheckDuplicateImportNamesInScope(const ModuleDecl* mod, DiagEngine& diag) {
+// are forbidden." This scans the items of one scope for repeated DPI import
+// subroutine names. A module declaration, a package body and the compilation
+// unit are each one such scope.
+void CheckDuplicateImportNamesInScope(const std::vector<ModuleItem*>& items,
+                                      DiagEngine& diag) {
   std::unordered_set<std::string_view> sv_names_in_scope;
-  for (const auto* item : mod->items) {
+  for (const auto* item : items) {
     if (item == nullptr) continue;
     if (item->kind != ModuleItemKind::kDpiImport) continue;
     auto [it, inserted] = sv_names_in_scope.insert(item->name);
@@ -249,15 +251,16 @@ void AddImportedTypedefs(const ImportItem& import_item,
 // the following constructs: struct, union (packed forms only), unpacked array,
 // typedef", so a typedef name is permitted exactly where the type behind the
 // name is. Deciding that needs the typedefs visible to the declaration, and a
-// module-local one is not in the elaborator's compilation-unit table, so this
-// copies the outer table, adds every typedef the module declares, and adds
-// every typedef the module's import declarations name. One map then answers for
-// a module-local, an imported, a compilation-unit and a scope-qualified name
+// scope-local one is not in the elaborator's compilation-unit table, so this
+// copies the outer table, adds every typedef the scope declares, and adds every
+// typedef the scope's import declarations name. One map then answers for a
+// scope-local, an imported, a compilation-unit and a scope-qualified name
 // alike.
-TypedefMap DpiScopeTypedefs(const ModuleDecl* mod, const CompilationUnit* unit,
+TypedefMap DpiScopeTypedefs(const std::vector<ModuleItem*>& items,
+                            const CompilationUnit* unit,
                             const TypedefMap& outer) {
   TypedefMap typedefs = outer;
-  for (const auto* item : mod->items) {
+  for (const auto* item : items) {
     if (item == nullptr) continue;
     if (item->kind == ModuleItemKind::kTypedef) {
       typedefs[item->name] = item->typedef_type;
@@ -513,13 +516,13 @@ void CheckImportSignatureAgreement(
   }
 }
 
-// §35.4: index a module's SystemVerilog function and task declarations by name
+// §35.4: index one scope's SystemVerilog function and task declarations by name
 // so each export can look up the routine it names and obtain its signature for
 // the cross-scope equivalence check.
 std::unordered_map<std::string_view, const ModuleItem*> IndexSvCallables(
-    const ModuleDecl* mod) {
+    const std::vector<ModuleItem*>& items) {
   std::unordered_map<std::string_view, const ModuleItem*> sv_callables;
-  for (const auto* item : mod->items) {
+  for (const auto* item : items) {
     if (item == nullptr) continue;
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
@@ -577,6 +580,76 @@ void ProcessDpiGlobalNameItem(
   CheckDpiVersionStringAgreement(item, link_name, link_version, diag);
 }
 
+// §35.5.4: check one scope's import declarations, both against each other and
+// against every declaration of the same linkage name seen so far. The duplicate
+// subroutine names the clause forbids are a within-scope rule and the signature
+// agreement it requires holds "regardless of scope", so signatures and
+// first_decl_loc are threaded through every scope while the duplicate check
+// starts afresh in each.
+void CheckDpiScopeImportDeclarations(
+    const std::vector<ModuleItem*>& items,
+    std::unordered_map<std::string_view, DpiSignatureKey>& signatures,
+    std::unordered_map<std::string_view, SourceLoc>& first_decl_loc,
+    DiagEngine& diag) {
+  CheckDuplicateImportNamesInScope(items, diag);
+
+  for (const auto* item : items) {
+    if (item == nullptr) continue;
+    // Signature comparison applies to imports only — an export declaration
+    // carries no signature in its syntax (the signature comes from the
+    // SystemVerilog function being exported).
+    if (item->kind != ModuleItemKind::kDpiImport) continue;
+    CheckImportSignatureAgreement(item, signatures, first_decl_loc, diag);
+  }
+}
+
+// §35.4: run the global-name checks over one scope's DPI declarations.
+// export_signatures and link_version carry the rules the clause states across
+// scopes and are threaded through every call; the sets built here carry the
+// rules it states within one, and start afresh for each scope.
+void ValidateDpiScopeGlobalNames(
+    const std::vector<ModuleItem*>& items, const CompilationUnit* unit,
+    const TypedefMap& outer_typedefs,
+    std::unordered_map<std::string_view, DpiExportSignature>& export_signatures,
+    std::unordered_map<std::string_view, std::string_view>& link_version,
+    DiagEngine& diag) {
+  // Index this scope's SystemVerilog function and task declarations by name so
+  // each export can look up the routine it names and obtain its signature for
+  // the cross-scope equivalence check.
+  std::unordered_map<std::string_view, const ModuleItem*> sv_callables =
+      IndexSvCallables(items);
+
+  // §35.5.6 permits a typedef as a formal argument's type only where the type
+  // behind the name is permitted, so the checks below need the names this scope
+  // resolves. The outer table holds the compilation-unit, package- and
+  // class-qualified ones but no scope-local one, which this adds.
+  TypedefMap dpi_typedefs = DpiScopeTypedefs(items, unit, outer_typedefs);
+
+  // §35.4: multiple export declarations with the same c_identifier in the same
+  // scope are forbidden, so this tracks the export linkage names seen here.
+  std::unordered_set<std::string_view> export_link_in_scope;
+
+  // §35.7: "Only one export declaration is permitted per SystemVerilog
+  // function." Linkage-name deduplication catches the explicit/implicit
+  // c_identifier overlap from §35.4, but two exports of the same SV function
+  // with distinct c_identifiers would slip past that check. Tracking SV
+  // function names per scope catches that case directly.
+  std::unordered_set<std::string_view> exported_sv_func_in_scope;
+
+  ExportScopeContext scope{sv_callables, export_link_in_scope,
+                           exported_sv_func_in_scope, dpi_typedefs};
+
+  for (const auto* item : items) {
+    if (item == nullptr) continue;
+    if (item->kind != ModuleItemKind::kDpiImport &&
+        item->kind != ModuleItemKind::kDpiExport) {
+      continue;
+    }
+    ProcessDpiGlobalNameItem(item, scope, export_signatures, link_version,
+                             diag);
+  }
+}
+
 }  // namespace
 
 void Elaborator::ValidateDpiDeclarations() {
@@ -587,18 +660,16 @@ void Elaborator::ValidateDpiDeclarations() {
 
   for (const auto* mod : unit_->modules) {
     if (mod == nullptr) continue;
-
-    CheckDuplicateImportNamesInScope(mod, diag_);
-
-    for (const auto* item : mod->items) {
-      if (item == nullptr) continue;
-      // Signature comparison applies to imports only — an export declaration
-      // carries no signature in its syntax (the signature comes from the
-      // SystemVerilog function being exported).
-      if (item->kind != ModuleItemKind::kDpiImport) continue;
-      CheckImportSignatureAgreement(item, signatures, first_decl_loc, diag_);
-    }
+    CheckDpiScopeImportDeclarations(mod->items, signatures, first_decl_loc,
+                                    diag_);
   }
+  for (const auto* pkg : unit_->packages) {
+    if (pkg == nullptr) continue;
+    CheckDpiScopeImportDeclarations(pkg->items, signatures, first_decl_loc,
+                                    diag_);
+  }
+  CheckDpiScopeImportDeclarations(unit_->cu_items, signatures, first_decl_loc,
+                                  diag_);
 }
 
 void Elaborator::ValidateDpiGlobalNameSpace() {
@@ -616,47 +687,24 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
   // for cross-scope exports sharing one c_identifier.
   std::unordered_map<std::string_view, DpiExportSignature> export_signatures;
 
+  // §35.4's rules run over every scope a DPI declaration can be written in, not
+  // over modules alone. A.1.11 makes dpi_import_export a
+  // package_or_generate_item_declaration and so a package_item; §26.2 calls
+  // packages "explicitly named scopes"; and §3.12.1 gives the compilation-unit
+  // scope "all declarations that lie outside any other scope", adding that it
+  // "can contain any item that can be defined within a package".
   for (const auto* mod : unit_->modules) {
     if (mod == nullptr) continue;
-
-    // Index this module's SystemVerilog function and task declarations by
-    // name so each export can look up the routine it names and obtain its
-    // signature for the cross-scope equivalence check.
-    std::unordered_map<std::string_view, const ModuleItem*> sv_callables =
-        IndexSvCallables(mod);
-
-    // §35.5.6 permits a typedef as a formal argument's type only where the
-    // type behind the name is permitted, so the checks below need the names
-    // this scope resolves. typedefs_ holds the compilation-unit, package- and
-    // class-qualified ones at this point but no module-local one, which this
-    // adds.
-    TypedefMap dpi_typedefs = DpiScopeTypedefs(mod, unit_, typedefs_);
-
-    // §35.4: multiple export declarations with the same c_identifier in the
-    // same scope are forbidden. Each module declaration is one scope, so we
-    // track the set of export linkage names seen within this module.
-    std::unordered_set<std::string_view> export_link_in_scope;
-
-    // §35.7: "Only one export declaration is permitted per SystemVerilog
-    // function." Linkage-name deduplication catches the explicit/implicit
-    // c_identifier overlap from §35.4, but two exports of the same SV
-    // function with distinct c_identifiers would slip past that check.
-    // Tracking SV function names per scope catches that case directly.
-    std::unordered_set<std::string_view> exported_sv_func_in_scope;
-
-    ExportScopeContext scope{sv_callables, export_link_in_scope,
-                             exported_sv_func_in_scope, dpi_typedefs};
-
-    for (const auto* item : mod->items) {
-      if (item == nullptr) continue;
-      if (item->kind != ModuleItemKind::kDpiImport &&
-          item->kind != ModuleItemKind::kDpiExport) {
-        continue;
-      }
-      ProcessDpiGlobalNameItem(item, scope, export_signatures, link_version,
-                               diag_);
-    }
+    ValidateDpiScopeGlobalNames(mod->items, unit_, typedefs_, export_signatures,
+                                link_version, diag_);
   }
+  for (const auto* pkg : unit_->packages) {
+    if (pkg == nullptr) continue;
+    ValidateDpiScopeGlobalNames(pkg->items, unit_, typedefs_, export_signatures,
+                                link_version, diag_);
+  }
+  ValidateDpiScopeGlobalNames(unit_->cu_items, unit_, typedefs_,
+                              export_signatures, link_version, diag_);
 }
 
 namespace {
