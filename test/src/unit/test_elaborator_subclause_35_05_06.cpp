@@ -171,4 +171,100 @@ TEST(DpiExportFormalType, ExportedFunctionWithPackedUnionArgIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §35.5.6 permits "Types constructed from the supported types with the help of
+// the following constructs: struct, union (packed forms only), unpacked array,
+// typedef", so a typedef is permitted exactly where the type behind the name
+// is. The export path follows the name too: an event named through a typedef is
+// the event §35.5.6 leaves out of its permitted set.
+TEST(DpiExportFormalType, ExportedFunctionWithTypedefOfEventIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      typedef event ev_t;
+      function void sv_notify(input ev_t ev); endfunction
+      export "DPI-C" function sv_notify;
+    endmodule
+  )",
+            f, "m");
+  // The report stands at the export declaration, line 5 of the literal above,
+  // whose first line is the newline that follows R"(.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "SystemVerilog function 'sv_notify' has a formal "
+                            "argument 'ev' whose type is not permitted for DPI",
+                            5, "35.5.6"));
+}
+
+// §35.5.6 admits a typedef only as a construct built over the supported types,
+// so a name standing for an event names a type the permitted set leaves out and
+// the import is rejected exactly as the bare event would be.
+TEST(DpiImportFormalTypedefType, ImportedFunctionWithTypedefOfEventIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      typedef event ev_t;
+      import "DPI-C" function void f(input ev_t ev);
+    endmodule
+  )",
+            f, "m");
+  // The report stands at the import declaration, line 4 of the literal above,
+  // whose first line is the newline that follows R"(.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "formal argument 'ev' has type 'ev_t', which is "
+                            "not permitted for a DPI imported subroutine",
+                            4, "35.5.6"));
+}
+
+// §35.5.6 admits a union in its packed form only. Following the typedef name
+// reaches a union declared without `packed`, so the import is rejected and the
+// report names the type the argument was written with.
+TEST(DpiImportFormalTypedefType,
+     ImportedFunctionWithTypedefOfUnpackedUnionIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      typedef union { byte b; int i; } u_t;
+      import "DPI-C" function void f(input u_t u);
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "formal argument 'u' has type 'u_t', an unpacked "
+                            "union, which is not permitted for a DPI imported "
+                            "subroutine; only the packed form of a union is "
+                            "allowed",
+                            4, "35.5.6"));
+}
+
+// §35.5.6 lists `int` among the permitted types, and permits a typedef built
+// over a permitted type, so an import taking a name standing for `int` is
+// well-formed -- confirming the check follows the name rather than rejecting
+// every name it has to resolve.
+TEST(DpiImportFormalTypedefType, ImportedFunctionWithTypedefOfIntIsOk) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      typedef int my_int_t;
+      import "DPI-C" function void f(input my_int_t v);
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A formal argument named with a type the source declares nowhere resolves to
+// nothing, and §35.5.6 is a rule about the type a name stands for. So the rule
+// is left unenforced rather than enforced against a type it could not read, and
+// nothing is reported here under it.
+TEST(DpiImportFormalTypedefType,
+     ImportedFunctionWithUnresolvedTypeNameIsSilent) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      import "DPI-C" function void f(input some_unknown_t v);
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

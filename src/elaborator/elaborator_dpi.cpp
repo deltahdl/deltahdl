@@ -11,6 +11,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/let_construct.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "parser/parser_dpi_validate.h"
 
@@ -221,16 +222,95 @@ void CheckExportDynamicArrayArguments(const ModuleItem* callable,
   }
 }
 
+// §35.5.6 permits a type "constructed from the supported types with the help of
+// the following constructs: struct, union (packed forms only), unpacked array,
+// typedef", so a typedef name is permitted exactly where the type behind the
+// name is. Deciding that needs the typedefs visible to the declaration, and a
+// module-local one is not in the elaborator's compilation-unit table, so this
+// copies the outer table and adds every typedef the module declares. One map
+// then answers for a module-local, a compilation-unit and a scope-qualified
+// name alike.
+TypedefMap DpiScopeTypedefs(const ModuleDecl* mod, const TypedefMap& outer) {
+  TypedefMap typedefs = outer;
+  for (const auto* item : mod->items) {
+    if (item == nullptr) continue;
+    if (item->kind != ModuleItemKind::kTypedef) continue;
+    typedefs[item->name] = item->typedef_type;
+  }
+  return typedefs;
+}
+
+// §35.5.6: follow a formal argument's type name to the type it stands for, so
+// the clause's permitted set is applied to that type rather than to the name.
+// A built-in keyword wins over a table entry, and a name that resolves to
+// another name is followed in turn, under a depth bound because a typedef table
+// built from erroneous source can cycle. Returns the type reached, which is the
+// argument's own type when nothing resolved -- the prevailing treatment of an
+// unresolved name is to stay silent about it.
+DataType ResolveDpiFormalType(const DataType& type,
+                              const TypedefMap& typedefs) {
+  DataType dt = type;
+  for (int depth = 0; depth < 16 && dt.kind == DataTypeKind::kNamed; ++depth) {
+    DataType builtin = TypeNameToDataType(dt.type_name);
+    if (builtin.kind != DataTypeKind::kNamed) {
+      dt = builtin;
+      break;
+    }
+    auto it = typedefs.find(dt.type_name);
+    if (it == typedefs.end()) break;
+    dt = it->second;
+  }
+  return dt;
+}
+
+// §35.5.6: an imported subroutine's formal argument written as a typedef name
+// is permitted only where the type behind the name is. The parser holds every
+// such formal as a kNamed type and has no typedef table to look it up in, so
+// the rule is enforced here, over the names the enclosing scope resolves. A
+// name that does not resolve is left alone. The report names the typedef the
+// source wrote, which is what a reader has in front of them, and one import
+// reports once however many of its formals are at fault.
+void CheckImportFormalTypedefTypes(const ModuleItem* item,
+                                   const TypedefMap& typedefs,
+                                   DiagEngine& diag) {
+  for (const auto& arg : item->func_args) {
+    if (arg.data_type.kind != DataTypeKind::kNamed) continue;
+    DataType resolved = ResolveDpiFormalType(arg.data_type, typedefs);
+    if (resolved.kind == DataTypeKind::kNamed) continue;
+    DpiFormalTypeVerdict verdict = ClassifyDpiFormalType(resolved);
+    if (verdict == DpiFormalTypeVerdict::kPermitted) continue;
+    if (verdict == DpiFormalTypeVerdict::kUnpackedUnion) {
+      diag.Error(
+          item->loc,
+          std::format("formal argument '{}' has type '{}', an unpacked union, "
+                      "which is not permitted for a DPI imported subroutine; "
+                      "only the packed form of a union is allowed",
+                      arg.name, arg.data_type.type_name),
+          Subclause("35.5.6"));
+    } else {
+      diag.Error(item->loc,
+                 std::format("formal argument '{}' has type '{}', which is not "
+                             "permitted for a DPI imported subroutine",
+                             arg.name, arg.data_type.type_name),
+                 Subclause("35.5.6"));
+    }
+    break;
+  }
+}
+
 // §35.5.6: "The following SystemVerilog types are the only permitted types for
 // formal arguments of import and export subroutines". The clause names imports
 // and exports together, so the permitted set an exported subroutine's formals
 // are held to is the same one the import path applies, and both consult
-// ClassifyDpiFormalType for it. The dynamic array formal is a separate rule of
+// ClassifyDpiFormalType for it. A formal written as a typedef name is followed
+// to the type behind the name first, since the clause permits the name only
+// where that type is permitted. The dynamic array formal is a separate rule of
 // the same clause, checked by CheckExportDynamicArrayArguments.
 void CheckExportFormalTypes(const ModuleItem* callable, const ModuleItem* item,
-                            DiagEngine& diag) {
+                            const TypedefMap& typedefs, DiagEngine& diag) {
   for (const auto& arg : callable->func_args) {
-    DpiFormalTypeVerdict verdict = ClassifyDpiFormalType(arg.data_type);
+    DpiFormalTypeVerdict verdict =
+        ClassifyDpiFormalType(ResolveDpiFormalType(arg.data_type, typedefs));
     if (verdict == DpiFormalTypeVerdict::kPermitted) continue;
     if (verdict == DpiFormalTypeVerdict::kUnpackedUnion) {
       diag.Error(
@@ -330,11 +410,14 @@ void CheckExportDuplicateSvFunc(
 // the SystemVerilog function/task callables indexed by name plus the two
 // per-scope dedup sets the "forbidden in one scope" rules consult: the set of
 // export linkage names already seen and the set of SystemVerilog functions
-// already exported.
+// already exported. It carries the typedefs visible in the scope as well, since
+// §35.5.6 decides a formal argument written as a typedef name by the type the
+// name stands for.
 struct ExportScopeContext {
   const std::unordered_map<std::string_view, const ModuleItem*>& sv_callables;
   std::unordered_set<std::string_view>& export_link_in_scope;
   std::unordered_set<std::string_view>& exported_sv_func_in_scope;
+  const TypedefMap& typedefs;
 };
 
 // §35.4/§35.7: run the full battery of export-declaration checks for one export
@@ -367,7 +450,7 @@ void ValidateExportDeclaration(
   const ModuleItem* callable = callable_it->second;
   CheckExportRefArguments(callable, item, diag);
   CheckExportDynamicArrayArguments(callable, item, diag);
-  CheckExportFormalTypes(callable, item, diag);
+  CheckExportFormalTypes(callable, item, scope.typedefs, diag);
   CheckExportResultType(callable, item, diag);
   CheckExportSignatureEquivalence(callable, link_name, item, export_signatures,
                                   diag);
@@ -443,9 +526,10 @@ void CheckDpiVersionStringAgreement(
 
 // §35.4: validate one DPI declaration (import or export) against the global
 // linkage-name namespace. Export declarations additionally run the full
-// per-scope export battery via ValidateExportDeclaration; every DPI
-// declaration, import or export, contributes to the shared version-string
-// agreement check.
+// per-scope export battery via ValidateExportDeclaration, and import
+// declarations have their typedef-named formal arguments held to §35.5.6 here,
+// where the scope's typedefs are known; every DPI declaration, import or
+// export, contributes to the shared version-string agreement check.
 void ProcessDpiGlobalNameItem(
     const ModuleItem* item, ExportScopeContext& scope,
     std::unordered_map<std::string_view, DpiExportSignature>& export_signatures,
@@ -455,6 +539,10 @@ void ProcessDpiGlobalNameItem(
 
   if (item->kind == ModuleItemKind::kDpiExport) {
     ValidateExportDeclaration(item, link_name, scope, export_signatures, diag);
+  }
+
+  if (item->kind == ModuleItemKind::kDpiImport) {
+    CheckImportFormalTypedefTypes(item, scope.typedefs, diag);
   }
 
   CheckDpiVersionStringAgreement(item, link_name, link_version, diag);
@@ -508,6 +596,13 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
     std::unordered_map<std::string_view, const ModuleItem*> sv_callables =
         IndexSvCallables(mod);
 
+    // §35.5.6 permits a typedef as a formal argument's type only where the
+    // type behind the name is permitted, so the checks below need the names
+    // this scope resolves. typedefs_ holds the compilation-unit, package- and
+    // class-qualified ones at this point but no module-local one, which this
+    // adds.
+    TypedefMap dpi_typedefs = DpiScopeTypedefs(mod, typedefs_);
+
     // §35.4: multiple export declarations with the same c_identifier in the
     // same scope are forbidden. Each module declaration is one scope, so we
     // track the set of export linkage names seen within this module.
@@ -521,7 +616,7 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
     std::unordered_set<std::string_view> exported_sv_func_in_scope;
 
     ExportScopeContext scope{sv_callables, export_link_in_scope,
-                             exported_sv_func_in_scope};
+                             exported_sv_func_in_scope, dpi_typedefs};
 
     for (const auto* item : mod->items) {
       if (item == nullptr) continue;
