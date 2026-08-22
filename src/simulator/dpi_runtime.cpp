@@ -276,6 +276,9 @@ bool SameArgValue(const DpiArgValue& a, const DpiArgValue& b) {
 }  // namespace
 
 void DpiRuntime::RegisterImport(DpiRtFunction func) {
+  // §35.4: the declaration also resolves to a symbol in the global name space,
+  // under its linkage name rather than its SystemVerilog name.
+  import_global_index_.emplace(DpiGlobalName(func), imports_.size());
   import_index_[func.sv_name] = imports_.size();
   imports_.push_back(std::move(func));
 }
@@ -323,6 +326,9 @@ void DpiRuntime::RegisterExport(DpiRtExport exp) {
     export_scope_index_[ExportInstanceKey(exp.sv_name, exp.scope_name)] =
         exports_.size();
   }
+  // §35.4: the declaration also defines a symbol in the global name space,
+  // under its linkage name rather than its SystemVerilog name.
+  export_global_index_.emplace(DpiGlobalName(exp), exports_.size());
   export_index_[exp.sv_name] = exports_.size();
   exports_.push_back(std::move(exp));
 }

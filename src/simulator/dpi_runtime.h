@@ -143,6 +143,14 @@ struct DpiRtExport {
   bool is_task = false;
 };
 
+// §35.4: the name in the global name space that a declaration resolves to.
+// Every imported subroutine resolves to a global symbol and every exported one
+// defines a global symbol, named by the declaration's linkage name. "If a
+// global name is not explicitly given, it shall be the same as the
+// SystemVerilog subroutine name."
+std::string_view DpiGlobalName(const DpiRtFunction& func);
+std::string_view DpiGlobalName(const DpiRtExport& exp);
+
 // §35.5.3: outcome of attempting to call a SystemVerilog export from inside
 // a DPI import call chain. kOk means the call was permitted; kNoncontextChain
 // reports the §35.5.3 error of a noncontext import trying to invoke an
@@ -225,6 +233,29 @@ class DpiRuntime {
                                        std::string_view scope_name) const;
   bool HasExport(std::string_view sv_name) const;
   uint32_t ExportCount() const;
+
+  // §35.4: the declaration resolving to the global symbol `global_name`, or
+  // nullptr where none does. DPI subroutines "have their own global name space
+  // of linkage names, different from compilation-unit scope name space", so a
+  // SystemVerilog subroutine name is not a global name: a declaration giving a
+  // linkage name is reachable here under that name and under no other.
+  // FindImport and FindExport answer the other name space, keyed by the name
+  // SystemVerilog calls the subroutine.
+  const DpiRtFunction* FindImportByGlobalName(
+      std::string_view global_name) const;
+  const DpiRtExport* FindExportByGlobalName(std::string_view global_name) const;
+
+  // §35.4: whether any imported or exported subroutine resolves to the global
+  // symbol `global_name`. Imports and exports share one name space between
+  // them, so this answers for both kinds of declaration.
+  bool HasGlobalName(std::string_view global_name) const;
+
+  // §35.4: how many distinct global symbols the declarations registered here
+  // resolve to. "The same global subroutine can be referred to in multiple
+  // import declarations in different scopes or/and with different SystemVerilog
+  // names", so this falls below ImportCount() plus ExportCount() wherever
+  // declarations share a linkage name.
+  uint32_t GlobalNameCount() const;
 
   DpiArgValue CallImport(std::string_view sv_name,
                          const std::vector<DpiArgValue>& args) const;
@@ -466,6 +497,14 @@ class DpiRuntime {
   // subroutine has in several scopes stay separately reachable. export_index_
   // keys on the name alone and holds one of them.
   std::unordered_map<std::string, size_t> export_scope_index_;
+  // §35.4: the global name space imports and exports share, each linkage name
+  // held against the first declaration that resolved to it. A later declaration
+  // referring to one global subroutine does not displace the earlier one,
+  // because the two name one symbol rather than two. Keying on linkage names is
+  // what makes this a different name space from the SystemVerilog names
+  // import_index_ and export_index_ are keyed by.
+  std::unordered_map<std::string_view, size_t> import_global_index_;
+  std::unordered_map<std::string_view, size_t> export_global_index_;
   // §35.5.2: the value each pure import call computed, kept under the import's
   // name and the values its input arguments presented, so that a later call
   // presenting the same values can be answered from it.

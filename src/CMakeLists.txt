@@ -307,6 +307,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/coverage_db.cpp
     simulator/coverage_options.cpp
     simulator/dpi_runtime_assertion.cpp
+    simulator/dpi_runtime_global_names.cpp
     simulator/eval_array_locator.cpp
     simulator/eval_array_queue.cpp
     simulator/eval_function_args.cpp
