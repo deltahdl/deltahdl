@@ -251,16 +251,67 @@ TEST(DpiImportFormalTypedefType, ImportedFunctionWithTypedefOfIntIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A formal argument named with a type the source declares nowhere resolves to
-// nothing, and §35.5.6 is a rule about the type a name stands for. So the rule
-// is left unenforced rather than enforced against a type it could not read, and
-// nothing is reported here under it.
+// §26.3 makes a wildcard-imported package typedef nameable by its bare name, so
+// the name a formal argument is written with stands for the package's type and
+// §35.5.6 decides the argument on that type. The declaration is rejected here
+// exactly as one naming a module-local typedef of event is.
 TEST(DpiImportFormalTypedefType,
-     ImportedFunctionWithUnresolvedTypeNameIsSilent) {
+     ImportedFunctionWithWildcardImportedTypedefOfEventIsError) {
   ElabFixture f;
   Elaborate(R"(
+    package p;
+      typedef event ev_t;
+    endpackage
     module m;
-      import "DPI-C" function void f(input some_unknown_t v);
+      import p::*;
+      import "DPI-C" function void f(input ev_t ev);
+    endmodule
+  )",
+            f, "m");
+  // The report stands at the import declaration, line 7 of the literal above,
+  // whose first line is the newline that follows R"(.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "formal argument 'ev' has type 'ev_t', which is "
+                            "not permitted for a DPI imported subroutine",
+                            7, "35.5.6"));
+}
+
+// §26.3's explicit import names one item, and reaches the type behind that name
+// by a different arm from the wildcard form. A rule following only the wildcard
+// arm would leave this declaration accepted, so the two are asserted apart.
+TEST(DpiImportFormalTypedefType,
+     ImportedFunctionWithNamedImportedTypedefOfEventIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    package p;
+      typedef event ev_t;
+    endpackage
+    module m;
+      import p::ev_t;
+      import "DPI-C" function void f(input ev_t ev);
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "formal argument 'ev' has type 'ev_t', which is "
+                            "not permitted for a DPI imported subroutine",
+                            7, "35.5.6"));
+}
+
+// §35.5.6 permits a typedef built over a permitted type, and an import
+// declaration changes nothing about which types those are. A package typedef of
+// `int` reached through a wildcard import is therefore accepted, which is what
+// separates following the name from rejecting every imported one.
+TEST(DpiImportFormalTypedefType,
+     ImportedFunctionWithWildcardImportedTypedefOfIntIsOk) {
+  ElabFixture f;
+  Elaborate(R"(
+    package p;
+      typedef int my_int_t;
+    endpackage
+    module m;
+      import p::*;
+      import "DPI-C" function void f(input my_int_t v);
     endmodule
   )",
             f, "m");

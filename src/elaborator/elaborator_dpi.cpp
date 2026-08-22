@@ -222,20 +222,49 @@ void CheckExportDynamicArrayArguments(const ModuleItem* callable,
   }
 }
 
+// §26.3: an import declaration makes a package's typedef nameable in the
+// importing scope by its bare name, so a DPI formal argument written with that
+// name is a typedef reference the §35.5.6 check has to follow. The elaborator's
+// compilation-unit table holds a package typedef under its "pkg::name" key
+// alone, and the bare-name entry is added while the module is elaborated, which
+// is after ValidateDpiGlobalNameSpace has run. This adds the bare name for the
+// declaration in hand. A wildcard import brings every typedef of the package;
+// an explicit one brings the single name it states.
+void AddImportedTypedefs(const ImportItem& import_item,
+                         const CompilationUnit* unit, TypedefMap& typedefs) {
+  for (const auto* pkg : unit->packages) {
+    if (pkg->name != import_item.package_name) continue;
+    for (const auto* pi : pkg->items) {
+      if (pi->kind != ModuleItemKind::kTypedef) continue;
+      if (!import_item.is_wildcard && pi->name != import_item.item_name) {
+        continue;
+      }
+      typedefs[pi->name] = pi->typedef_type;
+    }
+    return;
+  }
+}
+
 // §35.5.6 permits a type "constructed from the supported types with the help of
 // the following constructs: struct, union (packed forms only), unpacked array,
 // typedef", so a typedef name is permitted exactly where the type behind the
 // name is. Deciding that needs the typedefs visible to the declaration, and a
 // module-local one is not in the elaborator's compilation-unit table, so this
-// copies the outer table and adds every typedef the module declares. One map
-// then answers for a module-local, a compilation-unit and a scope-qualified
-// name alike.
-TypedefMap DpiScopeTypedefs(const ModuleDecl* mod, const TypedefMap& outer) {
+// copies the outer table, adds every typedef the module declares, and adds
+// every typedef the module's import declarations name. One map then answers for
+// a module-local, an imported, a compilation-unit and a scope-qualified name
+// alike.
+TypedefMap DpiScopeTypedefs(const ModuleDecl* mod, const CompilationUnit* unit,
+                            const TypedefMap& outer) {
   TypedefMap typedefs = outer;
   for (const auto* item : mod->items) {
     if (item == nullptr) continue;
-    if (item->kind != ModuleItemKind::kTypedef) continue;
-    typedefs[item->name] = item->typedef_type;
+    if (item->kind == ModuleItemKind::kTypedef) {
+      typedefs[item->name] = item->typedef_type;
+      continue;
+    }
+    if (item->kind != ModuleItemKind::kImportDecl) continue;
+    AddImportedTypedefs(item->import_item, unit, typedefs);
   }
   return typedefs;
 }
@@ -601,7 +630,7 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
     // this scope resolves. typedefs_ holds the compilation-unit, package- and
     // class-qualified ones at this point but no module-local one, which this
     // adds.
-    TypedefMap dpi_typedefs = DpiScopeTypedefs(mod, typedefs_);
+    TypedefMap dpi_typedefs = DpiScopeTypedefs(mod, unit_, typedefs_);
 
     // §35.4: multiple export declarations with the same c_identifier in the
     // same scope are forbidden. Each module declaration is one scope, so we
