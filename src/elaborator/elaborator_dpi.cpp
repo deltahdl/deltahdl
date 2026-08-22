@@ -480,6 +480,19 @@ void ValidateExportDeclaration(
   }
 
   const ModuleItem* callable = callable_it->second;
+  if (!callable->method_class.empty()) {
+    // §35.7: "Class member functions cannot be exported, but all other
+    // SystemVerilog functions can be exported." An out-of-block method
+    // definition is written in the scope its class is declared in and carries
+    // the bare method name, so it is indexed among the scope's callables and an
+    // export naming it would otherwise attach to it.
+    diag.Error(item->loc,
+               std::format("SystemVerilog function '{}' is a member of class "
+                           "'{}' and class member functions cannot be exported",
+                           item->name, callable->method_class),
+               Subclause("35.7"));
+    return;
+  }
   CheckExportRefArguments(callable, item, diag);
   CheckExportDynamicArrayArguments(callable, item, diag);
   CheckExportFormalTypes(callable, item, scope.typedefs, diag);
@@ -656,6 +669,31 @@ void ValidateDpiScopeGlobalNames(const std::vector<ModuleItem*>& items,
   }
 }
 
+// §35.4 and §35.7 state their rules over the scope a DPI declaration is written
+// in, so this returns the item list of every scope one can be written in.
+// A.1.11 makes dpi_import_export a package_or_generate_item_declaration and so
+// a package_item, and A.1.4's module_common_item carries the same production
+// into a module, an interface, a program and a checker; the parser fills all
+// four through Parser::ParseModuleItem and a package body through it as well.
+// §3.12.1's compilation-unit scope holds "all declarations that lie outside any
+// other scope" and comes last, since a declaration reaches it only by being in
+// none of the others.
+std::vector<const std::vector<ModuleItem*>*> DpiDeclarationScopes(
+    const CompilationUnit* unit) {
+  std::vector<const std::vector<ModuleItem*>*> scopes;
+  for (const auto* group :
+       {&unit->modules, &unit->interfaces, &unit->programs, &unit->checkers}) {
+    for (const auto* decl : *group) {
+      if (decl != nullptr) scopes.push_back(&decl->items);
+    }
+  }
+  for (const auto* pkg : unit->packages) {
+    if (pkg != nullptr) scopes.push_back(&pkg->items);
+  }
+  scopes.push_back(&unit->cu_items);
+  return scopes;
+}
+
 }  // namespace
 
 void Elaborator::ValidateDpiDeclarations() {
@@ -664,18 +702,9 @@ void Elaborator::ValidateDpiDeclarations() {
   std::unordered_map<std::string_view, DpiSignatureKey> signatures;
   std::unordered_map<std::string_view, SourceLoc> first_decl_loc;
 
-  for (const auto* mod : unit_->modules) {
-    if (mod == nullptr) continue;
-    CheckDpiScopeImportDeclarations(mod->items, signatures, first_decl_loc,
-                                    diag_);
+  for (const auto* items : DpiDeclarationScopes(unit_)) {
+    CheckDpiScopeImportDeclarations(*items, signatures, first_decl_loc, diag_);
   }
-  for (const auto* pkg : unit_->packages) {
-    if (pkg == nullptr) continue;
-    CheckDpiScopeImportDeclarations(pkg->items, signatures, first_decl_loc,
-                                    diag_);
-  }
-  CheckDpiScopeImportDeclarations(unit_->cu_items, signatures, first_decl_loc,
-                                  diag_);
 }
 
 void Elaborator::ValidateDpiGlobalNameSpace() {
@@ -693,23 +722,11 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
   // for cross-scope exports sharing one c_identifier.
   std::unordered_map<std::string_view, DpiExportSignature> export_signatures;
 
-  // §35.4's rules run over every scope a DPI declaration can be written in, not
-  // over modules alone. A.1.11 makes dpi_import_export a
-  // package_or_generate_item_declaration and so a package_item; §26.2 calls
-  // packages "explicitly named scopes"; and §3.12.1 gives the compilation-unit
-  // scope "all declarations that lie outside any other scope", adding that it
-  // "can contain any item that can be defined within a package".
   DpiGlobalNameSpace global{link_version, export_signatures};
 
-  for (const auto* mod : unit_->modules) {
-    if (mod == nullptr) continue;
-    ValidateDpiScopeGlobalNames(mod->items, unit_, typedefs_, global, diag_);
+  for (const auto* items : DpiDeclarationScopes(unit_)) {
+    ValidateDpiScopeGlobalNames(*items, unit_, typedefs_, global, diag_);
   }
-  for (const auto* pkg : unit_->packages) {
-    if (pkg == nullptr) continue;
-    ValidateDpiScopeGlobalNames(pkg->items, unit_, typedefs_, global, diag_);
-  }
-  ValidateDpiScopeGlobalNames(unit_->cu_items, unit_, typedefs_, global, diag_);
 }
 
 namespace {

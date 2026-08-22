@@ -481,6 +481,16 @@ struct RtlirModule {
   // src/simulator/lowerer_register.cpp registers let_decls and would otherwise
   // answer an import's name with a let expansion of nothing.
   std::vector<ModuleItem*> dpi_import_decls;
+  // §35.7's exported subroutines, declared in this module. §35.7 states that
+  // "Declaring a SystemVerilog function to be exported does not change its
+  // semantics or behavior from the SystemVerilog perspective; there is no
+  // effect on SystemVerilog usage other than making it possible for foreign
+  // language tasks and functions in a DPI call-chain to call the exported
+  // function", and an export declaration held in let_decls breaches that: it
+  // carries no expression to substitute, so RegisterModuleSubroutines in
+  // src/simulator/lowerer_register.cpp would answer the exported subroutine's
+  // own name with a let expansion of nothing, ahead of the function itself.
+  std::vector<ModuleItem*> dpi_export_decls;
   std::vector<ModuleItem*> sequence_decls;
   std::vector<ClassDecl*> class_decls;
   std::vector<RtlirImport> imports;

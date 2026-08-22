@@ -202,4 +202,98 @@ TEST(DpiExportElab, ExportInAPackageOfAFunctionThePackageDoesNotDefineIsError) {
                             3, "35.7"));
 }
 
+// §35.7: "Declaring a SystemVerilog function to be exported does not change its
+// semantics or behavior from the SystemVerilog perspective." The elaborator
+// keeps the export declaration out of the module's let declarations, whose
+// entries a run resolves a call to before it reaches a function, so the
+// exported function stays the thing its own name calls.
+TEST(DpiExportElab, AnExportDeclarationIsNotAmongTheLetDeclarations) {
+  ElabFixture f;
+  auto* design = Elaborate(R"(
+    module m;
+      function int sv_func();
+      endfunction
+      export "DPI-C" function sv_func;
+    endmodule
+  )",
+                           f, "m");
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  for (const ModuleItem* item : design->top_modules[0]->let_decls) {
+    EXPECT_NE(item->kind, ModuleItemKind::kDpiExport);
+  }
+}
+
+// The other half of that rule: the export declaration is still elaborated, and
+// is reachable where §35.7's exports are held. Without this the case above
+// would hold of an elaborator that dropped the declaration entirely.
+TEST(DpiExportElab, AnExportDeclarationIsAmongTheExportDeclarations) {
+  ElabFixture f;
+  auto* design = Elaborate(R"(
+    module m;
+      function int sv_func();
+      endfunction
+      export "DPI-C" function sv_func;
+    endmodule
+  )",
+                           f, "m");
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  bool carries_export = false;
+  for (const ModuleItem* item : design->top_modules[0]->dpi_export_decls) {
+    if (item->kind == ModuleItemKind::kDpiExport && item->name == "sv_func") {
+      carries_export = true;
+    }
+  }
+  EXPECT_TRUE(carries_export);
+}
+
+// §35.7: "Class member functions cannot be exported, but all other
+// SystemVerilog functions can be exported." §8.24 writes an out-of-block method
+// body in the scope its class is declared in, under the bare method name, so
+// such a definition sits among the scope's callables and an export naming it
+// reaches a class member function.
+TEST(DpiExportElab, ExportOfAnOutOfBlockClassMethodIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      class C;
+        extern function int foo();
+      endclass
+      function int C::foo();
+        return 42;
+      endfunction
+      export "DPI-C" function foo;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "SystemVerilog function 'foo' is a member of class "
+                            "'C' and class member functions cannot be exported",
+                            9, "35.7"));
+}
+
+// §35.7: "Export declarations are allowed to occur only in the scope in which
+// the function being exported is defined." An interface is such a scope —
+// A.1.4's module_common_item carries dpi_import_export into an interface body —
+// so an export written in one names a function that interface must define.
+TEST(DpiExportElab, ExportInAnInterfaceOfAFunctionItDoesNotDefineIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    interface i;
+      export "DPI-C" function sv_func;
+    endinterface
+    module m;
+      function int sv_func();
+      endfunction
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export names 'sv_func', which is not a "
+                            "SystemVerilog function or task defined in the "
+                            "enclosing scope",
+                            3, "35.7"));
+}
+
 }  // namespace

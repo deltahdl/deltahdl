@@ -62,4 +62,46 @@ TEST(DpiRuntime, RegisteredExportIsAlwaysContext) {
   EXPECT_TRUE(stored->is_context);
 }
 
+// §35.7: "Declaring a SystemVerilog function to be exported does not change its
+// semantics or behavior from the SystemVerilog perspective; there is no effect
+// on SystemVerilog usage other than making it possible for foreign language
+// tasks and functions in a DPI call-chain to call the exported function." So a
+// SystemVerilog call to an exported function returns what the function returns,
+// exactly as it would without the export declaration.
+TEST(DpiExportedFunctionInADesign, ACallToAnExportedFunctionReturnsItsResult) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int x;\n"
+      "  function int five();\n"
+      "    return 5;\n"
+      "  endfunction\n"
+      "  export \"DPI-C\" function five;\n"
+      "  initial x = five();\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 5u);
+}
+
+// The same rule holds of the arguments a call passes: exporting the function
+// leaves the actual reaching the formal and the result computed from it. Five
+// is what the case above returns from a body that reads nothing, so this one
+// varies the actual to keep the answer out of the body.
+TEST(DpiExportedFunctionInADesign, AnExportedFunctionStillReadsItsArguments) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int x;\n"
+      "  function int twice(input int v);\n"
+      "    return v + v;\n"
+      "  endfunction\n"
+      "  export \"DPI-C\" function twice;\n"
+      "  initial x = twice(21);\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
 }  // namespace

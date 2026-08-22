@@ -819,7 +819,10 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       mod->let_decls.push_back(item);
       return true;
     case ModuleItemKind::kDpiExport:
-      mod->let_decls.push_back(item);
+      // §35.7: an export declaration has no effect on SystemVerilog usage of
+      // the subroutine it names, so it is held apart from let_decls, whose
+      // entries the run resolves a call to before it reaches a function.
+      mod->dpi_export_decls.push_back(item);
       return true;
     default:
       return ElaborateAssertionItem(item, mod);
