@@ -373,8 +373,16 @@ static void CheckParenOmittedCall(
   auto it = func_decls.find(s->expr->text);
   if (it == func_decls.end()) return;
   const auto* func = it->second;
-  bool is_task = func->kind == ModuleItemKind::kTaskDecl;
-  bool is_void_func = func->kind == ModuleItemKind::kFunctionDecl &&
+  // §35.5: "The usage of imported functions is similar as for native
+  // SystemVerilog functions", so §13.5.5 decides an imported subroutine's
+  // paren-omitted call by what §35.5.4 declared it as. A task is a task by its
+  // keyword, and a function is void by the result type §35.5.5 required it to
+  // state.
+  bool is_import = func->kind == ModuleItemKind::kDpiImport;
+  bool is_task = func->kind == ModuleItemKind::kTaskDecl ||
+                 (is_import && func->dpi_is_task);
+  bool is_void_func = (func->kind == ModuleItemKind::kFunctionDecl ||
+                       (is_import && !func->dpi_is_task)) &&
                       func->return_type.kind == DataTypeKind::kVoid;
   if (!is_task && !is_void_func) {
     diag.Error(s->expr->range.start,
@@ -414,7 +422,12 @@ static void CheckDiscardedCallStmt(
   auto fit = func_decls.find(s->expr->callee);
   if (fit == func_decls.end()) return;
   const auto* func = fit->second;
-  if (func->kind == ModuleItemKind::kFunctionDecl &&
+  // §35.5 makes an imported function's usage that of a native one, so §13.4.1's
+  // warning about a discarded result covers a call to one. An imported task is
+  // excluded by its keyword: §35.5.4 writes no result type for one, so its
+  // result type would otherwise read as a non-void type here.
+  if ((func->kind == ModuleItemKind::kFunctionDecl ||
+       (func->kind == ModuleItemKind::kDpiImport && !func->dpi_is_task)) &&
       func->return_type.kind != DataTypeKind::kVoid) {
     diag.Warning(
         s->expr->range.start,

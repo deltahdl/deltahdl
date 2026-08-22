@@ -241,4 +241,77 @@ TEST(DpiImportClassification, ALetDeclarationStaysAmongTheLetDeclarations) {
   EXPECT_TRUE(carries_let);
 }
 
+// §13.4.1 warns that a non-void function called as a statement discards its
+// result, and §35.5 makes an imported function's usage that of a native one, so
+// the warning covers a call to one.
+TEST(DpiImportCallArgs, ADiscardedImportedFunctionResultIsWarnedAbout) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      import "DPI-C" function int sv_f(input int a);
+      initial sv_f(1);
+    endmodule
+  )",
+            f, "m");
+  // The report stands at the call, line 4 of the literal above, whose first
+  // line is the newline that follows R"(.
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "return value of nonvoid function 'sv_f' is "
+                              "discarded; cast to void to silence this warning",
+                              4, "13.4.1"));
+}
+
+// §13.5.5 permits the parentheses of a call to be omitted only for a task or a
+// void function. §35.5.5 has an imported function state its result type, so a
+// non-void one is decided by that type here as a native function is.
+TEST(DpiImportCallArgs, ParenthesesCannotBeOmittedOnANonvoidImportedFunction) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      import "DPI-C" function int sv_f(input int a);
+      initial sv_f;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cannot omit parentheses in call to nonvoid function 'sv_f'", 4,
+      "13.5.5"));
+}
+
+// §13.5.5's second condition: the parentheses may be omitted only where every
+// formal has a default. An imported task passes the first condition by the
+// keyword §35.5.4 declared it with and is decided by this one, which is why it
+// is asserted apart from the case above.
+TEST(DpiImportCallArgs,
+     ParenthesesCannotBeOmittedWhenAnImportedTaskNeedsAnArg) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      import "DPI-C" task sv_wait(input int cycles);
+      initial sv_wait;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot omit parentheses in call to 'sv_wait': not "
+                            "all formal arguments have defaults",
+                            4, "13.5.5"));
+}
+
+// §13.5.5 is satisfied where the imported task's every formal has a default, so
+// the omission stands. Without this a repair rejecting every paren-omitted call
+// to an import would satisfy the two cases above.
+TEST(DpiImportCallArgs, ParenthesesMayBeOmittedOnAnImportedTaskWithDefaults) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      import "DPI-C" task sv_wait(input int cycles = 1);
+      initial sv_wait;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
