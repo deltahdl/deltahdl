@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <iostream>
 #include <list>
 #include <map>
 #include <string>
@@ -628,6 +629,16 @@ void DpiRuntime::EnterDeclaredImportCall(std::string_view sv_name,
 
 void DpiRuntime::LeaveImportCall() {
   if (call_chain_.empty()) return;
+  // §35.9 item c): an imported function returning due to a disable shall have
+  // called svAckDisabledState() before returning. This frame popping is that
+  // return, and the acknowledgement is thread state the function has either set
+  // or not, so the check §35.9 requires of a simulator is made here rather than
+  // left to whatever drives the call. Item b) is checked by
+  // VerifyImportReturnUnderDisable instead, because the int an imported task
+  // returns is not something a frame carries.
+  if (!call_chain_.back().is_task) {
+    VerifyImportFunctionReturnUnderDisable(call_chain_.back().sv_name);
+  }
   bool had_context = call_chain_.back().is_context;
   const DpiScope* entry_scope = call_chain_.back().entry_scope;
   bool entry_scope_from_stack = call_chain_.back().entry_scope_from_stack;
@@ -687,6 +698,15 @@ DpiExportCallStatus DpiRuntime::CallExportFromImport(
   // subroutines. This applies whatever the chain's context property or the kind
   // of export, so it is checked ahead of the §35.8 and §35.5.3 rules.
   if (DpiCurrentDisabledState()) {
+    // §35.9: the simulator checks item d) and issues a fatal simulation error
+    // where it is not followed. The export is not entered either way, so no
+    // work the disabled subroutine asked for is done.
+    std::string caller(call_chain_.empty() ? std::string_view()
+                                           : call_chain_.back().sv_name);
+    IssueDisableProtocolFatalError("35.9 item d): imported subroutine '" +
+                                   caller + "' called exported subroutine '" +
+                                   std::string(sv_name) +
+                                   "' after entering the disabled state");
     return DpiExportCallStatus::kDisabledStateExportCall;
   }
   // §35.8: it is never legal to call an exported task from within an imported
@@ -772,6 +792,66 @@ bool DpiRuntime::CheckImportedSubroutineDisableReturn(
   // item c): an imported function returning due to a disable shall have
   // acknowledged it by calling svAckDisabledState() first.
   return DpiCurrentDisableAcknowledged();
+}
+
+bool DpiRuntime::VerifyImportTaskReturnUnderDisable(std::string_view sv_name,
+                                                    int task_return_value) {
+  if (CheckImportedSubroutineDisableReturn(/*is_task=*/true,
+                                           task_return_value)) {
+    return true;
+  }
+  IssueDisableProtocolFatalError(
+      "35.9 item b): imported task '" + std::string(sv_name) + "' returned " +
+      std::to_string(task_return_value) +
+      " while a disable was in effect; a task returning due to a disable shall "
+      "return 1");
+  return false;
+}
+
+bool DpiRuntime::VerifyImportFunctionReturnUnderDisable(
+    std::string_view sv_name) {
+  if (CheckImportedSubroutineDisableReturn(/*is_task=*/false,
+                                           /*task_return_value=*/0)) {
+    return true;
+  }
+  IssueDisableProtocolFatalError(
+      "35.9 item c): imported function '" + std::string(sv_name) +
+      "' returned while a disable was in effect without having called "
+      "svAckDisabledState()");
+  return false;
+}
+
+bool DpiRuntime::VerifyImportReturnUnderDisable(int task_return_value) {
+  // §35.9: the protocol governs an imported subroutine that returns while a
+  // disable is in effect. With no import call open there is no such return.
+  if (call_chain_.empty()) return true;
+  std::string_view sv_name = call_chain_.back().sv_name;
+  if (call_chain_.back().is_task) {
+    return VerifyImportTaskReturnUnderDisable(sv_name, task_return_value);
+  }
+  return VerifyImportFunctionReturnUnderDisable(sv_name);
+}
+
+void DpiRuntime::IssueDisableProtocolFatalError(const std::string& message) {
+  // §35.9: "If any protocol item is not correctly followed, a fatal simulation
+  // error is issued." The first violation is the error that ends the run, so it
+  // is the one recorded and reported; a later violation is reached only because
+  // this runtime cannot halt the caller itself, and adds nothing.
+  if (disable_protocol_fatal_) return;
+  disable_protocol_fatal_ = true;
+  disable_protocol_fatal_message_ = message;
+  // FATAL is the severity word §20.10's $fatal prints and std::cerr is the
+  // stream it prints on, so a disable-protocol violation reads like any other
+  // fatal simulation error.
+  std::cerr << "FATAL: " << message << "\n";
+}
+
+bool DpiRuntime::DisableProtocolFatalErrorIssued() const {
+  return disable_protocol_fatal_;
+}
+
+const std::string& DpiRuntime::DisableProtocolFatalError() const {
+  return disable_protocol_fatal_message_;
 }
 
 void CoverageApi::SetControl(CoverageControl ctrl) { control_ = ctrl; }

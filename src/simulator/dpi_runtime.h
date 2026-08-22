@@ -351,6 +351,28 @@ class DpiRuntime {
   bool CheckImportedSubroutineDisableReturn(bool is_task,
                                             int task_return_value) const;
 
+  // §35.9 items b) and c): verify that the imported subroutine whose call frame
+  // is innermost followed the disable protocol on its return, and issue the
+  // fatal simulation error §35.9 mandates where it did not. §35.9 makes items
+  // b), c) and d) the responsibility of the DPI programmer and requires a
+  // simulator to check them, so a violation is reported rather than corrected.
+  // `task_return_value` is the int an imported task returns and is ignored when
+  // the innermost frame belongs to an imported function. Call this before
+  // LeaveImportCall, which pops the frame naming which of the two returned.
+  // With no import call open there is no return to verify and the result is
+  // true. LeaveImportCall makes the item c) check on its own, because the
+  // acknowledgement is thread state the function has either set or not; only
+  // item b) needs a value no frame carries.
+  bool VerifyImportReturnUnderDisable(int task_return_value);
+
+  // §35.9: whether a fatal simulation error has been issued for a violation of
+  // the disable protocol, and the text it carried. §35.9 leaves no discretion
+  // here — "if any protocol item is not correctly followed, a fatal simulation
+  // error is issued" — so a caller driving this runtime halts the run once this
+  // reports true.
+  bool DisableProtocolFatalErrorIssued() const;
+  const std::string& DisableProtocolFatalError() const;
+
   static uint32_t SvLow(const SvOpenArrayHandle& h);
   static uint32_t SvHigh(const SvOpenArrayHandle& h);
   static uint32_t SvSize(const SvOpenArrayHandle& h);
@@ -367,6 +389,21 @@ class DpiRuntime {
                                                    uint32_t elem_width);
 
  private:
+  // §35.9 item b): an imported task returning due to a disable shall return 1.
+  // Issues the fatal simulation error and returns false when it returned
+  // anything else.
+  bool VerifyImportTaskReturnUnderDisable(std::string_view sv_name,
+                                          int task_return_value);
+
+  // §35.9 item c): an imported function returning due to a disable shall have
+  // called svAckDisabledState() first. Issues the fatal simulation error and
+  // returns false when it did not.
+  bool VerifyImportFunctionReturnUnderDisable(std::string_view sv_name);
+
+  // §35.9: report and record the fatal simulation error a disable-protocol
+  // violation issues.
+  void IssueDisableProtocolFatalError(const std::string& message);
+
   struct ImportFrame {
     std::string_view sv_name;
     bool is_context = false;
@@ -404,6 +441,11 @@ class DpiRuntime {
   std::vector<DpiScope> scope_stack_;
   const DpiScope* current_scope_ = nullptr;
   std::vector<ImportFrame> call_chain_;
+  // §35.9: whether a disable-protocol violation has issued its fatal simulation
+  // error, and the message of the first one, which is the error that ends the
+  // run.
+  bool disable_protocol_fatal_ = false;
+  std::string disable_protocol_fatal_message_;
 };
 
 enum class AssertionSeverity : uint8_t {

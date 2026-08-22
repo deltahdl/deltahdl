@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
 #include "parser/ast.h"
@@ -398,6 +399,171 @@ TEST(DpiDisableProtocol, ACallAfterADisabledChainPropagatesItsOutputArgument) {
 
   EXPECT_EQ(actuals[0].AsInt(), 222);
   EXPECT_EQ(result.AsInt(), 444);
+}
+
+// §35.9 item b): an imported task returning due to a disable shall return 1.
+// Returning 0 is the violation the clause has a simulator check, and "if any
+// protocol item is not correctly followed, a fatal simulation error is issued".
+TEST(DpiDisableProtocol, ImportedTaskReturningZeroUnderADisableIsFatal) {
+  ResetDisableState();
+  DpiRuntime rt;
+
+  rt.EnterNoncontextImportCall("imp_task", /*is_task=*/true);
+  rt.ReturnFromExportUnderDisable(DpiDisableTarget::kAncestor);
+
+  testing::internal::CaptureStderr();
+  bool ok = rt.VerifyImportReturnUnderDisable(/*task_return_value=*/0);
+  testing::internal::GetCapturedStderr();
+
+  EXPECT_FALSE(ok);
+  EXPECT_TRUE(rt.DisableProtocolFatalErrorIssued());
+  EXPECT_NE(rt.DisableProtocolFatalError().find("35.9 item b)"),
+            std::string::npos);
+  ResetDisableState();
+}
+
+// §35.9 item b) is followed when the imported task returns 1, so no fatal
+// simulation error is issued and the run continues.
+TEST(DpiDisableProtocol, ImportedTaskReturningOneUnderADisableIsNotFatal) {
+  ResetDisableState();
+  DpiRuntime rt;
+
+  rt.EnterNoncontextImportCall("imp_task", /*is_task=*/true);
+  rt.ReturnFromExportUnderDisable(DpiDisableTarget::kAncestor);
+
+  EXPECT_TRUE(rt.VerifyImportReturnUnderDisable(/*task_return_value=*/1));
+  EXPECT_FALSE(rt.DisableProtocolFatalErrorIssued());
+  ResetDisableState();
+}
+
+// §35.9 item c): an imported function returning due to a disable shall call
+// svAckDisabledState() first. The return is the frame leaving the call chain,
+// so the check is made there and needs nothing from the caller.
+TEST(DpiDisableProtocol, ImportedFunctionReturningUnacknowledgedIsFatal) {
+  ResetDisableState();
+  DpiRuntime rt;
+
+  rt.EnterNoncontextImportCall("imp_func", /*is_task=*/false);
+  rt.ReturnFromExportUnderDisable(DpiDisableTarget::kAncestor);
+
+  testing::internal::CaptureStderr();
+  rt.LeaveImportCall();
+  testing::internal::GetCapturedStderr();
+
+  EXPECT_TRUE(rt.DisableProtocolFatalErrorIssued());
+  EXPECT_NE(rt.DisableProtocolFatalError().find("35.9 item c)"),
+            std::string::npos);
+  ResetDisableState();
+}
+
+// §35.9 item c) is followed when the imported function acknowledges the disable
+// before it returns, so its return issues no fatal simulation error.
+TEST(DpiDisableProtocol, ImportedFunctionThatAcknowledgedIsNotFatal) {
+  ResetDisableState();
+  DpiRuntime rt;
+
+  rt.EnterNoncontextImportCall("imp_func", /*is_task=*/false);
+  rt.ReturnFromExportUnderDisable(DpiDisableTarget::kAncestor);
+  svAckDisabledState();
+  rt.LeaveImportCall();
+
+  EXPECT_FALSE(rt.DisableProtocolFatalErrorIssued());
+  ResetDisableState();
+}
+
+// §35.9 item d): an imported subroutine in the disabled state making a further
+// call to an exported subroutine is a violation, and the clause has the
+// simulator issue a fatal simulation error for it rather than only refuse the
+// call.
+TEST(DpiDisableProtocol, ExportCallFromADisabledImportIsFatal) {
+  ResetDisableState();
+  DpiRuntime rt;
+  DpiRtExport exp;
+  exp.c_name = "c_export";
+  exp.sv_name = "sv_export";
+  exp.impl = [](const std::vector<DpiArgValue>&) {
+    return DpiArgValue::FromInt(0);
+  };
+  rt.RegisterExport(exp);
+
+  DpiScope sc;
+  sc.name = "top";
+  rt.EnterContextImportCall("ctx_import", sc, /*is_task=*/false);
+  rt.ReturnFromExportUnderDisable(DpiDisableTarget::kAncestor);
+
+  testing::internal::CaptureStderr();
+  DpiArgValue result;
+  rt.CallExportFromImport("sv_export", {}, &result);
+  testing::internal::GetCapturedStderr();
+
+  EXPECT_TRUE(rt.DisableProtocolFatalErrorIssued());
+  EXPECT_NE(rt.DisableProtocolFatalError().find("35.9 item d)"),
+            std::string::npos);
+  ResetDisableState();
+}
+
+// §35.9 requires the violation to be issued as a fatal simulation error rather
+// than only recorded, so it is written to the stream and under the severity
+// word §20.10 gives $fatal.
+TEST(DpiDisableProtocol, TheDisableProtocolFatalErrorReachesTheErrorStream) {
+  ResetDisableState();
+  DpiRuntime rt;
+
+  rt.EnterNoncontextImportCall("imp_task", /*is_task=*/true);
+  rt.ReturnFromExportUnderDisable(DpiDisableTarget::kAncestor);
+
+  testing::internal::CaptureStderr();
+  rt.VerifyImportReturnUnderDisable(/*task_return_value=*/0);
+  std::string err = testing::internal::GetCapturedStderr();
+
+  EXPECT_NE(err.find("FATAL: 35.9 item b)"), std::string::npos);
+  ResetDisableState();
+}
+
+// §35.9's checks apply to a subroutine returning while a disable is in effect.
+// An imported task returning with none in effect returns whatever it returns,
+// so nothing is verified and no fatal simulation error is issued.
+TEST(DpiDisableProtocol, AReturnWithNoDisableInEffectIsNotFatal) {
+  ResetDisableState();
+  DpiRuntime rt;
+
+  rt.EnterNoncontextImportCall("imp_task", /*is_task=*/true);
+
+  EXPECT_TRUE(rt.VerifyImportReturnUnderDisable(/*task_return_value=*/0));
+  EXPECT_FALSE(rt.DisableProtocolFatalErrorIssued());
+  rt.LeaveImportCall();
+  ResetDisableState();
+}
+
+// A fatal simulation error ends the run, so the error this runtime reports is
+// the first violation. A second one is reached only because nothing here can
+// halt the caller, and it does not displace the error that ended the run.
+TEST(DpiDisableProtocol, TheFirstDisableProtocolViolationIsTheRecordedError) {
+  ResetDisableState();
+  DpiRuntime rt;
+  DpiRtExport exp;
+  exp.c_name = "c_export";
+  exp.sv_name = "sv_export";
+  exp.impl = [](const std::vector<DpiArgValue>&) {
+    return DpiArgValue::FromInt(0);
+  };
+  rt.RegisterExport(exp);
+
+  DpiScope sc;
+  sc.name = "top";
+  rt.EnterContextImportCall("ctx_import", sc, /*is_task=*/true);
+  rt.ReturnFromExportUnderDisable(DpiDisableTarget::kAncestor);
+
+  testing::internal::CaptureStderr();
+  rt.VerifyImportReturnUnderDisable(/*task_return_value=*/0);
+  DpiArgValue result;
+  rt.CallExportFromImport("sv_export", {}, &result);
+  std::string err = testing::internal::GetCapturedStderr();
+
+  EXPECT_NE(rt.DisableProtocolFatalError().find("35.9 item b)"),
+            std::string::npos);
+  EXPECT_EQ(err.find("35.9 item d)"), std::string::npos);
+  ResetDisableState();
 }
 
 }  // namespace
