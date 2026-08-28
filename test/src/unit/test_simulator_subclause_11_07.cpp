@@ -278,4 +278,60 @@ TEST(SignedExprSim, SignedOfPartSelectKeepsSelectedWidth) {
   EXPECT_EQ(var->value.ToUint64(), 0xFCu);
 }
 
+// §11.7: the value `$signed` returns is signed and the value `$unsigned`
+// returns is unsigned, so an assignment that stores such a value has to keep
+// that signedness whatever the width of the variable it is stored in. The
+// three tests below read `var->value.is_signed`, the flag on the vector the
+// run stored, and never a flag off an evaluated expression. EvalIdentifier in
+// src/simulator/evaluation.cpp writes `val.is_signed = var->is_signed` on
+// every read of a variable, so an expression naming the variable reports the
+// signedness of the declaration and says nothing about what was stored.
+
+// The eight-bit variable is resized by ResizeNarrowKnown in
+// src/simulator/statement_assign.cpp, the path ResizeToWidth takes for a value
+// with no x or z that fits in 64 bits.
+TEST(SignedExprSim, StoredValueOfNarrowSignedVariableIsSigned) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic signed [7:0] narrow;\n"
+      "  initial narrow = $signed(4'b1100);\n"
+      "endmodule\n",
+      f, "narrow");
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(var->value.is_signed);
+}
+
+// The ninety-six-bit variable is resized by the other path of ResizeToWidth,
+// the one that builds its result with MakeLogic4Vec. Neither this test nor the
+// narrow one above states the rule alone. Together they say the two paths
+// answer alike, so the one assignment does not store the signed value
+// $signed returns as signed in a wide variable and as unsigned in a narrow one.
+TEST(SignedExprSim, StoredValueOfWideSignedVariableIsSigned) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic signed [95:0] wide;\n"
+      "  initial wide = $signed(4'b1100);\n"
+      "endmodule\n",
+      f, "wide");
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(var->value.is_signed);
+}
+
+// §11.7: `$unsigned` returns an unsigned value, so the stored flag is false.
+// This is the test that fails if the two paths of ResizeToWidth are made to
+// agree by setting the flag on every value they store.
+TEST(SignedExprSim, StoredValueOfUnsignedVariableIsUnsigned) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] plain;\n"
+      "  initial plain = $unsigned(4'b1100);\n"
+      "endmodule\n",
+      f, "plain");
+  ASSERT_NE(var, nullptr);
+  EXPECT_FALSE(var->value.is_signed);
+}
+
 }  // namespace

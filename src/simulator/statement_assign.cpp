@@ -347,6 +347,11 @@ void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
 
 // Single-word resize for known (no x/z) values that fit in 64 bits, applying
 // sign extension when the source is signed and being widened.
+// Logic4Vec::is_signed carries the signedness §11.7 gives the value itself,
+// which $signed and $unsigned set, so the result takes the flag from val
+// instead of the false MakeLogic4VecVal leaves in place. ResizeToWidth sets
+// that flag from val on its wide path, and a value resized here is stored
+// beside those, so the two paths have to answer alike.
 static Logic4Vec ResizeNarrowKnown(const Logic4Vec& val, uint32_t target_width,
                                    Arena& arena) {
   uint64_t v = val.ToUint64();
@@ -355,7 +360,9 @@ static Logic4Vec ResizeNarrowKnown(const Logic4Vec& val, uint32_t target_width,
     uint64_t sign_bit = uint64_t{1} << (val.width - 1);
     if (v & sign_bit) v |= ~uint64_t{0} << val.width;
   }
-  return MakeLogic4VecVal(arena, target_width, v);
+  Logic4Vec result = MakeLogic4VecVal(arena, target_width, v);
+  result.is_signed = val.is_signed;
+  return result;
 }
 
 // Replicates the source MSB across the widened high bits of result when val is
