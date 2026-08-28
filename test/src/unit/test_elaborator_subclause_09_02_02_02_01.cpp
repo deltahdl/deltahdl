@@ -502,6 +502,16 @@ TEST(AlwaysCombSensitivityInference, TaskCallBodyExcludedFromSensitivity) {
   ExpectSensitivityExcludes(design->top_modules[0]->processes[0], {"ext"});
 }
 
+// §9.2.2.2.1 (printed page 223): "Expressions used in assertion action blocks
+// do not contribute to the implicit sensitivity list of an always_comb." The
+// sentence before it puts the asserted expression itself in the list, "as if
+// that expression were used as a condition of an if statement", so b is in and
+// c and d are out. That is the clause's own example, whose always_comb triggers
+// on b, c and e while the disable_error read in its else branch stays out.
+//
+// This case is the reason CollectStmtReads stops at Stmt::assert_pass_stmt and
+// Stmt::assert_fail_stmt rather than descending every link ForEachChildStmt
+// hands it. A walk that took the whole list would put c and d in.
 TEST(AlwaysCombSensitivityInference, AssertBothPassAndFailActionsExcluded) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -517,7 +527,7 @@ TEST(AlwaysCombSensitivityInference, AssertBothPassAndFailActionsExcluded) {
   ASSERT_FALSE(design->top_modules.empty());
   auto& proc = design->top_modules[0]->processes[0];
   ExpectSensitivityContains(proc, {"a", "b"});
-  ExpectSensitivityExcludes(proc, {"c", "d"});
+  ExpectSensitivityExcludes(proc, {"c", "d", "y"});
 }
 
 TEST(AlwaysCombSensitivityCollection, WaitConditionExcludedFromSensitivity) {
@@ -763,6 +773,140 @@ TEST(AlwaysCombSensitivityInference, ClassScopeResolvedCallArgInSensitivity) {
   auto& proc = design->top_modules[0]->processes[0];
   ExpectSensitivityContains(proc, {"a"});
   ExpectSensitivityExcludes(proc, {"C"});
+}
+
+// True when CollectReadSignals takes `name` from `body`. §9.2.2.2.1 asks which
+// names reach the implicit sensitivity list, so the cases below read the
+// returned set rather than any diagnostic; a read the walk misses is a wrong
+// simulated value and not a missing report.
+bool ReadSignalsContain(const Stmt* body, std::string_view name) {
+  for (const auto& read : CollectReadSignals(body)) {
+    if (read == name) return true;
+  }
+  return false;
+}
+
+// §16.3 keeps an immediate assertion's action_block statements in
+// Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. §9.2.2.2.1 puts no
+// condition on which statement a read stands in, so a read in either belongs in
+// the list.
+Stmt* MakeImmediateAssert(Arena& arena, Stmt* pass_stmt, Stmt* fail_stmt) {
+  auto* s = arena.Create<Stmt>();
+  s->kind = StmtKind::kAssertImmediate;
+  s->assert_expr = SensId(arena, "en");
+  s->assert_pass_stmt = pass_stmt;
+  s->assert_fail_stmt = fail_stmt;
+  return s;
+}
+
+// A randsequence statement holds procedural statements in two places: A.6.12
+// makes an rs_code_block one form of rs_prod, whose statements the parser puts
+// in RsProd::code_stmts, and §18.17.1 lets a weight_specification be followed
+// by one, whose statements go in RsRule::weight_code.
+Stmt* MakeRandsequence(Arena& arena, Stmt* prod_code, Stmt* weight_code) {
+  auto* s = arena.Create<Stmt>();
+  s->kind = StmtKind::kRandsequence;
+  RsProd prod;
+  prod.kind = RsProdKind::kCodeBlock;
+  if (prod_code) prod.code_stmts.push_back(prod_code);
+  RsRule rule;
+  rule.prods.push_back(prod);
+  rule.weight = SensIntLit(arena, 1);
+  if (weight_code) rule.weight_code.push_back(weight_code);
+  RsProduction production;
+  production.name = "top";
+  production.rules.push_back(rule);
+  s->rs_top_production = "top";
+  s->rs_productions.push_back(production);
+  return s;
+}
+
+// §9.2.2.2.1 (printed page 223): "Expressions used in assertion action blocks
+// do not contribute to the implicit sensitivity list of an always_comb." These
+// two are the collection-level counterpart of
+// AlwaysCombSensitivityInference.AssertBothPassAndFailActionsExcluded below,
+// and they are what fails if CollectStmtReads is ever handed the whole of
+// ForEachChildStmt instead of stopping at the two action-block links.
+TEST(AlwaysCombSensitivityCollection, AssertPassStmtReadNotCollected) {
+  Arena arena;
+  auto* stmt = MakeImmediateAssert(
+      arena, MakeAssign(arena, "y", SensId(arena, "a")), nullptr);
+
+  EXPECT_FALSE(ReadSignalsContain(stmt, "a"));
+}
+
+TEST(AlwaysCombSensitivityCollection, AssertFailStmtReadNotCollected) {
+  Arena arena;
+  auto* stmt = MakeImmediateAssert(arena, nullptr,
+                                   MakeAssign(arena, "y", SensId(arena, "b")));
+
+  EXPECT_FALSE(ReadSignalsContain(stmt, "b"));
+}
+
+// §18.16 gives a randcase item a statement, which the parser keeps in the
+// second member of a Stmt::randcase_items entry. §9.2.2.2.1 names no statement
+// position among its exceptions, so a read there belongs in the list.
+TEST(AlwaysCombSensitivityCollection, RandcaseItemStmtReadCollected) {
+  Arena arena;
+  auto* stmt = arena.Create<Stmt>();
+  stmt->kind = StmtKind::kRandcase;
+  stmt->randcase_items.emplace_back(SensIntLit(arena, 1),
+                                    MakeAssign(arena, "y", SensId(arena, "c")));
+
+  EXPECT_TRUE(ReadSignalsContain(stmt, "c"));
+}
+
+TEST(AlwaysCombSensitivityCollection, RandsequenceCodeBlockReadCollected) {
+  Arena arena;
+  auto* stmt = MakeRandsequence(
+      arena, MakeAssign(arena, "y", SensId(arena, "d")), nullptr);
+
+  EXPECT_TRUE(ReadSignalsContain(stmt, "d"));
+}
+
+// §9.2.2.2.1 exception (a) leaves out "any expansion of a variable declared
+// within the block", and names no statement position, so a variable declared
+// in a randcase item's statement is as local as one declared in the enclosing
+// sequential block. §18.16 gives that item a statement, which the parser keeps
+// in the second member of a Stmt::randcase_items entry.
+//
+// The case is written over a randcase item rather than an assertion action
+// block because printed page 223 keeps action-block reads out of the list
+// entirely, so a local declared there could never reach it and a case built on
+// one would pass whether exception (a) worked or not. t_local is read and never
+// written, so exception (b) cannot remove it and only exception (a) can:
+// without CollectBlockLocalNames descending the item, the list carries a name
+// no variable of the design answers to.
+TEST(AlwaysCombSensitivityInference, RandcaseItemLocalExcluded) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, en, y, z;\n"
+      "  always_comb begin\n"
+      "    y = a;\n"
+      "    randcase\n"
+      "      3: begin\n"
+      "        logic [7:0] t_local;\n"
+      "        z = en + t_local;\n"
+      "      end\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& proc = design->top_modules[0]->processes[0];
+  ExpectSensitivityContains(proc, {"a", "en"});
+  ExpectSensitivityExcludes(proc, {"t_local"});
+}
+
+TEST(AlwaysCombSensitivityCollection, RandsequenceWeightCodeReadCollected) {
+  Arena arena;
+  auto* stmt = MakeRandsequence(arena, nullptr,
+                                MakeAssign(arena, "y", SensId(arena, "e")));
+
+  EXPECT_TRUE(ReadSignalsContain(stmt, "e"));
 }
 
 }  // namespace

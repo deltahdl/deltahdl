@@ -417,4 +417,35 @@ TEST(AlwaysLatchBasicSim, BeginEndBlockWithArithmetic) {
   EXPECT_EQ(q->value.ToUint64(), 0x30u);
 }
 
+// §9.2.2.3: "The always_latch construct is identical to the always_comb
+// construct except that software tools should perform additional checks and
+// warn if the behavior in an always_latch construct does not represent latched
+// logic", and "All statements in 9.2.2.2 shall apply to always_latch". So the
+// implicit sensitivity list of an always_latch is the one §9.2.2.2.1 defines,
+// including the sentence on printed page 223 that expressions used in assertion
+// action blocks do not contribute to it.
+//
+// `en` is the assertion expression and is in the list; `d` is read only in the
+// pass statement and is not. `d` moves from 10 to 20 at time 1 with `en` held,
+// and `q` keeps the 13 the time-zero evaluation left it.
+TEST(AlwaysLatchBasicSim, AssertPassStatementReadStaysOutOfSensitivity) {
+  SimFixture f;
+  auto* q = RunAndFindVar(
+      "module t;\n"
+      "  logic en = 1'b1;\n"
+      "  logic [7:0] d = 8'd10;\n"
+      "  logic [7:0] q;\n"
+      "  always_latch begin\n"
+      "    assert (en) q = d + 8'd3;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 d = 8'd20;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->value.ToUint64(), 13u);
+}
+
 }  // namespace

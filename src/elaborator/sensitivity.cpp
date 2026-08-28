@@ -4,6 +4,7 @@
 
 #include "common/arena.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast.h"
 
 namespace delta {
@@ -60,6 +61,44 @@ static void CollectLhsIndexReads(const Expr* lhs,
   }
 }
 
+// True when `sub` is one of the two statements of `owner`'s assertion action
+// block. §9.2.2.2.1 (printed page 223) says "Expressions used in assertion
+// action blocks do not contribute to the implicit sensitivity list of an
+// always_comb", and its example has the always_comb trigger on b, c and e while
+// `disable_error`, read in the else branch of `A1:assert (a != e) else if
+// (!disable_error) $error("failed");`, stays out. So the two walks that collect
+// reads stop at these, and the two that collect writes and block-local
+// declarations do not: exception (b) is about where a name is written and
+// exception (a) about where one is declared, and neither is a rule about what
+// contributes.
+//
+// The sentence before it puts the asserted expression itself in the list, "as
+// if that expression were used as a condition of an if statement", which is
+// Stmt::assert_expr and is read directly rather than through this descent.
+bool IsAssertionActionBlock(const Stmt* owner, const Stmt* sub) {
+  return sub != nullptr &&
+         (sub == owner->assert_pass_stmt || sub == owner->assert_fail_stmt);
+}
+
+// §9.2.2.2.1 takes the longest static prefix of every net or variable read
+// within the block. Its three exceptions name no statement position, and the
+// one position the clause does exclude is the assertion action block
+// IsAssertionActionBlock above answers for, so a read counts wherever else a
+// statement holds a statement.
+//
+// ForEachChildStmt in elaborator_validate_internal.h states those thirteen
+// positions, once for the whole elaborator, which is why the list is not
+// written out again here. It hands the visitor the field itself, so a walk that
+// only reads the tree takes a `Stmt* const&`.
+//
+// The expression fields are read one by one rather than through the
+// ForEachChildExpr beside it, because exception (c) excludes an identifier that
+// appears only in a timing control expression and not reading those fields is
+// how this function implements it. ForEachChildExpr hands over Stmt::delay,
+// Stmt::cycle_delay, Stmt::events, Stmt::repeat_event_count and
+// Stmt::wait_order_events along with the rest, giving the visitor no way to
+// tell a timing control expression from an ordinary one; a wait statement's
+// condition is skipped here for the same reason.
 void CollectStmtReads(const Stmt* stmt, std::unordered_set<std::string>& out) {
   if (!stmt) return;
   if (stmt->kind == StmtKind::kBlockingAssign ||
@@ -72,19 +111,16 @@ void CollectStmtReads(const Stmt* stmt, std::unordered_set<std::string>& out) {
   CollectExprReads(stmt->rhs, out);
   CollectExprReads(stmt->expr, out);
   CollectExprReads(stmt->for_cond, out);
-  for (auto* s : stmt->stmts) CollectStmtReads(s, out);
-  CollectStmtReads(stmt->then_branch, out);
-  CollectStmtReads(stmt->else_branch, out);
-  CollectStmtReads(stmt->for_body, out);
-  for (auto* fi : stmt->for_inits) CollectStmtReads(fi, out);
-  for (auto* fs : stmt->for_steps) CollectStmtReads(fs, out);
-  CollectStmtReads(stmt->body, out);
-  for (auto* s : stmt->fork_stmts) CollectStmtReads(s, out);
+  CollectExprReads(stmt->assert_expr, out);
+  // The case-item bodies are statements the descent below reaches; the patterns
+  // are expressions it does not, so they are read here.
   for (const auto& ci : stmt->case_items) {
     for (const auto* pat : ci.patterns) CollectExprReads(pat, out);
-    CollectStmtReads(ci.body, out);
   }
-  CollectExprReads(stmt->assert_expr, out);
+  ForEachChildStmt(stmt, [stmt, &out](Stmt* const& sub) {
+    if (IsAssertionActionBlock(stmt, sub)) return;
+    CollectStmtReads(sub, out);
+  });
 }
 
 std::vector<std::string> CollectReadSignals(const Stmt* body) {
@@ -102,6 +138,14 @@ static void CollectAssignLhsName(const Expr* lhs,
     out.insert(std::string(e->text));
 }
 
+// §9.2.2.2.1 exception (b) leaves out of the list any expression also written
+// within the block, and names no statement position either, so a write counts
+// wherever a statement holds a statement. A write this walk does not reach is a
+// name the exception does not remove, which puts the process's own output in
+// its sensitivity list and re-triggers it on its own assignment.
+//
+// The positions come from ForEachChildStmt in
+// elaborator_validate_internal.h, stated there once for the whole elaborator.
 void CollectWrittenNames(const Stmt* stmt,
                          std::unordered_set<std::string>& out) {
   if (!stmt) return;
@@ -109,29 +153,28 @@ void CollectWrittenNames(const Stmt* stmt,
       stmt->kind == StmtKind::kNonblockingAssign) {
     CollectAssignLhsName(stmt->lhs, out);
   }
-  for (const auto* s : stmt->stmts) CollectWrittenNames(s, out);
-  CollectWrittenNames(stmt->then_branch, out);
-  CollectWrittenNames(stmt->else_branch, out);
-  CollectWrittenNames(stmt->body, out);
-  CollectWrittenNames(stmt->for_body, out);
-  for (auto* fi : stmt->for_inits) CollectWrittenNames(fi, out);
-  for (auto* fs : stmt->for_steps) CollectWrittenNames(fs, out);
-  for (const auto& ci : stmt->case_items) CollectWrittenNames(ci.body, out);
-  for (const auto* s : stmt->fork_stmts) CollectWrittenNames(s, out);
+  ForEachChildStmt(stmt,
+                   [&out](Stmt* const& sub) { CollectWrittenNames(sub, out); });
 }
 
+// §9.2.2.2.1 exception (a) leaves out of the list any expansion of a variable
+// declared within the block, and names no statement position, so a declaration
+// counts wherever a statement holds a statement. A.6.3 admits a
+// block_item_declaration at the head of every seq_block, and a seq_block stands
+// in each of those positions, so a declaration this walk does not reach is a
+// block-local name the exception does not remove and the list then carries a
+// name no net or variable of the design answers to.
+//
+// The positions come from ForEachChildStmt in elaborator_validate_internal.h,
+// stated there once for the whole elaborator.
 static void CollectBlockLocalNames(const Stmt* stmt,
                                    std::unordered_set<std::string>& out) {
   if (!stmt) return;
   if (stmt->kind == StmtKind::kVarDecl && !stmt->var_name.empty()) {
     out.insert(std::string(stmt->var_name));
   }
-  for (const auto* s : stmt->stmts) CollectBlockLocalNames(s, out);
-  CollectBlockLocalNames(stmt->then_branch, out);
-  CollectBlockLocalNames(stmt->else_branch, out);
-  CollectBlockLocalNames(stmt->body, out);
-  CollectBlockLocalNames(stmt->for_body, out);
-  for (const auto& ci : stmt->case_items) CollectBlockLocalNames(ci.body, out);
+  ForEachChildStmt(
+      stmt, [&out](Stmt* const& sub) { CollectBlockLocalNames(sub, out); });
 }
 
 static void CollectCallNamesFromExpr(
@@ -151,6 +194,14 @@ static void CollectCallNamesFromExpr(
   for (auto* elem : expr->elements) CollectCallNamesFromExpr(elem, out);
 }
 
+// §9.2.2.2.1 counts a read "within any function called within the block", and
+// puts no condition on where in the block the call stands, so a call counts
+// wherever a statement holds a statement. A call this walk does not reach
+// contributes none of the called function's reads.
+//
+// The positions come from ForEachChildStmt in
+// elaborator_validate_internal.h, and the expressions are read one by one for
+// the reason CollectStmtReads above gives.
 static void CollectCallNamesFromStmt(
     const Stmt* stmt, std::unordered_set<std::string_view>& out) {
   if (!stmt) return;
@@ -161,16 +212,10 @@ static void CollectCallNamesFromStmt(
   CollectCallNamesFromExpr(stmt->expr, out);
   CollectCallNamesFromExpr(stmt->for_cond, out);
   CollectCallNamesFromExpr(stmt->assert_expr, out);
-  for (auto* s : stmt->stmts) CollectCallNamesFromStmt(s, out);
-  CollectCallNamesFromStmt(stmt->then_branch, out);
-  CollectCallNamesFromStmt(stmt->else_branch, out);
-  CollectCallNamesFromStmt(stmt->for_body, out);
-  for (auto* fi : stmt->for_inits) CollectCallNamesFromStmt(fi, out);
-  for (auto* fs : stmt->for_steps) CollectCallNamesFromStmt(fs, out);
-  CollectCallNamesFromStmt(stmt->body, out);
-  for (auto* s : stmt->fork_stmts) CollectCallNamesFromStmt(s, out);
-  for (const auto& ci : stmt->case_items)
-    CollectCallNamesFromStmt(ci.body, out);
+  ForEachChildStmt(stmt, [stmt, &out](Stmt* const& sub) {
+    if (IsAssertionActionBlock(stmt, sub)) return;
+    CollectCallNamesFromStmt(sub, out);
+  });
 }
 
 static std::unordered_set<std::string_view> ResolveCalledFunctions(

@@ -1,3 +1,5 @@
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -289,6 +291,176 @@ TEST(AlwaysCombSensitivitySim, TaskCallInAlwaysCombExecutes) {
       f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 6u);
+}
+
+// §9.2.2.2.1 (printed page 223) settles what an immediate assertion inside an
+// always_comb contributes: "An expression used in an immediate assertion (see
+// 16.3) within the procedure, or in any function called within the procedure,
+// contributes to the implicit sensitivity list of an always_comb as if that
+// expression were used as a condition of an if statement. Expressions used in
+// assertion action blocks do not contribute to the implicit sensitivity list of
+// an always_comb." Its worked example writes `disable_error` in the else action
+// and states the block "shall trigger whenever b, c or e changes", naming the
+// action block's identifier in neither list.
+//
+// So `en`, the assertion expression, is in the list, and `a`, read only in the
+// pass statement, is not. `a` moves from 10 to 20 at time 1 while `en` is held,
+// and `y` keeps the 13 that the time-zero evaluation left it.
+TEST(AlwaysCombSensitivitySim, AssertPassStatementReadStaysOutOfSensitivity) {
+  SimFixture f;
+  auto* y = RunAndFindVar(
+      "module t;\n"
+      "  logic en = 1'b1;\n"
+      "  logic [7:0] a = 8'd10;\n"
+      "  logic [7:0] y;\n"
+      "  always_comb begin\n"
+      "    assert (en) y = a + 8'd3;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 a = 8'd20;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 13u);
+}
+
+// §9.2.2.2.1 (printed page 223): the fail statement is the other half of the
+// action block the clause excludes, and the clause's own example puts its
+// excluded identifier there. `en` is the assertion expression and drives the
+// block; `b` is read only in the fail statement, so changing `b` at time 1
+// leaves `y` at the 13 the time-zero evaluation wrote.
+TEST(AlwaysCombSensitivitySim, AssertFailStatementReadStaysOutOfSensitivity) {
+  SimFixture f;
+  auto* y = RunAndFindVar(
+      "module t;\n"
+      "  logic en = 1'b0;\n"
+      "  logic [7:0] b = 8'd10;\n"
+      "  logic [7:0] y;\n"
+      "  always_comb begin\n"
+      "    assert (en) y = 8'd77; else y = b + 8'd3;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 b = 8'd20;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 13u);
+}
+
+// §9.2.2.2.1: the implicit sensitivity list holds "each net or variable
+// identifier or select expression that is read within the block", and its three
+// exceptions name a declaration, a write and a timing control expression. None
+// of them names a statement position, and the action-block exclusion on printed
+// page 223 is about assertion action blocks alone, so a read inside a randcase
+// item counts. `a` is read only in the item, moves from 10 to 20 at time 1, and
+// the re-evaluated block leaves 23 behind. The single item carries weight 3, so
+// §18.16 selects it on every draw whatever the random number is.
+TEST(AlwaysCombSensitivitySim, RandcaseItemReadRetriggersProcess) {
+  SimFixture f;
+  auto* y = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a = 8'd10;\n"
+      "  logic [7:0] y;\n"
+      "  always_comb begin\n"
+      "    randcase\n"
+      "      3 : y = a + 8'd3;\n"
+      "    endcase\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 a = 8'd20;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 23u);
+}
+
+// §9.2.2.2.1: a randsequence production's code block is a statement within the
+// block, and no exception of the clause and no sentence of printed page 223
+// excludes it, so the read of `a` inside it belongs to the implicit sensitivity
+// list. `a` moves from 10 to 20 at time 1 and the re-evaluated block leaves 23.
+TEST(AlwaysCombSensitivitySim, RandsequenceCodeBlockReadRetriggersProcess) {
+  SimFixture f;
+  auto* y = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a = 8'd10;\n"
+      "  logic [7:0] y;\n"
+      "  always_comb begin\n"
+      "    randsequence(main)\n"
+      "      main : { y = a + 8'd3; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 a = 8'd20;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 23u);
+}
+
+// §9.2.2.2.1 exception (b) leaves out of the implicit sensitivity list "any
+// expression that is also written within the block", and names no statement
+// position, so a write standing in an assertion action block is a write within
+// the block. `tmp` is read by `y = tmp;` and written by the pass statement, so
+// exception (b) removes it and the procedure does not re-trigger on its own
+// assignment. The count of evaluations is what distinguishes that from a
+// procedure sensitive to `tmp`: such a procedure evaluates once at time zero,
+// drives `tmp` from x to 13, wakes on that change and evaluates a second time.
+// Both evaluations compute the same 13, so the printed line is the only place
+// the extra pass shows.
+TEST(AlwaysCombSensitivitySim, ActionBlockWriteKeepsNameOutOfSensitivity) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic [7:0] a = 8'd10;\n"
+      "  logic [7:0] tmp;\n"
+      "  logic [7:0] y;\n"
+      "  always_comb begin\n"
+      "    assert (1'b1) tmp = a + 8'd3;\n"
+      "    y = tmp;\n"
+      "    $display(\"eval %0d\", y);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "eval 13\n");
+}
+
+// §9.2.2.2.1 (printed page 223) excludes the expressions used in an assertion
+// action block from the implicit sensitivity list, and a call to `plus_a` is
+// such an expression. What the function reads therefore reaches the list by no
+// route: `a` is read only in `plus_a`, `plus_a` is called only from the pass
+// statement, and moving `a` from 10 to 20 at time 1 leaves `y` at 13.
+//
+// The contrast is with AlwaysCombSensitivitySim.FunctionCallBodyReadRetriggers
+// above, where the same function is called from an ordinary statement and the
+// same change to `a` does re-evaluate the block.
+TEST(AlwaysCombSensitivitySim, ActionBlockFunctionCallStaysOutOfSensitivity) {
+  SimFixture f;
+  auto* y = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a = 8'd10;\n"
+      "  logic [7:0] y;\n"
+      "  function automatic logic [7:0] plus_a(input logic [7:0] x);\n"
+      "    return x + a;\n"
+      "  endfunction\n"
+      "  always_comb begin\n"
+      "    assert (1'b1) y = plus_a(8'd3);\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 a = 8'd20;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 13u);
 }
 
 }  // namespace

@@ -174,6 +174,19 @@ void ForEachRandsequenceExpr(S* s, Visit visit) {
 // walker here already answers with an early return, and it receives the field
 // itself rather than a copy, so a walker given a `Stmt*` may assign a
 // replacement expression through it and one given a `const Stmt*` may not.
+//
+// A walker whose rule turns on which field an expression came from cannot use
+// this, and should write its positions out with a comment saying so. `visit`
+// receives the expression and not the member it stood in, so the visitor cannot
+// tell a timing control expression from an ordinary one. CollectStmtReads in
+// sensitivity.cpp is the case: §9.2.2.2.1 exception (c) excludes an identifier
+// appearing only in a wait, event or delay expression, and that walk implements
+// the exception by not reading Stmt::delay, Stmt::cycle_delay, Stmt::events,
+// Stmt::repeat_event_count and Stmt::wait_order_events at all. Handing it this
+// list would put every delay and event identifier into the implicit sensitivity
+// list. That is a rule about which positions a walk reads, which is what this
+// list settles; it is not a rule about which statements it descends, which is
+// what ForEachChildStmt settles, and that walk does use ForEachChildStmt.
 template <typename S, typename Visit>
 void ForEachChildExpr(S* s, Visit visit) {
   visit(s->condition);
