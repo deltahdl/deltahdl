@@ -520,8 +520,17 @@ static bool CollectFromQueueElem(const Expr* expr, SimContext& ctx,
   if (expr->base->kind != ExprKind::kIdentifier) return false;
   auto* q = ctx.FindQueue(expr->base->text);
   if (!q) return false;
-  auto idx = EvalQueueIndex(expr->index, q, ctx, arena);
-  if (idx >= 0 && static_cast<size_t>(idx) < q->elements.size())
+  // §7.10.1: an invalid index -- a 4-state expression holding an x or z bit,
+  // or a value outside 0...$ -- makes the read "return the value appropriate
+  // for a nonexistent array entry of the queue's element type (as described in
+  // Table 7-1 in 7.4.5)", so such an index yields a value rather than nothing.
+  // §10.10 makes the item contribute one element to the concatenation whatever
+  // its index turned out to be, so every path here pushes exactly one element.
+  bool idx_xz = false;
+  auto idx = EvalQueueIndex(expr->index, q, ctx, arena, &idx_xz);
+  if (idx_xz || idx < 0 || static_cast<size_t>(idx) >= q->elements.size())
+    out.push_back(NonexistentQueueElement(q, arena));
+  else
     out.push_back(q->elements[static_cast<size_t>(idx)]);
   return true;
 }

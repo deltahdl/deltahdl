@@ -18,6 +18,11 @@
 
 namespace delta {
 
+Logic4Vec NonexistentQueueElement(const QueueObject* q, Arena& arena) {
+  return q->is_4state ? MakeAllX(arena, q->elem_width)
+                      : MakeLogic4VecVal(arena, q->elem_width, 0);
+}
+
 static uint64_t ResolveQueueIdx(const Expr* idx_expr, QueueObject* q,
                                 SimContext& ctx, Arena& arena,
                                 bool* has_xz = nullptr) {
@@ -38,22 +43,18 @@ static bool TryQueueSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   auto* q = ctx.FindQueue(expr->base->text);
   if (!q) return false;
 
-  // §7.10.1: an invalid queue index (an x/z 4-state expression, or a position
-  // outside 0..$) makes the read return the value appropriate for a nonexistent
-  // element of the queue's element type, per Table 7-1 in §7.4.5. That value is
-  // x for a 4-state element type but '0 for a 2-state one, so it must respect
-  // the queue's own state-ness rather than always yielding x.
-  auto nonexistent = [&] {
-    return q->is_4state ? MakeAllX(arena, q->elem_width)
-                        : MakeLogic4VecVal(arena, q->elem_width, 0);
-  };
+  // §7.10.1 makes two things an invalid index, and each needs a test of its
+  // own. An index expression holding an x or z bit still converts to some
+  // position, so a bounds test alone would let it read an element; it is
+  // checked first, and the bounds decide the rest.
   bool idx_xz = false;
   auto idx = ResolveQueueIdx(expr->index, q, ctx, arena, &idx_xz);
   if (idx_xz) {
-    out = nonexistent();
+    out = NonexistentQueueElement(q, arena);
     return true;
   }
-  out = (idx < q->elements.size()) ? q->elements[idx] : nonexistent();
+  out = (idx < q->elements.size()) ? q->elements[idx]
+                                   : NonexistentQueueElement(q, arena);
   return true;
 }
 

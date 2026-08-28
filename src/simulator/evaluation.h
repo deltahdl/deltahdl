@@ -18,6 +18,7 @@ struct ModuleItem;
 struct StructTypeInfo;
 struct TimeFormatSpec;
 struct NetStrength;
+struct QueueObject;
 class SimContext;
 class Arena;
 
@@ -32,6 +33,15 @@ uint32_t LiteralWidth(std::string_view text, uint64_t val);
 bool HasUnknownBits(const Logic4Vec& v);
 Logic4Vec MakeAllX(Arena& arena, uint32_t width);
 int64_t SignExtend(uint64_t val, uint32_t width);
+
+// §7.10.1 — the value a read of a queue element that is not there yields. An
+// invalid index (a 4-state expression with an x or z bit, or a value outside
+// 0...$) reads as the value Table 7-1 in §7.4.5 gives a nonexistent array entry
+// of the queue's element type: x for a 4-state element type and '0 for a
+// 2-state one. The answer therefore follows the queue's own state-ness rather
+// than always being x. Every path that reads an element of a queue calls this,
+// so that all of them answer such a read alike.
+Logic4Vec NonexistentQueueElement(const QueueObject* q, Arena& arena);
 
 // §6.12: a shortreal is a C float and a real is a C double, so the width of a
 // real vector says which pattern it carries — 32 bits a float, any other width

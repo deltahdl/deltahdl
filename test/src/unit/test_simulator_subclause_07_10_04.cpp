@@ -1,5 +1,6 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
+#include "helpers_lower_run.h"
 #include "helpers_queue.h"
 #include "helpers_queue_assign_assert.h"
 #include "simulator/lowerer.h"
@@ -535,6 +536,73 @@ TEST(QueueAssignNba, RefTakenAfterAssignWritesBack) {
       "  end\n"
       "endmodule\n",
       "q", {2, 99, 8, 6});
+}
+
+// §7.10.1: "an invalid index value (i.e., a 4-state expression whose value has
+// one or more x or z bits, or a value that lies outside 0...$) shall cause a
+// read operation to return the value appropriate for a nonexistent array entry
+// of the queue's element type (as described in Table 7-1 in 7.4.5)". On a
+// three-element queue the index 5 lies outside 0...$, so `q[5]` written as an
+// item of the §7.10.4 concatenation still contributes one element, and Table
+// 7-1 makes that element 'x for the 4-state element type `logic [31:0]`. A
+// read that contributes nothing leaves a queue of one element instead of two.
+TEST(QueueAssign, SourceConcatItemOutOfRangeIndexContributesX) {
+  SimFixture f;
+  ElaborateLowerRun(f,
+                    "module t;\n"
+                    "  logic [31:0] q[$] = '{10, 20, 30};\n"
+                    "  initial q = {q[5], 1};\n"
+                    "endmodule\n");
+  auto* q = f.ctx.FindQueue("q");
+  ASSERT_NE(q, nullptr);
+  ASSERT_EQ(q->elements.size(), 2u);
+  EXPECT_FALSE(q->elements[0].IsKnown());
+  EXPECT_EQ(q->elements[1].ToUint64(), 1u);
+}
+
+// §7.10.1 makes an index expression carrying an x or z bit invalid on the same
+// terms as one lying outside 0...$, so `q[i]` with `i` holding x contributes
+// the same Table 7-1 value the case above expects. Collapsing the index to a
+// number instead reaches element 0 and contributes the known 10 stored there,
+// so the value and not just the count is what separates the two readings.
+TEST(QueueAssign, SourceConcatItemUnknownIndexContributesX) {
+  SimFixture f;
+  ElaborateLowerRun(f,
+                    "module t;\n"
+                    "  logic [31:0] q[$] = '{10, 20, 30};\n"
+                    "  logic [31:0] i;\n"
+                    "  initial begin\n"
+                    "    i = 32'bx;\n"
+                    "    q = {q[i], 1};\n"
+                    "  end\n"
+                    "endmodule\n");
+  auto* q = f.ctx.FindQueue("q");
+  ASSERT_NE(q, nullptr);
+  ASSERT_EQ(q->elements.size(), 2u);
+  EXPECT_FALSE(q->elements[0].IsKnown());
+  EXPECT_EQ(q->elements[1].ToUint64(), 1u);
+}
+
+// Table 7-1 in §7.4.5 gives a 2-state integral type '0 where it gives a 4-state
+// one 'x, and §7.10.1 sends an invalid queue index to that table, so the
+// element type decides the value the item contributes. Only the declared type
+// changes from the out-of-range case above: `bit [31:0]` is 2-state where
+// `logic [31:0]` is 4-state, at the same width and the same index. An
+// implementation that always yields x passes that case and fails this one.
+TEST(QueueAssign,
+     SourceConcatItemOutOfRangeIndexOnTwoStateQueueContributesZero) {
+  SimFixture f;
+  ElaborateLowerRun(f,
+                    "module t;\n"
+                    "  bit [31:0] q[$] = '{10, 20, 30};\n"
+                    "  initial q = {q[5], 1};\n"
+                    "endmodule\n");
+  auto* q = f.ctx.FindQueue("q");
+  ASSERT_NE(q, nullptr);
+  ASSERT_EQ(q->elements.size(), 2u);
+  EXPECT_TRUE(q->elements[0].IsKnown());
+  EXPECT_EQ(q->elements[0].ToUint64(), 0u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 1u);
 }
 
 }  // namespace

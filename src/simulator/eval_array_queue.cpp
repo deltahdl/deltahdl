@@ -14,13 +14,6 @@
 
 namespace delta {
 
-static Logic4Vec NonexistentQueueElement(const QueueObject* q, Arena& arena) {
-  // Empty queue: yield the value of a nonexistent element of the queue's
-  // element type (Table 7-1, see 7.4.5) and leave the queue unchanged.
-  return q->is_4state ? MakeAllX(arena, q->elem_width)
-                      : MakeLogic4VecVal(arena, q->elem_width, 0);
-}
-
 static void PopQueueFront(QueueObject* q, Arena& arena, Logic4Vec& out) {
   if (q->elements.empty()) {
     out = NonexistentQueueElement(q, arena);
