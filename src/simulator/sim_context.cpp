@@ -165,6 +165,22 @@ std::string SimContext::ActiveInstancePrefix() const {
 }
 
 Variable* SimContext::FindVariable(std::string_view name) {
+  // §23.6: "The instance name $root refers to the top of the instantiated
+  // design and is used to unambiguously gain access to the top of the design."
+  // A name written from there is absolute, so it is read straight out of
+  // variables_ and never joined to ActiveInstancePrefix(), which would make
+  // the top of the design relative to whichever instance is running. `$root`
+  // cannot spell a local or a prefixed name either, `$` starting no
+  // identifier, so this stands ahead of both lookups below.
+  //
+  // variables_ keys a top-level hierarchy block's own declarations under no
+  // instance prefix, so the remainder after "$root." is the key itself.
+  constexpr std::string_view kRootPrefix = "$root.";
+  if (name.substr(0, kRootPrefix.size()) == kRootPrefix) {
+    auto it = variables_.find(name.substr(kRootPrefix.size()));
+    if (it != variables_.end()) return it->second;
+  }
+
   auto* local = FindLocalVariable(name);
   if (local) return local;
   std::string prefix = ActiveInstancePrefix();
@@ -195,6 +211,9 @@ Variable* SimContext::FindVariable(std::string_view name) {
   // declared inside the one instantiating it, of which that subclause says
   // "The outer name space is visible to the inner module so that any name
   // declared there can be used", so the boundary §23.9 draws is not there.
+  // §23.6's `$root` is a fifth, answered above rather than here: it names the
+  // top of the design outright rather than climbing to it, so no boundary
+  // stands between the reference and what it reaches.
   if (prefix.empty() || dot != std::string_view::npos ||
       imported_names_.count(name) != 0 ||
       nested_decl_scopes_.count(std::string(prefix)) != 0) {

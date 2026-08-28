@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "common/arena.h"
@@ -55,7 +56,23 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
   if (expr->text == "this") {
     return MakeLogic4VecVal(arena, 64, ctx.CurrentThisHandle());
   }
-  auto* var = ctx.FindVariable(expr->text);
+  // §23.6: a leading `$root` makes the name absolute from the top of the
+  // instantiated design, and the parser keeps it in Expr::scope_prefix rather
+  // than in the identifier's text (Parser::MakeSysScopePrefix in
+  // src/parser/expr_parser_calls.cpp). Reading the text alone drops it and
+  // resolves the name in whichever instance is running.
+  // ResolveSignalToVariable in src/simulator/awaiters.h spells the same name
+  // the same way, so an event control and an expression reading one signal
+  // reach one variable. Only `$root` is spelled out: Expr::scope_prefix also
+  // carries the §23.7.1 package and `$unit` prefixes, which resolve elsewhere.
+  std::string rooted_name;
+  std::string_view lookup_name = expr->text;
+  if (expr->scope_prefix == "$root") {
+    rooted_name = "$root.";
+    rooted_name += expr->text;
+    lookup_name = rooted_name;
+  }
+  auto* var = ctx.FindVariable(lookup_name);
   if (!var) {
     // §11.12 — a no-argument let referenced without parentheses appears here
     // as a bare identifier. Expand its body at each use (re-evaluated, not

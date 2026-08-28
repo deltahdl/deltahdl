@@ -217,8 +217,8 @@ TEST(GlobalClockingSim, GlobalClockInARandcaseItemResumesThatProcess) {
 // suspended at @($global_clock) for the whole run is accepted too.
 //
 // The declaration is in an instantiated child rather than in the top module,
-// which is the shape §14.14's own example uses. A global clocking declared in
-// the top module is deltahdl/deltahdl#3298 and is not resolved from below.
+// which is the shape §14.14's own example uses. The three cases at the end of
+// this file put the declaration in the top module instead.
 
 // §14.14's example has `common_sub` declare no global clocking and instantiate
 // under `subsystem1`, whose declaration is the one its $global_clock resolves
@@ -329,6 +329,121 @@ TEST(GlobalClockingSim, AChildsOwnGlobalClockingBeatsItsAncestors) {
       f, "c.hits");
   ASSERT_NE(hits, nullptr);
   EXPECT_EQ(hits->value.ToUint64(), 2u);
+}
+
+// §14.14 with the global clocking declared in the top-level hierarchy block
+// rather than in an instantiated child. Rule b) states no exception for that
+// block: it is the scope the climb stops at, so a declaration there is the
+// effective one for every reference below that finds no nearer declaration of
+// its own, and the result is still "the event expression of that global
+// clocking declaration" -- the top's own signal.
+//
+// The top-level hierarchy block is not an instance and has no instance name to
+// reach its signals through, so the name written for a reference below it is
+// §23.6's `$root.clk`, absolute from the top of the instantiated design. The
+// first two cases below are that rule-b) reference; the third holds rule a)
+// where it was, in the top module that declares the global clocking.
+//
+// Each of the three declares a `clk` in the child as well as in the top, so a
+// reference resolved against the referencing scope rather than the declaring
+// one finds a signal by that name and waits on the wrong one.
+
+// The child's own `clk` is never driven, so a reference bound to it waits for
+// an edge that never arrives and leaves `hits` at the 0 its declaration gave
+// it. The top's `clk` rises three times (t=5, t=15, t=25) against two falls.
+TEST(GlobalClockingSim, TopLevelGlobalClockingReachesAReferenceInAChild) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "module child;\n"
+      "  logic clk = 1'b0;\n"
+      "  int hits = 0;\n"
+      "  always @($global_clock) hits = hits + 1;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 1'b0;\n"
+      "  global clocking gclk @(posedge clk); endclocking\n"
+      "  child c();\n"
+      "  initial begin\n"
+      "    #5 clk = 1'b1;\n"
+      "    #5 clk = 1'b0;\n"
+      "    #5 clk = 1'b1;\n"
+      "    #5 clk = 1'b0;\n"
+      "    #5 clk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "c.hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 3u);
+}
+
+// The child's own `clk` moves here, on a schedule of its own: it rises at t=7
+// and t=21 while the top's rises at t=5, t=15 and t=25. Three is therefore the
+// count only a reference following the top's declaration reaches, and a
+// reference bound to the child's own `clk` reads back 2 rather than the 0 the
+// case above leaves it at. Without this case a resolution that waits on any
+// moving signal of that name passes.
+TEST(GlobalClockingSim,
+     ChildFollowsTheTopsGlobalClockNotItsOwnLikeNamedSignal) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "module child;\n"
+      "  logic clk = 1'b0;\n"
+      "  int hits = 0;\n"
+      "  always @($global_clock) hits = hits + 1;\n"
+      "  initial begin\n"
+      "    #7 clk = 1'b1;\n"
+      "    #7 clk = 1'b0;\n"
+      "    #7 clk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 1'b0;\n"
+      "  global clocking gclk @(posedge clk); endclocking\n"
+      "  child c();\n"
+      "  initial begin\n"
+      "    #5 clk = 1'b1;\n"
+      "    #5 clk = 1'b0;\n"
+      "    #5 clk = 1'b1;\n"
+      "    #5 clk = 1'b0;\n"
+      "    #5 clk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "c.hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 3u);
+}
+
+// §14.14 rule a) runs first, and a reference in the top-level hierarchy block
+// that declares the global clocking is answered by it: the event expression
+// already names a signal of the scope holding the reference, so nothing is
+// written onto it and no `$root` stands in front of it. The top's `clk` rises
+// three times. A `$root.clk` written here anyway reads back 0 wherever the
+// simulator does not resolve that spelling, which is what makes this case fail
+// rather than merely repeat the rule-a) cases above.
+TEST(GlobalClockingSim,
+     ReferenceInTheDeclaringTopModuleStaysUnqualifiedAlongsideAChild) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "module child;\n"
+      "  logic clk = 1'b0;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 1'b0;\n"
+      "  int hits = 0;\n"
+      "  global clocking gclk @(posedge clk); endclocking\n"
+      "  child c();\n"
+      "  always @($global_clock) hits = hits + 1;\n"
+      "  initial begin\n"
+      "    #5 clk = 1'b1;\n"
+      "    #5 clk = 1'b0;\n"
+      "    #5 clk = 1'b1;\n"
+      "    #5 clk = 1'b0;\n"
+      "    #5 clk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 3u);
 }
 
 }  // namespace

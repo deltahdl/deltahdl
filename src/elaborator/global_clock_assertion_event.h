@@ -80,19 +80,15 @@ Stmt* SubstituteGlobalClockEventControls(
 // rule a): the declaration is in the scope holding the reference, so its event
 // expression already names signals that scope can see.
 //
-// Returns nullptr where `declared_events` is null, and where the declaration
-// is in the top-level hierarchy block itself while the reference is below it.
-// The flattened design the simulator runs keys a top-level hierarchy block's
-// declarations under no instance prefix at all, and §23.9 stops
-// SimContext::FindVariable in src/simulator/sim_context.cpp from reading such
-// a key from inside an instance, so no name written here would reach the
-// signal. That is deltahdl/deltahdl#3298; a null return leaves the reference
-// unsubstituted, which is what it was before rule b) was served at all.
+// Returns nullptr where `declared_events` is null.
 //
 // Otherwise the result is a new vector allocated from `arena`, holding a copy
 // of each event in which a signal that is a plain identifier is replaced by
 // the §23.6 hierarchical name reaching it from the top-level hierarchy block:
-// `clk` declared in instance `sub1` becomes `sub1.clk`.
+// `clk` declared in instance `sub1` becomes `sub1.clk`. Where the declaration
+// is in the top-level hierarchy block itself there is no instance name to
+// reach it through, and the name written is §23.6's `$root.clk`, absolute from
+// the top of the instantiated design.
 const std::vector<EventExpr>* EffectiveGlobalClockingEvent(
     const std::vector<EventExpr>* declared_events,
     std::string_view declaring_inst_path,

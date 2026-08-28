@@ -126,6 +126,33 @@ Expr* MakeMemberAccess(Expr* base, std::string_view member, const Expr* at,
   return acc;
 }
 
+// §23.6 gives `$root` as the first component of a name written from the top of
+// the instantiated design: "The instance name $root refers to the top of the
+// instantiated design and is used to unambiguously gain access to the top of
+// the design." A string literal has static storage duration, so unlike a name
+// spelled out of an instance path it needs no copy in the arena.
+constexpr std::string_view kRootScope = "$root";
+
+// `signal` re-allocated as a name absolute from the top of the instantiated
+// design, carrying `$root` in Expr::scope_prefix the way
+// Parser::MakeSysScopePrefix in src/parser/expr_parser_calls.cpp carries it for
+// a `$root.clk` written in a source.
+//
+// No instance name stands between the `$root` and the signal, because the
+// flattened design the simulator runs keys a top-level hierarchy block's own
+// declarations under no instance prefix at all: see InstancePathBelowTop
+// above, whose result is empty for exactly that block.
+//
+// A new Expr is allocated rather than the prefix written onto `signal`. The
+// declared event expression belongs to the ModuleDecl the global clocking was
+// written in, and every instance of every module below it reads that one node,
+// so writing to it would qualify the declaring scope's own references too.
+Expr* RootQualifySignal(const Expr* signal, Arena& arena) {
+  Expr* id = MakeIdentifier(signal->text, signal, arena);
+  id->scope_prefix = kRootScope;
+  return id;
+}
+
 // `signal` prefixed by the instance names in `prefix`, so that the identifier
 // `clk` under a `prefix` of "sub1.inner" becomes `sub1.inner.clk`. An empty
 // `prefix` names no instance to reach through and returns `signal` itself.
@@ -156,10 +183,6 @@ const std::vector<EventExpr>* EffectiveGlobalClockingEvent(
   // §14.14 rule a): the declaration is in the scope holding the reference, so
   // its event expression names signals of that scope and stands as written.
   if (declaring == referencing) return declared_events;
-  // deltahdl/deltahdl#3298: a top-level hierarchy block's declarations are
-  // keyed under no instance prefix, and §23.9 forbids reading such a key from
-  // inside an instance, so there is no name to write.
-  if (declaring.empty()) return nullptr;
   auto* qualified = arena.Create<std::vector<EventExpr>>(*declared_events);
   for (auto& ev : *qualified) {
     if (ev.signal == nullptr) continue;
@@ -172,7 +195,11 @@ const std::vector<EventExpr>* EffectiveGlobalClockingEvent(
     // instance. EventExpr::iff_condition is left alone for the same reason,
     // being an arbitrary expression rather than a name.
     if (ev.signal->kind != ExprKind::kIdentifier) continue;
-    ev.signal = QualifySignal(ev.signal, declaring, arena);
+    // An empty `declaring` is the declaration in the top-level hierarchy
+    // block, which is not an instance and so has no instance name to reach it
+    // through. §23.6 names it from the top of the instantiated design instead.
+    ev.signal = declaring.empty() ? RootQualifySignal(ev.signal, arena)
+                                  : QualifySignal(ev.signal, declaring, arena);
   }
   return qualified;
 }

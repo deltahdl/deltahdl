@@ -290,9 +290,9 @@ class ElaboratorData {
   std::vector<GlobalClockingScope> global_clocking_scopes_;
 
   // §14.14: the event expression a $global_clock reference in the cell being
-  // elaborated resolves to, or null where the lookup reaches no declaration it
-  // can name from here. §16.5.2 makes this the clock of a concurrent assertion
-  // written `assert property(@$global_clock a);`, which under a
+  // elaborated resolves to, or null where the lookup reaches no declaration.
+  // §16.5.2 makes this the clock of a concurrent assertion written
+  // `assert property(@$global_clock a);`, which under a
   // `global clocking @clk; endclocking` is equivalent to
   // `assert property(@clk a);`. EffectiveGlobalClockingEvent in
   // elaborator/global_clock_assertion_event.h computes it from the innermost

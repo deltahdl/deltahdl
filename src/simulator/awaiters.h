@@ -82,6 +82,23 @@ inline Variable* ResolveMemberAccessSignal(const Expr* signal,
 // compound expression) or cannot be resolved.
 inline Variable* ResolveSignalToVariable(const Expr* signal, SimContext& ctx) {
   if (signal->kind == ExprKind::kIdentifier) {
+    // §23.6: a leading `$root` makes the name absolute from the top of the
+    // instantiated design, and the parser keeps it in Expr::scope_prefix
+    // rather than in the identifier's text (Parser::MakeSysScopePrefix in
+    // src/parser/expr_parser_calls.cpp). Reading the text alone drops it and
+    // resolves the name in whichever instance is running, so the whole name is
+    // spelled out here. BuildLhsName writes both fields, and the member-access
+    // branch below already reaches SimContext::FindVariable through it.
+    //
+    // Only `$root` is spelled out. Expr::scope_prefix also carries the §23.7.1
+    // package and `$unit` scope resolution prefixes, which are separated by ::
+    // rather than by the period BuildLhsName writes and are not hierarchical
+    // names at all.
+    if (signal->scope_prefix == "$root") {
+      std::string rooted_name;
+      BuildLhsName(signal, rooted_name);
+      return ctx.FindVariable(rooted_name);
+    }
     return ctx.FindVariable(signal->text);
   }
   if (signal->kind == ExprKind::kMemberAccess) {
