@@ -29,6 +29,27 @@ bool SubstituteGlobalClockLeadingEvent(
     std::vector<EventExpr>& sensitivity,
     const std::vector<EventExpr>& global_event);
 
+// §14.14: "The $global_clock system function shall be used to explicitly
+// refer to the event expression in the effective global clocking
+// declaration", and an event control naming it waits on that event expression
+// wherever it is written -- a procedure's own sensitivity list, an event
+// control standing as a statement, an intra-assignment event control, a wait.
+// Walk the statement tree rooted at `stmt` and rewrite every such event
+// control into `global_event`, by the same substitution
+// SubstituteGlobalClockLeadingEvent makes on a leading clocking event, so the
+// process suspends on the declared event rather than on a system call naming
+// no signal.
+//
+// This serves §14.14 lookup rule a) alone, whose result is "the event
+// expression of that global clocking declaration" in "the enclosing module,
+// interface, checker, or program instance scope": the caller passes the
+// enclosing module's own declaration. Rule b), which walks up the instance
+// hierarchy to an ancestor's declaration, is not served here, and a reference
+// resolving to an ancestor's event is left as it stands rather than half
+// resolved.
+void SubstituteGlobalClockEventControls(
+    Stmt* stmt, const std::vector<EventExpr>& global_event);
+
 }  // namespace delta
 
 #endif  // DELTA_ELABORATOR_GLOBAL_CLOCK_ASSERTION_EVENT_H

@@ -16,6 +16,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -742,16 +743,39 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
   }
 }
 
+namespace {
+
+// §14.14 rule a): a $global_clock reference resolves to "the event expression
+// of that global clocking declaration" found in "the enclosing module,
+// interface, checker, or program instance scope". `global_event` is that event
+// expression, and is nullptr where the enclosing module declares no global
+// clocking, in which case the procedure is left as it stands and §14.14's own
+// report of a reference with no declaration in scope is the only account of
+// it. A procedure names $global_clock either in its own sensitivity list
+// (`always @($global_clock)`) or in an event control within its body
+// (`initial @($global_clock) done = 1;`), so both are rewritten, before
+// AddProcess copies the sensitivity list into the process and builds the body.
+void SubstituteGlobalClockInProcedure(
+    ModuleItem* item, const std::vector<EventExpr>* global_event) {
+  if (global_event == nullptr) return;
+  SubstituteGlobalClockLeadingEvent(item->sensitivity, *global_event);
+  SubstituteGlobalClockEventControls(item->body, *global_event);
+}
+
+}  // namespace
+
 // Processes, generates, subroutines, assertions, and remaining items (§9, §16,
 // §13, §27).
 bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
   const ProcessBuildEnv kEnv{arena_, diag_, &func_decls_, &const_names_};
   switch (item->kind) {
     case ModuleItemKind::kInitialBlock:
+      SubstituteGlobalClockInProcedure(item, module_global_clocking_event_);
       AddProcess(RtlirProcessKind::kInitial, item, mod,
                  ProcessBuildEnv{arena_, diag_});
       return true;
     case ModuleItemKind::kFinalBlock:
+      SubstituteGlobalClockInProcedure(item, module_global_clocking_event_);
       AddProcess(RtlirProcessKind::kFinal, item, mod,
                  ProcessBuildEnv{arena_, diag_});
       return true;
@@ -759,6 +783,7 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kAlwaysCombBlock:
     case ModuleItemKind::kAlwaysFFBlock:
     case ModuleItemKind::kAlwaysLatchBlock:
+      SubstituteGlobalClockInProcedure(item, module_global_clocking_event_);
       AddProcess(MapAlwaysKind(item->always_kind), item, mod, kEnv);
       return true;
     case ModuleItemKind::kGenerateIf:

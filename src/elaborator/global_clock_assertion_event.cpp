@@ -27,4 +27,40 @@ bool SubstituteGlobalClockLeadingEvent(
   return true;
 }
 
+namespace {
+
+// Recurse into every nested-statement slot of `s`, so that an event control
+// written anywhere beneath a procedure is reached.
+void SubstituteGlobalClockInSubStmts(
+    Stmt* s, const std::vector<EventExpr>& global_event) {
+  for (auto* sub : s->stmts) {
+    SubstituteGlobalClockEventControls(sub, global_event);
+  }
+  for (auto* sub : s->for_inits) {
+    SubstituteGlobalClockEventControls(sub, global_event);
+  }
+  for (auto* sub : s->for_steps) {
+    SubstituteGlobalClockEventControls(sub, global_event);
+  }
+  for (auto* sub : s->fork_stmts) {
+    SubstituteGlobalClockEventControls(sub, global_event);
+  }
+  for (auto& ci : s->case_items) {
+    SubstituteGlobalClockEventControls(ci.body, global_event);
+  }
+  SubstituteGlobalClockEventControls(s->then_branch, global_event);
+  SubstituteGlobalClockEventControls(s->else_branch, global_event);
+  SubstituteGlobalClockEventControls(s->body, global_event);
+  SubstituteGlobalClockEventControls(s->for_body, global_event);
+}
+
+}  // namespace
+
+void SubstituteGlobalClockEventControls(
+    Stmt* stmt, const std::vector<EventExpr>& global_event) {
+  if (stmt == nullptr) return;
+  SubstituteGlobalClockLeadingEvent(stmt->events, global_event);
+  SubstituteGlobalClockInSubStmts(stmt, global_event);
+}
+
 }  // namespace delta
