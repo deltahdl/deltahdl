@@ -167,25 +167,28 @@ const Expr* FindGclkFunctionRef(const Expr* e, GclkKindPredicate match) {
 
 const Expr* FindGclkFunctionRefInStmt(const Stmt* s, GclkKindPredicate match);
 
+// Recurse into every nested statement of `s`; returns the first descendant
+// call whose kind satisfies `match`, or nullptr. §16.9.4 says the global
+// clocking sampled value functions "may be used only if global clocking is
+// defined" and puts no condition on where the call stands, so every position a
+// statement holds a statement in is one such a call may be written in.
+//
+// ForEachChildStmt in elaborator_validate_internal.h states those positions,
+// once for the whole elaborator, which is why the list is not written out again
+// here. It visits every one of them and gives the visitor no way to stop, so
+// the search short-circuits by keeping the first hit in `found` and recursing
+// only while `found` is null. That skip is what the early return out of the old
+// list of slots did: without it the walk descends into every remaining subtree
+// after the answer is already known, and a hit found beneath a later child
+// would overwrite the one this function is required to return.
 const Expr* FindGclkFunctionRefInSubStmts(const Stmt* s,
                                           GclkKindPredicate match) {
-  for (auto* sub : s->stmts) {
-    if (const Expr* hit = FindGclkFunctionRefInStmt(sub, match)) return hit;
-  }
-  if (const Expr* hit = FindGclkFunctionRefInStmt(s->then_branch, match)) {
-    return hit;
-  }
-  if (const Expr* hit = FindGclkFunctionRefInStmt(s->else_branch, match)) {
-    return hit;
-  }
-  if (const Expr* hit = FindGclkFunctionRefInStmt(s->body, match)) return hit;
-  if (const Expr* hit = FindGclkFunctionRefInStmt(s->for_body, match)) {
-    return hit;
-  }
-  for (auto& ci : s->case_items) {
-    if (const Expr* hit = FindGclkFunctionRefInStmt(ci.body, match)) return hit;
-  }
-  return nullptr;
+  const Expr* found = nullptr;
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    if (found) return;
+    found = FindGclkFunctionRefInStmt(sub, match);
+  });
+  return found;
 }
 
 const Expr* FindGclkFunctionRefInStmt(const Stmt* s, GclkKindPredicate match) {

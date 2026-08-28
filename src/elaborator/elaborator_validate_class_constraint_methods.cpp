@@ -4,6 +4,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_class_constraints.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
 
@@ -96,50 +97,39 @@ static bool StmtExprFieldsCallModeMethod(const Stmt* s) {
   return false;
 }
 
-// 18.5.11: true if any case or randcase arm of 's' (its guard expressions or
-// its arm body) contains a rand_mode()/constraint_mode() call.
-static bool CaseArmsCallModeMethod(const Stmt* s) {
+// 18.5.11: true if a guard expression of a case or randcase arm of 's'
+// contains a rand_mode()/constraint_mode() call. The arm bodies are
+// statements, which StmtChildrenCallModeMethod below reaches along with every
+// other substatement.
+static bool CaseArmExprsCallModeMethod(const Stmt* s) {
   for (const auto& ci : s->case_items) {
     for (const auto* p : ci.patterns)
       if (ExprCallsModeMethod(p)) return true;
-    if (StmtCallsModeMethod(ci.body)) return true;
   }
-  for (const auto& [w, body] : s->randcase_items) {
-    if (ExprCallsModeMethod(w)) return true;
-    if (StmtCallsModeMethod(body)) return true;
+  for (const auto& rc : s->randcase_items) {
+    if (ExprCallsModeMethod(rc.first)) return true;
   }
   return false;
 }
 
-// 18.5.11: true if any list-valued substatement field of 's' (block/fork
-// bodies, for-loop inits and steps) contains a rand_mode()/constraint_mode()
-// call.
-static bool StmtListChildrenCallModeMethod(const Stmt* s) {
-  for (const auto* sub : s->stmts)
-    if (StmtCallsModeMethod(sub)) return true;
-  for (const auto* sub : s->fork_stmts)
-    if (StmtCallsModeMethod(sub)) return true;
-  for (const auto* fi : s->for_inits)
-    if (StmtCallsModeMethod(fi)) return true;
-  for (const auto* fs : s->for_steps)
-    if (StmtCallsModeMethod(fs)) return true;
-  return false;
-}
-
-// 18.5.11: true if any single-substatement field of 's' (branch arms, loop and
-// generic bodies) contains a rand_mode()/constraint_mode() call.
-static bool ScalarStmtChildrenCallModeMethod(const Stmt* s) {
-  return StmtCallsModeMethod(s->then_branch) ||
-         StmtCallsModeMethod(s->else_branch) || StmtCallsModeMethod(s->body) ||
-         StmtCallsModeMethod(s->for_body);
-}
-
-// 18.5.11: recurse into every substatement (and the expressions guarding case
-// and randcase arms) of 's', returning true on a rand_mode()/constraint_mode()
-// call.
+// 18.5.11: recurse into every substatement of 's', returning true on a
+// rand_mode()/constraint_mode() call. The clause forbids the call anywhere in
+// a function that appears in a constraint and names no position it is allowed
+// in, so every position a statement holds a statement in is one the search has
+// to look at.
+//
+// ForEachChildStmt in elaborator_validate_internal.h states those positions,
+// once for the whole elaborator, which is why the list is not written out again
+// here. It gives the visitor no way to stop, so the search short-circuits by
+// recording the first hit in `found` and recursing only while `found` is false,
+// which is what the early return out of the old list of slots did.
 static bool StmtChildrenCallModeMethod(const Stmt* s) {
-  return CaseArmsCallModeMethod(s) || ScalarStmtChildrenCallModeMethod(s) ||
-         StmtListChildrenCallModeMethod(s);
+  bool found = false;
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    if (found) return;
+    found = StmtCallsModeMethod(sub);
+  });
+  return found;
 }
 
 // 18.5.11: recursively search a statement (and its substatements and
@@ -147,6 +137,7 @@ static bool StmtChildrenCallModeMethod(const Stmt* s) {
 static bool StmtCallsModeMethod(const Stmt* s) {
   if (!s) return false;
   if (StmtExprFieldsCallModeMethod(s)) return true;
+  if (CaseArmExprsCallModeMethod(s)) return true;
   return StmtChildrenCallModeMethod(s);
 }
 

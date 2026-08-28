@@ -701,4 +701,137 @@ TEST(ScopeRulesElaboration, DuplicateGateInstanceNamesInOneScopeRejected) {
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'g'", 4, "23.9"));
 }
 
+// The ten cases below cover the child-statement links of Stmt that the two
+// §23.9 walks in src/elaborator/elaborator_scope_rules.cpp reach for the first
+// time now that both take their list from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. CollectScopeWalk had written
+// out nine of the thirteen links and CheckBlockLocalRedeclarations nine, and
+// the four each was missing are the same four: Stmt::assert_pass_stmt,
+// Stmt::assert_fail_stmt, the body of a randcase item, and the two statement
+// lists Stmt::rs_productions holds. A randsequence production keeps statements
+// in RsProd::code_stmts and in RsRule::weight_code, which
+// ForEachRandsequenceRuleStmt reaches by different members, so each is its own
+// position and each gets its own case.
+
+// §23.9 rules that an identifier "referenced directly (without a hierarchical
+// path)" is declared "locally or within a module, interface, program, checker,
+// task, function, named block, or generate block that is higher in the same
+// branch of the name tree", and puts no condition on the statement the
+// reference stands in. Each case here assigns to `z`, which nothing declares,
+// from one position CollectScopeWalk did not reach before.
+//
+// `stmt` is written at line 4 and may run to several lines, so the line the
+// report stands at is read back out of the source rather than counted.
+//
+// Elaborator::ValidateScopeRules in src/elaborator/elaborator_scope_rules.cpp
+// is the emission site: it formats "undeclared identifier '{}'" from the name
+// CollectScopeWalk recorded and passes Subclause("23.9").
+void ExpectUndeclaredAssignTargetIn(const std::string& stmt) {
+  ElabFixture f;
+  std::string src =
+      "module m;\n  logic ok;\n  initial\n    " + stmt + "\nendmodule\n";
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "undeclared identifier 'z'",
+                            LineHolding(src, "z = 1;"), "23.9"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
+// next cover one arm each.
+TEST(ScopeRulesElaboration, UndeclaredAssignTargetInAnAssertionPassStmt) {
+  ExpectUndeclaredAssignTargetIn("assert (ok) z = 1;");
+}
+
+TEST(ScopeRulesElaboration, UndeclaredAssignTargetInAnAssertionFailStmt) {
+  ExpectUndeclaredAssignTargetIn("assert (ok) else z = 1;");
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
+// statement the parser keeps in the second member of a Stmt::randcase_items
+// entry. §23.9 is a rule about the source, so it holds whether the weighted
+// draw would select the item or not.
+TEST(ScopeRulesElaboration, UndeclaredAssignTargetInARandcaseItem) {
+  ExpectUndeclaredAssignTargetIn("randcase 1: z = 1; endcase");
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements. They are kept in RsProd::code_stmts, reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(ScopeRulesElaboration, UndeclaredAssignTargetInARandsequenceCodeBlock) {
+  ExpectUndeclaredAssignTargetIn(
+      "begin\n"
+      "      randsequence(main)\n"
+      "        main : { z = 1; };\n"
+      "      endsequence\n"
+      "    end");
+}
+
+// §18.17.1 lets a weight specification be followed by a code block of its own,
+// which the parser keeps in RsRule::weight_code. It is a second list under
+// Stmt::rs_productions, so a walk reaches it without reaching
+// RsProd::code_stmts and the case above does not answer for it.
+TEST(ScopeRulesElaboration,
+     UndeclaredAssignTargetInARandsequenceWeightCodeBlock) {
+  ExpectUndeclaredAssignTargetIn(
+      "begin\n"
+      "      randsequence(main)\n"
+      "        main : alt := 1 { z = 1; };\n"
+      "        alt : { ok = 1; };\n"
+      "      endsequence\n"
+      "    end");
+}
+
+// §23.9 rules that "An identifier shall be used to declare only one item within
+// a scope" and lists "begin-end blocks (named or unnamed)" among the elements
+// that define one, putting no condition on the statement the block stands in.
+// Each case here writes a block declaring `a` twice into one position
+// CheckBlockLocalRedeclarations did not reach before.
+//
+// CheckOneBlockLocals in src/elaborator/elaborator_scope_rules.cpp is the
+// emission site: it formats "redeclaration of '{}'" from Stmt::var_name and
+// passes Subclause("23.9"). The report stands at the second declaration, which
+// each source writes on the same line as the first.
+void ExpectDuplicateBlockLocalIn(const std::string& stmt) {
+  ElabFixture f;
+  std::string src =
+      "module m;\n  logic ok;\n  initial\n    " + stmt + "\nendmodule\n";
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "redeclaration of 'a'",
+                            LineHolding(src, "begin int a; int a; end"),
+                            "23.9"));
+}
+
+TEST(ScopeRulesElaboration, DuplicateBlockLocalInAnAssertionPassStmt) {
+  ExpectDuplicateBlockLocalIn("assert (ok) begin int a; int a; end");
+}
+
+TEST(ScopeRulesElaboration, DuplicateBlockLocalInAnAssertionFailStmt) {
+  ExpectDuplicateBlockLocalIn("assert (ok) else begin int a; int a; end");
+}
+
+TEST(ScopeRulesElaboration, DuplicateBlockLocalInARandcaseItem) {
+  ExpectDuplicateBlockLocalIn("randcase 1: begin int a; int a; end endcase");
+}
+
+TEST(ScopeRulesElaboration, DuplicateBlockLocalInARandsequenceCodeBlock) {
+  ExpectDuplicateBlockLocalIn(
+      "begin\n"
+      "      randsequence(main)\n"
+      "        main : { begin int a; int a; end };\n"
+      "      endsequence\n"
+      "    end");
+}
+
+TEST(ScopeRulesElaboration, DuplicateBlockLocalInARandsequenceWeightCodeBlock) {
+  ExpectDuplicateBlockLocalIn(
+      "begin\n"
+      "      randsequence(main)\n"
+      "        main : alt := 1 { begin int a; int a; end };\n"
+      "        alt : { ok = 1; };\n"
+      "      endsequence\n"
+      "    end");
+}
+
 }  // namespace

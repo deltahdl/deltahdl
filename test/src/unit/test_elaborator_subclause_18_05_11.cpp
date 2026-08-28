@@ -269,4 +269,113 @@ TEST(FunctionsInConstraints, NestedConstraintCallInnerFunctionChecked) {
                             6, "18.5.11"));
 }
 
+// 18.5.11 forbids the call anywhere in a function that appears in a
+// constraint and names no position it is allowed in. §16.3's action_block puts
+// a statement after the asserted expression, which the parser keeps in
+// Stmt::assert_pass_stmt; a body walk that omits that field exempts the call
+// written there.
+TEST(FunctionsInConstraints, ModeMethodCallInAssertionPassStatementRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand int x;\n"
+             "  rand int y;\n"
+             "  function int f(int a);\n"
+             "    assert (a > 0) this.rand_mode(0);\n"
+             "    return a;\n"
+             "  endfunction\n"
+             "  constraint c1 { x == f(y); }\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "function 'f' used in a constraint cannot modify the "
+                    "constraints by calling rand_mode or constraint_mode",
+                    8, "18.5.11"));
+}
+
+// §16.3's action_block also puts a statement after `else`, which the parser
+// keeps in Stmt::assert_fail_stmt. 18.5.11 reaches a call written there for the
+// same reason it reaches one in the pass statement.
+TEST(FunctionsInConstraints, ModeMethodCallInAssertionFailStatementRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand int x;\n"
+             "  rand int y;\n"
+             "  function int f(int a);\n"
+             "    assert (a > 0) else this.constraint_mode(0);\n"
+             "    return a;\n"
+             "  endfunction\n"
+             "  constraint c1 { x == f(y); }\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "function 'f' used in a constraint cannot modify the "
+                    "constraints by calling rand_mode or constraint_mode",
+                    8, "18.5.11"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements and 18.5.11 forbids the call in one as it forbids it in a
+// begin-end block.
+TEST(FunctionsInConstraints, ModeMethodCallInRandsequenceCodeBlockRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand int x;\n"
+             "  rand int y;\n"
+             "  function int f(int a);\n"
+             "    randsequence(main)\n"
+             "      main : { this.rand_mode(0); };\n"
+             "    endsequence\n"
+             "    return a;\n"
+             "  endfunction\n"
+             "  constraint c1 { x == f(y); }\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "function 'f' used in a constraint cannot modify the "
+                    "constraints by calling rand_mode or constraint_mode",
+                    10, "18.5.11"));
+}
+
+// A.6.12's `rs_rule ::= rs_production_list [ := weight_specification [
+// rs_code_block ] ]` puts a second code block after the weight, which the
+// parser keeps in RsRule::weight_code rather than in RsProd::code_stmts. A walk
+// that reads only the production's own block leaves this one unreached.
+TEST(FunctionsInConstraints, ModeMethodCallInRandsequenceWeightBlockRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand int x;\n"
+             "  rand int y;\n"
+             "  function int f(int a);\n"
+             "    randsequence(main)\n"
+             "      main : a := 5 { this.constraint_mode(0); };\n"
+             "      a : { ; };\n"
+             "    endsequence\n"
+             "    return a;\n"
+             "  endfunction\n"
+             "  constraint c1 { x == f(y); }\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "function 'f' used in a constraint cannot modify the "
+                    "constraints by calling rand_mode or constraint_mode",
+                    11, "18.5.11"));
+}
+
 }  // namespace

@@ -164,4 +164,162 @@ TEST(GlobalClockingElab, GclkFunctionResolvesGlobalClockingFromParentInstance) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §16.9.4 says the global clocking sampled value functions "may be used only
+// if global clocking is defined (see 14.14)" and states no condition on where
+// the call stands, so a $past_gclk written in any statement position of a
+// module that declares no global clocking and is instantiated under none is an
+// error. §16.9.4 also says "the global clocking past sampled value functions
+// are usable in general procedural code and action blocks", so every case below
+// breaks the requires-a-declaration rule alone and the placement rule the
+// future functions carry cannot account for the report.
+//
+// The seven cases each put the call in one statement position, and each is a
+// position Elaborator::ValidateGclkRequiresGlobalClocking reached only once
+// FindGclkFunctionRefInSubStmts in
+// src/elaborator/elaborator_validate_global_clocking.cpp took its list of
+// nested statements from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. Every one of them elaborated
+// clean beforehand, with the design left to sample a global clock it has no
+// declaration for.
+
+// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
+// block_item_declaration } { statement_or_null } join_keyword ...`, so a fork
+// holds statements the way a begin-end block does. The parser keeps them in
+// Stmt::fork_stmts rather than in Stmt::stmts.
+TEST(GlobalClockingElab,
+     GclkFunctionInAForkStatementWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  initial fork\n"
+      "    x = $past_gclk(x);\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 4,
+      "16.9.4"));
+}
+
+// A.6.8's for_initialization is a list of variable assignments, so the loop
+// header holds statements of its own in Stmt::for_inits and a call written
+// there is a use of the function like any other.
+TEST(GlobalClockingElab,
+     GclkFunctionInAForInitializerWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  int i;\n"
+      "  initial\n"
+      "    for (i = $past_gclk(x); i < 1; i = i + 1)\n"
+      "      x = 32'd1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 5,
+      "16.9.4"));
+}
+
+// A.6.8's for_step_assignment is the same rule at the other end of the loop
+// header, kept in Stmt::for_steps. The initializer here assigns a constant, so
+// the call the report names can only be the one in the step.
+TEST(GlobalClockingElab, GclkFunctionInAForStepWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  int i;\n"
+      "  initial\n"
+      "    for (i = 0; i < 1; i = $past_gclk(x))\n"
+      "      x = 32'd1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 5,
+      "16.9.4"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. The two cases
+// below cover one arm each.
+TEST(GlobalClockingElab,
+     GclkFunctionInAnAssertionPassStatementWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  logic ok;\n"
+      "  initial assert (ok) x = $past_gclk(x);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 4,
+      "16.9.4"));
+}
+
+TEST(GlobalClockingElab,
+     GclkFunctionInAnAssertionFailStatementWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  logic ok;\n"
+      "  initial assert (ok) else x = $past_gclk(x);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 4,
+      "16.9.4"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
+// randcase holds a statement per item, kept in Stmt::randcase_items. The rule
+// is a static one, so it holds whether the weighted draw would select the item
+// or not.
+TEST(GlobalClockingElab,
+     GclkFunctionInARandcaseItemWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  initial randcase 1: x = $past_gclk(x); endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 3,
+      "16.9.4"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements, kept in RsProd::code_stmts and reached through
+// Stmt::rs_productions.
+TEST(GlobalClockingElab,
+     GclkFunctionInARandsequenceCodeBlockWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { x = $past_gclk(x); };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 5,
+      "16.9.4"));
+}
+
 }  // namespace

@@ -330,4 +330,75 @@ TEST(FunctionBackgroundProcessElaboration, InitialCallToBackgroundFuncOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §13.4.4 asks whether the called function schedules an event that cannot
+// become active until after it returns, and puts no condition on where the
+// statement that schedules it stands. StmtSpawnsBackgroundProcess in
+// src/elaborator/elaborator_validate_subroutine.cpp had written out ten of the
+// thirteen child-statement links Stmt declares, and now takes the list from
+// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The two
+// cases below cover the one newly reached position a background-spawning
+// statement can be written in. Stmt::for_inits and Stmt::for_steps are the
+// other two and get no case: A.6.8 admits only a variable assignment or a
+// for_variable_declaration in a for_initialization, and only an
+// operator_assignment, an inc_or_dec_expression or a function_subroutine_call
+// in a for_step, so a nonblocking assignment, an event trigger and a fork are
+// all barred from both.
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements and a nonblocking assignment written there schedules the event
+// §13.4.4 is about. The statements are kept in RsProd::code_stmts, reached
+// through Stmt::rs_productions and through no other member of Stmt.
+TEST(FunctionBackgroundProcessElaboration,
+     ContAssignToFuncWithNbaInRandsequenceCodeBlockError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic q;\n"
+      "  logic r;\n"
+      "  function automatic logic spawn_rs();\n"
+      "    randsequence(main)\n"
+      "      main : { q <= 1'b1; };\n"
+      "    endsequence\n"
+      "    return 1'b0;\n"
+      "  endfunction\n"
+      "  assign r = spawn_rs();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "function 'spawn_rs' schedules a background event and cannot be called "
+      "outside an initial/always procedure or fork block",
+      10, "13.4.4"));
+}
+
+// §18.17.1 lets a weight specification be followed by a code block of its own,
+// which the parser keeps in RsRule::weight_code. It is a second list under
+// Stmt::rs_productions, so a walk reaches it without reaching
+// RsProd::code_stmts and the case above does not answer for it.
+TEST(FunctionBackgroundProcessElaboration,
+     ContAssignToFuncWithNbaInRandsequenceWeightCodeBlockError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic q;\n"
+      "  logic r;\n"
+      "  int i;\n"
+      "  function automatic logic spawn_rs_weight();\n"
+      "    randsequence(main)\n"
+      "      main : alt := 1 { q <= 1'b1; };\n"
+      "      alt : { i = 1; };\n"
+      "    endsequence\n"
+      "    return 1'b0;\n"
+      "  endfunction\n"
+      "  assign r = spawn_rs_weight();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function 'spawn_rs_weight' schedules a background "
+                            "event and cannot be called outside an "
+                            "initial/always procedure or fork block",
+                            12, "13.4.4"));
+}
+
 }  // namespace

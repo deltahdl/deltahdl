@@ -5,6 +5,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -81,17 +82,21 @@ void Elaborator::WalkExprForDpiCalls(const Expr* e) {
   for (auto* el : e->elements) WalkExprForDpiCalls(el);
 }
 
+// §7.7 puts no condition on where the call it prohibits stands, and A.6.9 makes
+// a subroutine_call_statement a statement, so a DPI import call may be written
+// in every position a statement holds a statement in and the check is owed at
+// each of them.
+//
+// ForEachChildStmt in elaborator_validate_internal.h states those positions,
+// once for the whole elaborator, which is why the list is not written out again
+// here. It hands the visitor the field itself, so a walker that only reads the
+// tree takes a `Stmt* const&`.
 void Elaborator::WalkStmtsForDpiArgs(const Stmt* s) {
   if (!s) return;
   WalkExprForDpiCalls(s->rhs);
   WalkExprForDpiCalls(s->expr);
   WalkExprForDpiCalls(s->condition);
-  for (auto* sub : s->stmts) WalkStmtsForDpiArgs(sub);
-  WalkStmtsForDpiArgs(s->then_branch);
-  WalkStmtsForDpiArgs(s->else_branch);
-  WalkStmtsForDpiArgs(s->body);
-  WalkStmtsForDpiArgs(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForDpiArgs(ci.body);
+  ForEachChildStmt(s, [this](Stmt* const& sub) { WalkStmtsForDpiArgs(sub); });
 }
 
 void Elaborator::ValidateDpiOpenArrayArgs(const ModuleDecl* decl) {
@@ -122,35 +127,36 @@ static bool StmtNodeSpawnsBackgroundProcess(const Stmt* s) {
 
 static bool StmtSpawnsBackgroundProcess(const Stmt* s);
 
-// §13.4.4: true when any statement in one of `s`'s child statement-list slots
-// spawns a background process.
-static bool ChildStmtListSpawnsBackgroundProcess(const Stmt* s) {
-  for (auto* sub : s->stmts)
-    if (StmtSpawnsBackgroundProcess(sub)) return true;
-  for (auto* sub : s->fork_stmts)
-    if (StmtSpawnsBackgroundProcess(sub)) return true;
-  for (auto& ci : s->case_items)
-    if (StmtSpawnsBackgroundProcess(ci.body)) return true;
-  for (auto& ri : s->randcase_items)
-    if (StmtSpawnsBackgroundProcess(ri.second)) return true;
-  return false;
-}
-
-// §13.4.4: true when one of `s`'s single-statement child slots spawns a
-// background process.
-static bool ChildStmtSlotSpawnsBackgroundProcess(const Stmt* s) {
-  return StmtSpawnsBackgroundProcess(s->then_branch) ||
-         StmtSpawnsBackgroundProcess(s->else_branch) ||
-         StmtSpawnsBackgroundProcess(s->body) ||
-         StmtSpawnsBackgroundProcess(s->for_body) ||
-         StmtSpawnsBackgroundProcess(s->assert_pass_stmt) ||
-         StmtSpawnsBackgroundProcess(s->assert_fail_stmt);
-}
-
-// §13.4.4: true when any substatement of `s` spawns a background process.
+// §13.4.4: true when any substatement of `s` spawns a background process. The
+// clause asks whether the function schedules an event that cannot become
+// active until after the function returns, and puts no condition on where the
+// statement that schedules it stands, so every position a statement holds a
+// statement in is one it may be written in.
+//
+// ForEachChildStmt in elaborator_validate_internal.h states those positions,
+// once for the whole elaborator. It visits every one of them and gives the
+// visitor no way to stop, so the search short-circuits by keeping the answer in
+// `found` and calling StmtSpawnsBackgroundProcess only while `found` is false.
+//
+// Stmt::fork_stmts is walked deliberately rather than skipped. §13.4.4 says a
+// fork-join_none inside a function "may contain any statements that are legal
+// within a task", so a nonblocking assignment written inside one schedules an
+// event that cannot become active until after the function returns exactly as
+// one written beside it does.
+//
+// Stmt::for_inits and Stmt::for_steps are walked because the shared list is
+// walked whole, and no source can make either of them answer true: A.6.8 admits
+// only a variable assignment or a for_variable_declaration in a
+// for_initialization, and only an operator_assignment, an inc_or_dec_expression
+// or a function_subroutine_call in a for_step, none of which is a nonblocking
+// assignment, an event trigger or a fork.
 static bool ChildStmtSpawnsBackgroundProcess(const Stmt* s) {
-  return ChildStmtListSpawnsBackgroundProcess(s) ||
-         ChildStmtSlotSpawnsBackgroundProcess(s);
+  bool found = false;
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    if (found) return;
+    found = StmtSpawnsBackgroundProcess(sub);
+  });
+  return found;
 }
 
 // §13.4.4

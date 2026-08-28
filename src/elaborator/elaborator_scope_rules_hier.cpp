@@ -10,6 +10,7 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
 
@@ -36,6 +37,22 @@ void CollectMemberAccess(const Expr* e, std::vector<const Expr*>& out) {
   for (const auto* el : e->elements) CollectMemberAccess(el, out);
 }
 
+// Collects every member access written anywhere in `s` and its nested
+// statements. §23.6 says a hierarchical name may be written wherever the object
+// it names is referenced, and §26.3 bars a hierarchical reference into an
+// importing scope with no condition on where that reference stands, so every
+// position a statement holds a statement in is a position both rules reach.
+//
+// ForEachChildStmt in elaborator_validate_internal.h states those positions
+// once for the whole elaborator, which is why the list is not written out again
+// here. The visitor takes `Stmt* const&` because `s` is a `const Stmt*`, which
+// is how ForEachChildStmt lets a walk that only reads the tree share its list
+// with the walks that rewrite it.
+//
+// The two loops above the call read expressions rather than statements: a case
+// item's patterns and a randcase item's weight are the only expressions Stmt
+// holds outside its own scalar fields, and ForEachChildStmt reaches neither
+// because neither is a statement.
 void CollectMemberAccessInStmt(const Stmt* s, std::vector<const Expr*>& out) {
   if (!s) return;
   CollectMemberAccess(s->condition, out);
@@ -48,22 +65,10 @@ void CollectMemberAccessInStmt(const Stmt* s, std::vector<const Expr*>& out) {
   CollectMemberAccess(s->assert_expr, out);
   for (const auto& ci : s->case_items) {
     for (const auto* p : ci.patterns) CollectMemberAccess(p, out);
-    CollectMemberAccessInStmt(ci.body, out);
   }
-  for (const auto& [w, body] : s->randcase_items) {
-    CollectMemberAccess(w, out);
-    CollectMemberAccessInStmt(body, out);
-  }
-  for (const auto* sub : s->stmts) CollectMemberAccessInStmt(sub, out);
-  for (const auto* sub : s->fork_stmts) CollectMemberAccessInStmt(sub, out);
-  CollectMemberAccessInStmt(s->then_branch, out);
-  CollectMemberAccessInStmt(s->else_branch, out);
-  CollectMemberAccessInStmt(s->body, out);
-  CollectMemberAccessInStmt(s->for_body, out);
-  for (const auto* fi : s->for_inits) CollectMemberAccessInStmt(fi, out);
-  for (const auto* fs : s->for_steps) CollectMemberAccessInStmt(fs, out);
-  CollectMemberAccessInStmt(s->assert_pass_stmt, out);
-  CollectMemberAccessInStmt(s->assert_fail_stmt, out);
+  for (const auto& rc : s->randcase_items) CollectMemberAccess(rc.first, out);
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { CollectMemberAccessInStmt(sub, out); });
 }
 
 struct InstanceArrayBounds {

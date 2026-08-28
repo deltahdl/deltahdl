@@ -10,6 +10,7 @@
 #include "common/source_loc.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_scope_rules_names.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -63,19 +64,25 @@ void CollectScopeWalk(const Stmt* s, ScopeWalk& out) {
                 s->lhs->text) == out.active_loop_vars.end()) {
     out.proc_lhs.emplace_back(s->lhs->text, s->range.start);
   }
-  for (const auto* sub : s->stmts) CollectScopeWalk(sub, out);
-  for (const auto* sub : s->fork_stmts) CollectScopeWalk(sub, out);
-  CollectScopeWalk(s->then_branch, out);
-  CollectScopeWalk(s->else_branch, out);
-  CollectScopeWalk(s->body, out);
-  for (const auto& ci : s->case_items) CollectScopeWalk(ci.body, out);
-
-  // §12.7.1: walk the for-loop's init, step, and body with the locally declared
-  // control variables in scope, then drop them so they do not leak outward.
+  // §23.9 makes a block label, a local declaration and an assignment target
+  // part of the scope they are written in wherever the statement holding them
+  // stands, so every position a statement holds a statement in is one this
+  // collection reaches. ForEachChildStmt in elaborator_validate_internal.h
+  // states those positions once for the whole elaborator, which is why the
+  // list is not written out again here. The visitor takes `Stmt* const&`
+  // because `s` is a `const Stmt*`, which is how ForEachChildStmt lets a walk
+  // that only reads the tree share its list with the walks that rewrite it.
+  //
+  // §12.7.1: the control variables a for-loop header declares are in scope
+  // while the loop's own sub-statements are walked and are dropped afterwards
+  // so they do not leak outward. The push brackets the whole descent rather
+  // than Stmt::for_inits, Stmt::for_steps and Stmt::for_body alone, because
+  // PushTypedForInitVars pushes nothing unless Stmt::for_inits holds
+  // something, which A.6.8 admits on a for-loop statement alone, and a
+  // for-loop statement holds its sub-statements in those three members and no
+  // other.
   size_t pushed = PushTypedForInitVars(s, out);
-  for (const auto* fi : s->for_inits) CollectScopeWalk(fi, out);
-  for (const auto* fs : s->for_steps) CollectScopeWalk(fs, out);
-  CollectScopeWalk(s->for_body, out);
+  ForEachChildStmt(s, [&](Stmt* const& sub) { CollectScopeWalk(sub, out); });
   out.active_loop_vars.resize(out.active_loop_vars.size() - pushed);
 }
 
@@ -113,17 +120,13 @@ void CheckBlockLocalRedeclarations(const Stmt* s, DiagEngine& diag) {
   // because the fork-join block is a separate scope and a name reused there is
   // legal shadowing.
   if (s->kind == StmtKind::kFork) CheckOneBlockLocals(s->fork_stmts, diag);
-  for (const auto* sub : s->stmts) CheckBlockLocalRedeclarations(sub, diag);
-  for (const auto* sub : s->fork_stmts)
-    CheckBlockLocalRedeclarations(sub, diag);
-  CheckBlockLocalRedeclarations(s->then_branch, diag);
-  CheckBlockLocalRedeclarations(s->else_branch, diag);
-  CheckBlockLocalRedeclarations(s->body, diag);
-  CheckBlockLocalRedeclarations(s->for_body, diag);
-  for (const auto* fi : s->for_inits) CheckBlockLocalRedeclarations(fi, diag);
-  for (const auto* fs : s->for_steps) CheckBlockLocalRedeclarations(fs, diag);
-  for (const auto& ci : s->case_items)
-    CheckBlockLocalRedeclarations(ci.body, diag);
+  // §23.9 puts no condition on where the block whose declarations it governs
+  // is written, so every position a statement holds a statement in is a
+  // position a begin-end or fork-join block stands in. ForEachChildStmt in
+  // elaborator_validate_internal.h states those positions once for the whole
+  // elaborator, which is why the list is not written out again here.
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { CheckBlockLocalRedeclarations(sub, diag); });
 }
 
 // §8.30.1: a weak_reference's type parameter shall name a class type. The same
@@ -144,20 +147,14 @@ void ValidateLocalWeakRefDecls(
                  Subclause("8.30.1"));
     }
   }
-  for (const auto* sub : s->stmts)
+  // §8.30.1 puts no condition on where the declaration it governs is written,
+  // so every position a statement holds a statement in is a position a
+  // weak_reference variable is declared in. ForEachChildStmt in
+  // elaborator_validate_internal.h states those positions once for the whole
+  // elaborator, which is why the list is not written out again here.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     ValidateLocalWeakRefDecls(sub, typedefs, class_names, diag);
-  for (const auto* sub : s->fork_stmts)
-    ValidateLocalWeakRefDecls(sub, typedefs, class_names, diag);
-  ValidateLocalWeakRefDecls(s->then_branch, typedefs, class_names, diag);
-  ValidateLocalWeakRefDecls(s->else_branch, typedefs, class_names, diag);
-  ValidateLocalWeakRefDecls(s->body, typedefs, class_names, diag);
-  ValidateLocalWeakRefDecls(s->for_body, typedefs, class_names, diag);
-  for (const auto* fi : s->for_inits)
-    ValidateLocalWeakRefDecls(fi, typedefs, class_names, diag);
-  for (const auto* fs : s->for_steps)
-    ValidateLocalWeakRefDecls(fs, typedefs, class_names, diag);
-  for (const auto& ci : s->case_items)
-    ValidateLocalWeakRefDecls(ci.body, typedefs, class_names, diag);
+  });
 }
 
 }  // namespace
@@ -188,8 +185,6 @@ void WalkExprIdents(const Expr* e, std::vector<const Expr*>& out) {
   for (const auto* el : e->elements) WalkExprIdents(el, out);
 }
 
-void WalkStmtIdents(const Stmt* s, std::vector<const Expr*>& out);
-
 void WalkStmtScalarIdents(const Stmt* s, std::vector<const Expr*>& out) {
   WalkExprIdents(s->condition, out);
   WalkExprIdents(s->lhs, out);
@@ -204,35 +199,31 @@ void WalkStmtScalarIdents(const Stmt* s, std::vector<const Expr*>& out) {
   for (const auto* e : s->wait_order_events) WalkExprIdents(e, out);
 }
 
+// The expressions a case item and a randcase item hold beside their bodies:
+// A.6.7 gives a case item its case_item_expressions and §18.16 gives a randcase
+// item its weight expression. Neither is a statement, so ForEachChildStmt does
+// not reach either and both are read here. The two bodies are left to the
+// descent in WalkStmtIdents below, which ForEachChildStmt reaches through
+// CaseItem::body and through the second member of a randcase item, so that no
+// statement is walked twice.
 void WalkStmtCaseIdents(const Stmt* s, std::vector<const Expr*>& out) {
   for (const auto& ci : s->case_items) {
     for (const auto* p : ci.patterns) WalkExprIdents(p, out);
-    WalkStmtIdents(ci.body, out);
   }
-  for (const auto& [w, body] : s->randcase_items) {
-    WalkExprIdents(w, out);
-    WalkStmtIdents(body, out);
-  }
+  for (const auto& rc : s->randcase_items) WalkExprIdents(rc.first, out);
 }
 
-void WalkStmtChildIdents(const Stmt* s, std::vector<const Expr*>& out) {
-  for (const auto* sub : s->stmts) WalkStmtIdents(sub, out);
-  for (const auto* sub : s->fork_stmts) WalkStmtIdents(sub, out);
-  WalkStmtIdents(s->then_branch, out);
-  WalkStmtIdents(s->else_branch, out);
-  WalkStmtIdents(s->body, out);
-  WalkStmtIdents(s->for_body, out);
-  for (const auto* fi : s->for_inits) WalkStmtIdents(fi, out);
-  for (const auto* fs : s->for_steps) WalkStmtIdents(fs, out);
-  WalkStmtIdents(s->assert_pass_stmt, out);
-  WalkStmtIdents(s->assert_fail_stmt, out);
-}
-
+// §26.3 makes a name a wildcard-imported package supplies directly visible to
+// a reference written anywhere in the importing scope, so every position a
+// statement holds a statement in is a position one of these reads stands in.
+// ForEachChildStmt in elaborator_validate_internal.h states those positions
+// once for the whole elaborator, which is why the list is not written out again
+// here.
 void WalkStmtIdents(const Stmt* s, std::vector<const Expr*>& out) {
   if (!s) return;
   WalkStmtScalarIdents(s, out);
   WalkStmtCaseIdents(s, out);
-  WalkStmtChildIdents(s, out);
+  ForEachChildStmt(s, [&](Stmt* const& sub) { WalkStmtIdents(sub, out); });
 }
 
 bool PackageDeclared(const CompilationUnit* unit, std::string_view pkg_name) {
@@ -599,20 +590,14 @@ void CheckStringNumericAssigns(
     DiagEngine& diag) {
   if (!s) return;
   CheckStringNumericAssignStmt(s, var_types, diag);
-  for (const auto* sub : s->stmts)
+  // §6.16 makes a string and a numeric type incompatible whatever statement
+  // the assignment between them stands in, so every position a statement holds
+  // a statement in is a position the report is made at. ForEachChildStmt in
+  // elaborator_validate_internal.h states those positions once for the whole
+  // elaborator, which is why the list is not written out again here.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     CheckStringNumericAssigns(sub, var_types, diag);
-  for (const auto* sub : s->fork_stmts)
-    CheckStringNumericAssigns(sub, var_types, diag);
-  CheckStringNumericAssigns(s->then_branch, var_types, diag);
-  CheckStringNumericAssigns(s->else_branch, var_types, diag);
-  CheckStringNumericAssigns(s->body, var_types, diag);
-  CheckStringNumericAssigns(s->for_body, var_types, diag);
-  for (const auto* fi : s->for_inits)
-    CheckStringNumericAssigns(fi, var_types, diag);
-  for (const auto* fs : s->for_steps)
-    CheckStringNumericAssigns(fs, var_types, diag);
-  for (const auto& ci : s->case_items)
-    CheckStringNumericAssigns(ci.body, var_types, diag);
+  });
 }
 
 // §23.9: reports every collected read that names no declaration the reference
@@ -723,15 +708,13 @@ void CollectProcScopeBases(const Stmt* s, std::vector<const Expr*>& out) {
       s->kind == StmtKind::kNonblockingAssign) {
     CollectScopeBases(s->rhs, out);
   }
-  for (const auto* sub : s->stmts) CollectProcScopeBases(sub, out);
-  for (const auto* sub : s->fork_stmts) CollectProcScopeBases(sub, out);
-  CollectProcScopeBases(s->then_branch, out);
-  CollectProcScopeBases(s->else_branch, out);
-  CollectProcScopeBases(s->body, out);
-  CollectProcScopeBases(s->for_body, out);
-  for (const auto* fi : s->for_inits) CollectProcScopeBases(fi, out);
-  for (const auto* fs : s->for_steps) CollectProcScopeBases(fs, out);
-  for (const auto& ci : s->case_items) CollectProcScopeBases(ci.body, out);
+  // §26.3 puts no condition on where the assignment carrying a scope-resolution
+  // prefix stands, so every position a statement holds a statement in is one
+  // this collection reaches. ForEachChildStmt in
+  // elaborator_validate_internal.h states those positions once for the whole
+  // elaborator, which is why the list is not written out again here.
+  ForEachChildStmt(s,
+                   [&](Stmt* const& sub) { CollectProcScopeBases(sub, out); });
 }
 
 // §26.3: a scope-resolution prefix `base::` shall name a package (or a class /

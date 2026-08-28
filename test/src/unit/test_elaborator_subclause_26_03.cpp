@@ -1,5 +1,7 @@
 
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
@@ -605,6 +607,201 @@ TEST(PackageReference, ScopedTypedefSizesTheVariableWithoutImport) {
   const auto* v = FindVar(design, "m", "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->width, 16u);
+}
+
+// §26.3 rules that an imported identifier "shall not be visible outside that
+// importing scope by hierarchical reference into that scope", and puts no
+// condition on where that hierarchical reference stands. Every position a
+// statement holds a statement in is therefore one the rule reaches.
+// CollectMemberAccessInStmt in src/elaborator/elaborator_scope_rules_hier.cpp,
+// which gathers the accesses this check reads, had written out twelve of the
+// thirteen child-statement links Stmt declares and now takes the list from
+// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The
+// missing link was Stmt::rs_productions; the two cases below cover the two
+// statement lists a randsequence production holds.
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements. They are kept in RsProd::code_stmts, reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(PackageImport,
+     ImportedIdentifierNotVisibleViaHierRefInARandsequenceCodeBlock) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pkg;\n"
+      "  int x;\n"
+      "endpackage\n"
+      "module child;\n"
+      "  import pkg::x;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child c();\n"
+      "  int y;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { y = c.x; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference 'c.x' targets a name "
+                            "imported into 'child' from a package",
+                            12, "26.3"));
+}
+
+// §18.17.1's Syntax 18-14 gives `rs_rule ::= rs_production_list [ :=
+// rs_weight_specification [ rs_code_block ] ]`, putting a second code block
+// after the weight. The parser keeps it in RsRule::weight_code, a list a walk
+// reaches without reaching RsProd::code_stmts, so the case above does not
+// answer for it.
+TEST(PackageImport,
+     ImportedIdentifierNotVisibleViaHierRefInARandsequenceWeightCodeBlock) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pkg;\n"
+      "  int x;\n"
+      "endpackage\n"
+      "module child;\n"
+      "  import pkg::x;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child c();\n"
+      "  int y;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : alt := 1 { y = c.x; };\n"
+      "      alt : { ; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference 'c.x' targets a name "
+                            "imported into 'child' from a package",
+                            12, "26.3"));
+}
+
+// §26.3 rules that a package's declarations are referenced from outside it
+// through the `::` scope-resolution operator, so a prefix that names no
+// declared package (and no class or type) resolves to nothing, and the rule
+// puts no condition on the statement the reference stands in.
+// CollectProcScopeBases in src/elaborator/elaborator_scope_rules.cpp gathers
+// the prefixes ReportUnknownScopeBases judges, and it had written out nine of
+// the thirteen child-statement links Stmt declares. It now takes the list from
+// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h, and the
+// five cases below cover one newly reached position each. A randsequence
+// production keeps statements in RsProd::code_stmts and in RsRule::weight_code,
+// which ForEachRandsequenceRuleStmt reaches by different members, so each is
+// its own position.
+//
+// `stmt` is written at line 4 and may run to several lines, so the line the
+// report stands at is read back out of the source rather than counted.
+void ExpectUnknownScopeBaseIn(const std::string& stmt) {
+  ElabFixture f;
+  std::string src =
+      "module m;\n  int x;\n  initial\n    " + stmt + "\nendmodule\n";
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved package or scope 'nope'",
+                            LineHolding(src, "x = nope::y;"), "26.3"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
+// next cover one arm each.
+TEST(PackageImport, UnknownScopeBaseInAnAssertionPassStmt) {
+  ExpectUnknownScopeBaseIn("assert (x) x = nope::y;");
+}
+
+TEST(PackageImport, UnknownScopeBaseInAnAssertionFailStmt) {
+  ExpectUnknownScopeBaseIn("assert (x) else x = nope::y;");
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
+// statement the parser keeps in the second member of a Stmt::randcase_items
+// entry. §26.3 is a rule about the source, so it holds whether the weighted
+// draw would select the item or not.
+TEST(PackageImport, UnknownScopeBaseInARandcaseItem) {
+  ExpectUnknownScopeBaseIn("randcase 1: x = nope::y; endcase");
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements. They are kept in RsProd::code_stmts, reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(PackageImport, UnknownScopeBaseInARandsequenceCodeBlock) {
+  ExpectUnknownScopeBaseIn(
+      "begin\n"
+      "      randsequence(main)\n"
+      "        main : { x = nope::y; };\n"
+      "      endsequence\n"
+      "    end");
+}
+
+// §18.17.1 lets a weight specification be followed by a code block of its own,
+// which the parser keeps in RsRule::weight_code. It is a second list under
+// Stmt::rs_productions, so a walk reaches it without reaching
+// RsProd::code_stmts and the case above does not answer for it.
+TEST(PackageImport, UnknownScopeBaseInARandsequenceWeightCodeBlock) {
+  ExpectUnknownScopeBaseIn(
+      "begin\n"
+      "      randsequence(main)\n"
+      "        main : alt := 1 { x = nope::y; };\n"
+      "        alt : { x = 1; };\n"
+      "      endsequence\n"
+      "    end");
+}
+
+// §26.3 rules that a name two wildcard-imported packages both supply is an
+// error at the reference, and puts no condition on the statement the reference
+// stands in. WalkStmtIdents in src/elaborator/elaborator_scope_rules.cpp
+// collects the reads Elaborator::ValidateImportRules judges, and it was the one
+// walk in that file reaching Stmt::assert_pass_stmt, Stmt::assert_fail_stmt and
+// the randcase item bodies already; Stmt::rs_productions was the only link it
+// missed. Taking the list from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h newly reaches the two statement
+// lists a randsequence production holds, and the two cases below cover one
+// each.
+//
+// The imports stand after the initial block, as they do in
+// PackageImport.WildcardAmbiguityBetweenTwoPackagesIsError above:
+// Elaborator::ValidateImportRules gathers the wildcard-imported packages of the
+// whole module before walking its items, so the reference is judged against
+// both packages wherever the imports are written. `y` is declared, so the only
+// read left ambiguous is `X`.
+void ExpectWildcardAmbiguityIn(const std::string& stmt) {
+  ElabFixture f;
+  std::string src =
+      "package p1;\n  parameter int X = 1;\nendpackage\n"
+      "package p2;\n  parameter int X = 2;\nendpackage\n"
+      "module m;\n  int y;\n  initial\n    " +
+      stmt + "\n  import p1::*;\n  import p2::*;\nendmodule\n";
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to 'X' is ambiguous between wildcard "
+                            "imports of packages 'p1' and 'p2'",
+                            LineHolding(src, "y = X;"), "26.3"));
+}
+
+TEST(PackageImport, WildcardAmbiguityInARandsequenceCodeBlock) {
+  ExpectWildcardAmbiguityIn(
+      "begin\n"
+      "      randsequence(main)\n"
+      "        main : { y = X; };\n"
+      "      endsequence\n"
+      "    end");
+}
+
+TEST(PackageImport, WildcardAmbiguityInARandsequenceWeightCodeBlock) {
+  ExpectWildcardAmbiguityIn(
+      "begin\n"
+      "      randsequence(main)\n"
+      "        main : alt := 1 { y = X; };\n"
+      "        alt : { y = 1; };\n"
+      "      endsequence\n"
+      "    end");
 }
 
 }  // namespace

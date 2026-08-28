@@ -338,4 +338,127 @@ TEST(HierarchicalNameElaboration,
       "23.6"));
 }
 
+// §23.6 says a hierarchical name reference names its object "by concatenating
+// the names of the modules, module instance names, generate blocks, tasks,
+// functions ... that contain it", and puts no condition on where the reference
+// is written. Every position a statement holds a statement in is therefore one
+// the two rules below reach: the unresolved-member report, and the instance
+// select §23.6 requires when an instance array name is not the last path
+// element. CollectMemberAccessInStmt in
+// src/elaborator/elaborator_scope_rules_hier.cpp, which gathers the accesses
+// both checks read, had written out twelve of the thirteen child-statement
+// links Stmt declares and now takes the list from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. The missing link was
+// Stmt::rs_productions; the cases below cover the two statement lists a
+// randsequence production holds, once for each of the two rules.
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements. They are kept in RsProd::code_stmts, reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(HierarchicalNameElaboration,
+     UnresolvedMemberInARandsequenceCodeBlockIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sub; endmodule\n"
+      "module top;\n"
+      "  int y;\n"
+      "  sub u();\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { y = u.nonexistent; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference 'u.nonexistent' is "
+                            "unresolved: 'nonexistent' is not declared in "
+                            "module 'sub'",
+                            7, "23.6"));
+}
+
+// §18.17.1's Syntax 18-14 gives `rs_rule ::= rs_production_list [ :=
+// rs_weight_specification [ rs_code_block ] ]`, putting a second code block
+// after the weight. The parser keeps it in RsRule::weight_code, a list a walk
+// reaches without reaching RsProd::code_stmts, so the case above does not
+// answer for it.
+TEST(HierarchicalNameElaboration,
+     UnresolvedMemberInARandsequenceWeightCodeBlockIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sub; endmodule\n"
+      "module top;\n"
+      "  int y;\n"
+      "  sub u();\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : alt := 1 { y = u.nonexistent; };\n"
+      "      alt : { ; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference 'u.nonexistent' is "
+                            "unresolved: 'nonexistent' is not declared in "
+                            "module 'sub'",
+                            7, "23.6"));
+}
+
+// §23.6: "If the array name is not the last path element in the hierarchical
+// name, the instance select expression is required." A reference written in a
+// randsequence production's code block is subject to that as one written in a
+// continuous assignment is.
+TEST(HierarchicalNameElaboration,
+     InstanceArrayRefMissingSelectInARandsequenceCodeBlockIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child;\n"
+      "  logic sig;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child c [3:0] ();\n"
+      "  logic x;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { x = c.sig; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference to instance array 'c' "
+                            "requires an instance select",
+                            9, "23.6"));
+}
+
+// The same rule in the weight code block RsRule::weight_code holds, which the
+// case above does not reach. The instance-array check reads the same collected
+// accesses as the unresolved-member check, so each position is covered once for
+// each rule.
+TEST(HierarchicalNameElaboration,
+     InstanceArrayRefMissingSelectInARandsequenceWeightCodeBlockIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child;\n"
+      "  logic sig;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child c [3:0] ();\n"
+      "  logic x;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : alt := 1 { x = c.sig; };\n"
+      "      alt : { ; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference to instance array 'c' "
+                            "requires an instance select",
+                            9, "23.6"));
+}
+
 }  // namespace
