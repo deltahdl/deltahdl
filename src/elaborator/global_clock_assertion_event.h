@@ -7,6 +7,8 @@
 
 namespace delta {
 
+class Arena;
+
 // §16.5.2: a concurrent assertion whose leading clocking event is
 // $global_clock is clocked by the clocking event of the global clocking
 // declaration in scope. The clause states the equivalence outright: given
@@ -40,6 +42,19 @@ bool SubstituteGlobalClockLeadingEvent(
 // process suspends on the declared event rather than on a system call naming
 // no signal.
 //
+// Returns the statement tree to use, which is `stmt` itself where nothing was
+// rewritten -- where no event control named $global_clock, and where
+// `global_event` is empty. No statement reachable from `stmt` is written to. A
+// statement whose event control is rewritten is copied into `arena` first, and
+// so is every statement on the path from `stmt` down to it, because each of
+// those holds a pointer to the next. A subtree holding no $global_clock event
+// control is returned as it stands, and nothing is allocated for it.
+//
+// The copy is what lets two callers holding the same Stmt objects substitute
+// different `global_event`s into them. A statement rewritten in place would
+// carry the first caller's substitution into the second caller's result, so
+// keep any further rewrite of a statement tree here on a copy as well.
+//
 // This serves §14.14 lookup rule a) alone, whose result is "the event
 // expression of that global clocking declaration" in "the enclosing module,
 // interface, checker, or program instance scope": the caller passes the
@@ -47,8 +62,8 @@ bool SubstituteGlobalClockLeadingEvent(
 // hierarchy to an ancestor's declaration, is not served here, and a reference
 // resolving to an ancestor's event is left as it stands rather than half
 // resolved.
-void SubstituteGlobalClockEventControls(
-    Stmt* stmt, const std::vector<EventExpr>& global_event);
+Stmt* SubstituteGlobalClockEventControls(
+    Stmt* stmt, const std::vector<EventExpr>& global_event, Arena& arena);
 
 }  // namespace delta
 

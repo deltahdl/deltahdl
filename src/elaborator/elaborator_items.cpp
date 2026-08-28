@@ -749,17 +749,24 @@ namespace {
 // of that global clocking declaration" found in "the enclosing module,
 // interface, checker, or program instance scope". `global_event` is that event
 // expression, and is nullptr where the enclosing module declares no global
-// clocking, in which case the procedure is left as it stands and §14.14's own
-// report of a reference with no declaration in scope is the only account of
-// it. A procedure names $global_clock either in its own sensitivity list
+// clocking, in which case the sensitivity list is left as it stands and
+// §14.14's own report of a reference with no declaration in scope is the only
+// account of it.
+//
+// A procedure names $global_clock either in its own sensitivity list
 // (`always @($global_clock)`) or in an event control within its body
-// (`initial @($global_clock) done = 1;`), so both are rewritten, before
-// AddProcess copies the sensitivity list into the process and builds the body.
-void SubstituteGlobalClockInProcedure(
+// (`initial @($global_clock) done = 1;`). Only the sensitivity list is
+// rewritten here, before AddProcess copies it into the process, because
+// ValidateAlwaysFFProcess (src/elaborator/elaborator_process.cpp) reads
+// item->sensitivity rather than the copy and §9.2.2.4 holds always_ff to the
+// event that was substituted in. The body is rewritten by BuildProcessBody
+// (src/elaborator/elaborator_process.cpp), which is handed the event in
+// ProcessBuildEnv::global_clocking_event and writes the result of the rewrite
+// straight onto the process, leaving item->body untouched.
+void SubstituteGlobalClockInSensitivity(
     ModuleItem* item, const std::vector<EventExpr>* global_event) {
   if (global_event == nullptr) return;
   SubstituteGlobalClockLeadingEvent(item->sensitivity, *global_event);
-  SubstituteGlobalClockEventControls(item->body, *global_event);
 }
 
 }  // namespace
@@ -767,23 +774,29 @@ void SubstituteGlobalClockInProcedure(
 // Processes, generates, subroutines, assertions, and remaining items (§9, §16,
 // §13, §27).
 bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
-  const ProcessBuildEnv kEnv{arena_, diag_, &func_decls_, &const_names_};
+  const ProcessBuildEnv kEnv{arena_, diag_, &func_decls_, &const_names_,
+                             module_global_clocking_event_};
+  // An initial or final procedure never infers a sensitivity list, so the two
+  // members BuildProcessWithSensitivity consults only when inferring one --
+  // func_map and const_names -- are left at their defaults.
+  const ProcessBuildEnv kNoInferenceEnv{
+      .arena = arena_,
+      .diag = diag_,
+      .global_clocking_event = module_global_clocking_event_};
   switch (item->kind) {
     case ModuleItemKind::kInitialBlock:
-      SubstituteGlobalClockInProcedure(item, module_global_clocking_event_);
-      AddProcess(RtlirProcessKind::kInitial, item, mod,
-                 ProcessBuildEnv{arena_, diag_});
+      SubstituteGlobalClockInSensitivity(item, module_global_clocking_event_);
+      AddProcess(RtlirProcessKind::kInitial, item, mod, kNoInferenceEnv);
       return true;
     case ModuleItemKind::kFinalBlock:
-      SubstituteGlobalClockInProcedure(item, module_global_clocking_event_);
-      AddProcess(RtlirProcessKind::kFinal, item, mod,
-                 ProcessBuildEnv{arena_, diag_});
+      SubstituteGlobalClockInSensitivity(item, module_global_clocking_event_);
+      AddProcess(RtlirProcessKind::kFinal, item, mod, kNoInferenceEnv);
       return true;
     case ModuleItemKind::kAlwaysBlock:
     case ModuleItemKind::kAlwaysCombBlock:
     case ModuleItemKind::kAlwaysFFBlock:
     case ModuleItemKind::kAlwaysLatchBlock:
-      SubstituteGlobalClockInProcedure(item, module_global_clocking_event_);
+      SubstituteGlobalClockInSensitivity(item, module_global_clocking_event_);
       AddProcess(MapAlwaysKind(item->always_kind), item, mod, kEnv);
       return true;
     case ModuleItemKind::kGenerateIf:

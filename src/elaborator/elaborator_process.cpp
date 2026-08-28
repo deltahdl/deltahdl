@@ -1,7 +1,6 @@
 #include <format>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -10,6 +9,7 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
 #include "parser/ast.h"
@@ -397,26 +397,47 @@ static void ValidateFinalProcess(ModuleItem* item, const RtlirProcess& proc,
   }
 }
 
-static RtlirProcess BuildProcessWithSensitivity(
-    RtlirProcessKind kind, ModuleItem* item, Arena& arena,
-    const std::unordered_map<std::string_view, const ModuleItem*>* func_map,
-    const std::unordered_set<std::string_view>* const_names) {
+// §14.14: an event control naming $global_clock in the procedure body waits on
+// the event expression of the global clocking declaration in scope, so it is
+// rewritten into that expression here, where the body reaches the process.
+//
+// The rewrite is made on a copy of the statement rather than in place because
+// `item` belongs to the one ModuleDecl the parser built for the module, while
+// Elaborator::ElaborateModule runs once per instantiation of it: every
+// instance of a module builds its processes from the same Stmt objects, so a
+// statement written in place would carry one instance's substitution into
+// every other instance. Keep any further per-instance rewrite of a process
+// body on a copy for the same reason.
+//
+// SubstituteGlobalClockEventControls returns `item->body` itself where nothing
+// was rewritten, which is every procedure that does not name $global_clock, so
+// the copy costs an allocation only where the rewrite is actually made.
+static Stmt* BuildProcessBody(const ModuleItem* item,
+                              const ProcessBuildEnv& env) {
+  if (env.global_clocking_event == nullptr) return item->body;
+  return SubstituteGlobalClockEventControls(
+      item->body, *env.global_clocking_event, env.arena);
+}
+
+static RtlirProcess BuildProcessWithSensitivity(RtlirProcessKind kind,
+                                                ModuleItem* item,
+                                                const ProcessBuildEnv& env) {
   RtlirProcess proc;
   proc.kind = kind;
   proc.loc = item->loc;
-  proc.body = item->body;
+  proc.body = BuildProcessBody(item, env);
   proc.sensitivity = item->sensitivity;
   proc.is_star_sensitivity = item->is_star_sensitivity;
   bool needs_infer = (kind == RtlirProcessKind::kAlwaysComb ||
                       kind == RtlirProcessKind::kAlwaysLatch);
   if (needs_infer && proc.sensitivity.empty()) {
-    proc.sensitivity =
-        InferSensitivity(proc.body, arena, func_map, true, const_names);
+    proc.sensitivity = InferSensitivity(proc.body, env.arena, env.func_map,
+                                        true, env.const_names);
   }
   if (kind == RtlirProcessKind::kAlways && item->is_star_sensitivity &&
       proc.sensitivity.empty()) {
     proc.sensitivity =
-        InferSensitivity(proc.body, arena, nullptr, false, const_names);
+        InferSensitivity(proc.body, env.arena, nullptr, false, env.const_names);
   }
   return proc;
 }
@@ -441,8 +462,7 @@ static void ValidateProcess(RtlirProcessKind kind, ModuleItem* item,
 
 void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
                 const ProcessBuildEnv& env) {
-  RtlirProcess proc = BuildProcessWithSensitivity(
-      kind, item, env.arena, env.func_map, env.const_names);
+  RtlirProcess proc = BuildProcessWithSensitivity(kind, item, env);
   ValidateProcess(kind, item, proc, env.diag);
   proc.attrs = ResolveAttributes(item->attrs, env.diag);
   mod->processes.push_back(proc);

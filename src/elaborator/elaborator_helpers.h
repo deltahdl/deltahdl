@@ -92,6 +92,13 @@ struct ProcessBuildEnv {
   // localparams, specparams) so the inferred sensitivity list can drop them --
   // only nets and variables belong in the list.
   const std::unordered_set<std::string_view>* const_names = nullptr;
+  // §14.14 rule a): the event expression of the global clocking declaration in
+  // the enclosing module, interface, checker, or program instance scope, which
+  // an event control naming $global_clock in the process body is rewritten
+  // into. Null where that scope declares no global clocking, in which case the
+  // body is used as it stands and §14.14's own report of a $global_clock
+  // reference with no declaration in scope is the only account of it.
+  const std::vector<EventExpr>* global_clocking_event = nullptr;
 };
 void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
                 const ProcessBuildEnv& env);
