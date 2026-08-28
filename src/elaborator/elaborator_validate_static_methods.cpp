@@ -115,6 +115,18 @@ static std::unordered_set<std::string_view> NamesDeclaredUnder(const Stmt* s) {
   return declared;
 }
 
+// Whether `e` or any expression nested inside it names one of `non_static`,
+// discounting the names `locals` holds. §8.10 makes the access illegal "within
+// the body of a static method" and names no position in that body where it is
+// permitted, so this reaches every child link AnyExprChild in
+// elaborator_validate_internal.h names.
+//
+// This wrote its own list of ten of those thirteen links, and the three it left
+// out are positions a property name is written in: `k = a[3:i];` puts one in
+// Expr::index_end, `k = {i{1'b0}};` in Expr::repeat_count and `a = '{i: 1};` in
+// Expr::pattern_keys. AnyExprChild answers a question about a subtree and stops
+// at the first child that answers it, which is what this search wants, so it is
+// used here rather than ForEachExprChild beside it.
 static bool ExprRefsNonStaticMember(
     const Expr* e, const std::unordered_set<std::string_view>& non_static,
     const std::unordered_set<std::string_view>& locals) {
@@ -125,23 +137,9 @@ static bool ExprRefsNonStaticMember(
   if (e->kind == ExprKind::kCall && !e->callee.empty() &&
       non_static.count(e->callee) && !locals.count(e->callee))
     return true;
-  if (ExprRefsNonStaticMember(e->lhs, non_static, locals) ||
-      ExprRefsNonStaticMember(e->rhs, non_static, locals) ||
-      ExprRefsNonStaticMember(e->base, non_static, locals) ||
-      ExprRefsNonStaticMember(e->index, non_static, locals) ||
-      ExprRefsNonStaticMember(e->condition, non_static, locals) ||
-      ExprRefsNonStaticMember(e->true_expr, non_static, locals) ||
-      ExprRefsNonStaticMember(e->false_expr, non_static, locals) ||
-      ExprRefsNonStaticMember(e->with_expr, non_static, locals)) {
-    return true;
-  }
-  for (const auto* elem : e->elements) {
-    if (ExprRefsNonStaticMember(elem, non_static, locals)) return true;
-  }
-  for (const auto* arg : e->args) {
-    if (ExprRefsNonStaticMember(arg, non_static, locals)) return true;
-  }
-  return false;
+  return AnyExprChild(e, [&](const Expr* child) {
+    return ExprRefsNonStaticMember(child, non_static, locals);
+  });
 }
 
 // `locals` are the names in scope where `s` stands. §8.10 bars an access to a
@@ -166,16 +164,28 @@ static bool StmtRefsNonStaticMember(
   const std::unordered_set<std::string_view>& scope =
       declared.empty() ? locals : widened;
 
-  if (ExprRefsNonStaticMember(s->lhs, non_static, scope)) return true;
-  if (ExprRefsNonStaticMember(s->rhs, non_static, scope)) return true;
-  if (ExprRefsNonStaticMember(s->expr, non_static, scope)) return true;
-  if (ExprRefsNonStaticMember(s->condition, non_static, scope)) return true;
   // §8.10 makes the access illegal "within the body of a static method" and
-  // names no position in that body where it is permitted, so this search looks
-  // at every position ForEachChildStmt in elaborator_validate_internal.h names.
-  // That list gives the visitor no way to stop, so the first hit is kept in
-  // `found` and the recursion runs only while `found` is false.
+  // names no position in that body where it is permitted, so this search reads
+  // every expression position ForEachChildExpr names and descends every
+  // statement ForEachChildStmt names, both in elaborator_validate_internal.h.
+  //
+  // This read Stmt::lhs, Stmt::rhs, Stmt::expr and Stmt::condition and no other
+  // expression position, and the twelve it left out are positions a property
+  // name is written in: `int k = i;` puts one in Stmt::var_init, `for (int k =
+  // 0; k < i; k = k + 1) ;` in Stmt::for_cond -- which is the one that reads as
+  // an oversight, since a `for` keeps its condition there and not in
+  // Stmt::condition -- `#(i) k = 1;` in Stmt::delay, `assert (i);` in
+  // Stmt::assert_expr, and a case-item pattern, a randcase weight and an
+  // unpacked dimension each hold one too.
+  //
+  // Neither list gives the visitor a way to stop, so the first hit is kept in
+  // `found` and each walk runs only while `found` is false.
   bool found = false;
+  ForEachChildExpr(s, [&](Expr* const& e) {
+    if (found) return;
+    found = ExprRefsNonStaticMember(e, non_static, scope);
+  });
+  if (found) return true;
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     if (found) return;
     found = StmtRefsNonStaticMember(sub, non_static, scope);

@@ -1,3 +1,15 @@
+// §8.10 "Static methods" and the part of §8.11 "This" that a static method
+// reaches: the `this` and `super` rule, an unqualified access to a non-static
+// property or method, the names that shadow one, and the statement links
+// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h admits,
+// each holding an access written as a right-hand side, an assignment target, a
+// condition or a call argument.
+//
+// The cases writing the access in one of the other twelve expression positions
+// a statement holds, and in the three Expr child links nested below them, are
+// in test_elaborator_subclause_08_10b.cpp, which the 1000-line cap in
+// .github/workflows/deltahdl.yml separated this file from.
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
