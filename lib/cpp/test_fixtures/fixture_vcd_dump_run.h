@@ -95,7 +95,7 @@ class VcdDumpRunTestBase : public VcdTestBase {
       if (!opts.driver_comment.empty()) vcd.WriteComment(opts.driver_comment);
       vcd.ArmDumpvarsStart();
       f.ctx.SetVcdWriter(&vcd);
-      f.scheduler.SetPostTimestepCallback([&vcd, &f]() {
+      f.scheduler.AddPostTimestepCallback([&vcd, &f]() {
         vcd.WriteTimestamp(f.ctx.CurrentTime().ticks);
         vcd.DumpChangedValues(0);
       });

@@ -12,6 +12,7 @@
 #include "parser/ast.h"
 #include "simulator/coverage_control.h"
 #include "simulator/dpi.h"
+#include "simulator/sva_engine_sequences.h"
 
 namespace delta {
 
@@ -522,13 +523,6 @@ class DpiRuntime {
   // run.
   bool disable_protocol_fatal_ = false;
   std::string disable_protocol_fatal_message_;
-};
-
-enum class AssertionSeverity : uint8_t {
-  kInfo = 0,
-  kWarning = 1,
-  kError = 2,
-  kFatal = 3,
 };
 
 enum class AssertionAction : uint8_t {
