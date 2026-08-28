@@ -189,4 +189,61 @@ TEST(CoverPassStatement, CoverSequenceOrdinaryPassStatementIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §16.14.3: "include" reaches a concurrent assertion in an arm of a randcase
+// statement standing as the pass statement. A.6.7 gives
+// `randcase_item ::= expression : statement_or_null`, so an arm holds any
+// statement the pass statement itself could hold. Stmt::randcase_items is one
+// of the four links FindConcurrentAssertionInPassStmt in
+// src/elaborator/elaborator_items_assertions.cpp did not descend before it was
+// given ForEachChildStmt, so this assertion was not found.
+TEST(CoverPassStatement, RejectsConcurrentAssertInRandcaseArm) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kDecls) +
+                   "  cover property (@(posedge clk) a)\n"
+                   "    randcase\n"
+                   "      1: assert property (@(posedge clk) b);\n"
+                   "    endcase\n"
+                   "endmodule\n",
+               f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "concurrent assert, assume, or cover statement", 3,
+                            "16.14.3"));
+}
+
+// §16.14.3: "include" reaches a concurrent assertion in the code block of a
+// randsequence production standing as the pass statement. A.6.12 gives
+// `rs_code_block ::= { { data_declaration } { statement_or_null } }`, so a code
+// block holds any statement the pass statement itself could hold.
+// Stmt::rs_productions is the second of the four links the walk did not
+// descend.
+TEST(CoverPassStatement, RejectsConcurrentAssertInRandsequenceCodeBlock) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kDecls) +
+                   "  cover property (@(posedge clk) a)\n"
+                   "    randsequence (main)\n"
+                   "      main : { assert property (@(posedge clk) b); };\n"
+                   "    endsequence\n"
+                   "endmodule\n",
+               f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "concurrent assert, assume, or cover statement", 3,
+                            "16.14.3"));
+}
+
+// The other two links FindConcurrentAssertionInPassStmt gained get no case,
+// because no conforming source can put a concurrent assertion in either.
+//
+// Stmt::for_inits: A.6.8 gives
+// `for_initialization ::= list_of_variable_assignments |
+// for_variable_declaration { , for_variable_declaration }`, and both
+// alternatives are assignments or declarations. No production reaches
+// statement_or_null there, so a `for` header holds no assertion statement to
+// find.
+//
+// Stmt::for_steps: A.6.8 gives
+// `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
+// function_subroutine_call`, which is the same finding. Neither omission was
+// reachable from a conforming cover statement; they were carried because the
+// walk wrote out its own list rather than reading ForEachChildStmt's.
+
 }  // namespace

@@ -13,6 +13,7 @@
 #include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
+#include "lexer/token.h"
 #include "parser/ast.h"
 
 namespace delta {
@@ -59,18 +60,26 @@ RtlirProcessKind MapAlwaysKind(AlwaysKind ak) {
   return RtlirProcessKind::kAlwaysComb;
 }
 
+// §9.2.2.2.2 rules that statements in an always_comb "shall not include ...
+// fork-join statements", §9.2.2.3 applies that to always_latch, §9.2.2.4 states
+// it of always_ff and §9.2.3 of a final procedure. None of the four names a
+// statement the bar is lifted inside, so this descends every link
+// ForEachChildStmt in elaborator_validate_internal.h names. It wrote out six of
+// the thirteen, so a fork nested in another fork's arm, in a for initialization
+// or step, in a randcase item, in either arm of an assertion action block or in
+// a randsequence production was never looked at.
+//
+// ForEachChildStmt gives the visitor no way to stop, so the first fork found is
+// kept in `found` and the recursion runs only while `found` is false.
 static bool StmtHasForkJoin(const Stmt* stmt) {
   if (!stmt) return false;
   if (stmt->kind == StmtKind::kFork) return true;
-  for (const auto* s : stmt->stmts)
-    if (StmtHasForkJoin(s)) return true;
-  if (StmtHasForkJoin(stmt->then_branch)) return true;
-  if (StmtHasForkJoin(stmt->else_branch)) return true;
-  if (StmtHasForkJoin(stmt->body)) return true;
-  if (StmtHasForkJoin(stmt->for_body)) return true;
-  for (const auto& ci : stmt->case_items)
-    if (StmtHasForkJoin(ci.body)) return true;
-  return false;
+  bool found = false;
+  ForEachChildStmt(stmt, [&](Stmt* const& sub) {
+    if (found) return;
+    found = StmtHasForkJoin(sub);
+  });
+  return found;
 }
 
 using AssignedNames = std::unordered_set<std::string_view>;
@@ -100,6 +109,14 @@ static std::string_view AssignedVariable(const Expr* lhs) {
 }
 
 // Every variable the body assigns anywhere, whatever path reaches it.
+//
+// §9.2.2.2 and §9.2.2.3 ask what values the procedure leaves behind and put no
+// condition on which statement an assignment stands in, so this descends every
+// link ForEachChildStmt in elaborator_validate_internal.h names. It wrote out
+// six of the thirteen, so a variable assigned only in a fork arm, a for
+// initialization or step, a randcase item, an assertion action block or a
+// randsequence production was invisible to InfersLatch below, and neither the
+// always_comb warning nor the always_latch one could reach it.
 static void CollectAssignedVariables(const Stmt* stmt, AssignedNames& out) {
   if (!stmt) return;
   if (stmt->kind == StmtKind::kBlockingAssign ||
@@ -107,13 +124,8 @@ static void CollectAssignedVariables(const Stmt* stmt, AssignedNames& out) {
     auto name = AssignedVariable(stmt->lhs);
     if (!name.empty()) out.insert(name);
   }
-  for (const auto* s : stmt->stmts) CollectAssignedVariables(s, out);
-  CollectAssignedVariables(stmt->then_branch, out);
-  CollectAssignedVariables(stmt->else_branch, out);
-  CollectAssignedVariables(stmt->body, out);
-  CollectAssignedVariables(stmt->for_body, out);
-  for (const auto& ci : stmt->case_items)
-    CollectAssignedVariables(ci.body, out);
+  ForEachChildStmt(
+      stmt, [&](Stmt* const& sub) { CollectAssignedVariables(sub, out); });
 }
 
 // Drops from `acc` every name `other` does not also hold, leaving what the two
@@ -128,7 +140,43 @@ static void KeepOnlyCommon(AssignedNames& acc, const AssignedNames& other) {
   }
 }
 
+// Adds to `acc` every name `other` holds, for a statement that runs whenever
+// the statement before it ran.
+static void KeepBoth(AssignedNames& acc, const AssignedNames& other) {
+  acc.insert(other.begin(), other.end());
+}
+
 static AssignedNames AssignedOnEveryPath(const Stmt* stmt);
+
+// §9.3.2's Table 9-1 gives the three join keywords their meanings. Under `join`
+// "the parent process blocks until all the processes spawned by this fork
+// terminate", so control leaves the block only once every arm has run and the
+// arms contribute everything each of them contributes. Under `join_any` the
+// parent blocks "until any one of the processes spawned by this fork
+// terminates" and under `join_none` it "continues to execute concurrently with
+// all the processes spawned by the fork", so under either one an arm's
+// assignment need not have been made when control passes on, and the fork
+// establishes nothing.
+static AssignedNames AssignedOnEveryForkPath(const Stmt* stmt) {
+  AssignedNames out;
+  if (stmt->join_kind != TokenKind::kKwJoin) return out;
+  for (const auto* s : stmt->fork_stmts) KeepBoth(out, AssignedOnEveryPath(s));
+  return out;
+}
+
+// §12.7.1 controls the for-loop "by a three-step process": step a) "executes
+// one or more for_initialization assignments", once and under no condition;
+// step b) tests the expression and executes the body; step c) "executes one or
+// more for_step assignments ... then repeats step b)". So an initialization
+// assignment is made on every path through the statement, and a step assignment
+// is made once the body has run, which the note below counts as taken.
+static AssignedNames AssignedOnEveryForPath(const Stmt* stmt) {
+  AssignedNames out;
+  for (const auto* s : stmt->for_inits) KeepBoth(out, AssignedOnEveryPath(s));
+  KeepBoth(out, AssignedOnEveryPath(stmt->for_body));
+  for (const auto* s : stmt->for_steps) KeepBoth(out, AssignedOnEveryPath(s));
+  return out;
+}
 
 // A case statement covers every path only if it has a default item: without one
 // there is a way through the statement that runs no item at all, and that way
@@ -161,6 +209,30 @@ static AssignedNames AssignedOnEveryCasePath(const Stmt* stmt) {
 // A loop body counts as taken. A loop that might run no iterations would make
 // every assignment inside it conditional, and this check exists to identify a
 // latch, so reading a loop as skipped would report latches that are not there.
+//
+// This walk does not take its list of children from ForEachChildStmt in
+// elaborator_validate_internal.h, and the licence for that is the sentence
+// above ForEachChildStmt about saying so in a comment rather than writing a
+// shorter list silently. The answer here is a union over some of the thirteen
+// statement links and an intersection over others, and a visitor handed a bare
+// child cannot tell which link it came from, which is the same reason
+// ForEachChildExpr's own comment gives for a walk whose rule turns on the field
+// an expression stood in. So the links are written out with the clause that
+// decides each, and three of them contribute nothing on purpose:
+//
+//  - Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. §16.3 has the pass
+//    statement "executed if the expression evaluates to true" and the fail
+//    statement "executed if the expression evaluates to false", which between
+//    them would cover the expression's whole domain, but §20.11 gives
+//    $assertcontrol "the capability to enable/disable action block execution of
+//    assertions and expect statements". So there is a way through the statement
+//    that runs neither arm, exactly as there is through a case with no default.
+//  - Stmt::randcase_items. §18.16 rules that "if all randcase_items specify
+//    zero weights, then no branch is taken", and the weights "can be arbitrary
+//    expressions", read while the design runs.
+//  - Stmt::rs_productions. §18.17 rules that production lists separated by a
+//    "|" "imply a set of choices, which the generator will make at random", so
+//    no code block of a randsequence is reached on every path through it.
 static AssignedNames AssignedOnEveryPath(const Stmt* stmt) {
   AssignedNames out;
   if (!stmt) return out;
@@ -172,10 +244,7 @@ static AssignedNames AssignedOnEveryPath(const Stmt* stmt) {
       return out;
     }
     case StmtKind::kBlock:
-      for (const auto* s : stmt->stmts) {
-        AssignedNames sub = AssignedOnEveryPath(s);
-        out.insert(sub.begin(), sub.end());
-      }
+      for (const auto* s : stmt->stmts) KeepBoth(out, AssignedOnEveryPath(s));
       return out;
     case StmtKind::kIf:
       if (!stmt->else_branch) return out;
@@ -184,8 +253,10 @@ static AssignedNames AssignedOnEveryPath(const Stmt* stmt) {
       return out;
     case StmtKind::kCase:
       return AssignedOnEveryCasePath(stmt);
+    case StmtKind::kFork:
+      return AssignedOnEveryForkPath(stmt);
     case StmtKind::kFor:
-      return AssignedOnEveryPath(stmt->for_body);
+      return AssignedOnEveryForPath(stmt);
     case StmtKind::kForeach:
     case StmtKind::kWhile:
     case StmtKind::kDoWhile:
@@ -238,22 +309,19 @@ static bool InfersLatch(const Stmt* body) {
 // function.
 static bool StmtBlocks(const Stmt* stmt, bool include_intra_assign = false);
 
-// True when any statement of `stmts` blocks.
-template <typename Stmts>
-static bool AnyStmtBlocks(const Stmts& stmts, bool include_intra_assign) {
-  for (const auto* s : stmts)
-    if (StmtBlocks(s, include_intra_assign)) return true;
-  return false;
-}
-
-// True when the statement of any case item blocks.
-static bool AnyCaseItemBlocks(const std::vector<CaseItem>& items,
-                              bool include_intra_assign) {
-  for (const auto& ci : items)
-    if (StmtBlocks(ci.body, include_intra_assign)) return true;
-  return false;
-}
-
+// §9.2.2.2.2 states its rule of "statements in an always_comb", §9.2.2.4 of the
+// statements of an always_ff and §9.2.3 of those a final procedure holds; none
+// of the three names a statement the rule is suspended inside, so this descends
+// every link ForEachChildStmt in elaborator_validate_internal.h names. It wrote
+// out seven of the thirteen, so a delay, a cycle delay, an event control, a
+// wait, a wait_order or an expect written in a for initialization or step, in a
+// randcase item, in either arm of an assertion action block or in a
+// randsequence production stood in an always_comb, an always_ff and a final
+// procedure unreported.
+//
+// ForEachChildStmt gives the visitor no way to stop, so the first blocking
+// statement found is kept in `found` and the recursion runs only while `found`
+// is false.
 static bool StmtBlocks(const Stmt* stmt, bool include_intra_assign) {
   if (!stmt) return false;
   switch (stmt->kind) {
@@ -280,26 +348,15 @@ static bool StmtBlocks(const Stmt* stmt, bool include_intra_assign) {
       return include_intra_assign &&
              (stmt->delay != nullptr || stmt->cycle_delay != nullptr ||
               !stmt->events.empty());
-    case StmtKind::kBlock:
-      return AnyStmtBlocks(stmt->stmts, include_intra_assign);
-    case StmtKind::kIf:
-      return StmtBlocks(stmt->then_branch, include_intra_assign) ||
-             StmtBlocks(stmt->else_branch, include_intra_assign);
-    case StmtKind::kFor:
-      return StmtBlocks(stmt->for_body, include_intra_assign);
-    case StmtKind::kWhile:
-    case StmtKind::kDoWhile:
-    case StmtKind::kForever:
-    case StmtKind::kRepeat:
-    case StmtKind::kForeach:
-      return StmtBlocks(stmt->body, include_intra_assign);
-    case StmtKind::kFork:
-      return AnyStmtBlocks(stmt->fork_stmts, include_intra_assign);
-    case StmtKind::kCase:
-      return AnyCaseItemBlocks(stmt->case_items, include_intra_assign);
     default:
-      return false;
+      break;
   }
+  bool found = false;
+  ForEachChildStmt(stmt, [&](Stmt* const& sub) {
+    if (found) return;
+    found = StmtBlocks(sub, include_intra_assign);
+  });
+  return found;
 }
 
 static void ValidateCombLatchProcess(ModuleItem* item, const RtlirProcess& proc,

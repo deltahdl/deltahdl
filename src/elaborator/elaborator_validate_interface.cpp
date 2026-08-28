@@ -226,15 +226,16 @@ void WalkStmtsForVifClocking(const Stmt* s, const VifTypeMap& vifs,
   CheckVifClockingExpr(s->expr, vifs, vif_mps, unit, diag);
   CheckVifClockingExpr(s->condition, vifs, vif_mps, unit, diag);
   CheckVifClockingExpr(s->var_init, vifs, vif_mps, unit, diag);
-  for (const auto* sub : s->stmts)
+  // §25.9 states how a clocking block of an interface is reached through a
+  // virtual interface and names no statement those rules are suspended in, so
+  // this descends every link ForEachChildStmt in
+  // elaborator_validate_internal.h names, and names none itself. It wrote out
+  // six of the thirteen, so a `vif.cb.sig` naming something that is no clocking
+  // block of the interface went unreported in a fork arm or a randsequence
+  // production.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForVifClocking(sub, vifs, vif_mps, unit, diag);
-  WalkStmtsForVifClocking(s->then_branch, vifs, vif_mps, unit, diag);
-  WalkStmtsForVifClocking(s->else_branch, vifs, vif_mps, unit, diag);
-  WalkStmtsForVifClocking(s->body, vifs, vif_mps, unit, diag);
-  WalkStmtsForVifClocking(s->for_body, vifs, vif_mps, unit, diag);
-  for (auto& ci : s->case_items) {
-    WalkStmtsForVifClocking(ci.body, vifs, vif_mps, unit, diag);
-  }
+  });
 }
 
 // Checks one assignment-pattern element `elem` of an array-of-virtual-interface
@@ -303,12 +304,15 @@ void Elaborator::ValidateArrayOfVifInitStmt(const Stmt* s) {
 static void WalkStmtsForArrayOfVifInit(const Stmt* s, Elaborator* elab) {
   if (!s) return;
   elab->ValidateArrayOfVifInitStmt(s);
-  for (const auto* sub : s->stmts) WalkStmtsForArrayOfVifInit(sub, elab);
-  WalkStmtsForArrayOfVifInit(s->then_branch, elab);
-  WalkStmtsForArrayOfVifInit(s->else_branch, elab);
-  WalkStmtsForArrayOfVifInit(s->body, elab);
-  WalkStmtsForArrayOfVifInit(s->for_body, elab);
-  for (auto& ci : s->case_items) WalkStmtsForArrayOfVifInit(ci.body, elab);
+  // §25.9 states which interface instances and virtual interfaces an
+  // array-of-virtual-interface initializer may name, and names no statement the
+  // declaration it initializes is exempt in, so this descends every link
+  // ForEachChildStmt in elaborator_validate_internal.h names, and names none
+  // itself. It wrote out six of the thirteen, so an incompatible element in a
+  // declaration written in a fork arm or a randsequence code block was never
+  // checked.
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { WalkStmtsForArrayOfVifInit(sub, elab); });
 }
 
 void Elaborator::WalkStmtsForVirtualInterfaceClocking(const Stmt* s) {
@@ -489,9 +493,6 @@ void CheckInterfaceObjectAccessExpr(const Expr* e,
   }
 }
 
-void WalkStmtsForInterfaceObjectAccess(const Stmt* s,
-                                       const IfaceAccessContext& ctx);
-
 // Runs the interface-object-access check on every expression field carried
 // directly by statement `s`.
 void CheckInterfaceObjectAccessStmtExprs(const Stmt* s,
@@ -503,26 +504,22 @@ void CheckInterfaceObjectAccessStmtExprs(const Stmt* s,
   CheckInterfaceObjectAccessExpr(s->var_init, ctx);
 }
 
-// Recurses the interface-object-access walk into every child statement of `s`.
-void WalkInterfaceObjectAccessChildStmts(const Stmt* s,
-                                         const IfaceAccessContext& ctx) {
-  for (const auto* sub : s->stmts) {
-    WalkStmtsForInterfaceObjectAccess(sub, ctx);
-  }
-  WalkStmtsForInterfaceObjectAccess(s->then_branch, ctx);
-  WalkStmtsForInterfaceObjectAccess(s->else_branch, ctx);
-  WalkStmtsForInterfaceObjectAccess(s->body, ctx);
-  WalkStmtsForInterfaceObjectAccess(s->for_body, ctx);
-  for (auto& ci : s->case_items) {
-    WalkStmtsForInterfaceObjectAccess(ci.body, ctx);
-  }
-}
-
 void WalkStmtsForInterfaceObjectAccess(const Stmt* s,
                                        const IfaceAccessContext& ctx) {
   if (!s) return;
   CheckInterfaceObjectAccessStmtExprs(s, ctx);
-  WalkInterfaceObjectAccessChildStmts(s, ctx);
+  // §25.5 restricts access to an interface object to what the selected modport
+  // lists, and §25.5.5 says the same of a clocking block, neither naming a
+  // statement the restriction is lifted in, so this descends every link
+  // ForEachChildStmt in elaborator_validate_internal.h names, and names none
+  // itself. WalkInterfaceObjectAccessChildStmts held that list and wrote out
+  // six of the thirteen, so an access to an unlisted member in a fork arm or an
+  // assertion action block was never reported. The helper existed only to hold
+  // the list, so it is gone along with the forward declaration of this function
+  // that the mutual recursion between the two needed.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    WalkStmtsForInterfaceObjectAccess(sub, ctx);
+  });
 }
 
 // Runs the interface-object-access checks for one module item, using the

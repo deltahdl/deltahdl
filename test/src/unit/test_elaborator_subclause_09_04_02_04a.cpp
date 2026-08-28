@@ -1,3 +1,13 @@
+// §9.4.2.4 "Sequence events": a sequence instance used as an event control,
+// written where such a control is normally written -- at the top of a task
+// body.
+//
+// The cases writing it in one of the statement links
+// Elaborator::WalkStmtsForSequenceEvents reaches only since it took its list
+// from ForEachChildStmt are in test_elaborator_subclause_09_04_02_04b.cpp,
+// which the 1000-line cap in .github/workflows/deltahdl.yml separated this
+// file from.
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 

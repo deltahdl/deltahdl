@@ -18,6 +18,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -323,24 +324,60 @@ void CheckModuleInstParentRules(const ModuleItem* item, const ModuleDecl* decl,
   }
 }
 
+// Whether `sub` stands in the header of the for loop `s` rather than in one of
+// the positions A.6.4 gives a statement. A.6.8 writes `for_initialization ::=
+// list_of_variable_assignments | for_variable_declaration {,
+// for_variable_declaration}` and `for_step_assignment ::= operator_assignment |
+// inc_or_dec_expression | function_subroutine_call`, and
+// Parser::ParseAssignmentOrExprNoSemi (src/parser/parser_stmt.cpp) records the
+// assignment forms of both as a StmtKind::kBlockingAssign, so every for loop
+// carries one in its header whatever its body assigns.
+bool IsForHeaderStmt(const Stmt* s, const Stmt* sub) {
+  for (const auto* init : s->for_inits)
+    if (init == sub) return true;
+  for (const auto* step : s->for_steps)
+    if (step == sub) return true;
+  return false;
+}
+
 // §17.5: walks a procedural statement tree looking for a blocking assignment.
-// Recurses only through control-flow bodies (block, branch arms, loop body,
-// case arms, fork arms, and a wrapping timing control's body); the for-loop
-// header (init/step) is intentionally not traversed, so a loop's own iteration
-// update is not mistaken for a blocking assignment in the procedure body.
+// The clause lists what a checker always procedure may contain and writes
+// "Blocking assignments (see 10.4.1; always_comb and always_latch procedures
+// only)" on that list, naming no statement the restriction is lifted in, so
+// this descends the links ForEachChildStmt in elaborator_validate_internal.h
+// names rather than a list written out here. The list written here held six of
+// the thirteen, so a blocking assignment in either arm of an immediate
+// assertion's action block was never looked at: §17.5 puts immediate assertions
+// on the same list, A.6.10 writes `simple_immediate_assert_statement ::= assert
+// ( expression ) action_block`, and §16.3 writes `action_block ::=
+// statement_or_null | [ statement ] else statement_or_null`, so both arms hold
+// a statement. A randcase (§18.16) and a randsequence (A.6.12) are on §17.5's
+// list of neither, so no conforming checker always procedure holds one; the
+// walk descends them anyway, since what a checker procedure may hold is
+// §17.5's own rule to report rather than a reason to keep a shorter list here.
+//
+// The visitor skips the two for-header links, which is the one position this
+// rule does not reach. §17.5 admits "Loop statements (see 12.7)" in a checker
+// always procedure with none of the always_comb/always_latch restriction it
+// writes beside blocking assignments, and A.6.2 makes an operator_assignment
+// and an inc_or_dec_expression -- two of the three forms A.6.8 gives a
+// for_step_assignment, and the form it gives a for_initialization's
+// variable_assignment -- alternatives of blocking_assignment. Reporting the
+// header would therefore leave an always_ff no for loop that initializes or
+// steps anything, which is not the loop statement §17.5 admits. The header
+// holds no statement in the A.6.4 sense either, so nothing else is lost.
+//
+// ForEachChildStmt gives the visitor no way to stop, so the first hit is kept
+// in `found` and the recursion runs only while `found` is false.
 bool StmtContainsBlockingAssignment(const Stmt* stmt) {
   if (stmt == nullptr) return false;
   if (stmt->kind == StmtKind::kBlockingAssign) return true;
-  for (const auto* s : stmt->stmts)
-    if (StmtContainsBlockingAssignment(s)) return true;
-  for (const auto* s : stmt->fork_stmts)
-    if (StmtContainsBlockingAssignment(s)) return true;
-  for (const auto& ci : stmt->case_items)
-    if (StmtContainsBlockingAssignment(ci.body)) return true;
-  return StmtContainsBlockingAssignment(stmt->then_branch) ||
-         StmtContainsBlockingAssignment(stmt->else_branch) ||
-         StmtContainsBlockingAssignment(stmt->for_body) ||
-         StmtContainsBlockingAssignment(stmt->body);
+  bool found = false;
+  ForEachChildStmt(stmt, [&](Stmt* const& sub) {
+    if (found || IsForHeaderStmt(stmt, sub)) return;
+    found = StmtContainsBlockingAssignment(sub);
+  });
+  return found;
 }
 
 // §17.5: walks a procedural statement tree looking for a timing control that is
@@ -349,6 +386,29 @@ bool StmtContainsBlockingAssignment(const Stmt* stmt) {
 // assignment. An event control statement is itself permitted, but its
 // controlled statement is still inspected in case a non-event control is nested
 // inside.
+//
+// §17.5 says an initial procedure in a checker body "may contain let
+// declarations, immediate, deferred, and concurrent assertions, and a
+// procedural timing control statement using an event control only", and names
+// no statement the rule is suspended in, so this descends the links
+// ForEachChildStmt in elaborator_validate_internal.h names rather than a list
+// written out here. The list written here held six of the thirteen, so a delay,
+// a cycle delay or a wait in either arm of an immediate assertion's action
+// block was never looked at: §17.5 puts immediate assertions on the same list,
+// A.6.10 writes `simple_immediate_assert_statement ::= assert ( expression )
+// action_block`, and §16.3 writes `action_block ::= statement_or_null |
+// [ statement ] else statement_or_null`, so both arms hold a statement.
+//
+// The other four links hold no such control in conforming source, and the walk
+// descends them all the same. A.6.8 gives a for_initialization only a
+// list_of_variable_assignments or for_variable_declarations and a
+// for_step_assignment only an operator_assignment, an inc_or_dec_expression or
+// a function_subroutine_call, none of which carries a delay_or_event_control or
+// is a delay, cycle-delay or wait statement; a randcase (§18.16) and a
+// randsequence (A.6.12) are on §17.5's list of neither.
+//
+// ForEachChildStmt gives the visitor no way to stop, so the first hit is kept
+// in `found` and the recursion runs only while `found` is false.
 bool StmtContainsNonEventTimingControl(const Stmt* stmt) {
   if (stmt == nullptr) return false;
   switch (stmt->kind) {
@@ -366,16 +426,12 @@ bool StmtContainsNonEventTimingControl(const Stmt* stmt) {
     default:
       break;
   }
-  for (const auto* s : stmt->stmts)
-    if (StmtContainsNonEventTimingControl(s)) return true;
-  for (const auto* s : stmt->fork_stmts)
-    if (StmtContainsNonEventTimingControl(s)) return true;
-  for (const auto& ci : stmt->case_items)
-    if (StmtContainsNonEventTimingControl(ci.body)) return true;
-  return StmtContainsNonEventTimingControl(stmt->then_branch) ||
-         StmtContainsNonEventTimingControl(stmt->else_branch) ||
-         StmtContainsNonEventTimingControl(stmt->for_body) ||
-         StmtContainsNonEventTimingControl(stmt->body);
+  bool found = false;
+  ForEachChildStmt(stmt, [&](Stmt* const& sub) {
+    if (found) return;
+    found = StmtContainsNonEventTimingControl(sub);
+  });
+  return found;
 }
 
 // Emits the per-item legality diagnostics that depend only on the parent decl

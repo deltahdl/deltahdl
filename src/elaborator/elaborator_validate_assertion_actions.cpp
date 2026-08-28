@@ -6,6 +6,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -96,12 +97,15 @@ static void WalkStmtsForSequenceEvents(Stmt* s, const SequenceEventCtx& ctx) {
   if (s->kind == StmtKind::kEventControl) {
     for (auto& ev : s->events) MarkSequenceEvent(s, ev, ctx);
   }
-  for (auto* sub : s->stmts) WalkStmtsForSequenceEvents(sub, ctx);
-  WalkStmtsForSequenceEvents(s->then_branch, ctx);
-  WalkStmtsForSequenceEvents(s->else_branch, ctx);
-  WalkStmtsForSequenceEvents(s->body, ctx);
-  WalkStmtsForSequenceEvents(s->for_body, ctx);
-  for (auto& ci : s->case_items) WalkStmtsForSequenceEvents(ci.body, ctx);
+  // §9.4.2.4 requires the arguments of a sequence used as an event control to
+  // be static, and §16.8 requires an actual for every formal that has no
+  // default. Neither names a statement the requirement is lifted in, so this
+  // descends every link ForEachChildStmt in elaborator_validate_internal.h
+  // names. It wrote out six of the thirteen, so an `@(s(a, b))` standing in a
+  // fork arm, a randcase arm, an assertion action block or a randsequence code
+  // block was neither marked a sequence event nor argument-counted.
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { WalkStmtsForSequenceEvents(sub, ctx); });
 }
 
 // Walk one module item's statements for sequence-event arguments. A process
@@ -177,17 +181,24 @@ static bool ContainsPostponedIllegalStmt(const Stmt* s) {
     default:
       break;
   }
-  for (auto* sub : s->stmts) {
-    if (ContainsPostponedIllegalStmt(sub)) return true;
-  }
-  if (ContainsPostponedIllegalStmt(s->then_branch)) return true;
-  if (ContainsPostponedIllegalStmt(s->else_branch)) return true;
-  if (ContainsPostponedIllegalStmt(s->body)) return true;
-  if (ContainsPostponedIllegalStmt(s->for_body)) return true;
-  for (const auto& ci : s->case_items) {
-    if (ContainsPostponedIllegalStmt(ci.body)) return true;
-  }
-  return false;
+  // §16.4 refuses a final deferred assertion whose callee body holds a
+  // statement the Postponed region cannot run, and it names no statement
+  // position the restriction is suspended in, so this descends every link
+  // ForEachChildStmt in elaborator_validate_internal.h names. It wrote out six
+  // of the thirteen, so an assignment or a timing control written in a fork
+  // arm, a for header, an assertion action block, a randcase arm or a
+  // randsequence code block left the callee looking legal in the Postponed
+  // region.
+  //
+  // ForEachChildStmt gives the visitor no way to stop, so the first offending
+  // statement is kept in `found` and the recursion runs only while `found` is
+  // false.
+  bool found = false;
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    if (found) return;
+    found = ContainsPostponedIllegalStmt(sub);
+  });
+  return found;
 }
 
 static bool CalleeBodyHasPostponedIllegal(const ModuleItem* callee) {
@@ -316,31 +327,37 @@ static void CollectAutomaticVarNames(
       (routine_is_automatic || s->var_is_automatic)) {
     out.insert(s->var_name);
   }
-  for (auto* sub : s->stmts)
+  // §16.4 bars an automatic variable as the actual for a pass-by-reference
+  // formal of a deferred-assertion action call, and it puts no condition on the
+  // statement the variable is declared under, so this descends every link
+  // ForEachChildStmt in elaborator_validate_internal.h names. It wrote out
+  // eight of the thirteen, so an automatic declared in a fork arm, under a
+  // randcase arm or in a randsequence code block was never collected and
+  // passing it by reference was allowed. A.6.8 admits in a for_initialization
+  // and a for_step_assignment only an assignment, an increment or a call, so no
+  // declaration stands in either; they are descended all the same because this
+  // walk names no link itself.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     CollectAutomaticVarNames(sub, routine_is_automatic, out);
-  CollectAutomaticVarNames(s->then_branch, routine_is_automatic, out);
-  CollectAutomaticVarNames(s->else_branch, routine_is_automatic, out);
-  CollectAutomaticVarNames(s->body, routine_is_automatic, out);
-  CollectAutomaticVarNames(s->for_body, routine_is_automatic, out);
-  CollectAutomaticVarNames(s->assert_pass_stmt, routine_is_automatic, out);
-  CollectAutomaticVarNames(s->assert_fail_stmt, routine_is_automatic, out);
-  for (const auto& ci : s->case_items)
-    CollectAutomaticVarNames(ci.body, routine_is_automatic, out);
+  });
 }
 
 void Elaborator::WalkStmtsForDeferredActions(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars) {
   if (!s) return;
   CheckDeferredActionStmt(s, deferred_subroutine_map_, auto_vars, diag_);
-  for (auto* sub : s->stmts) WalkStmtsForDeferredActions(sub, auto_vars);
-  WalkStmtsForDeferredActions(s->then_branch, auto_vars);
-  WalkStmtsForDeferredActions(s->else_branch, auto_vars);
-  WalkStmtsForDeferredActions(s->body, auto_vars);
-  WalkStmtsForDeferredActions(s->for_body, auto_vars);
-  WalkStmtsForDeferredActions(s->assert_pass_stmt, auto_vars);
-  WalkStmtsForDeferredActions(s->assert_fail_stmt, auto_vars);
-  for (const auto& ci : s->case_items)
-    WalkStmtsForDeferredActions(ci.body, auto_vars);
+  // §16.4 states the shape a deferred assertion's action block takes and the
+  // actuals its subroutine call may pass, and it names no statement position
+  // either rule is lifted in, so this descends every link ForEachChildStmt in
+  // elaborator_validate_internal.h names. It wrote out eight of the thirteen,
+  // so a deferred assertion written in a fork arm, under a randcase arm or in a
+  // randsequence code block was checked for neither. A.6.8 admits no statement
+  // in a for header, so a deferred assertion cannot stand in for_inits or in
+  // for_steps; both are descended all the same because this walk names no link
+  // itself.
+  ForEachChildStmt(s, [this, &auto_vars](Stmt* const& sub) {
+    WalkStmtsForDeferredActions(sub, auto_vars);
+  });
 }
 
 // §16.4: the automatic-variable names in scope for one module item, so a

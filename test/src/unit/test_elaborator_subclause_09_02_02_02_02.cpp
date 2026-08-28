@@ -466,4 +466,162 @@ TEST(AlwaysCombVsAlwaysStar, NonblockingEventTriggerInAlwaysCombAccepted) {
       << cited;
 }
 
+// §9.2.2.2.2 states two of its three rules of "statements in an always_comb" --
+// that they "shall not include those that block, have blocking timing or event
+// controls, or fork-join statements" -- and names no statement either rule is
+// suspended inside. StmtHasForkJoin and StmtBlocks in
+// src/elaborator/elaborator_process.cpp answer the two, and each wrote out its
+// own shorter list of the thirteen statement links ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h names. The cases below name one
+// newly reached link each.
+//
+// Stmt::for_inits and Stmt::for_steps have no case under either rule, and that
+// is a fact about the grammar rather than a gap. A.6.8 gives
+// `for_initialization ::= list_of_variable_assignments | for_variable_
+// declaration { , for_variable_declaration }` and `for_step_assignment ::=
+// operator_assignment | inc_or_dec_expression | function_subroutine_call`, so
+// neither position holds a statement at all: a par_block and a
+// procedural_timing_control_statement are statement_item alternatives and no
+// conforming source writes one in a for header.
+//
+// Stmt::fork_stmts has no case under the fork-join rule for a different reason:
+// a fork is the only statement that holds one, and StmtHasForkJoin answers true
+// on reaching it without descending, so no source can make that link change the
+// answer. The blocking rule does reach it, and
+// AlwaysCombVsAlwaysStar.ForkJoinInAlwaysCombErrors above already covers the
+// fork itself.
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null` and A.6.4 makes a par_block a statement_item, so a
+// fork-join is written in either arm. This case and the next cover one arm
+// each. §9.2.2.2.2 puts no condition on when the fork would run, so the arm the
+// assertion would take is not the question.
+TEST(AlwaysCombVsAlwaysStar, ForkJoinInAnAssertionPassStatementErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, y;\n"
+      "  always_comb assert (a) fork y = a; join\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "always_comb shall not contain fork-join statements", 3, "9.2.2.2.2"));
+}
+
+TEST(AlwaysCombVsAlwaysStar, ForkJoinInAnAssertionFailStatementErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, y;\n"
+      "  always_comb assert (a) y = a; else fork y = 1'b0; join\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "always_comb shall not contain fork-join statements", 3, "9.2.2.2.2"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`. The weighted
+// draw picks an item while the design runs; §9.2.2.2.2 is decided before it
+// does, so a fork in an item is reported whether the item would be drawn or
+// not.
+TEST(AlwaysCombVsAlwaysStar, ForkJoinInARandcaseItemErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, y;\n"
+      "  always_comb\n"
+      "    randcase\n"
+      "      1: fork y = a; join\n"
+      "    endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "always_comb shall not contain fork-join statements", 3, "9.2.2.2.2"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements. They are kept in RsProd::code_stmts, reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(AlwaysCombVsAlwaysStar, ForkJoinInARandsequenceCodeBlockErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, y;\n"
+      "  always_comb\n"
+      "    randsequence(main)\n"
+      "      main : { fork y = a; join };\n"
+      "    endsequence\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "always_comb shall not contain fork-join statements", 3, "9.2.2.2.2"));
+}
+
+// The same four positions under the other rule. A.6.5 gives
+// `procedural_timing_control_statement ::= procedural_timing_control
+// statement_or_null`, which is a statement_item like any other, so a delay
+// control stands wherever a statement stands.
+TEST(AlwaysCombVsAlwaysStar, DelayInAnAssertionPassStatementErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, y;\n"
+      "  always_comb assert (a) #5 y = a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_comb shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
+}
+
+TEST(AlwaysCombVsAlwaysStar, DelayInAnAssertionFailStatementErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, y;\n"
+      "  always_comb assert (a) y = a; else #5 y = 1'b0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_comb shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
+}
+
+TEST(AlwaysCombVsAlwaysStar, DelayInARandcaseItemErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, y;\n"
+      "  always_comb\n"
+      "    randcase\n"
+      "      1: #5 y = a;\n"
+      "    endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_comb shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
+}
+
+TEST(AlwaysCombVsAlwaysStar, DelayInARandsequenceCodeBlockErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, y;\n"
+      "  always_comb\n"
+      "    randsequence(main)\n"
+      "      main : { #5 y = a; };\n"
+      "    endsequence\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_comb shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
+}
+
 }  // namespace

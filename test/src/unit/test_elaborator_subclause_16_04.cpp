@@ -336,4 +336,368 @@ TEST(DeferredAssertionElaboration, AssignmentPassActionNames16_4) {
   }
 }
 
+// §16.4 refuses a final deferred assertion whose callee body holds a statement
+// the Postponed region cannot run, and it names no statement position the
+// restriction is suspended in. The seven cases below write the offending
+// assignment in each of the seven links ContainsPostponedIllegalStmt in
+// src/elaborator/elaborator_validate_assertion_actions.cpp did not descend
+// before it was handed the list ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h states, so each one saw the
+// callee as legal in the Postponed region and made no report.
+
+// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
+// block_item_declaration } { statement_or_null } join_keyword`, so a fork arm
+// holds an ordinary blocking assignment.
+TEST(DeferredAssertionElaboration,
+     FinalDeferredCalleeAssignsInAForkArmFlagged) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  task mutator;\n"
+      "    fork\n"
+      "      x = 8'd1;\n"
+      "    join\n"
+      "  endtask\n"
+      "  initial assert final (1) mutator();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "whose body contains statements not legally "
+                              "callable in the Postponed region",
+                              8, "16.4"));
+}
+
+// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`, so
+// the loop header's first clause is an assignment like any other. The step
+// clause is left empty here, which leaves the initialization as the only
+// assignment in the callee.
+TEST(DeferredAssertionElaboration,
+     FinalDeferredCalleeAssignsInAForInitializationFlagged) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  task mutator;\n"
+      "    for (x = 8'd0; 1'b0; ) ;\n"
+      "  endtask\n"
+      "  initial assert final (1) mutator();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "whose body contains statements not legally "
+                              "callable in the Postponed region",
+                              6, "16.4"));
+}
+
+// A.6.8 gives `for_step_assignment ::= operator_assignment |
+// inc_or_dec_expression | function_subroutine_call`, so an assignment stands in
+// the step clause too. The initialization clause is left empty here, which
+// leaves the step as the only assignment in the callee.
+TEST(DeferredAssertionElaboration,
+     FinalDeferredCalleeAssignsInAForStepFlagged) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  task mutator;\n"
+      "    for ( ; 1'b0; x = 8'd1) ;\n"
+      "  endtask\n"
+      "  initial assert final (1) mutator();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "whose body contains statements not legally "
+                              "callable in the Postponed region",
+                              6, "16.4"));
+}
+
+// A.6.10 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so either arm of an immediate assertion inside the callee
+// holds an assignment. The assertion here is not deferred, so §16.4's
+// single-subroutine-call rule does not apply to it and the assignment is legal
+// where it stands.
+TEST(DeferredAssertionElaboration,
+     FinalDeferredCalleeAssignsInAnAssertionPassActionFlagged) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  task mutator;\n"
+      "    assert (1'b1) x = 8'd1;\n"
+      "  endtask\n"
+      "  initial assert final (1) mutator();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "whose body contains statements not legally "
+                              "callable in the Postponed region",
+                              6, "16.4"));
+}
+
+TEST(DeferredAssertionElaboration,
+     FinalDeferredCalleeAssignsInAnAssertionFailActionFlagged) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  task mutator;\n"
+      "    assert (1'b1) else x = 8'd1;\n"
+      "  endtask\n"
+      "  initial assert final (1) mutator();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "whose body contains statements not legally "
+                              "callable in the Postponed region",
+                              6, "16.4"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
+// randcase arm holds the assignment directly. §16.4 is a rule about what the
+// callee's body can be asked to run, so it holds whether the weighted draw
+// would select the arm or not.
+TEST(DeferredAssertionElaboration,
+     FinalDeferredCalleeAssignsInARandcaseArmFlagged) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  task mutator;\n"
+      "    randcase\n"
+      "      1 : x = 8'd1;\n"
+      "    endcase\n"
+      "  endtask\n"
+      "  initial assert final (1) mutator();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "whose body contains statements not legally "
+                              "callable in the Postponed region",
+                              8, "16.4"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds the assignment.
+TEST(DeferredAssertionElaboration,
+     FinalDeferredCalleeAssignsInARandsequenceCodeBlockFlagged) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  task mutator;\n"
+      "    randsequence(main)\n"
+      "      main : { x = 8'd1; };\n"
+      "    endsequence\n"
+      "  endtask\n"
+      "  initial assert final (1) mutator();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "whose body contains statements not legally "
+                              "callable in the Postponed region",
+                              8, "16.4"));
+}
+
+// §16.4 bars an automatic variable as the actual for a pass-by-reference formal
+// of a deferred-assertion action call. Two walks in
+// src/elaborator/elaborator_validate_assertion_actions.cpp answer that
+// together: CollectAutomaticVarNames gathers the names an enclosing routine
+// declares automatic, and Elaborator::WalkStmtsForDeferredActions finds the
+// deferred assertion whose call passes one of them. Each wrote its own list of
+// the statement links to descend, and each omitted the same five, so the cases
+// below put the declaration and the deferred assertion in those links.
+//
+// A.6.8 admits in a for_initialization only a list_of_variable_assignments or a
+// for_variable_declaration, and in a for_step_assignment only an
+// operator_assignment, an inc_or_dec_expression or a function_subroutine_call.
+// No statement stands in either, so a deferred assertion cannot be written
+// there, and the parser records a for-header declaration as an assignment in
+// Stmt::for_inits rather than as a Stmt of kind kVarDecl, so no declaration is
+// collected there either. Those two links therefore take no case.
+
+// The deferred assertion in a fork arm, with the automatic declared at the top
+// of the enclosing automatic task, so the report turns on
+// Elaborator::WalkStmtsForDeferredActions reaching Stmt::fork_stmts.
+TEST(DeferredAssertionElaboration,
+     AutomaticLocalToRefFormalInAForkArmRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  task automatic upd(ref int r); endtask\n"
+      "  task automatic caller;\n"
+      "    int loc;\n"
+      "    fork\n"
+      "      assert #0 (1) upd(loc);\n"
+      "    join\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot pass automatic variable as actual for ref "
+                            "formal 'r' in deferred-assertion call",
+                            6, "16.4"));
+}
+
+TEST(DeferredAssertionElaboration,
+     AutomaticLocalToRefFormalInARandcaseArmRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  task automatic upd(ref int r); endtask\n"
+      "  task automatic caller;\n"
+      "    int loc;\n"
+      "    randcase\n"
+      "      1 : assert #0 (1) upd(loc);\n"
+      "    endcase\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot pass automatic variable as actual for ref "
+                            "formal 'r' in deferred-assertion call",
+                            6, "16.4"));
+}
+
+TEST(DeferredAssertionElaboration,
+     AutomaticLocalToRefFormalInARandsequenceCodeBlockRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  task automatic upd(ref int r); endtask\n"
+      "  task automatic caller;\n"
+      "    int loc;\n"
+      "    randsequence(main)\n"
+      "      main : { assert #0 (1) upd(loc); };\n"
+      "    endsequence\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot pass automatic variable as actual for ref "
+                            "formal 'r' in deferred-assertion call",
+                            6, "16.4"));
+}
+
+// The three pairs below turn on CollectAutomaticVarNames instead. §6.21 makes a
+// local of a static task static unless it is declared automatic, so each pair
+// writes the same source twice inside a static task and varies only the
+// lifetime keyword on the declaration: the automatic form is rejected because
+// the name is collected, and the static form is accepted because it is not.
+// The declaration and the use stand in the same block because a
+// block_item_declaration is local to the block that holds it, so no conforming
+// source declares the variable in one of these links and uses it outside.
+TEST(DeferredAssertionElaboration,
+     AutomaticDeclaredInAForkArmToRefFormalRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  task automatic upd(ref int r); endtask\n"
+      "  task caller;\n"
+      "    fork\n"
+      "      automatic int loc;\n"
+      "      assert #0 (1) upd(loc);\n"
+      "    join\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot pass automatic variable as actual for ref "
+                            "formal 'r' in deferred-assertion call",
+                            6, "16.4"));
+}
+
+TEST(DeferredAssertionElaboration,
+     StaticDeclaredInAForkArmToRefFormalAccepted) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  task automatic upd(ref int r); endtask\n"
+      "  task caller;\n"
+      "    fork\n"
+      "      int loc;\n"
+      "      assert #0 (1) upd(loc);\n"
+      "    join\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DeferredAssertionElaboration,
+     AutomaticDeclaredUnderARandcaseArmToRefFormalRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  task automatic upd(ref int r); endtask\n"
+      "  task caller;\n"
+      "    randcase\n"
+      "      1 : begin\n"
+      "        automatic int loc;\n"
+      "        assert #0 (1) upd(loc);\n"
+      "      end\n"
+      "    endcase\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot pass automatic variable as actual for ref "
+                            "formal 'r' in deferred-assertion call",
+                            7, "16.4"));
+}
+
+TEST(DeferredAssertionElaboration,
+     StaticDeclaredUnderARandcaseArmToRefFormalAccepted) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  task automatic upd(ref int r); endtask\n"
+      "  task caller;\n"
+      "    randcase\n"
+      "      1 : begin\n"
+      "        int loc;\n"
+      "        assert #0 (1) upd(loc);\n"
+      "      end\n"
+      "    endcase\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DeferredAssertionElaboration,
+     AutomaticDeclaredInARandsequenceCodeBlockToRefFormalRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  task automatic upd(ref int r); endtask\n"
+      "  task caller;\n"
+      "    randsequence(main)\n"
+      "      main : { automatic int loc; assert #0 (1) upd(loc); };\n"
+      "    endsequence\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot pass automatic variable as actual for ref "
+                            "formal 'r' in deferred-assertion call",
+                            5, "16.4"));
+}
+
+TEST(DeferredAssertionElaboration,
+     StaticDeclaredInARandsequenceCodeBlockToRefFormalAccepted) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  task automatic upd(ref int r); endtask\n"
+      "  task caller;\n"
+      "    randsequence(main)\n"
+      "      main : { int loc; assert #0 (1) upd(loc); };\n"
+      "    endsequence\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

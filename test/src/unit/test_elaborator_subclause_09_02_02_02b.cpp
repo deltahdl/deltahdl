@@ -1,16 +1,22 @@
-// §9.2.2.2 "Combinational logic always_comb procedure", the multiple-driver
-// rule where the procedure reaches the second driver through a function it
-// calls and the call is written somewhere other than a right-hand side. The
-// clause says of the variables an always_comb assigns that they "shall not be
-// assigned by any other process", and that this "includes variables assigned
-// within functions called by the procedure but not those assigned within tasks
-// called by the procedure". It puts no condition on where in the procedure the
-// call stands, so every case here names one position a statement or an
-// expression holds an expression in and asserts the same report.
+// §9.2.2.2 "Combinational logic always_comb procedure", in the two families of
+// case the 1000-line cap in .github/workflows/deltahdl.yml kept out of
+// test_elaborator_subclause_09_02_02_02a.cpp.
 //
-// The cases where the call is written where a call is usually written are in
-// test_elaborator_subclause_09_02_02_02a.cpp, which the 1000-line cap in
-// .github/workflows/deltahdl.yml separated this file from.
+// The first is the multiple-driver rule where the procedure reaches the second
+// driver through a function it calls and the call is written somewhere other
+// than a right-hand side. The clause says of the variables an always_comb
+// assigns that they "shall not be assigned by any other process", and that this
+// "includes variables assigned within functions called by the procedure but not
+// those assigned within tasks called by the procedure". It puts no condition on
+// where in the procedure the call stands, so every case in that family names
+// one position a statement or an expression holds an expression in and asserts
+// the same report. The cases where the call is written where a call is usually
+// written are in test_elaborator_subclause_09_02_02_02a.cpp.
+//
+// The second is the latch-inference warning the clause asks for -- "warn if the
+// behavior within an always_comb procedure does not represent combinational
+// logic, such as if latched behavior can be inferred" -- read at one statement
+// position each. Those cases begin below the multiple-driver ones.
 
 #include <string>
 
@@ -249,6 +255,184 @@ TEST(AlwaysCombMultiDriver, FunctionCalledFromAReplicationCountIsADriver) {
 // Expr::pattern_keys, beside the value it names in Expr::elements.
 TEST(AlwaysCombMultiDriver, FunctionCalledFromAnAssignmentPatternKeyIsADriver) {
   ExpectFunctionTargetDrivenTwice("arr = '{f(): 1};");
+}
+
+// §9.2.2.2's latch-inference warning, per statement position. InfersLatch in
+// src/elaborator/elaborator_process.cpp answers it from two walks over the
+// procedure body: CollectAssignedVariables gathers every variable the body
+// assigns anywhere, and AssignedOnEveryPath gathers those an execution of the
+// body cannot leave unassigned. A variable in the first set and not the second
+// keeps its previous value on the paths that skip it, which is what a latch
+// does.
+//
+// Both walks named six of the thirteen statement links ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h states, so a variable assigned
+// only in a fork arm, a for header, a randcase item, an assertion action block
+// or a randsequence code block was in neither set and the warning could not
+// reach it. Each case below names one position, and says which of the two
+// answers the position gives.
+
+// §16.3 has the pass statement of an action block "executed if the expression
+// evaluates to true", so a variable assigned only there is left holding its
+// previous value whenever the assertion fails. It is assigned somewhere and on
+// no path, which is the latch.
+TEST(AlwaysCombLatchWarning, AssertionPassStatementAssignmentInfersLatch) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, y;\n"
+      "  always_comb assert (a) y = a;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "always_comb may infer latched behavior", 3,
+                              "9.2.2.2"));
+}
+
+// The fail statement is the other arm of the same action block, kept in a
+// different member of Stmt, and §16.3 has it "executed if the expression
+// evaluates to false".
+TEST(AlwaysCombLatchWarning, AssertionFailStatementAssignmentInfersLatch) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, y;\n"
+      "  always_comb assert (a) else y = a;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "always_comb may infer latched behavior", 3,
+                              "9.2.2.2"));
+}
+
+// Both arms written is still a latch, and this is the case that says so. §16.3
+// alone would make the two arms a two-way choice on the assertion expression,
+// covering its whole domain the way an if with an else covers a condition's,
+// and an every-path answer built on §16.3 alone would report no latch here. But
+// §20.11 gives $assertcontrol "the capability to enable/disable action block
+// execution of assertions and expect statements", so there is a way through the
+// statement that runs neither arm and leaves `y` holding its previous value.
+TEST(AlwaysCombLatchWarning, AssertionBothActionArmsStillInferLatch) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, y;\n"
+      "  always_comb assert (a) y = a; else y = 1'b0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "always_comb may infer latched behavior", 3,
+                              "9.2.2.2"));
+}
+
+// §18.16 rules that "if all randcase_items specify zero weights, then no branch
+// is taken", and that the weights "can be arbitrary expressions", read while
+// the design runs. So no item of a randcase is reached on every path through
+// it, however many items are written, and a variable assigned only in one is
+// latched.
+TEST(AlwaysCombLatchWarning, RandcaseItemAssignmentInfersLatch) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, y;\n"
+      "  always_comb randcase 1: y = a; endcase\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "always_comb may infer latched behavior", 3,
+                              "9.2.2.2"));
+}
+
+// §18.17 rules that production lists separated by a "|" "imply a set of
+// choices, which the generator will make at random", so a randsequence code
+// block is reached at the generator's discretion. A.6.12 gives `rs_code_block
+// ::= { { data_declaration } { statement_or_null } }`, whose statements the
+// parser keeps in RsProd::code_stmts under Stmt::rs_productions.
+TEST(AlwaysCombLatchWarning, RandsequenceCodeBlockAssignmentInfersLatch) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, y;\n"
+      "  always_comb\n"
+      "    randsequence(main)\n"
+      "      main : { y = a; };\n"
+      "    endsequence\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "always_comb may infer latched behavior", 3,
+                              "9.2.2.2"));
+}
+
+// §9.3.2's Table 9-1 has join_none leave "the parent process ... to execute
+// concurrently with all the processes spawned by the fork", so an arm's
+// assignment need not have been made when control passes out of the block and
+// the fork puts nothing on every path. The fork-join is also barred from an
+// always_comb by §9.2.2.2.2 and reported separately; this case is about the
+// warning, and the counterpart that does complete every arm is in
+// test_elaborator_subclause_09_02_02_03.cpp.
+TEST(AlwaysCombLatchWarning, ForkJoinNoneArmAssignmentInfersLatch) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, y;\n"
+      "  always_comb fork y = a; join_none\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "always_comb may infer latched behavior", 3,
+                              "9.2.2.2"));
+}
+
+// The other direction, at the two positions of a for header. §12.7.1 step a)
+// "executes one or more for_initialization assignments" once and under no
+// condition, so a variable initialized there is assigned on every path through
+// the loop however the body is written. `y` is assigned nowhere else
+// unconditionally -- the body's if has no else -- so the initialization is the
+// whole of the answer, and a walk that skipped it would warn about a procedure
+// that describes combinational logic.
+TEST(AlwaysCombLatchWarning, ForInitializationAssignmentIsCombinational) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic sel, a, y;\n"
+      "  int i;\n"
+      "  always_comb begin\n"
+      "    for (y = 1'b0; i < 2; i++)\n"
+      "      if (sel) y = a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// §12.7.1 step c) "executes one or more for_step assignments ... then repeats
+// step b)", so a step assignment is made once the body has run, which this
+// check counts as taken for the reason it counts any loop body as taken. The
+// initialization is omitted here, which A.6.8 permits, so the step is the only
+// position that can put `y` on every path.
+TEST(AlwaysCombLatchWarning, ForStepAssignmentIsCombinational) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic sel, a, y;\n"
+      "  int i;\n"
+      "  always_comb begin\n"
+      "    for ( ; i < 2; i++, y = a)\n"
+      "      if (sel) y = a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
 }  // namespace

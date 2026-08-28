@@ -1,4 +1,3 @@
-#include <initializer_list>
 #include <string>
 #include <string_view>
 
@@ -7,6 +6,7 @@
 #include "elaborator/concurrent_assertion_expr.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
@@ -16,26 +16,30 @@ namespace delta {
 
 namespace {
 
-// §16.14.3: the optional pass statement (statement_or_null) of a cover
-// statement shall not include any concurrent assert, assume, or cover
-// statement. A procedural concurrent assertion is parsed as an
-// assert/assume/cover-immediate Stmt that carries is_procedural_concurrent;
-// ordinary immediate assertions leave that flag clear and remain permitted.
-// Walk the pass-statement subtree — including the statements a block, fork,
-// conditional, loop, or case nests — and return the first offending statement,
-// or nullptr when the pass statement contains none.
-const Stmt* FindConcurrentAssertionInPassStmt(const Stmt* s);
-
-// The first procedural concurrent assertion reachable from any statement in
-// `children`, or null when none of them contains one.
-template <typename Stmts>
-const Stmt* FindConcurrentAssertionInStmtList(const Stmts& children) {
-  for (const Stmt* child : children) {
-    if (const Stmt* hit = FindConcurrentAssertionInPassStmt(child)) return hit;
-  }
-  return nullptr;
-}
-
+// §16.14.3: a cover statement may have an optional pass statement
+// (statement_or_null), and that pass statement "shall not include any
+// concurrent assert, assume, or cover statement". A procedural concurrent
+// assertion is parsed as an assert/assume/cover-immediate Stmt that carries
+// is_procedural_concurrent; ordinary immediate assertions leave that flag clear
+// and remain permitted. Returns the first offending statement, or nullptr when
+// the pass statement contains none.
+//
+// §16.14.3 says "include" and names no statement the prohibition is lifted in,
+// so this descends every link ForEachChildStmt in
+// elaborator_validate_internal.h names. It wrote out nine of the thirteen, so a
+// concurrent assertion written in a randcase arm or a randsequence code block
+// was not found and the cover statement holding it elaborated clean. Two of the
+// four links it now reaches cannot hold one: A.6.8 admits in a
+// for_initialization only a list_of_variable_assignments or a
+// for_variable_declaration, and in a for_step only an operator_assignment, an
+// inc_or_dec_expression or a function_subroutine_call, so no assertion
+// statement stands in a for header. Descending them costs nothing and keeps the
+// walk from naming any link itself.
+//
+// ForEachChildStmt gives the visitor no way to stop, so the first offending
+// statement is kept in `hit` and the recursion runs only while `hit` is null.
+// That is what makes this walk report the first one in source order rather than
+// whichever link the list happens to visit last.
 const Stmt* FindConcurrentAssertionInPassStmt(const Stmt* s) {
   if (s == nullptr) return nullptr;
   if (s->is_procedural_concurrent && (s->kind == StmtKind::kAssertImmediate ||
@@ -43,19 +47,12 @@ const Stmt* FindConcurrentAssertionInPassStmt(const Stmt* s) {
                                       s->kind == StmtKind::kCoverImmediate)) {
     return s;
   }
-  if (const Stmt* hit = FindConcurrentAssertionInStmtList(s->stmts)) return hit;
-  if (const Stmt* hit = FindConcurrentAssertionInStmtList(s->fork_stmts))
-    return hit;
-  const std::initializer_list<const Stmt*> kBranches = {
-      s->then_branch, s->else_branch,      s->body,
-      s->for_body,    s->assert_pass_stmt, s->assert_fail_stmt};
-  if (const Stmt* hit = FindConcurrentAssertionInStmtList(kBranches))
-    return hit;
-  for (const CaseItem& ci : s->case_items) {
-    if (const Stmt* hit = FindConcurrentAssertionInPassStmt(ci.body))
-      return hit;
-  }
-  return nullptr;
+  const Stmt* hit = nullptr;
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    if (hit) return;
+    hit = FindConcurrentAssertionInPassStmt(sub);
+  });
+  return hit;
 }
 
 // §16.6: an expression appearing in a concurrent assertion shall not reference

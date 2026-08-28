@@ -517,4 +517,37 @@ TEST(AlwaysLatchElaboration, CycleDelayInAlwaysLatchErrors) {
                             "9.2.2.3"));
 }
 
+// §9.2.2.3 rules that "all statements in 9.2.2.2 shall apply to always_latch",
+// so the question §9.2.2.2 asks of an always_comb is asked here in reverse: an
+// always_latch whose body leaves nothing held describes no latch and is warned
+// about. AssignedOnEveryPath in src/elaborator/elaborator_process.cpp is what
+// decides whether a variable is left held, and §9.3.2's Table 9-1 decides it
+// for a fork: under `join` "the parent process blocks until all the processes
+// spawned by this fork terminate", so control leaves the block only once every
+// arm has run and an arm's assignment is made on every path through it.
+//
+// `q` is assigned conditionally in the if and unconditionally in the fork arm,
+// so the fork arm is the whole of what makes this procedure hold nothing. A
+// walk that did not read Stmt::fork_stmts would find `q` assigned on no path,
+// infer a latch and stay silent. The fork-join is also barred from an
+// always_latch and reported separately, which
+// AlwaysLatchElaboration.ForkJoinInAlwaysLatchErrors above covers; this case is
+// about the warning, and the join_none counterpart that completes no arm is in
+// test_elaborator_subclause_09_02_02_02b.cpp.
+TEST(AlwaysLatchElaboration, ForkJoinArmAssignmentLeavesNothingLatched) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic en, d, q;\n"
+      "  always_latch begin\n"
+      "    if (en) q = d;\n"
+      "    fork q = d; join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "always_latch does not infer latched behavior", 3,
+                              "9.2.2.3"));
+}
+
 }  // namespace

@@ -312,4 +312,157 @@ TEST(InterfaceModportNames, UndeclaredModportNameNames25_5) {
       ReportedError(f.diag.Diagnostics(), "which interface 'bus'", 3, "25.5"));
 }
 
+// §25.5 restricts access through an interface port to the members its selected
+// modport lists, and names no statement the restriction is lifted in, so every
+// child-statement link Stmt declares is a position the restriction reaches.
+// WalkStmtsForInterfaceObjectAccess in
+// src/elaborator/elaborator_validate_interface.cpp had kept its own list of six
+// of the thirteen links ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h states, so the same access
+// UnlistedMemberIsInaccessibleThroughModport above rejects was accepted in any
+// of the other seven. The walk now takes its list from ForEachChildStmt, and
+// the seven cases below are one per newly reached position: A.6.3's par_block
+// (Stmt::fork_stmts), A.6.8's for_initialization and for_step
+// (Stmt::for_inits, Stmt::for_steps), A.6.10's action_block
+// (Stmt::assert_pass_stmt, Stmt::assert_fail_stmt), A.6.9's randcase_item
+// (Stmt::randcase_items) and A.6.12's rs_code_block (Stmt::rs_productions).
+// Each holds a statement, so each can hold the read of the unlisted member.
+
+TEST(InterfaceModportAccess, UnlistedMemberInForkArmIsInaccessible) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface bus;\n"
+      "  logic ctrl, status, secret;\n"
+      "  modport master(input status, output ctrl);\n"
+      "endinterface\n"
+      "module child(bus.master b);\n"
+      "  logic x;\n"
+      "  initial fork\n"
+      "    x = b.secret;\n"
+      "  join\n"
+      "endmodule\n",
+      f, "child");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'secret' is not accessible through modport 'master' of interface 'bus'",
+      8, "25.5"));
+}
+
+TEST(InterfaceModportAccess, UnlistedMemberInForInitializationIsInaccessible) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface bus;\n"
+      "  logic ctrl, status, secret;\n"
+      "  modport master(input status, output ctrl);\n"
+      "endinterface\n"
+      "module child(bus.master b);\n"
+      "  logic x;\n"
+      "  int i;\n"
+      "  initial for (x = b.secret; i < 1; i = i + 1) ;\n"
+      "endmodule\n",
+      f, "child");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'secret' is not accessible through modport 'master' of interface 'bus'",
+      8, "25.5"));
+}
+
+TEST(InterfaceModportAccess, UnlistedMemberInForStepIsInaccessible) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface bus;\n"
+      "  logic ctrl, status, secret;\n"
+      "  modport master(input status, output ctrl);\n"
+      "endinterface\n"
+      "module child(bus.master b);\n"
+      "  logic x;\n"
+      "  int i;\n"
+      "  initial for (i = 0; i < 1; x = b.secret) ;\n"
+      "endmodule\n",
+      f, "child");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'secret' is not accessible through modport 'master' of interface 'bus'",
+      8, "25.5"));
+}
+
+TEST(InterfaceModportAccess, UnlistedMemberInAssertionPassStmtIsInaccessible) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface bus;\n"
+      "  logic ctrl, status, secret;\n"
+      "  modport master(input status, output ctrl);\n"
+      "endinterface\n"
+      "module child(bus.master b);\n"
+      "  logic x;\n"
+      "  initial assert (1) x = b.secret;\n"
+      "endmodule\n",
+      f, "child");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'secret' is not accessible through modport 'master' of interface 'bus'",
+      7, "25.5"));
+}
+
+TEST(InterfaceModportAccess, UnlistedMemberInAssertionFailStmtIsInaccessible) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface bus;\n"
+      "  logic ctrl, status, secret;\n"
+      "  modport master(input status, output ctrl);\n"
+      "endinterface\n"
+      "module child(bus.master b);\n"
+      "  logic x;\n"
+      "  initial assert (1) else x = b.secret;\n"
+      "endmodule\n",
+      f, "child");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'secret' is not accessible through modport 'master' of interface 'bus'",
+      7, "25.5"));
+}
+
+TEST(InterfaceModportAccess, UnlistedMemberInRandcaseItemIsInaccessible) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface bus;\n"
+      "  logic ctrl, status, secret;\n"
+      "  modport master(input status, output ctrl);\n"
+      "endinterface\n"
+      "module child(bus.master b);\n"
+      "  logic x;\n"
+      "  initial randcase\n"
+      "    1 : x = b.secret;\n"
+      "  endcase\n"
+      "endmodule\n",
+      f, "child");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'secret' is not accessible through modport 'master' of interface 'bus'",
+      8, "25.5"));
+}
+
+TEST(InterfaceModportAccess,
+     UnlistedMemberInRandsequenceCodeBlockIsInaccessible) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface bus;\n"
+      "  logic ctrl, status, secret;\n"
+      "  modport master(input status, output ctrl);\n"
+      "endinterface\n"
+      "module child(bus.master b);\n"
+      "  logic x;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { x = b.secret; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f, "child");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'secret' is not accessible through modport 'master' of interface 'bus'",
+      9, "25.5"));
+}
+
 }  // namespace

@@ -361,4 +361,133 @@ TEST(CheckerProcedures, CheckerInitialProcedureRejectsDelayTimingControl) {
       3, "17.5"));
 }
 
+// §17.5's two checker-procedure walks in
+// src/elaborator/elaborator_items_udp.cpp
+// -- StmtContainsBlockingAssignment for the always_ff restriction and
+// StmtContainsNonEventTimingControl for the initial procedure's timing control
+// -- each wrote out six of the thirteen child-statement links Stmt holds, and
+// now take the list from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. The cases below stand at the
+// positions each rule newly reaches.
+//
+// Four links get no case. §17.5 puts neither a randcase (§18.16) nor a
+// randsequence (A.6.12) on the list of what either procedure may contain, so no
+// conforming checker holds one and neither Stmt::randcase_items nor
+// Stmt::rs_productions carries a construct these two rules would report.
+// Stmt::for_inits and Stmt::for_steps hold no timing control: A.6.8 writes
+// `for_initialization ::= list_of_variable_assignments |
+// for_variable_declaration {, for_variable_declaration}` and
+// `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
+// function_subroutine_call`, and none of those forms carries a
+// delay_or_event_control or is a delay, cycle-delay or wait statement. Those
+// same two links are the ones StmtContainsBlockingAssignment skips on purpose,
+// and ForLoopHeaderInCheckerAlwaysFfIsNotABlockingAssignment below is what
+// holds the skip in place.
+
+TEST(CheckerProcedures,
+     BlockingAssignmentInAlwaysFfAssertionPassActionIsRejected) {
+  // §17.5: blocking assignments are allowed in always_comb and always_latch
+  // procedures only, and A.6.10's `simple_immediate_assert_statement ::= assert
+  // ( expression ) action_block` with §16.3's `action_block ::=
+  // statement_or_null | [ statement ] else statement_or_null` puts a statement
+  // in the pass arm of an assertion §17.5 admits in the same procedure. The
+  // assertion is the only thing separating this from
+  // BlockingAssignmentInCheckerAlwaysFfIsRejected above.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "checker chk(input logic clk, input logic d);\n"
+      "  logic q;\n"
+      "  always_ff @(posedge clk) assert (d) q = d;\n"
+      "endchecker\n",
+      f, "chk");
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a blocking assignment cannot appear in an "
+                            "always_ff procedure of checker",
+                            3, "17.7.1"));
+}
+
+TEST(CheckerProcedures,
+     BlockingAssignmentInAlwaysFfAssertionFailActionIsRejected) {
+  // §17.5: the else arm of the same action block is the other statement
+  // position §16.3 gives it. The pass arm holds the nonblocking form the clause
+  // does admit in an always_ff, so the blocking assignment in the fail arm is
+  // the sole cause of the report.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "checker chk(input logic clk, input logic d);\n"
+      "  logic q;\n"
+      "  always_ff @(posedge clk) assert (d) q <= d; else q = d;\n"
+      "endchecker\n",
+      f, "chk");
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a blocking assignment cannot appear in an "
+                            "always_ff procedure of checker",
+                            3, "17.7.1"));
+}
+
+TEST(CheckerProcedures,
+     ForLoopHeaderInCheckerAlwaysFfIsNotABlockingAssignment) {
+  // §17.5 admits "Loop statements (see 12.7)" in a checker always procedure
+  // with none of the always_comb/always_latch restriction it writes beside
+  // blocking assignments, and A.6.8 gives a for_initialization only a
+  // list_of_variable_assignments and a for_step_assignment only an
+  // operator_assignment, an inc_or_dec_expression or a
+  // function_subroutine_call. A.6.2 makes the assignment forms of both
+  // alternatives of blocking_assignment, so a rule reaching the header would
+  // leave an always_ff no for loop that initializes or steps anything. The
+  // header here is written in exactly those forms and the body assigns only
+  // with the nonblocking form, so any report at all is that rule reaching a
+  // position §17.5 does not put it in.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "checker chk(input logic clk, input logic [3:0] d);\n"
+      "  logic q;\n"
+      "  always_ff @(posedge clk)\n"
+      "    for (int i = 0; i < 4; i = i + 1) q <= d[i];\n"
+      "endchecker\n",
+      f, "chk");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(CheckerProcedures, DelayInCheckerInitialAssertionPassActionIsRejected) {
+  // §17.5: an initial procedure in a checker "may contain let declarations,
+  // immediate, deferred, and concurrent assertions, and a procedural timing
+  // control statement using an event control only", so the pass arm §16.3 gives
+  // the immediate assertion it admits is a position the timing-control
+  // restriction reaches. The delay is the only timing control in the source.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "checker chk(input logic d);\n"
+      "  initial assert (d) #5 $display(\"late\");\n"
+      "endchecker\n",
+      f, "chk");
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "may use only an event control for timing; a delay, a cycle delay and a "
+      "wait are not allowed",
+      2, "17.5"));
+}
+
+TEST(CheckerProcedures, DelayInCheckerInitialAssertionFailActionIsRejected) {
+  // §17.5: the else arm of the same action block. The pass arm holds a plain
+  // subroutine call, so the delay in the fail arm is the sole cause of the
+  // report.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "checker chk(input logic d);\n"
+      "  initial assert (d) $display(\"ok\"); else #5 $display(\"late\");\n"
+      "endchecker\n",
+      f, "chk");
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "may use only an event control for timing; a delay, a cycle delay and a "
+      "wait are not allowed",
+      2, "17.5"));
+}
+
 }  // namespace
