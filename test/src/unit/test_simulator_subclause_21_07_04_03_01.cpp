@@ -40,10 +40,11 @@ namespace {
 // through the production path. The state character is a function of the port's
 // resolved value, and that value is produced by the pipeline, so each test
 // builds the port from real source syntax and drives it through parse,
-// elaboration, lowering, and the scheduler -- selecting the port form because
-// the source invoked $dumpports (§21.7.3.1) on a real port declaration whose
+// elaboration, lowering, and the scheduler -- on a real port declaration whose
 // $var identifier code comes from §21.7.4.2 -- rather than hand-building a
-// resolved value into a vector.
+// resolved value into a vector. The port form itself is selected by the
+// fixture below, not by the source's $dumpports, because RunVcdDump installs
+// its writer before the run.
 class ExtendedVcdStateCharacterSim : public VcdDumpRunTestBase {
  protected:
   std::string RunPortVcd(const std::string& src) {

@@ -461,11 +461,18 @@ static void ExecDumpports(const Expr* expr, SimContext& ctx, Arena& arena) {
   }
   // §21.7.1: $dumpports is one of the VCD system tasks a source inserts to
   // create a dump file, so the file named above is opened here rather than
-  // waiting for something outside the source to open one.
-  VcdWriter* vcd = ctx.OpenVcdDumpFromTask();
+  // waiting for something outside the source to open one. §21.7 b) makes what
+  // it opens the extended type -- variable changes in all states and strength
+  // information -- and the type is stated at the open because §21.7.4.2's node
+  // information goes out with the definitions, before this task returns.
+  VcdWriter* vcd = ctx.OpenVcdDumpFromTask(VcdFileType::kExtended);
   if (!vcd) return;
   // $dumpports produces an extended VCD file, which closes with the
-  // $vcdclose keyword command (§21.7.3.6.1).
+  // $vcdclose keyword command (§21.7.3.6.1). Marking the writer here as well
+  // as at the open covers a dump this call found already open, whose node
+  // information is on disk in whatever form opened it: §21.7.3.6.1 records the
+  // final simulation time "at the time the extended VCD file is closed", which
+  // is still writable then, while the definitions above it are not.
   vcd->SetExtended();
   size_t scope_end = expr->args.size() - (last_is_file ? 1 : 0);
   std::vector<std::string> scopes =
@@ -630,14 +637,16 @@ Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                : DumpfileArgSourceText(expr->args[0]));
     ctx.SetDumpFileName(ResolveDumpFileName(expr, ctx, arena));
     // §21.7.1: Figure 21-1 has the source's own $dumpfile call produce the VCD
-    // file, so the dump is opened here under the name just recorded.
-    ctx.OpenVcdDumpFromTask();
+    // file, so the dump is opened here under the name just recorded. §21.7.1
+    // is the 4-state file's subclause, so that is the type $dumpfile creates.
+    ctx.OpenVcdDumpFromTask(VcdFileType::kFourState);
   } else if (name == "$dumpvars") {
     // §21.7.1.2: $dumpvars lists the variables to dump "into the file
     // specified by $dumpfile", which §21.7.1.1 defaults to "dump.vcd" when the
     // source named none. Either way the file exists from this call on, so a
     // source that reaches $dumpvars without a $dumpfile still gets a dump.
-    ExecDumpvars(expr, ctx, arena, ctx.OpenVcdDumpFromTask());
+    ExecDumpvars(expr, ctx, arena,
+                 ctx.OpenVcdDumpFromTask(VcdFileType::kFourState));
   } else if (name == "$dumplimit") {
     // §21.7.1.5: the single argument bounds the VCD file size in bytes. A
     // limit on a dump no task has opened bounds nothing, so this opens no

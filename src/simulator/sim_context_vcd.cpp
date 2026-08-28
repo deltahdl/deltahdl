@@ -187,7 +187,7 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
 // An empty top_scope leaves the definitions at the top level rather than
 // inside a $scope.
 VcdWriter* SimContext::OpenVcdDump(std::string_view top_scope,
-                                   bool wait_for_dumpvars) {
+                                   bool wait_for_dumpvars, VcdFileType type) {
   // The writer already installed wins. src/main.cpp's --vcd option opens one
   // before the scheduler runs, so a source's $dumpfile or $dumpvars finds a
   // dump whose header and definitions are already on disk; a second writer
@@ -196,6 +196,19 @@ VcdWriter* SimContext::OpenVcdDump(std::string_view top_scope,
   if (vcd_writer_ != nullptr) return vcd_writer_;
   auto vcd = std::make_unique<VcdWriter>(dump_file_name_);
   if (!vcd->IsOpen()) return nullptr;
+  // §21.7 b): an extended file represents "variable changes in all states and
+  // strength information", which is a different form for the node information
+  // (§21.7.4.2 declares each object as $var port with an integer identifier
+  // code), for the checkpoint keywords (§21.7.4.1 gives the extended file
+  // $dumpports, $dumpportsoff, $dumpportson and $dumpportsall as its
+  // simulation_keyword) and for the value changes (§21.7.4.3). The type is
+  // applied here, ahead of the $var declarations RegisterVcdSignals writes
+  // below, because a declaration already on disk cannot be reissued in the
+  // other form.
+  if (type == VcdFileType::kExtended) {
+    vcd->SetExtended();
+    vcd->SetExtendedPortNodes();
+  }
   // §21.7.2.3: the $version section reproduces the $dumpfile call that named
   // the file, its filename argument spelled as it was written. A dump no
   // $dumpfile named leaves that entry out.
@@ -238,9 +251,11 @@ VcdWriter* SimContext::OpenVcdDump(std::string_view top_scope,
 // §21.7.1: the dump a source creates for itself. §21.7.1.1 names the file
 // through $dumpfile and defaults it to "dump.vcd" when the source specifies no
 // filename, and the dumped objects sit in the $scope of the top module the run
-// elaborated (§21.7.2.3).
-VcdWriter* SimContext::OpenVcdDumpFromTask() {
-  return OpenVcdDump(current_scope_name_, /*wait_for_dumpvars=*/true);
+// elaborated (§21.7.2.3). The calling task states which of the two §21.7 file
+// types it creates; the first such task to run settles it, since §21.7.4.1 and
+// §21.7.2.1 give the node information already written no second spelling.
+VcdWriter* SimContext::OpenVcdDumpFromTask(VcdFileType type) {
+  return OpenVcdDump(current_scope_name_, /*wait_for_dumpvars=*/true, type);
 }
 
 // §21.7.3.6.1: an extended VCD file records the final simulation time as it is

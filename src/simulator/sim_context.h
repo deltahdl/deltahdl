@@ -274,13 +274,19 @@ class SimContext {
   // that precedes the value changes and install the per-timestep recording;
   // the context owns the writer from then on. `top_scope` is the module whose
   // $scope encloses the object definitions, and `wait_for_dumpvars` holds the
-  // recording back until a $dumpvars starts it (§21.7.1.3). Returns the writer
-  // to dump through, or null when the file could not be opened; a writer
-  // already installed through SetVcdWriter wins and comes back unchanged.
-  VcdWriter* OpenVcdDump(std::string_view top_scope, bool wait_for_dumpvars);
+  // recording back until a $dumpvars starts it (§21.7.1.3). `type` picks which
+  // of the two file types §21.7 defines is written, which has to be settled
+  // here because it decides the form of the object definitions. Returns the
+  // writer to dump through, or null when the file could not be opened; a
+  // writer already installed through SetVcdWriter wins and comes back
+  // unchanged, keeping the type it was given.
+  VcdWriter* OpenVcdDump(std::string_view top_scope, bool wait_for_dumpvars,
+                         VcdFileType type);
   // §21.7.1: the dump the source creates for itself, opened by the first
-  // $dumpfile, $dumpvars or $dumpports the run executes.
-  VcdWriter* OpenVcdDumpFromTask();
+  // $dumpfile, $dumpvars or $dumpports the run executes. §21.7.1 gives the
+  // first two the 4-state file and §21.7.3.1 gives $dumpports the extended
+  // one, so the task passes the type it creates.
+  VcdWriter* OpenVcdDumpFromTask(VcdFileType type);
   // §21.7.3.6.1: record the final simulation time and close the dump, which is
   // what puts the buffered value changes on disk.
   void CloseVcdDump();

@@ -48,6 +48,21 @@ enum class VcdScopeKind : uint8_t {
   kFork,
 };
 
+// §21.7: "The following two types of VCD files exist: a) 4-state: to represent
+// variable changes in 0, 1, x, and z with no strength information.
+// b) Extended: to represent variable changes in all states and strength
+// information." Which of the two a file is decides the form of everything
+// written into it -- the node information (§21.7.4.2 declares a port where
+// §21.7.2.1 declares a 4-state variable), the checkpoint keywords (§21.7.3)
+// and the value changes (§21.7.4.3 prefixes each with p) -- so it is settled
+// when the file is opened, before the first declaration goes out. §21.7.1
+// gives the 4-state file to $dumpfile and $dumpvars, §21.7.3.1 the extended
+// file to $dumpports.
+enum class VcdFileType : uint8_t {
+  kFourState,
+  kExtended,
+};
+
 struct VcdSignal {
   std::string_view name;
   uint32_t width = 1;

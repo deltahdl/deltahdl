@@ -9,6 +9,7 @@
 // unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_text_lines.h"
 #include "helpers_vcd_file_form.h"
@@ -404,6 +405,141 @@ TEST_F(ExtendedVcdFileFormat, WithoutWriterNoFileContentToFormat) {
   f.scheduler.Run();  // no VcdWriter installed anywhere
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_TRUE(ReadVcd().empty());
+}
+
+// §21.7.4 again, with the source choosing the format instead of the test.
+// Every case above hands the run a writer the fixture built, marked and filled
+// with definitions before the source executed, so those cases observe what the
+// extended form holds and cannot observe what selects it. §21.7.4.2 says the
+// node information section "is affected by the $dumpports task as Syntax 21-28
+// shows" and §21.7.4.3 says "the value change section of the VCD file is also
+// affected by $dumpports", so the task the source calls is what selects the
+// form. These cases supply the source and nothing else -- no writer is
+// installed and no fixture flag is set -- so the form of the file left on disk
+// is the form the run's own $dumpports or $dumpvars asked for.
+class ExtendedVcdFormatChosenByTheSource : public VcdDumpFromSourceTestBase {
+ protected:
+  // One design under either VCD task family, so the only difference between
+  // the cases below is which task `tasks` inserts. It declares a bus and a
+  // single-bit object and changes each at its own time: §21.7.4.2 gives a bus
+  // and a single-bit port different size fields, and a change apiece exercises
+  // the §21.7.4.3 value form for both widths.
+  static std::string DesignCalling(const std::string& tasks) {
+    return "module t;\n"
+           "  logic [3:0] bus;\n"
+           "  logic clk;\n"
+           "  initial begin\n"
+           "    bus = 4'b0000;\n"
+           "    clk = 1'b0;\n" +
+           tasks +
+           "    #10 clk = 1'b1;\n"
+           "    #10 bus = 4'b1010;\n"
+           "  end\n"
+           "endmodule\n";
+  }
+};
+
+// One line of a dump file reduced to the two parts of Syntax 21-29 (§21.7.4.3)
+// these cases read: the p key character with the port_value written straight
+// after it -- "there is no space between the p and the port_value" -- and the
+// identifier_code, "the integer preceded by the < character as defined in the
+// $var construct for the port". The two strength components standing between
+// them are dropped, so no claim below rests on what strength a port record
+// reports (deltahdl/deltahdl#3252). A line that is not a port value change
+// reduces to the empty string.
+std::string PortValueChangeRecord(const std::string& line) {
+  if (line.empty() || line[0] != 'p') return "";
+  auto space = line.find(' ');
+  // The p, at least one port_value state character and both strength
+  // components stand before that space.
+  if (space == std::string::npos || space < 4U) return "";
+  if (line.compare(space + 1, 1, "<") != 0) return "";
+  return line.substr(0, space - 2) + line.substr(space);
+}
+
+// Every port value change the file records, in file order and space-separated,
+// so a case claiming a file holds none of them reports the ones it does hold
+// when the claim fails rather than a bare count.
+std::string PortValueChanges(const std::string& content) {
+  std::string joined;
+  for (const auto& line : Lines(content)) {
+    auto record = PortValueChangeRecord(line);
+    if (record.empty()) continue;
+    if (!joined.empty()) joined += ' ';
+    joined += record;
+  }
+  return joined;
+}
+
+// §21.7.4.2: "The node information section (also referred to as the variable
+// definitions section) is affected by the $dumpports task as Syntax 21-28
+// shows"; §21.7.4.3: "The value change section of the VCD file is also
+// affected by $dumpports". A run whose source calls $dumpports and nothing
+// else therefore leaves both sections in the extended form -- each object
+// declared "$var var_type size < identifier_code reference $end" with the
+// var_type keyword port, and each value change written as the Syntax 21-29 p
+// record naming that port's identifier code.
+TEST_F(ExtendedVcdFormatChosenByTheSource,
+       DumpportsWritesPortNodesAndPortValues) {
+  RunSource(DesignCalling("    $dumpports(, \"portdump.vcd\");\n"));
+
+  auto content = DumpFile("portdump.vcd");
+  // §21.7.4.2 on size: "A decimal number indicating the number of bits in the
+  // port. If the port is a single bit, the value shall be 1. If the port is a
+  // bus, the actual index is printed." bus is declared [3:0] and clk is a
+  // single bit, so the two objects take the two size forms. Their identifier
+  // codes are the integers ascending from zero that the clause requires.
+  EXPECT_NE(content.find("$var port [3:0] <0 bus $end"), std::string::npos);
+  EXPECT_NE(content.find("$var port 1 <1 clk $end"), std::string::npos);
+  // §21.7.4.3: each change is recorded against the identifier code the port's
+  // $var declaration gave it -- bus at <0, clk at <1 -- and carries the port
+  // value in the binary form §21.7.4.1 states value changes are given in.
+  auto changes = PortValueChanges(content);
+  EXPECT_NE(changes.find("p0000 <0"), std::string::npos);
+  EXPECT_NE(changes.find("p1010 <0"), std::string::npos);
+  EXPECT_NE(changes.find("p0 <1"), std::string::npos);
+  EXPECT_NE(changes.find("p1 <1"), std::string::npos);
+}
+
+// The complement, which is what makes the case above a claim about $dumpports
+// rather than about every dump: §21.7.4.2 and §21.7.4.3 make the port forms
+// the effect of the $dumpports task, so a source calling $dumpvars gets
+// neither of them. Its file carries the §21.7.2.1 4-state $var declaration --
+// a net var_type keyword sized by bit count, identified by a printable ASCII
+// character rather than by an integer after < -- and no p record anywhere.
+// Without this case a simulator that opened every dump file in the port form
+// would satisfy both $dumpports cases here.
+TEST_F(ExtendedVcdFormatChosenByTheSource,
+       DumpvarsWritesNeitherPortNodesNorPortValues) {
+  RunSource(
+      DesignCalling("    $dumpfile(\"vardump.vcd\");\n"
+                    "    $dumpvars;\n"));
+
+  auto content = DumpFile("vardump.vcd");
+  // The 4-state declaration and the §21.7.1.3 $dumpvars checkpoint anchor the
+  // two absences below, which a run that created no file at all would
+  // otherwise satisfy on its own.
+  EXPECT_NE(content.find("$var wire 4 ! bus $end"), std::string::npos);
+  EXPECT_TRUE(HasLine(Lines(content), "$dumpvars"));
+  EXPECT_EQ(content.find("$var port"), std::string::npos);
+  EXPECT_EQ(PortValueChanges(content), "");
+}
+
+// §21.7.4.1 (Syntax 21-27): simulation_keyword ::= $dumpports | $dumpportsoff
+// | $dumpportson | $dumpportsall. The keyword introducing a checkpoint section
+// of an extended file comes from that list, so the opening checkpoint of a
+// file the source's $dumpports created is keyed $dumpports and never with the
+// $dumpvars of the 4-state Syntax 21-20. This is a separate observation from
+// the two sections above because one writer switch spells all three: a change
+// that reaches the declarations and the value changes can still leave the
+// keyword reading $dumpvars.
+TEST_F(ExtendedVcdFormatChosenByTheSource,
+       DumpportsKeysItsCheckpointWithTheExtendedKeyword) {
+  RunSource(DesignCalling("    $dumpports(, \"portdump.vcd\");\n"));
+
+  auto lines = Lines(DumpFile("portdump.vcd"));
+  EXPECT_TRUE(HasLine(lines, "$dumpports"));
+  EXPECT_FALSE(HasLine(lines, "$dumpvars"));
 }
 
 }  // namespace

@@ -27,13 +27,16 @@ class ExtendedVcdValueChangeSim : public VcdDumpRunTestBase {
  protected:
   // Drives real SystemVerilog source through parse, elaboration, lowering, and
   // the scheduler, emitting an extended VCD file in the $dumpports port form
-  // (SetExtendedPortNodes) and returning its contents. The port value-change
-  // form of this subclause is not selected in isolation: it is chosen because
-  // the source invoked $dumpports (§21.7.3.1) on real port declarations
-  // (§21.7.4.2 supplies each port's integer identifier code). So the rule's
-  // input -- a port whose value the simulator resolves, dumped under the port
-  // form -- is built from that real dependency syntax and carried end to end,
-  // rather than hand-built into a value vector.
+  // (SetExtendedPortNodes) and returning its contents. The form is selected by
+  // this fixture rather than by the source: RunVcdDump installs its own writer
+  // before the run and SimContext::OpenVcdDump returns an installed writer
+  // untouched, so the source's $dumpports cannot reach the choice here. What
+  // the source supplies is the rest of the input -- real port declarations
+  // (§21.7.4.2 supplies each port's integer identifier code) whose values the
+  // simulator resolves -- carried end to end rather than hand-built into a
+  // value vector. That the task selects the form is asserted by
+  // ExtendedVcdFormatChosenByTheSource in
+  // test_simulator_subclause_21_07_04.cpp, which supplies no writer.
   std::string RunPortVcd(const std::string& src) {
     return RunVcdDump(src,
                       {.scope = "t",
@@ -43,15 +46,14 @@ class ExtendedVcdValueChangeSim : public VcdDumpRunTestBase {
 };
 
 // §21.7.4.3 (claims p-prefix / port_value / identifier_code, end to end): the
-// port value-change form is not something the writer emits on its own -- it is
-// selected because the source invoked $dumpports (§21.7.3.1) rather than
-// $dumpvars, and the integer identifier code it carries is the one the port's
-// $var declaration assigned (§21.7.4.2). Driving two scalar ports through the
-// full pipeline, each assigned a known level, shows the value change produced
-// by that real dependency machinery: p immediately followed by the port_value
-// state character (no space), then the strength components, then the integer
-// identifier code preceded by <. The 4-state scalar form (a single-character
-// charset identifier such as 1!) never stands in for it.
+// port value-change form is selected by the fixture above, and the integer
+// identifier code the record carries is the one the port's $var declaration
+// assigned (§21.7.4.2), which is what this case is about. Driving two scalar
+// ports through the full pipeline, each assigned a known level, shows the value
+// change produced by that real dependency machinery: p immediately followed by
+// the port_value state character (no space), then the strength components, then
+// the integer identifier code preceded by <. The 4-state scalar form (a
+// single-character charset identifier such as 1!) never stands in for it.
 TEST_F(ExtendedVcdValueChangeSim, ScalarPortValueChangeFormFromDumpports) {
   auto content = RunPortVcd(
       "module t;\n"
