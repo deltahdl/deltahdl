@@ -1,7 +1,9 @@
 #pragma once
 
-// Internal declarations shared between the elaborator_validate*.cpp translation
-// units that were split out of elaborator_validate.cpp. These helpers are
+// Internal declarations shared between the translation units of the elaborator.
+// Most were split out of elaborator_validate.cpp and are used by the
+// elaborator_validate*.cpp files alone; ForEachChildStmt below is used by any
+// elaborator translation unit that walks a statement tree. These helpers are
 // file-local in spirit; the header exists only so that one translation unit can
 // define a helper that another references, keeping a single definition of each
 // symbol.
@@ -31,11 +33,11 @@ using NameSet = std::unordered_set<std::string_view>;
 // weight_specification may be followed by one, whose statements go in
 // RsRule::weight_code. Both hold ordinary procedural statements, so a walker
 // whose rule reaches a statement reaches these.
-template <typename Visit>
-void ForEachRandsequenceRuleStmt(const RsRule& rule, Visit visit) {
-  for (const auto* sub : rule.weight_code) visit(sub);
-  for (const auto& prod : rule.prods) {
-    for (const auto* sub : prod.code_stmts) visit(sub);
+template <typename Rule, typename Visit>
+void ForEachRandsequenceRuleStmt(Rule& rule, Visit visit) {
+  for (auto& sub : rule.weight_code) visit(sub);
+  for (auto& prod : rule.prods) {
+    for (auto& sub : prod.code_stmts) visit(sub);
   }
 }
 
@@ -46,10 +48,10 @@ void ForEachRandsequenceRuleStmt(const RsRule& rule, Visit visit) {
 // is split across two functions because writing all four loops in one carries
 // it past the readability-function-cognitive-complexity threshold of 15 that
 // etc/clang_tidy/src.yml sets.
-template <typename Visit>
-void ForEachRandsequenceStmt(const Stmt* s, Visit visit) {
-  for (const auto& production : s->rs_productions) {
-    for (const auto& rule : production.rules) {
+template <typename S, typename Visit>
+void ForEachRandsequenceStmt(S* s, Visit visit) {
+  for (auto& production : s->rs_productions) {
+    for (auto& rule : production.rules) {
       ForEachRandsequenceRuleStmt(rule, visit);
     }
   }
@@ -69,20 +71,26 @@ void ForEachRandsequenceStmt(const Stmt* s, Visit visit) {
 //
 // `visit` is called with a null pointer for an absent single-statement field,
 // which every walker here already answers with an early return.
-template <typename Visit>
-void ForEachChildStmt(const Stmt* s, Visit visit) {
-  for (const auto* sub : s->stmts) visit(sub);
-  for (const auto* sub : s->fork_stmts) visit(sub);
-  for (const auto* sub : s->for_inits) visit(sub);
-  for (const auto* sub : s->for_steps) visit(sub);
+//
+// `visit` receives the field itself rather than a copy of it, so a walker given
+// a `Stmt*` may assign a replacement child through it and one given a
+// `const Stmt*` may not. That is what lets a walker that rewrites the tree
+// share this list with the walkers that only read it, instead of writing a
+// second copy of the list that drifts from this one.
+template <typename S, typename Visit>
+void ForEachChildStmt(S* s, Visit visit) {
+  for (auto& sub : s->stmts) visit(sub);
+  for (auto& sub : s->fork_stmts) visit(sub);
+  for (auto& sub : s->for_inits) visit(sub);
+  for (auto& sub : s->for_steps) visit(sub);
   visit(s->then_branch);
   visit(s->else_branch);
   visit(s->body);
   visit(s->for_body);
   visit(s->assert_pass_stmt);
   visit(s->assert_fail_stmt);
-  for (const auto& ci : s->case_items) visit(ci.body);
-  for (const auto& rc : s->randcase_items) visit(rc.second);
+  for (auto& ci : s->case_items) visit(ci.body);
+  for (auto& rc : s->randcase_items) visit(rc.second);
   ForEachRandsequenceStmt(s, visit);
 }
 

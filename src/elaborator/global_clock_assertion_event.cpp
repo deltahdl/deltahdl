@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 
@@ -39,7 +40,7 @@ namespace {
 // `original` until then, which is what leaves a subtree holding no
 // $global_clock event control shared rather than copied.
 struct CloneOnWriteStmt {
-  Stmt* original;
+  const Stmt* original;
   Stmt* current;
   Arena& arena;
 
@@ -49,61 +50,35 @@ struct CloneOnWriteStmt {
   }
 };
 
-using StmtSlot = Stmt* Stmt::*;
-using StmtListSlot = std::vector<Stmt*> Stmt::*;
-
-// Rewrite the statement `slot` names, and write the result into the owner's
-// copy where the rewrite produced a different statement.
-void SubstituteInStmtSlot(CloneOnWriteStmt& owner,
-                          const std::vector<EventExpr>& global_event,
-                          StmtSlot slot) {
-  Stmt* sub = owner.original->*slot;
-  Stmt* rewritten =
-      SubstituteGlobalClockEventControls(sub, global_event, owner.arena);
-  if (rewritten != sub) owner.Mutable()->*slot = rewritten;
-}
-
-// Rewrite every statement of the list `slot` names, and write each result into
-// the owner's copy of the list where the rewrite produced a different
-// statement.
-void SubstituteInStmtListSlot(CloneOnWriteStmt& owner,
-                              const std::vector<EventExpr>& global_event,
-                              StmtListSlot slot) {
-  const std::vector<Stmt*>& subs = owner.original->*slot;
-  for (size_t i = 0; i < subs.size(); ++i) {
-    Stmt* rewritten =
-        SubstituteGlobalClockEventControls(subs[i], global_event, owner.arena);
-    if (rewritten != subs[i]) (owner.Mutable()->*slot)[i] = rewritten;
-  }
-}
-
-// Rewrite the body of every case item, which is a nested statement reached
-// through Stmt::case_items rather than through a slot of Stmt itself.
-void SubstituteInCaseItems(CloneOnWriteStmt& owner,
-                           const std::vector<EventExpr>& global_event) {
-  const std::vector<CaseItem>& items = owner.original->case_items;
-  for (size_t i = 0; i < items.size(); ++i) {
-    Stmt* rewritten = SubstituteGlobalClockEventControls(
-        items[i].body, global_event, owner.arena);
-    if (rewritten != items[i].body) {
-      owner.Mutable()->case_items[i].body = rewritten;
-    }
-  }
-}
-
-// Recurse into every nested-statement slot of the statement `owner` holds, so
-// that an event control written anywhere beneath a procedure is reached.
+// Recurse into every nested statement of the statement `owner` holds, so that
+// an event control written anywhere beneath a procedure is reached. §14.14 says
+// where $global_clock refers and not where it may be written, so every position
+// a statement holds a statement in is one it may be written in.
+//
+// ForEachChildStmt in elaborator_validate_internal.h states those positions,
+// once for the whole elaborator, which is why the list is not written out again
+// here. It is walked twice so that the copy stays conditional. The first walk
+// rewrites each nested statement of `owner.original` and records what came
+// back. The second writes those results into `owner.Mutable()`, and runs only
+// where some nested statement was actually rewritten. `owner.Mutable()` is a
+// copy of `owner.original` and so has the same fields holding the same nested
+// statements, and one function walks both, so the two walks reach the same
+// positions in the same order and `next` names the position the result it
+// consumes was recorded for.
 void SubstituteGlobalClockInSubStmts(
     CloneOnWriteStmt& owner, const std::vector<EventExpr>& global_event) {
-  SubstituteInStmtListSlot(owner, global_event, &Stmt::stmts);
-  SubstituteInStmtListSlot(owner, global_event, &Stmt::for_inits);
-  SubstituteInStmtListSlot(owner, global_event, &Stmt::for_steps);
-  SubstituteInStmtListSlot(owner, global_event, &Stmt::fork_stmts);
-  SubstituteInCaseItems(owner, global_event);
-  SubstituteInStmtSlot(owner, global_event, &Stmt::then_branch);
-  SubstituteInStmtSlot(owner, global_event, &Stmt::else_branch);
-  SubstituteInStmtSlot(owner, global_event, &Stmt::body);
-  SubstituteInStmtSlot(owner, global_event, &Stmt::for_body);
+  std::vector<Stmt*> rewritten;
+  bool any_rewritten = false;
+  ForEachChildStmt(owner.original, [&](Stmt* const& sub) {
+    Stmt* result =
+        SubstituteGlobalClockEventControls(sub, global_event, owner.arena);
+    if (result != sub) any_rewritten = true;
+    rewritten.push_back(result);
+  });
+  if (!any_rewritten) return;
+  size_t next = 0;
+  ForEachChildStmt(owner.Mutable(),
+                   [&](Stmt*& slot) { slot = rewritten[next++]; });
 }
 
 }  // namespace

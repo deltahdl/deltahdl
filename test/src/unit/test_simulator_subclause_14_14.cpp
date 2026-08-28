@@ -144,4 +144,66 @@ TEST(GlobalClockingSim, GlobalClockInAnInitialEventControlResumesThatProcess) {
   EXPECT_EQ(done->value.ToUint64(), 1u);
 }
 
+// §14.14 puts no condition on where the reference to the effective global
+// clocking declaration's event expression stands, so an event control naming
+// $global_clock resolves in the pass and fail statements of an immediate
+// assertion's action block (§16.3) and in the statement of a randcase item
+// (§18.16) exactly as it does in the sensitivity list of an always. Each of the
+// three cases below drives one posedge of the declared clock and reads `hits`
+// back: a process that resumed on that edge leaves 1, and one that arms no
+// watcher and stays suspended at @($global_clock) for the whole run leaves the
+// 0 the declaration gave it. The assertion cases hold the expression in a
+// variable rather than writing a constant, so the branch each takes is the one
+// the run evaluated.
+TEST(GlobalClockingSim,
+     GlobalClockInAnAssertionFailStatementResumesThatProcess) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 1'b0;\n"
+      "  logic ok = 1'b0;\n"
+      "  int hits = 0;\n"
+      "  global clocking gclk @(posedge clk); endclocking\n"
+      "  initial assert (ok) else @($global_clock) hits = hits + 1;\n"
+      "  initial #5 clk = 1'b1;\n"
+      "endmodule\n",
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+}
+
+TEST(GlobalClockingSim,
+     GlobalClockInAnAssertionPassStatementResumesThatProcess) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 1'b0;\n"
+      "  logic ok = 1'b1;\n"
+      "  int hits = 0;\n"
+      "  global clocking gclk @(posedge clk); endclocking\n"
+      "  initial assert (ok) @($global_clock) hits = hits + 1;\n"
+      "  initial #5 clk = 1'b1;\n"
+      "endmodule\n",
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+}
+
+// The randcase has one item, so §18.16's weighted draw selects that item on
+// every run and the case reads the event control rather than the selection.
+TEST(GlobalClockingSim, GlobalClockInARandcaseItemResumesThatProcess) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 1'b0;\n"
+      "  int hits = 0;\n"
+      "  global clocking gclk @(posedge clk); endclocking\n"
+      "  initial randcase 1: @($global_clock) hits = hits + 1; endcase\n"
+      "  initial #5 clk = 1'b1;\n"
+      "endmodule\n",
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+}
+
 }  // namespace
