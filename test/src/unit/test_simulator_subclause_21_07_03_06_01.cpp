@@ -8,6 +8,7 @@
 // path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_text_lines.h"
 #include "simulator/coverage.h"
@@ -328,6 +329,102 @@ TEST_F(VcdcloseKeyword, WithoutOpenFileIsHarmless) {
   vcd.SetExtended();
   vcd.WriteVcdClose(13000);
   EXPECT_FALSE(vcd.IsOpen());
+}
+
+// §21.7.3.6.1 again, with the source issuing the command instead of the
+// simulation driver. Every case above takes the command from the fixture:
+// VcdDumpRunTestBase::RunVcdDump calls WriteVcdClose itself when close_file is
+// set, so those cases observe the command's form and none of them can observe
+// what a source's own $vcdclose call does. These cases supply the source and
+// nothing else -- no writer is installed and the fixture's closing step is off
+// -- so the only thing that can put a close command in the file is the task
+// the source called (deltahdl/deltahdl#3254).
+class VcdcloseFromSource : public VcdDumpFromSourceTestBase {
+ protected:
+  // One design under either VCD task family and with or without the source's
+  // own close, so the only difference between the cases below is which tasks
+  // they insert. The close stands at a simulation time of its own: the dump is
+  // opened at time 0 and the run goes on to time 15, while §21.7.3.6.1 records
+  // "the final simulation time at the time the extended VCD file is closed",
+  // which is neither of those. A command carrying 0 or 15 would therefore be
+  // recording something other than what the clause asks for.
+  static std::string DesignCalling(const std::string& open_task,
+                                   const std::string& close_task) {
+    return "module t;\n"
+           "  logic a;\n"
+           "  initial begin\n"
+           "    a = 1'b0;\n" +
+           open_task + "    #10 a = 1'b1;\n" + close_task +
+           "    #5 a = 1'b0;\n"
+           "  end\n"
+           "endmodule\n";
+  }
+};
+
+// §21.7.3.6.1: "The $vcdclose keyword indicates the final simulation time at
+// the time the extended VCD file is closed." A source calling the task gets
+// that command written into the extended file its $dumpports opened, carrying
+// the time the call executed at. The keyword terminates the file, so it stands
+// last and stands once: the value change the run makes at time 15 is not
+// recorded after it, and no second close is stamped with a later time.
+TEST_F(VcdcloseFromSource, SourceCallTerminatesTheExtendedFileAtItsOwnTime) {
+  RunSource(DesignCalling("    $dumpports(, \"portdump.vcd\");\n",
+                          "    $vcdclose;\n"),
+            /*close_file=*/false);
+
+  auto content = DumpFile("portdump.vcd");
+  // §21.7.3.1 puts the opening checkpoint at the end of the time unit the dump
+  // task executed in, one time unit before the close, so the dump was recording
+  // by the time the file was closed. Without this the claims below would hold
+  // just as well of a file nothing was ever dumped into.
+  EXPECT_TRUE(HasLine(Lines(content), "$dumpports"));
+  auto toks = Tokens(content);
+  ASSERT_GE(toks.size(), 3u);
+  EXPECT_EQ(toks[toks.size() - 3], "$vcdclose");
+  EXPECT_EQ(toks[toks.size() - 2], "#10");
+  EXPECT_EQ(toks[toks.size() - 1], "$end");
+  EXPECT_EQ(CountToken(toks, "$vcdclose"), 1u);
+}
+
+// The complement, and what makes the case above a claim about the source's own
+// call rather than about every extended dump: with the call taken out of the
+// same design, nothing terminates the file. Without this case a simulator that
+// wrote the command into every extended dump it released would satisfy the
+// case above.
+TEST_F(VcdcloseFromSource, ExtendedDumpWithoutTheCallIsNotTerminated) {
+  RunSource(DesignCalling("    $dumpports(, \"portdump.vcd\");\n", ""),
+            /*close_file=*/false);
+
+  auto content = DumpFile("portdump.vcd");
+  // The §21.7.4.2 node information and the value change of the run's last time
+  // unit anchor the absence, which a run that created no file at all -- or one
+  // whose dump stopped early -- would otherwise satisfy on its own.
+  ASSERT_NE(content.find("$var port"), std::string::npos);
+  ASSERT_TRUE(HasLine(Lines(content), "#15"));
+  EXPECT_EQ(content.find("$vcdclose"), std::string::npos);
+}
+
+// §21.7.3.6: "Extended VCD provides one additional keyword command to that of
+// the 4-state VCD." The keyword is what the extended format adds, so a 4-state
+// file has no place for it however its source asks. §21.7.3.7 settles what the
+// call does instead of leaving it unspecified: an extended VCD system task
+// naming a file no $dumpports call opened "shall be ignored", and its
+// no-argument form runs its default action over the files $dumpports opened,
+// of which this run opened none. So the command is not written and the 4-state
+// dump goes on recording.
+TEST_F(VcdcloseFromSource, FourStateDumpIgnoresTheSourceCall) {
+  RunSource(DesignCalling("    $dumpfile(\"vardump.vcd\");\n    $dumpvars;\n",
+                          "    $vcdclose;\n"),
+            /*close_file=*/false);
+
+  auto content = DumpFile("vardump.vcd");
+  // The §21.7.2.1 4-state node information anchors the absence below, which a
+  // run that created no file at all would otherwise satisfy on its own.
+  ASSERT_NE(content.find("$var wire"), std::string::npos);
+  EXPECT_EQ(content.find("$vcdclose"), std::string::npos);
+  // Ignored rather than obeyed: the value change of the time unit after the
+  // call is recorded, so the dump the call could not close is still running.
+  EXPECT_TRUE(HasLine(Lines(content), "#15"));
 }
 
 }  // namespace

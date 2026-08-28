@@ -27,6 +27,7 @@ bool IsStrobeTask(std::string_view name);
 bool IsMonitorTask(std::string_view name);
 Logic4Vec EvalMonitor(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalMonitorFlag(SimContext& ctx, Arena& arena, std::string_view name);
+bool IsVcdSysCall(std::string_view name);
 Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                          std::string_view name);
 

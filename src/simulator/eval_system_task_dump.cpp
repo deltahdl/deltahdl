@@ -267,11 +267,12 @@ static std::string ResolveDumpportsFileName(const Expr* expr, SimContext& ctx,
 
 // §21.7.3.7: the extended VCD control tasks each act on a $dumpports dump and
 // share the general rules for filename matching and no-argument default
-// actions.
-static bool IsDumpportsControlTask(std::string_view name) {
+// actions. $vcdclose is one of them: §21.7.3.6.1 gives it the extended VCD
+// file, and §21.7.3.7 states its rules for every extended VCD system task.
+static bool IsExtendedVcdControlTask(std::string_view name) {
   return name == "$dumpportsoff" || name == "$dumpportson" ||
          name == "$dumpportsall" || name == "$dumpportslimit" ||
-         name == "$dumpportsflush";
+         name == "$dumpportsflush" || name == "$vcdclose";
 }
 
 // §21.7.3.2: a control task's optional filename is its trailing argument and
@@ -490,7 +491,7 @@ static bool DumpportsControlTaskTargetsUnknownFile(const Expr* expr,
                                                    SimContext& ctx,
                                                    Arena& arena,
                                                    std::string_view name) {
-  if (!IsDumpportsControlTask(name) || !ctx.HasDumpportsFiles()) return false;
+  if (!IsExtendedVcdControlTask(name) || !ctx.HasDumpportsFiles()) return false;
   std::string file = DumpportsControlFileArg(expr, ctx, arena, name);
   return !file.empty() && !ctx.IsDumpportsFile(file);
 }
@@ -623,6 +624,31 @@ static bool ExecDumpportsControl(const Expr* expr, SimContext& ctx,
   return ExecDumpportsWriterAction(name, ctx, vcd);
 }
 
+// §21.7.3.6.1: terminate the extended VCD file, recording the final simulation
+// time. The keyword command states the time "at the time the extended VCD file
+// is closed", so the task closes the dump as well as stamping it: closing here
+// is what stops the per-timestep recording, which would otherwise write value
+// changes after the command that terminates the file. The time written is the
+// simulation time the task executes at, which is that closing moment.
+//
+// §21.7.3.6 adds the keyword to the extended VCD format alone -- Table 21-10
+// lists the 4-state keyword commands and $vcdclose is not among them -- so a
+// dump opened by $dumpfile or $dumpvars is neither stamped nor closed, and goes
+// on recording. That is the same outcome §21.7.3.7 gives a control task naming
+// a file no $dumpports call opened.
+static void ExecVcdClose(SimContext& ctx, VcdWriter* vcd) {
+  if (vcd == nullptr || !vcd->IsExtended()) return;
+  ctx.CloseVcdDump();
+}
+
+// The system tasks of §21.7 that write a value change dump. Every task named in
+// §21.7.1 and §21.7.3.1 through §21.7.3.5 shares the $dump prefix; $vcdclose is
+// the one that does not, being the keyword command §21.7.3.6 adds to the
+// extended format rather than a member of the $dumpports family.
+bool IsVcdSysCall(std::string_view name) {
+  return name.starts_with("$dump") || name == "$vcdclose";
+}
+
 Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                          std::string_view name) {
   auto* vcd = ctx.GetVcdWriter();
@@ -654,6 +680,8 @@ Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
     ExecDumpLimit(expr, ctx, arena, vcd);
   } else if (name == "$dumpports") {
     ExecDumpports(expr, ctx, arena);
+  } else if (name == "$vcdclose") {
+    ExecVcdClose(ctx, vcd);
   } else if (!ExecBasicVcdControl(name, vcd, ctx)) {
     ExecDumpportsControl(expr, ctx, arena, vcd, name);
   }

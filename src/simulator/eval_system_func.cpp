@@ -453,7 +453,7 @@ static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
   if (name == "$stacktrace") {
     return StringToLogic4Vec(arena, BuildStackTraceReport(ctx));
   }
-  if (name.starts_with("$dump")) return EvalVcdSysCall(expr, ctx, arena, name);
+  if (IsVcdSysCall(name)) return EvalVcdSysCall(expr, ctx, arena, name);
   // §32.9: $sdf_annotate reads timing data out of an SDF file and into the
   // region of the design its module_instance operand names. It produces no
   // value of its own.

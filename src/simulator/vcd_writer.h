@@ -250,6 +250,12 @@ class VcdWriter {
   // only an extended writer emits it.
   void SetExtended() { extended_ = true; }
 
+  // True when this writer produces an extended VCD file (§21.7.3), which is
+  // the form $vcdclose belongs to: §21.7.3.6 gives the keyword command to the
+  // extended format as its one addition over the 4-state format, whose keyword
+  // commands Table 21-10 lists without it.
+  bool IsExtended() const { return extended_; }
+
   // §21.7.3.1: $dumpports value change dumping starts at the end of the
   // simulation time unit in which the task executed, not at the execution
   // point. The task therefore schedules its opening checkpoint here; the next

@@ -13,6 +13,7 @@
 #include "gtest/gtest.h"
 #include "helpers_temp_file.h"
 #include "simulator/coverage.h"
+#include "simulator/vcd_writer.h"
 
 // A run whose dump file, if there is one, was created by the source and by
 // nothing else.
@@ -48,15 +49,29 @@ class VcdDumpFromSourceTestBase : public ::testing::Test {
   // lowering, then the scheduler -- supplying no VcdWriter, so whatever the
   // run leaves in the working directory the source's own tasks put there.
   //
-  // The dump is closed at the end for the same reason RunSimulation in
-  // src/main.cpp closes it: the writer holds a buffered std::ofstream, so a
-  // file small enough to sit entirely in that buffer reads back empty until it
-  // is closed. A run that opened no dump closes nothing.
-  void RunSource(const std::string& src) {
+  // `close_file` runs the driver's closing step, which RunSimulation in
+  // src/main.cpp takes after the scheduler finishes: SimContext::CloseVcdDump
+  // hands the writer the final simulation time and releases it, and the
+  // release is what puts the dump on disk, since the writer holds a buffered
+  // std::ofstream and a file small enough to sit entirely in that buffer reads
+  // back empty until it is closed.
+  //
+  // A test whose subject is what the source's own tasks wrote turns that step
+  // off, because it is the driver rather than the source that writes the
+  // §21.7.3.6.1 close command there. The dump is flushed instead: §21.7.1.6
+  // gives a flush no command of its own and leaves the dump state untouched,
+  // so the file reads back holding exactly what the run put in it. A run whose
+  // own tasks closed the dump has no writer left to flush, and neither has a
+  // run that opened no dump at all.
+  void RunSource(const std::string& src, bool close_file = true) {
     auto* design = ElaborateSrc(src, f_);
     ASSERT_NE(design, nullptr);
     LowerAndRun(design, f_);
-    f_.ctx.CloseVcdDump();
+    if (close_file) {
+      f_.ctx.CloseVcdDump();
+    } else if (f_.ctx.GetVcdWriter() != nullptr) {
+      f_.ctx.GetVcdWriter()->Flush();
+    }
     ASSERT_FALSE(f_.diag.HasErrors());
   }
 
