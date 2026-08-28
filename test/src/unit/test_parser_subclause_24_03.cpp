@@ -792,4 +792,109 @@ TEST(ProgramDeclaration, AnonymousProgramAllowsInterfaceClassDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// ---------------------------------------------------------------------------
+// The admitting half of A.1.11's closed set, which Syntax 24-1 reproduces in
+// this clause labelled as an excerpt from Annex A. Each case below writes one
+// alternative the production does admit and reads the item back, so the check
+// over an anonymous program's body is shown to be a filter over the kinds
+// A.1.11 lists rather than a blanket rejection of what an anonymous program
+// holds. The cases for the kinds it excludes live in
+// test/src/unit/test_parser_annex_a_01_11.cpp.
+//
+// §24.6 admits an anonymous program at compilation-unit scope, which is where
+// these stand: it declares no scope of its own, so its items land in the
+// compilation unit's own item list and that is where each case finds them.
+// ---------------------------------------------------------------------------
+
+// The report an item outside A.1.11's set draws, named here so a case can
+// claim it did not fire over an item inside the set.
+constexpr std::string_view kExcludedItemMessage =
+    "an anonymous program may contain only task, function, class, interface "
+    "class, covergroup, and class constructor declarations";
+
+// A compilation unit whose only description is an anonymous program holding
+// `item` and nothing else.
+ParseResult ParseAnonymousProgramHolding(const std::string& item) {
+  return Parse("program;\n" + item + "\nendprogram\n");
+}
+
+// Whether the anonymous program's one item reached the compilation unit as an
+// item of kind `kind`, unreported and marked as having come from an anonymous
+// program. FilterAnonymousProgramItems in src/parser/parser.cpp marks only the
+// items it keeps, and ValidateNameSpaceCompilationUnit in
+// src/elaborator/elaborator_validate_config.cpp reads that mark, so an item
+// kept without it is checked as though no anonymous program had held it.
+void ExpectAnonymousProgramKept(const ParseResult& r, ModuleItemKind kind) {
+  EXPECT_EQ(FindDiag(r, kExcludedItemMessage), nullptr);
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.cu->programs.empty());
+  ASSERT_EQ(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->cu_items[0]->kind, kind);
+  EXPECT_TRUE(r.cu->cu_items[0]->from_anonymous_program);
+}
+
+TEST(ProgramDeclaration, AnonymousProgramKeepsTaskDeclaration) {
+  auto r = ParseAnonymousProgramHolding("  task anon_task; endtask");
+  ExpectAnonymousProgramKept(r, ModuleItemKind::kTaskDecl);
+}
+
+TEST(ProgramDeclaration, AnonymousProgramKeepsFunctionDeclaration) {
+  auto r = ParseAnonymousProgramHolding(
+      "  function int anon_func; return 0; endfunction");
+  ExpectAnonymousProgramKept(r, ModuleItemKind::kFunctionDecl);
+}
+
+TEST(ProgramDeclaration, AnonymousProgramKeepsClassDeclaration) {
+  auto r = ParseAnonymousProgramHolding("  class anon_class; endclass");
+  ExpectAnonymousProgramKept(r, ModuleItemKind::kClassDecl);
+  ASSERT_EQ(r.cu->cu_items.size(), 1u);
+  ASSERT_NE(r.cu->cu_items[0]->class_decl, nullptr);
+  EXPECT_FALSE(r.cu->cu_items[0]->class_decl->is_interface);
+}
+
+// interface_class_declaration is its own alternative of anonymous_program_item
+// and the parser records it under the same kind as a class_declaration, so the
+// case reads the flag that tells the two apart rather than the kind alone.
+TEST(ProgramDeclaration, AnonymousProgramKeepsInterfaceClassDeclaration) {
+  auto r = ParseAnonymousProgramHolding(
+      "  interface class anon_iface_class;\n"
+      "    pure virtual function int get();\n"
+      "  endclass");
+  ExpectAnonymousProgramKept(r, ModuleItemKind::kClassDecl);
+  ASSERT_EQ(r.cu->cu_items.size(), 1u);
+  ASSERT_NE(r.cu->cu_items[0]->class_decl, nullptr);
+  EXPECT_TRUE(r.cu->cu_items[0]->class_decl->is_interface);
+}
+
+TEST(ProgramDeclaration, AnonymousProgramKeepsCovergroupDeclaration) {
+  auto r = ParseAnonymousProgramHolding("  covergroup anon_cg; endgroup");
+  ExpectAnonymousProgramKept(r, ModuleItemKind::kCovergroupDecl);
+}
+
+// class_constructor_declaration is its own alternative of
+// anonymous_program_item and the parser records an out-of-block `new` as a
+// function declaration carrying the class it belongs to, so the case reads
+// that name as well as the kind.
+TEST(ProgramDeclaration, AnonymousProgramKeepsClassConstructorDeclaration) {
+  auto r = ParseAnonymousProgramHolding(
+      "  function anon_ctor_class::new(); endfunction");
+  ExpectAnonymousProgramKept(r, ModuleItemKind::kFunctionDecl);
+  ASSERT_EQ(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->cu_items[0]->method_class, "anon_ctor_class");
+  EXPECT_EQ(r.cu->cu_items[0]->name, "new");
+}
+
+// A.1.11's last alternative is a bare `;`, and what it declares is nothing:
+// the body loop in Parser::TryParseAnonymousProgram consumes the semicolon
+// before ParseModuleItem is reached, so no item is built and none reaches the
+// filter. The compilation unit is therefore empty rather than holding an item
+// of some kind that a filter over kinds would then have to admit.
+TEST(ProgramDeclaration, AnonymousProgramNullItemDeclaresNothing) {
+  auto r = ParseAnonymousProgramHolding("  ;");
+  EXPECT_EQ(FindDiag(r, kExcludedItemMessage), nullptr);
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->cu_items.empty());
+}
+
 }  // namespace

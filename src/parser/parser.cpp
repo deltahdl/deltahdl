@@ -8,18 +8,60 @@
 namespace delta {
 
 namespace {
-// §A.1.11: anonymous_program_item is a closed set (task, function, class,
-// interface-class, covergroup, and class-constructor declarations, plus the
-// null item). Unlike a named program, an anonymous program may not contain net
-// or variable declarations, so reject any that appear directly in its body.
-void CheckAnonymousProgramItem(DiagEngine& diag, ModuleItem* item) {
-  if (item->kind == ModuleItemKind::kNetDecl ||
-      item->kind == ModuleItemKind::kVarDecl) {
-    diag.Error(item->loc,
-               "a net or variable declaration is not allowed in an anonymous "
-               "program",
-               Subclause("24.3"));
+// Whether A.1.11 admits a ModuleItem of this kind as an anonymous_program_item.
+// The production is closed: task_declaration, function_declaration,
+// class_declaration, interface_class_declaration, covergroup_declaration,
+// class_constructor_declaration and the null item, and nothing else.
+//
+// Four ModuleItemKind values carry the six declarations, because
+// Parser::IsAtClassDecl reads `interface class` into a kClassDecl and
+// Parser::ParseFunctionDecl reads the `function C::new` of a
+// class_constructor_declaration into a kFunctionDecl. The null item produces no
+// ModuleItem at all: Parser::TryParseAnonymousProgram and
+// Parser::TryParsePackageBodyItem each consume a bare `;` before calling
+// Parser::ParseModuleItem, so it never reaches this predicate.
+bool IsAnonymousProgramItemKind(ModuleItemKind kind) {
+  switch (kind) {
+    case ModuleItemKind::kTaskDecl:
+    case ModuleItemKind::kFunctionDecl:
+    case ModuleItemKind::kClassDecl:
+    case ModuleItemKind::kCovergroupDecl:
+      return true;
+    default:
+      return false;
   }
+}
+
+// Reports every item Parser::ParseModuleItem appended to `items` at or after
+// `before` that A.1.11 does not admit in an anonymous program, drops it, and
+// marks each surviving item as declared in one. An anonymous program's body is
+// read by Parser::ParseModuleItem, which admits everything a module body may
+// hold, so this is what narrows the body to A.1.11's set.
+//
+// A rejected item is dropped rather than kept because §24.6 gives an anonymous
+// program's items the name space of the package or compilation-unit scope
+// holding it. Keeping one would declare in that scope a thing the source could
+// not legally declare there, and the elaborator would then read it as an
+// ordinary item of that package or compilation unit: an `initial` block nothing
+// runs, or a parameter that collides with one outside the program.
+void FilterAnonymousProgramItems(DiagEngine& diag,
+                                 std::vector<ModuleItem*>& items,
+                                 size_t before) {
+  size_t kept = before;
+  for (size_t i = before; i < items.size(); ++i) {
+    ModuleItem* item = items[i];
+    if (!IsAnonymousProgramItemKind(item->kind)) {
+      diag.Error(item->loc,
+                 "an anonymous program may contain only task, function, class, "
+                 "interface class, covergroup, and class constructor "
+                 "declarations",
+                 Subclause("A.1.11"));
+      continue;
+    }
+    item->from_anonymous_program = true;
+    items[kept++] = item;
+  }
+  items.resize(kept);
 }
 
 // Each top-level design element defaults to the "work" library unless one was
@@ -428,10 +470,7 @@ bool Parser::TryParseAnonymousProgram(CompilationUnit* unit) {
     if (Match(TokenKind::kSemicolon)) continue;
     size_t before = unit->cu_items.size();
     ParseModuleItem(unit->cu_items);
-    for (size_t i = before; i < unit->cu_items.size(); ++i) {
-      unit->cu_items[i]->from_anonymous_program = true;
-      CheckAnonymousProgramItem(diag_, unit->cu_items[i]);
-    }
+    FilterAnonymousProgramItems(diag_, unit->cu_items, before);
   }
   in_anonymous_program_ = prev_anon;
   Expect(TokenKind::kKwEndprogram, Subclause("24.6"));
@@ -698,10 +737,7 @@ bool Parser::TryParsePackageBodyItem(std::vector<ModuleItem*>& items) {
       if (Match(TokenKind::kSemicolon)) continue;
       size_t before = items.size();
       ParseModuleItem(items);
-      for (size_t i = before; i < items.size(); ++i) {
-        items[i]->from_anonymous_program = true;
-        CheckAnonymousProgramItem(diag_, items[i]);
-      }
+      FilterAnonymousProgramItems(diag_, items, before);
     }
     in_anonymous_program_ = prev_anon;
     Expect(TokenKind::kKwEndprogram, Subclause("24.6"));

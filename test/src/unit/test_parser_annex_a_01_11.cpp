@@ -328,36 +328,115 @@ TEST(PackageItemsParsing, ErrorAnonymousProgramWithName) {
       ReportedError(r.diags, "expected ';', got identifier", 2, "24.6"));
 }
 
-// net_declaration is not a legal anonymous_program_item.
+// ---------------------------------------------------------------------------
+// A.1.11 closes anonymous_program_item to task_declaration,
+// function_declaration, class_declaration, interface_class_declaration,
+// covergroup_declaration, class_constructor_declaration and the null item `;`.
+// A closed set is tested by what it excludes, so each case below writes one
+// kind the production leaves out. Every one of them is a
+// package_or_generate_item_declaration, which A.1.11 admits as a package_item
+// and not as an anonymous_program_item, so the surrounding package would take
+// it were the program not there.
+// ---------------------------------------------------------------------------
+
+// The report FilterAnonymousProgramItems in src/parser/parser.cpp writes and
+// the clause it names as the rule. Both stand here rather than in each case
+// that reads them, so a rewording at the emission site is one edit here.
+// A.1.11 is the clause because it is the production that closes the set; §24.6
+// states the name-space rule instead, and §24.3 the syntax of a named
+// program_declaration, whose Syntax 24-1 reproduces this production labelled
+// as an excerpt from Annex A.
+constexpr std::string_view kExcludedItemMessage =
+    "an anonymous program may contain only task, function, class, interface "
+    "class, covergroup, and class constructor declarations";
+constexpr std::string_view kExcludedItemSubclause = "A.1.11";
+
+// The line the item handed to ExpectAnonymousProgramExcludes stands on.
+constexpr uint32_t kExcludedItemLine = 3;
+
+// Whether a package holding one anonymous program whose whole body is `item`
+// rejects it under A.1.11, and whether the package came away declaring
+// nothing. `item` carries its own terminator and holds to one line, so the
+// report stands on kExcludedItemLine of the source composed here.
+//
+// The second claim is the one the report alone does not make. §24.6 has an
+// anonymous program declare its items in the surrounding package's name space
+// rather than in a scope of its own, so an excluded item the parser kept would
+// be an item the package declares -- a parameter or a typedef that collides
+// with one written outside the program, or an initial procedure the package
+// carries and nothing runs.
+void ExpectAnonymousProgramExcludes(const std::string& item) {
+  auto r = Parse("package pkg;\n  program;\n    " + item +
+                 "\n  endprogram\nendpackage\n");
+  EXPECT_TRUE(ReportedError(r.diags, kExcludedItemMessage, kExcludedItemLine,
+                            kExcludedItemSubclause));
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_TRUE(r.cu->packages[0]->items.empty());
+}
+
+// net_declaration is a package_or_generate_item_declaration and no
+// anonymous_program_item.
 TEST(PackageItemsParsing, ErrorAnonymousProgramWithNetDecl) {
+  ExpectAnonymousProgramExcludes("wire w;");
+}
+
+// data_declaration is a package_or_generate_item_declaration and no
+// anonymous_program_item.
+TEST(PackageItemsParsing, ErrorAnonymousProgramWithDataDecl) {
+  ExpectAnonymousProgramExcludes("int x;");
+}
+
+// An initial_construct is a non_port_program_item of a named
+// program_declaration (Syntax 24-1) and no anonymous_program_item. An
+// anonymous program declares no scope of its own (§24.6), so an initial
+// procedure kept here becomes a procedure of the package, which nothing
+// elaborates and nothing runs.
+TEST(PackageItemsParsing, ErrorAnonymousProgramWithInitialBlock) {
+  ExpectAnonymousProgramExcludes("initial begin end");
+}
+
+// parameter_declaration is a package_or_generate_item_declaration and no
+// anonymous_program_item. It carries its value because footnote 22 to Syntax
+// 6-6 in §6.20.1 permits the constant_param_expression to be omitted only
+// inside a parameter_port_list, so A.1.11's is the only rule this source
+// breaks.
+TEST(PackageItemsParsing, ErrorAnonymousProgramWithParameterDecl) {
+  ExpectAnonymousProgramExcludes("parameter int anon_p = 1;");
+}
+
+// A typedef is a data_declaration (A.2.1.3), hence a
+// package_or_generate_item_declaration and no anonymous_program_item.
+TEST(PackageItemsParsing, ErrorAnonymousProgramWithTypedef) {
+  ExpectAnonymousProgramExcludes("typedef int anon_int_t;");
+}
+
+// A module_instantiation is a module_or_generate_item and no
+// anonymous_program_item; A.1.11 does not admit it even as a package_item.
+// The parser reads `m u0();` as a hierarchical_instance from its shape alone,
+// because A.4.1.1 makes the port-connection list mandatory, so no
+// module_declaration is needed above it to reach that item kind.
+TEST(PackageItemsParsing, ErrorAnonymousProgramWithModuleInst) {
+  ExpectAnonymousProgramExcludes("m u0();");
+}
+
+// One rule reported once per breach, and the clause it names is the same for
+// both kinds: the citation belongs to A.1.11's item set rather than to
+// whichever kind the source wrote. The two items stand on different lines so
+// that the two reports are told apart by where the source broke the rule.
+TEST(PackageItemsParsing,
+     AnonymousProgramExcludedItemsBothCiteTheGrammarClause) {
   auto r = Parse(
       "package pkg;\n"
       "  program;\n"
       "    wire w;\n"
+      "    initial begin end\n"
       "  endprogram\n"
       "endpackage\n");
-  // §24.3 lists the anonymous_program_item alternatives, so the rejection of a
-  // net declaration among them is filed there rather than under §24.6.
-  EXPECT_TRUE(ReportedError(
-      r.diags,
-      "a net or variable declaration is not allowed in an anonymous program", 3,
-      "24.3"));
-}
-
-// data_declaration is not a legal anonymous_program_item.
-TEST(PackageItemsParsing, ErrorAnonymousProgramWithDataDecl) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  program;\n"
-      "    int x;\n"
-      "  endprogram\n"
-      "endpackage\n");
-  // §24.3 lists the anonymous_program_item alternatives, so the rejection of a
-  // variable declaration among them is filed there rather than under §24.6.
-  EXPECT_TRUE(ReportedError(
-      r.diags,
-      "a net or variable declaration is not allowed in an anonymous program", 3,
-      "24.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, kExcludedItemMessage, 3, kExcludedItemSubclause));
+  EXPECT_TRUE(
+      ReportedError(r.diags, kExcludedItemMessage, 4, kExcludedItemSubclause));
 }
 
 }  // namespace

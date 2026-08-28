@@ -91,18 +91,30 @@ TEST(ClockingScopeParse, DefaultClockingInPackageRejected) {
       "14.7"));
 }
 
-TEST(ClockingScopeParse, InAnonymousProgramInPackageAccepted) {
-  // §24.6 permits an anonymous program inside a package; a clocking block
-  // there lives in a program scope, so §14.7's package prohibition does not
-  // apply.
-  EXPECT_TRUE(
-      ParseOk("package pkg;\n"
-              "  program;\n"
-              "    clocking cb @(posedge clk);\n"
-              "      input data;\n"
-              "    endclocking\n"
-              "  endprogram\n"
-              "endpackage\n"));
+// A.1.11 closes anonymous_program_item to task, function, class, interface
+// class, covergroup and class constructor declarations plus the null item, and
+// no clocking_declaration is among them, so a clocking block written in an
+// anonymous program is rejected there whatever clause governs the package
+// around it.
+//
+// §14.7's own package prohibition stays silent on this source. The guard in
+// Parser::ParseClockingDecl holds it back while the parser is inside an
+// anonymous program, which is what leaves A.1.11's report the only one the run
+// records and makes the message this case names the one it must name.
+TEST(ClockingScopeParse, InAnonymousProgramInPackageRejected) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  program;\n"
+      "    clocking cb @(posedge clk);\n"
+      "      input data;\n"
+      "    endclocking\n"
+      "  endprogram\n"
+      "endpackage\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "an anonymous program may contain only task, function, class, interface "
+      "class, covergroup, and class constructor declarations",
+      3, "A.1.11"));
 }
 
 // §14.7: clocking blocks "cannot be declared inside functions, tasks, or
