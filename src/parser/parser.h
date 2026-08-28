@@ -525,6 +525,7 @@ class Parser {
   ModuleItem* ParsePropertyAssertLike(ModuleItemKind kind, TokenKind keyword);
   bool TryParseSimpleConcurrentProperty(ModuleItem* item);
   bool BodyHasTemporalOperator();
+  void WarnUnevaluatedConcurrentAssertion(SourceLoc loc, ModuleItemKind kind);
   ModuleItem* ParseCoverProperty();
   ModuleItem* ParseRestrictProperty();
   ModuleItem* ParsePropertyDecl();
