@@ -106,21 +106,21 @@ TEST(StatementChildPositions, ForEachChildStmtVisitsEveryStatementPosition) {
     if (sub != nullptr) visited.insert(std::string(sub->label));
   });
 
-  const std::set<std::string> expected{"assert_fail_stmt",
-                                       "assert_pass_stmt",
-                                       "body",
-                                       "case_items[].body",
-                                       "else_branch",
-                                       "for_body",
-                                       "for_inits",
-                                       "for_steps",
-                                       "fork_stmts",
-                                       "randcase_items[].second",
-                                       "rs_productions RsProd::code_stmts",
-                                       "rs_productions RsRule::weight_code",
-                                       "stmts",
-                                       "then_branch"};
-  EXPECT_EQ(visited, expected);
+  const std::set<std::string> kExpected{"assert_fail_stmt",
+                                        "assert_pass_stmt",
+                                        "body",
+                                        "case_items[].body",
+                                        "else_branch",
+                                        "for_body",
+                                        "for_inits",
+                                        "for_steps",
+                                        "fork_stmts",
+                                        "randcase_items[].second",
+                                        "rs_productions RsProd::code_stmts",
+                                        "rs_productions RsRule::weight_code",
+                                        "stmts",
+                                        "then_branch"};
+  EXPECT_EQ(visited, kExpected);
 }
 
 // One expression per position ForEachChildExpr is required to reach, each
@@ -204,35 +204,35 @@ TEST(StatementChildPositions, ForEachChildExprVisitsEveryExpressionPosition) {
     if (e != nullptr) visited.insert(std::string(e->text));
   });
 
-  const std::set<std::string> expected{"RsCaseItem::item args",
-                                       "RsCaseItem::patterns",
-                                       "RsProd::case_expr",
-                                       "RsProd::condition",
-                                       "RsProd::if_false args",
-                                       "RsProd::if_true args",
-                                       "RsProd::item args",
-                                       "RsProd::repeat_count",
-                                       "RsProd::repeat_item args",
-                                       "RsRule::rand_join_expr",
-                                       "RsRule::rand_join_items args",
-                                       "RsRule::weight",
-                                       "assert_expr",
-                                       "case_items[].patterns",
-                                       "condition",
-                                       "cycle_delay",
-                                       "delay",
-                                       "events[].iff_condition",
-                                       "events[].signal",
-                                       "expr",
-                                       "for_cond",
-                                       "lhs",
-                                       "randcase_items[].first",
-                                       "repeat_event_count",
-                                       "rhs",
-                                       "var_init",
-                                       "var_unpacked_dims",
-                                       "wait_order_events"};
-  EXPECT_EQ(visited, expected);
+  const std::set<std::string> kExpected{"RsCaseItem::item args",
+                                        "RsCaseItem::patterns",
+                                        "RsProd::case_expr",
+                                        "RsProd::condition",
+                                        "RsProd::if_false args",
+                                        "RsProd::if_true args",
+                                        "RsProd::item args",
+                                        "RsProd::repeat_count",
+                                        "RsProd::repeat_item args",
+                                        "RsRule::rand_join_expr",
+                                        "RsRule::rand_join_items args",
+                                        "RsRule::weight",
+                                        "assert_expr",
+                                        "case_items[].patterns",
+                                        "condition",
+                                        "cycle_delay",
+                                        "delay",
+                                        "events[].iff_condition",
+                                        "events[].signal",
+                                        "expr",
+                                        "for_cond",
+                                        "lhs",
+                                        "randcase_items[].first",
+                                        "repeat_event_count",
+                                        "rhs",
+                                        "var_init",
+                                        "var_unpacked_dims",
+                                        "wait_order_events"};
+  EXPECT_EQ(visited, kExpected);
 }
 
 }  // namespace
