@@ -346,4 +346,35 @@ TEST(ConstantExpressionElaboration,
                             3, "7.2.2"));
 }
 
+// §11.7 rules that "the $signed and $unsigned system functions ... shall
+// evaluate the input expression and return a one-dimensional packed array with
+// the same number of bits and value of the input expression and the signedness
+// defined by the function", so `$unsigned(4'b1100)` is four bits wide and not
+// thirty-two. A specparam is what makes that inferred width observable: §6.20.5
+// gives a specparam with no range specification the range of its final value,
+// and Elaborator::ElaborateSpecparam in src/elaborator/elaborator_items.cpp
+// takes RtlirVariable::width from InferExprWidth, so the width recorded for
+// `tW` is the width the signing conversion was inferred to have.
+//
+// 4 is not a default here. A width that did not come from the operand is the
+// 32 InferExprWidth answers for every other system function, which is what this
+// case read before the fix.
+TEST(ConstantExpressionElaboration,
+     SigningConversionSpecparamTakesOperandWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  specparam tW = $unsigned(4'b1100);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirVariable* tw = nullptr;
+  for (const auto& var : design->top_modules[0]->variables) {
+    if (var.name == "tW") tw = &var;
+  }
+  ASSERT_NE(tw, nullptr);
+  EXPECT_EQ(tw->width, 4U);
+}
+
 }  // namespace

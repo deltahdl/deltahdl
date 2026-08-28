@@ -774,6 +774,27 @@ static uint32_t InferCastWidth(const Expr* expr, const TypedefMap& typedefs) {
   return InferExprWidth(expr->lhs, typedefs);
 }
 
+// §11.7: `$signed` and `$unsigned` "shall evaluate the input expression and
+// return a one-dimensional packed array with the same number of bits and value
+// of the input expression and the signedness defined by the function". A
+// signing conversion is therefore as wide as its operand, so `$signed(4'b1100)`
+// is four bits and not thirty-two. Every other system function returns a 32-bit
+// integer, which makes the 32 below their own width rather than a fallback
+// these two escape. The 32 stands for a signing conversion as well when the
+// operand's width is unknown: InferExprWidth answers 0 for
+// ExprKind::kIdentifier, whose declared width it does not read, and returning
+// that 0 would take a width away from callers that read one today.
+static uint32_t InferSystemCallWidth(const Expr* expr,
+                                     const TypedefMap& typedefs) {
+  if (expr->callee == "$signed" || expr->callee == "$unsigned") {
+    if (!expr->args.empty()) {
+      uint32_t w = InferExprWidth(expr->args[0], typedefs);
+      if (w > 0) return w;
+    }
+  }
+  return 32;
+}
+
 uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
   if (!expr) return 0;
   switch (expr->kind) {
@@ -789,7 +810,7 @@ uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
     case ExprKind::kIdentifier:
       return 0;
     case ExprKind::kSystemCall:
-      return 32;
+      return InferSystemCallWidth(expr, typedefs);
     case ExprKind::kUnary:
       if (expr->op == TokenKind::kBang || IsReductionOp(expr->op)) return 1;
       return InferExprWidth(expr->lhs, typedefs);
