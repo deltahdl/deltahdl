@@ -181,4 +181,87 @@ TEST(GlobalClockingElab, DuplicateGlobalClockingNames14_14) {
       "only one global clocking block is allowed per scope", 3, "14.14"));
 }
 
+// The body statement of the one process each of the two instances the top
+// module holds was elaborated into. The two cases below differ in the source
+// they elaborate and in what they claim about the pair, so the walk from the
+// design down to the two RtlirProcess::body pointers is written once here.
+void InstanceProcessBodies(RtlirDesign* design, Stmt** first, Stmt** second) {
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto* top = design->top_modules[0];
+  ASSERT_EQ(top->children.size(), 2U);
+  auto* u0 = top->children[0].resolved;
+  auto* u1 = top->children[1].resolved;
+  ASSERT_NE(u0, nullptr);
+  ASSERT_NE(u1, nullptr);
+  ASSERT_EQ(u0->processes.size(), 1U);
+  ASSERT_EQ(u1->processes.size(), 1U);
+  *first = u0->processes[0].body;
+  *second = u1->processes[0].body;
+}
+
+// §14.14: an event control naming $global_clock waits on the event expression
+// of the effective global clocking declaration, so BuildProcessBody in
+// src/elaborator/elaborator_process.cpp rewrites the event control the
+// procedure body holds. The body it rewrites is reached through the one
+// ModuleDecl the parser built, and Elaborator::ElaborateModule runs once per
+// instantiation, so a rewrite made in place is written into the statement
+// every instance of the module shares. This fails when the two instances of
+// `sub` name one Stmt.
+TEST(GlobalClockingElab,
+     GlobalClockSubstitutionGivesEachInstanceItsOwnProcessBody) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module sub;\n"
+      "  logic clk, done;\n"
+      "  global clocking gclk @(posedge clk); endclocking\n"
+      "  initial @($global_clock) done = 1'b1;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  sub u0();\n"
+      "  sub u1();\n"
+      "endmodule\n",
+      f);
+  ASSERT_FALSE(f.has_errors);
+  Stmt* first = nullptr;
+  Stmt* second = nullptr;
+  InstanceProcessBodies(design, &first, &second);
+  ASSERT_NE(first, nullptr);
+  ASSERT_NE(second, nullptr);
+  EXPECT_NE(first, second)
+      << "both instances of sub hold one body statement, so the §14.14 "
+         "substitution made for either of them was written into the other";
+}
+
+// §14.14: a procedure body naming no $global_clock has nothing to substitute,
+// so SubstituteGlobalClockEventControls in
+// src/elaborator/global_clock_assertion_event.cpp returns the statement it was
+// given rather than a copy of it. Both instances of `sub` then hold the one
+// Stmt the parser built for the module, which is what the elaborator does with
+// every process body it does not rewrite. This fails when a body is copied per
+// instance whether anything in it was rewritten or not.
+TEST(GlobalClockingElab, ProcessBodyWithNoGlobalClockIsSharedBetweenInstances) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module sub;\n"
+      "  logic clk, done;\n"
+      "  global clocking gclk @(posedge clk); endclocking\n"
+      "  initial done = 1'b1;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  sub u0();\n"
+      "  sub u1();\n"
+      "endmodule\n",
+      f);
+  ASSERT_FALSE(f.has_errors);
+  Stmt* first = nullptr;
+  Stmt* second = nullptr;
+  InstanceProcessBodies(design, &first, &second);
+  ASSERT_NE(first, nullptr);
+  ASSERT_NE(second, nullptr);
+  EXPECT_EQ(first, second)
+      << "a body naming no $global_clock was copied per instance, so every "
+         "process body is allocated again for every instantiation";
+}
+
 }  // namespace
