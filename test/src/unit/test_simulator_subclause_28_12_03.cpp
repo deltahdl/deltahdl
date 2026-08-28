@@ -563,11 +563,15 @@ TEST(NetStrengthAmbigUnambig, DominatedUnambigSignalOpensNoGapToFill) {
 // unknown value with a strong driving 0 component and a pull driving 1
 // component" -- and §28.12.3 rule a keeps the strongest level of each side
 // whatever the weaker drivers do, so the levels that clause names never move
-// here. What separates StX from 66X below is FormatStrength reaching for the
-// mnemonic only where each side holds a single level. For every other shape in
-// this file the rendering is therefore the same whether the weaker drivers
-// were combined or dropped, and a case reading it would pass on the behavior
-// and on its absence alike, which docs/tenets/tests/UNIT_TESTS.md rules out.
+// here. The rendering therefore does not separate a folded result from an
+// unfolded one at all: FormatStrength reaches for the mnemonic when the two
+// sides' strongest levels are equal, which they are either way. What the
+// rendering says is that the strength reached %v as the resolver left it; what
+// says the weaker drivers were combined is the four bounds asserted beside it,
+// and for every other shape in this file the rendering is the same whether they
+// were combined or dropped, so a case reading it alone would pass on the
+// behavior and on its absence alike -- which docs/tenets/tests/UNIT_TESTS.md
+// rules out.
 // The bounds stand beside the rendering for the same reason: they are what
 // §28.12.3 decides, and they say so whatever the renderer does with them.
 //
@@ -584,8 +588,11 @@ TEST(NetStrengthAmbigUnambig, DominatedUnambigSignalOpensNoGapToFill) {
 // combined, so each side of the result carries the single level strong, which
 // §21.2.1.4 renders with that level's mnemonic and the unknown logic value:
 // StX. Combining only the strongest of them leaves the 0 side running down to
-// pull, and the rendering falls back to the two decimal digits, 66X -- what a
-// reader of this net is told today.
+// pull, and renders StX as well -- §21.2.1.4 chooses the mnemonic when the two
+// sides' strongest levels are equal, which rule a keeps them either way. The
+// four bounds asserted below are what separates the two, and the rendering is
+// asserted beside them to say that the strength reaches %v as the resolver
+// left it.
 TEST(StrengthResolution, SourceOppositeValuePullDriversRenderAsStX) {
   NetStrength ns = ResolveSrcNetW(
       ConflictPlusWeakerSrc("  assign (pull0, pull1) w = 1'b0;\n"

@@ -450,10 +450,12 @@ static const char* StrengthMnemonic(uint8_t level) {
   return k_mnemonics[level & 0x7];
 }
 
-// Renders the three-character strength format of a scalar net. The first two
-// characters describe the strength -- a Table 21-4 mnemonic when the level is a
-// single point, or a pair of decimal digits when a range of levels applies.
-// The third character is the logic value drawn from Table 21-3.
+// Renders the three-character strength format §21.2.1.4 gives a scalar net.
+// The first two characters describe the strength, as either a Table 21-4
+// mnemonic or a pair of decimal digits; the third is the logic value drawn
+// from Table 21-3. §21.2.1.4 states one rule for choosing between the two
+// forms for a known value and a different rule for the unknown value, so the
+// branches below decide it separately rather than from one test of the range.
 std::string FormatStrength(const NetStrength& ns) {
   auto s0_hi = static_cast<uint8_t>(ns.s0_hi);
   auto s0_lo = static_cast<uint8_t>(ns.s0_lo);
@@ -468,13 +470,21 @@ std::string FormatStrength(const NetStrength& ns) {
   // only the Z logic value, and its level is always the Hi mnemonic.
   if (!drives0 && !drives1) return "HiZ";
 
-  // Both sides drive: the resolved logic value is unknown (X). A mnemonic is
-  // used only when the 0 and 1 components share one common strength level;
-  // otherwise the 0-side and 1-side levels print as two decimal digits.
+  // Both sides drive, so the resolved logic value is unknown (X). §21.2.1.4:
+  // "For the unknown value, a mnemonic is used when both the 0 and 1 strength
+  // components are at the same strength level. Otherwise, the unknown value X
+  // is preceded by two decimal digits, which indicate the 0 and 1 strength
+  // levels, respectively." Those two components are the highest level of each
+  // side: §28.12.2 says of the 35X in Figure 28-9 that "The first is the digit
+  // 3, which corresponds to the highest strength0 level for the result. The
+  // second digit, 5, corresponds to the highest strength1 level for the
+  // result." Neither form renders the low end of either side, so s0_lo and
+  // s1_lo do not appear here. Figure 28-4 combines We1 with We0 and prints
+  // WeX, and Figure 28-5 draws that result's range running down through high
+  // impedance on both sides, so a low bound below the mnemonic's level is what
+  // this case ordinarily has rather than a reason to fall to the digits.
   if (drives0 && drives1) {
-    if (s0_hi == s0_lo && s1_hi == s1_lo && s0_hi == s1_hi) {
-      return std::string(StrengthMnemonic(s0_hi)) + "X";
-    }
+    if (s0_hi == s1_hi) return std::string(StrengthMnemonic(s0_hi)) + "X";
     return std::string(1, static_cast<char>('0' + s0_hi)) +
            static_cast<char>('0' + s1_hi) + "X";
   }
@@ -492,8 +502,11 @@ std::string FormatStrength(const NetStrength& ns) {
     return std::string(StrengthMnemonic(hi)) + ambiguous;
   }
 
-  // A single level uses its mnemonic; a genuine range prints the maximum and
-  // minimum levels as two decimal digits.
+  // §21.2.1.4: "For the logic values 0 and 1, a mnemonic is used when there is
+  // no range of strengths in the signal. Otherwise, the logic value is preceded
+  // by two decimal digits, which indicate the maximum and minimum strength
+  // levels." Table 21-5 reads 520 as "An 0 value with a range of possible
+  // strength from pull driving to medium capacitor".
   if (hi == lo) return std::string(StrengthMnemonic(hi)) + known;
   return std::string(1, static_cast<char>('0' + hi)) +
          static_cast<char>('0' + lo) + known;

@@ -39,6 +39,15 @@ std::string CaptureDisplayOutput(const std::string& src, SimFixture& f) {
   return captured.str();
 }
 
+// Runs a source that displays one net with %v and asserts the expected
+// three-character strength rendering appears in the output, so cases that
+// differ only in the drive strengths of their source share one body.
+void ExpectPercentVOutput(const std::string& src, const std::string& expected) {
+  SimFixture f;
+  std::string out = CaptureDisplayOutput(src, f);
+  EXPECT_NE(out.find(expected), std::string::npos);
+}
+
 // Table 21-5: a strong drive of a logic 1 renders with the St mnemonic and the
 // 1 logic-value character.
 TEST(StrengthFormat, StrongDriveOneIsSt1) {
@@ -70,11 +79,22 @@ TEST(StrengthFormat, MediumCapacitorZeroIsMe0) {
             "Me0");
 }
 
-// §21.2.1.4 / Table 21-5: an unknown value whose 0 and 1 components sit at one
-// common strength level uses that level's mnemonic, here strong -> StX.
+// §21.2.1.4: "For the unknown value, a mnemonic is used when both the 0 and 1
+// strength components are at the same strength level." §28.12.2 says which
+// level each component is, reading the 35X of Figure 28-9 as a first digit that
+// "corresponds to the highest strength0 level for the result" and a second that
+// corresponds to "the highest strength1 level for the result". The two sides
+// here are ranges, which is the shape §28.12.2 gives an equal-strength
+// conflict: the result carries "the strength levels of both signals and all the
+// smaller strength levels", drawn in Figure 28-5 as reaching down through high
+// impedance on both sides. Their highest levels are both strong, so the
+// rendering is StX. Collapsing the two sides to points instead would make "both
+// components at the same level" and "no range on either side" one condition for
+// this input, and the case could not tell the clause's rule from that narrower
+// one.
 TEST(StrengthFormat, StrongUnknownSameLevelIsStX) {
-  EXPECT_EQ(FormatStrength(MakeNS(Strength::kStrong, Strength::kStrong,
-                                  Strength::kStrong, Strength::kStrong)),
+  EXPECT_EQ(FormatStrength(MakeNS(Strength::kStrong, Strength::kHighz,
+                                  Strength::kStrong, Strength::kHighz)),
             "StX");
 }
 
@@ -104,6 +124,46 @@ TEST(StrengthFormat, UnknownDifferentLevelsKeepsZeroThenOneOrder) {
   EXPECT_EQ(FormatStrength(MakeNS(Strength::kPull, Strength::kPull,
                                   Strength::kStrong, Strength::kStrong)),
             "56X");
+}
+
+// §21.2.1.4 builds the unknown rendering out of the 0 and 1 strength components
+// alone, and §28.12.2 makes each of those the highest level of its side, so
+// neither the mnemonic nor the digit form carries a lower bound. Two values
+// whose highest levels agree therefore render alike however far down their
+// ranges reach; these two differ only in s1_lo.
+TEST(StrengthFormat, UnknownRenderingIgnoresTheLowerBounds) {
+  const std::string kCollapsed =
+      FormatStrength(MakeNS(Strength::kStrong, Strength::kStrong,
+                            Strength::kStrong, Strength::kStrong));
+  const std::string kOneSideRanged =
+      FormatStrength(MakeNS(Strength::kStrong, Strength::kStrong,
+                            Strength::kStrong, Strength::kPull));
+  EXPECT_EQ(kOneSideRanged, kCollapsed);
+  EXPECT_EQ(kOneSideRanged, "StX");
+}
+
+// §28.12.2, Figure 28-11: a 651 signal (a 1 ranging from strong down to pull)
+// and a 530 signal (a 0 ranging from pull down to weak) combine to 56X. Both
+// sides of that result are genuine ranges, and the standard still spells it
+// with exactly two digits -- the highest strength0 level, pull (5), then the
+// highest strength1 level, strong (6). There is no four-digit form in which the
+// two lower bounds could appear.
+TEST(StrengthFormat, UnknownWithBothSidesRangedPrintsTheTwoHighestLevels) {
+  EXPECT_EQ(FormatStrength(MakeNS(Strength::kPull, Strength::kWeak,
+                                  Strength::kStrong, Strength::kPull)),
+            "56X");
+}
+
+// §28.12.2, Figure 28-9: a pull H combined with a weak L is 35X, over the range
+// Figure 28-10 draws from We0 (3) through high impedance up to Pu1 (5). Both
+// lower bounds are at high impedance here and the digits still apply, because
+// the two highest levels differ. Together with StrongUnknownSameLevelIsStX,
+// whose lower bounds are equally low but whose highest levels agree, this fixes
+// the choice between the mnemonic and the digits on the highest levels alone.
+TEST(StrengthFormat, UnknownFromCombinedAmbiguousStrengthsIs35X) {
+  EXPECT_EQ(FormatStrength(MakeNS(Strength::kWeak, Strength::kHighz,
+                                  Strength::kPull, Strength::kHighz)),
+            "35X");
 }
 
 // §21.2.1.4 / Table 21-5: a logic 0 driven across a range of strengths prints
@@ -338,24 +398,40 @@ TEST(StrengthFormat, DisplayPercentVOnSupplyDrivenNetShowsSu1) {
   EXPECT_NE(out.find("Su1"), std::string::npos);
 }
 
-// End-to-end: Table 21-3's X logic value and Claim 6's two-digit form for an
-// unknown whose 0 and 1 strength components are NOT at a single common level.
-// Two equal-strength continuous assignments (§28.12.2) driving opposite values
-// settle the wire to an ambiguous x whose 0- and 1-side ranges each span weak
-// down to high impedance. §21.2.1.4 renders that as the two level digits (weak
-// is level 3 on both sides) followed by X: 33X. This is the only end-to-end
-// path that reaches the X logic value and the decimal-digit strength form.
-TEST(StrengthFormat, DisplayPercentVOnConflictingDriversShowsDigitFormX) {
-  SimFixture f;
-  std::string out = CaptureDisplayOutput(
+// End-to-end: §28.12.2, Figure 28-4 combines a weak 1 with a weak 0 and names
+// the result WeX, Figure 28-5 drawing its range from We0 through high impedance
+// up to We1. Two weak continuous assignments of opposite value are exactly that
+// combination, and §21.2.1.4 gives it a mnemonic because both strength
+// components -- the highest level of each side, per §28.12.2 -- are weak. The
+// lower bounds lie at high impedance and reach no part of the rendering, so the
+// weak conflict prints WeX rather than the digits of its range.
+TEST(StrengthFormat, DisplayPercentVOnWeakConflictShowsWeX) {
+  ExpectPercentVOutput(
       "module m;\n"
       "  wire w;\n"
       "  assign (weak0, weak1) w = 1'b1;\n"
       "  assign (weak0, weak1) w = 1'b0;\n"
       "  initial #1 $display(\"%v\", w);\n"
       "endmodule\n",
-      f);
-  EXPECT_NE(out.find("33X"), std::string::npos);
+      "WeX");
+}
+
+// End-to-end: the ordinary conflict. Two continuous assignments of opposite
+// value at the default drive put strong0 and strong1 on the wire, so both
+// strength components are at the strong level and §21.2.1.4 gives the result
+// the St mnemonic: StX. §28.12.2 adds "all the smaller strength levels" to that
+// result, so both lower bounds sit at high impedance, and the digit form is
+// still not what the clause asks for. Table 21-5 reads StX as "A strong driving
+// unknown value".
+TEST(StrengthFormat, DisplayPercentVOnStrongConflictShowsStX) {
+  ExpectPercentVOutput(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign w = 1'b1;\n"
+      "  assign w = 1'b0;\n"
+      "  initial #1 $display(\"%v\", w);\n"
+      "endmodule\n",
+      "StX");
 }
 
 // End-to-end: the small-capacitor charge storage strength Sm (Table 21-4, level
