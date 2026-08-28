@@ -264,4 +264,157 @@ TEST(GlobalClockingElab, ProcessBodyWithNoGlobalClockIsSharedBetweenInstances) {
          "process body is allocated again for every instantiation";
 }
 
+// §14.14 ends both of its lookup rules "the lookup terminates and shall result
+// in an error", and states no condition on where the reference stands, so a
+// $global_clock written in any statement position of a module that declares no
+// global clocking and is instantiated under none is an error. The seven cases
+// below each put the reference in one such position, and each is a position
+// Elaborator::ValidateGlobalClockReference reached only once its search took
+// its list of nested statements from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. Every one of them elaborated
+// clean beforehand, and an event control among them then armed no watcher and
+// suspended its process for the whole run.
+
+// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
+// block_item_declaration } { statement_or_null } join_keyword ...`, so a fork
+// holds statements the way a begin-end block does. The parser keeps them in
+// Stmt::fork_stmts rather than in Stmt::stmts.
+TEST(GlobalClockingElab, GlobalClockInAForkStatementWithoutDeclarationErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic x;\n"
+      "  initial fork\n"
+      "    @($global_clock) x = 1'b1;\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$global_clock has no effective global clocking "
+                            "declaration in any enclosing scope up to the "
+                            "top-level hierarchy block",
+                            4, "14.14"));
+}
+
+// A.6.8's for_initialization is a list of variable assignments, so the loop
+// header holds statements of its own in Stmt::for_inits and an expression
+// written there is an expression of the design like any other.
+TEST(GlobalClockingElab, GlobalClockInAForInitializerWithoutDeclarationErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic x;\n"
+      "  int i;\n"
+      "  initial\n"
+      "    for (i = $global_clock; i < 1; i = i + 1)\n"
+      "      x = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$global_clock has no effective global clocking "
+                            "declaration in any enclosing scope up to the "
+                            "top-level hierarchy block",
+                            5, "14.14"));
+}
+
+// A.6.8's for_step_assignment is the same rule at the other end of the loop
+// header, kept in Stmt::for_steps. The initializer here assigns a constant, so
+// the reference the report names can only be the one in the step.
+TEST(GlobalClockingElab, GlobalClockInAForStepWithoutDeclarationErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic x;\n"
+      "  int i;\n"
+      "  initial\n"
+      "    for (i = 0; i < 1; i = $global_clock)\n"
+      "      x = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$global_clock has no effective global clocking "
+                            "declaration in any enclosing scope up to the "
+                            "top-level hierarchy block",
+                            5, "14.14"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. The two cases
+// below cover one arm each.
+TEST(GlobalClockingElab,
+     GlobalClockInAnAssertionPassStatementWithoutDeclarationErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic x, ok;\n"
+      "  initial assert (ok) @($global_clock) x = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$global_clock has no effective global clocking "
+                            "declaration in any enclosing scope up to the "
+                            "top-level hierarchy block",
+                            3, "14.14"));
+}
+
+TEST(GlobalClockingElab,
+     GlobalClockInAnAssertionFailStatementWithoutDeclarationErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic x, ok;\n"
+      "  initial assert (ok) else @($global_clock) x = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$global_clock has no effective global clocking "
+                            "declaration in any enclosing scope up to the "
+                            "top-level hierarchy block",
+                            3, "14.14"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
+// randcase holds a statement per item, kept in Stmt::randcase_items. The rule
+// is a static one, so it holds whether the weighted draw would select the item
+// or not.
+TEST(GlobalClockingElab, GlobalClockInARandcaseItemWithoutDeclarationErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic x;\n"
+      "  initial randcase 1: @($global_clock) x = 1'b1; endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$global_clock has no effective global clocking "
+                            "declaration in any enclosing scope up to the "
+                            "top-level hierarchy block",
+                            3, "14.14"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements, kept in RsProd::code_stmts and reached through
+// Stmt::rs_productions.
+TEST(GlobalClockingElab,
+     GlobalClockInARandsequenceCodeBlockWithoutDeclarationErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic x;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { @($global_clock) x = 1'b1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$global_clock has no effective global clocking "
+                            "declaration in any enclosing scope up to the "
+                            "top-level hierarchy block",
+                            5, "14.14"));
+}
+
 }  // namespace
