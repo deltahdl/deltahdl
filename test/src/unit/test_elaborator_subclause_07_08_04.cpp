@@ -236,4 +236,27 @@ TEST(IntegralIndexAssocArrayElaboration, ExplicitRealCastIndexLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// A.2.2.1 gives `data_type ::= integer_vector_type [ signing ] {
+// packed_dimension } | ...` and §7.8 makes an associative array's index_type a
+// data type, so `bit [3:0]` is a legal index type written inline, without a
+// typedef naming it. §7.8.4 keys an entry off the index cast to the declared
+// index width, so the packed dimension has to reach that width: the inline
+// form must record the same width 4 and unsigned signedness the typedef'd
+// `bit [4:1]` form above records, rather than being parsed and dropped.
+TEST(IntegralIndexAssocArrayElaboration, InlinePackedDimensionIndexWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  int aa[bit[3:0]];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& vars = design->top_modules[0]->variables;
+  ASSERT_FALSE(vars.empty());
+  EXPECT_TRUE(vars[0].is_assoc);
+  EXPECT_EQ(vars[0].assoc_index_width, 4u);
+  EXPECT_FALSE(vars[0].is_index_signed);
+}
+
 }  // namespace

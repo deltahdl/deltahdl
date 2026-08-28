@@ -355,4 +355,28 @@ TEST(IntegralIndexAssocArraySimulation,
             1u);
 }
 
+// §7.8.4 keys an entry off the index cast to the declared index width, and
+// A.2.2.1's `data_type ::= integer_vector_type [ signing ] { packed_dimension
+// }` lets that width be written inline as `bit [3:0]` rather than through a
+// typedef. Under that index type -1 and 15 cast to one key, so the two writes
+// address a single element and num() answers 1 -- the claim
+// FunctionBodyAndModuleWritesShareOneKey makes for the `typedef bit [3:0]
+// Nibble;` form, here for the inline one. An index type that dropped its
+// packed dimension would key off a wider width, where -1 and 15 are two
+// elements and num() answers 2.
+TEST(IntegralIndexAssocArraySimulation,
+     InlinePackedDimensionIndexSharesOneKey) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int aa[bit[3:0]];\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    aa[-1] = 1;\n"
+                      "    aa[15] = 2;\n"
+                      "    result = aa.num();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
+}
+
 }  // namespace

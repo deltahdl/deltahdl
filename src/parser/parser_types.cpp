@@ -489,6 +489,13 @@ static bool TakesSigning(TokenKind tk) {
 // `[byte unsigned]` is a legal index type. The qualifier is held in `op`
 // because it decides how the keys order: an unsigned byte index sorts key 200
 // above key 50, while a signed one reads that key as -56 and sorts it below.
+// A.2.2.1 writes `integer_vector_type [ signing ] { packed_dimension }`, so the
+// packed dimensions after the signing are part of the same data_type and
+// `[bit [3:0]]` is a legal index type too. They are kept because §7.8.4 keys an
+// entry off the index cast to the declared index width: `bit [3:0]` holds
+// sixteen entries and reads index 17 as 1, while a bare `bit` holds two, so the
+// two declarations are different arrays. Each one is appended to `elements` in
+// declaration order as a `[msb:lsb]` range.
 Expr* Parser::ParseAssocIndexDim() {
   auto* dim = arena_.Create<Expr>();
   dim->kind = ExprKind::kIdentifier;
@@ -501,6 +508,23 @@ Expr* Parser::ParseAssocIndexDim() {
   if (takes_signing &&
       (Check(TokenKind::kKwSigned) || Check(TokenKind::kKwUnsigned))) {
     dim->op = Consume().kind;
+  }
+  while (Check(TokenKind::kLBracket)) {
+    Consume();
+    auto* packed = arena_.Create<Expr>();
+    packed->kind = ExprKind::kBinary;
+    packed->op = TokenKind::kColon;
+    packed->lhs = ParseExpr();
+    // §7.4.1 states the rule both these calls enforce: "Each packed dimension
+    // in a packed array declaration shall be specified by a range specification
+    // of the form [ constant_expression : constant_expression ]".
+    Expect(TokenKind::kColon, Subclause("7.4.1"));
+    packed->rhs = ParseExpr();
+    Expect(TokenKind::kRBracket, Subclause("7.4.1"));
+    // The dimension begins where its first bound begins, as §7.4.2 writes the
+    // dimension as that bound followed by the colon.
+    packed->range.start = packed->lhs->range.start;
+    dim->elements.push_back(packed);
   }
   return dim;
 }

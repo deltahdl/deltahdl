@@ -75,25 +75,60 @@ static bool TryParseRangeDim(const Expr* dim, RtlirVariable& var,
   return true;
 }
 
+// §6.11: the width each index type keyword denotes on its own. `bit`, `logic`
+// and `reg` are the one-bit types, and `time` is a 64-bit unsigned integer
+// type.
 static uint32_t AssocIndexWidth(std::string_view t) {
+  if (t == "bit" || t == "logic" || t == "reg") return 1;
   if (t == "byte") return 8;
   if (t == "shortint") return 16;
-  if (t == "longint") return 64;
+  if (t == "longint" || t == "time") return 64;
   return 32;
 }
 
-static bool TryParseAssocDim(const Expr* dim, RtlirVariable& var) {
+// §6.11: the index types that are signed unless the declaration says
+// otherwise. `bit`, `logic`, `reg` and `time` are unsigned, as is a wildcard
+// index, whose value stays unsigned and self-determined (§7.8.4).
+static bool IsAssocIndexSigned(std::string_view t) {
+  return t == "byte" || t == "shortint" || t == "int" || t == "integer" ||
+         t == "longint";
+}
+
+// §7.8 makes the index type a data_type, and A.2.2.1 lets an
+// integer_vector_type carry packed dimensions, so the index of `int
+// aa[bit[3:0]]` is four bits wide rather than one. The width is the product of
+// the declared dimensions' sizes. Each bound is a constant_expression that
+// §11.2.1 lets name a parameter or localparam, so it is evaluated in the
+// enclosing parameter scope — just like a range dimension's bounds — and a
+// bound that does not fold leaves the width the keyword alone gives.
+static uint32_t AssocIndexWidth(const Expr* dim, const ScopeMap& scope) {
+  if (dim->elements.empty()) return AssocIndexWidth(dim->text);
+  uint32_t width = 1;
+  for (const auto* packed_dim : dim->elements) {
+    auto lval = ConstEvalInt(packed_dim->lhs, scope);
+    auto rval = ConstEvalInt(packed_dim->rhs, scope);
+    if (!lval || !rval) return AssocIndexWidth(dim->text);
+    width *= static_cast<uint32_t>(std::abs(*lval - *rval) + 1);
+  }
+  return width;
+}
+
+static bool TryParseAssocDim(const Expr* dim, RtlirVariable& var,
+                             const ScopeMap& scope) {
   if (dim->kind != ExprKind::kIdentifier) return false;
   auto t = dim->text;
   if (t == "string" || t == "int" || t == "integer" || t == "byte" ||
-      t == "shortint" || t == "longint" || t == "*") {
+      t == "shortint" || t == "longint" || t == "bit" || t == "logic" ||
+      t == "reg" || t == "time" || t == "*") {
     var.is_assoc = true;
     var.is_string_index = (t == "string");
     var.is_wildcard_index = (t == "*");
-    var.assoc_index_width = AssocIndexWidth(t);
-    // The built-in integral index types are signed; a wildcard index keeps an
-    // unsigned, self-determined value (§7.8.4).
-    var.is_index_signed = !var.is_wildcard_index;
+    // §7.8.4 keys an entry off the index cast to the declared index width, so
+    // the packed dimensions the declaration wrote decide which values are one
+    // element: `aa[-1]` and `aa[15]` are the same entry under a `bit [3:0]`
+    // index and separate ones under a wider index type.
+    var.assoc_index_width = AssocIndexWidth(dim, scope);
+    var.is_index_signed = IsAssocIndexSigned(t);
     // An index type is a data_type (§7.8), so it may carry the signing that
     // A.2.2.1 allows on an integer type. That overrides the default: keys of
     // a `byte unsigned` index order 0 to 255, not -128 to 127.
@@ -165,7 +200,7 @@ void ComputeUnpackedDims(const std::vector<Expr*>& dims, RtlirVariable& var,
   if (dims.empty() || !dims[0]) return;
   auto* dim = dims[0];
   if (TryParseQueueDim(dim, var, ctx.diag, ctx.loc, ctx.scope)) return;
-  if (TryParseAssocDim(dim, var)) return;
+  if (TryParseAssocDim(dim, var, ctx.scope)) return;
   if (TryParseUserDefinedAssocDim(dim, var, ctx.types.typedefs,
                                   ctx.types.class_names))
     return;
