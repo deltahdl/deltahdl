@@ -752,6 +752,7 @@ void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
   ValidateCheckerVariableInitialAssignment(decl);
   ValidateHierRefIntoProgram(decl);
   ValidateProgramSubroutineCall(decl);
+  ValidateProgramWideSpaceAccess(decl);
   ValidateHierRefToAutomatic(decl);
   ValidateHierRefToImportedName(decl, mod);
   ValidateUnresolvedReferences(decl, mod);

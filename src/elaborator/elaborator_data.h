@@ -514,6 +514,11 @@ class ElaboratorData {
   std::unordered_map<std::string_view, uint32_t> fixed_unpacked_typedef_widths_;
   std::unordered_map<std::string_view, std::vector<Expr*>> td_array_dims_;
   std::unordered_set<std::string_view> cu_scope_names_;
+  // §24.6: the names anonymous programs declare into the program-wide space,
+  // gathered from the compilation-unit scope and from every package. The space
+  // "is accessible only to programs", so a scope that is not a program block
+  // may reference none of these names.
+  std::unordered_set<std::string_view> anonymous_program_names_;
   ScopeMap cu_param_scope_;
   // The same union for the parameter scope; see all_typedefs_ above.
   ScopeMap all_cu_param_scope_;

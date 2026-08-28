@@ -929,6 +929,8 @@ class Elaborator : public ElaboratorOperationRules {
 
   void ValidateProgramSubroutineCall(const ModuleDecl* decl);
 
+  void ValidateProgramWideSpaceAccess(const ModuleDecl* decl);
+
   ModuleItem* FindCuScopeItem(std::string_view name) const;
 
   void ApplyBindDirectives(RtlirModule* top);

@@ -7,8 +7,9 @@
 // assignment and any checker variable from an assignment in an initial
 // procedure, §24.3 bars a reference to a program signal from outside the
 // program, §13.3.1 and §13.4.2 bar a reference to an item of an automatic task
-// or function, and §24.5 bars a call to a program subroutine from within a
-// design module.
+// or function, §24.5 bars a call to a program subroutine from within a
+// design module, and §24.6 bars a reference to a name an anonymous program
+// declared from any scope that is not a program block.
 
 #include <format>
 #include <string>
@@ -474,6 +475,77 @@ static void WalkStmtForProgramCall(
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtForProgramCall(sub, program_names, diag);
   });
+}
+
+// §24.6 NOTE: "identifiers declared inside an anonymous program cannot be
+// referenced outside any program block". Every position below reports through
+// this one call, so the rule reads the same wherever the reference stood and a
+// test naming this message names this rule.
+static void ReportProgramWideSpaceAccess(SourceLoc loc, DiagEngine& diag) {
+  diag.Error(loc,
+             "an identifier declared inside an anonymous program cannot be "
+             "referenced outside any program block",
+             Subclause("24.6"));
+}
+
+// §24.6 names no position a reference may stand in, so every expression a
+// statement holds is one this report reaches, at every depth. ForEachChildExpr
+// and ForEachChildStmt in elaborator_validate_internal.h state those positions
+// once for the whole elaborator.
+static void WalkStmtForProgramWideSpaceAccess(
+    const Stmt* s, const std::unordered_set<std::string_view>& names,
+    DiagEngine& diag) {
+  if (!s) return;
+  ForEachChildExpr(s, [&](Expr* const& e) {
+    if (ExprMentionsAny(e, names))
+      ReportProgramWideSpaceAccess(s->range.start, diag);
+  });
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    WalkStmtForProgramWideSpaceAccess(sub, names, diag);
+  });
+}
+
+// The positions one module item names a declaration in outside its statements.
+// A.1.11 admits a task, a function, a class, an interface class, a covergroup
+// and a class constructor into an anonymous program, so a reference to one is
+// either a call or the name of a type: the type of a declaration reaches a
+// class, and an initializer or either side of a continuous assignment reaches a
+// function. The four are read into one list so that one report answers for all
+// of them, rather than each position acquiring a rule of its own.
+static void CheckItemForProgramWideSpaceAccess(
+    const ModuleItem* item, const std::unordered_set<std::string_view>& names,
+    DiagEngine& diag) {
+  for (bool mentions : {names.count(item->data_type.type_name) != 0,
+                        ExprMentionsAny(item->init_expr, names),
+                        ExprMentionsAny(item->assign_lhs, names),
+                        ExprMentionsAny(item->assign_rhs, names)}) {
+    if (mentions) ReportProgramWideSpaceAccess(item->loc, diag);
+  }
+  if (IsProceduralItemKind(item->kind))
+    WalkStmtForProgramWideSpaceAccess(item->body, names, diag);
+}
+
+void Elaborator::ValidateProgramWideSpaceAccess(const ModuleDecl* decl) {
+  if (anonymous_program_names_.empty()) return;
+  // §24.6 opens by making the program-wide space "accessible only to programs",
+  // and its note bars a reference from outside *any* program block rather than
+  // from outside the one that declared the name. §24.3 settles the same
+  // question for a program signal in the affirmative -- "It shall be legal for
+  // hierarchical references to extend from one program scope to another program
+  // scope" -- so what decides is whether the referring scope is a program block
+  // and not which program it is. A program's own items are inside one, and so
+  // are the items of every other anonymous program, which stand among the
+  // compilation-unit or package items and are not walked here.
+  if (decl->decl_kind == ModuleDeclKind::kProgram) return;
+  // §24.6 shares the anonymous program's name space with the surrounding
+  // package or compilation-unit scope and with nothing below it, so a module
+  // declaring a name of its own declares a different thing of the same name and
+  // its references reach that one.
+  std::unordered_set<std::string_view> names = anonymous_program_names_;
+  for (const auto* item : decl->items) names.erase(item->name);
+  for (const auto* item : decl->items) {
+    CheckItemForProgramWideSpaceAccess(item, names, diag_);
+  }
 }
 
 void Elaborator::ValidateProgramSubroutineCall(const ModuleDecl* decl) {

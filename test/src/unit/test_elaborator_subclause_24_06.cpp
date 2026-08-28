@@ -1,3 +1,5 @@
+#include <string_view>
+
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -200,6 +202,126 @@ TEST(AnonymousProgramNameSpaceSharing,
       f, "top");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §24.6 opens by ruling that "the set of program definitions and instances
+// define a space of program-wide data, tasks, and functions that is accessible
+// only to programs", and its NOTE states the consequence for an anonymous
+// program: "identifiers declared inside an anonymous program cannot be
+// referenced outside any program block". §24.3 says what a program block is,
+// giving `program_declaration` its syntax and ruling that "references to
+// program signals from outside any program block shall be an error"; the same
+// paragraph makes a reference from one program scope to another legal, which is
+// what ProgramCallingAnonymousProgramTaskElaborates below stands for.
+//
+// The three rejection cases below share this substring rather than the whole
+// sentence so that one literal serves every position a reference can stand in.
+// The report names no identifier: the walk answers whether an expression
+// mentions any of the anonymous program's names, so it has no name to quote and
+// one wording serves them all. No other report in the tree says a reference is
+// barred from a place, so the fragment is this rule's alone.
+constexpr std::string_view kNotReferencedOutside =
+    "cannot be referenced outside";
+
+// §24.6: a design module is not a program, so a task an anonymous program
+// declared at compilation-unit scope is outside its reach. The parser flattens
+// the anonymous program's items into CompilationUnit::cu_items (§24.6 declares
+// no new scope), so the call resolves like any call to a compilation-unit task
+// -- CompilationUnitElaboration.ForwardReferenceToCuScopeTaskAccepted in
+// test_elaborator_subclause_03_12_01.cpp is the same shape with no anonymous
+// program around the declaration, and it elaborates.
+TEST(AnonymousProgramWideSpace, ModuleCallingAnonymousProgramTaskIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "program;\n"
+      "  task probe(); endtask\n"
+      "endprogram\n"
+      "module top;\n"
+      "  initial probe();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kNotReferencedOutside, 5, "24.6"));
+}
+
+// §24.6: the space is "accessible only to programs", not accessible to nobody.
+// A named program is a program block, so the identical call made from inside
+// one is legal and elaborates. Without this case, refusing the call from every
+// scope satisfies the case above while leaving the anonymous program with no
+// caller at all, which is the opposite of what the clause is for.
+TEST(AnonymousProgramWideSpace, ProgramCallingAnonymousProgramTaskElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "program;\n"
+      "  task probe(); endtask\n"
+      "endprogram\n"
+      "module top;\n"
+      "  program checker;\n"
+      "    initial probe();\n"
+      "  endprogram\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §24.6: "anonymous programs can be used inside packages (see Clause 26) or
+// compilation-unit scopes (see 3.12.1)", and the space is one space however the
+// item was declared. A package's items are held in PackageDecl::items rather
+// than in CompilationUnit::cu_items and reach a module through the import
+// (§26.3), so this is a second route into the module and not the first one
+// written twice: a check placed only where the compilation-unit names are
+// gathered leaves this call unreported.
+TEST(AnonymousProgramWideSpace,
+     ModuleCallingImportedAnonymousProgramTaskIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pkg;\n"
+      "  program;\n"
+      "    task probe(); endtask\n"
+      "  endprogram\n"
+      "endpackage\n"
+      "module top;\n"
+      "  import pkg::*;\n"
+      "  initial probe();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kNotReferencedOutside, 8, "24.6"));
+}
+
+// §24.6's NOTE bars every "identifier declared inside an anonymous program"
+// from being referenced outside a program block, and puts no kind on the
+// identifier. A.1.11 gives `anonymous_program_item ::= task_declaration |
+// function_declaration | class_declaration | interface_class_declaration |
+// covergroup_declaration | class_constructor_declaration | ;`, so a class is
+// one of the things an anonymous program declares, and §24.3 counts "class
+// definitions" among a program block's contents. The subject the clause's first
+// sentence enumerates -- "data, tasks, and functions" -- is therefore not the
+// limit of what the NOTE covers, and a rule written over subroutine calls alone
+// leaves the type name reachable.
+//
+// The reference here is the module's own variable declaration naming the class
+// as its type, which the elaborator already recognizes as a class reference:
+// Elaborator::ValidateVarDeclTypes in src/elaborator/elaborator_decls_var.cpp
+// selects a declaration whose DataType::type_name is in class_names_, and
+// ClassifyCuScopeItem in src/elaborator/elaborator_resolve.cpp is what put the
+// anonymous program's class into class_names_. The declaration carries no
+// initializer, so the report stands on naming the type and not on calling
+// new().
+TEST(AnonymousProgramWideSpace,
+     ModuleDeclaringAnonymousProgramClassHandleIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "program;\n"
+      "  class Secret; endclass\n"
+      "endprogram\n"
+      "module top;\n"
+      "  Secret handle;\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kNotReferencedOutside, 5, "24.6"));
 }
 
 }  // namespace

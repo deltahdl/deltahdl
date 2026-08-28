@@ -395,6 +395,29 @@ void RegisterCuClasses(
   }
 }
 
+// §24.6: every name an anonymous program declares, whichever scope the program
+// stands in. "Anonymous programs can be used inside packages (see Clause 26) or
+// compilation-unit scopes (see 3.12.1) to declare items that are part of the
+// program-wide space without declaring a new scope", and that space is one
+// space however a declaration entered it, so the two lists fill one set.
+void RegisterAnonymousProgramNames(
+    CompilationUnit* unit, std::unordered_set<std::string_view>& names) {
+  for (const auto* item : unit->cu_items) {
+    if (item->from_anonymous_program) names.insert(item->name);
+  }
+  for (const auto* pkg : unit->packages) {
+    for (const auto* item : pkg->items) {
+      if (item->from_anonymous_program) names.insert(item->name);
+    }
+  }
+  // An item the parser left unnamed is dropped here rather than tested for at
+  // each insertion, because an empty name in this set matches every reference
+  // position that is itself empty -- a declaration written with no type name
+  // carries an empty DataType::type_name, and every such declaration would
+  // then be read as naming an anonymous program's class.
+  names.erase(std::string_view{});
+}
+
 }  // namespace
 
 // Whether `e` mentions any name in `names`, at any depth. Every identifier the
@@ -456,6 +479,7 @@ void Elaborator::RegisterCuScopeItems() {
   }
   RegisterCuClasses(unit_, class_names_, cu_scope_names_,
                     parameterized_class_names_);
+  RegisterAnonymousProgramNames(unit_, anonymous_program_names_);
   RegisterPackageParams(unit_, cu_param_scope_, arena_);
   RegisterClassParams(unit_, cu_param_scope_, arena_, diag_);
   RegisterPackageTypedefs(unit_, typedefs_, arena_);
