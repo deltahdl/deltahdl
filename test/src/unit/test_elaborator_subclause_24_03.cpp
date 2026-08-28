@@ -1,3 +1,6 @@
+#include <string>
+#include <string_view>
+
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -235,6 +238,89 @@ TEST(ProgramConstruct, AnonymousProgramHierRefToProgramIsError) {
                             "hierarchical reference to program signal from "
                             "outside the program is not permitted",
                             6, "24.3"));
+}
+
+// §24.3 closes its account of hierarchical references with "However, anonymous
+// programs shall not contain hierarchical references to other program scopes",
+// and puts no condition on where the anonymous program itself stands. §24.6
+// says where it may stand -- "anonymous programs can be used inside packages
+// (see Clause 26) or compilation-unit scopes (see 3.12.1)" -- and A.1.11 makes
+// anonymous_program a package_item, so the two placements are one rule.
+// AnonymousProgramHierRefToProgramIsError above writes the reference at
+// compilation-unit scope; the two cases below write the same reference in a
+// package, whose items Parser::TryParsePackageBodyItem puts into
+// PackageDecl::items rather than into CompilationUnit::cu_items.
+constexpr std::string_view kProgramSignalFromOutside =
+    "hierarchical reference to program signal from outside the program is not "
+    "permitted";
+
+// A package whose anonymous program holds `subroutine`, which writes the signal
+// of the named program `prog` declared above the package. A named program is
+// required: with no name in CompilationUnit::programs the check has no program
+// to match a reference against and answers nothing. `subroutine` is three lines
+// -- its header, the assignment, and its end keyword -- so the assignment is
+// line 7 of the source whichever subroutine kind is passed.
+void ExpectPackageAnonymousProgramHierRefRejected(
+    const std::string& subroutine) {
+  ElabFixture f;
+  ElaborateSrc(
+      "program prog;\n"
+      "  int psig;\n"
+      "endprogram\n"
+      "package pkg;\n"
+      "  program;\n" +
+          subroutine +
+          "  endprogram\n"
+          "endpackage\n",
+      f, "prog");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kProgramSignalFromOutside, 7,
+                            "24.3"));
+}
+
+// A.1.11 gives `anonymous_program_item ::= task_declaration |
+// function_declaration | class_declaration | interface_class_declaration |
+// covergroup_declaration | class_constructor_declaration | ;`, so a task is one
+// of the things a package's anonymous program declares, and its statements are
+// held in ModuleItem::func_body_stmts.
+TEST(ProgramConstruct, PackageAnonymousProgramTaskHierRefToProgramIsError) {
+  ExpectPackageAnonymousProgramHierRefRejected(
+      "    task t;\n"
+      "      prog.psig = 1;\n"
+      "    endtask\n");
+}
+
+// The same reference written in a function, which A.1.11 admits beside the
+// task. The two reach the walk as different values of ModuleItem::kind, so a
+// check narrowed to one kind reports the case above and not this one.
+TEST(ProgramConstruct, PackageAnonymousProgramFunctionHierRefToProgramIsError) {
+  ExpectPackageAnonymousProgramHierRefRejected(
+      "    function void f();\n"
+      "      prog.psig = 1;\n"
+      "    endfunction\n");
+}
+
+// §24.3 bars an anonymous program from containing a hierarchical reference to
+// another program scope and bars nothing else about it, so what the report
+// selects is the reference and not the placement. The task below stands in the
+// same package anonymous program as the two cases above, beside the same named
+// program, and assigns a variable it declared itself.
+TEST(ProgramConstruct, PackageAnonymousProgramWithoutHierRefElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "program prog;\n"
+      "  int psig;\n"
+      "endprogram\n"
+      "package pkg;\n"
+      "  program;\n"
+      "    task t;\n"
+      "      int held;\n"
+      "      held = 1;\n"
+      "    endtask\n"
+      "  endprogram\n"
+      "endpackage\n",
+      f, "prog");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 // §24.3 says "References to program signals from outside any program block

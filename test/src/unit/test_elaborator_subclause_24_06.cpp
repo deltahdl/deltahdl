@@ -1,3 +1,5 @@
+#include <cstdint>
+#include <string>
 #include <string_view>
 
 #include "elaborator/elaborator.h"
@@ -322,6 +324,107 @@ TEST(AnonymousProgramWideSpace,
       f, "top");
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(), kNotReferencedOutside, 5, "24.6"));
+}
+
+// §24.6's note bars a reference to an anonymous program's identifier from
+// "outside any program block", and the clause names the two scopes an anonymous
+// program stands in without distinguishing them: "anonymous programs can be
+// used inside packages (see Clause 26) or compilation-unit scopes (see
+// 3.12.1)". Neither a package nor the compilation unit is a program block, so
+// an item of either that is not itself in an anonymous program is a place the
+// note reaches, exactly as a module's item is. Every case above writes the
+// reference inside a module or a program, whose items are in ModuleDecl::items;
+// a package's items are in PackageDecl::items and the compilation unit's in
+// CompilationUnit::cu_items, and a check reading module declarations reaches
+// neither list.
+void ExpectProgramWideSpaceRefRejected(const std::string& src, uint32_t line) {
+  ElabFixture f;
+  ElaborateSrc(src, f, "top");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kNotReferencedOutside, line, "24.6"));
+}
+
+// §24.6: the reference stands in a package task's body, and the task is a
+// package item outside the anonymous program, so the call is made outside every
+// program block. §26.2 admits no procedural block in a package -- that is what
+// "process is not allowed in a package" reports -- so a subroutine body is the
+// only place a statement stands there, and a check reading a package item's
+// declaration positions alone never sees this call. The report stands at the
+// statement rather than at the task, on line 6.
+TEST(AnonymousProgramWideSpace, PackageTaskCallingAnonymousProgramTaskIsError) {
+  ExpectProgramWideSpaceRefRejected(
+      "package pkg;\n"
+      "  program;\n"
+      "    task probe(); endtask\n"
+      "  endprogram\n"
+      "  task caller();\n"
+      "    probe();\n"
+      "  endtask\n"
+      "endpackage\n"
+      "module top; endmodule\n",
+      6);
+}
+
+// §24.6: the reference is the package variable's own type name, naming the
+// class the package's anonymous program declared. A.1.11 admits a class into an
+// anonymous program and §24.3 counts "class definitions" among a program
+// block's contents, so the type name is an identifier the note covers.
+// ModuleDeclaringAnonymousProgramClassHandleIsError above is the same
+// declaration written in a module, and the report stands at the declaration
+// rather than inside a statement.
+TEST(AnonymousProgramWideSpace,
+     PackageItemDeclaringAnonymousProgramClassHandleIsError) {
+  ExpectProgramWideSpaceRefRejected(
+      "package pkg;\n"
+      "  program;\n"
+      "    class Secret; endclass\n"
+      "  endprogram\n"
+      "  Secret handle;\n"
+      "endpackage\n"
+      "module top; endmodule\n",
+      5);
+}
+
+// §24.6 names the compilation-unit scope beside the package, and §3.12.1 is
+// what it cites for it. The reference here is a compilation-unit variable's
+// initializer calling the function the anonymous program declared, which is a
+// third position and a second scope, so neither this case nor the two above
+// stands for another.
+TEST(AnonymousProgramWideSpace,
+     CompilationUnitItemCallingAnonymousProgramFunctionIsError) {
+  ExpectProgramWideSpaceRefRejected(
+      "program;\n"
+      "  function int probe(); return 1; endfunction\n"
+      "endprogram\n"
+      "int cached = probe();\n"
+      "module top; endmodule\n",
+      4);
+}
+
+// §24.6 makes the program-wide space "accessible only to programs", and an
+// anonymous program is a program block: the items it declares are that space's
+// own declarations. So one anonymous program naming another's task is not a
+// reference "outside any program block", and it shall elaborate. This is what
+// keeps the space usable, because the package and compilation-unit items the
+// three cases above are reported from are the same two lists an anonymous
+// program's own items stand in, and a walk that did not pass over them would
+// leave the anonymous program's task with no caller at all.
+TEST(AnonymousProgramWideSpace,
+     AnonymousProgramCallingAnotherAnonymousProgramTaskElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "program;\n"
+      "  task probe(); endtask\n"
+      "endprogram\n"
+      "program;\n"
+      "  task caller();\n"
+      "    probe();\n"
+      "  endtask\n"
+      "endprogram\n"
+      "module top; endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

@@ -401,6 +401,10 @@ void Elaborator::RunPreElaborationValidations() {
 
   RegisterCuScopeItems();
 
+  // After RegisterCuScopeItems above, which is what fills
+  // anonymous_program_names_ with the names §24.6's note bars a reference to.
+  ValidateProgramWideSpaceAccessInPackageAndCuScopes();
+
   ValidateCuTypedefs();
 
   ApplyClassMethodAutomaticDefault();

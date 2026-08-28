@@ -296,23 +296,49 @@ void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
   }
 }
 
+// The anonymous program items of one scope, read for the references §24.3
+// bars an anonymous program from holding: "anonymous programs shall not contain
+// hierarchical references to other program scopes". §24.6 admits an anonymous
+// program "inside packages (see Clause 26) or compilation-unit scopes (see
+// 3.12.1)" and A.1.11 makes anonymous_program a package_item, so a package's
+// items and the compilation unit's items are two lists this one body reads
+// rather than two rules.
+static void CheckScopeItemsForAnonymousProgramHierRefs(
+    const std::vector<ModuleItem*>& items,
+    const std::unordered_set<std::string_view>& program_names,
+    DiagEngine& diag) {
+  for (const auto* item : items) {
+    if (!item->from_anonymous_program) continue;
+    // §24.3: a hierarchical reference to a program from an anonymous program is
+    // illegal wherever it appears, including inside a task or function the
+    // anonymous program declares, whose body is in func_body_stmts.
+    //
+    // ModuleItem::body is not read here because no item reaching this walk
+    // carries one. It holds a procedural block's statement, and A.1.11 admits
+    // only task, function, class, interface class, covergroup and class
+    // constructor declarations as an anonymous_program_item -- which
+    // FilterAnonymousProgramItems in src/parser/parser.cpp now enforces, so an
+    // initial block written there is reported and dropped rather than arriving
+    // with a body for this walk to miss.
+    if (item->kind == ModuleItemKind::kTaskDecl ||
+        item->kind == ModuleItemKind::kFunctionDecl) {
+      for (const auto* s : item->func_body_stmts)
+        WalkStmtsForProgramRef(s, program_names, diag);
+    }
+  }
+}
+
 void Elaborator::ValidateAnonymousProgramHierRefs() {
   std::unordered_set<std::string_view> program_names;
   for (const auto* p : unit_->programs) {
     if (!p->name.empty()) program_names.insert(p->name);
   }
   if (program_names.empty()) return;
-  for (const auto* item : unit_->cu_items) {
-    if (!item->from_anonymous_program) continue;
-    if (item->body) WalkStmtsForProgramRef(item->body, program_names, diag_);
-    // §24.3: a hierarchical reference to a program from an anonymous program is
-    // illegal wherever it appears, including inside a task or function the
-    // anonymous program declares (whose body is in func_body_stmts, not body).
-    if (item->kind == ModuleItemKind::kTaskDecl ||
-        item->kind == ModuleItemKind::kFunctionDecl) {
-      for (const auto* s : item->func_body_stmts)
-        WalkStmtsForProgramRef(s, program_names, diag_);
-    }
+  CheckScopeItemsForAnonymousProgramHierRefs(unit_->cu_items, program_names,
+                                             diag_);
+  for (const auto* pkg : unit_->packages) {
+    CheckScopeItemsForAnonymousProgramHierRefs(pkg->items, program_names,
+                                               diag_);
   }
 }
 
@@ -523,6 +549,15 @@ static void CheckItemForProgramWideSpaceAccess(
   }
   if (IsProceduralItemKind(item->kind))
     WalkStmtForProgramWideSpaceAccess(item->body, names, diag);
+  // A.1.11 admits a task and a function into an anonymous program, and §24.6
+  // names no position a reference to one may not stand in, so a subroutine
+  // body is read as well. A task or function keeps its statements in
+  // func_body_stmts rather than in body, and a package holds no procedural
+  // item at all -- §26.2 is what ValidatePackageItems reports "process is not
+  // allowed in a package" under -- so in a package a subroutine body is the
+  // only place a statement stands.
+  for (const auto* s : item->func_body_stmts)
+    WalkStmtForProgramWideSpaceAccess(s, names, diag);
 }
 
 void Elaborator::ValidateProgramWideSpaceAccess(const ModuleDecl* decl) {
@@ -545,6 +580,45 @@ void Elaborator::ValidateProgramWideSpaceAccess(const ModuleDecl* decl) {
   for (const auto* item : decl->items) names.erase(item->name);
   for (const auto* item : decl->items) {
     CheckItemForProgramWideSpaceAccess(item, names, diag_);
+  }
+}
+
+// The items of one package, or of the compilation unit, read for the reference
+// §24.6's note bars. An anonymous program's own items are skipped: they are
+// declarations of the program-wide space §24.6 opens by defining, so naming one
+// from another is not a reference "outside any program block", and
+// ValidateProgramWideSpaceAccess keeps the same items legal by never reaching
+// them.
+static void CheckScopeItemsForProgramWideSpaceAccess(
+    const std::vector<ModuleItem*>& items,
+    const std::unordered_set<std::string_view>& names, DiagEngine& diag) {
+  for (const auto* item : items) {
+    if (item->from_anonymous_program) continue;
+    CheckItemForProgramWideSpaceAccess(item, names, diag);
+  }
+}
+
+// §24.6's note bars a reference to an identifier an anonymous program declared
+// from "outside any program block", and §24.6 names "the package or
+// compilation-unit scope in which they are declared" in one phrase, drawing no
+// distinction between the two. Neither is a program block, so an item of either
+// that is not itself in an anonymous program is a place the note reaches, and
+// the two lists are read the same way. ValidateProgramWideSpaceAccess above
+// reads the same rule over a module, an interface and a checker, and reports it
+// through the same ReportProgramWideSpaceAccess.
+void Elaborator::ValidateProgramWideSpaceAccessInPackageAndCuScopes() {
+  if (anonymous_program_names_.empty()) return;
+  // No name is erased here, where ValidateProgramWideSpaceAccess erases the
+  // names a module redeclares: §24.6 makes an anonymous program's items "share
+  // the same name space as the package or compilation-unit scope in which they
+  // are declared", so a declaration of that name in the surrounding scope is
+  // the collision ValidateAnonymousProgramNameSharing reports rather than a
+  // different thing a reference could reach.
+  CheckScopeItemsForProgramWideSpaceAccess(unit_->cu_items,
+                                           anonymous_program_names_, diag_);
+  for (const auto* pkg : unit_->packages) {
+    CheckScopeItemsForProgramWideSpaceAccess(pkg->items,
+                                             anonymous_program_names_, diag_);
   }
 }
 
