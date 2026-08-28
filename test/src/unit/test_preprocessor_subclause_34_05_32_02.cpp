@@ -46,13 +46,15 @@ using namespace delta;
 // src/elaborator/rtlir.h and Elaborator::CheckHierRefUndeclaredMember in
 // src/elaborator/elaborator_scope_rules_hier.cpp already do it.
 //
-// The third sentence is performed by nothing. No access is permitted to
-// anything, because nothing downstream of the preprocessor is told a design
-// element came out of a protected envelope, so there is no protection of an
-// object for a relaxation to relax. What this file holds the value to is
-// therefore only that it is carried as written and that no spelling of it is
-// judged, which is what "implementation-specific" leaves open. #3284 records
-// both gaps.
+// The third sentence is performed by nothing, and the last section here is
+// about the tool saying so. No access is permitted to anything, because
+// nothing downstream of the preprocessor is told a design element came out of
+// a protected envelope, so there is no protection of an object for a
+// relaxation to relax and every object is reachable already. This file holds
+// the value to two things: that it is carried as written, no spelling of it
+// being judged, which is what "implementation-specific" leaves open; and that
+// a text asking for a grant this tool does not make is told so rather than
+// left to assume it was made. #3284 records the grant itself.
 
 namespace {
 
@@ -87,6 +89,11 @@ constexpr std::string_view kClosesDecryption =
 // envelope with.
 constexpr std::string_view kNoEnvelope =
     "viewport expression stands in no protected envelope";
+
+// The message Preprocessor::ApplyViewport answers a viewport it does nothing
+// for with. The fragment is the sentence's opening rather than the whole of
+// it, the rest naming what a reader reaches instead.
+constexpr std::string_view kNotActedOn = "viewport expression is not acted on";
 
 // ---------------------------------------------------------------------------
 // The expression describes objects within the current protected envelope.
@@ -223,6 +230,79 @@ TEST(ProtectViewportDescription, AnAccessTheStandardNeverNamesIsCarriedToo) {
                            ViewportOf(kObject, kOwnAccess));
   ASSERT_EQ(reading.Count(), 1U) << reading.text;
   EXPECT_EQ(reading.Viewports().front().access, kOwnAccess);
+}
+
+// ---------------------------------------------------------------------------
+// The relaxation this implementation does not perform.
+// ---------------------------------------------------------------------------
+
+// A relaxation of protection needs a protection to relax, and this tool has
+// none. §34.2 says code contained within a decryption envelope is said to be
+// protected, and the property that withholds such an object from a reader is
+// VpiObject::is_protected in src/simulator/vpi_object.h, which no path from a
+// decryption envelope sets. So an object of a region this preprocessor
+// decrypted is reachable whether a viewport named it or not, and a text that
+// asked for one object to be reachable got every object instead.
+//
+// That is what Preprocessor::ApplyViewport in
+// src/preprocessor/preprocessor_protect_viewport.cpp answers a viewport with,
+// and the case names the report rather than counting one. It is a warning
+// because the expression breaks no rule of §34.5.32: it is the spelling
+// §34.5.32.1 defines, standing in an envelope as §34.5.32.2 requires, and
+// what goes unanswered is the grant rather than the writing.
+TEST(ProtectViewportDescription, AViewportIsAnsweredWithWhatWasNotDoneForIt) {
+  ReadingViewports reading(std::string(kOpensDecryption) +
+                           ViewportOf(kObject, kAccess));
+  EXPECT_TRUE(
+      ReportedWarning(reading.diag.Diagnostics(), kNotActedOn, 2, "34.5.32"));
+}
+
+// The other half of the report's severity: the expression is accepted. The
+// viewport is gathered as the cases above read it back and no error stands
+// against the text, so a producer's model still compiles. Without this the
+// case above would hold of a tool that turned the expression away, which
+// would refuse a source §34.5.32 permits.
+TEST(ProtectViewportDescription, TheAnswerLeavesTheViewportGathered) {
+  ReadingViewports reading(std::string(kOpensDecryption) +
+                           ViewportOf(kObject, kAccess));
+  ASSERT_EQ(reading.Count(), 1U) << reading.text;
+  EXPECT_FALSE(reading.diag.HasErrors());
+}
+
+// A protected envelope that asked for nothing is told nothing. The envelope
+// here carries a content keyword of its own, so the case says the report
+// follows the viewport rather than the protect pragma directive standing
+// inside an envelope: without the keyword it would be an empty envelope, and
+// an empty envelope is quiet whatever provokes the report.
+TEST(ProtectViewportDescription, AnEnvelopeAskingForNoAccessIsToldNothing) {
+  ReadingViewports reading(std::string(kOpensDecryption) +
+                           ProtectDirective("author = \"acme\""));
+  EXPECT_TRUE(reading.diag.Diagnostics().empty()) << reading.text;
+}
+
+// §34.5.32.2 has each expression describe its own object, and each object is
+// one the reader reaches anyway, so each expression is answered. A report made
+// once for the envelope would satisfy the case above and leave the second
+// object's author believing that one was granted, which is why the two lines
+// are named separately here.
+TEST(ProtectViewportDescription, EachViewportIsAnsweredAtItsOwnLine) {
+  ReadingViewports reading(std::string(kOpensDecryption) +
+                           ViewportOf(kObject, kAccess) +
+                           ViewportOf(kOtherObject, kAccess));
+  EXPECT_TRUE(
+      ReportedWarning(reading.diag.Diagnostics(), kNotActedOn, 2, "34.5.32"));
+  EXPECT_TRUE(
+      ReportedWarning(reading.diag.Diagnostics(), kNotActedOn, 3, "34.5.32"));
+}
+
+// An expression standing in no envelope is reported under §34.5.32.2 and stops
+// there, the object it named being contained in nothing. So the two reports
+// are alternatives rather than a pair: a text told its viewport describes no
+// envelope is not also told what would have been granted had it described one.
+TEST(ProtectViewportDescription, AnExpressionInNoEnvelopeIsNotAnsweredTwice) {
+  ReadingViewports reading(ViewportOf(kObject, kAccess));
+  EXPECT_FALSE(
+      ReportedWarning(reading.diag.Diagnostics(), kNotActedOn, 1, "34.5.32"));
 }
 
 }  // namespace

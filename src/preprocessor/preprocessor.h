@@ -274,6 +274,11 @@ class Preprocessor {
   // envelope and the access asked for it, so a viewport is gathered where an
   // envelope is open to hold it, and the two rules the subclause states about
   // where one may stand are reported here.
+  //
+  // A viewport that states both and stands where it may is reported as well.
+  // §34.5.32.2 leaves the access value an implementation-specific relaxation
+  // of protection, and this tool applies no protection for it to relax, so
+  // the expression is answered with a warning rather than acted on.
   void ApplyViewport(const PragmaKeywordExpression& expr, SourceLoc loc);
   // Finishes the run of pragma expressions gathered for the block a decryption
   // envelope carries. §34.5.4.2 has the expression closing such an envelope
@@ -436,6 +441,12 @@ class Preprocessor {
   // subclause has a viewport describe objects within the current protected
   // envelope, so what one describes goes away with the envelope it was written
   // in and is not offered to the next.
+  //
+  // What they were described for is not done for them. Permitting access to
+  // one object rather than another needs the objects a decryption envelope
+  // seals to be sealed from a reader in the first place, and nothing here
+  // seals them, so this reads back what a text described and not what any
+  // reader of the design is then allowed. ApplyViewport reports that.
   const std::vector<ProtectViewport>& ProtectViewports() const {
     return protect_viewports_;
   }
