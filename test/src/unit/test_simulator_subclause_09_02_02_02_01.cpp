@@ -463,4 +463,108 @@ TEST(AlwaysCombSensitivitySim, ActionBlockFunctionCallStaysOutOfSensitivity) {
   EXPECT_EQ(y->value.ToUint64(), 13u);
 }
 
+// §9.2.2.2.1 puts in the implicit sensitivity list every net or variable
+// identifier "that is read within the block", and A.2.4 gives a
+// variable_decl_assignment an initializer, which is where `a` and `b` are read
+// here and nowhere else. None of the clause's three exceptions removes them:
+// neither is declared within the block, neither is written within it, and an
+// initializer is not a timing control expression. So the change to `a` at time
+// 1 re-evaluates the block: `y` is 13 after the time-zero evaluation and 23
+// after the second one, and a block that never woke leaves 13 behind.
+TEST(AlwaysCombSensitivitySim, BlockLocalInitializerReadRetriggersProcess) {
+  SimFixture f;
+  auto* y = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a = 8'd10;\n"
+      "  logic [7:0] b = 8'd3;\n"
+      "  logic [7:0] y;\n"
+      "  always_comb begin\n"
+      "    logic [7:0] tmp = a + b;\n"
+      "    y = tmp;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 a = 8'd20;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 23u);
+}
+
+// §9.2.2.2.1 counts every net or variable read within the block, and §18.16
+// makes a randcase weight an expression the statement evaluates: "The randcase
+// weights can be arbitrary expressions, not just constants". `w` is read in the
+// two weights and nowhere else, and no exception of §9.2.2.2.1 removes it.
+//
+// The weights are written so that `w` alone decides which branch runs, which is
+// what makes a failure attributable. They sum to 8 whatever `w` holds, so
+// §18.16's "all weights are zero" case never arises and a branch is selected on
+// every execution; and §18.16 never selects a zero-weight branch, so at
+// `w == 8'd8` the second weight is zero and the first branch runs, while at
+// `w == 8'd0` the first weight is zero and the second runs. The random draw
+// therefore changes nothing. `y` is 21 after the time-zero evaluation, and 35
+// only if the change to `w` at time 1 re-evaluated the block. `w` is the only
+// name the block reads -- `y` is written within the block, which exception (b)
+// removes -- so no other name can wake the process and a run that never reads
+// the weight leaves 21.
+TEST(AlwaysCombSensitivitySim, RandcaseWeightReadRetriggersProcess) {
+  SimFixture f;
+  auto* y = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] w = 8'd8;\n"
+      "  logic [7:0] y;\n"
+      "  always_comb begin\n"
+      "    randcase\n"
+      "      w : y = 8'd21;\n"
+      "      (8'd8 - w) : y = 8'd35;\n"
+      "    endcase\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 w = 8'd0;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 35u);
+}
+
+// §9.2.2.2.1 counts a read "within any function called within the block" and
+// puts no condition on where in the block the call stands. `a` is read only in
+// `plus_a`, and `plus_a` is called only from the initializer of a block-local
+// declaration, so `a` reaches the implicit sensitivity list only through the
+// walk that collects the names of called functions. That is a separate walk
+// from the one
+// AlwaysCombSensitivitySim.BlockLocalInitializerReadRetriggersProcess above
+// pins, and it fails separately: the call is passed the literal 8'd5, so the
+// initializer's own reads contribute nothing.
+//
+// `y` is 17 after the time-zero evaluation and 41 after the change to `a` at
+// time 1. The contrast is with
+// AlwaysCombSensitivitySim.FunctionCallBodyReadRetriggers above, where the same
+// shape of function is called from an assignment's right-hand side.
+TEST(AlwaysCombSensitivitySim, InitializerFunctionCallReadRetriggersProcess) {
+  SimFixture f;
+  auto* y = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a = 8'd12;\n"
+      "  logic [7:0] y;\n"
+      "  function automatic logic [7:0] plus_a(input logic [7:0] x);\n"
+      "    return x + a;\n"
+      "  endfunction\n"
+      "  always_comb begin\n"
+      "    logic [7:0] tmp = plus_a(8'd5);\n"
+      "    y = tmp;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 a = 8'd36;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 41u);
+}
+
 }  // namespace

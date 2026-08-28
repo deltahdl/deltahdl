@@ -909,4 +909,68 @@ TEST(AlwaysCombSensitivityCollection, RandsequenceWeightCodeReadCollected) {
   EXPECT_TRUE(ReadSignalsContain(stmt, "e"));
 }
 
+// §9.2.2.2.1 counts every net or variable read within the block, and A.2.4
+// gives a variable_decl_assignment an initializer the parser keeps in
+// Stmt::var_init. `a` and `b` are read there and nowhere else: neither is
+// declared in the block, neither is written in it, and an initializer is not a
+// timing control expression, so none of the three exceptions removes them.
+TEST(AlwaysCombSensitivityCollection, VarInitReadsCollected) {
+  Arena arena;
+  auto* decl = arena.Create<Stmt>();
+  decl->kind = StmtKind::kVarDecl;
+  decl->var_name = "t";
+  decl->var_init = MakeBinary(arena, TokenKind::kPlus, SensId(arena, "a"),
+                              SensId(arena, "b"));
+  auto* block = arena.Create<Stmt>();
+  block->kind = StmtKind::kBlock;
+  block->stmts.push_back(decl);
+  block->stmts.push_back(MakeAssign(arena, "y", SensId(arena, "t")));
+
+  EXPECT_TRUE(ReadSignalsContain(block, "a"));
+  EXPECT_TRUE(ReadSignalsContain(block, "b"));
+}
+
+// §18.16: "The randcase weights can be arbitrary expressions, not just
+// constants", each of which the statement evaluates when it runs, so a variable
+// named in a weight is read within the block and no exception of §9.2.2.2.1
+// removes it. AlwaysCombSensitivityCollection.RandcaseItemStmtReadCollected
+// above covers the item's statement, the other member of a
+// Stmt::randcase_items entry. The item's assignment here takes a literal so
+// that only the weight can supply `w`.
+TEST(AlwaysCombSensitivityCollection, RandcaseWeightReadCollected) {
+  Arena arena;
+  auto* stmt = arena.Create<Stmt>();
+  stmt->kind = StmtKind::kRandcase;
+  stmt->randcase_items.emplace_back(
+      SensId(arena, "w"), MakeAssign(arena, "y", SensIntLit(arena, 1)));
+
+  EXPECT_TRUE(ReadSignalsContain(stmt, "w"));
+}
+
+// §9.2.2.2.1 counts a read "within any function called within the block" and
+// puts no condition on where in the block the call stands. The only call here
+// is in the initializer of a block-local declaration, and it is passed a
+// literal, so `a` reaches the list only if CollectCallNamesFromStmt reads
+// Stmt::var_init. That is a different walk from the one the two cases above
+// pin, and it fails separately.
+TEST(AlwaysCombSensitivityInference, VarInitFunctionCallReadInSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, result;\n"
+      "  function automatic logic [7:0] read_a(input logic [7:0] x);\n"
+      "    return x + a;\n"
+      "  endfunction\n"
+      "  always_comb begin\n"
+      "    logic [7:0] tv = read_a(8'd0);\n"
+      "    result = tv;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  ExpectSensitivityContains(design->top_modules[0]->processes[0], {"a"});
+}
+
 }  // namespace

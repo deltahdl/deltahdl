@@ -98,7 +98,10 @@ bool IsAssertionActionBlock(const Stmt* owner, const Stmt* sub) {
 // Stmt::cycle_delay, Stmt::events, Stmt::repeat_event_count and
 // Stmt::wait_order_events along with the rest, giving the visitor no way to
 // tell a timing control expression from an ordinary one; a wait statement's
-// condition is skipped here for the same reason.
+// condition is skipped here for the same reason. The positions read are
+// Stmt::condition, Stmt::rhs, Stmt::expr, Stmt::for_cond, Stmt::assert_expr,
+// Stmt::var_init, the weight of each Stmt::randcase_items entry and the
+// patterns of each Stmt::case_items entry.
 void CollectStmtReads(const Stmt* stmt, std::unordered_set<std::string>& out) {
   if (!stmt) return;
   if (stmt->kind == StmtKind::kBlockingAssign ||
@@ -112,6 +115,20 @@ void CollectStmtReads(const Stmt* stmt, std::unordered_set<std::string>& out) {
   CollectExprReads(stmt->expr, out);
   CollectExprReads(stmt->for_cond, out);
   CollectExprReads(stmt->assert_expr, out);
+  // A.2.4 gives a variable_decl_assignment an initializer, which the parser
+  // keeps in Stmt::var_init. It is an ordinary expression and not a timing
+  // control, so exception (c) leaves what it reads in the list, and exception
+  // (a) removes the name being declared rather than the names its initializer
+  // reads.
+  CollectExprReads(stmt->var_init, out);
+  // §18.16 makes a randcase weight an expression the statement evaluates:
+  // "The randcase weights can be arbitrary expressions, not just constants",
+  // and its example weighs branches by `a + b` over two byte variables, each
+  // weight expression being "evaluated at most once" per execution. A variable
+  // named there is therefore read within the block, and no exception of
+  // §9.2.2.2.1 removes it. That is the same answer WalkStmtCaseIdents in
+  // elaborator_scope_rules.cpp gives the position for §26.3.
+  for (const auto& rc : stmt->randcase_items) CollectExprReads(rc.first, out);
   // The case-item bodies are statements the descent below reaches; the patterns
   // are expressions it does not, so they are read here.
   for (const auto& ci : stmt->case_items) {
@@ -212,6 +229,13 @@ static void CollectCallNamesFromStmt(
   CollectCallNamesFromExpr(stmt->expr, out);
   CollectCallNamesFromExpr(stmt->for_cond, out);
   CollectCallNamesFromExpr(stmt->assert_expr, out);
+  // Stmt::var_init and a randcase weight are expressions the block evaluates,
+  // for the reasons CollectStmtReads above gives, so a function called from
+  // either is called within the block and contributes its own reads.
+  CollectCallNamesFromExpr(stmt->var_init, out);
+  for (const auto& rc : stmt->randcase_items) {
+    CollectCallNamesFromExpr(rc.first, out);
+  }
   ForEachChildStmt(stmt, [stmt, &out](Stmt* const& sub) {
     if (IsAssertionActionBlock(stmt, sub)) return;
     CollectCallNamesFromStmt(sub, out);
