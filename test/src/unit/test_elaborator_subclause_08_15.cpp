@@ -511,4 +511,15 @@ TEST(SuperElaboration, SuperValueParamInARandsequenceWeightCodeBlockNames8_15) {
                             6, "8.15"));
 }
 
+// There is no case here for a for header, and that is a fact about A.6.8
+// rather than a gap. CheckStmtConstantContexts in
+// src/elaborator/elaborator_validate_class_members.cpp reads two constant
+// contexts, a static variable's initializer and an unpacked dimension, and a
+// for header can hold neither. A.6.8 writes for_variable_declaration as
+// `[ var ] data_type variable_identifier = expression { , variable_identifier
+// = expression }`, which admits no unpacked dimension and no `static`
+// lifetime, and it admits in a for_step only an operator_assignment, an
+// inc_or_dec_expression or a call. So `for (int a[super.P] = 0; ...)` is not
+// source, and a case written over one would assert about a parse error.
+
 }  // namespace

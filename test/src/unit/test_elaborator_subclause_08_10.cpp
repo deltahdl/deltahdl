@@ -565,4 +565,54 @@ TEST(StaticMethodElaboration,
              "endmodule\n"));
 }
 
+// §12.7.1: "The loop variables declared in the for loop header are local to
+// the loop", so `i` in the body below is the header's own variable and not the
+// class property `i`. §8.10 therefore has nothing to report, and the source is
+// as ordinary a loop as SystemVerilog has. The property is declared for the
+// case to mean anything: without it §8.10 is silent whatever the collection
+// does, because CollectNonStaticMemberNames returns an empty set and
+// ValidateOneClassStaticMethods stops before it looks at any statement.
+TEST(StaticMethodElaboration, ForHeaderControlVariableShadowsTheProperty) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  int i;\n"
+             "  static function void f();\n"
+             "    int x;\n"
+             "    for (int i = 0; i < 2; i = i + 1) x = i;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+// The same loop with no type in the header. A.6.8 makes that a
+// list_of_variable_assignments rather than a for_variable_declaration, so
+// §12.7.1 declares nothing and `i` is the class property throughout. §8.10
+// bars a static method from reaching it, and the report is made three times
+// over -- the initialization, the condition and the step all name it -- which
+// is why the method is reported once, at its own declaration.
+//
+// This case is what keeps the one above from being answered by collecting
+// every name a for header mentions: such a fix passes that test and fails this
+// one.
+TEST(StaticMethodElaboration, UntypedForHeaderVariableIsStillTheProperty) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int i;\n"
+      "  static function void f();\n"
+      "    int x;\n"
+      "    for (i = 0; i < 2; i = i + 1) x = i;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "static method shall not access non-static members",
+                            3, "8.10"));
+}
+
 }  // namespace

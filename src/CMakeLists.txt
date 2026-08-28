@@ -295,6 +295,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_queries_dims.cpp
     elaborator/elaborator_validate_specify.cpp
     elaborator/elaborator_validate_specify_limits.cpp
+    elaborator/elaborator_validate_static_methods.cpp
     elaborator/elaborator_validate_subroutine.cpp
     elaborator/elaborator_validate_subroutine_args.cpp
     elaborator/queue_dim.cpp
