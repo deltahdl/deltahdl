@@ -2,11 +2,11 @@
 
 // Internal declarations shared between the translation units of the elaborator.
 // Most were split out of elaborator_validate.cpp and are used by the
-// elaborator_validate*.cpp files alone; ForEachChildStmt below is used by any
-// elaborator translation unit that walks a statement tree. These helpers are
-// file-local in spirit; the header exists only so that one translation unit can
-// define a helper that another references, keeping a single definition of each
-// symbol.
+// elaborator_validate*.cpp files alone; ForEachChildStmt and AnyExprChild below
+// are used by any elaborator translation unit that walks a statement or an
+// expression tree. These helpers are file-local in spirit; the header exists
+// only so that one translation unit can define a helper that another
+// references, keeping a single definition of each symbol.
 
 #include <cstdint>
 #include <optional>
@@ -210,6 +210,55 @@ void ForEachChildExpr(S* s, Visit visit) {
   }
   for (auto& d : s->var_unpacked_dims) visit(d);
   ForEachRandsequenceExpr(s, visit);
+}
+
+// Whether `fn` holds for any child expression of `e`. Expr in
+// src/parser/ast_expr.h carries thirteen links to other expressions, and this
+// is the one place they are enumerated: a walk that names some of them answers
+// a question about part of the tree while reading as though it answered it
+// about all of it. ExprContainsIdent in elaborator_validate.cpp followed lhs
+// and rhs alone, which is what made §6.20.5's two specparam checks accept a
+// specparam reached through a call argument, a conditional, a concatenation, a
+// replication count or an index. The three §11.5.1 walks in that same file
+// followed lhs, rhs, base and index alone, which is what made a select of a
+// real variable, a real parameter or a scalar legal in every one of the other
+// nine positions.
+//
+// Extend this when Expr gains a child link. What it leaves out on purpose is
+// everything that names something rather than holding an expression: `callee`
+// and `scope_prefix` name a subroutine and a package, `arg_names` and
+// `with_restrict_ids` are identifier lists, and `inline_constraint` is a
+// ClassMember.
+template <typename Fn>
+bool AnyExprChild(const Expr* e, Fn&& fn) {
+  for (const Expr* child :
+       {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr, e->base,
+        e->index, e->index_end, e->with_expr, e->repeat_count}) {
+    if (fn(child)) return true;
+  }
+  for (const Expr* child : e->args) {
+    if (fn(child)) return true;
+  }
+  for (const Expr* child : e->elements) {
+    if (fn(child)) return true;
+  }
+  for (const Expr* child : e->pattern_keys) {
+    if (fn(child)) return true;
+  }
+  return false;
+}
+
+// Runs `fn` over every child expression of `e`, for what it does rather than
+// for an answer. It enumerates nothing itself: it asks AnyExprChild a question
+// no child answers, so a walk written to report on a subtree reads the same
+// list of children as a walk written to search one, and the two cannot come to
+// disagree about what a child is.
+template <typename Fn>
+void ForEachExprChild(const Expr* e, Fn&& fn) {
+  AnyExprChild(e, [&fn](const Expr* child) {
+    fn(child);
+    return false;
+  });
 }
 
 // Parses the size prefix of an integer literal's text (the digits before the

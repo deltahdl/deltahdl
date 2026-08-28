@@ -1,3 +1,13 @@
+// §9.2.2.2 "Combinational logic always_comb procedure": the latch warning, the
+// implicit sensitivity, the timing controls the clause admits, the simulation
+// of an always_comb procedure, and the multiple-driver rule where the call that
+// reaches the second driver is written where a call is usually written -- a
+// right-hand side, a condition, an expression statement.
+//
+// The cases where that call is written somewhere else are in
+// test_elaborator_subclause_09_02_02_02b.cpp, which the 1000-line cap in
+// .github/workflows/deltahdl.yml separated this file from.
+
 #include <string>
 
 #include "fixture_elaborator.h"
@@ -751,99 +761,6 @@ TEST(AlwaysCombLatchWarning, CompleteIfElseAssigningDifferentOutputsWarns) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   EXPECT_GE(f.diag.WarningCount(), 1u);
-}
-
-// §9.2.2.2 says of the variables an always_comb assigns that they "shall not be
-// assigned by any other process", and that this "includes variables assigned
-// within functions called by the procedure". CollectCallNamesStmt in
-// src/elaborator/elaborator_process.cpp is what finds those calls, and
-// CollectFuncLhsPrefixes opens the named functions and adds what they assign to
-// the procedure's own targets. CollectCallNamesStmt had written out nine of the
-// thirteen child-statement links Stmt declares, so a call written in one of the
-// other four was never seen, the function was never opened, and every variable
-// it assigns stayed out of the procedure's set. The five cases below cover one
-// newly reached position each; before the walk took its list from
-// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h, each of
-// these sources elaborated clean with `y` assigned by an always_comb and by an
-// initial procedure at once.
-//
-// The call is the only route by which `y` reaches the always_comb's target set:
-// `stmt` assigns `z` and never `y`, so the assignment-target walk over the same
-// body cannot account for the report.
-//
-// The report stands at the always_comb, which is line 7 of every source built
-// here whatever `stmt` runs to, and the line is read back out of the source
-// rather than counted so that it stays right if the preamble is edited.
-void ExpectFunctionTargetDrivenTwice(const std::string& stmt) {
-  ElabFixture f;
-  std::string src =
-      "module m;\n"
-      "  logic a, y, z, ok;\n"
-      "  function automatic logic f();\n"
-      "    y = a;\n"
-      "    return a;\n"
-      "  endfunction\n"
-      "  always_comb\n"
-      "    " +
-      stmt +
-      "\n"
-      "  initial y = a;\n"
-      "endmodule\n";
-  ElaborateSrc(src, f);
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "variable 'y' driven by always_comb and another process",
-                    LineHolding(src, "always_comb"), "9.2.2.2"));
-}
-
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
-// next cover one arm each. §9.2.2.2 puts no condition on when the call runs, so
-// the arm the assertion would take is not the question.
-TEST(AlwaysCombMultiDriver, FunctionCalledFromAnAssertionPassStmtIsADriver) {
-  ExpectFunctionTargetDrivenTwice("assert (ok) z = f();");
-}
-
-TEST(AlwaysCombMultiDriver, FunctionCalledFromAnAssertionFailStmtIsADriver) {
-  ExpectFunctionTargetDrivenTwice("assert (ok) else z = f();");
-}
-
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
-// statement the parser keeps in the second member of a Stmt::randcase_items
-// entry. The weighted draw picks an item while the design runs; the
-// single-driver rule is decided before it does, so a call in an item counts
-// whether the item would be selected or not.
-TEST(AlwaysCombMultiDriver, FunctionCalledFromARandcaseItemIsADriver) {
-  ExpectFunctionTargetDrivenTwice("randcase 1: z = f(); endcase");
-}
-
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements. They are kept in RsProd::code_stmts, reached through
-// Stmt::rs_productions and through no other member of Stmt.
-TEST(AlwaysCombMultiDriver, FunctionCalledFromARandsequenceCodeBlockIsADriver) {
-  ExpectFunctionTargetDrivenTwice(
-      "begin\n"
-      "      randsequence(main)\n"
-      "        main : { z = f(); };\n"
-      "      endsequence\n"
-      "    end");
-}
-
-// §18.17.1 lets a weight specification be followed by a code block of its own,
-// which the parser keeps in RsRule::weight_code. It is a second statement list
-// under Stmt::rs_productions, reached by a different member from
-// RsProd::code_stmts, so the case above does not answer for it.
-TEST(AlwaysCombMultiDriver,
-     FunctionCalledFromARandsequenceWeightCodeBlockIsADriver) {
-  ExpectFunctionTargetDrivenTwice(
-      "begin\n"
-      "      randsequence(main)\n"
-      "        main : alt := 1 { z = f(); };\n"
-      "        alt : { z = a; };\n"
-      "      endsequence\n"
-      "    end");
 }
 
 }  // namespace

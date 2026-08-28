@@ -514,47 +514,52 @@ static void CollectStmtLhsPrefixes(const Stmt* stmt,
       stmt, [&](Stmt* const& sub) { CollectStmtLhsPrefixes(sub, out, scope); });
 }
 
+// Collects the name of every subroutine called from `expr` or from any
+// expression nested inside it. AnyExprChild in elaborator_validate_internal.h
+// states the links an Expr holds, which is why the list is not written out
+// again here. This walk named nine of the thirteen, and the four it left out
+// are positions a call is written in: `w[3:f()]` puts one in Expr::index_end,
+// `q.sum() with (f())` in Expr::with_expr, `{f(){1'b0}}` in Expr::repeat_count,
+// and `'{f(): 1}` in Expr::pattern_keys.
 static void CollectCallNamesExpr(const Expr* expr,
                                  std::unordered_set<std::string_view>& out) {
   if (!expr) return;
   if (expr->kind == ExprKind::kCall && !expr->callee.empty())
     out.insert(expr->callee);
-  CollectCallNamesExpr(expr->lhs, out);
-  CollectCallNamesExpr(expr->rhs, out);
-  CollectCallNamesExpr(expr->condition, out);
-  CollectCallNamesExpr(expr->true_expr, out);
-  CollectCallNamesExpr(expr->false_expr, out);
-  CollectCallNamesExpr(expr->base, out);
-  CollectCallNamesExpr(expr->index, out);
-  for (auto* arg : expr->args) CollectCallNamesExpr(arg, out);
-  for (auto* elem : expr->elements) CollectCallNamesExpr(elem, out);
+  ForEachExprChild(
+      expr, [&](const Expr* child) { CollectCallNamesExpr(child, out); });
 }
 
 // Collects the name of every subroutine called from `stmt` or from any
-// statement nested inside it. §9.2.2.2 counts a variable assigned inside a
-// function the procedure calls as assigned by the procedure itself, and states
-// no condition on where in the procedure the call is written, so every position
-// a statement holds a statement in is a position a call reaches the rule from.
+// statement nested inside it. §9.2.2.2 says of an always_comb procedure that
+// "The variables assigned on the left-hand side of assignments shall not be
+// assigned by any other process. This includes variables assigned within
+// functions called by the procedure but not those assigned within tasks called
+// by the procedure." It states no condition on where in the procedure the call
+// is written, so every position a statement holds an expression in is a
+// position a call reaches the rule from.
 //
 // This is a collector, so a position it does not reach costs a name rather than
 // a report. CollectFuncLhsPrefixes below takes the names gathered here, and no
 // others, as the roots of its search of the function bodies; a function called
 // only from an unreached position is therefore never opened, its assignment
 // targets never join the procedure's own, and the variables it assigns are
-// exempt from §9.2.2.2's "shall not be assigned by any other process" however
-// many other processes assign them. The same holds one level down, since the
-// closure re-enters this walk over each function body it does open.
+// exempt from that sentence however many other processes assign them. The same
+// holds one level down, since the closure re-enters this walk over each
+// function body it does open.
 //
-// ForEachChildStmt in elaborator_validate_internal.h states those positions
-// once for the whole elaborator, which is why the list is not written out again
-// here.
+// ForEachChildExpr states the positions a statement holds an expression in and
+// ForEachChildStmt the positions it holds a statement in, both in
+// elaborator_validate_internal.h, which is why neither list is written out
+// again here. This walk named four of the sixteen expression positions, and the
+// twelve it left out are positions a call is written in: `int k = f();` puts
+// one in Stmt::var_init, `w[f()] = 1;` under Stmt::lhs, `z <= #(f()) a;` in
+// Stmt::delay, `assert (f());` in Stmt::assert_expr, and a case-item pattern
+// and a randcase weight each hold one too.
 static void CollectCallNamesStmt(const Stmt* stmt,
                                  std::unordered_set<std::string_view>& out) {
   if (!stmt) return;
-  CollectCallNamesExpr(stmt->expr, out);
-  CollectCallNamesExpr(stmt->rhs, out);
-  CollectCallNamesExpr(stmt->condition, out);
-  CollectCallNamesExpr(stmt->for_cond, out);
+  ForEachChildExpr(stmt, [&](Expr* const& e) { CollectCallNamesExpr(e, out); });
   ForEachChildStmt(stmt,
                    [&](Stmt* const& sub) { CollectCallNamesStmt(sub, out); });
 }
