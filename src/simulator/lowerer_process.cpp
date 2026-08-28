@@ -1,5 +1,4 @@
 #include <string_view>
-#include <unordered_map>
 #include <utility>
 
 #include "common/arena.h"
@@ -22,7 +21,7 @@ namespace delta {
 // instance's index while everything else still resolves as usual.
 void Lowerer::InstallGenBlockConsts(const GenBlockConsts& consts, Process* p) {
   if (consts.empty()) return;
-  std::unordered_map<std::string_view, Variable*> scope;
+  Scope scope;
   for (const auto& [name, value] : consts) {
     auto* var = arena_.Create<Variable>();
     // A genvar is an integer (§27.4), so the parameter it names is 32-bit
@@ -30,7 +29,7 @@ void Lowerer::InstallGenBlockConsts(const GenBlockConsts& consts, Process* p) {
     var->value = MakeLogic4VecVal(arena_, 32, static_cast<uint64_t>(value));
     var->value.is_signed = true;
     var->is_signed = true;
-    scope[name] = var;
+    scope.vars[name] = var;
   }
   p->saved_scope_stack.push_back(std::move(scope));
 }

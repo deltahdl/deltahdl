@@ -6,16 +6,14 @@
 #include <random>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "simulator/scope.h"
 
 namespace delta {
-
-struct Variable;
 
 struct SimCoroutine {
   struct promise_type {
@@ -203,10 +201,13 @@ struct Process {
   // the context's single scope stack while this process runs; when the process
   // suspends and another runs, its scope stack is parked here and swapped back
   // in on resume by SimContext::SetCurrentProcess, so concurrent activations
-  // never see each other's locals. Kept last so adding it does not shift the
-  // offsets of the fields above.
-  std::vector<std::unordered_map<std::string_view, Variable*>>
-      saved_scope_stack;
+  // never see each other's locals. A frame carries the shape of an array a
+  // name stands for in that scope as well as the variables (see Scope in
+  // simulator/scope.h), so what §18.17 declares inside a randsequence is
+  // parked with the rest and is not visible to whichever process runs while
+  // this one is suspended. Kept last so adding it does not shift the offsets
+  // of the fields above.
+  std::vector<Scope> saved_scope_stack;
 
   ~Process() {
     if (coro) coro.destroy();

@@ -519,4 +519,119 @@ TEST(RandseqValuePassingSim, StringReturnLongerThanFourCharactersSurvives) {
   EXPECT_EQ(len->value.ToUint64(), 9u);
 }
 
+// §18.17: "The randsequence statement creates an automatic scope." What
+// §18.17.7 implicitly declares inside a rule is declared in that scope, so
+// nothing it declared can still be read once the statement has ended. Here the
+// rule names the value-returning production 'a' twice, which §18.17.7 declares
+// as `int a[1:2]` for the rule's code block, and the module declares a
+// variable of its own named 'a'. After the randsequence, `a[1]` is a bit-select
+// of that module variable per §11.5.1 and reads bit 1 of 8'b1010_1010, which
+// is 1. A shape recorded under the bare name 'a' and left standing reads the
+// same expression as element 1 of an array whose elements are gone, which is x
+// and so 0. The read has to come after the randsequence: one taken before it
+// reads the module variable whether the shape leaks or not, and so cannot
+// fail.
+TEST(RandseqValuePassingSim, ImplicitArrayShapeDoesNotOutliveTheStatement) {
+  SimFixture f;
+  auto [in_rule, after] =
+      RunModuleTwoVars(f,
+                       "module t;\n"
+                       "  logic [7:0] a;\n"
+                       "  int n;\n"
+                       "  int in_rule;\n"
+                       "  int after;\n"
+                       "  initial begin\n"
+                       "    a = 8'b1010_1010;\n"
+                       "    n = 0; in_rule = 0; after = 0;\n"
+                       "    randsequence(main)\n"
+                       "      void main : a a { in_rule = a[2]; } ;\n"
+                       "      int a : { n = n + 1; return n; } ;\n"
+                       "    endsequence\n"
+                       "    after = a[1];\n"
+                       "  end\n"
+                       "endmodule\n",
+                       "in_rule", "after");
+  // Inside the rule 'a' is the implicit array, so a[2] is its second element;
+  // after the statement 'a' is the module variable, so a[1] is its bit 1.
+  EXPECT_EQ(in_rule, 2u);
+  EXPECT_EQ(after, 1u);
+}
+
+// §18.17 gives each randsequence statement an automatic scope of its own, so
+// what one statement implicitly declared is gone before the next one runs.
+// §18.17.7: "If a production appears only once in a rule, the type of the
+// implicit variable is the return type of the production" -- a scalar. The
+// first statement's rule names 'p' twice and so declares `int p[1:2]`; the
+// second statement's rule names 'p' once and so declares the scalar `int p`,
+// whose `p[1]` is a bit-select per §11.5.1 and reads bit 1 of 6, which is 1. A
+// shape left standing by the first statement reads the same expression as
+// element 1 of an array whose elements are gone, which is x and so 0. Naming
+// 'p' once in the second statement is what lets the leak show: a rule naming it
+// more than once records a shape of its own over the stale one, so the order
+// that puts the count of one last is the only one that can fail.
+TEST(RandseqValuePassingSim,
+     ImplicitArrayShapeDoesNotReachTheNextRandsequence) {
+  SimFixture f;
+  auto [total, sel] = RunModuleTwoVars(
+      f,
+      "module t;\n"
+      "  int total;\n"
+      "  int sel;\n"
+      "  initial begin\n"
+      "    total = 0; sel = 0;\n"
+      "    randsequence(main)\n"
+      "      void main : p(20) p(30) { total = p[1] + p[2]; } ;\n"
+      "      int p ( int k ) : { return k; } ;\n"
+      "    endsequence\n"
+      "    randsequence(main)\n"
+      "      void main : p(6) { sel = p[1]; } ;\n"
+      "      int p ( int k ) : { return k; } ;\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      "total", "sel");
+  // 20 and 30 are the first statement's two elements; neither is 1, so a read
+  // that reached them instead of bit 1 of the scalar is still distinguishable.
+  EXPECT_EQ(total, 50u);
+  EXPECT_EQ(sel, 1u);
+}
+
+// §18.17.7's Example 2 gives one production ('C') rules that name it once,
+// twice and three times over, so the implicit variable's shape belongs to the
+// rule that named the production and not to the production itself. §18.17 makes
+// every activation's scope automatic and says "a recursive production will
+// cause looping", so an inner activation's declarations are gone once it
+// returns. Here 'main' names 'p' twice, declaring `int p[1:2]` for main's code
+// block, while 'p' names itself three times, declaring `int p[1:3]` for its
+// own. After the inner activations have returned, %p prints main's array as an
+// assignment pattern of its elements per §21.2.1.6, which is two of them. A
+// shape recorded under the bare name 'p' and left standing by the inner
+// activations prints three, the third an element main never declared and
+// nothing ever wrote. One activation deep cannot tell the two apart, since the
+// only shape recorded is then the one being read.
+TEST(RandseqValuePassingSim, RecursiveActivationLeavesTheOuterArrayShape) {
+  SimFixture f;
+  auto printed = RunCapture(
+      "module t;\n"
+      "  int total;\n"
+      "  initial begin\n"
+      "    total = 0;\n"
+      "    randsequence(main)\n"
+      "      void main : p(1) p(2)\n"
+      "                  { total = p[1] + p[2]; $display(\"%p\", p); } ;\n"
+      "      int p ( int d ) : if (d) p(0) if (d) p(0) if (d) p(0)\n"
+      "                        { return d + 40; } ;\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(printed, "'{41, 42}\n");
+  // The elements themselves are read back too, so a run that printed the right
+  // pattern for the wrong reason -- because no element was generated at all --
+  // is still caught.
+  auto* sum = f.ctx.FindVariable("total");
+  ASSERT_NE(sum, nullptr);
+  EXPECT_EQ(sum->value.ToUint64(), 83u);
+}
+
 }  // namespace

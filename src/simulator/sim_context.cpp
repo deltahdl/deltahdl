@@ -6,6 +6,7 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -408,9 +409,7 @@ void SimContext::PopScope() {
   if (!scope_stack_.empty()) scope_stack_.pop_back();
 }
 
-std::vector<std::unordered_map<std::string_view, Variable*>>
-SimContext::SwapScopeStack(
-    std::vector<std::unordered_map<std::string_view, Variable*>> new_stack) {
+std::vector<Scope> SimContext::SwapScopeStack(std::vector<Scope> new_stack) {
   auto old = std::move(scope_stack_);
   scope_stack_ = std::move(new_stack);
   return old;
@@ -424,20 +423,20 @@ std::string_view SimContext::StaticFrameKey(std::string_view name) {
 }
 
 void SimContext::PushStaticScope(std::string_view func_name) {
-  scope_stack_.push_back(static_frames_[StaticFrameKey(func_name)]);
+  scope_stack_.push_back(Scope{static_frames_[StaticFrameKey(func_name)], {}});
 }
 
 void SimContext::PopStaticScope(std::string_view func_name) {
   if (!scope_stack_.empty()) {
-    static_frames_[StaticFrameKey(func_name)] = scope_stack_.back();
+    static_frames_[StaticFrameKey(func_name)] = scope_stack_.back().vars;
     scope_stack_.pop_back();
   }
 }
 
 Variable* SimContext::FindLocalVariable(std::string_view name) {
   for (auto it = scope_stack_.rbegin(); it != scope_stack_.rend(); ++it) {
-    auto found = it->find(name);
-    if (found != it->end()) return found->second;
+    auto found = it->vars.find(name);
+    if (found != it->vars.end()) return found->second;
   }
   return nullptr;
 }
@@ -447,7 +446,7 @@ Variable* SimContext::CreateLocalVariable(std::string_view name,
   auto* var = arena_.Create<Variable>();
   var->value = MakeLogic4VecVal(arena_, width, 0);
   if (!scope_stack_.empty()) {
-    scope_stack_.back()[name] = var;
+    scope_stack_.back().vars[name] = var;
   }
   return var;
 }
@@ -468,7 +467,7 @@ void SimContext::SaveStaticFuncVar(std::string_view func_name,
 
 void SimContext::AliasLocalVariable(std::string_view name, Variable* var) {
   if (!scope_stack_.empty()) {
-    scope_stack_.back()[name] = var;
+    scope_stack_.back().vars[name] = var;
   }
 }
 
@@ -907,12 +906,32 @@ void SimContext::RegisterArray(std::string_view name, const ArrayInfo& info) {
   array_infos_[name] = info;
 }
 
-ArrayInfo* SimContext::FindArrayInfo(std::string_view name) {
-  auto it = array_infos_.find(name);
-  return (it != array_infos_.end()) ? &it->second : nullptr;
+// §18.17: "The randsequence statement creates an automatic scope", so the
+// array §18.17.7 declares within one of its rules is described by the scope
+// and not by the design. The shape is copied into the arena because the frame
+// holds a pointer, and the arena outlives every scope: what ends with the
+// scope is the name standing for the array, which is the whole of the
+// declaration.
+void SimContext::RegisterLocalArray(std::string_view name,
+                                    const ArrayInfo& info) {
+  scope_stack_.back().arrays[name] = arena_.Create<ArrayInfo>(info);
 }
 
+ArrayInfo* SimContext::FindArrayInfo(std::string_view name) {
+  return const_cast<ArrayInfo*>(std::as_const(*this).FindArrayInfo(name));
+}
+
+// §23.9: "If it is declared locally, then the local item shall be used; if not,
+// the search shall continue upward". An array a scope declares is therefore
+// what its name reads while that scope is on the stack, and a like-named array
+// RegisterArray recorded for the whole run is what the name reads again once
+// the scope is gone.
 const ArrayInfo* SimContext::FindArrayInfo(std::string_view name) const {
+  for (auto frame = scope_stack_.rbegin(); frame != scope_stack_.rend();
+       ++frame) {
+    auto local = frame->arrays.find(name);
+    if (local != frame->arrays.end()) return local->second;
+  }
   auto it = array_infos_.find(name);
   return (it != array_infos_.end()) ? &it->second : nullptr;
 }

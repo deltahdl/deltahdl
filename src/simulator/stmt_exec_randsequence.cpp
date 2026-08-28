@@ -482,7 +482,16 @@ static RuleValueCapture BuildRuleValueCapture(const Stmt* stmt,
     // 32-bit carrier.
     info.elem_type_kind = child->return_type.kind;
     info.elem_width = w ? w : (ProductionReturnsString(child) ? 0 : 32);
-    ctx.RegisterArray(name, info);
+    // §18.17: "The randsequence statement creates an automatic scope", and
+    // §18.17.7 declares this array "within a rule", so the name stands for the
+    // array only while that scope is on the stack. RegisterLocalArray puts the
+    // shape in the same scope as the implicit variables
+    // StoreRuleProductionValue creates, so PopScope takes both away together: a
+    // variable of the design that shares the name is read as itself again once
+    // the statement ends, and each activation of the rule sees its own shape.
+    // §18.17.7's Example 2 needs the last of those, giving one production three
+    // rules that name C once, twice and three times.
+    ctx.RegisterLocalArray(name, info);
   }
   return cap;
 }

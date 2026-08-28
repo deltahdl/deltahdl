@@ -82,8 +82,7 @@ void ScanVarForLiveHandles(
 // global variable map, every local scope and every static frame.
 void CollectRootLiveHandles(
     const std::unordered_map<std::string_view, Variable*>& variables,
-    const std::vector<std::unordered_map<std::string_view, Variable*>>&
-        scope_stack,
+    const std::vector<Scope>& scope_stack,
     const std::unordered_map<std::string_view,
                              std::unordered_map<std::string_view, Variable*>>&
         static_frames,
@@ -94,7 +93,7 @@ void CollectRootLiveHandles(
     ScanVarForLiveHandles(name, var, var_class_types, live);
   }
   for (const auto& scope : scope_stack) {
-    for (const auto& [name, var] : scope) {
+    for (const auto& [name, var] : scope.vars) {
       ScanVarForLiveHandles(name, var, var_class_types, live);
     }
   }

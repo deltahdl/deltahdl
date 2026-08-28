@@ -24,6 +24,7 @@
 #include "simulator/coverage_control.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
+#include "simulator/scope.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/sva_engine_sampling.h"
 #include "simulator/sync_objects.h"
@@ -228,8 +229,7 @@ class SimContext {
   Logic4Vec* SetRsReturnSlot(Logic4Vec* slot);
   Logic4Vec* RsReturnSlot() const { return rs_return_slot_; }
 
-  std::vector<std::unordered_map<std::string_view, Variable*>> SwapScopeStack(
-      std::vector<std::unordered_map<std::string_view, Variable*>> new_stack);
+  std::vector<Scope> SwapScopeStack(std::vector<Scope> new_stack);
   void PushStaticScope(std::string_view func_name);
   void PopStaticScope(std::string_view func_name);
   bool HasLocalScope() const { return !scope_stack_.empty(); }
@@ -481,8 +481,22 @@ class SimContext {
   const StructTypeInfo* GetVariableStructType(std::string_view var_name) const;
 
   // Like CreateVariable, keys on the string_view: `name` must outlive the
-  // context, so intern a run-time-built name in the arena before calling.
+  // context, so intern a run-time-built name in the arena before calling. The
+  // registration lasts for the rest of the run, which is what a declared array
+  // needs; an array a scope declares is registered with RegisterLocalArray
+  // below instead.
   void RegisterArray(std::string_view name, const ArrayInfo& info);
+
+  // Registers `name` as an array of the innermost scope, the way
+  // CreateLocalVariable creates a variable of it: PopScope takes the shape away
+  // again, and a lookup of the name reads whatever the enclosing scopes or
+  // RegisterArray registered for it once the scope is gone. §18.17 needs this
+  // for the array §18.17.7 implicitly declares within a randsequence rule,
+  // that statement creating "an automatic scope". The caller must have pushed a
+  // scope: in stmt_exec_randsequence.cpp, ExecRandsequence pushes one for the
+  // statement and ExecRsProduction another for the production, both before a
+  // rule is selected. `name` must outlive the context, as for RegisterArray.
+  void RegisterLocalArray(std::string_view name, const ArrayInfo& info);
   ArrayInfo* FindArrayInfo(std::string_view name);
   const ArrayInfo* FindArrayInfo(std::string_view name) const;
 
@@ -749,7 +763,7 @@ class SimContext {
   std::unordered_map<std::string_view, ModuleItem*> functions_;
   std::unordered_map<std::string_view, ModuleItem*> let_decls_;
   std::unordered_map<std::string_view, ModuleItem*> sequence_decls_;
-  std::vector<std::unordered_map<std::string_view, Variable*>> scope_stack_;
+  std::vector<Scope> scope_stack_;
   Logic4Vec* rs_return_slot_ = nullptr;
 
   std::unordered_map<std::string_view,
