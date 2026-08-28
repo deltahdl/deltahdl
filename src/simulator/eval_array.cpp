@@ -1,7 +1,6 @@
 #include "simulator/eval_array.h"
 
 #include <algorithm>
-#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -72,6 +71,54 @@ static void WriteElements(std::string_view var_name, const ArrayInfo& info,
     auto* v = ctx.FindVariable(name);
     if (v) v->value = MakeLogic4VecVal(arena, info.elem_width, vals[i]);
   }
+}
+
+// The identity permutation over `count` positions. Each ordering method of
+// §7.12.2 sorts, reverses or shuffles this vector instead of the values, so
+// that where every element moved is still known once the new value list has
+// been built from it.
+static std::vector<size_t> IdentityOrder(size_t count) {
+  std::vector<size_t> order(count);
+  for (size_t i = 0; i < count; ++i) order[i] = i;
+  return order;
+}
+
+// Applies a permutation to a value list: `order[i]` is the position the value
+// now at i came from, the same meaning the permutation carries into
+// ApplyDynArrayIdPermutation.
+template <typename T>
+static std::vector<T> GatherByOrder(const std::vector<T>& vals,
+                                    const std::vector<size_t>& order) {
+  std::vector<T> out(order.size());
+  for (size_t i = 0; i < order.size(); ++i) out[i] = vals[order[i]];
+  return out;
+}
+
+// §7.10.3: an argument passed by reference names the element it was taken on,
+// so it must keep naming that element after the array is reordered. A dynamic
+// array is backed by a QueueObject whose element_ids run parallel to its
+// elements, and a ref argument is recorded against the id at the index it was
+// taken at; moving an element without moving its id sends the write-back to
+// whichever element landed at that index. So every §7.12.2 ordering method
+// applies its permutation here as well as to the values. `order[i]` is the
+// index the element now at position i came from. element_ids can be shorter
+// than elements, so an entry whose source or destination index is past its end
+// is skipped rather than read or written out of range. Nothing is done for a
+// fixed-size array, whose elements are ordinary variables and carry no ids.
+static void ApplyDynArrayIdPermutation(std::string_view var_name,
+                                       const ArrayInfo& info,
+                                       const std::vector<size_t>& order,
+                                       SimContext& ctx) {
+  if (!info.is_dynamic) return;
+  auto* q = ctx.FindQueue(var_name);
+  if (!q) return;
+  auto& ids = q->element_ids;
+  std::vector<uint64_t> reordered(ids.size());
+  for (size_t i = 0; i < order.size(); ++i) {
+    if (i < reordered.size() && order[i] < ids.size())
+      reordered[i] = ids[order[i]];
+  }
+  ids = std::move(reordered);
 }
 
 std::vector<Logic4Vec> CollectVecElements(std::string_view var_name,
@@ -485,11 +532,22 @@ static void ArraySortWithExpr(const ArrayCtx& ac, const Expr* expr,
   SortKeysByValue(keys, ascending);
   std::vector<Logic4Vec> sorted = ReorderByKeys(vals, keys);
   WriteVecElements(ac.var_name, ac.info, sorted, ac.ctx);
+  // The second of each key pair is the index the element now at that position
+  // came from, which is the permutation §7.10.3 requires the element ids of a
+  // dynamic array to follow.
+  std::vector<size_t> order(keys.size());
+  for (size_t i = 0; i < keys.size(); ++i) order[i] = keys[i].second;
+  ApplyDynArrayIdPermutation(ac.var_name, ac.info, order, ac.ctx);
 }
 
 // §7.12.2: reorder a queue by the with-clause key. A queue is not registered as
 // an ArrayInfo, so it cannot share the array path above; reorder its elements
-// (and their tracking ids, kept parallel) directly by the computed key.
+// (and their tracking ids, kept parallel) directly by the computed key. The
+// permuted ids are always stored, because §7.10.3 makes a reference follow the
+// element it was taken on and a lost permutation sends its write-back to the
+// element that took that position. Each id is bounds-guarded on its own, so an
+// element_ids list that has drifted shorter than elements costs the entries it
+// no longer covers rather than the whole permutation.
 static void SortQueueByWithExpr(QueueObject* q, const Expr* expr,
                                 bool ascending, SimContext& ctx, Arena& arena) {
   auto names = ExtractIterNames(expr);
@@ -502,11 +560,11 @@ static void SortQueueByWithExpr(QueueObject* q, const Expr* expr,
   std::vector<uint64_t> new_ids(q->element_ids.size());
   for (size_t i = 0; i < keys.size(); ++i) {
     new_elems[i] = q->elements[keys[i].second];
-    if (keys[i].second < q->element_ids.size() && i < new_ids.size())
+    if (i < new_ids.size() && keys[i].second < q->element_ids.size())
       new_ids[i] = q->element_ids[keys[i].second];
   }
   q->elements = std::move(new_elems);
-  if (new_ids.size() == q->elements.size()) q->element_ids = std::move(new_ids);
+  q->element_ids = std::move(new_ids);
   ++q->generation;
 }
 
@@ -540,18 +598,30 @@ bool TryExecArrayOrderingWithClauseStmt(const Expr* expr, SimContext& ctx,
   return false;
 }
 
+// §7.12.2 sort()/rsort() order the elements by their own value. The order the
+// values take is computed over indices rather than over the values themselves,
+// so that ApplyDynArrayIdPermutation can move the element ids of a dynamic
+// array the same way and keep the §7.10.3 references pointing at their own
+// elements.
+static void ArraySortByValue(std::string_view var_name, const ArrayInfo& info,
+                             bool ascending, SimContext& ctx, Arena& arena) {
+  auto vals = CollectElements(var_name, info, ctx);
+  auto order = IdentityOrder(vals.size());
+  std::sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+    return ascending ? vals[a] < vals[b] : vals[a] > vals[b];
+  });
+  WriteElements(var_name, info, GatherByOrder(vals, order), ctx, arena);
+  ApplyDynArrayIdPermutation(var_name, info, order, ctx);
+}
+
 static void ArraySort(std::string_view var_name, const ArrayInfo& info,
                       SimContext& ctx, Arena& arena) {
-  auto vals = CollectElements(var_name, info, ctx);
-  std::sort(vals.begin(), vals.end());
-  WriteElements(var_name, info, vals, ctx, arena);
+  ArraySortByValue(var_name, info, true, ctx, arena);
 }
 
 static void ArrayRsort(std::string_view var_name, const ArrayInfo& info,
                        SimContext& ctx, Arena& arena) {
-  auto vals = CollectElements(var_name, info, ctx);
-  std::sort(vals.begin(), vals.end(), std::greater<>());
-  WriteElements(var_name, info, vals, ctx, arena);
+  ArraySortByValue(var_name, info, false, ctx, arena);
 }
 
 static void WriteVecElements(std::string_view var_name, const ArrayInfo& info,
@@ -573,22 +643,32 @@ static void WriteVecElements(std::string_view var_name, const ArrayInfo& info,
   }
 }
 
+// §7.12.2 reverse() reverses the element order. Reversing the index vector and
+// gathering through it leaves the permutation available for the element ids of
+// a dynamic array, which §7.10.3 requires to move with their elements.
 static void ArrayReverse(std::string_view var_name, const ArrayInfo& info,
                          SimContext& ctx, Arena& arena) {
   auto vals = CollectVecElements(var_name, info, ctx, arena);
-  std::reverse(vals.begin(), vals.end());
-  WriteVecElements(var_name, info, vals, ctx);
+  auto order = IdentityOrder(vals.size());
+  std::reverse(order.begin(), order.end());
+  WriteVecElements(var_name, info, GatherByOrder(vals, order), ctx);
+  ApplyDynArrayIdPermutation(var_name, info, order, ctx);
 }
 
+// §7.12.2 shuffle() randomizes the element order. The Fisher-Yates swaps are
+// applied to the index vector rather than to the values, so the draw that
+// produced the new order is also the permutation the element ids of a dynamic
+// array follow under §7.10.3.
 static void ArrayShuffle(std::string_view var_name, const ArrayInfo& info,
                          SimContext& ctx, Arena& arena) {
   auto vals = CollectElements(var_name, info, ctx);
-
-  for (size_t i = vals.size(); i > 1; --i) {
+  auto order = IdentityOrder(vals.size());
+  for (size_t i = order.size(); i > 1; --i) {
     size_t j = ctx.Urandom32() % i;
-    std::swap(vals[i - 1], vals[j]);
+    std::swap(order[i - 1], order[j]);
   }
-  WriteElements(var_name, info, vals, ctx, arena);
+  WriteElements(var_name, info, GatherByOrder(vals, order), ctx, arena);
+  ApplyDynArrayIdPermutation(var_name, info, order, ctx);
 }
 
 static bool IsOrderingMethod(std::string_view name) {

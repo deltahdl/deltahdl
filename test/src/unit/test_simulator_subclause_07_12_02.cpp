@@ -8,6 +8,7 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_queue.h"
+#include "helpers_queue_ref_method.h"
 #include "helpers_reported_error.h"
 #include "simulator/eval_array.h"
 
@@ -409,6 +410,68 @@ TEST(ArrayOrdering, ReverseWithClauseErrorNames7_12_2) {
   TryExecArrayMethodStmt(call, f.ctx, f.arena);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "does not accept a 'with' clause", 0, "7.12.2"));
+}
+
+// ---------------------------------------------------------------------------
+// §7.10.3 over the §7.12.2 ordering methods, on a dynamic array. §7.12.2 gives
+// sort(), rsort(), reverse() and shuffle() to any unpacked array, and none of
+// them removes an element. §7.10.3 therefore keeps every outstanding element
+// reference valid across one, and a valid reference stays attached to the
+// element it was taken on rather than to the index that element sat at. A
+// dynamic array is backed by the same QueueObject a queue is, and a `ref`
+// argument is recorded against the identity of the element it was taken on, so
+// an ordering method that moves the values without moving those identities
+// makes a later write through the reference land on whichever element moved
+// into the old index -- a different element from the one the reference names.
+// ---------------------------------------------------------------------------
+
+// §7.10.3 with §7.12.2: sort() removes nothing, so the reference taken on the
+// element holding 30 stays valid and follows that element to the back, where
+// sorting {30, 10, 20} puts it. The write of 99 has to land there rather than
+// at index 0, the index the reference was taken at.
+TEST(ArrayOrdering, SortLeavesDynArrayRefFollowingItsElement) {
+  SimFixture f;
+  MakeDynArray(f, "arr", {30, 10, 20});
+
+  RunQueueRefMethodThenAssign(f, "arr", "sort", {}, 0);
+
+  ExpectQueueValues(f, {10u, 20u, 99u});
+}
+
+// §7.10.3 with §7.12.2: reverse() removes nothing either, and it moves the
+// element holding 30 from the front of {30, 10, 20} to the back. The reference
+// taken on that element follows it, so the write of 99 lands at the back.
+TEST(ArrayOrdering, ReverseLeavesDynArrayRefFollowingItsElement) {
+  SimFixture f;
+  MakeDynArray(f, "arr", {30, 10, 20});
+
+  RunQueueRefMethodThenAssign(f, "arr", "reverse", {}, 0);
+
+  ExpectQueueValues(f, {20u, 10u, 99u});
+}
+
+// §7.10.3 with §7.12.2: shuffle() removes nothing, so the reference taken on
+// the element holding 30 stays valid and the write of 99 replaces that element
+// wherever the permutation put it. The permutation is not predictable, so the
+// claim is stated as what holds for every one of them: 99 is in the array once
+// and 30, the value the reference was taken on, is gone. A write that landed on
+// whichever element moved into index 0 would leave 30 behind.
+TEST(ArrayOrdering, ShuffleLeavesDynArrayRefValid) {
+  SimFixture f;
+  MakeDynArray(f, "arr", {30, 10, 20});
+
+  RunQueueRefMethodThenAssign(f, "arr", "shuffle", {}, 0);
+
+  auto* q = f.ctx.FindQueue("arr");
+  ASSERT_NE(q, nullptr);
+  ASSERT_EQ(q->elements.size(), 3u);
+  size_t wrote = 0, kept = 0;
+  for (const auto& e : q->elements) {
+    if (e.ToUint64() == 99u) ++wrote;
+    if (e.ToUint64() == 30u) ++kept;
+  }
+  EXPECT_EQ(wrote, 1u);
+  EXPECT_EQ(kept, 0u);
 }
 
 }  // namespace

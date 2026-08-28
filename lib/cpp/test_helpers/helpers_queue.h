@@ -28,6 +28,13 @@ inline void MakeDynArray(SimFixture& f, std::string_view name,
   for (auto v : vals) {
     q->elements.push_back(MakeLogic4VecVal(f.arena, 32, v));
   }
+  // A dynamic array's elements carry ids exactly as a queue's do, and the two
+  // lists are indexed together: Lowerer::LowerDynArrayInit and the `new[]` arm
+  // beside it both call AssignFreshIds, so a dynamic array a run built always
+  // has one id per element. Leaving them empty here built a shape no run
+  // produces, and a reference taken on an element of such an array was
+  // recorded against no identity at all.
+  q->AssignFreshIds();
   ArrayInfo info;
   info.is_dynamic = true;
   info.elem_width = 32;
