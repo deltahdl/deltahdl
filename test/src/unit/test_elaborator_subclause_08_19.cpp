@@ -233,4 +233,169 @@ TEST(ConstantClassPropertyElaboration, InstanceConstAssignInTaskError) {
                             "assignment to instance constant", 7, "8.19"));
 }
 
+// The seven cases below cover the child-statement links of Stmt that
+// WalkStmtsForConstClassProp in src/elaborator/elaborator_validate_classes.cpp
+// reaches for the first time now that it takes its list from ForEachChildStmt
+// in src/elaborator/elaborator_validate_internal.h. It had written out six of
+// the thirteen, so a write to a const class property standing in any of the
+// other seven was reported by nothing. §8.19 puts no condition on the statement
+// the assignment is written in, so each is the same rule the two cases above
+// state, moved into one more statement position. The report stands at the
+// offending assignment, which is the location Stmt::range.start gives.
+
+// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
+// block_item_declaration } { statement_or_null } join_keyword`, so a fork arm
+// holds an assignment like any other statement position, and §9.3.2 makes the
+// arms of a fork run concurrently, which §8.19 says nothing about.
+TEST(ConstantClassPropertyElaboration, GlobalConstAssignInForkArmError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  const int MAX = 100;\n"
+      "  task reset();\n"
+      "    fork\n"
+      "      MAX = 0;\n"
+      "    join\n"
+      "  endtask\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to global constant", 5, "8.19"));
+}
+
+// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`, so a
+// for header assigns to any variable in scope, the const class property among
+// them. The loop's control variable is declared above the loop, which leaves
+// the header's assignment as the only write in the source.
+TEST(ConstantClassPropertyElaboration,
+     GlobalConstAssignInForInitializationError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  const int MAX = 100;\n"
+      "  task reset();\n"
+      "    int i;\n"
+      "    for (MAX = 0; i < 2; i = i + 1) ;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to global constant", 5, "8.19"));
+}
+
+// A.6.8 gives `for_step_assignment ::= operator_assignment |
+// inc_or_dec_expression | function_subroutine_call`, so a for step writes a
+// variable the same way the initialization does.
+TEST(ConstantClassPropertyElaboration, GlobalConstAssignInForStepError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  const int MAX = 100;\n"
+      "  task reset();\n"
+      "    int i;\n"
+      "    for (i = 0; i < 2; MAX = 0) ;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to global constant", 5, "8.19"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm.
+// Which arm runs is decided when the design runs; §8.19 is a rule about the
+// source, so the write is illegal in either.
+TEST(ConstantClassPropertyElaboration,
+     GlobalConstAssignInAssertionPassStmtError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  const int MAX = 100;\n"
+      "  task reset();\n"
+      "    assert (1) MAX = 0;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to global constant", 4, "8.19"));
+}
+
+TEST(ConstantClassPropertyElaboration,
+     GlobalConstAssignInAssertionFailStmtError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  const int MAX = 100;\n"
+      "  task reset();\n"
+      "    assert (1) else MAX = 0;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to global constant", 4, "8.19"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
+// statement the parser keeps in the second member of a Stmt::randcase_items
+// entry. The weighted draw decides which item runs, and §8.19 holds whether
+// this one is drawn or not.
+TEST(ConstantClassPropertyElaboration, GlobalConstAssignInRandcaseItemError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  const int MAX = 100;\n"
+      "  task reset();\n"
+      "    randcase\n"
+      "      1 : MAX = 0;\n"
+      "    endcase\n"
+      "  endtask\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to global constant", 5, "8.19"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements. Parser::ParseRsCodeBlockStmts in src/parser/parser_verify.cpp
+// puts them in RsProd::code_stmts, which Stmt::rs_productions reaches and no
+// other member of Stmt does.
+TEST(ConstantClassPropertyElaboration,
+     GlobalConstAssignInRandsequenceCodeBlockError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  const int MAX = 100;\n"
+      "  task reset();\n"
+      "    randsequence(main)\n"
+      "      main : { MAX = 0; };\n"
+      "    endsequence\n"
+      "  endtask\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to global constant", 5, "8.19"));
+}
+
 }  // namespace

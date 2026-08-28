@@ -49,23 +49,31 @@ static bool ExprRefsThisOrSuper(const Expr* e) {
   return false;
 }
 
+// §8.10 makes an access "to the special this handle within the body of a static
+// method" illegal and names no statement of that body where the handle is
+// permitted, so this descends every link ForEachChildStmt in
+// elaborator_validate_internal.h names and names no link itself. It wrote out
+// six of the thirteen, so `fork this.x = 1; join` and `assert (1) else this.x =
+// 1;` in a static method each named `this` where nothing looked.
+//
+// That is the list StmtRefsNonStaticMember below already reads, and the two
+// halves of §8.10's one sentence -- the non-static member and the `this` handle
+// -- now hold over the same body rather than over two different subsets of it.
+//
+// ForEachChildStmt gives the visitor no way to stop, so the first hit is kept
+// in `found` and the recursion runs only while `found` is false.
 static bool StmtRefsThisOrSuper(const Stmt* s) {
   if (!s) return false;
   if (ExprRefsThisOrSuper(s->lhs)) return true;
   if (ExprRefsThisOrSuper(s->rhs)) return true;
   if (ExprRefsThisOrSuper(s->expr)) return true;
   if (ExprRefsThisOrSuper(s->condition)) return true;
-  for (auto* sub : s->stmts) {
-    if (StmtRefsThisOrSuper(sub)) return true;
-  }
-  if (StmtRefsThisOrSuper(s->then_branch)) return true;
-  if (StmtRefsThisOrSuper(s->else_branch)) return true;
-  if (StmtRefsThisOrSuper(s->body)) return true;
-  if (StmtRefsThisOrSuper(s->for_body)) return true;
-  for (auto& ci : s->case_items) {
-    if (StmtRefsThisOrSuper(ci.body)) return true;
-  }
-  return false;
+  bool found = false;
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    if (found) return;
+    found = StmtRefsThisOrSuper(sub);
+  });
+  return found;
 }
 
 // §12.7.1 makes a control variable declared in a for header local to the loop,

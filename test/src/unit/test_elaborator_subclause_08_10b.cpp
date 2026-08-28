@@ -17,6 +17,13 @@
 // and Stmt::condition -- and the cases for the statement links ForEachChildStmt
 // admits are in test_elaborator_subclause_08_10a.cpp, which the 1000-line cap
 // in .github/workflows/deltahdl.yml separated this file from.
+//
+// The other half of §8.10's sentence, the special `this` handle, is found by
+// StmtRefsThisOrSuper standing beside StmtRefsNonStaticMember in that same
+// source file, and it wrote out six of the thirteen statement links until
+// #3319. The cases at the end of this file are one per link that walk did not
+// read, and they stand here rather than in test_elaborator_subclause_08_10a.cpp
+// because that file is already the larger half of the split.
 
 #include <string>
 
@@ -325,6 +332,157 @@ TEST(StaticMethodExprPositions, PropertyInAnAssignmentPatternKeyIsReported) {
 
 TEST(StaticMethodExprPositions, BlockLocalInAnAssignmentPatternKeyIsAccepted) {
   ExpectBlockLocalAccepted("arr = '{i: 1};");
+}
+
+// The nine cases below are the other half of §8.10's sentence: the special
+// `this` handle, written in each statement link StmtRefsThisOrSuper in
+// src/elaborator/elaborator_validate_static_methods.cpp did not read before
+// #3319. That walk wrote out six of the thirteen links ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h names, so `this` written in a
+// fork arm, a for header, either arm of an immediate assertion, a randcase item
+// or a randsequence code block named the handle where nothing looked.
+//
+// The class property below is static, which leaves the source with the one
+// report: §8.10's other half needs a non-static member to have anything to say,
+// and CollectNonStaticMemberNames finds none here. §8.10 bars `this` in a
+// static method whatever the member it qualifies, because
+// CheckStaticMethodsForThisSuper searches the body for the handle itself.
+//
+// A static task rather than a static function, which is the method the
+// statement-link cases for the other half of the sentence are written in, in
+// test_elaborator_subclause_08_10a.cpp. §8.10 reaches a task and a function
+// alike: Elaborator::ValidateOneClassStaticMethods selects on
+// ClassMemberKind::kMethod and ModuleItem::is_static and not on which of the
+// two it is.
+std::string StaticMethodThisSrc(const std::string& stmt) {
+  return "class C;\n"
+         "  static int x;\n"
+         "  static task t();\n"
+         "    int k;\n"
+         "    " +
+         stmt +
+         "\n"
+         "  endtask\n"
+         "endclass\n"
+         "module m;\n"
+         "  C c;\n"
+         "endmodule\n";
+}
+
+// The report stands at the method's own declaration rather than at the
+// statement holding the handle, because §8.10's rule is about the method:
+// CheckStaticMethodsForThisSuper scans a static method body and reports the
+// method once.
+void ExpectThisReported(const std::string& stmt) {
+  ElabFixture f;
+  std::string src = StaticMethodThisSrc(stmt);
+  ElabOk(src, f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'this' and 'super' shall not be used in a static method",
+                    LineHolding(src, "static task"), "8.10"));
+}
+
+// A.6.3 gives `par_block ::= fork [ : block_identifier ]
+// { block_item_declaration } { statement_or_null } join_keyword`, whose
+// statements Parser::ParseBlockVarDecls in src/parser/parser_stmt_block.cpp
+// puts in Stmt::fork_stmts.
+TEST(StaticMethodThisPositions, ThisInAForkArmIsReported) {
+  ExpectThisReported(
+      "fork\n"
+      "      k = this.x;\n"
+      "    join");
+}
+
+// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`, and
+// the right-hand side of such an assignment is an ordinary expression, so it
+// may name the handle. The loop's control variable is declared above the loop,
+// which leaves the header's assignment as the only `this` in the source.
+TEST(StaticMethodThisPositions, ThisInAForInitializationIsReported) {
+  ExpectThisReported("for (k = this.x; k < 2; k = k + 1) ;");
+}
+
+// A.6.8 gives `for_step_assignment ::= operator_assignment |
+// inc_or_dec_expression | function_subroutine_call`, and an operator_assignment
+// takes the same expression on its right.
+TEST(StaticMethodThisPositions, ThisInAForStepIsReported) {
+  ExpectThisReported("for (k = 0; k < 2; k = this.x) ;");
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// which the parser keeps in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt.
+// This case and the one below it cover one arm each.
+TEST(StaticMethodThisPositions, ThisInAnAssertionPassStmtIsReported) {
+  ExpectThisReported("assert (1) k = this.x;");
+}
+
+TEST(StaticMethodThisPositions, ThisInAnAssertionFailStmtIsReported) {
+  ExpectThisReported("assert (1) else k = this.x;");
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
+// statement the parser keeps in the second member of a Stmt::randcase_items
+// entry. §8.10 is a rule about the source, so it holds whether the weighted
+// draw would select the item or not.
+TEST(StaticMethodThisPositions, ThisInARandcaseItemIsReported) {
+  ExpectThisReported(
+      "randcase\n"
+      "      1 : k = this.x;\n"
+      "    endcase");
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, which Parser::ParseRsCodeBlockStmts in src/parser/parser_verify.cpp puts
+// in RsProd::code_stmts, reached through Stmt::rs_productions and through no
+// other member of Stmt.
+TEST(StaticMethodThisPositions, ThisInARandsequenceCodeBlockIsReported) {
+  ExpectThisReported(
+      "randsequence(main)\n"
+      "      main : { k = this.x; };\n"
+      "    endsequence");
+}
+
+// A.6.12's `rs_rule ::= rs_production_list [ := weight_specification [
+// rs_code_block ] ]` puts a second code block after the weight, which the
+// parser keeps in RsRule::weight_code rather than in RsProd::code_stmts. It is
+// a second statement position under Stmt::rs_productions, so it takes its own
+// case: the production `alt` holds a null statement, which leaves the weight
+// block as the only place the handle stands.
+TEST(StaticMethodThisPositions, ThisInARandsequenceWeightCodeBlockIsReported) {
+  ExpectThisReported(
+      "randsequence(main)\n"
+      "      main : alt := 5 { k = this.x; };\n"
+      "      alt : { ; };\n"
+      "    endsequence");
+}
+
+// `super` stands in the same positions as `this` and is the same half of the
+// sentence: ExprRefsThisOrSuper answers for both names and
+// CheckStaticMethodsForThisSuper makes one report for either. One case carries
+// it, in the link the walk reached last, so the conversion is not read as
+// covering `this` alone.
+TEST(StaticMethodThisPositions, SuperInAForkArmIsReported) {
+  ElabFixture f;
+  std::string src =
+      "class Base;\n"
+      "  function void foo(); endfunction\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  static task t();\n"
+      "    fork\n"
+      "      super.foo();\n"
+      "    join\n"
+      "  endtask\n"
+      "endclass\n"
+      "module m;\n"
+      "  Derived d;\n"
+      "endmodule\n";
+  ElabOk(src, f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'this' and 'super' shall not be used in a static method",
+                    LineHolding(src, "static task"), "8.10"));
 }
 
 }  // namespace

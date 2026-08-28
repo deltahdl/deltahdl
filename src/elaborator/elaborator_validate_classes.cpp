@@ -6,6 +6,7 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
 
@@ -145,13 +146,25 @@ static void WalkStmtsForVisibility(
   CheckVisibilityExpr(s->rhs, var_types, unit, diag);
   CheckVisibilityExpr(s->expr, var_types, unit, diag);
   CheckVisibilityExpr(s->condition, var_types, unit, diag);
-  for (auto* sub : s->stmts) WalkStmtsForVisibility(sub, var_types, unit, diag);
-  WalkStmtsForVisibility(s->then_branch, var_types, unit, diag);
-  WalkStmtsForVisibility(s->else_branch, var_types, unit, diag);
-  WalkStmtsForVisibility(s->body, var_types, unit, diag);
-  WalkStmtsForVisibility(s->for_body, var_types, unit, diag);
-  for (auto& ci : s->case_items)
-    WalkStmtsForVisibility(ci.body, var_types, unit, diag);
+  // §8.18 states that a local member is unreachable from outside its class and
+  // a protected member from outside its class hierarchy, and it names no
+  // statement the rules are suspended in, so this descends every link
+  // ForEachChildStmt in elaborator_validate_internal.h names. It wrote out six
+  // of the thirteen, so `p.secret = 1;` written in a fork arm or in a for-loop
+  // initialization reached CheckVisibilityExpr through no link at all.
+  //
+  // CollectBlockClassVarDecls below takes its list from the same function, and
+  // the two are converted together: it is what records the class a block-local
+  // handle is declared with, so a walk reaching an access in a link the
+  // collection does not reach reads the name's type from the enclosing scope
+  // and reports the access against a class the block itself redeclared the name
+  // away from. That state is not reachable from a source today, because
+  // Elaborator::ValidateClassHandleOps in elaborator_validate_class_handles.cpp
+  // descends all thirteen links and records the same declarations in
+  // Elaborator::class_var_types_ before this pass copies it.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    WalkStmtsForVisibility(sub, var_types, unit, diag);
+  });
 }
 
 // §8.18: collect class-typed handle variables declared inside a procedural
@@ -167,14 +180,22 @@ static void CollectBlockClassVarDecls(
       class_names.count(s->var_decl_type.type_name)) {
     var_types[s->var_name] = s->var_decl_type.type_name;
   }
-  for (auto* sub : s->stmts)
+  // A.6.3 gives `par_block ::= fork [ : block_identifier ] {
+  // block_item_declaration } { statement_or_null } join_keyword` and A.6.12
+  // gives `rs_code_block ::= { { data_declaration } { statement_or_null } }`,
+  // so a handle declaration stands in a fork arm and in a randsequence
+  // production code block as it stands in a begin-end block. This therefore
+  // descends every link ForEachChildStmt in elaborator_validate_internal.h
+  // names rather than the six it wrote out, under which a handle declared in
+  // either place never entered var_types and every access through it was read
+  // with the class the enclosing scope bound the name to.
+  //
+  // WalkStmtsForVisibility above is converted in the same commit, for the
+  // reason given there: the walk that reports and the collection it reads are
+  // one rule, and either one alone answers §8.18 with the other's list.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     CollectBlockClassVarDecls(sub, class_names, var_types);
-  CollectBlockClassVarDecls(s->then_branch, class_names, var_types);
-  CollectBlockClassVarDecls(s->else_branch, class_names, var_types);
-  CollectBlockClassVarDecls(s->body, class_names, var_types);
-  CollectBlockClassVarDecls(s->for_body, class_names, var_types);
-  for (auto& ci : s->case_items)
-    CollectBlockClassVarDecls(ci.body, class_names, var_types);
+  });
 }
 
 void Elaborator::ValidateLocalProtectedAccess(const ModuleDecl* decl) {
@@ -212,20 +233,17 @@ static void WalkStmtsForConstClassProp(
       }
     }
   }
-  for (auto* sub : s->stmts)
+  // §8.19 makes a global constant unassignable and confines an assignment to an
+  // instance constant to the constructor, and it conditions neither rule on the
+  // statement the assignment is written in, so this descends every link
+  // ForEachChildStmt in elaborator_validate_internal.h names. It wrote out six
+  // of the thirteen, so a write to a const class property from a fork arm, a
+  // randcase item or an immediate assertion's action block was reported by
+  // nothing.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForConstClassProp(sub, global_consts, instance_consts,
                                in_constructor, diag);
-  WalkStmtsForConstClassProp(s->then_branch, global_consts, instance_consts,
-                             in_constructor, diag);
-  WalkStmtsForConstClassProp(s->else_branch, global_consts, instance_consts,
-                             in_constructor, diag);
-  WalkStmtsForConstClassProp(s->body, global_consts, instance_consts,
-                             in_constructor, diag);
-  WalkStmtsForConstClassProp(s->for_body, global_consts, instance_consts,
-                             in_constructor, diag);
-  for (auto& ci : s->case_items)
-    WalkStmtsForConstClassProp(ci.body, global_consts, instance_consts,
-                               in_constructor, diag);
+  });
 }
 
 static void CollectConstClassProperties(
@@ -335,13 +353,15 @@ static void WalkStmtsForParamScope(
   CheckParamScopeExpr(s->rhs, param_classes, diag);
   CheckParamScopeExpr(s->expr, param_classes, diag);
   CheckParamScopeExpr(s->condition, param_classes, diag);
-  for (auto* sub : s->stmts) WalkStmtsForParamScope(sub, param_classes, diag);
-  WalkStmtsForParamScope(s->then_branch, param_classes, diag);
-  WalkStmtsForParamScope(s->else_branch, param_classes, diag);
-  WalkStmtsForParamScope(s->body, param_classes, diag);
-  WalkStmtsForParamScope(s->for_body, param_classes, diag);
-  for (auto& ci : s->case_items)
-    WalkStmtsForParamScope(ci.body, param_classes, diag);
+  // §8.25.1 requires an explicit specialization before `::` wherever a
+  // parameterized class name prefixes the operator outside the class, and it
+  // names no statement that is exempt, so this descends every link
+  // ForEachChildStmt in elaborator_validate_internal.h names. It wrote out six
+  // of the thirteen, so `result = C::q;` in a fork arm or in a randsequence
+  // production code block never reached CheckParamScopeExpr.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    WalkStmtsForParamScope(sub, param_classes, diag);
+  });
 }
 
 void Elaborator::ValidateParameterizedScopeResolution(const ModuleDecl* decl) {
@@ -441,13 +461,16 @@ static void WalkStmtsForRestrictedScopePrefix(const Stmt* s,
   CheckRestrictedScopePrefixExpr(s->rhs, r, diag);
   CheckRestrictedScopePrefixExpr(s->expr, r, diag);
   CheckRestrictedScopePrefixExpr(s->condition, r, diag);
-  for (auto* sub : s->stmts) WalkStmtsForRestrictedScopePrefix(sub, r, diag);
-  WalkStmtsForRestrictedScopePrefix(s->then_branch, r, diag);
-  WalkStmtsForRestrictedScopePrefix(s->else_branch, r, diag);
-  WalkStmtsForRestrictedScopePrefix(s->body, r, diag);
-  WalkStmtsForRestrictedScopePrefix(s->for_body, r, diag);
-  for (auto& ci : s->case_items)
-    WalkStmtsForRestrictedScopePrefix(ci.body, r, diag);
+  // §8.23 confines a prefix of any of its three restricted kinds to a typedef
+  // declaration, the type operator and a type parameter assignment, none of
+  // which is a statement, so a prefix reached from any statement is outside the
+  // permitted set wherever the statement stands. This descends every link
+  // ForEachChildStmt in elaborator_validate_internal.h names rather than the
+  // six it wrote out, under which `x = C::val;` in a fork arm or in an
+  // immediate assertion's action block was left unreported.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    WalkStmtsForRestrictedScopePrefix(sub, r, diag);
+  });
 }
 
 // Sorts the typedefs of one scope into the kinds §8.23 restricts, and collects

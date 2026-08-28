@@ -82,4 +82,147 @@ TEST(AssocArrayElaboration, WholeAssocCopyAssignmentAccepted) {
              "endmodule\n"));
 }
 
+// §7.8 gives an associative array no slice, and the report
+// WalkStmtsForAssocSlice emits names §7.4.6, which states the rule. Neither
+// clause conditions it on the statement the slice is written in, and the walk
+// wrote out six of the thirteen statement links ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h states, so a slice written in
+// any of the other seven was never looked at. The cases below write the same
+// `x = aa[1:2];` at the top level and then in each of those seven links.
+TEST(AssocArrayElaboration, AssocSliceRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int x;\n"
+      "  initial x = aa[1:2];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "slice is not allowed on an associative array", 4,
+                            "7.4.6"));
+}
+
+TEST(AssocArrayElaboration, AssocSliceInForkArmRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      x = aa[1:2];\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "slice is not allowed on an associative array", 6,
+                            "7.4.6"));
+}
+
+// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...` and
+// A.6.2 gives `variable_assignment ::= variable_lvalue = expression`, so a
+// slice may stand in the expression of a for-loop initialization.
+TEST(AssocArrayElaboration, AssocSliceInForInitRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int x;\n"
+      "  integer i;\n"
+      "  initial for (x = aa[1:2]; i < 0; i = i + 1) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "slice is not allowed on an associative array", 5,
+                            "7.4.6"));
+}
+
+// A.6.8 gives `for_step_assignment ::= operator_assignment | ...`.
+TEST(AssocArrayElaboration, AssocSliceInForStepRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int x;\n"
+      "  integer i;\n"
+      "  initial for (i = 0; i < 0; x = aa[1:2]) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "slice is not allowed on an associative array", 5,
+                            "7.4.6"));
+}
+
+// A.6.10 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, which is Stmt::assert_pass_stmt here and
+// Stmt::assert_fail_stmt below.
+TEST(AssocArrayElaboration, AssocSliceInAssertPassRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int x;\n"
+      "  initial assert (1) x = aa[1:2];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "slice is not allowed on an associative array", 4,
+                            "7.4.6"));
+}
+
+TEST(AssocArrayElaboration, AssocSliceInAssertFailRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int x;\n"
+      "  initial assert (1) else x = aa[1:2];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "slice is not allowed on an associative array", 4,
+                            "7.4.6"));
+}
+
+// §18.16 and A.6.7 give `randcase_item ::= expression : statement_or_null`.
+TEST(AssocArrayElaboration, AssocSliceInRandcaseItemRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    randcase\n"
+      "      1: x = aa[1:2];\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "slice is not allowed on an associative array", 6,
+                            "7.4.6"));
+}
+
+// §18.17 and A.6.12 give `rs_code_block ::= { { data_declaration } {
+// statement_or_null } }`.
+TEST(AssocArrayElaboration, AssocSliceInRandsequenceCodeBlockRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { x = aa[1:2]; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "slice is not allowed on an associative array", 6,
+                            "7.4.6"));
+}
+
 }  // namespace

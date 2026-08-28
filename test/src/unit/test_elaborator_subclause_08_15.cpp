@@ -522,4 +522,174 @@ TEST(SuperElaboration, SuperValueParamInARandsequenceWeightCodeBlockNames8_15) {
 // inc_or_dec_expression or a call. So `for (int a[super.P] = 0; ...)` is not
 // source, and a case written over one would assert about a parse error.
 
+// The seven cases below cover the links StmtRefsSuper in
+// src/elaborator/elaborator_validate_class_members.cpp gained when its
+// hand-written recursion list was replaced by ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. §8.15 conditions the rule on
+// the class -- Base extends nothing in every one of them -- rather than on the
+// statement the reference is written in, so every position is a rejection.
+// CheckNonDerivedClassMethodsForSuper reports at the method's own location, so
+// each report stands at the `function` keyword on line 4 wherever in the body
+// the reference is.
+
+// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
+// block_item_declaration } { statement_or_null } join_keyword`, whose
+// statements the parser puts in Stmt::fork_stmts. §13.4.4 admits the
+// fork-join_none form inside a function.
+TEST(SuperElaboration, SuperInAForkArmOutsideASubclassNames8_15) {
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  int x;\n"
+      "  int i;\n"
+      "  function void f();\n"
+      "    fork\n"
+      "      x = super.x;\n"
+      "    join_none\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Base b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'super' shall only be used in a derived class", 4,
+                            "8.15"));
+}
+
+// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...` and
+// `variable_assignment ::= variable_lvalue = expression`, so a for header's
+// initialization holds an expression, which is where `super.x` stands here.
+// The parser keeps each such assignment in Stmt::for_inits.
+TEST(SuperElaboration, SuperInAForInitializationOutsideASubclassNames8_15) {
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  int x;\n"
+      "  int i;\n"
+      "  function void f();\n"
+      "    for (i = super.x; i < 2; i = i + 1) ;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Base b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'super' shall only be used in a derived class", 4,
+                            "8.15"));
+}
+
+// A.6.8 gives `for_step_assignment ::= operator_assignment |
+// inc_or_dec_expression | function_subroutine_call`, and an
+// operator_assignment holds an expression too, kept in Stmt::for_steps.
+TEST(SuperElaboration, SuperInAForStepOutsideASubclassNames8_15) {
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  int x;\n"
+      "  int i;\n"
+      "  function void f();\n"
+      "    for (i = 0; i < 2; i = super.x) ;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Base b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'super' shall only be used in a derived class", 4,
+                            "8.15"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
+// next cover one arm each.
+TEST(SuperElaboration, SuperInAnAssertionPassStmtOutsideASubclassNames8_15) {
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  int x;\n"
+      "  int i;\n"
+      "  function void f();\n"
+      "    assert (1) x = super.x;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Base b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'super' shall only be used in a derived class", 4,
+                            "8.15"));
+}
+TEST(SuperElaboration, SuperInAnAssertionFailStmtOutsideASubclassNames8_15) {
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  int x;\n"
+      "  int i;\n"
+      "  function void f();\n"
+      "    assert (1) else x = super.x;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Base b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'super' shall only be used in a derived class", 4,
+                            "8.15"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
+// statement the parser keeps in the second member of a Stmt::randcase_items
+// entry. §8.15 is a rule about the source, so it holds whether the weighted
+// draw would select the item or not.
+TEST(SuperElaboration, SuperInARandcaseItemOutsideASubclassNames8_15) {
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  int x;\n"
+      "  int i;\n"
+      "  function void f();\n"
+      "    randcase\n"
+      "      1 : x = super.x;\n"
+      "    endcase\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Base b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'super' shall only be used in a derived class", 4,
+                            "8.15"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, reached through Stmt::rs_productions and through no other member of
+// Stmt.
+TEST(SuperElaboration, SuperInARandsequenceCodeBlockOutsideASubclassNames8_15) {
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  int x;\n"
+      "  int i;\n"
+      "  function void f();\n"
+      "    randsequence(main)\n"
+      "      main : { x = super.x; };\n"
+      "    endsequence\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Base b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'super' shall only be used in a derived class", 4,
+                            "8.15"));
+}
+
 }  // namespace

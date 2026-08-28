@@ -386,4 +386,354 @@ TEST(ChainedConstructorElaboration, SuperNewInCaseItemError) {
       7, "8.17"));
 }
 
+// The cases below cover the seven links Stmt carries that
+// ConstructorHasGuardedSuperNew and StmtSubtreeHasSuperNew in
+// src/elaborator/elaborator_validate_class_members.cpp gained when their
+// hand-written recursion lists were replaced by ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. Each of the six links a
+// conforming source can write the call in appears twice: once with the
+// construct as the constructor's own top-level statement, which is the list
+// ConstructorHasGuardedSuperNew walks, and once with the same construct under
+// an `if`, which is the list StmtSubtreeHasSuperNew walks after the `if` has
+// already settled that the position guards.
+//
+// Every one of them is a rejection, because §8.17 states "To use this
+// approach, super.new(...) shall be the first executable statement in the
+// function new" and each of these positions is reached only after something
+// else has run: a fork arm after the fork statement and in no order §9.3.2
+// defines against its siblings, a for step after an iteration of the body, an
+// action block after the immediate assertion has passed or failed (§16.3), a
+// randcase arm after the weighted draw has selected it (§18.16), and a
+// randsequence production after the generator has reached it (§18.17).
+//
+// Stmt::for_inits is the seventh link and takes no case. A.6.8 gives
+// `for_initialization ::= list_of_variable_assignments | for_variable_
+// declaration { , for_variable_declaration }`, and a super.new() call is
+// neither a variable assignment nor a variable declaration, so no conforming
+// source puts one in a for header's initialization.
+
+// The report stands at the constructor's own top-level statement, which is the
+// `fork` on line 7, because ReportGuardedSuperNew passes that statement's
+// Stmt::range.start. §13.4.4 admits the fork-join_none form inside a function,
+// which a constructor is.
+TEST(ChainedConstructorElaboration, SuperNewInAForkArmError) {
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  function new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Child extends Base;\n"
+      "  function new();\n"
+      "    fork\n"
+      "      super.new();\n"
+      "    join_none\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Child c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "super.new() shall be the first executable statement in the constructor",
+      7, "8.17"));
+}
+
+// A.6.8 admits a function_subroutine_call as a for_step_assignment, so the
+// step is a position a call can be written in; it runs after an iteration of
+// the loop body and so is never the first executable statement.
+TEST(ChainedConstructorElaboration, SuperNewInAForStepError) {
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  function new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Child extends Base;\n"
+      "  function new();\n"
+      "    for (int i = 0; i < 2; super.new()) ;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Child c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "super.new() shall be the first executable statement in the constructor",
+      7, "8.17"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm.
+// This case and the next cover one arm each.
+TEST(ChainedConstructorElaboration, SuperNewInAnAssertionPassStmtError) {
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  function new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Child extends Base;\n"
+      "  function new();\n"
+      "    assert (1) super.new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Child c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "super.new() shall be the first executable statement in the constructor",
+      7, "8.17"));
+}
+TEST(ChainedConstructorElaboration, SuperNewInAnAssertionFailStmtError) {
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  function new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Child extends Base;\n"
+      "  function new();\n"
+      "    assert (1) else super.new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Child c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "super.new() shall be the first executable statement in the constructor",
+      7, "8.17"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`. The report
+// stands at the `randcase` keyword, which is the top-level statement.
+TEST(ChainedConstructorElaboration, SuperNewInARandcaseItemError) {
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  function new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Child extends Base;\n"
+      "  function new();\n"
+      "    randcase\n"
+      "      1 : super.new();\n"
+      "    endcase\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Child c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "super.new() shall be the first executable statement in the constructor",
+      7, "8.17"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds a statement. The report
+// stands at the `randsequence` keyword.
+TEST(ChainedConstructorElaboration, SuperNewInARandsequenceCodeBlockError) {
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  function new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Child extends Base;\n"
+      "  function new();\n"
+      "    randsequence(main)\n"
+      "      main : { super.new(); };\n"
+      "    endsequence\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Child c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "super.new() shall be the first executable statement in the constructor",
+      7, "8.17"));
+}
+
+// The six cases below write the same constructs under an `if`, so the guarding
+// answer is already settled by Stmt::then_branch and what is under test is
+// whether StmtSubtreeHasSuperNew finds the call beneath it. The report stands
+// at the `if` on line 7, which is the constructor's top-level statement.
+TEST(ChainedConstructorElaboration, SuperNewInAForkArmUnderAnIfError) {
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  function new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Child extends Base;\n"
+      "  function new();\n"
+      "    if (1)\n"
+      "      fork\n"
+      "        super.new();\n"
+      "      join_none\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Child c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "super.new() shall be the first executable statement in the constructor",
+      7, "8.17"));
+}
+TEST(ChainedConstructorElaboration, SuperNewInAForStepUnderAnIfError) {
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  function new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Child extends Base;\n"
+      "  function new();\n"
+      "    if (1)\n"
+      "      for (int i = 0; i < 2; super.new()) ;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Child c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "super.new() shall be the first executable statement in the constructor",
+      7, "8.17"));
+}
+TEST(ChainedConstructorElaboration,
+     SuperNewInAnAssertionPassStmtUnderAnIfError) {
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  function new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Child extends Base;\n"
+      "  function new();\n"
+      "    if (1)\n"
+      "      assert (1) super.new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Child c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "super.new() shall be the first executable statement in the constructor",
+      7, "8.17"));
+}
+TEST(ChainedConstructorElaboration,
+     SuperNewInAnAssertionFailStmtUnderAnIfError) {
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  function new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Child extends Base;\n"
+      "  function new();\n"
+      "    if (1)\n"
+      "      assert (1) else super.new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Child c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "super.new() shall be the first executable statement in the constructor",
+      7, "8.17"));
+}
+TEST(ChainedConstructorElaboration, SuperNewInARandcaseItemUnderAnIfError) {
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  function new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Child extends Base;\n"
+      "  function new();\n"
+      "    if (1)\n"
+      "      randcase\n"
+      "        1 : super.new();\n"
+      "      endcase\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Child c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "super.new() shall be the first executable statement in the constructor",
+      7, "8.17"));
+}
+TEST(ChainedConstructorElaboration,
+     SuperNewInARandsequenceCodeBlockUnderAnIfError) {
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  function new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Child extends Base;\n"
+      "  function new();\n"
+      "    if (1)\n"
+      "      randsequence(main)\n"
+      "        main : { super.new(); };\n"
+      "      endsequence\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Child c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "super.new() shall be the first executable statement in the constructor",
+      7, "8.17"));
+}
+
+// Stmt::stmts is the one link ConstructorHasGuardedSuperNew does not treat as
+// guarding, and this case is what holds it there. §9.3.1 runs the statements
+// of a begin-end block in the order written, so a super.new() written first
+// inside a block that is itself the constructor's first statement is the first
+// executable statement §8.17 asks for, and reporting it would name a rule the
+// source did not break.
+TEST(ChainedConstructorElaboration, SuperNewFirstInABeginEndBlockOk) {
+  EXPECT_TRUE(
+      ElabOk("class Base;\n"
+             "  function new();\n"
+             "  endfunction\n"
+             "endclass\n"
+             "class Child extends Base;\n"
+             "  int x;\n"
+             "  function new();\n"
+             "    begin\n"
+             "      super.new();\n"
+             "      x = 1;\n"
+             "    end\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  Child c;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

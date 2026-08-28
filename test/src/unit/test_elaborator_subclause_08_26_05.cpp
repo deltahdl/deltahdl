@@ -277,4 +277,200 @@ TEST(InterfaceClassCastingAndRefAssignment, ParamInterfaceClassNewError) {
                             "8.26.5"));
 }
 
+// The seven cases below, and the note that closes them, carry §8.26.5's
+// construction prohibition into each statement link
+// Elaborator::WalkStmtsForClassHandleOps in
+// src/elaborator/elaborator_validate_class_handles.cpp did not read before
+// #3319. That walk wrote out six of the thirteen links ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h names, so a `new` on an
+// interface class handle one level down -- in a fork arm, an assertion action
+// block, a randcase item or a randsequence code block -- reached neither
+// CheckNewOnUnconstructibleHandle nor CheckNewOnInterfaceDeclInit.
+//
+// The two checks take separate cases because they answer different sources:
+// the first reads a procedural assignment (`ic = new;`), the second a
+// declaration initializer (`IC ic = new;`), and A.6.3 and A.6.12 are the only
+// two of the seven links that admit a declaration at all.
+//
+// Each report stands at the offending statement, which is where both checks
+// anchor it, so every case names the line its own `new` is written on.
+
+// A.6.3 gives `par_block ::= fork [ : block_identifier ]
+// { block_item_declaration } { statement_or_null } join_keyword`, whose
+// statements the parser puts in Stmt::fork_stmts.
+
+TEST(InterfaceClassCastingAndRefAssignment,
+     InterfaceClassNewInAForkArmIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "  IC ic;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      ic = new;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot construct object of interface class", 8,
+                            "8.26.5"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
+// one below it cover one arm each.
+TEST(InterfaceClassCastingAndRefAssignment,
+     InterfaceClassNewInAnAssertionPassStmtIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "  IC ic;\n"
+      "  initial begin\n"
+      "    assert (1) ic = new;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot construct object of interface class", 7,
+                            "8.26.5"));
+}
+
+TEST(InterfaceClassCastingAndRefAssignment,
+     InterfaceClassNewInAnAssertionFailStmtIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "  IC ic;\n"
+      "  initial begin\n"
+      "    assert (1) else ic = new;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot construct object of interface class", 7,
+                            "8.26.5"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
+// statement the parser keeps in the second member of a Stmt::randcase_items
+// entry. §8.26.5 is a rule about the source, so it holds whether the weighted
+// draw would select the item or not.
+TEST(InterfaceClassCastingAndRefAssignment,
+     InterfaceClassNewInARandcaseItemIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "  IC ic;\n"
+      "  initial begin\n"
+      "    randcase\n"
+      "      1 : ic = new;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot construct object of interface class", 8,
+                            "8.26.5"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, which Parser::ParseRsCodeBlockStmts in src/parser/parser_verify.cpp puts
+// in RsProd::code_stmts, reached through Stmt::rs_productions and through no
+// other member of Stmt. RsRule::weight_code is the second statement position
+// under that one link, and ForEachRandsequenceRuleStmt visits both.
+TEST(InterfaceClassCastingAndRefAssignment,
+     InterfaceClassNewInARandsequenceCodeBlockIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "  IC ic;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { ic = new; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot construct object of interface class", 8,
+                            "8.26.5"));
+}
+
+// The declaration form in the two links that admit a declaration. A.6.3's
+// par_block holds a block_item_declaration before its statements, which
+// Parser::ParseBlockVarDecls in src/parser/parser_stmt_block.cpp puts in
+// Stmt::fork_stmts beside them, so CheckNewOnInterfaceDeclInit reads it there
+// or nowhere.
+TEST(InterfaceClassCastingAndRefAssignment,
+     InterfaceClassNewDeclInitInAForkArmIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      IC ic2 = new;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot construct object of interface class", 7,
+                            "8.26.5"));
+}
+
+// A.6.12's rs_code_block admits a data_declaration ahead of its statements,
+// the second and last of the seven links that admits one.
+TEST(InterfaceClassCastingAndRefAssignment,
+     InterfaceClassNewDeclInitInARandsequenceCodeBlockIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { IC ic2 = new; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot construct object of interface class", 7,
+                            "8.26.5"));
+}
+
+// Stmt::for_inits and Stmt::for_steps get no case for either check, and no
+// conforming source can give them one. A.6.8 gives `for_initialization ::=
+// list_of_variable_assignments | for_variable_declaration` and
+// `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
+// function_subroutine_call`, and every one of those forms writes `= expression`
+// or a call. A.6.2 makes `class_new` an alternative of blocking_assignment
+// rather than an expression -- `[ implicit_class_handle . | class_scope |
+// package_scope ] hierarchical_variable_identifier select = class_new` -- and
+// A.2.4 admits it in a variable_decl_assignment, so `new` reaches neither
+// position. The links are still descended, because the list is descended
+// whole, and the §8.4 cases in test_elaborator_subclause_08_04.cpp cover them
+// with an operation those productions do admit.
+
 }  // namespace

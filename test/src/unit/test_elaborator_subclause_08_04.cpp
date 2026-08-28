@@ -445,4 +445,192 @@ TEST(ClassObjectElaboration, ClassHandleAssignParentToChildError) {
       "8.4"));
 }
 
+// The eight cases below write one §8.4 breach -- `r = a + 1;`, which Table 8-1
+// records as not allowed on an object handle -- into each statement link
+// Elaborator::WalkStmtsForClassHandleOps in
+// src/elaborator/elaborator_validate_class_handles.cpp did not read before
+// #3319. That walk wrote out six of the thirteen links ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h names, so the same arithmetic
+// one level down, in a fork arm or a randcase item, elaborated clean.
+//
+// The report stands at the offending expression rather than at the enclosing
+// method, because CheckClassHandleBinary anchors it at Expr::range.start, so
+// each case names the line its own arithmetic is written on.
+
+// A.6.3 gives `par_block ::= fork [ : block_identifier ]
+// { block_item_declaration } { statement_or_null } join_keyword`, whose
+// statements the parser puts in Stmt::fork_stmts.
+TEST(ClassObjectElaboration, ArithmeticOnAHandleInAForkArmIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  C a;\n"
+      "  initial begin\n"
+      "    automatic int r;\n"
+      "    fork\n"
+      "      r = a + 1;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on class object handles",
+                            7, "8.4"));
+}
+
+// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`,
+// whose right-hand side is an ordinary expression and so may name a handle.
+TEST(ClassObjectElaboration,
+     ArithmeticOnAHandleInAForInitializationIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  C a;\n"
+      "  initial begin\n"
+      "    automatic int r;\n"
+      "    for (r = a + 1; r < 2; r = r + 1) ;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on class object handles",
+                            6, "8.4"));
+}
+
+// A.6.8 gives `for_step_assignment ::= operator_assignment |
+// inc_or_dec_expression | function_subroutine_call`, and an operator_assignment
+// takes the same expression on its right.
+TEST(ClassObjectElaboration, ArithmeticOnAHandleInAForStepIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  C a;\n"
+      "  initial begin\n"
+      "    automatic int r;\n"
+      "    for (r = 0; r < 2; r = a + 1) ;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on class object handles",
+                            6, "8.4"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
+// one below it cover one arm each.
+TEST(ClassObjectElaboration,
+     ArithmeticOnAHandleInAnAssertionPassStmtIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  C a;\n"
+      "  initial begin\n"
+      "    automatic int r;\n"
+      "    assert (1) r = a + 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on class object handles",
+                            6, "8.4"));
+}
+
+TEST(ClassObjectElaboration,
+     ArithmeticOnAHandleInAnAssertionFailStmtIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  C a;\n"
+      "  initial begin\n"
+      "    automatic int r;\n"
+      "    assert (1) else r = a + 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on class object handles",
+                            6, "8.4"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
+// statement the parser keeps in the second member of a Stmt::randcase_items
+// entry. §8.4 is a rule about the source, so it holds whether the weighted draw
+// would select the item or not.
+TEST(ClassObjectElaboration, ArithmeticOnAHandleInARandcaseItemIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  C a;\n"
+      "  initial begin\n"
+      "    automatic int r;\n"
+      "    randcase\n"
+      "      1 : r = a + 1;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on class object handles",
+                            7, "8.4"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, which Parser::ParseRsCodeBlockStmts in src/parser/parser_verify.cpp puts
+// in RsProd::code_stmts, reached through Stmt::rs_productions and through no
+// other member of Stmt.
+TEST(ClassObjectElaboration,
+     ArithmeticOnAHandleInARandsequenceCodeBlockIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  C a;\n"
+      "  initial begin\n"
+      "    automatic int r;\n"
+      "    randsequence(main)\n"
+      "      main : { r = a + 1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on class object handles",
+                            7, "8.4"));
+}
+
+// A.6.12's `rs_rule ::= rs_production_list [ := weight_specification [
+// rs_code_block ] ]` puts a second code block after the weight, which the
+// parser keeps in RsRule::weight_code rather than in RsProd::code_stmts. It is
+// a second statement position under Stmt::rs_productions, so it takes its own
+// case: the production `alt` holds a null statement, which leaves the weight
+// block as the only place the arithmetic stands.
+TEST(ClassObjectElaboration,
+     ArithmeticOnAHandleInARandsequenceWeightCodeBlockIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  C a;\n"
+      "  initial begin\n"
+      "    automatic int r;\n"
+      "    randsequence(main)\n"
+      "      main : alt := 5 { r = a + 1; };\n"
+      "      alt : { ; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on class object handles",
+                            7, "8.4"));
+}
+
 }  // namespace

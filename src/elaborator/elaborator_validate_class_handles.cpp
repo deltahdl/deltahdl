@@ -5,6 +5,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
 
@@ -731,12 +732,16 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
                        diag_);
   CheckClassHandleExpr(s->condition, class_var_names_, class_var_types_, unit_,
                        diag_);
-  for (auto* sub : s->stmts) WalkStmtsForClassHandleOps(sub);
-  WalkStmtsForClassHandleOps(s->then_branch);
-  WalkStmtsForClassHandleOps(s->else_branch);
-  WalkStmtsForClassHandleOps(s->body);
-  WalkStmtsForClassHandleOps(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForClassHandleOps(ci.body);
+  // §8.4 states which operations an object handle admits and §8.26.9 which
+  // ones an interface class handle admits, and neither names a statement the
+  // rules are suspended in, so this descends every link ForEachChildStmt in
+  // elaborator_validate_internal.h names and names no link itself. It wrote out
+  // six of the thirteen, so `fork r = a + 1; join` and `assert (1) else r = a +
+  // 1;` performed arithmetic on a handle where nothing looked, and a handle
+  // declared in one of those seven links never entered class_var_names_ either,
+  // which left every later operation on it unchecked as well.
+  ForEachChildStmt(
+      s, [this](Stmt* const& sub) { WalkStmtsForClassHandleOps(sub); });
 }
 
 void Elaborator::ValidateClassHandleOps(const ModuleDecl* decl) {

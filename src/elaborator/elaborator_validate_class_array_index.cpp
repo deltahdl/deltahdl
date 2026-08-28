@@ -5,6 +5,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -146,12 +147,16 @@ static void WalkStmtsForClassIndexSelect(const Stmt* s,
                                          const ClassIndexCtx& ctx) {
   if (!s) return;
   CheckStmtExprsForClassIndexSelect(s, ctx);
-  for (auto* sub : s->stmts) WalkStmtsForClassIndexSelect(sub, ctx);
-  WalkStmtsForClassIndexSelect(s->then_branch, ctx);
-  WalkStmtsForClassIndexSelect(s->else_branch, ctx);
-  WalkStmtsForClassIndexSelect(s->body, ctx);
-  WalkStmtsForClassIndexSelect(s->for_body, ctx);
-  for (auto& ci : s->case_items) WalkStmtsForClassIndexSelect(ci.body, ctx);
+  // §7.8.3 requires an object of the index class, or of a class derived from
+  // it, wherever such an array is indexed, and names no statement the
+  // requirement is suspended in. This walk therefore names no statement link
+  // itself: the list comes from ForEachChildStmt in
+  // elaborator_validate_internal.h, which states all thirteen links of Stmt in
+  // one place. The six written out here reached neither a fork arm
+  // (`fork x = data[7]; join`) nor a randcase item, so an illegal class index
+  // written in either elaborated clean.
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { WalkStmtsForClassIndexSelect(sub, ctx); });
 }
 
 // Collects the classes declared directly inside a module, keyed by name. These
@@ -282,16 +287,17 @@ static void WalkStmtsForStringIndexSelect(
   CheckStringIndexSelectExpr(s->rhs, var_array_info, var_types, diag);
   CheckStringIndexSelectExpr(s->expr, var_array_info, var_types, diag);
   CheckStringIndexSelectExpr(s->condition, var_array_info, var_types, diag);
-  for (auto* sub : s->stmts)
+  // §7.8.2 requires a string or a string literal wherever such an array is
+  // indexed, and names no statement the requirement is suspended in. This walk
+  // therefore names no statement link itself: the list comes from
+  // ForEachChildStmt in elaborator_validate_internal.h, which states all
+  // thirteen links of Stmt in one place. The six written out here reached
+  // neither a for-loop initialization (`for (x = aa[7]; ...)`) nor the else
+  // action of an immediate assertion, so an integer index written in either
+  // went unreported.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForStringIndexSelect(sub, var_array_info, var_types, diag);
-  WalkStmtsForStringIndexSelect(s->then_branch, var_array_info, var_types,
-                                diag);
-  WalkStmtsForStringIndexSelect(s->else_branch, var_array_info, var_types,
-                                diag);
-  WalkStmtsForStringIndexSelect(s->body, var_array_info, var_types, diag);
-  WalkStmtsForStringIndexSelect(s->for_body, var_array_info, var_types, diag);
-  for (auto& ci : s->case_items)
-    WalkStmtsForStringIndexSelect(ci.body, var_array_info, var_types, diag);
+  });
 }
 
 void Elaborator::ValidateStringIndexSelect(const ModuleDecl* decl) {
@@ -357,16 +363,17 @@ static void WalkStmtsForIntegralIndexSelect(
   CheckIntegralIndexSelectExpr(s->rhs, integral_names, var_types, diag);
   CheckIntegralIndexSelectExpr(s->expr, integral_names, var_types, diag);
   CheckIntegralIndexSelectExpr(s->condition, integral_names, var_types, diag);
-  for (auto* sub : s->stmts)
+  // §7.8.4 forbids an implicit cast from a real or shortreal expression to the
+  // index type wherever such an array is indexed, and names no statement the
+  // prohibition is suspended in. This walk therefore names no statement link
+  // itself: the list comes from ForEachChildStmt in
+  // elaborator_validate_internal.h, which states all thirteen links of Stmt in
+  // one place. The six written out here reached neither a randsequence
+  // production code block nor a for-loop step, so `x = map[r]` written in
+  // either was never looked at.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForIntegralIndexSelect(sub, integral_names, var_types, diag);
-  WalkStmtsForIntegralIndexSelect(s->then_branch, integral_names, var_types,
-                                  diag);
-  WalkStmtsForIntegralIndexSelect(s->else_branch, integral_names, var_types,
-                                  diag);
-  WalkStmtsForIntegralIndexSelect(s->body, integral_names, var_types, diag);
-  WalkStmtsForIntegralIndexSelect(s->for_body, integral_names, var_types, diag);
-  for (auto& ci : s->case_items)
-    WalkStmtsForIntegralIndexSelect(ci.body, integral_names, var_types, diag);
+  });
 }
 
 // Returns true when an associative-array index type spelled `t` denotes an

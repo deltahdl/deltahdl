@@ -271,4 +271,140 @@ TEST(EmbeddedCovergroup, CoversLocalAndProtectedPropertiesOk) {
              "module m; endmodule\n"));
 }
 
+// The five cases below cover the links CheckCovergroupAssignStmt in
+// src/elaborator/elaborator_validate_class_members.cpp gained when its
+// hand-written recursion list was replaced by ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. §19.4 names no statement the
+// assignment is permitted in outside new(), so each is a rejection, and each
+// report stands at the assignment itself rather than at the statement
+// enclosing it.
+//
+// Stmt::for_inits and Stmt::for_steps take no case, and that is a fact about
+// A.6.2 rather than a gap. A covergroup is instantiated by the class_new
+// alternative of `blocking_assignment ::= ... hierarchical_variable_identifier
+// select = class_new`, and neither `for_initialization`'s
+// `variable_assignment ::= variable_lvalue = expression` nor `for_step_
+// assignment`'s `operator_assignment` admits a class_new on the right-hand
+// side (A.6.8), so no conforming source writes `cg = new` in a for header.
+
+// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
+// block_item_declaration } { statement_or_null } join_keyword`, whose
+// statements the parser puts in Stmt::fork_stmts. §13.4.4 admits the
+// fork-join_none form inside a function.
+TEST(EmbeddedCovergroup, AssignInAForkArmOutsideNewMethodError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int x;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "  function void reconfig();\n"
+      "    fork\n"
+      "      cg = new;\n"
+      "    join_none\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "embedded covergroup 'cg' shall only be assigned "
+                            "inside the new() method of its class",
+                            8, "19.4"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
+// next cover one arm each.
+TEST(EmbeddedCovergroup, AssignInAnAssertionPassStmtOutsideNewMethodError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int x;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "  function void reconfig();\n"
+      "    assert (1) cg = new;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "embedded covergroup 'cg' shall only be assigned "
+                            "inside the new() method of its class",
+                            7, "19.4"));
+}
+TEST(EmbeddedCovergroup, AssignInAnAssertionFailStmtOutsideNewMethodError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int x;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "  function void reconfig();\n"
+      "    assert (1) else cg = new;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "embedded covergroup 'cg' shall only be assigned "
+                            "inside the new() method of its class",
+                            7, "19.4"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
+// statement the parser keeps in the second member of a Stmt::randcase_items
+// entry. §19.4 is a rule about the source, so it holds whether the weighted
+// draw would select the item or not.
+TEST(EmbeddedCovergroup, AssignInARandcaseItemOutsideNewMethodError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int x;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "  function void reconfig();\n"
+      "    randcase\n"
+      "      1 : cg = new;\n"
+      "    endcase\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "embedded covergroup 'cg' shall only be assigned "
+                            "inside the new() method of its class",
+                            8, "19.4"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, reached through Stmt::rs_productions and through no other member of
+// Stmt.
+TEST(EmbeddedCovergroup, AssignInARandsequenceCodeBlockOutsideNewMethodError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int x;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "  function void reconfig();\n"
+      "    randsequence(main)\n"
+      "      main : { cg = new; };\n"
+      "    endsequence\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "embedded covergroup 'cg' shall only be assigned "
+                            "inside the new() method of its class",
+                            8, "19.4"));
+}
+
 }  // namespace

@@ -275,4 +275,137 @@ TEST(ArrayAssignmentValidation, DynamicArrayToAssocAssignRejected) {
                             4, "7.9.9"));
 }
 
+// §7.6 states the shape and element-type compatibility an array assignment
+// requires and conditions the rule on the two operands, not on the statement
+// the assignment is written in. Elaborator::WalkStmtsForArrayAssign wrote out
+// six of the thirteen statement links ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h states, so each source below
+// elaborated clean while the same `a = b;` one level up was reported. The seven
+// cases write it in the seven links the walk did not read.
+TEST(ArrayAssignmentValidation, ArrayAssignInForkArmRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int a[4], b[8];\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      a = b;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array size mismatch: 'a' has 4 elements but 'b' "
+                            "has 8",
+                            5, "7.6"));
+}
+
+// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...` and
+// A.6.2 gives `variable_assignment ::= variable_lvalue = expression`, so an
+// array-to-array assignment is a conforming for-loop initialization.
+TEST(ArrayAssignmentValidation, ArrayAssignInForInitRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int a[4], b[8];\n"
+      "  integer i;\n"
+      "  initial for (a = b; i < 0; i = i + 1) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array size mismatch: 'a' has 4 elements but 'b' "
+                            "has 8",
+                            4, "7.6"));
+}
+
+// A.6.8 gives `for_step_assignment ::= operator_assignment | ...`, and the
+// assignment operator of an operator_assignment may be `=`.
+TEST(ArrayAssignmentValidation, ArrayAssignInForStepRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int a[4], b[8];\n"
+      "  integer i;\n"
+      "  initial for (i = 0; i < 0; a = b) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array size mismatch: 'a' has 4 elements but 'b' "
+                            "has 8",
+                            4, "7.6"));
+}
+
+// A.6.10 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, which is two statement links rather than one:
+// Stmt::assert_pass_stmt here and Stmt::assert_fail_stmt below.
+TEST(ArrayAssignmentValidation, ArrayAssignInAssertPassRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int a[4], b[8];\n"
+      "  initial assert (1) a = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array size mismatch: 'a' has 4 elements but 'b' "
+                            "has 8",
+                            3, "7.6"));
+}
+
+TEST(ArrayAssignmentValidation, ArrayAssignInAssertFailRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int a[4], b[8];\n"
+      "  initial assert (1) else a = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array size mismatch: 'a' has 4 elements but 'b' "
+                            "has 8",
+                            3, "7.6"));
+}
+
+// §18.16 and A.6.7 give `randcase_item ::= expression : statement_or_null`, and
+// the parser puts that statement in the second of each Stmt::randcase_items
+// pair.
+TEST(ArrayAssignmentValidation, ArrayAssignInRandcaseItemRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int a[4], b[8];\n"
+      "  initial begin\n"
+      "    randcase\n"
+      "      1: a = b;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array size mismatch: 'a' has 4 elements but 'b' "
+                            "has 8",
+                            5, "7.6"));
+}
+
+// §18.17 and A.6.12 give `rs_code_block ::= { { data_declaration } {
+// statement_or_null } }`, so a production code block holds procedural
+// statements like any other block.
+TEST(ArrayAssignmentValidation, ArrayAssignInRandsequenceCodeBlockRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int a[4], b[8];\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { a = b; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array size mismatch: 'a' has 4 elements but 'b' "
+                            "has 8",
+                            5, "7.6"));
+}
+
 }  // namespace

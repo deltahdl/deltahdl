@@ -79,38 +79,73 @@ static bool IsSuperNewCall(const Stmt* s) {
   return lhs_is_super && rhs_is_new;
 }
 
-// §8.17: returns whether a statement subtree contains a super.new() call.
+// §8.17: returns whether a statement subtree contains a super.new() call. The
+// question is only where the call stands, so no statement position is exempt
+// and the list of child links descended is the one ForEachChildStmt in
+// elaborator_validate_internal.h states; this walk names no link itself. It
+// wrote out six of the thirteen, so a call in a fork arm
+// (`fork super.new(); join_none`) or in an immediate assertion's action block
+// (`assert (c) super.new();`) was not found.
+//
+// ForEachChildStmt gives the visitor no way to stop, so the first hit is kept
+// in `found` and the recursion runs only while `found` is false.
 static bool StmtSubtreeHasSuperNew(const Stmt* s) {
   if (!s) return false;
   if (IsSuperNewCall(s)) return true;
-  for (const auto* sub : s->stmts)
-    if (StmtSubtreeHasSuperNew(sub)) return true;
-  if (StmtSubtreeHasSuperNew(s->then_branch)) return true;
-  if (StmtSubtreeHasSuperNew(s->else_branch)) return true;
-  if (StmtSubtreeHasSuperNew(s->body)) return true;
-  if (StmtSubtreeHasSuperNew(s->for_body)) return true;
-  for (const auto& ci : s->case_items)
-    if (StmtSubtreeHasSuperNew(ci.body)) return true;
-  return false;
+  bool found = false;
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    if (found) return;
+    found = StmtSubtreeHasSuperNew(sub);
+  });
+  return found;
 }
 
-// §8.17: returns whether a super.new() call appears in a control-flow position
-// (the then/else branch of an if, a loop body, or a case-item body), where it
-// can never be the unconditional first executable statement. Sequential
-// statements (top-level or inside a begin/end block) are not flagged here; a
-// non-first sequential super.new() is handled by the index check.
+// §8.17 states "To use this approach, super.new(...) shall be the first
+// executable statement in the function new." This returns whether a
+// super.new() call stands somewhere that sentence rules out, meaning a
+// position it can never be the first executable statement from however the
+// source is written. A non-first sequential call is handled instead by the
+// index check in ReportSequentialSuperNew.
+//
+// The list of child links descended is the one ForEachChildStmt in
+// elaborator_validate_internal.h states, and this walk names no link itself.
+// What §8.17 decides is which of two treatments a link gets:
+//
+// Stmt::stmts does not guard. §9.3.1 runs the statements of a begin-end block
+// in the order written, so a super.new() written first inside a block that is
+// itself the constructor's first statement is the first executable statement
+// of function new. The recursion through that link therefore carries on
+// asking this same question rather than answering yes.
+//
+// The other twelve links guard, because reaching a statement under one of them
+// takes something else first: an if evaluating its condition, a loop
+// iterating, a case arm being selected, a for step running after a body, a
+// randcase arm winning the weighted draw (§18.16), a randsequence production
+// being reached (§18.17), an immediate assertion having already passed or
+// failed to reach its action block (§16.3), or a fork arm being scheduled,
+// which §9.3.2 orders in no defined way against its siblings. A super.new()
+// below any of them is not the first executable statement, so it is reported.
+//
+// Six links were written out before and none of the seven guarding ones among
+// them, so `fork super.new(); join_none` and `assert (c) super.new();` in a
+// constructor were answered "not guarded" and went unreported.
+//
+// ForEachChildStmt gives the visitor no way to stop, so the first hit is kept
+// in `found` and the recursion runs only while `found` is false.
 static bool ConstructorHasGuardedSuperNew(const Stmt* s) {
   if (!s) return false;
-  if (StmtSubtreeHasSuperNew(s->then_branch) ||
-      StmtSubtreeHasSuperNew(s->else_branch) ||
-      StmtSubtreeHasSuperNew(s->body) || StmtSubtreeHasSuperNew(s->for_body)) {
-    return true;
+  if (s->kind == StmtKind::kBlock) {
+    for (const auto* sub : s->stmts) {
+      if (ConstructorHasGuardedSuperNew(sub)) return true;
+    }
+    return false;
   }
-  for (const auto& ci : s->case_items)
-    if (StmtSubtreeHasSuperNew(ci.body)) return true;
-  for (const auto* sub : s->stmts)
-    if (ConstructorHasGuardedSuperNew(sub)) return true;
-  return false;
+  bool found = false;
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    if (found) return;
+    found = StmtSubtreeHasSuperNew(sub);
+  });
+  return found;
 }
 
 // Returns the new() constructor member of a class, or nullptr if absent.
@@ -216,16 +251,14 @@ static void CheckCovergroupAssignStmt(
                  Subclause("19.4"));
     }
   }
-  for (const auto* sub : s->stmts) {
+  // §19.4 forbids the assignment outside new() and names no statement it is
+  // permitted in, so this descends every link ForEachChildStmt in
+  // elaborator_validate_internal.h states and names none itself. It wrote out
+  // six of the thirteen, so `fork cg = new; join_none` and
+  // `assert (en) cg = new;` in a method other than new() were never read.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     CheckCovergroupAssignStmt(sub, cg_names, diag);
-  }
-  CheckCovergroupAssignStmt(s->then_branch, cg_names, diag);
-  CheckCovergroupAssignStmt(s->else_branch, cg_names, diag);
-  CheckCovergroupAssignStmt(s->body, cg_names, diag);
-  CheckCovergroupAssignStmt(s->for_body, cg_names, diag);
-  for (const auto& ci : s->case_items) {
-    CheckCovergroupAssignStmt(ci.body, cg_names, diag);
-  }
+  });
 }
 
 // §19.4: collects the names of all embedded covergroups declared in the class.
@@ -369,21 +402,26 @@ static bool ExprRefsSuper(const Expr* e) {
   return false;
 }
 
+// §8.15 conditions the rule on the class rather than on the statement the
+// reference is written in, so this descends every link ForEachChildStmt in
+// elaborator_validate_internal.h states and names none itself. It wrote out
+// six of the thirteen, so `fork x = super.y; join_none` and
+// `assert (1) x = super.y;` in a class that extends nothing were never read.
+//
+// ForEachChildStmt gives the visitor no way to stop, so the first hit is kept
+// in `found` and the recursion runs only while `found` is false.
 static bool StmtRefsSuper(const Stmt* s) {
   if (!s) return false;
   if (ExprRefsSuper(s->lhs)) return true;
   if (ExprRefsSuper(s->rhs)) return true;
   if (ExprRefsSuper(s->expr)) return true;
   if (ExprRefsSuper(s->condition)) return true;
-  for (auto* sub : s->stmts)
-    if (StmtRefsSuper(sub)) return true;
-  if (StmtRefsSuper(s->then_branch)) return true;
-  if (StmtRefsSuper(s->else_branch)) return true;
-  if (StmtRefsSuper(s->body)) return true;
-  if (StmtRefsSuper(s->for_body)) return true;
-  for (auto& ci : s->case_items)
-    if (StmtRefsSuper(ci.body)) return true;
-  return false;
+  bool found = false;
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    if (found) return;
+    found = StmtRefsSuper(sub);
+  });
+  return found;
 }
 
 // §8.15: in a class that does not extend another, no method body may reference

@@ -328,4 +328,183 @@ TEST(InterfaceClassPrePostRandomize,
              "endmodule\n"));
 }
 
+// The seven cases below write a rand_mode() call on an interface class handle
+// into each statement link Elaborator::WalkStmtsForClassHandleOps in
+// src/elaborator/elaborator_validate_class_handles.cpp did not read before
+// #3319. That walk wrote out six of the thirteen links ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h names, so the same call one
+// level down -- in a fork arm, a for header, an assertion action block, a
+// randcase item or a randsequence code block -- reached
+// CheckInterfaceHandleRandConstraintMode nowhere and elaborated clean.
+//
+// The report stands at the call rather than at the enclosing block, because
+// that check anchors it at the method access's own Expr::range.start, so each
+// case names the line its own call is written on.
+//
+// The handle is declared at module scope, which is what puts it in
+// class_var_types_ before any statement is walked: a handle declared in one of
+// these seven links was not recorded either, and the two defects would
+// otherwise mask each other.
+// A.6.3 gives `par_block ::= fork [ : block_identifier ]
+// { block_item_declaration } { statement_or_null } join_keyword`, and
+// A.6.9's subroutine_call_statement is one such statement.
+TEST(InterfaceClassRandomize, RandModeOnAnInterfaceHandleInAForkArmIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "  IC iref;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      iref.rand_mode(0);\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is not legal on interface class handle", 8,
+                            "8.26.9"));
+}
+
+// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`,
+// whose right-hand side is an expression, and A.8.1 admits a subroutine call
+// there. The nonvoid query form is the one that fits, which §8.26.9 bars on an
+// interface class handle as flatly as the void form.
+TEST(InterfaceClassRandomize,
+     RandModeOnAnInterfaceHandleInAForInitializationIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "  IC iref;\n"
+      "  int q;\n"
+      "  initial begin\n"
+      "    for (q = iref.rand_mode(); q < 2; q = q + 1) ;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is not legal on interface class handle", 8,
+                            "8.26.9"));
+}
+
+// A.6.8 gives `for_step_assignment ::= operator_assignment |
+// inc_or_dec_expression | function_subroutine_call`, and an
+// operator_assignment takes the same expression on its right.
+TEST(InterfaceClassRandomize, RandModeOnAnInterfaceHandleInAForStepIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "  IC iref;\n"
+      "  int q;\n"
+      "  initial begin\n"
+      "    for (q = 0; q < 2; q = iref.rand_mode()) ;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is not legal on interface class handle", 8,
+                            "8.26.9"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
+// one below it cover one arm each.
+TEST(InterfaceClassRandomize,
+     RandModeOnAnInterfaceHandleInAnAssertionPassStmtIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "  IC iref;\n"
+      "  initial begin\n"
+      "    assert (1) iref.rand_mode(0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is not legal on interface class handle", 7,
+                            "8.26.9"));
+}
+
+TEST(InterfaceClassRandomize,
+     RandModeOnAnInterfaceHandleInAnAssertionFailStmtIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "  IC iref;\n"
+      "  initial begin\n"
+      "    assert (1) else iref.rand_mode(0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is not legal on interface class handle", 7,
+                            "8.26.9"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
+// statement the parser keeps in the second member of a Stmt::randcase_items
+// entry. §8.26.9 is a rule about the source, so it holds whether the weighted
+// draw would select the item or not.
+TEST(InterfaceClassRandomize,
+     RandModeOnAnInterfaceHandleInARandcaseItemIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "  IC iref;\n"
+      "  initial begin\n"
+      "    randcase\n"
+      "      1 : iref.rand_mode(0);\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is not legal on interface class handle", 8,
+                            "8.26.9"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, which Parser::ParseRsCodeBlockStmts in src/parser/parser_verify.cpp puts
+// in RsProd::code_stmts, reached through Stmt::rs_productions and through no
+// other member of Stmt. RsRule::weight_code is the second statement position
+// under that one link, and ForEachRandsequenceRuleStmt visits both.
+TEST(InterfaceClassRandomize,
+     RandModeOnAnInterfaceHandleInARandsequenceCodeBlockIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "  IC iref;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { iref.rand_mode(0); };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is not legal on interface class handle", 8,
+                            "8.26.9"));
+}
+
 }  // namespace

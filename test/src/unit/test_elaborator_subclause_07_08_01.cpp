@@ -208,4 +208,138 @@ TEST(WildcardIndexType, IntegralIndexIsAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §7.8.1 bars a wildcard-indexed associative array from a foreach loop, from
+// the §7.12 methods that return an index, and from a nonintegral index, and it
+// conditions none of the three on the statement the array is written in.
+// WalkStmtsForWildcardTraversal wrote out six of the thirteen statement links
+// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h states, so
+// each source below elaborated clean. The seven cases cover the seven links the
+// walk did not read.
+//
+// Stmt::for_inits and Stmt::for_steps get the nonintegral-index form rather
+// than the foreach form: A.6.8 admits only a list_of_variable_assignments or a
+// for_variable_declaration at the initialization and only an
+// operator_assignment, an inc_or_dec_expression or a function_subroutine_call
+// at the step, so no loop_statement can be written at either, while a select
+// with a real index is an ordinary expression that can.
+TEST(WildcardIndexType, ForeachOnWildcardInForkArmIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int aa[*];\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      foreach (aa[i]) ;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "wildcard associative array 'aa' may not be used "
+                            "in a foreach loop",
+                            5, "7.8.1"));
+}
+
+TEST(WildcardIndexType, NonintegralIndexInForInitIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int aa[*];\n"
+      "  int x;\n"
+      "  integer i;\n"
+      "  initial for (x = aa[1.5]; i < 0; i = i + 1) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "nonintegral index is not allowed on wildcard "
+                            "associative array 'aa'",
+                            5, "7.8.1"));
+}
+
+TEST(WildcardIndexType, NonintegralIndexInForStepIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int aa[*];\n"
+      "  int x;\n"
+      "  integer i;\n"
+      "  initial for (i = 0; i < 0; x = aa[1.5]) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "nonintegral index is not allowed on wildcard "
+                            "associative array 'aa'",
+                            5, "7.8.1"));
+}
+
+// A.6.10 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, which is Stmt::assert_pass_stmt here and
+// Stmt::assert_fail_stmt below.
+TEST(WildcardIndexType, ForeachOnWildcardInAssertPassIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int aa[*];\n"
+      "  initial assert (1) foreach (aa[i]) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "wildcard associative array 'aa' may not be used "
+                            "in a foreach loop",
+                            3, "7.8.1"));
+}
+
+TEST(WildcardIndexType, ForeachOnWildcardInAssertFailIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int aa[*];\n"
+      "  initial assert (1) else foreach (aa[i]) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "wildcard associative array 'aa' may not be used "
+                            "in a foreach loop",
+                            3, "7.8.1"));
+}
+
+// §18.16 and A.6.7 give `randcase_item ::= expression : statement_or_null`.
+TEST(WildcardIndexType, ForeachOnWildcardInRandcaseItemIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int aa[*];\n"
+      "  initial begin\n"
+      "    randcase\n"
+      "      1: foreach (aa[i]) ;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "wildcard associative array 'aa' may not be used "
+                            "in a foreach loop",
+                            5, "7.8.1"));
+}
+
+// §18.17 and A.6.12 give `rs_code_block ::= { { data_declaration } {
+// statement_or_null } }`.
+TEST(WildcardIndexType, ForeachOnWildcardInRandsequenceCodeBlockIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int aa[*];\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { foreach (aa[i]) ; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "wildcard associative array 'aa' may not be used "
+                            "in a foreach loop",
+                            5, "7.8.1"));
+}
+
 }  // namespace

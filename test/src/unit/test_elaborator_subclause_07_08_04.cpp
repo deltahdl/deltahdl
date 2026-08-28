@@ -259,4 +259,160 @@ TEST(IntegralIndexAssocArrayElaboration, InlinePackedDimensionIndexWidth) {
   EXPECT_FALSE(vars[0].is_index_signed);
 }
 
+// The seven cases below stand in the seven statement positions
+// WalkStmtsForIntegralIndexSelect in
+// src/elaborator/elaborator_validate_class_array_index.cpp reached only once it
+// took its list of nested statements from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. Each writes the real index
+// RealIndexExprIllegal above writes in a plain initial statement, and §7.8.4
+// rules on it the same way wherever it stands. Each elaborated clean
+// beforehand. The walk emits the one report of Subclause("7.8.4"); the §7.8.5
+// rule on a real index *type* is reported at the declaration instead, so it
+// has no statement position to cover.
+
+// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
+// block_item_declaration } { statement_or_null } join_keyword [ :
+// block_identifier ]`, so a fork arm is a statement position like any other.
+TEST(IntegralIndexAssocArrayElaboration, RealIndexInAForkArmIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int map[int];\n"
+      "  real r;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      x = map[r];\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real or shortreal index is not allowed on "
+                            "integral-indexed associative array 'map'",
+                            7, "7.8.4"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm.
+// This case covers the pass arm and the one below it the else arm.
+TEST(IntegralIndexAssocArrayElaboration,
+     RealIndexInAnAssertionPassStatementIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int map[int];\n"
+      "  real r;\n"
+      "  int x;\n"
+      "  logic ok;\n"
+      "  initial assert (ok) x = map[r];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real or shortreal index is not allowed on "
+                            "integral-indexed associative array 'map'",
+                            6, "7.8.4"));
+}
+
+TEST(IntegralIndexAssocArrayElaboration,
+     RealIndexInAnAssertionFailStatementIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int map[int];\n"
+      "  real r;\n"
+      "  int x;\n"
+      "  logic ok;\n"
+      "  initial assert (ok) else x = map[r];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real or shortreal index is not allowed on "
+                            "integral-indexed associative array 'map'",
+                            6, "7.8.4"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`. The rule is
+// a static one, so it holds whether the weighted draw would select the item or
+// not.
+TEST(IntegralIndexAssocArrayElaboration, RealIndexInARandcaseItemIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int map[int];\n"
+      "  real r;\n"
+      "  int x;\n"
+      "  initial randcase 1: x = map[r]; endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real or shortreal index is not allowed on "
+                            "integral-indexed associative array 'map'",
+                            5, "7.8.4"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements.
+TEST(IntegralIndexAssocArrayElaboration,
+     RealIndexInARandsequenceCodeBlockIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int map[int];\n"
+      "  real r;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { x = map[r]; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real or shortreal index is not allowed on "
+                            "integral-indexed associative array 'map'",
+                            7, "7.8.4"));
+}
+
+// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...` and
+// `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
+// function_subroutine_call`, so an assignment stands at each of the two
+// positions: this case writes one at the initialization and the case below it
+// writes one at the step.
+TEST(IntegralIndexAssocArrayElaboration,
+     RealIndexInAForLoopInitializationIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int map[int];\n"
+      "  real r;\n"
+      "  int x;\n"
+      "  int i;\n"
+      "  initial for (x = map[r]; i < 1; i = i + 1) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real or shortreal index is not allowed on "
+                            "integral-indexed associative array 'map'",
+                            6, "7.8.4"));
+}
+
+TEST(IntegralIndexAssocArrayElaboration, RealIndexInAForLoopStepIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int map[int];\n"
+      "  real r;\n"
+      "  int x;\n"
+      "  int i;\n"
+      "  initial for (i = 0; i < 1; x = map[r]) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real or shortreal index is not allowed on "
+                            "integral-indexed associative array 'map'",
+                            6, "7.8.4"));
+}
+
 }  // namespace

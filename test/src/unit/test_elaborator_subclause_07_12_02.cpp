@@ -162,4 +162,122 @@ TEST(ArrayOrderingElaboration, ShuffleOnAssocArrayIsError) {
                             3, "7.12.2"));
 }
 
+// §7.12.2 gives the array ordering methods no associative receiver, and states
+// that of the receiver rather than of the statement the call is written in.
+// WalkStmtsForArrayOrdering wrote out six of the thirteen statement links
+// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h states, so
+// each source below elaborated clean while the same `arr.sort();` one level up
+// was reported.
+//
+// Stmt::for_inits gets no case. A.6.8 admits only a
+// list_of_variable_assignments or a for_variable_declaration there, and A.6.2
+// gives `variable_assignment ::= variable_lvalue = expression`, so a
+// for-loop initialization holds an assignment and never a bare
+// function_subroutine_call; an ordering method returns no value, so it cannot
+// stand in the expression of one either. Stmt::for_steps does get a case,
+// because A.6.8 names function_subroutine_call among the for_step_assignment
+// alternatives.
+TEST(ArrayOrderingElaboration, SortOnAssocArrayInForkArmIsError) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  int arr [string];\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      arr.sort();\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array ordering method 'sort' cannot be applied to "
+                            "associative array 'arr'",
+                            5, "7.12.2"));
+}
+
+TEST(ArrayOrderingElaboration, SortOnAssocArrayInForStepIsError) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  int arr [string];\n"
+      "  integer i;\n"
+      "  initial for (i = 0; i < 0; arr.sort()) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array ordering method 'sort' cannot be applied to "
+                            "associative array 'arr'",
+                            4, "7.12.2"));
+}
+
+// A.6.10 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, which is Stmt::assert_pass_stmt here and
+// Stmt::assert_fail_stmt below.
+TEST(ArrayOrderingElaboration, SortOnAssocArrayInAssertPassIsError) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  int arr [string];\n"
+      "  initial assert (1) arr.sort();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array ordering method 'sort' cannot be applied to "
+                            "associative array 'arr'",
+                            3, "7.12.2"));
+}
+
+TEST(ArrayOrderingElaboration, SortOnAssocArrayInAssertFailIsError) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  int arr [string];\n"
+      "  initial assert (1) else arr.sort();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array ordering method 'sort' cannot be applied to "
+                            "associative array 'arr'",
+                            3, "7.12.2"));
+}
+
+// §18.16 and A.6.7 give `randcase_item ::= expression : statement_or_null`.
+TEST(ArrayOrderingElaboration, SortOnAssocArrayInRandcaseItemIsError) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  int arr [string];\n"
+      "  initial begin\n"
+      "    randcase\n"
+      "      1: arr.sort();\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array ordering method 'sort' cannot be applied to "
+                            "associative array 'arr'",
+                            5, "7.12.2"));
+}
+
+// §18.17 and A.6.12 give `rs_code_block ::= { { data_declaration } {
+// statement_or_null } }`.
+TEST(ArrayOrderingElaboration, SortOnAssocArrayInRandsequenceCodeBlockIsError) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  int arr [string];\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { arr.sort(); };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array ordering method 'sort' cannot be applied to "
+                            "associative array 'arr'",
+                            5, "7.12.2"));
+}
+
 }  // namespace

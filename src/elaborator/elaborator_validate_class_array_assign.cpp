@@ -220,12 +220,14 @@ void Elaborator::WalkStmtsForArrayAssign(const Stmt* s) {
       s->kind == StmtKind::kNonblockingAssign) {
     CheckArrayAssignExprs(s->lhs, s->rhs, s->range.start);
   }
-  for (auto* sub : s->stmts) WalkStmtsForArrayAssign(sub);
-  WalkStmtsForArrayAssign(s->then_branch);
-  WalkStmtsForArrayAssign(s->else_branch);
-  WalkStmtsForArrayAssign(s->body);
-  WalkStmtsForArrayAssign(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForArrayAssign(ci.body);
+  // §7.6 states the shape and element-type compatibility an array assignment
+  // requires and names no statement the requirement is suspended in, so this
+  // descends every link ForEachChildStmt in elaborator_validate_internal.h
+  // names and names no link itself. It wrote out six of the thirteen, so
+  // `fork a = b; join` and `assert (1) a = b;` reached CheckArrayAssignExprs
+  // in neither form while the same `a = b;` one level up was reported.
+  ForEachChildStmt(s,
+                   [this](Stmt* const& sub) { WalkStmtsForArrayAssign(sub); });
 }
 
 void Elaborator::ValidateArrayAssignments(const ModuleDecl* decl) {
@@ -477,13 +479,15 @@ static void WalkStmtsForAssocSlice(
   CheckAssocSliceExpr(s->rhs, assoc_names, diag);
   CheckAssocSliceExpr(s->expr, assoc_names, diag);
   CheckAssocSliceExpr(s->condition, assoc_names, diag);
-  for (auto* sub : s->stmts) WalkStmtsForAssocSlice(sub, assoc_names, diag);
-  WalkStmtsForAssocSlice(s->then_branch, assoc_names, diag);
-  WalkStmtsForAssocSlice(s->else_branch, assoc_names, diag);
-  WalkStmtsForAssocSlice(s->body, assoc_names, diag);
-  WalkStmtsForAssocSlice(s->for_body, assoc_names, diag);
-  for (auto& ci : s->case_items)
-    WalkStmtsForAssocSlice(ci.body, assoc_names, diag);
+  // §7.8 gives an associative array no slice, the rule the report names
+  // §7.4.6 for, and neither clause conditions it on the statement the slice is
+  // written in, so this descends every link ForEachChildStmt in
+  // elaborator_validate_internal.h names and names no link itself. It wrote out
+  // six of the thirteen, so `fork x = aa[1:2]; join` and a slice written in a
+  // randcase item were never looked at.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    WalkStmtsForAssocSlice(sub, assoc_names, diag);
+  });
 }
 
 void Elaborator::ValidateAssocArraySlices(const ModuleDecl* decl) {
@@ -616,16 +620,16 @@ static void WalkStmtsForWildcardTraversal(
   CheckWildcardTraversalExpr(s->rhs, wildcard_names, var_types, diag);
   CheckWildcardTraversalExpr(s->expr, wildcard_names, var_types, diag);
   CheckWildcardTraversalExpr(s->condition, wildcard_names, var_types, diag);
-  for (auto* sub : s->stmts)
+  // §7.8.1 bars a wildcard-indexed associative array from a foreach loop, from
+  // the §7.12 methods that return an index and from a nonintegral index, and
+  // names no statement the prohibition is lifted in, so this descends every
+  // link ForEachChildStmt in elaborator_validate_internal.h names and names no
+  // link itself. It wrote out six of the thirteen, so
+  // `fork foreach (aa[i]) ; join` and `assert (1) else x = aa[1.5];`
+  // elaborated clean.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForWildcardTraversal(sub, wildcard_names, var_types, diag);
-  WalkStmtsForWildcardTraversal(s->then_branch, wildcard_names, var_types,
-                                diag);
-  WalkStmtsForWildcardTraversal(s->else_branch, wildcard_names, var_types,
-                                diag);
-  WalkStmtsForWildcardTraversal(s->body, wildcard_names, var_types, diag);
-  WalkStmtsForWildcardTraversal(s->for_body, wildcard_names, var_types, diag);
-  for (auto& ci : s->case_items)
-    WalkStmtsForWildcardTraversal(ci.body, wildcard_names, var_types, diag);
+  });
 }
 
 void Elaborator::ValidateAssocWildcardTraversal(const ModuleDecl* decl) {
@@ -770,14 +774,16 @@ static void WalkStmtsForTraversalArgType(
   CheckTraversalArgTypeExpr(s->rhs, assoc_keys, var_types, diag);
   CheckTraversalArgTypeExpr(s->expr, assoc_keys, var_types, diag);
   CheckTraversalArgTypeExpr(s->condition, assoc_keys, var_types, diag);
-  for (auto* sub : s->stmts)
+  // §7.9.8 requires a traversal method's argument to be assignment compatible
+  // with the array's index type, and §7.9.4 through §7.9.7 bar the four methods
+  // on a wildcard-indexed array; neither rule is conditioned on the statement
+  // the call is written in, so this descends every link ForEachChildStmt in
+  // elaborator_validate_internal.h names and names no link itself. It wrote out
+  // six of the thirteen, so `fork status = aa.first(s); join` and the same call
+  // written in a randsequence production code block went unchecked.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForTraversalArgType(sub, assoc_keys, var_types, diag);
-  WalkStmtsForTraversalArgType(s->then_branch, assoc_keys, var_types, diag);
-  WalkStmtsForTraversalArgType(s->else_branch, assoc_keys, var_types, diag);
-  WalkStmtsForTraversalArgType(s->body, assoc_keys, var_types, diag);
-  WalkStmtsForTraversalArgType(s->for_body, assoc_keys, var_types, diag);
-  for (auto& ci : s->case_items)
-    WalkStmtsForTraversalArgType(ci.body, assoc_keys, var_types, diag);
+  });
 }
 
 void Elaborator::ValidateAssocTraversalArgType(const ModuleDecl* decl) {
@@ -902,14 +908,15 @@ static void WalkStmtsForArrayOrdering(
   CheckArrayOrderingExpr(s->lhs, var_array_info, diag);
   CheckArrayOrderingExpr(s->rhs, var_array_info, diag);
   CheckArrayOrderingExpr(s->condition, var_array_info, diag);
-  for (auto* sub : s->stmts)
+  // §7.12.2 gives the array ordering methods no associative receiver and gives
+  // reverse() and shuffle() no with clause, and names no statement either rule
+  // is suspended in, so this descends every link ForEachChildStmt in
+  // elaborator_validate_internal.h names and names no link itself. It wrote out
+  // six of the thirteen, so `fork aa.sort(); join` and `assert (1) aa.sort();`
+  // reached CheckArrayOrderingExpr in neither form.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForArrayOrdering(sub, var_array_info, diag);
-  WalkStmtsForArrayOrdering(s->then_branch, var_array_info, diag);
-  WalkStmtsForArrayOrdering(s->else_branch, var_array_info, diag);
-  WalkStmtsForArrayOrdering(s->body, var_array_info, diag);
-  WalkStmtsForArrayOrdering(s->for_body, var_array_info, diag);
-  for (auto& ci : s->case_items)
-    WalkStmtsForArrayOrdering(ci.body, var_array_info, diag);
+  });
 }
 
 void Elaborator::ValidateArrayOrderingMethods(const ModuleDecl* decl) {

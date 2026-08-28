@@ -517,4 +517,171 @@ TEST(ClassScopeResolutionElaboration, ScopedTypedefSizesWithNoUnqualifiedName) {
   EXPECT_EQ(x->width, 32u);
 }
 
+// The seven cases below cover the child-statement links of Stmt that
+// WalkStmtsForRestrictedScopePrefix in
+// src/elaborator/elaborator_validate_classes.cpp reaches for the first time now
+// that it takes its list from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. It had written out six of the
+// thirteen, so a restricted prefix standing in any of the other seven reached
+// CheckRestrictedScopePrefixExpr through no link and was left unreported. Each
+// case writes the prefix kind IncompleteForwardTypePrefixIsError above uses,
+// because the three contexts §8.23 permits are parsed as data types and never
+// as expressions, which puts a prefix reached from a statement outside the
+// permitted set wherever that statement stands. The report is at the prefix
+// itself, the `C` of `C::val`.
+
+// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
+// block_item_declaration } { statement_or_null } join_keyword`, so a fork arm
+// holds the expression like any other statement position.
+TEST(ClassScopeResolutionElaboration,
+     IncompleteForwardTypePrefixInForkArmIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef class C;\n"
+      "  int x;\n"
+      "  initial fork\n"
+      "    x = C::val;\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "incomplete forward type 'C' may prefix the class scope "
+                    "resolution operator",
+                    5, "8.23"));
+}
+
+// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`, so
+// the right-hand side of a header assignment is an ordinary expression. The
+// loop's control variable is declared above the loop, which leaves the header
+// as the only place the prefix is written.
+TEST(ClassScopeResolutionElaboration,
+     IncompleteForwardTypePrefixInForInitializationIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef class C;\n"
+      "  int x;\n"
+      "  int i;\n"
+      "  initial for (x = C::val; i < 2; i = i + 1) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "incomplete forward type 'C' may prefix the class scope "
+                    "resolution operator",
+                    5, "8.23"));
+}
+
+// A.6.8 gives `for_step_assignment ::= operator_assignment |
+// inc_or_dec_expression | function_subroutine_call`, so a for step carries an
+// expression the same way.
+TEST(ClassScopeResolutionElaboration,
+     IncompleteForwardTypePrefixInForStepIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef class C;\n"
+      "  int x;\n"
+      "  int i;\n"
+      "  initial for (i = 0; i < 2; x = C::val) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "incomplete forward type 'C' may prefix the class scope "
+                    "resolution operator",
+                    5, "8.23"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm.
+// Which arm runs is settled when the design runs, and §8.23 restricts where the
+// prefix may be written.
+TEST(ClassScopeResolutionElaboration,
+     IncompleteForwardTypePrefixInAssertionPassStmtIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef class C;\n"
+      "  int x;\n"
+      "  initial assert (1) x = C::val;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "incomplete forward type 'C' may prefix the class scope "
+                    "resolution operator",
+                    4, "8.23"));
+}
+
+TEST(ClassScopeResolutionElaboration,
+     IncompleteForwardTypePrefixInAssertionFailStmtIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef class C;\n"
+      "  int x;\n"
+      "  initial assert (1) else x = C::val;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "incomplete forward type 'C' may prefix the class scope "
+                    "resolution operator",
+                    4, "8.23"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
+// statement the parser keeps in the second member of a Stmt::randcase_items
+// entry. The item is reported whether the weighted draw would select it or
+// not.
+TEST(ClassScopeResolutionElaboration,
+     IncompleteForwardTypePrefixInRandcaseItemIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef class C;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    randcase\n"
+      "      1 : x = C::val;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "incomplete forward type 'C' may prefix the class scope "
+                    "resolution operator",
+                    6, "8.23"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements. Parser::ParseRsCodeBlockStmts in src/parser/parser_verify.cpp
+// puts them in RsProd::code_stmts, which Stmt::rs_productions reaches and no
+// other member of Stmt does.
+TEST(ClassScopeResolutionElaboration,
+     IncompleteForwardTypePrefixInRandsequenceCodeBlockIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef class C;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { x = C::val; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "incomplete forward type 'C' may prefix the class scope "
+                    "resolution operator",
+                    6, "8.23"));
+}
+
 }  // namespace
