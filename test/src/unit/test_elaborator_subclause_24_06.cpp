@@ -256,7 +256,7 @@ TEST(AnonymousProgramWideSpace, ProgramCallingAnonymousProgramTaskElaborates) {
       "  task probe(); endtask\n"
       "endprogram\n"
       "module top;\n"
-      "  program checker;\n"
+      "  program tb;\n"
       "    initial probe();\n"
       "  endprogram\n"
       "endmodule\n",
