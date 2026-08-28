@@ -4,18 +4,25 @@ description: >-
   binary names so callers never name a version. Which packages arrive is the
   caller's choice and defaults to the whole toolchain (clang, clang-tidy,
   clang-format, lld, llvm-cov, llvm-profdata) plus the compiler-rt profile
-  runtime. Nothing is pinned in this file: a caller that passes no major gets
-  the latest LLVM stable release, discovered at run time.
+  runtime. The release is this file's to choose: a caller that passes no major
+  gets the major named below, and it changes when a commit here changes it.
 inputs:
   major:
-    default: ''
+    default: '22'
     description: >-
       LLVM major version to install. Pass the major output of an earlier call
       to install exactly what that call installed, which is what two jobs
       exchanging compiled artifacts need: a release landing between them
       otherwise leaves the second job compiling against the first job's
-      objects with a different compiler. Left empty, the newest stable major
-      is discovered at run time and nothing is pinned.
+      objects with a different compiler. Passed empty, the newest stable major
+      is discovered at run time, which is how the default below is chosen when
+      it is raised. The default is a number rather than empty because
+      clang-format and clang-tidy judge the whole tree rather than a diff, so
+      a release published between two pushes re-judges code no commit touched:
+      LLVM 23 reported 930 clang-tidy diagnostics and one clang-format
+      violation against a tree LLVM 22 passed, and every build, e2e and
+      integration job behind those gates was skipped. Raising it is its own
+      commit, carrying whatever the tree owes the new release.
     required: false
   packages:
     default: >-
