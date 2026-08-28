@@ -17,6 +17,7 @@
 #include "elaborator/elaborator_decls_internal.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -36,20 +37,20 @@ void InferDynArraySize(const std::vector<Expr*>& dims, const Expr* init,
 static bool TryParseQueueDim(const Expr* dim, RtlirVariable& var,
                              DiagEngine& diag, SourceLoc loc,
                              const ScopeMap& scope) {
-  if (dim->kind != ExprKind::kIdentifier || dim->text != "$") return false;
+  if (!IsQueueDim(dim)) return false;
   var.is_queue = true;
   if (dim->rhs) {
-    // §7.10: the optional right bound is a constant_expression that shall
-    // evaluate to a positive integer. Per §11.2.1 that expression may name a
-    // parameter or localparam, so it is evaluated in the enclosing parameter
-    // scope — just like a range dimension's bounds.
+    // §7.10: the optional right bound is a constant_expression, which per
+    // §11.2.1 may name a parameter or localparam. Evaluate it in the enclosing
+    // parameter scope — just like a range dimension's bounds.
     auto max_val = ConstEvalInt(dim->rhs, scope);
     if (max_val) {
-      if (*max_val <= 0) {
+      auto max_size = QueueBoundMaxSize(*max_val);
+      if (max_size) {
+        var.queue_max_size = *max_size;
+      } else {
         diag.Error(loc, "queue bound must be a positive integer",
                    Subclause("7.10"));
-      } else {
-        var.queue_max_size = static_cast<int32_t>(*max_val + 1);
       }
     }
   }

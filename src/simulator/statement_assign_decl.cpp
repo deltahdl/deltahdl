@@ -2,11 +2,13 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "common/arena.h"
+#include "elaborator/queue_dim.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
@@ -38,6 +40,32 @@ static void CreateBlockArrayElements(const Stmt* stmt, uint32_t elem_width,
     auto name = std::string(stmt->var_name) + "[" + std::to_string(idx) + "]";
     ctx.CreateVariable(*arena.Create<std::string>(std::move(name)), elem_width);
   }
+}
+
+// §7.10: a declaration whose first unpacked dimension is `[$]` or `[$:N]`
+// declares a queue, wherever the declaration stands. Creates the QueueObject
+// the queue methods of §7.10.2 operate on, so that a declaration inside a
+// procedural block gets the same backing store a declaration among a module's
+// items gets from Lowerer::LowerVarAggregate. Returns true when it made one.
+static bool CreateBlockQueue(const Stmt* stmt, uint32_t elem_width,
+                             SimContext& ctx, Arena& arena) {
+  if (stmt->var_unpacked_dims.empty()) return false;
+  const auto* dim = stmt->var_unpacked_dims[0];
+  if (!IsQueueDim(dim)) return false;
+  // §7.10.5: N in `[$:N]` bounds the queue at N + 1 elements, and `[$]` leaves
+  // it unbounded, which CreateQueue spells -1. A bound the subclause rules out
+  // is left unbounded here rather than reported: the elaborator's
+  // CheckBlockQueueBounds already reports it, and a second report of one
+  // declaration's one error would name the same rule twice.
+  int32_t max_size = -1;
+  if (dim->rhs) {
+    auto bound =
+        static_cast<int64_t>(EvalExpr(dim->rhs, ctx, arena).ToUint64());
+    if (auto size = QueueBoundMaxSize(bound)) max_size = *size;
+  }
+  ctx.CreateQueue(stmt->var_name, elem_width, max_size,
+                  Is4stateType(stmt->var_decl_type.kind));
+  return true;
 }
 
 static bool TryExecWeakRefVarDecl(const Stmt* stmt, SimContext& ctx,
@@ -161,7 +189,11 @@ static void CreateDeclVariable(const Stmt* stmt, uint32_t width, bool is_real,
     if (is_real && width < 64) width = 64;
     CreateVarInScope(stmt->var_name, width, ctx);
     if (is_real) ctx.RegisterRealVariable(stmt->var_name);
-    CreateBlockArrayElements(stmt, width, ctx, arena);
+    // §7.10: a queue dimension is not the range dimension of a fixed-size
+    // unpacked array, so a declaration is one or the other and never both.
+    if (!CreateBlockQueue(stmt, width, ctx, arena)) {
+      CreateBlockArrayElements(stmt, width, ctx, arena);
+    }
   }
 }
 

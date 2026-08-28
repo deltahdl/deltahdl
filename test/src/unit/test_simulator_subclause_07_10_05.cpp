@@ -696,4 +696,47 @@ TEST(BoundedQueue, StreamingUnpackWithRangeWithinBoundNoWarning) {
   EXPECT_EQ(FindDiag(f, "bounded queue overflow"), nullptr);
 }
 
+// §7.10.5: "if, after any operation that writes to a bounded queue variable,
+// that variable has any elements beyond its bound, then all such out-of-bounds
+// elements shall be discarded". §7.10 declares a queue wherever the
+// declaration stands, so `[$:1]` inside a procedural block bounds that queue
+// at two elements and the third push_back leaves two behind.
+TEST(BoundedQueue, BlockScopedBoundTruncatesPushBack) {
+  SimFixture f;
+  auto* q = RunAndFindQ(
+      "module t;\n"
+      "  initial begin\n"
+      "    int q[$:1];\n"
+      "    q.push_back(10);\n"
+      "    q.push_back(20);\n"
+      "    q.push_back(30);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(q, nullptr);
+  ASSERT_EQ(q->elements.size(), 2u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
+}
+
+// §7.10.5: the same discard "shall be issued" a warning, and the report the
+// push_back on line 6 raises names §7.10.5 as the rule it enforces.
+TEST(BoundedQueue, BlockScopedBoundWarningNames7_10_5) {
+  SimFixture f;
+  auto* q = RunAndFindQ(
+      "module t;\n"
+      "  initial begin\n"
+      "    int q[$:1];\n"
+      "    q.push_back(10);\n"
+      "    q.push_back(20);\n"
+      "    q.push_back(30);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(q, nullptr);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "bounded queue overflow in push_back", 6,
+                              "7.10.5"));
+}
+
 }  // namespace

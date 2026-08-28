@@ -48,4 +48,22 @@ TEST(BoundedQueueElaboration, NegativeBoundIsError) {
                             "7.10"));
 }
 
+// §7.10, Syntax 7-4: the bound in `[$:N]` "shall evaluate to a positive
+// integer value", and the subclause puts no scope on that, so a declaration
+// inside a procedural block is held to it as a module item's declaration is.
+// The report names §7.10 for the reason given above BoundOfZeroIsError.
+TEST(BoundedQueueElaboration, BlockScopedBoundOfZeroIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    int q[$:0];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "queue bound must be a positive integer", 3,
+                            "7.10"));
+}
+
 }  // namespace

@@ -7,6 +7,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -113,6 +114,8 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
     CheckProceduralAssignLhs(item->body, diag_);
 
     CheckForceLhs(item->body, net_names_, nettype_net_names_, diag_);
+
+    CheckBlockQueueBounds(item->body, scope, diag_);
 
     WalkStmtsForLhsPatternKeys(item->body, diag_);
   }
