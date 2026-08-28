@@ -208,4 +208,40 @@ TEST(CastOperatorSim, IntCastFromRealRoundsHalfUp) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
+// §6.24.1: a signing cast returns the value a packed [n-1:0] type holds after
+// being assigned the expression, with n the operand's own width, and gives the
+// result the signedness the cast names. §11.7 spells the same conversion two
+// ways, so signed'(c) in a localparam initializer must resolve as $signed(c)
+// does: the unsigned four-bit 1100 becomes the signed -4, and assigning that
+// to the signed eight-bit parameter sign-extends it to 8'hFC.
+TEST(CastOperatorSim, SigningCastFoldsInLocalparamInitializer) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  localparam signed [7:0] P = signed'(4'b1100);\n"
+      "  logic signed [7:0] r;\n"
+      "  initial r = P;\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xFCu);
+}
+
+// §6.24.1: a size cast returns the value at the cast size and passes the
+// operand's self-determined signedness through unchanged. A localparam
+// initialized from 8'(4'b1100) therefore holds 8'h0C, the unsigned four-bit
+// operand zero-extended to eight bits, and not the sign-extended 8'hFC.
+TEST(CastOperatorSim, SizeCastFoldsInLocalparamInitializer) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  localparam [7:0] P = 8'(4'b1100);\n"
+      "  logic [7:0] r;\n"
+      "  initial r = P;\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x0Cu);
+}
+
 }  // namespace

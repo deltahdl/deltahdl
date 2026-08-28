@@ -9,6 +9,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 
@@ -566,6 +567,36 @@ static std::optional<ConstVal> ConstEvalIdentifierFull(const Expr* expr,
   return std::nullopt;
 }
 
+// §6.24.1: what a cast expression is worth. Each form decides the width and the
+// signedness the operand's bits are read by, which is what NormalizeConstVal
+// applies: a signing cast keeps "the number of bits in the expression to be
+// cast" and sets "the signedness specified by the cast type"; a size cast takes
+// "the cast size" and leaves "the self-determined signedness of the expression
+// inside the cast" alone; a const cast lets "the type of the expression to be
+// cast pass through unchanged"; a cast to a predefined type takes both from
+// that type; and a void cast has no value to return.
+static std::optional<ConstVal> ConstEvalCastFull(const Expr* expr,
+                                                 const ScopeMap& scope) {
+  if (expr->text == "void") return std::nullopt;
+  auto operand = ConstEvalFull(expr->lhs, scope);
+  if (!operand) return std::nullopt;
+  if (expr->text == "const") return *operand;
+  if (expr->text == "signed" || expr->text == "unsigned")
+    return NormalizeConstVal(operand->value, operand->width,
+                             expr->text == "signed");
+  uint32_t width = CastTargetWidth(expr->text);
+  // A cast to a user-defined type takes its width from the typedef map, which
+  // ConstEvalFull is not given: a ScopeMap is its only other argument. The
+  // operand's own width and signedness stand in, as InferCastWidth in
+  // src/elaborator/type_eval.cpp falls back to the operand's width for the same
+  // reason. CastTargetWidth answers 0 for a user-defined name and for `string`.
+  if (width == 0) return *operand;
+  if (expr->text[0] >= '0' && expr->text[0] <= '9')
+    return NormalizeConstVal(operand->value, width, operand->is_signed);
+  return NormalizeConstVal(operand->value, width,
+                           TypeNameToDataType(expr->text).is_signed);
+}
+
 std::optional<ConstVal> ConstEvalFull(const Expr* expr, const ScopeMap& scope) {
   if (!expr) return std::nullopt;
 
@@ -600,6 +631,8 @@ std::optional<ConstVal> ConstEvalFull(const Expr* expr, const ScopeMap& scope) {
       return ConstEvalSelectFull(expr, scope);
     case ExprKind::kSystemCall:
       return ConstEvalSysCallFull(expr, scope);
+    case ExprKind::kCast:
+      return ConstEvalCastFull(expr, scope);
     case ExprKind::kMemberAccess:
       return ConstEvalMemberAccessFull(expr, scope);
     case ExprKind::kCall: {

@@ -1,6 +1,7 @@
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -334,6 +335,38 @@ TEST(CastOperatorElaboration, SizeCastZeroWidthNames6_24_1) {
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "size cast target width must be a positive constant", 4, "6.24.1"));
+}
+
+// §6.24.1: "If the casting type is a constant expression with a positive
+// integral value, the expression in parentheses shall be padded or truncated to
+// the size specified." So 4'(20) is 20 truncated to four bits: 20 is 5'b10100,
+// its low four bits are 4'b0100, and the value is 4. §6.20.4 makes a
+// localparam identical to a parameter but for the ways it can be overridden, so
+// one holding that value is a constant expression and legal as a packed range
+// bound, and `logic [W-1:0] r` with W folded to 4 is [3:0] -- four bits wide.
+//
+// This reads the recorded width rather than the absence of a diagnostic because
+// an initializer accepted as constant and then folded to nothing reports
+// nothing: the localparam is left with no value, and a case asserting the
+// module elaborates cleanly passes whether the cast folded or not. A packed
+// range bound has to resolve to a number before the elaborator can record a
+// width, so the width it records is the value the fold produced. The three
+// outcomes are distinct: 4 is the folded cast, 22 is a fold that passed the
+// operand through without truncating it to four bits, and anything else is a
+// range that never resolved.
+TEST(CastOperatorElaboration, SizeCastInLocalparamSizesAPackedRange) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam int W = 4'(20);\n"
+      "  logic [W-1:0] r;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* var = FindVar(design, "m", "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->width, 4u);
 }
 
 }  // namespace
