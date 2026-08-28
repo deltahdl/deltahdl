@@ -109,4 +109,112 @@ TEST(IfMatchesElaboration, RealValueMatchesInTrailingClauseRejected) {
                             8, "12.6.2"));
 }
 
+// §12.6.2 requires each `e matches p` clause of an if-else predicate to pair a
+// value and a pattern of one type, and puts no condition on where that if
+// statement stands. CheckMatchesIfPredicateStmt in
+// src/elaborator/elaborator_validate_matches.cpp had written out seven of the
+// thirteen child-statement links Stmt declares, and now takes the list from
+// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The cases
+// below cover one newly reached position each. Stmt::for_inits and
+// Stmt::for_steps are the two remaining ones and get no case: A.6.8 admits only
+// a variable assignment or a declaration there, so an if statement cannot be
+// written in either.
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
+// next cover one arm each.
+TEST(IfMatchesElaboration, RealValueInAnAssertionPassStatementIsReported) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  real r;\n"
+      "  logic [7:0] y;\n"
+      "  logic ok;\n"
+      "  initial assert (ok) if (r matches 8'd5) y = 8'd1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pattern-matching if predicate value type differs",
+                            5, "12.6.2"));
+}
+
+TEST(IfMatchesElaboration, RealValueInAnAssertionFailStatementIsReported) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  real r;\n"
+      "  logic [7:0] y;\n"
+      "  logic ok;\n"
+      "  initial assert (ok) else if (r matches 8'd5) y = 8'd1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pattern-matching if predicate value type differs",
+                            5, "12.6.2"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, kept in
+// Stmt::randcase_items. §12.6.2 is a rule about the source, so it holds whether
+// the weighted draw would select the item or not.
+TEST(IfMatchesElaboration, RealValueInARandcaseItemIsReported) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  real r;\n"
+      "  logic [7:0] y;\n"
+      "  initial randcase 1: if (r matches 8'd5) y = 8'd1; endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pattern-matching if predicate value type differs",
+                            4, "12.6.2"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements. They are kept in RsProd::code_stmts, reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(IfMatchesElaboration, RealValueInARandsequenceCodeBlockIsReported) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  real r;\n"
+      "  logic [7:0] y;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { if (r matches 8'd5) y = 8'd1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pattern-matching if predicate value type differs",
+                            6, "12.6.2"));
+}
+
+// §18.17.1 lets a weight specification be followed by a code block of its own,
+// which the parser keeps in RsRule::weight_code. It is a second list under
+// Stmt::rs_productions, so a walk reaches it without reaching
+// RsProd::code_stmts and the case above does not answer for it.
+TEST(IfMatchesElaboration, RealValueInARandsequenceWeightCodeBlockIsReported) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  real r;\n"
+      "  logic [7:0] y;\n"
+      "  integer i;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : alt := 1 { if (r matches 8'd5) y = 8'd1; };\n"
+      "      alt : { i = 1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pattern-matching if predicate value type differs",
+                            7, "12.6.2"));
+}
+
 }  // namespace

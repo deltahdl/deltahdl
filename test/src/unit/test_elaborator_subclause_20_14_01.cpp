@@ -132,4 +132,126 @@ TEST(RandomSeedType, SeedlessFormIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §20.14.1 requires the seed argument of $random to be an integral variable and
+// puts no condition on where the call is written, so every position a statement
+// holds a statement in is a position the report is made at. CheckRandomSeedStmt
+// in src/elaborator/elaborator_validate_matches.cpp had written out eight of
+// the thirteen child-statement links Stmt declares, and now takes the list from
+// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The cases
+// below cover one newly reached position each.
+
+// Stmt::for_steps holds a for loop's step assignments, a member of its own
+// beside the initializers the walk already reached.
+TEST(RandomSeedType, RealSeedInAForStepIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  real seed;\n"
+      "  integer x;\n"
+      "  integer i;\n"
+      "  initial for (i = 0; i < 2; x = $random(seed)) begin end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "seed argument of $random shall be an integral variable", 5, "20.14.1"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
+// next cover one arm each.
+TEST(RandomSeedType, RealSeedInAnAssertionPassStatementIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  real seed;\n"
+      "  integer x;\n"
+      "  logic ok;\n"
+      "  initial assert (ok) x = $random(seed);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "seed argument of $random shall be an integral variable", 5, "20.14.1"));
+}
+
+TEST(RandomSeedType, RealSeedInAnAssertionFailStatementIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  real seed;\n"
+      "  integer x;\n"
+      "  logic ok;\n"
+      "  initial assert (ok) else x = $random(seed);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "seed argument of $random shall be an integral variable", 5, "20.14.1"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, kept in
+// Stmt::randcase_items. §20.14.1 is a rule about the source, so it holds
+// whether the weighted draw would select the item or not.
+TEST(RandomSeedType, RealSeedInARandcaseItemIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  real seed;\n"
+      "  integer x;\n"
+      "  initial randcase 1: x = $random(seed); endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "seed argument of $random shall be an integral variable", 4, "20.14.1"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements. They are kept in RsProd::code_stmts, reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(RandomSeedType, RealSeedInARandsequenceCodeBlockIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  real seed;\n"
+      "  integer x;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { x = $random(seed); };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "seed argument of $random shall be an integral variable", 6, "20.14.1"));
+}
+
+// §18.17.1 lets a weight specification be followed by a code block of its own,
+// which the parser keeps in RsRule::weight_code. It is a second list under
+// Stmt::rs_productions, so a walk reaches it without reaching
+// RsProd::code_stmts and the case above does not answer for it.
+TEST(RandomSeedType, RealSeedInARandsequenceWeightCodeBlockIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  real seed;\n"
+      "  integer x;\n"
+      "  integer i;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : alt := 1 { x = $random(seed); };\n"
+      "      alt : { i = 1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "seed argument of $random shall be an integral variable", 7, "20.14.1"));
+}
+
 }  // namespace

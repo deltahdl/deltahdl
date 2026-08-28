@@ -25,18 +25,24 @@ static void CheckLhsPatternNamedKeys(const Expr* lhs, DiagEngine& diag) {
   }
 }
 
+// §10.9 puts no condition on where the assignment whose left-hand side is a
+// pattern stands, so every position a statement holds a statement in is a
+// position the rule reaches. ForEachChildStmt in elaborator_validate_internal.h
+// states those positions once for the whole elaborator, which is why the list
+// is not written out again here.
+//
+// The visitor takes `Stmt* const&` because `s` is a `const Stmt*`, which is how
+// ForEachChildStmt lets a walk that only reads the tree share its list with the
+// walks that rewrite it. Nothing stops early, since §10.9 is broken as many
+// times as a source writes a keyed pattern on the left of an assignment.
 static void WalkStmtsForLhsPatternKeys(const Stmt* s, DiagEngine& diag) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign) {
     CheckLhsPatternNamedKeys(s->lhs, diag);
   }
-  for (auto* sub : s->stmts) WalkStmtsForLhsPatternKeys(sub, diag);
-  WalkStmtsForLhsPatternKeys(s->then_branch, diag);
-  WalkStmtsForLhsPatternKeys(s->else_branch, diag);
-  WalkStmtsForLhsPatternKeys(s->body, diag);
-  WalkStmtsForLhsPatternKeys(s->for_body, diag);
-  for (auto& ci : s->case_items) WalkStmtsForLhsPatternKeys(ci.body, diag);
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { WalkStmtsForLhsPatternKeys(sub, diag); });
 }
 
 // §10.9: a positional assignment pattern on the LHS shall hold the same number
@@ -70,6 +76,10 @@ static void CheckLhsPatternWidthSum(const Expr* lhs, const Expr* rhs,
              Subclause("10.9"));
 }
 
+// §10.9's bit-count rule reaches an assignment wherever one is written, as the
+// keyed-notation rule above does. ForEachChildStmt in
+// elaborator_validate_internal.h states those positions once for the whole
+// elaborator, which is why the list is not written out again here.
 static void WalkStmtsForLhsPatternWidths(const Stmt* s, const RtlirModule* mod,
                                          const TypedefMap& typedefs,
                                          DiagEngine& diag) {
@@ -78,14 +88,9 @@ static void WalkStmtsForLhsPatternWidths(const Stmt* s, const RtlirModule* mod,
       s->kind == StmtKind::kNonblockingAssign) {
     CheckLhsPatternWidthSum(s->lhs, s->rhs, mod, typedefs, diag);
   }
-  for (auto* sub : s->stmts)
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForLhsPatternWidths(sub, mod, typedefs, diag);
-  WalkStmtsForLhsPatternWidths(s->then_branch, mod, typedefs, diag);
-  WalkStmtsForLhsPatternWidths(s->else_branch, mod, typedefs, diag);
-  WalkStmtsForLhsPatternWidths(s->body, mod, typedefs, diag);
-  WalkStmtsForLhsPatternWidths(s->for_body, mod, typedefs, diag);
-  for (auto& ci : s->case_items)
-    WalkStmtsForLhsPatternWidths(ci.body, mod, typedefs, diag);
+  });
 }
 
 void Elaborator::ValidateLhsPatternWidths(const ModuleDecl* decl,
@@ -254,20 +259,20 @@ static void WalkMatchesPatternStmtExprs(const Stmt* s, DiagEngine& diag) {
   if (s->for_cond) WalkExprForMatchesOp(s->for_cond, diag);
 }
 
+// §12.6 requires a constant expression pattern to be integral and a pattern
+// identifier to bind once, wherever the pattern is written -- in a case-matches
+// item or in a `matches` operator inside any expression a statement holds.
+// ForEachChildStmt in elaborator_validate_internal.h states those positions
+// once for the whole elaborator, which is why the list is not written out again
+// here.
 static void WalkStmtForMatchesPattern(const Stmt* s, DiagEngine& diag) {
   if (!s) return;
   if (s->kind == StmtKind::kCase && s->case_matches) {
     CheckCaseMatchesPatterns(s, diag);
   }
   WalkMatchesPatternStmtExprs(s, diag);
-  for (auto* sub : s->stmts) WalkStmtForMatchesPattern(sub, diag);
-  for (auto* sub : s->fork_stmts) WalkStmtForMatchesPattern(sub, diag);
-  WalkStmtForMatchesPattern(s->then_branch, diag);
-  WalkStmtForMatchesPattern(s->else_branch, diag);
-  WalkStmtForMatchesPattern(s->body, diag);
-  WalkStmtForMatchesPattern(s->for_body, diag);
-  for (auto& ci : s->case_items) WalkStmtForMatchesPattern(ci.body, diag);
-  for (auto& ri : s->randcase_items) WalkStmtForMatchesPattern(ri.second, diag);
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { WalkStmtForMatchesPattern(sub, diag); });
 }
 
 void Elaborator::ValidateMatchesPatternIntegral(const ModuleDecl* decl) {
@@ -313,6 +318,10 @@ static void CheckRealSelectorAgainstIntegralPatterns(const Stmt* s,
   }
 }
 
+// §12.6.1 holds of a pattern-matching case statement wherever one is written.
+// ForEachChildStmt in elaborator_validate_internal.h states those positions
+// once for the whole elaborator, which is why the list is not written out again
+// here.
 static void CheckMatchesCaseSelectorType(const Stmt* s, const TypeMap& types,
                                          DiagEngine& diag) {
   if (!s) return;
@@ -323,15 +332,9 @@ static void CheckMatchesCaseSelectorType(const Stmt* s, const TypeMap& types,
       CheckRealSelectorAgainstIntegralPatterns(s, diag);
     }
   }
-  for (auto* sub : s->stmts) CheckMatchesCaseSelectorType(sub, types, diag);
-  for (auto* sub : s->fork_stmts)
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     CheckMatchesCaseSelectorType(sub, types, diag);
-  CheckMatchesCaseSelectorType(s->then_branch, types, diag);
-  CheckMatchesCaseSelectorType(s->else_branch, types, diag);
-  CheckMatchesCaseSelectorType(s->body, types, diag);
-  CheckMatchesCaseSelectorType(s->for_body, types, diag);
-  for (const auto& ci : s->case_items)
-    CheckMatchesCaseSelectorType(ci.body, types, diag);
+  });
 }
 
 void Elaborator::ValidateMatchesCaseSelectorType(const ModuleDecl* decl) {
@@ -374,20 +377,19 @@ static void CheckMatchesIfPredicate(const Expr* pred, const TypeMap& types,
   }
 }
 
+// §12.6.2 holds of a pattern-matching if statement wherever one is written.
+// ForEachChildStmt in elaborator_validate_internal.h states those positions
+// once for the whole elaborator, which is why the list is not written out again
+// here.
 static void CheckMatchesIfPredicateStmt(const Stmt* s, const TypeMap& types,
                                         DiagEngine& diag) {
   if (!s) return;
   if (s->kind == StmtKind::kIf && s->condition) {
     CheckMatchesIfPredicate(s->condition, types, diag);
   }
-  for (auto* sub : s->stmts) CheckMatchesIfPredicateStmt(sub, types, diag);
-  for (auto* sub : s->fork_stmts) CheckMatchesIfPredicateStmt(sub, types, diag);
-  CheckMatchesIfPredicateStmt(s->then_branch, types, diag);
-  CheckMatchesIfPredicateStmt(s->else_branch, types, diag);
-  CheckMatchesIfPredicateStmt(s->body, types, diag);
-  CheckMatchesIfPredicateStmt(s->for_body, types, diag);
-  for (const auto& ci : s->case_items)
-    CheckMatchesIfPredicateStmt(ci.body, types, diag);
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    CheckMatchesIfPredicateStmt(sub, types, diag);
+  });
 }
 
 void Elaborator::ValidateMatchesIfPredicateType(const ModuleDecl* decl) {
@@ -539,6 +541,10 @@ void Elaborator::ValidateInputPortAssignments(const ModuleDecl* decl) {
   }
 }
 
+// §9.6.2 bars a disable statement naming a function wherever the disable is
+// written. ForEachChildStmt in elaborator_validate_internal.h states those
+// positions once for the whole elaborator, which is why the list is not written
+// out again here.
 static void CheckDisableTargets(
     const Stmt* s,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -552,15 +558,8 @@ static void CheckDisableTargets(
                  Subclause("9.6.2"));
     }
   }
-  for (auto* sub : s->stmts) CheckDisableTargets(sub, func_decls, diag);
-  for (auto* sub : s->fork_stmts) CheckDisableTargets(sub, func_decls, diag);
-  CheckDisableTargets(s->then_branch, func_decls, diag);
-  CheckDisableTargets(s->else_branch, func_decls, diag);
-  CheckDisableTargets(s->body, func_decls, diag);
-  CheckDisableTargets(s->for_body, func_decls, diag);
-  for (auto& ci : s->case_items) CheckDisableTargets(ci.body, func_decls, diag);
-  for (auto& ri : s->randcase_items)
-    CheckDisableTargets(ri.second, func_decls, diag);
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { CheckDisableTargets(sub, func_decls, diag); });
 }
 
 void Elaborator::ValidateDisableTargets(const ModuleDecl* decl) {
@@ -659,6 +658,10 @@ void CheckArrayQueryOnDynamicTypeExpr(
     CheckArrayQueryOnDynamicTypeExpr(el, dyn_types, diag);
 }
 
+// §20.7 bars a direct query on a dynamically sized type identifier wherever the
+// query is written. ForEachChildStmt in elaborator_validate_internal.h states
+// those positions once for the whole elaborator, which is why the list is not
+// written out again here.
 void CheckArrayQueryOnDynamicTypeStmt(
     const Stmt* s, const std::unordered_set<std::string_view>& dyn_types,
     DiagEngine& diag) {
@@ -669,18 +672,9 @@ void CheckArrayQueryOnDynamicTypeStmt(
   CheckArrayQueryOnDynamicTypeExpr(s->expr, dyn_types, diag);
   CheckArrayQueryOnDynamicTypeExpr(s->delay, dyn_types, diag);
   CheckArrayQueryOnDynamicTypeExpr(s->var_init, dyn_types, diag);
-  for (auto* sub : s->stmts)
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     CheckArrayQueryOnDynamicTypeStmt(sub, dyn_types, diag);
-  for (auto* sub : s->fork_stmts)
-    CheckArrayQueryOnDynamicTypeStmt(sub, dyn_types, diag);
-  CheckArrayQueryOnDynamicTypeStmt(s->then_branch, dyn_types, diag);
-  CheckArrayQueryOnDynamicTypeStmt(s->else_branch, dyn_types, diag);
-  CheckArrayQueryOnDynamicTypeStmt(s->body, dyn_types, diag);
-  CheckArrayQueryOnDynamicTypeStmt(s->for_body, dyn_types, diag);
-  for (auto* init : s->for_inits)
-    CheckArrayQueryOnDynamicTypeStmt(init, dyn_types, diag);
-  for (auto& ci : s->case_items)
-    CheckArrayQueryOnDynamicTypeStmt(ci.body, dyn_types, diag);
+  });
 }
 
 }  // namespace
@@ -745,6 +739,10 @@ void CheckRandomSeedExpr(const Expr* e, const TypeMap& types,
   for (auto* el : e->elements) CheckRandomSeedExpr(el, types, diag);
 }
 
+// §20.14.1's rule on the seed argument holds wherever a $random call is
+// written. ForEachChildStmt in elaborator_validate_internal.h states those
+// positions once for the whole elaborator, which is why the list is not written
+// out again here.
 void CheckRandomSeedStmt(const Stmt* s, const TypeMap& types,
                          DiagEngine& diag) {
   if (!s) return;
@@ -754,14 +752,8 @@ void CheckRandomSeedStmt(const Stmt* s, const TypeMap& types,
   CheckRandomSeedExpr(s->expr, types, diag);
   CheckRandomSeedExpr(s->delay, types, diag);
   CheckRandomSeedExpr(s->var_init, types, diag);
-  for (auto* sub : s->stmts) CheckRandomSeedStmt(sub, types, diag);
-  for (auto* sub : s->fork_stmts) CheckRandomSeedStmt(sub, types, diag);
-  CheckRandomSeedStmt(s->then_branch, types, diag);
-  CheckRandomSeedStmt(s->else_branch, types, diag);
-  CheckRandomSeedStmt(s->body, types, diag);
-  CheckRandomSeedStmt(s->for_body, types, diag);
-  for (auto* init : s->for_inits) CheckRandomSeedStmt(init, types, diag);
-  for (auto& ci : s->case_items) CheckRandomSeedStmt(ci.body, types, diag);
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { CheckRandomSeedStmt(sub, types, diag); });
 }
 
 }  // namespace

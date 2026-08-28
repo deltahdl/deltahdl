@@ -250,4 +250,131 @@ TEST(PatternMatching, RealLiteralPatternNames12_6) {
       "constant expression pattern shall be of integral type", 7, "12.6"));
 }
 
+// §12.6 requires a constant expression pattern to be of integral type and puts
+// no condition on where the pattern is written, so every position a statement
+// holds a statement in is a position the report is made at.
+// WalkStmtForMatchesPattern in
+// src/elaborator/elaborator_validate_matches.cpp had written out eight of the
+// thirteen child-statement links Stmt declares, and now takes the list from
+// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The cases
+// below cover one newly reached position each. Each writes the pattern under
+// the binary `matches` operator of §12.6, which stands in an ordinary
+// expression and so can be written in a for initializer and a for step as well
+// as in the four statement positions.
+
+// §12.7.1's for loop holds its initialization statements in Stmt::for_inits,
+// apart from its body.
+TEST(PatternMatching, ARealLiteralPatternInAForInitializerIsReported) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  real r;\n"
+      "  logic y;\n"
+      "  integer i;\n"
+      "  initial for (y = r matches 2.5; i < 2; i = i + 1) begin end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constant expression pattern shall be of integral type", 5, "12.6"));
+}
+
+// Stmt::for_steps holds the same loop's step assignments, a member of its own
+// beside the initializers.
+TEST(PatternMatching, ARealLiteralPatternInAForStepIsReported) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  real r;\n"
+      "  logic y;\n"
+      "  integer i;\n"
+      "  initial for (i = 0; i < 2; y = r matches 2.5) begin end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constant expression pattern shall be of integral type", 5, "12.6"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
+// next cover one arm each.
+TEST(PatternMatching, ARealLiteralPatternInAnAssertionPassStatementIsReported) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  real r;\n"
+      "  logic y;\n"
+      "  logic ok;\n"
+      "  initial assert (ok) y = r matches 2.5;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constant expression pattern shall be of integral type", 5, "12.6"));
+}
+
+TEST(PatternMatching, ARealLiteralPatternInAnAssertionFailStatementIsReported) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  real r;\n"
+      "  logic y;\n"
+      "  logic ok;\n"
+      "  initial assert (ok) else y = r matches 2.5;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constant expression pattern shall be of integral type", 5, "12.6"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements. They are kept in RsProd::code_stmts, reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(PatternMatching, ARealLiteralPatternInARandsequenceCodeBlockIsReported) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  real r;\n"
+      "  logic y;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { y = r matches 2.5; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constant expression pattern shall be of integral type", 6, "12.6"));
+}
+
+// §18.17.1 lets a weight specification be followed by a code block of its own,
+// which the parser keeps in RsRule::weight_code. It is a second list under
+// Stmt::rs_productions, so a walk reaches it without reaching
+// RsProd::code_stmts and the case above does not answer for it.
+TEST(PatternMatching,
+     ARealLiteralPatternInARandsequenceWeightCodeBlockIsReported) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  real r;\n"
+      "  logic y;\n"
+      "  integer i;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : alt := 1 { y = r matches 2.5; };\n"
+      "      alt : { i = 1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constant expression pattern shall be of integral type", 7, "12.6"));
+}
+
 }  // namespace
