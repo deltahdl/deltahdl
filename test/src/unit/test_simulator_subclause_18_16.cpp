@@ -1,4 +1,6 @@
 #include <cstdint>
+#include <string>
+#include <string_view>
 
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
@@ -7,6 +9,39 @@ using namespace delta;
 
 namespace {
 
+// Runs a randcase of three branches that all carry `weight`, with `decls`
+// written among the module's declarations, and reports the counter the weights
+// advance and the branch that was selected. §18.16's "at most once" is a claim
+// about how many times a weight expression ran, so every case making it needs
+// the same run and differs only in how the weight does its counting.
+void RunThreeWeightRandcase(SimFixtureSeeded& f, std::string_view decls,
+                            std::string_view weight, uint64_t& cnt,
+                            uint64_t& x) {
+  const std::string w(weight);
+  std::string src =
+      "module t;\n"
+      "  int unsigned cnt;\n"
+      "  int unsigned x;\n" +
+      std::string(decls) +
+      "  initial begin\n"
+      "    cnt = 0;\n"
+      "    x = 0;\n"
+      "    randcase\n"
+      "      " +
+      w + " : x = 1;\n      " + w + " : x = 2;\n      " + w +
+      " : x = 3;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n";
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  cnt = f.ctx.FindVariable("cnt")->value.ToUint64();
+  x = f.ctx.FindVariable("x")->value.ToUint64();
+}
+
 // §18.16: each randcase_item weight expression is evaluated at most once. A
 // weight expression with a side effect (here a post-increment of a counter)
 // must therefore advance that counter exactly once per branch -- once for the
@@ -14,71 +49,38 @@ namespace {
 // whose weights each bump `cnt` leave it at 3, not 6.
 TEST(RandcaseWeightedCase, WeightExpressionsEvaluatedAtMostOnce) {
   SimFixtureSeeded f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int unsigned cnt;\n"
-      "  int unsigned x;\n"
-      "  initial begin\n"
-      "    cnt = 0;\n"
-      "    x = 0;\n"
-      "    randcase\n"
-      "      (cnt++ + 1) : x = 1;\n"
-      "      (cnt++ + 1) : x = 2;\n"
-      "      (cnt++ + 1) : x = 3;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+  uint64_t cnt = 0;
+  uint64_t x = 0;
+  RunThreeWeightRandcase(f, "", "(cnt++ + 1)", cnt, x);
   // Each of the three weight expressions ran exactly once.
-  EXPECT_EQ(f.ctx.FindVariable("cnt")->value.ToUint64(), 3u);
+  EXPECT_EQ(cnt, 3u);
   // A branch was selected and its body executed.
-  auto x = f.ctx.FindVariable("x")->value.ToUint64();
   EXPECT_GE(x, 1u);
   EXPECT_LE(x, 3u);
 }
 
-// §18.16: each randcase_item weight expression is evaluated at most once, so a
-// weight written as a call to a function that has an effect performs that
-// effect once per branch. Three branches each weighing (bump()) -- a call that
-// advances `cnt` and returns 1 -- leave cnt at 3, not 6. §18.17.1 puts the same
-// rule on a randsequence production's rule weights, whose selection runs
+// §18.16: the weight that is evaluated at most once may be a call, and a call
+// is what rs_weight_specification's parenthesized expression admits in the
+// sibling randsequence statement. Three branches each weighing (bump()) -- a
+// function advancing `cnt` and returning 1 -- leave cnt at 3. §18.17.1 puts the
+// same rule on a randsequence production's rule weights, whose selection runs
 // through SelectRule in src/simulator/stmt_exec_randsequence.cpp; the claim is
 // written here as well as in test_simulator_subclause_18_17_01.cpp so it stands
 // in both clauses' files rather than in whichever was written first.
 TEST(RandcaseWeightedCase, FunctionCallWeightEvaluatedOncePerBranch) {
   SimFixtureSeeded f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int unsigned cnt;\n"
-      "  int unsigned x;\n"
-      "  function int bump();\n"
-      "    cnt = cnt + 1;\n"
-      "    return 1;\n"
-      "  endfunction\n"
-      "  initial begin\n"
-      "    cnt = 0;\n"
-      "    x = 0;\n"
-      "    randcase\n"
-      "      (bump()) : x = 1;\n"
-      "      (bump()) : x = 2;\n"
-      "      (bump()) : x = 3;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+  uint64_t cnt = 0;
+  uint64_t x = 0;
+  RunThreeWeightRandcase(f,
+                         "  function int bump();\n"
+                         "    cnt = cnt + 1;\n"
+                         "    return 1;\n"
+                         "  endfunction\n",
+                         "(bump())", cnt, x);
   // Three branches, three calls.
-  EXPECT_EQ(f.ctx.FindVariable("cnt")->value.ToUint64(), 3u);
-  // A branch was selected and its body executed, so the count above was reached
-  // by selecting rather than by never running the statement.
-  auto x = f.ctx.FindVariable("x")->value.ToUint64();
+  EXPECT_EQ(cnt, 3u);
+  // The count above was reached by selecting a branch rather than by never
+  // running the statement.
   EXPECT_GE(x, 1u);
   EXPECT_LE(x, 3u);
 }
