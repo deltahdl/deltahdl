@@ -460,42 +460,55 @@ static void WalkConstFuncExpr(const Expr* e, ConstFuncBodyCheck& chk) {
   }
 }
 
+// The one expression §13.4.3 leaves to the statement it stands in: a system
+// task call written as a statement is ignored when the constant function is
+// evaluated rather than rejected when it is validated, so the §11.2.1
+// constant-system-function whitelist is not put to it and only its arguments
+// are walked, for the identifier-scope and hierarchical-reference rules.
+// Returns the call for WalkConstFuncStmt to walk that way and to skip when the
+// shared expression list hands it over as Stmt::expr.
+static const Expr* StatementFormSystemCall(const Stmt* s) {
+  if (s->kind != StmtKind::kExprStmt || !s->expr) return nullptr;
+  return s->expr->kind == ExprKind::kSystemCall ? s->expr : nullptr;
+}
+
 // §13.4.3's rules on what a constant function body may reference — no
 // hierarchical reference, no non-constant function invocation, only a constant
 // system function, and no identifier that is not a parameter, a function name
-// or a local declaration — say nothing about where the offending expression
-// stands, so the walk takes every position a statement holds a statement in
-// from ForEachChildStmt in elaborator_validate_internal.h. The case-arm guards
-// are read separately below because they are expressions, which that list does
-// not reach; the arm bodies are left to the descent, so no statement is walked
-// twice. §18.17.6 is about break and return, neither an expression, so
+// or a local declaration — bar the reference itself and say nothing about
+// which of a statement's expressions holds it, so every position a statement
+// holds an expression in is one they reach. The walk takes those positions
+// from ForEachChildExpr in elaborator_validate_internal.h and the
+// child-statement links from ForEachChildStmt beside it, rather than listing
+// either again. §18.17.6 is about break and return, neither an expression, so
 // descending Stmt::rs_productions is what §13.4.3 asks for. Stmt::fork_stmts is
-// walked because the shared list is walked whole, and no body reaches here
+// walked because the shared lists are walked whole, and no body reaches here
 // holding a fork: ValidateConstFuncBodyContent rejects one first.
+//
+// Two of the positions ForEachChildExpr hands over cannot carry a reference
+// this walk reports, and both are visited rather than skipped because the list
+// is one list. A.6.5 gives `wait_statement ::= wait_order ( hierarchical_
+// identifier { , hierarchical_identifier } ) action_block`, and
+// Stmt::wait_order_events is filled for that statement alone, which §13.4.3's
+// "shall not contain a statement that directly schedules an event to execute
+// after the function has returned" has ValidateConstFuncBodyContent reject
+// before this runs. Stmt::cycle_delay is the same: A.6.5 admits a cycle_delay
+// in a procedural_timing_control, rejected there as well, and A.6.11 admits
+// one in a clocking_drive, which is written with `<=` and so is rejected as a
+// nonblocking assignment. A.6.2's blocking_assignment takes a
+// delay_or_event_control, which A.6.5 gives no cycle_delay alternative:
+// src/parser/parser_stmt.cpp builds that statement anyway, from the intra-
+// assignment timing shared with the nonblocking form, and §14.11's "cycle
+// delay (##) is not a legal intra-assignment delay" is what answers it.
 static void WalkConstFuncStmt(const Stmt* s, ConstFuncBodyCheck& chk) {
   if (!s || chk.failed) return;
-  WalkConstFuncExpr(s->condition, chk);
-  WalkConstFuncExpr(s->lhs, chk);
-  WalkConstFuncExpr(s->rhs, chk);
-  // §13.4.3: system task calls within a constant function are ignored at
-  // evaluation time rather than rejected at validation time. A bare
-  // statement-form system call is therefore not subjected to the §11.2.1
-  // sys-func whitelist; only its arguments are walked for identifier-scope
-  // and hierarchical-reference checks.
-  if (s->kind == StmtKind::kExprStmt && s->expr &&
-      s->expr->kind == ExprKind::kSystemCall) {
-    for (auto* a : s->expr->args) WalkConstFuncExpr(a, chk);
-  } else {
-    WalkConstFuncExpr(s->expr, chk);
+  const Expr* sys_call = StatementFormSystemCall(s);
+  if (sys_call) {
+    for (auto* a : sys_call->args) WalkConstFuncExpr(a, chk);
   }
-  WalkConstFuncExpr(s->delay, chk);
-  WalkConstFuncExpr(s->for_cond, chk);
-  WalkConstFuncExpr(s->repeat_event_count, chk);
-  WalkConstFuncExpr(s->assert_expr, chk);
-  WalkConstFuncExpr(s->var_init, chk);
-  for (auto& ci : s->case_items) {
-    for (auto* pat : ci.patterns) WalkConstFuncExpr(pat, chk);
-  }
+  ForEachChildExpr(s, [&](Expr* const& e) {
+    if (e != sys_call) WalkConstFuncExpr(e, chk);
+  });
   ForEachChildStmt(s, [&](Stmt* const& sub) { WalkConstFuncStmt(sub, chk); });
 }
 

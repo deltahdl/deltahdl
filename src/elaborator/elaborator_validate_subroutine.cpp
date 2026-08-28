@@ -91,11 +91,25 @@ void Elaborator::WalkExprForDpiCalls(const Expr* e) {
 // once for the whole elaborator, which is why the list is not written out again
 // here. It hands the visitor the field itself, so a walker that only reads the
 // tree takes a `Stmt* const&`.
+//
+// §7.7 reads "A dynamic array or queue shall not be passed as an actual
+// argument if the DPI formal argument has unsized dimensions and an output
+// direction mode", and A.8.4 makes a function_subroutine_call a primary, so the
+// prohibited call may be written in every position a statement holds an
+// expression in and the check is owed at each of those too. ForEachChildExpr in
+// the same header states them, and this walk hands every one of them to
+// WalkExprForDpiCalls. It had read Stmt::rhs, Stmt::expr and Stmt::condition
+// alone, which left the call in `for (i = 0; f(dyn) < 1; i = i + 1)` and in
+// `assert (f(dyn) == 0);` unreported.
+//
+// A.6.5 gives `wait_order ( hierarchical_identifier { , hierarchical_identifier
+// } ) action_block`, so Stmt::wait_order_events holds no expression a call can
+// stand in and no source makes that position answer. It is visited rather than
+// skipped, because visiting it costs one null check and keeps the list one
+// list.
 void Elaborator::WalkStmtsForDpiArgs(const Stmt* s) {
   if (!s) return;
-  WalkExprForDpiCalls(s->rhs);
-  WalkExprForDpiCalls(s->expr);
-  WalkExprForDpiCalls(s->condition);
+  ForEachChildExpr(s, [this](Expr* const& e) { WalkExprForDpiCalls(e); });
   ForEachChildStmt(s, [this](Stmt* const& sub) { WalkStmtsForDpiArgs(sub); });
 }
 

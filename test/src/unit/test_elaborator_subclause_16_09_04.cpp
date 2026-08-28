@@ -322,4 +322,357 @@ TEST(GlobalClockingElab,
       "16.9.4"));
 }
 
+// §16.9.4 says the global clocking sampled value functions "may be used only
+// if global clocking is defined (see 14.14)" and states no condition on where
+// the call stands, so a $past_gclk written in any expression position of a
+// module that declares no global clocking and is instantiated under none is an
+// error. §16.9.4 also says "the global clocking past sampled value functions
+// are usable in general procedural code and action blocks", so every case below
+// breaks the requires-a-declaration rule alone and the placement rule the
+// future functions carry cannot account for the report.
+//
+// Each case puts the call in one expression position of a Stmt, and each is a
+// position Elaborator::ValidateGclkRequiresGlobalClocking reached only once
+// FindGclkFunctionRefInOwnExprs in
+// src/elaborator/elaborator_validate_global_clocking.cpp took its list of
+// expressions from ForEachChildExpr in
+// src/elaborator/elaborator_validate_internal.h. Every one of them elaborated
+// clean beforehand, with the design left to sample a global clock it has no
+// declaration for.
+//
+// Stmt::wait_order_events is the one position ForEachChildExpr reaches that no
+// case below covers. A.6.5 gives `wait_statement ::= ... | wait_order (
+// hierarchical_identifier { , hierarchical_identifier } ) action_block`, so a
+// wait_order operand is a hierarchical identifier and never a call, and a case
+// written for it would assert a report over a source Annex A does not admit.
+
+// A.6.5 gives `delay_control ::= # delay_value | # ( mintypmax_expression )`,
+// so the parenthesized form of a procedural delay holds an expression, kept in
+// Stmt::delay.
+TEST(GlobalClockingElab,
+     GclkFunctionInADelayControlWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  initial #($past_gclk(x)) x = 32'd1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 3,
+      "16.9.4"));
+}
+
+// A.6.11 gives `cycle_delay ::= ## integral_number | ## identifier | ## (
+// expression )`, so a cycle delay holds an expression, kept in
+// Stmt::cycle_delay. §14.11 requires a default clocking for a ## at all, so one
+// is declared here; a default clocking is not a global clocking, and §16.9.4
+// asks for the latter.
+TEST(GlobalClockingElab, GclkFunctionInACycleDelayWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  logic [31:0] x;\n"
+      "  default clocking cb @(posedge clk); endclocking\n"
+      "  initial ##($past_gclk(x)) x = 32'd1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 5,
+      "16.9.4"));
+}
+
+// A.6.5 gives `delay_or_event_control ::= ... | repeat ( expression )
+// event_control`, so the repeat count of an intra-assignment timing control is
+// an expression, kept in Stmt::repeat_event_count.
+TEST(GlobalClockingElab,
+     GclkFunctionInARepeatEventCountWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  logic [31:0] x;\n"
+      "  initial x <= repeat ($past_gclk(x)) @(posedge clk) 32'd1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 4,
+      "16.9.4"));
+}
+
+// A.2.4 gives `variable_decl_assignment ::= variable_identifier {
+// variable_dimension } [ = expression ]`, so a variable declared inside a block
+// holds its initializer expression, kept in Stmt::var_init.
+TEST(GlobalClockingElab,
+     GclkFunctionInAVariableInitializerWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    int i = $past_gclk(x);\n"
+      "    x = i;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 4,
+      "16.9.4"));
+}
+
+// A.2.5 gives `unpacked_dimension ::= [ constant_range ] | [
+// constant_expression ]`, and A.8.4's constant_primary admits a
+// constant_function_call, so a variable's unpacked dimension holds an
+// expression, kept in Stmt::var_unpacked_dims.
+TEST(GlobalClockingElab,
+     GclkFunctionInAVariableUnpackedDimensionWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    logic [31:0] y [$past_gclk(x)];\n"
+      "    y[0] = 32'd1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 4,
+      "16.9.4"));
+}
+
+// A.6.5 gives `event_expression ::= [ edge_identifier ] expression [ iff
+// expression ]`, so an event control holds a second expression beside the
+// signal it waits on, kept in EventExpr::iff_condition. §16.9.4 puts no
+// condition on which of the two holds the call, so the gate is a use of the
+// function like the signal is. The event control is written as a statement
+// rather than as the sensitivity of an always procedure, because the parser
+// keeps an always procedure's event list in ModuleItem::sensitivity and only a
+// procedural event control reaches Stmt::events.
+TEST(GlobalClockingElab,
+     GclkFunctionInAnEventControlIffConditionWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  logic [31:0] x;\n"
+      "  initial @(posedge clk iff $past_gclk(x)) x = 32'd1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 4,
+      "16.9.4"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
+// randcase item holds a weight expression beside its statement, kept in the
+// first of each Stmt::randcase_items pair.
+TEST(GlobalClockingElab,
+     GclkFunctionInARandcaseWeightWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  initial randcase $past_gclk(x): x = 32'd1; endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 3,
+      "16.9.4"));
+}
+
+// A.6.7 gives `case_item ::= case_item_expression { , case_item_expression } :
+// statement_or_null`, so a case item holds the expressions it is selected by
+// beside its statement, kept in CaseItem::patterns.
+TEST(GlobalClockingElab,
+     GclkFunctionInACaseItemExpressionWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  initial case (x) $past_gclk(x): x = 32'd1; default: x = 32'd0; "
+      "endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 3,
+      "16.9.4"));
+}
+
+// A.6.12 gives `rs_weight_specification ::= integral_number | ps_identifier | (
+// expression )`, so a randsequence rule holds a weight expression, kept in
+// RsRule::weight.
+TEST(GlobalClockingElab,
+     GclkFunctionInARandsequenceWeightWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : a := ($past_gclk(x));\n"
+      "      a : { x = 32'd1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 5,
+      "16.9.4"));
+}
+
+// A.6.12 gives `rs_production_list ::= ... | rand join [ ( expression ) ]
+// rs_production_item rs_production_item { rs_production_item }`, so a rand join
+// holds an expression before its production list, kept in
+// RsRule::rand_join_expr.
+TEST(GlobalClockingElab,
+     GclkFunctionInARandJoinExpressionWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : rand join ($past_gclk(x)) a b;\n"
+      "      a : { x = 32'd1; };\n"
+      "      b : { x = 32'd2; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 5,
+      "16.9.4"));
+}
+
+// A.6.12 gives `rs_production_item ::= rs_production_identifier [ (
+// list_of_arguments ) ]`, so a production item holds the actual arguments
+// §18.17.7 passes down to the production, kept in RsProductionItem::args.
+TEST(GlobalClockingElab,
+     GclkFunctionInARandsequenceProductionArgumentWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : a($past_gclk(x));\n"
+      "      a( int v ) : { x = v; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 5,
+      "16.9.4"));
+}
+
+// A.6.12 gives `rs_if_else ::= if ( expression ) rs_production_item [ else
+// rs_production_item ]`, so an if production holds a condition, kept in
+// RsProd::condition.
+TEST(GlobalClockingElab,
+     GclkFunctionInARandsequenceIfConditionWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : if ($past_gclk(x)) a else b;\n"
+      "      a : { x = 32'd1; };\n"
+      "      b : { x = 32'd2; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 5,
+      "16.9.4"));
+}
+
+// A.6.12 gives `rs_repeat ::= repeat ( expression ) rs_production_item`, so a
+// repeat production holds a count expression, kept in RsProd::repeat_count.
+TEST(GlobalClockingElab,
+     GclkFunctionInARandsequenceRepeatCountWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : repeat ($past_gclk(x)) a;\n"
+      "      a : { x = 32'd1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 5,
+      "16.9.4"));
+}
+
+// A.6.12 gives `rs_case ::= case ( case_expression ) rs_case_item {
+// rs_case_item } endcase`, so a case production holds the expression its arms
+// are selected on, kept in RsProd::case_expr.
+TEST(GlobalClockingElab,
+     GclkFunctionInARandsequenceCaseExpressionWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : case ($past_gclk(x)) 0: a; default: b; endcase;\n"
+      "      a : { x = 32'd1; };\n"
+      "      b : { x = 32'd2; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 5,
+      "16.9.4"));
+}
+
+// A.6.12 gives `rs_case_item ::= case_item_expression { , case_item_expression
+// } : rs_production_item ;`, so an arm of a case production holds the
+// expressions it is selected by, kept in RsCaseItem::patterns. The case
+// expression here is the plain `x`, so the call the report names can only be
+// the one in the arm.
+TEST(GlobalClockingElab,
+     GclkFunctionInARandsequenceCaseItemExpressionWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : case (x) $past_gclk(x): a; default: b; endcase;\n"
+      "      a : { x = 32'd1; };\n"
+      "      b : { x = 32'd2; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 5,
+      "16.9.4"));
+}
+
 }  // namespace

@@ -94,6 +94,111 @@ void ForEachChildStmt(S* s, Visit visit) {
   ForEachRandsequenceStmt(s, visit);
 }
 
+// The expressions a randsequence production item holds: A.6.12 gives an
+// rs_production a list of actual arguments, written the way a task call writes
+// them.
+template <typename Item, typename Visit>
+void ForEachRandsequenceItemExpr(Item& item, Visit visit) {
+  for (auto& arg : item.args) visit(arg);
+}
+
+// The expressions one production of a rule holds. A.6.12 admits four forms
+// beyond the plain item and the code block: rs_if_else carries a condition and
+// two items, rs_repeat a repeat count and an item, and rs_case a case
+// expression and a list of arms, each arm carrying its own case-item
+// expressions and its own item.
+template <typename Prod, typename Visit>
+void ForEachRandsequenceProdExpr(Prod& prod, Visit visit) {
+  visit(prod.condition);
+  visit(prod.repeat_count);
+  visit(prod.case_expr);
+  ForEachRandsequenceItemExpr(prod.item, visit);
+  ForEachRandsequenceItemExpr(prod.if_true, visit);
+  ForEachRandsequenceItemExpr(prod.if_false, visit);
+  ForEachRandsequenceItemExpr(prod.repeat_item, visit);
+  for (auto& ci : prod.case_items) {
+    for (auto& p : ci.patterns) visit(p);
+    ForEachRandsequenceItemExpr(ci.item, visit);
+  }
+}
+
+// The expressions one rule holds. §18.17.1's rs_rule admits a
+// weight_specification, and §18.17.4's rand_join admits an expression before
+// its production list. The nesting is split across these three functions for
+// the reason ForEachRandsequenceRuleStmt is split from ForEachRandsequenceStmt:
+// written as one function it passes the
+// readability-function-cognitive-complexity threshold of 15 that
+// etc/clang_tidy/src.yml sets.
+template <typename Rule, typename Visit>
+void ForEachRandsequenceRuleExpr(Rule& rule, Visit visit) {
+  visit(rule.weight);
+  visit(rule.rand_join_expr);
+  for (auto& item : rule.rand_join_items) {
+    ForEachRandsequenceItemExpr(item, visit);
+  }
+  for (auto& prod : rule.prods) ForEachRandsequenceProdExpr(prod, visit);
+}
+
+// Hands `visit` every expression a randsequence statement holds outside its
+// code blocks, which is everything Stmt::rs_productions carries that is an
+// expression at all. The code blocks hold statements, and a walker reaches
+// their expressions by descending them through ForEachChildStmt above.
+template <typename S, typename Visit>
+void ForEachRandsequenceExpr(S* s, Visit visit) {
+  for (auto& production : s->rs_productions) {
+    for (auto& rule : production.rules)
+      ForEachRandsequenceRuleExpr(rule, visit);
+  }
+}
+
+// The expressions Stmt holds directly, as against the statements
+// ForEachChildStmt above hands over. src/parser/ast_stmt.h declares ten scalar
+// Expr* members -- condition, lhs, rhs, delay, cycle_delay, for_cond, expr,
+// assert_expr, repeat_event_count and var_init -- and reaches six more
+// positions through members it holds: EventExpr::signal and
+// EventExpr::iff_condition for each entry of events, wait_order_events, the
+// weight of each randcase item, the patterns of each case item,
+// var_unpacked_dims, and the randsequence expressions above.
+//
+// This is that list, stated once, for the same reason ForEachChildStmt states
+// the statement links once. A walker that writes its own runs its rule over the
+// positions somebody happened to write down rather than over the positions
+// Annex A admits: #3303 records three walkers that each missed a different
+// subset, so a $bits call in a for-loop condition, a rand_mode call in a #()
+// delay and a sampled value function in a wait_order list each escaped the rule
+// above it. Where a rule genuinely cannot reach a position, skip it in the
+// visitor with a comment naming the clause rather than by dropping this call
+// and writing a shorter list.
+//
+// `visit` is called with a null pointer for an absent scalar field, which every
+// walker here already answers with an early return, and it receives the field
+// itself rather than a copy, so a walker given a `Stmt*` may assign a
+// replacement expression through it and one given a `const Stmt*` may not.
+template <typename S, typename Visit>
+void ForEachChildExpr(S* s, Visit visit) {
+  visit(s->condition);
+  visit(s->lhs);
+  visit(s->rhs);
+  visit(s->delay);
+  visit(s->cycle_delay);
+  visit(s->for_cond);
+  visit(s->expr);
+  visit(s->assert_expr);
+  visit(s->repeat_event_count);
+  visit(s->var_init);
+  for (auto& ev : s->events) {
+    visit(ev.signal);
+    visit(ev.iff_condition);
+  }
+  for (auto& e : s->wait_order_events) visit(e);
+  for (auto& rc : s->randcase_items) visit(rc.first);
+  for (auto& ci : s->case_items) {
+    for (auto& p : ci.patterns) visit(p);
+  }
+  for (auto& d : s->var_unpacked_dims) visit(d);
+  ForEachRandsequenceExpr(s, visit);
+}
+
 // Parses the size prefix of an integer literal's text (the digits before the
 // base tick "'"). Returns that width when present and positive, otherwise the
 // default unsized-literal width of 32. Defined in elaborator_validate.cpp.

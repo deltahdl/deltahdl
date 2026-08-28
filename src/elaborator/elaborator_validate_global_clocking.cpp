@@ -86,17 +86,39 @@ const Expr* FindGlobalClockRefInSubStmts(const Stmt* s) {
   return found;
 }
 
+// Search the expressions `s` holds itself, as against those its nested
+// statements hold; returns the first hit, or nullptr. §14.14 requires
+// $global_clock to be used "to explicitly refer to the event expression in the
+// effective global clocking declaration" and resolves the declaration for "a
+// specific reference" by a hierarchical lookup over the design, which reads
+// nothing about where in a statement the reference stands. So every position a
+// statement holds an expression in is one the rule reaches.
+//
+// ForEachChildExpr in elaborator_validate_internal.h states those positions,
+// once for the whole elaborator, which is why the list is not written out again
+// here. It visits every one of them and gives the visitor no way to stop, so
+// the search short-circuits the way FindGlobalClockRefInSubStmts above does:
+// the first hit is kept in `found`, and the visitor returns at once while
+// `found` is set. Without that the walk searches every remaining position after
+// the answer is known, and a hit in a later one overwrites the one this
+// function is required to return.
+//
+// The iff condition of an event control is searched alongside the signal.
+// A.6.5 gives `event_expression ::= [ edge_identifier ] expression [ iff
+// expression ]`, so both are expressions of one production, and §14.14 puts no
+// condition on which of them holds the reference.
+const Expr* FindGlobalClockRefInOwnExprs(const Stmt* s) {
+  const Expr* found = nullptr;
+  ForEachChildExpr(s, [&](Expr* const& e) {
+    if (found) return;
+    if (ExprRefsGlobalClock(e)) found = e;
+  });
+  return found;
+}
+
 const Expr* FindGlobalClockRefInStmt(const Stmt* s) {
   if (!s) return nullptr;
-  if (ExprRefsGlobalClock(s->expr)) return s->expr;
-  if (ExprRefsGlobalClock(s->lhs)) return s->lhs;
-  if (ExprRefsGlobalClock(s->rhs)) return s->rhs;
-  if (ExprRefsGlobalClock(s->condition)) return s->condition;
-  if (ExprRefsGlobalClock(s->assert_expr)) return s->assert_expr;
-  if (ExprRefsGlobalClock(s->for_cond)) return s->for_cond;
-  for (const auto& ev : s->events) {
-    if (ExprRefsGlobalClock(ev.signal)) return ev.signal;
-  }
+  if (const Expr* hit = FindGlobalClockRefInOwnExprs(s)) return hit;
   return FindGlobalClockRefInSubStmts(s);
 }
 
@@ -191,17 +213,39 @@ const Expr* FindGclkFunctionRefInSubStmts(const Stmt* s,
   return found;
 }
 
+// Search the expressions `s` holds itself, as against those its nested
+// statements hold; returns the first call whose kind satisfies `match`, or
+// nullptr. §16.9.4 says the global clocking sampled value functions "may be
+// used only if global clocking is defined (see 14.14)" and states no condition
+// on where the call stands, so every position a statement holds an expression
+// in is one the rule reaches.
+//
+// ForEachChildExpr in elaborator_validate_internal.h states those positions,
+// once for the whole elaborator, which is why the list is not written out again
+// here. It visits every one of them and gives the visitor no way to stop, so
+// the search short-circuits the way FindGclkFunctionRefInSubStmts above does:
+// the first hit is kept in `found`, and the visitor returns at once while
+// `found` is set. Without that the walk searches every remaining position after
+// the answer is known, and a hit in a later one overwrites the one this
+// function is required to return.
+//
+// The iff condition of an event control is searched alongside the signal.
+// A.6.5 gives `event_expression ::= [ edge_identifier ] expression [ iff
+// expression ]`, so both are expressions of one production, and §16.9.4 puts no
+// condition on which of them holds the call.
+const Expr* FindGclkFunctionRefInOwnExprs(const Stmt* s,
+                                          GclkKindPredicate match) {
+  const Expr* found = nullptr;
+  ForEachChildExpr(s, [&](Expr* const& e) {
+    if (found) return;
+    found = FindGclkFunctionRef(e, match);
+  });
+  return found;
+}
+
 const Expr* FindGclkFunctionRefInStmt(const Stmt* s, GclkKindPredicate match) {
   if (!s) return nullptr;
-  if (const Expr* hit = FindGclkFunctionRef(s->expr, match)) return hit;
-  if (const Expr* hit = FindGclkFunctionRef(s->lhs, match)) return hit;
-  if (const Expr* hit = FindGclkFunctionRef(s->rhs, match)) return hit;
-  if (const Expr* hit = FindGclkFunctionRef(s->condition, match)) return hit;
-  if (const Expr* hit = FindGclkFunctionRef(s->assert_expr, match)) return hit;
-  if (const Expr* hit = FindGclkFunctionRef(s->for_cond, match)) return hit;
-  for (const auto& ev : s->events) {
-    if (const Expr* hit = FindGclkFunctionRef(ev.signal, match)) return hit;
-  }
+  if (const Expr* hit = FindGclkFunctionRefInOwnExprs(s, match)) return hit;
   return FindGclkFunctionRefInSubStmts(s, match);
 }
 

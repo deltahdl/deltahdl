@@ -779,4 +779,130 @@ TEST(ConstantFunctionBodyReachElaboration,
   ExpectConstFuncAccepted(InRandsequenceWeightCodeBlock(kLocalDeclStmt));
 }
 
+// The expression side of that conversion. WalkConstFuncStmt now takes the
+// positions a statement holds an expression in from ForEachChildExpr in
+// src/elaborator/elaborator_validate_internal.h, having written out ten of
+// them: Stmt::condition, lhs, rhs, expr, delay, for_cond, repeat_event_count,
+// assert_expr, var_init and the patterns of each case item. §13.4.3 bars the
+// reference and not the position it stands in, so each position newly reached
+// gets a case reading back the report for a reference to the module variable
+// `i`.
+//
+// A.6.5 writes `event_expression ::= [ edge_identifier ] expression [ iff
+// expression ]` and A.6.2 admits an event_control after the `=` of a
+// blocking_assignment, which fills Stmt::events with an entry holding those
+// two expressions. §18.16 gives `randcase_item ::= expression :
+// statement_or_null`, whose weight the parser keeps in the first member of a
+// Stmt::randcase_items entry. A.2.5 gives `unpacked_dimension ::= [
+// constant_range ] | [ constant_expression ]`, kept in
+// Stmt::var_unpacked_dims. A.6.12 gives a randsequence twelve expression
+// positions outside its code blocks, which ForEachRandsequenceExpr reaches:
+// the rs_weight_specification of a rule and the expression of its rand join,
+// the list_of_arguments of each of the six rs_production_items a rule can
+// hold, and the condition of an rs_if_else, the count of an rs_repeat, and the
+// case_expression and case_item_expressions of an rs_case.
+//
+// Stmt::wait_order_events and Stmt::cycle_delay get no case. Every statement
+// Annex A admits either in is one §13.4.3 rejects before this walk runs:
+// A.6.5 fills wait_order_events for `wait_order ( hierarchical_identifier { ,
+// hierarchical_identifier } ) action_block` alone and admits a cycle_delay in
+// a procedural_timing_control, both of which ValidateConstFuncBodyContent
+// answers with "shall not contain statements that schedule events to execute
+// after it returns", and A.6.11's clocking_drive, the other cycle_delay
+// position, is written with `<=` and is answered as a nonblocking assignment.
+// A.6.2's blocking_assignment takes a delay_or_event_control, to which A.6.5
+// gives no cycle_delay alternative, and the one spelling reaching the walk
+// with a cycle delay on it -- `q = ##2 d;`, which src/parser/parser_stmt.cpp
+// builds from the intra-assignment timing it shares with the nonblocking form
+// -- is what §14.11's "cycle delay (##) is not a legal intra-assignment delay"
+// rejects. A case for either would rest on a source Annex A does not admit, or
+// read back a rejection rather than the reference report.
+
+// One randsequence statement whose top production `main` is `rules`, with `a`
+// and `b` defined for an rs_production_item to name and `c` carrying the
+// tf_port_list §18.17.7 gives a production that takes an argument.
+std::string InRandsequence(const std::string& rules) {
+  return "    randsequence(main)\n      main : " + rules +
+         ";\n      a : { t = 0; };\n      b : { t = 0; };\n"
+         "      c(int x) : { t = 0; };\n    endsequence";
+}
+
+TEST(ConstantFunctionExprReachElaboration,
+     ModuleVariableInAnIntraAssignmentEventSignal) {
+  ExpectConstFuncError("    t = @(i) 1;", kIdentMsg);
+}
+
+TEST(ConstantFunctionExprReachElaboration,
+     ModuleVariableInAnIntraAssignmentEventIff) {
+  ExpectConstFuncError("    t = @(n iff i) 1;", kIdentMsg);
+}
+
+TEST(ConstantFunctionExprReachElaboration, ModuleVariableInARandcaseWeight) {
+  ExpectConstFuncError("    randcase i: t = 1; endcase", kIdentMsg);
+}
+
+TEST(ConstantFunctionExprReachElaboration,
+     ModuleVariableInAnUnpackedDimension) {
+  ExpectConstFuncError("    int u[i];", kIdentMsg);
+}
+
+TEST(ConstantFunctionExprReachElaboration,
+     ModuleVariableInARandsequenceWeight) {
+  ExpectConstFuncError(InRandsequence("a := i"), kIdentMsg);
+}
+
+TEST(ConstantFunctionExprReachElaboration, ModuleVariableInARandJoinExpr) {
+  ExpectConstFuncError(InRandsequence("rand join (i) a b"), kIdentMsg);
+}
+
+TEST(ConstantFunctionExprReachElaboration,
+     ModuleVariableInARandJoinItemArgument) {
+  ExpectConstFuncError(InRandsequence("rand join (1) c(i) a"), kIdentMsg);
+}
+
+TEST(ConstantFunctionExprReachElaboration,
+     ModuleVariableInARandsequenceItemArgument) {
+  ExpectConstFuncError(InRandsequence("c(i)"), kIdentMsg);
+}
+
+TEST(ConstantFunctionExprReachElaboration,
+     ModuleVariableInARandsequenceIfCondition) {
+  ExpectConstFuncError(InRandsequence("if (i) a"), kIdentMsg);
+}
+
+TEST(ConstantFunctionExprReachElaboration,
+     ModuleVariableInARandsequenceIfItemArgument) {
+  ExpectConstFuncError(InRandsequence("if (n) c(i)"), kIdentMsg);
+}
+
+TEST(ConstantFunctionExprReachElaboration,
+     ModuleVariableInARandsequenceElseItemArgument) {
+  ExpectConstFuncError(InRandsequence("if (n) a else c(i)"), kIdentMsg);
+}
+
+TEST(ConstantFunctionExprReachElaboration,
+     ModuleVariableInARandsequenceRepeatCount) {
+  ExpectConstFuncError(InRandsequence("repeat (i) a"), kIdentMsg);
+}
+
+TEST(ConstantFunctionExprReachElaboration,
+     ModuleVariableInARandsequenceRepeatItemArgument) {
+  ExpectConstFuncError(InRandsequence("repeat (n) c(i)"), kIdentMsg);
+}
+
+TEST(ConstantFunctionExprReachElaboration,
+     ModuleVariableInARandsequenceCaseExpr) {
+  ExpectConstFuncError(InRandsequence("case (i) 1: a; endcase"), kIdentMsg);
+}
+
+TEST(ConstantFunctionExprReachElaboration,
+     ModuleVariableInARandsequenceCaseItemExpr) {
+  ExpectConstFuncError(InRandsequence("case (n) i: a; endcase"), kIdentMsg);
+}
+
+TEST(ConstantFunctionExprReachElaboration,
+     ModuleVariableInARandsequenceCaseItemArgument) {
+  ExpectConstFuncError(InRandsequence("case (n) 1: c(i); endcase"), kIdentMsg);
+}
+
 }  // namespace

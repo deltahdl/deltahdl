@@ -86,30 +86,33 @@ static bool ExprCallsModeMethod(const Expr* e) {
 static bool StmtCallsModeMethod(const Stmt* s);
 
 // 18.5.11: true if any expression field directly held by statement 's'
-// contains a rand_mode()/constraint_mode() call (not its substatements).
+// contains a rand_mode()/constraint_mode() call (not its substatements). The
+// clause forbids the call anywhere in a function that appears in a constraint
+// and names no position it is allowed in, so every position a statement holds
+// an expression in is one the search has to look at.
+//
+// ForEachChildExpr in elaborator_validate_internal.h states those positions,
+// once for the whole elaborator, which is why the list is not written out again
+// here. It reaches the case and randcase arm guards along with the rest, the
+// arm bodies being statements StmtChildrenCallModeMethod below reaches. It
+// gives the visitor no way to stop, so the search short-circuits by recording
+// the first hit in `found` and reading an expression only while `found` is
+// false, which is what the early return out of the old list of slots did.
+//
+// One position the list names can never answer true and is walked because the
+// shared list is walked whole: A.6.5 gives `wait_order (
+// hierarchical_identifier { , hierarchical_identifier } ) action_block`, so no
+// conforming source writes a call in Stmt::wait_order_events. Every other
+// position admits one, A.8.4's constant_primary reaching a
+// constant_function_call for A.2.5's unpacked_dimension and for A.6.12's
+// rs_weight_specification.
 static bool StmtExprFieldsCallModeMethod(const Stmt* s) {
-  if (ExprCallsModeMethod(s->condition)) return true;
-  if (ExprCallsModeMethod(s->lhs)) return true;
-  if (ExprCallsModeMethod(s->rhs)) return true;
-  if (ExprCallsModeMethod(s->for_cond)) return true;
-  if (ExprCallsModeMethod(s->expr)) return true;
-  if (ExprCallsModeMethod(s->var_init)) return true;
-  return false;
-}
-
-// 18.5.11: true if a guard expression of a case or randcase arm of 's'
-// contains a rand_mode()/constraint_mode() call. The arm bodies are
-// statements, which StmtChildrenCallModeMethod below reaches along with every
-// other substatement.
-static bool CaseArmExprsCallModeMethod(const Stmt* s) {
-  for (const auto& ci : s->case_items) {
-    for (const auto* p : ci.patterns)
-      if (ExprCallsModeMethod(p)) return true;
-  }
-  for (const auto& rc : s->randcase_items) {
-    if (ExprCallsModeMethod(rc.first)) return true;
-  }
-  return false;
+  bool found = false;
+  ForEachChildExpr(s, [&](Expr* const& e) {
+    if (found) return;
+    found = ExprCallsModeMethod(e);
+  });
+  return found;
 }
 
 // 18.5.11: recurse into every substatement of 's', returning true on a
@@ -137,7 +140,6 @@ static bool StmtChildrenCallModeMethod(const Stmt* s) {
 static bool StmtCallsModeMethod(const Stmt* s) {
   if (!s) return false;
   if (StmtExprFieldsCallModeMethod(s)) return true;
-  if (CaseArmExprsCallModeMethod(s)) return true;
   return StmtChildrenCallModeMethod(s);
 }
 
