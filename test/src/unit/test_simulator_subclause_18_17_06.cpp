@@ -193,4 +193,153 @@ TEST(RandsequenceSim, ReturnInWeightSpecCodeBlockAbortsCurrentProductionOnly) {
   EXPECT_EQ(trace, 19u);
 }
 
+// 18.17.6: the break terminates the randsequence block and nothing wider. The
+// randsequence statement itself finishes normally, so a loop enclosing it runs
+// its remaining iterations instead of being terminated in its turn. A break
+// that leaked out of the randsequence would satisfy 12.8 against this for loop
+// and stop it after one pass.
+TEST(RandsequenceSim, BreakDoesNotTerminateLoopEnclosingRandsequence) {
+  SimFixture f;
+  auto [x, y] = RunModuleTwoVars(f,
+                                 "module t;\n"
+                                 "  int x;\n"
+                                 "  int y;\n"
+                                 "  initial begin\n"
+                                 "    x = 0;\n"
+                                 "    y = 0;\n"
+                                 "    for (int i = 0; i < 3; i++) begin\n"
+                                 "      randsequence(main)\n"
+                                 "        main : a b;\n"
+                                 "        a : { x = x + 2; break; };\n"
+                                 "        b : { x = x + 90; };\n"
+                                 "      endsequence\n"
+                                 "      y = y + 5;\n"
+                                 "    end\n"
+                                 "  end\n"
+                                 "endmodule\n",
+                                 "x", "y");
+  EXPECT_EQ(x, 6u);   // three passes of a, and b never generated
+  EXPECT_EQ(y, 15u);  // the loop body finished all three iterations
+}
+
+// 18.17.6: a break in a production code block leaves the randsequence block,
+// not the subroutine holding it. The statements written after the randsequence
+// in the task body still run, and the caller resumes where the call left off.
+TEST(RandsequenceSim, BreakInTaskDoesNotReturnFromTask) {
+  SimFixture f;
+  auto [x, y] = RunModuleTwoVars(f,
+                                 "module t;\n"
+                                 "  int x;\n"
+                                 "  int y;\n"
+                                 "  task automatic run;\n"
+                                 "    randsequence(main)\n"
+                                 "      main : a b;\n"
+                                 "      a : { x = x + 3; break; };\n"
+                                 "      b : { x = x + 90; };\n"
+                                 "    endsequence\n"
+                                 "    y = y + 4;\n"
+                                 "  endtask\n"
+                                 "  initial begin\n"
+                                 "    x = 0;\n"
+                                 "    y = 0;\n"
+                                 "    run;\n"
+                                 "    y = y + 20;\n"
+                                 "  end\n"
+                                 "endmodule\n",
+                                 "x", "y");
+  EXPECT_EQ(x, 3u);   // b never generated
+  EXPECT_EQ(y, 24u);  // the task ran on past the randsequence, then the caller
+}
+
+// 18.17.6: a return in a production code block aborts that production and
+// nothing wider, so inside a task it is not the task's return. Generation
+// continues with the next production, and the task body continues after the
+// randsequence.
+TEST(RandsequenceSim, ReturnInTaskDoesNotReturnFromTask) {
+  SimFixture f;
+  auto [x, y] =
+      RunModuleTwoVars(f,
+                       "module t;\n"
+                       "  int x;\n"
+                       "  int y;\n"
+                       "  task automatic run;\n"
+                       "    randsequence(main)\n"
+                       "      main : a b;\n"
+                       "      a : { x = x + 3; return; x = x + 500; };\n"
+                       "      b : { x = x + 30; };\n"
+                       "    endsequence\n"
+                       "    y = y + 4;\n"
+                       "  endtask\n"
+                       "  initial begin\n"
+                       "    x = 0;\n"
+                       "    y = 0;\n"
+                       "    run;\n"
+                       "    y = y + 20;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       "x", "y");
+  EXPECT_EQ(x, 33u);  // a aborted before 500, then b still generated
+  EXPECT_EQ(y, 24u);  // the task ran on past the randsequence, then the caller
+}
+
+// 18.17.6: break "can appear in any code block", which includes the weight
+// code block of a rule reached as a rand join operand (18.17.5). Expanding an
+// operand runs that rule's weight code, so the break fires there, before any
+// interleaving, and terminates the whole randsequence: the other operand and
+// the production written after the rand join are never generated.
+TEST(RandsequenceSim, BreakInRandJoinWeightCodeTerminatesRandsequence) {
+  SimFixture f;
+  auto [x, y] = RunModuleTwoVars(f,
+                                 "module t;\n"
+                                 "  int x;\n"
+                                 "  int y;\n"
+                                 "  initial begin\n"
+                                 "    x = 0;\n"
+                                 "    y = 0;\n"
+                                 "    randsequence(main)\n"
+                                 "      main : j tail;\n"
+                                 "      j    : rand join s1 s2;\n"
+                                 "      s1   : p := 1 { x = x + 3; break; };\n"
+                                 "      p    : { x = x + 900; };\n"
+                                 "      s2   : { x = x + 7; };\n"
+                                 "      tail : { x = x + 50; };\n"
+                                 "    endsequence\n"
+                                 "    y = y + 6;\n"
+                                 "  end\n"
+                                 "endmodule\n",
+                                 "x", "y");
+  // Operands are expanded in the order written, so s1's weight code runs first
+  // and its break leaves s2 (7), p (900) and tail (50) ungenerated.
+  EXPECT_EQ(x, 3u);
+  EXPECT_EQ(y, 6u);  // execution resumed after the randsequence
+}
+
+// 18.17.6: return aborts only the current production, so a return in the
+// weight code of a rand join operand drops that operand's contribution and
+// leaves the interleaving intact. The sibling operand still generates, and so
+// does the production written after the rand join.
+TEST(RandsequenceSim, ReturnInRandJoinWeightCodeAbortsOperandOnly) {
+  SimFixture f;
+  uint64_t x = RunModule(f,
+                         "module t;\n"
+                         "  int x;\n"
+                         "  initial begin\n"
+                         "    x = 0;\n"
+                         "    randsequence(main)\n"
+                         "      main : j tail;\n"
+                         "      j    : rand join s1 s2;\n"
+                         "      s1   : p := 1 { x = x + 2; return; };\n"
+                         "      p    : { x = x + 900; };\n"
+                         "      s2   : { x = x + 4; };\n"
+                         "      tail : { x = x + 30; };\n"
+                         "    endsequence\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "x");
+  // s1's weight code adds 2 and aborts s1, so p (900) contributes nothing; s2
+  // (4) is still interleaved and tail (30) still follows the join. A break
+  // there would have left 2, and ignoring the return would have left 936.
+  EXPECT_EQ(x, 36u);
+}
+
 }  // namespace
