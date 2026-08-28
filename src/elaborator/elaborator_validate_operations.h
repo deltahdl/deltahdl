@@ -107,11 +107,16 @@ class ElaboratorOperationRules : public ElaboratorData {
   void WalkExprForRealOps(const Expr* expr);
   void WalkStmtsForRealOps(const Stmt* s);
 
-  // §6.24.1: size-cast width and size/signing-cast integral-operand rules.
+  // §6.24.1: size-cast width and size/signing-cast integral-operand rules, and
+  // §11.7's same integral-argument rule for $signed and $unsigned.
   void ValidateCastOperations(const ModuleDecl* decl);
   void WalkExprForCast(const Expr* expr);
   void WalkStmtsForCast(const Stmt* s);
   void CheckCastExpr(const Expr* expr);
+  // §11.7: rejects a real argument to $signed or $unsigned, which shall return
+  // a packed array holding the bits of its input. Called from CheckCastExpr,
+  // which WalkExprForCast reaches for every expression.
+  void CheckSigningSystemCallExpr(const Expr* expr);
   bool CastOperandIsReal(const Expr* operand) const;
 
   void ValidateAssignInExprRestrictions(const ModuleDecl* decl);

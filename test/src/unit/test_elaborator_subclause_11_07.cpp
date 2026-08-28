@@ -127,4 +127,81 @@ TEST(SignedExprElaboration,
                             4, "6.24.3"));
 }
 
+// §11.7: `$signed` "shall evaluate the input expression and return a
+// one-dimensional packed array with the same number of bits and value of the
+// input expression", and a real has no packed-array bits to return, so a real
+// variable is not something the conversion can be applied to. These four cases
+// cite §11.7 rather than §6.24.1 because §6.24.1 states the rule for the cast
+// spelling, `signed'(rv)`, which
+// test/src/unit/test_elaborator_subclause_06_24_01.cpp already covers at
+// CastOperatorElaboration.RealVarInSignedCastError and its neighbours. §11.7 is
+// the clause that governs the system-function spelling, and the report names
+// that spelling rather than a cast.
+TEST(SignedExprElaboration, RealVarInSignedSystemFunctionRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real rv;\n"
+      "  int r;\n"
+      "  initial r = $signed(rv);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "expression inside $signed shall be an integral value", 4, "11.7"));
+}
+
+// §11.7 defines `$unsigned` by the same sentence it defines `$signed` by, the
+// two differing only in "the signedness defined by the function", so the
+// packed-array requirement on the input expression governs `$unsigned` as
+// well.
+TEST(SignedExprElaboration, RealVarInUnsignedSystemFunctionRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real rv;\n"
+      "  int r;\n"
+      "  initial r = $unsigned(rv);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "expression inside $unsigned shall be an integral value", 4, "11.7"));
+}
+
+// §11.7 puts the requirement on the input expression rather than on how the
+// input expression is written, so a real literal written directly as the
+// argument breaks it as a declared real variable does. A literal is worth its
+// own case because it reaches the check as a literal rather than as a name
+// looked up among the declared variables.
+TEST(SignedExprElaboration, RealLiteralArgumentToSignedSystemFunctionRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int r;\n"
+      "  initial r = $signed(2.5);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "expression inside $signed shall be an integral value", 3, "11.7"));
+}
+
+// §11.7's requirement is that the input expression have packed-array bits, and
+// §6.12 makes `shortreal` a real type distinct from `real`, so a shortreal
+// variable has no such bits either and is rejected by the same rule.
+TEST(SignedExprElaboration, ShortrealVarInUnsignedSystemFunctionRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  shortreal s;\n"
+      "  int r;\n"
+      "  initial r = $unsigned(s);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "expression inside $unsigned shall be an integral value", 4, "11.7"));
+}
+
 }  // namespace

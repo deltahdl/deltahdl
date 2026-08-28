@@ -633,6 +633,14 @@ bool IsSigningCast(const Expr* cast) {
   return cast->text == "signed" || cast->text == "unsigned";
 }
 
+// §11.7: $signed() and $unsigned() are the system-function spelling of the same
+// signedness change the signing cast writes, and the parser records a call to
+// either one as a kSystemCall whose callee carries the leading '$'.
+bool IsSigningSystemCall(const Expr* call) {
+  return call->kind == ExprKind::kSystemCall &&
+         (call->callee == "$signed" || call->callee == "$unsigned");
+}
+
 }  // namespace
 
 // §6.24.1: a real value has no bit representation of its own, so the two casts
@@ -645,7 +653,34 @@ bool ElaboratorOperationRules::CastOperandIsReal(const Expr* operand) const {
   return IsRealVar(operand, var_types_);
 }
 
+// §11.7: $signed and $unsigned shall return a one-dimensional packed array with
+// the same number of bits and value as the input expression, so the input has
+// to have bits to return and a real argument has none. The argument is rejected
+// here by the same test the signing cast uses, a real literal or a real
+// variable standing directly as the first argument.
+//
+// This spelling cites §11.7 and the cast spelling cites §6.24.1 because each
+// clause states the requirement for the syntax it defines; §11.7 is what makes
+// the two one conversion, defining these functions in terms of the signedness
+// the cast applies. Left unreported, the argument reaches EvalSignCast in
+// src/simulator/eval_systask.cpp, which sets is_signed on the real value it
+// evaluated, and the result claims to be both a real and a signed integer.
+void ElaboratorOperationRules::CheckSigningSystemCallExpr(const Expr* expr) {
+  if (!expr || !IsSigningSystemCall(expr) || expr->args.empty()) return;
+  if (!CastOperandIsReal(expr->args.front())) return;
+  diag_.Error(expr->range.start,
+              std::format("expression inside {} shall be an integral value",
+                          expr->callee),
+              Subclause("11.7"));
+}
+
 void ElaboratorOperationRules::CheckCastExpr(const Expr* expr) {
+  // §11.7's system-function spelling of the signing conversion is checked from
+  // here because WalkExprForCast in
+  // src/elaborator/elaborator_validate_cast_ops.cpp visits every expression and
+  // calls only this member, and the early return below drops every node that is
+  // not a cast.
+  CheckSigningSystemCallExpr(expr);
   if (!expr || expr->kind != ExprKind::kCast) return;
 
   if (IsSizeCastForm(expr)) {
