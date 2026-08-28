@@ -5,7 +5,6 @@
 // test_elaborator_subclause_09_02_02_02_01b.cpp, which the 1000-line cap in
 // .github/workflows/deltahdl.yml separated this file from.
 
-#include <initializer_list>
 #include <string_view>
 #include <unordered_set>
 
@@ -16,40 +15,11 @@
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_sensitivity_assert.h"
 
 using namespace delta;
 
 namespace {
-
-void ExpectSensitivityContains(
-    const RtlirProcess& proc,
-    std::initializer_list<std::string_view> expected) {
-  for (const auto& name : expected) {
-    bool found = false;
-    for (const auto& ev : proc.sensitivity) {
-      if (ev.signal && ev.signal->text == name) {
-        found = true;
-        break;
-      }
-    }
-    EXPECT_TRUE(found) << "missing sensitivity signal: " << name;
-  }
-}
-
-void ExpectSensitivityExcludes(
-    const RtlirProcess& proc,
-    std::initializer_list<std::string_view> excluded) {
-  for (const auto& name : excluded) {
-    bool found = false;
-    for (const auto& ev : proc.sensitivity) {
-      if (ev.signal && ev.signal->text == name) {
-        found = true;
-        break;
-      }
-    }
-    EXPECT_FALSE(found) << "unexpected sensitivity signal: " << name;
-  }
-}
 
 TEST(AlwaysCombSensitivityInference, BasicReadInferred) {
   ElabFixture f;
