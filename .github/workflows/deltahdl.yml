@@ -262,6 +262,61 @@ jobs:
             done
           done
           exit $fail
+  # This job fails when a file under src/elaborator/ names one of Stmt's
+  # scalar child-statement links -- then_branch, else_branch or for_body --
+  # and is not listed in etc/elaborator_stmt_link_allowlist.txt. It also fails
+  # when a line in that file names no such file any more, so a conversion
+  # deletes its own entry instead of leaving one standing.
+  #
+  # ForEachChildStmt in src/elaborator/elaborator_validate_internal.h is meant
+  # to be the one place Stmt's thirteen child-statement links are written. A
+  # walk that writes out six of them enforces its rule over part of a
+  # procedure while reading as though it enforced it over all of one, and
+  # nothing about the walk says which six. That has cost this repository real
+  # work: #3301, #3305, #3307, #3318, #3319 and #3320 converted a hundred and
+  # nineteen walks between them, every one found by a person reading, and each
+  # conversion left the next reader no way to know what remained.
+  #
+  # The three links are the key because only a walk over statements reads
+  # them. #3317 proposed case_items as the second key and it is the wrong one:
+  # seven files under src/elaborator/ read ci.patterns or ci.is_default and
+  # walk no statement, so the allow-list would have recorded which files read
+  # a case item's expressions rather than which walks still write their own
+  # list, and no conversion would ever shorten it. fork_stmts is wrong for the
+  # reason #3317 itself gives -- it is a link the hand-written walks omit, so
+  # a search keyed on it finds none of them.
+  #
+  # The allow-list is a tracked file rather than a string in this job so that
+  # reading what remains does not mean reading a job definition, and so that
+  # the entry a conversion deletes shows in the diff as a line.
+  assert-no-hand-written-stmt-link-lists:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Assert no hand-written Stmt link lists
+        run: |
+          list=etc/elaborator_stmt_link_allowlist.txt
+          fail=0
+          allowed=$(grep -v '^[[:space:]]*#' "$list" | grep -v '^[[:space:]]*$')
+          hits=$(grep -rlE -- '->(then_branch|else_branch|for_body)' \
+            src/elaborator/ | sort)
+          for f in $hits; do
+            if ! printf '%s\n' "$allowed" | grep -qxF "$f"; then
+              echo "::error file=$f,line=1::$f names a Stmt child-statement" \
+                "link itself; take the list from ForEachChildStmt in" \
+                "src/elaborator/elaborator_validate_internal.h, or add $f to" \
+                "$list with a comment saying why its rule cannot"
+              fail=1
+            fi
+          done
+          for f in $allowed; do
+            if ! printf '%s\n' "$hits" | grep -qxF "$f"; then
+              echo "::error file=$list,line=1::$f is listed but names no" \
+                "then_branch, else_branch or for_body; delete its entry"
+              fail=1
+            fi
+          done
+          exit $fail
   # DO NOT disable this job. Inline suppression comments (NOLINT,
   # clang-format off, etc.) hide problems instead of fixing them and make the
   # codebase progressively harder to maintain.

@@ -1,0 +1,47 @@
+# Files under src/elaborator/ permitted to name one of Stmt's scalar
+# child-statement links -- then_branch, else_branch or for_body -- instead of
+# taking the list from ForEachChildStmt in
+# src/elaborator/elaborator_validate_internal.h.
+#
+# assert-no-hand-written-stmt-link-lists in .github/workflows/deltahdl.yml
+# reads this file. It fails on a file that names one of the three and is not
+# listed here, and it also fails on a line here that names no such file any
+# more, so a conversion has to delete its own entry rather than leave one
+# standing over a file that has stopped needing it.
+#
+# Blank lines and lines beginning with # are ignored. Every other line is a
+# repository-relative path.
+#
+# The three links are the key because only a walk over statements reads them.
+# case_items is not, though #3317 proposed it: seven files under
+# src/elaborator/ read ci.patterns or ci.is_default and walk no statement at
+# all, so an allow-list seeded with them would record which files read a case
+# item's expressions rather than which walks still write out their own list.
+# fork_stmts is not either, and for the reason #3317 gives: it is a link the
+# hand-written walks omit, so a search keyed on it finds none of them.
+
+# The one place the thirteen links are written. ForEachChildStmt and
+# ForEachChildExpr are what every other walk is meant to call.
+src/elaborator/elaborator_validate_internal.h
+
+# An interpreter rather than a rule walk. ExecConstFuncStmt executes a
+# constant function body one statement at a time, so it takes the branch a
+# condition selects and must name that branch to take it. A walk that visited
+# both branches would evaluate the arm the source did not choose.
+src/elaborator/const_eval_func.cpp
+
+# AssignedOnEveryPath answers whether a variable is assigned on every path
+# through a statement, which is a union over some links and an intersection
+# over others: §12.7.1 runs a for_initialization once unconditionally, §9.3.2
+# Table 9-1 makes a fork establish under join and not under join_any or
+# join_none, and §18.16, §18.17 and §20.11 leave a randcase arm, a
+# randsequence production and an assertion action block each able to run not
+# at all. ForEachChildStmt hands the visitor a bare child with no way to tell
+# which field it came from, so this walk cannot use it and says so in a
+# comment, which is what the paragraph above ForEachChildStmt asks for.
+src/elaborator/elaborator_process.cpp
+
+# CheckJumpRules names for_body alone, and only to carry a changed JumpScope
+# into the loop body it opens. Every other link it descends through
+# ForEachChildStmt.
+src/elaborator/elaborator_validate_jump_statements.cpp
