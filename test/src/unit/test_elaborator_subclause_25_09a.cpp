@@ -1,3 +1,19 @@
+// §25.9 "Virtual interfaces": the operations a virtual interface admits, and
+// the declarations that may name one. Holds the cases for the declaration
+// rules -- a virtual interface as a port, a union member or an interface item,
+// an unknown interface or modport, an interface that references objects
+// outside its body -- and for the operations themselves: which operators may
+// be applied, which operand may stand opposite one in a comparison, and which
+// right-hand side may be assigned to one, including the interface type,
+// modport and parameter-value matching that assignment compatibility rests on.
+//
+// The cases for the statement positions those operation rules reach -- the
+// seven child-statement links Elaborator::WalkStmtsForVirtualInterfaceOps in
+// src/elaborator/elaborator_validate_datatype_ops.cpp did not descend before
+// it took its list from ForEachChildStmt -- are in
+// test_elaborator_subclause_25_09b.cpp, which the 1000-line cap in
+// .github/workflows/deltahdl.yml separated this file from.
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 

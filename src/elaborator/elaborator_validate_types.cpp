@@ -793,12 +793,23 @@ void Elaborator::WalkStmtsForEnumAssign(const Stmt* s) {
   } else if (StmtIsPostfixIncDec(s)) {
     CheckEnumIncDecStmt(s, enum_var_names_, diag_);
   }
-  for (const Stmt* branch :
-       {s->then_branch, s->else_branch, s->body, s->for_body}) {
-    WalkStmtsForEnumAssign(branch);
-  }
-  for (auto* sub : s->stmts) WalkStmtsForEnumAssign(sub);
-  for (auto& ci : s->case_items) WalkStmtsForEnumAssign(ci.body);
+  // §6.19.3 makes an enumerated type strongly typed: a value of any other
+  // type reaches an enum variable only through a cast. The rule is stated of
+  // the assignment and names no statement it is suspended in, so this descends
+  // every link ForEachChildStmt in elaborator_validate_internal.h names and
+  // writes out no link of its own. It used to write out six of the thirteen,
+  // which left an assignment in a fork arm (§9.3.2), in a for-loop
+  // initialization or step (A.6.8), in either arm of an immediate assertion's
+  // action block (§16.3), in a randcase item (§18.16) or in a randsequence
+  // production's code block (§18.17) unreached.
+  //
+  // That cost twice over, because this walk both reports the offending
+  // assignment and collects the enum variables a statement declares into
+  // enum_var_names_. A variable declared in one of those seven links never
+  // entered that set, so a later assignment to it -- even one written in a link
+  // the walk did read -- was unjudged as well as unreported.
+  ForEachChildStmt(s,
+                   [this](Stmt* const& sub) { WalkStmtsForEnumAssign(sub); });
 }
 
 void Elaborator::ValidateEnumAssignments(const ModuleDecl* decl) {

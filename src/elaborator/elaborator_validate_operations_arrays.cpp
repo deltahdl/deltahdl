@@ -3,6 +3,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -46,12 +47,14 @@ void ElaboratorOperationRules::WalkStmtsForAssocOperand(const Stmt* s) {
   CheckAssocOperandInBinaryExpr(s->expr);
   CheckAssocOperandInBinaryExpr(s->condition);
   CheckAssocOperandInBinaryExpr(s->for_cond);
-  for (auto* sub : s->stmts) WalkStmtsForAssocOperand(sub);
-  WalkStmtsForAssocOperand(s->then_branch);
-  WalkStmtsForAssocOperand(s->else_branch);
-  WalkStmtsForAssocOperand(s->body);
-  WalkStmtsForAssocOperand(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForAssocOperand(ci.body);
+  // §7.4.6 requires an associative array to be selected down to an element
+  // before an operator other than equality takes it, and names no statement the
+  // requirement is suspended in, so this descends every link ForEachChildStmt
+  // in elaborator_validate_internal.h names and names none itself. It wrote out
+  // six of the thirteen, so `x = aa + 1` written in a fork arm or in a
+  // randcase item was never looked at rather than looked at and allowed.
+  ForEachChildStmt(s,
+                   [this](Stmt* const& sub) { WalkStmtsForAssocOperand(sub); });
 }
 
 void ElaboratorOperationRules::ValidateAssocOperandInExpr(
@@ -135,12 +138,15 @@ void ElaboratorOperationRules::WalkStmtsForArrayPatternElemType(const Stmt* s) {
       s->kind == StmtKind::kNonblockingAssign) {
     CheckArrayPatternElemTypeInAssign(s);
   }
-  for (auto* sub : s->stmts) WalkStmtsForArrayPatternElemType(sub);
-  WalkStmtsForArrayPatternElemType(s->then_branch);
-  WalkStmtsForArrayPatternElemType(s->else_branch);
-  WalkStmtsForArrayPatternElemType(s->body);
-  WalkStmtsForArrayPatternElemType(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForArrayPatternElemType(ci.body);
+  // §10.9.1 requires every element of an assignment pattern targeting an
+  // unpacked array to match that array's element type, and conditions the rule
+  // on the assignment rather than on where it stands, so this descends every
+  // link ForEachChildStmt in elaborator_validate_internal.h names and names
+  // none itself. It wrote out six of the thirteen, so `A9 = '{A3, ...}` written
+  // in an assertion action block or in a randsequence production code block
+  // reached CheckArrayPatternElemTypeInAssign in neither.
+  ForEachChildStmt(
+      s, [this](Stmt* const& sub) { WalkStmtsForArrayPatternElemType(sub); });
 }
 
 void ElaboratorOperationRules::ValidateArrayPatternElemType(
@@ -185,12 +191,14 @@ void ElaboratorOperationRules::WalkStmtsForReplicateTargetingArray(
       s->kind == StmtKind::kNonblockingAssign) {
     CheckReplicateTargetingArrayInAssign(s);
   }
-  for (auto* sub : s->stmts) WalkStmtsForReplicateTargetingArray(sub);
-  WalkStmtsForReplicateTargetingArray(s->then_branch);
-  WalkStmtsForReplicateTargetingArray(s->else_branch);
-  WalkStmtsForReplicateTargetingArray(s->body);
-  WalkStmtsForReplicateTargetingArray(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForReplicateTargetingArray(ci.body);
+  // §10.10.1 forbids a replication from targeting an unpacked array, and puts
+  // no condition on the statement the assignment is written in, so this
+  // descends every link ForEachChildStmt in elaborator_validate_internal.h
+  // names and names none itself. It wrote out six of the thirteen, so
+  // `A9 = {9{1}}` written in a fork arm or in a randcase item elaborated clean.
+  ForEachChildStmt(s, [this](Stmt* const& sub) {
+    WalkStmtsForReplicateTargetingArray(sub);
+  });
 }
 
 void ElaboratorOperationRules::ValidateReplicateTargetingArray(
@@ -328,12 +336,13 @@ void ElaboratorOperationRules::WalkStmtsForArrayElementPartSelect(
   WalkExprForArrayElementPartSelect(s->expr);
   WalkExprForArrayElementPartSelect(s->condition);
   WalkExprForArrayElementPartSelect(s->assert_expr);
-  for (auto* sub : s->stmts) WalkStmtsForArrayElementPartSelect(sub);
-  WalkStmtsForArrayElementPartSelect(s->then_branch);
-  WalkStmtsForArrayElementPartSelect(s->else_branch);
-  WalkStmtsForArrayElementPartSelect(s->body);
-  WalkStmtsForArrayElementPartSelect(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForArrayElementPartSelect(ci.body);
+  // §11.5.2 sends an array's trailing range to §11.5.1's ordering rule, which
+  // governs the range itself and not the statement holding it, so this descends
+  // every link ForEachChildStmt in elaborator_validate_internal.h names and
+  // names none itself. It wrote out six of the thirteen, so `r = A[1][1:0]`
+  // written in a fork arm or in an assertion action block was never looked at.
+  ForEachChildStmt(
+      s, [this](Stmt* const& sub) { WalkStmtsForArrayElementPartSelect(sub); });
 }
 
 void ElaboratorOperationRules::ValidateArrayElementPartSelect(
@@ -436,12 +445,15 @@ void ElaboratorOperationRules::WalkStmtsForArrayConcatNesting(const Stmt* s) {
     CheckArrayConcatNestingInAssign(s);
     CheckNullItemInArrayConcatAssign(s);
   }
-  for (auto* sub : s->stmts) WalkStmtsForArrayConcatNesting(sub);
-  WalkStmtsForArrayConcatNesting(s->then_branch);
-  WalkStmtsForArrayConcatNesting(s->else_branch);
-  WalkStmtsForArrayConcatNesting(s->body);
-  WalkStmtsForArrayConcatNesting(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForArrayConcatNesting(ci.body);
+  // §10.10.3 bars an unpacked array concatenation from being an item of
+  // another, and §10.10 admits `null` as an item only for the element types
+  // that have a null value; neither rule mentions the statement the assignment
+  // is written in, so this descends every link ForEachChildStmt in
+  // elaborator_validate_internal.h names and names none itself. It wrote out
+  // six of the thirteen, so `q = {null, null}` on a queue of ints written in a
+  // fork arm or in a randsequence production code block went unreported.
+  ForEachChildStmt(
+      s, [this](Stmt* const& sub) { WalkStmtsForArrayConcatNesting(sub); });
 }
 
 void ElaboratorOperationRules::ValidateUnpackedArrayConcatNesting(
@@ -514,12 +526,15 @@ void ElaboratorOperationRules::WalkStmtsForUnsizedInConcat(const Stmt* s) {
   WalkExprForUnsizedInConcat(s->expr);
   WalkExprForUnsizedInConcat(s->condition);
   WalkExprForUnsizedInConcat(s->assert_expr);
-  for (auto* sub : s->stmts) WalkStmtsForUnsizedInConcat(sub);
-  WalkStmtsForUnsizedInConcat(s->then_branch);
-  WalkStmtsForUnsizedInConcat(s->else_branch);
-  WalkStmtsForUnsizedInConcat(s->body);
-  WalkStmtsForUnsizedInConcat(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForUnsizedInConcat(ci.body);
+  // §11.4.12 says "Unsized constant numbers shall not be allowed in
+  // concatenations", a property of the concatenation and not of the statement
+  // holding it, so this descends every link ForEachChildStmt in
+  // elaborator_validate_internal.h names and names none itself. It wrote out
+  // six of the thirteen, so `a = {x, 1}` written in a fork arm or in an
+  // assertion action block was never looked at rather than looked at and
+  // allowed.
+  ForEachChildStmt(
+      s, [this](Stmt* const& sub) { WalkStmtsForUnsizedInConcat(sub); });
 }
 
 void ElaboratorOperationRules::ValidateUnsizedInConcat(const ModuleDecl* decl) {
@@ -582,12 +597,15 @@ void ElaboratorOperationRules::WalkStmtsForSelectOnConcatLvalue(const Stmt* s) {
       s->kind == StmtKind::kForce) {
     CheckSelectOnConcatLvalue(s->lhs);
   }
-  for (auto* sub : s->stmts) WalkStmtsForSelectOnConcatLvalue(sub);
-  WalkStmtsForSelectOnConcatLvalue(s->then_branch);
-  WalkStmtsForSelectOnConcatLvalue(s->else_branch);
-  WalkStmtsForSelectOnConcatLvalue(s->body);
-  WalkStmtsForSelectOnConcatLvalue(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForSelectOnConcatLvalue(ci.body);
+  // §11.4.12 says of a select of a concatenation that "Such a select shall not
+  // be legal as a net_lvalue, variable_lvalue, or in any equivalent use, such
+  // as on the left-hand side of an assignment", which is a rule about the
+  // lvalue and not about the statement holding it, so this descends every link
+  // ForEachChildStmt in elaborator_validate_internal.h names, naming none
+  // itself. It wrote out six of the thirteen, so `{a, b}[2] = 1'b1` written in
+  // a fork arm or in a randcase item elaborated clean.
+  ForEachChildStmt(
+      s, [this](Stmt* const& sub) { WalkStmtsForSelectOnConcatLvalue(sub); });
 }
 
 void ElaboratorOperationRules::ValidateSelectOnConcatLvalue(
@@ -631,12 +649,14 @@ void ElaboratorOperationRules::WalkStmtsForReplicateLvalue(const Stmt* s) {
       s->kind == StmtKind::kForce) {
     CheckReplicateLvalue(s->lhs);
   }
-  for (auto* sub : s->stmts) WalkStmtsForReplicateLvalue(sub);
-  WalkStmtsForReplicateLvalue(s->then_branch);
-  WalkStmtsForReplicateLvalue(s->else_branch);
-  WalkStmtsForReplicateLvalue(s->body);
-  WalkStmtsForReplicateLvalue(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForReplicateLvalue(ci.body);
+  // §11.4.12.1 says a replication "shall not appear on the left-hand side of an
+  // assignment", a rule about the lvalue and not about the statement the
+  // assignment stands in, so this descends every link ForEachChildStmt in
+  // elaborator_validate_internal.h names and names none itself. It wrote out
+  // six of the thirteen, so `{2{a}} = b` written in a fork arm or in an
+  // assertion action block reached CheckReplicateLvalue in neither.
+  ForEachChildStmt(
+      s, [this](Stmt* const& sub) { WalkStmtsForReplicateLvalue(sub); });
 }
 
 void ElaboratorOperationRules::ValidateReplicateLvalue(const ModuleDecl* decl) {
@@ -774,14 +794,15 @@ static void WalkStmtsForZeroReplicateStandalone(const Stmt* s,
   CheckZeroReplicateStandalone(s->expr, scope, diag);
   CheckZeroReplicateStandalone(s->condition, scope, diag);
   CheckZeroReplicateStandalone(s->assert_expr, scope, diag);
-  for (auto* sub : s->stmts)
+  // §11.4.12.1 allows a zero replication only inside a concatenation holding an
+  // operand of positive size, and says nothing about the statement the
+  // replication is written in, so this descends every link ForEachChildStmt in
+  // elaborator_validate_internal.h names and names none itself. It wrote out
+  // six of the thirteen, so `result = {0{a}}` written in a fork arm or in a
+  // randcase item was never looked at.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForZeroReplicateStandalone(sub, scope, diag);
-  WalkStmtsForZeroReplicateStandalone(s->then_branch, scope, diag);
-  WalkStmtsForZeroReplicateStandalone(s->else_branch, scope, diag);
-  WalkStmtsForZeroReplicateStandalone(s->body, scope, diag);
-  WalkStmtsForZeroReplicateStandalone(s->for_body, scope, diag);
-  for (auto& ci : s->case_items)
-    WalkStmtsForZeroReplicateStandalone(ci.body, scope, diag);
+  });
 }
 
 void ElaboratorOperationRules::WalkStmtsForReplicateMultiplier(const Stmt* s) {
@@ -791,12 +812,14 @@ void ElaboratorOperationRules::WalkStmtsForReplicateMultiplier(const Stmt* s) {
   WalkExprForReplicateMultiplier(s->expr);
   WalkExprForReplicateMultiplier(s->condition);
   WalkExprForReplicateMultiplier(s->assert_expr);
-  for (auto* sub : s->stmts) WalkStmtsForReplicateMultiplier(sub);
-  WalkStmtsForReplicateMultiplier(s->then_branch);
-  WalkStmtsForReplicateMultiplier(s->else_branch);
-  WalkStmtsForReplicateMultiplier(s->body);
-  WalkStmtsForReplicateMultiplier(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForReplicateMultiplier(ci.body);
+  // §11.4.12.1 requires a replication multiplier to be a constant expression
+  // that is neither negative nor x/z, a rule about the multiplier and not about
+  // the statement around it, so this descends every link ForEachChildStmt in
+  // elaborator_validate_internal.h names and names none itself. It wrote out
+  // six of the thirteen, so `a = {1'bx{1'b0}}` written in a fork arm or in a
+  // randsequence production code block went unreported.
+  ForEachChildStmt(
+      s, [this](Stmt* const& sub) { WalkStmtsForReplicateMultiplier(sub); });
 }
 
 void ElaboratorOperationRules::ValidateReplicateMultiplier(

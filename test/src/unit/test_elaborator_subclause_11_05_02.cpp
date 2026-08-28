@@ -356,4 +356,153 @@ TEST(ArrayAddressingElaboration,
                             4, "11.5.1"));
 }
 
+// §11.5.2 sends an array's trailing range to §11.5.1's ordering rule, which
+// governs the range itself and not the statement holding it. A slice written
+// against the direction of the dimension it slices is illegal wherever it
+// stands.
+//
+// ElaboratorOperationRules::WalkStmtsForArrayElementPartSelect in
+// src/elaborator/elaborator_validate_operations_arrays.cpp reached six of the
+// thirteen statement links ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h states. The seven cases here
+// each put `r = A[1][1:0]` in one of the seven positions it did not read, every
+// one of which elaborated clean beforehand.
+//
+// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
+// block_item_declaration } { statement_or_null } join_keyword [ :
+// block_identifier ]`, so a fork arm is a statement position like any other.
+TEST(ArrayAddressingElaboration, ReversedSliceInAForkArmNames11_5_2) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  int A[2][3];\n"
+             "  logic [63:0] r;\n"
+             "  initial begin\n"
+             "    fork\n"
+             "      r = A[1][1:0];\n"
+             "    join\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "slice's first index must address a more", 6,
+                            "11.5.2"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case covers
+// the pass arm and the one below it the fail arm.
+TEST(ArrayAddressingElaboration,
+     ReversedSliceInAnAssertionPassStatementNames11_5_2) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  int A[2][3];\n"
+             "  logic [63:0] r;\n"
+             "  logic ok;\n"
+             "  initial assert (ok) r = A[1][1:0];\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "slice's first index must address a more", 5,
+                            "11.5.2"));
+}
+
+TEST(ArrayAddressingElaboration,
+     ReversedSliceInAnAssertionFailStatementNames11_5_2) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  int A[2][3];\n"
+             "  logic [63:0] r;\n"
+             "  logic ok;\n"
+             "  initial assert (ok) else r = A[1][1:0];\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "slice's first index must address a more", 5,
+                            "11.5.2"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
+// randcase holds a statement per item, kept in Stmt::randcase_items. The rule
+// is a static one, so it holds whether the weighted draw would select the item
+// or not.
+TEST(ArrayAddressingElaboration, ReversedSliceInARandcaseItemNames11_5_2) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  int A[2][3];\n"
+             "  logic [63:0] r;\n"
+             "  initial randcase 1: r = A[1][1:0]; endcase\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "slice's first index must address a more", 4,
+                            "11.5.2"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements, kept in RsProd::code_stmts and reached through
+// Stmt::rs_productions.
+TEST(ArrayAddressingElaboration,
+     ReversedSliceInARandsequenceCodeBlockNames11_5_2) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  int A[2][3];\n"
+             "  logic [63:0] r;\n"
+             "  initial begin\n"
+             "    randsequence(main)\n"
+             "      main : { r = A[1][1:0]; };\n"
+             "    endsequence\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "slice's first index must address a more", 6,
+                            "11.5.2"));
+}
+
+// A.6.8 gives `for_initialization ::= list_of_variable_assignments |
+// for_variable_declaration { , for_variable_declaration }` and
+// `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
+// function_subroutine_call`. A.6.2 gives `variable_assignment ::=
+// variable_lvalue = expression` and `operator_assignment ::= variable_lvalue
+// assignment_operator expression`, whose assignment_operator includes `=`, so
+// an assignment stands at each of the two positions: this case writes one at
+// the initialization and the case below it writes one at the step.
+TEST(ArrayAddressingElaboration,
+     ReversedSliceInAForLoopInitializationNames11_5_2) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  int A[2][3];\n"
+             "  logic [63:0] r;\n"
+             "  int i;\n"
+             "  initial for (r = A[1][1:0]; i < 1; i = i + 1) ;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "slice's first index must address a more", 5,
+                            "11.5.2"));
+}
+
+TEST(ArrayAddressingElaboration, ReversedSliceInAForLoopStepNames11_5_2) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  int A[2][3];\n"
+             "  logic [63:0] r;\n"
+             "  int i;\n"
+             "  initial for (i = 0; i < 1; r = A[1][1:0]) ;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "slice's first index must address a more", 5,
+                            "11.5.2"));
+}
+
 }  // namespace

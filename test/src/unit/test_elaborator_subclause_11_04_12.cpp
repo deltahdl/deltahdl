@@ -233,4 +233,154 @@ TEST(ConcatenationSim, ConcatMixedWidths) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCu);
 }
 
+// §11.4.12 says "Unsized constant numbers shall not be allowed in
+// concatenations", a property of the concatenation and not of the statement
+// holding it.
+//
+// ElaboratorOperationRules::WalkStmtsForUnsizedInConcat in
+// src/elaborator/elaborator_validate_operations_arrays.cpp reached six of the
+// thirteen statement links ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h states. The seven cases here
+// each put `a = {x, 1}` in one of the seven positions it did not read, every
+// one of which elaborated clean beforehand.
+//
+// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
+// block_item_declaration } { statement_or_null } join_keyword [ :
+// block_identifier ]`, so a fork arm is a statement position like any other.
+TEST(ConcatenationElaboration, UnsizedConstantInConcatInAForkArmNames11_4_12) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [3:0] x;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      a = {x, 1};\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unsized constant is not allowed in a concatenation", 6, "11.4.12"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case covers
+// the pass arm and the one below it the fail arm.
+TEST(ConcatenationElaboration,
+     UnsizedConstantInConcatInAnAssertionPassStatementNames11_4_12) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [3:0] x;\n"
+      "  logic ok;\n"
+      "  initial assert (ok) a = {x, 1};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unsized constant is not allowed in a concatenation", 5, "11.4.12"));
+}
+
+TEST(ConcatenationElaboration,
+     UnsizedConstantInConcatInAnAssertionFailStatementNames11_4_12) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [3:0] x;\n"
+      "  logic ok;\n"
+      "  initial assert (ok) else a = {x, 1};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unsized constant is not allowed in a concatenation", 5, "11.4.12"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
+// randcase holds a statement per item, kept in Stmt::randcase_items. The rule
+// is a static one, so it holds whether the weighted draw would select the item
+// or not.
+TEST(ConcatenationElaboration,
+     UnsizedConstantInConcatInARandcaseItemNames11_4_12) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [3:0] x;\n"
+      "  initial randcase 1: a = {x, 1}; endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unsized constant is not allowed in a concatenation", 4, "11.4.12"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements, kept in RsProd::code_stmts and reached through
+// Stmt::rs_productions.
+TEST(ConcatenationElaboration,
+     UnsizedConstantInConcatInARandsequenceCodeBlockNames11_4_12) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [3:0] x;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { a = {x, 1}; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unsized constant is not allowed in a concatenation", 6, "11.4.12"));
+}
+
+// A.6.8 gives `for_initialization ::= list_of_variable_assignments |
+// for_variable_declaration { , for_variable_declaration }` and
+// `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
+// function_subroutine_call`. A.6.2 gives `variable_assignment ::=
+// variable_lvalue = expression` and `operator_assignment ::= variable_lvalue
+// assignment_operator expression`, whose assignment_operator includes `=`, so
+// an assignment stands at each of the two positions: this case writes one at
+// the initialization and the case below it writes one at the step.
+TEST(ConcatenationElaboration,
+     UnsizedConstantInConcatInAForLoopInitializationNames11_4_12) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [3:0] x;\n"
+      "  int i;\n"
+      "  initial for (a = {x, 1}; i < 1; i = i + 1) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unsized constant is not allowed in a concatenation", 5, "11.4.12"));
+}
+
+TEST(ConcatenationElaboration,
+     UnsizedConstantInConcatInAForLoopStepNames11_4_12) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [3:0] x;\n"
+      "  int i;\n"
+      "  initial for (i = 0; i < 1; a = {x, 1}) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unsized constant is not allowed in a concatenation", 5, "11.4.12"));
+}
+
 }  // namespace

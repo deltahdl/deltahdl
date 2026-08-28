@@ -1,3 +1,5 @@
+#include <string>
+
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -496,6 +498,97 @@ TEST(TaggedUnionValidation, UnpackedUntaggedUnionVoidMember_Rejected) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "void member is only allowed in tagged unions", 2,
                             "7.2"));
+}
+
+// §7.3.2 defers the rule on a tagged expression to §11.9 -- "Members of tagged
+// unions can be referenced as tagged expressions. See 11.9" -- and §11.9
+// requires the name written after `tagged` to be a member of the target's
+// tagged union type. CheckTaggedMemberName in
+// src/elaborator/elaborator_validate_operations.cpp is that rule, and
+// WalkStmtsForTaggedExpr carries it down a statement tree, judging every
+// blocking and nonblocking assignment it reaches.
+//
+// That walk wrote out six of the thirteen child-statement links Stmt declares
+// and now takes the list from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. The seven cases below cover
+// one newly reached position each, and each elaborated clean before the
+// conversion, accepting a tag name the union does not declare.
+//
+// `stmt` is written at line 6 of the source and may run to several lines, so
+// the line the report stands at is read back out of the source rather than
+// counted.
+void ExpectUnknownTagIn(const std::string& stmt) {
+  ElabFixture f;
+  std::string src =
+      "module top;\n"
+      "  typedef union tagged { int A; int B; } U;\n"
+      "  U u;\n"
+      "  logic r;\n"
+      "  initial\n"
+      "    " +
+      stmt + "\nendmodule\n";
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "tagged union 'U' has no member named 'Bogus'",
+                            LineHolding(src, "tagged Bogus"), "11.9"));
+}
+
+// §9.3.2 gives `fork { statement_or_null } join`, whose arms the parser keeps
+// in Stmt::fork_stmts.
+TEST(TaggedUnionValidation, UnknownTagInAForkArm_Rejected) {
+  ExpectUnknownTagIn(
+      "fork\n"
+      "      u = tagged Bogus 1;\n"
+      "    join");
+}
+
+// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...` and
+// `variable_assignment ::= variable_lvalue = expression`, and A.8.3 makes a
+// tagged_union_expression an alternative of expression, so the assignment
+// stands in a for-loop initialization. The parser keeps it in Stmt::for_inits.
+TEST(TaggedUnionValidation, UnknownTagInAForInit_Rejected) {
+  ExpectUnknownTagIn("for (u = tagged Bogus 1; r == 0; r = 0) r = 1;");
+}
+
+// A.6.8 gives `for_step_assignment ::= operator_assignment |
+// inc_or_dec_expression | function_subroutine_call`, and an operator_assignment
+// is a variable_lvalue, an assignment_operator and an expression, so the same
+// assignment stands in a for-loop step. The parser keeps it in Stmt::for_steps.
+TEST(TaggedUnionValidation, UnknownTagInAForStep_Rejected) {
+  ExpectUnknownTagIn("for (r = 0; r == 0; u = tagged Bogus 1) r = 1;");
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// which the parser keeps in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt.
+// This case and the next cover one arm each.
+TEST(TaggedUnionValidation, UnknownTagInAnAssertionPassStmt_Rejected) {
+  ExpectUnknownTagIn("assert (r) u = tagged Bogus 1;");
+}
+
+TEST(TaggedUnionValidation, UnknownTagInAnAssertionFailStmt_Rejected) {
+  ExpectUnknownTagIn("assert (r) else u = tagged Bogus 1;");
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
+// statement the parser keeps in the second member of a Stmt::randcase_items
+// entry. §11.9 is a rule about the source, so it holds whether the weighted
+// draw would select the item or not.
+TEST(TaggedUnionValidation, UnknownTagInARandcaseItem_Rejected) {
+  ExpectUnknownTagIn("randcase 1: u = tagged Bogus 1; endcase");
+}
+
+// §18.17 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements. They are kept in RsProd::code_stmts, reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(TaggedUnionValidation, UnknownTagInARandsequenceCodeBlock_Rejected) {
+  ExpectUnknownTagIn(
+      "begin\n"
+      "      randsequence(main)\n"
+      "        main : { u = tagged Bogus 1; };\n"
+      "      endsequence\n"
+      "    end");
 }
 
 }  // namespace

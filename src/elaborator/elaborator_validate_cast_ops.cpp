@@ -9,6 +9,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -37,12 +38,14 @@ void ElaboratorOperationRules::WalkStmtsForCast(const Stmt* s) {
   WalkExprForCast(s->expr);
   WalkExprForCast(s->condition);
   WalkExprForCast(s->assert_expr);
-  for (auto* sub : s->stmts) WalkStmtsForCast(sub);
-  WalkStmtsForCast(s->then_branch);
-  WalkStmtsForCast(s->else_branch);
-  WalkStmtsForCast(s->body);
-  WalkStmtsForCast(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForCast(ci.body);
+  // §6.24 states when a cast is legal -- §6.24.1 requires a positive size
+  // and an integral operand -- and names no statement a cast written inside it
+  // is exempt in, so this descends every link ForEachChildStmt in
+  // elaborator_validate_internal.h names and names none itself. It wrote out
+  // six of the thirteen, so `fork r = signed'(2.5); join` and
+  // `assert (ok) else r = signed'(2.5);` each carried a cast CheckCastExpr
+  // never saw.
+  ForEachChildStmt(s, [this](Stmt* const& sub) { WalkStmtsForCast(sub); });
 }
 
 void ElaboratorOperationRules::ValidateCastOperations(const ModuleDecl* decl) {
@@ -106,12 +109,17 @@ void ElaboratorOperationRules::WalkStmtsForAssignInExpr(const Stmt* s) {
   if (s->kind == StmtKind::kAssign && s->rhs) {
     WalkExprForAssignInExpr(s->rhs, true);
   }
-  for (auto* sub : s->stmts) WalkStmtsForAssignInExpr(sub);
-  WalkStmtsForAssignInExpr(s->then_branch);
-  WalkStmtsForAssignInExpr(s->else_branch);
-  WalkStmtsForAssignInExpr(s->body);
-  WalkStmtsForAssignInExpr(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForAssignInExpr(ci.body);
+  // §11.3.6 says "It shall be illegal to include an assignment operator in an
+  // event expression, in an expression within a procedural continuous
+  // assignment, or in an expression that is not within a procedural
+  // statement", and names no statement the procedural continuous assignment
+  // may stand in to escape that, so this descends every link ForEachChildStmt
+  // in elaborator_validate_internal.h names and names none itself. It wrote
+  // out six of the thirteen, so `fork assign c = (a = b); join` and
+  // `randcase 1: assign c = (a = b); endcase` each held an embedded assignment
+  // operator that was never looked at.
+  ForEachChildStmt(s,
+                   [this](Stmt* const& sub) { WalkStmtsForAssignInExpr(sub); });
 }
 
 void ElaboratorOperationRules::ValidateAssignInExprRestrictions(
@@ -515,12 +523,17 @@ void ElaboratorOperationRules::WalkStmtsForAssocConcatTarget(const Stmt* s) {
       s->kind == StmtKind::kNonblockingAssign) {
     CheckAssocConcatTargetInAssign(s);
   }
-  for (auto* sub : s->stmts) WalkStmtsForAssocConcatTarget(sub);
-  WalkStmtsForAssocConcatTarget(s->then_branch);
-  WalkStmtsForAssocConcatTarget(s->else_branch);
-  WalkStmtsForAssocConcatTarget(s->body);
-  WalkStmtsForAssocConcatTarget(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForAssocConcatTarget(ci.body);
+  // §10.10 requires the target of an unpacked array concatenation to be an
+  // array whose slowest-varying dimension is unpacked fixed-size, queue or
+  // dynamic, and says "A target of any other type (including associative
+  // array) shall be illegal". It names no statement the assignment may be
+  // written in to escape that, so this descends every link ForEachChildStmt in
+  // elaborator_validate_internal.h names and names none itself. It wrote out
+  // six of the thirteen, so `fork aa = {1, 2, 3}; join` and
+  // `for (aa = {1, 2, 3}; i < 1; i = i + 1)` each targeted an associative
+  // array with a concatenation that CheckAssocConcatTargetInAssign never saw.
+  ForEachChildStmt(
+      s, [this](Stmt* const& sub) { WalkStmtsForAssocConcatTarget(sub); });
 }
 
 void ElaboratorOperationRules::ValidateAssocConcatTarget(

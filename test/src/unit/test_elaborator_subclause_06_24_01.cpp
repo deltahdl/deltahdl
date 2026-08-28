@@ -412,4 +412,162 @@ TEST(CastOperatorElaboration, SizeCastInLocalparamSizesAPackedRange) {
   EXPECT_EQ(var->width, 4u);
 }
 
+// §6.24.1 requires the expression inside a signing cast to be an integral
+// value, and names no statement the cast is allowed to stand in unjudged.
+// ElaboratorOperationRules::WalkStmtsForCast in
+// src/elaborator/elaborator_validate_cast_ops.cpp had written out six of the
+// thirteen child-statement links Stmt declares and now takes the list from
+// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The seven
+// cases below are CastOperatorElaboration.RealLiteralInSignedCastError above
+// rewritten in the seven positions the walk was missing, each of which
+// elaborated clean beforehand with the non-integral operand unreported.
+
+// A.6.3 gives `par_block ::= fork [ : block_identifier ]
+// { block_item_declaration } { statement_or_null } join_keyword ...`, so a fork
+// holds statements the way a begin-end block does. The parser keeps them in
+// Stmt::fork_stmts rather than in Stmt::stmts.
+TEST(CastOperatorElaboration, RealLiteralInSignedCastInForkArmError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int r;\n"
+      "  initial fork\n"
+      "    r = signed'(2.5);\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "expression inside a signing cast shall be an integral "
+                    "value",
+                    4, "6.24.1"));
+}
+
+// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...` and
+// A.6.2 gives `variable_assignment ::= variable_lvalue = expression`, so a cast
+// stands on the right of an assignment in a for-loop header. The parser keeps
+// those assignments in Stmt::for_inits.
+TEST(CastOperatorElaboration, RealLiteralInSignedCastInForInitializerError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int r;\n"
+      "  int i;\n"
+      "  initial\n"
+      "    for (r = signed'(2.5); i < 1; i = i + 1)\n"
+      "      i = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "expression inside a signing cast shall be an integral "
+                    "value",
+                    5, "6.24.1"));
+}
+
+// A.6.8's `for_step_assignment ::= operator_assignment | ...` is the same rule
+// at the other end of the loop header, kept in Stmt::for_steps. The
+// initializer here assigns an integer, so the report can only be about the
+// step.
+TEST(CastOperatorElaboration, RealLiteralInSignedCastInForStepError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int r;\n"
+      "  int i;\n"
+      "  initial\n"
+      "    for (i = 0; i < 1; r = signed'(2.5))\n"
+      "      i = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "expression inside a signing cast shall be an integral "
+                    "value",
+                    5, "6.24.1"));
+}
+
+// A.6.10 gives `simple_immediate_assert_statement ::= assert ( expression )
+// action_block` and §16.3 gives `action_block ::= statement_or_null |
+// [ statement ] else statement_or_null`, so the pass arm of an immediate
+// assertion holds an ordinary statement, kept in Stmt::assert_pass_stmt.
+TEST(CastOperatorElaboration,
+     RealLiteralInSignedCastInAssertionPassStatementError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int r;\n"
+      "  logic ok;\n"
+      "  initial assert (ok) r = signed'(2.5);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "expression inside a signing cast shall be an integral "
+                    "value",
+                    4, "6.24.1"));
+}
+
+// The else arm of the same production, kept in Stmt::assert_fail_stmt, a link
+// the pass-arm case above does not reach.
+TEST(CastOperatorElaboration,
+     RealLiteralInSignedCastInAssertionFailStatementError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int r;\n"
+      "  logic armed;\n"
+      "  initial assert (armed) else r = signed'(2.5);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "expression inside a signing cast shall be an integral "
+                    "value",
+                    4, "6.24.1"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
+// randcase holds a statement per item, kept in Stmt::randcase_items. §6.24.1
+// judges the operand written inside the cast rather than what runs, so the
+// report stands whether the weighted draw would select the item or not.
+TEST(CastOperatorElaboration, RealLiteralInSignedCastInRandcaseItemError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int r;\n"
+      "  initial randcase 1: r = signed'(2.5); endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "expression inside a signing cast shall be an integral "
+                    "value",
+                    3, "6.24.1"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements, kept in RsProd::code_stmts and reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(CastOperatorElaboration,
+     RealLiteralInSignedCastInRandsequenceCodeBlockError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { r = signed'(2.5); };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "expression inside a signing cast shall be an integral "
+                    "value",
+                    5, "6.24.1"));
+}
+
 }  // namespace

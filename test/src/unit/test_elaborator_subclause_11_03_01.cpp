@@ -1,3 +1,5 @@
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -621,6 +623,96 @@ TEST(RealOps, BinaryXnorAndReductionXnorGiveDifferentReports) {
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "unary operator '^~' is not allowed on real operands", 6, "11.3.1"));
+}
+
+// §11.3.1's Table 11-1 lists the operators that may have real operands, and the
+// bitwise AND is not among them. WalkExprForRealOps in
+// src/elaborator/elaborator_validate_operations.cpp reports one that is
+// applied to a real operand, and WalkStmtsForRealOps carries that rule down a
+// statement tree.
+//
+// That walk wrote out six of the thirteen child-statement links Stmt declares
+// and now takes the list from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. The seven cases below cover
+// one newly reached position each: before the conversion `c = a & b;` was
+// reported where the walk descended and accepted in every one of these seven.
+//
+// `stmt` is written at line 6 of the source and may run to several lines, so
+// the line the report stands at is read back out of the source rather than
+// counted.
+void ExpectIllegalOpOnRealIn(const std::string& stmt) {
+  ElabFixture f;
+  std::string src =
+      "module m;\n"
+      "  real a, b;\n"
+      "  real c;\n"
+      "  logic r;\n"
+      "  initial\n"
+      "    " +
+      stmt + "\nendmodule\n";
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "binary operator '&' is not allowed on real "
+                            "operands",
+                            LineHolding(src, "a & b"), "11.3.1"));
+}
+
+// §9.3.2 gives `fork { statement_or_null } join`, whose arms the parser keeps
+// in Stmt::fork_stmts.
+TEST(RealOps, IllegalOpOnRealInAForkArm) {
+  ExpectIllegalOpOnRealIn(
+      "fork\n"
+      "      c = a & b;\n"
+      "    join");
+}
+
+// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...` and
+// `variable_assignment ::= variable_lvalue = expression`, so the offending
+// expression stands in a for-loop initialization, which the parser keeps in
+// Stmt::for_inits.
+TEST(RealOps, IllegalOpOnRealInAForInit) {
+  ExpectIllegalOpOnRealIn("for (c = a & b; r == 0; r = 0) r = 1;");
+}
+
+// A.6.8 gives `for_step_assignment ::= operator_assignment |
+// inc_or_dec_expression | function_subroutine_call`, and an operator_assignment
+// ends in an expression, so the offending expression stands in a for-loop step,
+// which the parser keeps in Stmt::for_steps.
+TEST(RealOps, IllegalOpOnRealInAForStep) {
+  ExpectIllegalOpOnRealIn("for (r = 0; r == 0; c = a & b) r = 1;");
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// which the parser keeps in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt.
+// This case and the next cover one arm each.
+TEST(RealOps, IllegalOpOnRealInAnAssertionPassStmt) {
+  ExpectIllegalOpOnRealIn("assert (r) c = a & b;");
+}
+
+TEST(RealOps, IllegalOpOnRealInAnAssertionFailStmt) {
+  ExpectIllegalOpOnRealIn("assert (r) else c = a & b;");
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
+// statement the parser keeps in the second member of a Stmt::randcase_items
+// entry. §11.3.1 is a rule about the source, so it holds whether the weighted
+// draw would select the item or not.
+TEST(RealOps, IllegalOpOnRealInARandcaseItem) {
+  ExpectIllegalOpOnRealIn("randcase 1: c = a & b; endcase");
+}
+
+// §18.17 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements. They are kept in RsProd::code_stmts, reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(RealOps, IllegalOpOnRealInARandsequenceCodeBlock) {
+  ExpectIllegalOpOnRealIn(
+      "begin\n"
+      "      randsequence(main)\n"
+      "        main : { c = a & b; };\n"
+      "      endsequence\n"
+      "    end");
 }
 
 }  // namespace

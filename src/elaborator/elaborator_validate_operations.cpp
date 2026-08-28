@@ -7,6 +7,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
@@ -138,12 +139,14 @@ void ElaboratorOperationRules::WalkStmtsForAggregateCompare(const Stmt* s) {
   WalkExprForAggregateCompare(s->expr);
   WalkExprForAggregateCompare(s->condition);
   WalkExprForAggregateCompare(s->assert_expr);
-  for (auto* sub : s->stmts) WalkStmtsForAggregateCompare(sub);
-  WalkStmtsForAggregateCompare(s->then_branch);
-  WalkStmtsForAggregateCompare(s->else_branch);
-  WalkStmtsForAggregateCompare(s->body);
-  WalkStmtsForAggregateCompare(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForAggregateCompare(ci.body);
+  // §6.22.2 makes a comparison of two non-equivalent aggregate operands illegal
+  // and names no statement the rule is suspended in, so this descends every
+  // link ForEachChildStmt in elaborator_validate_internal.h names. It wrote out
+  // six of the thirteen, so a comparison of two differently typed structures
+  // written as a fork arm, as a randcase item or in a randsequence production
+  // reached CheckAggregateCompareOp through nothing and elaborated clean.
+  ForEachChildStmt(
+      s, [this](Stmt* const& sub) { WalkStmtsForAggregateCompare(sub); });
 }
 
 void ElaboratorOperationRules::ValidateAggregateComparisons(
@@ -267,12 +270,14 @@ void ElaboratorOperationRules::WalkStmtsForTypeRefCompare(const Stmt* s) {
   WalkExprForTypeRefCompare(s->expr);
   WalkExprForTypeRefCompare(s->condition);
   WalkExprForTypeRefCompare(s->assert_expr);
-  for (auto* sub : s->stmts) WalkStmtsForTypeRefCompare(sub);
-  WalkStmtsForTypeRefCompare(s->then_branch);
-  WalkStmtsForTypeRefCompare(s->else_branch);
-  WalkStmtsForTypeRefCompare(s->body);
-  WalkStmtsForTypeRefCompare(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForTypeRefCompare(ci.body);
+  // §6.23 admits a type reference in a comparison only against another type
+  // reference, and A.10 restricts it to the four equality operators, neither
+  // conditioned on the statement the comparison stands in, so this descends
+  // every link ForEachChildStmt in elaborator_validate_internal.h names. It
+  // wrote out six of the thirteen, so `type(T) == 5` written as a fork arm or
+  // as an immediate assertion's else action was never compared at all.
+  ForEachChildStmt(
+      s, [this](Stmt* const& sub) { WalkStmtsForTypeRefCompare(sub); });
 }
 
 void ElaboratorOperationRules::ValidateTypeRefComparisons(
@@ -404,12 +409,14 @@ void ElaboratorOperationRules::WalkStmtsForTypeRefArg(const Stmt* s) {
   if (s->var_decl_type.type_ref_expr) {
     CheckTypeRefArgInner(s->var_decl_type.type_ref_expr, s->range.start);
   }
-  for (auto* sub : s->stmts) WalkStmtsForTypeRefArg(sub);
-  WalkStmtsForTypeRefArg(s->then_branch);
-  WalkStmtsForTypeRefArg(s->else_branch);
-  WalkStmtsForTypeRefArg(s->body);
-  WalkStmtsForTypeRefArg(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForTypeRefArg(ci.body);
+  // §6.23 bars a hierarchical reference and a reference to an element of a
+  // dynamic object from the operand of the type operator wherever the operator
+  // is written, so this descends every link ForEachChildStmt in
+  // elaborator_validate_internal.h names. It wrote out six of the thirteen, so
+  // `type(d[0])` on a dynamic array `d` went unreported in a fork arm and in a
+  // for-loop step.
+  ForEachChildStmt(s,
+                   [this](Stmt* const& sub) { WalkStmtsForTypeRefArg(sub); });
 }
 
 void ElaboratorOperationRules::ValidateTypeRefArgs(const ModuleDecl* decl) {
@@ -470,12 +477,15 @@ void ElaboratorOperationRules::WalkStmtsForTaggedExpr(const Stmt* s) {
       s->lhs && s->rhs) {
     CheckTaggedExprMember(s->lhs, s->rhs);
   }
-  for (auto* sub : s->stmts) WalkStmtsForTaggedExpr(sub);
-  WalkStmtsForTaggedExpr(s->then_branch);
-  WalkStmtsForTaggedExpr(s->else_branch);
-  WalkStmtsForTaggedExpr(s->body);
-  WalkStmtsForTaggedExpr(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForTaggedExpr(ci.body);
+  // §11.9, which §7.3.2 defers the rule to, requires the name after `tagged` to
+  // be a member of the target's tagged union type, and neither clause
+  // conditions that on the statement the assignment stands in, so this descends
+  // every link ForEachChildStmt in elaborator_validate_internal.h names. It
+  // wrote out six of the thirteen, so `u = tagged Bogus 1;` written as a fork
+  // arm or as an immediate assertion's pass action named a member that does not
+  // exist and was accepted.
+  ForEachChildStmt(s,
+                   [this](Stmt* const& sub) { WalkStmtsForTaggedExpr(sub); });
 }
 
 void ElaboratorOperationRules::ValidateTaggedUnionMembers(
@@ -590,12 +600,12 @@ void ElaboratorOperationRules::WalkStmtsForRealOps(const Stmt* s) {
   WalkExprForRealOps(s->expr);
   WalkExprForRealOps(s->condition);
   WalkExprForRealOps(s->assert_expr);
-  for (auto* sub : s->stmts) WalkStmtsForRealOps(sub);
-  WalkStmtsForRealOps(s->then_branch);
-  WalkStmtsForRealOps(s->else_branch);
-  WalkStmtsForRealOps(s->body);
-  WalkStmtsForRealOps(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForRealOps(ci.body);
+  // §11.3.1's Table 11-1 decides which operators a real operand admits and
+  // names no statement the table is suspended in, so this descends every link
+  // ForEachChildStmt in elaborator_validate_internal.h names. It wrote out six
+  // of the thirteen, so `c = a & b;` on real `a` and `b` was reported in a
+  // begin-end block and accepted in a fork arm or a for-loop step.
+  ForEachChildStmt(s, [this](Stmt* const& sub) { WalkStmtsForRealOps(sub); });
 }
 
 void ElaboratorOperationRules::ValidateRealOperatorRestrictions(

@@ -164,12 +164,15 @@ void Elaborator::WalkStmtsForChandleOps(const Stmt* s) {
   CheckChandleExpr(s->rhs, var_types_, var_array_info_, diag_);
   CheckChandleExpr(s->expr, var_types_, var_array_info_, diag_);
   CheckChandleExpr(s->condition, var_types_, var_array_info_, diag_);
-  for (auto* sub : s->stmts) WalkStmtsForChandleOps(sub);
-  WalkStmtsForChandleOps(s->then_branch);
-  WalkStmtsForChandleOps(s->else_branch);
-  WalkStmtsForChandleOps(s->body);
-  WalkStmtsForChandleOps(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForChandleOps(ci.body);
+  // §6.14 admits only the equality family on a chandle and no bit-select of a
+  // scalar one, and names no statement those rules are suspended in, so this
+  // descends every link ForEachChildStmt in elaborator_validate_internal.h
+  // names. It wrote out six of the thirteen, so with a, b chandle and r int,
+  // `fork r = a + b; join` (§9.3.2) and `for (r = a + b; r < 1; r = r + 1) ;`
+  // (A.6.8) elaborated clean while the same assignment written one level up
+  // was reported.
+  ForEachChildStmt(s,
+                   [this](Stmt* const& sub) { WalkStmtsForChandleOps(sub); });
 }
 
 void Elaborator::ValidateChandleOps(const ModuleDecl* decl) {
@@ -596,12 +599,16 @@ void Elaborator::WalkStmtsForVirtualInterfaceOps(const Stmt* s) {
                             interface_inst_types_, diag_);
   CheckVirtualInterfaceExpr(s->condition, var_types_, vi_var_interface_types_,
                             interface_inst_types_, diag_);
-  for (auto* sub : s->stmts) WalkStmtsForVirtualInterfaceOps(sub);
-  WalkStmtsForVirtualInterfaceOps(s->then_branch);
-  WalkStmtsForVirtualInterfaceOps(s->else_branch);
-  WalkStmtsForVirtualInterfaceOps(s->body);
-  WalkStmtsForVirtualInterfaceOps(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForVirtualInterfaceOps(ci.body);
+  // §25.9 admits only ==, !=, === and !== on a virtual interface, and only
+  // another virtual interface, an interface instance or null as the operand
+  // opposite one. It names no statement those rules are suspended in, so this
+  // descends every link ForEachChildStmt in elaborator_validate_internal.h
+  // names. It wrote out six of the thirteen, so with a, b, c virtual
+  // interfaces, `c = a + b` written in a fork arm (§9.3.2) or in an assertion
+  // action block (§16.3) reached neither CheckVirtualInterfaceExpr nor
+  // CheckVirtualInterfaceAssignStmt.
+  ForEachChildStmt(
+      s, [this](Stmt* const& sub) { WalkStmtsForVirtualInterfaceOps(sub); });
 }
 
 static bool ScopeHasVirtualInterfaceVar(const TypeMap& types) {
@@ -707,12 +714,13 @@ void Elaborator::WalkStmtsForEventOps(const Stmt* s) {
   CheckEventExpr(s->rhs, var_types_, diag_);
   CheckEventExpr(s->expr, var_types_, diag_);
   CheckEventExpr(s->condition, var_types_, diag_);
-  for (auto* sub : s->stmts) WalkStmtsForEventOps(sub);
-  WalkStmtsForEventOps(s->then_branch);
-  WalkStmtsForEventOps(s->else_branch);
-  WalkStmtsForEventOps(s->body);
-  WalkStmtsForEventOps(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForEventOps(ci.body);
+  // §15.5.5.3 admits only ==, !=, === and !== on an event variable and names
+  // no statement the rule is suspended in, so this descends every link
+  // ForEachChildStmt in elaborator_validate_internal.h names. It wrote out six
+  // of the thirteen, so with a, b event variables, `x = a + b` written in a
+  // fork arm (§9.3.2) or in a randcase item (§18.16) reached CheckEventExpr
+  // from nowhere.
+  ForEachChildStmt(s, [this](Stmt* const& sub) { WalkStmtsForEventOps(sub); });
 }
 
 void Elaborator::ValidateEventOps(const ModuleDecl* decl) {

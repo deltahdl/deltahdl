@@ -366,4 +366,261 @@ TEST(Elaboration, EnumDynamicCastAssign_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §6.19.3 is stated of the assignment and names no statement it is suspended
+// in, so Elaborator::WalkStmtsForEnumAssign in
+// src/elaborator/elaborator_validate_types.cpp descends every link
+// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h names. The
+// cases below cover the seven links the walk used to omit. Each link that can
+// hold a declaration takes a pair, because the walk both reports the offending
+// assignment and collects the enum variables a statement declares into
+// Elaborator::enum_var_names_: the first case declares the variable outside the
+// link and assigns inside it, which exercises the report, and the second
+// declares it inside the link, which exercises the collection.
+
+// §9.3.2 gives `par_block ::= fork [ : block_identifier ]
+// { block_item_declaration } { statement_or_null } join_keyword`, so a fork arm
+// holds both halves of this pair. Parser::ParseBlockVarDecls in
+// src/parser/parser_stmt_block.cpp puts the declarations in Stmt::fork_stmts
+// beside the statements.
+TEST(Elaboration, EnumIntAssignInAForkArmIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {a, b, c, d} e;\n"
+      "  e val;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      val = 1;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 6,
+                            "6.19.3"));
+}
+
+TEST(Elaboration, EnumDeclaredAndAssignedInAForkArmIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {a, b, c, d} e;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      e val;\n"
+      "      val = 1;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 6,
+                            "6.19.3"));
+}
+
+// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`, so a
+// for header assigns to any variable in scope, an enum variable among them.
+//
+// The other form A.6.8 admits there, `for_variable_declaration ::= [ var ]
+// data_type variable_identifier = expression { , ... }`, takes no case of its
+// own: Parser::ParseForLocalDeclInits in src/parser/parser_stmt.cpp records the
+// declared type in Stmt::for_init_types and pushes the initialization into
+// Stmt::for_inits as a plain assignment statement, so no statement in the link
+// satisfies StmtDeclaresEnumVar and the collecting half of the walk has nothing
+// there to reach whatever it descends.
+TEST(Elaboration, EnumIntAssignInAForInitializationIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {a, b, c, d} e;\n"
+      "  e val;\n"
+      "  int i;\n"
+      "  initial begin\n"
+      "    for (val = 1; i < 2; i = i + 1) ;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 6,
+                            "6.19.3"));
+}
+
+// A.6.8 gives `for_step_assignment ::= operator_assignment |
+// inc_or_dec_expression | function_subroutine_call`, so a for step assigns to
+// an enum variable the same way. None of the three declares a name, so this
+// link takes the assignment case alone: no conforming source puts a
+// declaration in a for step for the collecting half of the walk to find.
+TEST(Elaboration, EnumIntAssignInAForStepIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {a, b, c, d} e;\n"
+      "  e val;\n"
+      "  int i;\n"
+      "  initial begin\n"
+      "    for (i = 0; i < 2; val = 1) ;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 6,
+                            "6.19.3"));
+}
+
+// §16.3 and A.6.10 give `action_block ::= statement_or_null | [ statement ]
+// else statement_or_null`, so an immediate assertion holds a statement in each
+// arm, kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. A
+// declaration is not a statement_or_null, so the collecting case of each pair
+// writes the declaration in a begin-end block the arm holds, which is reached
+// through that arm and through no other link.
+TEST(Elaboration, EnumIntAssignInAnAssertionPassStmtIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {a, b, c, d} e;\n"
+      "  e val;\n"
+      "  initial begin\n"
+      "    assert (1) val = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 5,
+                            "6.19.3"));
+}
+
+TEST(Elaboration, EnumDeclaredAndAssignedInAnAssertionPassStmtIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {a, b, c, d} e;\n"
+      "  initial begin\n"
+      "    assert (1) begin\n"
+      "      e val;\n"
+      "      val = 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 6,
+                            "6.19.3"));
+}
+
+TEST(Elaboration, EnumIntAssignInAnAssertionFailStmtIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {a, b, c, d} e;\n"
+      "  e val;\n"
+      "  initial begin\n"
+      "    assert (1) else val = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 5,
+                            "6.19.3"));
+}
+
+TEST(Elaboration, EnumDeclaredAndAssignedInAnAssertionFailStmtIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {a, b, c, d} e;\n"
+      "  initial begin\n"
+      "    assert (1) else begin\n"
+      "      e val;\n"
+      "      val = 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 6,
+                            "6.19.3"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
+// statement the parser keeps in the second member of a Stmt::randcase_items
+// entry. §6.19.3 is a rule about the source, so it holds whether the weighted
+// draw would select the item or not.
+TEST(Elaboration, EnumIntAssignInARandcaseItemIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {a, b, c, d} e;\n"
+      "  e val;\n"
+      "  initial begin\n"
+      "    randcase\n"
+      "      1 : val = 1;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 6,
+                            "6.19.3"));
+}
+
+TEST(Elaboration, EnumDeclaredAndAssignedInARandcaseItemIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {a, b, c, d} e;\n"
+      "  initial begin\n"
+      "    randcase\n"
+      "      1 : begin\n"
+      "        e val;\n"
+      "        val = 1;\n"
+      "      end\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 7,
+                            "6.19.3"));
+}
+
+// §18.17 and A.6.12 give `rs_code_block ::= { { data_declaration }
+// { statement_or_null } }`, so a randsequence production's code block holds
+// both halves of this pair directly. Parser::ParseRsCodeBlockStmts in
+// src/parser/parser_verify.cpp puts them in RsProd::code_stmts, reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(Elaboration, EnumIntAssignInARandsequenceCodeBlockIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {a, b, c, d} e;\n"
+      "  e val;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { val = 1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 6,
+                            "6.19.3"));
+}
+
+TEST(Elaboration, EnumDeclaredAndAssignedInARandsequenceCodeBlockIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {a, b, c, d} e;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { e val; val = 1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 5,
+                            "6.19.3"));
+}
+
 }  // namespace

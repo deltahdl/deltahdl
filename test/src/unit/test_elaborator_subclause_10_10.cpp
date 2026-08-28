@@ -264,4 +264,311 @@ TEST(UnpackedArrayConcatElaboration, NullItemAllowedForEventElementType) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §10.10 admits `null` as an item of an unpacked array concatenation only where
+// the target's element type has a null value, and says nothing about the
+// statement the assignment is written in.
+//
+// ElaboratorOperationRules::WalkStmtsForArrayConcatNesting in
+// src/elaborator/elaborator_validate_operations_arrays.cpp reached six of the
+// thirteen statement links ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h states. The seven cases here
+// each put `q = {1, null, 3}` on a queue of ints in one of the seven positions
+// it did not read, where the item reached CheckNullItemInArrayConcatAssign not
+// at all.
+//
+// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
+// block_item_declaration } { statement_or_null } join_keyword [ :
+// block_identifier ]`, so a fork arm is a statement position like any other.
+TEST(UnpackedArrayConcatElaboration,
+     NullItemInArrayConcatInAForkArmNames10_10) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int q[$];\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      q = {1, null, 3};\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "null is not a legal item in an unpacked array", 5,
+                            "10.10"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case covers
+// the pass arm and the one below it the fail arm.
+TEST(UnpackedArrayConcatElaboration,
+     NullItemInArrayConcatInAnAssertionPassStatementNames10_10) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int q[$];\n"
+      "  logic ok;\n"
+      "  initial assert (ok) q = {1, null, 3};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "null is not a legal item in an unpacked array", 4,
+                            "10.10"));
+}
+
+TEST(UnpackedArrayConcatElaboration,
+     NullItemInArrayConcatInAnAssertionFailStatementNames10_10) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int q[$];\n"
+      "  logic ok;\n"
+      "  initial assert (ok) else q = {1, null, 3};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "null is not a legal item in an unpacked array", 4,
+                            "10.10"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
+// randcase holds a statement per item, kept in Stmt::randcase_items. The rule
+// is a static one, so it holds whether the weighted draw would select the item
+// or not.
+TEST(UnpackedArrayConcatElaboration,
+     NullItemInArrayConcatInARandcaseItemNames10_10) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int q[$];\n"
+      "  initial randcase 1: q = {1, null, 3}; endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "null is not a legal item in an unpacked array", 3,
+                            "10.10"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements, kept in RsProd::code_stmts and reached through
+// Stmt::rs_productions.
+TEST(UnpackedArrayConcatElaboration,
+     NullItemInArrayConcatInARandsequenceCodeBlockNames10_10) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int q[$];\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { q = {1, null, 3}; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "null is not a legal item in an unpacked array", 5,
+                            "10.10"));
+}
+
+// A.6.8 gives `for_initialization ::= list_of_variable_assignments |
+// for_variable_declaration { , for_variable_declaration }` and
+// `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
+// function_subroutine_call`. A.6.2 gives `variable_assignment ::=
+// variable_lvalue = expression` and `operator_assignment ::= variable_lvalue
+// assignment_operator expression`, whose assignment_operator includes `=`, so
+// an assignment stands at each of the two positions: this case writes one at
+// the initialization and the case below it writes one at the step.
+TEST(UnpackedArrayConcatElaboration,
+     NullItemInArrayConcatInAForLoopInitializationNames10_10) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int q[$];\n"
+      "  int i;\n"
+      "  initial for (q = {1, null, 3}; i < 1; i = i + 1) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "null is not a legal item in an unpacked array", 4,
+                            "10.10"));
+}
+
+TEST(UnpackedArrayConcatElaboration,
+     NullItemInArrayConcatInAForLoopStepNames10_10) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int q[$];\n"
+      "  int i;\n"
+      "  initial for (i = 0; i < 1; q = {1, null, 3}) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "null is not a legal item in an unpacked array", 4,
+                            "10.10"));
+}
+
+// §10.10 requires the target of an unpacked array concatenation to be an array
+// whose slowest-varying dimension is unpacked fixed-size, queue or dynamic, and
+// says "A target of any other type (including associative array) shall be
+// illegal". It names no statement the assignment is allowed to stand in
+// unjudged. WalkStmtsForAssocConcatTarget in
+// src/elaborator/elaborator_validate_cast_ops.cpp had written out six of the
+// thirteen child-statement links Stmt declares and now takes the list from
+// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The seven
+// cases below are UnpackedArrayConcatElaboration.AssociativeArrayTargetError
+// above rewritten in the seven positions the walk was missing, each of which
+// elaborated clean beforehand with the associative-array target unreported.
+
+// A.6.3 gives `par_block ::= fork [ : block_identifier ]
+// { block_item_declaration } { statement_or_null } join_keyword ...`, so a fork
+// holds statements the way a begin-end block does. The parser keeps them in
+// Stmt::fork_stmts rather than in Stmt::stmts.
+TEST(UnpackedArrayConcatElaboration, AssociativeArrayTargetInForkArmError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int aa[string];\n"
+      "  initial fork\n"
+      "    aa = {1, 2, 3};\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array concatenation cannot target an "
+                            "associative array",
+                            4, "10.10"));
+}
+
+// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...` and
+// A.6.2 gives `variable_assignment ::= variable_lvalue = expression`, so the
+// assignment §10.10 judges stands in a for-loop header. The parser keeps those
+// assignments in Stmt::for_inits.
+TEST(UnpackedArrayConcatElaboration,
+     AssociativeArrayTargetInForInitializerError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int aa[string];\n"
+      "  int i;\n"
+      "  initial\n"
+      "    for (aa = {1, 2, 3}; i < 1; i = i + 1)\n"
+      "      i = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array concatenation cannot target an "
+                            "associative array",
+                            5, "10.10"));
+}
+
+// A.6.8's `for_step_assignment ::= operator_assignment | ...` is the same rule
+// at the other end of the loop header, kept in Stmt::for_steps. The
+// initializer here assigns an integer, so the report can only be about the
+// step.
+TEST(UnpackedArrayConcatElaboration, AssociativeArrayTargetInForStepError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int aa[string];\n"
+      "  int i;\n"
+      "  initial\n"
+      "    for (i = 0; i < 1; aa = {1, 2, 3})\n"
+      "      i = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array concatenation cannot target an "
+                            "associative array",
+                            5, "10.10"));
+}
+
+// A.6.10 gives `simple_immediate_assert_statement ::= assert ( expression )
+// action_block` and §16.3 gives `action_block ::= statement_or_null |
+// [ statement ] else statement_or_null`, so the pass arm of an immediate
+// assertion holds an ordinary statement, kept in Stmt::assert_pass_stmt.
+TEST(UnpackedArrayConcatElaboration,
+     AssociativeArrayTargetInAssertionPassStatementError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int aa[string];\n"
+      "  logic ok;\n"
+      "  initial assert (ok) aa = {1, 2, 3};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array concatenation cannot target an "
+                            "associative array",
+                            4, "10.10"));
+}
+
+// The else arm of the same production, kept in Stmt::assert_fail_stmt, a link
+// the pass-arm case above does not reach.
+TEST(UnpackedArrayConcatElaboration,
+     AssociativeArrayTargetInAssertionFailStatementError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int aa[string];\n"
+      "  logic armed;\n"
+      "  initial assert (armed) else aa = {1, 2, 3};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array concatenation cannot target an "
+                            "associative array",
+                            4, "10.10"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
+// randcase holds a statement per item, kept in Stmt::randcase_items. §10.10
+// judges the assignment as written rather than what runs, so the report stands
+// whether the weighted draw would select the item or not.
+TEST(UnpackedArrayConcatElaboration,
+     AssociativeArrayTargetInRandcaseItemError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int aa[string];\n"
+      "  initial randcase 1: aa = {1, 2, 3}; endcase\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array concatenation cannot target an "
+                            "associative array",
+                            3, "10.10"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements, kept in RsProd::code_stmts and reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(UnpackedArrayConcatElaboration,
+     AssociativeArrayTargetInRandsequenceCodeBlockError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int aa[string];\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { aa = {1, 2, 3}; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array concatenation cannot target an "
+                            "associative array",
+                            5, "10.10"));
+}
+
 }  // namespace
