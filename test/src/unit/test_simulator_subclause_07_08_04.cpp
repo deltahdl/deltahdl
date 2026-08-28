@@ -303,4 +303,56 @@ TEST(IntegralIndexAssocArraySimulation, IntegerVariableXZIndexInvalid) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
+// §7.8.4: the index expression is cast to the declared index type wherever the
+// assignment is written, so a write inside a subroutine body reaches the same
+// key as a read written among the module's items. Under a `bit [3:0]` index
+// type the source index -1 zero-extends to key 15 in both places, and the value
+// the function stored is the value the module-level read hands back. A
+// function-body write keyed off the uncast index value would store the element
+// under a second key, and this read would return the array default instead.
+TEST(IntegralIndexAssocArraySimulation, FunctionBodyWriteKeyMatchesModuleRead) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  typedef bit [3:0] Nibble;\n"
+                      "  int aa[Nibble];\n"
+                      "  int result;\n"
+                      "  int called;\n"
+                      "  function automatic int store(int v);\n"
+                      "    aa[-1] = v;\n"
+                      "    return v;\n"
+                      "  endfunction\n"
+                      "  initial begin\n"
+                      "    called = store(42);\n"
+                      "    result = aa[-1];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            42u);
+}
+
+// §7.8.4: -1 and 15 cast to the same `bit [3:0]` key, so a write from inside a
+// function body and a write among the module's items address one element and
+// leave the array holding a single entry. A function-body write keyed off the
+// uncast index value would land under a key of its own, splitting the element
+// in two and reporting num() == 2.
+TEST(IntegralIndexAssocArraySimulation,
+     FunctionBodyAndModuleWritesShareOneKey) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  typedef bit [3:0] Nibble;\n"
+                      "  int aa[Nibble];\n"
+                      "  int result;\n"
+                      "  int called;\n"
+                      "  function automatic int store(int v);\n"
+                      "    aa[-1] = v;\n"
+                      "    return v;\n"
+                      "  endfunction\n"
+                      "  initial begin\n"
+                      "    called = store(1);\n"
+                      "    aa[15] = 2;\n"
+                      "    result = aa.num();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
+}
+
 }  // namespace

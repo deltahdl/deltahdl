@@ -287,6 +287,30 @@ TEST(AssocInvalidIndex, XzIndexWriteDoesNotClobberExisting) {
   EXPECT_EQ(v, 42u);
 }
 
+// §7.8.6: the write is ignored wherever it is written, so the same x/z index
+// used from inside a subroutine body stores nothing either: the array is still
+// empty after the call. A function body runs on its own statement executor, so
+// the rule holds there only if that executor performs the check too.
+TEST(AssocInvalidIndex, XzIndexWriteFromFunctionBodyStoresNothing) {
+  auto r = RunObserving(
+      "module t;\n"
+      "  int aa[integer];\n"
+      "  integer idx;\n"
+      "  int result;\n"
+      "  function void store();\n"
+      "    aa[idx] = 99;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    idx = 'x;\n"
+      "    store();\n"
+      "    result = aa.num();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  ASSERT_TRUE(r.ok);
+  EXPECT_EQ(r.value, 0u);
+}
+
 // --- W1 negative: a valid write is not ignored -------------------------------
 
 // The closest accepting input to W1: a write through a well-defined index is
@@ -369,6 +393,30 @@ TEST(AssocInvalidIndex, XzIndexWriteWarningNames7_8_6) {
       f);
   EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
                               "associative array index contains x/z", 6,
+                              "7.8.6"));
+}
+
+// §7.8.6: a write through an invalid index performs no operation and issues a
+// warning whether the assignment stands among a module's items or inside a
+// function body, and the report a function body raises names the same
+// subclause, at the line of the index expression the body wrote.
+TEST(AssocInvalidIndex, XzIndexWriteFromFunctionBodyWarningNames7_8_6) {
+  SimFixture f;
+  RunForDiags(
+      "module t;\n"
+      "  int aa[integer];\n"
+      "  integer idx;\n"
+      "  function void store();\n"
+      "    aa[idx] = 99;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    idx = 'x;\n"
+      "    store();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "associative array index contains x/z", 5,
                               "7.8.6"));
 }
 

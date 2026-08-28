@@ -23,18 +23,19 @@ namespace delta {
 
 static void ExecFuncSelectAssign(const Expr* lhs, const Logic4Vec& val,
                                  SimContext& ctx, Arena& arena) {
+  // §7.8.1 and §7.8.4 decide what key an index yields: a wildcard index is
+  // self-determined and unsigned, and a typed integral index is cast to the
+  // declared index width, sign-extended when the index type is signed and
+  // zero-extended when it is not. §7.8.6 rules that a write through an index
+  // holding an x or z bit performs no operation and issues a warning.
+  // TryAssocIndexedWrite applies all three, so calling it here leaves one
+  // function deciding the key an associative array write uses: `aa[-1] = v`
+  // reaches the entry in a subroutine body that the same statement reaches
+  // among a module's items, rather than a second entry of its own. It declines
+  // (returning false) when the base is not an identifier naming an associative
+  // array, leaving the fixed-size array element write below.
+  if (TryAssocIndexedWrite(lhs, val, ctx, arena)) return;
   if (!lhs->base || lhs->base->kind != ExprKind::kIdentifier) return;
-  auto* aa = ctx.FindAssocArray(lhs->base->text);
-  if (aa && lhs->index) {
-    if (aa->is_string_key) {
-      aa->str_data[FormatValueAsString(EvalExpr(lhs->index, ctx, arena))] = val;
-    } else {
-      auto key =
-          static_cast<int64_t>(EvalExpr(lhs->index, ctx, arena).ToUint64());
-      aa->int_data[key] = val;
-    }
-    return;
-  }
   auto idx = EvalExpr(lhs->index, ctx, arena).ToUint64();
   auto name = std::string(lhs->base->text) + "[" + std::to_string(idx) + "]";
   auto* elem = ctx.FindVariable(name);
