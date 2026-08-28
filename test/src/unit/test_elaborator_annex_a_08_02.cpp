@@ -226,4 +226,117 @@ TEST(SubroutineCallExprElaboration, ConstantFunctionCallWithLocalparamArg) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// Footnote 43 of A.8.2 bars `null` from the argument list of a scope
+// randomize_call and puts no condition on where that call is written; A.6.4
+// makes a subroutine_call_statement a statement_item, so every position a
+// statement holds a statement in is a position the report is owed at.
+// WalkStmtForScopeRandomize in
+// src/elaborator/elaborator_validate_subroutine_args.cpp had written out eight
+// of the thirteen child-statement links Stmt declares, and now takes the list
+// from ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The
+// cases below cover one newly reached position each.
+
+// A.6.3's par_block holds statement_or_null between fork and its join_keyword,
+// which the parser keeps in Stmt::fork_stmts.
+TEST(SubroutineCallExprElaboration, ScopeRandomizeWithNullInForkArmRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial fork\n"
+      "    randomize(null);\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'null' is not a legal argument to a scope randomize call", 3, "A.8.2"));
+}
+
+// A.6.3's action_block gives an immediate assertion a statement in each arm,
+// held in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
+// next cover one arm each.
+TEST(SubroutineCallExprElaboration,
+     ScopeRandomizeWithNullInAssertionPassStatementRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial assert (1) randomize(null);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'null' is not a legal argument to a scope randomize call", 2, "A.8.2"));
+}
+
+TEST(SubroutineCallExprElaboration,
+     ScopeRandomizeWithNullInAssertionFailStatementRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial assert (1) else randomize(null);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'null' is not a legal argument to a scope randomize call", 2, "A.8.2"));
+}
+
+// §18.16's `randcase_item ::= expression : statement_or_null` puts a statement
+// after each weight, held in Stmt::randcase_items.
+TEST(SubroutineCallExprElaboration,
+     ScopeRandomizeWithNullInRandcaseItemRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial randcase\n"
+      "    1 : randomize(null);\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'null' is not a legal argument to a scope randomize call", 3, "A.8.2"));
+}
+
+// A.6.12's rs_code_block holds procedural statements, which the parser keeps in
+// RsProd::code_stmts under Stmt::rs_productions.
+TEST(SubroutineCallExprElaboration,
+     ScopeRandomizeWithNullInRandsequenceCodeBlockRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { randomize(null); };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'null' is not a legal argument to a scope randomize call", 4, "A.8.2"));
+}
+
+// §18.17.1 admits a code block after a rule's weight specification, kept in
+// RsRule::weight_code. That is a second statement list under
+// Stmt::rs_productions, reached by a different member from the case above.
+TEST(SubroutineCallExprElaboration,
+     ScopeRandomizeWithNullInRandsequenceWeightCodeBlockRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int i;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : alt := 1 { randomize(null); };\n"
+      "      alt : { i = 1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'null' is not a legal argument to a scope randomize call", 5, "A.8.2"));
+}
+
 }  // namespace

@@ -82,6 +82,24 @@ void CheckPlaOutputTermsExpr(
   for (auto* el : e->elements) CheckPlaOutputTermsExpr(el, net_names, diag);
 }
 
+// §20.16 states its rule over the arguments of a call -- "the input terms can
+// be nets or variables whereas the output terms shall only be variables" -- and
+// names no position the call may stand in, so every position a statement holds
+// a statement in is one this check is owed at.
+//
+// ForEachChildStmt in elaborator_validate_internal.h states those positions,
+// once for the whole elaborator, which is why the list is not written out again
+// here. It hands the visitor the field itself, so a walker that only reads the
+// tree takes a `Stmt* const&`.
+//
+// Stmt::for_steps is walked because the shared list is walked whole, and no
+// conforming source puts a PLA call in one. A.6.8 gives `for_step_assignment
+// ::= operator_assignment | inc_or_dec_expression | function_subroutine_call`.
+// A PLA task returns no value, so it is no operator_assignment's right-hand
+// side and no inc_or_dec_expression; and the one form Syntax 20-16 defines,
+// `$array_type$logic$format ( memory_identifier , input_terms , output_terms )
+// ;`, carries the terminating semicolon a statement carries and a for_step does
+// not.
 void CheckPlaOutputTermsStmt(
     const Stmt* s, const std::unordered_set<std::string_view>& net_names,
     DiagEngine& diag) {
@@ -91,16 +109,9 @@ void CheckPlaOutputTermsStmt(
   CheckPlaOutputTermsExpr(s->rhs, net_names, diag);
   CheckPlaOutputTermsExpr(s->expr, net_names, diag);
   CheckPlaOutputTermsExpr(s->var_init, net_names, diag);
-  for (auto* sub : s->stmts) CheckPlaOutputTermsStmt(sub, net_names, diag);
-  for (auto* sub : s->fork_stmts) CheckPlaOutputTermsStmt(sub, net_names, diag);
-  CheckPlaOutputTermsStmt(s->then_branch, net_names, diag);
-  CheckPlaOutputTermsStmt(s->else_branch, net_names, diag);
-  CheckPlaOutputTermsStmt(s->body, net_names, diag);
-  CheckPlaOutputTermsStmt(s->for_body, net_names, diag);
-  for (auto* init : s->for_inits)
-    CheckPlaOutputTermsStmt(init, net_names, diag);
-  for (auto& ci : s->case_items)
-    CheckPlaOutputTermsStmt(ci.body, net_names, diag);
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    CheckPlaOutputTermsStmt(sub, net_names, diag);
+  });
 }
 
 // §21.3.3, Syntax 21-6: the string-formatting output tasks whose first
@@ -148,6 +159,28 @@ void CheckStringOutputTargetsExpr(const Expr* e, const TypeMap& types,
   for (auto* el : e->elements) CheckStringOutputTargetsExpr(el, types, diag);
 }
 
+// §21.3.3 states its rule over the first argument of a call -- it "shall be a
+// variable of integral, unpacked array of byte, or string data types" -- and
+// names no position the call may stand in, so every position a statement holds
+// a statement in is one this check is owed at.
+//
+// ForEachChildStmt in elaborator_validate_internal.h states those positions,
+// once for the whole elaborator, which is why the list is not written out again
+// here. It hands the visitor the field itself, so a walker that only reads the
+// tree takes a `Stmt* const&`.
+//
+// Stmt::for_steps is walked because the shared list is walked whole, and no
+// conforming source puts one of these calls in one. A.6.8's for_step_assignment
+// is an operator_assignment, an inc_or_dec_expression or a
+// function_subroutine_call; $swrite and $sformat return no value, so neither is
+// an operand of the first two. Syntax 21-6 settles the third: it gives
+// `string_output_tasks ::= string_output_task_name ( output_var [ ,
+// list_of_arguments ] ) ;` and `variable_format_string_output_task ::= $sformat
+// ( output_var , format_string [ , list_of_arguments ] ) ;` with the
+// terminating semicolon a statement carries, and gives
+// `variable_format_string_output_function ::= $sformatf ( format_string [ ,
+// list_of_arguments ] )` without one. The semicolon is what tells the two tasks
+// from the function inside that one syntax box, and a for_step carries none.
 void CheckStringOutputTargetsStmt(const Stmt* s, const TypeMap& types,
                                   DiagEngine& diag) {
   if (s == nullptr) return;
@@ -156,17 +189,9 @@ void CheckStringOutputTargetsStmt(const Stmt* s, const TypeMap& types,
   CheckStringOutputTargetsExpr(s->rhs, types, diag);
   CheckStringOutputTargetsExpr(s->expr, types, diag);
   CheckStringOutputTargetsExpr(s->var_init, types, diag);
-  for (auto* sub : s->stmts) CheckStringOutputTargetsStmt(sub, types, diag);
-  for (auto* sub : s->fork_stmts)
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     CheckStringOutputTargetsStmt(sub, types, diag);
-  CheckStringOutputTargetsStmt(s->then_branch, types, diag);
-  CheckStringOutputTargetsStmt(s->else_branch, types, diag);
-  CheckStringOutputTargetsStmt(s->body, types, diag);
-  CheckStringOutputTargetsStmt(s->for_body, types, diag);
-  for (auto* init : s->for_inits)
-    CheckStringOutputTargetsStmt(init, types, diag);
-  for (auto& ci : s->case_items)
-    CheckStringOutputTargetsStmt(ci.body, types, diag);
+  });
 }
 
 }  // namespace
@@ -241,6 +266,20 @@ void CheckBitVectorArgExpr(const Expr* e, const TypeMap& types,
   for (auto* el : e->elements) CheckBitVectorArgExpr(el, types, diag);
 }
 
+// §20.9 states its rule over the expression argument of a call and names no
+// position the call may stand in, so every position a statement holds a
+// statement in is one this check is owed at.
+//
+// ForEachChildStmt in elaborator_validate_internal.h states those positions,
+// once for the whole elaborator, which is why the list is not written out again
+// here. It hands the visitor the field itself, so a walker that only reads the
+// tree takes a `Stmt* const&`.
+//
+// Stmt::for_steps holds this check's subject, unlike the PLA and string-output
+// tasks above. Syntax 20-10 gives `bit_vector_function` with no terminating
+// semicolon, so each of the five is a function whose call is an expression, and
+// A.6.8's `for_step_assignment ::= operator_assignment | ...` admits one as the
+// right-hand side of the assignment the loop step is written as.
 void CheckBitVectorArgStmt(const Stmt* s, const TypeMap& types,
                            DiagEngine& diag) {
   if (s == nullptr) return;
@@ -249,14 +288,8 @@ void CheckBitVectorArgStmt(const Stmt* s, const TypeMap& types,
   CheckBitVectorArgExpr(s->rhs, types, diag);
   CheckBitVectorArgExpr(s->expr, types, diag);
   CheckBitVectorArgExpr(s->var_init, types, diag);
-  for (auto* sub : s->stmts) CheckBitVectorArgStmt(sub, types, diag);
-  for (auto* sub : s->fork_stmts) CheckBitVectorArgStmt(sub, types, diag);
-  CheckBitVectorArgStmt(s->then_branch, types, diag);
-  CheckBitVectorArgStmt(s->else_branch, types, diag);
-  CheckBitVectorArgStmt(s->body, types, diag);
-  CheckBitVectorArgStmt(s->for_body, types, diag);
-  for (auto* init : s->for_inits) CheckBitVectorArgStmt(init, types, diag);
-  for (auto& ci : s->case_items) CheckBitVectorArgStmt(ci.body, types, diag);
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { CheckBitVectorArgStmt(sub, types, diag); });
 }
 
 }  // namespace
@@ -374,6 +407,20 @@ void CheckPlaAscendingExpr(const Expr* e, const PlaRangeMap& ranges,
   for (auto* el : e->elements) CheckPlaAscendingExpr(el, ranges, diag);
 }
 
+// §20.16.3 states its rule over the memory and term arguments of a call --
+// "PLA input terms, output terms, and memory shall be specified in ascending
+// order" -- and names no position the call may stand in, so every position a
+// statement holds a statement in is one this check is owed at.
+//
+// ForEachChildStmt in elaborator_validate_internal.h states those positions,
+// once for the whole elaborator, which is why the list is not written out again
+// here. It hands the visitor the field itself, so a walker that only reads the
+// tree takes a `Stmt* const&`.
+//
+// Stmt::for_steps is walked whole and reaches nothing, for the reason
+// CheckPlaOutputTermsStmt above records: the call this check is about is the
+// one Syntax 20-16 defines, and that form ends in the semicolon A.6.8 gives no
+// for_step_assignment.
 void CheckPlaAscendingStmt(const Stmt* s, const PlaRangeMap& ranges,
                            DiagEngine& diag) {
   if (!s) return;
@@ -382,14 +429,8 @@ void CheckPlaAscendingStmt(const Stmt* s, const PlaRangeMap& ranges,
   CheckPlaAscendingExpr(s->rhs, ranges, diag);
   CheckPlaAscendingExpr(s->expr, ranges, diag);
   CheckPlaAscendingExpr(s->var_init, ranges, diag);
-  for (auto* sub : s->stmts) CheckPlaAscendingStmt(sub, ranges, diag);
-  for (auto* sub : s->fork_stmts) CheckPlaAscendingStmt(sub, ranges, diag);
-  CheckPlaAscendingStmt(s->then_branch, ranges, diag);
-  CheckPlaAscendingStmt(s->else_branch, ranges, diag);
-  CheckPlaAscendingStmt(s->body, ranges, diag);
-  CheckPlaAscendingStmt(s->for_body, ranges, diag);
-  for (auto* init : s->for_inits) CheckPlaAscendingStmt(init, ranges, diag);
-  for (auto& ci : s->case_items) CheckPlaAscendingStmt(ci.body, ranges, diag);
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { CheckPlaAscendingStmt(sub, ranges, diag); });
 }
 
 // §20.16.3: fold a single declaration's packed and constant unpacked ranges
@@ -497,6 +538,21 @@ void CheckArrayQueryOnVarDimExpr(const Expr* e, const VarDimMap& vars,
     CheckArrayQueryOnVarDimExpr(el, vars, scope, diag);
 }
 
+// §20.7.1 states its rule over the arguments of a call -- "if any of the
+// functions described in 20.7 are called with arguments (v, n) ... it shall be
+// an error if the dimension indicated by n is a variable-sized dimension" --
+// and names no position the call may stand in, so every position a statement
+// holds a statement in is one this check is owed at.
+//
+// ForEachChildStmt in elaborator_validate_internal.h states those positions,
+// once for the whole elaborator, which is why the list is not written out again
+// here. It hands the visitor the field itself, so a walker that only reads the
+// tree takes a `Stmt* const&`.
+//
+// Stmt::for_steps holds this check's subject. §20.7's array query functions
+// return a value, so a call is an expression, and A.6.8's `for_step_assignment
+// ::= operator_assignment | ...` admits one as the right-hand side of the
+// assignment the loop step is written as.
 void CheckArrayQueryOnVarDimStmt(const Stmt* s, const VarDimMap& vars,
                                  const ScopeMap& scope, DiagEngine& diag) {
   if (!s) return;
@@ -506,18 +562,9 @@ void CheckArrayQueryOnVarDimStmt(const Stmt* s, const VarDimMap& vars,
   CheckArrayQueryOnVarDimExpr(s->expr, vars, scope, diag);
   CheckArrayQueryOnVarDimExpr(s->delay, vars, scope, diag);
   CheckArrayQueryOnVarDimExpr(s->var_init, vars, scope, diag);
-  for (auto* sub : s->stmts)
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     CheckArrayQueryOnVarDimStmt(sub, vars, scope, diag);
-  for (auto* sub : s->fork_stmts)
-    CheckArrayQueryOnVarDimStmt(sub, vars, scope, diag);
-  CheckArrayQueryOnVarDimStmt(s->then_branch, vars, scope, diag);
-  CheckArrayQueryOnVarDimStmt(s->else_branch, vars, scope, diag);
-  CheckArrayQueryOnVarDimStmt(s->body, vars, scope, diag);
-  CheckArrayQueryOnVarDimStmt(s->for_body, vars, scope, diag);
-  for (auto* init : s->for_inits)
-    CheckArrayQueryOnVarDimStmt(init, vars, scope, diag);
-  for (auto& ci : s->case_items)
-    CheckArrayQueryOnVarDimStmt(ci.body, vars, scope, diag);
+  });
 }
 
 }  // namespace

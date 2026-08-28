@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "builders_ast.h"
 #include "common/arena.h"
 #include "elaborator/const_eval.h"
@@ -489,6 +491,94 @@ TEST(LongestStaticPrefixDriver, MultiDimVariableInnerIndexCollapsesToBase) {
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "driven by multiple always_comb/always_latch/always_ff", 5, "9.2.2.2"));
+}
+
+// The five cases below cover the statement positions CollectStmtLhsPrefixes in
+// src/elaborator/elaborator_process.cpp reaches only since it took its list of
+// nested statements from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. It had written out nine of the
+// thirteen child-statement links Stmt declares, and a longest static prefix it
+// never gathered is a driver nothing knows about: the target below was driven
+// by an always_comb and by an initial procedure at once, and every one of these
+// sources elaborated clean.
+//
+// `stmt` stands in the initial procedure, so the prefix it contributes reaches
+// the rule through the general procedural driver set alone, which is what
+// CollectStmtLhsPrefixes fills. §9.2.2.2 is the rule reported, its "shall not
+// be assigned by any other process" being what the always_comb and the initial
+// procedure break between them, and §11.5.3 is what makes the report name the
+// bit `v[0]` rather than the whole vector `v`.
+//
+// The report stands at the always_comb, which is line 4 of every source built
+// here whatever `stmt` runs to, and the line is read back out of the source
+// rather than counted so that it stays right if the preamble is edited.
+void ExpectElementDrivenByInitialStmt(const std::string& stmt) {
+  ElabFixture f;
+  std::string src =
+      "module m;\n"
+      "  logic [7:0] v;\n"
+      "  logic ok;\n"
+      "  always_comb v[0] = 1'b1;\n"
+      "  initial\n"
+      "    " +
+      stmt + "\nendmodule\n";
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "variable 'v[0]' driven by always_comb and another process",
+                    LineHolding(src, "always_comb"), "9.2.2.2"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
+// next cover one arm each. §9.2.2.2 counts an assignment as a driver whether it
+// runs on a given pass or not, so the arm the assertion would take is not the
+// question.
+TEST(LongestStaticPrefixDriver, ElementAssignedInAnAssertionPassStmtIsADriver) {
+  ExpectElementDrivenByInitialStmt("assert (ok) v[0] = 1'b0;");
+}
+
+TEST(LongestStaticPrefixDriver, ElementAssignedInAnAssertionFailStmtIsADriver) {
+  ExpectElementDrivenByInitialStmt("assert (ok) else v[0] = 1'b0;");
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
+// statement the parser keeps in the second member of a Stmt::randcase_items
+// entry. The weighted draw picks an item while the design runs; the
+// single-driver rule is decided before it does, so an item is a driver whether
+// it would be selected or not.
+TEST(LongestStaticPrefixDriver, ElementAssignedInARandcaseItemIsADriver) {
+  ExpectElementDrivenByInitialStmt("randcase 1: v[0] = 1'b0; endcase");
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements. They are kept in RsProd::code_stmts, reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(LongestStaticPrefixDriver,
+     ElementAssignedInARandsequenceCodeBlockIsADriver) {
+  ExpectElementDrivenByInitialStmt(
+      "begin\n"
+      "      randsequence(main)\n"
+      "        main : { v[0] = 1'b0; };\n"
+      "      endsequence\n"
+      "    end");
+}
+
+// §18.17.1 lets a weight specification be followed by a code block of its own,
+// which the parser keeps in RsRule::weight_code. It is a second statement list
+// under Stmt::rs_productions, reached by a different member from
+// RsProd::code_stmts, so the case above does not answer for it.
+TEST(LongestStaticPrefixDriver,
+     ElementAssignedInARandsequenceWeightCodeBlockIsADriver) {
+  ExpectElementDrivenByInitialStmt(
+      "begin\n"
+      "      randsequence(main)\n"
+      "        main : alt := 1 { v[0] = 1'b0; };\n"
+      "        alt : { ok = 1'b1; };\n"
+      "      endsequence\n"
+      "    end");
 }
 
 }  // namespace

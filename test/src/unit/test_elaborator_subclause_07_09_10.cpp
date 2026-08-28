@@ -225,4 +225,142 @@ TEST(Elaboration, AssocArgIndexMismatchViaNamedBindingRejected) {
                             7, "7.9.10"));
 }
 
+// §7.9.10 governs the actual bound to an array formal and says nothing about
+// the statement the call stands in, so every position a statement holds a
+// statement in is a position the report is made at. WalkStmtForArrayArgTypes
+// in src/elaborator/elaborator_validate_class_array_assign.cpp had written out
+// eight of the thirteen child-statement links Stmt declares, and now takes the
+// list from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. The cases below cover one
+// newly reached position each, all of them using the element-type mismatch of
+// AssocArgElementTypeMismatchRejected above so that only the position varies.
+
+// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
+// block_item_declaration } { statement_or_null } join_keyword`, whose
+// statements the parser keeps in Stmt::fork_stmts.
+TEST(Elaboration, AssocArgElementTypeMismatchInForkArmRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int aa[int];\n"
+      "  function automatic int f(logic [7:0] x[int]);\n"
+      "    return x[0];\n"
+      "  endfunction\n"
+      "  initial fork\n"
+      "    f(aa);\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "associative array element type mismatch in argument", 7, "7.9.10"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
+// next cover one arm each.
+TEST(Elaboration, AssocArgElementTypeMismatchInAssertionPassStmtRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int aa[int];\n"
+      "  function automatic int f(logic [7:0] x[int]);\n"
+      "    return x[0];\n"
+      "  endfunction\n"
+      "  initial assert (1) f(aa);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "associative array element type mismatch in argument", 6, "7.9.10"));
+}
+
+TEST(Elaboration, AssocArgElementTypeMismatchInAssertionFailStmtRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int aa[int];\n"
+      "  function automatic int f(logic [7:0] x[int]);\n"
+      "    return x[0];\n"
+      "  endfunction\n"
+      "  initial assert (1) else f(aa);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "associative array element type mismatch in argument", 6, "7.9.10"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, kept in
+// Stmt::randcase_items.
+TEST(Elaboration, AssocArgElementTypeMismatchInRandcaseItemRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int aa[int];\n"
+      "  function automatic int f(logic [7:0] x[int]);\n"
+      "    return x[0];\n"
+      "  endfunction\n"
+      "  initial randcase\n"
+      "    1 : f(aa);\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "associative array element type mismatch in argument", 7, "7.9.10"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements. They are kept in RsProd::code_stmts, reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(Elaboration, AssocArgElementTypeMismatchInRandsequenceCodeBlockRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int aa[int];\n"
+      "  function automatic int f(logic [7:0] x[int]);\n"
+      "    return x[0];\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { f(aa); };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "associative array element type mismatch in argument", 8, "7.9.10"));
+}
+
+// §18.17.1 lets a weight specification be followed by a code block of its own,
+// which the parser keeps in RsRule::weight_code. It is a second statement list
+// under Stmt::rs_productions, reached by a different member from
+// RsProd::code_stmts, so the case above does not answer for it.
+TEST(Elaboration,
+     AssocArgElementTypeMismatchInRandsequenceWeightCodeBlockRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int aa[int];\n"
+      "  int i;\n"
+      "  function automatic int f(logic [7:0] x[int]);\n"
+      "    return x[0];\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : alt := 1 { f(aa); };\n"
+      "      alt : { i = 1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "associative array element type mismatch in argument", 9, "7.9.10"));
+}
+
 }  // namespace

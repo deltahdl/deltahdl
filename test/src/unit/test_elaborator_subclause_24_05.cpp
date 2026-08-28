@@ -103,4 +103,98 @@ TEST(ProgramSubroutineCall, ProgramCallingDesignModuleTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §24.5 says "Calling program subroutines from within design modules is illegal
+// and shall result in an error" and names no position the call is allowed in,
+// so every position a statement holds a statement in is one the report reaches.
+// WalkStmtForProgramCall in
+// src/elaborator/elaborator_validate_hier_refs.cpp had written out nine of
+// the thirteen child-statement links Stmt declares and now takes the
+// list from ForEachChildStmt in src/elaborator/elaborator_validate_internal.h.
+// The four cases below stand in the four positions it was missing, each of
+// which elaborated clean beforehand with the illegal call left unreported.
+
+// A.6.10 gives `simple_immediate_assert_statement ::= assert ( expression )
+// action_block` and §16.3 gives `action_block ::= statement_or_null |
+// [ statement ] else statement_or_null`, so the pass arm of an immediate
+// assertion holds an ordinary statement, kept in Stmt::assert_pass_stmt.
+TEST(ProgramSubroutineCall, ProgramTaskCallInAnAssertionPassStatementIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic ok;\n"
+      "  program p;\n"
+      "    task ptask; endtask\n"
+      "  endprogram\n"
+      "  initial assert (ok) p.ptask();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "calling a program subroutine from within a design "
+                            "module is not permitted",
+                            6, "24.5"));
+}
+
+// The else arm of the same production, kept in Stmt::assert_fail_stmt, a link
+// the pass-arm case above does not reach.
+TEST(ProgramSubroutineCall, ProgramTaskCallInAnAssertionFailStatementIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic armed;\n"
+      "  program pr;\n"
+      "    task drain; endtask\n"
+      "  endprogram\n"
+      "  initial assert (armed) else pr.drain();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "calling a program subroutine from within a design "
+                            "module is not permitted",
+                            6, "24.5"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
+// randcase holds a statement per item, kept in Stmt::randcase_items. §24.5 is
+// a rule about where the call is written rather than about whether it runs, so
+// the report stands whether the weighted draw would select the item or not.
+TEST(ProgramSubroutineCall, ProgramTaskCallInARandcaseItemIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  program pk;\n"
+      "    task pick; endtask\n"
+      "  endprogram\n"
+      "  initial randcase 1: pk.pick(); endcase\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "calling a program subroutine from within a design "
+                            "module is not permitted",
+                            5, "24.5"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements, kept in RsProd::code_stmts and reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(ProgramSubroutineCall, ProgramTaskCallInARandsequenceCodeBlockIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  program ps;\n"
+      "    task sample; endtask\n"
+      "  endprogram\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { ps.sample(); };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "calling a program subroutine from within a design "
+                            "module is not permitted",
+                            7, "24.5"));
+}
+
 }  // namespace

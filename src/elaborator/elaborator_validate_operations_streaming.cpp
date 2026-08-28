@@ -10,6 +10,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -49,12 +50,14 @@ void ElaboratorOperationRules::WalkStmtsForStringConcatLvalue(const Stmt* s) {
       s->kind == StmtKind::kForce) {
     CheckStringConcatLvalue(s->lhs);
   }
-  for (auto* sub : s->stmts) WalkStmtsForStringConcatLvalue(sub);
-  WalkStmtsForStringConcatLvalue(s->then_branch);
-  WalkStmtsForStringConcatLvalue(s->else_branch);
-  WalkStmtsForStringConcatLvalue(s->body);
-  WalkStmtsForStringConcatLvalue(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForStringConcatLvalue(ci.body);
+  // §11.4.12.2 bars a concatenation of strings from the left-hand side of an
+  // assignment and names no statement the assignment is allowed to stand in,
+  // so every position a statement holds a statement in is one this report
+  // reaches. ForEachChildStmt in elaborator_validate_internal.h states those
+  // positions once for the whole elaborator, which is why the list is not
+  // written out again here.
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { WalkStmtsForStringConcatLvalue(sub); });
 }
 
 void ElaboratorOperationRules::ValidateStringConcatLvalue(
@@ -259,12 +262,15 @@ void ElaboratorOperationRules::WalkStmtsForStreamingContext(const Stmt* s) {
   WalkExprForStreamingContext(s->expr, false);
   WalkExprForStreamingContext(s->condition, false);
   WalkExprForStreamingContext(s->assert_expr, false);
-  for (auto* sub : s->stmts) WalkStmtsForStreamingContext(sub);
-  WalkStmtsForStreamingContext(s->then_branch);
-  WalkStmtsForStreamingContext(s->else_branch);
-  WalkStmtsForStreamingContext(s->body);
-  WalkStmtsForStreamingContext(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForStreamingContext(ci.body);
+  // §11.4.14 confines a streaming concatenation to an assignment or a
+  // bit-stream cast, §11.4.14.1 rules on its operands and §11.4.14.2 on its
+  // slice_size, and none of the three names a statement the concatenation is
+  // allowed to stand in, so every position a statement holds a statement in is
+  // one these reports reach. ForEachChildStmt in
+  // elaborator_validate_internal.h states those positions once for the whole
+  // elaborator, which is why the list is not written out again here.
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { WalkStmtsForStreamingContext(sub); });
 }
 
 void ElaboratorOperationRules::ValidateStreamingConcatContext(
@@ -459,12 +465,14 @@ void ElaboratorOperationRules::WalkStmtsForBitStreamCast(const Stmt* s) {
   WalkExprForBitStreamCast(s->rhs);
   WalkExprForBitStreamCast(s->expr);
   WalkExprForBitStreamCast(s->condition);
-  for (auto* sub : s->stmts) WalkStmtsForBitStreamCast(sub);
-  WalkStmtsForBitStreamCast(s->then_branch);
-  WalkStmtsForBitStreamCast(s->else_branch);
-  WalkStmtsForBitStreamCast(s->body);
-  WalkStmtsForBitStreamCast(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForBitStreamCast(ci.body);
+  // §6.24.3 rules on the source and destination types of a bit-stream cast
+  // and names no statement the cast is allowed to stand in, so every position
+  // a statement holds a statement in is one these reports reach.
+  // ForEachChildStmt in elaborator_validate_internal.h states those positions
+  // once for the whole elaborator, which is why the list is not written out
+  // again here.
+  ForEachChildStmt(s,
+                   [&](Stmt* const& sub) { WalkStmtsForBitStreamCast(sub); });
 }
 
 void ElaboratorOperationRules::ValidateBitStreamCast(const ModuleDecl* decl) {
@@ -480,472 +488,6 @@ void ElaboratorOperationRules::ValidateBitStreamCast(const ModuleDecl* decl) {
     if (item->kind == ModuleItemKind::kVarDecl) {
       WalkExprForBitStreamCast(item->init_expr);
     }
-  }
-}
-
-static std::string_view HierRefLeftmost(const Expr* e) {
-  if (e->kind == ExprKind::kIdentifier) return e->text;
-  if (e->kind == ExprKind::kMemberAccess && e->lhs)
-    return HierRefLeftmost(e->lhs);
-  return {};
-}
-
-static bool ExprRefersToChecker(
-    const Expr* e, const std::unordered_set<std::string_view>& checker_names) {
-  if (!e) return false;
-  if (e->kind == ExprKind::kMemberAccess) {
-    auto leftmost = HierRefLeftmost(e);
-    if (!leftmost.empty() && checker_names.count(leftmost)) return true;
-  }
-  if (ExprRefersToChecker(e->lhs, checker_names)) return true;
-  if (ExprRefersToChecker(e->rhs, checker_names)) return true;
-  if (ExprRefersToChecker(e->base, checker_names)) return true;
-  for (auto* elem : e->elements) {
-    if (ExprRefersToChecker(elem, checker_names)) return true;
-  }
-  return false;
-}
-
-static void WalkStmtsForCheckerRef(
-    const Stmt* s, const std::unordered_set<std::string_view>& checker_names,
-    DiagEngine& diag) {
-  if (!s) return;
-  if (s->lhs && ExprRefersToChecker(s->lhs, checker_names))
-    diag.Error(s->range.start,
-               "hierarchical reference into a checker is not permitted",
-               Subclause("23.6"));
-  if (s->rhs && ExprRefersToChecker(s->rhs, checker_names))
-    diag.Error(s->range.start,
-               "hierarchical reference into a checker is not permitted",
-               Subclause("23.6"));
-  for (auto* sub : s->stmts) WalkStmtsForCheckerRef(sub, checker_names, diag);
-  WalkStmtsForCheckerRef(s->then_branch, checker_names, diag);
-  WalkStmtsForCheckerRef(s->else_branch, checker_names, diag);
-  WalkStmtsForCheckerRef(s->body, checker_names, diag);
-  WalkStmtsForCheckerRef(s->for_body, checker_names, diag);
-  for (auto* init : s->for_inits)
-    WalkStmtsForCheckerRef(init, checker_names, diag);
-  for (auto* step : s->for_steps)
-    WalkStmtsForCheckerRef(step, checker_names, diag);
-  for (auto* fs : s->fork_stmts)
-    WalkStmtsForCheckerRef(fs, checker_names, diag);
-  for (auto& ci : s->case_items)
-    WalkStmtsForCheckerRef(ci.body, checker_names, diag);
-}
-
-void Elaborator::ValidateHierRefIntoChecker(const ModuleDecl* decl) {
-  if (checker_inst_names_.empty()) return;
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kContAssign) {
-      if (ExprRefersToChecker(item->assign_lhs, checker_inst_names_))
-        diag_.Error(item->loc,
-                    "hierarchical reference into a checker is not permitted",
-                    Subclause("23.6"));
-      if (ExprRefersToChecker(item->assign_rhs, checker_inst_names_))
-        diag_.Error(item->loc,
-                    "hierarchical reference into a checker is not permitted",
-                    Subclause("23.6"));
-    }
-    bool is_proc = IsProceduralItemKind(item->kind);
-    if (is_proc && item->body)
-      WalkStmtsForCheckerRef(item->body, checker_inst_names_, diag_);
-  }
-}
-
-// §17.7.1: flags any blocking procedural assignment whose target is one of the
-// checker's free variables. A free variable may only be updated by a
-// nonblocking assignment (from an always_ff procedure), so a blocking
-// assignment to it — in any procedure — is illegal.
-static void WalkStmtsForFreeBlockingAssign(
-    const Stmt* s, const std::unordered_set<std::string_view>& free_vars,
-    DiagEngine& diag) {
-  if (!s) return;
-  if (s->kind == StmtKind::kBlockingAssign && s->lhs) {
-    auto target = HierRefLeftmost(s->lhs);
-    if (!target.empty() && free_vars.count(target))
-      diag.Error(
-          s->range.start,
-          std::format("a blocking assignment cannot target free checker "
-                      "variable '{}'; a free variable is updated only by "
-                      "a nonblocking assignment",
-                      target),
-          Subclause("17.7.1"));
-  }
-  for (auto* sub : s->stmts)
-    WalkStmtsForFreeBlockingAssign(sub, free_vars, diag);
-  WalkStmtsForFreeBlockingAssign(s->then_branch, free_vars, diag);
-  WalkStmtsForFreeBlockingAssign(s->else_branch, free_vars, diag);
-  WalkStmtsForFreeBlockingAssign(s->body, free_vars, diag);
-  WalkStmtsForFreeBlockingAssign(s->for_body, free_vars, diag);
-  for (auto* step : s->for_steps)
-    WalkStmtsForFreeBlockingAssign(step, free_vars, diag);
-  for (auto* fs : s->fork_stmts)
-    WalkStmtsForFreeBlockingAssign(fs, free_vars, diag);
-  for (auto& ci : s->case_items)
-    WalkStmtsForFreeBlockingAssign(ci.body, free_vars, diag);
-}
-
-// §17.7.1: continuous assignments and blocking procedural assignments to a free
-// checker variable are illegal; a free variable is left to the nonblocking form
-// only. Collects the free (rand) checker variables declared in the checker body
-// and rejects any continuous assign or blocking procedural assign that targets
-// one. Runs only on checker declarations.
-// §17.7.1: a free checker variable is updated only by a nonblocking
-// assignment, so a continuous assignment may not target one.
-static void CheckContAssignNotFreeVariable(
-    const ModuleItem* item,
-    const std::unordered_set<std::string_view>& free_vars, DiagEngine& diag) {
-  auto target = HierRefLeftmost(item->assign_lhs);
-  if (target.empty() || free_vars.count(target) == 0) return;
-  diag.Error(item->loc,
-             std::format("a continuous assignment cannot target free checker "
-                         "variable '{}'; a free variable is updated only by a "
-                         "nonblocking assignment",
-                         target),
-             Subclause("17.7.1"));
-}
-
-void Elaborator::ValidateFreeCheckerVariableAssignments(
-    const ModuleDecl* decl) {
-  if (decl->decl_kind != ModuleDeclKind::kChecker) return;
-  std::unordered_set<std::string_view> free_vars;
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kVarDecl && item->is_rand &&
-        !item->name.empty())
-      free_vars.insert(item->name);
-  }
-  if (free_vars.empty()) return;
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kContAssign)
-      CheckContAssignNotFreeVariable(item, free_vars, diag_);
-    if (IsProceduralItemKind(item->kind) && item->body)
-      WalkStmtsForFreeBlockingAssign(item->body, free_vars, diag_);
-  }
-}
-
-// §17.7.1: flags a blocking or nonblocking assignment inside an initial
-// procedure whose target names one of the checker's variables. A checker
-// variable may only be initialized in its declaration, never assigned from an
-// initial procedure. Variables declared locally inside the initial block are
-// not checker variables and so are not in `checker_vars`.
-static void WalkStmtsForCheckerVarAssignInInitial(
-    const Stmt* s, const std::unordered_set<std::string_view>& checker_vars,
-    DiagEngine& diag) {
-  if (!s) return;
-  if ((s->kind == StmtKind::kBlockingAssign ||
-       s->kind == StmtKind::kNonblockingAssign) &&
-      s->lhs) {
-    auto target = HierRefLeftmost(s->lhs);
-    if (!target.empty() && checker_vars.count(target))
-      diag.Error(s->range.start,
-                 std::format("checker variable '{}' cannot be assigned in an "
-                             "initial procedure; initialize it in its "
-                             "declaration instead",
-                             target),
-                 Subclause("17.7.1"));
-  }
-  for (auto* sub : s->stmts)
-    WalkStmtsForCheckerVarAssignInInitial(sub, checker_vars, diag);
-  WalkStmtsForCheckerVarAssignInInitial(s->then_branch, checker_vars, diag);
-  WalkStmtsForCheckerVarAssignInInitial(s->else_branch, checker_vars, diag);
-  WalkStmtsForCheckerVarAssignInInitial(s->body, checker_vars, diag);
-  WalkStmtsForCheckerVarAssignInInitial(s->for_body, checker_vars, diag);
-  for (auto* init : s->for_inits)
-    WalkStmtsForCheckerVarAssignInInitial(init, checker_vars, diag);
-  for (auto* step : s->for_steps)
-    WalkStmtsForCheckerVarAssignInInitial(step, checker_vars, diag);
-  for (auto* fs : s->fork_stmts)
-    WalkStmtsForCheckerVarAssignInInitial(fs, checker_vars, diag);
-  for (auto& ci : s->case_items)
-    WalkStmtsForCheckerVarAssignInInitial(ci.body, checker_vars, diag);
-}
-
-// §17.7.1: a checker variable may not be assigned in an initial procedure (it
-// may only be initialized in its declaration). Collects the variables declared
-// in the checker body and rejects any assignment to one of them from an initial
-// procedure. Runs only on checker declarations.
-void Elaborator::ValidateCheckerVariableInitialAssignment(
-    const ModuleDecl* decl) {
-  if (decl->decl_kind != ModuleDeclKind::kChecker) return;
-  std::unordered_set<std::string_view> checker_vars;
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kVarDecl && !item->name.empty())
-      checker_vars.insert(item->name);
-  }
-  if (checker_vars.empty()) return;
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock && item->body)
-      WalkStmtsForCheckerVarAssignInInitial(item->body, checker_vars, diag_);
-  }
-}
-
-static bool ExprRefersToProgram(
-    const Expr* e, const std::unordered_set<std::string_view>& program_names) {
-  if (!e) return false;
-  if (e->kind == ExprKind::kMemberAccess) {
-    auto leftmost = HierRefLeftmost(e);
-    if (!leftmost.empty() && program_names.count(leftmost)) return true;
-  }
-  if (ExprRefersToProgram(e->lhs, program_names)) return true;
-  if (ExprRefersToProgram(e->rhs, program_names)) return true;
-  if (ExprRefersToProgram(e->base, program_names)) return true;
-  for (auto* elem : e->elements) {
-    if (ExprRefersToProgram(elem, program_names)) return true;
-  }
-  return false;
-}
-
-static void WalkStmtsForProgramRef(
-    const Stmt* s, const std::unordered_set<std::string_view>& program_names,
-    DiagEngine& diag) {
-  if (!s) return;
-  if (s->lhs && ExprRefersToProgram(s->lhs, program_names))
-    diag.Error(s->range.start,
-               "hierarchical reference to program signal from outside the "
-               "program is not permitted",
-               Subclause("24.3"));
-  if (s->rhs && ExprRefersToProgram(s->rhs, program_names))
-    diag.Error(s->range.start,
-               "hierarchical reference to program signal from outside the "
-               "program is not permitted",
-               Subclause("24.3"));
-  for (auto* sub : s->stmts) WalkStmtsForProgramRef(sub, program_names, diag);
-  WalkStmtsForProgramRef(s->then_branch, program_names, diag);
-  WalkStmtsForProgramRef(s->else_branch, program_names, diag);
-  WalkStmtsForProgramRef(s->body, program_names, diag);
-  WalkStmtsForProgramRef(s->for_body, program_names, diag);
-  for (auto* init : s->for_inits)
-    WalkStmtsForProgramRef(init, program_names, diag);
-  for (auto* step : s->for_steps)
-    WalkStmtsForProgramRef(step, program_names, diag);
-  for (auto* fs : s->fork_stmts)
-    WalkStmtsForProgramRef(fs, program_names, diag);
-  for (auto& ci : s->case_items)
-    WalkStmtsForProgramRef(ci.body, program_names, diag);
-}
-
-void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
-  if (program_inst_names_.empty()) return;
-  if (decl->decl_kind == ModuleDeclKind::kProgram) return;
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kContAssign) {
-      if (ExprRefersToProgram(item->assign_lhs, program_inst_names_))
-        diag_.Error(item->loc,
-                    "hierarchical reference to program signal from outside "
-                    "the program is not permitted",
-                    Subclause("24.3"));
-      if (ExprRefersToProgram(item->assign_rhs, program_inst_names_))
-        diag_.Error(item->loc,
-                    "hierarchical reference to program signal from outside "
-                    "the program is not permitted",
-                    Subclause("24.3"));
-    }
-    bool is_proc = IsProceduralItemKind(item->kind);
-    if (is_proc && item->body)
-      WalkStmtsForProgramRef(item->body, program_inst_names_, diag_);
-  }
-}
-
-void Elaborator::ValidateAnonymousProgramHierRefs() {
-  std::unordered_set<std::string_view> program_names;
-  for (const auto* p : unit_->programs) {
-    if (!p->name.empty()) program_names.insert(p->name);
-  }
-  if (program_names.empty()) return;
-  for (const auto* item : unit_->cu_items) {
-    if (!item->from_anonymous_program) continue;
-    if (item->body) WalkStmtsForProgramRef(item->body, program_names, diag_);
-    // §24.3: a hierarchical reference to a program from an anonymous program is
-    // illegal wherever it appears, including inside a task or function the
-    // anonymous program declares (whose body is in func_body_stmts, not body).
-    if (item->kind == ModuleItemKind::kTaskDecl ||
-        item->kind == ModuleItemKind::kFunctionDecl) {
-      for (const auto* s : item->func_body_stmts)
-        WalkStmtsForProgramRef(s, program_names, diag_);
-    }
-  }
-}
-
-static void CollectHierPathComponents(const Expr* e,
-                                      std::vector<std::string_view>& out) {
-  if (!e) return;
-  if (e->kind == ExprKind::kIdentifier) {
-    out.push_back(e->text);
-    return;
-  }
-  if (e->kind == ExprKind::kMemberAccess) {
-    CollectHierPathComponents(e->lhs, out);
-    CollectHierPathComponents(e->rhs, out);
-  }
-}
-
-static bool ExprRefersToAutomatic(
-    const Expr* e, const std::unordered_set<std::string_view>& auto_names) {
-  if (!e) return false;
-  if (e->kind == ExprKind::kMemberAccess) {
-    std::vector<std::string_view> components;
-    CollectHierPathComponents(e, components);
-    for (size_t i = 0; i + 1 < components.size(); ++i) {
-      if (auto_names.count(components[i])) return true;
-    }
-  }
-  if (ExprRefersToAutomatic(e->lhs, auto_names)) return true;
-  if (ExprRefersToAutomatic(e->rhs, auto_names)) return true;
-  if (ExprRefersToAutomatic(e->base, auto_names)) return true;
-  for (auto* elem : e->elements) {
-    if (ExprRefersToAutomatic(elem, auto_names)) return true;
-  }
-  return false;
-}
-
-// §13.3.1 states the rule for a task and §13.4.2 states it for a function, in
-// the same words each time: the items of an automatic subroutine are allocated
-// per call and cannot be accessed by hierarchical references. The two are one
-// walk over two sets of names, so each set travels with the report its kind of
-// subroutine gets.
-struct AutoSubroutineRule {
-  const std::unordered_set<std::string_view>& names;
-  std::string_view message;
-  Subclause subclause;
-};
-
-// The names of `decl`'s automatic tasks, or of its automatic functions,
-// selected by `kind`. Lifetimes have already been defaulted from the enclosing
-// declaration (§6.21) by the time this runs, so `is_automatic` is final here.
-static std::unordered_set<std::string_view> AutoSubroutineNames(
-    const ModuleDecl* decl, ModuleItemKind kind) {
-  std::unordered_set<std::string_view> names;
-  for (const auto* item : decl->items) {
-    if (item->kind == kind && item->is_automatic) names.insert(item->name);
-  }
-  return names;
-}
-
-static void WalkStmtsForAutoRef(const Stmt* s, const AutoSubroutineRule& rule,
-                                DiagEngine& diag) {
-  if (!s) return;
-  if (s->lhs && ExprRefersToAutomatic(s->lhs, rule.names))
-    diag.Error(s->range.start, std::string(rule.message), rule.subclause);
-  if (s->rhs && ExprRefersToAutomatic(s->rhs, rule.names))
-    diag.Error(s->range.start, std::string(rule.message), rule.subclause);
-  for (auto* sub : s->stmts) WalkStmtsForAutoRef(sub, rule, diag);
-  WalkStmtsForAutoRef(s->then_branch, rule, diag);
-  WalkStmtsForAutoRef(s->else_branch, rule, diag);
-  WalkStmtsForAutoRef(s->body, rule, diag);
-  WalkStmtsForAutoRef(s->for_body, rule, diag);
-  for (auto* init : s->for_inits) WalkStmtsForAutoRef(init, rule, diag);
-  for (auto* step : s->for_steps) WalkStmtsForAutoRef(step, rule, diag);
-  for (auto* fs : s->fork_stmts) WalkStmtsForAutoRef(fs, rule, diag);
-  for (auto& ci : s->case_items) WalkStmtsForAutoRef(ci.body, rule, diag);
-}
-
-static void CheckHierRefToAutomatic(const ModuleDecl* decl,
-                                    const AutoSubroutineRule& rule,
-                                    DiagEngine& diag) {
-  if (rule.names.empty()) return;
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kContAssign) {
-      if (ExprRefersToAutomatic(item->assign_lhs, rule.names))
-        diag.Error(item->loc, std::string(rule.message), rule.subclause);
-      if (ExprRefersToAutomatic(item->assign_rhs, rule.names))
-        diag.Error(item->loc, std::string(rule.message), rule.subclause);
-    }
-    bool is_proc = IsProceduralItemKind(item->kind);
-    if (is_proc && item->body) WalkStmtsForAutoRef(item->body, rule, diag);
-  }
-}
-
-void Elaborator::ValidateHierRefToAutomatic(const ModuleDecl* decl) {
-  if (auto_task_func_names_.empty()) return;
-  auto tasks = AutoSubroutineNames(decl, ModuleItemKind::kTaskDecl);
-  CheckHierRefToAutomatic(
-      decl,
-      {tasks,
-       "hierarchical reference to object in automatic task is not permitted",
-       Subclause("13.3.1")},
-      diag_);
-  auto funcs = AutoSubroutineNames(decl, ModuleItemKind::kFunctionDecl);
-  CheckHierRefToAutomatic(
-      decl,
-      {funcs,
-       "hierarchical reference to object in automatic function is not "
-       "permitted",
-       Subclause("13.4.2")},
-      diag_);
-}
-
-static bool IsProgramSubroutineCallExpr(
-    const Expr* e, const std::unordered_set<std::string_view>& program_names) {
-  if (!e || e->kind != ExprKind::kCall) return false;
-  const Expr* callee = e->lhs;
-  if (!callee || callee->kind != ExprKind::kMemberAccess) return false;
-  auto leftmost = HierRefLeftmost(callee);
-  return !leftmost.empty() && program_names.count(leftmost) > 0;
-}
-
-static void WalkExprForProgramCall(
-    const Expr* e, const std::unordered_set<std::string_view>& program_names,
-    DiagEngine& diag, SourceLoc loc) {
-  if (!e) return;
-  if (IsProgramSubroutineCallExpr(e, program_names)) {
-    diag.Error(loc,
-               "calling a program subroutine from within a design module is "
-               "not permitted",
-               Subclause("24.5"));
-  }
-  WalkExprForProgramCall(e->lhs, program_names, diag, loc);
-  WalkExprForProgramCall(e->rhs, program_names, diag, loc);
-  WalkExprForProgramCall(e->condition, program_names, diag, loc);
-  WalkExprForProgramCall(e->true_expr, program_names, diag, loc);
-  WalkExprForProgramCall(e->false_expr, program_names, diag, loc);
-  WalkExprForProgramCall(e->base, program_names, diag, loc);
-  WalkExprForProgramCall(e->index, program_names, diag, loc);
-  WalkExprForProgramCall(e->index_end, program_names, diag, loc);
-  WalkExprForProgramCall(e->with_expr, program_names, diag, loc);
-  WalkExprForProgramCall(e->repeat_count, program_names, diag, loc);
-  for (auto* arg : e->args)
-    WalkExprForProgramCall(arg, program_names, diag, loc);
-  for (auto* elem : e->elements)
-    WalkExprForProgramCall(elem, program_names, diag, loc);
-}
-
-static void WalkStmtForProgramCall(
-    const Stmt* s, const std::unordered_set<std::string_view>& program_names,
-    DiagEngine& diag) {
-  if (!s) return;
-  auto loc = s->range.start;
-  WalkExprForProgramCall(s->lhs, program_names, diag, loc);
-  WalkExprForProgramCall(s->rhs, program_names, diag, loc);
-  WalkExprForProgramCall(s->expr, program_names, diag, loc);
-  WalkExprForProgramCall(s->condition, program_names, diag, loc);
-  for (auto* sub : s->stmts) WalkStmtForProgramCall(sub, program_names, diag);
-  WalkStmtForProgramCall(s->then_branch, program_names, diag);
-  WalkStmtForProgramCall(s->else_branch, program_names, diag);
-  WalkStmtForProgramCall(s->body, program_names, diag);
-  WalkStmtForProgramCall(s->for_body, program_names, diag);
-  for (auto* init : s->for_inits)
-    WalkStmtForProgramCall(init, program_names, diag);
-  for (auto* step : s->for_steps)
-    WalkStmtForProgramCall(step, program_names, diag);
-  for (auto* fs : s->fork_stmts)
-    WalkStmtForProgramCall(fs, program_names, diag);
-  for (auto& ci : s->case_items)
-    WalkStmtForProgramCall(ci.body, program_names, diag);
-}
-
-void Elaborator::ValidateProgramSubroutineCall(const ModuleDecl* decl) {
-  if (program_inst_names_.empty()) return;
-  if (decl->decl_kind == ModuleDeclKind::kProgram) return;
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kContAssign) {
-      WalkExprForProgramCall(item->assign_lhs, program_inst_names_, diag_,
-                             item->loc);
-      WalkExprForProgramCall(item->assign_rhs, program_inst_names_, diag_,
-                             item->loc);
-    }
-    bool is_proc = IsProceduralItemKind(item->kind);
-    if (is_proc && item->body)
-      WalkStmtForProgramCall(item->body, program_inst_names_, diag_);
   }
 }
 

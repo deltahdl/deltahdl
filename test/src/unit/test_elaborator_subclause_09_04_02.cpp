@@ -204,4 +204,130 @@ TEST(EventControlElaboration,
                             5, "9.4.2"));
 }
 
+// §9.4.2 says "Event expressions shall return singular values" and puts no
+// condition on where the statement the event control precedes stands. A.6.4
+// makes a procedural_timing_control_statement a statement_item, so an event
+// control may be written in every position a statement holds a statement in,
+// and the clause's own example writes three of them inside a fork-join.
+// WalkStmtForEventSingular in
+// src/elaborator/elaborator_validate_subroutine_args.cpp had written out eight
+// of the thirteen child-statement links Stmt declares, and now takes the list
+// from ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The
+// cases below cover one newly reached position each.
+
+// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
+// block_item_declaration } { statement_or_null } join_keyword`, whose
+// statements the parser keeps in Stmt::fork_stmts. §9.4.2's own example puts
+// its event controls in exactly this position.
+TEST(EventControlElaboration, NonSingularEventExpressionInForkArmRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int arr[3];\n"
+      "  initial fork\n"
+      "    @(arr) ;\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "event expression references non-singular variable 'arr'", 4, "9.4.2"));
+}
+
+// A.6.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
+// next cover one arm each.
+TEST(EventControlElaboration,
+     NonSingularEventExpressionInAssertionPassStatementRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int arr[3];\n"
+      "  initial assert (1) @(arr) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "event expression references non-singular variable 'arr'", 3, "9.4.2"));
+}
+
+TEST(EventControlElaboration,
+     NonSingularEventExpressionInAssertionFailStatementRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int arr[3];\n"
+      "  initial assert (1) else @(arr) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "event expression references non-singular variable 'arr'", 3, "9.4.2"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, kept in
+// Stmt::randcase_items.
+TEST(EventControlElaboration,
+     NonSingularEventExpressionInRandcaseItemRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int arr[3];\n"
+      "  initial randcase\n"
+      "    1 : @(arr) ;\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "event expression references non-singular variable 'arr'", 4, "9.4.2"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements. The parser keeps them in RsProd::code_stmts, reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(EventControlElaboration,
+     NonSingularEventExpressionInRandsequenceCodeBlockRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int arr[3];\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { @(arr) ; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "event expression references non-singular variable 'arr'", 5, "9.4.2"));
+}
+
+// §18.17.1 lets a weight specification be followed by a code block of its own,
+// which the parser keeps in RsRule::weight_code. It is a second list under
+// Stmt::rs_productions, so a walk reaches it without reaching
+// RsProd::code_stmts and the case above does not answer for it.
+TEST(EventControlElaboration,
+     NonSingularEventExpressionInRandsequenceWeightCodeBlockRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int arr[3];\n"
+      "  int i;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : alt := 1 { @(arr) ; };\n"
+      "      alt : { i = 1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "event expression references non-singular variable 'arr'", 6, "9.4.2"));
+}
+
 }  // namespace

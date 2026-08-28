@@ -299,4 +299,133 @@ TEST(SubroutineCallElaboration, InoutArgSelectOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §13.5 restricts an output actual to an expression legal on the left-hand
+// side of a procedural assignment and says nothing about where the call
+// carrying it stands; A.6.4 makes a subroutine_call_statement a statement_item,
+// so every position a statement holds a statement in is a position the report
+// is owed at. WalkChildStmtsForCallArgs in
+// src/elaborator/elaborator_validate_subroutine_args.cpp had written out eight
+// of the thirteen child-statement links Stmt declares, and now takes the list
+// from ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The
+// cases below cover one newly reached position each.
+
+// A.6.3's par_block holds a list of statement_or_null between fork and its
+// join_keyword, which the parser keeps in Stmt::fork_stmts. §13.4.4 grants a
+// fork-join_none written inside a function "any statements that are legal
+// within a task", so a call in a fork arm is a call §13.5 governs.
+TEST(SubroutineCallElaboration, OutputArgLiteralInForkArmError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void foo(output int x);\n"
+      "    x = 1;\n"
+      "  endfunction\n"
+      "  initial fork\n"
+      "    foo(42);\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "output argument 'x' requires a variable", 6,
+                            "13.5"));
+}
+
+// A.6.3's action_block gives an immediate assertion a statement in each arm,
+// held in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
+// next cover one arm each.
+TEST(SubroutineCallElaboration, OutputArgLiteralInAssertionPassStatementError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void foo(output int x);\n"
+      "    x = 1;\n"
+      "  endfunction\n"
+      "  initial assert (1) foo(42);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "output argument 'x' requires a variable", 5,
+                            "13.5"));
+}
+
+TEST(SubroutineCallElaboration, OutputArgLiteralInAssertionFailStatementError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void foo(output int x);\n"
+      "    x = 1;\n"
+      "  endfunction\n"
+      "  initial assert (1) else foo(42);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "output argument 'x' requires a variable", 5,
+                            "13.5"));
+}
+
+// §18.16's `randcase_item ::= expression : statement_or_null` puts a statement
+// after each weight, held in Stmt::randcase_items.
+TEST(SubroutineCallElaboration, OutputArgLiteralInRandcaseItemError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void foo(output int x);\n"
+      "    x = 1;\n"
+      "  endfunction\n"
+      "  initial randcase\n"
+      "    1 : foo(42);\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "output argument 'x' requires a variable", 6,
+                            "13.5"));
+}
+
+// A.6.12's rs_code_block holds procedural statements, which the parser keeps in
+// RsProd::code_stmts under Stmt::rs_productions.
+TEST(SubroutineCallElaboration, OutputArgLiteralInRandsequenceCodeBlockError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void foo(output int x);\n"
+      "    x = 1;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { foo(42); };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "output argument 'x' requires a variable", 7,
+                            "13.5"));
+}
+
+// §18.17.1 admits a code block after a rule's weight specification, kept in
+// RsRule::weight_code. That is a second statement list under
+// Stmt::rs_productions, reached by a different member from the case above.
+TEST(SubroutineCallElaboration,
+     OutputArgLiteralInRandsequenceWeightCodeBlockError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void foo(output int x);\n"
+      "    x = 1;\n"
+      "  endfunction\n"
+      "  int y;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : alt := 1 { foo(42); };\n"
+      "      alt : { y = 1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "output argument 'x' requires a variable", 8,
+                            "13.5"));
+}
+
 }  // namespace

@@ -9,6 +9,7 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
@@ -468,6 +469,29 @@ void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
   mod->processes.push_back(proc);
 }
 
+// Collects the longest static prefix (§11.5.3) of every assignment target
+// written in `stmt` or in any statement nested inside it.
+//
+// §9.2.2.2 states its rule of "the variables assigned on the left-hand side of
+// assignments" and §10.3.2 of "any procedural assignment"; neither puts a
+// condition on which statement the assignment stands in, so every position a
+// statement holds a statement in is a position this collection reaches.
+//
+// This is a collector, so a position it does not reach costs a name rather than
+// a report. The callers below compare the names gathered here against each
+// other and against the continuous-assignment targets, and a name that was
+// never gathered overlaps nothing: a variable assigned only in the unreached
+// position stays absent from every set, so §9.2.2.2's "shall not be assigned by
+// any other process" and §10.3.2's "It shall be an error for a variable driven
+// by a continuous assignment or output to have ... any procedural assignment"
+// both pass it in silence, however many drivers it has. The unreached position
+// is an exemption from the single-driver rule rather than a missing diagnostic.
+//
+// ForEachChildStmt in elaborator_validate_internal.h states those positions
+// once for the whole elaborator, which is why the list is not written out again
+// here. The visitor takes `Stmt* const&` because `stmt` is a `const Stmt*`,
+// which is how ForEachChildStmt lets a walk that only reads the tree share its
+// list with the walks that rewrite it.
 static void CollectStmtLhsPrefixes(const Stmt* stmt,
                                    std::unordered_set<std::string>& out,
                                    const ScopeMap& scope) {
@@ -486,16 +510,8 @@ static void CollectStmtLhsPrefixes(const Stmt* stmt,
       if (!prefix.empty()) out.insert(std::move(prefix));
     }
   }
-  for (const auto* s : stmt->stmts) CollectStmtLhsPrefixes(s, out, scope);
-  CollectStmtLhsPrefixes(stmt->then_branch, out, scope);
-  CollectStmtLhsPrefixes(stmt->else_branch, out, scope);
-  CollectStmtLhsPrefixes(stmt->body, out, scope);
-  CollectStmtLhsPrefixes(stmt->for_body, out, scope);
-  for (auto* fi : stmt->for_inits) CollectStmtLhsPrefixes(fi, out, scope);
-  for (auto* fs : stmt->for_steps) CollectStmtLhsPrefixes(fs, out, scope);
-  for (const auto& ci : stmt->case_items)
-    CollectStmtLhsPrefixes(ci.body, out, scope);
-  for (const auto* s : stmt->fork_stmts) CollectStmtLhsPrefixes(s, out, scope);
+  ForEachChildStmt(
+      stmt, [&](Stmt* const& sub) { CollectStmtLhsPrefixes(sub, out, scope); });
 }
 
 static void CollectCallNamesExpr(const Expr* expr,
@@ -514,6 +530,24 @@ static void CollectCallNamesExpr(const Expr* expr,
   for (auto* elem : expr->elements) CollectCallNamesExpr(elem, out);
 }
 
+// Collects the name of every subroutine called from `stmt` or from any
+// statement nested inside it. §9.2.2.2 counts a variable assigned inside a
+// function the procedure calls as assigned by the procedure itself, and states
+// no condition on where in the procedure the call is written, so every position
+// a statement holds a statement in is a position a call reaches the rule from.
+//
+// This is a collector, so a position it does not reach costs a name rather than
+// a report. CollectFuncLhsPrefixes below takes the names gathered here, and no
+// others, as the roots of its search of the function bodies; a function called
+// only from an unreached position is therefore never opened, its assignment
+// targets never join the procedure's own, and the variables it assigns are
+// exempt from §9.2.2.2's "shall not be assigned by any other process" however
+// many other processes assign them. The same holds one level down, since the
+// closure re-enters this walk over each function body it does open.
+//
+// ForEachChildStmt in elaborator_validate_internal.h states those positions
+// once for the whole elaborator, which is why the list is not written out again
+// here.
 static void CollectCallNamesStmt(const Stmt* stmt,
                                  std::unordered_set<std::string_view>& out) {
   if (!stmt) return;
@@ -521,15 +555,8 @@ static void CollectCallNamesStmt(const Stmt* stmt,
   CollectCallNamesExpr(stmt->rhs, out);
   CollectCallNamesExpr(stmt->condition, out);
   CollectCallNamesExpr(stmt->for_cond, out);
-  for (const auto* s : stmt->stmts) CollectCallNamesStmt(s, out);
-  CollectCallNamesStmt(stmt->then_branch, out);
-  CollectCallNamesStmt(stmt->else_branch, out);
-  CollectCallNamesStmt(stmt->body, out);
-  CollectCallNamesStmt(stmt->for_body, out);
-  for (auto* fi : stmt->for_inits) CollectCallNamesStmt(fi, out);
-  for (auto* fs : stmt->for_steps) CollectCallNamesStmt(fs, out);
-  for (const auto& ci : stmt->case_items) CollectCallNamesStmt(ci.body, out);
-  for (const auto* s : stmt->fork_stmts) CollectCallNamesStmt(s, out);
+  ForEachChildStmt(stmt,
+                   [&](Stmt* const& sub) { CollectCallNamesStmt(sub, out); });
 }
 
 static void CollectFuncLhsPrefixes(const Stmt* body, const FuncMap& funcs,

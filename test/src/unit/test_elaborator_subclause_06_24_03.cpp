@@ -285,4 +285,169 @@ TEST(BitStreamCastElaboration, StreamSourceMatchingUnpackedDestinationWidthOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §6.24.3 makes a bit-stream cast between fixed-size types of different sizes
+// illegal when either is unpacked, and names no statement the cast is allowed
+// to stand in, so every position a statement holds a statement in is one the
+// report reaches. ElaboratorOperationRules::WalkStmtsForBitStreamCast in
+// src/elaborator/elaborator_validate_operations_streaming.cpp had written out
+// six of the thirteen child-statement links Stmt declares and now takes the
+// list from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. The seven cases below stand in
+// the seven positions it was missing, each of which elaborated clean beforehand
+// with the illegal cast unreported. Each casts the same 24-bit unpacked array
+// to a 32-bit int that FixedSizeMismatchUnpackedRejected above establishes as
+// illegal in an initial-block statement.
+
+// A.6.3 gives `par_block ::= fork [ : block_identifier ]
+// { block_item_declaration } { statement_or_null } join_keyword ...`, so a fork
+// holds statements the way a begin-end block does. The parser keeps them in
+// Stmt::fork_stmts rather than in Stmt::stmts.
+TEST(BitStreamCastElaboration, FixedSizeMismatchInAForkStatementRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  byte arr [3];\n"
+      "  int result;\n"
+      "  initial fork\n"
+      "    result = int'(arr);\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-stream cast between fixed-size types of "
+                            "different sizes (24 bits to 32 bits) with an "
+                            "unpacked operand is illegal",
+                            5, "6.24.3"));
+}
+
+// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`, so
+// the loop header holds assignments of its own, kept in Stmt::for_inits.
+TEST(BitStreamCastElaboration, FixedSizeMismatchInAForInitializerRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  byte arr [3];\n"
+      "  int result;\n"
+      "  int i;\n"
+      "  initial\n"
+      "    for (result = int'(arr); i < 1; i = i + 1)\n"
+      "      i = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-stream cast between fixed-size types of "
+                            "different sizes (24 bits to 32 bits) with an "
+                            "unpacked operand is illegal",
+                            6, "6.24.3"));
+}
+
+// A.6.8's `for_step_assignment ::= operator_assignment | ...` is the same rule
+// at the other end of the loop header, kept in Stmt::for_steps. The initializer
+// here assigns a constant, so the report can only be about the step.
+TEST(BitStreamCastElaboration, FixedSizeMismatchInAForStepRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  byte arr [3];\n"
+      "  int result;\n"
+      "  int i;\n"
+      "  initial\n"
+      "    for (i = 0; i < 1; result = int'(arr))\n"
+      "      i = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-stream cast between fixed-size types of "
+                            "different sizes (24 bits to 32 bits) with an "
+                            "unpacked operand is illegal",
+                            6, "6.24.3"));
+}
+
+// A.6.10 gives `simple_immediate_assert_statement ::= assert ( expression )
+// action_block` and §16.3 gives `action_block ::= statement_or_null |
+// [ statement ] else statement_or_null`, so the pass arm of an immediate
+// assertion holds an ordinary statement, kept in Stmt::assert_pass_stmt.
+TEST(BitStreamCastElaboration,
+     FixedSizeMismatchInAnAssertionPassStatementRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  byte arr [3];\n"
+      "  int result;\n"
+      "  logic ok;\n"
+      "  initial assert (ok) result = int'(arr);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-stream cast between fixed-size types of "
+                            "different sizes (24 bits to 32 bits) with an "
+                            "unpacked operand is illegal",
+                            5, "6.24.3"));
+}
+
+// The else arm of the same production, kept in Stmt::assert_fail_stmt, a link
+// the pass-arm case above does not reach.
+TEST(BitStreamCastElaboration,
+     FixedSizeMismatchInAnAssertionFailStatementRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  byte arr [3];\n"
+      "  int result;\n"
+      "  logic armed;\n"
+      "  initial assert (armed) else result = int'(arr);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-stream cast between fixed-size types of "
+                            "different sizes (24 bits to 32 bits) with an "
+                            "unpacked operand is illegal",
+                            5, "6.24.3"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
+// randcase holds a statement per item, kept in Stmt::randcase_items. §6.24.3
+// judges the cast rather than whether it runs, so the report stands whether the
+// weighted draw would select the item or not.
+TEST(BitStreamCastElaboration, FixedSizeMismatchInARandcaseItemRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  byte arr [3];\n"
+      "  int result;\n"
+      "  initial randcase 1: result = int'(arr); endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-stream cast between fixed-size types of "
+                            "different sizes (24 bits to 32 bits) with an "
+                            "unpacked operand is illegal",
+                            4, "6.24.3"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements, kept in RsProd::code_stmts and reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(BitStreamCastElaboration,
+     FixedSizeMismatchInARandsequenceCodeBlockRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  byte arr [3];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { result = int'(arr); };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-stream cast between fixed-size types of "
+                            "different sizes (24 bits to 32 bits) with an "
+                            "unpacked operand is illegal",
+                            6, "6.24.3"));
+}
+
 }  // namespace

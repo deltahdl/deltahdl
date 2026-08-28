@@ -5,6 +5,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -287,6 +288,14 @@ static void CheckEventExprSingular(
     CheckEventExprSingular(e, non_singular_vars, non_singular_funcs, diag);
 }
 
+// §9.4.2 requires an event expression to return a singular value and puts no
+// condition on where the statement carrying the event control stands; A.6.4
+// makes a procedural_timing_control_statement a statement_item, and the
+// clause's own example writes three event controls inside a fork-join. Every
+// position a statement holds a statement in is therefore one this check is owed
+// at, and ForEachChildStmt in elaborator_validate_internal.h states those
+// positions once for the whole elaborator. It hands the visitor the field
+// itself, so a walk that only reads the tree takes a `Stmt* const&`.
 static void WalkStmtForEventSingular(
     const Stmt* s,
     const std::unordered_set<std::string_view>& non_singular_vars,
@@ -301,23 +310,9 @@ static void WalkStmtForEventSingular(
                              non_singular_funcs, diag);
     }
   }
-  for (auto* sub : s->stmts)
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtForEventSingular(sub, non_singular_vars, non_singular_funcs, diag);
-  WalkStmtForEventSingular(s->then_branch, non_singular_vars,
-                           non_singular_funcs, diag);
-  WalkStmtForEventSingular(s->else_branch, non_singular_vars,
-                           non_singular_funcs, diag);
-  WalkStmtForEventSingular(s->body, non_singular_vars, non_singular_funcs,
-                           diag);
-  for (auto* fi : s->for_inits)
-    WalkStmtForEventSingular(fi, non_singular_vars, non_singular_funcs, diag);
-  WalkStmtForEventSingular(s->for_body, non_singular_vars, non_singular_funcs,
-                           diag);
-  for (auto* fs : s->for_steps)
-    WalkStmtForEventSingular(fs, non_singular_vars, non_singular_funcs, diag);
-  for (auto& ci : s->case_items)
-    WalkStmtForEventSingular(ci.body, non_singular_vars, non_singular_funcs,
-                             diag);
+  });
 }
 
 static void CheckCallNoOutInoutRefInExpr(
@@ -460,7 +455,14 @@ static void WalkStmtForCallArgs(
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
     const std::unordered_set<std::string_view>& net_names, DiagEngine& diag);
 
-// Recurse into every substatement / sub-expression of `s`.
+// Recurse into every substatement and sub-expression of `s`. A.6.4 makes a
+// subroutine_call_statement a statement_item and none of §13.5, §13.5.2,
+// §13.5.3, §13.5.4, §13.5.5, §13.4.1, §13.4 or §9.4.2 conditions its rule on
+// where the call stands, so every position a statement holds a statement in is
+// one these reports are owed at; §13.4.4 settles the fork arms, a fork-join
+// inside a function holding any statement legal within a task. ForEachChildStmt
+// in elaborator_validate_internal.h states those positions once for the whole
+// elaborator, which is why the list is not written out again here.
 static void WalkChildStmtsForCallArgs(
     const Stmt* s,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -469,19 +471,10 @@ static void WalkChildStmtsForCallArgs(
   WalkExprForCallArgs(s->lhs, func_decls, net_names, diag);
   WalkExprForCallArgs(s->rhs, func_decls, net_names, diag);
   WalkExprForCallArgs(s->condition, func_decls, net_names, diag);
-  for (auto* sub : s->stmts)
-    WalkStmtForCallArgs(sub, func_decls, net_names, diag);
-  WalkStmtForCallArgs(s->then_branch, func_decls, net_names, diag);
-  WalkStmtForCallArgs(s->else_branch, func_decls, net_names, diag);
-  WalkStmtForCallArgs(s->body, func_decls, net_names, diag);
-  for (auto* fi : s->for_inits)
-    WalkStmtForCallArgs(fi, func_decls, net_names, diag);
-  WalkStmtForCallArgs(s->for_body, func_decls, net_names, diag);
-  for (auto* fs : s->for_steps)
-    WalkStmtForCallArgs(fs, func_decls, net_names, diag);
   WalkExprForCallArgs(s->for_cond, func_decls, net_names, diag);
-  for (auto& ci : s->case_items)
-    WalkStmtForCallArgs(ci.body, func_decls, net_names, diag);
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    WalkStmtForCallArgs(sub, func_decls, net_names, diag);
+  });
 }
 
 static void WalkStmtForCallArgs(
@@ -573,6 +566,12 @@ static void CheckScopeRandomizeRulesInExpr(const Expr* expr, DiagEngine& diag) {
   for (const auto* e : expr->elements) CheckScopeRandomizeRulesInExpr(e, diag);
 }
 
+// Footnote 43 of A.8.2 bars `null` and a parenthesized identifier list from a
+// scope randomize_call wherever the call is written, and A.6.4 makes a
+// subroutine_call_statement a statement_item, so every position a statement
+// holds a statement in is one this walk is owed at. ForEachChildStmt in
+// elaborator_validate_internal.h states those positions once for the whole
+// elaborator, which is why the list is not written out again here.
 static void WalkStmtForScopeRandomize(const Stmt* s, DiagEngine& diag) {
   if (!s) return;
   CheckScopeRandomizeRulesInExpr(s->expr, diag);
@@ -580,14 +579,8 @@ static void WalkStmtForScopeRandomize(const Stmt* s, DiagEngine& diag) {
   CheckScopeRandomizeRulesInExpr(s->rhs, diag);
   CheckScopeRandomizeRulesInExpr(s->condition, diag);
   CheckScopeRandomizeRulesInExpr(s->for_cond, diag);
-  for (const auto* sub : s->stmts) WalkStmtForScopeRandomize(sub, diag);
-  WalkStmtForScopeRandomize(s->then_branch, diag);
-  WalkStmtForScopeRandomize(s->else_branch, diag);
-  WalkStmtForScopeRandomize(s->body, diag);
-  for (const auto* fi : s->for_inits) WalkStmtForScopeRandomize(fi, diag);
-  WalkStmtForScopeRandomize(s->for_body, diag);
-  for (const auto* fs : s->for_steps) WalkStmtForScopeRandomize(fs, diag);
-  for (const auto& ci : s->case_items) WalkStmtForScopeRandomize(ci.body, diag);
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { WalkStmtForScopeRandomize(sub, diag); });
 }
 
 // Builds a name→decl map of all callable subroutines (the elaborator's known
@@ -894,6 +887,12 @@ void CheckMailboxCallExpr(
     CheckMailboxCallExpr(el, mbx_elem, var_kinds, diag);
 }
 
+// §15.4.9 puts no condition on where the parameterized-mailbox method call it
+// type-checks stands, and A.6.4 makes a subroutine_call_statement a
+// statement_item, so every position a statement holds a statement in is one the
+// report is owed at. ForEachChildStmt in elaborator_validate_internal.h states
+// those positions once for the whole elaborator, which is why the list is not
+// written out again here.
 void CheckMailboxCallStmt(
     const Stmt* s,
     const std::unordered_map<std::string_view, DataTypeKind>& mbx_elem,
@@ -905,20 +904,9 @@ void CheckMailboxCallStmt(
   CheckMailboxCallExpr(s->rhs, mbx_elem, var_kinds, diag);
   CheckMailboxCallExpr(s->condition, mbx_elem, var_kinds, diag);
   CheckMailboxCallExpr(s->for_cond, mbx_elem, var_kinds, diag);
-  for (auto* sub : s->stmts)
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     CheckMailboxCallStmt(sub, mbx_elem, var_kinds, diag);
-  CheckMailboxCallStmt(s->then_branch, mbx_elem, var_kinds, diag);
-  CheckMailboxCallStmt(s->else_branch, mbx_elem, var_kinds, diag);
-  CheckMailboxCallStmt(s->body, mbx_elem, var_kinds, diag);
-  for (auto* fi : s->for_inits)
-    CheckMailboxCallStmt(fi, mbx_elem, var_kinds, diag);
-  CheckMailboxCallStmt(s->for_body, mbx_elem, var_kinds, diag);
-  for (auto* fs : s->for_steps)
-    CheckMailboxCallStmt(fs, mbx_elem, var_kinds, diag);
-  for (auto* fk : s->fork_stmts)
-    CheckMailboxCallStmt(fk, mbx_elem, var_kinds, diag);
-  for (auto& ci : s->case_items)
-    CheckMailboxCallStmt(ci.body, mbx_elem, var_kinds, diag);
+  });
 }
 
 }  // namespace

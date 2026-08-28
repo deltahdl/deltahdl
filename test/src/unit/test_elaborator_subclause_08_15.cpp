@@ -326,4 +326,189 @@ TEST(SuperElaboration, StaticInitConstantOk) {
              "endmodule\n"));
 }
 
+// The six cases below cover the child-statement links of Stmt that the §8.15
+// walk in src/elaborator/elaborator_validate_class_members.cpp reaches for the
+// first time now that CheckStmtConstantContexts takes its list from
+// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. That walk
+// had written out seven of the thirteen links, so a declaration standing in one
+// of the other six was never looked at and its initializer and its unpacked
+// dimensions were exempt from the clause.
+//
+// Each source below declares `int a[super.P]` in one such position. §7.4.2
+// requires a fixed-size unpacked dimension to be a constant expression, and
+// §8.15's last sentence bars reaching a base class value parameter through
+// 'super' where a constant expression is required, so the declaration is
+// rejected wherever it stands. The report stands at the `super.P` expression,
+// which CheckConstExprForSuperParam locates from Expr::range.
+//
+// Stmt::for_steps is the seventh link the walk gains and takes no case. A.6.8
+// gives `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
+// function_subroutine_call`, and none of the three declares a variable, so no
+// conforming source puts a declaration there for this rule to read.
+
+// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
+// block_item_declaration } { statement_or_null } join_keyword`, so a fork holds
+// declarations of its own, which Parser::ParseBlockVarDecls in
+// src/parser/parser_stmt_block.cpp puts in Stmt::fork_stmts beside the
+// statements. §13.4.4 admits the fork-join_none form inside a function.
+TEST(SuperElaboration, SuperValueParamInAForkArmDeclarationNames8_15) {
+  ElabFixture f;
+  ElabOk(
+      "class Base #(parameter int P = 4);\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  function int f();\n"
+      "    fork\n"
+      "      int a[super.P];\n"
+      "    join_none\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Derived d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "expression using 'super' to access base class "
+                            "value parameter 'P' is not a constant expression",
+                            6, "8.15"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
+// next cover one arm each.
+TEST(SuperElaboration, SuperValueParamInAnAssertionPassStmtNames8_15) {
+  ElabFixture f;
+  ElabOk(
+      "class Base #(parameter int P = 4);\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  function int f();\n"
+      "    assert (1) begin\n"
+      "      int a[super.P];\n"
+      "    end\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Derived d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "expression using 'super' to access base class "
+                            "value parameter 'P' is not a constant expression",
+                            6, "8.15"));
+}
+
+TEST(SuperElaboration, SuperValueParamInAnAssertionFailStmtNames8_15) {
+  ElabFixture f;
+  ElabOk(
+      "class Base #(parameter int P = 4);\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  function int f();\n"
+      "    assert (1) else begin\n"
+      "      int a[super.P];\n"
+      "    end\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Derived d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "expression using 'super' to access base class "
+                            "value parameter 'P' is not a constant expression",
+                            6, "8.15"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
+// statement the parser keeps in the second member of a Stmt::randcase_items
+// entry. §8.15 is a rule about the source, so it holds whether the weighted
+// draw would select the item or not.
+TEST(SuperElaboration, SuperValueParamInARandcaseItemNames8_15) {
+  ElabFixture f;
+  ElabOk(
+      "class Base #(parameter int P = 4);\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  function int f();\n"
+      "    randcase\n"
+      "      1 : begin\n"
+      "        int a[super.P];\n"
+      "      end\n"
+      "    endcase\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Derived d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "expression using 'super' to access base class "
+                            "value parameter 'P' is not a constant expression",
+                            7, "8.15"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds a declaration directly.
+// Parser::ParseRsCodeBlockStmts in src/parser/parser_verify.cpp puts it in
+// RsProd::code_stmts, reached through Stmt::rs_productions and through no other
+// member of Stmt.
+TEST(SuperElaboration, SuperValueParamInARandsequenceCodeBlockNames8_15) {
+  ElabFixture f;
+  ElabOk(
+      "class Base #(parameter int P = 4);\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  function int f();\n"
+      "    randsequence(main)\n"
+      "      main : { int a[super.P]; };\n"
+      "    endsequence\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Derived d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "expression using 'super' to access base class "
+                            "value parameter 'P' is not a constant expression",
+                            6, "8.15"));
+}
+
+// A.6.12's `rs_rule ::= rs_production_list [ := weight_specification [
+// rs_code_block ] ]` puts a second code block after the weight, which the
+// parser keeps in RsRule::weight_code rather than in RsProd::code_stmts. It is
+// a second statement position under Stmt::rs_productions, so it gets its own
+// case: the production `alt` below holds a null statement, which leaves the
+// weight block as the only place the declaration stands.
+TEST(SuperElaboration, SuperValueParamInARandsequenceWeightCodeBlockNames8_15) {
+  ElabFixture f;
+  ElabOk(
+      "class Base #(parameter int P = 4);\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  function int f();\n"
+      "    randsequence(main)\n"
+      "      main : alt := 5 { int a[super.P]; };\n"
+      "      alt : { ; };\n"
+      "    endsequence\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Derived d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "expression using 'super' to access base class "
+                            "value parameter 'P' is not a constant expression",
+                            6, "8.15"));
+}
+
 }  // namespace

@@ -160,4 +160,122 @@ TEST(BitsCallRestrictions, BitsOnInterfaceClassObjectIsError) {
       "20.6.2"));
 }
 
+// §20.6.2 says "It shall be an error to: -- Use the $bits system function
+// directly with a dynamically sized data type identifier", and states no
+// condition on where the call stands. So the error is owed wherever a statement
+// can be written, and the five cases below each put the call in one statement
+// position of a module whose 'qt' is a queue typedef.
+//
+// Each of those five is a position
+// Elaborator::ValidateBitsCallRestrictions reached only once CheckBitsCallStmt
+// in src/elaborator/elaborator_validate_queries_dims.cpp took its list of
+// nested statements from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. Every one of them elaborated
+// clean beforehand, leaving a $bits applied to a type with no defined extent
+// unreported.
+
+// A.6.8 gives `for_step_assignment ::= operator_assignment |
+// inc_or_dec_expression | function_subroutine_call`, and A.6.2's
+// operator_assignment is `variable_lvalue assignment_operator expression`, so
+// the loop's third header clause holds a statement of its own, kept in
+// Stmt::for_steps. The initializer here assigns a constant, so the report can
+// only name the call in the step.
+TEST(BitsCallRestrictions, BitsOnQueueTypedefInAForStepIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  typedef byte qt[$];\n"
+      "  int n;\n"
+      "  int i;\n"
+      "  initial\n"
+      "    for (i = 0; i < 1; n = $bits(qt))\n"
+      "      n = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'$bits' cannot be applied directly to dynamically sized type 'qt'", 6,
+      "20.6.2"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case covers
+// the pass arm and the one below it the fail arm.
+TEST(BitsCallRestrictions,
+     BitsOnQueueTypedefInAnAssertionPassStatementIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  typedef byte qt[$];\n"
+      "  int n;\n"
+      "  logic ok;\n"
+      "  initial assert (ok) n = $bits(qt);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'$bits' cannot be applied directly to dynamically sized type 'qt'", 5,
+      "20.6.2"));
+}
+
+TEST(BitsCallRestrictions,
+     BitsOnQueueTypedefInAnAssertionFailStatementIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  typedef byte qt[$];\n"
+      "  int c;\n"
+      "  logic pass;\n"
+      "  initial assert (pass) else c = $bits(qt);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'$bits' cannot be applied directly to dynamically sized type 'qt'", 5,
+      "20.6.2"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
+// randcase holds a statement per item, kept in Stmt::randcase_items. §20.6.2's
+// error is a static one, so it stands whether the weighted draw would select
+// the item or not.
+TEST(BitsCallRestrictions, BitsOnQueueTypedefInARandcaseItemIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  typedef byte qt[$];\n"
+      "  int total;\n"
+      "  initial randcase 1: total = $bits(qt); endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'$bits' cannot be applied directly to dynamically sized type 'qt'", 4,
+      "20.6.2"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements, kept in RsProd::code_stmts and reached through
+// Stmt::rs_productions.
+TEST(BitsCallRestrictions, BitsOnQueueTypedefInARandsequenceCodeBlockIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  typedef byte qt[$];\n"
+      "  int width;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { width = $bits(qt); };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'$bits' cannot be applied directly to dynamically sized type 'qt'", 6,
+      "20.6.2"));
+}
+
 }  // namespace

@@ -6,6 +6,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -387,6 +388,26 @@ static void WalkExprForArrayArgTypes(const Expr* expr,
   for (auto* e : expr->elements) WalkExprForArrayArgTypes(e, ctx);
 }
 
+// §7.9.10 puts no condition on where the call whose argument it governs is
+// written: it says an associative array can be passed only to an associative
+// formal of a compatible type and with the same index type, and says nothing
+// about the statement the call stands in. §13.5 makes a task or void function
+// call a statement of a procedural block, and A.6.9's
+// subroutine_call_statement is a statement, so such a call may appear in every
+// position a statement holds a statement in and the check is owed at each of
+// them.
+//
+// ForEachChildStmt in elaborator_validate_internal.h states those positions,
+// once for the whole elaborator, which is why the list is not written out
+// again here. It hands the visitor the field itself, so a walker that only
+// reads the tree takes a `Stmt* const&`.
+//
+// Stmt::fork_stmts is descended into deliberately. A.6.3's par_block admits a
+// statement_or_null in each arm, and neither §7.9.10 nor §13.5 makes argument
+// compatibility depend on the process the call runs in, so a call in a fork
+// arm binds its actuals to the same formals as one written beside the fork.
+// That is what separates this rule from §13.4.4, which asks what a function
+// body may schedule and so turns on whether the fork is there at all.
 static void WalkStmtForArrayArgTypes(const Stmt* s,
                                      const ArrayArgTypeCtx& ctx) {
   if (!s) return;
@@ -394,15 +415,9 @@ static void WalkStmtForArrayArgTypes(const Stmt* s,
   WalkExprForArrayArgTypes(s->lhs, ctx);
   WalkExprForArrayArgTypes(s->rhs, ctx);
   WalkExprForArrayArgTypes(s->condition, ctx);
-  for (auto* sub : s->stmts) WalkStmtForArrayArgTypes(sub, ctx);
-  WalkStmtForArrayArgTypes(s->then_branch, ctx);
-  WalkStmtForArrayArgTypes(s->else_branch, ctx);
-  WalkStmtForArrayArgTypes(s->body, ctx);
-  for (auto* fi : s->for_inits) WalkStmtForArrayArgTypes(fi, ctx);
-  WalkStmtForArrayArgTypes(s->for_body, ctx);
-  for (auto* fs : s->for_steps) WalkStmtForArrayArgTypes(fs, ctx);
   WalkExprForArrayArgTypes(s->for_cond, ctx);
-  for (auto& ci : s->case_items) WalkStmtForArrayArgTypes(ci.body, ctx);
+  ForEachChildStmt(
+      s, [&ctx](Stmt* const& sub) { WalkStmtForArrayArgTypes(sub, ctx); });
 }
 
 void Elaborator::ValidateArrayArgTypes(const ModuleDecl* decl) {

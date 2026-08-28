@@ -5,6 +5,7 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -61,22 +62,22 @@ static bool StmtRefsThisOrSuper(const Stmt* s) {
   return false;
 }
 
+// §8.10 bars a static method from accessing a non-static member, and a name a
+// statement declares is not a member, so it shadows one wherever the
+// declaration stands. This collection therefore reaches every position
+// ForEachChildStmt in elaborator_validate_internal.h names. Stmt::for_steps is
+// descended and holds no name to collect: A.6.8 admits in it an
+// operator_assignment, an inc_or_dec_expression or a call and nothing else.
 static void CollectLocalNames(const Stmt* s,
                               std::unordered_set<std::string_view>& out) {
   if (!s) return;
   if (s->kind == StmtKind::kVarDecl && !s->var_name.empty()) {
     out.insert(s->var_name);
   }
-  for (auto* fi : s->for_inits) CollectLocalNames(fi, out);
   for (auto v : s->foreach_vars) {
     if (!v.empty()) out.insert(v);
   }
-  for (auto* sub : s->stmts) CollectLocalNames(sub, out);
-  CollectLocalNames(s->then_branch, out);
-  CollectLocalNames(s->else_branch, out);
-  CollectLocalNames(s->body, out);
-  CollectLocalNames(s->for_body, out);
-  for (auto& ci : s->case_items) CollectLocalNames(ci.body, out);
+  ForEachChildStmt(s, [&](Stmt* const& sub) { CollectLocalNames(sub, out); });
 }
 
 static bool ExprRefsNonStaticMember(
@@ -116,17 +117,17 @@ static bool StmtRefsNonStaticMember(
   if (ExprRefsNonStaticMember(s->rhs, non_static, locals)) return true;
   if (ExprRefsNonStaticMember(s->expr, non_static, locals)) return true;
   if (ExprRefsNonStaticMember(s->condition, non_static, locals)) return true;
-  for (auto* sub : s->stmts) {
-    if (StmtRefsNonStaticMember(sub, non_static, locals)) return true;
-  }
-  if (StmtRefsNonStaticMember(s->then_branch, non_static, locals)) return true;
-  if (StmtRefsNonStaticMember(s->else_branch, non_static, locals)) return true;
-  if (StmtRefsNonStaticMember(s->body, non_static, locals)) return true;
-  if (StmtRefsNonStaticMember(s->for_body, non_static, locals)) return true;
-  for (auto& ci : s->case_items) {
-    if (StmtRefsNonStaticMember(ci.body, non_static, locals)) return true;
-  }
-  return false;
+  // §8.10 makes the access illegal "within the body of a static method" and
+  // names no position in that body where it is permitted, so this search looks
+  // at every position ForEachChildStmt in elaborator_validate_internal.h names.
+  // That list gives the visitor no way to stop, so the first hit is kept in
+  // `found` and the recursion runs only while `found` is false.
+  bool found = false;
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    if (found) return;
+    found = StmtRefsNonStaticMember(sub, non_static, locals);
+  });
+  return found;
 }
 
 // §8.10: "Access to non-static members or to the special this handle within
@@ -739,16 +740,15 @@ static void CheckStmtConstantContexts(const Stmt* s, const ClassDecl* cls,
       CheckConstExprForSuperParam(dim, cls, unit, diag);
     }
   }
-  for (const auto* fi : s->for_inits)
-    CheckStmtConstantContexts(fi, cls, unit, diag);
-  for (const auto* sub : s->stmts)
+  // §8.15 bars the reach through 'super' wherever a constant expression is
+  // required and puts no condition on the statement the declaration stands in,
+  // so this reaches every position ForEachChildStmt in
+  // elaborator_validate_internal.h names. Stmt::for_steps is descended and
+  // holds no declaration to check, A.6.8 admitting in it an
+  // operator_assignment, an inc_or_dec_expression or a call and nothing else.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     CheckStmtConstantContexts(sub, cls, unit, diag);
-  CheckStmtConstantContexts(s->then_branch, cls, unit, diag);
-  CheckStmtConstantContexts(s->else_branch, cls, unit, diag);
-  CheckStmtConstantContexts(s->body, cls, unit, diag);
-  CheckStmtConstantContexts(s->for_body, cls, unit, diag);
-  for (const auto& ci : s->case_items)
-    CheckStmtConstantContexts(ci.body, cls, unit, diag);
+  });
 }
 
 // §8.15: checks every method body of a derived class for a base class value

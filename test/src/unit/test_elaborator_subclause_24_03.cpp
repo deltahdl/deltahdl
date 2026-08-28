@@ -237,4 +237,103 @@ TEST(ProgramConstruct, AnonymousProgramHierRefToProgramIsError) {
                             6, "24.3"));
 }
 
+// §24.3 says "References to program signals from outside any program block
+// shall be an error" and puts no condition on where the reference is written,
+// so every position a statement holds a statement in is one the report reaches.
+// WalkStmtsForProgramRef in
+// src/elaborator/elaborator_validate_hier_refs.cpp had written out nine of
+// the thirteen child-statement links Stmt declares and now takes the
+// list from ForEachChildStmt in src/elaborator/elaborator_validate_internal.h.
+// The four cases below stand in the four positions it was missing, each of
+// which elaborated clean beforehand with the reference into the program left
+// unreported.
+
+// A.6.10 gives `simple_immediate_assert_statement ::= assert ( expression )
+// action_block` and §16.3 gives `action_block ::= statement_or_null |
+// [ statement ] else statement_or_null`, so the pass arm of an immediate
+// assertion holds an ordinary statement, kept in Stmt::assert_pass_stmt.
+TEST(ProgramConstruct, ProgramSignalRefInAnAssertionPassStatementIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  program p;\n"
+      "    int psig;\n"
+      "  endprogram\n"
+      "  int q;\n"
+      "  logic ok;\n"
+      "  initial assert (ok) q = p.psig;\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference to program signal from "
+                            "outside the program is not permitted",
+                            7, "24.3"));
+}
+
+// The else arm of the same production, kept in Stmt::assert_fail_stmt, a link
+// the pass-arm case above does not reach.
+TEST(ProgramConstruct, ProgramSignalRefInAnAssertionFailStatementIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  program pr;\n"
+      "    int level;\n"
+      "  endprogram\n"
+      "  int depth;\n"
+      "  logic armed;\n"
+      "  initial assert (armed) else depth = pr.level;\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference to program signal from "
+                            "outside the program is not permitted",
+                            7, "24.3"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
+// randcase holds a statement per item, kept in Stmt::randcase_items. §24.3
+// judges the name rather than what runs, so the report stands whether the
+// weighted draw would select the item or not.
+TEST(ProgramConstruct, ProgramSignalRefInARandcaseItemIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  program pk;\n"
+      "    int chosen;\n"
+      "  endprogram\n"
+      "  int taken;\n"
+      "  initial randcase 1: taken = pk.chosen; endcase\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference to program signal from "
+                            "outside the program is not permitted",
+                            6, "24.3"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements, kept in RsProd::code_stmts and reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(ProgramConstruct, ProgramSignalRefInARandsequenceCodeBlockIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  program ps;\n"
+      "    int sampled;\n"
+      "  endprogram\n"
+      "  int kept;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { kept = ps.sampled; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference to program signal from "
+                            "outside the program is not permitted",
+                            8, "24.3"));
+}
+
 }  // namespace

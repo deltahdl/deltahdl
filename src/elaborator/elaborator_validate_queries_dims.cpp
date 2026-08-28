@@ -103,6 +103,24 @@ void CheckBitsCallExpr(const Expr* e, const BitsDynamicNames& names,
   for (auto* el : e->elements) CheckBitsCallExpr(el, names, diag);
 }
 
+// §20.6.2 says "It shall be an error to: -- Use the $bits system function
+// directly with a dynamically sized data type identifier. -- Use the $bits
+// system function on an object of an interface class type", and says "It shall
+// be an error to enclose a function that returns a dynamically sized data
+// type". None of the three names a position the call is allowed to stand in, so
+// every position a statement holds a statement in is one such a call may be
+// written in and the check is owed at each of them.
+//
+// ForEachChildStmt in elaborator_validate_internal.h states those positions,
+// once for the whole elaborator, which is why the list is not written out again
+// here. It hands the visitor the field itself, so a walker that only reads the
+// tree takes a `Stmt* const&`.
+//
+// A.6.8 gives `for_step_assignment ::= operator_assignment |
+// inc_or_dec_expression | function_subroutine_call`, and A.6.2's
+// operator_assignment is `variable_lvalue assignment_operator expression`, so a
+// $bits call may stand in a for-loop step exactly as it may in the loop's
+// initializer.
 void CheckBitsCallStmt(const Stmt* s, const BitsDynamicNames& names,
                        DiagEngine& diag) {
   if (!s) return;
@@ -112,14 +130,8 @@ void CheckBitsCallStmt(const Stmt* s, const BitsDynamicNames& names,
   CheckBitsCallExpr(s->expr, names, diag);
   CheckBitsCallExpr(s->delay, names, diag);
   CheckBitsCallExpr(s->var_init, names, diag);
-  for (auto* sub : s->stmts) CheckBitsCallStmt(sub, names, diag);
-  for (auto* sub : s->fork_stmts) CheckBitsCallStmt(sub, names, diag);
-  CheckBitsCallStmt(s->then_branch, names, diag);
-  CheckBitsCallStmt(s->else_branch, names, diag);
-  CheckBitsCallStmt(s->body, names, diag);
-  CheckBitsCallStmt(s->for_body, names, diag);
-  for (auto* init : s->for_inits) CheckBitsCallStmt(init, names, diag);
-  for (auto& ci : s->case_items) CheckBitsCallStmt(ci.body, names, diag);
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { CheckBitsCallStmt(sub, names, diag); });
 }
 
 // §20.6.2 (NC12): the typedefs in the module whose declared unpacked dimensions
@@ -389,22 +401,26 @@ void CheckPartSelectBoundsExpr(const Expr* e, const PartSelectBoundsCtx& ctx) {
   for (const auto* el : e->elements) CheckPartSelectBoundsExpr(el, ctx);
 }
 
+// §11.5.1 says of a non-indexed part-select that "Both msb_expr and lsb_expr
+// shall be constant integer expressions" and that "The first expression shall
+// address a more significant bit than the second expression". It puts no
+// condition on where the select stands, and §11.5 makes a part-select an
+// operand, so every position a statement holds a statement in is one a
+// part-select may be written in and both rules are owed at each of them.
+//
+// ForEachChildStmt in elaborator_validate_internal.h states those positions,
+// once for the whole elaborator, which is why the list is not written out again
+// here. It hands the visitor the field itself, so a walker that only reads the
+// tree takes a `Stmt* const&`.
 void CheckPartSelectBoundsStmt(const Stmt* s, const PartSelectBoundsCtx& ctx) {
   if (!s) return;
   CheckPartSelectBoundsExpr(s->lhs, ctx);
   CheckPartSelectBoundsExpr(s->rhs, ctx);
   CheckPartSelectBoundsExpr(s->expr, ctx);
   CheckPartSelectBoundsExpr(s->condition, ctx);
-  for (const auto* c : s->stmts) CheckPartSelectBoundsStmt(c, ctx);
-  CheckPartSelectBoundsStmt(s->then_branch, ctx);
-  CheckPartSelectBoundsStmt(s->else_branch, ctx);
-  CheckPartSelectBoundsStmt(s->body, ctx);
-  for (const auto* fi : s->for_inits) CheckPartSelectBoundsStmt(fi, ctx);
-  CheckPartSelectBoundsStmt(s->for_body, ctx);
-  for (const auto* fs : s->for_steps) CheckPartSelectBoundsStmt(fs, ctx);
   CheckPartSelectBoundsExpr(s->for_cond, ctx);
-  for (const auto& ci : s->case_items) CheckPartSelectBoundsStmt(ci.body, ctx);
-  for (const auto* fs : s->fork_stmts) CheckPartSelectBoundsStmt(fs, ctx);
+  ForEachChildStmt(
+      s, [&ctx](Stmt* const& sub) { CheckPartSelectBoundsStmt(sub, ctx); });
 }
 
 // Folds a declaration's packed dimensions into `out`, outermost first. Returns

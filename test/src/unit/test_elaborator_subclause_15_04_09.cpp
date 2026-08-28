@@ -285,4 +285,110 @@ TEST(MailboxParameterizedElaborator, MismatchedPutInTaskBodyRejected) {
       "argument to mailbox method 'put' is not type-equivalent", 5, "15.4.9"));
 }
 
+// §15.4.9 has the compiler check a parameterized-mailbox method argument
+// against the element type and puts no condition on where the call stands;
+// A.6.4 makes a subroutine_call_statement a statement_item, so every position a
+// statement holds a statement in is a position the report is owed at.
+// CheckMailboxCallStmt in
+// src/elaborator/elaborator_validate_subroutine_args.cpp had written out nine
+// of the thirteen child-statement links Stmt declares, and now takes the list
+// from ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The
+// cases below cover one newly reached position each.
+
+// A.6.3's action_block gives an immediate assertion a statement in each arm,
+// held in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
+// next cover one arm each.
+TEST(MailboxParameterizedElaborator,
+     MismatchedPutInAssertionPassStatementRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  mailbox #(int) mb;\n"
+      "  string s;\n"
+      "  initial assert (1) mb.put(s);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "argument to mailbox method 'put' is not type-equivalent", 4, "15.4.9"));
+}
+
+TEST(MailboxParameterizedElaborator,
+     MismatchedPutInAssertionFailStatementRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  mailbox #(int) mb;\n"
+      "  string s;\n"
+      "  initial assert (1) else mb.put(s);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "argument to mailbox method 'put' is not type-equivalent", 4, "15.4.9"));
+}
+
+// §18.16's `randcase_item ::= expression : statement_or_null` puts a statement
+// after each weight, held in Stmt::randcase_items.
+TEST(MailboxParameterizedElaborator, MismatchedPutInRandcaseItemRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  mailbox #(int) mb;\n"
+      "  string s;\n"
+      "  initial randcase\n"
+      "    1 : mb.put(s);\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "argument to mailbox method 'put' is not type-equivalent", 5, "15.4.9"));
+}
+
+// A.6.12's rs_code_block holds procedural statements, which the parser keeps in
+// RsProd::code_stmts under Stmt::rs_productions.
+TEST(MailboxParameterizedElaborator,
+     MismatchedPutInRandsequenceCodeBlockRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  mailbox #(int) mb;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { mb.put(s); };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "argument to mailbox method 'put' is not type-equivalent", 6, "15.4.9"));
+}
+
+// §18.17.1 admits a code block after a rule's weight specification, kept in
+// RsRule::weight_code. That is a second statement list under
+// Stmt::rs_productions, reached by a different member from the case above.
+TEST(MailboxParameterizedElaborator,
+     MismatchedPutInRandsequenceWeightCodeBlockRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  mailbox #(int) mb;\n"
+      "  string s;\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : alt := 1 { mb.put(s); };\n"
+      "      alt : { n = 1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "argument to mailbox method 'put' is not type-equivalent", 7, "15.4.9"));
+}
+
 }  // namespace

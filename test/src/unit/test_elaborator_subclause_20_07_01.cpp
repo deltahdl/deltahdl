@@ -253,4 +253,125 @@ TEST(ArrayQueryVariableDim, SizeOfDynamicInnerDimensionNames20_7_1) {
                             4, "20.7.1"));
 }
 
+// §20.7.1 says that when a §20.7 query function is "called with arguments (v,
+// n) where v denotes some array variable and n is greater than 1, then it
+// shall be an error if the dimension indicated by n is a variable-sized
+// dimension", and names no position the call may stand in. Each of the five
+// cases below writes the call in one such position, and each is a position
+// CheckArrayQueryOnVarDimStmt in
+// src/elaborator/elaborator_validate_queries.cpp reached only once it took its
+// list of nested statements from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. Every one of them elaborated
+// clean beforehand, with an inner variable-sized dimension left queried.
+//
+// Each case names a different query function, and the three forms §20.7 counts
+// as variable-sized -- the dynamic array, the queue and the wildcard
+// associative array -- are spread across them.
+
+// A.6.8 gives `for_step_assignment ::= operator_assignment |
+// inc_or_dec_expression | function_subroutine_call`, and a §20.7 query
+// function returns a value, so a call stands as the right-hand side of the
+// operator_assignment the loop step is written as. The parser keeps that
+// statement in Stmt::for_steps.
+TEST(ArrayQueryVariableDim, SizeOfDynamicInnerDimensionInAForStepIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int qa[3][][5];\n"
+      "  int i;\n"
+      "  initial\n"
+      "    for (i = 0; i < 1; i = $size(qa, 2))\n"
+      "      i = i + 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array query function '$size' cannot query "
+                            "variable-sized dimension 2 of array 'qa'",
+                            5, "20.7.1"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm.
+// The parser keeps the pass arm in Stmt::assert_pass_stmt.
+TEST(ArrayQueryVariableDim,
+     LowOfDynamicInnerDimensionInAnAssertionPassStatementIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int pa[4][][2];\n"
+      "  int n;\n"
+      "  logic ready;\n"
+      "  initial assert (ready) n = $low(pa, 2);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array query function '$low' cannot query "
+                            "variable-sized dimension 2 of array 'pa'",
+                            5, "20.7.1"));
+}
+
+// §16.3's else arm of the same action block, kept in Stmt::assert_fail_stmt.
+// The inner dimension here is a queue, the second of the three variable-sized
+// forms.
+TEST(ArrayQueryVariableDim,
+     HighOfQueueInnerDimensionInAnAssertionFailStatementIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int qb[2][$];\n"
+      "  int n;\n"
+      "  logic go;\n"
+      "  initial assert (go) else n = $high(qb, 2);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array query function '$high' cannot query "
+                            "variable-sized dimension 2 of array 'qb'",
+                            5, "20.7.1"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
+// randcase holds a statement per item, kept in Stmt::randcase_items. The inner
+// dimension here is a wildcard associative array, the third variable-sized
+// form.
+TEST(ArrayQueryVariableDim,
+     IncrementOfWildcardAssocInnerDimensionInARandcaseItemIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int wa[2][*];\n"
+      "  int n;\n"
+      "  initial randcase 1: n = $increment(wa, 2); endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array query function '$increment' cannot query "
+                            "variable-sized dimension 2 of array 'wa'",
+                            4, "20.7.1"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements, kept in RsProd::code_stmts and reached through
+// Stmt::rs_productions.
+TEST(ArrayQueryVariableDim,
+     RightOfDynamicInnerDimensionInARandsequenceCodeBlockIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int ra[3][][6];\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { n = $right(ra, 2); };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array query function '$right' cannot query "
+                            "variable-sized dimension 2 of array 'ra'",
+                            6, "20.7.1"));
+}
+
 }  // namespace

@@ -199,4 +199,113 @@ TEST(PlaAscendingOrder, NonPlaTaskNameIsNotRangeChecked) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §20.16.3 states its rule over the memory and term arguments of a PLA
+// modeling system task -- "PLA input terms, output terms, and memory shall be
+// specified in ascending order" -- and names no position the call may stand
+// in. Each of the four cases below writes the call in one such position, and
+// each is a position CheckPlaAscendingStmt in
+// src/elaborator/elaborator_validate_queries.cpp reached only once it took its
+// list of nested statements from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. Every one of them elaborated
+// clean beforehand, with a descending range left where the clause requires an
+// ascending one.
+//
+// Stmt::for_steps is the fifth position that list added and it carries no case
+// here, for the reason the same conversion records in
+// test/src/unit/test_elaborator_subclause_20_16.cpp: a PLA task returns no
+// value and the one form Syntax 20-16 defines ends in a semicolon, while none
+// of A.6.8's three for_step_assignment forms takes one.
+//
+// The three arguments the clause names are spread across the cases so that no
+// two of them assert the same report.
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm.
+// The parser keeps the pass arm in Stmt::assert_pass_stmt.
+TEST(PlaAscendingOrder, DescendingMemoryInAnAssertionPassStatementIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic [7:1] amem [1:3];\n"
+      "  wire [1:7] ain;\n"
+      "  logic [1:3] aout;\n"
+      "  logic ready;\n"
+      "  initial assert (ready) $sync$nand$array(amem, ain, aout);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the memory of a PLA modeling system task shall be "
+                            "declared in ascending order",
+                            6, "20.16.3"));
+}
+
+// §16.3's else arm of the same action block, kept in Stmt::assert_fail_stmt.
+// The memory and the output terms here are ascending, so the input terms are
+// the only argument that can carry the report.
+TEST(PlaAscendingOrder,
+     DescendingInputTermsInAnAssertionFailStatementIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic [1:7] bmem [1:3];\n"
+      "  wire [7:1] bterm;\n"
+      "  logic [1:3] bout;\n"
+      "  logic done;\n"
+      "  initial assert (done) else $async$nor$plane(bmem, bterm, bout);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the input terms of a PLA modeling system task "
+                            "shall be specified in ascending order",
+                            6, "20.16.3"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
+// randcase holds a statement per item, kept in Stmt::randcase_items. The
+// output terms are declared descending and are variables, so §20.16's separate
+// requirement that they not be nets is satisfied and cannot account for the
+// report.
+TEST(PlaAscendingOrder, DescendingOutputTermsInARandcaseItemIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic [1:7] cmem [1:3];\n"
+      "  wire [1:7] cterm;\n"
+      "  logic [3:1] cout;\n"
+      "  initial randcase 1: $sync$and$plane(cmem, cterm, cout); endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the output terms of a PLA modeling system task "
+                            "shall be specified in ascending order",
+                            5, "20.16.3"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements, kept in RsProd::code_stmts and reached through
+// Stmt::rs_productions. The memory's packed range is ascending and its
+// unpacked one is not, which is the second of the two ranges §20.16.3 reads
+// off a memory declaration.
+TEST(PlaAscendingOrder,
+     DescendingMemoryDepthInARandsequenceCodeBlockIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic [1:7] dmem [3:1];\n"
+      "  wire [1:7] dterm;\n"
+      "  logic [1:3] dout;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { $async$or$array(dmem, dterm, dout); };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the memory of a PLA modeling system task shall be "
+                            "declared in ascending order",
+                            7, "20.16.3"));
+}
+
 }  // namespace

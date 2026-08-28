@@ -4,6 +4,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
 
@@ -191,20 +192,37 @@ void CollectProcLocalNames(const Stmt* s,
     names.insert(s->var_name);
   }
   for (auto v : s->foreach_vars) names.insert(v);
-  for (const auto* sub : s->stmts) CollectProcLocalNames(sub, names);
-  for (const auto* sub : s->fork_stmts) CollectProcLocalNames(sub, names);
-  CollectProcLocalNames(s->then_branch, names);
-  CollectProcLocalNames(s->else_branch, names);
-  CollectProcLocalNames(s->body, names);
-  CollectProcLocalNames(s->for_body, names);
+  // A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`,
+  // and the target of one such assignment is an expression rather than a
+  // statement, so the control variable it declares is read here and not
+  // through the descent below. §12.7.1 makes it a declaration of the loop.
   for (const auto* fi : s->for_inits) {
     if (fi && fi->lhs && fi->lhs->kind == ExprKind::kIdentifier) {
       names.insert(fi->lhs->text);
     }
-    CollectProcLocalNames(fi, names);
   }
-  for (const auto* fs : s->for_steps) CollectProcLocalNames(fs, names);
-  for (const auto& ci : s->case_items) CollectProcLocalNames(ci.body, names);
+  // §6.5 rules that "Data shall be declared before they are used, apart from
+  // implicit nets", and puts no condition on the statement the declaration
+  // stands in, so every position a statement holds a statement in is a
+  // position this collection reaches. ForEachChildStmt in
+  // elaborator_validate_internal.h states those positions once for the whole
+  // elaborator, which is why the list is not written out again here. The
+  // visitor takes `Stmt* const&` because `s` is a `const Stmt*`, which is how
+  // ForEachChildStmt lets a walk that only reads the tree share its list with
+  // the walks that rewrite it.
+  //
+  // The list written out here before was nine of the thirteen links, missing
+  // Stmt::assert_pass_stmt, Stmt::assert_fail_stmt, the body of a randcase
+  // item, and the two statement lists Stmt::rs_productions holds. That
+  // omission cost a report made wrongly rather than a report not made: a name
+  // declared in one of those positions was absent from `names`, so the read of
+  // it that CollectProcRhsIdents below hands to ReportUnresolvedRefs resolves
+  // against nothing and is reported under §23.9 as unresolved. Nothing
+  // observed the false positive because CollectProcRhsIdents was short by the
+  // same four links and never collected the read either, which is why the two
+  // halves of the check are put on this list together.
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { CollectProcLocalNames(sub, names); });
 }
 
 // Collects the bare identifier reads of every procedural blocking/nonblocking
@@ -231,16 +249,25 @@ void CollectProcRhsIdents(const Stmt* s,
       if (locals.count(r->text) == 0) out.push_back(r);
     }
   }
-  for (const auto* sub : s->stmts) CollectProcRhsIdents(sub, locals, out);
-  for (const auto* sub : s->fork_stmts) CollectProcRhsIdents(sub, locals, out);
-  CollectProcRhsIdents(s->then_branch, locals, out);
-  CollectProcRhsIdents(s->else_branch, locals, out);
-  CollectProcRhsIdents(s->body, locals, out);
-  CollectProcRhsIdents(s->for_body, locals, out);
-  for (const auto* fi : s->for_inits) CollectProcRhsIdents(fi, locals, out);
-  for (const auto* fs : s->for_steps) CollectProcRhsIdents(fs, locals, out);
-  for (const auto& ci : s->case_items)
-    CollectProcRhsIdents(ci.body, locals, out);
+  // §6.5's declared-before-use rule is broken by the assignment wherever the
+  // assignment stands, and §26.3 makes an identifier a package supplies
+  // visible "within the current scope without a package name qualifier"
+  // wherever the read of it stands, so every position a statement holds a
+  // statement in is a position one of these reads is written in.
+  // ForEachChildStmt in elaborator_validate_internal.h states those positions
+  // once for the whole elaborator, which is why the list is not written out
+  // again here.
+  //
+  // The list written out here before was the same nine links
+  // CollectProcLocalNames above wrote out, missing the same four. That
+  // omission cost a report not made: an assignment whose right side read a
+  // name nothing declares was never collected when it stood in an immediate
+  // assertion's pass statement, in its fail statement, in a randcase item, or
+  // in either code block of a randsequence production, so §23.9's "reference to
+  // unresolved identifier" was never reported for it and the source elaborated
+  // clean.
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { CollectProcRhsIdents(sub, locals, out); });
 }
 
 // The names a subroutine's body may read without the module declaring them:

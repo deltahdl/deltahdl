@@ -164,4 +164,173 @@ TEST(StreamingOperatorElaboration,
   EXPECT_EQ(InferExprWidth(&stream, typedefs), 8u);
 }
 
+// §11.4.14 confines a streaming concatenation to an assignment or a bit-stream
+// cast and names no statement it is allowed to stand in, so every position a
+// statement holds a statement in is one the report reaches.
+// ElaboratorOperationRules::WalkStmtsForStreamingContext in
+// src/elaborator/elaborator_validate_operations_streaming.cpp had written out
+// six of the thirteen child-statement links Stmt declares and now takes the
+// list from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. The seven cases below stand in
+// the seven positions it was missing, each of which elaborated clean beforehand
+// with the concatenation left in an operand position nothing objected to. Each
+// writes the concatenation as the right operand of `+`, the form
+// StreamingAsArithOperandRejected above establishes as illegal in an
+// initial-block statement.
+
+// A.6.3 gives `par_block ::= fork [ : block_identifier ]
+// { block_item_declaration } { statement_or_null } join_keyword ...`, so a fork
+// holds statements the way a begin-end block does. The parser keeps them in
+// Stmt::fork_stmts rather than in Stmt::stmts.
+TEST(StreamingOperatorElaboration,
+     StreamingAsArithOperandInAForkStatementRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [15:0] dst;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial fork\n"
+      "    dst = a + {>> {b}};\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "streaming concatenation shall not be used as an operand of an "
+      "expression other than an assignment or bit-stream cast",
+      5, "11.4.14"));
+}
+
+// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`, so
+// the loop header holds assignments of its own, kept in Stmt::for_inits.
+TEST(StreamingOperatorElaboration,
+     StreamingAsArithOperandInAForInitializerRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [15:0] dst;\n"
+      "  logic [7:0] a, b;\n"
+      "  int i;\n"
+      "  initial\n"
+      "    for (dst = a + {>> {b}}; i < 1; i = i + 1)\n"
+      "      i = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "streaming concatenation shall not be used as an operand of an "
+      "expression other than an assignment or bit-stream cast",
+      6, "11.4.14"));
+}
+
+// A.6.8's `for_step_assignment ::= operator_assignment | ...` is the same rule
+// at the other end of the loop header, kept in Stmt::for_steps. The initializer
+// here assigns a constant, so the report can only be about the step.
+TEST(StreamingOperatorElaboration, StreamingAsArithOperandInAForStepRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [15:0] dst;\n"
+      "  logic [7:0] a, b;\n"
+      "  int i;\n"
+      "  initial\n"
+      "    for (i = 0; i < 1; dst = a + {>> {b}})\n"
+      "      i = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "streaming concatenation shall not be used as an operand of an "
+      "expression other than an assignment or bit-stream cast",
+      6, "11.4.14"));
+}
+
+// A.6.10 gives `simple_immediate_assert_statement ::= assert ( expression )
+// action_block` and §16.3 gives `action_block ::= statement_or_null |
+// [ statement ] else statement_or_null`, so the pass arm of an immediate
+// assertion holds an ordinary statement, kept in Stmt::assert_pass_stmt.
+TEST(StreamingOperatorElaboration,
+     StreamingAsArithOperandInAnAssertionPassStatementRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [15:0] dst;\n"
+      "  logic [7:0] a, b;\n"
+      "  logic ok;\n"
+      "  initial assert (ok) dst = a + {>> {b}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "streaming concatenation shall not be used as an operand of an "
+      "expression other than an assignment or bit-stream cast",
+      5, "11.4.14"));
+}
+
+// The else arm of the same production, kept in Stmt::assert_fail_stmt, a link
+// the pass-arm case above does not reach.
+TEST(StreamingOperatorElaboration,
+     StreamingAsArithOperandInAnAssertionFailStatementRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [15:0] dst;\n"
+      "  logic [7:0] a, b;\n"
+      "  logic armed;\n"
+      "  initial assert (armed) else dst = a + {>> {b}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "streaming concatenation shall not be used as an operand of an "
+      "expression other than an assignment or bit-stream cast",
+      5, "11.4.14"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
+// randcase holds a statement per item, kept in Stmt::randcase_items. §11.4.14
+// judges where the concatenation is written rather than whether it runs, so the
+// report stands whether the weighted draw would select the item or not.
+TEST(StreamingOperatorElaboration,
+     StreamingAsArithOperandInARandcaseItemRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [15:0] dst;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial randcase 1: dst = a + {>> {b}}; endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "streaming concatenation shall not be used as an operand of an "
+      "expression other than an assignment or bit-stream cast",
+      4, "11.4.14"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements, kept in RsProd::code_stmts and reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(StreamingOperatorElaboration,
+     StreamingAsArithOperandInARandsequenceCodeBlockRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [15:0] dst;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { dst = a + {>> {b}}; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "streaming concatenation shall not be used as an operand of an "
+      "expression other than an assignment or bit-stream cast",
+      6, "11.4.14"));
+}
+
 }  // namespace

@@ -217,4 +217,114 @@ TEST(BitVectorFunctionArgs, AcceptsIntegralExpressionArgument) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §20.9 states its rule over the expression argument of a bit-vector function
+// and names no position the call may stand in. Each of the five cases below
+// writes the call in one such position, and each is a position
+// CheckBitVectorArgStmt in src/elaborator/elaborator_validate_queries.cpp
+// reached only once it took its list of nested statements from
+// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. Every one
+// of them elaborated clean beforehand, with a real operand left where a
+// bit-stream type is required.
+//
+// Every case passes a real, which is the operand §20.9 rules out that a
+// declaration states plainly, and each names a different one of the five
+// functions Syntax 20-10 gives, so the rejection also witnesses that the
+// position and the function are independent of each other.
+TEST(BitVectorFunctionArgs, RejectsRealArgumentInAForStep) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real rv;\n"
+      "  int i;\n"
+      "  initial\n"
+      "    for (i = 0; i < 1; i = $countones(rv))\n"
+      "      i = i + 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "the expression argument to '$countones' shall be of a bit-stream type",
+      5, "20.9"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm.
+// The parser keeps the pass arm in Stmt::assert_pass_stmt.
+TEST(BitVectorFunctionArgs, RejectsRealArgumentInAnAssertionPassStatement) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real amp;\n"
+      "  logic hot;\n"
+      "  logic ready;\n"
+      "  initial assert (ready) hot = $onehot(amp);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "the expression argument to '$onehot' shall be of a bit-stream type", 5,
+      "20.9"));
+}
+
+// §16.3's else arm of the same action block, kept in Stmt::assert_fail_stmt.
+TEST(BitVectorFunctionArgs, RejectsRealArgumentInAnAssertionFailStatement) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real gain;\n"
+      "  logic clear;\n"
+      "  logic go;\n"
+      "  initial assert (go) else clear = $onehot0(gain);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "the expression argument to '$onehot0' shall be of a bit-stream type", 5,
+      "20.9"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
+// randcase holds a statement per item, kept in Stmt::randcase_items. The rule
+// is static, so it holds whether the weighted draw would select the item or
+// not.
+TEST(BitVectorFunctionArgs, RejectsRealArgumentInARandcaseItem) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real drift;\n"
+      "  logic unk;\n"
+      "  initial randcase 2: unk = $isunknown(drift); endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "the expression argument to '$isunknown' shall be of a bit-stream type",
+      4, "20.9"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements, kept in RsProd::code_stmts and reached through
+// Stmt::rs_productions. The call carries a control_bit, so the report it draws
+// is the bit-stream one rather than Syntax 20-10's requirement that
+// list_of_control_bits be non-empty.
+TEST(BitVectorFunctionArgs, RejectsRealArgumentInARandsequenceCodeBlock) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real slope;\n"
+      "  int bits;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { bits = $countbits(slope, 1'b1); };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "the expression argument to '$countbits' shall be of a bit-stream type",
+      6, "20.9"));
+}
+
 }  // namespace

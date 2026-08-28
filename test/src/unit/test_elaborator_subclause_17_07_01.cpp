@@ -260,4 +260,135 @@ TEST(CheckerVariableAssignment, RhsSequenceTriggeredElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §17.7.1 says "A checker variable may not be assigned in an initial procedure,
+// but may be initialized in its declaration" and names no statement the
+// assignment is allowed to stand in, so every position a statement holds a
+// statement in that a checker initial procedure can reach is one the report
+// reaches. WalkStmtsForCheckerVarAssignInInitial in
+// src/elaborator/elaborator_validate_hier_refs.cpp had written out nine of
+// the thirteen child-statement links Stmt declares and now takes the
+// list from ForEachChildStmt in src/elaborator/elaborator_validate_internal.h.
+//
+// Of the four links it was missing, two are reachable and are covered below.
+// §17.5 settles which: "An initial procedure in a checker body may contain let
+// declarations, immediate, deferred, and concurrent assertions, and a
+// procedural timing control statement using an event control only." An
+// immediate assertion is on that list and A.6.10 gives
+// `simple_immediate_assert_statement ::= assert ( expression ) action_block`,
+// whose two arms the parser keeps in Stmt::assert_pass_stmt and
+// Stmt::assert_fail_stmt. A randcase (§18.16) and a randsequence (A.6.12) are
+// on neither list, so no conforming checker initial procedure holds one and
+// Stmt::randcase_items and Stmt::rs_productions get no case here.
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so the pass arm of the assertion holds the assignment.
+TEST(CheckerVariableAssignment,
+     CheckerVarAssignedInAnAssertionPassStatementOfAnInitialRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk;\n"
+      "  bit v;\n"
+      "  logic ready;\n"
+      "  initial assert (ready) v = 1'b1;\n"
+      "endchecker\n",
+      f, "chk");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "checker variable 'v' cannot be assigned in an initial procedure", 4,
+      "17.7.1"));
+}
+
+// The else arm of the same production, kept in Stmt::assert_fail_stmt, which
+// the pass-arm case above does not reach.
+TEST(CheckerVariableAssignment,
+     CheckerVarAssignedInAnAssertionFailStatementOfAnInitialRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk;\n"
+      "  bit held;\n"
+      "  logic armed;\n"
+      "  initial assert (armed) else held = 1'b0;\n"
+      "endchecker\n",
+      f, "chk");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "checker variable 'held' cannot be assigned in an initial procedure", 4,
+      "17.7.1"));
+}
+
+// §17.7.1 leaves a free checker variable to the nonblocking assignment alone
+// and names no statement a blocking assignment to one is permitted in, so every
+// position a statement holds a statement in that a checker always procedure can
+// reach is one the report reaches. WalkStmtsForFreeBlockingAssign in
+// src/elaborator/elaborator_validate_hier_refs.cpp had written out eight of the
+// thirteen child-statement links Stmt declares and now takes the list from
+// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h.
+//
+// Of the five links it was missing, three are reachable and are covered below.
+// §17.5 settles which, listing what a checker always procedure may contain:
+// blocking and nonblocking assignments, selection statements, loop statements,
+// timing event control, subroutine calls, immediate, deferred and concurrent
+// assertions, and let declarations. A loop statement is on that list and A.6.8
+// gives `for_initialization ::= list_of_variable_assignments | ...`; an
+// immediate assertion is on it too, and A.6.10's
+// `simple_immediate_assert_statement ::= assert ( expression ) action_block`
+// with §16.3's `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null` gives it two arms. A randcase (§18.16) and a randsequence
+// (A.6.12) are on neither list, so no conforming checker always procedure holds
+// one and Stmt::randcase_items and Stmt::rs_productions get no case here.
+
+// The assignment the loop header holds, kept in Stmt::for_inits. The step
+// assigns the loop counter, which is an ordinary checker variable and not a
+// free one, so the report can only be about the initializer.
+TEST(CheckerVariableAssignment,
+     BlockingAssignmentToFreeVariableInAForInitializerRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(input logic a);\n"
+      "  rand bit x;\n"
+      "  int i;\n"
+      "  always_comb\n"
+      "    for (x = a; i < 1; i = i + 1)\n"
+      "      i = 1;\n"
+      "endchecker\n",
+      f, "chk");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a blocking assignment cannot target free checker variable 'x'", 5,
+      "17.7.1"));
+}
+
+// The pass arm of the immediate assertion, kept in Stmt::assert_pass_stmt.
+TEST(CheckerVariableAssignment,
+     BlockingAssignmentToFreeVariableInAnAssertionPassStatementRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(input logic a, input logic ok);\n"
+      "  rand bit x;\n"
+      "  always_comb assert (ok) x = a;\n"
+      "endchecker\n",
+      f, "chk");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a blocking assignment cannot target free checker variable 'x'", 3,
+      "17.7.1"));
+}
+
+// The else arm of the same production, kept in Stmt::assert_fail_stmt, a link
+// the pass-arm case above does not reach.
+TEST(CheckerVariableAssignment,
+     BlockingAssignmentToFreeVariableInAnAssertionFailStatementRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(input logic a, input logic armed);\n"
+      "  rand bit held;\n"
+      "  always_comb assert (armed) else held = a;\n"
+      "endchecker\n",
+      f, "chk");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a blocking assignment cannot target free checker variable 'held'", 3,
+      "17.7.1"));
+}
+
 }  // namespace

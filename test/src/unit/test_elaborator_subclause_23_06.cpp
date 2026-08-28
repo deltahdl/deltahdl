@@ -461,4 +461,111 @@ TEST(HierarchicalNameElaboration,
                             9, "23.6"));
 }
 
+// §23.6 ends "Hierarchical references into checkers (see Clause 17) shall not
+// be permitted", putting no condition on where the reference is written, so
+// every position a statement holds a statement in is one the report reaches.
+// WalkStmtsForCheckerRef in
+// src/elaborator/elaborator_validate_hier_refs.cpp had written out nine of
+// the thirteen child-statement links Stmt declares and now takes the
+// list from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. The four cases below stand in
+// the four positions it was missing, each of which elaborated clean beforehand
+// with the reference into the checker left unreported.
+
+// A.6.10 gives `simple_immediate_assert_statement ::= assert ( expression )
+// action_block` and §16.3 gives `action_block ::= statement_or_null |
+// [ statement ] else statement_or_null`, so the pass arm of an immediate
+// assertion holds an ordinary statement. The parser keeps it in
+// Stmt::assert_pass_stmt.
+TEST(HierarchicalNameElaboration,
+     CheckerRefInAnAssertionPassStatementIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker cap_chk;\n"
+      "  logic captured;\n"
+      "endchecker\n"
+      "module m;\n"
+      "  cap_chk cap_inst();\n"
+      "  logic x;\n"
+      "  logic ok;\n"
+      "  initial assert (ok) x = cap_inst.captured;\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference into a checker is not "
+                            "permitted",
+                            8, "23.6"));
+}
+
+// The else arm of the same production, which the parser keeps in
+// Stmt::assert_fail_stmt -- a link the pass-arm case above does not reach.
+TEST(HierarchicalNameElaboration,
+     CheckerRefInAnAssertionFailStatementIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker flag_chk;\n"
+      "  logic flagged;\n"
+      "endchecker\n"
+      "module m;\n"
+      "  flag_chk flag_inst();\n"
+      "  logic y;\n"
+      "  logic armed;\n"
+      "  initial assert (armed) else y = flag_inst.flagged;\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference into a checker is not "
+                            "permitted",
+                            8, "23.6"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
+// randcase holds a statement per item, kept in Stmt::randcase_items. §23.6 is a
+// rule about the name rather than about what runs, so it holds whether the
+// weighted draw would ever select the item or not.
+TEST(HierarchicalNameElaboration, CheckerRefInARandcaseItemIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker pick_chk;\n"
+      "  logic chosen;\n"
+      "endchecker\n"
+      "module m;\n"
+      "  pick_chk pick_inst();\n"
+      "  logic z;\n"
+      "  initial randcase 1: z = pick_inst.chosen; endcase\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference into a checker is not "
+                            "permitted",
+                            7, "23.6"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements. They are kept in RsProd::code_stmts, reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(HierarchicalNameElaboration,
+     CheckerRefInARandsequenceCodeBlockIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker samp_chk;\n"
+      "  logic sampled;\n"
+      "endchecker\n"
+      "module m;\n"
+      "  samp_chk samp_inst();\n"
+      "  logic w;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { w = samp_inst.sampled; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference into a checker is not "
+                            "permitted",
+                            9, "23.6"));
+}
+
 }  // namespace

@@ -52,7 +52,7 @@ TEST(PackageImportInHeader, ConstantVisibleInParameterDefault) {
 //
 // This is the header half of the pair PackageImport.
 // BodyImportedTypedefSizesTheVariable in
-// test/src/unit/test_elaborator_subclause_26_03.cpp completes: §26.4 permits
+// test/src/unit/test_elaborator_subclause_26_03a.cpp completes: §26.4 permits
 // the import to stand in the header, and §26.3 decides what importing does, so
 // the same declaration is sized the same way whichever form carried it.
 TEST(PackageImportInHeader, WildcardImportVisibleInBody) {
