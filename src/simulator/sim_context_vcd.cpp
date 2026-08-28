@@ -156,7 +156,14 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
     // §21.7.2.3: the writer picks the $var var_type from the declared net
     // type -- notably a uwire net is recorded as wire -- so a dumped object
     // that is a net carries its net type into the registration.
-    if (const Net* net = FindNet(name)) spec.net_type = net->type;
+    // §21.7.4.3: the two strength components of an extended-VCD port value
+    // change report the strength0 and the strength1 specification for the
+    // port, which for a net is what Net::Resolve settled into
+    // Net::resolved_strength, so the net itself travels with the registration.
+    if (const Net* net = FindNet(name)) {
+      spec.net_type = net->type;
+      spec.net = net;
+    }
     // §21.7.4.2: in the extended VCD node-information section a port that is a
     // bus prints its index range as the size field, while a single-bit port
     // prints 1. The simulator keeps the resolved bit width of the dumped

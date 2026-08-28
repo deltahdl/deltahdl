@@ -1,9 +1,12 @@
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
+#include "helpers_text_lines.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/vcd_writer.h"
@@ -183,6 +186,169 @@ TEST_F(ExtendedVcdValueChangeSim, PortIdentifierCodeIsMultiDigitInteger) {
       << content;
   // ... and its value change carries that same two-digit integer code.
   EXPECT_NE(content.find("p166 <10"), std::string::npos) << content;
+}
+
+// §21.7.4.3 again, on the two strength components rather than on the p
+// prefix, the port_value or the identifier code the cases above read. The
+// clause defines 0_strength_component as "one of the eight SystemVerilog
+// strengths that indicates the strength0 specification for the port" and
+// 1_strength_component as the strength1 one, and numbers the eight 0 highz,
+// 1 small, 2 medium, 3 weak, 4 large, 5 pull, 6 strong, 7 supply. §21.7 gives
+// the extended file the job of representing variable changes "in all states
+// and strength information", so those two digits are the whole of what the
+// extended file adds over the 4-state one.
+//
+// Every source below drives its net at a strength other than strong, because
+// a strongly driven net reports the strong digit whether the writer resolves
+// the strength or assumes it. §28.6 gives a driver written with no
+// drive_strength specification strong0 and strong1, so plain procedural and
+// continuous assignment -- what every case above uses -- is the one input
+// that cannot tell the two apart.
+//
+// The source selects the extended form here, as it does in
+// ExtendedVcdFormatChosenByTheSource in
+// test_simulator_subclause_21_07_04.cpp: VcdDumpFromSourceTestBase installs
+// no writer, so the file on disk is the one the run's own $dumpports opened.
+class ExtendedVcdStrengthFromSource : public VcdDumpFromSourceTestBase {
+ protected:
+  // Runs a module t holding `body` under a $dumpports that names its own file,
+  // and returns what the run left in that file. The #1 puts a second time step
+  // after the task: §21.7.3.1 starts the dumping "at the end of the current
+  // simulation time unit", so the opening checkpoint the cases read is emitted
+  // by the recording pass that follows time 0.
+  std::string RunPortDump(const std::string& body) {
+    RunSource("module t;\n" + body +
+              "  initial begin\n"
+              "    $dumpports(, \"strengths.vcd\");\n"
+              "    #1;\n"
+              "  end\n"
+              "endmodule\n");
+    return DumpFile("strengths.vcd");
+  }
+
+  // §21.7.4.2: a node information line is
+  // "$var port <size> <<identifier_code> <reference> $end". Returns the
+  // <-prefixed integer the declaration of `name` carries, or an empty string
+  // when the file declares no port of that name.
+  static std::string PortIdentifierCode(const std::string& content,
+                                        const std::string& name) {
+    for (const auto& line : Lines(content)) {
+      auto fields = Tokens(line);
+      if (fields.size() != 6 || fields[0] != "$var" || fields[1] != "port") {
+        continue;
+      }
+      if (fields[4] == name) return fields[3];
+    }
+    return "";
+  }
+
+  // §21.7.4.3 (Syntax 21-29): a value change is
+  // "p<port_value><0_strength_component><1_strength_component>", one space,
+  // then the identifier_code. Returns the last such record written against
+  // `name`, as "<port_value>|<0_strength_component><1_strength_component>",
+  // so a failure reports the state characters and the strength digits apart
+  // and a wrong digit is readable without counting characters. A file
+  // declaring no such port, or holding no change against its code, answers
+  // with a marker naming which of the two is missing.
+  static std::string PortRecord(const std::string& content,
+                                const std::string& name) {
+    std::string code = PortIdentifierCode(content, name);
+    if (code.empty()) return "<no-$var-port-" + name + ">";
+    std::string record = "<no-change-" + code + ">";
+    for (const auto& line : Lines(content)) {
+      auto fields = Tokens(line);
+      if (fields.size() != 2 || fields[0][0] != 'p' || fields[1] != code) {
+        continue;
+      }
+      std::string body = fields[0].substr(1);
+      if (body.size() < 3) return "<malformed-" + fields[0] + ">";
+      record =
+          body.substr(0, body.size() - 2) + "|" + body.substr(body.size() - 2);
+    }
+    return record;
+  }
+};
+
+// §21.7.4.3: the 1_strength_component reports the strength1 specification for
+// the port, and 5 is the digit the clause gives pull. §28.12.2 lets a
+// continuous assignment carry a drive_strength, so a net assigned 1 under
+// (pull0, pull1) is driven on its 1 side at pull and on its 0 side not at all
+// -- the digits 0 and 5. The case fails on a writer that reports a port at
+// strong whenever its value is not z, which writes 1|66 and leaves a reader
+// unable to tell this net from one a plain assign drives.
+TEST_F(ExtendedVcdStrengthFromSource, PullDrivenNetReportsThePullDigit) {
+  auto content = RunPortDump(
+      "  wire w;\n"
+      "  assign (pull0, pull1) w = 1'b1;\n");
+  EXPECT_EQ(PortRecord(content, "w"), "1|05") << content;
+}
+
+// §21.7.4.3: the components report the strength specification "for the port",
+// so two ports of one design driven at two strengths carry two different
+// records. Both nets here are assigned 1, one at pull (digit 5) and one at
+// weak (digit 3), which leaves the strength components as the only thing
+// separating the two records. The case fails on a writer that reports every
+// port at one strength, which makes the two records identical apart from their
+// identifier codes. The case above alone cannot say whether a writer does
+// that, because one port is one record.
+TEST_F(ExtendedVcdStrengthFromSource,
+       TwoNetsAtDifferentStrengthsGetDifferentRecords) {
+  auto content = RunPortDump(
+      "  wire pu;\n"
+      "  wire we;\n"
+      "  assign (pull0, pull1) pu = 1'b1;\n"
+      "  assign (weak0, weak1) we = 1'b1;\n");
+  EXPECT_EQ(PortRecord(content, "pu"), "1|05") << content;
+  EXPECT_EQ(PortRecord(content, "we"), "1|03") << content;
+  EXPECT_NE(PortRecord(content, "pu"), PortRecord(content, "we")) << content;
+}
+
+// §21.7.4.3 numbers supply 7, the one strength above strong, so a writer that
+// clamped every port at the strong digit would satisfy every case that drives
+// below it and fail only this one. §6.6.6 gives a supply1 net supply strength
+// on the 1 it drives, and §28.15.3 makes it carry that value with no driver
+// connected, so the declaration alone settles both components: highz on the 0
+// side, supply on the 1 side. The case fails on a writer that reports a driven
+// port at strong, which writes 1|66.
+TEST_F(ExtendedVcdStrengthFromSource, SupplyNetReportsTheSupplyDigit) {
+  auto content = RunPortDump("  supply1 vdd;\n");
+  EXPECT_EQ(PortRecord(content, "vdd"), "1|07") << content;
+}
+
+// §21.7.4.3: what the components report of a net is what §28.12 resolved for
+// it, not what any one of its drivers was declared with. The two drivers here
+// disagree in value and in strength, and the pull 0 outranks the weak 1, so
+// the net settles to 0 at pull -- the digits 5 and 0. Every reading of a
+// single driver's declaration gives some other pair: the first driver's is
+// 5 and 5, the second's is 3 and 3, and the strongest declared level on each
+// side is 5 and 5. A writer reporting a driven port at strong writes 0|66,
+// which is none of them either.
+TEST_F(ExtendedVcdStrengthFromSource,
+       ResolvedStrengthOfTwoDriversReachesTheRecord) {
+  auto content = RunPortDump(
+      "  wire w;\n"
+      "  assign (pull0, pull1) w = 1'b0;\n"
+      "  assign (weak0, weak1) w = 1'b1;\n");
+  EXPECT_EQ(PortRecord(content, "w"), "0|50") << content;
+}
+
+// §21.7.4.3 gives each component one digit while §28.12.3 lets a resolved
+// strength span a range of levels, so a range has to be reduced to one digit.
+// §21.7.4.3.2's only rule reducing two strengths to one takes "the stronger of
+// the two", which makes the stronger bound of the range what a component
+// reports. Two equal weak drivers of opposite value resolve to x with both
+// sides spanning weak down to highz, so both components report weak, the digit
+// 3. Nothing else in this file reaches an ambiguous strength: every other case
+// resolves to a single level, where the two bounds coincide and the reduction
+// cannot be observed. The case fails on a writer that reports a driven port at
+// strong, which writes x|66.
+TEST_F(ExtendedVcdStrengthFromSource,
+       AmbiguousResolvedStrengthReportsTheStrongerBound) {
+  auto content = RunPortDump(
+      "  wire w;\n"
+      "  assign (weak0, weak1) w = 1'b1;\n"
+      "  assign (weak0, weak1) w = 1'b0;\n");
+  EXPECT_EQ(PortRecord(content, "w"), "x|33") << content;
 }
 
 }  // namespace

@@ -34,11 +34,13 @@ namespace {
 // Only Claim 1 is reachable through this simulator. The port value change is
 // emitted by VcdWriter::WritePortValueChange (src/simulator/vcd_writer.cpp),
 // which reads a single resolved 4-state value per bit through LogicBitToChar
-// (only 0/1/x/z) and writes a fixed strength pair -- strong (6) for a driven
-// bit, highz (0) for a high-impedance bit. The Variable/VcdSignal model keeps
-// no record of drive direction, of separate input versus output contributions,
-// or of a per-driver strength. So Claims 2-4, which all require decomposing a
-// port into an input driver and an output driver and comparing their strength
+// (only 0/1/x/z) and takes the two strength components from the resolved
+// strength of the net behind the port (Net::resolved_strength), falling back
+// to strong for a driven port with no net and no resolved strength and to
+// highz for a high-impedance one. The VcdSignal model keeps no record of drive
+// direction, of separate input versus output contributions, or of a
+// per-driver strength. So Claims 2-4, which all require decomposing a port
+// into an input driver and an output driver and comparing their strength
 // ranges, cannot be exercised: the conflict characters d/u/l/h (and the
 // direction-tagged 0/1 conflict semantics) are unreachable here, exactly as the
 // dependency subclause §21.7.4.3.1 established for the character vocabulary.
@@ -149,8 +151,10 @@ class ExtendedVcdDriversSim : public VcdDumpRunTestBase {
 // §21.7.4.3.2 Claim 1: a gate primitive is a driver. Instantiating buf so it
 // drives the net w, then dumping w under $dumpports, resolves w's value from
 // that primitive. The writer reports w as an active port: the state character
-// is the driven value (1) and the strength pair is the driven (strong) 66,
-// never the highz 00 an undriven port would carry.
+// is the driven value (1) and the 1_strength_component is strong (6), which
+// §28.6 gives a primitive written with no drive_strength specification, never
+// the highz 0 an undriven port would carry. The 0_strength_component is highz
+// because nothing drives w's 0 side (§21.7.4.3).
 TEST_F(ExtendedVcdDriversSim, PrimitiveDriverDumpsActivePort) {
   auto content = RunPortVcd(
       "module t;\n"
@@ -162,11 +166,13 @@ TEST_F(ExtendedVcdDriversSim, PrimitiveDriverDumpsActivePort) {
       "    a = 1'b1;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_EQ(PortRecord(content, "w"), "1|66") << content;
+  EXPECT_EQ(PortRecord(content, "w"), "1|06") << content;
 }
 
 // §21.7.4.3.2 Claim 1: a continuous assignment is a driver. A net resolved by
-// assign is dumped as an active port -- driven value, strong strength.
+// assign is dumped as an active port -- driven value, and strong on the side
+// it drives because §28.6 gives an assignment written with no drive_strength
+// specification strong0 and strong1.
 TEST_F(ExtendedVcdDriversSim, ContinuousAssignmentDriverDumpsActivePort) {
   auto content = RunPortVcd(
       "module t;\n"
@@ -174,7 +180,7 @@ TEST_F(ExtendedVcdDriversSim, ContinuousAssignmentDriverDumpsActivePort) {
       "  assign w = 1'b1;\n"
       "  initial $dumpports;\n"
       "endmodule\n");
-  EXPECT_EQ(PortRecord(content, "w"), "1|66") << content;
+  EXPECT_EQ(PortRecord(content, "w"), "1|06") << content;
 }
 
 // §21.7.4.3.2 Claim 1: a procedural continuous assignment is a driver. This

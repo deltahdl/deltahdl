@@ -5,6 +5,7 @@
 #include <iosfwd>
 
 #include "simulator/evaluation.h"
+#include "simulator/net.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -154,6 +155,9 @@ static VcdSignal MakeVcdSignalFields(const VcdSignalSpec& spec) {
   // it is one member of an unpacked structure sharing that variable.
   sig.bit_offset = spec.bit_offset;
   sig.is_field = spec.is_field;
+  // §21.7.4.3: the net whose resolved strength answers the two strength
+  // components of a port value change, null when the object is not a net.
+  sig.net = spec.net;
   return sig;
 }
 
@@ -370,6 +374,56 @@ void VcdWriter::WriteRealChange(const VcdSignal& sig) {
   ofs_ << "r" << buf << " " << sig.ident << "\n";
 }
 
+// §21.7.4.3: a strength component is one of the eight SystemVerilog strengths,
+// written as the digit 0 highz, 1 small, 2 medium, 3 weak, 4 large, 5 pull, 6
+// strong, 7 supply. Strength (common/types.h) is numbered the same way, so the
+// digit is the enum value.
+static char VcdStrengthDigit(Strength s) {
+  return static_cast<char>('0' + static_cast<uint8_t>(s));
+}
+
+// §21.7.4.3: both strength components of a port whose drive strength the model
+// leaves unresolved. §21.7.4.3.2 counts primitives, continuous assignments and
+// procedural continuous assignments as drivers, so a port_value other than z
+// says a driver is active, and §28.6 gives a driver written without a drive
+// strength specification strong0 and strong1 -- the digit 6. A z port_value
+// says no driver is active, which is highz, the digit 0.
+//
+// Two kinds of object are answered here. An object that is not a net has no
+// drive strength to resolve. So has a net Net::Resolve computed no strength
+// for: one held by force, whose drivers it skips (net.cpp: is_forced returns
+// before resolution), and one driven to x, which §28.12 places on neither the
+// 0 side nor the 1 side.
+static char VcdUnresolvedStrengthDigit(bool driven) {
+  return driven ? '6' : '0';
+}
+
+// §21.7.4.3: write the 0_strength_component and the 1_strength_component of one
+// port value change. They report the strength0 and the strength1 specification
+// for the port, and net resolution settles both: NetStrength keeps the strength
+// of the drive on the 0 side and on the 1 side separately, so its s0 fields
+// answer the first component and its s1 fields the second.
+//
+// Each component is a single digit while §28.12 lets a resolved strength be
+// ambiguous -- a range of levels rather than one level. §21.7.4.3.2 does not
+// say what one digit reports for a range. The one rule it does give that
+// reduces two strengths to one takes "the stronger of the two", so the stronger
+// bound of the range is what is written here.
+static void WritePortStrengthComponents(std::ofstream& ofs,
+                                        const VcdSignal& sig, bool driven) {
+  if (sig.net != nullptr) {
+    const NetStrength& resolved = sig.net->resolved_strength;
+    if (resolved.s0_hi != Strength::kHighz ||
+        resolved.s1_hi != Strength::kHighz) {
+      ofs << VcdStrengthDigit(resolved.s0_hi)
+          << VcdStrengthDigit(resolved.s1_hi);
+      return;
+    }
+  }
+  char digit = VcdUnresolvedStrengthDigit(driven);
+  ofs << digit << digit;
+}
+
 void VcdWriter::WritePortValueChange(const VcdSignal& sig) {
   if (!sig.var) return;
   // §21.7.4.3 (Syntax 21-29): value ::= p port_value 0_strength_component
@@ -386,13 +440,7 @@ void VcdWriter::WritePortValueChange(const VcdSignal& sig) {
     if (c != 'z') driven = true;
     ofs_ << c;
   }
-  // The strength0 and strength1 components are each one of the eight
-  // SystemVerilog strength values, encoded as the digit 0 highz, 1 small, 2
-  // medium, 3 weak, 4 large, 5 pull, 6 strong, 7 supply. The model does not
-  // track per-port drive strength, so a driven port is reported at strong
-  // strength and a high-impedance port at highz strength for both components.
-  char strength = driven ? '6' : '0';
-  ofs_ << strength << strength;
+  WritePortStrengthComponents(ofs_, sig, driven);
   // identifier_code: the port's integer code preceded by <, exactly as written
   // in its $var declaration (§21.7.4.2). One space separates the value from it.
   ofs_ << " <" << sig.port_id << "\n";

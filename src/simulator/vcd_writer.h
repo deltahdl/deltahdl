@@ -10,6 +10,7 @@
 
 namespace delta {
 
+struct Net;
 struct Variable;
 
 // §21.7.5 (Table 21-11): SystemVerilog does not extend the IEEE Std 1364-2005
@@ -81,6 +82,12 @@ struct VcdSignal {
   int32_t msb = -1;
   int32_t lsb = -1;
   uint32_t port_id = 0;
+  // §21.7.4.3: the net behind this object, when it is one. The two strength
+  // components of a port value change report the strength0 and the strength1
+  // specification for the port, and for a net that is what net resolution
+  // settled -- Net::resolved_strength. Null for an object that is not a net,
+  // which has no drive strength at all.
+  const Net* net = nullptr;
   // §21.7.5: a member of an unpacked structure is dumped as its own object even
   // though the model holds the whole structure in one value. bit_offset is
   // where this member's bits start within that value, and width is how many it
@@ -117,6 +124,10 @@ struct VcdSignalSpec {
   // so existing positional initializations keep their meaning.
   uint32_t bit_offset = 0;
   bool is_field = false;
+  // §21.7.4.3: the net this object is, whose resolved strength answers the two
+  // strength components of its port value changes. Null when the object is not
+  // a net.
+  const Net* net = nullptr;
 };
 
 class VcdWriter {
