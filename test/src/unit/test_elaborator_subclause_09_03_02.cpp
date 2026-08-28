@@ -397,4 +397,90 @@ TEST(ParallelBlockElaboration,
                             4, "9.3.2"));
 }
 
+// The three cases below are §9.3.2 cases about a report withheld.
+// CheckNoReturnInFork in src/elaborator/elaborator_validate_funcbody.cpp is the
+// walk that finds the return §9.3.2 forbids, and it now takes its
+// child-statement links from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h, which reaches
+// Stmt::rs_productions. §18.17.6 "Aborting productions—break and return" says
+// "The return statement aborts the generation of the current production", so a
+// return written in a randsequence production code block is not the enclosing
+// subroutine's return and "A return statement within the context of a fork-join
+// block is illegal" is not the rule that governs it. Take
+// CheckNoReturnInFork::in_production_code_block away and each source below is
+// rejected.
+//
+// Stmt::for_inits and Stmt::for_steps are newly reached too and get no case:
+// A.6.8 admits only a list_of_variable_assignments or a
+// for_variable_declaration in a for_initialization and only an
+// operator_assignment, an inc_or_dec_expression or a function_subroutine_call
+// in a for_step, and a jump_statement is none of those.
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }` and an rs_prod may be one, whose statements the parser keeps in
+// RsProd::code_stmts.
+TEST(ParallelBlockElaboration,
+     ReturnInARandsequenceCodeBlockInAForkIsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  task t();\n"
+      "    fork\n"
+      "      randsequence(main)\n"
+      "        main : { return; };\n"
+      "      endsequence\n"
+      "    join_none\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A.6.12's `rs_rule ::= rs_production_list [ := weight_specification [
+// rs_code_block ] ]` puts a second code block after the weight, kept in
+// RsRule::weight_code rather than in RsProd::code_stmts, so it is a second
+// statement position under Stmt::rs_productions and gets its own case.
+TEST(ParallelBlockElaboration,
+     ReturnInARandsequenceWeightCodeBlockInAForkIsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  task t();\n"
+      "    fork\n"
+      "      randsequence(main)\n"
+      "        main : alt := 5 { return; };\n"
+      "        alt : { ; };\n"
+      "      endsequence\n"
+      "    join_none\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The fork below the production rather than above it. §18.17.6 states what the
+// return does without qualifying it by what stands between the return and the
+// production, so the return here still aborts the production and is still not
+// the subroutine's return, however many processes the fork spawns in between.
+// CheckNoReturnInFork keeps its §18.17.6 term set through a fork for that
+// reason, which is the same reading JumpScope::in_production_code_block in
+// src/elaborator/elaborator_validate_jump_statements.cpp records for §12.8.
+TEST(ParallelBlockElaboration,
+     ReturnInAForkInARandsequenceCodeBlockIsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  task t();\n"
+      "    randsequence(main)\n"
+      "      main : { fork return; join_none };\n"
+      "    endsequence\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

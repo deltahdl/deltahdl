@@ -14,24 +14,48 @@ namespace delta {
 void ValidateRefLifetime(const ModuleItem* func, DiagEngine& diag);
 void ValidateConstRefWriteProtection(const ModuleItem* func, DiagEngine& diag);
 
-static void CheckNoReturnInFork(const Stmt* s, DiagEngine& diag) {
+// §9.3.2: "A return statement within the context of a fork-join block is
+// illegal and shall result in a compilation error." The clause puts no
+// condition on where inside the fork the return stands, so every position a
+// statement holds a statement in is one the rule reaches. ForEachChildStmt in
+// elaborator_validate_internal.h states those positions once for the whole
+// elaborator, which is why the list is not written out again here.
+//
+// Stmt::for_inits and Stmt::for_steps are walked because the shared list is
+// walked whole, and no conforming source puts a return in either: A.6.8 admits
+// only a list_of_variable_assignments or a for_variable_declaration in a
+// for_initialization, and only an operator_assignment, an inc_or_dec_expression
+// or a function_subroutine_call in a for_step, and a jump_statement is none of
+// those.
+//
+// `in_production_code_block` is §18.17.6's term. It is set at a randsequence
+// statement and stays set below one, through a fork-join written inside a
+// production code block as well: a return there aborts the production rather
+// than the enclosing subroutine, so the return §9.3.2 forbids is not what is
+// written there, however many process boundaries stand between.
+static void CheckNoReturnInFork(const Stmt* s, bool in_production_code_block,
+                                DiagEngine& diag) {
   if (!s) return;
   if (s->kind == StmtKind::kReturn) {
-    diag.Error(s->range.start,
-               "return statement is not allowed inside a fork-join block",
-               Subclause("9.3.2"));
+    // §18.17.6: "The return statement aborts the generation of the current
+    // production." A return in a randsequence production code block is
+    // therefore not the enclosing subroutine's return, and §9.3.2 is about the
+    // subroutine's return, so this clause has nothing to report about it.
+    if (!in_production_code_block) {
+      diag.Error(s->range.start,
+                 "return statement is not allowed inside a fork-join block",
+                 Subclause("9.3.2"));
+    }
     return;
   }
-  for (auto* sub : s->stmts) CheckNoReturnInFork(sub, diag);
-  for (auto* sub : s->fork_stmts) CheckNoReturnInFork(sub, diag);
-  CheckNoReturnInFork(s->then_branch, diag);
-  CheckNoReturnInFork(s->else_branch, diag);
-  CheckNoReturnInFork(s->body, diag);
-  CheckNoReturnInFork(s->for_body, diag);
-  for (auto& ci : s->case_items) CheckNoReturnInFork(ci.body, diag);
-  for (auto& ri : s->randcase_items) CheckNoReturnInFork(ri.second, diag);
-  CheckNoReturnInFork(s->assert_pass_stmt, diag);
-  CheckNoReturnInFork(s->assert_fail_stmt, diag);
+  // Stmt::rs_productions is the only member of Stmt a randsequence statement
+  // fills, and every statement it holds stands in one of the two rs_code_blocks
+  // A.6.12's rs_rule admits, so the term is set at the randsequence itself.
+  bool in_production =
+      in_production_code_block || s->kind == StmtKind::kRandsequence;
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    CheckNoReturnInFork(sub, in_production, diag);
+  });
 }
 
 static void CheckExprForRefArgs(
@@ -170,11 +194,38 @@ static void CheckFuncBodyVarDecl(const Stmt* s, std::string_view func_name,
   // static variable declared inside a subroutine.
 }
 
-static void CheckFuncBodyStmtSelf(
-    const Stmt* s, bool is_void,
-    const std::unordered_set<std::string_view>& task_names,
-    std::string_view func_name, DiagEngine& diag) {
-  if (s->kind == StmtKind::kReturn && s->expr && is_void) {
+// What §13.4 and §13.4.1 need to know about the function whose body is being
+// walked, and §18.17.6 about where in that body the statement being walked
+// stands.
+struct FunctionBodyScope {
+  // §13.4.1: "Functions can be declared as type void, which do not have a
+  // return value", so a return carrying one in such a function breaks the
+  // clause.
+  bool is_void = false;
+  // §13.4.1: "It shall also be illegal to declare another object with the same
+  // name as the function inside the function scope." A declaration written in
+  // the body is compared against this name.
+  std::string_view func_name;
+  // §13.4: "A function shall not enable tasks regardless of whether those
+  // tasks contain time-controlling statements." A call is a task enable when
+  // it names one of these.
+  const std::unordered_set<std::string_view>& task_names;
+  // §18.17.6: "The return statement aborts the generation of the current
+  // production." Such a return is not the function's return, and §18.17.7 has
+  // it carry an expression -- "A value is returned from a production by using
+  // the return with an expression" -- which is the shape §13.4.1's void-return
+  // report fires on. The term is what withholds that report.
+  bool in_production_code_block = false;
+};
+
+static void CheckFuncBodyStmtSelf(const Stmt* s, const FunctionBodyScope& scope,
+                                  DiagEngine& diag) {
+  // §18.17.6 and §18.17.7: the expression a return carries in a randsequence
+  // production code block is the production's value and not a value returned
+  // from the function, so §13.4.1's rule about a void function is not what
+  // governs it.
+  if (s->kind == StmtKind::kReturn && s->expr && scope.is_void &&
+      !scope.in_production_code_block) {
     diag.Error(s->range.start, "void function returns a value",
                Subclause("13.4.1"));
   }
@@ -188,12 +239,12 @@ static void CheckFuncBodyStmtSelf(
 
   if (s->kind == StmtKind::kExprStmt && s->expr &&
       s->expr->kind == ExprKind::kCall &&
-      task_names.count(s->expr->callee) != 0) {
+      scope.task_names.count(s->expr->callee) != 0) {
     diag.Error(s->range.start, "function cannot enable a task",
                Subclause("13.4"));
   }
 
-  CheckFuncBodyVarDecl(s, func_name, diag);
+  CheckFuncBodyVarDecl(s, scope.func_name, diag);
 
   if (s->kind == StmtKind::kAssign && s->lhs &&
       s->lhs->kind == ExprKind::kSelect) {
@@ -203,31 +254,46 @@ static void CheckFuncBodyStmtSelf(
   }
 
   if (s->kind == StmtKind::kFork) {
-    for (auto* sub : s->fork_stmts) CheckNoReturnInFork(sub, diag);
+    for (auto* sub : s->fork_stmts)
+      CheckNoReturnInFork(sub, scope.in_production_code_block, diag);
   }
 }
 
-static void CheckFuncBodyStmt(
-    const Stmt* s, bool is_void,
-    const std::unordered_set<std::string_view>& task_names,
-    std::string_view func_name, DiagEngine& diag) {
+// §13.4 and §13.4.1 state the rules a function body is held to and put no
+// condition on where in the body the statement breaking one stands, so every
+// position a statement holds a statement in is one they reach. ForEachChildStmt
+// in elaborator_validate_internal.h states those positions once for the whole
+// elaborator, which is why the list is not written out again here.
+//
+// Stmt::for_inits is walked because the shared list is walked whole, and no
+// conforming source makes any report above from it: A.6.8 admits only a
+// list_of_variable_assignments or a for_variable_declaration there, and
+// ParserStmtHelpers::ParseForLocalDeclInits in src/parser/parser_stmt.cpp
+// leaves a control variable declared local to the loop as an assignment with
+// its type in Stmt::for_init_types rather than as a StmtKind::kVarDecl.
+// Stmt::for_steps does make one: A.6.8 admits a function_subroutine_call there,
+// and a task enable is one.
+static void CheckFuncBodyStmt(const Stmt* s, const FunctionBodyScope& scope,
+                              DiagEngine& diag) {
   if (!s) return;
-  CheckFuncBodyStmtSelf(s, is_void, task_names, func_name, diag);
+  CheckFuncBodyStmtSelf(s, scope, diag);
 
+  // §13.4.4: "Within a function, a fork-join_none construct may contain any
+  // statements that are legal within a task", which is the exception §13.4
+  // refers to when it opens "with exceptions noted in 13.4.4". The statements
+  // under such a fork are answerable to §13.3 rather than to §13.4, so the walk
+  // stops here.
   if (s->kind == StmtKind::kFork && s->join_kind == TokenKind::kKwJoinNone)
     return;
-  for (auto* sub : s->stmts)
-    CheckFuncBodyStmt(sub, is_void, task_names, func_name, diag);
-  CheckFuncBodyStmt(s->then_branch, is_void, task_names, func_name, diag);
-  CheckFuncBodyStmt(s->else_branch, is_void, task_names, func_name, diag);
-  CheckFuncBodyStmt(s->body, is_void, task_names, func_name, diag);
-  CheckFuncBodyStmt(s->for_body, is_void, task_names, func_name, diag);
-  CheckFuncBodyStmt(s->assert_pass_stmt, is_void, task_names, func_name, diag);
-  CheckFuncBodyStmt(s->assert_fail_stmt, is_void, task_names, func_name, diag);
-  for (auto& ci : s->case_items)
-    CheckFuncBodyStmt(ci.body, is_void, task_names, func_name, diag);
-  for (auto& ri : s->randcase_items)
-    CheckFuncBodyStmt(ri.second, is_void, task_names, func_name, diag);
+
+  FunctionBodyScope inner = scope;
+  // Stmt::rs_productions is the only member of Stmt a randsequence statement
+  // fills, and every statement it holds stands in one of the two rs_code_blocks
+  // A.6.12's rs_rule admits, so §18.17.6's term is set at the randsequence
+  // itself.
+  if (s->kind == StmtKind::kRandsequence) inner.in_production_code_block = true;
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { CheckFuncBodyStmt(sub, inner, diag); });
 }
 
 // §13.3.2: an automatic task variable is deallocated when the invocation ends,
@@ -382,35 +448,71 @@ static void CheckTaskBodyContAssign(
   }
 }
 
-static void CheckTaskBodyStmtSelf(
-    const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
-    const AutoVarRule& rule, DiagEngine& diag) {
-  if (s->kind == StmtKind::kReturn && s->expr) {
+// What §13.3 and the clause AutoVarRule selects need to know about the task
+// whose body is being walked, and §18.17.6 about where in that body the
+// statement being walked stands.
+struct TaskBodyScope {
+  // The variables the four uses are forbidden of: §13.3.2's "variables declared
+  // in automatic tasks", or §6.21's automatic variables where a static task
+  // declared them, as CollectAutoVarNames collects them.
+  const std::unordered_set<std::string_view>& auto_vars;
+  // Which of those two clauses forbids the use, and how its report names the
+  // variable. See AutoVarRule above.
+  const AutoVarRule& rule;
+  // §18.17.6: "The return statement aborts the generation of the current
+  // production." Such a return is not the task's return, and §18.17.7 has it
+  // carry an expression -- "A value is returned from a production by using the
+  // return with an expression" -- which is the shape §13.3's report fires on.
+  // The term is what withholds that report.
+  bool in_production_code_block = false;
+};
+
+static void CheckTaskBodyStmtSelf(const Stmt* s, const TaskBodyScope& scope,
+                                  DiagEngine& diag) {
+  // §18.17.6 and §18.17.7: the expression a return carries in a randsequence
+  // production code block is the production's value and not a value returned
+  // from the task, so §13.3's "A task exits when the endtask is reached. The
+  // return statement can be used to exit the task before the endtask keyword"
+  // is not what governs it.
+  if (s->kind == StmtKind::kReturn && s->expr &&
+      !scope.in_production_code_block) {
     diag.Error(s->range.start, "task returns a value", Subclause("13.3"));
   }
 
-  CheckTaskBodyNbaForAutoVar(s, auto_vars, rule, diag);
-  CheckTaskBodyMonitorTrace(s, auto_vars, rule, diag);
-  CheckTaskBodyContAssign(s, auto_vars, rule, diag);
+  CheckTaskBodyNbaForAutoVar(s, scope.auto_vars, scope.rule, diag);
+  CheckTaskBodyMonitorTrace(s, scope.auto_vars, scope.rule, diag);
+  CheckTaskBodyContAssign(s, scope.auto_vars, scope.rule, diag);
 
   if (s->kind == StmtKind::kFork) {
-    for (auto* sub : s->fork_stmts) CheckNoReturnInFork(sub, diag);
+    for (auto* sub : s->fork_stmts)
+      CheckNoReturnInFork(sub, scope.in_production_code_block, diag);
   }
 }
 
-static void CheckTaskBodyStmt(
-    const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
-    const AutoVarRule& rule, DiagEngine& diag) {
+// §13.3, §13.3.2, §6.21 and §10.6.1 each state a rule about a statement written
+// in a task body and put no condition on where in the body it stands, so every
+// position a statement holds a statement in is one they reach. ForEachChildStmt
+// in elaborator_validate_internal.h states those positions once for the whole
+// elaborator, which is why the list is not written out again here.
+//
+// Stmt::for_inits is walked because the shared list is walked whole, and no
+// conforming source makes any report above from it: A.6.8 admits only a
+// list_of_variable_assignments or a for_variable_declaration there, and neither
+// is a return, a nonblocking assignment, a procedural continuous assignment or
+// a system task call. Stmt::for_steps does make one: A.6.8 admits a
+// function_subroutine_call there, and $monitor is one.
+static void CheckTaskBodyStmt(const Stmt* s, const TaskBodyScope& scope,
+                              DiagEngine& diag) {
   if (!s) return;
-  CheckTaskBodyStmtSelf(s, auto_vars, rule, diag);
-  for (auto* sub : s->stmts) CheckTaskBodyStmt(sub, auto_vars, rule, diag);
-  for (auto* sub : s->fork_stmts) CheckTaskBodyStmt(sub, auto_vars, rule, diag);
-  CheckTaskBodyStmt(s->then_branch, auto_vars, rule, diag);
-  CheckTaskBodyStmt(s->else_branch, auto_vars, rule, diag);
-  CheckTaskBodyStmt(s->body, auto_vars, rule, diag);
-  CheckTaskBodyStmt(s->for_body, auto_vars, rule, diag);
-  for (auto& ci : s->case_items)
-    CheckTaskBodyStmt(ci.body, auto_vars, rule, diag);
+  CheckTaskBodyStmtSelf(s, scope, diag);
+  TaskBodyScope inner = scope;
+  // Stmt::rs_productions is the only member of Stmt a randsequence statement
+  // fills, and every statement it holds stands in one of the two rs_code_blocks
+  // A.6.12's rs_rule admits, so §18.17.6's term is set at the randsequence
+  // itself.
+  if (s->kind == StmtKind::kRandsequence) inner.in_production_code_block = true;
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { CheckTaskBodyStmt(sub, inner, diag); });
 }
 
 // Collects the names §6.21 and §13.3.2 govern. §6.21 says "Automatic variables
@@ -497,8 +599,9 @@ static void ValidateTaskBody(const ModuleItem* item, DiagEngine& diag) {
   }
   const AutoVarRule& rule =
       is_auto ? kAutomaticTaskVar : kAutomaticVarInStaticTask;
+  TaskBodyScope scope{.auto_vars = auto_vars, .rule = rule};
   for (auto* s : item->func_body_stmts) {
-    CheckTaskBodyStmt(s, auto_vars, rule, diag);
+    CheckTaskBodyStmt(s, scope, diag);
   }
 }
 
@@ -581,8 +684,10 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
   }
   if (item->kind != ModuleItemKind::kFunctionDecl) return;
   bool is_void = (item->return_type.kind == DataTypeKind::kVoid);
+  FunctionBodyScope scope{
+      .is_void = is_void, .func_name = item->name, .task_names = task_names_};
   for (auto* s : item->func_body_stmts) {
-    CheckFuncBodyStmt(s, is_void, task_names_, item->name, diag_);
+    CheckFuncBodyStmt(s, scope, diag_);
   }
 }
 

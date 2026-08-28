@@ -519,6 +519,30 @@ TEST(FunctionElaboration, InputOnlyArgCallInContAssignOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// Stmt::for_steps is a position CheckFuncBodyStmt in
+// src/elaborator/elaborator_validate_funcbody.cpp reaches for the first time
+// now that it takes its child-statement links from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. A.6.8 gives
+// `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
+// function_subroutine_call`, and a task enable is a function_subroutine_call,
+// so §13.4 rule b) -- "A function shall not enable tasks regardless of whether
+// those tasks contain time-controlling statements" -- reaches a for step. It
+// went unenforced there while the walk wrote out its own list of nine links.
+TEST(FunctionElaboration, TaskEnabledFromAForStepError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task t(); endtask\n"
+      "  function void f(input int n);\n"
+      "    int i;\n"
+      "    for (i = 0; i < n; t()) ;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function cannot enable a task", 5, "13.4"));
+}
+
 // §13.4.3 lists the constraints a constant function is held to, and none of
 // them says where in the body the statement or expression breaking one may
 // stand. Five walks in src/elaborator/elaborator_validate_funcchecks.cpp

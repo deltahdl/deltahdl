@@ -444,9 +444,10 @@ TEST(JumpStatementElaboration,
 // in src/elaborator/elaborator_validate_jump_statements.cpp reports the bare
 // return that breaks it. §18.17.6 makes the bare return below abort the
 // production rather than the function, so it is not the function's return and
-// that report is not about it. This is the case that holds
-// CheckValueReturningFuncReturn out of #3301's conversion onto
-// ForEachChildStmt, which would descend Stmt::rs_productions.
+// that report is not about it. This is the case that pins the one exclusion
+// CheckValueReturningFuncReturn makes: it takes its child links from
+// ForEachChildStmt and stops at a randsequence statement, whose
+// Stmt::rs_productions ForEachChildStmt would otherwise descend.
 TEST(JumpStatementElaboration,
      ReturnInARandsequenceProductionCodeBlockInAValueReturningFunctionOk) {
   ElabFixture f;
@@ -561,6 +562,198 @@ TEST(JumpStatementElaboration,
       "      endsequence\n"
       "    end\n"
       "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The cases below stand on Stmt::body of a statement that is not a loop.
+// src/parser/parser_stmt.cpp fills that field for StmtKind::kDelay,
+// StmtKind::kCycleDelay, StmtKind::kEventControl and StmtKind::kWait as well
+// as for the loop statements, and CheckJumpRulesChildren in
+// src/elaborator/elaborator_validate_jump_statements.cpp reaches it through
+// ForEachChildStmt. §12.8 says "the continue and break statements can only be
+// used in a loop" and "the return statement can only be used in a subroutine"
+// without qualifying either by what a statement is waiting for, so a jump
+// written after a delay, a cycle delay, an event control or a wait is judged
+// exactly as one written on its own.
+
+// §12.8: the break is the whole body of a delay control, and no loop encloses
+// the delay control, so the break is not inside a loop.
+TEST(JumpStatementElaboration, BreakAfterADelayControlIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial #5 break;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "break statement is not inside a loop", 2, "12.8"));
+}
+
+// The continue that the case above's break does not answer for. §12.8 holds
+// both statements to the same enclosing loop, and CheckContinueScope in
+// src/elaborator/elaborator_validate_jump_statements.cpp is a separate
+// emission site from CheckBreakScope, so the link carries two reports and not
+// one.
+TEST(JumpStatementElaboration, ContinueAfterADelayControlIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial #5 continue;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "continue statement is not inside a loop", 2,
+                            "12.8"));
+}
+
+// §9.4.2's event control fills the same Stmt::body, so §12.8's rule reaches a
+// break written after @(posedge clk) as it reaches one written after a delay.
+TEST(JumpStatementElaboration, BreakAfterAnEventControlIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  initial @(posedge clk) break;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "break statement is not inside a loop", 3, "12.8"));
+}
+
+// §9.4.3's wait statement fills the same Stmt::body. A wait is not a loop, so
+// the break it guards is a break outside a loop.
+TEST(JumpStatementElaboration, BreakAfterAWaitStatementIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic done;\n"
+      "  initial wait (done) break;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "break statement is not inside a loop", 3, "12.8"));
+}
+
+// §14.11's cycle delay fills the same Stmt::body. The default clocking is
+// there because §14.11 makes a ## without one an error of its own, which would
+// leave the source rejected whether §12.8 reported the break or not.
+TEST(JumpStatementElaboration, BreakAfterACycleDelayIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  default clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "  initial ##1 break;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "break statement is not inside a loop", 5, "12.8"));
+}
+
+// The third §12.8 report through the same link: "the return statement can only
+// be used in a subroutine", and an initial block is not one. CheckJumpLeaf in
+// src/elaborator/elaborator_validate_jump_statements.cpp emits it, reading
+// JumpScope::in_subroutine, which an event control neither sets nor clears.
+TEST(JumpStatementElaboration,
+     ReturnAfterAnEventControlOutsideASubroutineIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  initial @(posedge clk) return;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "return statement is only allowed inside a subroutine", 3, "12.8"));
+}
+
+// The enclosing loop count passes through a delay control unchanged. Without
+// this case, a walk that reached Stmt::body with a fresh JumpScope rather than
+// the caller's would pass every rejection case above.
+TEST(JumpStatementElaboration, BreakAfterADelayControlInsideAForLoopOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 4; i++) #5 break;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The enclosing fork-join count passes through a delay control too, which is
+// what selects §12.8's second break report rather than its first: "the
+// continue and break statements cannot be used inside a fork-join block to
+// control a loop outside the fork-join block". The for loop stands outside the
+// fork.
+TEST(JumpStatementElaboration,
+     BreakAfterADelayControlInsideAForkInsideALoopIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 4; i++) begin\n"
+      "      fork\n"
+      "        #5 break;\n"
+      "      join\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "break inside fork-join cannot exit a loop outside "
+                            "the fork-join block",
+                            5, "12.8"));
+}
+
+// §18.17.6's term passes through a delay control as well, so a return written
+// after a delay inside a production code block still aborts the production
+// rather than a subroutine and §12.8's subroutine rule is still not the one
+// that governs it.
+TEST(JumpStatementElaboration,
+     ReturnAfterADelayControlInARandsequenceProductionCodeBlockOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { #5 return; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The weight code block A.6.12's rs_rule admits after a weight_specification
+// is a second statement list under Stmt::rs_productions, and
+// CheckValueReturningFuncReturn stops at the randsequence statement, so it
+// excludes that list along with the production code blocks. §18.17.6 makes the
+// bare return below abort the production rather than the function, so §13.4.1's
+// "when the return statement is used, nonvoid functions shall specify an
+// expression with the return" is not about it. The production `a` has an empty
+// code block, which leaves the weight block as the only place the return can
+// stand.
+TEST(JumpStatementElaboration,
+     ReturnInARandsequenceWeightCodeBlockInAValueReturningFunctionOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function int f();\n"
+      "    randsequence(main)\n"
+      "      main : a := 5 { return; };\n"
+      "      a : { ; };\n"
+      "    endsequence\n"
+      "    return 0;\n"
+      "  endfunction\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);

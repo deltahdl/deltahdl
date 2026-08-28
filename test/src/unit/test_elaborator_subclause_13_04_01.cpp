@@ -321,4 +321,112 @@ TEST(FunctionReturnElaboration, SystemFunctionAllowedAsImplicitVariable) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// The four cases below cover the positions CheckFuncBodyStmt in
+// src/elaborator/elaborator_validate_funcbody.cpp reaches for the first time
+// now that it takes its child-statement links from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. It had written out nine of the
+// thirteen links Stmt declares, so §13.4.1's two reports -- and §13.4's and
+// §10.6.1's beside them -- went unmade for a statement written in
+// Stmt::fork_stmts, Stmt::for_inits, Stmt::for_steps or Stmt::rs_productions.
+//
+// Stmt::for_inits gets no case: A.6.8 admits only a
+// list_of_variable_assignments or a for_variable_declaration there, and neither
+// is a return or a declaration the elaborator sees as a StmtKind::kVarDecl.
+// Stmt::for_steps does hold a function_subroutine_call, and
+// FunctionElaboration.TaskEnabledFromAForStepError in
+// test/src/unit/test_elaborator_subclause_13_04.cpp covers it, the rule that
+// reaches a for step being §13.4's rather than §13.4.1's.
+
+// §9.3.2 already rejected this return, through CheckNoReturnInFork, but
+// §13.4.1's own report about the value it carries was never made: nothing in
+// CheckFuncBodyStmt descended into a fork. §13.4.4 exempts the statements under
+// a fork-join_none -- "Within a function, a fork-join_none construct may
+// contain any statements that are legal within a task" -- and the walk still
+// stops at one, so the fork here is the fork-join §13.4 rule a) forbids
+// outright.
+TEST(FunctionReturnElaboration, VoidFunctionReturnWithValueInsideAForkJoin) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void f();\n"
+      "    fork\n"
+      "      return 1;\n"
+      "    join\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "void function returns a value", 4, "13.4.1"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds the data declaration
+// §13.4.1's "It shall also be illegal to declare another object with the same
+// name as the function inside the function scope" is about. The parser keeps it
+// in RsProd::code_stmts, reached through Stmt::rs_productions and through no
+// other member of Stmt.
+TEST(FunctionReturnElaboration, VarNamedAsFunctionInARandsequenceCodeBlock) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void f();\n"
+      "    randsequence(main)\n"
+      "      main : { int f; };\n"
+      "    endsequence\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of 'f' conflicts with function name",
+                            4, "13.4.1"));
+}
+
+// A.6.12's `rs_rule ::= rs_production_list [ := weight_specification [
+// rs_code_block ] ]` puts a second code block after the weight, kept in
+// RsRule::weight_code rather than in RsProd::code_stmts, so it is a second
+// statement position under Stmt::rs_productions and gets its own case.
+TEST(FunctionReturnElaboration,
+     VarNamedAsFunctionInARandsequenceWeightCodeBlock) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void f();\n"
+      "    randsequence(main)\n"
+      "      main : alt := 5 { int f; };\n"
+      "      alt : { ; };\n"
+      "    endsequence\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of 'f' conflicts with function name",
+                            4, "13.4.1"));
+}
+
+// The §18.17.6 case: what a return written in a randsequence production code
+// block is, and what §13.4.1 therefore owes it. "The return statement aborts
+// the generation of the current production", and §18.17.7 adds that "A value is
+// returned from a production by using the return with an expression", so a
+// production declared `int` returns its value exactly the way §13.4.1's "void
+// function returns a value" report fires -- a return carrying an expression.
+// Neither return below is the function's, so neither is that report's. Take
+// FunctionBodyScope::in_production_code_block in
+// src/elaborator/elaborator_validate_funcbody.cpp away and §18.17.7's own
+// construct is rejected inside a void function.
+TEST(FunctionReturnElaboration, ValueReturningProductionInAVoidFunctionOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function void f();\n"
+      "    randsequence(main)\n"
+      "      void main : a { return; };\n"
+      "      int a : { return 7; };\n"
+      "    endsequence\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

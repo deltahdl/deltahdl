@@ -124,38 +124,32 @@ bool IsLoopStmtKind(StmtKind k) {
          k == StmtKind::kRepeat || k == StmtKind::kDoWhile;
 }
 
-// Recurses into every generic child statement of `s` carrying the current
-// jump scope unchanged (used for non-loop, non-fork statements), and into the
-// randsequence production code blocks with the §18.17.6 term set.
+// Recurses into every child statement of `s` carrying `scope` unchanged.
 //
-// The generic links are still written out here rather than taken from
-// ForEachChildStmt in elaborator_validate_internal.h. That conversion is
-// #3301's, and it also brings Stmt::body, Stmt::for_body, Stmt::fork_stmts,
-// Stmt::for_inits and Stmt::for_steps, each of which this walk already reaches
-// with a scope of its own; folding them into one list is a separate question
-// from the two lists below.
+// The links come from ForEachChildStmt in elaborator_validate_internal.h,
+// which is the one list of the thirteen fields of Stmt that hold a
+// statement. This walk may take all thirteen from it even though four of them
+// stand in a scope of their own, because CheckJumpRules answers every
+// statement kind that fills those four before reaching here. Stmt::for_inits,
+// Stmt::for_steps and Stmt::for_body are filled by Parser::ParseForStmt in
+// src/parser/parser_stmt.cpp alone, Stmt::fork_stmts by Parser::ParseForkStmt
+// in src/parser/parser_stmt_block.cpp alone, and Stmt::rs_productions by
+// Parser::ParseRandsequenceStmt in src/parser/parser_verify.cpp alone. All
+// five are therefore empty at every statement that reaches this function, and
+// visiting them here changes nothing.
+//
+// Stmt::body is the one link that is not empty here. The five loop statements
+// of §12.7 other than for fill it and are answered above, but
+// Parser::ParseDelayStmt, Parser::ParseCycleDelayStmt,
+// Parser::ParseEventControlStmt and Parser::ParseWaitStmt fill it too, and
+// none of those four is a loop. §12.8 says "the continue and break statements
+// can only be used in a loop" without qualifying it by what a statement is
+// waiting for, so `initial #5 break;` is a break outside a loop and is
+// reported as one.
 void CheckJumpRulesChildren(const Stmt* s, const JumpScope& scope,
                             DiagEngine& diag) {
-  for (auto* sub : s->stmts) CheckJumpRules(sub, scope, diag);
-  CheckJumpRules(s->then_branch, scope, diag);
-  CheckJumpRules(s->else_branch, scope, diag);
-  for (auto& ci : s->case_items) CheckJumpRules(ci.body, scope, diag);
-  for (auto& ri : s->randcase_items) CheckJumpRules(ri.second, scope, diag);
-  CheckJumpRules(s->assert_pass_stmt, scope, diag);
-  CheckJumpRules(s->assert_fail_stmt, scope, diag);
-
-  // §18.17.6 gives break and return a meaning in a randsequence production
-  // code block that they have nowhere else, so the two statement lists
-  // Stmt::rs_productions reaches are walked with that term set.
-  // ForEachRandsequenceStmt in elaborator_validate_internal.h hands over both
-  // of them: A.6.12's rs_prod may be an rs_code_block, whose statements the
-  // parser keeps in RsProd::code_stmts, and A.6.12's rs_rule admits a second
-  // rs_code_block after a weight_specification, whose statements go in
-  // RsRule::weight_code.
-  JumpScope production = scope;
-  production.in_production_code_block = true;
-  ForEachRandsequenceStmt(
-      s, [&](Stmt* const& sub) { CheckJumpRules(sub, production, diag); });
+  ForEachChildStmt(s,
+                   [&](Stmt* const& sub) { CheckJumpRules(sub, scope, diag); });
 }
 
 // Walks one statement subtree enforcing §12.8's rules for break, continue and
@@ -180,6 +174,23 @@ void CheckJumpRules(const Stmt* s, const JumpScope& scope, DiagEngine& diag) {
     inner.loop_depth = 0;
     inner.fork_depth = scope.fork_depth + 1;
     for (auto* sub : s->fork_stmts) CheckJumpRules(sub, inner, diag);
+    return;
+  }
+
+  // §18.17.6 gives break and return a meaning in a randsequence production
+  // code block that they have nowhere else, so the statements a randsequence
+  // statement holds are walked with that term set.
+  // Parser::ParseRandsequenceStmt in src/parser/parser_verify.cpp fills
+  // Stmt::rs_productions and no other child-statement link, so handing the
+  // whole of ForEachChildStmt the production scope reaches those statements and
+  // nothing besides. A.6.12 keeps them in two lists: an rs_prod may be an
+  // rs_code_block, whose statements the parser puts in RsProd::code_stmts, and
+  // an rs_rule admits a second rs_code_block after a weight_specification,
+  // whose statements go in RsRule::weight_code.
+  if (s->kind == StmtKind::kRandsequence) {
+    JumpScope production = scope;
+    production.in_production_code_block = true;
+    CheckJumpRulesChildren(s, production, diag);
     return;
   }
 
@@ -237,28 +248,25 @@ void CheckValueReturningFuncReturn(const Stmt* s, std::string_view func_name,
     }
     return;
   }
-  // Stmt::rs_productions is left out of this walk, and #3301's conversion onto
-  // ForEachChildStmt is held back for it: §18.17.6 makes a return in a
-  // randsequence production code block abort the production rather than the
-  // enclosing function, so it is not the function's return and §12.8's
-  // "in a function returning a value, the return statement shall have an
-  // expression of the correct type" is not about it.
-  for (auto* sub : s->stmts)
+  // §18.17.6 makes a return written in a randsequence production code block
+  // abort the generation of the current production rather than return from the
+  // enclosing function: "the return statement aborts the generation of the
+  // current production". It is therefore not the function's return, and
+  // neither §12.8's "in a function returning a value, the return statement
+  // shall have an expression of the correct type" nor §13.4.1's "when the
+  // return statement is used, nonvoid functions shall specify an expression
+  // with the return" is about it. Stopping at the randsequence statement
+  // excludes exactly those statements: Parser::ParseRandsequenceStmt in
+  // src/parser/parser_verify.cpp fills Stmt::rs_productions and no other
+  // child-statement link, so nothing else is left unreached by stopping here.
+  if (s->kind == StmtKind::kRandsequence) return;
+
+  // Every other link comes from ForEachChildStmt in
+  // elaborator_validate_internal.h, which is the one list of the fields of Stmt
+  // that hold a statement.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     CheckValueReturningFuncReturn(sub, func_name, return_type, diag);
-  for (auto* sub : s->fork_stmts)
-    CheckValueReturningFuncReturn(sub, func_name, return_type, diag);
-  CheckValueReturningFuncReturn(s->then_branch, func_name, return_type, diag);
-  CheckValueReturningFuncReturn(s->else_branch, func_name, return_type, diag);
-  CheckValueReturningFuncReturn(s->body, func_name, return_type, diag);
-  CheckValueReturningFuncReturn(s->for_body, func_name, return_type, diag);
-  for (auto& ci : s->case_items)
-    CheckValueReturningFuncReturn(ci.body, func_name, return_type, diag);
-  for (auto& ri : s->randcase_items)
-    CheckValueReturningFuncReturn(ri.second, func_name, return_type, diag);
-  CheckValueReturningFuncReturn(s->assert_pass_stmt, func_name, return_type,
-                                diag);
-  CheckValueReturningFuncReturn(s->assert_fail_stmt, func_name, return_type,
-                                diag);
+  });
 }
 
 // §12.8 — applies the jump rules to a function/task body and, for a

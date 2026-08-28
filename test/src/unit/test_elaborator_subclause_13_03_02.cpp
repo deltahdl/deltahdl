@@ -393,4 +393,82 @@ TEST(TaskBodyElaboration, MonitorOfModuleVarOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// The three cases below cover the positions CheckTaskBodyStmt in
+// src/elaborator/elaborator_validate_funcbody.cpp reaches for the first time
+// now that it takes its child-statement links from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. It had written out seven of
+// the thirteen links Stmt declares, so §13.3.2's four bullets went unenforced
+// for a use written in Stmt::for_steps or Stmt::rs_productions. The other
+// newly reached links -- Stmt::assert_pass_stmt, Stmt::assert_fail_stmt and
+// Stmt::randcase_items -- are covered by the §13.3 cases in
+// test/src/unit/test_elaborator_subclause_13_03.cpp, and Stmt::for_inits by
+// neither: A.6.8 admits only a list_of_variable_assignments or a
+// for_variable_declaration there, and none of the four bullets is about one.
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds the nonblocking
+// assignment §13.3.2's first bullet forbids. The parser keeps its statements in
+// RsProd::code_stmts, reached through Stmt::rs_productions and through no other
+// member of Stmt.
+TEST(TaskBodyElaboration, AutoTaskLocalInNonblockingInARandsequenceCodeBlock) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task automatic t();\n"
+      "    int x;\n"
+      "    randsequence(main)\n"
+      "      main : { x <= 1; };\n"
+      "    endsequence\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic task variable in nonblocking assignment",
+                            5, "13.3.2"));
+}
+
+// A.6.12's `rs_rule ::= rs_production_list [ := weight_specification [
+// rs_code_block ] ]` puts a second code block after the weight, kept in
+// RsRule::weight_code rather than in RsProd::code_stmts, so it is a second
+// statement position under Stmt::rs_productions and gets its own case.
+TEST(TaskBodyElaboration,
+     AutoTaskLocalInNonblockingInARandsequenceWeightCodeBlock) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task automatic t();\n"
+      "    int x;\n"
+      "    randsequence(main)\n"
+      "      main : alt := 5 { x <= 1; };\n"
+      "      alt : { ; };\n"
+      "    endsequence\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic task variable in nonblocking assignment",
+                            5, "13.3.2"));
+}
+
+// A.6.8 gives `for_step_assignment ::= operator_assignment |
+// inc_or_dec_expression | function_subroutine_call`, and a system task call is
+// a function_subroutine_call, so §13.3.2's fourth bullet -- "They shall not be
+// traced with system tasks such as $monitor and $dumpvars" -- reaches a for
+// step.
+TEST(TaskBodyElaboration, AutoTaskLocalInMonitorInAForStepError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task automatic t(input int n);\n"
+      "    int x;\n"
+      "    int i;\n"
+      "    for (i = 0; i < n; $monitor(\"%d\", x)) ;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic task variable traced by system task", 5,
+                            "13.3.2"));
+}
+
 }  // namespace
