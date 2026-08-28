@@ -647,17 +647,27 @@ bool IsSigningSystemCall(const Expr* call) {
 // that reinterpret an operand as a packed vector -- the size cast and the
 // signing cast -- require an integral operand. A real variable or a real
 // literal used directly as such an operand is rejected here at elaboration.
+//
+// A time literal is one of those real operands. §5.8 interprets it as a
+// realtime value scaled to the current time unit, so 2.1ns is a real value and
+// not a value of the type named time, which §6.11 defines as a 64-bit integral
+// type. That reading is what this test used to have, admitting kRealLiteral
+// alone and letting signed'(2.1ns), 8'(2.1ns) and $signed(2.1ns) through while
+// the same conversions applied to a realtime variable were rejected.
 bool ElaboratorOperationRules::CastOperandIsReal(const Expr* operand) const {
   if (!operand) return false;
-  if (operand->kind == ExprKind::kRealLiteral) return true;
+  if (operand->kind == ExprKind::kRealLiteral ||
+      operand->kind == ExprKind::kTimeLiteral) {
+    return true;
+  }
   return IsRealVar(operand, var_types_);
 }
 
 // §11.7: $signed and $unsigned shall return a one-dimensional packed array with
 // the same number of bits and value as the input expression, so the input has
 // to have bits to return and a real argument has none. The argument is rejected
-// here by the same test the signing cast uses, a real literal or a real
-// variable standing directly as the first argument.
+// here by CastOperandIsReal, the same test the signing cast uses, which states
+// above it which operands count as real.
 //
 // This spelling cites §11.7 and the cast spelling cites §6.24.1 because each
 // clause states the requirement for the syntax it defines; §11.7 is what makes

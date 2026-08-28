@@ -204,4 +204,26 @@ TEST(SignedExprElaboration, ShortrealVarInUnsignedSystemFunctionRejected) {
       "expression inside $unsigned shall be an integral value", 4, "11.7"));
 }
 
+// §11.7: `$signed` "shall evaluate the input expression and return a
+// one-dimensional packed array with the same number of bits and value of the
+// input expression", and §5.8 interprets a time literal as a realtime value
+// scaled to the current time unit, so 2.1ns has no packed-array bits for the
+// conversion to return. This case cites §11.7 rather than §6.24.1 because
+// §6.24.1 states the rule for the cast spelling, signed'(2.1ns), which
+// test/src/unit/test_elaborator_subclause_06_24_01.cpp covers at
+// CastOperatorElaboration.TimeLiteralInSignedCastError.
+TEST(SignedExprElaboration, TimeLiteralArgumentToSignedSystemFunctionRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "  int r;\n"
+      "  initial r = $signed(2.1ns);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "expression inside $signed shall be an integral value", 4, "11.7"));
+}
+
 }  // namespace

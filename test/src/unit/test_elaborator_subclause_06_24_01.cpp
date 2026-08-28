@@ -307,6 +307,49 @@ TEST(CastOperatorElaboration, ShortrealVarInSignedCastError) {
                     4, "6.24.1"));
 }
 
+// §5.8: a time literal "is interpreted as a realtime value scaled to the
+// current time unit", so 2.1ns is a real value and not a value of the type
+// named time, which §6.11 defines as a 64-bit integral type. §6.24.1 requires
+// the expression inside a signing cast to be an integral value, so
+// signed'(2.1ns) breaks that rule exactly as signed'(2.5) does at
+// CastOperatorElaboration.RealLiteralInSignedCastError above.
+TEST(CastOperatorElaboration, TimeLiteralInSignedCastError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "  int r;\n"
+      "  initial r = signed'(2.1ns);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "expression inside a signing cast shall be an integral "
+                    "value",
+                    4, "6.24.1"));
+}
+
+// §6.24.1 puts the same integral-operand rule on the size cast, and §5.8 makes
+// 2.1ns a realtime value scaled to the current time unit, so 8'(2.1ns) is
+// rejected too. This case reaches the operand test through the size-cast arm of
+// ElaboratorOperationRules::CheckCastExpr in
+// src/elaborator/elaborator_validate_operations.cpp, which reports a different
+// message under the same subclause than the signing-cast arm
+// CastOperatorElaboration.TimeLiteralInSignedCastError reaches.
+TEST(CastOperatorElaboration, TimeLiteralInSizeCastError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "  logic [7:0] r;\n"
+      "  initial r = 8'(2.1ns);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "expression inside a size cast shall be an integral value", 4, "6.24.1"));
+}
+
 TEST(CastOperatorSim, CastByteTruncate) {
   SimFixture f;
   auto* var = RunAndFindVar(
