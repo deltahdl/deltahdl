@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -91,6 +92,37 @@ TEST(ChargeDecayElaboration, DecayTimeFromLocalparam) {
     }
   }
   EXPECT_TRUE(found);
+}
+
+// §28.16.2: "Like all nets, the delay specification in a trireg net declaration
+// can contain up to three delays. The first two delays shall specify the delay
+// for transition to the 1 and 0 logic states when the trireg net is driven to
+// these states by a driver. The third delay shall specify the charge decay time
+// instead of the delay in a transition to the z logic state." "Like all nets"
+// carries §28.16.1's three-valued form into each of the three slots, so a
+// declaration may write a triple in every one of them and the charge decay time
+// is the third triple's.
+//
+// The charge decay time is 8, the typical member of the third triple. §11.11
+// orders the three as "minimum, typical, and maximum values -- in that order",
+// and the typical member is the one elaboration can reach: nothing in
+// production writes the DelayMode in src/simulator/sim_context_types.h that
+// would name another, which is #3264. A decay time read off the first triple
+// answers 2, one taking the third triple's minimum answers 7, and a fold that
+// gives up on a triple answers 0 -- which §28.16.2.1 makes a trireg that never
+// decays, the opposite of what this declaration asks for.
+TEST(ChargeDecayElaboration, DecayTimeIsTheThirdTripleWhenEveryDelayIsATriple) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  trireg #(1:2:3, 4:5:6, 7:8:9) cap;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* cap = FindNet(design, "t", "cap");
+  ASSERT_NE(cap, nullptr);
+  EXPECT_EQ(cap->decay_ticks, 8u);
 }
 
 }  // namespace

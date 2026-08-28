@@ -646,6 +646,16 @@ std::optional<ConstVal> ConstEvalFull(const Expr* expr, const ScopeMap& scope) {
       return ConstEvalCastFull(expr, scope);
     case ExprKind::kMemberAccess:
       return ConstEvalMemberAccessFull(expr, scope);
+    case ExprKind::kMinTypMax:
+      // §11.11 admits three colon-separated expressions "wherever expressions
+      // can appear", to "represent minimum, typical, and maximum values -- in
+      // that order", so a constant expression can be written as one. The
+      // typical value is what folds, and Expr::condition holds it. §11.11
+      // names no default among the three, and nothing an elaboration reads says
+      // which one a run wants, so the typical value is the choice that agrees
+      // with the run: the simulator selects the same member until something
+      // calls SimContext::SetDelayMode in src/simulator/sim_context.h.
+      return ConstEvalFull(expr->condition, scope);
     case ExprKind::kCall: {
       // §11.2.1: a constant built-in method call (§5.13) is evaluated at
       // elaboration time. It is tried first because a built-in method is not a

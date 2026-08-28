@@ -499,26 +499,54 @@ static void LowerNetDeclAssignment(const ModuleItem* item, const RtlirNet& net,
   sink.mod->assigns.push_back(BuildNetDeclContAssign(item, net, sink.arena));
 }
 
-// §10.3.1 / §28.16: apply the compilation unit's default trireg charge strength
-// and decay-time settings to a freshly built trireg net.
+// §28.16.2.2: give the net the charge decay time its declaration writes as the
+// third delay -- "The third delay in a trireg net declaration shall specify the
+// charge decay time" -- or, where the declaration writes no third delay, the
+// compilation unit's default decay time. The third delay is evaluated in the
+// module's parameter scope, so a parameter or localparam decay time resolves
+// and not just a bare literal.
+static void ApplyTriregDecayTime(const ModuleItem* item, RtlirNet& net,
+                                 const CompilationUnit* unit,
+                                 const ScopeMap& scope, DiagEngine& diag) {
+  if (item->net_delay_decay == nullptr) {
+    if (!unit->default_decay_time_infinite) {
+      net.decay_ticks = unit->default_decay_time;
+    }
+    return;
+  }
+  auto decay_ticks = ConstEvalInt(item->net_delay_decay, scope);
+  if (!decay_ticks) {
+    // Report the fold that failed rather than substituting a decay time.
+    // RtlirNet::decay_ticks records a net that does not decay as zero, which is
+    // the opposite of what a declaration writing a third delay asks for, and no
+    // other value is any better a guess. The report is a warning rather than an
+    // error because A.2.2.3 writes delay3 over mintypmax_expression rather than
+    // constant_mintypmax_expression, so a third delay that constant folding
+    // does not reach is not thereby illegal.
+    diag.Warning(item->net_delay_decay->range.start,
+                 "trireg charge decay time does not fold to a constant, so the "
+                 "net is left holding its charge",
+                 Subclause("28.16.2.2"));
+    return;
+  }
+  net.decay_ticks = static_cast<uint64_t>(*decay_ticks);
+}
+
+// §10.3.1 / §28.16.2: apply the compilation unit's default trireg charge
+// strength and the declaration's charge decay time to a freshly built net.
+// Neither reaches a net that is not a trireg, because §28.16.2 gives the third
+// delay of a trireg declaration to the charge decay time "instead of the delay
+// in a transition to the z logic state" -- on every other net that delay is the
+// turn-off delay RecordNetDeclDelay below records.
 static void ApplyTriregNetDefaults(const ModuleItem* item, RtlirNet& net,
                                    const CompilationUnit* unit,
-                                   const ScopeMap& scope) {
-  if (net.net_type == NetType::kTrireg &&
-      item->data_type.charge_strength == 0 &&
+                                   const ScopeMap& scope, DiagEngine& diag) {
+  if (net.net_type != NetType::kTrireg) return;
+  if (item->data_type.charge_strength == 0 &&
       unit->has_default_trireg_strength) {
     net.trireg_capacitance = unit->default_trireg_strength;
   }
-  if (item->net_delay_decay) {
-    // §28.16.2: the third delay specifies the charge decay time, which is a
-    // constant expression -- evaluate it in the module's parameter scope so a
-    // parameter or localparam decay time resolves, not just a bare literal.
-    net.decay_ticks = static_cast<uint64_t>(
-        ConstEvalInt(item->net_delay_decay, scope).value_or(0));
-  } else if (net.net_type == NetType::kTrireg &&
-             !unit->default_decay_time_infinite) {
-    net.decay_ticks = unit->default_decay_time;
-  }
+  ApplyTriregDecayTime(item, net, unit, scope, diag);
 }
 
 // §28.16: record on the net the delay its declaration wrote, which is what
@@ -789,7 +817,7 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
         static_cast<Strength>(item->data_type.charge_strength);
   }
 
-  ApplyTriregNetDefaults(item, net, unit_, BuildParamScope(mod));
+  ApplyTriregNetDefaults(item, net, unit_, BuildParamScope(mod), diag_);
 
   RecordNetDeclDelay(item, net);
 

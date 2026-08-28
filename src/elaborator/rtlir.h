@@ -123,6 +123,14 @@ struct RtlirNet {
 
   Strength charge_strength = Strength::kMedium;
   uint32_t trireg_capacitance = 0;
+
+  // §28.16.2.2: the charge decay time of a trireg net, counted in time units,
+  // which the declaration writes as its third delay: "The third delay in a
+  // trireg net declaration shall specify the charge decay time." Zero records a
+  // net that does not decay, which is what §28.16.2 leaves a trireg whose
+  // declaration writes no third delay holding its charge with. Only a trireg
+  // carries one, because §28.16.2 gives the third delay of every other net to
+  // "the delay in a transition to the z logic state" instead.
   uint64_t decay_ticks = 0;
 
   // §28.16: the net delay this net was declared with. "Net delays refer to the
