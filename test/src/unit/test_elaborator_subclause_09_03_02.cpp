@@ -236,4 +236,66 @@ TEST(ParallelBlockElaboration, RefArgInForkJoinAnyBlockItemInitAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §9.3.2 says "Within a fork-join_any or fork-join_none block, it shall be
+// illegal to refer to formal arguments passed by reference other than in the
+// initialization value expressions of variables declared in a
+// block_item_declaration of the fork, unless the argument is declared ref
+// static", and puts no condition on the statement position the reference
+// stands in. A randsequence production's code block holds ordinary procedural
+// statements, which A.6.12 gives as `rs_code_block ::= { { data_declaration }
+// { statement_or_null } }`, and the parser keeps them in RsProd::code_stmts
+// and RsRule::weight_code, reached through Stmt::rs_productions. That is the
+// thirteenth of the child-statement links src/parser/ast_stmt.h declares, and
+// the only one CheckStmtForRefArgs in
+// src/elaborator/elaborator_validate_funcbody.cpp did not walk before it took
+// its list from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. A ref argument written there
+// elaborated clean beforehand.
+TEST(ParallelBlockElaboration,
+     RefArgInARandsequenceCodeBlockInForkJoinNoneIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task automatic t(ref int v);\n"
+      "    fork\n"
+      "      randsequence(main)\n"
+      "        main : { v = 1; };\n"
+      "      endsequence\n"
+      "    join_none\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "ref argument 'v' cannot be used inside a "
+                            "fork-join_any or fork-join_none block",
+                            5, "9.3.2"));
+}
+
+// A.6.12's `rs_rule ::= rs_production_list [ := weight_specification [
+// rs_code_block ] ]` puts a second code block after the weight, which the
+// parser keeps in RsRule::weight_code rather than in RsProd::code_stmts. It is
+// a second statement position under Stmt::rs_productions, so it gets its own
+// case: the production `a` below assigns nothing, which leaves the weight
+// block as the only place the reported reference can stand.
+TEST(ParallelBlockElaboration,
+     RefArgInARandsequenceWeightCodeBlockInForkJoinNoneIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task automatic t(ref int v);\n"
+      "    fork\n"
+      "      randsequence(main)\n"
+      "        main : a := 5 { v = 1; };\n"
+      "        a : { ; };\n"
+      "      endsequence\n"
+      "    join_none\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "ref argument 'v' cannot be used inside a "
+                            "fork-join_any or fork-join_none block",
+                            5, "9.3.2"));
+}
+
 }  // namespace

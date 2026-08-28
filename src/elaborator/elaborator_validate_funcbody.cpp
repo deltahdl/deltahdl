@@ -4,6 +4,7 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -87,28 +88,26 @@ static void CheckStmtExprsForRefArgs(
     CheckExprForRefArgs(we, ref_names, diag);
 }
 
+// §9.3.2 forbids a ref argument anywhere inside a fork-join_any or
+// fork-join_none block, and puts no condition on the position the use is
+// written in, so every position a statement holds a statement in is one the
+// rule reaches. ForEachChildStmt in elaborator_validate_internal.h states
+// those positions once for the whole elaborator, which is why the list is not
+// written out again here.
+//
+// The recursion passes false for is_fork_block_item because the flag answers
+// for a statement the fork holds directly. §9.3.2 excepts "the initialization
+// value expressions of variables declared in a block_item_declaration of the
+// fork", and A.6.3 puts a block_item_declaration among the fork's own items,
+// so no statement nested below one is that declaration.
 static void CheckStmtForRefArgs(
     const Stmt* s, const std::unordered_set<std::string_view>& ref_names,
     bool is_fork_block_item, DiagEngine& diag) {
   if (!s) return;
   CheckStmtExprsForRefArgs(s, ref_names, is_fork_block_item, diag);
-  for (auto* sub : s->stmts) CheckStmtForRefArgs(sub, ref_names, false, diag);
-  for (auto* sub : s->fork_stmts)
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     CheckStmtForRefArgs(sub, ref_names, false, diag);
-  CheckStmtForRefArgs(s->then_branch, ref_names, false, diag);
-  CheckStmtForRefArgs(s->else_branch, ref_names, false, diag);
-  CheckStmtForRefArgs(s->body, ref_names, false, diag);
-  CheckStmtForRefArgs(s->for_body, ref_names, false, diag);
-  for (auto* init : s->for_inits)
-    CheckStmtForRefArgs(init, ref_names, false, diag);
-  for (auto* step : s->for_steps)
-    CheckStmtForRefArgs(step, ref_names, false, diag);
-  for (auto& ci : s->case_items)
-    CheckStmtForRefArgs(ci.body, ref_names, false, diag);
-  for (auto& ri : s->randcase_items)
-    CheckStmtForRefArgs(ri.second, ref_names, false, diag);
-  CheckStmtForRefArgs(s->assert_pass_stmt, ref_names, false, diag);
-  CheckStmtForRefArgs(s->assert_fail_stmt, ref_names, false, diag);
+  });
 }
 
 static void CheckRefArgsInForkBlocks(
