@@ -80,8 +80,8 @@ class VcdChangeDetectionFromSource : public VcdDumpFromSourceTestBase {
   std::string ValuesRecordedFor(const std::string& src,
                                 const std::string& name) {
     RunSource(src);
-    const std::string content = DumpFile(kDumpName);
-    const std::string code = IdentCodeFor(content, name);
+    std::string content = DumpFile(kDumpName);
+    std::string code = IdentCodeFor(content, name);
     if (code.empty()) return "<not-declared>";
     return ScalarChanges(content, code);
   }
@@ -148,7 +148,7 @@ class VcdChangeDetectionFromSource : public VcdDumpFromSourceTestBase {
 // was not a posedge, and either write lands between the assignment and the
 // end-of-increment recording pass.
 TEST_F(VcdChangeDetectionFromSource, ClockWaitedOnByPosedgeRecordsEveryEdge) {
-  const std::string values = ValuesRecordedFor(
+  std::string values = ValuesRecordedFor(
       ClockSource("  always @(posedge clk) n = n + 1;\n"), "clk");
 
   // Two posedges reached the waiter, so the source did arm an edge watcher on
@@ -163,7 +163,7 @@ TEST_F(VcdChangeDetectionFromSource, ClockWaitedOnByPosedgeRecordsEveryEdge) {
 // this design records every edge, and adding a process that waits on the clock
 // is not one of the things §21.7.2.1 lets change what is listed.
 TEST_F(VcdChangeDetectionFromSource, ClockWithNoWaiterRecordsEveryEdge) {
-  const std::string values = ValuesRecordedFor(ClockSource(""), "clk");
+  std::string values = ValuesRecordedFor(ClockSource(""), "clk");
 
   EXPECT_EQ(WaiterResumes(), 0U);
   EXPECT_EQ(values, "01010");
@@ -180,7 +180,7 @@ TEST_F(VcdChangeDetectionFromSource, ClockWithNoWaiterRecordsEveryEdge) {
 // are owed their record, and the file reads 1 for the $dumpvars checkpoint,
 // then 0 and 1.
 TEST_F(VcdChangeDetectionFromSource, PosedgeUnderANegedgeWaitIsStillRecorded) {
-  const std::string values =
+  std::string values =
       ValuesRecordedFor(std::string("module t;\n"
                                     "  logic v;\n"
                                     "  integer n;\n"
