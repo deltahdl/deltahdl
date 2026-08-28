@@ -23,8 +23,6 @@ void CollectStmtReads(const Stmt* stmt, std::unordered_set<std::string>& out);
 void CollectWrittenNames(const Stmt* stmt,
                          std::unordered_set<std::string>& out);
 
-std::vector<std::string> CollectReadSignals(const Stmt* body);
-
 // §9.2.2.2.1: the implicit sensitivity list expands the longest static prefix
 // of each *net or variable* identifier or select expression read by the
 // process. `const_names`, when supplied, names the identifiers that are

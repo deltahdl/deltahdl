@@ -205,10 +205,6 @@ class SimContext {
   void RegisterFinalProcess(Process* proc);
   void RunFinalBlocks();
 
-  void AddSensitivity(std::string_view signal, Process* proc);
-  const std::vector<Process*>& GetSensitiveProcesses(
-      std::string_view signal) const;
-
   void RegisterFunction(std::string_view name, ModuleItem* item);
   ModuleItem* FindFunction(std::string_view name);
 
@@ -756,8 +752,6 @@ class SimContext {
 
   std::vector<std::string_view> func_name_stack_;
   std::vector<Process*> final_processes_;
-  std::unordered_map<std::string, std::vector<Process*>> sensitivity_map_;
-  static const std::vector<Process*> kEmptyProcessList;
   VcdWriter* vcd_writer_ = nullptr;
   SpecifyManager* specify_manager_ = nullptr;
   std::string dump_file_name_ = "dump.vcd";

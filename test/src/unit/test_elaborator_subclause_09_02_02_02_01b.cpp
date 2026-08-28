@@ -1,11 +1,13 @@
 // §9.2.2.2.1 "Implicit always_comb sensitivities", collection side: the cases
-// that call CollectReadSignals over a statement built here rather than
+// that call CollectStmtReads over a statement built here rather than
 // elaborated from source, which is how a position no source reaches easily gets
 // covered. The cases that drive the inference end to end are in
 // test_elaborator_subclause_09_02_02_02_01a.cpp, which the 1000-line cap in
 // .github/workflows/deltahdl.yml separated this file from.
 
+#include <string>
 #include <string_view>
+#include <unordered_set>
 
 #include "builders_ast.h"
 #include "builders_sensitivity.h"
@@ -20,15 +22,14 @@ using namespace delta;
 
 namespace {
 
-// True when CollectReadSignals takes `name` from `body`. §9.2.2.2.1 asks which
+// True when CollectStmtReads takes `name` from `body`. §9.2.2.2.1 asks which
 // names reach the implicit sensitivity list, so the cases below read the
-// returned set rather than any diagnostic; a read the walk misses is a wrong
+// collected set rather than any diagnostic; a read the walk misses is a wrong
 // simulated value and not a missing report.
 bool ReadSignalsContain(const Stmt* body, std::string_view name) {
-  for (const auto& read : CollectReadSignals(body)) {
-    if (read == name) return true;
-  }
-  return false;
+  std::unordered_set<std::string> reads;
+  CollectStmtReads(body, reads);
+  return reads.count(std::string(name)) != 0;
 }
 
 // §16.3 keeps an immediate assertion's action_block statements in

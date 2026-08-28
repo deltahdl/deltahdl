@@ -35,23 +35,6 @@ TEST(InitialProcedureSimulation, InitialBlockExecutes) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(InitialProcedureSimulation, NoSensitivityRegistered) {
-  LowerFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial x = 1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-
-  const auto& procs = f.ctx.GetSensitiveProcesses("x");
-  EXPECT_TRUE(procs.empty());
-}
-
 TEST(InitialProcedureSimulation, EmptyInitialDoesNotInterfere) {
   SimFixture f;
   auto* design = ElaborateSrc(

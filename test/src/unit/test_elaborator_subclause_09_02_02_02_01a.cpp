@@ -1,7 +1,7 @@
 // §9.2.2.2.1 "Implicit always_comb sensitivities", elaboration side: the cases
 // that drive the inference through ElaborateSrc and read RtlirProcess back, and
 // the cases that call CollectExprReads over a hand-built expression. The cases
-// that call CollectReadSignals over a hand-built statement are in
+// that call CollectStmtReads over a hand-built statement are in
 // test_elaborator_subclause_09_02_02_02_01b.cpp, which the 1000-line cap in
 // .github/workflows/deltahdl.yml separated this file from.
 

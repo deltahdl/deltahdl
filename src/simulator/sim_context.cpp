@@ -496,18 +496,7 @@ void SimContext::RegisterFinalProcess(Process* proc) {
   final_processes_.push_back(proc);
 }
 
-void SimContext::AddSensitivity(std::string_view signal, Process* proc) {
-  sensitivity_map_[std::string(signal)].push_back(proc);
-}
-
-const std::vector<Process*> SimContext::kEmptyProcessList;
 const std::vector<Process*> SimContext::kEmptyNamedScopeList;
-
-const std::vector<Process*>& SimContext::GetSensitiveProcesses(
-    std::string_view signal) const {
-  auto it = sensitivity_map_.find(std::string(signal));
-  return (it != sensitivity_map_.end()) ? it->second : kEmptyProcessList;
-}
 
 bool SimContext::IsReactiveContext() const {
   return current_process_ && current_process_->is_reactive;

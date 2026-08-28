@@ -11,7 +11,6 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "elaborator/rtlir.h"
-#include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/awaiters.h"
@@ -330,14 +329,6 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   LowerChildModules(mod);
 }
 
-static void RegisterSensitivity(const RtlirProcess& proc, Process* p,
-                                SimContext& ctx) {
-  auto signals = CollectReadSignals(proc.body);
-  for (const auto& name : signals) {
-    ctx.AddSensitivity(name, p);
-  }
-}
-
 void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
                            uint32_t program_block_id) {
   auto* p = arena_.Create<Process>();
@@ -393,7 +384,6 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
       p->coro =
           MakeAlwaysCombCoroutine(proc.body, proc.sensitivity, ctx_, arena_)
               .Release();
-      RegisterSensitivity(proc, p, ctx_);
       break;
     case RtlirProcessKind::kAlwaysFF:
       // §9.2.2.4: an always_ff is driven by its explicit edge event control

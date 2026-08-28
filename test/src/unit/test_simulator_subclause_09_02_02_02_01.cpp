@@ -137,24 +137,6 @@ TEST(AlwaysCombSensitivitySim, RetriggersOnInputChange) {
   EXPECT_EQ(y->value.ToUint64(), 11u);
 }
 
-TEST(AlwaysCombSensitivitySim, ProcessRegisteredForInputSignal) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] a, b;\n"
-      "  always_comb b = a + 1;\n"
-      "  initial #1 $finish;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-
-  const auto& procs = f.ctx.GetSensitiveProcesses("a");
-  EXPECT_FALSE(procs.empty());
-}
-
 TEST(AlwaysCombSensitivitySim, CaseSelectorChangeSwitchesBranch) {
   SimFixture f;
   auto* y = RunAndFindVar(

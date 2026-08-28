@@ -140,12 +140,6 @@ void CollectStmtReads(const Stmt* stmt, std::unordered_set<std::string>& out) {
   });
 }
 
-std::vector<std::string> CollectReadSignals(const Stmt* body) {
-  std::unordered_set<std::string> set;
-  CollectStmtReads(body, set);
-  return {set.begin(), set.end()};
-}
-
 static void CollectAssignLhsName(const Expr* lhs,
                                  std::unordered_set<std::string>& out) {
   if (!lhs) return;
