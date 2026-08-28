@@ -87,30 +87,32 @@ static void CollectForHeaderNames(const Stmt* s,
   }
 }
 
-// §8.10 bars a static method from accessing a non-static member, and a name a
-// statement declares is not a member, so it shadows one wherever the
-// declaration stands. This collection therefore reaches every position
-// ForEachChildStmt in elaborator_validate_internal.h names. Stmt::for_steps is
-// descended and holds no name to collect: A.6.8 admits in it an
+// The names `s` brings into scope for its own expressions and its child
+// statements. §6.21 says of a declaration in a block that "These variables are
+// visible to the unnamed block and any nested blocks below it", so a
+// declaration reaches this from one level down and no further: an immediate
+// child that is a declaration, whatever the for header declares, and a
+// foreach's index variables. A declaration deeper than that belongs to a scope
+// `s` is outside of, and StmtRefsNonStaticMember collects it when it gets
+// there.
+//
+// Stmt::for_steps holds no name to collect: A.6.8 admits in it an
 // operator_assignment, an inc_or_dec_expression or a call and nothing else.
 //
-// The set is flat and the whole method body shares it, so a name collected
-// anywhere shadows the member everywhere in that body. That is wrong for every
-// declaration whose scope §12.7 bounds -- a for header's control variable, a
-// named block's locals -- and it is an approximation this collection has always
-// made rather than one the for-header names introduce. Making the set scoped
-// is issue #3315.
-static void CollectLocalNames(const Stmt* s,
-                              std::unordered_set<std::string_view>& out) {
-  if (!s) return;
-  if (s->kind == StmtKind::kVarDecl && !s->var_name.empty()) {
-    out.insert(s->var_name);
-  }
+// The result is empty for almost every statement, which is what lets the
+// caller copy the enclosing set only where a scope is really opened.
+static std::unordered_set<std::string_view> NamesDeclaredUnder(const Stmt* s) {
+  std::unordered_set<std::string_view> declared;
+  CollectForHeaderNames(s, declared);
   for (auto v : s->foreach_vars) {
-    if (!v.empty()) out.insert(v);
+    if (!v.empty()) declared.insert(v);
   }
-  CollectForHeaderNames(s, out);
-  ForEachChildStmt(s, [&](Stmt* const& sub) { CollectLocalNames(sub, out); });
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    if (sub && sub->kind == StmtKind::kVarDecl && !sub->var_name.empty()) {
+      declared.insert(sub->var_name);
+    }
+  });
+  return declared;
 }
 
 static bool ExprRefsNonStaticMember(
@@ -142,14 +144,32 @@ static bool ExprRefsNonStaticMember(
   return false;
 }
 
+// `locals` are the names in scope where `s` stands. §8.10 bars an access to a
+// non-static member, and a name in scope is not the member it spells, so the
+// search subtracts them.
+//
+// The set grows on the way down and never on the way up, which is what §6.21
+// asks for: a declaration is visible to its own block and to the blocks nested
+// below it, and to nothing outside. A set gathered over the whole body instead
+// would let a declaration in one block exempt the member of that name from the
+// rule in every other.
 static bool StmtRefsNonStaticMember(
     const Stmt* s, const std::unordered_set<std::string_view>& non_static,
     const std::unordered_set<std::string_view>& locals) {
   if (!s) return false;
-  if (ExprRefsNonStaticMember(s->lhs, non_static, locals)) return true;
-  if (ExprRefsNonStaticMember(s->rhs, non_static, locals)) return true;
-  if (ExprRefsNonStaticMember(s->expr, non_static, locals)) return true;
-  if (ExprRefsNonStaticMember(s->condition, non_static, locals)) return true;
+  std::unordered_set<std::string_view> declared = NamesDeclaredUnder(s);
+  std::unordered_set<std::string_view> widened;
+  if (!declared.empty()) {
+    widened = locals;
+    widened.insert(declared.begin(), declared.end());
+  }
+  const std::unordered_set<std::string_view>& scope =
+      declared.empty() ? locals : widened;
+
+  if (ExprRefsNonStaticMember(s->lhs, non_static, scope)) return true;
+  if (ExprRefsNonStaticMember(s->rhs, non_static, scope)) return true;
+  if (ExprRefsNonStaticMember(s->expr, non_static, scope)) return true;
+  if (ExprRefsNonStaticMember(s->condition, non_static, scope)) return true;
   // §8.10 makes the access illegal "within the body of a static method" and
   // names no position in that body where it is permitted, so this search looks
   // at every position ForEachChildStmt in elaborator_validate_internal.h names.
@@ -158,7 +178,7 @@ static bool StmtRefsNonStaticMember(
   bool found = false;
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     if (found) return;
-    found = StmtRefsNonStaticMember(sub, non_static, locals);
+    found = StmtRefsNonStaticMember(sub, non_static, scope);
   });
   return found;
 }
@@ -202,8 +222,16 @@ static std::unordered_set<std::string_view> CollectNonStaticMemberNames(
   return non_static;
 }
 
-// §8.10: collects names that are local to a static method body (arguments, the
-// function's own result name, and declared locals) and so shadow class members.
+// §8.10: the names in scope for the whole of a static method body, which are
+// what shadows a class member there. Its arguments, its own result name where
+// it is a function, and the declarations written at the top level of the body:
+// ModuleItem::func_body_stmts holds those as siblings of the statements that
+// see them rather than under a block statement, so nothing else would collect
+// them.
+//
+// A declaration deeper in the body is not here. §6.21 makes it visible to its
+// own block and the blocks below it and to nothing else, and
+// StmtRefsNonStaticMember adds it to the set as it descends into that block.
 static std::unordered_set<std::string_view> CollectStaticMethodLocalNames(
     const ModuleItem* method) {
   std::unordered_set<std::string_view> locals;
@@ -214,7 +242,9 @@ static std::unordered_set<std::string_view> CollectStaticMethodLocalNames(
     locals.insert(method->name);
   }
   for (const auto* s : method->func_body_stmts) {
-    CollectLocalNames(s, locals);
+    if (s && s->kind == StmtKind::kVarDecl && !s->var_name.empty()) {
+      locals.insert(s->var_name);
+    }
   }
   return locals;
 }

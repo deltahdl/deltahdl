@@ -187,7 +187,7 @@ TEST(ThisElaboration, TypeOfThisInStaticMethodBodyAllowed) {
 // an error is issued. This is the static-method rejection form, a different
 // enforcement path from the module-context rejections above:
 // CheckStaticMethodsForThisSuper in
-// src/elaborator/elaborator_validate_class_members.cpp reports it under §8.10,
+// src/elaborator/elaborator_validate_static_methods.cpp reports it under §8.10,
 // which is where the standard states that a static method has no 'this', and
 // the report stands at the `function` keyword.
 TEST(ThisElaboration, ThisInStaticMethodError) {

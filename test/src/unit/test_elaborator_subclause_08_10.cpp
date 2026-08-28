@@ -244,14 +244,14 @@ TEST(StaticMethodElaboration, StaticMethodThisInCallArgError) {
 }
 
 // The fourteen cases below cover the child-statement links of Stmt that the two
-// §8.10 walks in src/elaborator/elaborator_validate_class_members.cpp reach for
-// the first time now that both take their list from ForEachChildStmt in
+// §8.10 walks in src/elaborator/elaborator_validate_static_methods.cpp reach
+// for the first time now that both take their list from ForEachChildStmt in
 // src/elaborator/elaborator_validate_internal.h. StmtRefsNonStaticMember, which
-// finds the access, had written out six of the thirteen links, and
-// CollectLocalNames, which records the names a body declares and so which
-// references resolve locally, seven. A reference in a link the first was
-// missing was never looked at, and a declaration in a link the second was
-// missing left the name out of the set.
+// finds the access, had written out six of the thirteen links, and the
+// collection of the names a block declares -- and so of which references
+// resolve locally -- seven. A reference in a link the first was missing was
+// never looked at, and a declaration in a link the second was missing left the
+// name out of the set.
 //
 // The two are converted together because either alone is wrong: the reporter
 // alone would report an access to a name the block does declare, and the
@@ -338,7 +338,7 @@ TEST(StaticMethodElaboration,
 // inc_or_dec_expression | function_subroutine_call`, so a for step writes a
 // variable the same way, and the class property is one such variable. None of
 // the three declares a name, so this link takes the access case alone: no
-// conforming source puts a declaration in a for step for CollectLocalNames to
+// conforming source puts a declaration in a for step for NamesDeclaredUnder to
 // find.
 TEST(StaticMethodElaboration, NonStaticPropertyWrittenInAForStepIsReported) {
   ElabFixture f;
@@ -565,12 +565,15 @@ TEST(StaticMethodElaboration,
              "endmodule\n"));
 }
 
-// §12.7.1: "The loop variables declared in the for loop header are local to
-// the loop", so `i` in the body below is the header's own variable and not the
-// class property `i`. §8.10 therefore has nothing to report, and the source is
-// as ordinary a loop as SystemVerilog has. The property is declared for the
-// case to mean anything: without it §8.10 is silent whatever the collection
-// does, because CollectNonStaticMemberNames returns an empty set and
+// §12.7.1: a for header that declares its control variables "creates an
+// implicit begin-end block around the loop, containing declarations of the
+// loop variables with automatic lifetime. This block creates a new
+// hierarchical scope, making the variables local to the loop scope." So `i` in
+// the body below is the header's own variable and not the class property `i`.
+// §8.10 therefore has nothing to report, and the source is as ordinary a loop
+// as SystemVerilog has. The property is declared for the case to mean anything:
+// without it §8.10 is silent whatever the collection does, because
+// CollectNonStaticMemberNames returns an empty set and
 // ValidateOneClassStaticMethods stops before it looks at any statement.
 TEST(StaticMethodElaboration, ForHeaderControlVariableShadowsTheProperty) {
   EXPECT_TRUE(
@@ -613,6 +616,82 @@ TEST(StaticMethodElaboration, UntypedForHeaderVariableIsStillTheProperty) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "static method shall not access non-static members",
                             3, "8.10"));
+}
+
+// §12.7.1: a for header that declares its control variables "creates an
+// implicit begin-end block around the loop ... making the variables local to
+// the loop scope". `x = i;` stands after that block has ended, so `i` there is
+// the class property and §8.10 bars the access. The loop body names nothing,
+// which leaves the statement after the loop as the only access in the source.
+TEST(StaticMethodElaboration,
+     ForHeaderControlVariableIsOutOfScopeAfterTheLoop) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int i;\n"
+      "  static function void f();\n"
+      "    int x;\n"
+      "    for (int i = 0; i < 2; i = i + 1) x = 0;\n"
+      "    x = i;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "static method shall not access non-static members",
+                            3, "8.10"));
+}
+
+// §6.21: "Variables may also be declared in unnamed blocks. These variables are
+// visible to the unnamed block and any nested blocks below it." The block below
+// is named, which §9.3.4 makes no difference to here, and either way `i` is
+// visible to the block and not to the statement after it. So `i = 1;` inside is
+// the block's own variable and `x = i;` outside is the class property.
+TEST(StaticMethodElaboration, BlockLocalIsOutOfScopeAfterTheBlock) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int i;\n"
+      "  static function void f();\n"
+      "    int x;\n"
+      "    begin : b\n"
+      "      int i;\n"
+      "      i = 1;\n"
+      "    end\n"
+      "    x = i;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "static method shall not access non-static members",
+                            3, "8.10"));
+}
+
+// The other direction of the same sentence of §6.21: a declaration is visible
+// to "any nested blocks below it", so `i` declared in the outer block still
+// shadows the property two blocks down. This is what a fix that narrows the
+// scope too far breaks, and neither case above would catch that.
+TEST(StaticMethodElaboration, BlockLocalShadowsThePropertyInANestedBlock) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  int i;\n"
+             "  static function void f();\n"
+             "    begin\n"
+             "      int i;\n"
+             "      begin\n"
+             "        i = 1;\n"
+             "      end\n"
+             "    end\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
 }
 
 }  // namespace
