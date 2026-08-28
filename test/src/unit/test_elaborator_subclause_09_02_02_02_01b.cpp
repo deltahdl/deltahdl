@@ -6,7 +6,6 @@
 // .github/workflows/deltahdl.yml separated this file from.
 
 #include <string_view>
-#include <unordered_set>
 
 #include "builders_ast.h"
 #include "builders_sensitivity.h"
