@@ -6,6 +6,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -252,15 +253,14 @@ static void CheckForeachVarsReadOnly(
                  Subclause("12.7.3"));
     }
   }
-  for (auto* sub : s->stmts) CheckForeachVarsReadOnly(sub, vars, diag);
-  CheckForeachVarsReadOnly(s->then_branch, vars, diag);
-  CheckForeachVarsReadOnly(s->else_branch, vars, diag);
-  CheckForeachVarsReadOnly(s->body, vars, diag);
-  CheckForeachVarsReadOnly(s->for_body, vars, diag);
-  for (auto* sub : s->for_inits) CheckForeachVarsReadOnly(sub, vars, diag);
-  for (auto* sub : s->for_steps) CheckForeachVarsReadOnly(sub, vars, diag);
-  for (auto* sub : s->fork_stmts) CheckForeachVarsReadOnly(sub, vars, diag);
-  for (auto& ci : s->case_items) CheckForeachVarsReadOnly(ci.body, vars, diag);
+  // Every member of Stmt that holds a statement, taken from ForEachChildStmt
+  // in elaborator_validate_internal.h rather than listed again here. §12.7.3
+  // makes the loop variable read-only for the whole of the loop body, so a
+  // member this walk misses is a position an assignment to one goes
+  // unreported. Nothing stops early: the clause is broken once per write, and
+  // each write is reported where it stands.
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { CheckForeachVarsReadOnly(sub, vars, diag); });
 }
 
 static bool IsIntegralVectorKind(DataTypeKind k) {
@@ -340,15 +340,13 @@ static void CheckForeachInStmt(
     DiagEngine& diag) {
   if (!s) return;
   if (s->kind == StmtKind::kForeach) CheckOneForeachStmt(s, arrays, diag);
-  for (auto* sub : s->stmts) CheckForeachInStmt(sub, arrays, diag);
-  CheckForeachInStmt(s->then_branch, arrays, diag);
-  CheckForeachInStmt(s->else_branch, arrays, diag);
-  CheckForeachInStmt(s->body, arrays, diag);
-  CheckForeachInStmt(s->for_body, arrays, diag);
-  for (auto* sub : s->for_inits) CheckForeachInStmt(sub, arrays, diag);
-  for (auto* sub : s->for_steps) CheckForeachInStmt(sub, arrays, diag);
-  for (auto* sub : s->fork_stmts) CheckForeachInStmt(sub, arrays, diag);
-  for (auto& ci : s->case_items) CheckForeachInStmt(ci.body, arrays, diag);
+  // Every member of Stmt that holds a statement, taken from ForEachChildStmt
+  // in elaborator_validate_internal.h rather than listed again here. A foreach
+  // is a statement like any other, so which member holds it says nothing about
+  // whether §12.7.3 covers it, and a member this walk misses is a foreach the
+  // clause is not applied to.
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { CheckForeachInStmt(sub, arrays, diag); });
 }
 
 // §12.8 — applies the jump rules to a function/task body and, for a
