@@ -1,7 +1,6 @@
 #include <algorithm>
 #include <cmath>
 #include <format>
-#include <initializer_list>
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
