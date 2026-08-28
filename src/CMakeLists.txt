@@ -293,6 +293,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_operations_streaming.cpp
     elaborator/elaborator_validate_queries.cpp
     elaborator/elaborator_validate_queries_dims.cpp
+    elaborator/elaborator_validate_randsequence.cpp
     elaborator/elaborator_validate_specify.cpp
     elaborator/elaborator_validate_specify_limits.cpp
     elaborator/elaborator_validate_static_methods.cpp

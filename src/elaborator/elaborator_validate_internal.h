@@ -123,7 +123,7 @@ void ForEachRandsequenceProdExpr(Prod& prod, Visit visit) {
 }
 
 // The expressions one rule holds. §18.17.1's rs_rule admits a
-// weight_specification, and §18.17.4's rand_join admits an expression before
+// weight_specification, and §18.17.5's rand_join admits an expression before
 // its production list. The nesting is split across these three functions for
 // the reason ForEachRandsequenceRuleStmt is split from ForEachRandsequenceStmt:
 // written as one function it passes the
@@ -148,6 +148,62 @@ void ForEachRandsequenceExpr(S* s, Visit visit) {
   for (auto& production : s->rs_productions) {
     for (auto& rule : production.rules)
       ForEachRandsequenceRuleExpr(rule, visit);
+  }
+}
+
+// The rs_production_items one rs_prod holds. A.6.12 gives an rs_prod five
+// forms and four of them name a production: the plain rs_production_item, the
+// two an rs_if_else selects between, the one an rs_repeat repeats, and the one
+// each arm of an rs_case carries. The fifth is the rs_code_block, which names
+// no production and holds statements ForEachRandsequenceRuleStmt above hands
+// over instead.
+//
+// The items of the forms an rs_prod is not carry an empty name.
+// Parser::ParseRsProd in src/parser/parser_verify.cpp fills the member its form
+// uses and leaves the other three default-constructed, so RsProd::if_true is an
+// empty name on every rs_prod that is not an rs_if_else and a visitor that
+// reads a name skips an empty one.
+template <typename Prod, typename Visit>
+void ForEachRandsequenceProdItem(Prod& prod, Visit visit) {
+  visit(prod.item);
+  visit(prod.if_true);
+  visit(prod.if_false);
+  visit(prod.repeat_item);
+  for (auto& ci : prod.case_items) visit(ci.item);
+}
+
+// The rs_production_items one rs_rule holds. §18.17.5's rand_join names the
+// productions it interleaves in a list of its own, RsRule::rand_join_items,
+// rather than through an rs_prod, so a walk that took the rs_prods alone would
+// reach none of them.
+template <typename Rule, typename Visit>
+void ForEachRandsequenceRuleItem(Rule& rule, Visit visit) {
+  for (auto& item : rule.rand_join_items) visit(item);
+  for (auto& prod : rule.prods) ForEachRandsequenceProdItem(prod, visit);
+}
+
+// Hands `visit` every rs_production_item a randsequence statement holds, which
+// is every position §18.17 admits a production identifier in bar the optional
+// top-level name the statement's own parentheses carry in
+// Stmt::rs_top_production.
+//
+// This is that list, stated once, for the reason ForEachChildStmt below states
+// the statement links once: a walk that writes its own runs its rule over the
+// positions somebody happened to write down. §18.17 makes every production
+// identifier local to the scope the randsequence statement creates, so a rule
+// about whether a production identifier resolves has to reach all of them or it
+// passes an unresolvable name in the position it missed.
+//
+// The nesting is split across these three functions for the reason
+// ForEachRandsequenceRuleStmt is split from ForEachRandsequenceStmt: written as
+// one function it carries past the
+// readability-function-cognitive-complexity threshold of 15 that
+// etc/clang_tidy/src.yml sets.
+template <typename S, typename Visit>
+void ForEachRandsequenceItem(S* s, Visit visit) {
+  for (auto& production : s->rs_productions) {
+    for (auto& rule : production.rules)
+      ForEachRandsequenceRuleItem(rule, visit);
   }
 }
 

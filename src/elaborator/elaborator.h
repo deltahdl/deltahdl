@@ -701,6 +701,11 @@ class Elaborator : public ElaboratorOperationRules {
   // dimensions, are read-only, and may not reuse the array's identifier.
   void ValidateForeachLoops(const ModuleDecl* decl);
 
+  // §18.17 — a production identifier is local to the scope its randsequence
+  // statement creates, so every one the statement writes shall name one of
+  // that statement's own productions.
+  void ValidateRandsequenceProductionNames(const ModuleDecl* decl);
+
   void ValidateConstantFunctionCalls(const ModuleDecl* decl);
 
   // §7.7: a dynamic array or queue may not be passed to a DPI import formal
