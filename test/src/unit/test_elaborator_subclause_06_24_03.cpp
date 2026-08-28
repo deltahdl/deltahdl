@@ -247,4 +247,42 @@ TEST(BitStreamCastElaboration, FixedSizeMatchUnpackedDestOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §6.24.3: a bit-stream cast between fixed-size types of different sizes with
+// an unpacked destination is illegal. §11.4.14 makes the source stream four
+// bits wide, the width of its one operand, against the sixteen bits of
+// arr2_t, and the report names both.
+TEST(BitStreamCastElaboration,
+     StreamSourceNarrowerThanUnpackedDestinationRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef byte arr2_t [2];\n"
+      "  arr2_t a;\n"
+      "  initial a = arr2_t'({>> {4'b1100}});\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-stream cast between fixed-size types of "
+                            "different sizes (4 bits to 16 bits) with an "
+                            "unpacked destination is illegal",
+                            4, "6.24.3"));
+}
+
+// §6.24.3: the same cast is legal when the two sizes agree. §11.4.14 sums the
+// stream's two eight-bit operands to the sixteen bits of arr2_t, so nothing is
+// reported. A check that rejected every streaming source would satisfy the
+// case above and fail here.
+TEST(BitStreamCastElaboration, StreamSourceMatchingUnpackedDestinationWidthOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef byte arr2_t [2];\n"
+      "  arr2_t a;\n"
+      "  initial a = arr2_t'({>> {8'hAB, 8'hCD}});\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

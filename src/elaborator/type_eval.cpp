@@ -762,6 +762,27 @@ static uint32_t InferReplicateWidth(const Expr* expr,
   return count ? static_cast<uint32_t>(*count) * inner : inner;
 }
 
+// §11.4.14 builds a streaming concatenation out of the stream expressions the
+// parser records in Expr::elements, and re-orders their bits without adding or
+// dropping any, so the result is as wide as those operands together. The slice
+// size in Expr::lhs does not enter the sum, §11.4.14 having it decide the order
+// the bits leave in rather than how many there are. An operand of unknown width
+// makes the whole stream unknown: InferExprWidth answers 0 for "not known", and
+// a total that dropped such a term would be a width short by that operand
+// instead of an absent one. An empty Expr::elements answers 0 as well, there
+// being no operand to measure.
+static uint32_t InferStreamingConcatWidth(const Expr* expr,
+                                          const TypedefMap& typedefs) {
+  if (expr->elements.empty()) return 0;
+  uint32_t total = 0;
+  for (const auto* el : expr->elements) {
+    uint32_t w = InferExprWidth(el, typedefs);
+    if (w == 0) return 0;
+    total += w;
+  }
+  return total;
+}
+
 static uint32_t InferCastWidth(const Expr* expr, const TypedefMap& typedefs) {
   if (expr->text == "signed" || expr->text == "unsigned" ||
       expr->text == "const")
@@ -829,13 +850,14 @@ uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
       return InferExprWidth(expr->lhs, typedefs);
     case ExprKind::kCast:
       return InferCastWidth(expr, typedefs);
+    case ExprKind::kStreamingConcat:
+      return InferStreamingConcatWidth(expr, typedefs);
     case ExprKind::kSelect:
     case ExprKind::kMemberAccess:
     case ExprKind::kCall:
     case ExprKind::kAssignmentPattern:
     case ExprKind::kPostfixUnary:
     case ExprKind::kInside:
-    case ExprKind::kStreamingConcat:
     case ExprKind::kMinTypMax:
     case ExprKind::kTagged:
       return 0;

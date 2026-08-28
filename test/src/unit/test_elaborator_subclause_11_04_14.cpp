@@ -1,5 +1,7 @@
+#include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "parser/ast.h"
 
 using namespace delta;
 
@@ -136,6 +138,30 @@ TEST(StreamingOperatorElaboration, ChandleTargetForStreamingSourceRejected) {
       "target of a streaming concatenation source assignment must be a "
       "bit-stream type",
       4, "11.4.14"));
+}
+
+// §11.4.14: a streaming concatenation re-orders the bits of its stream
+// expressions without adding or dropping any, so it is as wide as those
+// operands together -- eight bits for two four-bit literals. The slice size
+// decides the order the bits leave in rather than how many there are, so it
+// does not enter the sum.
+TEST(StreamingOperatorElaboration,
+     StreamingConcatWidthIsTheSumOfItsOperandWidths) {
+  TypedefMap typedefs;
+  Expr first;
+  first.kind = ExprKind::kIntegerLiteral;
+  first.text = "4'b1100";
+
+  Expr second;
+  second.kind = ExprKind::kIntegerLiteral;
+  second.text = "4'b0011";
+
+  Expr stream;
+  stream.kind = ExprKind::kStreamingConcat;
+  stream.op = TokenKind::kGtGt;
+  stream.elements = {&first, &second};
+
+  EXPECT_EQ(InferExprWidth(&stream, typedefs), 8u);
 }
 
 }  // namespace
