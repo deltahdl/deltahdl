@@ -149,6 +149,43 @@ TEST(AssignmentDelayElaboration, NetDeclTwoDelayOnImplicitAssign) {
   EXPECT_EQ(mod->assigns[0].delay_decay, nullptr);
 }
 
+// §10.3.3 rules that "specifying the delay in a continuous assignment that is
+// part of the net declaration shall be treated differently from specifying a
+// net delay and then making a continuous assignment to the net", and the three
+// cases above write the first of those two forms. This is the second: the
+// declaration assigns nothing, so its delay is what the clause calls a net
+// delay, and "any value change that is to be applied to [the net] by some other
+// statement shall be delayed" by it. The continuous assignment written
+// separately is such a statement, so the elaborated design has to carry the
+// five ticks on it; a design that drops them cannot delay the net at run time,
+// which is the failure this case names one stage before the simulator sees it.
+//
+// The delay is read off the continuous assignment because that is where the
+// three slots live today (RtlirContAssign::delay), and because the assignment
+// is the only driver this source gives the net. A net with two drivers is
+// delayed on both, since §28.16 measures the delay "from any driver on the net
+// changing value", and a design that carried the delay somewhere else would
+// have to be read somewhere else here.
+TEST(AssignmentDelayElaboration,
+     NetDeclDelayWithoutAssignReachesSeparateContAssign) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  reg a;\n"
+      "  wire #5 w;\n"
+      "  assign w = a;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->assigns.size(), 1u);
+  ASSERT_NE(mod->assigns[0].delay, nullptr);
+  EXPECT_EQ(mod->assigns[0].delay->int_val, 5u);
+  EXPECT_EQ(mod->assigns[0].delay_fall, nullptr);
+  EXPECT_EQ(mod->assigns[0].delay_decay, nullptr);
+}
+
 // §10.3.3 admits a single delay not only on a scalar nettype net but also on
 // "an array of such nets". The declared array name is registered as a nettype
 // net, so a whole-array continuous assignment carrying more than one delay must

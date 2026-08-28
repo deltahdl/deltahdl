@@ -448,9 +448,14 @@ static void ValidateDriveStrengthHasAssignment(const ModuleItem* item,
   }
 }
 
-// §6.10: build the continuous assignment that lowers a net declaration
+// §10.3.1: build the continuous assignment that lowers a net declaration
 // assignment — an identifier LHS naming the net driven by the initializer, with
 // the net's width and the declaration's drive strengths and delays.
+//
+// §10.3.3 puts the declaration's delay here rather than on the net: "When there
+// is a continuous assignment in a declaration, the delay is part of the
+// continuous assignment and is not a net delay. Thus, it shall not be added to
+// the delay of other drivers on the net."
 static RtlirContAssign BuildNetDeclContAssign(const ModuleItem* item,
                                               const RtlirNet& net,
                                               Arena& arena) {
@@ -470,7 +475,7 @@ static RtlirContAssign BuildNetDeclContAssign(const ModuleItem* item,
   return ca;
 }
 
-// §6.10: where a lowered net declaration assignment is emitted — the module
+// §10.3.1: where a lowered net declaration assignment is emitted — the module
 // receiving the continuous assignment, the arena that allocates its LHS, and
 // the table recording continuous-assignment driver targets.
 struct NetDeclLowerSink {
@@ -479,8 +484,8 @@ struct NetDeclLowerSink {
   std::unordered_map<std::string_view, SourceLoc>& cont_assign_targets;
 };
 
-// §6.10: a net declaration assignment lowers to a continuous assignment of the
-// initializer to the net (illegal on interconnect nets).
+// §10.3.1: a net declaration assignment lowers to a continuous assignment of
+// the initializer to the net (illegal on interconnect nets).
 static void LowerNetDeclAssignment(const ModuleItem* item, const RtlirNet& net,
                                    NetDeclLowerSink sink, DiagEngine& diag) {
   if (!item->init_expr) return;
@@ -494,7 +499,7 @@ static void LowerNetDeclAssignment(const ModuleItem* item, const RtlirNet& net,
   sink.mod->assigns.push_back(BuildNetDeclContAssign(item, net, sink.arena));
 }
 
-// §6.10 / §28.16: apply the compilation unit's default trireg charge strength
+// §10.3.1 / §28.16: apply the compilation unit's default trireg charge strength
 // and decay-time settings to a freshly built trireg net.
 static void ApplyTriregNetDefaults(const ModuleItem* item, RtlirNet& net,
                                    const CompilationUnit* unit,
@@ -513,6 +518,76 @@ static void ApplyTriregNetDefaults(const ModuleItem* item, RtlirNet& net,
   } else if (net.net_type == NetType::kTrireg &&
              !unit->default_decay_time_infinite) {
     net.decay_ticks = unit->default_decay_time;
+  }
+}
+
+// §28.16: record on the net the delay its declaration wrote, which is what
+// §10.3.3 calls a net delay: "any value change that is to be applied to wireA
+// by some other statement shall be delayed for ten time units before it takes
+// effect." A declaration that also assigns the net writes no net delay, because
+// the same subclause rules that "when there is a continuous assignment in a
+// declaration, the delay is part of the continuous assignment and is not a net
+// delay"; BuildNetDeclContAssign puts that one on the assignment instead.
+//
+// The third delay is left off a trireg, for which §28.16.2 rules that "the
+// first two delays shall specify the delay for transition to the 1 and 0 logic
+// states when the trireg net is driven to these states by a driver. The third
+// delay shall specify the charge decay time instead of the delay in a
+// transition to the z logic state" -- ApplyTriregNetDefaults above reads that
+// third delay into RtlirNet::decay_ticks, and it is not a turn-off delay.
+static void RecordNetDeclDelay(const ModuleItem* item, RtlirNet& net) {
+  if (item->init_expr != nullptr) return;
+  net.delay_rise = item->net_delay;
+  net.delay_fall = item->net_delay_fall;
+  if (net.net_type == NetType::kTrireg) return;
+  net.delay_turnoff = item->net_delay_decay;
+}
+
+std::string_view LhsSignalName(const Expr* lhs) {
+  if (lhs == nullptr || lhs->kind != ExprKind::kIdentifier) return {};
+  return lhs->text;
+}
+
+// §28.16: the nets of `mod` that carry a net delay, keyed by their names, which
+// is what a driver of one names it by.
+static std::unordered_map<std::string_view, const RtlirNet*> CollectDelayedNets(
+    const RtlirModule* mod) {
+  std::unordered_map<std::string_view, const RtlirNet*> delayed;
+  for (const RtlirNet& net : mod->nets) {
+    if (net.delay_rise == nullptr) continue;
+    delayed.emplace(net.name, &net);
+  }
+  return delayed;
+}
+
+// The net of `delayed` that `lhs` drives, or null where `lhs` drives none of
+// them. A left-hand side naming no single signal reaches no entry, because
+// LhsSignalName answers an empty name for it and no net is declared under one.
+static const RtlirNet* FindDelayedNetDriven(
+    const Expr* lhs,
+    const std::unordered_map<std::string_view, const RtlirNet*>& delayed) {
+  auto it = delayed.find(LhsSignalName(lhs));
+  if (it == delayed.end()) return nullptr;
+  return it->second;
+}
+
+void ApplyNetDeclDelaysToDrivers(RtlirModule* mod) {
+  std::unordered_map<std::string_view, const RtlirNet*> delayed =
+      CollectDelayedNets(mod);
+  for (RtlirContAssign& ca : mod->assigns) {
+    // A driver that wrote a delay of its own keeps exactly that delay, and the
+    // net's is not added to it. §10.3.3 requires the addition: it rules that a
+    // declaration assignment's delay "shall not be added to the delay of other
+    // drivers on the net", stating as an exception what a genuine net delay is
+    // held to. Summing the two means first expanding §28.16's one- and
+    // two-delay defaults into expressions, one of which is a minimum of two.
+    // That is a change of its own, and deltahdl/deltahdl#3373 carries it.
+    if (ca.delay != nullptr) continue;
+    const RtlirNet* net = FindDelayedNetDriven(ca.lhs, delayed);
+    if (net == nullptr) continue;
+    ca.delay = net->delay_rise;
+    ca.delay_fall = net->delay_fall;
+    ca.delay_decay = net->delay_turnoff;
   }
 }
 
@@ -715,6 +790,8 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   }
 
   ApplyTriregNetDefaults(item, net, unit_, BuildParamScope(mod));
+
+  RecordNetDeclDelay(item, net);
 
   RecordNetArrayShape(item, net, mod);
 

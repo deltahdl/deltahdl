@@ -16,6 +16,7 @@
 #include "elaborator/concurrent_assertion_expr.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_decls_internal.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
@@ -867,6 +868,12 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   }
 
   InstantiateImplicitNestedModules(local_nested_modules, mod);
+
+  // §28.16: a net delay is a property of the net, so it reaches the drivers
+  // only once every item is elaborated -- §10.3.2 lets the continuous
+  // assignment that drives a net stand before the declaration that gives it its
+  // delay, and a gate instance driving it may stand there too.
+  ApplyNetDeclDelaysToDrivers(mod);
 
   RunPostItemValidations(decl, mod);
 }

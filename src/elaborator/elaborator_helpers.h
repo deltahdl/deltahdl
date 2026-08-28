@@ -56,6 +56,12 @@ void CollectInstantiatedNames(const std::vector<ModuleItem*>& items,
 std::vector<ResolvedAttribute> ResolveAttributes(
     const std::vector<Attribute>& attrs, DiagEngine& diag,
     const ScopeMap& scope = {});
+// §10.3.2: the name a left-hand side drives as a whole, empty where it drives
+// no single declared signal under a name. The clause admits a concatenation, a
+// select and a member access there as well as a plain name, none of which names
+// one signal, and a malformed left-hand side is absent altogether.
+std::string_view LhsSignalName(const Expr* lhs);
+
 uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod);
 
 // The range a select on the signal named `name` in `mod` resolves its indices

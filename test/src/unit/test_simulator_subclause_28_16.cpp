@@ -22,6 +22,25 @@ static uint64_t SettleTicks(const std::string& src) {
   return f.scheduler.CurrentTime().ticks;
 }
 
+// §10.3.3: a delay written on a net declaration that assigns nothing is a net
+// delay, and "any value change that is to be applied to [the net] by some other
+// statement shall be delayed" by it before it takes effect. Runs a module whose
+// net `w` carries a declaration delay of five and is driven by `driver` alone,
+// with the value that driver reads rising at t=100, and returns the time the
+// run settles at. The two cases using it differ in nothing but that driver, so
+// the module they share is written once here.
+static uint64_t SettleTicksForNetDelayDriver(const std::string& driver) {
+  return SettleTicks(
+      "module m;\n"
+      "  reg a;\n"
+      "  wire #5 w;\n"
+      "  " +
+      driver +
+      "\n"
+      "  initial begin a = 1'b0; #100 a = 1'b1; end\n"
+      "endmodule\n");
+}
+
 TEST(GateNetDelays, ProductionNoDelaySchedulerStopsAtZero) {
   // Running the lowered simulator on a gate without a delay specification
   // leaves the scheduler at time zero: the production coroutine takes the
@@ -414,6 +433,55 @@ TEST(GateNetDelays, ProductionDelayValueFromConstantExpressionSelectsSlot) {
                         "  initial begin a = 1'b0; #100 a = 1'b1; end\n"
                         "endmodule\n"),
             107u);
+}
+
+TEST(GateNetDelays, ProductionNetDelayDelaysSeparateContinuousAssignment) {
+  // §10.3.3 names this arrangement and rules on it: "Specifying the delay in a
+  // continuous assignment that is part of the net declaration shall be treated
+  // differently from specifying a net delay and then making a continuous
+  // assignment to the net." The declaration `wire #5 w;` assigns nothing, so
+  // its delay is a net delay, and every value change another statement applies
+  // to `w` waits five ticks before it takes effect. The continuous assignment
+  // drives `w` from a rise at t=100, so the run settles at 105. Every other net
+  // delay case in this file writes the initializer form, whose delay belongs to
+  // the assignment the declaration makes and reaches the net by a route this
+  // source does not use.
+  EXPECT_EQ(SettleTicksForNetDelayDriver("assign w = a;"), 105u);
+}
+
+TEST(GateNetDelays, ProductionNetDelayDelaysGatePrimitiveDriver) {
+  // §28.16 defines a net delay as "the time it takes from any driver on the net
+  // changing value to the time when the net value is updated and propagated
+  // further", so which construct drives the net does not change the answer: a
+  // gate primitive is a driver on `w` exactly as the continuous assignment
+  // above is, and the same five ticks stand between its output changing and the
+  // net carrying the change. The buf carries no delay of its own, so the five
+  // ticks are the net's alone and this case rests on no rule about how a gate
+  // delay and a net delay combine.
+  EXPECT_EQ(SettleTicksForNetDelayDriver("buf g(w, a);"), 105u);
+}
+
+TEST(GateNetDelays, ProductionUndrivenDelayedNetAcquiresNoDriver) {
+  // §28.16 gives a net delay its effect on "any driver on the net changing
+  // value", so a declaration carrying a delay and no assignment declares a net
+  // and creates nothing that drives it. Honouring the delay on a separately
+  // written driver must not manufacture a driver where the source wrote none:
+  // the module gains no continuous assignment, the lowered net gains no driver,
+  // and the run has nothing to schedule.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire #5 w;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  EXPECT_TRUE(design->top_modules[0]->assigns.empty());
+  LowerAndRun(design, f);
+  auto* net = f.ctx.FindNet("w");
+  ASSERT_NE(net, nullptr);
+  EXPECT_TRUE(net->drivers.empty());
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
 
 }  // namespace

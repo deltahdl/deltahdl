@@ -33,15 +33,16 @@ RtlirNet MakeImplicitPortNet(std::string_view name, uint32_t port_width,
 }
 
 uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod) {
-  if (!lhs || lhs->kind != ExprKind::kIdentifier) return 0;
+  std::string_view name = LhsSignalName(lhs);
+  if (name.empty()) return 0;
   for (const auto& v : mod->variables) {
-    if (v.name == lhs->text) return v.width;
+    if (v.name == name) return v.width;
   }
   for (const auto& n : mod->nets) {
-    if (n.name == lhs->text) return n.width;
+    if (n.name == name) return n.width;
   }
   for (const auto& p : mod->ports) {
-    if (p.name == lhs->text) return p.width;
+    if (p.name == name) return p.width;
   }
   return 0;
 }

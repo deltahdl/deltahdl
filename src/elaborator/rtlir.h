@@ -125,6 +125,29 @@ struct RtlirNet {
   uint32_t trireg_capacitance = 0;
   uint64_t decay_ticks = 0;
 
+  // §28.16: the net delay this net was declared with. "Net delays refer to the
+  // time it takes from any driver on the net changing value to the time when
+  // the net value is updated and propagated further", so the delay belongs to
+  // the net and every driver of it waits the delay out, whatever construct the
+  // driver is written as. §10.3.3 excludes the declaration that also assigns
+  // the net -- "When there is a continuous assignment in a declaration, the
+  // delay is part of the continuous assignment and is not a net delay. Thus, it
+  // shall not be added to the delay of other drivers on the net" -- so these
+  // are null for such a declaration, whose delay stays on the continuous
+  // assignment RtlirModule::assigns holds for it. They are null as well for a
+  // declaration that wrote no delay at all.
+  //
+  // The three are §28.16's rise, fall and turn-off delays, chosen between by
+  // Table 28-9. §28.16.1 lets any one of them be written as a min:typ:max
+  // triple, which is a property of the expression in the slot and not of the
+  // slot, so it does not change what the three are. delay_turnoff is null on a
+  // trireg net, whose third delay §28.16.2 makes "the charge decay time instead
+  // of the delay in a transition to the z logic state" -- decay_ticks above
+  // carries that one.
+  Expr* delay_rise = nullptr;
+  Expr* delay_fall = nullptr;
+  Expr* delay_turnoff = nullptr;
+
   bool is_vectored = false;
   bool is_scalared = false;
 
