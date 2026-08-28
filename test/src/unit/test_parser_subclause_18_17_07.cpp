@@ -1,3 +1,6 @@
+#include <string>
+#include <string_view>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -23,6 +26,40 @@ const Stmt* RandseqStmt(ParseResult& r) {
   auto* stmt = FirstInitialStmt(r);
   if (!stmt) return nullptr;
   return stmt->kind == StmtKind::kRandsequence ? stmt : nullptr;
+}
+
+// Parses a randsequence whose production `v` declares `type_text` as its
+// return type, from a module carrying `decls` ahead of the initial block.
+// §18.17's Syntax 18-13 writes the optional data_type_or_void immediately
+// before the production identifier, so the cases below vary that text alone
+// and share the module, the statement and the rule around it.
+ParseResult ParseProductionReturnType(std::string_view decls,
+                                      std::string_view type_text) {
+  return Parse(std::string("module m;\n") + std::string(decls) +
+               "  initial begin\n"
+               "    randsequence(main)\n"
+               "      void main : v ;\n"
+               "      " +
+               std::string(type_text) +
+               " v : { return 7; } ;\n"
+               "    endsequence\n"
+               "  end\n"
+               "endmodule\n");
+}
+
+// The production named `v` in a run that accepted its source and recorded a
+// return type on it, or nullptr when the run reported something or recorded no
+// such production. Each case below then reads the one member of DataType that
+// says which data_type form of A.2.2.1 was parsed.
+const RsProduction* ProductionWithReturnType(ParseResult& r) {
+  EXPECT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto* stmt = RandseqStmt(r);
+  if (stmt == nullptr) return nullptr;
+  const auto* v = FindProd(stmt, "v");
+  if (v == nullptr) return nullptr;
+  EXPECT_TRUE(v->has_return_type);
+  return v;
 }
 
 // §18.17.7: a production with no data_type_or_void and no tf_port_list assumes
@@ -225,6 +262,63 @@ TEST(RandseqValuePassingParse, FormalArgumentDefaultAmongMultiple) {
   EXPECT_EQ(combine->ports[0].default_value, nullptr);
   EXPECT_EQ(combine->ports[1].name, "b");
   EXPECT_NE(combine->ports[1].default_value, nullptr);
+}
+
+// §18.17.7: the return type a production declares is a data_type_or_void, and
+// A.2.2.1 gives `data_type` a `[ class_scope | package_scope ] type_identifier
+// { packed_dimension }` alternative — a name A.2.1.3's typedef declared. No
+// keyword marks the type here, so the return type is recognized only from the
+// parser's record of which identifiers name types; the production's own
+// identifier is the one after it.
+TEST(RandseqValuePassingParse, TypedefNameReturnTypeCaptured) {
+  auto r = ParseProductionReturnType("  typedef int word;\n", "word");
+  const auto* v = ProductionWithReturnType(r);
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->return_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(v->return_type.type_name, "word");
+}
+
+// §18.17.7 with A.2.2.1: `data_type ::= ... | enum [ enum_base_type ] {
+// enum_name_declaration { , enum_name_declaration } } { packed_dimension }`,
+// so an enumeration written out in place is a return type Syntax 18-13 admits.
+// Its members are what an enum return type carries beyond the keyword, so they
+// are read back rather than the kind alone.
+TEST(RandseqValuePassingParse, EnumReturnTypeCaptured) {
+  auto r = ParseProductionReturnType("", "enum { RED, GREEN }");
+  const auto* v = ProductionWithReturnType(r);
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->return_type.kind, DataTypeKind::kEnum);
+  EXPECT_EQ(v->return_type.enum_members.size(), 2u);
+}
+
+// §18.17.7 with A.2.2.1: `data_type ::= ... | struct_union [ packed [ signing ]
+// ] { struct_union_member { struct_union_member } } { packed_dimension }`, so a
+// structure written out in place is a return type Syntax 18-13 admits. Both
+// members and the packed qualifier are read back, because they are what the
+// return type has to carry for the value to be sized at all.
+TEST(RandseqValuePassingParse, StructReturnTypeCaptured) {
+  auto r = ParseProductionReturnType(
+      "", "struct packed { bit [3:0] lo; bit [3:0] hi; }");
+  const auto* v = ProductionWithReturnType(r);
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->return_type.kind, DataTypeKind::kStruct);
+  EXPECT_TRUE(v->return_type.is_packed);
+  EXPECT_EQ(v->return_type.struct_members.size(), 2u);
+}
+
+// §18.17.7 with A.2.2.1: `data_type ::= integer_vector_type [ signing ] {
+// packed_dimension }` and `integer_vector_type ::= bit | logic | reg`, so
+// `reg signed [7:0]` is a signed vector return type Syntax 18-13 admits. It is
+// written on `reg` because A.2.2.1 attaches the signing to a vector keyword: a
+// bare `signed [7:0]` is an implicit_data_type, which data_type_or_void does
+// not reach.
+TEST(RandseqValuePassingParse, RegSignedVectorReturnTypeCaptured) {
+  auto r = ParseProductionReturnType("", "reg signed [7:0]");
+  const auto* v = ProductionWithReturnType(r);
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->return_type.kind, DataTypeKind::kReg);
+  EXPECT_TRUE(v->return_type.is_signed);
+  EXPECT_NE(v->return_type.packed_dim_left, nullptr);
 }
 
 }  // namespace

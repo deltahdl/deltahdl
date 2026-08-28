@@ -277,18 +277,25 @@ RsRule Parser::ParseRsRule() {
 RsProduction Parser::ParseRsProduction() {
   RsProduction prod;
 
-  // §18.17.7: a production may begin with a data_type_or_void return type. The
-  // return type is recognized from a leading 'void', a built-in type keyword,
-  // or a leading packed-dimension '['; the parsed type is retained so the
-  // value-passing engine can size the production's return value. A production
-  // without a return type assumes a void return type (handled downstream).
-  if (Check(TokenKind::kKwVoid) || Check(TokenKind::kKwInt) ||
-      Check(TokenKind::kKwBit) || Check(TokenKind::kKwLogic) ||
-      Check(TokenKind::kKwByte) || Check(TokenKind::kKwShortint) ||
-      Check(TokenKind::kKwLongint) || Check(TokenKind::kKwInteger) ||
-      Check(TokenKind::kKwString) || Check(TokenKind::kKwReal) ||
-      Check(TokenKind::kKwShortreal) || Check(TokenKind::kKwRealtime) ||
-      Check(TokenKind::kKwTime) || Check(TokenKind::kLBracket)) {
+  // Syntax 18-13 (§18.17): `rs_production ::= [ data_type_or_void ]
+  // rs_production_identifier [ ( tf_port_list ) ] : rs_rule { | rs_rule } ;`.
+  // A return type is present when the production opens on a data_type_or_void,
+  // which AtDataTypeOrVoid answers for the whole of A.2.2.1 rather than for
+  // its keyword cases alone. §18.17.7 sizes a returned value by that type.
+  //
+  // An identifier naming a declared type is either that return type or the
+  // production's own name, and the token after it decides which: Syntax 18-13
+  // admits only `(` or `:` after the rs_production_identifier. So `word v :`
+  // returns `word` from a production `v`, `word :` names a production `word`,
+  // and a scoped type name, followed by `::`, stays a return type.
+  bool has_return_type = AtDataTypeOrVoid();
+  if (has_return_type && Check(TokenKind::kIdentifier)) {
+    auto saved = lexer_.SavePos();
+    Consume();
+    has_return_type = !Check(TokenKind::kLParen) && !Check(TokenKind::kColon);
+    lexer_.RestorePos(saved);
+  }
+  if (has_return_type) {
     prod.return_type = ParseFunctionReturnType();
     prod.has_return_type = true;
   }

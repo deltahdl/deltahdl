@@ -400,6 +400,34 @@ bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
   return false;
 }
 
+bool Parser::AtDataTypeOrVoid() {
+  if (Check(TokenKind::kIdentifier)) {
+    return known_types_.count(CurrentToken().text) != 0;
+  }
+  auto tk = CurrentToken().kind;
+  switch (tk) {
+    // A.2.2.1 opens a data_type with struct_union, enum, `virtual` or a
+    // type_reference without any of the four reaching TokenToTypeKind, and
+    // ParseDataType takes a leading `const` and a leading `signing` as well.
+    case TokenKind::kKwStruct:
+    case TokenKind::kKwUnion:
+    case TokenKind::kKwEnum:
+    case TokenKind::kKwVirtual:
+    case TokenKind::kKwType:
+    case TokenKind::kKwConst:
+    case TokenKind::kKwSigned:
+    case TokenKind::kKwUnsigned:
+    case TokenKind::kLBracket:
+      return true;
+    default:
+      break;
+  }
+  // Every other data_type opens on one keyword, and TokenToTypeKind is the
+  // list ParseDataType reads to turn that keyword into a DataTypeKind. Asking
+  // it rather than restating it is what keeps the two from parting company.
+  return TokenToTypeKind(tk).has_value();
+}
+
 DataType Parser::ParseDataType() {
   DataType dtype;
 

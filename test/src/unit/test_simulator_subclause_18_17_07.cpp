@@ -634,4 +634,38 @@ TEST(RandseqValuePassingSim, RecursiveActivationLeavesTheOuterArrayShape) {
   EXPECT_EQ(sum->value.ToUint64(), 83u);
 }
 
+// §18.17.7: a production's return type is a data_type_or_void, and A.2.2.1
+// makes a type_identifier declared by a typedef one of the data_type
+// alternatives. The triggering production then reads the returned value
+// through the implicit variable named after the production, so `r` holds 41.
+// The claim is that the value arrives through a return type written as a
+// declared name: a production whose return type the parser did not read is
+// generated with no return slot at all, its `return 41` reaches nothing, and
+// `r` keeps the 0 the initial block assigned it.
+//
+// The width the value is stored at is not claimed here, because the run does
+// not yet honour it. EvalTypeWidth (src/elaborator/type_eval.cpp) gives
+// DataTypeKind::kNamed no width, and both sites in
+// src/simulator/stmt_exec_randsequence.cpp that size a return value turn that
+// zero into a 32-bit carrier, so `octet` is stored in 32 bits rather than the
+// 8 that `byte` declares. 41 fits both, so this case reads the same before and
+// after that is repaired.
+TEST(RandseqValuePassingSim, TypedefNameReturnTypeValueReachesTheRule) {
+  SimFixture f;
+  uint64_t r = RunModule(f,
+                         "module t;\n"
+                         "  typedef byte octet;\n"
+                         "  int r;\n"
+                         "  initial begin\n"
+                         "    r = 0;\n"
+                         "    randsequence(main)\n"
+                         "      void main : v { r = v; } ;\n"
+                         "      octet v : { return 41; } ;\n"
+                         "    endsequence\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "r");
+  EXPECT_EQ(r, 41u);
+}
+
 }  // namespace

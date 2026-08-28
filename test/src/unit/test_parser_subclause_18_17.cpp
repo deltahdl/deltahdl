@@ -226,4 +226,34 @@ TEST(RandseqBaseParse, MalformedProductionNames18_17) {
   EXPECT_TRUE(ReportedError(r.diags, "expected ':'", 4, "18.17"));
 }
 
+// §18.17, Syntax 18-13: `rs_production ::= [ data_type_or_void ]
+// rs_production_identifier [ ( tf_port_list ) ] : rs_rule { | rs_rule } ;`, so
+// where a data_type_or_void is written the production identifier is the
+// identifier that follows it and not the one that opens the declaration.
+// A.2.2.1 makes a type_identifier a data_type, and A.2.1.3's typedef is what
+// declares `word` to be one, so `word v : ...` declares the production `v`
+// returning `word`. A parser that reads the leading identifier as the
+// production identifier files a production under the name `word` and then
+// meets `v` where Syntax 18-13 puts the colon.
+TEST(RandseqBaseParse, TypeNameBeforeProductionIdentifierIsNotTheName) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef int word;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      void main : v ;\n"
+      "      word v : { return 7; } ;\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto* stmt = RandseqStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->rs_productions.size(), 2u);
+  EXPECT_EQ(stmt->rs_productions[1].name, "v");
+  // Nothing is declared under the type's name: `word` names the return type.
+  EXPECT_EQ(FindProd(stmt, "word"), nullptr);
+}
+
 }  // namespace
