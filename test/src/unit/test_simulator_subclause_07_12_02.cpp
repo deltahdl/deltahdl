@@ -399,6 +399,72 @@ TEST(ArrayOrderingE2E, RsortWithExpressionOnDeclaredQueue) {
   EXPECT_EQ(got, (std::vector<uint64_t>{1u, 2u, 3u}));
 }
 
+// ---------------------------------------------------------------------------
+// §7.12 Syntax 7-5 writes the argument list of an array method call as
+// optional, so `q.sort` and `q.sort()` are one call, and §7.12.2 gives that one
+// call the same effect on a queue whichever way it is spelled. The two
+// spellings reach evaluation through different productions -- a call
+// expression and a member reference -- so each is stated on its own, and the
+// pair is what says they are one call rather than two methods.
+// ---------------------------------------------------------------------------
+
+// §7.12 Syntax 7-5 with §7.12.2: sort() written with its (empty) argument list
+// orders the queue in ascending order.
+TEST(ArrayOrderingE2E, SortCallWithParensReordersDeclaredQueue) {
+  SimFixture f;
+  auto got = RunAndReadElems(f,
+                             "module m;\n"
+                             "  int q[$] = '{30, 10, 20};\n"
+                             "  initial q.sort();\n"
+                             "endmodule\n",
+                             "q");
+  EXPECT_EQ(got, (std::vector<uint64_t>{10u, 20u, 30u}));
+}
+
+// §7.12 Syntax 7-5 with §7.12.2: the same sort() call written without the
+// argument list orders the same queue the same way. Paired with the
+// parenthesized case above, this is the claim that Syntax 7-5's optional
+// argument list leaves one call with one effect.
+TEST(ArrayOrderingE2E, SortCallWithoutParensReordersDeclaredQueue) {
+  SimFixture f;
+  auto got = RunAndReadElems(f,
+                             "module m;\n"
+                             "  int q[$] = '{30, 10, 20};\n"
+                             "  initial q.sort;\n"
+                             "endmodule\n",
+                             "q");
+  EXPECT_EQ(got, (std::vector<uint64_t>{10u, 20u, 30u}));
+}
+
+// §7.12 Syntax 7-5 with §7.12.2: reverse() written with its (empty) argument
+// list reverses the order of the queue's elements.
+TEST(ArrayOrderingE2E, ReverseCallWithParensReordersDeclaredQueue) {
+  SimFixture f;
+  auto got = RunAndReadElems(f,
+                             "module m;\n"
+                             "  int q[$] = '{10, 20, 30};\n"
+                             "  initial q.reverse();\n"
+                             "endmodule\n",
+                             "q");
+  EXPECT_EQ(got, (std::vector<uint64_t>{30u, 20u, 10u}));
+}
+
+// §7.12 Syntax 7-5 with §7.12.2: shuffle() written with its (empty) argument
+// list randomizes the order of the queue's elements and neither adds nor drops
+// one, so the multiset of values is what holds for every permutation the draw
+// could produce.
+TEST(ArrayOrderingE2E, ShuffleCallWithParensPreservesQueueMultiset) {
+  SimFixture f;
+  auto got = RunAndReadElems(f,
+                             "module m;\n"
+                             "  int q[$] = '{10, 20, 30, 40, 50};\n"
+                             "  initial q.shuffle();\n"
+                             "endmodule\n",
+                             "q");
+  std::sort(got.begin(), got.end());
+  EXPECT_EQ(got, (std::vector<uint64_t>{10u, 20u, 30u, 40u, 50u}));
+}
+
 // §7.12.2: specifying a with clause on reverse() is an error, and the report
 // it raises names §7.12.2 -- the subclause that says so of both reverse() and
 // shuffle().

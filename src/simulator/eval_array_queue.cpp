@@ -136,6 +136,19 @@ static bool IsQueueMutator(std::string_view method) {
          method == "delete";
 }
 
+// The four ordering methods §7.12.2 defines over an array: sort and rsort put
+// the elements in ascending and descending order, reverse and shuffle permute
+// them. Syntax 7-5 of §7.12 makes the argument list of an array method call
+// optional, so `q.sort` and `q.sort()` are the same call and both reach
+// TryExecQueuePropertyStmt below. The four are named here rather than every
+// method that dispatch declined being passed on, because that function also
+// serves `delete`, which DispatchQueueDelete has already handled with its
+// argument.
+static bool IsQueueOrderingMethod(std::string_view method) {
+  return method == "sort" || method == "rsort" || method == "reverse" ||
+         method == "shuffle";
+}
+
 static void NotifyOwningVar(SimContext& ctx, std::string_view var_name) {
   if (auto* v = ctx.FindVariable(var_name)) v->NotifyWatchers();
 }
@@ -157,6 +170,12 @@ bool TryEvalQueueMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
     return true;
   }
   if (DispatchQueueDelete(parts.method_name, q, expr, ctx, arena)) {
+    out = MakeLogic4VecVal(arena, 1, 0);
+    NotifyOwningVar(ctx, parts.var_name);
+    return true;
+  }
+  if (IsQueueOrderingMethod(parts.method_name) &&
+      TryExecQueuePropertyStmt(parts.var_name, parts.method_name, ctx, arena)) {
     out = MakeLogic4VecVal(arena, 1, 0);
     NotifyOwningVar(ctx, parts.var_name);
     return true;
