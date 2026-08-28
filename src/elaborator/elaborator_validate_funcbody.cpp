@@ -110,6 +110,19 @@ static void CheckStmtForRefArgs(
   });
 }
 
+// Finds the fork-join_any and fork-join_none blocks §9.3.2 governs. A.6.3
+// makes a par_block a statement, and the clause puts no condition on where the
+// fork stands, so every position a statement holds a statement in is one such
+// a fork can be written in. ForEachChildStmt in
+// elaborator_validate_internal.h states those positions once for the whole
+// elaborator, which is why the list is not written out again here.
+//
+// Stmt::for_inits and Stmt::for_steps are walked because the shared list is
+// walked whole, and no conforming source puts a fork in either: A.6.8 admits
+// only a list_of_variable_assignments or a for_variable_declaration in a
+// for_initialization, and only an operator_assignment, an
+// inc_or_dec_expression or a function_subroutine_call in a for_step, none of
+// which is a par_block.
 static void CheckRefArgsInForkBlocks(
     const Stmt* s, const std::unordered_set<std::string_view>& ref_names,
     DiagEngine& diag) {
@@ -121,17 +134,9 @@ static void CheckRefArgsInForkBlocks(
       CheckStmtForRefArgs(fs, ref_names, is_block_item, diag);
     }
   }
-  for (auto* sub : s->stmts) CheckRefArgsInForkBlocks(sub, ref_names, diag);
-  for (auto* sub : s->fork_stmts)
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     CheckRefArgsInForkBlocks(sub, ref_names, diag);
-  CheckRefArgsInForkBlocks(s->then_branch, ref_names, diag);
-  CheckRefArgsInForkBlocks(s->else_branch, ref_names, diag);
-  CheckRefArgsInForkBlocks(s->body, ref_names, diag);
-  CheckRefArgsInForkBlocks(s->for_body, ref_names, diag);
-  for (auto& ci : s->case_items)
-    CheckRefArgsInForkBlocks(ci.body, ref_names, diag);
-  for (auto& ri : s->randcase_items)
-    CheckRefArgsInForkBlocks(ri.second, ref_names, diag);
+  });
 }
 
 static void CheckFuncBodyTimeControl(const Stmt* s, DiagEngine& diag) {
@@ -408,6 +413,24 @@ static void CheckTaskBodyStmt(
     CheckTaskBodyStmt(ci.body, auto_vars, rule, diag);
 }
 
+// Collects the names §6.21 and §13.3.2 govern. §6.21 says "Automatic variables
+// and elements of dynamically sized array variables shall not be written with
+// nonblocking, continuous, or procedural continuous assignments" and §13.3.2
+// opens "Because variables declared in automatic tasks are deallocated at the
+// end of the task invocation", so each turns on how a variable was declared and
+// neither on where the declaration stands. A.2.8 makes a data_declaration a
+// block_item_declaration, so a declaration this collects can be reached through
+// every position a statement holds a statement in. ForEachChildStmt in
+// elaborator_validate_internal.h states those positions once for the whole
+// elaborator, which is why the list is not written out again here.
+//
+// Stmt::for_inits and Stmt::for_steps are walked because the shared list is
+// walked whole, and neither ever holds a declaration this collects.
+// Parser::ParseAssignmentOrExprNoSemi in src/parser/parser_stmt.cpp builds
+// every statement in both, and it produces a blocking assignment, a nonblocking
+// assignment or an expression statement and never a StmtKind::kVarDecl; a
+// control variable declared local to the loop leaves its type in
+// Stmt::for_init_types and its name in the assignment.
 static void CollectAutoVarNames(const Stmt* s, bool task_is_auto,
                                 std::unordered_set<std::string_view>& out) {
   if (!s) return;
@@ -417,13 +440,9 @@ static void CollectAutoVarNames(const Stmt* s, bool task_is_auto,
       out.insert(s->var_name);
     }
   }
-  for (auto* sub : s->stmts) CollectAutoVarNames(sub, task_is_auto, out);
-  CollectAutoVarNames(s->then_branch, task_is_auto, out);
-  CollectAutoVarNames(s->else_branch, task_is_auto, out);
-  CollectAutoVarNames(s->body, task_is_auto, out);
-  CollectAutoVarNames(s->for_body, task_is_auto, out);
-  for (auto& ci : s->case_items)
-    CollectAutoVarNames(ci.body, task_is_auto, out);
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    CollectAutoVarNames(sub, task_is_auto, out);
+  });
 }
 
 static void ValidateFunctionArgDecls(
@@ -529,19 +548,14 @@ static void CheckSubroutineBodyRedeclarations(const Stmt* s, DiagEngine& diag) {
   // merged into the enclosing block's, because the fork-join block is a
   // separate scope and a name reused there is legal shadowing.
   if (s->kind == StmtKind::kFork) CheckBlockDeclDups(s->fork_stmts, diag);
-  for (const auto* sub : s->stmts) CheckSubroutineBodyRedeclarations(sub, diag);
-  for (const auto* sub : s->fork_stmts)
+  // §23.9 puts no condition on where the block whose declarations it governs is
+  // written, so every position a statement holds a statement in is a position a
+  // begin-end or fork-join block stands in. ForEachChildStmt in
+  // elaborator_validate_internal.h states those positions once for the whole
+  // elaborator, which is why the list is not written out again here.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     CheckSubroutineBodyRedeclarations(sub, diag);
-  CheckSubroutineBodyRedeclarations(s->then_branch, diag);
-  CheckSubroutineBodyRedeclarations(s->else_branch, diag);
-  CheckSubroutineBodyRedeclarations(s->body, diag);
-  CheckSubroutineBodyRedeclarations(s->for_body, diag);
-  for (const auto* fi : s->for_inits)
-    CheckSubroutineBodyRedeclarations(fi, diag);
-  for (const auto* fs : s->for_steps)
-    CheckSubroutineBodyRedeclarations(fs, diag);
-  for (const auto& ci : s->case_items)
-    CheckSubroutineBodyRedeclarations(ci.body, diag);
+  });
 }
 
 void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
@@ -665,15 +679,23 @@ static void CheckAutoVarWritesInProc(
                  Subclause("6.21"));
     }
   }
-  for (auto* sub : s->stmts) CheckAutoVarWritesInProc(sub, auto_vars, diag);
-  for (auto* sub : s->fork_stmts)
+  // §6.21 forbids the nonblocking assignment and the procedural continuous
+  // assignment reported above by what each writes into rather than by where it
+  // is written, so every position a statement holds a statement in is one
+  // either can stand in. ForEachChildStmt in
+  // elaborator_validate_internal.h states those positions once for the whole
+  // elaborator, which is why the list is not written out again here.
+  //
+  // Stmt::for_inits and Stmt::for_steps are walked because the shared list is
+  // walked whole, and no conforming source makes either report: A.6.8 admits
+  // only a list_of_variable_assignments or a for_variable_declaration in a
+  // for_initialization, and only an operator_assignment, an
+  // inc_or_dec_expression or a function_subroutine_call in a for_step, and none
+  // of those is a nonblocking assignment, a procedural continuous assignment or
+  // a force.
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
     CheckAutoVarWritesInProc(sub, auto_vars, diag);
-  CheckAutoVarWritesInProc(s->then_branch, auto_vars, diag);
-  CheckAutoVarWritesInProc(s->else_branch, auto_vars, diag);
-  CheckAutoVarWritesInProc(s->body, auto_vars, diag);
-  CheckAutoVarWritesInProc(s->for_body, auto_vars, diag);
-  for (auto& ci : s->case_items)
-    CheckAutoVarWritesInProc(ci.body, auto_vars, diag);
+  });
 }
 
 void Elaborator::ValidateAutomaticVarProcWrites(const ModuleDecl* decl) {

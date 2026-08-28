@@ -298,4 +298,103 @@ TEST(ParallelBlockElaboration,
                             5, "9.3.2"));
 }
 
+// The four cases below cover the child-statement links of Stmt that
+// CheckRefArgsInForkBlocks in src/elaborator/elaborator_validate_funcbody.cpp
+// reaches for the first time now that it takes its list from ForEachChildStmt
+// in src/elaborator/elaborator_validate_internal.h. That walk is the one that
+// finds the fork-join_any and fork-join_none blocks §9.3.2 governs, and it had
+// written out eight of the thirteen links: Stmt::assert_pass_stmt,
+// Stmt::assert_fail_stmt and the two statement lists Stmt::rs_productions holds
+// were missing, so a ref argument used inside a fork written in one of them
+// elaborated clean. Stmt::for_inits and Stmt::for_steps were missing too and
+// get no case, A.6.8 admitting no par_block in either.
+//
+// The cases above cover a ref argument written in a new position inside a fork
+// the walk already found. These cover the fork itself standing in a new
+// position, which is a different link of a different walk.
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. A.6.3 makes a
+// par_block a statement, so a fork stands in either arm. This case and the next
+// cover one arm each.
+TEST(ParallelBlockElaboration,
+     ForkJoinNoneInAnAssertionPassStmtRejectsARefArg) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task automatic t(ref int v);\n"
+      "    assert (1) fork v = 1; join_none\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "ref argument 'v' cannot be used inside a "
+                            "fork-join_any or fork-join_none block",
+                            3, "9.3.2"));
+}
+
+TEST(ParallelBlockElaboration,
+     ForkJoinNoneInAnAssertionFailStmtRejectsARefArg) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task automatic t(ref int v);\n"
+      "    assert (1) else fork v = 1; join_none\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "ref argument 'v' cannot be used inside a "
+                            "fork-join_any or fork-join_none block",
+                            3, "9.3.2"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements and a fork is one of them. They are kept in RsProd::code_stmts,
+// reached through Stmt::rs_productions and through no other member of Stmt.
+TEST(ParallelBlockElaboration,
+     ForkJoinNoneInARandsequenceCodeBlockRejectsARefArg) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task automatic t(ref int v);\n"
+      "    randsequence(main)\n"
+      "      main : { fork v = 1; join_none };\n"
+      "    endsequence\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "ref argument 'v' cannot be used inside a "
+                            "fork-join_any or fork-join_none block",
+                            4, "9.3.2"));
+}
+
+// A.6.12's `rs_rule ::= rs_production_list [ := weight_specification [
+// rs_code_block ] ]` puts a second code block after the weight, which the
+// parser keeps in RsRule::weight_code rather than in RsProd::code_stmts. It is
+// a second statement position under Stmt::rs_productions, so it gets its own
+// case: the production `alt` below holds a null statement, which leaves the
+// weight block as the only place the fork can stand.
+TEST(ParallelBlockElaboration,
+     ForkJoinNoneInARandsequenceWeightCodeBlockRejectsARefArg) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task automatic t(ref int v);\n"
+      "    randsequence(main)\n"
+      "      main : alt := 5 { fork v = 1; join_none };\n"
+      "      alt : { ; };\n"
+      "    endsequence\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "ref argument 'v' cannot be used inside a "
+                            "fork-join_any or fork-join_none block",
+                            4, "9.3.2"));
+}
+
 }  // namespace

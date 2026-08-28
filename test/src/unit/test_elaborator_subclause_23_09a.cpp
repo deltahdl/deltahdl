@@ -834,4 +834,86 @@ TEST(ScopeRulesElaboration, DuplicateBlockLocalInARandsequenceWeightCodeBlock) {
       "    end");
 }
 
+// §23.9 rules that "An identifier shall be used to declare only one item within
+// a scope" and lists "begin-end blocks (named or unnamed)" among the elements
+// that define one, putting no condition on the statement the block stands in.
+// The five cases below write a block declaring `a` twice into one position
+// CheckSubroutineBodyRedeclarations in
+// src/elaborator/elaborator_validate_funcbody.cpp did not reach before it took
+// its list from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h: it had written out nine of the
+// thirteen child-statement links of Stmt, and Stmt::assert_pass_stmt,
+// Stmt::assert_fail_stmt, the body of a randcase item and the two statement
+// lists Stmt::rs_productions holds were the four it was missing.
+//
+// The block is written inside a task rather than inside a procedural block
+// because those are two separate walks. CheckBlockLocalRedeclarations in
+// src/elaborator/elaborator_scope_rules.cpp is what checks a procedural block,
+// and Elaborator::ValidateScopeRules calls it only for an item
+// IsProceduralItemKind admits, so nothing but the subroutine walk reaches a
+// task body.
+//
+// CheckBlockDeclDups in src/elaborator/elaborator_validate_funcbody.cpp is the
+// emission site: it formats "redeclaration of '{}'" from Stmt::var_name and
+// passes Subclause("23.9"). The report stands at the second declaration, which
+// each source writes on the same line as the first; `stmt` may run to several
+// lines, so that line is read back out of the source rather than counted.
+void ExpectDuplicateTaskBlockLocalIn(const std::string& stmt) {
+  ElabFixture f;
+  std::string src =
+      "module m;\n  task t();\n    " + stmt + "\n  endtask\nendmodule\n";
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "redeclaration of 'a'",
+                            LineHolding(src, "begin int a; int a; end"),
+                            "23.9"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
+// next cover one arm each.
+TEST(ScopeRulesElaboration, DuplicateBlockLocalInATaskAssertionPassStmt) {
+  ExpectDuplicateTaskBlockLocalIn("assert (1) begin int a; int a; end");
+}
+
+TEST(ScopeRulesElaboration, DuplicateBlockLocalInATaskAssertionFailStmt) {
+  ExpectDuplicateTaskBlockLocalIn("assert (1) else begin int a; int a; end");
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
+// statement the parser keeps in the second member of a Stmt::randcase_items
+// entry. §23.9 is a rule about the source, so it holds whether the weighted
+// draw would select the item or not.
+TEST(ScopeRulesElaboration, DuplicateBlockLocalInATaskRandcaseItem) {
+  ExpectDuplicateTaskBlockLocalIn(
+      "randcase 1: begin int a; int a; end endcase");
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements and a begin-end block is one of them. They are kept in
+// RsProd::code_stmts, reached through Stmt::rs_productions and through no other
+// member of Stmt.
+TEST(ScopeRulesElaboration, DuplicateBlockLocalInATaskRandsequenceCodeBlock) {
+  ExpectDuplicateTaskBlockLocalIn(
+      "randsequence(main)\n"
+      "      main : { begin int a; int a; end };\n"
+      "    endsequence");
+}
+
+// A.6.12's `rs_rule ::= rs_production_list [ := weight_specification [
+// rs_code_block ] ]` puts a second code block after the weight, which the
+// parser keeps in RsRule::weight_code rather than in RsProd::code_stmts. It is
+// a second statement position under Stmt::rs_productions, so it gets its own
+// case: the production `alt` below holds a null statement, which leaves the
+// weight block as the only place the declaring block can stand.
+TEST(ScopeRulesElaboration,
+     DuplicateBlockLocalInATaskRandsequenceWeightCodeBlock) {
+  ExpectDuplicateTaskBlockLocalIn(
+      "randsequence(main)\n"
+      "      main : alt := 5 { begin int a; int a; end };\n"
+      "      alt : { ; };\n"
+      "    endsequence");
+}
+
 }  // namespace

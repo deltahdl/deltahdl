@@ -1,3 +1,5 @@
+#include <string>
+
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -515,6 +517,242 @@ TEST(FunctionElaboration, InputOnlyArgCallInContAssignOk) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §13.4.3 lists the constraints a constant function is held to, and none of
+// them says where in the body the statement or expression breaking one may
+// stand. Five walks in src/elaborator/elaborator_validate_funcchecks.cpp
+// enforce them — BodyContainsFork and BodyContainsNonblocking and
+// BodyContainsEventScheduling for "shall not contain any fork constructs" and
+// "shall not contain a statement that directly schedules an event to execute
+// after the function has returned", CollectLocalDeclNames and
+// WalkConstFuncStmt for "shall not reference any identifiers that are not
+// either parameter or function names, or declared locally to the current
+// function" — and each had written out a short list of its own of the thirteen
+// child-statement links Stmt declares. They now take the list from
+// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h, and the
+// cases below cover the positions that reaches which their own lists did not.
+//
+// Five positions are newly reached, and each walk gets one case per position.
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. §18.16 gives
+// `randcase_item ::= expression : statement_or_null`, whose statement the
+// parser keeps in the second member of a Stmt::randcase_items entry. A.6.12
+// gives `rs_code_block ::= { { data_declaration } { statement_or_null } }`,
+// reached from an rs_prod as RsProd::code_stmts and, per §18.17.1, from after a
+// weight specification as RsRule::weight_code; both hang off
+// Stmt::rs_productions, and a walk reaches one without reaching the other.
+//
+// §18.17.6 gives break and return a meaning inside a randsequence production
+// code block that they have nowhere else, and none of these five walks is about
+// break or return, so each is owed inside one.
+//
+// Stmt::fork_stmts, Stmt::for_inits and Stmt::for_steps get no case. A.6.8
+// admits only a variable_assignment or a for_variable_declaration in a
+// for_initialization and only an operator_assignment, an inc_or_dec_expression
+// or a function_subroutine_call in a for_step, so neither can hold a fork, a
+// nonblocking assignment, a timing control or a declaration.
+// src/parser/parser_stmt_block.cpp fills Stmt::fork_stmts on a StmtKind::kFork
+// alone, so BodyContainsFork answers at that fork before descending, and
+// §13.4.3's "shall not contain any fork constructs" stops the other four walks
+// before they see the inside of one.
+//
+// These cases cover §13.4.3 and belong in
+// test/src/unit/test_elaborator_subclause_13_04_03.cpp. They stand here because
+// that file is at 908 lines against the 1000-line maximum
+// .github/workflows/deltahdl.yml enforces.
+
+// The statement each walk is looking for, written once and placed by the
+// helpers below into each of the five positions.
+constexpr const char* kForkStmt = "fork t = 1; join_none";
+constexpr const char* kNbaStmt = "t <= 1;";
+constexpr const char* kEventTriggerStmt = "-> ev;";
+constexpr const char* kLocalDeclStmt = "begin int u; u = 1; end";
+constexpr const char* kModuleVarStmt = "t = i;";
+
+// What each walk's rule reports, with the function named `cf` by ConstFuncSrc.
+constexpr const char* kForkMsg =
+    "constant function 'cf' shall not contain fork";
+constexpr const char* kNbaMsg =
+    "constant function 'cf' shall not contain nonblocking assignments";
+constexpr const char* kEventMsg =
+    "constant function 'cf' shall not contain statements that schedule events "
+    "to execute after it returns";
+constexpr const char* kIdentMsg =
+    "constant function 'cf' references identifier 'i' that is not a parameter, "
+    "function name, or local declaration";
+
+// One module holding `body` as the whole of a constant function's body between
+// its own `int t;` declaration and its return. §13.4.3 holds of a function
+// called where a constant expression is required, so `cf` is called from a
+// localparam initializer, and every report below stands at that call rather
+// than at the offending statement.
+std::string ConstFuncSrc(const std::string& body) {
+  return std::string(
+             "module m;\n"
+             "  event ev;\n"
+             "  int i;\n"
+             "  function int cf(input int n);\n"
+             "    int t;\n") +
+         body +
+         "\n    return n;\n"
+         "  endfunction\n"
+         "  localparam int P = cf(1);\n"
+         "endmodule\n";
+}
+
+void ExpectConstFuncError(const std::string& body, const std::string& message) {
+  ElabFixture f;
+  std::string src = ConstFuncSrc(body);
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message,
+                            LineHolding(src, "localparam int P"), "13.4.3"));
+}
+
+// The companion to ExpectConstFuncError for CollectLocalDeclNames, whose rule
+// is that a name declared in the position is in scope rather than that a
+// statement there is rejected. Without the collection reaching the position,
+// WalkConstFuncStmt reaches the use and reports the name as declared nowhere.
+void ExpectConstFuncAccepted(const std::string& body) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(ConstFuncSrc(body), f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The five positions, each placing `stmt` where the old lists did not look.
+std::string InAssertPassStmt(const std::string& stmt) {
+  return "    assert (n) " + stmt;
+}
+
+std::string InAssertFailStmt(const std::string& stmt) {
+  return "    assert (n) else " + stmt;
+}
+
+std::string InRandcaseItem(const std::string& stmt) {
+  return "    randcase 1: " + stmt + " endcase";
+}
+
+std::string InRandsequenceCodeBlock(const std::string& stmt) {
+  return "    randsequence(main)\n      main : { " + stmt +
+         " };\n    endsequence";
+}
+
+std::string InRandsequenceWeightCodeBlock(const std::string& stmt) {
+  return "    randsequence(main)\n      main : alt := 1 { " + stmt +
+         " };\n      alt : { t = 0; };\n    endsequence";
+}
+
+TEST(ConstantFunctionBodyReachElaboration, ForkInAnAssertionPassStmt) {
+  ExpectConstFuncError(InAssertPassStmt(kForkStmt), kForkMsg);
+}
+
+TEST(ConstantFunctionBodyReachElaboration, ForkInAnAssertionFailStmt) {
+  ExpectConstFuncError(InAssertFailStmt(kForkStmt), kForkMsg);
+}
+
+TEST(ConstantFunctionBodyReachElaboration, ForkInARandcaseItem) {
+  ExpectConstFuncError(InRandcaseItem(kForkStmt), kForkMsg);
+}
+
+TEST(ConstantFunctionBodyReachElaboration, ForkInARandsequenceCodeBlock) {
+  ExpectConstFuncError(InRandsequenceCodeBlock(kForkStmt), kForkMsg);
+}
+
+TEST(ConstantFunctionBodyReachElaboration, ForkInARandsequenceWeightCodeBlock) {
+  ExpectConstFuncError(InRandsequenceWeightCodeBlock(kForkStmt), kForkMsg);
+}
+
+TEST(ConstantFunctionBodyReachElaboration, NonblockingInAnAssertionPassStmt) {
+  ExpectConstFuncError(InAssertPassStmt(kNbaStmt), kNbaMsg);
+}
+
+TEST(ConstantFunctionBodyReachElaboration, NonblockingInAnAssertionFailStmt) {
+  ExpectConstFuncError(InAssertFailStmt(kNbaStmt), kNbaMsg);
+}
+
+TEST(ConstantFunctionBodyReachElaboration, NonblockingInARandcaseItem) {
+  ExpectConstFuncError(InRandcaseItem(kNbaStmt), kNbaMsg);
+}
+
+TEST(ConstantFunctionBodyReachElaboration,
+     NonblockingInARandsequenceCodeBlock) {
+  ExpectConstFuncError(InRandsequenceCodeBlock(kNbaStmt), kNbaMsg);
+}
+
+TEST(ConstantFunctionBodyReachElaboration,
+     NonblockingInARandsequenceWeightCodeBlock) {
+  ExpectConstFuncError(InRandsequenceWeightCodeBlock(kNbaStmt), kNbaMsg);
+}
+
+TEST(ConstantFunctionBodyReachElaboration, EventTriggerInAnAssertionPassStmt) {
+  ExpectConstFuncError(InAssertPassStmt(kEventTriggerStmt), kEventMsg);
+}
+
+TEST(ConstantFunctionBodyReachElaboration, EventTriggerInAnAssertionFailStmt) {
+  ExpectConstFuncError(InAssertFailStmt(kEventTriggerStmt), kEventMsg);
+}
+
+TEST(ConstantFunctionBodyReachElaboration, EventTriggerInARandcaseItem) {
+  ExpectConstFuncError(InRandcaseItem(kEventTriggerStmt), kEventMsg);
+}
+
+TEST(ConstantFunctionBodyReachElaboration,
+     EventTriggerInARandsequenceCodeBlock) {
+  ExpectConstFuncError(InRandsequenceCodeBlock(kEventTriggerStmt), kEventMsg);
+}
+
+TEST(ConstantFunctionBodyReachElaboration,
+     EventTriggerInARandsequenceWeightCodeBlock) {
+  ExpectConstFuncError(InRandsequenceWeightCodeBlock(kEventTriggerStmt),
+                       kEventMsg);
+}
+
+TEST(ConstantFunctionBodyReachElaboration,
+     ModuleVariableReadInAnAssertionPassStmt) {
+  ExpectConstFuncError(InAssertPassStmt(kModuleVarStmt), kIdentMsg);
+}
+
+TEST(ConstantFunctionBodyReachElaboration,
+     ModuleVariableReadInAnAssertionFailStmt) {
+  ExpectConstFuncError(InAssertFailStmt(kModuleVarStmt), kIdentMsg);
+}
+
+TEST(ConstantFunctionBodyReachElaboration, ModuleVariableReadInARandcaseItem) {
+  ExpectConstFuncError(InRandcaseItem(kModuleVarStmt), kIdentMsg);
+}
+
+TEST(ConstantFunctionBodyReachElaboration,
+     ModuleVariableReadInARandsequenceCodeBlock) {
+  ExpectConstFuncError(InRandsequenceCodeBlock(kModuleVarStmt), kIdentMsg);
+}
+
+TEST(ConstantFunctionBodyReachElaboration,
+     ModuleVariableReadInARandsequenceWeightCodeBlock) {
+  ExpectConstFuncError(InRandsequenceWeightCodeBlock(kModuleVarStmt),
+                       kIdentMsg);
+}
+
+TEST(ConstantFunctionBodyReachElaboration, LocalDeclInAnAssertionPassStmt) {
+  ExpectConstFuncAccepted(InAssertPassStmt(kLocalDeclStmt));
+}
+
+TEST(ConstantFunctionBodyReachElaboration, LocalDeclInAnAssertionFailStmt) {
+  ExpectConstFuncAccepted(InAssertFailStmt(kLocalDeclStmt));
+}
+
+TEST(ConstantFunctionBodyReachElaboration, LocalDeclInARandcaseItem) {
+  ExpectConstFuncAccepted(InRandcaseItem(kLocalDeclStmt));
+}
+
+TEST(ConstantFunctionBodyReachElaboration, LocalDeclInARandsequenceCodeBlock) {
+  ExpectConstFuncAccepted(InRandsequenceCodeBlock(kLocalDeclStmt));
+}
+
+TEST(ConstantFunctionBodyReachElaboration,
+     LocalDeclInARandsequenceWeightCodeBlock) {
+  ExpectConstFuncAccepted(InRandsequenceWeightCodeBlock(kLocalDeclStmt));
 }
 
 }  // namespace

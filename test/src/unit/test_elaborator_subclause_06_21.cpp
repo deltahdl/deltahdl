@@ -642,4 +642,156 @@ TEST(ScopeAndLifetimeElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
+// The six cases below cover the child-statement links of Stmt that the two
+// §6.21 walks in src/elaborator/elaborator_validate_funcbody.cpp reach for the
+// first time now that both take their list from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. CollectAutoVarNames, which
+// records which names were declared automatic, had written out six of the
+// thirteen links, and CheckAutoVarWritesInProc, which reports the write, seven.
+// A declaration in a link the first was missing left the variable out of the
+// set, and a write in a link the second was missing was never looked at, so
+// either omission left the source accepted.
+//
+// Stmt::for_inits and Stmt::for_steps are missing from both and get no case.
+// Parser::ParseAssignmentOrExprNoSemi in src/parser/parser_stmt.cpp builds
+// every statement in either and never builds a StmtKind::kVarDecl, and A.6.8
+// admits in them no nonblocking assignment, no procedural continuous assignment
+// and no force.
+
+// The one link only CollectAutoVarNames was missing. A.6.3 gives `par_block ::=
+// fork [ : block_identifier ] { block_item_declaration } { statement_or_null }
+// join_keyword`, so a fork holds declarations of its own, which
+// Parser::ParseBlockVarDecls in src/parser/parser_stmt_block.cpp puts in
+// Stmt::fork_stmts beside the statements. CheckAutoVarWritesInProc already
+// walked that list, so the write below was always looked at and it is the
+// declaration's position that decides the case.
+TEST(ScopeAndLifetimeElaboration,
+     AutoVarDeclaredInAForkIsReachedByTheNonblockingRule) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      automatic int x;\n"
+      "      x <= 1;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic variable in nonblocking assignment", 5,
+                            "6.21"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. Both walks were
+// missing both arms, so this case and the next each need the declaration and
+// the write to be reached through the arm.
+TEST(ScopeAndLifetimeElaboration,
+     AutoVarNonblockingInAnAssertionPassStmtIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    assert (1) begin\n"
+      "      automatic int x;\n"
+      "      x <= 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic variable in nonblocking assignment", 5,
+                            "6.21"));
+}
+
+TEST(ScopeAndLifetimeElaboration,
+     AutoVarNonblockingInAnAssertionFailStmtIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    assert (1) else begin\n"
+      "      automatic int x;\n"
+      "      x <= 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic variable in nonblocking assignment", 5,
+                            "6.21"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
+// statement the parser keeps in the second member of a Stmt::randcase_items
+// entry. §6.21 is a rule about the source, so it holds whether the weighted
+// draw would select the item or not.
+TEST(ScopeAndLifetimeElaboration, AutoVarNonblockingInARandcaseItemIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    randcase\n"
+      "      1 : begin\n"
+      "        automatic int x;\n"
+      "        x <= 1;\n"
+      "      end\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic variable in nonblocking assignment", 6,
+                            "6.21"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds both halves of this rule
+// directly: the data_declaration that names the automatic variable and the
+// statement that writes it. Parser::ParseRsCodeBlockStmts in
+// src/parser/parser_verify.cpp puts both in RsProd::code_stmts, reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(ScopeAndLifetimeElaboration,
+     AutoVarNonblockingInARandsequenceCodeBlockIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { automatic int x; x <= 1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic variable in nonblocking assignment", 4,
+                            "6.21"));
+}
+
+// A.6.12's `rs_rule ::= rs_production_list [ := weight_specification [
+// rs_code_block ] ]` puts a second code block after the weight, which the
+// parser keeps in RsRule::weight_code rather than in RsProd::code_stmts. It is
+// a second statement position under Stmt::rs_productions, so it gets its own
+// case: the production `alt` below holds a null statement, which leaves the
+// weight block as the only place the declaration and the write can stand.
+TEST(ScopeAndLifetimeElaboration,
+     AutoVarNonblockingInARandsequenceWeightCodeBlockIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : alt := 5 { automatic int x; x <= 1; };\n"
+      "      alt : { ; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic variable in nonblocking assignment", 4,
+                            "6.21"));
+}
+
 }  // namespace

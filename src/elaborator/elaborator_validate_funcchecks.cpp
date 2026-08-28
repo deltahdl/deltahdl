@@ -396,40 +396,51 @@ void Elaborator::ValidateJumpStatements(const ModuleDecl* decl) {
   }
 }
 
-static bool BodyContainsFork(const Stmt* s) {
+// §13.4.3 says a constant function "shall not contain a statement that
+// directly schedules an event to execute after the function has returned" and
+// "shall not contain any fork constructs". Neither says where the offending
+// statement may stand, so every position a statement holds a statement in is
+// one the search has to look at, and BodyContainsStmt takes those positions
+// from ForEachChildStmt in elaborator_validate_internal.h rather than listing
+// them again. ForEachChildStmt hands the visitor the field itself, so a walk
+// that only reads takes a `Stmt* const&`, and it visits every link with no way
+// to stop, so the first hit is kept in `found` and the recursion runs only
+// while `found` is false.
+//
+// Stmt::rs_productions is descended with the rest: §18.17.6 gives break and
+// return a meaning in a randsequence production code block that they have
+// nowhere else, neither is matched here, and A.6.12's rs_code_block holds the
+// ordinary procedural statements that do spawn a fork and schedule an event.
+// Three links can never be the one that answers and are walked because the
+// shared list is walked whole: src/parser/parser_stmt_block.cpp fills
+// Stmt::fork_stmts on a StmtKind::kFork alone, which `match` answers at first,
+// and A.6.8 admits no fork, nonblocking assignment or timing control in a
+// for_initialization or a for_step.
+template <typename Match>
+static bool BodyContainsStmt(const Stmt* s, Match match) {
   if (!s) return false;
-  if (s->kind == StmtKind::kFork) return true;
-  for (auto* sub : s->stmts)
-    if (BodyContainsFork(sub)) return true;
-  if (BodyContainsFork(s->then_branch)) return true;
-  if (BodyContainsFork(s->else_branch)) return true;
-  if (BodyContainsFork(s->body)) return true;
-  if (BodyContainsFork(s->for_body)) return true;
-  for (auto& ci : s->case_items)
-    if (BodyContainsFork(ci.body)) return true;
-  return false;
+  if (match(s)) return true;
+  bool found = false;
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    if (!found) found = BodyContainsStmt(sub, match);
+  });
+  return found;
+}
+
+static bool BodyContainsFork(const Stmt* s) {
+  return BodyContainsStmt(
+      s, [](const Stmt* n) { return n->kind == StmtKind::kFork; });
 }
 
 static bool BodyContainsNonblocking(const Stmt* s) {
-  if (!s) return false;
-  if (s->kind == StmtKind::kNonblockingAssign) return true;
-  for (auto* sub : s->stmts)
-    if (BodyContainsNonblocking(sub)) return true;
-  if (BodyContainsNonblocking(s->then_branch)) return true;
-  if (BodyContainsNonblocking(s->else_branch)) return true;
-  if (BodyContainsNonblocking(s->body)) return true;
-  if (BodyContainsNonblocking(s->for_body)) return true;
-  for (auto& ci : s->case_items)
-    if (BodyContainsNonblocking(ci.body)) return true;
-  return false;
+  return BodyContainsStmt(
+      s, [](const Stmt* n) { return n->kind == StmtKind::kNonblockingAssign; });
 }
 
-// §13.4.3 (c): a constant function may not contain anything that schedules
-// an event to fire after the function has returned — that covers every
-// timing-control / waiting / event-trigger statement, not just nonblocking
-// assignments.
-static bool BodyContainsEventScheduling(const Stmt* s) {
-  if (!s) return false;
+// §13.4.3 (c): every timing-control, waiting and event-trigger statement
+// schedules an event to fire after the function has returned, not just the
+// nonblocking assignment BodyContainsNonblocking answers for.
+static bool SchedulesPostReturnEvent(const Stmt* s) {
   switch (s->kind) {
     case StmtKind::kDelay:
     case StmtKind::kCycleDelay:
@@ -443,33 +454,32 @@ static bool BodyContainsEventScheduling(const Stmt* s) {
     case StmtKind::kExpect:
       return true;
     default:
-      break;
+      return false;
   }
-  for (auto* sub : s->stmts)
-    if (BodyContainsEventScheduling(sub)) return true;
-  if (BodyContainsEventScheduling(s->then_branch)) return true;
-  if (BodyContainsEventScheduling(s->else_branch)) return true;
-  if (BodyContainsEventScheduling(s->body)) return true;
-  if (BodyContainsEventScheduling(s->for_body)) return true;
-  for (auto& ci : s->case_items)
-    if (BodyContainsEventScheduling(ci.body)) return true;
-  return false;
 }
 
+static bool BodyContainsEventScheduling(const Stmt* s) {
+  return BodyContainsStmt(s, SchedulesPostReturnEvent);
+}
+
+// §13.4.3 lets a constant function reference a name "declared locally to the
+// current function", and a declaration is local wherever in the body it is
+// written, so the collection takes every position a statement holds a statement
+// in from ForEachChildStmt in elaborator_validate_internal.h. A position it
+// misses is one a name declared there goes uncollected from, and
+// CheckConstFuncIdentifier below then reports a reference to that name.
+// §18.17.6 is about break and return, which declare nothing, so descending
+// Stmt::rs_productions is what §13.4.3 asks for: A.6.12 puts a data_declaration
+// at the head of an rs_code_block. Stmt::for_steps holds no declaration, A.6.8
+// admitting only an operator_assignment, an inc_or_dec_expression or a call.
 static void CollectLocalDeclNames(const Stmt* s,
                                   std::unordered_set<std::string_view>& out) {
   if (!s) return;
   if (s->kind == StmtKind::kVarDecl || s->kind == StmtKind::kBlockItemDecl) {
     if (!s->var_name.empty()) out.insert(s->var_name);
   }
-  for (auto* sub : s->stmts) CollectLocalDeclNames(sub, out);
-  CollectLocalDeclNames(s->then_branch, out);
-  CollectLocalDeclNames(s->else_branch, out);
-  CollectLocalDeclNames(s->body, out);
-  CollectLocalDeclNames(s->for_body, out);
-  for (auto* init : s->for_inits) CollectLocalDeclNames(init, out);
-  for (auto& ci : s->case_items) CollectLocalDeclNames(ci.body, out);
-  for (auto* fs : s->fork_stmts) CollectLocalDeclNames(fs, out);
+  ForEachChildStmt(s,
+                   [&](Stmt* const& sub) { CollectLocalDeclNames(sub, out); });
 }
 
 // §13.4.3 (e) — true when the expr is a `.`-separated path that reaches
@@ -648,6 +658,18 @@ static void WalkConstFuncExpr(const Expr* e, ConstFuncBodyCheck& chk) {
   }
 }
 
+// §13.4.3's rules on what a constant function body may reference — no
+// hierarchical reference, no non-constant function invocation, only a constant
+// system function, and no identifier that is not a parameter, a function name
+// or a local declaration — say nothing about where the offending expression
+// stands, so the walk takes every position a statement holds a statement in
+// from ForEachChildStmt in elaborator_validate_internal.h. The case-arm guards
+// are read separately below because they are expressions, which that list does
+// not reach; the arm bodies are left to the descent, so no statement is walked
+// twice. §18.17.6 is about break and return, neither an expression, so
+// descending Stmt::rs_productions is what §13.4.3 asks for. Stmt::fork_stmts is
+// walked because the shared list is walked whole, and no body reaches here
+// holding a fork: ValidateConstFuncBodyContent rejects one first.
 static void WalkConstFuncStmt(const Stmt* s, ConstFuncBodyCheck& chk) {
   if (!s || chk.failed) return;
   WalkConstFuncExpr(s->condition, chk);
@@ -669,17 +691,10 @@ static void WalkConstFuncStmt(const Stmt* s, ConstFuncBodyCheck& chk) {
   WalkConstFuncExpr(s->repeat_event_count, chk);
   WalkConstFuncExpr(s->assert_expr, chk);
   WalkConstFuncExpr(s->var_init, chk);
-  for (auto* sub : s->stmts) WalkConstFuncStmt(sub, chk);
-  WalkConstFuncStmt(s->then_branch, chk);
-  WalkConstFuncStmt(s->else_branch, chk);
-  WalkConstFuncStmt(s->body, chk);
-  WalkConstFuncStmt(s->for_body, chk);
-  for (auto* init : s->for_inits) WalkConstFuncStmt(init, chk);
-  for (auto* step : s->for_steps) WalkConstFuncStmt(step, chk);
   for (auto& ci : s->case_items) {
     for (auto* pat : ci.patterns) WalkConstFuncExpr(pat, chk);
-    WalkConstFuncStmt(ci.body, chk);
   }
+  ForEachChildStmt(s, [&](Stmt* const& sub) { WalkConstFuncStmt(sub, chk); });
 }
 
 // §13.4.3 — a constant function may not take output/inout/ref arguments, and
