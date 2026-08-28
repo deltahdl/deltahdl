@@ -20,6 +20,7 @@
 #include "common/source_loc.h"
 #include "common/string_methods.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast.h"
 
 namespace delta {
@@ -58,20 +59,6 @@ void Elaborator::ReportConstAssignTarget(const Expr* lhs, SourceLoc loc) {
               Subclause("6.20"));
 }
 
-// Every statement a randsequence production holds, which no other member of
-// Stmt reaches: §18.17 gives a production's rules code blocks of their own, and
-// a weight specification a block of its own beside them.
-void Elaborator::WalkRandsequenceForConstAssign(const Stmt* s) {
-  for (const auto& production : s->rs_productions) {
-    for (const auto& rule : production.rules) {
-      for (auto* sub : rule.weight_code) WalkStmtsForConstAssign(sub);
-      for (const auto& prod : rule.prods) {
-        for (auto* sub : prod.code_stmts) WalkStmtsForConstAssign(sub);
-      }
-    }
-  }
-}
-
 void Elaborator::ReportConstMutatingMethodCall(const Expr* call,
                                                SourceLoc loc) {
   if (call == nullptr || call->kind != ExprKind::kCall) return;
@@ -98,22 +85,20 @@ void Elaborator::WalkStmtsForConstAssign(const Stmt* s) {
   if (s->kind == StmtKind::kExprStmt) {
     ReportConstMutatingMethodCall(s->expr, s->range.start);
   }
-  // Every member of Stmt that holds a statement. A statement this misses is a
+  // Every member of Stmt that holds a statement, taken from ForEachChildStmt in
+  // elaborator_validate_internal.h rather than listed again here. §6.20 puts no
+  // condition on where the write stands, so a statement this walk misses is a
   // place a write to a constant goes unreported, and which member holds a given
-  // statement says nothing about whether §6.20 covers it.
-  for (auto* sub : s->stmts) WalkStmtsForConstAssign(sub);
-  for (auto* sub : s->for_inits) WalkStmtsForConstAssign(sub);
-  for (auto* sub : s->for_steps) WalkStmtsForConstAssign(sub);
-  for (auto* sub : s->fork_stmts) WalkStmtsForConstAssign(sub);
-  WalkStmtsForConstAssign(s->then_branch);
-  WalkStmtsForConstAssign(s->else_branch);
-  WalkStmtsForConstAssign(s->body);
-  WalkStmtsForConstAssign(s->for_body);
-  WalkStmtsForConstAssign(s->assert_pass_stmt);
-  WalkStmtsForConstAssign(s->assert_fail_stmt);
-  for (auto& ci : s->case_items) WalkStmtsForConstAssign(ci.body);
-  for (auto& ri : s->randcase_items) WalkStmtsForConstAssign(ri.second);
-  WalkRandsequenceForConstAssign(s);
+  // statement says nothing about whether §6.20 covers it. Keeping the list in
+  // one place is what stops this rule and the list from disagreeing about which
+  // members those are.
+  //
+  // The visitor takes `Stmt* const&` because `s` is a `const Stmt*`, which is
+  // how ForEachChildStmt lets a walk that only reads the tree share its list
+  // with the walks that rewrite it. Nothing here stops early, since §6.20 is
+  // broken as many times as a source writes a constant and each write is
+  // reported where it stands.
+  ForEachChildStmt(s, [&](Stmt* const& sub) { WalkStmtsForConstAssign(sub); });
 }
 
 void Elaborator::ValidateConstAssignments(const ModuleDecl* decl) {

@@ -735,10 +735,6 @@ class Elaborator : public ElaboratorOperationRules {
 
   void WalkStmtsForConstAssign(const Stmt* s);
 
-  // §18.17: the statements a randsequence production holds, which the walk over
-  // Stmt's own members does not reach.
-  void WalkRandsequenceForConstAssign(const Stmt* s);
-
   // §6.20: reports a procedural write whose left-hand side reaches a constant,
   // naming the constant it reaches. `loc` is where the assignment stands, since
   // that is what somebody whose source was rejected has to find.

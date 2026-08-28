@@ -256,4 +256,204 @@ TEST(ConstAssignElaboration, AGetcOnAStringParameterIsAccepted) {
              "endmodule\n"));
 }
 
+// §6.20 says a constant never changes and puts no condition on where the write
+// that would change one stands, so every position a statement holds a statement
+// in is a position the report is made at. The cases below cover one such
+// position each, and between them they cover every child-statement link Stmt
+// declares that no case above already reaches.
+// Elaborator::WalkStmtsForConstAssign takes that list from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h instead of writing its own, so
+// a link dropped from the shared list drops §6.20 from that position with it,
+// and these are the cases that go red when it does.
+
+// A.6.3 gives `seq_block ::= begin [ : block_identifier ] {
+// block_item_declaration } { statement_or_null } end`, whose statements the
+// parser keeps in Stmt::stmts.
+TEST(ConstAssignElaboration, AWriteToAParameterInABeginEndBlockIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  parameter int P = 4;\n"
+      "  initial begin\n"
+      "    P = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment to constant 'P'",
+                            4, "6.20"));
+}
+
+// §12.4's conditional statement holds a statement per branch, kept in
+// Stmt::then_branch and Stmt::else_branch. This case and the next cover one
+// branch each, because a walk reaches one member without the other.
+TEST(ConstAssignElaboration, AWriteToAParameterInAnIfBranchIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  parameter int P = 4;\n"
+      "  integer i;\n"
+      "  initial if (i == 0) P = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment to constant 'P'",
+                            4, "6.20"));
+}
+
+// The else arm of the same statement. Its then arm writes i, so the report the
+// case reads can only have come from the else arm.
+TEST(ConstAssignElaboration, AWriteToAParameterInAnElseBranchIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  parameter int P = 4;\n"
+      "  integer i;\n"
+      "  initial if (i == 0) i = 1; else P = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment to constant 'P'",
+                            4, "6.20"));
+}
+
+// §12.7.4's while loop holds its statement in Stmt::body, which the parser also
+// fills for forever, repeat, foreach and do-while, so one case answers for the
+// member. §6.20 is broken by the write being written, whether the loop would
+// run it or not.
+TEST(ConstAssignElaboration, AWriteToAParameterInAWhileBodyIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  parameter int P = 4;\n"
+      "  integer i;\n"
+      "  initial while (i < 2) P = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment to constant 'P'",
+                            4, "6.20"));
+}
+
+// §12.7.1's for loop holds its body in Stmt::for_body, a fourth member beside
+// the initializers and the steps the two cases above cover. The initializer and
+// the step here write i, so the report the case reads is the body's.
+TEST(ConstAssignElaboration, AWriteToAParameterInAForBodyIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  parameter int P = 4;\n"
+      "  integer i;\n"
+      "  initial for (i = 0; i < 2; i = i + 1) P = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment to constant 'P'",
+                            4, "6.20"));
+}
+
+// §12.5's case statement holds a statement per item, kept in
+// Stmt::case_items rather than in Stmt::stmts.
+TEST(ConstAssignElaboration, AWriteToAParameterInACaseItemIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  parameter int P = 4;\n"
+      "  integer i;\n"
+      "  initial\n"
+      "    case (i)\n"
+      "      0: P = 1;\n"
+      "    endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment to constant 'P'",
+                            6, "6.20"));
+}
+
+// §18.16 gives `randcase_item ::= expression : statement_or_null`, kept in
+// Stmt::randcase_items. §6.20 is a rule about the source, so it holds whether
+// the weighted draw would select the item or not.
+TEST(ConstAssignElaboration, AWriteToAParameterInARandcaseItemIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  parameter int P = 4;\n"
+      "  initial randcase 1: P = 1; endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment to constant 'P'",
+                            3, "6.20"));
+}
+
+// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, so an immediate assertion holds a statement in each arm,
+// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
+// next cover one arm each.
+TEST(ConstAssignElaboration,
+     AWriteToAParameterInAnAssertionPassStatementIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  parameter int P = 4;\n"
+      "  logic ok;\n"
+      "  initial assert (ok) P = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment to constant 'P'",
+                            4, "6.20"));
+}
+
+TEST(ConstAssignElaboration,
+     AWriteToAParameterInAnAssertionFailStatementIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  parameter int P = 4;\n"
+      "  logic ok;\n"
+      "  initial assert (ok) else P = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment to constant 'P'",
+                            4, "6.20"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a randsequence production's code block holds ordinary procedural
+// statements. They are kept in RsProd::code_stmts, reached through
+// Stmt::rs_productions and through no other member of Stmt.
+TEST(ConstAssignElaboration,
+     AWriteToAParameterInARandsequenceCodeBlockIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  parameter int P = 4;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { P = 1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment to constant 'P'",
+                            5, "6.20"));
+}
+
+// §18.17.1 lets a weight specification be followed by a code block of its own,
+// which the parser keeps in RsRule::weight_code. It is a second list under
+// Stmt::rs_productions, so a walk reaches it without reaching
+// RsProd::code_stmts and the case above does not answer for it.
+TEST(ConstAssignElaboration,
+     AWriteToAParameterInARandsequenceWeightCodeBlockIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  parameter int P = 4;\n"
+      "  integer i;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : a := 1 { P = 1; };\n"
+      "      a : { i = 1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment to constant 'P'",
+                            6, "6.20"));
+}
+
 }  // namespace
