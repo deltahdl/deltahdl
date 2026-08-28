@@ -217,7 +217,20 @@ ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     co_return StmtResult::kDone;
   }
 
+  // §16.5.1: a concurrent assertion's property is evaluated on the sampled
+  // values of the variables it names, and §16.5.2 makes the sampled value "the
+  // only valid value of a variable during a clock tick". The mode is raised
+  // around this one evaluation and lowered again before anything else runs,
+  // because §16.5.1 reaches the assertion's own expression and nothing else in
+  // the source: the pass and fail statements below are ordinary procedural code
+  // and read the values standing when they run. The previous setting is put
+  // back rather than cleared so that an immediate assertion reached from a
+  // function called by the property leaves the property's own reads sampled.
+  auto& samples = ctx.AssertionSamples();
+  bool outer_evaluating_property = samples.EvaluatingProperty();
+  samples.SetEvaluatingProperty(stmt->is_concurrent_clocked);
   auto cond = EvalExpr(stmt->assert_expr, ctx, arena);
+  samples.SetEvaluatingProperty(outer_evaluating_property);
 
   bool is_true = cond.IsTruthy();
   RecordCoverImmediateSample(stmt, is_true, ctx);

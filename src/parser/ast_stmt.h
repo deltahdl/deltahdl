@@ -190,6 +190,14 @@ struct Stmt {
 
   bool is_procedural_concurrent = false;
 
+  // §16.5: "The keyword property distinguishes a concurrent assertion from an
+  // immediate assertion." Set on the immediate-assert statement the parser
+  // synthesises for the clocked boolean form of `assert property (@(clk) e)`,
+  // which is the only thing that tells that body apart from an `assert (e)`
+  // written inside an always_ff: §16.5.1 samples the expressions of the first
+  // and leaves the second reading the values standing now.
+  bool is_concurrent_clocked = false;
+
   std::vector<Expr*> wait_order_events;
 
   std::vector<std::pair<Expr*, Stmt*>> randcase_items;

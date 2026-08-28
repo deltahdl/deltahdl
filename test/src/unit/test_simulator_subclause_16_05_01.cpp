@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/types.h"
+#include "fixture_simulator.h"
 #include "simulator/sva_engine.h"
 
 using namespace delta;
@@ -148,6 +151,100 @@ TEST(ConcurrentAssertionSampling, DefaultSampledValueOfExpressionIsRecursive) {
 TEST(ConcurrentAssertionSampling, ClockingBlockInputMustUseStep1Sampling) {
   EXPECT_TRUE(IsClockingBlockInputSamplingValid(ClockingInputSkew::kStep1));
   EXPECT_FALSE(IsClockingBlockInputSamplingValid(ClockingInputSkew::kOther));
+}
+
+// One concurrent assertion on `a`, clocked by the posedge of `clk`, over a run
+// whose only clock tick is in the time step `tick_line` writes. `a` and `clk`
+// both settle to 0 at time 0 and `tick_line` is the whole of what happens at
+// time 5, so the order it writes the two in is the only thing that varies
+// between two sources built from this.
+std::string SourceWithTickStep(const std::string& tick_line) {
+  return "module m;\n"
+         "  logic clk;\n"
+         "  logic a;\n"
+         "  int hits = 0;\n"
+         "  int misses = 0;\n"
+         "  assert property (@(posedge clk) a) hits = hits + 1;\n"
+         "  else misses = misses + 1;\n"
+         "  initial begin\n"
+         "    clk = 1'b0; a = 1'b0;\n"
+         "    #5 " +
+         tick_line +
+         "\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+// §16.5.1: "The sampled value of a variable in a time slot corresponding to
+// time greater than 0 is the value of this variable in the Preponed region of
+// this time slot." The Preponed value of a time slot is settled before the slot
+// begins, so nothing a process writes during the slot can change it and the
+// order of the writes within the slot cannot change the verdict either.
+//
+// Both runs below drive one clock tick at time 5 and raise `a` in that same
+// time step, one before the assignment to `clk` and one after. §16.5.1 gives
+// each the value `a` held in the Preponed region of time 5, which is the 0 it
+// settled to at time 0, so neither assertion passes.
+//
+// Either run on its own is satisfied by an implementation that reads `a` live:
+// the one writing `a` second reads 0 and agrees by accident, and the one
+// writing it first reads 1 and disagrees. The pair is the claim. Without
+// sampling the counts are 1 and 0.
+TEST(ConcurrentAssertionSampling, VerdictDoesNotDependOnWriteOrderInTheTick) {
+  SimFixture before;
+  auto* first_hits = RunAndFindVar(SourceWithTickStep("a = 1'b1; clk = 1'b1;"),
+                                   before, "hits");
+  ASSERT_NE(first_hits, nullptr);
+  auto* first_misses = before.ctx.FindVariable("misses");
+  ASSERT_NE(first_misses, nullptr);
+  SimFixture after;
+  auto* second_hits =
+      RunAndFindVar(SourceWithTickStep("clk = 1'b1; a = 1'b1;"), after, "hits");
+  ASSERT_NE(second_hits, nullptr);
+  auto* second_misses = after.ctx.FindVariable("misses");
+  ASSERT_NE(second_misses, nullptr);
+  EXPECT_EQ(first_hits->value.ToUint64(), second_hits->value.ToUint64());
+  EXPECT_EQ(first_misses->value.ToUint64(), second_misses->value.ToUint64());
+  // Each run drove one tick, and each read the 0 that `a` carried into the time
+  // step rather than the 1 written within it.
+  EXPECT_EQ(first_hits->value.ToUint64(), 0u);
+  EXPECT_EQ(first_misses->value.ToUint64(), 1u);
+}
+
+// §16.5.1: "The sampled value of a variable in a time slot corresponding to
+// time 0 is its default sampled value", and the default sampled value of a
+// static variable is "the value assigned in its declaration, or, in the absence
+// of such an assignment, ... the default (or uninitialized) value of the
+// corresponding type". `a` is declared `logic` and its declaration assigns
+// nothing, so its default sampled value is 1'bx however early the initial
+// procedure raises it.
+//
+// The single clock tick here is at time 0, in the same time step that assigns
+// `a` its 1. The assertion reads 1'bx, which §12.4 makes false, so the fail
+// action runs and the pass action does not. An implementation reading the live
+// value reads 1 and counts the pass instead.
+TEST(ConcurrentAssertionSampling, TimeZeroTickReadsTheDefaultSampledValue) {
+  SimFixture f;
+  const std::string kSrc =
+      "module m;\n"
+      "  logic clk;\n"
+      "  logic a;\n"
+      "  int hits = 0;\n"
+      "  int misses = 0;\n"
+      "  assert property (@(posedge clk) a) hits = hits + 1;\n"
+      "  else misses = misses + 1;\n"
+      "  initial begin\n"
+      "    a = 1'b1;\n"
+      "    clk = 1'b0;\n"
+      "    clk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n";
+  auto* hits = RunAndFindVar(kSrc, f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 0u);
+  auto* misses = f.ctx.FindVariable("misses");
+  ASSERT_NE(misses, nullptr);
+  EXPECT_EQ(misses->value.ToUint64(), 1u);
 }
 
 }  // namespace

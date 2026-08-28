@@ -5,6 +5,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <vector>
 
 #include "common/types.h"
 
@@ -101,8 +102,13 @@ class Scheduler {
 
   EventPool& GetEventPool() { return pool_; }
 
-  void SetPostTimestepCallback(std::function<void()> cb) {
-    post_timestep_cb_ = std::move(cb);
+  // Registers work to run once a time slot has finished, after its Postponed
+  // region. A time slot ends once but several unrelated readers have something
+  // to do at that point, and a single stored callback silently replaced
+  // whichever had registered before, so the callbacks are held as a list and
+  // each runs in registration order.
+  void AddPostTimestepCallback(std::function<void()> cb) {
+    post_timestep_cbs_.push_back(std::move(cb));
   }
 
   size_t IllegalPreponedScheduleCount() const {
@@ -191,7 +197,7 @@ class Scheduler {
   EventPool pool_;
   SimContext* ctx_ = nullptr;
   std::map<SimTime, TimeSlot> event_calendar_;
-  std::function<void()> post_timestep_cb_;
+  std::vector<std::function<void()>> post_timestep_cbs_;
   SimTime current_time_{0};
   Region current_region_ = Region::kCOUNT;
   size_t illegal_preponed_schedule_count_ = 0;

@@ -194,7 +194,7 @@ void Scheduler::ExecuteTimeSlot(TimeSlot& slot) {
   ExecuteRegion(slot, Region::kPostponed);
 
   current_region_ = Region::kCOUNT;
-  if (post_timestep_cb_) post_timestep_cb_();
+  for (const auto& cb : post_timestep_cbs_) cb();
 }
 
 bool Scheduler::IterateActiveSet(TimeSlot& slot) {

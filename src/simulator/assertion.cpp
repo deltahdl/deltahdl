@@ -38,7 +38,7 @@ void AssertionMonitor::Attach(SimContext& ctx, Scheduler& sched) {
     std::string prop_name(entry.property.name);
     RegisterAssertionWatcher(this, var, prop_name, sched);
   }
-  sched.SetPostTimestepCallback([this, &ctx]() { Tick(ctx); });
+  sched.AddPostTimestepCallback([this, &ctx]() { Tick(ctx); });
 }
 
 AssertionResult AssertionMonitor::Evaluate(std::string_view prop_name,

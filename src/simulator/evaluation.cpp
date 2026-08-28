@@ -14,6 +14,9 @@
 #include "simulator/evaluation_internal.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
+// AssertionSampleStore, the §16.5.1 sampled values a concurrent assertion
+// reads.
+#include "simulator/sva_engine_sampling.h"
 
 namespace delta {
 // Resolves an unqualified identifier that is not a local variable against the
@@ -86,6 +89,16 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
   if (var->is_event)
     return MakeLogic4VecVal(arena, 1, var->is_null_event ? 0u : 1u);
   auto val = var->value;
+  // §16.5.2: "In an assertion, the sampled value is the only valid value of a
+  // variable during a clock tick." While a clocked concurrent assertion's
+  // property is being evaluated, a variable named in it therefore reads the
+  // value §16.5.1 samples for this time slot rather than the value standing
+  // now. The store answers nothing for a variable no such assertion reads and
+  // nothing at all outside such an evaluation, so every other read of a
+  // variable in the design is the live read it was before.
+  const Logic4Vec* sampled =
+      ctx.AssertionSamples().ReadWithinProperty(var, ctx.CurrentTime());
+  if (sampled != nullptr) val = *sampled;
   if (ctx.IsRealVariable(expr->text)) val.is_real = true;
   if (ctx.IsStringVariable(expr->text)) val.is_string = true;
   // An object's signedness is fixed by its own declaration; it is never

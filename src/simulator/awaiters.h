@@ -426,6 +426,15 @@ struct EventAwaiter {
 
   static void ResumeMaybeReactive(std::coroutine_handle<> h, Process* proc,
                                   SimContext& ctx, bool defer = false) {
+    // §16.5: "Concurrent assertions are evaluated in the Observed region." A
+    // process carrying one is therefore resumed into that region whatever edge
+    // its clocking event names, rather than synchronously inside the process
+    // that assigned the clock, where `cond = 1; clk = 1;` and
+    // `clk = 1; cond = 1;` would reach two different verdicts.
+    if (proc && proc->is_concurrent_clocked) {
+      ScheduleResume(h, proc, ctx, Region::kObserved);
+      return;
+    }
     // §9.2.2.2 / §4: a level-sensitive (non-edge) process triggered by another
     // process's blocking write must observe *settled* inputs, so its evaluation
     // is scheduled into the Active region rather than resumed synchronously in

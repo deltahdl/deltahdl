@@ -2,7 +2,9 @@
 
 #include <cstdint>
 
+#include "common/arena.h"
 #include "common/types.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -192,5 +194,55 @@ bool DisableConditionAllowsTriggeredMethod() { return true; }
 bool DisableConditionAllowsMatchedMethod() { return false; }
 
 bool DisableConditionAllowsLocalVariableReference() { return false; }
+
+// A Logic4Vec carries a pointer to its words rather than the words themselves,
+// so assigning one shares storage with the value it was taken from: a later
+// write through that value -- a bit-select deposit above all, which edits the
+// words in place -- would show through what was meant to be a fixed sample.
+// Every value this store keeps therefore owns its words. The buffer is
+// allocated once per variable and reused, because Refill runs at the end of
+// every time slot and MakeLogic4Vec derives the word count from the width, so a
+// variable whose width has not changed needs no second allocation.
+static void CopySample(const Logic4Vec& src, Logic4Vec& dst, Arena& arena) {
+  if (dst.words == nullptr || dst.width != src.width) {
+    dst = MakeLogic4Vec(arena, src.width);
+  }
+  dst.is_real = src.is_real;
+  dst.is_signed = src.is_signed;
+  dst.is_string = src.is_string;
+  for (uint32_t i = 0; i < dst.nwords && i < src.nwords; ++i) {
+    dst.words[i] = src.words[i];
+  }
+}
+
+void AssertionSampleStore::Register(const Variable* var, Arena& arena) {
+  if (var == nullptr || entries_.count(var) != 0) return;
+  Entry entry;
+  CopySample(var->value, entry.default_value, arena);
+  // Before the first Refill the only value there is to read is the default one,
+  // and §16.5.1 gives a time-0 read that value anyway.
+  CopySample(var->value, entry.preponed_value, arena);
+  entries_.emplace(var, entry);
+}
+
+void AssertionSampleStore::Refill(Arena& arena) {
+  for (auto& [var, entry] : entries_) {
+    CopySample(var->value, entry.preponed_value, arena);
+  }
+}
+
+const Logic4Vec* AssertionSampleStore::Read(const Variable* var,
+                                            SimTime t) const {
+  auto it = entries_.find(var);
+  if (it == entries_.end()) return nullptr;
+  // SampleStaticVariable carries §16.5.1's split between time 0, which reads
+  // the default sampled value, and every later time slot, which reads the
+  // Preponed value. Only the mode it returns is used: SampledValue::value is a
+  // uint64_t and would drop the upper bits of a variable wider than 64, so the
+  // answer is the stored Logic4Vec that the mode names.
+  SampledValue decision = SampleStaticVariable(0, t, 0);
+  return decision.mode == SampleMode::kDefault ? &it->second.default_value
+                                               : &it->second.preponed_value;
+}
 
 }  // namespace delta

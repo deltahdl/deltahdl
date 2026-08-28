@@ -330,6 +330,13 @@ struct RtlirAlias {
 
 struct RtlirProcess {
   RtlirProcessKind kind = RtlirProcessKind::kInitial;
+  // §16.5: true where this process carries a concurrent assertion's property
+  // rather than a procedure the source wrote. §16.14.5 gives such an assertion
+  // `always` semantics and the elaborator models it as kAlwaysFF, so the kind
+  // alone cannot tell it from an always_ff procedure; §16.5 evaluates the
+  // assertion in the Observed region and §16.5.1 samples the variables its
+  // property reads, neither of which holds for the procedure.
+  bool is_concurrent_clocked = false;
   // Where the keyword that opened this procedure stands. A report that rejects
   // the procedure itself rather than a statement within it has no other
   // position to name: body is a separate statement carrying its own.

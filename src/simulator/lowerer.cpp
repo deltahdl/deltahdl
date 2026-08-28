@@ -11,6 +11,8 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "elaborator/rtlir.h"
+// CollectExprReads, the walk over the names an expression reads.
+#include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/awaiters.h"
@@ -329,6 +331,30 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   LowerChildModules(mod);
 }
 
+// §16.5.1: enrols every variable a concurrent assertion's property reads in the
+// sampled-value store, so that the end of each time slot copies its value and
+// the property is evaluated against that copy rather than against whatever
+// stands at the clock tick.
+//
+// CollectExprReads is the reader-name walk §9.2.2.2.1's implicit sensitivity
+// list is built from, so it reaches the base and index of a select, the
+// arguments of a call and the operands of every subexpression -- which is the
+// set of variables a property names.
+static void RegisterAssertionSampledVars(const Stmt* body, SimContext& ctx,
+                                         const std::string& inst_prefix) {
+  if (body == nullptr || body->assert_expr == nullptr) return;
+  std::unordered_set<std::string> names;
+  CollectExprReads(body->assert_expr, names);
+  for (const auto& name : names) {
+    // A variable is keyed under the instance prefix joined to its declared
+    // name. The prefix is passed in because no process is executing while the
+    // design is lowered for SimContext::FindVariable to take it from.
+    if (auto* var = ctx.FindVariable(inst_prefix + name)) {
+      ctx.AssertionSamples().Register(var, ctx.GetArena());
+    }
+  }
+}
+
 void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
                            uint32_t program_block_id) {
   auto* p = arena_.Create<Process>();
@@ -339,6 +365,13 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
                        : Region::kActive;
   p->is_reactive = from_program;
   p->inst_prefix = inst_prefix_;
+  // §16.5: the process carries a concurrent assertion's property, so it is
+  // evaluated in the Observed region on the sampled values of the variables the
+  // property names.
+  p->is_concurrent_clocked = proc.is_concurrent_clocked;
+  if (proc.is_concurrent_clocked) {
+    RegisterAssertionSampledVars(proc.body, ctx_, inst_prefix_);
+  }
   // §18.14.1: a static process is seeded with the next value from the
   // enclosing initialization RNG. Lowering happens before any thread runs, so
   // the active stream here is the context-wide generator, which embodies the
@@ -514,6 +547,18 @@ void Lowerer::Lower(const RtlirDesign* design) {
   }
   RegisterDesignTypeWidths(design, ctx_);
   InitPackageDataVariables(design, ctx_, arena_);
+
+  // §16.5.1 reads a concurrent assertion's variables as of the Preponed region
+  // of the time slot the clock tick falls in. No event reaches a Preponed
+  // region -- the scheduler drains it once, ahead of the iterative regions, and
+  // never returns to it -- and §4.4.2.1 makes that unnecessary: "Sampling in
+  // the Preponed region is equivalent to sampling in the previous Postponed
+  // region." The sample is therefore taken once a time slot has finished, where
+  // it is the next slot's Preponed value. Registering it here rather than
+  // beside the first assertion keeps it to one registration per run; it does
+  // nothing while no assertion has enrolled a variable.
+  ctx_.GetScheduler().AddPostTimestepCallback(
+      [ctx = &ctx_]() { ctx->AssertionSamples().Refill(ctx->GetArena()); });
 
   for (auto* cls : design->cu_class_decls) {
     if (!ctx_.FindClassType(cls->name)) {

@@ -339,6 +339,10 @@ bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item) {
   stmt->kind = StmtKind::kAssertImmediate;
   stmt->range.start = item->loc;
   stmt->assert_expr = prop;
+  // §16.5: this statement carries a concurrent assertion's property, not an
+  // immediate assertion's expression, so the mark travels with it to the
+  // evaluation that §16.5.1 gives sampled values.
+  stmt->is_concurrent_clocked = true;
   item->body = stmt;
   return true;
 }

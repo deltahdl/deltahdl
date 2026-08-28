@@ -167,4 +167,84 @@ TEST(AssertionClockSim, GlobalClockFollowsTheDeclaredEdge) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
+// §16.5.2, on Figure 16-1: "The sampled value of variable req at clock tick 6
+// is low and remains low up to and including clock tick 9. Notice that the
+// simulation value transitions to high at clock tick 9. However, the sampled
+// value at clock tick 9 is low."
+//
+// The run below is that time step. `req` is low, and the single posedge of
+// `clk` falls in the very time step that raises it. §16.5.2's rule gives the
+// assertion the low value, so the fail action runs once and the pass action
+// never does. An implementation reading the simulation value reads the high
+// `req` the same time step wrote and counts a pass instead.
+TEST(AssertionClockSim, OperandRisingInTheTicksTimeStepIsStillSampledLow) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  logic req;\n"
+      "  int held = 0;\n"
+      "  int broken = 0;\n"
+      "  assert property (@(posedge clk) req) held = held + 1;\n"
+      "  else broken = broken + 1;\n"
+      "  initial begin\n"
+      "    clk = 1'b0;\n"
+      "    req = 1'b0;\n"
+      "    #5 req = 1'b1; clk = 1'b1;\n"  // req rises in the tick's own step
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* held = f.ctx.FindVariable("held");
+  ASSERT_NE(held, nullptr);
+  EXPECT_EQ(held->value.ToUint64(), 0u);
+  auto* broken = f.ctx.FindVariable("broken");
+  ASSERT_NE(broken, nullptr);
+  EXPECT_EQ(broken->value.ToUint64(), 1u);
+}
+
+// §16.5.2: "If a variable that appears in the expression for clock also appears
+// in an expression with an assertion, the values of the two usages of the
+// variable can be different. The current value of the variable is used in the
+// clock expression, while the sampled value of the variable is used within the
+// assertion."
+//
+// `clk` is that variable here: it is the whole of the clocking event and the
+// whole of the property. The tick happens, so the clock expression saw the
+// current value 1; and the property `clk == 1'b0` holds, so the assertion read
+// the sampled value 0 that `clk` carried in the Preponed region of the same
+// time slot. One run observes both halves, because a pass action that runs at
+// all is a tick that fired, and it ran the pass rather than the fail branch.
+// An implementation reading the current value inside the assertion reaches the
+// fail branch instead.
+TEST(AssertionClockSim,
+     ClockVariableReadsCurrentInTheEventAndSampledInTheBody) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  int sampled_low = 0;\n"
+      "  int sampled_high = 0;\n"
+      "  assert property (@(posedge clk) clk == 1'b0)\n"
+      "    sampled_low = sampled_low + 1;\n"
+      "  else sampled_high = sampled_high + 1;\n"
+      "  initial begin\n"
+      "    clk = 1'b0;\n"
+      "    #5 clk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* sampled_low = f.ctx.FindVariable("sampled_low");
+  ASSERT_NE(sampled_low, nullptr);
+  EXPECT_EQ(sampled_low->value.ToUint64(), 1u);
+  auto* sampled_high = f.ctx.FindVariable("sampled_high");
+  ASSERT_NE(sampled_high, nullptr);
+  EXPECT_EQ(sampled_high->value.ToUint64(), 0u);
+}
+
 }  // namespace

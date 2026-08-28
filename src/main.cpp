@@ -460,7 +460,7 @@ void SetupVcd(delta::VcdWriter& vcd, delta::SimContext& ctx,
   vcd.WriteTimestamp(0);
   vcd.DumpAllValues();
 
-  scheduler.SetPostTimestepCallback([&vcd, &ctx]() {
+  scheduler.AddPostTimestepCallback([&vcd, &ctx]() {
     vcd.WriteTimestamp(ctx.CurrentTime().ticks);
     vcd.DumpChangedValues(0);
   });

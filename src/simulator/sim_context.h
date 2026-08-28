@@ -25,6 +25,7 @@
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context_types.h"
+#include "simulator/sva_engine_sampling.h"
 #include "simulator/sync_objects.h"
 #include "simulator/variable.h"
 
@@ -697,6 +698,11 @@ class SimContext {
     deferred_arg_snapshots_.erase(arg);
   }
 
+  // §16.5.1: the sampled values the clocked concurrent assertions in this
+  // design read. The store is owned here because the read that consults it is
+  // EvalIdentifier, which holds the context and nothing else.
+  AssertionSampleStore& AssertionSamples() { return assertion_samples_; }
+
   // §21.2.3 continuous monitoring. Only one $monitor display list can be
   // active at a time; recording a new one bumps the generation so that
   // watchers left behind by a superseded list deactivate themselves.
@@ -784,6 +790,8 @@ class SimContext {
   CoverageControlState coverage_control_;
 
   std::unordered_map<const Expr*, Logic4Vec> deferred_arg_snapshots_;
+
+  AssertionSampleStore assertion_samples_;
 
   const Expr* active_monitor_ = nullptr;
   // §33.7: the instance the active display list was written in (see above).

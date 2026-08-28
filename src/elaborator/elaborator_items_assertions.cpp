@@ -169,6 +169,12 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
   // each leading clock edge.
   if (item->body != nullptr && !item->sensitivity.empty()) {
     AddProcess(RtlirProcessKind::kAlwaysFF, item, mod, kEnv);
+    // §16.5: the process just added carries a concurrent assertion's property.
+    // The mark is taken from the statement the parser built for that property
+    // rather than set outright, so the one place that decides what a concurrent
+    // assertion body is stays in the parser.
+    mod->processes.back().is_concurrent_clocked =
+        item->body->is_concurrent_clocked;
     return;
   }
   ValidateClockingBlock(item, mod);

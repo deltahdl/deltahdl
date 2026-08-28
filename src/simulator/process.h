@@ -114,6 +114,12 @@ struct Process {
 
   uint32_t program_block_id = 0;
 
+  // §16.5: true where this process carries a concurrent assertion's property.
+  // "Concurrent assertions are evaluated in the Observed region", so such a
+  // process is never resumed synchronously inside the process that assigned its
+  // clock, whatever edge its clocking event names.
+  bool is_concurrent_clocked = false;
+
   WaitForkState wait_fork_state;
 
   std::vector<Process*> children;

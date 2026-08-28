@@ -890,7 +890,7 @@ void SpecifyManager::StartInterconnectPropagation(SimContext& ctx,
   // Take the values standing now as the starting point, so only transitions
   // from here on produce an arrival at a load.
   PollInterconnectSources();
-  scheduler.SetPostTimestepCallback([this]() { PollInterconnectSources(); });
+  scheduler.AddPostTimestepCallback([this]() { PollInterconnectSources(); });
 }
 
 void SpecifyManager::PollInterconnectSources() {
