@@ -582,4 +582,26 @@ TEST(StringDataType,
             "ababab\n");
 }
 
+// §6.16: "The string data type is an ordered collection of characters." An
+// element of an array of strings is a string, so a bare $display of one has to
+// render its characters. §21.2.1.1 gives $display the decimal default radix
+// that a value of any other type takes, and an element read back without the
+// string mark took it: `$display(a[0])` printed the packed number the six
+// characters spell instead of the characters. The assertion cannot use %s,
+// because FormatArg in src/simulator/eval_format.cpp renders %s through
+// FormatValueAsString whatever the value is marked, so a %s form passes either
+// way.
+TEST(StringDataType, AnElementOfAnArrayOfStringsDisplaysItsCharacters) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  string a [2];\n"
+                       "  initial begin\n"
+                       "    a[0] = \"planet\";\n"
+                       "    $display(a[0]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "planet\n");
+}
+
 }  // namespace

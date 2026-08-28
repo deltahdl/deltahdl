@@ -1,5 +1,6 @@
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
+#include "helpers_string_var.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -421,6 +422,101 @@ TEST(RandseqValuePassingSim,
                          "endmodule\n",
                          "r");
   EXPECT_EQ(r, 1u);
+}
+
+// §18.17.7: a production may declare a string return type -- the subclause's
+// first example declares `string operator`, whose rules return "+", "-" and
+// "*" -- and the triggering production reads that value through the implicit
+// variable named after the production. The value has to be a string and not
+// just the bits of one: a bare $display argument is rendered as its characters
+// only when the value is marked a string (eval_system_task.cpp,
+// AppendDisplayArg picking 's' over the task's default radix), so an unmarked
+// value prints the decimal 43 here instead of "+". Only one rule is written, so
+// the returned text is fixed rather than drawn at random.
+TEST(RandseqValuePassingSim, StringReturnTypeProductionCarriesItsText) {
+  SimFixture f;
+  auto printed = RunCapture(
+      "module t;\n"
+      "  string r;\n"
+      "  initial begin\n"
+      "    r = \"unset\";\n"
+      "    randsequence(main)\n"
+      "      void main : op { r = op; $display(op); } ;\n"
+      "      string op : { return \"+\"; } ;\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(printed, "+\n");
+  auto* var = f.ctx.FindVariable("r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(VecToStr(var->value), "+");
+}
+
+// §18.17.7: a production named more than once in a rule yields an implicit
+// array indexed 1..N whose element type is the production's return type, so
+// each element of a string production's array is itself a string. An element
+// is reached by a select rather than by the production's bare name, so what
+// marks it a string is not what marks the scalar, and it can go unmarked on its
+// own: an unmarked element prints as decimal digits. The formal `k` fixes which
+// text each appearance returns, so neither element depends on a random choice.
+TEST(RandseqValuePassingSim, StringReturnTypeArrayElementsCarryTheirText) {
+  SimFixture f;
+  auto printed = RunCapture(
+      "module t;\n"
+      "  string r1;\n"
+      "  string r2;\n"
+      "  initial begin\n"
+      "    r1 = \"unset\"; r2 = \"unset\";\n"
+      "    randsequence(main)\n"
+      "      void main : op(1) op(2)\n"
+      "                  { r1 = op[1]; r2 = op[2];\n"
+      "                    $display(op[1]); $display(op[2]); } ;\n"
+      "      string op ( int k ) :\n"
+      "        { if (k == 1) return \"minus\"; return \"times\"; } ;\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(printed, "minus\ntimes\n");
+  auto* first = f.ctx.FindVariable("r1");
+  auto* second = f.ctx.FindVariable("r2");
+  ASSERT_NE(first, nullptr);
+  ASSERT_NE(second, nullptr);
+  EXPECT_EQ(VecToStr(first->value), "minus");
+  EXPECT_EQ(VecToStr(second->value), "times");
+}
+
+// §18.17.7: the implicit variable holds a string, so it answers the string
+// methods §6.16.1 gives one. `op.len()` resolves only for a variable the
+// simulation context knows to be a string (eval_string.cpp,
+// TryEvalStringMethodCall), so it reports the nine characters of "plusminus"
+// only once the production's value is registered as one. Nine characters also
+// outrun the four that fit in the 32 bits an integer return type would take,
+// so the printed text distinguishes a full value from a truncated one -- which
+// a one-character return cannot do.
+TEST(RandseqValuePassingSim, StringReturnLongerThanFourCharactersSurvives) {
+  SimFixture f;
+  auto printed = RunCapture(
+      "module t;\n"
+      "  string r;\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    r = \"unset\"; n = 0;\n"
+      "    randsequence(main)\n"
+      "      void main : op { r = op; n = op.len(); $display(op); } ;\n"
+      "      string op : { return \"plusminus\"; } ;\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(printed, "plusminus\n");
+  auto* text = f.ctx.FindVariable("r");
+  auto* len = f.ctx.FindVariable("n");
+  ASSERT_NE(text, nullptr);
+  ASSERT_NE(len, nullptr);
+  EXPECT_EQ(VecToStr(text->value), "plusminus");
+  EXPECT_EQ(len->value.ToUint64(), 9u);
 }
 
 }  // namespace

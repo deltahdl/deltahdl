@@ -88,12 +88,24 @@ static bool TryArrayElementSelect(const Expr* expr, uint64_t idx,
   auto elem_name =
       std::string(expr->base->text) + "[" + std::to_string(idx) + "]";
   auto* elem = ctx.FindVariable(elem_name);
+  // §6.16: an element of an array of strings is a string, and a string has no
+  // declared width to fill with x or zero; one that was never written is "",
+  // the empty string, of zero length. Both branches mark the value a string so
+  // it reads back as one, since what reads a string reads that mark rather
+  // than the width.
+  bool elem_is_string = info->elem_type_kind == DataTypeKind::kString;
   if (!elem) {
+    if (elem_is_string) {
+      out = MakeLogic4VecVal(arena, 8, 0);
+      out.is_string = true;
+      return true;
+    }
     out = info->is_4state ? MakeAllX(arena, info->elem_width)
                           : MakeLogic4VecVal(arena, info->elem_width, 0);
     return true;
   }
   out = elem->value;
+  if (elem_is_string) out.is_string = true;
   return true;
 }
 

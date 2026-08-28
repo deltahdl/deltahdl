@@ -9,6 +9,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
+#include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/stmt_exec.h"
@@ -106,6 +107,16 @@ static const RsProduction* FindProduction(const Stmt* stmt,
 static bool ProductionReturnsValue(const RsProduction* p) {
   return p != nullptr && p->has_return_type &&
          p->return_type.kind != DataTypeKind::kVoid;
+}
+
+// §18.17.7: reports whether a production returns a string. §6.16 gives a
+// string no declared width: it is as wide as the characters it holds, and one
+// that was never written is "", the empty string, of zero length. Storage for
+// such a value is therefore sized by what was returned, and not by the 32-bit
+// carrier every other return type with no computable width falls back to.
+static bool ProductionReturnsString(const RsProduction* p) {
+  return p != nullptr && p->has_return_type &&
+         p->return_type.kind == DataTypeKind::kString;
 }
 
 static ExecTask ExecRsProd(const Stmt* stmt, const RsProd& prod,
@@ -463,7 +474,14 @@ static RuleValueCapture BuildRuleValueCapture(const Stmt* stmt,
     info.lo = 1;
     info.size = static_cast<uint32_t>(n);
     uint32_t w = EvalTypeWidth(child->return_type);
-    info.elem_width = w ? w : 32;
+    // §18.17.7: "the type is an array where the element type is the return
+    // type of the production", so record the return type's kind for a read of
+    // an element to consult. §6.16 then makes the element of a string array
+    // that no generation wrote "", the empty string, rather than 32 bits of x;
+    // every other return type EvalTypeWidth gives no width to keeps the
+    // 32-bit carrier.
+    info.elem_type_kind = child->return_type.kind;
+    info.elem_width = w ? w : (ProductionReturnsString(child) ? 0 : 32);
     ctx.RegisterArray(name, info);
   }
   return cap;
@@ -488,15 +506,21 @@ static RuleProductionSlot SlotForAppearance(const RuleValueCapture* cap,
 // return value. A production named more than once in the rule writes the
 // idx-th element of its 1..N array, whose name is built at run time and so must
 // be interned in the arena (the scope map keys on a stable string_view); a
-// production named once writes the scalar named after the production.
+// production named once writes the scalar named after the production. The name
+// the variable was created under is reported through `created_name`; it
+// outlives the call in both forms, so a caller that has to name the variable
+// again does not have to rebuild the name.
 static Variable* CreateRuleProductionVariable(const RuleProductionSlot& slot,
                                               uint32_t width, SimContext& ctx,
-                                              Arena& arena) {
+                                              Arena& arena,
+                                              std::string_view* created_name) {
   if (slot.total > 1) {
     auto name = std::string(slot.name) + "[" + std::to_string(slot.idx) + "]";
-    return ctx.CreateLocalVariable(*arena.Create<std::string>(std::move(name)),
-                                   width);
+    const std::string& interned = *arena.Create<std::string>(std::move(name));
+    *created_name = interned;
+    return ctx.CreateLocalVariable(interned, width);
   }
+  *created_name = slot.name;
   return ctx.CreateLocalVariable(slot.name, width);
 }
 
@@ -508,9 +532,22 @@ static void StoreRuleProductionValue(const RuleProductionSlot& slot,
                                      const Logic4Vec& ret_value,
                                      SimContext& ctx, Arena& arena) {
   uint32_t w = EvalTypeWidth(child->return_type);
-  if (w == 0) w = ret_value.width ? ret_value.width : 32;
-  Variable* var = CreateRuleProductionVariable(slot, w, ctx, arena);
+  if (w == 0) w = ret_value.width;
+  // §6.16: a string is as wide as the characters it holds, so a string
+  // production that returned nothing leaves the empty string and not 32 bits
+  // of zero. Every other return type EvalTypeWidth gives no width to keeps the
+  // 32-bit carrier.
+  if (w == 0 && !ProductionReturnsString(child)) w = 32;
+  std::string_view created_name;
+  Variable* var =
+      CreateRuleProductionVariable(slot, w, ctx, arena, &created_name);
   var->value = ret_value;
+  // §18.17.7 gives the implicit variable the production's return type, and
+  // what reads a string reads SimContext::IsStringVariable rather than the
+  // width, so register the name the variable was created under. The registry
+  // keys on a string_view it never erases, and both names
+  // CreateRuleProductionVariable reports outlive this call.
+  if (ProductionReturnsString(child)) ctx.RegisterStringVariable(created_name);
 }
 
 static ExecTask ExecRuleProds(const Stmt* stmt, const RsRule& selected,
@@ -608,7 +645,15 @@ static ExecTask ExecRsProduction(const Stmt* stmt, const RsProductionItem& call,
   bool returns_value = ProductionReturnsValue(production);
   if (returns_value) {
     uint32_t w = EvalTypeWidth(production->return_type);
-    if (w == 0) w = 32;
+    // §6.16: a string has no declared width and starts as "", the empty
+    // string, of zero length. DispatchReturn hands this slot's width to
+    // EvalExpr as the context width. A string literal ignores it, so
+    // `return "minus"` keeps its five characters whatever the slot holds, but
+    // a context-sized expression does not: a 32-bit slot sizes
+    // `return k ? "minus" : "times"` to four characters through EvalTernary. A
+    // zero width leaves every returned expression self-determined. Every other
+    // return type EvalTypeWidth gives no width to keeps the 32-bit carrier.
+    if (w == 0 && !ProductionReturnsString(production)) w = 32;
     ret_value = MakeLogic4VecVal(arena, w, 0);
   }
   Logic4Vec* prev_slot =
@@ -619,6 +664,16 @@ static ExecTask ExecRsProduction(const Stmt* stmt, const RsProductionItem& call,
 
   ctx.SetRsReturnSlot(prev_slot);
   ctx.PopScope();
+
+  // §6.16: a string cannot hold the "\0" character, and assigning a value to a
+  // string drops that value's zero bytes. A returned string literal carries
+  // none, but an integral expression returned by a string production carries
+  // the zero bytes of its own width, so strip them before the value reaches
+  // the implicit variable. Stripping a slot nothing returned into leaves the
+  // empty string.
+  if (returns_value && ProductionReturnsString(production)) {
+    ret_value = StripStringZeros(ret_value, arena);
+  }
 
   // §18.17.7: the implicit variable belongs to the rule that named the
   // production, so it is written once this production's own scope is gone.
