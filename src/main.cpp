@@ -1,7 +1,6 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
-#include <memory>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -22,7 +21,6 @@
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
-#include "simulator/vcd_writer.h"
 #include "synthesizer/aig_opt.h"
 #include "synthesizer/synth_lower.h"
 
@@ -444,26 +442,24 @@ delta::CompilationUnit* ParseSource(
   return parser.Parse();
 }
 
-void SetupVcd(delta::VcdWriter& vcd, delta::SimContext& ctx,
-              delta::Scheduler& scheduler, const std::string& top,
+// --vcd is not one of the VCD system tasks §21.7.1 creates a dump file with,
+// so it opens the same dump those tasks open -- SimContext::OpenVcdDump writes
+// the header, the definitions and the per-timestep recording either way. What
+// differs is that no $dumpvars is coming to start this one (§21.7.1.3): the
+// option asks for the whole design dumped from time 0, so the recording is not
+// held back.
+//
+// The option runs before the scheduler does, so its writer is the one in place
+// when a source that also calls the VCD tasks reaches its first $dumpfile.
+// That call finds the dump already open and adds nothing; the file named on
+// the command line is the one written.
+void SetupVcd(delta::SimContext& ctx, const std::string& top,
               const std::string& vcd_file) {
-  ctx.SetVcdWriter(&vcd);
-  // Reproduce the $dumpfile call that named the output in the $version section
-  // (§21.7.2.3).
-  vcd.WriteHeader("1ns", "\"" + vcd_file + "\"");
-  vcd.BeginScope(top);
-  // §21.7.2.1: the context owns the dumpability rules (memories are excluded,
-  // reals declare the real var_type) and registers the objects in name order.
-  ctx.RegisterVcdSignals(vcd);
-  vcd.EndScope();
-  vcd.EndDefinitions();
-  vcd.WriteTimestamp(0);
-  vcd.DumpAllValues();
-
-  scheduler.AddPostTimestepCallback([&vcd, &ctx]() {
-    vcd.WriteTimestamp(ctx.CurrentTime().ticks);
-    vcd.DumpChangedValues(0);
-  });
+  ctx.SetDumpFileName(vcd_file);
+  // Reproduce the $dumpfile call that would have named this output in the
+  // $version section (§21.7.2.3).
+  ctx.SetDumpFileLiteral("\"" + vcd_file + "\"");
+  ctx.OpenVcdDump(top, /*wait_for_dumpvars=*/false);
 }
 
 void DumpAst(const delta::CompilationUnit* cu) {
@@ -586,17 +582,15 @@ int RunSimulation(const CliOptions& opts, delta::CompilationUnit* cu,
   delta::Lowerer lowerer(sim_ctx, arena, diag);
   lowerer.Lower(design);
 
-  std::unique_ptr<delta::VcdWriter> vcd;
-  if (!opts.vcd_file.empty()) {
-    vcd = std::make_unique<delta::VcdWriter>(opts.vcd_file);
-    SetupVcd(*vcd, sim_ctx, scheduler, top, opts.vcd_file);
-  }
+  if (!opts.vcd_file.empty()) SetupVcd(sim_ctx, top, opts.vcd_file);
 
   scheduler.Run();
   sim_ctx.RunFinalBlocks();
-  // §21.7.3.6.1: close the extended VCD file by recording the final simulation
-  // time. This is a no-op for a plain 4-state VCD file.
-  if (vcd) vcd->WriteVcdClose(sim_ctx.CurrentTime().ticks);
+  // §21.7.3.6.1: close the dump by recording the final simulation time, which
+  // an extended VCD file ends with. This covers a dump the source's own VCD
+  // tasks opened as well as one --vcd asked for, and does nothing when the run
+  // opened none.
+  sim_ctx.CloseVcdDump();
   return diag.HasErrors() ? 1 : 0;
 }
 

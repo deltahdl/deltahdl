@@ -4,6 +4,7 @@
 // spelled; this file decides which objects reach it and under what type.
 #include <algorithm>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -171,5 +172,84 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
     }
     vcd.RegisterSignal(spec);
   }
+}
+
+// §21.7.1 lists two steps for creating a 4-state VCD file: insert the VCD
+// system tasks in the SystemVerilog source file "to define the dump file name
+// and to specify the variables to be dumped", then run the simulation. Opening
+// the file is part of running the source, so this is where it happens.
+// Everything §21.7.2.1 orders ahead of the value changes goes out in one go --
+// the header sections, the $scope holding the dumped objects, their $var
+// declarations and $enddefinitions -- because a task that opens the file
+// part-way through a run is already past the point where a header could still
+// be written.
+//
+// An empty top_scope leaves the definitions at the top level rather than
+// inside a $scope.
+VcdWriter* SimContext::OpenVcdDump(std::string_view top_scope,
+                                   bool wait_for_dumpvars) {
+  // The writer already installed wins. src/main.cpp's --vcd option opens one
+  // before the scheduler runs, so a source's $dumpfile or $dumpvars finds a
+  // dump whose header and definitions are already on disk; a second writer
+  // over the same context would drop a fresh set of definitions into the
+  // middle of that file, and the two would race for the same signal codes.
+  if (vcd_writer_ != nullptr) return vcd_writer_;
+  auto vcd = std::make_unique<VcdWriter>(dump_file_name_);
+  if (!vcd->IsOpen()) return nullptr;
+  // §21.7.2.3: the $version section reproduces the $dumpfile call that named
+  // the file, its filename argument spelled as it was written. A dump no
+  // $dumpfile named leaves that entry out.
+  //
+  // The $timescale section states the time unit the value change times are
+  // given in. Both dump paths declare 1ns, the default GlobalPrecision() whose
+  // ticks SimTime counts; a design whose `timescale sets another precision is
+  // dumped under a unit it does not use.
+  vcd->WriteHeader("1ns", dump_file_literal_);
+  if (!top_scope.empty()) vcd->BeginScope(top_scope);
+  RegisterVcdSignals(*vcd);
+  if (!top_scope.empty()) vcd->EndScope();
+  vcd->EndDefinitions();
+  if (wait_for_dumpvars) {
+    // §21.7.1.3: "Executing the $dumpvars task causes the value change dumping
+    // to start at the end of the current simulation time unit", so nothing is
+    // recorded until that task runs.
+    vcd->ArmDumpvarsStart();
+  } else {
+    // A dump opened by something other than a VCD system task has no $dumpvars
+    // coming to start it, so it records every object from time 0.
+    vcd->WriteTimestamp(0);
+    vcd->DumpAllValues();
+  }
+  owned_vcd_writer_ = std::move(vcd);
+  vcd_writer_ = owned_vcd_writer_.get();
+  // §21.7.2.4: each simulation time unit that changed a dumped value
+  // contributes its simulation_time command and the value changes under it, so
+  // the recording runs once per time step for the rest of the run. The
+  // callback reads the writer back out of the context rather than capturing
+  // it, so it stops on its own once CloseVcdDump has closed the dump.
+  scheduler_.AddPostTimestepCallback([this]() {
+    if (vcd_writer_ == nullptr) return;
+    vcd_writer_->WriteTimestamp(CurrentTime().ticks);
+    vcd_writer_->DumpChangedValues(0);
+  });
+  return vcd_writer_;
+}
+
+// §21.7.1: the dump a source creates for itself. §21.7.1.1 names the file
+// through $dumpfile and defaults it to "dump.vcd" when the source specifies no
+// filename, and the dumped objects sit in the $scope of the top module the run
+// elaborated (§21.7.2.3).
+VcdWriter* SimContext::OpenVcdDumpFromTask() {
+  return OpenVcdDump(current_scope_name_, /*wait_for_dumpvars=*/true);
+}
+
+// §21.7.3.6.1: an extended VCD file records the final simulation time as it is
+// closed. Closing here rather than at destruction is what flushes the buffered
+// value changes to disk while the context is still alive to be read back.
+void SimContext::CloseVcdDump() {
+  if (vcd_writer_ == nullptr) return;
+  vcd_writer_->WriteVcdClose(CurrentTime().ticks);
+  owned_vcd_writer_.reset();
+  vcd_writer_ = nullptr;
 }
 }  // namespace delta

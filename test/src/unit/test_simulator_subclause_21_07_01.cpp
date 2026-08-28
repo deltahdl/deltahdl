@@ -6,6 +6,7 @@
 // included ahead of the fixtures so SimContext's inline constructor (whose
 // unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
+#include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_vcd_file_form.h"
 #include "simulator/coverage.h"
@@ -178,28 +179,54 @@ TEST_F(CreatingFourStateVcd, TasksInsertedInTaskBodyStillCreateFile) {
   EXPECT_NE(content.find("1!"), std::string::npos);
 }
 
-// Negative: with no writer installed (no dump file in place), executing the
-// creation tasks is harmless -- the design still runs to completion and no
-// dump file content appears.
-TEST_F(CreatingFourStateVcd, WithoutWriterCreationTasksAreHarmless) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic a;\n"
-      "  initial begin\n"
-      "    a = 1'b0;\n"
-      "    $dumpfile(\"dump1.dump\");\n"
-      "    $dumpvars;\n"
-      "    #10 a = 1'b1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();  // no VcdWriter installed anywhere
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_TRUE(ReadVcd().empty());
+// §21.7.1 again, with the test supplying nothing but the source. The cases
+// above hand the run a dump file already opened, so they observe what a VCD
+// file holds and cannot observe that one gets created; these two observe the
+// creation. §21.7.1's two steps are the whole claim: insert the VCD system
+// tasks in the SystemVerilog source file, then run the simulation, and the
+// file of Figure 21-1 is what the pair produces.
+class CreatingFourStateVcdFromSourceAlone : public VcdDumpFromSourceTestBase {
+ protected:
+  // The design Figure 21-1 draws, with the two creation tasks either present
+  // or absent, so the only difference between the cases below is the step
+  // §21.7.1 (a) calls for. `tasks` is inserted between the initial block's
+  // first assignment and the value change that follows it.
+  static std::string DesignWith(const std::string& tasks) {
+    return "module t;\n"
+           "  logic a;\n"
+           "  initial begin\n"
+           "    a = 1'b0;\n" +
+           tasks +
+           "    #10 a = 1'b1;\n"
+           "  end\n"
+           "endmodule\n";
+  }
+};
+
+// §21.7.1: the two steps that create the file are inserting the VCD system
+// tasks in the source and running the simulation, so a run of a source that
+// calls $dumpfile and $dumpvars leaves a dump file under the name $dumpfile
+// gave it. $enddefinitions is what says the file is a VCD file rather than an
+// empty one the run happened to touch: §21.7.2.1 makes it the declaration
+// command that closes the header and variable definitions, and a file holding
+// it has been through the whole of Figure 21-1's header and node information.
+TEST_F(CreatingFourStateVcdFromSourceAlone, InsertedTasksAndARunCreateTheFile) {
+  RunSource(
+      DesignWith("    $dumpfile(\"dump1.dump\");\n"
+                 "    $dumpvars;\n"));
+
+  EXPECT_NE(DumpFile("dump1.dump").find("$enddefinitions"), std::string::npos);
+}
+
+// §21.7.1: the control for the case above. The file is created by inserting
+// the VCD system tasks, so the same design with neither task inserted creates
+// nothing -- run the simulation alone and step (a) is missing. Without this
+// case, a simulator that opened a dump file for every design whatever its
+// source called would satisfy every other §21.7 case in the tree.
+TEST_F(CreatingFourStateVcdFromSourceAlone, ASourceWithNoVcdTaskCreatesNoFile) {
+  RunSource(DesignWith(""));
+
+  EXPECT_EQ(NamesWritten(), "");
 }
 
 }  // namespace

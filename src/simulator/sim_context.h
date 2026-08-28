@@ -29,12 +29,12 @@
 #include "simulator/sva_engine_sampling.h"
 #include "simulator/sync_objects.h"
 #include "simulator/variable.h"
+#include "simulator/vcd_writer.h"
 
 namespace delta {
 
 class DiagEngine;
 class DpiContext;
-class VcdWriter;
 class SpecifyManager;
 struct ModuleItem;
 struct Process;
@@ -269,6 +269,21 @@ class SimContext {
 
   void SetVcdWriter(VcdWriter* vcd) { vcd_writer_ = vcd; }
   VcdWriter* GetVcdWriter() { return vcd_writer_; }
+
+  // §21.7.1: open the dump file named by GetDumpFileName, write everything
+  // that precedes the value changes and install the per-timestep recording;
+  // the context owns the writer from then on. `top_scope` is the module whose
+  // $scope encloses the object definitions, and `wait_for_dumpvars` holds the
+  // recording back until a $dumpvars starts it (§21.7.1.3). Returns the writer
+  // to dump through, or null when the file could not be opened; a writer
+  // already installed through SetVcdWriter wins and comes back unchanged.
+  VcdWriter* OpenVcdDump(std::string_view top_scope, bool wait_for_dumpvars);
+  // §21.7.1: the dump the source creates for itself, opened by the first
+  // $dumpfile, $dumpvars or $dumpports the run executes.
+  VcdWriter* OpenVcdDumpFromTask();
+  // §21.7.3.6.1: record the final simulation time and close the dump, which is
+  // what puts the buffered value changes on disk.
+  void CloseVcdDump();
 
   // §32.9: the timing data a $sdf_annotate call reads out of an SDF file lands
   // in the design's specify data, so the running model needs a way back to the
@@ -773,6 +788,9 @@ class SimContext {
   std::vector<std::string_view> func_name_stack_;
   std::vector<Process*> final_processes_;
   VcdWriter* vcd_writer_ = nullptr;
+  // §21.7.1: the writer OpenVcdDump created. Null when the dump the context
+  // acts through was installed by SetVcdWriter and belongs to its caller.
+  std::unique_ptr<VcdWriter> owned_vcd_writer_;
   SpecifyManager* specify_manager_ = nullptr;
   std::string dump_file_name_ = "dump.vcd";
   // §21.7.2.3: unevaluated source form of the $dumpfile filename argument.

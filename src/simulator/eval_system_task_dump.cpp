@@ -435,8 +435,7 @@ static std::vector<std::string> CollectDumpportsScopes(const Expr* expr,
 // current simulation time unit, so the opening checkpoint is scheduled on the
 // writer rather than emitted here. Dumping reuses the 4-state VCD machinery,
 // which the extended VCD file inherits unless otherwise stated.
-static void ExecDumpports(const Expr* expr, SimContext& ctx, Arena& arena,
-                          VcdWriter* vcd) {
+static void ExecDumpports(const Expr* expr, SimContext& ctx, Arena& arena) {
   // §21.7.3.1: $dumpports can be invoked multiple times, but every execution
   // shall be at the same simulation time.
   if (!ctx.RegisterDumpportsTime(ctx.CurrentTime().ticks)) {
@@ -460,6 +459,10 @@ static void ExecDumpports(const Expr* expr, SimContext& ctx, Arena& arena,
         "$dumpports may not name the same output file more than once",
         Subclause("21.7.3.1"));
   }
+  // §21.7.1: $dumpports is one of the VCD system tasks a source inserts to
+  // create a dump file, so the file named above is opened here rather than
+  // waiting for something outside the source to open one.
+  VcdWriter* vcd = ctx.OpenVcdDumpFromTask();
   if (!vcd) return;
   // $dumpports produces an extended VCD file, which closes with the
   // $vcdclose keyword command (§21.7.3.6.1).
@@ -626,13 +629,22 @@ Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                ? std::string{}
                                : DumpfileArgSourceText(expr->args[0]));
     ctx.SetDumpFileName(ResolveDumpFileName(expr, ctx, arena));
+    // §21.7.1: Figure 21-1 has the source's own $dumpfile call produce the VCD
+    // file, so the dump is opened here under the name just recorded.
+    ctx.OpenVcdDumpFromTask();
   } else if (name == "$dumpvars") {
-    ExecDumpvars(expr, ctx, arena, vcd);
+    // §21.7.1.2: $dumpvars lists the variables to dump "into the file
+    // specified by $dumpfile", which §21.7.1.1 defaults to "dump.vcd" when the
+    // source named none. Either way the file exists from this call on, so a
+    // source that reaches $dumpvars without a $dumpfile still gets a dump.
+    ExecDumpvars(expr, ctx, arena, ctx.OpenVcdDumpFromTask());
   } else if (name == "$dumplimit") {
-    // §21.7.1.5: the single argument bounds the VCD file size in bytes.
+    // §21.7.1.5: the single argument bounds the VCD file size in bytes. A
+    // limit on a dump no task has opened bounds nothing, so this opens no
+    // file of its own; §21.7.1 gives that job to the three tasks above.
     ExecDumpLimit(expr, ctx, arena, vcd);
   } else if (name == "$dumpports") {
-    ExecDumpports(expr, ctx, arena, vcd);
+    ExecDumpports(expr, ctx, arena);
   } else if (!ExecBasicVcdControl(name, vcd, ctx)) {
     ExecDumpportsControl(expr, ctx, arena, vcd, name);
   }
