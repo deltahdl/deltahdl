@@ -466,4 +466,51 @@ TEST(ClockingBlockElab, NonNegativeIntegerSkewStillAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §14.3's input and output clockvar rules hold wherever the access is written,
+// and Elaborator::WalkStmtsForClockvarAccess wrote out six of the thirteen
+// statement links ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h states. The two cases below
+// write the file's own WriteToInputClockvarError and
+// ReadFromOutputClockvarError in two of the seven links it did not read, where
+// the access was never looked at rather than looked at and allowed.
+TEST(ClockingBlockElab, WriteToInputClockvarInForkArmError) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic clk;\n"
+             "  logic [7:0] data, r;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    input data;\n"
+             "  endclocking\n"
+             "  initial begin\n"
+             "    fork\n"
+             "      cb.data = r;\n"
+             "    join\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "write to input clockvar 'cb.data'", 9, "14.3"));
+}
+
+// A.6.10's action_block is a statement position like any other, and §14.3 puts
+// no condition on where the read stands.
+TEST(ClockingBlockElab, ReadFromOutputClockvarInAssertionActionBlockError) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic clk;\n"
+             "  logic [7:0] data, r;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    output data;\n"
+             "  endclocking\n"
+             "  initial begin\n"
+             "    assert (1) r = cb.data;\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "read from output clockvar 'cb.data'", 8, "14.3"));
+}
+
 }  // namespace

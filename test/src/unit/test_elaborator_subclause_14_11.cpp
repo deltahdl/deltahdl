@@ -538,4 +538,138 @@ TEST(CycleDelayElab, SynchronousDriveInTaskNoError) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §14.11 says "If no default clocking has been specified for the current
+// module, interface, checker, or program, then the compiler shall issue an
+// error." It conditions the rule on the module and not on the statement the
+// delay is written in, so the five cases below write the same `##5;` the file
+// opens with in five statement links HasCycleDelay did not read.
+//
+// The walk wrote out six of the thirteen links ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h states, so
+// Elaborator::ValidateCycleDelayDefaultClocking concluded each of these modules
+// wrote no cycle delay at all. The construct enclosing the `##` decided whether
+// the rule held, and no clause of IEEE 1800-2023 says that.
+//
+// The report stands at the procedural item rather than at the delay, which is
+// why every case below expects line 2: the rule is about the module the item is
+// written in, so ValidateCycleDelayDefaultClocking reports the item once.
+TEST(CycleDelayElab, ForkArmWithoutDefaultClockingErrors) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      ##5;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) requires a default clocking block", 2, "14.11"));
+}
+
+// A.6.7 gives `randcase_item ::= expression : statement_or_null`, and the
+// parser puts that statement in the second of each Stmt::randcase_items pair.
+TEST(CycleDelayElab, RandcaseItemWithoutDefaultClockingErrors) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    randcase\n"
+      "      1: ##5;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) requires a default clocking block", 2, "14.11"));
+}
+
+// A.6.10 gives `action_block ::= statement_or_null | [ statement ] else
+// statement_or_null`, which is two statement links rather than one:
+// Stmt::assert_pass_stmt here, and Stmt::assert_fail_stmt in the case below.
+TEST(CycleDelayElab, AssertionPassStmtWithoutDefaultClockingErrors) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    assert (1) ##5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) requires a default clocking block", 2, "14.11"));
+}
+
+TEST(CycleDelayElab, AssertionFailStmtWithoutDefaultClockingErrors) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    assert (1) else ##5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) requires a default clocking block", 2, "14.11"));
+}
+
+// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
+// }`, so a production code block holds statements like any other block.
+// §18.17.6 gives `break` and `return` a meaning there that they have nowhere
+// else, and that carve-out is why commit 68ac2cbc8 had to settle the clause
+// before §12.8's walk could descend the link. §14.11 has no such carve-out, so
+// a `##` written in a production code block is a cycle delay like any other.
+TEST(CycleDelayElab, RandsequenceCodeBlockWithoutDefaultClockingErrors) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { ##5; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) requires a default clocking block", 2, "14.11"));
+}
+
+// §14.11's other rule, that a cycle delay is not a legal intra-assignment delay
+// outside a synchronous drive, is found by a second walk,
+// FindIntraAssignCycleDelay, which wrote out the same six links. `r` is an
+// ordinary variable rather than a writable clockvar, so the `##1` on it is
+// illegal wherever it stands. The report is at the offending statement, which
+// this walk returns, and not at the item.
+TEST(CycleDelayElab, IntraAssignCycleDelayInForkArmErrors) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic clk;\n"
+             "  logic [7:0] data, r;\n"
+             "  default clocking cb @(posedge clk);\n"
+             "    output data;\n"
+             "  endclocking\n"
+             "  initial begin\n"
+             "    fork\n"
+             "      r <= ##1 data;\n"
+             "    join\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) is not a legal intra-assignment delay", 9, "14.11"));
+}
+
 }  // namespace

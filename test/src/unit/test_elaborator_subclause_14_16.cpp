@@ -306,4 +306,33 @@ TEST(SyncDriveElab, DriveExpressionMayBeArbitraryExpression) {
              "endmodule\n"));
 }
 
+// §14.16 states the form a synchronous drive takes and names no statement the
+// form is not required in, but Elaborator::WalkStmtsForSyncDriveForm wrote out
+// six of the thirteen statement links ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h states. This is the file's own
+// IntraAssignDelayDriveErrors written in a randsequence production code block,
+// which A.6.12 gives `{ { data_declaration } { statement_or_null } }`, so the
+// drive reached neither CheckSyncDriveAssign nor CheckSyncDriveProcContAssign.
+TEST(SyncDriveElab, IntraAssignDelayDriveInRandsequenceCodeBlockErrors) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic clk;\n"
+             "  logic [7:0] data, r;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    output data;\n"
+             "  endclocking\n"
+             "  initial begin\n"
+             "    randsequence(main)\n"
+             "      main : { cb.data <= #4 r; };\n"
+             "    endsequence\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "intra-assignment delay (#) is not a legal "
+                            "synchronous drive to a clocking output variable",
+                            9, "14.16"));
+}
+
 }  // namespace

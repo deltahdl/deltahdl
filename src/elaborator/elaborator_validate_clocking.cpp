@@ -12,6 +12,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/global_clocking_sampled_value.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -402,12 +403,14 @@ void Elaborator::WalkStmtsForClockvarAccess(const Stmt* s) {
     CheckClockvarAccessExpr(s->expr, false);
     CheckClockvarAccessExpr(s->rhs, false);
   }
-  for (auto* sub : s->stmts) WalkStmtsForClockvarAccess(sub);
-  WalkStmtsForClockvarAccess(s->then_branch);
-  WalkStmtsForClockvarAccess(s->else_branch);
-  WalkStmtsForClockvarAccess(s->body);
-  WalkStmtsForClockvarAccess(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForClockvarAccess(ci.body);
+  // §14.3 states the input and output clockvar rules of a clocking block and
+  // names no statement a clockvar access is exempt in, so this descends every
+  // link ForEachChildStmt in elaborator_validate_internal.h names. It wrote out
+  // six of the thirteen, and an access in any of the other seven -- a fork arm,
+  // a for initialization or step, a randcase item, either arm of an assertion
+  // action block, or a randsequence production -- was never looked at.
+  ForEachChildStmt(
+      s, [this](Stmt* const& sub) { WalkStmtsForClockvarAccess(sub); });
 }
 
 void Elaborator::ValidateClockvarAccess(const ModuleDecl* decl) {
@@ -423,17 +426,25 @@ void Elaborator::ValidateClockvarAccess(const ModuleDecl* decl) {
 static bool HasCycleDelay(const Stmt* s) {
   if (!s) return false;
   if (s->kind == StmtKind::kCycleDelay) return true;
-  for (auto* sub : s->stmts) {
-    if (HasCycleDelay(sub)) return true;
-  }
-  if (HasCycleDelay(s->then_branch)) return true;
-  if (HasCycleDelay(s->else_branch)) return true;
-  if (HasCycleDelay(s->body)) return true;
-  if (HasCycleDelay(s->for_body)) return true;
-  for (auto& ci : s->case_items) {
-    if (HasCycleDelay(ci.body)) return true;
-  }
-  return false;
+  // §14.11 says "If no default clocking has been specified for the current
+  // module, interface, checker, or program, then the compiler shall issue an
+  // error." It conditions that on the module and not on the statement the delay
+  // is written in, so this descends every link ForEachChildStmt in
+  // elaborator_validate_internal.h names. It wrote out six of the thirteen,
+  // which is what let `initial begin fork ##1; join end` elaborate clean in a
+  // module with no default clocking while the same `##1;` written one level up
+  // was reported: the walk never read Stmt::fork_stmts, so
+  // Elaborator::ValidateCycleDelayDefaultClocking concluded the module wrote no
+  // cycle delay.
+  //
+  // ForEachChildStmt gives the visitor no way to stop, so the first hit is kept
+  // in `found` and the recursion runs only while `found` is false.
+  bool found = false;
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    if (found) return;
+    found = HasCycleDelay(sub);
+  });
+  return found;
 }
 
 // One statement tree written in a module, together with the item that holds it.
@@ -557,26 +568,23 @@ static const Stmt* FindIntraAssignCycleDelay(
       !targets_writable(s->lhs)) {
     return s;
   }
-  for (auto* sub : s->stmts) {
-    if (const auto* hit = FindIntraAssignCycleDelay(sub, targets_writable))
-      return hit;
-  }
-  if (const auto* hit =
-          FindIntraAssignCycleDelay(s->then_branch, targets_writable))
-    return hit;
-  if (const auto* hit =
-          FindIntraAssignCycleDelay(s->else_branch, targets_writable))
-    return hit;
-  if (const auto* hit = FindIntraAssignCycleDelay(s->body, targets_writable))
-    return hit;
-  if (const auto* hit =
-          FindIntraAssignCycleDelay(s->for_body, targets_writable))
-    return hit;
-  for (auto& ci : s->case_items) {
-    if (const auto* hit = FindIntraAssignCycleDelay(ci.body, targets_writable))
-      return hit;
-  }
-  return nullptr;
+  // §14.11 admits a leading cycle delay on a synchronous drive alone and names
+  // no statement the rule is suspended in, so this descends every link
+  // ForEachChildStmt in elaborator_validate_internal.h names. It wrote out six
+  // of the thirteen, so an illegal intra-assignment `##` in a fork arm, a
+  // randcase item, an assertion action block or a randsequence production went
+  // unreported.
+  //
+  // ForEachChildStmt gives the visitor no way to stop, so the first offending
+  // statement is kept in `hit` and the recursion runs only while `hit` is null.
+  // That is what makes this walk report the first one in source order rather
+  // than whichever link the list happens to visit last.
+  const Stmt* hit = nullptr;
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    if (hit) return;
+    hit = FindIntraAssignCycleDelay(sub, targets_writable);
+  });
+  return hit;
 }
 
 void Elaborator::ValidateIntraAssignCycleDelay(const ModuleDecl* decl) {
@@ -844,12 +852,14 @@ void Elaborator::WalkStmtsForSyncDriveForm(const Stmt* s) {
         [this](std::string_view name) { return IsOutputClockvarSignal(name); };
     CheckSyncDriveProcContAssign(s, kTargetsWritable, kIsOutputClockvar, diag_);
   }
-  for (auto* sub : s->stmts) WalkStmtsForSyncDriveForm(sub);
-  WalkStmtsForSyncDriveForm(s->then_branch);
-  WalkStmtsForSyncDriveForm(s->else_branch);
-  WalkStmtsForSyncDriveForm(s->body);
-  WalkStmtsForSyncDriveForm(s->for_body);
-  for (auto& ci : s->case_items) WalkStmtsForSyncDriveForm(ci.body);
+  // §14.16 and §14.16.2 state the form a synchronous drive takes and name no
+  // statement the form is not required in, so this descends every link
+  // ForEachChildStmt in elaborator_validate_internal.h names. It wrote out six
+  // of the thirteen, so a malformed drive in a fork arm, a randcase item, an
+  // assertion action block or a randsequence production reached neither
+  // CheckSyncDriveAssign nor CheckSyncDriveProcContAssign.
+  ForEachChildStmt(
+      s, [this](Stmt* const& sub) { WalkStmtsForSyncDriveForm(sub); });
 }
 
 void Elaborator::ValidateSyncDriveForm(const ModuleDecl* decl) {
