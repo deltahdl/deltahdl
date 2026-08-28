@@ -58,8 +58,17 @@ NetStrength CombineAmbiguousStrength(NetStrength a, NetStrength b);
 // the ambiguous levels above `su` remain (rule a), those at or below it
 // disappear (rule b), and the gap those two rules open between `su` and the
 // lowest surviving level is filled back in, because the two signals are of
-// opposite value (rule c). On the side of `vu` the signals agree, so each
-// ambiguous level resolves against `su` to whichever of the two is stronger.
+// opposite value (rule c). The gap is filled only where `su` is itself in the
+// result: §28.12.1 has an ambiguous signal every one of whose levels is
+// stronger than `su` dominate the unambiguous signal outright, and a gap needs
+// that level to bound it from below. On the side of `vu` the signals agree, so
+// each ambiguous level resolves against `su` to whichever of the two is
+// stronger.
+//
+// The clause combines the ambiguous signal with one signal of known value and
+// unambiguous strength, so a net carrying several such signals weaker than its
+// ambiguous signal has one combination to make per signal: apply this to the
+// result of the last, once for each of them.
 NetStrength CombineAmbigWithUnambig(NetStrength ambig, uint8_t vu, uint8_t su);
 
 enum class WiredLogicKind : uint8_t { kAnd, kOr };

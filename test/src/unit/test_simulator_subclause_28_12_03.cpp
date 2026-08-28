@@ -1,10 +1,13 @@
 #include <gtest/gtest.h>
 
 #include <initializer_list>
+#include <string>
 
 #include "common/arena.h"
+#include "fixture_simulator.h"
 #include "helpers_net_strength.h"
 #include "model_strength.h"
+#include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/variable.h"
@@ -49,6 +52,32 @@ void ExpectResolvedStrengthsAndX(const StrengthNet& sn, Strength s0_hi,
   EXPECT_EQ(net.resolved_strength.s1_lo, s1_lo);
   EXPECT_EQ(sn.var->value.words[0].aval & 1u, 1u);
   EXPECT_EQ(sn.var->value.words[0].bval & 1u, 1u);
+}
+
+// A module driving the scalar net w from the two equally strong drivers of
+// opposite value §28.12.2 makes an ambiguous signal out of, followed by the
+// weaker continuous assignments `weaker` supplies.
+std::string ConflictPlusWeakerSrc(const std::string& weaker) {
+  return "module m;\n"
+         "  wire w;\n"
+         "  assign (strong0, strong1) w = 1'b0;\n"
+         "  assign (strong0, strong1) w = 1'b1;\n" +
+         weaker + "endmodule\n";
+}
+
+// Elaborates, lowers and runs `src`, then returns the resolved strength of the
+// scalar net w it declares. Centralizes the elaborate/lower/run and net lookup
+// shared by the StrengthResolution tests that drive a net from real source
+// rather than by appending drivers to a Net directly.
+NetStrength ResolveSrcNetW(const std::string& src) {
+  SimFixture f;
+  auto* design = ElaborateSrc(src, f);
+  EXPECT_NE(design, nullptr);
+  if (design == nullptr) return {};
+  LowerAndRun(design, f);
+  const Net* net = f.ctx.FindNet("w");
+  EXPECT_NE(net, nullptr);
+  return net == nullptr ? NetStrength{} : net->resolved_strength;
 }
 
 TEST(StrengthCombineAmbigUnambig, RuleAPreservesHighEndOfRange) {
@@ -281,7 +310,15 @@ TEST(StrengthResolution, RuleBCompleteEliminationProducesUnambigResult) {
   EXPECT_EQ(sn.var->value.ToUint64(), 0u);
 }
 
-TEST(StrengthResolution, StrongestWeakerUnambigSelectedForRuleApplication) {
+// §28.12.3 makes one combination per signal of known value and unambiguous
+// strength, so the weak 0 here is combined as surely as the pull 0 above it --
+// and it moves no bound. §28.12.1 has the stronger signal dominate the weaker,
+// and after the pull 0 has been combined the result holds no level at or below
+// weak for the weak 0 to be the lower bound of: rule c's gap needs the
+// unambiguous signal's own level to bound it from below, and that level is not
+// in the result. A combination that filled the gap regardless would take the 1
+// side down to large and report the net at levels no driver drives it to.
+TEST(StrengthResolution, SecondWeakerDriverBelowTheFirstWidensNothing) {
   Arena arena;
   StrengthNet sn = ResolveWidth1(arena, {{0, Strength::kStrong},
                                          {1, Strength::kStrong},
@@ -290,6 +327,61 @@ TEST(StrengthResolution, StrongestWeakerUnambigSelectedForRuleApplication) {
 
   ExpectResolvedStrengthsAndX(sn, Strength::kStrong, Strength::kPull,
                               Strength::kStrong, Strength::kStrong);
+}
+
+// The shape a second combination decides. The two weaker drivers are of
+// opposite value at one level, so neither dominates the other and §28.12.3 has
+// a combination to make for each: the pull 0 leaves the 1 side only the levels
+// above pull (rules a and b), and the pull 1 leaves the 0 side only the levels
+// above pull. Combining only the strongest of them leaves the 0 side reaching
+// to pull, a level the drivers do not admit. The result carries a single level
+// on each side, so the net is a strong x of unambiguous strength -- Table
+// 21-5's StX -- rather than a range.
+TEST(StrengthResolution, OppositeValueWeakerDriversAtOneLevelBothCombine) {
+  Arena arena;
+  StrengthNet sn = ResolveWidth1(arena, {{0, Strength::kStrong},
+                                         {1, Strength::kStrong},
+                                         {0, Strength::kPull},
+                                         {1, Strength::kPull}});
+
+  ExpectResolvedStrengthsAndX(sn, Strength::kStrong, Strength::kStrong,
+                              Strength::kStrong, Strength::kStrong);
+  EXPECT_FALSE(sn.net.resolved_strength.IsAmbiguous());
+}
+
+// The same two weaker drivers at one value. Each is combined, and the second
+// leaves the bounds the first put there: §28.12.3 resolves a level against the
+// unambiguous signal it agrees with to whichever of the two is stronger, and
+// the two are the same level. A combination of several signals has to be
+// idempotent in the signal it repeats, or a net would resolve differently for
+// carrying a driver twice.
+TEST(StrengthResolution, SameValueWeakerDriversAtOneLevelCombineIdempotently) {
+  Arena arena;
+  StrengthNet sn = ResolveWidth1(arena, {{0, Strength::kStrong},
+                                         {1, Strength::kStrong},
+                                         {0, Strength::kPull},
+                                         {0, Strength::kPull}});
+
+  ExpectResolvedStrengthsAndX(sn, Strength::kStrong, Strength::kPull,
+                              Strength::kStrong, Strength::kStrong);
+}
+
+// A weaker driver at the high-impedance level. §21.2.1.4 says that level
+// "cannot have a known logic value" and that the only logic value allowed for
+// it is z, so it is not the signal of known value and unambiguous strength
+// §28.12.3 combines with, and §28.12.1 has the conflict dominate it. The
+// conflict range §28.12.2 gave -- strong down to high impedance on both sides
+// -- therefore stands. Running the rules with the level itself, as though a
+// high-impedance driver were a signal at strength 0, would instead take the
+// 1-side lower bound up to small.
+TEST(StrengthResolution, HighzWeakerDriverLeavesTheConflictRangeWhole) {
+  Arena arena;
+  StrengthNet sn = ResolveWidth1(
+      arena,
+      {{0, Strength::kStrong}, {1, Strength::kStrong}, {0, Strength::kHighz}});
+
+  ExpectResolvedStrengthsAndX(sn, Strength::kStrong, Strength::kHighz,
+                              Strength::kStrong, Strength::kHighz);
 }
 
 TEST(StrengthResolution, RuleAAndBAtSmallestNonHighzSu) {
@@ -434,6 +526,88 @@ TEST(NetStrengthAmbigUnambig, RulesFollowTheValueAndNotTheSide) {
   EXPECT_EQ(r.s0_lo, Strength::kStrong);
   EXPECT_EQ(r.s1_hi, Strength::kPull);
   EXPECT_EQ(r.s1_lo, Strength::kPull);
+}
+
+// §28.12.3 rule c against a signal that dominates the unambiguous one. Every
+// level of this ambiguous signal is stronger than the weak the unambiguous
+// signal drives at, so by §28.12.1 the stronger signal dominates the weaker
+// and the weak level is in no part of the result. Rule c's gap is bounded from
+// below by that level, so there is no gap: the levels beneath the surviving
+// ones lie under nothing. The 0-side bound therefore stays where rules a and b
+// left it, at pull, and a gap fill that ran regardless would take it to large.
+//
+// This is the shape a net presents to the second of two combinations, which is
+// why it decides whether combining every weaker driver widens the result or
+// leaves it alone.
+TEST(NetStrengthAmbigUnambig, DominatedUnambigSignalOpensNoGapToFill) {
+  NetStrength ambig;
+  ambig.s0_hi = Strength::kStrong;
+  ambig.s0_lo = Strength::kPull;
+  ambig.s1_hi = Strength::kStrong;
+  ambig.s1_lo = Strength::kStrong;
+  NetStrength r = CombineAmbigWithUnambig(ambig, /*vu=*/1, /*su=*/3);
+  EXPECT_EQ(r.s0_hi, Strength::kStrong);
+  EXPECT_EQ(r.s0_lo, Strength::kPull);
+  EXPECT_EQ(r.s1_hi, Strength::kStrong);
+  EXPECT_EQ(r.s1_lo, Strength::kStrong);
+}
+
+// §28.12.3 driven from source. Nothing above reaches Net::Resolve the way a
+// design does: the two cases below state their nets as continuous assignments
+// carrying the drive strength specifications of §28.11, so the strengths the
+// lowerer hands the resolver are the ones the source names.
+//
+// Only the opposite-value shape is read back through %v, and its four bounds
+// are asserted beside the rendering. §21.2.1.4 names the strength characters
+// of an unknown value from one level per side -- Table 21-5 reads "65X" as "an
+// unknown value with a strong driving 0 component and a pull driving 1
+// component" -- and §28.12.3 rule a keeps the strongest level of each side
+// whatever the weaker drivers do, so the levels that clause names never move
+// here. What separates StX from 66X below is FormatStrength reaching for the
+// mnemonic only where each side holds a single level. For every other shape in
+// this file the rendering is therefore the same whether the weaker drivers
+// were combined or dropped, and a case reading it would pass on the behavior
+// and on its absence alike, which docs/tenets/tests/UNIT_TESTS.md rules out.
+// The bounds stand beside the rendering for the same reason: they are what
+// §28.12.3 decides, and they say so whatever the renderer does with them.
+//
+// FormatStrength is the function §21.2.1.4's %v dispatches to
+// (src/simulator/eval_system_task.cpp), so the assertion names the whole
+// three-character string rather than searching a captured line for it.
+//
+// A large capacitor strength cannot appear in either source. §28.11 makes
+// large, medium and small the charge storage strengths of a trireg, and the
+// driving strengths a continuous assignment can name are supply, strong, pull
+// and weak.
+
+// Two weaker drivers of opposite value at one level, from source. Both are
+// combined, so each side of the result carries the single level strong, which
+// §21.2.1.4 renders with that level's mnemonic and the unknown logic value:
+// StX. Combining only the strongest of them leaves the 0 side running down to
+// pull, and the rendering falls back to the two decimal digits, 66X -- what a
+// reader of this net is told today.
+TEST(StrengthResolution, SourceOppositeValuePullDriversRenderAsStX) {
+  NetStrength ns = ResolveSrcNetW(
+      ConflictPlusWeakerSrc("  assign (pull0, pull1) w = 1'b0;\n"
+                            "  assign (pull0, pull1) w = 1'b1;\n"));
+  EXPECT_EQ(ns.s0_hi, Strength::kStrong);
+  EXPECT_EQ(ns.s0_lo, Strength::kStrong);
+  EXPECT_EQ(ns.s1_hi, Strength::kStrong);
+  EXPECT_EQ(ns.s1_lo, Strength::kStrong);
+  EXPECT_EQ(FormatStrength(ns), "StX");
+}
+
+// A driver at the high-impedance level from source, which only a strength
+// specification can state: §28.11 makes (highz0, highz1) illegal, so the 1
+// side carries a driving strength and the assignment drives a 0, leaving the
+// driver at highz0. It combines to nothing and the conflict range stands.
+TEST(StrengthResolution, SourceHighzStrengthDriverLeavesTheConflictRangeWhole) {
+  NetStrength ns = ResolveSrcNetW(
+      ConflictPlusWeakerSrc("  assign (highz0, strong1) w = 1'b0;\n"));
+  EXPECT_EQ(ns.s0_hi, Strength::kStrong);
+  EXPECT_EQ(ns.s0_lo, Strength::kHighz);
+  EXPECT_EQ(ns.s1_hi, Strength::kStrong);
+  EXPECT_EQ(ns.s1_lo, Strength::kHighz);
 }
 
 }  // namespace

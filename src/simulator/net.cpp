@@ -286,9 +286,15 @@ static void TrimAmbigSide(Strength a_lo, Strength a_hi, uint8_t su,
 // the signals are of opposite value, the levels in the gap are part of the
 // result. The gap runs from just above `su`, the strongest level rule b
 // removed, up to the lowest level that survived, so filling it takes the lower
-// bound back down to `su` + 1.
-static void FillRuleCGap(Strength& r_lo, Strength r_hi, uint8_t su) {
+// bound back down to `su` + 1. A gap needs the unambiguous signal's own level
+// to bound it from below, which `su_in_result` reports: where every level of
+// the ambiguous signal is stronger than `su`, §28.12.1 has the stronger signal
+// dominate, the unambiguous signal is in no part of the result, and the levels
+// below the surviving ones lie under nothing rather than in a gap.
+static void FillRuleCGap(Strength& r_lo, Strength r_hi, uint8_t su,
+                         bool su_in_result) {
   if (r_hi == Strength::kHighz) return;
+  if (!su_in_result) return;
   if (static_cast<uint8_t>(r_lo) <= su + 1) return;
   r_lo = static_cast<Strength>(su + 1);
 }
@@ -300,10 +306,18 @@ NetStrength CombineAmbigWithUnambig(NetStrength ambig, uint8_t vu, uint8_t su) {
   Strength amb_opp_lo = (vu == 0) ? ambig.s1_lo : ambig.s0_lo;
   Strength amb_opp_hi = (vu == 0) ? ambig.s1_hi : ambig.s0_hi;
 
+  // The unambiguous signal's own level stands in the result exactly where the
+  // ambiguous signal has a level at or below it: such a level resolves against
+  // `su` to `su` itself, while §28.12.1 has an ambiguous signal every one of
+  // whose levels is stronger dominate the unambiguous signal outright. This is
+  // the same test the side of `vu` applies below, where it puts the lower bound
+  // at the greater of `su` and the ambiguous signal's own bound.
+  bool su_in_result = static_cast<uint8_t>(amb_vu_lo) <= su;
+
   Strength& opp_hi = (vu == 0) ? r.s1_hi : r.s0_hi;
   Strength& opp_lo = (vu == 0) ? r.s1_lo : r.s0_lo;
   TrimAmbigSide(amb_opp_lo, amb_opp_hi, su, opp_lo, opp_hi);
-  FillRuleCGap(opp_lo, opp_hi, su);
+  FillRuleCGap(opp_lo, opp_hi, su, su_in_result);
 
   // §28.12.3 on the side of the unambiguous signal's own value: the two signals
   // agree there, so each level the ambiguous signal might have resolves against
@@ -333,21 +347,49 @@ static uint8_t DriverBit0Val(const Logic4Vec& drv) {
   return 3;              // z
 }
 
-static bool FindWeakerUnambig(const std::vector<Logic4Vec>& drivers,
-                              const std::vector<DriverStrength>& strengths,
-                              uint8_t max_str, uint8_t& vu, uint8_t& su) {
-  vu = 3;
-  su = 0;
+// §28.12.3's "signal of known value and unambiguous strength": one driver's
+// value and the strength level it drives at, in the vocabulary
+// CombineAmbigWithUnambig names them by.
+struct UnambigSignal {
+  uint8_t vu;
+  uint8_t su;
+};
+
+// Every driver weaker than `max_str` that §28.12.3 has a combination to make
+// with, strongest first. The clause combines a signal of known value and
+// unambiguous strength with a component of the ambiguous strength signal, so a
+// net with several weaker drivers has one such combination per driver rather
+// than one for the strongest of them.
+//
+// Two kinds of driver are left out. One whose value is x or z is not a signal
+// of known value, which is what the clause combines. One at the high-impedance
+// level is not either: §21.2.1.4 states that the high-impedance strength cannot
+// have a known logic value and that the only logic value allowed for that level
+// is z. By §28.12.1 the stronger signal dominates it, so it combines to
+// nothing, which is what leaving it out of the list says.
+//
+// The order is the strongest driver first, following §28.12.1's rule that the
+// stronger signal dominates the weaker: the strongest weaker driver is the one
+// that decides how far rules a and b move each bound, and every driver below it
+// then combines against bounds already at or above its own level. Any other
+// order gives the same result, because from a conflict range each combination
+// only raises the two lower bounds to the level the driver puts there.
+static std::vector<UnambigSignal> FindWeakerUnambig(
+    const std::vector<Logic4Vec>& drivers,
+    const std::vector<DriverStrength>& strengths, uint8_t max_str) {
+  std::vector<UnambigSignal> weaker;
   for (size_t d = 0; d < drivers.size(); ++d) {
     uint8_t val = DriverBit0Val(drivers[d]);
     if (val > 1) continue;
     uint8_t str = EffectiveStrength(val, strengths[d]);
-    if (str < max_str && str > su) {
-      su = str;
-      vu = val;
-    }
+    if (str == 0 || str >= max_str) continue;
+    weaker.push_back({val, str});
   }
-  return vu < 2 && su > 0;
+  std::sort(weaker.begin(), weaker.end(),
+            [](const UnambigSignal& a, const UnambigSignal& b) {
+              return a.su > b.su;
+            });
+  return weaker;
 }
 
 struct MaxTracker {
@@ -391,10 +433,10 @@ static void ComputeSingleBitStrength(
   if (m.conflict) {
     out.s0_hi = s;
     out.s1_hi = s;
-    uint8_t su = 0;
-    uint8_t vu = 3;
-    if (FindWeakerUnambig(drivers, strengths, m.str, vu, su)) {
-      out = CombineAmbigWithUnambig(out, vu, su);
+    std::vector<UnambigSignal> weaker =
+        FindWeakerUnambig(drivers, strengths, m.str);
+    for (const UnambigSignal& u : weaker) {
+      out = CombineAmbigWithUnambig(out, u.vu, u.su);
     }
     return;
   }
