@@ -17,7 +17,7 @@ namespace {
 void RunThreeWeightRandcase(SimFixtureSeeded& f, std::string_view decls,
                             std::string_view weight, uint64_t& cnt,
                             uint64_t& x) {
-  const std::string w(weight);
+  std::string w(weight);
   std::string src =
       "module t;\n"
       "  int unsigned cnt;\n"
