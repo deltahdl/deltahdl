@@ -236,4 +236,84 @@ TEST(RandsequenceSim, LocalparamWeightSelectsProductionList) {
   EXPECT_EQ(x->value.ToUint64(), 2u);
 }
 
+// §18.17.1, printed page 567, the sentence standing between claims 5 and 6
+// above: "Weight expressions are evaluated when their enclosing production is
+// selected, thus allowing weights to change dynamically." One selection of a
+// production evaluates each of its rules' weights once, so a weight whose
+// evaluation has an effect performs that effect once per rule.
+// rs_weight_specification admits a parenthesized expression and so a function
+// call: each of the three alternatives here weighs (bump()), a call that
+// advances `cnt` and returns 1, and one generation of `main` leaves cnt at 3 —
+// one evaluation per rule. A literal weight cannot make this claim, because it
+// reads the same number whether it is evaluated once or twice; the counter is
+// what separates one evaluation from two.
+TEST(RandsequenceSim, WeightExpressionEvaluatedOncePerSelection) {
+  SimFixture f;
+  auto* cnt = RunAndFindVar(
+      "module t;\n"
+      "  logic [31:0] cnt;\n"
+      "  logic [7:0] x;\n"
+      "  function int bump();\n"
+      "    cnt = cnt + 1;\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    cnt = 0;\n"
+      "    x = 0;\n"
+      "    randsequence(main)\n"
+      "      main : a := (bump()) | b := (bump()) | c := (bump());\n"
+      "      a : { x = 8'd1; };\n"
+      "      b : { x = 8'd2; };\n"
+      "      c : { x = 8'd3; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f, "cnt");
+  ASSERT_NE(cnt, nullptr);
+  // Three rules, three weight evaluations.
+  EXPECT_EQ(cnt->value.ToUint64(), 3u);
+  // One of the three alternatives was generated, so the count above was reached
+  // by selecting rather than by never running the statement.
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_GE(x->value.ToUint64(), 1u);
+  EXPECT_LE(x->value.ToUint64(), 3u);
+}
+
+// §18.17.1, printed page 567, the same sentence: the weights a selection is
+// drawn against are the weights that selection is made from, because each is
+// evaluated once.
+// Rule 'a' weighs (w++), which reads w and increments it, so with w starting at
+// 0 that weight is 0 and rule 'b' weighs the literal 1. §18.17.1 makes a
+// zero-weight list unreachable (see ZeroWeightProductionListNeverSelected), so
+// 'b' is generated and x is 2.
+//
+// The outcome does not depend on the random draw. The weights sum to 1, so the
+// selector's draw modulo the total is 0 for every random number, and it does
+// not depend on the order the two weights are evaluated in either, since only
+// 'a' reads or writes w. Evaluating the weights a second time to walk them
+// makes 'a' weigh 1 on that second read, and 'a' then covers the whole [0, 1)
+// interval the draw landed in, selecting the alternative §18.17.1 rules out.
+TEST(RandsequenceSim, WeightReadingItsOwnIncrementSelectsFromTheSummedWeights) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  int unsigned w;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    w = 0;\n"
+      "    x = 0;\n"
+      "    randsequence(main)\n"
+      "      main : a := (w++) | b := 1;\n"
+      "      a : { x = 8'd1; };\n"
+      "      b : { x = 8'd2; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+  // Weights 0 and 1: the zero-weight list is unreachable and 'b' is generated.
+  EXPECT_EQ(x->value.ToUint64(), 2u);
+}
+
 }  // namespace

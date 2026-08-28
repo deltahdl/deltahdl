@@ -41,6 +41,48 @@ TEST(RandcaseWeightedCase, WeightExpressionsEvaluatedAtMostOnce) {
   EXPECT_LE(x, 3u);
 }
 
+// §18.16: each randcase_item weight expression is evaluated at most once, so a
+// weight written as a call to a function that has an effect performs that
+// effect once per branch. Three branches each weighing (bump()) -- a call that
+// advances `cnt` and returns 1 -- leave cnt at 3, not 6. §18.17.1 puts the same
+// rule on a randsequence production's rule weights, whose selection runs
+// through SelectRule in src/simulator/stmt_exec_randsequence.cpp; the claim is
+// written here as well as in test_simulator_subclause_18_17_01.cpp so it stands
+// in both clauses' files rather than in whichever was written first.
+TEST(RandcaseWeightedCase, FunctionCallWeightEvaluatedOncePerBranch) {
+  SimFixtureSeeded f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int unsigned cnt;\n"
+      "  int unsigned x;\n"
+      "  function int bump();\n"
+      "    cnt = cnt + 1;\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    cnt = 0;\n"
+      "    x = 0;\n"
+      "    randcase\n"
+      "      (bump()) : x = 1;\n"
+      "      (bump()) : x = 2;\n"
+      "      (bump()) : x = 3;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  // Three branches, three calls.
+  EXPECT_EQ(f.ctx.FindVariable("cnt")->value.ToUint64(), 3u);
+  // A branch was selected and its body executed, so the count above was reached
+  // by selecting rather than by never running the statement.
+  auto x = f.ctx.FindVariable("x")->value.ToUint64();
+  EXPECT_GE(x, 1u);
+  EXPECT_LE(x, 3u);
+}
+
 // §18.16: a zero-weight branch interleaved among nonzero ones is still skipped;
 // the random number maps onto the nonzero branches in declaration order. Here
 // only the third branch carries weight, so it is always selected.

@@ -213,23 +213,44 @@ static ExecTask ExecRsProd(const Stmt* stmt, const RsProd& prod,
   co_return StmtResult::kDone;
 }
 
+// §18.17.1: "Weight expressions are evaluated when their enclosing production
+// is selected, thus allowing weights to change dynamically." One selection
+// evaluates each rule's weight once, so cache the drawn weights before summing
+// and walk the cached values: rs_weight_specification admits a parenthesized
+// expression and so a function call, and a second evaluation would perform that
+// call's effect twice and let the cumulative walk run against numbers other
+// than the ones the total was drawn from. §18.16 states the same rule for the
+// sibling randcase statement in as many words: "Each weight expression is
+// evaluated at most once (implementations can cache identical expressions) in
+// an unspecified order." A rule that specifies no weight counts 1, which is
+// what §18.17.1 makes the weight of a production list written without ':='.
 static const RsRule& SelectRule(const RsProduction& production, SimContext& ctx,
                                 Arena& arena) {
   if (production.rules.size() <= 1) return production.rules[0];
+  std::vector<uint64_t> weights;
+  weights.reserve(production.rules.size());
   uint64_t total_weight = 0;
   for (const auto& rule : production.rules) {
-    total_weight +=
-        rule.weight ? EvalExpr(rule.weight, ctx, arena).ToUint64() : 1;
+    uint64_t w = rule.weight ? EvalExpr(rule.weight, ctx, arena).ToUint64() : 1;
+    weights.push_back(w);
+    total_weight += w;
   }
   if (total_weight == 0) return production.rules[0];
   uint64_t pick = ctx.Urandom32() % total_weight;
+
+  // §18.17.1: the probability of a production list being generated is
+  // proportional to its weight, so the draw lands in the interval each rule's
+  // weight spans and a zero-weight rule spans no interval and is never
+  // selected. Summing the cached weights again reaches total_weight exactly,
+  // and pick is below total_weight, so the draw is always covered: the last
+  // rule covers whatever the rules before it do not, and is returned without a
+  // test rather than as a fallback for a walk that cannot run out.
   uint64_t cumulative = 0;
-  for (const auto& rule : production.rules) {
-    cumulative +=
-        rule.weight ? EvalExpr(rule.weight, ctx, arena).ToUint64() : 1;
-    if (pick < cumulative) return rule;
+  for (size_t i = 0; i + 1 < production.rules.size(); ++i) {
+    cumulative += weights[i];
+    if (pick < cumulative) return production.rules[i];
   }
-  return production.rules[0];
+  return production.rules.back();
 }
 
 // 18.17.5: the optional weight following the rand join keywords states, as a
