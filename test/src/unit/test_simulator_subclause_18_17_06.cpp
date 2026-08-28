@@ -144,8 +144,16 @@ TEST(RandsequenceSim, ReturnContinuesWithNextProductionEachInvocation) {
 // break "can appear in any code block", not only a production code block. A
 // rule's weight-specification code block (`:= weight { ... }`) is a distinct
 // syntactic code-block position; a break there must still terminate the whole
-// randsequence, so neither the rule's production list nor any later production
-// is generated.
+// randsequence, so no production standing after the rule that holds it is
+// generated.
+//
+// §18.17.7 fixes when that block runs relative to the rule's own production
+// list: "Only the return values of productions already generated (i.e., to the
+// left of the code block accessing them) can be retrieved", and a block written
+// after the weight has the whole production list to its left. The clause's own
+// LIST example reads ITEM, a value-returning production of the same rule, in
+// the block after `:= 8`. So a's list generates p first and the block runs
+// after it.
 TEST(RandsequenceSim, BreakInWeightSpecCodeBlockTerminatesRandsequence) {
   SimFixture f;
   uint64_t x = RunModule(f,
@@ -155,22 +163,30 @@ TEST(RandsequenceSim, BreakInWeightSpecCodeBlockTerminatesRandsequence) {
                          "    x = 8'd0;\n"
                          "    randsequence(main)\n"
                          "      main : a b;\n"
-                         "      a : p := 1 { x = 8'd1; break; };\n"
-                         "      p : { x = 8'd5; };\n"
-                         "      b : { x = 8'd9; };\n"
+                         "      a : p := 1 { x = x + 8'd1; break; };\n"
+                         "      p : { x = x + 8'd5; };\n"
+                         "      b : { x = x + 8'd9; };\n"
                          "    endsequence\n"
                          "  end\n"
                          "endmodule\n",
                          "x");
-  // The weight-spec block runs when a's rule is selected: x=1, then break
-  // unwinds the whole randsequence, so p (5) and b (9) never generate.
-  EXPECT_EQ(x, 1u);
+  // p generates first (x=5), then a's weight-spec block adds 1 and breaks,
+  // unwinding the whole randsequence so b never adds its 9: x == 6. Each block
+  // accumulates rather than assigning so that the case observes the order as
+  // well as the abort -- an assigning block reads 1 whichever ran first, and a
+  // break that aborted only production a would read 15.
+  EXPECT_EQ(x, 6u);
 }
 
 // return in a weight-specification code block aborts only the current
-// production (the rule's production list is not generated) and generation
-// continues with the next production, exactly as return does from a production
-// code block. Confirms the abort scope is the same across code-block positions.
+// production and generation continues with the next production, exactly as
+// return does from a production code block. Confirms the abort scope is the
+// same across code-block positions.
+//
+// §18.17.7 puts that block after the rule's production list, as the case above
+// quotes, so the list has already generated when the return runs and the return
+// skips nothing of it. What the case pins is the abort scope: the randsequence
+// carries on with the production following the aborted one.
 TEST(RandsequenceSim, ReturnInWeightSpecCodeBlockAbortsCurrentProductionOnly) {
   SimFixture f;
   uint64_t trace = RunModule(f,
@@ -188,9 +204,10 @@ TEST(RandsequenceSim, ReturnInWeightSpecCodeBlockAbortsCurrentProductionOnly) {
                              "  end\n"
                              "endmodule\n",
                              "trace");
-  // a's weight block sets trace=1 then returns: p (5) is skipped, but b still
-  // follows -> 1*10+9 = 19. A whole-sequence unwind would leave 1.
-  EXPECT_EQ(trace, 19u);
+  // a's list generates p (trace 5), then a's weight block appends 1 (51) and
+  // returns, ending production a; b still follows -> 51*10+9 = 519. A break
+  // there would have unwound the randsequence and left 51.
+  EXPECT_EQ(trace, 519u);
 }
 
 // 18.17.6: the break terminates the randsequence block and nothing wider. The

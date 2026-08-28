@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_lower_run.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -443,6 +444,62 @@ TEST(RandsequenceSim, RandJoinWeightFromLocalparam) {
       "af1");
   // A localparam of 1.0 favors the long sequence just as an explicit 1.0 does.
   EXPECT_LT(af1, 60u);
+}
+
+// §18.17.7: "The elements of the array are assigned the values returned by the
+// instances of the production according to the syntactic order of appearance",
+// while §18.17.5 has the generator "randomly interleave two or more production
+// sequences", so which operand of a rand join generates first is settled at run
+// time. The two rules meet in the rule written here, and the reading that keeps
+// them consistent is that the element an appearance writes follows where the
+// appearance is written and not when it generated. §18.17.7 already reads that
+// way for the ordinary productions, giving the code block of `if (cond) D(5)
+// else D(20)` the declaration `int D[1:2]` whose second element the else branch
+// writes when it is the only branch that generated at all.
+//
+// A rand join rule is a rule, so §18.17.7 declares `int p[1:2]` for the two
+// appearances of the value-returning production p. p returns a counter it
+// increments, so the operand that generates first returns 1 and the other
+// returns 2 whichever of the two they are. The elements therefore read (1, 2)
+// on the runs the first-written operand led and (2, 1) on the runs it did not,
+// and both orders happen: `swapped` counts the second kind and has to be
+// neither none of the 300 runs nor all of them.
+//
+// That is what makes the case able to fail. An engine numbering the elements as
+// it generates reports (1, 2) on every run and leaves `swapped` at zero, and a
+// single run passes such an engine on half the draws. An engine that captures
+// nothing reads bit selects of the module variable p, which is 0, so both
+// elements read 0 and `bad` counts every run. Both counts come off one run, so
+// the runs that swapped the order are the same runs the elements were read on.
+TEST(RandsequenceSim, RandJoinElementsFollowSyntacticOrderNotGenerationOrder) {
+  SimFixture f;
+  auto [bad, swapped] = RunModuleTwoVars(
+      f,
+      "module t;\n"
+      "  int p;\n"
+      "  int n, first, second, bad, swapped;\n"
+      "  initial begin\n"
+      "    p = 0; bad = 0; swapped = 0;\n"
+      "    repeat (300) begin\n"
+      "      n = 0; first = 0; second = 0;\n"
+      "      randsequence(main)\n"
+      "        void main : rand join p p\n"
+      "                    := 1 { first = p[1]; second = p[2]; };\n"
+      "        int p : { n = n + 1; return n; };\n"
+      "      endsequence\n"
+      "      if (!((first == 1 && second == 2) ||\n"
+      "            (first == 2 && second == 1))) bad = bad + 1;\n"
+      "      if (first == 2) swapped = swapped + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      "bad", "swapped");
+  // Each element holds what its own operand returned, on every run.
+  EXPECT_EQ(bad, 0u);
+  // Both interleaving orders happen, so the runs where the second-written
+  // operand generated first are among those the elements were read on.
+  EXPECT_GT(swapped, 0u);
+  EXPECT_LT(swapped, 300u);
 }
 
 }  // namespace

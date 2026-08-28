@@ -1,3 +1,7 @@
+#include <cstdint>
+#include <string>
+#include <string_view>
+
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
 #include "helpers_string_var.h"
@@ -666,6 +670,90 @@ TEST(RandseqValuePassingSim, TypedefNameReturnTypeValueReachesTheRule) {
                          "endmodule\n",
                          "r");
   EXPECT_EQ(r, 41u);
+}
+
+// Runs a randsequence whose top production `main` is given `main_rules` -- the
+// text Syntax 18-13 puts between `main :` and the trailing `;` -- over a fixed
+// set of productions, and reports what main's code block read out of the names
+// p and q. The two value-returning productions return 5 and 6, the void
+// production alt writes 1 and 2, and the module declares variables of its own
+// named p and q holding 7 and 8, so the pair reported says which of the three a
+// rule read: one that captured nothing reads the module variables. The cases
+// below vary only main's rules, so the module, the productions, and the run are
+// written once here.
+void RunRandJoinCapture(SimFixture& f, std::string_view main_rules,
+                        uint64_t& r1, uint64_t& r2) {
+  std::string src =
+      "module t;\n"
+      "  int p, q, r1, r2;\n"
+      "  initial begin\n"
+      "    p = 7; q = 8; r1 = 0; r2 = 0;\n"
+      "    randsequence(main)\n"
+      "      void main : " +
+      std::string(main_rules) +
+      ";\n"
+      "      int p : { return 5; };\n"
+      "      int q : { return 6; };\n"
+      "      void alt : { r1 = 1; r2 = 2; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n";
+  auto [got1, got2] = RunModuleTwoVars(f, src.c_str(), "r1", "r2");
+  r1 = got1;
+  r2 = got2;
+}
+
+// §18.17.7: "Within a rule, a variable is implicitly declared for each
+// production (of the rule) that returns a value", and "the return value can be
+// read in the code blocks of the production that triggered the generation of
+// the production returning a value". A rand join rule is a rule: Syntax 18-18
+// gives `rs_production_list ::= rs_prod { rs_prod } | rand join
+// [ ( expression ) ] rs_production_item rs_production_item
+// { rs_production_item }`, so each of its value-returning operands gets an
+// implicit variable of its own, named after the production because each is
+// named once.
+//
+// The code block reading them is written after a weight because that is the
+// only code block a rand join rule can hold: Syntax 18-14's `rs_rule ::=
+// rs_production_list [ := rs_weight_specification [ rs_code_block ] ]` admits
+// none inside a rand join production list, which is a list of production items.
+// The weight itself is without effect on a rule with no alternative, which is
+// what
+// RandsequenceSim.WeightOnNonAlternativeProductionIsIgnored
+// covers, so the case below writes the rand join rule among alternatives.
+//
+// Both operands are read, since a case reading one of them cannot show the
+// other was captured. An engine that discards what a rand join operand returns
+// reads the module variables instead and reports 7 and 8.
+TEST(RandseqValuePassingSim, RandJoinOperandReturnValuesReachTheRuleCodeBlock) {
+  SimFixture f;
+  uint64_t r1 = 0;
+  uint64_t r2 = 0;
+  RunRandJoinCapture(f, "rand join p q := 1 { r1 = p; r2 = q; }", r1, r2);
+  EXPECT_EQ(r1, 5u);
+  EXPECT_EQ(r2, 6u);
+}
+
+// §18.17.1: "A weight is only meaningful when assigned to alternative
+// productions, that is, production lists separated by a |." The rand join rule
+// here is one of two alternatives and carries the weight, so the code block
+// that reads its operands' values belongs to a rule the weight selected rather
+// than trailing an inert one. §18.17.1 makes the probability of a production
+// list "proportional to its specified weight", so the alternative weighing 0 is
+// never generated and the join runs on every run.
+//
+// The three outcomes stay apart: the join's code block reports 5 and 6, the
+// alternative writes 1 and 2, and the module variables an uncaptured name falls
+// back to hold 7 and 8.
+TEST(RandseqValuePassingSim,
+     RandJoinRuleSelectedByWeightReadsItsOperandValues) {
+  SimFixture f;
+  uint64_t r1 = 0;
+  uint64_t r2 = 0;
+  RunRandJoinCapture(f, "rand join p q := 5 { r1 = p; r2 = q; } | alt := 0", r1,
+                     r2);
+  EXPECT_EQ(r1, 5u);
+  EXPECT_EQ(r2, 6u);
 }
 
 }  // namespace

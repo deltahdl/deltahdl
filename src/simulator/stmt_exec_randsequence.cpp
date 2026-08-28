@@ -93,6 +93,23 @@ static ExecTask ExecRsProduction(const Stmt* stmt, const RsProductionItem& call,
                                  SimContext& ctx, Arena& arena,
                                  RuleValueCapture* cap);
 
+// §18.17.7: the rand join generation below declares and writes the implicit
+// variables of the rules it interleaves, so it calls these four ahead of their
+// definitions, which stand with the rest of the value-passing code at the end
+// of this file.
+static RuleValueCapture BuildRuleValueCapture(const Stmt* stmt,
+                                              const RsRule& selected,
+                                              SimContext& ctx);
+static RuleValueCapture BuildStepValueCapture(
+    const Stmt* stmt, const std::vector<const RsProd*>& steps, SimContext& ctx);
+static RuleProductionSlot SlotForAppearance(const RuleValueCapture* cap,
+                                            const RsProductionItem& call,
+                                            std::string_view name);
+static void StoreRuleProductionValue(const RuleProductionSlot& slot,
+                                     const RsProduction* child,
+                                     const Logic4Vec& ret_value,
+                                     SimContext& ctx, Arena& arena);
+
 static const RsProduction* FindProduction(const Stmt* stmt,
                                           std::string_view name) {
   for (const auto& prod : stmt->rs_productions) {
@@ -267,14 +284,27 @@ static double EvalRandJoinBias(Expr* expr, SimContext& ctx, Arena& arena) {
   return f;
 }
 
+namespace {
 // One operand of a rand join, expanded one level (to depth 1) into the
 // production items it will contribute. The interleaver emits these items in
 // order; cursor marks how many have already been generated.
+//
+// §18.17.7: item is the appearance the enclosing rand join rule wrote, which
+// fixes which implicit variable of that rule this operand writes; production is
+// what the appearance names; ret_value is the storage a return statement in the
+// operand assigns to; and cap holds the implicit variables of the operand's own
+// rule, since steps generates the productions that rule names.
 struct RandJoinSeq {
   std::vector<const RsProd*> steps;
   size_t cursor = 0;
+  const RsProductionItem* item = nullptr;
+  const RsProduction* production = nullptr;
+  RuleValueCapture cap;
+  Logic4Vec ret_value;
+  bool returns_value = false;
   size_t Remaining() const { return steps.size() - cursor; }
 };
+}  // namespace
 
 // 18.17.5: expanding an operand to depth 1 yields the production items of its
 // selected rule. A nested rand join contributes its own operands as the
@@ -351,24 +381,6 @@ static ExecTask RunRandJoinRuleWeightCode(const RsRule& rule, SimContext& ctx,
   co_return StmtResult::kDone;
 }
 
-// 18.17.5: expand one rand join operand to depth 1 into its production-item
-// steps. Selects the operand's rule, runs that rule's weight code, and (unless
-// the rule returned) collects its steps into seq. A break in the weight code is
-// surfaced via the returned StmtResult so the caller can abort the whole join.
-static ExecTask BuildOneRandJoinSeq(const Stmt* stmt,
-                                    const RsProductionItem& item,
-                                    SimContext& ctx, Arena& arena,
-                                    RandJoinSeq& seq) {
-  const auto* production = FindProduction(stmt, item.name);
-  if (!production) co_return StmtResult::kDone;
-  const auto& rule = SelectRule(*production, ctx, arena);
-  bool rule_aborted = false;
-  auto r = co_await RunRandJoinRuleWeightCode(rule, ctx, arena, rule_aborted);
-  if (r == StmtResult::kBreak) co_return StmtResult::kBreak;
-  if (!rule_aborted) CollectRandJoinSteps(rule, arena, seq.steps);
-  co_return StmtResult::kDone;
-}
-
 namespace {
 // 18.17: the randsequence execution environment threaded through the generation
 // helpers: the randsequence statement that owns the production declarations,
@@ -382,6 +394,41 @@ struct RandseqEngine {
 };
 }  // namespace
 
+// 18.17.5: expand one rand join operand to depth 1 into its production-item
+// steps. Selects the operand's rule, runs that rule's weight code, and (unless
+// the rule returned) collects its steps into seq. A break in the weight code is
+// surfaced via the returned StmtResult so the caller can abort the whole join.
+//
+// §18.17.7: record what the operand names and size the storage its generation
+// returns into, and declare the implicit variables of the rule the steps came
+// from, because those steps are what generates the productions that rule names.
+static ExecTask BuildOneRandJoinSeq(const RandseqEngine& eng,
+                                    const RsProductionItem& item,
+                                    RandJoinSeq& seq) {
+  const auto* production = FindProduction(eng.stmt, item.name);
+  if (!production) co_return StmtResult::kDone;
+  seq.item = &item;
+  seq.production = production;
+  seq.returns_value = ProductionReturnsValue(production);
+  if (seq.returns_value) {
+    // §6.16: a string has no declared width and starts as "", so leave its
+    // storage empty; every other return type EvalTypeWidth gives no width to
+    // keeps the 32-bit carrier, as ExecRsProduction sizes it.
+    uint32_t w = EvalTypeWidth(production->return_type);
+    if (w == 0 && !ProductionReturnsString(production)) w = 32;
+    seq.ret_value = MakeLogic4VecVal(eng.arena, w, 0);
+  }
+  const auto& rule = SelectRule(*production, eng.ctx, eng.arena);
+  bool rule_aborted = false;
+  auto r = co_await RunRandJoinRuleWeightCode(rule, eng.ctx, eng.arena,
+                                              rule_aborted);
+  if (r == StmtResult::kBreak) co_return StmtResult::kBreak;
+  if (rule_aborted) co_return StmtResult::kDone;
+  CollectRandJoinSteps(rule, eng.arena, seq.steps);
+  seq.cap = BuildStepValueCapture(eng.stmt, seq.steps, eng.ctx);
+  co_return StmtResult::kDone;
+}
+
 // 18.17.5: expand each rand join operand one level into the production items of
 // its selected rule, running that rule's weight code in declaration order
 // first. A rule whose weight code breaks aborts the whole interleaving; one
@@ -394,8 +441,7 @@ static ExecTask BuildRandJoinSeqs(const RandseqEngine& eng,
   seqs.reserve(selected.rand_join_items.size());
   for (const auto& item : selected.rand_join_items) {
     RandJoinSeq seq;
-    auto r =
-        co_await BuildOneRandJoinSeq(eng.stmt, item, eng.ctx, eng.arena, seq);
+    auto r = co_await BuildOneRandJoinSeq(eng, item, seq);
     if (r == StmtResult::kBreak) {
       aborted = true;
       co_return StmtResult::kBreak;
@@ -405,6 +451,52 @@ static ExecTask BuildRandJoinSeqs(const RandseqEngine& eng,
   co_return StmtResult::kDone;
 }
 
+// §18.17.7: generate one production of one rand join operand, with a return
+// statement inside it assigning to that operand's own storage. §18.17.5
+// interleaves the operands, so more than one of them is part-generated at any
+// moment and a single shared return slot would let one operand's return
+// statement write another operand's value. An operand of void return type holds
+// no slot at all, for the reason ExecRsProduction gives: the return statement
+// assigns its expression to the production whose code block holds it.
+//
+// The steps generate the productions the operand's own rule names, so they are
+// given that rule's implicit variables and not the enclosing rand join rule's.
+static ExecTask ExecOneRandJoinStep(const RandseqEngine& eng,
+                                    RandJoinSeq& seq) {
+  const RsProd* step = seq.steps[seq.cursor++];
+  Logic4Vec* prev_slot =
+      eng.ctx.SetRsReturnSlot(seq.returns_value ? &seq.ret_value : nullptr);
+  auto result =
+      co_await ExecRsProd(eng.stmt, *step, eng.ctx, eng.arena, &seq.cap);
+  eng.ctx.SetRsReturnSlot(prev_slot);
+  co_return result;
+}
+
+// §18.17.7: write the implicit variable this operand of a rand join rule
+// declares, once the operand has generated the last production it contributed.
+// Which element it writes is fixed by where the operand is written and not by
+// when it generated: the clause assigns "the elements of the array ... the
+// values returned by the instances of the production according to the syntactic
+// order of appearance", and §18.17.5 reorders generation alone. The clause
+// already reads that way for the ordinary productions, giving the code block of
+// `if (cond) D(5) else D(20)` an `int D[1:2]` whose second element the else
+// branch writes when it is the only branch that generated.
+static void StoreRandJoinOperandValue(const RandJoinSeq& seq,
+                                      const RuleValueCapture& cap,
+                                      SimContext& ctx, Arena& arena) {
+  if (!seq.returns_value) return;
+  RuleProductionSlot slot =
+      SlotForAppearance(&cap, *seq.item, seq.production->name);
+  if (slot.idx == 0) return;
+  // §6.16: a string cannot hold the "\0" character, so an integral expression
+  // returned by a string production loses the zero bytes of its own width.
+  // ExecRsProduction strips them on the ordinary path for the same reason.
+  Logic4Vec value = ProductionReturnsString(seq.production)
+                        ? StripStringZeros(seq.ret_value, arena)
+                        : seq.ret_value;
+  StoreRuleProductionValue(slot, seq.production, value, ctx, arena);
+}
+
 static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
                                   SimContext& ctx, Arena& arena) {
   // 18.17.5: rand join randomly interleaves its operand sequences while keeping
@@ -412,6 +504,13 @@ static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
   // operand is first expanded one level (depth 1) into the production items of
   // its selected rule; those items are the units that get interleaved.
   double bias = EvalRandJoinBias(selected.rand_join_expr, ctx, arena);
+
+  // §18.17.7: a rand join rule is a rule, so it declares an implicit variable
+  // for each of the productions it names that returns a value. Syntax 18-13
+  // writes those productions after the rand join keywords, and they are
+  // declared before any of them generates so that a production named more than
+  // once is an array from the start.
+  RuleValueCapture cap = BuildRuleValueCapture(stmt, selected, ctx);
 
   std::vector<RandJoinSeq> seqs;
   bool aborted = false;
@@ -424,13 +523,18 @@ static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
     size_t chosen = ChooseRandJoinOperand(seqs, exponent, ctx);
     if (chosen == seqs.size()) break;
 
-    const RsProd* step = seqs[chosen].steps[seqs[chosen].cursor++];
-    auto result = co_await ExecRsProd(stmt, *step, ctx, arena, nullptr);
+    auto result = co_await ExecOneRandJoinStep(eng, seqs[chosen]);
     if (result == StmtResult::kBreak) co_return StmtResult::kBreak;
     if (result == StmtResult::kReturn) {
       // 18.17.6: return aborts the current production; drop the remainder of
       // this operand's sequence and keep interleaving the others.
       seqs[chosen].cursor = seqs[chosen].steps.size();
+    }
+    // §18.17.7: only the return value of a production already generated can be
+    // read, so the operand's value is written the moment the last production it
+    // contributed has generated.
+    if (seqs[chosen].Remaining() == 0) {
+      StoreRandJoinOperandValue(seqs[chosen], cap, ctx, arena);
     }
   }
   co_return StmtResult::kDone;
@@ -474,20 +578,13 @@ static void CountRuleProductions(const Stmt* stmt, const RsProd& prod,
   }
 }
 
-// §18.17.7: within a rule, a variable is implicitly declared for each
-// value-returning production the rule names. A production named once yields a
-// scalar named after the production; a production named more than once yields
-// an array indexed 1..N, with element i holding the value returned by the i-th
-// appearance in syntactic order. Count the rule's appearances so a multiply
-// appearing production can be registered as an array before any code block
-// reads an element of it.
-static RuleValueCapture BuildRuleValueCapture(const Stmt* stmt,
-                                              const RsRule& selected,
-                                              SimContext& ctx) {
-  RuleValueCapture cap;
-  for (const auto& prod : selected.prods) {
-    CountRuleProductions(stmt, prod, cap);
-  }
+// §18.17.7: register the array shape of every production the counted
+// appearances name more than once, so a code block can read an element before
+// any generation has written one. A production named once needs no shape: its
+// implicit variable is the scalar StoreRuleProductionValue creates.
+static void RegisterRuleValueArrays(const Stmt* stmt,
+                                    const RuleValueCapture& cap,
+                                    SimContext& ctx) {
   for (const auto& [name, n] : cap.total) {
     if (n <= 1) continue;
     const auto* child = FindProduction(stmt, name);
@@ -514,13 +611,55 @@ static RuleValueCapture BuildRuleValueCapture(const Stmt* stmt,
     // rules that name C once, twice and three times.
     ctx.RegisterLocalArray(name, info);
   }
+}
+
+// §18.17.7: within a rule, a variable is implicitly declared for each
+// value-returning production the rule names. A production named once yields a
+// scalar named after the production; a production named more than once yields
+// an array indexed 1..N, with element i holding the value returned by the i-th
+// appearance in syntactic order. Count the rule's appearances so a multiply
+// appearing production can be registered as an array before any code block
+// reads an element of it.
+static RuleValueCapture BuildRuleValueCapture(const Stmt* stmt,
+                                              const RsRule& selected,
+                                              SimContext& ctx) {
+  RuleValueCapture cap;
+  // Syntax 18-13 gives a rand join rule its productions as the
+  // rs_production_items written after the keywords, which stand in
+  // RsRule::rand_join_items and in no RsProd of RsRule::prods. A rule holds one
+  // list or the other, so both are walked and the empty one contributes
+  // nothing.
+  for (const auto& item : selected.rand_join_items) {
+    CountRuleProductionItem(stmt, item, cap);
+  }
+  for (const auto& prod : selected.prods) {
+    CountRuleProductions(stmt, prod, cap);
+  }
+  RegisterRuleValueArrays(stmt, cap, ctx);
+  return cap;
+}
+
+// §18.17.5 interleaves a rand join operand's productions to a depth of 1, so
+// what generates under the operand is the productions its own rule names rather
+// than the operand itself. Count the appearances over the steps that expansion
+// produced: for a nested rand join rule those are the wrappers
+// CollectRandJoinSteps built around its operands, and the wrapper is what
+// SlotForAppearance is given to look up.
+static RuleValueCapture BuildStepValueCapture(
+    const Stmt* stmt, const std::vector<const RsProd*>& steps,
+    SimContext& ctx) {
+  RuleValueCapture cap;
+  for (const auto* step : steps) {
+    CountRuleProductions(stmt, *step, cap);
+  }
+  RegisterRuleValueArrays(stmt, cap, ctx);
   return cap;
 }
 
 // §18.17.7: the implicit variable this appearance of a production writes. An
 // appearance the rule recorded no ordinal for writes none: the top-level
-// production the randsequence statement names stands in no rule, and neither
-// does an operand of a rand join rule.
+// production the randsequence statement names stands in no rule, and a
+// production that returns no value declares no variable to write.
 static RuleProductionSlot SlotForAppearance(const RuleValueCapture* cap,
                                             const RsProductionItem& call,
                                             std::string_view name) {
@@ -590,23 +729,48 @@ static ExecTask ExecRuleProds(const Stmt* stmt, const RsRule& selected,
   for (const auto& prod : selected.prods) {
     auto result = co_await ExecRsProd(stmt, prod, ctx, arena, &cap);
     if (result == StmtResult::kBreak) co_return StmtResult::kBreak;
-    if (result == StmtResult::kReturn) co_return StmtResult::kDone;
+    // §18.17.6: a return aborts the generation of the current production, so
+    // the productions written after this one are not generated. Surface the
+    // abort rather than reporting a normal completion, because the rule's own
+    // code block is not generated either; ExecRsProduction turns it back into a
+    // normal completion once the aborted production has finished.
+    if (result == StmtResult::kReturn) co_return StmtResult::kReturn;
   }
   co_return StmtResult::kDone;
 }
 
+// §18.17.7: generate the rule's production list, then run the rs_code_block
+// Syntax 18-14 writes after the rs_weight_specification. The clause reads that
+// block against what stands to its left -- "Only the return values of
+// productions already generated (i.e., to the left of the code block accessing
+// them) can be retrieved" -- and the whole production list is written to its
+// left. §18.17.7's own GenQueue example needs exactly that, giving the rule
+// `LIST ITEM := 8 { q = { q, ITEM }; }` a code block that reads ITEM, a
+// value-returning production of that same rule. A rand join rule is the case
+// with nothing else: Syntax 18-18 admits only rs_production_items after the
+// keywords, so this is the one code block such a rule can hold.
+//
+// §18.17.6 leaves break and return doing what they do from any code block: a
+// break here terminates the randsequence, and a return aborts the current
+// production, which by this point has finished generating its list. A list that
+// broke or was itself aborted never reaches the block, an aborted production
+// having nothing further to generate.
 static ExecTask ExecSelectedRule(const Stmt* stmt, const RsRule& selected,
                                  SimContext& ctx, Arena& arena) {
+  StmtResult prods_result = StmtResult::kDone;
+  if (selected.is_rand_join) {
+    prods_result = co_await ExecRandJoinItems(stmt, selected, ctx, arena);
+  } else {
+    prods_result = co_await ExecRuleProds(stmt, selected, ctx, arena);
+  }
+  if (prods_result != StmtResult::kDone) co_return prods_result;
   for (auto* s : selected.weight_code) {
     auto result = co_await ExecStmt(s, ctx, arena);
     if (result == StmtResult::kBreak || result == StmtResult::kReturn) {
       co_return result;
     }
   }
-  if (selected.is_rand_join) {
-    co_return co_await ExecRandJoinItems(stmt, selected, ctx, arena);
-  }
-  co_return co_await ExecRuleProds(stmt, selected, ctx, arena);
+  co_return StmtResult::kDone;
 }
 
 // §18.17.7: passing data to a production uses the same syntax as a task call.
