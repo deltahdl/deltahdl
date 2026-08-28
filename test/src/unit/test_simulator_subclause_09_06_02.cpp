@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 #include "builders_ast.h"
@@ -412,6 +413,65 @@ TEST(DisableStatementExecution, DisableTaskWithForceDoesNotCrash) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
+}
+
+// §9.6.2: "The disable statement shall terminate the activity of a task or a
+// named block. Execution shall resume at the statement following the block or
+// following the task-enabling statement." Runs `rules` as the body of a
+// randsequence written inside the named block `blk`. `in_rs` is written by a
+// code block of the randsequence, `after_rs` by the statement standing after
+// the randsequence and still inside `blk`, and `after_blk` by the statement
+// standing after `blk`. A `disable blk` the rules reach therefore terminates
+// `blk`, leaving `after_rs` unwritten, and resumes at `after_blk`. The two
+// cases below differ only in which of the code blocks §18.17.1 admits holds
+// the disable, so they share the module, the lowering and the run.
+void RunRandseqDisableTrial(SimFixture& f, std::string_view rules) {
+  std::string src =
+      "module t;\n"
+      "  logic [7:0] in_rs, after_rs, after_blk;\n"
+      "  initial begin\n"
+      "    begin : blk\n"
+      "      randsequence(main)\n" +
+      std::string(rules) +
+      "      endsequence\n"
+      "      after_rs = 8'd51;\n"
+      "    end\n"
+      "    after_blk = 8'd93;\n"
+      "  end\n"
+      "endmodule\n";
+  auto* design = ElaborateSrc(src, f);
+  LowerRunAndCheck(f, design,
+                   {{"in_rs", 37u}, {"after_rs", 0u}, {"after_blk", 93u}});
+}
+
+// §9.6.2: "The disable statement can be used within blocks and tasks to
+// disable the particular block or task containing the disable statement", and
+// disabling a named block terminates it, execution resuming at the statement
+// following the block. A production code block of a randsequence written
+// inside `blk` is inside `blk`, so the disable it executes terminates `blk`
+// rather than being absorbed by the randsequence: §18.17.6 gives a randsequence
+// a meaning for break and for return and none for disable.
+TEST(DisableStatementExecution,
+     DisableInARandsequenceProductionCodeBlockTerminatesTheBlock) {
+  SimFixture f;
+  RunRandseqDisableTrial(f,
+                         "        main : { in_rs = 8'd37; disable blk; };\n");
+}
+
+// §18.17.1 and Syntax 18-14 write a rule as
+// `rs_production_list [ := rs_weight_specification [ rs_code_block ] ]`, so a
+// code block may follow a weight as well as stand as a production. §9.6.2 makes
+// no distinction between them: a disable executed in either terminates the
+// named block containing the randsequence. This is a second statement list,
+// run by a loop of its own, so the production-code-block case does not answer
+// for it. §18.17.7 puts this block after the rule's production list, so `alt`
+// writes `in_rs` before the weight code block disables `blk`.
+TEST(DisableStatementExecution,
+     DisableInARandsequenceWeightCodeBlockTerminatesTheBlock) {
+  SimFixture f;
+  RunRandseqDisableTrial(f,
+                         "        main : alt := 5 { disable blk; };\n"
+                         "        alt : { in_rs = 8'd37; };\n");
 }
 
 }  // namespace

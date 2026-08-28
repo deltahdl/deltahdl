@@ -136,6 +136,34 @@ static bool ProductionReturnsString(const RsProduction* p) {
          p->return_type.kind == DataTypeKind::kString;
 }
 
+// What a randsequence generation loop must do with the StmtResult its body
+// left, factored out of the "unwind / abort the production / keep generating"
+// branch every loop in this file repeats.
+//
+// kUnwind covers the two results that leave the whole generation. §18.17.6:
+// "The break statement terminates the sequence generation", and §9.6.2: a
+// disable "shall terminate the activity of a task or a named block", which is
+// something the randsequence statement is running inside, so the generation
+// ends either way and the loop hands the result to its caller unchanged.
+// kAbortProduction covers return, which §18.17.6 gives a narrower reach: it
+// "aborts the generation of the current production", and "sequence generation
+// continues with the next production following the aborted production", so
+// what a return ends is decided at the site rather than here. kKeepGenerating
+// covers the rest.
+enum class RandseqAction : uint8_t {
+  kKeepGenerating,
+  kAbortProduction,
+  kUnwind,
+};
+
+static RandseqAction ClassifyRandseqResult(StmtResult result) {
+  if (result == StmtResult::kBreak || result == StmtResult::kDisable) {
+    return RandseqAction::kUnwind;
+  }
+  if (result == StmtResult::kReturn) return RandseqAction::kAbortProduction;
+  return RandseqAction::kKeepGenerating;
+}
+
 static ExecTask ExecRsProd(const Stmt* stmt, const RsProd& prod,
                            SimContext& ctx, Arena& arena,
                            RuleValueCapture* cap);
@@ -156,10 +184,16 @@ static ExecTask ExecRsProdRepeat(const Stmt* stmt, const RsProd& prod,
                                  SimContext& ctx, Arena& arena,
                                  RuleValueCapture* cap) {
   auto count = EvalExpr(prod.repeat_count, ctx, arena).ToUint64();
-  for (uint64_t i = 0; i < count; ++i) {
+  // §20.2: "The $finish system task causes the simulator to exit and pass
+  // control back to the host operating system", so the iterations after the one
+  // that ran it do not generate. SimContext::RequestFinish raises the stop the
+  // process loops guard on, and this loop guards on it for the same reason.
+  for (uint64_t i = 0; i < count && !ctx.StopRequested(); ++i) {
     auto result =
         co_await ExecRsProduction(stmt, prod.repeat_item, ctx, arena, cap);
-    if (result == StmtResult::kBreak) co_return StmtResult::kBreak;
+    if (ClassifyRandseqResult(result) == RandseqAction::kUnwind) {
+      co_return result;
+    }
   }
   co_return StmtResult::kDone;
 }
@@ -203,10 +237,14 @@ static ExecTask ExecRsProdCodeBlock(const RsProd& prod, SimContext& ctx,
   StmtResult block_result = StmtResult::kDone;
   for (auto* s : prod.code_stmts) {
     auto result = co_await ExecStmt(s, ctx, arena);
-    if (result == StmtResult::kBreak || result == StmtResult::kReturn) {
+    if (ClassifyRandseqResult(result) != RandseqAction::kKeepGenerating) {
       block_result = result;
       break;
     }
+    // §20.2: a $finish written here exits the simulator, so the statements
+    // after it in this block do not run either. ExecBlock guards the statements
+    // of a begin-end block on the same stop.
+    if (ctx.StopRequested()) break;
   }
   ctx.PopScope();
   co_return block_result;
@@ -364,19 +402,23 @@ static size_t ChooseRandJoinOperand(const std::vector<RandJoinSeq>& seqs,
   return chosen;
 }
 
-// 18.17.5: run one operand rule's weight code in declaration order. A break
-// must propagate out and abort the whole interleaving (signalled via the
-// returned StmtResult); a return only aborts this rule's contribution, leaving
-// rule_aborted set so the caller emits no steps for it.
+// 18.17.5: run one operand rule's weight code in declaration order. A break or
+// a disable must propagate out and end the whole interleaving (signalled via
+// the returned StmtResult); a return only aborts this rule's contribution,
+// leaving rule_aborted set so the caller emits no steps for it.
 static ExecTask RunRandJoinRuleWeightCode(const RsRule& rule, SimContext& ctx,
                                           Arena& arena, bool& rule_aborted) {
   for (auto* s : rule.weight_code) {
     auto r = co_await ExecStmt(s, ctx, arena);
-    if (r == StmtResult::kBreak) co_return StmtResult::kBreak;
-    if (r == StmtResult::kReturn) {
+    auto action = ClassifyRandseqResult(r);
+    if (action == RandseqAction::kUnwind) co_return r;
+    if (action == RandseqAction::kAbortProduction) {
       rule_aborted = true;
       break;
     }
+    // §20.2: a $finish here exits the simulator, so the rest of this weight
+    // code does not run.
+    if (ctx.StopRequested()) break;
   }
   co_return StmtResult::kDone;
 }
@@ -422,7 +464,7 @@ static ExecTask BuildOneRandJoinSeq(const RandseqEngine& eng,
   bool rule_aborted = false;
   auto r = co_await RunRandJoinRuleWeightCode(rule, eng.ctx, eng.arena,
                                               rule_aborted);
-  if (r == StmtResult::kBreak) co_return StmtResult::kBreak;
+  if (ClassifyRandseqResult(r) == RandseqAction::kUnwind) co_return r;
   if (rule_aborted) co_return StmtResult::kDone;
   CollectRandJoinSteps(rule, eng.arena, seq.steps);
   seq.cap = BuildStepValueCapture(eng.stmt, seq.steps, eng.ctx);
@@ -431,9 +473,10 @@ static ExecTask BuildOneRandJoinSeq(const RandseqEngine& eng,
 
 // 18.17.5: expand each rand join operand one level into the production items of
 // its selected rule, running that rule's weight code in declaration order
-// first. A rule whose weight code breaks aborts the whole interleaving; one
-// that returns contributes no steps. Returns false (with abort set) when a
-// break must propagate out of the caller.
+// first. A rule whose weight code breaks or is disabled ends the whole
+// interleaving; one that returns contributes no steps. Sets aborted, and
+// returns the result the caller must propagate, when the expansion must not
+// finish.
 static ExecTask BuildRandJoinSeqs(const RandseqEngine& eng,
                                   const RsRule& selected,
                                   std::vector<RandJoinSeq>& seqs,
@@ -442,9 +485,9 @@ static ExecTask BuildRandJoinSeqs(const RandseqEngine& eng,
   for (const auto& item : selected.rand_join_items) {
     RandJoinSeq seq;
     auto r = co_await BuildOneRandJoinSeq(eng, item, seq);
-    if (r == StmtResult::kBreak) {
+    if (ClassifyRandseqResult(r) == RandseqAction::kUnwind) {
       aborted = true;
-      co_return StmtResult::kBreak;
+      co_return r;
     }
     seqs.push_back(std::move(seq));
   }
@@ -518,14 +561,19 @@ static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
   auto build = co_await BuildRandJoinSeqs(eng, selected, seqs, aborted);
   if (aborted) co_return build;
 
+  // §20.2: a $finish executed by any operand exits the simulator, so the steps
+  // the other operands have not contributed yet do not generate. The interleave
+  // guards on the stop SimContext::RequestFinish raises, as the process loops
+  // do.
   double exponent = 4.0 * bias - 1.0;
-  for (;;) {
+  while (!ctx.StopRequested()) {
     size_t chosen = ChooseRandJoinOperand(seqs, exponent, ctx);
     if (chosen == seqs.size()) break;
 
     auto result = co_await ExecOneRandJoinStep(eng, seqs[chosen]);
-    if (result == StmtResult::kBreak) co_return StmtResult::kBreak;
-    if (result == StmtResult::kReturn) {
+    auto action = ClassifyRandseqResult(result);
+    if (action == RandseqAction::kUnwind) co_return result;
+    if (action == RandseqAction::kAbortProduction) {
       // 18.17.6: return aborts the current production; drop the remainder of
       // this operand's sequence and keep interleaving the others.
       seqs[chosen].cursor = seqs[chosen].steps.size();
@@ -728,13 +776,18 @@ static ExecTask ExecRuleProds(const Stmt* stmt, const RsRule& selected,
   RuleValueCapture cap = BuildRuleValueCapture(stmt, selected, ctx);
   for (const auto& prod : selected.prods) {
     auto result = co_await ExecRsProd(stmt, prod, ctx, arena, &cap);
-    if (result == StmtResult::kBreak) co_return StmtResult::kBreak;
     // §18.17.6: a return aborts the generation of the current production, so
     // the productions written after this one are not generated. Surface the
     // abort rather than reporting a normal completion, because the rule's own
     // code block is not generated either; ExecRsProduction turns it back into a
-    // normal completion once the aborted production has finished.
-    if (result == StmtResult::kReturn) co_return StmtResult::kReturn;
+    // normal completion once the aborted production has finished. A break and a
+    // disable are surfaced unchanged, each ending more than this rule.
+    if (ClassifyRandseqResult(result) != RandseqAction::kKeepGenerating) {
+      co_return result;
+    }
+    // §20.2: a $finish executed while this production generated exits the
+    // simulator, so the productions after it in the list do not generate.
+    if (ctx.StopRequested()) break;
   }
   co_return StmtResult::kDone;
 }
@@ -766,9 +819,12 @@ static ExecTask ExecSelectedRule(const Stmt* stmt, const RsRule& selected,
   if (prods_result != StmtResult::kDone) co_return prods_result;
   for (auto* s : selected.weight_code) {
     auto result = co_await ExecStmt(s, ctx, arena);
-    if (result == StmtResult::kBreak || result == StmtResult::kReturn) {
+    if (ClassifyRandseqResult(result) != RandseqAction::kKeepGenerating) {
       co_return result;
     }
+    // §20.2: a $finish here exits the simulator, so the rest of this code block
+    // does not run.
+    if (ctx.StopRequested()) break;
   }
   co_return StmtResult::kDone;
 }
@@ -899,8 +955,20 @@ ExecTask ExecRandsequence(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto result = co_await ExecRsProduction(stmt, top_call, ctx, arena, nullptr);
   ctx.PopScope();
 
-  (void)result;
-  co_return StmtResult::kDone;
+  // §18.17.6: "The break statement terminates the sequence generation. When a
+  // break statement is executed from within a production code block, it forces
+  // a jump out of the randsequence block", and the clause's own example
+  // continues "on the line labeled next_statement". The randsequence statement
+  // therefore absorbs a break and completes normally, and it absorbs nothing
+  // else. §9.6.2 gives a disable a target outside this statement -- it "shall
+  // terminate the activity of a task or a named block", and "execution shall
+  // resume at the statement following the block or following the task-enabling
+  // statement" -- so a disable raised in a production code block travels on to
+  // whichever block or task it named. ExecRsProduction has already absorbed the
+  // return of the top production, which §18.17.6 gives no reach past the
+  // production it aborts.
+  if (result == StmtResult::kBreak) co_return StmtResult::kDone;
+  co_return result;
 }
 
 }  // namespace delta
