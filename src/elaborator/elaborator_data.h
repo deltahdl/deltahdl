@@ -273,14 +273,30 @@ class ElaboratorData {
   // ElaborateModule call so it tracks the ancestor chain of the current cell.
   bool global_clocking_in_scope_ = false;
 
-  // §16.5.2: the clocking event of the global clocking declaration of the
-  // module being elaborated, or null when it declares none. A concurrent
-  // assertion whose leading clocking event is $global_clock is rewritten to
-  // this event, which is what makes `assert property(@$global_clock a);`
-  // equivalent to `assert property(@clk a);`. This holds the current cell's own
-  // declaration only, unlike global_clocking_in_scope_ above: the event names a
-  // signal of the scope that declares it, so an ancestor's event cannot be
-  // written into a descendant without resolving that name there first.
+  // §14.14: the global clocking declarations in scope along the instance path,
+  // one entry per declaring instance, outermost first. The clause's lookup
+  // rules "iteratively check the design hierarchy to find the global clocking
+  // declaration closest to the point of reference", which is back(). Pushed
+  // and popped around each Elaborator::ElaborateModule call, so the stack
+  // holds the declarations of the current cell and of its ancestor instances.
+  struct GlobalClockingScope {
+    // §14.14's "event expression of that global clocking declaration".
+    const std::vector<EventExpr>* events = nullptr;
+    // current_inst_path_ of the declaring instance. The event expression names
+    // signals of the scope that declares it, so a reference in a descendant
+    // needs to know which instance that is (§23.6).
+    std::string inst_path;
+  };
+  std::vector<GlobalClockingScope> global_clocking_scopes_;
+
+  // §14.14: the event expression a $global_clock reference in the cell being
+  // elaborated resolves to, or null where the lookup reaches no declaration it
+  // can name from here. §16.5.2 makes this the clock of a concurrent assertion
+  // written `assert property(@$global_clock a);`, which under a
+  // `global clocking @clk; endclocking` is equivalent to
+  // `assert property(@clk a);`. EffectiveGlobalClockingEvent in
+  // elaborator/global_clock_assertion_event.h computes it from the innermost
+  // entry of global_clocking_scopes_ above.
   const std::vector<EventExpr>* module_global_clocking_event_ = nullptr;
 
   // §27.5 selects a conditional generate's block "based on constant

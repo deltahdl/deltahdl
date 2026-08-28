@@ -1,6 +1,7 @@
 #ifndef DELTA_ELABORATOR_GLOBAL_CLOCK_ASSERTION_EVENT_H
 #define DELTA_ELABORATOR_GLOBAL_CLOCK_ASSERTION_EVENT_H
 
+#include <string_view>
 #include <vector>
 
 #include "parser/ast_stmt.h"
@@ -55,15 +56,47 @@ bool SubstituteGlobalClockLeadingEvent(
 // carry the first caller's substitution into the second caller's result, so
 // keep any further rewrite of a statement tree here on a copy as well.
 //
-// This serves §14.14 lookup rule a) alone, whose result is "the event
-// expression of that global clocking declaration" in "the enclosing module,
-// interface, checker, or program instance scope": the caller passes the
-// enclosing module's own declaration. Rule b), which walks up the instance
-// hierarchy to an ancestor's declaration, is not served here, and a reference
-// resolving to an ancestor's event is left as it stands rather than half
-// resolved.
+// `global_event` is the effective global clocking declaration's event
+// expression, which EffectiveGlobalClockingEvent below computes for both of
+// §14.14's lookup rules.
 Stmt* SubstituteGlobalClockEventControls(
     Stmt* stmt, const std::vector<EventExpr>& global_event, Arena& arena);
+
+// §14.14 lookup rule b): a $global_clock reference in a scope that declares no
+// global clocking of its own resolves against the declaration of the nearest
+// enclosing instance, "with the result being the event expression of that
+// global clocking declaration". That event expression names signals of the
+// scope that declares it, so a reference in a descendant waits on the
+// declaring instance's signals and not on names of its own.
+//
+// Returns the event expression to substitute at a reference in the instance
+// `referencing_inst_path` names, given the nearest declaration's event
+// expression `declared_events` in the instance `declaring_inst_path` names.
+// Both paths are ElaboratorData::current_inst_path_: the instance names from
+// the top-level hierarchy block down, joined by dots, with the top-level
+// hierarchy block's own name as the first component.
+//
+// Returns `declared_events` unchanged where the two paths are equal, which is
+// rule a): the declaration is in the scope holding the reference, so its event
+// expression already names signals that scope can see.
+//
+// Returns nullptr where `declared_events` is null, and where the declaration
+// is in the top-level hierarchy block itself while the reference is below it.
+// The flattened design the simulator runs keys a top-level hierarchy block's
+// declarations under no instance prefix at all, and §23.9 stops
+// SimContext::FindVariable in src/simulator/sim_context.cpp from reading such
+// a key from inside an instance, so no name written here would reach the
+// signal. That is deltahdl/deltahdl#3298; a null return leaves the reference
+// unsubstituted, which is what it was before rule b) was served at all.
+//
+// Otherwise the result is a new vector allocated from `arena`, holding a copy
+// of each event in which a signal that is a plain identifier is replaced by
+// the §23.6 hierarchical name reaching it from the top-level hierarchy block:
+// `clk` declared in instance `sub1` becomes `sub1.clk`.
+const std::vector<EventExpr>* EffectiveGlobalClockingEvent(
+    const std::vector<EventExpr>* declared_events,
+    std::string_view declaring_inst_path,
+    std::string_view referencing_inst_path, Arena& arena);
 
 }  // namespace delta
 

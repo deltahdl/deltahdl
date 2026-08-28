@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
@@ -204,6 +206,129 @@ TEST(GlobalClockingSim, GlobalClockInARandcaseItemResumesThatProcess) {
       f, "hits");
   ASSERT_NE(hits, nullptr);
   EXPECT_EQ(hits->value.ToUint64(), 1u);
+}
+
+// §14.14 lookup rule b): a $global_clock reference in a scope that declares no
+// global clocking of its own resolves against "a global clocking declaration in
+// the parent module, interface, or checker instance scope of the enclosing
+// instantiation". The three cases below run the design, because the elaborator
+// cases in test/src/unit/test_elaborator_subclause_14_14.cpp assert only that
+// such a source is accepted, and a process that arms no watcher and stays
+// suspended at @($global_clock) for the whole run is accepted too.
+//
+// The declaration is in an instantiated child rather than in the top module,
+// which is the shape §14.14's own example uses. A global clocking declared in
+// the top module is deltahdl/deltahdl#3298 and is not resolved from below.
+
+// §14.14's example has `common_sub` declare no global clocking and instantiate
+// under `subsystem1`, whose declaration is the one its $global_clock resolves
+// to. `subclk1` rises three times (t=5, t=15, t=25) against two falls, so a
+// child following its ancestor's declaration counts three. A child resolving
+// against nothing counts the 0 its declaration gave it.
+TEST(GlobalClockingSim, GlobalClockInAChildFollowsItsAncestorsDeclaration) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "module common_sub;\n"
+      "  int hits = 0;\n"
+      "  always @($global_clock) hits = hits + 1;\n"
+      "endmodule\n"
+      "module subsystem1;\n"
+      "  logic subclk1 = 1'b0;\n"
+      "  global clocking sub_sys1 @(posedge subclk1); endclocking\n"
+      "  common_sub common();\n"
+      "  initial begin\n"
+      "    #5 subclk1 = 1'b1;\n"
+      "    #5 subclk1 = 1'b0;\n"
+      "    #5 subclk1 = 1'b1;\n"
+      "    #5 subclk1 = 1'b0;\n"
+      "    #5 subclk1 = 1'b1;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  subsystem1 sub1();\n"
+      "endmodule\n",
+      f, "sub1.common.hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 3u);
+}
+
+// §14.14's worked example: `top.sub1.common` resolves to `top.sub1.sub_sys1`
+// and `top.sub2.common` to `top.sub2.sub_sys2`, two declarations on two
+// different signals reached from one `common_sub` module. `subclk1` rises once
+// and `subclk2` twice, so the two instances of that module separate only where
+// each followed the declaration of its own ancestor. A resolution that takes
+// the first or the outermost declaration it finds gives both instances one
+// count, and so does one that substitutes onto the shared ModuleDecl rather
+// than onto each instance's own process.
+TEST(GlobalClockingSim,
+     SiblingInstancesEachFollowTheirOwnAncestorsDeclaration) {
+  SimFixture f;
+  const std::string kSrc =
+      "module common_sub;\n"
+      "  int hits = 0;\n"
+      "  always @($global_clock) hits = hits + 1;\n"
+      "endmodule\n"
+      "module subsystem1;\n"
+      "  logic subclk1 = 1'b0;\n"
+      "  global clocking sub_sys1 @(posedge subclk1); endclocking\n"
+      "  common_sub common();\n"
+      "  initial #5 subclk1 = 1'b1;\n"
+      "endmodule\n"
+      "module subsystem2;\n"
+      "  logic subclk2 = 1'b0;\n"
+      "  global clocking sub_sys2 @(posedge subclk2); endclocking\n"
+      "  common_sub common();\n"
+      "  initial begin\n"
+      "    #5 subclk2 = 1'b1;\n"
+      "    #5 subclk2 = 1'b0;\n"
+      "    #5 subclk2 = 1'b1;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  subsystem1 sub1();\n"
+      "  subsystem2 sub2();\n"
+      "endmodule\n";
+  auto* first = RunAndFindVar(kSrc, f, "sub1.common.hits");
+  ASSERT_NE(first, nullptr);
+  EXPECT_EQ(first->value.ToUint64(), 1u);
+  auto* second = f.ctx.FindVariable("sub2.common.hits");
+  ASSERT_NE(second, nullptr);
+  EXPECT_EQ(second->value.ToUint64(), 2u);
+}
+
+// §14.14 runs rule a) before rule b), so a scope that declares a global
+// clocking of its own resolves against that one and never climbs. `ownclk`
+// rises twice and `topclk` three times, so the count says which of the two
+// declarations the child followed.
+TEST(GlobalClockingSim, AChildsOwnGlobalClockingBeatsItsAncestors) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "module child;\n"
+      "  logic ownclk = 1'b0;\n"
+      "  int hits = 0;\n"
+      "  global clocking own_gclk @(posedge ownclk); endclocking\n"
+      "  always @($global_clock) hits = hits + 1;\n"
+      "  initial begin\n"
+      "    #10 ownclk = 1'b1;\n"
+      "    #10 ownclk = 1'b0;\n"
+      "    #10 ownclk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic topclk = 1'b0;\n"
+      "  global clocking top_gclk @(posedge topclk); endclocking\n"
+      "  child c();\n"
+      "  initial begin\n"
+      "    #3 topclk = 1'b1;\n"
+      "    #3 topclk = 1'b0;\n"
+      "    #3 topclk = 1'b1;\n"
+      "    #3 topclk = 1'b0;\n"
+      "    #3 topclk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "c.hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 2u);
 }
 
 }  // namespace

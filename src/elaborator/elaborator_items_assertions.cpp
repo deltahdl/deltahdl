@@ -7,7 +7,6 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
-#include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
@@ -147,22 +146,21 @@ void Elaborator::ElaboratePropertyDeclItem(ModuleItem* item, RtlirModule* mod) {
 void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
                                              RtlirModule* mod) {
   CheckConcurrentAssertionNoChandle(item, mod, diag_);
-  const ProcessBuildEnv kEnv{arena_, diag_, &func_decls_, &const_names_};
+  // §16.5.2: `assert property(@$global_clock a);` under a
+  // `global clocking @clk; endclocking` declaration is logically equivalent to
+  // `assert property(@clk a);`, so the assertion's leading clocking event is
+  // the event that declaration names. AddProcess substitutes it onto the
+  // process rather than onto `item`, which the one ModuleDecl the parser built
+  // for the module holds: §14.14 rule b) can give two instances of that module
+  // different events, and a rewrite made on `item` would give both whichever
+  // instance was elaborated first.
+  const ProcessBuildEnv kEnv{arena_, diag_, &func_decls_, &const_names_,
+                             module_global_clocking_event_};
   // §16.4.3: a module-item deferred immediate assertion is a static deferred
   // assertion, modeled as an implicit always_comb procedure.
   if (IsStaticDeferredAssertion(item)) {
     AddProcess(RtlirProcessKind::kAlwaysComb, item, mod, kEnv);
     return;
-  }
-  // §16.5.2: `assert property(@$global_clock a);` under a
-  // `global clocking @clk; endclocking` declaration is logically equivalent to
-  // `assert property(@clk a);`, so the assertion's leading clocking event is
-  // the event that declaration names. The rewrite runs before the process is
-  // built so the clock the process waits on, and the §9.2.2.4 checks the
-  // process is held to, both see the event that was substituted in.
-  if (module_global_clocking_event_ != nullptr) {
-    SubstituteGlobalClockLeadingEvent(item->sensitivity,
-                                      *module_global_clocking_event_);
   }
   // §16.14.5: a static concurrent assertion outside procedural code uses
   // `always` semantics. The parser captures the simple clocked boolean form as

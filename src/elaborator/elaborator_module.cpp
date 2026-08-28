@@ -10,6 +10,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -911,17 +912,26 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   global_clocking_in_scope_ =
       saved_global_clocking_in_scope || ModuleDeclaresGlobalClocking(decl);
 
-  // §16.5.2: a concurrent assertion in this cell whose leading clocking event
-  // is $global_clock is clocked by the event this cell's own global clocking
-  // declaration names. The event is set here rather than inherited from the
-  // chain above, because it names a signal of the scope that declares it.
+  // §14.14: this cell's own global clocking declaration joins the chain of its
+  // ancestors' rather than replacing it, so back() is "the global clocking
+  // declaration closest to the point of reference" -- rule a) before rule b).
+  const std::vector<EventExpr>* own_gclk = ModuleGlobalClockingEvent(decl);
+  if (own_gclk != nullptr) {
+    global_clocking_scopes_.push_back({own_gclk, current_inst_path_});
+  }
   const std::vector<EventExpr>* saved_global_clocking_event =
       module_global_clocking_event_;
-  module_global_clocking_event_ = ModuleGlobalClockingEvent(decl);
+  module_global_clocking_event_ = nullptr;
+  if (!global_clocking_scopes_.empty()) {
+    const auto& nearest = global_clocking_scopes_.back();
+    module_global_clocking_event_ = EffectiveGlobalClockingEvent(
+        nearest.events, nearest.inst_path, current_inst_path_, arena_);
+  }
 
   ElaborateItems(decl, mod);
   ResolveExplicitPortTypes(decl, mod);
   module_global_clocking_event_ = saved_global_clocking_event;
+  if (own_gclk != nullptr) global_clocking_scopes_.pop_back();
   global_clocking_in_scope_ = saved_global_clocking_in_scope;
   current_library_ = std::move(saved_library);
   enclosing_scope_names_ = std::move(saved_enclosing);

@@ -1,6 +1,7 @@
 #include "elaborator/global_clock_assertion_event.h"
 
 #include <cstddef>
+#include <string_view>
 #include <vector>
 
 #include "common/arena.h"
@@ -81,7 +82,100 @@ void SubstituteGlobalClockInSubStmts(
                    [&](Stmt*& slot) { slot = rewritten[next++]; });
 }
 
+// §23.6 names a signal from the top of the hierarchy down, one instance name
+// per step, and the flattened design the simulator runs keys a declaration on
+// that same path with the top-level hierarchy block's own name left off:
+// Lowerer::inst_prefix_ in src/simulator/lowerer.h is empty in a top-level
+// hierarchy block and gains one instance name per level below it.
+// ElaboratorData::current_inst_path_ is the same path with that first
+// component kept, so dropping it and its dot is what makes the two agree.
+//
+// The trailing dot Lowerer::inst_prefix_ carries is left off here, because the
+// only two things done with the result are comparing two of them and splitting
+// one on its dots.
+std::string_view InstancePathBelowTop(std::string_view inst_path) {
+  size_t dot = inst_path.find('.');
+  if (dot == std::string_view::npos) return {};
+  return inst_path.substr(dot + 1);
+}
+
+// Expr::text is a non-owning std::string_view, so a name this elaborator
+// spells out rather than reading out of the source has to be interned
+// somewhere that outlives the design. `at` gives the new identifier the source
+// position of the signal it stands for, so a report naming it points at the
+// global clocking declaration the name came from.
+Expr* MakeIdentifier(std::string_view text, const Expr* at, Arena& arena) {
+  auto* id = arena.Create<Expr>();
+  id->kind = ExprKind::kIdentifier;
+  id->text = std::string_view(arena.AllocString(text.data(), text.size()),
+                              text.size());
+  id->range = at->range;
+  return id;
+}
+
+// One step of a §23.6 hierarchical name, built the way
+// Parser::MakeMemberAccess in src/parser/expr_parser.cpp builds it, so a name
+// written here has the same shape as one the parser read out of the source.
+Expr* MakeMemberAccess(Expr* base, std::string_view member, const Expr* at,
+                       Arena& arena) {
+  auto* acc = arena.Create<Expr>();
+  acc->kind = ExprKind::kMemberAccess;
+  acc->lhs = base;
+  acc->rhs = MakeIdentifier(member, at, arena);
+  acc->range = base->range;
+  return acc;
+}
+
+// `signal` prefixed by the instance names in `prefix`, so that the identifier
+// `clk` under a `prefix` of "sub1.inner" becomes `sub1.inner.clk`. An empty
+// `prefix` names no instance to reach through and returns `signal` itself.
+Expr* QualifySignal(Expr* signal, std::string_view prefix, Arena& arena) {
+  Expr* base = nullptr;
+  size_t pos = 0;
+  while (pos < prefix.size()) {
+    size_t dot = prefix.find('.', pos);
+    size_t end = dot == std::string_view::npos ? prefix.size() : dot;
+    std::string_view component = prefix.substr(pos, end - pos);
+    base = base == nullptr ? MakeIdentifier(component, signal, arena)
+                           : MakeMemberAccess(base, component, signal, arena);
+    pos = end + 1;
+  }
+  if (base == nullptr) return signal;
+  return MakeMemberAccess(base, signal->text, signal, arena);
+}
+
 }  // namespace
+
+const std::vector<EventExpr>* EffectiveGlobalClockingEvent(
+    const std::vector<EventExpr>* declared_events,
+    std::string_view declaring_inst_path,
+    std::string_view referencing_inst_path, Arena& arena) {
+  if (declared_events == nullptr) return nullptr;
+  std::string_view declaring = InstancePathBelowTop(declaring_inst_path);
+  std::string_view referencing = InstancePathBelowTop(referencing_inst_path);
+  // §14.14 rule a): the declaration is in the scope holding the reference, so
+  // its event expression names signals of that scope and stands as written.
+  if (declaring == referencing) return declared_events;
+  // deltahdl/deltahdl#3298: a top-level hierarchy block's declarations are
+  // keyed under no instance prefix, and §23.9 forbids reading such a key from
+  // inside an instance, so there is no name to write.
+  if (declaring.empty()) return nullptr;
+  auto* qualified = arena.Create<std::vector<EventExpr>>(*declared_events);
+  for (auto& ev : *qualified) {
+    if (ev.signal == nullptr) continue;
+    // §23.6 spells a hierarchical name out of identifiers, and only a plain
+    // identifier is one. An event whose signal is any other expression is left
+    // as it stands, because CollectExprIdentifiers in src/simulator/awaiters.h
+    // has no ExprKind::kMemberAccess case: on the compound path it would
+    // descend into a qualified name and hand back its two components as two
+    // bare signal names, neither of which names anything in the referencing
+    // instance. EventExpr::iff_condition is left alone for the same reason,
+    // being an arbitrary expression rather than a name.
+    if (ev.signal->kind != ExprKind::kIdentifier) continue;
+    ev.signal = QualifySignal(ev.signal, declaring, arena);
+  }
+  return qualified;
+}
 
 Stmt* SubstituteGlobalClockEventControls(
     Stmt* stmt, const std::vector<EventExpr>& global_event, Arena& arena) {

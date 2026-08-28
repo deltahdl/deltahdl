@@ -50,6 +50,14 @@ TEST(GlobalClockingElab, GlobalClockInEventControlWithDeclarationIsAccepted) {
 // §14.14 lookup rule b): a $global_clock reference in a child that declares no
 // global clocking of its own resolves against the parent instance's global
 // clocking. This is the common_sub pattern from the clause example.
+//
+// This case and the next assert acceptance, which is all elaboration can say
+// about them: a process that arms no watcher and stays suspended at
+// @($global_clock) for the whole run is accepted too. What the reference
+// resolves to is asserted by GlobalClockInAChildFollowsItsAncestorsDeclaration
+// and SiblingInstancesEachFollowTheirOwnAncestorsDeclaration in
+// test/src/unit/test_simulator_subclause_14_14.cpp, which drive the declared
+// clock and read back what the child's process wrote.
 TEST(GlobalClockingElab, GlobalClockResolvesToParentInstanceDeclaration) {
   ElabFixture f;
   ElaborateSrc(

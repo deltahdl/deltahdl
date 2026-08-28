@@ -412,9 +412,14 @@ static void ValidateCombLatchProcess(ModuleItem* item, const RtlirProcess& proc,
   }
 }
 
+// §9.2.2.4's rules are read off proc.sensitivity, not item->sensitivity:
+// BuildProcessWithSensitivity substitutes the effective global clocking
+// declaration's event expression onto the process's own copy (§14.14). Read off
+// item->sensitivity, an `always_ff @($global_clock)` would be judged on the
+// argument-less system call the parser left there, which carries no edge.
 static void ValidateAlwaysFFProcess(ModuleItem* item, const RtlirProcess& proc,
                                     DiagEngine& diag) {
-  if (item->sensitivity.empty()) {
+  if (proc.sensitivity.empty()) {
     diag.Error(item->loc, "always_ff requires an event control",
                Subclause("9.2.2.4"));
   }
@@ -428,13 +433,13 @@ static void ValidateAlwaysFFProcess(ModuleItem* item, const RtlirProcess& proc,
                Subclause("9.2.2.4"));
   }
   bool has_edge = false;
-  for (const auto& ev : item->sensitivity) {
+  for (const auto& ev : proc.sensitivity) {
     if (ev.edge == Edge::kPosedge || ev.edge == Edge::kNegedge) {
       has_edge = true;
       break;
     }
   }
-  if (!item->sensitivity.empty() && !has_edge) {
+  if (!proc.sensitivity.empty() && !has_edge) {
     diag.Warning(item->loc,
                  "always_ff has no edge-sensitive event; "
                  "may not represent sequential logic",
@@ -485,6 +490,16 @@ static RtlirProcess BuildProcessWithSensitivity(RtlirProcessKind kind,
   proc.loc = item->loc;
   proc.body = BuildProcessBody(item, env);
   proc.sensitivity = item->sensitivity;
+  // §14.14: a procedure whose sensitivity list is the single clocking event
+  // $global_clock waits on the effective global clocking declaration's event
+  // expression. The substitution is made on the process's own copy because
+  // `item` belongs to the one ModuleDecl the parser built for the module while
+  // this runs once per instantiation, and rule b) can give two instances
+  // different events; writing `item` would give both whichever came first.
+  if (env.global_clocking_event != nullptr) {
+    SubstituteGlobalClockLeadingEvent(proc.sensitivity,
+                                      *env.global_clocking_event);
+  }
   proc.is_star_sensitivity = item->is_star_sensitivity;
   bool needs_infer = (kind == RtlirProcessKind::kAlwaysComb ||
                       kind == RtlirProcessKind::kAlwaysLatch);
