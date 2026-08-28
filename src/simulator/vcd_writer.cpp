@@ -446,6 +446,23 @@ void VcdWriter::WritePortValueChange(const VcdSignal& sig) {
   ofs_ << " <" << sig.port_id << "\n";
 }
 
+// Record what this signal has just put in the file, which is what the
+// end-of-increment scan in HasValueChanged compares the object against.
+// §21.7.5: a structure member records its own slice, because its siblings share
+// the one backing variable and each of them detects its own next change; every
+// other object records the words of the variable behind it, copied so a later
+// part-select assignment into those words cannot move the record with them.
+static void RecordEmittedValue(VcdSignal& sig) {
+  if (sig.is_field) {
+    sig.prev_digits = VcdSignalDigits(sig);
+    sig.has_prev_digits = true;
+    return;
+  }
+  const Logic4Vec& value = sig.var->value;
+  sig.prev_words.assign(value.words, value.words + value.nwords);
+  sig.has_prev_words = true;
+}
+
 void VcdWriter::WriteSignalChange(VcdSignal& sig) {
   // §21.7.2.2: an event is dumped in the scalar format, but its value
   // character carries no meaning -- only the identifier code matters, and the
@@ -471,20 +488,9 @@ void VcdWriter::WriteSignalChange(VcdSignal& sig) {
   } else {
     WriteVectorChange(sig);
   }
-  // §21.7.5: a structure member records the slice it just emitted instead of
-  // resyncing the shared variable, which its siblings still need untouched so
-  // each of them can detect its own next change.
-  if (sig.is_field) {
-    sig.prev_digits = VcdSignalDigits(sig);
-    sig.has_prev_digits = true;
-    return;
-  }
-  // The recorded state now matches the file: resync the previous value so the
-  // next time increment's change detection compares against what was last
-  // emitted. Assignments replace the value vector rather than mutating it in
-  // place (edge detection relies on the same property), so this shallow copy
-  // snapshots the emitted words.
-  if (sig.var) sig.var->prev_value = sig.var->value;
+  // The file now holds this object's current value, so the record the next
+  // end-of-increment scan compares against is updated to match it.
+  if (sig.var) RecordEmittedValue(sig);
 }
 
 void VcdWriter::WriteSignalAllX(const VcdSignal& sig) {
@@ -519,22 +525,22 @@ static const char* CheckpointKeyword(bool port_nodes, const char* four_state,
 
 static bool HasValueChanged(const VcdSignal& sig) {
   // §21.7.5: every member of an unpacked structure shares one backing
-  // variable, so the variable-wide previous value cannot say which member
-  // moved -- the first member emitted would resync it and mask its siblings.
-  // A member therefore compares its own slice against the digits it last
-  // emitted, which makes each member's change detection independent.
+  // variable, so a record of that variable's words cannot say which member
+  // moved -- the first member recorded would cover its siblings. A member
+  // therefore compares its own slice against the digits it last emitted,
+  // which makes each member's change detection independent.
   if (sig.is_field) {
     return !sig.has_prev_digits || VcdSignalDigits(sig) != sig.prev_digits;
   }
-  // A variable that no edge control ever resynced has no recorded previous
-  // value; treat it as changed so its first recording establishes the
-  // baseline (WriteSignalChange resyncs after emitting) instead of reading
-  // through an unset word array.
-  const Logic4Vec& prev = sig.var->prev_value;
-  if (prev.words == nullptr || prev.nwords < sig.var->value.nwords) return true;
-  for (uint32_t w = 0; w < sig.var->value.nwords; ++w) {
-    if (sig.var->value.words[w].aval != prev.words[w].aval ||
-        sig.var->value.words[w].bval != prev.words[w].bval) {
+  // Nothing has been written for this object yet, so there is no recorded
+  // value to compare against; report a change so the first scan writes the
+  // record (RecordEmittedValue) instead of reading through an unset array.
+  if (!sig.has_prev_words) return true;
+  const Logic4Vec& value = sig.var->value;
+  if (sig.prev_words.size() < value.nwords) return true;
+  for (uint32_t w = 0; w < value.nwords; ++w) {
+    if (value.words[w].aval != sig.prev_words[w].aval ||
+        value.words[w].bval != sig.prev_words[w].bval) {
       return true;
     }
   }

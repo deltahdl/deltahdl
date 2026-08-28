@@ -97,11 +97,25 @@ struct VcdSignal {
   // True when this object is a structure member sharing its backing variable
   // with sibling members. Change detection then compares this member's own
   // slice against what was last emitted for it (prev_digits), because the
-  // variable-wide previous value is shared by every sibling and cannot tell
+  // words the whole variable holds are shared by every sibling and cannot tell
   // which member moved.
   bool is_field = false;
   std::string prev_digits;
   bool has_prev_digits = false;
+  // §21.7.2.1: "Only the variables that change value during a time increment
+  // are listed", so the end-of-increment scan compares each object against the
+  // value it last put in the file. That value is kept here, and only the
+  // writer writes it. Variable::prev_value is not it: that field belongs to
+  // the §9.4.2 event controls, whose awaiters resync it to the current value
+  // whenever a watched variable moves without qualifying
+  // (EventAwaiter::EdgeGatePasses, src/simulator/awaiters.h), which would hide
+  // from this scan a change the file never recorded. The words are copied
+  // rather than pointed at, because a part-select assignment deposits into the
+  // variable's existing words (DepositBitField, src/common/types.h) and a
+  // shared pointer would move underneath the record. has_prev_words is false
+  // until the first record for this object is written.
+  std::vector<Logic4Word> prev_words;
+  bool has_prev_words = false;
 };
 
 // The descriptive identity of one dumped object passed to
@@ -279,8 +293,9 @@ class VcdWriter {
   // strength0 and strength1 strength components, then the port's identifier
   // code (< followed by its integer code as written in the $var declaration).
   void WritePortValueChange(const VcdSignal& sig);
-  // Takes a mutable signal because a structure member records the slice it last
-  // emitted (§21.7.5), which is how its own change detection works.
+  // Takes a mutable signal because each object records the value it just put
+  // in the file (prev_words, or prev_digits for a structure member per
+  // §21.7.5), which is what its change detection compares against.
   void WriteSignalChange(VcdSignal& sig);
   void WriteSignalAllX(const VcdSignal& sig);
   // Returns true once the configured size limit has been reached, emitting the
