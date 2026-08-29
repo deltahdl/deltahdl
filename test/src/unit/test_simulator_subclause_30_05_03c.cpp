@@ -131,28 +131,16 @@ constexpr std::string_view kIfnonePaths =
     "    if (act[4]) (a => y) = 13;\n"
     "    ifnone (a => y) = 21;\n";
 
-// The stimulus and the three things every case reads. `sa` rises once, at
-// t=50; the `always @(y)` names the time `y` followed it, which is the answer
-// each case asserts; and the two samples straddle every delay any case could
-// select, so the transition line is corroborated by `y` having been 0 before
-// t=50 and 1 well after it. Neither sample time is one a case's edge can land
-// on, so no sample reads a value in the time slot it is being written.
-constexpr std::string_view kStimulusAndProbes =
-    "  always @(y) begin\n"
-    "    if (armed) $display(\"edge %b at %0d\", y, $time);\n"
-    "  end\n"
-    "  initial begin\n"
-    "    armed = 1'b0;\n"
-    "    sa = 1'b0;\n"
-    "    #40 armed = 1'b1;\n"
-    "    #10 sa = 1'b1;\n"
-    "  end\n"
-    "  initial #45 $display(\"at 45 y=%b\", y);\n"
-    "  initial #80 $display(\"at 80 y=%b\", y);\n"
-    "endmodule\n";
-
 // A design whose single module path source is `a`, carrying `paths` inside its
-// specify block and one parameter declared as `param` spells it.
+// specify block and opening its stimulus with `setup`, which is what each case
+// writes into `act` to say which of the paths are conditionally active.
+//
+// `sa` rises once, at t=50; the `always @(y)` names the time `y` followed it,
+// which is the answer each case asserts; and the samples at t=45 and t=80
+// straddle every delay any case could select, so the transition line is
+// corroborated by `y` having been 0 before t=50 and 1 well after it. Neither
+// sample time is one a case's edge can land on, so no sample reads a value in
+// the time slot it is being written.
 //
 // The module is the only one in the source and so the one ElaborateSrc
 // elaborates, and it is a top module because only a top module's specify block
