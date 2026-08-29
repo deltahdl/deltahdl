@@ -10,9 +10,9 @@
 namespace delta {
 
 // Calls `visit` on every specify item of kind `kind` that `blocks` declares, in
-// declaration order, skipping a null block or item. The five registration
-// passes below walk the same items and differ only in what they do with one, so
-// the walk is written once here.
+// declaration order, skipping a null block or item. The six registration passes
+// below walk the same items and differ only in what they do with one, so the
+// walk is written once here.
 template <typename Visit>
 static void ForEachSpecifyItemOfKind(const std::vector<ModuleItem*>& blocks,
                                      SpecifyItemKind kind, const Visit& visit) {
@@ -36,6 +36,27 @@ static void RegisterPathDelays(const std::vector<ModuleItem*>& blocks,
         mgr.AddPathDelayFromDecl(si.path, ctx, arena,
                                  /*default_pulse_limits=*/true, inst_prefix);
       });
+}
+
+// §31.2: the system_timing_check declarations of Syntax 30-1, each built under
+// the invocation options §31.9.4 gives the manager and filed as a
+// TimingCheckEntry so §32.4.2's SDF TIMINGCHECK annotation has a declared check
+// to land on.
+//
+// The check is registered under `inst_prefix` because §31.3 has it name its
+// reference and data signals by the declaring module's own port names, so two
+// instances of one cell declare checks spelled identically and would otherwise
+// be filed as one. The prefix is also what
+// SpecifyManager::RebuildTimingChecksForSpecparam evaluates a constraint limit
+// under when §32.4.3's LABEL annotation reprices a specparam that limit reads.
+static void RegisterTimingChecks(const std::vector<ModuleItem*>& blocks,
+                                 std::string_view inst_prefix, SimContext& ctx,
+                                 Arena& arena, SpecifyManager& mgr) {
+  ForEachSpecifyItemOfKind(blocks, SpecifyItemKind::kTimingCheck,
+                           [&](const SpecifyItem& si) {
+                             mgr.AddTimingCheckUnderOptions(
+                                 si.timing_check, ctx, arena, inst_prefix);
+                           });
 }
 
 // §30.3: the specparam_declarations of Syntax 30-1, bound to `mgr` so §32.4.3's
@@ -141,6 +162,7 @@ void RegisterSpecifyBlocks(const std::vector<ModuleItem*>& blocks,
                            Arena& arena, SpecifyManager& mgr) {
   RegisterSpecparams(blocks, inst_prefix, ctx, arena, mgr);
   RegisterPathDelays(blocks, inst_prefix, ctx, arena, mgr);
+  RegisterTimingChecks(blocks, inst_prefix, ctx, arena, mgr);
   RegisterPulseStyles(blocks, inst_prefix, mgr);
   RegisterShowCancelled(blocks, inst_prefix, mgr);
   RegisterPathPulseSpecparams(blocks, inst_prefix, ctx, arena, mgr);

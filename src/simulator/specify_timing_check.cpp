@@ -23,6 +23,7 @@
 
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -195,15 +196,29 @@ void SpecifyManager::ApplyTimingCheckInvocationOptions() {
 }
 
 void SpecifyManager::AddTimingCheckUnderOptions(const TimingCheckDecl& decl,
-                                                SimContext& ctx, Arena& arena) {
-  AddTimingCheck(
-      BuildTimingCheckUnderOptions(decl, ctx, arena, timing_check_options_));
+                                                SimContext& ctx, Arena& arena,
+                                                std::string_view inst_prefix) {
+  TimingCheckEntry entry =
+      BuildTimingCheckUnderOptions(decl, ctx, arena, timing_check_options_);
+  // §31.3 names a check's reference and data signals by the declaring module's
+  // own port names, so the instance is what tells two instances of one cell
+  // apart when AnnotateSdfTimingCheck looks for the check an SDF TIMINGCHECK
+  // entry names.
+  entry.inst_prefix = inst_prefix;
+  AddTimingCheck(std::move(entry));
   // §32.4.3: a timing check limit is an expression too, so keep the declaration
   // in order to recompute it if an SDF LABEL changes a specparam it reads.
-  for (const auto* seen : timing_check_decls_) {
-    if (seen == &decl) return;
+  //
+  // §31.2 puts a system timing check inside a specify block and §30.3 puts that
+  // block inside a module declaration, so one declaration is registered once
+  // per instance of the cell holding it and the declaration alone does not
+  // identify what was already kept. The instance travels with it because
+  // RebuildTimingChecksForSpecparam evaluates the limit expressions in, and
+  // files the rebuilt check back at, the instance the declaration came from.
+  for (const auto& seen : timing_check_decls_) {
+    if (seen.decl == &decl && seen.inst_prefix == inst_prefix) return;
   }
-  timing_check_decls_.push_back(&decl);
+  timing_check_decls_.push_back({&decl, std::string(inst_prefix)});
 }
 
 bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,

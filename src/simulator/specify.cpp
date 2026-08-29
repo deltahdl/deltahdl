@@ -694,7 +694,13 @@ void SpecifyManager::IncrementInterconnectDelay(
 
 void SpecifyManager::AddTimingCheck(TimingCheckEntry check) {
   for (auto& existing : timing_checks_) {
-    if (existing.kind == check.kind &&
+    // §31.2 puts a system timing check inside a specify block and §30.3 puts
+    // that block inside a module declaration, so two instances of one cell
+    // declare checks naming identically spelled signals. The instance is
+    // compared alongside the signals, or the second instance's check would
+    // replace the first instance's rather than stand beside it.
+    if (existing.inst_prefix == check.inst_prefix &&
+        existing.kind == check.kind &&
         existing.ref_signal == check.ref_signal &&
         existing.ref_edge == check.ref_edge &&
         existing.data_signal == check.data_signal &&
@@ -710,7 +716,14 @@ void SpecifyManager::AddTimingCheck(TimingCheckEntry check) {
 namespace {
 
 bool SdfAnnotationMatchesCheck(const TimingCheckEntry& existing,
-                               const SdfTcAnnotation& a) {
+                               const SdfTcAnnotation& a,
+                               std::string_view inst_prefix) {
+  // §31.2 puts a system timing check inside a specify block, so two instances
+  // of one cell declare checks naming identically spelled signals and the
+  // instance is what tells them apart. An empty prefix names no instance and
+  // reaches the checks of every one, exactly as the SpecifyEdge::kNone and the
+  // empty condition below reach a check carrying any edge or any condition.
+  if (!inst_prefix.empty() && existing.inst_prefix != inst_prefix) return false;
   if (existing.kind != a.kind) return false;
   if (existing.ref_signal != a.ref_signal) return false;
   if (existing.data_signal != a.data_signal) return false;
@@ -735,7 +748,8 @@ void ApplySdfAnnotationFields(TimingCheckEntry& check,
 
 }  // namespace
 
-bool SpecifyManager::AnnotateSdfTimingCheck(const SdfTcAnnotation& a) {
+bool SpecifyManager::AnnotateSdfTimingCheck(const SdfTcAnnotation& a,
+                                            std::string_view inst_prefix) {
   // §32.1: SDF back-annotates the timing checks a design already declares in
   // its specify blocks; it never introduces a new check. A single SDF check
   // (e.g. SETUPHOLD) expands into several candidate annotations (setup, hold,
@@ -745,7 +759,7 @@ bool SpecifyManager::AnnotateSdfTimingCheck(const SdfTcAnnotation& a) {
   // SETUPHOLD into three entries).
   bool applied = false;
   for (auto& existing : timing_checks_) {
-    if (!SdfAnnotationMatchesCheck(existing, a)) continue;
+    if (!SdfAnnotationMatchesCheck(existing, a, inst_prefix)) continue;
     ApplySdfAnnotationFields(existing, a);
     applied = true;
   }

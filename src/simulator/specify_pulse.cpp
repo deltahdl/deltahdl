@@ -79,11 +79,28 @@ void SpecifyManager::RebuildPathDelaysForSpecparam(
 // was declared, so a check whose limit reads the changed specparam is rebuilt
 // from its declaration too.
 void SpecifyManager::RebuildTimingChecksForSpecparam(
-    const std::vector<std::string>& changed) {
-  for (const auto* decl : timing_check_decls_) {
-    if (!AnyExprReadsSpecparam(decl->limits, changed)) continue;
-    AddTimingCheck(BuildTimingCheckUnderOptions(
-        *decl, *specparam_ctx_, *specparam_arena_, timing_check_options_));
+    std::string_view inst_prefix, const std::vector<std::string>& changed) {
+  for (const auto& registered : timing_check_decls_) {
+    // §31.2 puts a system timing check inside a specify block, and a specparam
+    // of one instance is not the one an identically spelled declaration in
+    // another reads, so only that instance's checks are rebuilt.
+    if (registered.inst_prefix != inst_prefix) continue;
+    if (!AnyExprReadsSpecparam(registered.decl->limits, changed)) continue;
+    // A constraint limit written as a specparam is read by its bare name, and
+    // it must read the one belonging to the instance that declared the check.
+    // SimContext resolves a bare name against the running process's instance,
+    // which during a run is whichever process called $sdf_annotate.
+    InstancePrefixOverride scope(specparam_ctx_->InstancePrefixOverride(),
+                                 registered.inst_prefix);
+    TimingCheckEntry rebuilt =
+        BuildTimingCheckUnderOptions(*registered.decl, *specparam_ctx_,
+                                     *specparam_arena_, timing_check_options_);
+    // The rebuilt check is filed back at the instance the declaration was
+    // registered under (§31.2): AddTimingCheck compares
+    // TimingCheckEntry::inst_prefix, so a rebuild left at the empty prefix
+    // replaces another instance's check.
+    rebuilt.inst_prefix = registered.inst_prefix;
+    AddTimingCheck(std::move(rebuilt));
   }
 }
 
@@ -164,7 +181,7 @@ void SpecifyManager::ApplyAnnotatedSpecparam(std::string_view inst_prefix,
   // when a value is annotated to it from an SDF file.
   const std::vector<std::string> kChanged{name};
   RebuildPathDelaysForSpecparam(inst_prefix, kChanged);
-  RebuildTimingChecksForSpecparam(kChanged);
+  RebuildTimingChecksForSpecparam(inst_prefix, kChanged);
   RebuildGateDriversForSpecparam(inst_prefix, kChanged);
 }
 

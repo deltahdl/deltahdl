@@ -31,6 +31,24 @@ struct RegisteredPathDecl {
   std::string inst_prefix;
 };
 
+// §32.4.3: a system timing check declaration together with the module instance
+// it was registered under. SpecifyManager::RebuildTimingChecksForSpecparam
+// recomputes a check's constraint limits from its declaration when an SDF LABEL
+// changes a specparam one of those limit expressions reads, and the rebuilt
+// check has to be filed back at the instance the declaration came from. §31.2
+// puts a system timing check inside a specify block and §30.3 puts that block
+// inside a module declaration, and §31.3 has the check name its reference and
+// data signals by the declaring module's own port names, so the declaration
+// alone spells a check identically for every instance of the cell: a rebuild
+// left at the empty prefix replaces whichever instance's check stands first,
+// SpecifyManager::AddTimingCheck comparing TimingCheckEntry::inst_prefix. The
+// prefix is also what the limit expressions are evaluated under, a constraint
+// limit written as a specparam being read by its bare name.
+struct RegisteredTimingCheckDecl {
+  const TimingCheckDecl* decl = nullptr;
+  std::string inst_prefix;
+};
+
 // §32.4.3: a gate instantiation together with the module instance it was
 // registered under. SpecifyManager::RebuildGateDriversForSpecparam recomputes a
 // gate's propagation delays from its declaration when an SDF LABEL changes a
@@ -120,7 +138,18 @@ class SpecifyManager {
   // Returns whether it matched anything, so the caller can tell placed data
   // apart from data that found no home (§32.3 requires a warning for the
   // latter).
-  bool AnnotateSdfTimingCheck(const SdfTcAnnotation& annotation);
+  //
+  // `inst_prefix` is the module instance the annotation reaches, in the
+  // spelling TimingCheckEntry::inst_prefix carries. §31.2 puts a system timing
+  // check inside a specify block, so two instances of one cell declare checks
+  // naming identically spelled signals and the instance is what tells them
+  // apart. An empty prefix names no instance and so reaches a matching check in
+  // every one, the way an annotation carrying SpecifyEdge::kNone reaches a
+  // check of any edge: SdfTcAnnotation (simulator/specify_sdf.h) carries no
+  // instance of its own, so AnnotateSdfTimingCheckEntry
+  // (simulator/sdf_annotate_entry.cpp) has none to pass and passes none.
+  bool AnnotateSdfTimingCheck(const SdfTcAnnotation& annotation,
+                              std::string_view inst_prefix = {});
 
   // §32.4.1: register a module output driven by a gate primitive, so a DEVICE
   // delay that finds no specify path for that output can still land on it.
@@ -392,8 +421,21 @@ class SpecifyManager {
   // under the invocation options currently in force. The declaration is kept
   // (§32.4.3) so a limit expression that reads a specparam can be recomputed
   // when an SDF LABEL changes that specparam.
+  //
+  // `inst_prefix` is the hierarchical prefix of the module instance whose
+  // specify block declared the check, ending in a `.` and empty for a module
+  // elaborated as a top. §31.2 puts a system timing check inside a specify
+  // block and §30.3 puts that block inside a module declaration, so two
+  // instances of one cell declare checks naming identically spelled signals;
+  // the prefix is recorded as TimingCheckEntry::inst_prefix, which is what
+  // tells the two apart. It travels with the kept declaration as well, as
+  // RegisteredTimingCheckDecl above, because RebuildTimingChecksForSpecparam
+  // evaluates the limits in, and files the rebuilt check back at, the instance
+  // the declaration came from. It defaults to the empty prefix so a caller
+  // registering the checks of one module can name the declaration alone.
   void AddTimingCheckUnderOptions(const TimingCheckDecl& decl, SimContext& ctx,
-                                  Arena& arena);
+                                  Arena& arena,
+                                  std::string_view inst_prefix = {});
 
   const std::vector<SpecparamValue>& GetSpecparamValues() const {
     return specparam_values_;
@@ -475,10 +517,13 @@ class SpecifyManager {
   void RebuildPathDelaysForSpecparam(std::string_view inst_prefix,
                                      const std::vector<std::string>& changed);
   // §32.4.3: the same recomputation for the constraint limits of a timing
-  // check. It is not held to an instance: TimingCheckEntry
-  // (simulator/specify_timing_check.h) carries no instance field, so it has
-  // none to be held to.
-  void RebuildTimingChecksForSpecparam(const std::vector<std::string>& changed);
+  // check, held to an instance the way RebuildPathDelaysForSpecparam is. Only
+  // the checks declared in the instance `inst_prefix` names are considered, a
+  // specparam of one instance not being the one an identical declaration in
+  // another instance reads, and each rebuilt check is filed back at that same
+  // instance.
+  void RebuildTimingChecksForSpecparam(std::string_view inst_prefix,
+                                       const std::vector<std::string>& changed);
   // §32.4.3: the same recomputation for the propagation delays of a gate
   // primitive, held to an instance the way RebuildPathDelaysForSpecparam is.
   // Only the gates registered in the instance `inst_prefix` names are
@@ -547,7 +592,7 @@ class SpecifyManager {
   SimContext* specparam_ctx_ = nullptr;
   Arena* specparam_arena_ = nullptr;
   std::vector<RegisteredPathDecl> path_decls_;
-  std::vector<const TimingCheckDecl*> timing_check_decls_;
+  std::vector<RegisteredTimingCheckDecl> timing_check_decls_;
   std::vector<RegisteredGateDecl> gate_decls_;
 
   uint8_t reject_pulse_pct_ = 100;
@@ -571,12 +616,17 @@ class SpecifyManager {
 //
 // Syntax 30-1 (§30.3) lists five kinds of specify_item: specparam_declaration,
 // pulsestyle_declaration, showcancelled_declaration, path_declaration and
-// system_timing_check. Four of the five are registered here -- the module path
-// delays of §30.4, the specparam declarations of §30.3, the PATHPULSE$ pulse
-// limits of §30.7.1, and the pulsestyle and showcancelled declarations of
-// §30.7.4. The system timing checks of Clause 31 are NOT registered: nothing
-// under src/ calls SpecifyManager::AddTimingCheckUnderOptions, and closing that
-// is separate work from this.
+// system_timing_check. All five are registered here -- the module path delays
+// of §30.4, the specparam declarations of §30.3, the PATHPULSE$ pulse limits of
+// §30.7.1, the pulsestyle and showcancelled declarations of §30.7.4, and the
+// system timing checks of Clause 31.
+//
+// The timing checks are registered through
+// SpecifyManager::AddTimingCheckUnderOptions, which is what gives §32.4.2's SDF
+// TIMINGCHECK annotation a declared check to land on. Registering a check does
+// not yet make a violation appear: nothing watches its reference and data
+// signals to call SpecifyManager::CheckSetupViolation or its siblings, which is
+// separate work from this.
 //
 // The specparam declarations are bound through
 // SpecifyManager::BindDesignSpecparams, which is what lets §32.4.3's LABEL

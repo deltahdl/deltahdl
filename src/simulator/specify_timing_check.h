@@ -23,6 +23,17 @@ struct TimingCheckEntry {
   SpecifyEdge ref_edge = SpecifyEdge::kNone;
   std::string data_signal;
   SpecifyEdge data_edge = SpecifyEdge::kNone;
+
+  // The hierarchical prefix of the module instance whose specify block declared
+  // this check, ending in a `.` and empty for a module elaborated as a top.
+  // §31.2 puts a system timing check inside a specify block and §30.3 puts that
+  // block inside a module declaration, so two instances of one cell declare
+  // checks whose ref_signal and data_signal are spelled identically; this is
+  // what tells them apart. It is the same string PathDelay::inst_prefix
+  // (simulator/specify_path_delay.h) carries, which is what every variable of
+  // an instantiated module is named under.
+  std::string inst_prefix;
+
   uint64_t limit = 0;
   uint64_t limit2 = 0;
 
