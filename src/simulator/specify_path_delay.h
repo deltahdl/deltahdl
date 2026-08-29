@@ -115,6 +115,19 @@ struct PathCandidate {
   bool condition_true = true;
 };
 
+// The module path §30.5.3 selects for a transition of one path output: among
+// the candidates whose input transitioned most recently and whose condition
+// holds, the one whose delay for `transition_slot` is smallest. Null when no
+// candidate is active, which is what an empty list and a list of null paths
+// both come to.
+//
+// It is separate from SelectPathDelay because a caller measuring a pulse needs
+// PathDelay::reject_limit and PathDelay::error_limit from the path the delay
+// came from (§30.7), and two candidates may carry the same delay under
+// different limits.
+const PathDelay* SelectActivePath(const std::vector<PathCandidate>& candidates,
+                                  uint8_t transition_slot);
+
 uint64_t SelectPathDelay(const std::vector<PathCandidate>& candidates,
                          uint8_t transition_slot);
 

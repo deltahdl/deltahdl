@@ -11,6 +11,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "elaborator/rtlir.h"
+#include "simulator/module_path_delay.h"
 // CollectExprReads, the walk over the names an expression reads.
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -603,6 +604,12 @@ void Lowerer::Lower(const RtlirDesign* design) {
                           arena_, mgr);
   }
   ctx_.SetLoweringInstancePrefix("");
+  // §30.5.3 selects among the module paths "whose input has transitioned most
+  // recently in time", and nothing records when a signal last changed. This
+  // arms the watcher that does, on the source terminal of every path just
+  // registered, before the scheduler runs anything -- a source that transitions
+  // before it is watched leaves no time behind for the selection to read.
+  WatchModulePathSources(mgr, ctx_);
 
   for (auto* let_decl : design->cu_let_decls) {
     ctx_.RegisterLetDecl(let_decl->name, let_decl);

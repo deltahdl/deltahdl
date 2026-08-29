@@ -70,28 +70,6 @@ struct ModulePathDelay {
 // not be told apart.
 bool IsModulePathOutput(const SpecifyManager& mgr, std::string_view output);
 
-// The module path delay governing `output` transitioning from `from` to `to`,
-// selected over the paths that reach `output` from one of `sources`. `output`
-// is instance-qualified as IsModulePathOutput describes; `sources` are the bare
-// operand names of the driver, which is what a specify block writes and what a
-// path selected by its destination already stands in the instance of.
-//
-// §30.5.3 selects among the paths that are active -- those whose input
-// transitioned most recently -- and takes the smallest delay among them. No
-// Variable records when it last changed (simulator/variable.h holds a value and
-// a previous value and no time), so every path from an operand of the driver is
-// treated as active here and the smallest delay among them is what comes back.
-// Issue #3385 covers the difference, which shows only where two paths reach one
-// output and the larger delay belongs to the input that moved.
-//
-// The pulse limits come from the same path and the same slot as the delay, so a
-// caller measuring a pulse against them is measuring it against the limits of
-// the delay it selected.
-ModulePathDelay SelectModulePathDelay(
-    const SpecifyManager& mgr, std::string_view output,
-    const std::vector<std::string_view>& sources, const Logic4Vec& from,
-    const Logic4Vec& to);
-
 // Everything RunModulePathTransition needs from the driver it delays: the
 // context and arena it evaluates in, the manager holding the registered paths,
 // the instance-qualified name of the path output, the driver's operands (which
@@ -112,6 +90,41 @@ struct ModulePathDrive {
   uint64_t distributed_ticks;
   std::function<void(const Logic4Vec&)> commit;
 };
+
+// The module path delay governing `drive.output` transitioning from `from` to
+// `to`, selected over the paths that reach that output from one of
+// `drive.sources`.
+//
+// §30.5.3 selects in two steps: "Active specify paths are those whose input has
+// transitioned most recently in time", and then "a delay shall be selected from
+// among them ... by comparing the correct delay for the specific transition
+// being scheduled from each specify path and choosing the smallest".
+// SelectActivePath in simulator/specify_path_delay.h is both steps; what is
+// gathered here is the candidate list it works on, whose transition times come
+// from Variable::last_change_ticks on each path's source.
+//
+// Every candidate is offered as active in its condition, because the condition
+// of a state-dependent path (§30.4.4) is held on PathDelay as the source text
+// that wrote it and is not evaluated. Issue #3389 covers that; it shows only
+// where two paths reach one output and one of them is conditional.
+//
+// The pulse limits come from the same path and the same slot as the delay, so a
+// caller measuring a pulse against them is measuring it against the limits of
+// the delay it selected -- which is what §30.7 asks for and why the selection
+// answers with a path rather than with a number.
+ModulePathDelay SelectModulePathDelay(const ModulePathDrive& drive,
+                                      const Logic4Vec& from,
+                                      const Logic4Vec& to);
+
+// Arms, on the source terminal of every module path registered in `mgr`, the
+// watcher that records Variable::last_change_ticks. Called once after the
+// specify blocks are registered and before the run starts, because §30.5.3
+// cannot ask which input transitioned most recently unless something has been
+// writing that down since time zero.
+//
+// A design that declared no module path arms nothing, which leaves
+// last_change_ticks at 0 on every variable in it.
+void WatchModulePathSources(const SpecifyManager& mgr, SimContext& ctx);
 
 // Waits out one pending transition of a module path output and applies §30.7's
 // pulse filtering to whatever the wait turns up.

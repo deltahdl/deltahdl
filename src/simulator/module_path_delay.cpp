@@ -6,13 +6,18 @@
 #include "simulator/module_path_delay.h"
 
 #include <cstdint>
+#include <memory>
+#include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #include "common/types.h"
 #include "simulator/evaluation.h"
+#include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/specify_path_delay.h"
+#include "simulator/variable.h"
 
 namespace delta {
 namespace {
@@ -99,24 +104,80 @@ bool IsModulePathOutput(const SpecifyManager& mgr, std::string_view output) {
   return false;
 }
 
-ModulePathDelay SelectModulePathDelay(
-    const SpecifyManager& mgr, std::string_view output,
-    const std::vector<std::string_view>& sources, const Logic4Vec& from,
-    const Logic4Vec& to) {
+// The time the source terminal of `pd` last changed, or 0 where the design
+// declares no such variable. The name handed to FindVariable is already
+// qualified, and that resolves from inside the instance that declared the path
+// because SimContext::FindVariable reads a dotted name out of its own table
+// rather than joining it to the running process's prefix -- the rule §23.8's
+// hierarchical names need and this relies on. Zero is also what a source that
+// has never changed reads, and the two need not be told apart: §30.5.3 compares
+// these times against each other, and a source that never moved is never the
+// most recent unless every candidate is in the same position.
+static uint64_t SourceChangeTicks(const PathDelay& pd, SimContext& ctx) {
+  const Variable* var = ctx.FindVariable(pd.inst_prefix + pd.src_port);
+  return var != nullptr ? var->last_change_ticks : 0;
+}
+
+ModulePathDelay SelectModulePathDelay(const ModulePathDrive& drive,
+                                      const Logic4Vec& from,
+                                      const Logic4Vec& to) {
   uint8_t slot = ModulePathTransitionSlot(from, to);
-  ModulePathDelay selected;
-  for (const PathDelay& pd : mgr.GetPathDelays()) {
-    if (!PathEndsAt(pd, output)) continue;
-    if (!PathStartsAtOneOf(pd, sources)) continue;
-    // §30.5.3: "comparing the correct delay for the specific transition being
-    // scheduled from each specify path and choosing the smallest".
-    if (selected.found && pd.delays[slot] >= selected.delay) continue;
-    // §30.7's two limits are read from the path the delay was taken from, so a
-    // caller measures a pulse against the limits of the delay it got.
-    selected = ModulePathDelay{true, pd.delays[slot], pd.reject_limit[slot],
-                               pd.error_limit[slot]};
+  std::vector<PathCandidate> candidates;
+  for (const PathDelay& pd : drive.mgr.GetPathDelays()) {
+    if (!PathEndsAt(pd, drive.output)) continue;
+    if (!PathStartsAtOneOf(pd, drive.sources)) continue;
+    candidates.push_back(PathCandidate{&pd, SourceChangeTicks(pd, drive.ctx),
+                                       /*condition_true=*/true});
   }
-  return selected;
+  const PathDelay* selected = SelectActivePath(candidates, slot);
+  if (selected == nullptr) return ModulePathDelay{};
+  // §30.7 measures a pulse against the limits of the delay that formed its
+  // edge, so all three are read off the one path the selection settled on.
+  return ModulePathDelay{true, selected->delays[slot],
+                         selected->reject_limit[slot],
+                         selected->error_limit[slot]};
+}
+
+// Records on `var` the time its value last changed, for as long as the run
+// lasts. Variable::last_change_ticks has no other writer.
+//
+// The watcher keeps its own copy of the value it last recorded rather than
+// trusting that a notification means a change. Variable::NotifyWatchers fires
+// whenever a driver commits, and a driver may commit the value already there --
+// Net::Resolve in src/simulator/net.cpp notifies after every resolution. A time
+// recorded for a commit that changed nothing would make that path the more
+// recent of two and hand the transition the wrong delay, which is the very
+// mistake §30.5.3 is being applied to avoid.
+//
+// It returns false so that NotifyWatchers re-arms it: a module path source may
+// transition any number of times before the run ends.
+static void WatchSourceVariable(Variable* var, SimContext& ctx) {
+  auto seen = std::make_shared<std::vector<Logic4Word>>(
+      var->value.words, var->value.words + var->value.nwords);
+  var->AddWatcher([var, &ctx, seen]() {
+    bool changed = var->value.nwords != seen->size();
+    for (uint32_t i = 0; !changed && i < var->value.nwords; ++i) {
+      changed = var->value.words[i].aval != (*seen)[i].aval ||
+                var->value.words[i].bval != (*seen)[i].bval;
+    }
+    if (changed) {
+      seen->assign(var->value.words, var->value.words + var->value.nwords);
+      var->last_change_ticks = ctx.CurrentTime().ticks;
+    }
+    return false;
+  });
+}
+
+void WatchModulePathSources(const SpecifyManager& mgr, SimContext& ctx) {
+  // One watcher per source terminal however many paths start there, since the
+  // time recorded is the variable's and not the path's.
+  std::unordered_set<std::string> armed;
+  for (const PathDelay& pd : mgr.GetPathDelays()) {
+    std::string qualified = pd.inst_prefix + pd.src_port;
+    if (!armed.insert(qualified).second) continue;
+    Variable* var = ctx.FindVariable(qualified);
+    if (var != nullptr) WatchSourceVariable(var, ctx);
+  }
 }
 
 }  // namespace delta

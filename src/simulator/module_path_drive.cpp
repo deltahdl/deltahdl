@@ -65,8 +65,7 @@ struct ModulePathTransitionDelay {
 
 static ModulePathTransitionDelay ResolveTransitionDelay(
     const ModulePathDrive& drive, const Logic4Vec& from, const Logic4Vec& to) {
-  ModulePathDelay mp =
-      SelectModulePathDelay(drive.mgr, drive.output, drive.sources, from, to);
+  ModulePathDelay mp = SelectModulePathDelay(drive, from, to);
   if (!mp.found) return {drive.distributed_ticks, 0, 0};
   return {SelectEffectivePathDelay(mp.delay, drive.distributed_ticks),
           mp.reject_limit, mp.error_limit};

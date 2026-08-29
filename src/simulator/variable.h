@@ -15,6 +15,19 @@ struct Expr;
 struct Variable {
   Logic4Vec value{};
   Logic4Vec prev_value{};
+
+  // §30.5.3: the simulation time this variable's value last changed, in ticks.
+  // "Active specify paths are those whose input has transitioned most recently
+  // in time", and choosing among the module paths reaching one output is the
+  // only thing that asks. Nothing writes it but the watcher
+  // WatchModulePathSources in src/simulator/module_path_delay.cpp arms, and
+  // that arms only on the source terminal of a registered module path, so it
+  // stays 0 for every other variable in the design and for every design that
+  // declared no specify block. Zero therefore means "never recorded", not
+  // "changed at time zero", and only paths watched by the same arming are ever
+  // compared against each other.
+  uint64_t last_change_ticks = 0;
+
   bool is_forced = false;
   Logic4Vec forced_value{};
   Logic4Vec pending_nba{};
