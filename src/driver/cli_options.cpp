@@ -1,5 +1,6 @@
 #include "driver/cli_options.h"
 
+#include <charconv>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -21,25 +22,108 @@ void ParseDefine(std::string_view def, CliOptions& opts) {
                             std::string(def.substr(eq + 1)));
 }
 
+// One reading of a command line: where it has got to, how far it can go, the
+// arguments themselves, and what it has filled in. It travels as one value so
+// that a helper taking a destination as well stays inside the five parameters
+// readability-function-size.ParameterThreshold allows in
+// etc/clang_tidy/src.yml.
+struct ArgCursor {
+  int& i;
+  int argc;
+  const char* const* argv;
+  CliOptions& opts;
+};
+
+// Reports an option that was recognized and whose value the command line ended
+// before, and fails the parse through CliOptions::rejected_argument.
+//
+// The option is not an unrecognized one and must not be reported as one.
+// ParseArgs prints "unknown option" for an argument no parser took, and an
+// option written last with its value left off would reach that branch if the
+// parsers answered only "this is not my option"; the user would then be told
+// the option does not exist. Issue #3426 is that they were.
+void ReportMissingValue(std::string_view name, CliOptions& opts) {
+  std::cerr << name << " expects a value\n";
+  opts.rejected_argument = true;
+}
+
+// Whether `arg` is the option `name`, taking its value into `out` where the
+// command line carried one. The answer is the same for an option whose value is
+// missing: it was this option, and ReportMissingValue has said what is wrong
+// with it.
+bool TakeValue(std::string_view arg, std::string_view name, ArgCursor cur,
+               std::string& out) {
+  if (arg != name) return false;
+  if (cur.i + 1 >= cur.argc) {
+    ReportMissingValue(name, cur.opts);
+    return true;
+  }
+  out = cur.argv[++cur.i];
+  return true;
+}
+
+// The same for an option a command line may write more than once, whose values
+// are kept in the order they were written.
+bool TakeValue(std::string_view arg, std::string_view name, ArgCursor cur,
+               std::vector<std::string>& out) {
+  if (arg != name) return false;
+  if (cur.i + 1 >= cur.argc) {
+    ReportMissingValue(name, cur.opts);
+    return true;
+  }
+  out.emplace_back(cur.argv[++cur.i]);
+  return true;
+}
+
+// The same for an option whose value is a number.
+//
+// std::from_chars answers whether the text was a number rather than throwing
+// for one that was not, which std::stoull and its siblings do: nothing caught
+// those, so a mistyped number terminated the process instead of being reported.
+// The whole of the value has to be consumed, so a number with anything after it
+// is refused rather than read up to the first character that is not a digit.
+template <typename T>
+bool TakeNumber(std::string_view arg, std::string_view name, ArgCursor cur,
+                T& out) {
+  if (arg != name) return false;
+  if (cur.i + 1 >= cur.argc) {
+    ReportMissingValue(name, cur.opts);
+    return true;
+  }
+  std::string_view text = cur.argv[++cur.i];
+  // Every option read here is a count: a simulation time, a seed, an iteration
+  // budget and a LUT input count. None of them has a meaning below zero, and
+  // std::from_chars would take a negative value into the one signed field
+  // without complaint, so the sign is refused before the digits are read.
+  if (text.starts_with("-")) {
+    std::cerr << name << " expects a number that is not negative: " << text
+              << "\n";
+    cur.opts.rejected_argument = true;
+    return true;
+  }
+  T value = 0;
+  const char* end = text.data() + text.size();
+  auto [stop, ec] = std::from_chars(text.data(), end, value);
+  if (ec != std::errc() || stop != end) {
+    std::cerr << name << " expects a number: " << text << "\n";
+    cur.opts.rejected_argument = true;
+    return true;
+  }
+  out = value;
+  return true;
+}
+
 // The simulation options whose argument is a number rather than a name, split
 // out from TryParseSimArg below so that neither function's branch count grows
 // with the other's. A caller reaches these through TryParseSimArg; the split is
 // not visible on the command line.
 bool TryParseSimNumericArg(std::string_view arg, int& i, int argc,
                            const char* const argv[], CliOptions& opts) {
-  if (arg == "--max-time" && i + 1 < argc) {
-    opts.max_time = std::stoull(argv[++i]);
-    return true;
-  }
-  if (arg == "--seed" && i + 1 < argc) {
-    opts.seed = std::stoul(argv[++i]);
-    return true;
-  }
-  if (arg == "--max-generate-iterations" && i + 1 < argc) {
-    opts.max_generate_iterations = std::stoll(argv[++i]);
-    return true;
-  }
-  return false;
+  ArgCursor cur{i, argc, argv, opts};
+  if (TakeNumber(arg, "--max-time", cur, opts.max_time)) return true;
+  if (TakeNumber(arg, "--seed", cur, opts.seed)) return true;
+  return TakeNumber(arg, "--max-generate-iterations", cur,
+                    opts.max_generate_iterations);
 }
 
 // §11.11's min:typ:max selection, split out of TryParseSimArg below for the
@@ -51,10 +135,15 @@ bool TryParseSimNumericArg(std::string_view arg, int& i, int argc,
 // answers true after setting CliOptions::rejected_argument. Answering false
 // would hand --mintypmax back to ParseArgs, which knows only that no parser
 // took it and would report the option as unrecognized after this function had
-// already printed what is actually wrong with it.
+// already printed what is actually wrong with it. A --mintypmax written with no
+// value at all is answered the same way, for the same reason.
 bool TryParseMinTypMaxArg(std::string_view arg, int& i, int argc,
                           const char* const argv[], CliOptions& opts) {
-  if (arg != "--mintypmax" || i + 1 >= argc) return false;
+  if (arg != "--mintypmax") return false;
+  if (i + 1 >= argc) {
+    ReportMissingValue("--mintypmax", opts);
+    return true;
+  }
   std::string_view value = argv[i + 1];
   if (value == "min") {
     opts.mintypmax = delta::DelayMode::kMin;
@@ -72,49 +161,23 @@ bool TryParseMinTypMaxArg(std::string_view arg, int& i, int argc,
 
 bool TryParseSimArg(std::string_view arg, int& i, int argc,
                     const char* const argv[], CliOptions& opts) {
-  if (arg == "--top" && i + 1 < argc) {
-    opts.top_module = argv[++i];
-    return true;
-  }
-  if (arg == "--vcd" && i + 1 < argc) {
-    opts.vcd_file = argv[++i];
-    return true;
-  }
-  if (arg == "-o" && i + 1 < argc) {
-    opts.output_file = argv[++i];
-    return true;
-  }
-  if (arg == "--timescale" && i + 1 < argc) {
-    opts.timescale = argv[++i];
-    return true;
-  }
-  if (arg == "--fst" && i + 1 < argc) {
-    opts.fst_file = argv[++i];
-    return true;
-  }
+  ArgCursor cur{i, argc, argv, opts};
+  if (TakeValue(arg, "--top", cur, opts.top_module)) return true;
+  if (TakeValue(arg, "--vcd", cur, opts.vcd_file)) return true;
+  if (TakeValue(arg, "-o", cur, opts.output_file)) return true;
+  if (TakeValue(arg, "--timescale", cur, opts.timescale)) return true;
+  if (TakeValue(arg, "--fst", cur, opts.fst_file)) return true;
   if (TryParseSimNumericArg(arg, i, argc, argv, opts)) return true;
   return TryParseMinTypMaxArg(arg, i, argc, argv, opts);
 }
 
 bool TryParseSynthArg(std::string_view arg, int& i, int argc,
                       const char* const argv[], CliOptions& opts) {
-  if (arg == "--target" && i + 1 < argc) {
-    opts.target = argv[++i];
-    return true;
-  }
-  if (arg == "--lut-size" && i + 1 < argc) {
-    opts.lut_size = std::stoul(argv[++i]);
-    return true;
-  }
-  if (arg == "--lib" && i + 1 < argc) {
-    opts.lib_file = argv[++i];
-    return true;
-  }
-  if (arg == "--format" && i + 1 < argc) {
-    opts.format = argv[++i];
-    return true;
-  }
-  return false;
+  ArgCursor cur{i, argc, argv, opts};
+  if (TakeValue(arg, "--target", cur, opts.target)) return true;
+  if (TakeNumber(arg, "--lut-size", cur, opts.lut_size)) return true;
+  if (TakeValue(arg, "--lib", cur, opts.lib_file)) return true;
+  return TakeValue(arg, "--format", cur, opts.format);
 }
 
 bool TryParseGeneralFlag(std::string_view arg, CliOptions& opts) {
@@ -179,36 +242,16 @@ bool TryParseSynthFlag(std::string_view arg, CliOptions& opts) {
 
 bool TryParseLibArg(std::string_view arg, int& i, int argc,
                     const char* const argv[], CliOptions& opts) {
-  if (arg == "-v" && i + 1 < argc) {
-    opts.lib_files.emplace_back(argv[++i]);
+  ArgCursor cur{i, argc, argv, opts};
+  if (TakeValue(arg, "-v", cur, opts.lib_files)) return true;
+  if (TakeValue(arg, "-y", cur, opts.lib_dirs)) return true;
+  if (TakeValue(arg, "-L", cur, opts.lib_search_order)) return true;
+  if (TakeValue(arg, "--config", cur, opts.config)) return true;
+  if (TakeValue(arg, "--load-lib", cur, opts.precompiled_libs)) return true;
+  if (TakeValue(arg, "--precompile-into", cur, opts.precompile_library)) {
     return true;
   }
-  if (arg == "-y" && i + 1 < argc) {
-    opts.lib_dirs.emplace_back(argv[++i]);
-    return true;
-  }
-
-  if (arg == "-L" && i + 1 < argc) {
-    opts.lib_search_order.emplace_back(argv[++i]);
-    return true;
-  }
-  if (arg == "--config" && i + 1 < argc) {
-    opts.config = argv[++i];
-    return true;
-  }
-  if (arg == "--load-lib" && i + 1 < argc) {
-    opts.precompiled_libs.emplace_back(argv[++i]);
-    return true;
-  }
-  if (arg == "--precompile-into" && i + 1 < argc) {
-    opts.precompile_library = argv[++i];
-    return true;
-  }
-  if (arg == "--precompile-out" && i + 1 < argc) {
-    opts.precompile_output = argv[++i];
-    return true;
-  }
-  return false;
+  return TakeValue(arg, "--precompile-out", cur, opts.precompile_output);
 }
 
 bool TryParseDefineArg(std::string_view arg, int& i, int argc,
@@ -217,11 +260,13 @@ bool TryParseDefineArg(std::string_view arg, int& i, int argc,
     ParseDefine(arg.substr(2), opts);
     return true;
   }
-  if (arg == "-D" && i + 1 < argc) {
-    ParseDefine(argv[++i], opts);
+  if (arg != "-D") return false;
+  if (i + 1 >= argc) {
+    ReportMissingValue("-D", opts);
     return true;
   }
-  return false;
+  ParseDefine(argv[++i], opts);
+  return true;
 }
 
 bool TryParseSingleArg(std::string_view arg, int& i, int argc,
@@ -236,7 +281,24 @@ bool TryParseSingleArg(std::string_view arg, int& i, int argc,
   return false;
 }
 
-bool ReadOptionsFile(const std::string& path, CliOptions& opts) {
+// How deep a `-f` may nest. An options file naming another is ordinary, and one
+// naming itself recurses without bound; a limit refuses every cycle, including
+// two files that name each other, where a set of the files already read would
+// let a cycle of length two through unless it recorded the whole chain. The
+// figure is a budget rather than a rule: nothing about a command line says how
+// deep its options files may go, and sixteen is past any nesting a person
+// writes.
+constexpr int kMaxOptionsFileDepth = 16;
+
+bool ParseArgsAtDepth(int argc, char* argv[], CliOptions& opts, int depth);
+
+bool ReadOptionsFile(const std::string& path, CliOptions& opts, int depth) {
+  if (depth >= kMaxOptionsFileDepth) {
+    std::cerr << "error: options files nest more than " << kMaxOptionsFileDepth
+              << " deep at '" << path
+              << "'; one of them names another that leads back to it\n";
+    return false;
+  }
   std::ifstream ifs(path);
   if (!ifs) {
     std::cerr << "error: cannot open options file '" << path << "'\n";
@@ -252,12 +314,17 @@ bool ReadOptionsFile(const std::string& path, CliOptions& opts) {
     }
     words.push_back(std::move(word));
   }
+  // ParseArgs reads from argv[1], so argv[0] is filled with the program name it
+  // skips. The name is held in a buffer of its own rather than pointed at a
+  // string literal, which would need casting away const to match char* argv[].
+  std::string program = "deltahdl";
   std::vector<char*> ptrs;
-  ptrs.push_back(const_cast<char*>("deltahdl"));
+  ptrs.push_back(program.data());
   for (auto& w : words) {
     ptrs.push_back(w.data());
   }
-  return ParseArgs(static_cast<int>(ptrs.size()), ptrs.data(), opts);
+  return ParseArgsAtDepth(static_cast<int>(ptrs.size()), ptrs.data(), opts,
+                          depth + 1);
 }
 
 bool TryParsePlusArg(std::string_view arg, CliOptions& opts) {
@@ -272,15 +339,17 @@ bool TryParsePlusArg(std::string_view arg, CliOptions& opts) {
   return false;
 }
 
-}  // namespace
-
-bool ParseArgs(int argc, char* argv[], CliOptions& opts) {
+bool ParseArgsAtDepth(int argc, char* argv[], CliOptions& opts, int depth) {
   for (int i = 1; i < argc; ++i) {
     std::string_view arg = argv[i];
     if (TryParseSingleArg(arg, i, argc, argv, opts)) continue;
     if (TryParsePlusArg(arg, opts)) continue;
-    if (arg == "-f" && i + 1 < argc) {
-      if (!ReadOptionsFile(argv[++i], opts)) return false;
+    if (arg == "-f") {
+      if (i + 1 >= argc) {
+        ReportMissingValue("-f", opts);
+        continue;
+      }
+      if (!ReadOptionsFile(argv[++i], opts, depth)) return false;
       continue;
     }
     if (arg.starts_with("-") || arg.starts_with("+")) {
@@ -293,6 +362,12 @@ bool ParseArgs(int argc, char* argv[], CliOptions& opts) {
   // the loop runs to its end first so that the remaining arguments are still
   // checked. Nothing runs on this path: main returns 1 without preprocessing.
   return !opts.rejected_argument;
+}
+
+}  // namespace
+
+bool ParseArgs(int argc, char* argv[], CliOptions& opts) {
+  return ParseArgsAtDepth(argc, argv, opts, 0);
 }
 
 }  // namespace delta
