@@ -26,6 +26,10 @@
 #include "simulator/scheduler.h"
 #include "simulator/scope.h"
 #include "simulator/sim_context_types.h"
+// SpecifyManager, held by value behind the owning unique_ptr below. The
+// constructor of this class is defined inline, which instantiates that
+// pointer's destructor, so a forward declaration is not enough.
+#include "simulator/specify.h"
 #include "simulator/sva_engine_sampling.h"
 #include "simulator/sync_objects.h"
 #include "simulator/variable.h"
