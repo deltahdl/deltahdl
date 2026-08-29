@@ -10,6 +10,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
+#include "driver/cli_options.h"
 #include "elaborator/command_line_bind.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
@@ -29,70 +30,6 @@
 #include "synthesizer/synth_lower.h"
 
 namespace {
-
-struct CliOptions {
-  std::vector<std::string> source_files;
-  std::string top_module;
-  std::string vcd_file;
-  std::string output_file;
-  std::string timescale;
-  std::string fst_file;
-  std::string format;
-  std::string lib_file;
-  std::string target;
-  std::vector<std::string> include_dirs;
-  std::vector<std::string> lib_dirs;
-  std::vector<std::string> lib_files;
-
-  std::vector<std::string> lib_search_order;
-  // §33.5.4: "the tool that actually does the binding only needs to be given
-  // the lib.cell specification for the top-level cell(s) and/or the config to
-  // be used". `config` is that config, named by --config, and
-  // `precompiled_libs` are the files --load-lib names for the separate
-  // compilation flow of §33.5.3, whose cells "shall persist" between the
-  // invocation that compiled them and the one that binds them.
-  std::string config;
-  std::vector<std::string> precompiled_libs;
-  // The library --precompile-into compiles this invocation's source
-  // descriptions into, and the file it writes them to. §33.5.3 has a separate
-  // compilation tool put cells into a library that a later invocation binds
-  // from, and both are needed: a cell belongs to a library and the compiled
-  // form has to live somewhere.
-  std::string precompile_library;
-  std::string precompile_output;
-
-  std::vector<std::pair<std::string, std::string>> defines;
-  uint64_t max_time = 0;
-  // §27.4 bounds a loop generate scheme's iteration count nowhere, so this is
-  // a budget rather than a rule. It exists so a design that generates more
-  // instances than the default admits can say so, instead of being refused.
-  int64_t max_generate_iterations = delta::kDefaultMaxGenerateIterations;
-  uint32_t seed = 0;
-  uint32_t lut_size = 4;
-  bool synth_mode = false;
-  bool lint_only = false;
-  bool dump_ast = false;
-  bool dump_ir = false;
-  bool dump_aig = false;
-  bool no_opt = false;
-  bool area_mode = false;
-  bool delay_mode = false;
-  bool retime = false;
-  bool wall = false;
-  bool werror = false;
-  bool show_version = false;
-  bool show_help = false;
-  // §11.11's choice among the three values of a min:typ:max expression, set by
-  // --mintypmax. Not delay_mode above, which is the synthesizer's
-  // delay-oriented optimization.
-  delta::DelayMode mintypmax = delta::DelayMode::kTyp;
-  // Whether an option was recognized and its argument refused. It is separate
-  // from the unrecognized option ParseArgs reports, because an option that
-  // names its own complaint has already printed the one a reader needs.
-  bool rejected_argument = false;
-  // §34.3.1's encrypting mode, and the keys it needs.
-  delta::ProtectCliOptions protect;
-};
 
 void PrintVersion() {
   std::cout << "deltahdl 0.1.0\n";
@@ -153,290 +90,6 @@ void PrintHelp() {
             << "  --dump-aig           Print AIG to stdout\n";
 }
 
-void ParseDefine(std::string_view def, CliOptions& opts) {
-  auto eq = def.find('=');
-  if (eq == std::string_view::npos) {
-    opts.defines.emplace_back(std::string(def), "1");
-    return;
-  }
-  opts.defines.emplace_back(std::string(def.substr(0, eq)),
-                            std::string(def.substr(eq + 1)));
-}
-
-// The simulation options whose argument is a number rather than a name, split
-// out from TryParseSimArg below so that neither function's branch count grows
-// with the other's. A caller reaches these through TryParseSimArg; the split is
-// not visible on the command line.
-bool TryParseSimNumericArg(std::string_view arg, int& i, int argc,
-                           const char* const argv[], CliOptions& opts) {
-  if (arg == "--max-time" && i + 1 < argc) {
-    opts.max_time = std::stoull(argv[++i]);
-    return true;
-  }
-  if (arg == "--seed" && i + 1 < argc) {
-    opts.seed = std::stoul(argv[++i]);
-    return true;
-  }
-  if (arg == "--max-generate-iterations" && i + 1 < argc) {
-    opts.max_generate_iterations = std::stoll(argv[++i]);
-    return true;
-  }
-  return false;
-}
-
-// §11.11's min:typ:max selection, split out of TryParseSimArg below for the
-// same reason TryParseSimNumericArg is: neither function's branch count grows
-// with the other's. A caller reaches it through TryParseSimArg; the split is
-// not visible on the command line.
-//
-// A value that is none of the three is consumed rather than left behind, and
-// answers true after setting CliOptions::rejected_argument. Answering false
-// would hand --mintypmax back to ParseArgs, which knows only that no parser
-// took it and would report the option as unrecognized after this function had
-// already printed what is actually wrong with it.
-bool TryParseMinTypMaxArg(std::string_view arg, int& i, int argc,
-                          const char* const argv[], CliOptions& opts) {
-  if (arg != "--mintypmax" || i + 1 >= argc) return false;
-  std::string_view value = argv[i + 1];
-  if (value == "min") {
-    opts.mintypmax = delta::DelayMode::kMin;
-  } else if (value == "typ") {
-    opts.mintypmax = delta::DelayMode::kTyp;
-  } else if (value == "max") {
-    opts.mintypmax = delta::DelayMode::kMax;
-  } else {
-    std::cerr << "--mintypmax expects min, typ or max: " << value << "\n";
-    opts.rejected_argument = true;
-  }
-  ++i;
-  return true;
-}
-
-bool TryParseSimArg(std::string_view arg, int& i, int argc,
-                    const char* const argv[], CliOptions& opts) {
-  if (arg == "--top" && i + 1 < argc) {
-    opts.top_module = argv[++i];
-    return true;
-  }
-  if (arg == "--vcd" && i + 1 < argc) {
-    opts.vcd_file = argv[++i];
-    return true;
-  }
-  if (arg == "-o" && i + 1 < argc) {
-    opts.output_file = argv[++i];
-    return true;
-  }
-  if (arg == "--timescale" && i + 1 < argc) {
-    opts.timescale = argv[++i];
-    return true;
-  }
-  if (arg == "--fst" && i + 1 < argc) {
-    opts.fst_file = argv[++i];
-    return true;
-  }
-  if (TryParseSimNumericArg(arg, i, argc, argv, opts)) return true;
-  return TryParseMinTypMaxArg(arg, i, argc, argv, opts);
-}
-
-bool TryParseSynthArg(std::string_view arg, int& i, int argc,
-                      const char* const argv[], CliOptions& opts) {
-  if (arg == "--target" && i + 1 < argc) {
-    opts.target = argv[++i];
-    return true;
-  }
-  if (arg == "--lut-size" && i + 1 < argc) {
-    opts.lut_size = std::stoul(argv[++i]);
-    return true;
-  }
-  if (arg == "--lib" && i + 1 < argc) {
-    opts.lib_file = argv[++i];
-    return true;
-  }
-  if (arg == "--format" && i + 1 < argc) {
-    opts.format = argv[++i];
-    return true;
-  }
-  return false;
-}
-
-bool TryParseGeneralFlag(std::string_view arg, CliOptions& opts) {
-  if (arg == "--version") {
-    opts.show_version = true;
-    return true;
-  }
-  if (arg == "--help") {
-    opts.show_help = true;
-    return true;
-  }
-  if (arg == "--synth") {
-    opts.synth_mode = true;
-    return true;
-  }
-  if (arg == "--lint-only") {
-    opts.lint_only = true;
-    return true;
-  }
-  if (arg == "--dump-ast") {
-    opts.dump_ast = true;
-    return true;
-  }
-  if (arg == "--dump-ir") {
-    opts.dump_ir = true;
-    return true;
-  }
-  if (arg == "-Wall") {
-    opts.wall = true;
-    return true;
-  }
-  if (arg == "-Werror") {
-    opts.werror = true;
-    return true;
-  }
-  return false;
-}
-
-bool TryParseSynthFlag(std::string_view arg, CliOptions& opts) {
-  if (arg == "--dump-aig") {
-    opts.dump_aig = true;
-    return true;
-  }
-  if (arg == "--no-opt") {
-    opts.no_opt = true;
-    return true;
-  }
-  if (arg == "--area") {
-    opts.area_mode = true;
-    return true;
-  }
-  if (arg == "--delay") {
-    opts.delay_mode = true;
-    return true;
-  }
-  if (arg == "--retime") {
-    opts.retime = true;
-    return true;
-  }
-  return false;
-}
-
-bool TryParseLibArg(std::string_view arg, int& i, int argc,
-                    const char* const argv[], CliOptions& opts) {
-  if (arg == "-v" && i + 1 < argc) {
-    opts.lib_files.emplace_back(argv[++i]);
-    return true;
-  }
-  if (arg == "-y" && i + 1 < argc) {
-    opts.lib_dirs.emplace_back(argv[++i]);
-    return true;
-  }
-
-  if (arg == "-L" && i + 1 < argc) {
-    opts.lib_search_order.emplace_back(argv[++i]);
-    return true;
-  }
-  if (arg == "--config" && i + 1 < argc) {
-    opts.config = argv[++i];
-    return true;
-  }
-  if (arg == "--load-lib" && i + 1 < argc) {
-    opts.precompiled_libs.emplace_back(argv[++i]);
-    return true;
-  }
-  if (arg == "--precompile-into" && i + 1 < argc) {
-    opts.precompile_library = argv[++i];
-    return true;
-  }
-  if (arg == "--precompile-out" && i + 1 < argc) {
-    opts.precompile_output = argv[++i];
-    return true;
-  }
-  return false;
-}
-
-bool TryParseDefineArg(std::string_view arg, int& i, int argc,
-                       const char* const argv[], CliOptions& opts) {
-  if (arg.starts_with("-D") && arg.size() > 2) {
-    ParseDefine(arg.substr(2), opts);
-    return true;
-  }
-  if (arg == "-D" && i + 1 < argc) {
-    ParseDefine(argv[++i], opts);
-    return true;
-  }
-  return false;
-}
-
-bool TryParseSingleArg(std::string_view arg, int& i, int argc,
-                       const char* const argv[], CliOptions& opts) {
-  if (TryParseGeneralFlag(arg, opts)) return true;
-  if (TryParseSynthFlag(arg, opts)) return true;
-  if (TryParseDefineArg(arg, i, argc, argv, opts)) return true;
-  if (TryParseSimArg(arg, i, argc, argv, opts)) return true;
-  if (TryParseSynthArg(arg, i, argc, argv, opts)) return true;
-  if (TryParseLibArg(arg, i, argc, argv, opts)) return true;
-  if (delta::TryParseProtectArg(arg, i, argc, argv, opts.protect)) return true;
-  return false;
-}
-
-bool ParseArgs(int argc, char* argv[], CliOptions& opts);
-
-bool ReadOptionsFile(const std::string& path, CliOptions& opts) {
-  std::ifstream ifs(path);
-  if (!ifs) {
-    std::cerr << "error: cannot open options file '" << path << "'\n";
-    return false;
-  }
-  std::vector<std::string> words;
-  std::string word;
-  while (ifs >> word) {
-    if (!word.empty() && word[0] == '#') {
-      std::string rest;
-      std::getline(ifs, rest);
-      continue;
-    }
-    words.push_back(std::move(word));
-  }
-  std::vector<char*> ptrs;
-  ptrs.push_back(const_cast<char*>("deltahdl"));
-  for (auto& w : words) {
-    ptrs.push_back(w.data());
-  }
-  return ParseArgs(static_cast<int>(ptrs.size()), ptrs.data(), opts);
-}
-
-bool TryParsePlusArg(std::string_view arg, CliOptions& opts) {
-  if (arg.starts_with("+define+")) {
-    ParseDefine(arg.substr(8), opts);
-    return true;
-  }
-  if (arg.starts_with("+incdir+")) {
-    opts.include_dirs.emplace_back(arg.substr(8));
-    return true;
-  }
-  return false;
-}
-
-bool ParseArgs(int argc, char* argv[], CliOptions& opts) {
-  for (int i = 1; i < argc; ++i) {
-    std::string_view arg = argv[i];
-    if (TryParseSingleArg(arg, i, argc, argv, opts)) continue;
-    if (TryParsePlusArg(arg, opts)) continue;
-    if (arg == "-f" && i + 1 < argc) {
-      if (!ReadOptionsFile(argv[++i], opts)) return false;
-      continue;
-    }
-    if (arg.starts_with("-") || arg.starts_with("+")) {
-      std::cerr << "unknown option: " << arg << "\n";
-      return false;
-    }
-    opts.source_files.emplace_back(arg);
-  }
-  // A rejected argument fails the parse as an unrecognized option does, and
-  // the loop runs to its end first so that the remaining arguments are still
-  // checked. Nothing runs on this path: main returns 1 without preprocessing.
-  return !opts.rejected_argument;
-}
-
 std::string ReadFile(const std::string& path) {
   std::ifstream ifs(path);
   if (!ifs) {
@@ -473,7 +126,7 @@ struct PreprocResult {
   bool has_timescale = false;
 };
 
-PreprocResult PreprocessSources(const CliOptions& opts,
+PreprocResult PreprocessSources(const delta::CliOptions& opts,
                                 delta::SourceManager& src_mgr,
                                 delta::DiagEngine& diag) {
   delta::PreprocConfig pp_config;
@@ -586,7 +239,7 @@ void ApplyPreprocMetadata(delta::CompilationUnit* cu, const PreprocResult& pp) {
   cu->has_preproc_timescale = pp.has_timescale;
 }
 
-std::string ResolveTopModule(const CliOptions& opts,
+std::string ResolveTopModule(const delta::CliOptions& opts,
                              delta::CompilationUnit* cu) {
   if (!opts.top_module.empty()) return opts.top_module;
   if (!cu->modules.empty()) return std::string(cu->modules.back()->name);
@@ -598,7 +251,7 @@ std::string ResolveTopModule(const CliOptions& opts,
 // arguments carry library names and nothing else, so an argument that is not a
 // library name names no library the map could define and the run stops instead
 // of searching an order that was never asked for. Returns false in that case.
-bool InstallLibrarySearchOrder(const CliOptions& opts,
+bool InstallLibrarySearchOrder(const delta::CliOptions& opts,
                                const delta::LibraryMap& lib_map,
                                delta::Elaborator& elaborator) {
   std::vector<std::string> errors;
@@ -612,7 +265,7 @@ bool InstallLibrarySearchOrder(const CliOptions& opts,
   return true;
 }
 
-const delta::RtlirDesign* ElaborateDesign(const CliOptions& opts,
+const delta::RtlirDesign* ElaborateDesign(const delta::CliOptions& opts,
                                           delta::CompilationUnit* cu,
                                           delta::DiagEngine& diag,
                                           delta::Arena& arena) {
@@ -638,7 +291,7 @@ const delta::RtlirDesign* ElaborateDesign(const CliOptions& opts,
   return design;
 }
 
-int RunSynthesis(const CliOptions& opts, delta::CompilationUnit* cu,
+int RunSynthesis(const delta::CliOptions& opts, delta::CompilationUnit* cu,
                  delta::DiagEngine& diag, delta::Arena& arena) {
   const auto* design = ElaborateDesign(opts, cu, diag, arena);
   if (!design || design->top_modules.empty()) return 1;
@@ -665,7 +318,7 @@ int RunSynthesis(const CliOptions& opts, delta::CompilationUnit* cu,
   return 0;
 }
 
-int RunSimulation(const CliOptions& opts, delta::CompilationUnit* cu,
+int RunSimulation(const delta::CliOptions& opts, delta::CompilationUnit* cu,
                   delta::DiagEngine& diag, delta::Arena& arena) {
   const auto* design = ElaborateDesign(opts, cu, diag, arena);
   if (!design) return 1;
@@ -707,7 +360,8 @@ int RunSimulation(const CliOptions& opts, delta::CompilationUnit* cu,
 // printed and decide the status. The transformation reads each text to its end
 // whatever it found, so a breach costs the report rather than the text, and the
 // text is still written; the status is what says it was not clean.
-int RunEnvelopeEncryption(const CliOptions& opts, delta::SourceManager& src_mgr,
+int RunEnvelopeEncryption(const delta::CliOptions& opts,
+                          delta::SourceManager& src_mgr,
                           delta::DiagEngine& diag) {
   for (const auto& path : opts.source_files) {
     auto content = ReadFile(path);
@@ -728,7 +382,7 @@ int RunEnvelopeEncryption(const CliOptions& opts, delta::SourceManager& src_mgr,
 // Both options are required together. A library name with nowhere to write it
 // leaves nothing that persists, and a file with no library name holds cells
 // belonging to no library, which §33.5.3 has a bind select from.
-int RunPrecompile(const CliOptions& opts, delta::DiagEngine& diag) {
+int RunPrecompile(const delta::CliOptions& opts, delta::DiagEngine& diag) {
   if (opts.precompile_library.empty() || opts.precompile_output.empty()) {
     std::cerr << "--precompile-into and --precompile-out are used together\n";
     return 1;
@@ -755,7 +409,7 @@ int RunPrecompile(const CliOptions& opts, delta::DiagEngine& diag) {
 // and what roots the design is either --config or the top-level cells --top
 // names. A configuration is looked for among the precompiled cells for the same
 // reason every other cell is: this invocation reads no source description.
-int RunSeparateCompilationBind(const CliOptions& opts,
+int RunSeparateCompilationBind(const delta::CliOptions& opts,
                                delta::SourceManager& src_mgr,
                                delta::DiagEngine& diag) {
   delta::Arena arena;
@@ -786,8 +440,9 @@ int RunSeparateCompilationBind(const CliOptions& opts,
 //
 // They are asked about together so that main states once that an invocation is
 // either one of these or an ordinary elaboration, rather than once per mode.
-bool RanStandaloneMode(const CliOptions& opts, delta::SourceManager& src_mgr,
-                       delta::DiagEngine& diag, int& status) {
+bool RanStandaloneMode(const delta::CliOptions& opts,
+                       delta::SourceManager& src_mgr, delta::DiagEngine& diag,
+                       int& status) {
   if (opts.protect.encrypt) {
     status = RunEnvelopeEncryption(opts, src_mgr, diag);
     return true;
@@ -804,8 +459,8 @@ bool RanStandaloneMode(const CliOptions& opts, delta::SourceManager& src_mgr,
 }
 
 int main(int argc, char* argv[]) {
-  CliOptions opts;
-  if (!ParseArgs(argc, argv, opts)) {
+  delta::CliOptions opts;
+  if (!delta::ParseArgs(argc, argv, opts)) {
     return 1;
   }
   if (opts.show_version) {

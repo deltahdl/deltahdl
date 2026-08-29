@@ -282,3 +282,138 @@ class TestExpectedStatus:
         """run_test() should read a signed status from a .exit file."""
         (tmp_path / "killed.exit").write_text("-1\n")
         assert _run_over_case(rst, tmp_path, "killed", -1)[1] == (True, "")
+
+
+def _run_over_two_invocations(
+    rst: ModuleType, tmp_path: Path, before_text: str, before_code: int | None,
+) -> tuple[list[tuple[list[str], str]], tuple[bool, str]]:
+    """Run run_test() over a case whose .before file holds before_text.
+
+    The .sv, .args and .expected files are written for the caller. The .args
+    file names one argument, so a test can tell the two invocations apart by
+    their command lines, and the .expected file holds what the stub prints for
+    the invocation under test alone. before_code is the status the earlier
+    invocation exits with, and None makes it time out instead. Every invocation
+    the stub saw comes back as its command line and the directory it ran in, in
+    the order the invocations were made, so a test about the order or about the
+    directory can read them.
+    """
+    sv = tmp_path / "two.sv"
+    sv.write_text("module two; endmodule\n")
+    (tmp_path / "two.before").write_text(before_text)
+    (tmp_path / "two.args").write_text("--under-test\n")
+    expected_path = tmp_path / "two.expected"
+    expected_path.write_text("bound\n")
+
+    calls: list[tuple[list[str], str]] = []
+
+    def fake_run(cmd: list[str], **kwargs: object) -> MagicMock:
+        calls.append((cmd, str(kwargs["cwd"])))
+        first = len(calls) == 1
+        if first and before_code is None:
+            raise subprocess.TimeoutExpired(cmd="deltahdl", timeout=30)
+        stub = MagicMock()
+        stub.returncode = before_code if first else 0
+        stub.stdout = "compiled\n" if first else "bound\n"
+        stub.stderr = ""
+        return stub
+
+    with patch.object(rst.subprocess, "run", side_effect=fake_run):
+        outcome: tuple[bool, str] = rst.run_test(sv, expected_path)
+    return calls, outcome
+
+
+class TestBeforeArguments:
+    """Tests for the invocation a case names in its .before file."""
+
+    def test_runs_the_named_invocation_before_the_one_under_test(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should run the .before command line first."""
+        calls, _ = _run_over_two_invocations(
+            rst, tmp_path, "--precompile-into\ncells\n", 0,
+        )
+        source = str(tmp_path / "two.sv")
+        assert [cmd for cmd, _ in calls] == [
+            [str(rst.BINARY), source, "--precompile-into", "cells"],
+            [str(rst.BINARY), source, "--under-test"],
+        ]
+
+    def test_a_blank_line_names_no_earlier_argument(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should pass no empty argument for a blank .before line."""
+        calls, _ = _run_over_two_invocations(
+            rst, tmp_path, "--precompile-into\n\ncells\n", 0,
+        )
+        assert calls[0][0][2:] == ["--precompile-into", "cells"]
+
+    def test_both_invocations_run_in_one_directory_outside_the_repository(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should run both invocations in one directory it made.
+
+        A precompiled library the earlier invocation writes under a relative
+        path lands in the directory that invocation ran in, and the bind after
+        it reads the library back from the directory it runs in, so the two
+        directories being one is what lets a case name that file once. It is
+        outside the repository so that the library is not left in test/src/e2e/
+        for `git status` to report.
+        """
+        calls, _ = _run_over_two_invocations(
+            rst, tmp_path, "--precompile-into\ncells\n", 0,
+        )
+        directories = [work_dir for _, work_dir in calls]
+        assert (
+            directories[0] == directories[1]
+            and rst.REPO_ROOT not in Path(directories[0]).parents
+        )
+
+    def test_only_the_invocation_under_test_is_compared_to_expected(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should judge the case on the last invocation's output.
+
+        The stub prints 'compiled' for the earlier invocation and 'bound' for
+        the one under test, and the .expected file holds 'bound' alone.
+        """
+        _, outcome = _run_over_two_invocations(
+            rst, tmp_path, "--precompile-into\ncells\n", 0,
+        )
+        assert outcome == (True, "")
+
+    def test_a_failing_earlier_invocation_fails_the_case(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should fail a case whose earlier invocation exited 1."""
+        _, (ok, _) = _run_over_two_invocations(
+            rst, tmp_path, "--precompile-into\ncells\n", 1,
+        )
+        assert not ok
+
+    def test_a_failing_earlier_invocation_is_named_in_the_detail(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should name the .before file and the status it exited."""
+        detail = _run_over_two_invocations(
+            rst, tmp_path, "--precompile-into\ncells\n", 1,
+        )[1][1]
+        assert "two.before: exited 1" in detail
+
+    def test_the_invocation_under_test_does_not_run_after_a_failure(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should not run the second invocation after the first."""
+        calls, _ = _run_over_two_invocations(
+            rst, tmp_path, "--precompile-into\ncells\n", 1,
+        )
+        assert len(calls) == 1
+
+    def test_an_earlier_invocation_that_times_out_fails_the_case(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should fail the case rather than raise on a timeout."""
+        outcome = _run_over_two_invocations(
+            rst, tmp_path, "--precompile-into\ncells\n", None,
+        )[1]
+        assert outcome == (False, "two.before: TIMEOUT")
