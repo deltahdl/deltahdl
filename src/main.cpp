@@ -778,6 +778,31 @@ int RunSeparateCompilationBind(const CliOptions& opts,
   return 0;
 }
 
+// The invocations that finish without elaborating a design out of the source
+// descriptions named on the command line, each selected by an option of its
+// own: §34.3.1's encrypting mode, §33.5.3's precompile into a library, and
+// §33.5.4's bind from precompiled libraries. Returns true when one of them ran,
+// leaving its status in `status`, which is meaningless otherwise.
+//
+// They are asked about together so that main states once that an invocation is
+// either one of these or an ordinary elaboration, rather than once per mode.
+bool RanStandaloneMode(const CliOptions& opts, delta::SourceManager& src_mgr,
+                       delta::DiagEngine& diag, int& status) {
+  if (opts.protect.encrypt) {
+    status = RunEnvelopeEncryption(opts, src_mgr, diag);
+    return true;
+  }
+  if (!opts.precompile_library.empty() || !opts.precompile_output.empty()) {
+    status = RunPrecompile(opts, diag);
+    return true;
+  }
+  if (!opts.precompiled_libs.empty()) {
+    status = RunSeparateCompilationBind(opts, src_mgr, diag);
+    return true;
+  }
+  return false;
+}
+
 int main(int argc, char* argv[]) {
   CliOptions opts;
   if (!ParseArgs(argc, argv, opts)) {
@@ -798,17 +823,8 @@ int main(int argc, char* argv[]) {
     diag.SetWarningsAsErrors(true);
   }
 
-  if (opts.protect.encrypt) {
-    return RunEnvelopeEncryption(opts, src_mgr, diag);
-  }
-
-  if (!opts.precompile_library.empty() || !opts.precompile_output.empty()) {
-    return RunPrecompile(opts, diag);
-  }
-
-  if (!opts.precompiled_libs.empty()) {
-    return RunSeparateCompilationBind(opts, src_mgr, diag);
-  }
+  int mode_status = 0;
+  if (RanStandaloneMode(opts, src_mgr, diag, mode_status)) return mode_status;
 
   auto pp = PreprocessSources(opts, src_mgr, diag);
   if (pp.source.empty() || diag.HasErrors()) {
