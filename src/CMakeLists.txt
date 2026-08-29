@@ -224,6 +224,8 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/compiled_sim.cpp
     simulator/mt_sim.cpp
     simulator/constraint_solver.cpp
+    simulator/module_path_delay.cpp
+    simulator/module_path_drive.cpp
     simulator/specify.cpp
     simulator/specify_pulse.cpp
     simulator/specify_register.cpp

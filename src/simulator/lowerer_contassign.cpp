@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <unordered_set>
 #include <utility>
@@ -29,9 +30,11 @@
 #include "simulator/awaiters.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
+#include "simulator/module_path_delay.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
+#include "simulator/specify.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
 
@@ -405,6 +408,55 @@ static ExecTask RunInertialContAssignDelay(
   co_return StmtResult::kDone;
 }
 
+// Everything the wait before a continuous assignment's commit needs. The wait
+// has two forms: §28's inertial delay, taken from the assignment's own delay
+// expressions, and §30.4's module path delay, which a specify block declares
+// onto whatever drives the path output. `path_mgr` is null unless a registered
+// module path names this assignment's target, and `commit` is how either form
+// drives it.
+struct ContAssignWait {
+  const ContAssignParams& params;
+  SimContext& ctx;
+  Arena& arena;
+  const std::vector<std::string_view>& read_vars;
+  const SpecifyManager* path_mgr;
+  const std::function<void(const Logic4Vec&)>& commit;
+};
+
+// Waits out one pending transition, reporting through `*committed` whether the
+// wait already drove the target. Only the module path route ever does, because
+// §30.7's pulse filtering places two values on the output -- x and then the
+// value the pulse returned to, or the pulse's own two edges. Every other wait
+// leaves the single commit to the caller.
+static ExecTask RunContAssignWait(const ContAssignWait& w, const Net* net,
+                                  Logic4Vec& val, bool* committed) {
+  ContAssignDelays d;
+  if (w.params.delays.rise) {
+    d = BuildContAssignDelays(w.params.delays, w.ctx, w.arena);
+  }
+  Logic4Vec old_val = CurrentContAssignOldValue(w.params, net, w.ctx, w.arena);
+  uint64_t ticks = w.params.delays.rise
+                       ? SelectContAssignDelay(old_val, val, d, w.params.width)
+                       : 0;
+
+  if (w.path_mgr != nullptr && !Logic4VecEqual(val, old_val)) {
+    ModulePathDrive drive{
+        w.ctx,       w.arena,      *w.path_mgr,    w.params.lhs->text,
+        w.read_vars, w.params.rhs, w.params.width, ticks,
+        w.commit};
+    co_await RunModulePathTransition(drive, old_val, val, committed);
+    co_return StmtResult::kDone;
+  }
+
+  if (ticks > 0 && !w.read_vars.empty()) {
+    InertialLoopCtx loop{w.params, d, w.ctx, w.arena};
+    co_await RunInertialContAssignDelay(loop, w.read_vars, old_val, val, ticks);
+  } else if (ticks > 0) {
+    co_await DelayAwaiter{w.ctx, ticks};
+  }
+  co_return StmtResult::kDone;
+}
+
 static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
                                             SimContext& ctx, Arena& arena) {
   if (!params.lhs) co_return;
@@ -427,6 +479,24 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
   auto* net = lhs_is_name ? ctx.FindNet(params.lhs->text) : nullptr;
   ContAssignDriver drv = MakeContAssignDriver(net);
 
+  std::function<void(const Logic4Vec&)> commit = [&](const Logic4Vec& v) {
+    CommitContAssignValue(params, drv, v, ctx, arena);
+    drv.first = false;
+  };
+
+  // §30.4: a module path declared in a specify block delays whatever drives the
+  // path output, and §30.7's pulse limits then decide what reaches it. The
+  // manager is read here rather than at lowering because Lowerer::Lower
+  // registers the specify blocks after it has lowered the modules; this body
+  // first runs when the scheduler resumes it, by which time they are in.
+  // `path_mgr` stays null for a target no module path names, which is every
+  // target in a design that declared no specify block, and such a driver takes
+  // exactly the route it took before.
+  const SpecifyManager* spec = lhs_is_name ? ctx.GetSpecifyManager() : nullptr;
+  const SpecifyManager* path_mgr =
+      spec != nullptr && IsModulePathOutput(*spec, params.lhs->text) ? spec
+                                                                     : nullptr;
+
   // A continuous assignment must drive its left-hand side at least once when it
   // is activated, even if a simulation stop was already requested for the
   // region in which it first runs. A program's `assign` is reactive (§24.3.1),
@@ -440,22 +510,13 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
     evaluated_once = true;
     auto val = EvalExpr(params.rhs, ctx, arena, params.width);
 
-    if (params.delays.rise) {
-      ContAssignDelays d = BuildContAssignDelays(params.delays, ctx, arena);
-      Logic4Vec old_val = CurrentContAssignOldValue(params, net, ctx, arena);
-      uint64_t ticks = SelectContAssignDelay(old_val, val, d, params.width);
-
-      if (ticks > 0 && !read_vars.empty()) {
-        InertialLoopCtx loop{params, d, ctx, arena};
-        co_await RunInertialContAssignDelay(loop, read_vars, old_val, val,
-                                            ticks);
-      } else if (ticks > 0) {
-        co_await DelayAwaiter{ctx, ticks};
-      }
+    bool committed = false;
+    if (params.delays.rise || path_mgr != nullptr) {
+      ContAssignWait wait{params, ctx, arena, read_vars, path_mgr, commit};
+      co_await RunContAssignWait(wait, net, val, &committed);
     }
 
-    CommitContAssignValue(params, drv, val, ctx, arena);
-    drv.first = false;
+    if (!committed) commit(val);
 
     if (read_vars.empty()) break;
     co_await AnyChangeAwaiter{ctx, read_vars};
