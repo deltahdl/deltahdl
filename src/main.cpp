@@ -9,7 +9,9 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "common/types.h"
 #include "elaborator/command_line_bind.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "lexer/lexer.h"
@@ -62,6 +64,14 @@ struct CliOptions {
   bool werror = false;
   bool show_version = false;
   bool show_help = false;
+  // §11.11's choice among the three values of a min:typ:max expression, set by
+  // --mintypmax. Not delay_mode above, which is the synthesizer's
+  // delay-oriented optimization.
+  delta::DelayMode mintypmax = delta::DelayMode::kTyp;
+  // Whether an option was recognized and its argument refused. It is separate
+  // from the unrecognized option ParseArgs reports, because an option that
+  // names its own complaint has already printed the one a reader needs.
+  bool rejected_argument = false;
   // §34.3.1's encrypting mode, and the keys it needs.
   delta::ProtectCliOptions protect;
 };
@@ -77,6 +87,7 @@ void PrintHelp() {
             << "General:\n"
             << "  -o <name>            Set output name\n"
             << "  --top <module>       Top-level module\n"
+            << "  --mintypmax <val>    min:typ:max member: min, typ or max\n"
             << "  --max-generate-iterations <n>\n"
             << "                       Loop generate iteration budget "
                "(default 262144)\n"
@@ -149,6 +160,34 @@ bool TryParseSimNumericArg(std::string_view arg, int& i, int argc,
   return false;
 }
 
+// §11.11's min:typ:max selection, split out of TryParseSimArg below for the
+// same reason TryParseSimNumericArg is: neither function's branch count grows
+// with the other's. A caller reaches it through TryParseSimArg; the split is
+// not visible on the command line.
+//
+// A value that is none of the three is consumed rather than left behind, and
+// answers true after setting CliOptions::rejected_argument. Answering false
+// would hand --mintypmax back to ParseArgs, which knows only that no parser
+// took it and would report the option as unrecognized after this function had
+// already printed what is actually wrong with it.
+bool TryParseMinTypMaxArg(std::string_view arg, int& i, int argc,
+                          const char* const argv[], CliOptions& opts) {
+  if (arg != "--mintypmax" || i + 1 >= argc) return false;
+  std::string_view value = argv[i + 1];
+  if (value == "min") {
+    opts.mintypmax = delta::DelayMode::kMin;
+  } else if (value == "typ") {
+    opts.mintypmax = delta::DelayMode::kTyp;
+  } else if (value == "max") {
+    opts.mintypmax = delta::DelayMode::kMax;
+  } else {
+    std::cerr << "--mintypmax expects min, typ or max: " << value << "\n";
+    opts.rejected_argument = true;
+  }
+  ++i;
+  return true;
+}
+
 bool TryParseSimArg(std::string_view arg, int& i, int argc,
                     const char* const argv[], CliOptions& opts) {
   if (arg == "--top" && i + 1 < argc) {
@@ -171,7 +210,8 @@ bool TryParseSimArg(std::string_view arg, int& i, int argc,
     opts.fst_file = argv[++i];
     return true;
   }
-  return TryParseSimNumericArg(arg, i, argc, argv, opts);
+  if (TryParseSimNumericArg(arg, i, argc, argv, opts)) return true;
+  return TryParseMinTypMaxArg(arg, i, argc, argv, opts);
 }
 
 bool TryParseSynthArg(std::string_view arg, int& i, int argc,
@@ -351,7 +391,10 @@ bool ParseArgs(int argc, char* argv[], CliOptions& opts) {
     }
     opts.source_files.emplace_back(arg);
   }
-  return true;
+  // A rejected argument fails the parse as an unrecognized option does, and
+  // the loop runs to its end first so that the remaining arguments are still
+  // checked. Nothing runs on this path: main returns 1 without preprocessing.
+  return !opts.rejected_argument;
 }
 
 std::string ReadFile(const std::string& path) {
@@ -533,6 +576,12 @@ const delta::RtlirDesign* ElaborateDesign(const CliOptions& opts,
                                           delta::CompilationUnit* cu,
                                           delta::DiagEngine& diag,
                                           delta::Arena& arena) {
+  // §11.11's three values are chosen among while a constant expression is
+  // folded, and elaboration is where that folding happens, so the guard is
+  // constructed here rather than in main: ElaborateDesign is the whole of the
+  // elaboration, and both RunSimulation and RunSynthesis reach it through here.
+  delta::DelayModeGuard mintypmax_guard(opts.mintypmax);
+
   delta::Elaborator elaborator(arena, diag, cu);
   elaborator.SetMaxGenerateIterations(opts.max_generate_iterations);
 
@@ -583,6 +632,12 @@ int RunSimulation(const CliOptions& opts, delta::CompilationUnit* cu,
 
   delta::Scheduler scheduler(arena);
   delta::SimContext sim_ctx(scheduler, arena, diag, opts.seed);
+  // §11.11: the run selects the same member of a min:typ:max expression that
+  // ElaborateDesign folded parameters at, which EvalMinTypMax in
+  // src/simulator/evaluation.cpp reads back through SimContext::GetDelayMode.
+  // It is set before the design is lowered so that a delay evaluated during
+  // lowering sees it.
+  sim_ctx.SetDelayMode(opts.mintypmax);
   delta::Lowerer lowerer(sim_ctx, arena, diag);
   lowerer.Lower(design);
 

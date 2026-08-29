@@ -196,8 +196,6 @@ struct StochasticQueue {
   uint64_t shortest_wait = 0;
 };
 
-enum class DelayMode : uint8_t { kMin, kTyp, kMax };
-
 // State block governed by $timeformat (see 20.4.3). The four members map
 // 1:1 to the task's arguments and persist between invocations.
 struct TimeFormatSpec {

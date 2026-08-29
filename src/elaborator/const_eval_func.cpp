@@ -242,6 +242,19 @@ RegisteredConstFuncs() {
   return g_const_func_registry;
 }
 
+// §11.11: the min:typ:max member the folder selects. It is the typical value
+// unless a DelayModeGuard installed another, which is what src/main.cpp does
+// for the whole of an elaboration.
+static DelayMode g_delay_mode = DelayMode::kTyp;
+
+DelayModeGuard::DelayModeGuard(DelayMode mode) : prev_(g_delay_mode) {
+  g_delay_mode = mode;
+}
+
+DelayModeGuard::~DelayModeGuard() { g_delay_mode = prev_; }
+
+DelayMode ActiveDelayMode() { return g_delay_mode; }
+
 // Control-flow outcome of interpreting one constant-function statement.
 enum class ConstFuncFlow : std::uint8_t {
   kNormal,
@@ -608,6 +621,22 @@ static std::optional<ConstVal> ConstEvalCastFull(const Expr* expr,
                            TypeNameToDataType(expr->text).is_signed);
 }
 
+// §11.11 orders the three values "minimum, typical, and maximum", which
+// Parser::ParseMinTypMaxExpr in src/parser/expr_parser_patterns.cpp and
+// Parser::ParseParenExpr in src/parser/expr_parser_aux.cpp both record as
+// Expr::lhs, Expr::condition and Expr::rhs in that order.
+static const Expr* SelectMinTypMaxMember(const Expr* expr) {
+  switch (ActiveDelayMode()) {
+    case DelayMode::kMin:
+      return expr->lhs;
+    case DelayMode::kMax:
+      return expr->rhs;
+    case DelayMode::kTyp:
+      break;
+  }
+  return expr->condition;
+}
+
 std::optional<ConstVal> ConstEvalFull(const Expr* expr, const ScopeMap& scope) {
   if (!expr) return std::nullopt;
 
@@ -649,13 +678,12 @@ std::optional<ConstVal> ConstEvalFull(const Expr* expr, const ScopeMap& scope) {
     case ExprKind::kMinTypMax:
       // §11.11 admits three colon-separated expressions "wherever expressions
       // can appear", to "represent minimum, typical, and maximum values -- in
-      // that order", so a constant expression can be written as one. The
-      // typical value is what folds, and Expr::condition holds it. §11.11
-      // names no default among the three, and nothing an elaboration reads says
-      // which one a run wants, so the typical value is the choice that agrees
-      // with the run: the simulator selects the same member until something
-      // calls SimContext::SetDelayMode in src/simulator/sim_context.h.
-      return ConstEvalFull(expr->condition, scope);
+      // that order", so a constant expression can be written as one. Which of
+      // the three folds is what ActiveDelayMode answers, and EvalMinTypMax in
+      // src/simulator/evaluation.cpp selects by that same setting, so a
+      // parameter folded at elaboration and a delay waited out during the run
+      // cannot disagree.
+      return ConstEvalFull(SelectMinTypMaxMember(expr), scope);
     case ExprKind::kCall: {
       // §11.2.1: a constant built-in method call (§5.13) is evaluated at
       // elaboration time. It is tried first because a built-in method is not a

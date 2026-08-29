@@ -9,6 +9,7 @@
 #include <string_view>
 
 #include "common/diagnostic.h"
+#include "common/types.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sdf_parser.h"
@@ -457,6 +458,23 @@ std::string SdfAnnotateStringArg(const Expr* call, std::size_t index,
 
 }  // namespace
 
+// §32.9's Table 32-5 gives TOOL_CONTROL, the default mtm_spec, the description
+// "Annotates the value as selected by the simulator". What this simulator
+// selects is what --mintypmax established, so a $sdf_annotate call that names
+// no mtm_spec annotates the same member of the min/typ/max triple that the
+// source-level min:typ:max expressions of §11.11 are evaluated at.
+static SdfMtm SdfMtmFromDelayMode(DelayMode mode) {
+  switch (mode) {
+    case DelayMode::kMin:
+      return SdfMtm::kMinimum;
+    case DelayMode::kMax:
+      return SdfMtm::kMaximum;
+    case DelayMode::kTyp:
+      break;
+  }
+  return SdfMtm::kTypical;
+}
+
 bool EvalSdfAnnotateTask(const Expr* call, SimContext& ctx, Arena& arena) {
   if (call == nullptr) return false;
   SpecifyManager* mgr = ctx.GetSpecifyManager();
@@ -489,7 +507,8 @@ bool EvalSdfAnnotateTask(const Expr* call, SimContext& ctx, Arena& arena) {
   args.scale_factors = SdfAnnotateStringArg(call, 5, ctx, arena);
   args.scale_type = SdfAnnotateStringArg(call, 6, ctx, arena);
 
-  const SdfAnnotationResult kResult = RunSdfAnnotateTask(args, *mgr);
+  const SdfAnnotationResult kResult =
+      RunSdfAnnotateTask(args, *mgr, SdfMtmFromDelayMode(ctx.GetDelayMode()));
   for (const auto& warning : kResult.warnings) {
     ctx.GetDiag().Warning(call->range.start, warning, Subclause("32.9"));
   }

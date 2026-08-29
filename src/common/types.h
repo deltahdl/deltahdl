@@ -170,6 +170,20 @@ enum class DelayModeDirective : uint8_t {
   kZero,
 };
 
+// Which member of a min:typ:max expression is selected. §11.11 writes the three
+// as "minimum, typical, and maximum values -- in that order", and says "The
+// three values allow a design to be tested with minimum, typical, or maximum
+// delay values", so one of the three is chosen for a whole run rather than per
+// expression.
+//
+// This is not DelayModeDirective above, which carries the `delay_mode_path
+// family that Preprocessor::ProcessDelayModeDirective in
+// src/preprocessor/preprocessor_lines.cpp accepts and which selects nothing
+// among three values. §22.1 lists the compiler directives alphabetically and
+// names none of that family, which is why that function reports them under
+// Subclause::None().
+enum class DelayMode : uint8_t { kMin, kTyp, kMax };
+
 enum class NetType : uint8_t {
   kWire,
   kTri,

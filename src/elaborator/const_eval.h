@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "common/packed_range.h"
+#include "common/types.h"
 
 namespace delta {
 
@@ -114,6 +115,30 @@ class RegisteredGenScopeGuard {
  private:
   std::vector<std::string_view> prev_;
 };
+
+// Installs the min:typ:max member the constant folder selects, so that a
+// parameter folded at elaboration and a delay waited out during the run cannot
+// disagree. §11.11 gives a min:typ:max expression three values and says "The
+// three values allow a design to be tested with minimum, typical, or maximum
+// delay values", so the choice is one setting for a whole run. The folder is a
+// free function reached from about fifty sites that hand it a const Expr* and a
+// const ScopeMap& and nothing else, so the mode is installed for the duration
+// of an elaboration exactly as ConstFuncRegistryGuard installs a function
+// table. The guard restores the previously active mode on destruction.
+class DelayModeGuard {
+ public:
+  explicit DelayModeGuard(DelayMode mode);
+  ~DelayModeGuard();
+  DelayModeGuard(const DelayModeGuard&) = delete;
+  DelayModeGuard& operator=(const DelayModeGuard&) = delete;
+
+ private:
+  DelayMode prev_;
+};
+
+// The min:typ:max member a live DelayModeGuard installed, or DelayMode::kTyp
+// when none is live.
+DelayMode ActiveDelayMode();
 
 std::optional<int64_t> ConstEvalInt(const Expr* expr);
 
