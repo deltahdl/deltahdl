@@ -29,6 +29,7 @@
 // SpecifyManager, held by value behind the owning unique_ptr below. The
 // constructor of this class is defined inline, which instantiates that
 // pointer's destructor, so a forward declaration is not enough.
+#include "simulator/instance_prefix_override.h"
 #include "simulator/specify.h"
 #include "simulator/sva_engine_sampling.h"
 #include "simulator/sync_objects.h"
@@ -360,6 +361,13 @@ class SimContext {
   // any process exists, so whatever builds an instance's declarations states
   // the instance here instead.
   void SetLoweringInstancePrefix(std::string_view prefix);
+
+  // §32.4.3: the instance an evaluation stands in, where that is not the
+  // running process's. simulator/instance_prefix_override.h holds the reason
+  // and the guard that sets it; nothing else should write it.
+  InstancePrefixOverrideState& InstancePrefixOverride() {
+    return prefix_override_;
+  }
 
   void SetDisableTarget(std::string_view name) { disable_target_ = name; }
   std::string_view GetDisableTarget() const { return disable_target_; }
@@ -823,6 +831,7 @@ class SimContext {
   Process* current_process_ = nullptr;
   // The instance being built. See SetLoweringInstancePrefix.
   std::string lowering_inst_prefix_;
+  InstancePrefixOverrideState prefix_override_;
   bool stop_requested_ = false;
   bool finish_requested_ = false;
   uint32_t reset_count_ = 0;

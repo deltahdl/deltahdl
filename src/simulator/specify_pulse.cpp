@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "simulator/evaluation.h"
+#include "simulator/instance_prefix_override.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
@@ -37,6 +38,12 @@ void SpecifyManager::RebuildPathDelaysForSpecparam(
     // declaration in another reads, so only that instance's paths are rebuilt.
     if (registered.inst_prefix != inst_prefix) continue;
     if (!AnyExprReadsSpecparam(registered.decl->delays, changed)) continue;
+    // The delay reads the specparam by its bare name, and it must read the one
+    // belonging to the instance that declared the path. SimContext resolves a
+    // bare name against the running process's instance, which during a run is
+    // whichever process called $sdf_annotate.
+    InstancePrefixOverride scope(specparam_ctx_->InstancePrefixOverride(),
+                                 registered.inst_prefix);
     PathDelay pd = BuildPathDelayFromDecl(*registered.decl, *specparam_ctx_,
                                           *specparam_arena_);
     // The rebuilt path is filed back at the instance the declaration was

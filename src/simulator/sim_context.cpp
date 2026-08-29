@@ -170,6 +170,9 @@ void SimContext::SetLoweringInstancePrefix(std::string_view prefix) {
 }
 
 std::string SimContext::ActiveInstancePrefix() const {
+  // §32.4.3's rebuild stands in the instance that declared what is being
+  // rebuilt, which is neither of the two below.
+  if (prefix_override_.active) return prefix_override_.prefix;
   return current_process_ ? current_process_->inst_prefix
                           : lowering_inst_prefix_;
 }
