@@ -99,6 +99,14 @@ struct SdfTimingCheckMapping : public ::testing::Test {
     const auto* tc = Check(mgr, kind);
     return tc == nullptr ? 0u : tc->limit2;
   }
+  // §31.4.4's threshold, which is where a declared $width's third argument
+  // stands. It is not limit2: §31.4.4 gives $width one timing_check_limit, and
+  // BuildTimingCheckUnderOptions (simulator/specify_timing_check.cpp) leaves
+  // limit2 at zero for that kind.
+  uint64_t Threshold(TimingCheckKind kind) {
+    const auto* tc = Check(mgr, kind);
+    return tc == nullptr ? 0u : tc->threshold;
+  }
 };
 
 // Table 32-2 row 1: SETUP carries one value, which reaches $setup and the setup
@@ -137,11 +145,12 @@ TEST_F(SdfTimingCheckMapping, SetupholdReachesSetupHoldAndSetuphold) {
   EXPECT_EQ(Limit2(TimingCheckKind::kSetuphold), 80u);
 
   // $nochange shares this row's two signal names but is a different type, so
-  // this row does not reach it and its edge offsets stay where they were.
+  // this row does not reach it and its edge offsets stay where kDesign wrote
+  // them, which §31.4.6 makes the 25 and 26 of its third and fourth arguments.
   const auto* nc = Check(mgr, TimingCheckKind::kNochange);
   ASSERT_NE(nc, nullptr);
-  EXPECT_EQ(nc->start_edge_offset, 0);
-  EXPECT_EQ(nc->end_edge_offset, 0);
+  EXPECT_EQ(nc->start_edge_offset, 25);
+  EXPECT_EQ(nc->end_edge_offset, 26);
 }
 
 // Table 32-2 row 4: RECOVERY mirrors SETUP one type over -- $recovery and the
@@ -206,11 +215,18 @@ TEST_F(SdfTimingCheckMapping, BidirectskewReachesOnlyFullskew) {
 // and the second declared value, the threshold below which a pulse is ignored
 // (§31.4.4), is not. $period, declared on the same reference signal, is not a
 // target of this row.
+//
+// The threshold is read off TimingCheckEntry::threshold and limit2 is asserted
+// to be zero, §31.4.4 giving $width one timing_check_limit and no second. Issue
+// #3418 is that the declared threshold reached limit2 instead and left
+// threshold at zero, so this case read the right number out of the wrong
+// field.
 TEST_F(SdfTimingCheckMapping, WidthReachesWidthLimitButNotItsSecondValue) {
   Run("(WIDTH (posedge clk) (93))");
 
   EXPECT_EQ(Limit(TimingCheckKind::kWidth), 93u);
-  EXPECT_EQ(Limit2(TimingCheckKind::kWidth), 5u);
+  EXPECT_EQ(Threshold(TimingCheckKind::kWidth), 5u);
+  EXPECT_EQ(Limit2(TimingCheckKind::kWidth), 0u);
   EXPECT_EQ(Limit(TimingCheckKind::kPeriod), 24u);
 }
 
