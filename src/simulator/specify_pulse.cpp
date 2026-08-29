@@ -233,14 +233,15 @@ void PlaceSdfPulseLimits(PathDelay& pd, const SdfPulseLimitSpec& spec) {
 
 // §30.3 puts a specify block inside a module declaration, so two instances of
 // one cell hold paths spelled identically and PathDelay::inst_prefix is what
-// tells them apart. SdfPulseLimitSpec (simulator/specify_sdf.h) carries no such
-// prefix, so this scan reaches the named ports of every in-scope instance; the
-// §32.9 module_instance operand narrows the cells before a path is reached
-// (CellInScope in simulator/sdf_annotate.cpp) and nothing narrower is asked
-// here. AnnotateSdfPulseLimitEntry in that file records the same.
-void SpecifyManager::AddSdfPulseLimit(const SdfPulseLimitSpec& spec) {
+// tells them apart. `inst_prefix` is what SdfCellInstancePrefix
+// (simulator/sdf_annotate.cpp) made of the entry's CELLINSTANCE below the §32.9
+// module_instance operand, so the limits reach the paths of that one instance
+// and of no other in-scope instance of the cell.
+void SpecifyManager::AddSdfPulseLimit(const SdfPulseLimitSpec& spec,
+                                      std::string_view inst_prefix) {
   for (auto& pd : path_delays_) {
     if (pd.src_port != spec.src || pd.dst_port != spec.dst) continue;
+    if (pd.inst_prefix != inst_prefix) continue;
     PlaceSdfPulseLimits(pd, spec);
   }
 }
@@ -291,15 +292,17 @@ void SpecifyManager::ApplyPathSpecificPulseControl(
   }
 }
 
-// As with AddSdfPulseLimit above, the port pair is all this is given, so the
-// amounts reach the paths of every in-scope instance rather than of the one
-// instance the SDF cell named.
+// As with AddSdfPulseLimit above, `inst_prefix` is the prefix of the instance
+// the SDF cell named, so the amounts reach the paths of that one instance
+// rather than of every in-scope instance of the cell.
 void SpecifyManager::IncrementSdfPulseLimit(std::string_view src,
                                             std::string_view dst,
                                             int64_t reject_delta,
-                                            int64_t error_delta) {
+                                            int64_t error_delta,
+                                            std::string_view inst_prefix) {
   for (auto& pd : path_delays_) {
     if (pd.src_port != src || pd.dst_port != dst) continue;
+    if (pd.inst_prefix != inst_prefix) continue;
     for (int i = 0; i < 12; ++i) {
       const int64_t kNewReject =
           static_cast<int64_t>(pd.reject_limit[i]) + reject_delta;

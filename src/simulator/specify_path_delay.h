@@ -105,6 +105,12 @@ bool ExprReadsSpecparam(const Expr* expr,
 // the entry names.
 struct PrimitiveDriver {
   std::string output_port;
+  // The instance prefix of the module whose gate this driver came from, in the
+  // form PathDelay::inst_prefix carries. §29.8 puts a primitive instance inside
+  // a module the way §30.3 puts a specify block there, so two instances of one
+  // cell declare gates with the same output port names and this is what tells
+  // them apart.
+  std::string inst_prefix;
   uint8_t delay_count = 1;
   uint64_t delays[12] = {};
 };

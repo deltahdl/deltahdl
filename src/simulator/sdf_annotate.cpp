@@ -557,18 +557,16 @@ SdfIopathPulseIncrement SdfIopathPulseIncrementOf(const SdfIopath& io,
 // percentage settings: those supply a limit a construct did not state, and an
 // INCREMENT entry states a change to the limit already in place.
 //
-// The delays go through IncrementSdfPathDelay, which matches
-// PathDelay::inst_prefix, so they reach the one instance the entry names. The
-// two limits go through IncrementSdfPulseLimit, which is given the port pair
-// alone and reaches every in-scope instance, for the reason
-// AnnotateSdfPulseLimitEntry records.
+// The delays go through IncrementSdfPathDelay and the two limits through
+// IncrementSdfPulseLimit, and both match PathDelay::inst_prefix, so the whole
+// entry reaches the one instance its cell named.
 void AnnotateSdfIopathIncrementExtended(const PathDelay& pd,
                                         const SdfIopath& io,
                                         SpecifyManager& mgr, SdfMtm mtm) {
   mgr.IncrementSdfPathDelay(pd);
   const SdfIopathPulseIncrement kIncrement = SdfIopathPulseIncrementOf(io, mtm);
   mgr.IncrementSdfPulseLimit(pd.src_port, pd.dst_port, kIncrement.reject,
-                             kIncrement.error);
+                             kIncrement.error, pd.inst_prefix);
 }
 
 // §32.4.1: an IOPATH names its terminals by the cell's own port names, so the
@@ -704,12 +702,14 @@ std::vector<SdfDelayValue> SdfDeviceDelayValues(const SdfDevice& dev) {
 // therefore travel with it: the Table 32-4 expansion over twelve slots, and the
 // reduction to three plus the delay to the x state.
 //
-// As with AnnotateSdfPulseLimitEntry above, the entry travels without the
-// instance prefix its cell's CELLINSTANCE named, because SdfDeviceAnnotation
-// (simulator/specify_sdf.h) has no field for it, so the delay reaches the
-// paths of every in-scope instance that has the named output.
-void AnnotateSdfDeviceEntry(const SdfDevice& dev, SpecifyManager& mgr,
-                            SdfMtm mtm, SdfAnnotationResult& result) {
+// As with AnnotateSdfPulseLimitEntry above, `inst_prefix` is what
+// SdfCellInstancePrefix made of the cell's CELLINSTANCE, and it travels beside
+// the entry rather than on it because SdfDeviceAnnotation
+// (simulator/specify_sdf.h) has no field for it. It is what holds the delay to
+// the outputs of the one instance the entry names.
+void AnnotateSdfDeviceEntry(const SdfDevice& dev, std::string_view inst_prefix,
+                            SpecifyManager& mgr, SdfMtm mtm,
+                            SdfAnnotationResult& result) {
   SdfDeviceAnnotation ann;
   ann.port_instance = dev.port_instance;
   ann.is_increment = dev.is_increment;
@@ -719,7 +719,7 @@ void AnnotateSdfDeviceEntry(const SdfDevice& dev, SpecifyManager& mgr,
   const auto kReduced = ReduceSdfDelaysToThree(kValues, mtm);
   for (int i = 0; i < 4; ++i) ann.three_state_delays[i] = kReduced[i];
 
-  if (mgr.AnnotateSdfDeviceDelay(ann)) return;
+  if (mgr.AnnotateSdfDeviceDelay(ann, inst_prefix)) return;
   const std::string kTarget = dev.port_instance.empty()
                                   ? std::string("module outputs")
                                   : dev.port_instance;
@@ -739,23 +739,26 @@ int64_t SdfPulseLimitValue(const SdfDelayValue& dv, SdfMtm mtm,
 // §32.7: hand over one PATHPULSE or PATHPULSEPERCENT entry, in whichever mode
 // the section carrying it was written.
 //
-// The entry travels without the instance prefix SdfCellInstancePrefix worked
-// out for its cell, so SpecifyManager::AddSdfPulseLimit reaches every path
-// between the two ports rather than the paths of the one instance. Carrying it
-// would mean a field on SdfPulseLimitSpec (simulator/specify_sdf.h) or a sixth
-// parameter on AddSdfPulseLimit (simulator/specify.h), and neither header is
-// part of this change; issue #3387 names the IOPATH, which does carry it.
-void AnnotateSdfPulseLimitEntry(const SdfPulseLimit& pl, SpecifyManager& mgr,
-                                SdfMtm mtm) {
-  mgr.AddSdfPulseLimit(SdfPulseLimitSpec{
-      /*src=*/pl.src_port,
-      /*dst=*/pl.dst_port,
-      /*reject=*/SdfPulseLimitValue(pl.reject, mtm, pl.is_increment),
-      /*error=*/SdfPulseLimitValue(pl.error, mtm, pl.is_increment),
-      /*has_error=*/pl.has_error,
-      /*is_percent=*/pl.is_percent,
-      /*is_increment=*/pl.is_increment,
-  });
+// §30.4 names a path's terminals by the module's own port names, so two
+// instances of one cell declare paths spelled identically. `inst_prefix` is
+// what SdfCellInstancePrefix worked out for the cell, and it travels beside the
+// entry rather than on it because SdfPulseLimitSpec (simulator/specify_sdf.h)
+// has no field for it. SpecifyManager::AddSdfPulseLimit matches it against
+// PathDelay::inst_prefix, so the limits reach the one instance the entry names.
+void AnnotateSdfPulseLimitEntry(const SdfPulseLimit& pl,
+                                std::string_view inst_prefix,
+                                SpecifyManager& mgr, SdfMtm mtm) {
+  mgr.AddSdfPulseLimit(
+      SdfPulseLimitSpec{
+          /*src=*/pl.src_port,
+          /*dst=*/pl.dst_port,
+          /*reject=*/SdfPulseLimitValue(pl.reject, mtm, pl.is_increment),
+          /*error=*/SdfPulseLimitValue(pl.error, mtm, pl.is_increment),
+          /*has_error=*/pl.has_error,
+          /*is_percent=*/pl.is_percent,
+          /*is_increment=*/pl.is_increment,
+      },
+      inst_prefix);
 }
 
 void AnnotateSdfSpecparamEntry(const SdfSpecparam& sp, SpecifyManager& mgr,
@@ -845,14 +848,16 @@ void AnnotateSdfCellEntry(const SdfCellSource& src,
                              mtm);
       break;
     case SdfCellEntryKind::kPulseLimit:
-      AnnotateSdfPulseLimitEntry(cell.pulse_limits[entry.index], mgr, mtm);
+      AnnotateSdfPulseLimitEntry(cell.pulse_limits[entry.index],
+                                 src.inst_prefix, mgr, mtm);
       break;
     case SdfCellEntryKind::kInterconnect:
       AnnotateSdfInterconnectEntry(cell.interconnects[entry.index], src.file,
                                    mgr, mtm, result);
       break;
     case SdfCellEntryKind::kDevice:
-      AnnotateSdfDeviceEntry(cell.devices[entry.index], mgr, mtm, result);
+      AnnotateSdfDeviceEntry(cell.devices[entry.index], src.inst_prefix, mgr,
+                             mtm, result);
       break;
     case SdfCellEntryKind::kSpecparam:
       AnnotateSdfSpecparamEntry(cell.specparams[entry.index], mgr, mtm);

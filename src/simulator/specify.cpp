@@ -871,7 +871,8 @@ void ApplySdfDeviceThreeStateValues(PrimitiveDriver& driver,
 
 }  // namespace
 
-bool SpecifyManager::AnnotateSdfDeviceDelay(const SdfDeviceAnnotation& a) {
+bool SpecifyManager::AnnotateSdfDeviceDelay(const SdfDeviceAnnotation& a,
+                                            std::string_view inst_prefix) {
   // An entry with no operand is the whole-module row: it reaches every specify
   // path, because every specify path ends at a module output. An operand names
   // one output and narrows the entry to it; an operand that names no output
@@ -879,14 +880,13 @@ bool SpecifyManager::AnnotateSdfDeviceDelay(const SdfDeviceAnnotation& a) {
   // live with that submodule -- reaches nothing here.
   const bool kReachesAllOutputs = a.port_instance.empty();
 
-  // SdfDeviceAnnotation carries no instance prefix, so both scans reach the
-  // matching outputs of every in-scope instance rather than of the one instance
-  // the entry's cell named, as AnnotateSdfDeviceEntry
-  // (simulator/sdf_annotate.cpp) records. PrimitiveDriver
-  // (simulator/specify_path_delay.h) has no inst_prefix field at all, so the
-  // fallback scan could not tell them apart even were one carried.
+  // §30.3 puts a specify block inside a module declaration, so two instances of
+  // one cell hold outputs spelled identically. `inst_prefix` is what
+  // SdfCellInstancePrefix (simulator/sdf_annotate.cpp) made of the entry's
+  // CELLINSTANCE, so both scans reach the outputs of that one instance.
   bool applied = false;
   for (auto& pd : path_delays_) {
+    if (pd.inst_prefix != inst_prefix) continue;
     if (!kReachesAllOutputs && pd.dst_port != a.port_instance) continue;
     // Only the propagation delays come from the file; each path keeps its own
     // condition, ifnone flag and pulse limits, which a DEVICE entry says
@@ -903,6 +903,11 @@ bool SpecifyManager::AnnotateSdfDeviceDelay(const SdfDeviceAnnotation& a) {
   // so the entry's values reach it through the reduction rather than through
   // the twelve-slot expansion the paths above take.
   for (auto& driver : primitive_drivers_) {
+    // PrimitiveDriver::inst_prefix is compared for the reason
+    // PathDelay::inst_prefix is compared above, though nothing under src/ fills
+    // it yet: issue #3395 covers a design's gates never reaching the manager,
+    // and until they do every driver here was registered by a test.
+    if (driver.inst_prefix != inst_prefix) continue;
     if (!kReachesAllOutputs && driver.output_port != a.port_instance) continue;
     ApplySdfDeviceThreeStateValues(driver, a);
     applied = true;
