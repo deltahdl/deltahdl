@@ -1,6 +1,5 @@
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 #include "parser/ast.h"
@@ -91,7 +90,7 @@ static void RegisterPathPulseSpecparams(const std::vector<ModuleItem*>& blocks,
         if (s.has_error) {
           s.error = EvalExpr(si.pathpulse_error, ctx, arena).ToUint64();
         }
-        specs.push_back(std::move(s));
+        specs.push_back(s);
       });
   mgr.ResolvePulseControlSpecparams(specs);
 }
