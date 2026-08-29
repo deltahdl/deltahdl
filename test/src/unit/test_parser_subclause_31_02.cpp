@@ -85,19 +85,19 @@ TEST(SystemTimingCheckParsing, SystemTaskRejectedInSpecifyBlock) {
 // the module header rather than the check, and column 1 is what an off-by-one
 // or a position taken from the start of the line would give.
 TEST(SystemTimingCheckParsing, TimingCheckRecordsItsKeywordPosition) {
-  const std::string src =
+  const std::string kSrc =
       "module m(input d, clk);\n"
       "  wire w;\n"
       "  specify\n"
       "     $setup(d, posedge clk, 5);\n"
       "  endspecify\n"
       "endmodule\n";
-  auto r = Parse(src);
+  auto r = Parse(kSrc);
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->loc.line, LineHolding(src, "$setup"));
+  EXPECT_EQ(tc->loc.line, LineHolding(kSrc, "$setup"));
   // Five spaces precede the keyword on that line, so it starts at column 6.
   EXPECT_EQ(tc->loc.column, 6u);
 }
@@ -112,7 +112,7 @@ TEST(SystemTimingCheckParsing, TimingCheckRecordsItsKeywordPosition) {
 // GetSoleTimingCheck in lib/cpp/test_helpers/helpers_parser_verify.h returns
 // the first timing check of a block.
 TEST(SystemTimingCheckParsing, TwoTimingChecksRecordSeparateLines) {
-  const std::string src =
+  const std::string kSrc =
       "module m(input d, clk);\n"
       "  wire w;\n"
       "  specify\n"
@@ -120,16 +120,16 @@ TEST(SystemTimingCheckParsing, TwoTimingChecksRecordSeparateLines) {
       "       $hold(posedge clk, d, 3);\n"
       "  endspecify\n"
       "endmodule\n";
-  auto r = Parse(src);
+  auto r = Parse(kSrc);
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
   ASSERT_NE(spec, nullptr);
   ASSERT_EQ(spec->specify_items.size(), 2u);
   EXPECT_EQ(spec->specify_items[0]->timing_check.loc.line,
-            LineHolding(src, "$setup"));
+            LineHolding(kSrc, "$setup"));
   EXPECT_EQ(spec->specify_items[1]->timing_check.loc.line,
-            LineHolding(src, "$hold"));
+            LineHolding(kSrc, "$hold"));
   EXPECT_NE(spec->specify_items[0]->timing_check.loc.line,
             spec->specify_items[1]->timing_check.loc.line);
 }
