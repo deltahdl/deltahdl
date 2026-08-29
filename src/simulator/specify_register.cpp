@@ -29,26 +29,32 @@ static void ForEachSpecifyItemOfKind(const std::vector<ModuleItem*>& blocks,
 // the §30.7 default pulse limits, which is the state the PATHPULSE$ specparams
 // resolved afterwards replace.
 static void RegisterPathDelays(const std::vector<ModuleItem*>& blocks,
-                               SimContext& ctx, Arena& arena,
-                               SpecifyManager& mgr) {
+                               std::string_view inst_prefix, SimContext& ctx,
+                               Arena& arena, SpecifyManager& mgr) {
   ForEachSpecifyItemOfKind(
       blocks, SpecifyItemKind::kPathDecl, [&](const SpecifyItem& si) {
         mgr.AddPathDelayFromDecl(si.path, ctx, arena,
-                                 /*default_pulse_limits=*/true);
+                                 /*default_pulse_limits=*/true, inst_prefix);
       });
 }
 
 // §30.7.4.1: the pulsestyle_onevent and pulsestyle_ondetect declarations of
 // Syntax 30-8, each selecting the pulse filtering style for every path output
 // it names.
+// The output is qualified with `inst_prefix` because §30.4 has the
+// declaration name a port of the module it stands in by its bare name, so two
+// instances of one cell name the same output and would otherwise share one
+// style.
 static void RegisterPulseStyles(const std::vector<ModuleItem*>& blocks,
+                                std::string_view inst_prefix,
                                 SpecifyManager& mgr) {
   ForEachSpecifyItemOfKind(
       blocks, SpecifyItemKind::kPulsestyle, [&](const SpecifyItem& si) {
         PulseStyle style =
             si.is_ondetect ? PulseStyle::kOnDetect : PulseStyle::kOnEvent;
         for (std::string_view sig : si.signal_list) {
-          mgr.SetPathOutputPulseStyle(std::string(sig), style);
+          mgr.SetPathOutputPulseStyle(
+              std::string(inst_prefix) + std::string(sig), style);
         }
       });
 }
@@ -56,7 +62,11 @@ static void RegisterPulseStyles(const std::vector<ModuleItem*>& blocks,
 // §30.7.4.2: the showcancelled and noshowcancelled declarations of
 // Syntax 30-9, each selecting the negative-pulse mode for every path output it
 // names.
+// The output is qualified with `inst_prefix` for the same reason
+// RegisterPulseStyles qualifies it: a bare port name is shared by every
+// instance of the cell declaring the specify block.
 static void RegisterShowCancelled(const std::vector<ModuleItem*>& blocks,
+                                  std::string_view inst_prefix,
                                   SpecifyManager& mgr) {
   ForEachSpecifyItemOfKind(
       blocks, SpecifyItemKind::kShowcancelled, [&](const SpecifyItem& si) {
@@ -64,7 +74,8 @@ static void RegisterShowCancelled(const std::vector<ModuleItem*>& blocks,
                                  ? ShowCancelled::kNoshowcancelled
                                  : ShowCancelled::kShowcancelled;
         for (std::string_view sig : si.signal_list) {
-          mgr.SetPathOutputShowCancelled(std::string(sig), mode);
+          mgr.SetPathOutputShowCancelled(
+              std::string(inst_prefix) + std::string(sig), mode);
         }
       });
 }
@@ -75,7 +86,11 @@ static void RegisterShowCancelled(const std::vector<ModuleItem*>& blocks,
 // one whichever order the two were declared in. A specparam that states only a
 // reject limit leaves `has_error` clear, and §30.7.1 makes that reject limit
 // serve as the error limit too.
+// `specs` holds the specparams of this one scope, and they are resolved onto
+// `mgr` in one call, so a nonpath-specific PATHPULSE$ specparam reaches the
+// module paths of the instance that declared it and no others.
 static void RegisterPathPulseSpecparams(const std::vector<ModuleItem*>& blocks,
+                                        std::string_view inst_prefix,
                                         SimContext& ctx, Arena& arena,
                                         SpecifyManager& mgr) {
   std::vector<PulseControlSpecparam> specs;
@@ -83,6 +98,7 @@ static void RegisterPathPulseSpecparams(const std::vector<ModuleItem*>& blocks,
       blocks, SpecifyItemKind::kSpecparam, [&](const SpecifyItem& si) {
         if (!si.is_pathpulse) return;
         PulseControlSpecparam s;
+        s.inst_prefix = inst_prefix;
         s.input = si.pathpulse_input;
         s.output = si.pathpulse_output;
         s.reject = EvalExpr(si.pathpulse_reject, ctx, arena).ToUint64();
@@ -96,11 +112,12 @@ static void RegisterPathPulseSpecparams(const std::vector<ModuleItem*>& blocks,
 }
 
 void RegisterSpecifyBlocks(const std::vector<ModuleItem*>& blocks,
-                           SimContext& ctx, Arena& arena, SpecifyManager& mgr) {
-  RegisterPathDelays(blocks, ctx, arena, mgr);
-  RegisterPulseStyles(blocks, mgr);
-  RegisterShowCancelled(blocks, mgr);
-  RegisterPathPulseSpecparams(blocks, ctx, arena, mgr);
+                           std::string_view inst_prefix, SimContext& ctx,
+                           Arena& arena, SpecifyManager& mgr) {
+  RegisterPathDelays(blocks, inst_prefix, ctx, arena, mgr);
+  RegisterPulseStyles(blocks, inst_prefix, mgr);
+  RegisterShowCancelled(blocks, inst_prefix, mgr);
+  RegisterPathPulseSpecparams(blocks, inst_prefix, ctx, arena, mgr);
 }
 
 }  // namespace delta

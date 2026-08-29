@@ -34,6 +34,14 @@ enum class PulseLimitSource : uint8_t {
 struct PathDelay {
   std::string src_port;
   std::string dst_port;
+  // The hierarchical prefix of the module instance whose specify block declared
+  // this path, ending in a `.` and empty for a module elaborated as a top.
+  // §30.3 puts a specify block inside a module declaration and §30.4 has it
+  // name its terminals by that module's own port names, so two instances of one
+  // cell declare paths whose src_port and dst_port are identical; this is what
+  // tells them apart. It is the same string Lowerer::inst_prefix_ carries,
+  // which is what every variable of an instantiated module is named under.
+  std::string inst_prefix;
   SpecifyPathKind path_kind = SpecifyPathKind::kParallel;
   SpecifyEdge edge = SpecifyEdge::kNone;
 

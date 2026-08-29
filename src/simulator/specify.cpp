@@ -492,16 +492,27 @@ void ReplacePathDelayPreservingPulse(PathDelay& existing, PathDelay replacement,
   }
 }
 
-// Nonconditional SDF update: overwrites every existing path delay between the
-// same ports, but keeps each entry's original condition/ifnone (and whichever
-// pulse limits are being held). Returns true if at least one entry matched.
+// Nonconditional update: overwrites every existing path delay between the same
+// ports, but keeps each entry's original condition/ifnone (and whichever pulse
+// limits are being held). Returns true if at least one entry matched.
+//
+// §30.3 puts a specify block inside a module declaration, so two instances of
+// one cell declare paths carrying the same src_port and dst_port and are told
+// apart only by PathDelay::inst_prefix. `match_inst_prefix` asks for that
+// comparison: SpecifyManager::AddPathDelay sets it, so registering a second
+// instance adds a path rather than overwriting the first instance's. The SDF
+// route leaves it off, since an SDF-built PathDelay carries no instance -- the
+// §32.9 module_instance operand has already selected the cells in scope in
+// CellInScope (simulator/sdf_annotate.cpp) before a path is reached.
 bool UpdateNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
                                     const PathDelay& delay,
-                                    PathDelayPulseRetention retain) {
+                                    PathDelayPulseRetention retain,
+                                    bool match_inst_prefix) {
   bool matched = false;
   for (auto& existing : path_delays) {
     if (existing.src_port == delay.src_port &&
-        existing.dst_port == delay.dst_port) {
+        existing.dst_port == delay.dst_port &&
+        (!match_inst_prefix || existing.inst_prefix == delay.inst_prefix)) {
       std::string saved_cond = existing.condition;
       bool saved_ifnone = existing.is_ifnone;
       ReplacePathDelayPreservingPulse(existing, delay, retain);
@@ -520,7 +531,8 @@ void SpecifyManager::AddPathDelay(PathDelay delay, bool preserve_pulse_limits) {
                                         preserve_pulse_limits};
   const bool kSdfIsNonconditional = delay.condition.empty() && !delay.is_ifnone;
   if (kSdfIsNonconditional) {
-    if (!UpdateNonconditionalPathDelays(path_delays_, delay, kRetain)) {
+    if (!UpdateNonconditionalPathDelays(path_delays_, delay, kRetain,
+                                        /*match_inst_prefix=*/true)) {
       path_delays_.push_back(std::move(delay));
     }
     return;
@@ -528,6 +540,7 @@ void SpecifyManager::AddPathDelay(PathDelay delay, bool preserve_pulse_limits) {
   for (auto& existing : path_delays_) {
     if (existing.src_port == delay.src_port &&
         existing.dst_port == delay.dst_port &&
+        existing.inst_prefix == delay.inst_prefix &&
         existing.condition == delay.condition &&
         existing.is_ifnone == delay.is_ifnone) {
       ReplacePathDelayPreservingPulse(existing, std::move(delay), kRetain);
@@ -545,7 +558,8 @@ bool SpecifyManager::AnnotateSdfPathDelay(PathDelay delay,
     // ports. Its rule names no restriction to paths already declared, so an
     // entry matching none is still kept, which is how §32.3 chose to hold on to
     // delay data that finds no home.
-    if (!UpdateNonconditionalPathDelays(path_delays_, delay, retain)) {
+    if (!UpdateNonconditionalPathDelays(path_delays_, delay, retain,
+                                        /*match_inst_prefix=*/false)) {
       path_delays_.push_back(std::move(delay));
     }
     return true;
@@ -856,8 +870,12 @@ void SpecifyManager::AnnotateSdf(SdfAnnotation annotation) {
 
 void SpecifyManager::AddPathDelayFromDecl(const SpecifyPathDecl& decl,
                                           SimContext& ctx, Arena& arena,
-                                          bool default_pulse_limits) {
+                                          bool default_pulse_limits,
+                                          std::string_view inst_prefix) {
   PathDelay pd = BuildPathDelayFromDecl(decl, ctx, arena);
+  // §30.4 names a path's terminals by the declaring module's own port names, so
+  // the instance is what tells two instances of one cell apart.
+  pd.inst_prefix = inst_prefix;
   if (default_pulse_limits) InitDefaultPulseLimits(pd);
   AddPathDelay(std::move(pd));
   path_decls_.push_back(&decl);

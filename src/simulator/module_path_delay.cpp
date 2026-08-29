@@ -59,8 +59,23 @@ PathLevel LevelOf(const Logic4Vec& v) {
   return PathLevel::kZero;
 }
 
+// Whether `pd` ends at the module path destination `qualified` names, which is
+// that destination's own port name under the instance prefix of the module
+// whose specify block declared the path. The two halves are compared where they
+// stand rather than joined into one string, so a lookup allocates nothing.
+bool PathEndsAt(const PathDelay& pd, std::string_view qualified) {
+  if (qualified.size() != pd.inst_prefix.size() + pd.dst_port.size()) {
+    return false;
+  }
+  return qualified.substr(0, pd.inst_prefix.size()) == pd.inst_prefix &&
+         qualified.substr(pd.inst_prefix.size()) == pd.dst_port;
+}
+
 // Whether `pd` starts at one of the driver's operands, which is what makes it a
-// path the transition may be reached through.
+// path the transition may be reached through. The operands are the bare names
+// the driver was written with, and pd.src_port is the bare name the specify
+// block was written with; both stand in the instance PathEndsAt has already
+// selected, so no prefix enters here.
 bool PathStartsAtOneOf(const PathDelay& pd,
                        const std::vector<std::string_view>& sources) {
   for (std::string_view src : sources) {
@@ -79,7 +94,7 @@ uint8_t ModulePathTransitionSlot(const Logic4Vec& from, const Logic4Vec& to) {
 
 bool IsModulePathOutput(const SpecifyManager& mgr, std::string_view output) {
   for (const PathDelay& pd : mgr.GetPathDelays()) {
-    if (pd.dst_port == output) return true;
+    if (PathEndsAt(pd, output)) return true;
   }
   return false;
 }
@@ -91,7 +106,7 @@ ModulePathDelay SelectModulePathDelay(
   uint8_t slot = ModulePathTransitionSlot(from, to);
   ModulePathDelay selected;
   for (const PathDelay& pd : mgr.GetPathDelays()) {
-    if (pd.dst_port != output) continue;
+    if (!PathEndsAt(pd, output)) continue;
     if (!PathStartsAtOneOf(pd, sources)) continue;
     // §30.5.3: "comparing the correct delay for the specific transition being
     // scheduled from each specify path and choosing the smallest".

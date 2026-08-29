@@ -41,6 +41,17 @@ struct Process;
 // is its second caller.
 void ScheduleProcess(Process* proc, SimContext& ctx);
 
+// §30.3: the specify blocks one module instance declares, with the instance
+// they belong to. The prefix is what tells two instances of one cell apart,
+// since §30.4 has a specify block name its terminals by the bare port names of
+// the module it stands in. It is recorded rather than acted on where it is
+// found, because a module path delay may be written as a specparam and the
+// specparam variables of every instance have to exist first.
+struct SpecifyScope {
+  std::string inst_prefix;
+  const RtlirModule* module;
+};
+
 class Lowerer {
  public:
   Lowerer(SimContext& ctx, Arena& arena, DiagEngine& diag);
@@ -103,6 +114,10 @@ class Lowerer {
   void InitAssocDefault(const Expr* init, AssocArrayObject* aa);
   void RegisterEnumForCast(std::string_view name, const RtlirVariable& var);
   void RegisterEnumTypes(const RtlirModule* mod);
+  // §30.3: records that `mod` declares specify blocks, under the instance
+  // prefix in force when it is called, so that Lower can register them once
+  // every module has been lowered. A module declaring none is not recorded.
+  void RecordSpecifyScope(const RtlirModule* mod);
   void LowerChildModules(const RtlirModule* mod);
   void CreateChildModuleVariables(const std::string& inst_prefix,
                                   const RtlirModule* resolved);
@@ -117,6 +132,7 @@ class Lowerer {
   uint32_t next_id_ = 0;
   uint32_t next_program_block_id_ = 1;
   std::string inst_prefix_;
+  std::vector<SpecifyScope> specify_scopes_;
 };
 
 }  // namespace delta

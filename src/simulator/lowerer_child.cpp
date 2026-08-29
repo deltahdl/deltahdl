@@ -76,6 +76,11 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     RegisterInstanceKeyBinding(inst_prefix_, child.resolved->library,
                                child.resolved->name, ctx_);
     LowerParams(child.resolved);
+    // §30.3: the child's specify blocks belong to this instance, so they are
+    // recorded under this instance's prefix. Lower registers them once every
+    // module is lowered, because a module path delay may be written as a
+    // specparam and this instance's specparam variables are created below.
+    RecordSpecifyScope(child.resolved);
     CreateChildModuleVariables(inst_prefix_, child.resolved);
     CreateChildModulePorts(inst_prefix_, child.resolved, ctx_, arena_);
     // 25.3.2: only an interface instance owns nets that must be materialized

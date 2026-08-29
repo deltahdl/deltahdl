@@ -62,10 +62,19 @@ struct ModulePathDelay {
 // destination. A driver whose target is named by no module path is left exactly
 // as it was, so this is the test that keeps a design with no specify block off
 // the module path route altogether.
+//
+// `output` is the destination as the whole design names it: the port name the
+// specify block wrote, under the instance prefix of the module that declared
+// the path. Two instances of one cell declare a path to the same `y` and this
+// is what tells `u1.y` from `u2.y`; issue #3383 is the case where they could
+// not be told apart.
 bool IsModulePathOutput(const SpecifyManager& mgr, std::string_view output);
 
 // The module path delay governing `output` transitioning from `from` to `to`,
-// selected over the paths that reach `output` from one of `sources`.
+// selected over the paths that reach `output` from one of `sources`. `output`
+// is instance-qualified as IsModulePathOutput describes; `sources` are the bare
+// operand names of the driver, which is what a specify block writes and what a
+// path selected by its destination already stands in the instance of.
 //
 // §30.5.3 selects among the paths that are active -- those whose input
 // transitioned most recently -- and takes the smallest delay among them. No
@@ -85,7 +94,8 @@ ModulePathDelay SelectModulePathDelay(
 
 // Everything RunModulePathTransition needs from the driver it delays: the
 // context and arena it evaluates in, the manager holding the registered paths,
-// the name of the path output, the driver's operands (which are the path
+// the instance-qualified name of the path output, the driver's operands (which
+// are the path
 // sources it may be reached from, and the signals an inertial wait is
 // interrupted by), the expression it re-evaluates when one of those moves, the
 // target's bit width, the delay the driver already carried (§30.6's distributed

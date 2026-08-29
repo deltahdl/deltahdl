@@ -36,8 +36,16 @@ class SpecifyManager {
   // (§30.7.2) or an SDF pulse limit (§30.7.3) then replaces. A caller whose
   // subject is the delay alone leaves the flag off, and the path's two limits
   // stay at zero.
+  //
+  // `inst_prefix` is the hierarchical prefix of the module instance whose
+  // specify block holds `decl`, ending in a `.` and empty for a module
+  // elaborated as a top. §30.4 has a module path name its terminals by the
+  // declaring module's own port names, so two instances of one cell declare
+  // paths spelled identically and the prefix is what tells them apart. It is
+  // stamped onto PathDelay::inst_prefix before AddPathDelay files the path.
   void AddPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
-                            Arena& arena, bool default_pulse_limits = false);
+                            Arena& arena, bool default_pulse_limits = false,
+                            std::string_view inst_prefix = {});
 
   void IncrementPathDelay(const PathDelay& delta);
 
@@ -48,6 +56,14 @@ class SpecifyManager {
   // declares no such path rather than inventing one. Returns whether it landed
   // on a declared path. This is the backannotation counterpart of AddPathDelay,
   // which is how a declaration enters the manager in the first place.
+  //
+  // Unlike AddPathDelay, this matches on the port pair alone and not on
+  // PathDelay::inst_prefix, because `delay` is built from an SDF record that
+  // carries its instance separately: CellInScope in
+  // simulator/sdf_annotate.cpp already filters whole cells by the §32.9
+  // module_instance operand before any path is reached, and an SDF-built
+  // PathDelay therefore has an empty inst_prefix. It follows that this cannot
+  // tell two in-scope instances of one cell apart, which issue #3387 covers.
   bool AnnotateSdfPathDelay(PathDelay delay,
                             PathDelayPulseRetention retain = {});
 
@@ -231,7 +247,9 @@ class SpecifyManager {
 
   // §30.7.4.1: resolve the effective pulse-filtering style for a module path
   // output. A global invocation-option style wins over a specify block
-  // declaration; absent both, the default is on-event.
+  // declaration; absent both, the default is on-event. `output` is the module
+  // path destination qualified by the instance prefix of the module that
+  // declared the style, so two instances of one cell do not share a style.
   PulseStyle ResolvePulseStyle(std::string_view output) const;
 
   // §30.7.4.2: record the showcancelled mode a specify block showcancelled/
@@ -245,7 +263,9 @@ class SpecifyManager {
 
   // §30.7.4.2: resolve the effective showcancelled mode for a module path
   // output. A global invocation-option mode wins over a specify block
-  // declaration; absent both, the default is noshowcancelled.
+  // declaration; absent both, the default is noshowcancelled. `output` is the
+  // module path destination qualified by the instance prefix of the module that
+  // declared the mode, so two instances of one cell do not share a mode.
   ShowCancelled ResolveShowCancelled(std::string_view output) const;
 
   // §31.9.4: select the negative-timing-check and all-timing-checks-off
@@ -431,7 +451,16 @@ class SpecifyManager {
 // in `ctx`. The delay expressions of §30.5 and the limit expressions of
 // Syntax 30-7 are evaluated in `ctx`, and a specparam an expression reads is
 // read from there.
+//
+// `inst_prefix` is the hierarchical prefix of the module instance the blocks
+// were declared in, ending in a `.`, and is empty for a module elaborated as a
+// top. §30.4 has a module path name its terminals by the declaring module's own
+// port names, so two instances of one cell declare paths spelled identically;
+// the prefix is recorded on each path as PathDelay::inst_prefix and on each
+// PATHPULSE$ specparam as PulseControlSpecparam::inst_prefix, which is what
+// tells the two instances apart.
 void RegisterSpecifyBlocks(const std::vector<ModuleItem*>& blocks,
-                           SimContext& ctx, Arena& arena, SpecifyManager& mgr);
+                           std::string_view inst_prefix, SimContext& ctx,
+                           Arena& arena, SpecifyManager& mgr);
 
 }  // namespace delta

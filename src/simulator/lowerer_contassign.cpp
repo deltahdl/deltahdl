@@ -121,6 +121,14 @@ struct ContAssignParams {
   ContAssignDelayExprs delays;
   uint32_t width = 0;
 
+  // The hierarchical prefix of the module instance this assignment was lowered
+  // in, ending in a `.` and empty at the top. It is Lowerer::inst_prefix_ as it
+  // stood, and it is here because §30.4's module path names its destination by
+  // the bare port name of the module declaring it: two instances of one cell
+  // declare a path to the same `y`, and the prefix is what says which `y` this
+  // assignment drives.
+  std::string inst_prefix;
+
   bool nonresistive_switch = false;
 
   bool resistive_switch = false;
@@ -434,6 +442,7 @@ struct ContAssignWait {
   Arena& arena;
   const std::vector<std::string_view>& read_vars;
   const SpecifyManager* path_mgr;
+  std::string_view path_output;
   const std::function<void(const Logic4Vec&)>& commit;
 };
 
@@ -454,10 +463,9 @@ static ExecTask RunContAssignWait(const ContAssignWait& w, const Net* net,
                        : 0;
 
   if (w.path_mgr != nullptr && !Logic4VecEqual(val, old_val)) {
-    ModulePathDrive drive{
-        w.ctx,       w.arena,      *w.path_mgr,    w.params.lhs->text,
-        w.read_vars, w.params.rhs, w.params.width, ticks,
-        w.commit};
+    ModulePathDrive drive{w.ctx,          w.arena,     *w.path_mgr,
+                          w.path_output,  w.read_vars, w.params.rhs,
+                          w.params.width, ticks,       w.commit};
     co_await RunModulePathTransition(drive, old_val, val, committed);
     co_return StmtResult::kDone;
   }
@@ -493,6 +501,14 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
   auto* net = lhs_is_name ? ctx.FindNet(params.lhs->text) : nullptr;
   ContAssignDriver drv = MakeContAssignDriver(net);
 
+  // The name a module path declared in this instance gives this assignment's
+  // target: the bare identifier under the instance prefix, which is what
+  // PathDelay::inst_prefix and PathDelay::dst_port together spell. Built once
+  // outside the loop because ModulePathDrive::output is a view of it.
+  std::string path_output =
+      lhs_is_name ? params.inst_prefix + std::string(params.lhs->text)
+                  : std::string();
+
   std::function<void(const Logic4Vec&)> commit = [&](const Logic4Vec& v) {
     CommitContAssignValue(params, drv, v, ctx, arena);
     drv.first = false;
@@ -505,7 +521,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
   // first runs when the scheduler resumes it, by which time they are in. A
   // driver this answers null for takes exactly the route it took before.
   const SpecifyManager* path_mgr =
-      ModulePathManagerFor(ctx, lhs_is_name, params.lhs->text);
+      ModulePathManagerFor(ctx, lhs_is_name, path_output);
 
   // A continuous assignment must drive its left-hand side at least once when it
   // is activated, even if a simulation stop was already requested for the
@@ -522,7 +538,8 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
 
     bool committed = false;
     if (params.delays.rise || path_mgr != nullptr) {
-      ContAssignWait wait{params, ctx, arena, read_vars, path_mgr, commit};
+      ContAssignWait wait{params,   ctx,         arena, read_vars,
+                          path_mgr, path_output, commit};
       co_await RunContAssignWait(wait, net, val, &committed);
     }
 
@@ -556,6 +573,7 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
   cap.data_input = ca.data_input;
   cap.delays = {ca.delay, ca.delay_fall, ca.delay_decay};
   cap.width = ca.width;
+  cap.inst_prefix = inst_prefix_;
   p->coro = MakeContAssignCoroutine(cap, ctx_, arena_).Release();
 
   ScheduleProcess(p, ctx_);

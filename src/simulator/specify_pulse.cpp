@@ -247,9 +247,16 @@ void SpecifyManager::ResolvePulseControlSpecparams(
   // specparam appeared in source. A path-specific specparam that names no
   // existing path (e.g. a non-first terminal of a multiple-path declaration)
   // matches nothing and is thereby ignored.
+  //
+  // §30.7.1 says such a specparam applies "to all module paths defined in a
+  // module", and a module here is one instance of it: §30.3 puts the specify
+  // block inside the module declaration, so each instance declares its own
+  // paths. Matching PathDelay::inst_prefix is what keeps a PATHPULSE$ declared
+  // in one instance of a cell off the paths of another instance of it.
   for (const auto& s : specs) {
     if (!s.input.empty() || !s.output.empty()) continue;
     for (auto& pd : path_delays_) {
+      if (s.inst_prefix != std::string_view(pd.inst_prefix)) continue;
       ApplyPulseControlOverride(pd, s.reject, s.has_error, s.error);
     }
   }
@@ -261,12 +268,17 @@ void SpecifyManager::ResolvePulseControlSpecparams(
 
 // §30.7.1: a path-specific PATHPULSE$in$out overrides only the path it names. A
 // specparam that names no existing path (e.g. a non-first terminal of a
-// multiple-path declaration) matches nothing and is thereby ignored.
+// multiple-path declaration) matches nothing and is thereby ignored. The path
+// it names is a path of the instance whose specify block declared it, since
+// §30.4 has a path name its terminals by the module's own port names and two
+// instances of one cell therefore declare paths spelled identically, so
+// PathDelay::inst_prefix is matched as well.
 void SpecifyManager::ApplyPathSpecificPulseControl(
     const PulseControlSpecparam& s) {
   for (auto& pd : path_delays_) {
     if (s.input == std::string_view(pd.src_port) &&
-        s.output == std::string_view(pd.dst_port)) {
+        s.output == std::string_view(pd.dst_port) &&
+        s.inst_prefix == std::string_view(pd.inst_prefix)) {
       ApplyPulseControlOverride(pd, s.reject, s.has_error, s.error);
     }
   }

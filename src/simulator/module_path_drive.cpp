@@ -100,7 +100,11 @@ static ExecTask FilterModulePathPulse(const ModulePathDrive& drive,
   if (cls == PulseClassification::kForceX) {
     // §30.7.4.1: on-event leaves the x transition at the time the leading edge
     // was already scheduled for, on-detect advances it to now, the moment the
-    // pulse was detected.
+    // pulse was detected. The style is asked for by the instance-qualified
+    // output name, which is what RegisterPulseStyles in
+    // src/simulator/specify_register.cpp filed the declaration under, so a
+    // pulsestyle declared in one instance of a cell does not answer for
+    // another.
     uint64_t x_at =
         FilteredPulseLeadingXTime(drive.mgr.ResolvePulseStyle(drive.output),
                                   ctx.CurrentTime().ticks, target.ticks);

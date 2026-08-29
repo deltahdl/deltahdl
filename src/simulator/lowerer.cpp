@@ -297,9 +297,15 @@ void RegisterInstanceKeyBinding(const std::string& inst_prefix,
   ctx.RegisterInstanceBinding(key, library, name);
 }
 
+void Lowerer::RecordSpecifyScope(const RtlirModule* mod) {
+  if (mod->specify_blocks.empty()) return;
+  specify_scopes_.push_back(SpecifyScope{inst_prefix_, mod});
+}
+
 void Lowerer::LowerModule(const RtlirModule* mod) {
   RegisterInstanceKeyBinding(inst_prefix_, mod->library, mod->name, ctx_);
   LowerParams(mod);
+  RecordSpecifyScope(mod);
   RegisterModuleNets(mod, ctx_, arena_);
   RegisterEnumTypes(mod);
   // §8.7/§6.8: class types must be registered before module variables so a
@@ -581,14 +587,22 @@ void Lowerer::Lower(const RtlirDesign* design) {
   // because a module path delay may be written as a specparam, and
   // RegisterSpecifyBlockSpecparams in
   // src/elaborator/elaborator_validate_specify.cpp lowers a specparam as a
-  // variable of the module declaring it. Only a top module's specify block is
-  // registered, because SpecifyManager keys a module path on the bare names of
-  // the two ports it joins and so cannot tell two instances of a cell apart;
-  // issue #3383 covers the specify block of an instantiated module.
+  // variable of the module declaring it. Every module instance that declared a
+  // specify block is registered under its own instance prefix, which is what
+  // tells two instances of one cell apart, §30.4 having a specify block name
+  // its terminals by the bare port names of the module it stands in. The
+  // lowering instance prefix is set around each registration because a delay
+  // written as a specparam is read back through SimContext::FindVariable, which
+  // prepends SimContext::ActiveInstancePrefix; no process is running here, so
+  // that prefix is the one SetLoweringInstancePrefix last set, and a specparam
+  // of an instantiated module is reachable only while it names that instance.
   SpecifyManager& mgr = ctx_.AcquireSpecifyManager();
-  for (auto* mod : design->top_modules) {
-    RegisterSpecifyBlocks(mod->specify_blocks, ctx_, arena_, mgr);
+  for (const auto& scope : specify_scopes_) {
+    ctx_.SetLoweringInstancePrefix(scope.inst_prefix);
+    RegisterSpecifyBlocks(scope.module->specify_blocks, scope.inst_prefix, ctx_,
+                          arena_, mgr);
   }
+  ctx_.SetLoweringInstancePrefix("");
 
   for (auto* let_decl : design->cu_let_decls) {
     ctx_.RegisterLetDecl(let_decl->name, let_decl);
