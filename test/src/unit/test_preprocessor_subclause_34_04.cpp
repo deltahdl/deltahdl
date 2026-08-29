@@ -38,6 +38,27 @@
 // second file are written as the real `include syntax of §22.4 with the file
 // on disk, because a rule about crossing a file boundary is only exercised by
 // a boundary that was really crossed.
+//
+// A pragma expression that is a keyword and nothing else writes no
+// pragma_value. §34.4 has a directive's expressions settle what is in effect,
+// so such an expression settles nothing for its name and the keyword stands at
+// its default. §34.5.13.1's data_public_key, §34.5.14.1's data_decrypt_key,
+// §34.5.20.1's digest_decrypt_key and §34.5.26.1's key_public_key are defined
+// in that shape, as are §34.5.1.1 through §34.5.4.1's four delimiters and
+// §34.5.31.1's reset.
+//
+// The cases below claim three things about that. A keyword written bare is
+// reported as standing at its default. A keyword written with an '=' and an
+// empty string against it is reported as one a directive stated. §34.5.9.1's
+// encoding, whose value is a parenthesized list written after an '=', records
+// that list.
+//
+// Issue #3271 is what they answer. An expression writing no value recorded an
+// entry holding an empty string, so ProtectKeywordScope::ValueOf reported the
+// keyword as stated with an empty value, and nothing could tell it from a
+// keyword a directive wrote an empty string against.
+// ProtectKeywordValue::defaulted in src/preprocessor/protect_keywords.h is the
+// field that draws that line.
 
 #include <gtest/gtest.h>
 
@@ -203,18 +224,51 @@ TEST(ProtectPragmaDirectives, EveryTabulatedNameCarriesWhatItDoes) {
   }
 }
 
-// The source that writes one tabulated name as a source text writes it.
+// Whether the source SourceWriting builds for `keyword` writes a pragma_value
+// against it, which is whether the subclause defining that name writes one.
 //
-// Every name but one is a whole pragma expression standing alone, so the name
-// is the directive. §34.5.32.1 writes viewport with a value naming an object
-// and an access, and §34.5.32.2 has that object be one the current envelope
-// contains, so the name is reached here through the spelling that subclause
-// defines and from inside an envelope. Reaching it any other way asks §34.4's
-// question of a source §34.5.32 rejects, and the answer would be about the
-// spelling rather than about the table. What the value has to be written as is
-// read in test_preprocessor_subclause_34_05_32_01.cpp, and which envelope it
-// describes in test_preprocessor_subclause_34_05_32_02.cpp.
+// The names defined as `keyword = <string>` are the ones
+// IsProtectStringValuedKeyword answers for. Four more are defined with a
+// parenthesized list after an '=': §34.5.9.1's encoding, §34.5.28.1's
+// decrypt_license, §34.5.29.1's runtime_license and §34.5.32.1's viewport.
+// Every other tabulated name is defined standing alone.
+bool WrittenWithAValue(std::string_view keyword) {
+  return IsProtectStringValuedKeyword(keyword) || keyword == "encoding" ||
+         keyword == "decrypt_license" || keyword == "runtime_license" ||
+         keyword == kViewportKeyword;
+}
+
+// The source that writes one tabulated name as a source text writes it: the
+// name, and the pragma_value the subclause defining that name writes against
+// it.
+//
+// The value is written because a name written bare states nothing for itself.
+// A run over the whole table that wrote every name bare would leave every one
+// of them at its default, which is where an untabulated name stands too, and
+// the run would then say nothing about the table.
+//
+// §34.5.32.1 writes viewport with a value naming an object and an access, and
+// §34.5.32.2 has that object be one the current envelope contains, so the name
+// is reached here from inside an envelope. Reaching it any other way asks
+// §34.4's question of a source §34.5.32 rejects, and the answer would be about
+// the spelling rather than about the table. What the value has to be written
+// as is read in test_preprocessor_subclause_34_05_32_01.cpp, and which
+// envelope it describes in test_preprocessor_subclause_34_05_32_02.cpp.
+// §34.5.28.1's and §34.5.29.1's lists are written whole for the same reason,
+// and are read in test_preprocessor_subclause_34_05_28_01.cpp and
+// test_preprocessor_subclause_34_05_29_01.cpp.
 std::string SourceWriting(std::string_view keyword) {
+  if (IsProtectStringValuedKeyword(keyword)) {
+    return "`pragma protect " + std::string(keyword) + "=\"acme\"\n";
+  }
+  if (keyword == "encoding") {
+    return "`pragma protect encoding=(enctype=\"raw\")\n";
+  }
+  if (keyword == "decrypt_license" || keyword == "runtime_license") {
+    return "`pragma protect " + std::string(keyword) +
+           " = ( library = \"liblic.so\" , entry = \"check\" , feature = "
+           "\"core\" )\n";
+  }
   if (keyword != kViewportKeyword) {
     return "`pragma protect " + std::string(keyword) + "\n";
   }
@@ -226,19 +280,21 @@ std::string SourceWriting(std::string_view keyword) {
 
 // Every one of them, reached the way a source text reaches it: the name
 // written as the pragma_keyword of a protect pragma expression. Each is
-// recognized, so each comes into effect, and none of them is objected to.
+// recognized, and none of them is objected to.
 //
-// One name comes into effect by taking values away rather than by leaving one:
-// §34.5.31.2 has the reset expression restore every protect pragma keyword to
-// its default, and the record of the reset itself is among the values it
-// restores. So the table's own row is the thing asked about here, and what the
-// reset put back is read in test_preprocessor_subclause_34_05_31_02.cpp.
+// A name written with a pragma_value comes into effect with it, so the value
+// stands where the default stood. A name §34.5 defines standing alone writes
+// no value and so puts none in effect, which leaves it at its default: the
+// four delimiters, the five names announcing a key on the line beneath them,
+// the three names announcing a block, and §34.5.31.1's reset are read that way
+// here. What each of those does instead of stating a value is read in the file
+// for its own subclause.
 TEST(ProtectPragmaDirectives, EveryTabulatedNameIsAppliedFromASource) {
   for (const ProtectPragmaKeyword& keyword : ProtectPragmaKeywords()) {
     DirectiveRun run(SourceWriting(keyword.name));
     EXPECT_FALSE(run.diag.HasErrors()) << keyword.name;
     EXPECT_EQ(run.ValueOf(keyword.name).defaulted,
-              keyword.name == kResetKeyword)
+              !WrittenWithAValue(keyword.name))
         << keyword.name;
   }
 }
@@ -710,6 +766,75 @@ TEST(ProtectPragmaDirectives, ADefaultedKeywordAndAnUnlistedNameDiffer) {
   EXPECT_TRUE(run.ValueOf("acme_method").defaulted);
   EXPECT_TRUE(IsProtectPragmaKeyword("data_method"));
   EXPECT_FALSE(IsProtectPragmaKeyword("acme_method"));
+}
+
+// A keyword written bare states no value for itself, so it stands at its
+// default. §34.5.13.1 defines data_public_key in that shape: what it
+// designates is written on the line beneath the keyword rather than against
+// it, and there is no line beneath it here.
+//
+// The value is empty whichever way the expression is read, so the flag is the
+// only thing that can fail. It is read beside the value all the same, which
+// catches a reading that raises the flag while recording text. Issue #3271
+// reports the reading this rules out.
+TEST(ProtectPragmaDirectives, ABareKeywordStatesNoValueForItsName) {
+  DirectiveRun run("`pragma protect data_public_key\n");
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_TRUE(run.ValueOf("data_public_key").defaulted);
+  EXPECT_EQ(run.ValueOf("data_public_key").value, "");
+}
+
+// The other spelling, which means something else. A keyword written with an
+// '=' and an empty string against it has had a value stated for it by the
+// directive, and the value stated is the empty one, so it is not standing at
+// its default.
+//
+// This is the case the bare form has to be told apart from. A reading that
+// answered an empty value with the default would report the two spellings
+// alike, which is the state #3271 describes reached from the other side.
+TEST(ProtectPragmaDirectives, AnEmptyStringWrittenAgainstAKeywordIsAValue) {
+  DirectiveRun run("`pragma protect data_keyowner=\"\"\n");
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_FALSE(run.ValueOf("data_keyowner").defaulted);
+  EXPECT_EQ(run.ValueOf("data_keyowner").value, "");
+}
+
+// The delimiters are written bare as well, §34.5.3.1 and §34.5.4.1 defining
+// them standing alone, so neither states a value and both stand at their
+// default. EveryKeywordNeverWrittenHasItsDefault above passes over the pair
+// because the envelope it reads wrote them, and this is the case that reads
+// them.
+//
+// The envelope closes all the same, so what a bare expression does not do is
+// state a value rather than act.
+TEST(ProtectPragmaDirectives, ABareEnvelopeDelimiterStatesNoValue) {
+  DirectiveRun run(
+      "`pragma protect begin_protected\n"
+      "  wire w;\n"
+      "`pragma protect end_protected\n");
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_EQ(run.Envelopes().ClosedEnvelopes().size(), 1U);
+  EXPECT_TRUE(run.ValueOf("begin_protected").defaulted);
+  EXPECT_TRUE(run.ValueOf("end_protected").defaulted);
+}
+
+// §34.5.9.1 defines encoding as `encoding = ( enctype = <string> [, ...] )`.
+// The expression writes an '=', so it states a value, and the value it states
+// is the parenthesized list. The list is what the keyword records, because a
+// later reading takes the scheme an envelope's blocks are spelled in from
+// there and from nowhere else.
+//
+// What separates a stated value from a default is the '=' rather than the
+// characters after it, and this case is what holds the reading to that. A
+// reading that asked whether the value was empty would drop this list:
+// PragmaKeywordExpression::value is empty for a parenthesized pragma_value and
+// PragmaKeywordExpression::value_list is what carries it.
+TEST(ProtectPragmaDirectives, AParenthesizedListIsRecordedAsTheValue) {
+  constexpr std::string_view kEncodingList = "(enctype=\"raw\")";
+  DirectiveRun run("`pragma protect encoding=(enctype=\"raw\")\n");
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_FALSE(run.ValueOf("encoding").defaulted);
+  EXPECT_EQ(run.ValueOf("encoding").value, kEncodingList);
 }
 
 // ---------------------------------------------------------------------------

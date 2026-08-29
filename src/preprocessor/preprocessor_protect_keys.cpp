@@ -665,8 +665,26 @@ void Preprocessor::ApplyProtectKeywords(
     // the file. A keyword whose value is a list of further expressions has that
     // list put in effect for it -- §34.5.9.1 defines its keyword that way, and
     // what a later reading needs from it is written nowhere else.
-    protect_keywords_.Apply(expr.keyword,
-                            expr.value.empty() ? expr.value_list : expr.value);
+    //
+    // An expression that is a keyword and nothing else writes no value, so it
+    // puts none in effect and the keyword is left where it stood. §34.5.13.1,
+    // §34.5.14.1, §34.5.20.1 and §34.5.26.1 define their keywords that way, and
+    // so do §34.5.1.1 through §34.5.4.1 for the delimiters, and each of the
+    // first four announces a value on the line beneath it rather than carrying
+    // one: the value arrives at Preprocessor::TakeDataPublicKeyValue and the
+    // three beside it, which put it in effect when the line is read. Recording
+    // an entry here would leave the keyword stating an empty value in the
+    // meantime, which ProtectKeywordValue::defaulted
+    // (preprocessor/protect_keywords.h) exists to tell from a keyword no
+    // directive has written, and the announcement would be read as a
+    // designation of nothing rather than as a designation not yet made.
+    //
+    // The parenthesized form is written with a value all the same, having an
+    // '=' before it, so §34.5.9.1's encoding still takes effect.
+    if (expr.has_value) {
+      protect_keywords_.Apply(
+          expr.keyword, expr.value.empty() ? expr.value_list : expr.value);
+    }
     if (!protect_envelopes_.Apply(expr.keyword, loc)) {
       diag_.Error(loc,
                   "protect pragma nests decryption envelopes more deeply than "
