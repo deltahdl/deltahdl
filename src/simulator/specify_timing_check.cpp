@@ -189,17 +189,45 @@ TimingCheckEntry BuildTimingCheckUnderOptions(
   const int64_t kSecond = EvalTimingCheckLimit(
       decl.limits.size() < 2 ? nullptr : decl.limits[1], ctx, arena);
 
+  // §31.4.6's Syntax 31-14 writes $nochange's two trailing operands as
+  // start_edge_offset and end_edge_offset, which are not timing_check_limits
+  // and are not read as any. The clause moves an end of the window by each:
+  // "(beginning of time window) = (leading reference edge time) -
+  // start_edge_offset" and "(end of time window) = (trailing reference edge
+  // time) + end_edge_offset". Both are signed and each is kept as written,
+  // §31.4.6 giving a negative offset its own meaning, which is to shrink the
+  // region from that end. Parser::ParseTimingCheckTrailingArgs
+  // (parser/parser_specify.cpp) collects every trailing operand into
+  // TimingCheckDecl::limits by position, so the kind is what says which
+  // position holds what.
+  if (decl.check_kind == TimingCheckKind::kNochange) {
+    entry.start_edge_offset = kFirst;
+    entry.end_edge_offset = kSecond;
+    return entry;
+  }
+
+  // §31.4.4's Syntax 31-12 writes $width's second trailing operand as a
+  // threshold, which is not a second limit either: the clause reports a
+  // violation for "threshold < (timecheck time) - (timestamp time) < limit" and
+  // says that "no violation is reported for glitches smaller than the
+  // threshold". A $width written without one carries the zero §31.4.4 makes its
+  // default, which is what an empty limits list already gives. limit2 stays
+  // zero, nothing of §31.4.4 reading a second limit.
+  const bool kIsWidth = decl.check_kind == TimingCheckKind::kWidth;
+  const int64_t kSecondLimit = kIsWidth ? 0 : kSecond;
+
   entry.signed_limit = kFirst;
-  entry.signed_limit2 = kSecond;
+  entry.signed_limit2 = kSecondLimit;
 
   // §31.9.4: whether the negative values the declaration carries are handled at
   // all is decided by the invocation option, not by the declaration.
-  const bool kNegativePresent = kFirst < 0 || kSecond < 0;
+  const bool kNegativePresent = kFirst < 0 || kSecondLimit < 0;
   entry.negative_timing_check_enabled =
       NegativeTimingCheckValuesAccepted(kNegativePresent, options);
 
   entry.limit = UnhandledNegativeLimit(kFirst);
-  entry.limit2 = UnhandledNegativeLimit(kSecond);
+  entry.limit2 = UnhandledNegativeLimit(kSecondLimit);
+  if (kIsWidth) entry.threshold = UnhandledNegativeLimit(kSecond);
   return entry;
 }
 
