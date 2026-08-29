@@ -761,16 +761,20 @@ void AnnotateSdfPulseLimitEntry(const SdfPulseLimit& pl,
       inst_prefix);
 }
 
-void AnnotateSdfSpecparamEntry(const SdfSpecparam& sp, SpecifyManager& mgr,
-                               SdfMtm mtm) {
+// §32.4.3: hand over one LABEL entry. §30.3 has a specify block declare its
+// specparams by bare names, so `inst_prefix` -- SdfCellInstancePrefix's answer
+// for the cell, as for the three siblings above -- holds it to that instance.
+void AnnotateSdfSpecparamEntry(const SdfSpecparam& sp,
+                               std::string_view inst_prefix,
+                               SpecifyManager& mgr, SdfMtm mtm) {
   SpecparamValue value;
   value.name = sp.name;
   value.value = SelectMtm(sp.value, mtm);
 
   if (sp.is_increment) {
-    mgr.IncrementSpecparamValue(std::move(value));
+    mgr.IncrementSpecparamValue(std::move(value), inst_prefix);
   } else {
-    mgr.SetSpecparamValue(std::move(value));
+    mgr.SetSpecparamValue(std::move(value), inst_prefix);
   }
 }
 
@@ -860,7 +864,8 @@ void AnnotateSdfCellEntry(const SdfCellSource& src,
                              mtm, result);
       break;
     case SdfCellEntryKind::kSpecparam:
-      AnnotateSdfSpecparamEntry(cell.specparams[entry.index], mgr, mtm);
+      AnnotateSdfSpecparamEntry(cell.specparams[entry.index], src.inst_prefix,
+                                mgr, mtm);
       break;
     case SdfCellEntryKind::kTimingCheck:
       AnnotateSdfTimingCheckEntry(cell.timing_checks[entry.index], mgr, mtm,

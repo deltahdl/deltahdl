@@ -31,12 +31,19 @@ static bool AnyExprReadsSpecparam(const Exprs& exprs,
 // that reads nothing new is left exactly as it stands: recomputing it would
 // discard whatever else had been annotated onto it.
 void SpecifyManager::RebuildPathDelaysForSpecparam(
-    const std::vector<std::string>& changed) {
-  for (const auto* decl : path_decls_) {
-    if (!AnyExprReadsSpecparam(decl->delays, changed)) continue;
-    AddPathDelay(
-        BuildPathDelayFromDecl(*decl, *specparam_ctx_, *specparam_arena_),
-        /*preserve_pulse_limits=*/true);
+    std::string_view inst_prefix, const std::vector<std::string>& changed) {
+  for (const auto& registered : path_decls_) {
+    // A specparam of one instance is not the one an identically spelled
+    // declaration in another reads, so only that instance's paths are rebuilt.
+    if (registered.inst_prefix != inst_prefix) continue;
+    if (!AnyExprReadsSpecparam(registered.decl->delays, changed)) continue;
+    PathDelay pd = BuildPathDelayFromDecl(*registered.decl, *specparam_ctx_,
+                                          *specparam_arena_);
+    // The rebuilt path is filed back at the instance the declaration was
+    // registered under (§30.4): AddPathDelay compares PathDelay::inst_prefix,
+    // so a rebuild at the empty prefix lands beside the declared path.
+    pd.inst_prefix = registered.inst_prefix;
+    AddPathDelay(std::move(pd), /*preserve_pulse_limits=*/true);
   }
 }
 
@@ -84,15 +91,20 @@ void SpecifyManager::RebuildGateDriversForSpecparam(
   }
 }
 
-void SpecifyManager::ApplyAnnotatedSpecparam(const std::string& name,
+void SpecifyManager::ApplyAnnotatedSpecparam(std::string_view inst_prefix,
+                                             const std::string& name,
                                              uint64_t value) {
   if (specparam_ctx_ == nullptr) return;
-  // §32.4.3: a LABEL section annotates to specparams. A name the module did not
-  // declare as a specparam therefore has nothing here for the annotation to
+  // §32.4.3: a LABEL section annotates to specparams. A name the instance did
+  // not declare as a specparam therefore has nothing here for the annotation to
   // land on, whatever else the design may happen to call by that name.
-  if (!IsDeclaredSpecparam(name)) return;
+  if (!IsDeclaredSpecparam(inst_prefix, name)) return;
 
-  if (Variable* storage = specparam_ctx_->FindVariable(name);
+  // Lowerer::CreateChildModuleVariables keys an instantiated module's specparam
+  // under its instance prefix, and SimContext::FindVariable reads a dotted name
+  // out of its own table, so the qualified name is what reaches the storage.
+  std::string qualified = std::string(inst_prefix) + name;
+  if (Variable* storage = specparam_ctx_->FindVariable(qualified);
       storage != nullptr) {
     const uint32_t kWidth =
         storage->value.width == 0 ? 32u : storage->value.width;
@@ -102,45 +114,53 @@ void SpecifyManager::ApplyAnnotatedSpecparam(const std::string& name,
   // §32.4.3: an expression containing one or more specparams is reevaluated
   // when a value is annotated to it from an SDF file.
   const std::vector<std::string> kChanged{name};
-  RebuildPathDelaysForSpecparam(kChanged);
+  RebuildPathDelaysForSpecparam(inst_prefix, kChanged);
   RebuildTimingChecksForSpecparam(kChanged);
   RebuildGateDriversForSpecparam(kChanged);
 }
 
-void SpecifyManager::SetSpecparamValue(SpecparamValue spec) {
+void SpecifyManager::SetSpecparamValue(SpecparamValue spec,
+                                       std::string_view inst_prefix) {
   std::string name = spec.name;
   uint64_t value = spec.value;
-  auto it = specparam_index_.find(spec.name);
+  // Keyed per instance because §30.3 has a specify block declare its specparams
+  // by bare names: what one instance's CELL record asked for is not another's.
+  std::string key = std::string(inst_prefix) + spec.name;
+  auto it = specparam_index_.find(key);
   if (it != specparam_index_.end()) {
     specparam_values_[it->second] = std::move(spec);
   } else {
-    specparam_index_[spec.name] = specparam_values_.size();
+    specparam_index_[key] = specparam_values_.size();
     specparam_values_.push_back(std::move(spec));
   }
 
-  ApplyAnnotatedSpecparam(name, value);
+  ApplyAnnotatedSpecparam(inst_prefix, name, value);
 
   for (const auto& reev : specparam_reevaluators_) {
     if (reev.first == name) reev.second(value);
   }
 }
 
-void SpecifyManager::IncrementSpecparamValue(SpecparamValue delta) {
+void SpecifyManager::IncrementSpecparamValue(SpecparamValue delta,
+                                             std::string_view inst_prefix) {
   std::string name = std::move(delta.name);
   uint64_t added = delta.value;
   uint64_t new_value = added;
-  auto it = specparam_index_.find(name);
+  // Keyed per instance as in SetSpecparamValue, and the reason bites here: an
+  // INCREMENT entry would otherwise add onto another instance's running total.
+  std::string key = std::string(inst_prefix) + name;
+  auto it = specparam_index_.find(key);
   if (it != specparam_index_.end()) {
     new_value = specparam_values_[it->second].value + added;
     specparam_values_[it->second].value = new_value;
   } else {
-    specparam_index_[name] = specparam_values_.size();
+    specparam_index_[key] = specparam_values_.size();
     SpecparamValue stored;
     stored.name = name;
     stored.value = added;
     specparam_values_.push_back(std::move(stored));
   }
-  ApplyAnnotatedSpecparam(name, new_value);
+  ApplyAnnotatedSpecparam(inst_prefix, name, new_value);
   for (const auto& reev : specparam_reevaluators_) {
     if (reev.first == name) reev.second(new_value);
   }

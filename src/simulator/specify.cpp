@@ -915,19 +915,33 @@ void SpecifyManager::AddPathDelayFromDecl(const SpecifyPathDecl& decl,
   pd.inst_prefix = inst_prefix;
   if (default_pulse_limits) InitDefaultPulseLimits(pd);
   AddPathDelay(std::move(pd));
-  path_decls_.push_back(&decl);
+  // The instance travels with the declaration because
+  // RebuildPathDelaysForSpecparam files a rebuilt path back at the instance the
+  // declaration came from, §30.4 spelling it identically in every instance.
+  path_decls_.push_back({&decl, std::string(inst_prefix)});
 }
 
 void SpecifyManager::BindDesignSpecparams(std::vector<std::string> names,
-                                          SimContext& ctx, Arena& arena) {
-  declared_specparams_ = std::move(names);
+                                          SimContext& ctx, Arena& arena,
+                                          std::string_view inst_prefix) {
+  // §32.4.3: the names are added to what is already bound rather than
+  // replacing it. RegisterSpecifyBlocks calls this once per module instance
+  // that declared a specify block, so replacing would leave only the last
+  // instance's specparams annotatable.
+  for (auto& name : names) {
+    if (IsDeclaredSpecparam(inst_prefix, name)) continue;
+    declared_specparams_.push_back({std::string(inst_prefix), std::move(name)});
+  }
   specparam_ctx_ = &ctx;
   specparam_arena_ = &arena;
 }
 
-bool SpecifyManager::IsDeclaredSpecparam(std::string_view name) const {
+bool SpecifyManager::IsDeclaredSpecparam(std::string_view inst_prefix,
+                                         std::string_view name) const {
   for (const auto& declared : declared_specparams_) {
-    if (declared == name) return true;
+    if (declared.inst_prefix == inst_prefix && declared.name == name) {
+      return true;
+    }
   }
   return false;
 }

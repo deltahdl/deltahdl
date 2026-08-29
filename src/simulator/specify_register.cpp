@@ -10,7 +10,7 @@
 namespace delta {
 
 // Calls `visit` on every specify item of kind `kind` that `blocks` declares, in
-// declaration order, skipping a null block or item. The four registration
+// declaration order, skipping a null block or item. The five registration
 // passes below walk the same items and differ only in what they do with one, so
 // the walk is written once here.
 template <typename Visit>
@@ -36,6 +36,31 @@ static void RegisterPathDelays(const std::vector<ModuleItem*>& blocks,
         mgr.AddPathDelayFromDecl(si.path, ctx, arena,
                                  /*default_pulse_limits=*/true, inst_prefix);
       });
+}
+
+// §30.3: the specparam_declarations of Syntax 30-1, bound to `mgr` so §32.4.3's
+// LABEL annotation can reach them. Binding is also what gives the manager the
+// context and arena a LABEL writes an annotated value into, so this runs for a
+// specify block that declares no specparam at all.
+//
+// The names are bound under `inst_prefix` because §30.3 has the declaration
+// name the specparam by a bare name, while Lowerer::CreateChildModuleVariables
+// keys an instantiated module's specparam under its instance prefix.
+//
+// Only the specparams declared inside a specify block are collected, `blocks`
+// being all this is given. CollectDeclaredSpecparams in
+// simulator/specify_path_delay.h also reads the specparams declared at module
+// level, outside every specify block, and needs the ModuleDecl to do it.
+static void RegisterSpecparams(const std::vector<ModuleItem*>& blocks,
+                               std::string_view inst_prefix, SimContext& ctx,
+                               Arena& arena, SpecifyManager& mgr) {
+  std::vector<std::string> names;
+  ForEachSpecifyItemOfKind(blocks, SpecifyItemKind::kSpecparam,
+                           [&](const SpecifyItem& si) {
+                             if (si.param_name.empty()) return;
+                             names.emplace_back(si.param_name);
+                           });
+  mgr.BindDesignSpecparams(std::move(names), ctx, arena, inst_prefix);
 }
 
 // §30.7.4.1: the pulsestyle_onevent and pulsestyle_ondetect declarations of
@@ -114,6 +139,7 @@ static void RegisterPathPulseSpecparams(const std::vector<ModuleItem*>& blocks,
 void RegisterSpecifyBlocks(const std::vector<ModuleItem*>& blocks,
                            std::string_view inst_prefix, SimContext& ctx,
                            Arena& arena, SpecifyManager& mgr) {
+  RegisterSpecparams(blocks, inst_prefix, ctx, arena, mgr);
   RegisterPathDelays(blocks, inst_prefix, ctx, arena, mgr);
   RegisterPulseStyles(blocks, inst_prefix, mgr);
   RegisterShowCancelled(blocks, inst_prefix, mgr);
