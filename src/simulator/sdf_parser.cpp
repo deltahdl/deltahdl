@@ -185,9 +185,15 @@ static std::vector<std::string> ParseSdfCondTokens(std::string_view& s) {
   return out;
 }
 
-// Renders the first `count` collected tokens back as condition text, spaced the
-// way SpecifyConditionText spaces the SystemVerilog side it is compared
-// against.
+// Renders the first `count` collected tokens back as condition text, one space
+// between each.
+//
+// That is not how SpecifyConditionText spaces the SystemVerilog side, and no
+// join rule could be: NextSdfToken above lexes `:` as a token of its own, so
+// `mode[3:2]` arrives here as three tokens and `c ? a : b` as five, and one
+// spacing cannot serve both. SpecifyConditionsMatch in
+// simulator/specify_condition_text.cpp is what reconciles the two, comparing
+// them with whitespace ignored.
 static std::string JoinSdfCondTokens(const std::vector<std::string>& tokens,
                                      std::size_t count) {
   std::string out;

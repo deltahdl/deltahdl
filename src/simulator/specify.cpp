@@ -513,7 +513,7 @@ void SpecifyManager::AddPathDelay(PathDelay delay, bool preserve_pulse_limits) {
     if (existing.src_port == delay.src_port &&
         existing.dst_port == delay.dst_port &&
         existing.inst_prefix == delay.inst_prefix &&
-        existing.condition == delay.condition &&
+        SpecifyConditionsMatch(existing.condition, delay.condition) &&
         existing.condition_expr == delay.condition_expr &&
         existing.is_ifnone == delay.is_ifnone) {
       ReplacePathDelayPreservingPulse(existing, std::move(delay), kRetain);
@@ -548,7 +548,7 @@ bool SpecifyManager::AnnotateSdfPathDelay(PathDelay delay,
     if (existing.src_port == delay.src_port &&
         existing.dst_port == delay.dst_port &&
         existing.inst_prefix == delay.inst_prefix &&
-        existing.condition == delay.condition &&
+        SpecifyConditionsMatch(existing.condition, delay.condition) &&
         existing.is_ifnone == delay.is_ifnone) {
       ReplacePathDelayPreservingPulse(existing, std::move(delay), retain);
       return true;
@@ -592,7 +592,7 @@ bool IncrementConditionalPathDelay(std::vector<PathDelay>& path_delays,
     if (existing.src_port == delta.src_port &&
         existing.dst_port == delta.dst_port &&
         existing.inst_prefix == delta.inst_prefix &&
-        existing.condition == delta.condition &&
+        SpecifyConditionsMatch(existing.condition, delta.condition) &&
         existing.is_ifnone == delta.is_ifnone) {
       AddPathDelayValues(existing, delta);
       return true;
@@ -699,7 +699,7 @@ void SpecifyManager::AddTimingCheck(TimingCheckEntry check) {
         existing.ref_edge == check.ref_edge &&
         existing.data_signal == check.data_signal &&
         existing.data_edge == check.data_edge &&
-        existing.condition == check.condition) {
+        SpecifyConditionsMatch(existing.condition, check.condition)) {
       existing = std::move(check);
       return;
     }
@@ -718,7 +718,10 @@ bool SdfAnnotationMatchesCheck(const TimingCheckEntry& existing,
     return false;
   if (a.data_edge != SpecifyEdge::kNone && existing.data_edge != a.data_edge)
     return false;
-  if (!a.condition.empty() && existing.condition != a.condition) return false;
+  if (!a.condition.empty() &&
+      !SpecifyConditionsMatch(existing.condition, a.condition)) {
+    return false;
+  }
   return true;
 }
 

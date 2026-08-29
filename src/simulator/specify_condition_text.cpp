@@ -10,7 +10,10 @@
 // SpecifyConditionOperator gives the spelling of each operator Table 30-1
 // admits, and SpecifyConditionText walks the expression; the helpers between
 // them render the select, concatenation and conditional forms §30.4.4.1 names.
+// SpecifyConditionsMatch at the end answers whether two such conditions are the
+// same one, which is the question §32.4.1's matching actually asks.
 
+#include <cctype>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -165,6 +168,43 @@ std::string SpecifyConditionText(const Expr* cond) {
     default:
       return {};
   }
+}
+
+namespace {
+
+// Advances `pos` past every whitespace character of `s`, which is the set
+// std::isspace answers for. The cast to unsigned char is what std::isspace
+// requires of a char, whose value may be negative.
+void SkipSpecifyConditionSpace(std::string_view s, std::size_t& pos) {
+  while (pos < s.size() &&
+         std::isspace(static_cast<unsigned char>(s[pos])) != 0) {
+    ++pos;
+  }
+}
+
+}  // namespace
+
+// §32.4.1: whether two module path conditions are the same condition. An SDF
+// COND and the SystemVerilog declaration it names reach this having been
+// written down by different hands -- JoinSdfCondTokens in
+// simulator/sdf_parser.cpp rejoins the reader's tokens with one space each,
+// where SpecifyConditionText above spaces a binary operator and nothing else --
+// so `mode[3 : 2]` and `mode[3:2]` are one condition spelled twice. Whitespace
+// is what differs and nothing else: neither speller emits a comment, a newline
+// or a tab, and no operand of §30.4.4.1 contains a space.
+bool SpecifyConditionsMatch(std::string_view a, std::string_view b) {
+  std::size_t i = 0;
+  std::size_t j = 0;
+  SkipSpecifyConditionSpace(a, i);
+  SkipSpecifyConditionSpace(b, j);
+  while (i < a.size() && j < b.size()) {
+    if (a[i] != b[j]) return false;
+    ++i;
+    ++j;
+    SkipSpecifyConditionSpace(a, i);
+    SkipSpecifyConditionSpace(b, j);
+  }
+  return i == a.size() && j == b.size();
 }
 
 }  // namespace delta

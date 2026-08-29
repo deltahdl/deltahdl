@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 #include "parser/ast.h"
 #include "simulator/specify.h"
@@ -34,5 +35,6 @@ void DerivePulseLimitsFromDelays(const uint64_t (&delays)[12],
                                  uint64_t (&reject_limit)[12],
                                  uint64_t (&error_limit)[12]);
 std::string SpecifyConditionText(const Expr* cond);
+bool SpecifyConditionsMatch(std::string_view a, std::string_view b);
 
 }  // namespace delta
