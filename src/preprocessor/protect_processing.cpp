@@ -102,6 +102,17 @@ struct RegionKeyReader {
   // in the output file, so it belongs to the description of the envelope rather
   // than to the lines about to stop being readable.
   std::string_view key_method;
+  // The identifier §34.5.11 has the text name the cipher its data are to be
+  // encrypted under by, empty where the text named none, and the line the
+  // naming stands on.
+  //
+  // The line is carried because the report about it is made where the region
+  // closes, that being where the value in effect for the region is settled,
+  // while what the report is about is the expression the author wrote. A report
+  // standing at the closing delimiter would send the reader to a line that
+  // names no algorithm.
+  std::string_view data_method;
+  uint32_t data_method_line = 0;
   // The coding scheme in effect where the reading stands, which §34.5.9 has
   // every encoded value of the text written under and §34.5.26 sends the
   // reader of a public key's line to. It is carried with the names because it
@@ -129,6 +140,44 @@ struct RegionKeyReader {
   // nothing about the others.
   bool encoded_digest_key_next = false;
 };
+
+// The report a region asking to be encrypted under a cipher this implementation
+// does not provide is owed.
+//
+// §34.5.11.2 has the identifier name "the encryption algorithm that shall be
+// used to encrypt subsequent begin-end blocks", so a region naming one has
+// stated what its blocks are to be produced with rather than described them.
+// This implementation provides one cipher and names it kDataMethod
+// (preprocessor/protect_envelope_output.h), so a region naming any other names
+// a cipher its blocks cannot be produced with, and encrypting it under this
+// tool's own would hand the author a file claiming an algorithm nobody used.
+//
+// Table 34-3 decides how much is being asked for, and the report says which of
+// the two it was. An identifier the table marks required is one §34.5.11.2 says
+// is "standard in every implementation", so a text naming it assumed nothing
+// and this tool is the one falling short; #3430 covers providing those ciphers.
+// An identifier outside that -- tabulated and optional, or somebody's own --
+// names a cipher a text assumed its reader knew.
+//
+// A region naming nothing is not refused anything, and neither is one naming
+// the identifier this tool writes.
+void ReportUnprovidedDataMethod(const RegionKeyReader& in_effect,
+                                DiagEngine* diag, uint32_t file_id) {
+  if (diag == nullptr) return;
+  std::string_view stated = ProtectPragmaValueBody(in_effect.data_method);
+  if (stated.empty() || stated == kDataMethod) return;
+  std::string message(
+      "protect pragma data_method asks for an encryption algorithm this "
+      "implementation does not provide: ");
+  message.append(stated);
+  message.append(IsRequiredProtectEncryptionAlgorithm(stated)
+                     ? ", which IEEE 1800-2023 Table 34-3 requires of every "
+                       "implementation"
+                     : ", which IEEE 1800-2023 Table 34-3 does not require of "
+                       "every implementation");
+  diag->Error(LineOf(file_id, in_effect.data_method_line), message,
+              Subclause("34.5.11.2"));
+}
 
 // The data decryption pragma expressions standing where a region asks for a key
 // block. §34.5.27 forms the block's buffer from them and holds every block of
@@ -168,7 +217,19 @@ ProtectDataDecryption DataDecryptionInEffect(const RegionKeyNames& names) {
 // produced and opened with, each taken the way the names beside them are: the
 // value standing where a region ends is the one that region's blocks belong to,
 // and a line writing none of them leaves the earlier ones as they were.
-void TakeMethodKeywords(std::string_view line, RegionKeyReader* reader) {
+void TakeMethodKeywords(std::string_view line, uint32_t line_num,
+                        RegionKeyReader* reader) {
+  // §34.5.11.2 has this identifier name "the encryption algorithm that shall be
+  // used to encrypt subsequent begin-end blocks", so the value standing where a
+  // region ends is the one that region was to be encrypted under. §34.5.11.1
+  // spells the expression with a string, so a parenthesized pragma_value names
+  // no algorithm and the identifier stated earlier stands.
+  std::string_view data_method =
+      KeywordSingleValueOnLine(line, kDataMethodKeyword);
+  if (!data_method.empty()) {
+    reader->data_method = data_method;
+    reader->data_method_line = line_num;
+  }
   // §34.5.21 puts the identifier in effect for the blocks written after it, so
   // the value standing where a region ends is the one that region's digests
   // belong to.
@@ -466,7 +527,7 @@ void TakeKeyNames(std::string_view line, uint32_t line_num,
   TakeAuthorship(line, reader);
   TakeComment(line, reader);
   TakeKeyDesignations(line, line_num, reader);
-  TakeMethodKeywords(line, reader);
+  TakeMethodKeywords(line, line_num, reader);
   TakeAnnouncements(line, reader);
 }
 
@@ -884,6 +945,7 @@ std::string EncryptEnvelopes(std::string_view source_text,
             "the key_block pragma expressions of one encryption envelope",
             Subclause("34.5.27"));
       }
+      ReportUnprovidedDataMethod(in_effect, diag, file_id);
       transformed.append(
           ClosedRegionText(region, in_effect, line, delimiter, how));
       in_envelope = false;

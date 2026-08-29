@@ -26,6 +26,19 @@
 // §34.5.24.1's and is stated in test_preprocessor_subclause_34_05_24_01.cpp,
 // along with the identifier reaching the envelope as written and a
 // parenthesized list reaching it as nothing.
+//
+// Whether the table marks an identifier as one every implementation provides is
+// §34.5.11.2's, and three cases below state the answer for this keyword.
+// §34.5.24.2 sends key_method to the identifiers written for data_method, so
+// Table 34-3's required column answers for this keyword as it does for that
+// one. That column marks des-cbc required and the other fifteen rows optional.
+// §34.5.11.2 says the required methods are standard in every implementation,
+// and leaves an additional identifier and the cipher behind it to the
+// implementation. IsRequiredProtectEncryptionAlgorithm in
+// src/preprocessor/protect_key_method.h is what answers the question, and
+// ReportUnprovidedDataMethod in src/preprocessor/protect_processing.cpp asks it
+// to say, of a cipher this tool does not provide, whether the standard required
+// it. #3270 is where that reading came from.
 
 #include <gtest/gtest.h>
 
@@ -157,6 +170,31 @@ TEST(ProtectKeyMethodDescription,
     if (row.required) ++required;
   }
   EXPECT_EQ(required, 1U);
+}
+
+// Each identifier is answered from the column of its own row. The case above
+// states which row carries the mark and that no second row carries it; this one
+// states that the answer given for an identifier is the mark standing beside
+// it, so a reader asking about any of the fifteen optional rows is told no.
+TEST(ProtectKeyMethodDescription, EachRowIsAnsweredFromItsOwnRequiredColumn) {
+  for (const ProtectEncryptionAlgorithm& row : ProtectEncryptionAlgorithms()) {
+    EXPECT_EQ(IsRequiredProtectEncryptionAlgorithm(row.identifier),
+              row.required)
+        << row.identifier;
+  }
+}
+
+// An identifier the table does not list is required of nobody. §34.5.11.2
+// leaves an additional identifier and the cipher behind it to the
+// implementation, so nothing about such an identifier is standard in every
+// implementation. An answer of yes would report a cipher one tool defined as
+// one every reader owes its author. The answer is on the characters written, so
+// a name differing from a tabulated one only in case is answered the same way.
+TEST(ProtectKeyMethodDescription,
+     AnIdentifierOutsideTheTableIsRequiredOfNobody) {
+  EXPECT_FALSE(
+      IsRequiredProtectEncryptionAlgorithm("a-cipher-nobody-tabulated"));
+  EXPECT_FALSE(IsRequiredProtectEncryptionAlgorithm("DES-CBC"));
 }
 
 // Each row names the published algorithm its identifier stands for, which is

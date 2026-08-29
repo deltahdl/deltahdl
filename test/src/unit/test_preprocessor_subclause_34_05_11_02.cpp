@@ -41,6 +41,22 @@
 // relocated rather than dropped. Issue #3428 is the defect: the identifier
 // stood in the clear whether the envelope carried key blocks or not.
 //
+// The first and second of those are what the file closes with, read from the
+// side that writes an envelope rather than the side that reads one.
+// §34.5.11.2's ENCRYPTION INPUT states that the identifier "specifies the
+// encryption algorithm that shall be used to encrypt subsequent begin-end
+// blocks", so a region naming one has stated what its own block is to be
+// produced with. This implementation provides one cipher and names it
+// kDataMethod (src/preprocessor/protect_envelope_output.h), so a region naming
+// any other identifier has asked for a block this tool cannot produce, and it
+// is told so. Table 34-3 decides the second half of that report: des-cbc is the
+// one identifier the table marks Required, and the other fifteen are Optional.
+// Issue #3270 is the defect: the encrypting half read the keyword nowhere, so a
+// region asking for des-cbc was sealed under this tool's stream cipher and its
+// envelope claimed x-deltahdl-stream as though that was what had been asked
+// for. Issue #3430 covers providing des-cbc, and the report is what stands in
+// its place until that lands.
+//
 // Table 34-3 itself is modelled in src/preprocessor/protect_key_method.h, which
 // §34.5.24 shares, so the identifiers written below are the tabulated spellings
 // rather than spellings invented here.
@@ -291,6 +307,155 @@ TEST(ProtectDataMethodEncryptionOutput,
   std::string read = Preprocess(envelope, f, config);
   EXPECT_FALSE(f.diag.HasErrors()) << read;
   EXPECT_TRUE(Holds(read, kSealedDesign)) << read;
+}
+
+// ---------------------------------------------------------------------------
+// ENCRYPTION INPUT: the cipher a region asks its own block to be made with.
+// ---------------------------------------------------------------------------
+
+// The design the regions below seal, and the key they are sealed under.
+constexpr std::string_view kAskedDesign = "module gasket_m; endmodule\n";
+constexpr std::string_view kAskingKey = "another-key-of-the-authors-own";
+
+// The design sealed by the one region below that asks for no cipher at all. It
+// is spelled apart from the design above so that a case reading an output for
+// it is reading for the text of its own region.
+constexpr std::string_view kUnaskedDesign = "module cradle_m; endmodule\n";
+
+// The report a region asking for a cipher this implementation does not produce
+// draws, up to the identifier that region named.
+constexpr std::string_view kNoSuchCipher =
+    "asks for an encryption algorithm this implementation does not provide: ";
+
+// The two halves of Table 34-3, as that report names them. Which half a report
+// carries is what separates an identifier the standard obliges every
+// implementation to provide from an identifier it leaves optional.
+constexpr std::string_view kTableRequires =
+    ", which IEEE 1800-2023 Table 34-3 requires of every implementation";
+constexpr std::string_view kTableAdmitsWithoutRequiring =
+    ", which IEEE 1800-2023 Table 34-3 does not require of every "
+    "implementation";
+
+// The whole of that report for one identifier drawn from one half of the table.
+std::string AsksFor(std::string_view identifier, std::string_view tabulated) {
+  std::string message(kNoSuchCipher);
+  message.append(identifier).append(tabulated);
+  return message;
+}
+
+// Envelope encryption over a source text an author wrote, with the reports the
+// reading made kept beside the text it produced. The source is added to the
+// manager so that a report stands at the line of it the author wrote the
+// identifier on, that line being what the cases below name.
+struct SealingRun {
+  PreprocFixture f;
+  std::string text;
+
+  explicit SealingRun(const std::string& src)
+      : text(EncryptEnvelopes(src, kAskingKey, ProtectKeyList(), &f.diag,
+                              f.mgr.AddFile("<test>", src))) {}
+
+  // Whether the region holding `design` came back as a block rather than as
+  // the characters the author wrote.
+  bool Sealed(std::string_view design) const {
+    return !Holds(text, design) && Holds(text, kDataBlockKeyword);
+  }
+};
+
+// §34.5.11.2: the identifier states "the encryption algorithm that shall be
+// used to encrypt subsequent begin-end blocks", so a region naming des-cbc has
+// stated what its own block is to be produced with. This implementation
+// produces one cipher and des-cbc is not it. Table 34-3 marks des-cbc Required,
+// and the report says so, because §34.5.11.2 calls a required method "standard
+// in every implementation" and this implementation is the one falling short.
+// Issue #3430 covers providing the cipher, and this report is what stands in
+// its place until that lands. Issue #3270 is the defect the case was written
+// for: the encrypting half read the keyword nowhere, so this region was sealed
+// under the tool's own cipher and its envelope claimed x-deltahdl-stream as
+// though that was what the author had asked for.
+//
+// The identifier stands on the second line and the region closes on the fourth,
+// so a report placed where the region closes fails this.
+TEST(ProtectDataMethodEncryptionInput,
+     ARegionAskingForTheRequiredCipherIsReported) {
+  std::string src = "`pragma protect begin\n";
+  src.append(Writes(kDataMethodKeyword, "des-cbc"));
+  src.append(kAskedDesign);
+  src += "`pragma protect end\n";
+  SealingRun run(src);
+  EXPECT_TRUE(ReportedError(run.f.diag.Diagnostics(),
+                            AsksFor("des-cbc", kTableRequires), 2, "34.5.11.2"))
+      << run.text;
+}
+
+// §34.5.11.2: Table 34-3 marks aes256-cbc Optional, and the report says that
+// instead. An implementation offering that cipher is required to offer it under
+// this identifier, and this one offers it under no identifier at all. The half
+// of the table the identifier came from is the whole of what separates this
+// case from the one above, so the message is read for that half.
+//
+// The identifier stands on the third line here rather than the second, the
+// region opening inside a design element.
+TEST(ProtectDataMethodEncryptionInput,
+     ARegionAskingForAnOptionalCipherSaysTheTableDoesNotRequireIt) {
+  std::string src = "module bezel_m;\n`pragma protect begin\n";
+  src.append(Writes(kDataMethodKeyword, "aes256-cbc"));
+  src += "  initial hatch = 7;\n`pragma protect end\nendmodule\n";
+  SealingRun run(src);
+  EXPECT_TRUE(ReportedError(run.f.diag.Diagnostics(),
+                            AsksFor("aes256-cbc", kTableAdmitsWithoutRequiring),
+                            3, "34.5.11.2"))
+      << run.text;
+}
+
+// §34.5.11.2: a region asking for the cipher this implementation does produce
+// is refused nothing, so it is sealed and no report is made. kDataMethod
+// (src/preprocessor/protect_envelope_output.h) is that identifier, and
+// §34.5.11.2 leaves an identifier outside Table 34-3 to the implementation that
+// coins it. Without this case the two above would hold of a tool that reported
+// every region whatever cipher it asked for.
+TEST(ProtectDataMethodEncryptionInput,
+     ARegionAskingForTheCipherWeProvideIsSealedInSilence) {
+  std::string src = "`pragma protect begin\n";
+  src.append(StatesTheCipherWeProvide());
+  src.append(kAskedDesign);
+  src += "`pragma protect end\n";
+  SealingRun run(src);
+  EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
+  EXPECT_TRUE(run.Sealed(kAskedDesign)) << run.text;
+}
+
+// §34.5.11.2 governs a region that named an algorithm, and a region naming none
+// asked for nothing that could be refused. Such a region is sealed under this
+// implementation's own cipher and the reading says nothing about it. Without
+// this case the two reported ones would hold of a tool that objected to every
+// region it read, the identifier notwithstanding.
+TEST(ProtectDataMethodEncryptionInput,
+     ARegionAskingForNoCipherIsSealedInSilence) {
+  std::string src = "`pragma protect begin\n";
+  src.append(kUnaskedDesign);
+  src += "`pragma protect end\n";
+  SealingRun run(src);
+  EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
+  EXPECT_TRUE(run.Sealed(kUnaskedDesign)) << run.text;
+}
+
+// §34.4 makes the scope of a protect pragma keyword lexical, so an identifier
+// written ahead of a region is in effect inside that region and states what its
+// block is to be produced with. The report therefore stands on the line the
+// author wrote the identifier on, which is the first, and not on either
+// delimiter of the region, which are the third and the fifth. blowfish-cbc is
+// one of Table 34-3's optional identifiers.
+TEST(ProtectDataMethodEncryptionInput,
+     ACipherNamedAheadOfTheRegionIsReportedOnItsOwnLine) {
+  std::string src = Writes(kDataMethodKeyword, "blowfish-cbc");
+  src += "module bracket_m; endmodule\n`pragma protect begin\n";
+  src += "  initial latch = 3;\n`pragma protect end\n";
+  SealingRun run(src);
+  EXPECT_TRUE(ReportedError(
+      run.f.diag.Diagnostics(),
+      AsksFor("blowfish-cbc", kTableAdmitsWithoutRequiring), 1, "34.5.11.2"))
+      << run.text;
 }
 
 }  // namespace
