@@ -372,19 +372,6 @@ bool RanWithStimulus(const char* design, const std::string& stimulus,
   return true;
 }
 
-// The position in `f`'s diagnostics of the first whose message contains
-// `needle`, or the number of diagnostics when none does. The case below that
-// claims two reports passes this position plus one to FindDiagFrom, so what it
-// asks for is a report beyond the one it already named rather than a report
-// beyond a position it guessed.
-std::size_t PositionOfFirstDiag(const SimFixture& f, std::string_view needle) {
-  const auto& diags = f.diag.Diagnostics();
-  for (std::size_t i = 0; i < diags.size(); ++i) {
-    if (diags[i].message.find(needle) != std::string::npos) return i;
-  }
-  return diags.size();
-}
-
 // §31.4.3: `ref_sig` rises at time 703 and `data_sig` rises at time 752, so the
 // two signals move 49 time units apart against the 29 limit1 allows the data
 // signal to trail the reference by.

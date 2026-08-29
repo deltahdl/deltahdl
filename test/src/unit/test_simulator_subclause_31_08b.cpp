@@ -170,19 +170,6 @@ bool DrivenToCompletion(const std::string& design, SimFixture& f) {
   return true;
 }
 
-// The position in `f`'s diagnostics of the first whose message contains
-// `needle`, or the number of diagnostics when none does. A case that claims one
-// report and no second passes this position plus one to FindDiagFrom, so what
-// it asks for is a report beyond the one it already named rather than a report
-// beyond a position it guessed.
-std::size_t PositionOfFirstDiag(const SimFixture& f, std::string_view needle) {
-  const auto& diags = f.diag.Diagnostics();
-  for (std::size_t i = 0; i < diags.size(); ++i) {
-    if (diags[i].message.find(needle) != std::string::npos) return i;
-  }
-  return diags.size();
-}
-
 // The design the first three cases share: a $setup whose reference signal is
 // the two-bit vector §31.8 allows, with `stimulus` as the tail of its initial
 // block. `clk` is declared [5:4], so its upper bit stands at offset 1 of the

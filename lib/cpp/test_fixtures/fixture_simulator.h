@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <iostream>
 #include <sstream>
 #include <streambuf>
@@ -125,6 +126,26 @@ inline const Diagnostic* FindDiagFrom(const SimFixture& f, size_t from,
 inline const Diagnostic* FindDiag(const SimFixture& f,
                                   std::string_view needle) {
   return FindDiagFrom(f, 0, needle);
+}
+
+// The position of the first diagnostic whose message contains `needle`, or the
+// number of diagnostics when none does.
+//
+// A test that claims a run reported exactly once, or at least twice, passes
+// this position plus one to FindDiagFrom, so what it asks for is a report
+// beyond the one it already named rather than a report beyond a position it
+// guessed. A clause that states how many violations a construct reports is what
+// makes such a claim worth writing: §31.8 has a $setup over a vector "still
+// only report a single timing violation" however many bits transitioned, and
+// §31.4.3's event-based $fullskew continues its window after a violation where
+// the timer-based mode turns dormant.
+inline std::size_t PositionOfFirstDiag(const SimFixture& f,
+                                       std::string_view needle) {
+  const auto& diags = f.diag.Diagnostics();
+  for (std::size_t i = 0; i < diags.size(); ++i) {
+    if (diags[i].message.find(needle) != std::string::npos) return i;
+  }
+  return diags.size();
 }
 
 inline Variable* MakeVar(SimFixture& f, std::string_view name, uint32_t width,
