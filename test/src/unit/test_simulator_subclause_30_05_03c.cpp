@@ -34,6 +34,20 @@
 // specify paths are active. A rise transition would select a delay of 4
 // because that is the smallest rise delay among the first three."
 //
+// The conditions below are written `act[4]` through `act[0]` rather than as
+// the example prints them, because `<` is not one of the operators §30.4.4.1
+// permits in a state-dependent path condition. Table 30-1 on printed page 876
+// lists them -- the bitwise, reduction, logical and equality operators, plus
+// concatenation, replication and the conditional -- and no relational operator
+// is among them, so the example under §30.5.3 writes a condition its own
+// clause 30 excludes. ConditionOpMessage in
+// src/elaborator/elaborator_validate_specify_limits.cpp names the operator the
+// elaborator refused, which is correct and is not what these cases are about. A
+// bit-select of a locally defined variable is the first entry in §30.4.4.1's
+// own list of permitted operands, so `act` states the same five conditions
+// with nothing the clause disallows: each case sets the bits of the paths the
+// example's MODE would have left true, and the arithmetic is untouched.
+//
 // The delays are the standard's own, and each case tells apart quantities that
 // share no value. At MODE 2 the answer is a rise delay of 4 and the answer a
 // run ignoring the conditions gives is 3, the smallest rise delay of all five;
@@ -103,18 +117,18 @@ namespace {
 // §30.5.3's Example 2, with the standard's `A` and `Y` written as the design's
 // own port names and `MODE` left to the parameter the case fixes.
 constexpr std::string_view kExample2Paths =
-    "    if (MODE < 5) (a => y) = (5, 9);\n"
-    "    if (MODE < 4) (a => y) = (4, 8);\n"
-    "    if (MODE < 3) (a => y) = (6, 5);\n"
-    "    if (MODE < 2) (a => y) = (3, 2);\n"
-    "    if (MODE < 1) (a => y) = (7, 7);\n";
+    "    if (act[4]) (a => y) = (5, 9);\n"
+    "    if (act[3]) (a => y) = (4, 8);\n"
+    "    if (act[2]) (a => y) = (6, 5);\n"
+    "    if (act[1]) (a => y) = (3, 2);\n"
+    "    if (act[0]) (a => y) = (7, 7);\n";
 
 // §30.4.4.4's pairing: one conditional path and the ifnone path that answers
 // for the same two terminals when the condition is false. A single delay
 // value fills all twelve transition slots per §30.5.1, so which of the two
 // governed is one number whichever transition is scheduled.
 constexpr std::string_view kIfnonePaths =
-    "    if (C) (a => y) = 13;\n"
+    "    if (act[4]) (a => y) = 13;\n"
     "    ifnone (a => y) = 21;\n";
 
 // The stimulus and the three things every case reads. `sa` rises once, at
@@ -143,16 +157,28 @@ constexpr std::string_view kStimulusAndProbes =
 // The module is the only one in the source and so the one ElaborateSrc
 // elaborates, and it is a top module because only a top module's specify block
 // is registered, which issue #3383 records.
-std::string PathSource(const std::string& param, std::string_view paths) {
-  std::string src = "module dut #(parameter " + param + ")";
-  src += " (input a, output y);\n";
+std::string PathSource(std::string_view setup, std::string_view paths) {
+  std::string src = "module dut(input a, output y);\n";
   src += "  logic sa, armed;\n";
+  src += "  logic [4:0] act;\n";
   src += "  assign a = sa;\n";
   src += "  assign y = a;\n";
   src += "  specify\n";
   src.append(paths);
   src += "  endspecify\n";
-  src.append(kStimulusAndProbes);
+  src += "  always @(y) begin\n";
+  src += "    if (armed) $display(\"edge %b at %0d\", y, $time);\n";
+  src += "  end\n";
+  src += "  initial begin\n";
+  src += "    armed = 1'b0;\n";
+  src += "    sa = 1'b0;\n";
+  src.append(setup);
+  src += "    #40 armed = 1'b1;\n";
+  src += "    #10 sa = 1'b1;\n";
+  src += "  end\n";
+  src += "  initial #45 $display(\"at 45 y=%b\", y);\n";
+  src += "  initial #80 $display(\"at 80 y=%b\", y);\n";
+  src += "endmodule\n";
   return src;
 }
 
@@ -164,7 +190,8 @@ std::string PathSource(const std::string& param, std::string_view paths) {
 // `y` as active would answer 3 and place the edge at t=53.
 TEST(StateDependentPathActivity, FalseConditionsWithholdTheSmallerRiseDelay) {
   SimFixture f;
-  std::string out = RunCapture(PathSource("MODE = 2", kExample2Paths), f);
+  std::string out =
+      RunCapture(PathSource("    act = 5'b11100;\n", kExample2Paths), f);
   EXPECT_EQ(out, "at 45 y=0\nedge 1 at 54\nat 80 y=1\n");
 }
 
@@ -176,7 +203,8 @@ TEST(StateDependentPathActivity, FalseConditionsWithholdTheSmallerRiseDelay) {
 // read.
 TEST(StateDependentPathActivity, EveryTrueConditionLeavesEveryPathActive) {
   SimFixture f;
-  std::string out = RunCapture(PathSource("MODE = 0", kExample2Paths), f);
+  std::string out =
+      RunCapture(PathSource("    act = 5'b11111;\n", kExample2Paths), f);
   EXPECT_EQ(out, "at 45 y=0\nedge 1 at 53\nat 80 y=1\n");
 }
 
@@ -189,7 +217,8 @@ TEST(StateDependentPathActivity, EveryTrueConditionLeavesEveryPathActive) {
 // of the 53, 54, 55, 56 and 57 that the five rise delays would give.
 TEST(StateDependentPathActivity, NoTrueConditionLeavesNoPathActive) {
   SimFixture f;
-  std::string out = RunCapture(PathSource("MODE = 5", kExample2Paths), f);
+  std::string out =
+      RunCapture(PathSource("    act = 5'b00000;\n", kExample2Paths), f);
   EXPECT_EQ(out, "at 45 y=0\nedge 1 at 50\nat 80 y=1\n");
 }
 
@@ -200,7 +229,8 @@ TEST(StateDependentPathActivity, NoTrueConditionLeavesNoPathActive) {
 // t=71.
 TEST(StateDependentPathActivity, TrueConditionOutranksTheIfnonePath) {
   SimFixture f;
-  std::string out = RunCapture(PathSource("C = 1", kIfnonePaths), f);
+  std::string out =
+      RunCapture(PathSource("    act = 5'b10000;\n", kIfnonePaths), f);
   EXPECT_EQ(out, "at 45 y=0\nedge 1 at 63\nat 80 y=1\n");
 }
 
@@ -210,7 +240,8 @@ TEST(StateDependentPathActivity, TrueConditionOutranksTheIfnonePath) {
 // case above in the value of C alone.
 TEST(StateDependentPathActivity, IfnonePathGovernsWhenTheConditionIsFalse) {
   SimFixture f;
-  std::string out = RunCapture(PathSource("C = 0", kIfnonePaths), f);
+  std::string out =
+      RunCapture(PathSource("    act = 5'b00000;\n", kIfnonePaths), f);
   EXPECT_EQ(out, "at 45 y=0\nedge 1 at 71\nat 80 y=1\n");
 }
 
