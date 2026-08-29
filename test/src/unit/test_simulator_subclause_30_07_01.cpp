@@ -7,6 +7,7 @@
 #include "fixture_specify_manager.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
+#include "simulator/sim_context.h"
 #include "simulator/specify.h"
 
 using namespace delta;
@@ -261,6 +262,56 @@ TEST(PulseControlResolution, UnmatchedPathSpecificIsIgnored) {
   // data=>q specparam.
   EXPECT_EQ(p->reject_limit[0], 12u);
   EXPECT_EQ(p->error_limit[0], 12u);
+}
+
+// §30.7.1's worked example, run rather than inspected. Issue #3384 is that the
+// example's own last line, `PATHPULSE$ = 3;`, was rejected, and the prose above
+// the example reads the 3 back off exactly the path asserted here: "The path
+// (data=>q) is not explicitly defined in any of the PATHPULSE$ declarations;
+// therefore, it acquires reject and error limit of 3, as defined by the last
+// PATHPULSE$ declaration." A parse test alone would pass against a parser that
+// accepted the unparenthesized form and dropped the value, so this is the case
+// that says the 3 arrived; both limits are asserted because §30.7.1 mirrors a
+// lone reject limit onto the error limit.
+//
+// Nothing of the specify block is trimmed -- all three module path
+// declarations and all three specparams are the example's, verbatim. What is
+// added is the module header the example does not print: §30.4.1 requires a
+// module path source to be a net connected to an input or inout port and a
+// destination to be connected to an output or inout port, and
+// CheckSpecifyPathTerminal in src/elaborator/elaborator_validate_specify.cpp
+// rejects a path terminal that is a declared local signal, so clk, data, clr
+// and pre are input ports and q is an output port.
+//
+// The example's numbers are kept as printed. 3 is the value the claim rests
+// on, and it differs from every other limit and delay in the source (12, 10, 4,
+// 2, 9), so a limit taken from the wrong specparam or from a path's default
+// (its own delay of 10) is caught. Nothing asserts on the 0 in `(0,4)`, since a
+// reject limit of 0 and an unset one read the same.
+TEST(PulseControlResolution, StandardExampleUnparenthesizedLimitReachesPath) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t(input clk, input data, input clr, input pre, output q);\n"
+      "  specify\n"
+      "    (clk => q) = 12;\n"
+      "    (data => q) = 10;\n"
+      "    (clr, pre *> q) = 4;\n"
+      "\n"
+      "  specparam\n"
+      "      PATHPULSE$clk$q = (2,9),\n"
+      "      PATHPULSE$clr$q = (0,4),\n"
+      "      PATHPULSE$ = 3;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  SpecifyManager* installed = f.ctx.GetSpecifyManager();
+  ASSERT_NE(installed, nullptr);
+  const PathDelay* unnamed = FindPath(*installed, "data", "q");
+  ASSERT_NE(unnamed, nullptr);
+  EXPECT_EQ(unnamed->reject_limit[0], 3u);
+  EXPECT_EQ(unnamed->error_limit[0], 3u);
 }
 
 }  // namespace
