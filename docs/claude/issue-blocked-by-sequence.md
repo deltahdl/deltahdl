@@ -35,6 +35,19 @@ Use `-F` and not `-f`. `-f` sends the id as a string and the request fails with 
 
 Interposing takes two edits, not one. To put `<NEW>` between `<BEFORE>` and `<AFTER>`, add `<NEW>` blocked by `<BEFORE>`, then delete `<AFTER>` blocked by `<BEFORE>` and add `<AFTER>` blocked by `<NEW>`. Leaving the old edge in place is harmless to the ordering but hides where the sequence was cut.
 
+## Mending the cut when an issue closes out of order
+
+Closing an issue that is not the head leaves two heads. Block the orphaned successor on the nearest predecessor still open:
+
+```bash
+id=$(gh api repos/deltahdl/deltahdl/issues/<NEAREST-OPEN-PREDECESSOR> -q .id)
+gh api -X POST repos/deltahdl/deltahdl/issues/<ORPHANED-SUCCESSOR>/dependencies/blocked_by -F issue_id=$id
+```
+
+That is expected rather than a breach. Closing the head promotes its successor and needs no edit, because a head whose only blockers are closed is the head. Closing anything else promotes a second one alongside it, and the sequence has two heads until the cut is mended.
+
+It happens whenever a session solves a defect it filed while working the head. `.claude/skills/autopilot/SKILL.md` calls for exactly that -- "Where a defect you file while solving that issue stops it from closing, solve what you filed first" -- so two issues close and each promotes a successor. One session closed #3392 and #3397 together and left `heads: [3393, 3398]`; blocking #3398 on #3396 restored it.
+
 ## Checking it after an edit
 
 The check that matters is the head count. Walk the whole sequence and confirm one head, no branch and no orphan:
@@ -64,4 +77,4 @@ print("off the chain:", sorted(set(nums)-set(seen)) or "none")
 PY
 ```
 
-`heads` holding anything but one number is the breach. A closed issue still carries its edges, so filter on `state == "open"`: a head whose only blockers are closed is the head.
+`heads` holding anything but one number wants one of two answers. An issue created with no blocked-by edge is the breach this check exists to catch, and the fix is to place it. An issue orphaned by a predecessor closing out of order is the case above, and the fix is to mend the cut. A closed issue still carries its edges, so filter on `state == "open"`: a head whose only blockers are closed is the head.
