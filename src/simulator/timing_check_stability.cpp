@@ -379,16 +379,37 @@ void ArmStabilityPair(const SpecifyManager& mgr, std::size_t index,
   pair->armed = ArmedCheck{&mgr, index};
   pair->ref_signal = std::move(ref_signal);
   pair->data_signal = std::move(data_signal);
-  WatchEdge(ref_var, ref_edge, [pair, &ctx]() {
-    pair->has_ref = true;
-    pair->ref_ticks = ctx.CurrentTime().ticks;
-    EvaluateStabilityPair(*pair, StabilityEvent::kReference, ctx);
-  });
-  WatchEdge(data_var, data_edge, [pair, &ctx]() {
-    pair->has_data = true;
-    pair->data_ticks = ctx.CurrentTime().ticks;
-    EvaluateStabilityPair(*pair, StabilityEvent::kData, ctx);
-  });
+  // §31.7 ties "the occurrence of timing checks to the value of a conditioning
+  // signal", so an event whose `&&&` condition does not hold is not an
+  // occurrence of the check: it neither records a transition time in
+  // StabilityPair nor triggers an EvaluateStabilityPair call. Both watchers go
+  // through WatchConditionedEdge (simulator/timing_check_driver_internal.h)
+  // rather than WatchEdge, because §31.3.3's Table 31-3 and §31.3.6's Table
+  // 31-6 leave the timecheck event to whichever of the two "occurs first in the
+  // simulation" and either event can therefore be the one a check is evaluated
+  // at. Each watcher is gated on its own event's condition -- the reference
+  // watcher on TimingCheckEntry::ref_condition_expr, the data watcher on
+  // TimingCheckEntry::data_condition_expr -- which is what keeps a suppressed
+  // event from being read as the one that happened first: a transition that
+  // wrote StabilityPair::ref_ticks or StabilityPair::data_ticks under a false
+  // condition would stand as the other side of every window the surviving event
+  // closes.
+  WatchConditionedEdge(
+      ref_var, ref_edge,
+      ConditionedEvent{.armed = pair->armed, .is_data_event = false}, ctx,
+      [pair, &ctx]() {
+        pair->has_ref = true;
+        pair->ref_ticks = ctx.CurrentTime().ticks;
+        EvaluateStabilityPair(*pair, StabilityEvent::kReference, ctx);
+      });
+  WatchConditionedEdge(
+      data_var, data_edge,
+      ConditionedEvent{.armed = pair->armed, .is_data_event = true}, ctx,
+      [pair, &ctx]() {
+        pair->has_data = true;
+        pair->data_ticks = ctx.CurrentTime().ticks;
+        EvaluateStabilityPair(*pair, StabilityEvent::kData, ctx);
+      });
 }
 
 }  // namespace delta

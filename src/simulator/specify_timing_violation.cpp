@@ -399,6 +399,34 @@ TimingCheckConditionClass ClassifyTimingCheckCondition(const Expr* condition) {
   return result;
 }
 
+const Expr* TimingCheckConditioningSignal(const Expr* condition) {
+  if (condition == nullptr) return nullptr;
+  // `~ expression`: the negation is applied by TimingCheckConditionEnables, so
+  // the operand is what carries the conditioning signal's value. A unary node
+  // holds its operand in lhs.
+  if (condition->kind == ExprKind::kUnary &&
+      condition->op == TokenKind::kTilde) {
+    return condition->lhs;
+  }
+  // `expression <op> scalar_constant`: the comparison is applied by
+  // TimingCheckConditionEnables against the scalar_constant it already carries,
+  // so the left-hand operand is the conditioning signal.
+  if (condition->kind == ExprKind::kBinary) {
+    switch (condition->op) {
+      case TokenKind::kEqEq:
+      case TokenKind::kEqEqEq:
+      case TokenKind::kBangEq:
+      case TokenKind::kBangEqEq:
+        return condition->lhs;
+      default:
+        break;
+    }
+  }
+  // Any other expression is the plain form, whose own value gates the check --
+  // the same expression ClassifyTimingCheckCondition reports as kPlain.
+  return condition;
+}
+
 bool IsSingleSignalTimingCheck(TimingCheckKind kind) {
   return kind == TimingCheckKind::kWidth || kind == TimingCheckKind::kPeriod;
 }

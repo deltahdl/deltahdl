@@ -1,3 +1,19 @@
+// §31.7's `&&&` conditioned event, asked of the functions that answer it
+// rather than of a run. Every case here builds an Expr from a parsed source, or
+// names a TimingCheckConditionKind outright, and hands it to
+// ClassifyTimingCheckCondition, IsDeterministicTimingCheckCondition or
+// TimingCheckConditionEnables (all in src/simulator/specify_timing_check.h).
+// What each case claims is that the function answers the clause once something
+// asks it.
+//
+// test_simulator_subclause_31_07b.cpp beside this file claims the other half:
+// that a run asks. Every case there drives a design whose timing check carries
+// a `&&&` condition and reads back what the run reported. Issue #3410 is that
+// nothing asked -- the condition reached TimingCheckEntry only as the text
+// §32.4.1's SDF COND matching compares, every caller of the two predicates in
+// the tree was a unit test, and a conditioned check therefore fired whether or
+// not its condition held.
+
 #include <gtest/gtest.h>
 
 #include "common/types.h"

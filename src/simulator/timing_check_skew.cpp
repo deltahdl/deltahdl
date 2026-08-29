@@ -32,12 +32,12 @@
 // event-based for §31.4.1, timer-based for §31.4.2 and §31.4.3. The event-based
 // mode of the latter two is unreachable until the entry carries the flag, and
 // so is every rule §31.4.2 and §31.4.3 key to remain_active_flag, each of which
-// governs a reference event whose `&&&` condition is false. No driver evaluates
-// TimingCheckEntry::condition at all -- that is issue #3410, which predates
-// this file and which the $setup and $hold of simulator/timing_check_driver.cpp
-// share
-// -- so the MODE conditions of Figure 31-1, Figure 31-2 and Figure 31-3 are not
-// reproduced here either.
+// governs a reference event whose `&&&` condition is false. ArmSkewWindow does
+// read TimingCheckEntry::ref_condition_expr and
+// TimingCheckEntry::data_condition_expr, through WatchConditionedEdge
+// (simulator/timing_check_driver_internal.h), so the MODE conditions of Figure
+// 31-1, Figure 31-2 and Figure 31-3 reach the run; the comment above those two
+// calls states which half of each of them is reproduced.
 //
 // The timer is a scheduled event, which is what makes the timer-based mode a
 // mechanism rather than a predicate: ArmTimeout below schedules the report at
@@ -329,8 +329,37 @@ void ArmSkewWindow(const SpecifyManager& mgr, std::size_t index,
   window->armed = ArmedCheck{&mgr, index};
   window->ref_signal = std::move(ref_signal);
   window->data_signal = std::move(data_signal);
-  WatchEdge(ref_var, kRefEdge, [window, &ctx]() { OnRefEdge(window, ctx); });
-  WatchEdge(data_var, kDataEdge, [window, &ctx]() { OnDataEdge(window, ctx); });
+  // §31.7 gates each of the two events on the `&&&` condition it was declared
+  // with: a conditioned event "ties the occurrence of timing checks to the
+  // value of a conditioning signal", so a transition whose condition does not
+  // hold is not an occurrence of the check at all, and it therefore opens no
+  // window and closes none. The watcher on `ref_var` is the reference event and
+  // the watcher on `data_var` is the data event, which is what selects
+  // TimingCheckEntry::ref_condition_expr or
+  // TimingCheckEntry::data_condition_expr
+  // (simulator/specify_timing_check.h); an event written without a `&&&`
+  // condition carries a null one there and always occurs.
+  //
+  // Suppressing the event outright is only half of what §31.4.2 and §31.4.3
+  // give a conditioned *reference* event whose condition is false. Both clauses
+  // have such an event turn the check dormant unless the check's
+  // remain_active_flag is set, in which case the event is discarded and any
+  // open window stands. Discarding it is what happens here, so what this file
+  // implements is the remain_active_flag-set behaviour, applied to every check.
+  // TimingCheckEntry (simulator/specify_timing_check.h) carries a field for
+  // neither event_based_flag nor remain_active_flag, although TimingCheckDecl
+  // (parser/ast_specify.h) parses both into TimingCheckDecl::event_based_flag
+  // and TimingCheckDecl::remain_active_flag, so the two behaviours cannot be
+  // told apart in this file today; issue #3420 tracks carrying the flags
+  // through to the entry. TimeskewChecker and FullskewSecondTimestampAction
+  // (simulator/specify_timing_check.h) already state the dormant-versus-discard
+  // rule, and are exercised only by unit tests.
+  WatchConditionedEdge(ref_var, kRefEdge,
+                       ConditionedEvent{window->armed, /*is_data_event=*/false},
+                       ctx, [window, &ctx]() { OnRefEdge(window, ctx); });
+  WatchConditionedEdge(data_var, kDataEdge,
+                       ConditionedEvent{window->armed, /*is_data_event=*/true},
+                       ctx, [window, &ctx]() { OnDataEdge(window, ctx); });
 }
 
 }  // namespace delta

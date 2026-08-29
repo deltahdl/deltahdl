@@ -182,7 +182,9 @@ void EvaluateStabilityWindow(const StabilityWindow& window,
 // block was registered for a module the design never elaborated leaves behind.
 void ArmStabilityWindow(const SpecifyManager& mgr, std::size_t index,
                         SimContext& ctx) {
-  StabilityWindowEvents events = EventsOf(mgr.GetTimingChecks()[index]);
+  const TimingCheckEntry& check = mgr.GetTimingChecks()[index];
+  bool is_setup = check.kind == TimingCheckKind::kSetup;
+  StabilityWindowEvents events = EventsOf(check);
   Variable* timestamp_var = ctx.FindVariable(events.timestamp_signal);
   Variable* timecheck_var = ctx.FindVariable(events.timecheck_signal);
   if (timestamp_var == nullptr || timecheck_var == nullptr) return;
@@ -191,13 +193,27 @@ void ArmStabilityWindow(const SpecifyManager& mgr, std::size_t index,
   auto window = std::make_shared<StabilityWindow>();
   window->armed = ArmedCheck{&mgr, index};
   window->events = std::move(events);
-  WatchEdge(timestamp_var, timestamp_edge, [window, &ctx]() {
-    window->has_timestamp = true;
-    window->timestamp_ticks = ctx.CurrentTime().ticks;
-  });
-  WatchEdge(timecheck_var, timecheck_edge, [window, &ctx]() {
-    EvaluateStabilityWindow(*window, ctx.CurrentTime().ticks, ctx);
-  });
+  // §31.7 gates a transition by the `&&&` condition written on the
+  // timing_check_event that transitioned, so each watcher is armed with the
+  // event it is on and not with the role that event plays in the window. The
+  // two are crossed for a $setup and not for a $hold: the timestamp watcher of
+  // a $setup stands on the data_event and its timecheck watcher on the
+  // reference_event, while a $hold has them the other way round, which is the
+  // assignment EventsOf makes above. ConditionedEvent::is_data_event is what
+  // states which of the two an armed watcher is on, and
+  // ConditionedEvent::Condition reads TimingCheckEntry::data_condition_expr or
+  // TimingCheckEntry::ref_condition_expr accordingly.
+  WatchConditionedEdge(timestamp_var, timestamp_edge,
+                       ConditionedEvent{window->armed, is_setup}, ctx,
+                       [window, &ctx]() {
+                         window->has_timestamp = true;
+                         window->timestamp_ticks = ctx.CurrentTime().ticks;
+                       });
+  WatchConditionedEdge(
+      timecheck_var, timecheck_edge, ConditionedEvent{window->armed, !is_setup},
+      ctx, [window, &ctx]() {
+        EvaluateStabilityWindow(*window, ctx.CurrentTime().ticks, ctx);
+      });
 }
 
 }  // namespace

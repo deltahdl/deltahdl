@@ -148,6 +148,13 @@ TimingCheckEntry BuildTimingCheckUnderOptions(
     entry.condition = SpecifyConditionText(decl.data_condition);
   }
 
+  // §31.7: the same two conditions in the form the run can ask. The text above
+  // renders one of them for SDF matching and drops the other, and neither text
+  // answers whether the condition holds at the moment its event happens, which
+  // is what decides whether the event enables the check at all.
+  entry.ref_condition_expr = decl.ref_condition;
+  entry.data_condition_expr = decl.data_condition;
+
   const int64_t kFirst = EvalTimingCheckLimit(
       decl.limits.empty() ? nullptr : decl.limits[0], ctx, arena);
   const int64_t kSecond = EvalTimingCheckLimit(

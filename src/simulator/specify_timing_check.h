@@ -48,6 +48,19 @@ struct TimingCheckEntry {
   std::string notifier;
 
   std::string condition;
+
+  // §31.7: the `&&&` condition each of the check's two timing_check_events was
+  // declared with, held as the expression the parser built and null for an
+  // event written without one. The `condition` text above is rendered for
+  // §32.4.1's SDF COND matching and cannot answer whether a condition holds
+  // now, which is what decides whether an event that just happened is a
+  // conditioned event at all. PathDelay::condition_expr
+  // (simulator/specify_path_delay.h) stands beside PathDelay::condition for the
+  // same reason. The two are read through TimingCheckEventEnabled
+  // (simulator/timing_check_driver_internal.h), which applies §31.7's
+  // deterministic and nondeterministic rules to the conditioning signal.
+  const Expr* ref_condition_expr = nullptr;
+  const Expr* data_condition_expr = nullptr;
 };
 
 // §31.4.1: the $skew check is event-based and stateful. Reference- and data-
@@ -229,6 +242,18 @@ struct TimingCheckConditionClass {
 // binary forms map to their respective comparison kinds and carry the LSB of
 // the scalar_constant operand; any other expression is the plain form.
 TimingCheckConditionClass ClassifyTimingCheckCondition(const Expr* condition);
+
+// §31.7: the conditioning signal of a parsed `&&&` condition -- the operand
+// whose value the clause reads, which is not the value of the condition
+// expression as a whole. Syntax 31-16 writes a scalar_timing_check_condition as
+// a bare `expression`, as `~ expression`, or as `expression <op>
+// scalar_constant`, and in all six forms the conditioning signal is that
+// `expression`: §31.7 states the rule over "an x value on the conditioning
+// signal" and TimingCheckConditionEnables takes the signal's least significant
+// bit, applying the `~` or the comparison itself. Evaluating the whole
+// condition and passing that instead would apply the operator twice. Null for a
+// null condition, which is an unconditioned event.
+const Expr* TimingCheckConditioningSignal(const Expr* condition);
 
 bool IsSingleSignalTimingCheck(TimingCheckKind kind);
 

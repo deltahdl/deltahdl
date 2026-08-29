@@ -183,11 +183,21 @@ void ArmWidthWindow(const SpecifyManager& mgr, std::size_t index,
   auto window = std::make_shared<PulseWindow>();
   window->armed = ArmedCheck{&mgr, index};
   window->signal = std::move(signal);
-  WatchEdge(var, OppositeEdge(opening_edge), [window, &ctx]() {
-    EvaluatePulseWindow(*window, ctx.CurrentTime().ticks, ctx);
-    window->has_timestamp = false;
-  });
-  WatchEdge(var, opening_edge, [window, &ctx]() {
+  // §31.7: a transition whose `&&&` condition does not hold is not an
+  // occurrence of the check, so both watchers go through WatchConditionedEdge
+  // (src/simulator/timing_check_driver_internal.h) rather than WatchEdge. A
+  // $width names one signal and one timing_check_event -- §31.4.4 derives the
+  // data event as "reference event signal with opposite edge" rather than
+  // taking one written for it -- so there is a single condition to read
+  // whichever edge arrived, and both events set ConditionedEvent::is_data_event
+  // false to read TimingCheckEntry::ref_condition_expr.
+  ConditionedEvent ref_event{window->armed, false};
+  WatchConditionedEdge(
+      var, OppositeEdge(opening_edge), ref_event, ctx, [window, &ctx]() {
+        EvaluatePulseWindow(*window, ctx.CurrentTime().ticks, ctx);
+        window->has_timestamp = false;
+      });
+  WatchConditionedEdge(var, opening_edge, ref_event, ctx, [window, &ctx]() {
     window->has_timestamp = true;
     window->timestamp_ticks = ctx.CurrentTime().ticks;
   });
@@ -207,12 +217,21 @@ void ArmPeriodWindow(const SpecifyManager& mgr, std::size_t index,
   auto window = std::make_shared<PulseWindow>();
   window->armed = ArmedCheck{&mgr, index};
   window->signal = std::move(signal);
-  WatchEdge(var, edge, [window, &ctx]() {
-    uint64_t now = ctx.CurrentTime().ticks;
-    EvaluatePulseWindow(*window, now, ctx);
-    window->has_timestamp = true;
-    window->timestamp_ticks = now;
-  });
+  // §31.7: a transition whose `&&&` condition does not hold is not an
+  // occurrence of the check, so the watcher goes through WatchConditionedEdge
+  // (src/simulator/timing_check_driver_internal.h) rather than WatchEdge. A
+  // $period names one signal and one timing_check_event -- §31.4.5 derives the
+  // data event as the reference signal with the same edge rather than taking
+  // one written for it -- so there is a single condition to read whichever edge
+  // arrived, and ConditionedEvent::is_data_event is false to read
+  // TimingCheckEntry::ref_condition_expr.
+  WatchConditionedEdge(var, edge, ConditionedEvent{window->armed, false}, ctx,
+                       [window, &ctx]() {
+                         uint64_t now = ctx.CurrentTime().ticks;
+                         EvaluatePulseWindow(*window, now, ctx);
+                         window->has_timestamp = true;
+                         window->timestamp_ticks = now;
+                       });
 }
 
 // One §31.4.6 check: which entry it is, the two signals it names under the
@@ -337,16 +356,30 @@ void ArmNochangeWindow(const SpecifyManager& mgr, std::size_t index,
   window->armed = ArmedCheck{&mgr, index};
   window->ref_signal = std::move(ref_signal);
   window->data_signal = std::move(data_signal);
-  WatchEdge(ref_var, leading_edge, [window, &ctx]() {
+  // §31.7: a transition whose `&&&` condition does not hold is not an
+  // occurrence of the check, so all three watchers go through
+  // WatchConditionedEdge (src/simulator/timing_check_driver_internal.h) rather
+  // than WatchEdge. The leading edge and the trailing edge are both edges of
+  // the reference event -- §31.4.6 derives the trailing one as the opposite of
+  // the edge the reference event was written with -- so both watchers on
+  // ref_var read TimingCheckEntry::ref_condition_expr with
+  // ConditionedEvent::is_data_event false. A $nochange is the one check here
+  // whose data event is written rather than derived, so the watcher on
+  // data_var reads its own TimingCheckEntry::data_condition_expr with
+  // is_data_event true.
+  ConditionedEvent ref_event{window->armed, false};
+  ConditionedEvent data_event{window->armed, true};
+  WatchConditionedEdge(ref_var, leading_edge, ref_event, ctx, [window, &ctx]() {
     window->has_leading = true;
     window->has_trailing = false;
     window->leading_ticks = ctx.CurrentTime().ticks;
     window->pending.clear();
   });
-  WatchEdge(ref_var, OppositeEdge(leading_edge), [window, &ctx]() {
-    CloseNochangeWindow(*window, ctx.CurrentTime().ticks, ctx);
-  });
-  WatchEdge(data_var, data_edge, [window, &ctx]() {
+  WatchConditionedEdge(
+      ref_var, OppositeEdge(leading_edge), ref_event, ctx, [window, &ctx]() {
+        CloseNochangeWindow(*window, ctx.CurrentTime().ticks, ctx);
+      });
+  WatchConditionedEdge(data_var, data_edge, data_event, ctx, [window, &ctx]() {
     RecordNochangeData(*window, ctx.CurrentTime().ticks, ctx);
   });
 }

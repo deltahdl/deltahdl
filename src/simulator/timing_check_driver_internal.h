@@ -12,6 +12,8 @@
 #include "common/source_loc.h"
 #include "common/types.h"
 #include "parser/ast_specify.h"
+#include "simulator/evaluation.h"
+#include "simulator/instance_prefix_override.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/specify_timing_check.h"
@@ -126,6 +128,77 @@ struct ArmedCheck {
     return mgr->GetTimingChecks()[index];
   }
 };
+
+// §31.7: whether a timing_check_event that just happened enables the check it
+// belongs to. A conditioned event "ties the occurrence of timing checks to the
+// value of a conditioning signal", so an event whose condition does not hold is
+// not an occurrence of the check at all and neither opens a window nor closes
+// one. `condition` is the expression the event was declared with, null for an
+// unconditioned event, which always enables.
+//
+// Three rules of §31.7 are applied, and each is applied where it is stated:
+// TimingCheckConditioningSignal picks out the operand the clause calls the
+// conditioning signal, the least significant word of its value is what
+// TimingCheckConditionEnables is handed because "if a vector net or an
+// expression resulting in a multibit value is used, then the LSB ... is used",
+// and TimingCheckConditionEnables settles the six forms of Syntax 31-16
+// together with the x rule -- deterministic comparisons are disabled by an x on
+// the conditioning signal, nondeterministic ones enabled by it. A value with no
+// words states no bit, and states no true condition either;
+// ConditionalPathIsActive in src/simulator/module_path_delay.cpp answers
+// §30.4.4.1 the same way.
+//
+// The evaluation stands in the instance whose specify block declared the check,
+// which `inst_prefix` names. §31.7 has the conditioning signal written by the
+// declaring module's bare name, and SimContext would otherwise join that name
+// to the prefix of whatever process is running -- here the process that
+// committed the transition, which is in no particular instance relation to the
+// check.
+inline bool TimingCheckEventEnabled(const Expr* condition,
+                                    std::string_view inst_prefix,
+                                    SimContext& ctx) {
+  if (condition == nullptr) return true;
+  InstancePrefixOverride scope(ctx.InstancePrefixOverride(), inst_prefix);
+  const Expr* signal = TimingCheckConditioningSignal(condition);
+  Logic4Vec value = EvalExpr(signal, ctx, ctx.GetArena());
+  if (value.nwords == 0) return false;
+  TimingCheckConditionClass form = ClassifyTimingCheckCondition(condition);
+  return TimingCheckConditionEnables(form.kind, value.words[0],
+                                     form.scalar_constant_bit);
+}
+
+// §31.7: one check's conditioned event -- which check, and which of its two
+// timing_check_events, so that the `&&&` condition gating the event can be read
+// off the entry at the moment a transition arrives rather than copied when the
+// watcher was armed. Reading it back is what lets §32.4.2's TIMINGCHECK
+// annotation reach a check already armed, for the reason ArmedCheck holds a
+// position rather than a pointer.
+struct ConditionedEvent {
+  ArmedCheck armed;
+  bool is_data_event = false;
+
+  const Expr* Condition() const {
+    const TimingCheckEntry& check = armed.Entry();
+    return is_data_event ? check.data_condition_expr : check.ref_condition_expr;
+  }
+};
+
+// Arms the watcher WatchEdge arms and calls `on_edge` only for a transition
+// that §31.7 makes an occurrence of the check. Every §31 watcher goes through
+// this rather than through WatchEdge: an event written without a `&&&`
+// condition carries a null one and is enabled unconditionally, so there is no
+// second case to keep.
+inline void WatchConditionedEdge(Variable* var, SpecifyEdge edge,
+                                 ConditionedEvent event, SimContext& ctx,
+                                 std::function<void()> on_edge) {
+  WatchEdge(var, edge, [event, &ctx, on_edge = std::move(on_edge)]() {
+    if (!TimingCheckEventEnabled(event.Condition(),
+                                 event.armed.Entry().inst_prefix, ctx)) {
+      return;
+    }
+    on_edge();
+  });
+}
 
 // Reports one violation as a warning. §31.2's violation is a state the run
 // reached rather than a construct that is illegal, which is why it is a warning
