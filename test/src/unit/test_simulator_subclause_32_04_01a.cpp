@@ -42,7 +42,10 @@ bool BuildSpecifyFromSource(const std::string& src, SimFixture& f,
 // the unconditional endpoint pair no a-to-y construct may touch. Every declared
 // value is distinct, so untouched never reads as overwritten. The two $setup
 // checks differ only by condition and the $hold only by type, which is what
-// makes the timing check matching rule observable.
+// makes the timing check matching rule observable. $setup writes its data event
+// first (Syntax 31-3) and $hold its reference event first (Syntax 31-4), so the
+// three timing check declarations below name d as the data signal and clk as
+// the reference one despite writing their arguments in opposite orders.
 const char* const kDesign =
     "module t(input a, input b, input mode, input clk, input d,\n"
     "         output y, output z);\n"
@@ -52,8 +55,8 @@ const char* const kDesign =
     "    if (!mode) (a => y) = 22;\n"
     "    ifnone     (a => y) = 23;\n"
     "    (b => z) = 24;\n"
-    "    $setup(posedge clk &&& mode, d, 41, ntf);\n"
-    "    $setup(posedge clk &&& !mode, d, 42, ntf);\n"
+    "    $setup(d, posedge clk &&& mode, 41, ntf);\n"
+    "    $setup(d, posedge clk &&& !mode, 42, ntf);\n"
     "    $hold(posedge clk, d, 51, ntf);\n"
     "  endspecify\n"
     "endmodule\n";

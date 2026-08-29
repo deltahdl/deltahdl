@@ -167,7 +167,7 @@ const char* const kCheckedPathSrc =
     "  specify\n"
     "    (A => Z) = 40;\n"
     "    specparam PATHPULSE$ = (21, 34);\n"
-    "    $setup(posedge CK, D, 5);\n"
+    "    $setup(D, posedge CK, 5);\n"
     "  endspecify\n"
     "endmodule\n";
 

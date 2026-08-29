@@ -46,7 +46,7 @@ const char* const kDesign =
     "    specparam tRise = 11;\n"
     "    (a => y) = 21;\n"
     "    (b => z) = 31;\n"
-    "    $setup(posedge clk, d, 41, ntf);\n"
+    "    $setup(d, posedge clk, 41, ntf);\n"
     "    $hold(posedge clk, d, 51, ntf);\n"
     "  endspecify\n"
     "endmodule\n";

@@ -91,16 +91,19 @@ TEST(TimingCheckCondition, ConditionUsesOnlyLeastSignificantBit) {
 
 // Parse a module carrying a single conditioned timing check and run the parsed
 // reference-event `&&&` condition through the production classifier, returning
-// the small result POD. The ParseResult (and its arena) stays alive across the
+// the small result POD. Syntax 31-3 writes `$setup(data_event,
+// reference_event, timing_check_limit)`, so the reference event this condition
+// rides on is the second argument, spelled as §31.6 Example 2 spells it. The
+// ParseResult (and its arena) stays alive across the
 // ClassifyTimingCheckCondition call, so the classifier observes the expression
 // exactly as the parser built it from real syntax -- not a hand-built AST.
 TimingCheckConditionClass ClassifyRefCondition(const std::string& cond_src) {
   std::string src =
       "module m;\n"
       "specify\n"
-      "  $setup(data &&& " +
+      "  $setup(data, posedge clk &&& " +
       cond_src +
-      ", posedge clk, 10);\n"
+      ", 10);\n"
       "endspecify\n"
       "endmodule\n";
   ParseResult r = Parse(src);
@@ -317,7 +320,7 @@ TEST(ConditionedTimingCheckSimulation, TimingCheckConditionSimulates) {
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
-      "    $setup(data &&& en, posedge clk, 10);\n"
+      "    $setup(data, posedge clk &&& en, 10);\n"
       "  endspecify\n"
       "  initial x = 8'd33;\n"
       "endmodule\n",

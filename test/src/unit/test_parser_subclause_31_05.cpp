@@ -6,6 +6,12 @@ using namespace delta;
 
 namespace {
 
+// Syntax 31-3 writes `$setup(data_event, reference_event, timing_check_limit)`,
+// so a $setup's second argument is its reference event and an edge control
+// specifier written there reaches ref_edge and ref_edge_descriptors. Syntax
+// 31-4 writes `$hold(reference_event, data_event, ...)`, so the $hold cases
+// below decorate their first argument to reach the same two fields.
+
 TEST(EdgeControlSpecifierParsing, EdgeKeywordNoBrackets) {
   auto r = Parse(
       "module m;\n"
@@ -16,8 +22,8 @@ TEST(EdgeControlSpecifierParsing, EdgeKeywordNoBrackets) {
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->data_edge, SpecifyEdge::kEdge);
-  EXPECT_TRUE(tc->data_edge_descriptors.empty());
+  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kEdge);
+  EXPECT_TRUE(tc->ref_edge_descriptors.empty());
 }
 
 TEST(EdgeControlSpecifierParsing, SingleDescriptor01) {
@@ -30,10 +36,10 @@ TEST(EdgeControlSpecifierParsing, SingleDescriptor01) {
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->data_edge, SpecifyEdge::kEdge);
-  ASSERT_EQ(tc->data_edge_descriptors.size(), 1u);
-  EXPECT_EQ(tc->data_edge_descriptors[0].first, '0');
-  EXPECT_EQ(tc->data_edge_descriptors[0].second, '1');
+  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kEdge);
+  ASSERT_EQ(tc->ref_edge_descriptors.size(), 1u);
+  EXPECT_EQ(tc->ref_edge_descriptors[0].first, '0');
+  EXPECT_EQ(tc->ref_edge_descriptors[0].second, '1');
 }
 
 TEST(EdgeControlSpecifierParsing, Descriptors01And10) {
@@ -46,12 +52,12 @@ TEST(EdgeControlSpecifierParsing, Descriptors01And10) {
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->data_edge, SpecifyEdge::kEdge);
-  ASSERT_EQ(tc->data_edge_descriptors.size(), 2u);
-  EXPECT_EQ(tc->data_edge_descriptors[0].first, '0');
-  EXPECT_EQ(tc->data_edge_descriptors[0].second, '1');
-  EXPECT_EQ(tc->data_edge_descriptors[1].first, '1');
-  EXPECT_EQ(tc->data_edge_descriptors[1].second, '0');
+  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kEdge);
+  ASSERT_EQ(tc->ref_edge_descriptors.size(), 2u);
+  EXPECT_EQ(tc->ref_edge_descriptors[0].first, '0');
+  EXPECT_EQ(tc->ref_edge_descriptors[0].second, '1');
+  EXPECT_EQ(tc->ref_edge_descriptors[1].first, '1');
+  EXPECT_EQ(tc->ref_edge_descriptors[1].second, '0');
 }
 
 TEST(EdgeControlSpecifierParsing, DescriptorsXTransitions) {
@@ -64,11 +70,11 @@ TEST(EdgeControlSpecifierParsing, DescriptorsXTransitions) {
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  ASSERT_EQ(tc->data_edge_descriptors.size(), 2u);
-  EXPECT_EQ(tc->data_edge_descriptors[0].first, 'x');
-  EXPECT_EQ(tc->data_edge_descriptors[0].second, '0');
-  EXPECT_EQ(tc->data_edge_descriptors[1].first, 'x');
-  EXPECT_EQ(tc->data_edge_descriptors[1].second, '1');
+  ASSERT_EQ(tc->ref_edge_descriptors.size(), 2u);
+  EXPECT_EQ(tc->ref_edge_descriptors[0].first, 'x');
+  EXPECT_EQ(tc->ref_edge_descriptors[0].second, '0');
+  EXPECT_EQ(tc->ref_edge_descriptors[1].first, 'x');
+  EXPECT_EQ(tc->ref_edge_descriptors[1].second, '1');
 }
 
 TEST(EdgeControlSpecifierParsing, DescriptorsZTransitions) {
@@ -98,11 +104,11 @@ TEST(EdgeControlSpecifierParsing, DescriptorsToXTransitions) {
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  ASSERT_EQ(tc->data_edge_descriptors.size(), 2u);
-  EXPECT_EQ(tc->data_edge_descriptors[0].first, '0');
-  EXPECT_EQ(tc->data_edge_descriptors[0].second, 'x');
-  EXPECT_EQ(tc->data_edge_descriptors[1].first, '1');
-  EXPECT_EQ(tc->data_edge_descriptors[1].second, 'x');
+  ASSERT_EQ(tc->ref_edge_descriptors.size(), 2u);
+  EXPECT_EQ(tc->ref_edge_descriptors[0].first, '0');
+  EXPECT_EQ(tc->ref_edge_descriptors[0].second, 'x');
+  EXPECT_EQ(tc->ref_edge_descriptors[1].first, '1');
+  EXPECT_EQ(tc->ref_edge_descriptors[1].second, 'x');
 }
 
 TEST(EdgeControlSpecifierParsing, DescriptorUppercaseToXZ) {
@@ -115,11 +121,11 @@ TEST(EdgeControlSpecifierParsing, DescriptorUppercaseToXZ) {
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  ASSERT_EQ(tc->data_edge_descriptors.size(), 2u);
-  EXPECT_EQ(tc->data_edge_descriptors[0].first, '0');
-  EXPECT_EQ(tc->data_edge_descriptors[0].second, 'X');
-  EXPECT_EQ(tc->data_edge_descriptors[1].first, '1');
-  EXPECT_EQ(tc->data_edge_descriptors[1].second, 'Z');
+  ASSERT_EQ(tc->ref_edge_descriptors.size(), 2u);
+  EXPECT_EQ(tc->ref_edge_descriptors[0].first, '0');
+  EXPECT_EQ(tc->ref_edge_descriptors[0].second, 'X');
+  EXPECT_EQ(tc->ref_edge_descriptors[1].first, '1');
+  EXPECT_EQ(tc->ref_edge_descriptors[1].second, 'Z');
 }
 
 TEST(EdgeControlSpecifierParsing, OnReferenceEvent) {
@@ -148,7 +154,7 @@ TEST(EdgeControlSpecifierParsing, SixDescriptorsAccepted) {
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  ASSERT_EQ(tc->data_edge_descriptors.size(), 6u);
+  ASSERT_EQ(tc->ref_edge_descriptors.size(), 6u);
 }
 
 TEST(EdgeControlSpecifierParsing, SevenDescriptorsError) {
@@ -196,8 +202,8 @@ TEST(EdgeControlSpecifierParsing, PosedgeShorthandRecorded) {
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->data_edge, SpecifyEdge::kPosedge);
-  EXPECT_TRUE(tc->data_edge_descriptors.empty());
+  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kPosedge);
+  EXPECT_TRUE(tc->ref_edge_descriptors.empty());
 }
 
 TEST(EdgeControlSpecifierParsing, NegedgeShorthandRecorded) {
@@ -251,11 +257,11 @@ TEST(EdgeControlSpecifierParsing, DescriptorUppercaseFromXZ) {
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  ASSERT_EQ(tc->data_edge_descriptors.size(), 2u);
-  EXPECT_EQ(tc->data_edge_descriptors[0].first, 'X');
-  EXPECT_EQ(tc->data_edge_descriptors[0].second, '0');
-  EXPECT_EQ(tc->data_edge_descriptors[1].first, 'Z');
-  EXPECT_EQ(tc->data_edge_descriptors[1].second, '1');
+  ASSERT_EQ(tc->ref_edge_descriptors.size(), 2u);
+  EXPECT_EQ(tc->ref_edge_descriptors[0].first, 'X');
+  EXPECT_EQ(tc->ref_edge_descriptors[0].second, '0');
+  EXPECT_EQ(tc->ref_edge_descriptors[1].first, 'Z');
+  EXPECT_EQ(tc->ref_edge_descriptors[1].second, '1');
 }
 
 // The zero_or_one z_or_x form with a lowercase z half (e.g. 0z) lexes as an
@@ -272,11 +278,11 @@ TEST(EdgeControlSpecifierParsing, SplitFormLowercaseZ) {
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  ASSERT_EQ(tc->data_edge_descriptors.size(), 2u);
-  EXPECT_EQ(tc->data_edge_descriptors[0].first, '0');
-  EXPECT_EQ(tc->data_edge_descriptors[0].second, 'z');
-  EXPECT_EQ(tc->data_edge_descriptors[1].first, '1');
-  EXPECT_EQ(tc->data_edge_descriptors[1].second, 'z');
+  ASSERT_EQ(tc->ref_edge_descriptors.size(), 2u);
+  EXPECT_EQ(tc->ref_edge_descriptors[0].first, '0');
+  EXPECT_EQ(tc->ref_edge_descriptors[0].second, 'z');
+  EXPECT_EQ(tc->ref_edge_descriptors[1].first, '1');
+  EXPECT_EQ(tc->ref_edge_descriptors[1].second, 'z');
 }
 
 // A space inserted between the two halves of the zero_or_one z_or_x form is

@@ -99,10 +99,12 @@ TEST(TimingCheckCommandParsing, SetupAsSpecifyItem) {
   auto* si = sp.sole_item;
   EXPECT_EQ(si->kind, SpecifyItemKind::kTimingCheck);
   EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kSetup);
-  EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kNone);
-  EXPECT_EQ(si->timing_check.ref_terminal.name, "d");
-  EXPECT_EQ(si->timing_check.data_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(si->timing_check.data_terminal.name, "clk");
+  // Syntax 31-3 names the data_event first, so `d` is the data event and
+  // `posedge clk` the reference event.
+  EXPECT_EQ(si->timing_check.data_edge, SpecifyEdge::kNone);
+  EXPECT_EQ(si->timing_check.data_terminal.name, "d");
+  EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(si->timing_check.ref_terminal.name, "clk");
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
 }
 

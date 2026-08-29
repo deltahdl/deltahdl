@@ -47,12 +47,14 @@ std::string SdfWith(const std::string& entry) {
 // never reads as overwritten. The setup/hold/setuphold/nochange group shares
 // the clk-d signal pair, the recovery/removal/recrem group shares clk-rst and
 // the skew group shares clk-clk2, which is what makes "same names, other type"
-// the thing the mapping has to get right.
+// the thing the mapping has to get right. $setup writes its data event first
+// (Syntax 31-3) where every other check here writes the reference event first,
+// so its d precedes its posedge clk and it still names the clk-d pair.
 const char* const kDesign =
     "module t(input d, input clk, input clk2, input rst);\n"
     "  reg ntf;\n"
     "  specify\n"
-    "    $setup(posedge clk, d, 11, ntf);\n"
+    "    $setup(d, posedge clk, 11, ntf);\n"
     "    $hold(posedge clk, d, 12, ntf);\n"
     "    $setuphold(posedge clk, d, 13, 14, ntf);\n"
     "    $recovery(posedge clk, rst, 15, ntf);\n"

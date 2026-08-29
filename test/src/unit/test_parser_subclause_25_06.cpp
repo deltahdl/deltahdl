@@ -60,8 +60,10 @@ TEST(SpecifyInterfaceTerminalParsing,
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->ref_terminal.interface_name, "intf");
-  EXPECT_EQ(tc->ref_terminal.name, "data");
+  // Syntax 31-3 writes the data_event first, so the interface signal here is
+  // the $setup data event.
+  EXPECT_EQ(tc->data_terminal.interface_name, "intf");
+  EXPECT_EQ(tc->data_terminal.name, "data");
 }
 
 }  // namespace

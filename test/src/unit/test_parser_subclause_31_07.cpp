@@ -13,6 +13,11 @@ namespace {
 // distinct alternative drawn in Syntax 31-16 (scalar_timing_check_condition's
 // six forms and the parenthesized timing_check_condition). Operator/literal
 // spellings inside the condition belong to the expression grammar, not §31.7.
+//
+// Syntax 31-3 writes `$setup(data_event, reference_event, timing_check_limit)`,
+// where Syntax 31-4 writes `$hold(reference_event, data_event, ...)`. A
+// condition on a $setup's first argument therefore reaches data_condition, and
+// one on a $hold's first argument reaches ref_condition.
 
 TEST(ConditionedTimingCheckParsing, TimingCheckConditionBare) {
   auto r = Parse(
@@ -24,7 +29,7 @@ TEST(ConditionedTimingCheckParsing, TimingCheckConditionBare) {
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  EXPECT_NE(tc->ref_condition, nullptr);
+  EXPECT_NE(tc->data_condition, nullptr);
 }
 
 TEST(ConditionedTimingCheckParsing, ScalarTimingCheckCondNegation) {
@@ -37,7 +42,7 @@ TEST(ConditionedTimingCheckParsing, ScalarTimingCheckCondNegation) {
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  EXPECT_NE(tc->ref_condition, nullptr);
+  EXPECT_NE(tc->data_condition, nullptr);
 }
 
 TEST(ConditionedTimingCheckParsing, ScalarTimingCheckCondEquality) {
@@ -50,7 +55,7 @@ TEST(ConditionedTimingCheckParsing, ScalarTimingCheckCondEquality) {
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  EXPECT_NE(tc->ref_condition, nullptr);
+  EXPECT_NE(tc->data_condition, nullptr);
 }
 
 TEST(ConditionedTimingCheckParsing, ScalarTimingCheckCondCaseEquality) {
@@ -63,7 +68,7 @@ TEST(ConditionedTimingCheckParsing, ScalarTimingCheckCondCaseEquality) {
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  EXPECT_NE(tc->ref_condition, nullptr);
+  EXPECT_NE(tc->data_condition, nullptr);
 }
 
 TEST(ConditionedTimingCheckParsing, ScalarTimingCheckCondInequality) {
@@ -102,7 +107,7 @@ TEST(ConditionedTimingCheckParsing, TimingCheckConditionParenthesized) {
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  EXPECT_NE(tc->ref_condition, nullptr);
+  EXPECT_NE(tc->data_condition, nullptr);
 }
 
 TEST(ConditionedTimingCheckParsing, ConditionBothEvents) {
@@ -134,7 +139,7 @@ TEST(ConditionedTimingCheckParsing, ScalarTimingCheckCondBareComparison) {
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  EXPECT_NE(tc->ref_condition, nullptr);
+  EXPECT_NE(tc->data_condition, nullptr);
 }
 
 // §31.7 negative form: when `&&&` is present a timing_check_condition is

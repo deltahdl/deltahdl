@@ -541,7 +541,7 @@ TEST(SdfSpecparamReevaluation, TimingCheckLimitExpressionIsReevaluated) {
               "  reg ntf;\n"
               "  specify\n"
               "    specparam cap = 3;\n"
-              "    $setup(posedge clk, dat, 2 * cap, ntf);\n"
+              "    $setup(dat, posedge clk, 2 * cap, ntf);\n"
               "  endspecify\n"
               "endmodule\n"));
   const TimingCheckEntry* tc = d.Check(TimingCheckKind::kSetup);
@@ -591,7 +591,7 @@ TEST(SdfSpecparamReevaluation, LiteralTimingCheckLimitIsNotReevaluated) {
               "  reg ntf;\n"
               "  specify\n"
               "    specparam cap = 3;\n"
-              "    $setup(posedge clk, dat, 7, ntf);\n"
+              "    $setup(dat, posedge clk, 7, ntf);\n"
               "  endspecify\n"
               "endmodule\n"));
   ASSERT_NE(d.Check(TimingCheckKind::kSetup), nullptr);

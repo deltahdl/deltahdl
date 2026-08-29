@@ -323,7 +323,7 @@ TEST(SdfMultipleFiles, IncrementInALaterFileReachesOnlyTheRegionItNames) {
 std::string CheckDesign(const std::string& calls) {
   return "module check_leaf(input d_in, input clk_in, output q_out);\n"
          "  specify\n"
-         "    $setup(posedge clk_in, d_in, 5);\n"
+         "    $setup(d_in, posedge clk_in, 5);\n"
          "  endspecify\n"
          "endmodule\n"
          "module top;\n"

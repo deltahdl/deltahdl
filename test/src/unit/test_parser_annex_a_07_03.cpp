@@ -450,9 +450,11 @@ TEST(TimingCheckEventDefParsing, TerminalBitSelect) {
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->ref_terminal.name, "data");
-  EXPECT_EQ(tc->ref_terminal.range_kind, SpecifyRangeKind::kBitSelect);
-  EXPECT_NE(tc->ref_terminal.range_left, nullptr);
+  // Syntax 31-3 writes the data_event first, so the bit-select terminal is the
+  // $setup data event.
+  EXPECT_EQ(tc->data_terminal.name, "data");
+  EXPECT_EQ(tc->data_terminal.range_kind, SpecifyRangeKind::kBitSelect);
+  EXPECT_NE(tc->data_terminal.range_left, nullptr);
 }
 
 TEST(TimingCheckEventDefParsing, TerminalBitSelectOnDataSignal) {

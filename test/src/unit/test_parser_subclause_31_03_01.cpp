@@ -11,12 +11,12 @@ namespace {
 //   ] ) ;
 // The shared timing-check parser (ParseTimingCheck / ParseTimingCheckKind /
 // ParseTimingCheckTrailingArgs) carries it. The terminals are recorded
-// positionally, so for $setup the first argument (the data_event) lands in
-// ref_terminal and the second (the reference_event) in data_terminal; the
-// timestamp/timecheck role assignment of Table 31-1 is applied later by the
-// simulator. The optional trailing notifier (notifier ::= variable_identifier)
-// declared in this syntax is the same notifier whose violation-response
-// semantics §31.6 defines.
+// positionally into the reference fields and then swapped for $setup alone, so
+// the first argument (the data_event) lands in data_terminal and the second
+// (the reference_event) in ref_terminal; the timestamp/timecheck role
+// assignment of Table 31-1 is applied later by the simulator. The optional
+// trailing notifier (notifier ::= variable_identifier) declared in this syntax
+// is the same notifier whose violation-response semantics §31.6 defines.
 
 TEST(TimingCheckCommandParsing, SetupParsesDataReferenceLimit) {
   auto sp = ParseSpecifySingle(
@@ -32,11 +32,11 @@ TEST(TimingCheckCommandParsing, SetupParsesDataReferenceLimit) {
   EXPECT_EQ(si->kind, SpecifyItemKind::kTimingCheck);
   EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kSetup);
   // First positional argument is the data_event.
-  EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kNone);
-  EXPECT_EQ(si->timing_check.ref_terminal.name, "data");
+  EXPECT_EQ(si->timing_check.data_edge, SpecifyEdge::kNone);
+  EXPECT_EQ(si->timing_check.data_terminal.name, "data");
   // Second positional argument is the reference_event.
-  EXPECT_EQ(si->timing_check.data_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(si->timing_check.data_terminal.name, "clk");
+  EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(si->timing_check.ref_terminal.name, "clk");
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
   // The optional notifier is omitted here, so nothing is recorded for it.
   EXPECT_TRUE(si->timing_check.notifier.empty());

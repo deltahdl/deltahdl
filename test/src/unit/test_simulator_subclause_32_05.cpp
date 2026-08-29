@@ -144,7 +144,7 @@ const char* const kSpecparamCheckSrc =
     "module c(input D, input CK);\n"
     "  specify\n"
     "    specparam lim = 5;\n"
-    "    $setup(posedge CK, D, lim);\n"
+    "    $setup(D, posedge CK, lim);\n"
     "  endspecify\n"
     "endmodule\n";
 
