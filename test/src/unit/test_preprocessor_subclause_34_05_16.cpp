@@ -50,8 +50,7 @@
 // list of further expressions rather than one written thing, so a list written
 // against the keyword names no entity. The last four cases read what the tool
 // wrote rather than what a Preprocessor holds. Issue #3273 is the defect: the
-// list was taken as the entity and written into the envelope quoted, which is
-// no pragma_expression §22.11 admits.
+// list was taken as the entity and published on the envelope in the clear.
 
 #include <gtest/gtest.h>
 
@@ -859,17 +858,14 @@ TEST(ProtectDigestDesignationUniqueness, AnAnnouncedSessionKeyIsHeldToTheRule) {
 // ---------------------------------------------------------------------------
 
 // The parenthesized pragma_value §22.5.1 defines: expressions between
-// parentheses rather than the one written thing §34.5.16.1 spells the
-// expression with. What stands inside is a keyword of somebody's own.
+// parentheses rather than the one written thing §34.5.16.1 spells.
 constexpr std::string_view kEntityList = "(division=\"notary\", desk=\"emea\")";
 
-// The characters an envelope writes ahead of this keyword's value, which is
-// what a list taken as the value was written back quoted between.
-constexpr std::string_view kEntityDirectiveHead = "digest_keyowner=\"";
-
-// The expression §34.5.22 writes a digest with, which the comparison below
-// looks for so that two envelopes are not found equal in carrying no digest.
-constexpr std::string_view kDigestBlockLine = "`pragma protect digest_block";
+// The characters an envelope writes this keyword's directive with. §34.5.16.2
+// has the name unchanged, so a list taken as the value goes out between its own
+// parentheses rather than in quotation marks, and these characters are what a
+// case asking whether the envelope names an entity at all searches for.
+constexpr std::string_view kEntityDirectiveHead = "digest_keyowner=";
 
 // One protect pragma directive writing `value` against `keyword` exactly as
 // given, so a parenthesized list reaches the reading as the list §22.5.1
@@ -884,7 +880,7 @@ std::string WritesUnquoted(std::string_view keyword, std::string_view value) {
 // names no entity. §34.5.16.2 leaves this name in the clear whatever blocks the
 // envelope carries -- issue #3429 settled that the digest_key_block its
 // exception names is defined nowhere -- so a tool taking the list publishes it
-// there as the entity. Issue #3273 is that defect.
+// as the entity. Issue #3273 is that defect.
 TEST(ProtectDigestKeyownerEncryptionOutput, AListPutsNoEntityIntoTheEnvelope) {
   std::string encrypted = Encrypted(
       Region(WritesUnquoted("digest_keyowner", kEntityList), kSealedDesign));
@@ -904,8 +900,8 @@ TEST(ProtectDigestKeyownerEncryptionOutput,
 }
 
 // A list written after a string had already named the entity. Naming no entity
-// is not naming an empty one, so the envelope carries the name the earlier
-// string gave: an expression naming nothing takes no name away.
+// is not naming an empty one, so the envelope carries the earlier string's
+// name: an expression naming nothing takes no name away.
 TEST(ProtectDigestKeyownerEncryptionOutput,
      AListLeavesTheEntityTheEnvelopeCarriesStanding) {
   std::string described = Writes("digest_keyowner", kDigestOwner);
@@ -919,31 +915,17 @@ TEST(ProtectDigestKeyownerEncryptionOutput,
 
 // §34.5.16 has the entity in effect for a region's data stand where the digest
 // named none, and a list names none, so a region writing a list has its digest
-// sealed under the key that default reaches. The tool here holds the digest's
-// key under the data's party, so that default reaches a key other than the one
-// the data are under, and the choice between the two is a thing the tool makes.
-//
-// The key a digest was sealed under is stated nowhere a reader can read, the
-// block being encrypted and then encoded, so the claim is put as an equality
-// between two envelopes: the region writing the list and the region writing the
-// keyword nowhere produce the same output. A list taken as the entity reaches
-// no key of the user's and writes itself into the envelope besides, so it
-// breaks that equality twice over.
-TEST(ProtectDigestKeyownerEncryptionOutput,
-     AListLeavesTheDigestUnderTheDefaultedEntitysKey) {
-  std::string described = Writes("data_keyowner", kDataOwner);
-  described += Writes("data_keyname", kDataKeyName);
-  described += Writes("digest_keyname", kDigestKeyName);
-  std::string listed =
-      described + WritesUnquoted("digest_keyowner", kEntityList);
-  std::string under_the_default =
-      EncryptedUnderNames(RequestsDigest() + Region(described, kSealedDesign),
-                          KeysBothUnderTheDataParty());
-  std::string after_the_list =
-      EncryptedUnderNames(RequestsDigest() + Region(listed, kSealedDesign),
-                          KeysBothUnderTheDataParty());
-  EXPECT_NE(under_the_default.find(kDigestBlockLine), std::string::npos);
-  EXPECT_EQ(after_the_list, under_the_default);
-}
+// sealed under the key that default reaches. No case here claims that, and the
+// reason is worth recording: the key a digest was sealed under is stated
+// nowhere a reader can read, the block being encrypted and then encoded, and
+// the two envelopes that would be compared instead cannot be equal. A protect
+// pragma directive a region writes travels into the data block along with the
+// design -- only §34.5.5's author, §34.5.6's author_info and §34.5.30's comment
+// are held out of it, in ClosedRegionText
+// (src/preprocessor/protect_processing.cpp) -- so a region carrying one more
+// directive than another produces a longer block whatever the directive said.
+// ProtectDigestKeyownerSyntax.AListNamesNoEntityAndLeavesTheDefault in
+// test_preprocessor_subclause_34_05_16_01.cpp makes the claim on the reading
+// side, where the entity in effect can be read back.
 
 }  // namespace

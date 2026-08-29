@@ -104,13 +104,10 @@ struct RegionKeyReader {
   std::string_view key_method;
   // The identifier §34.5.11 has the text name the cipher its data are to be
   // encrypted under by, empty where the text named none, and the line the
-  // naming stands on.
-  //
-  // The line is carried because the report about it is made where the region
-  // closes, that being where the value in effect for the region is settled,
-  // while what the report is about is the expression the author wrote. A report
-  // standing at the closing delimiter would send the reader to a line that
-  // names no algorithm.
+  // naming stands on. The line is carried because the report is made where the
+  // region closes, that being where the value in effect for the region is
+  // settled, while what it is about is the expression the author wrote: a
+  // report at the closing delimiter would name a line stating no algorithm.
   std::string_view data_method;
   uint32_t data_method_line = 0;
   // The coding scheme in effect where the reading stands, which §34.5.9 has
@@ -146,18 +143,15 @@ struct RegionKeyReader {
 //
 // §34.5.11.2 has the identifier name "the encryption algorithm that shall be
 // used to encrypt subsequent begin-end blocks", so a region naming one has
-// stated what its blocks are to be produced with rather than described them.
-// This implementation provides one cipher and names it kDataMethod
-// (preprocessor/protect_envelope_output.h), so a region naming any other names
-// a cipher its blocks cannot be produced with, and encrypting it under this
-// tool's own would hand the author a file claiming an algorithm nobody used.
+// stated what its blocks are to be produced with. This implementation provides
+// one cipher and names it kDataMethod (preprocessor/protect_envelope_output.h),
+// and encrypting a region under that where the text named another would hand
+// the author a file claiming an algorithm nobody used.
 //
-// Table 34-3 decides how much is being asked for, and the report says which of
-// the two it was. An identifier the table marks required is one §34.5.11.2 says
-// is "standard in every implementation", so a text naming it assumed nothing
-// and this tool is the one falling short; #3430 covers providing those ciphers.
-// An identifier outside that -- tabulated and optional, or somebody's own --
-// names a cipher a text assumed its reader knew.
+// The report says which half of Table 34-3 the identifier came from. One the
+// table marks required is "standard in every implementation", so a text naming
+// it assumed nothing and this tool is what falls short; #3430 covers providing
+// those ciphers. Any other names a cipher a text assumed its reader knew.
 //
 // A region naming nothing is not refused anything, and neither is one naming
 // the identifier this tool writes.
@@ -452,47 +446,36 @@ void TakeReset(std::string_view line, RegionKeyReader* reader) {
 void TakeKeyDesignations(std::string_view line, uint32_t line_num,
                          RegionKeyReader* reader) {
   RegionKeyNames* names = &reader->names;
-  // §34.5.12.1 writes the value as a string, which is one written thing, so a
-  // parenthesized list of further expressions is not the value this keyword is
-  // defined with. Taking one would put a list of somebody's subkeywords where
-  // the name picking one key of the region's entity out belongs, and §34.5.12.2
-  // has that name written onto the envelope in the clear, so the list would go
-  // out quoted as though it were the name.
+  // §34.5.12.1 writes the value as a string, and §34.5.12.2 has the name
+  // written onto the envelope in the clear, where a list would go out quoted as
+  // though it were the name picking one key of the region's entity out.
   std::string_view keyname =
       KeywordSingleValueOnLine(line, kDataKeynameKeyword);
   if (!keyname.empty()) names->data_keyname = keyname;
-  // §34.5.10.1 writes the value as a string, which is one written thing, so a
-  // parenthesized list of further expressions is not the value this keyword is
-  // defined with. Taking one would put a list of somebody's subkeywords where
-  // the name of the entity that provided the region's keys belongs, and then
-  // write it on the envelope in the clear, quoted as though it were that name.
+  // §34.5.10.1 writes the value as a string, so taking a parenthesized list
+  // would write a list of somebody's subkeywords onto the envelope in the
+  // clear, quoted as though it were the entity that provided the region's keys.
   std::string_view keyowner =
       KeywordSingleValueOnLine(line, kDataKeyownerKeyword);
   if (!keyowner.empty()) names->data_keyowner = keyowner;
-  // §34.5.18.1 writes the value as a string, which is one written thing, so a
-  // parenthesized list of further expressions is not the value this keyword is
-  // defined with. Taking one would put a list of somebody's subkeywords where
-  // the name of the key a region's digest is under belongs, and §34.5.18.2 has
-  // that name written onto the envelope in the clear, so the list would go out
-  // quoted as though it were the name.
+  // §34.5.18.1 writes the value as a string, and §34.5.18.2 has the name
+  // written onto the envelope in the clear, where a list would go out quoted as
+  // though it were the name of the key a region's digest is under.
   std::string_view digest =
       KeywordSingleValueOnLine(line, kDigestKeynameKeyword);
   if (!digest.empty()) names->digest_keyname = digest;
   // §34.5.16 names the entity that provided the key the digest is under, which
   // the digest's own key name is read against rather than the data's entity.
-  //
-  // §34.5.16.1 writes the value as a string, so a parenthesized list is not the
-  // value this keyword is defined with either. §34.5.16.2 sends the name to a
-  // digest_key_block the standard defines nowhere, so it stands on the envelope
-  // in the clear whatever the envelope carries, and a list taken here goes out
-  // quoted as though it were the entity.
+  // §34.5.16.1 writes the value as a string, and §34.5.16.2 sends the name to a
+  // digest_key_block the standard defines nowhere, so a list taken here is
+  // published on the envelope in the clear as the entity.
   std::string_view provider =
       KeywordSingleValueOnLine(line, kDigestKeyownerKeyword);
   if (!provider.empty()) names->digest_keyowner = provider;
   // §34.5.25.1 and §34.5.23.1 write their values as strings as well, and
-  // §34.5.25.2 and §34.5.23.2 have both written onto the envelope in the clear:
-  // they are what a reader combines to reach the key that opens a key block, so
-  // a list taken here would put a way in that no reader could follow.
+  // §34.5.25.2 and §34.5.23.2 have both written onto the envelope in the clear.
+  // They are what a reader combines to reach the key opening a key block, so a
+  // list taken here publishes a way in that no reader can follow.
   std::string_view key_name =
       KeywordSingleValueOnLine(line, kKeyKeynameKeyword);
   std::string_view key_owner =
@@ -503,10 +486,8 @@ void TakeKeyDesignations(std::string_view line, uint32_t line_num,
   // the name in effect. The entity it is read against is the one standing here,
   // which is why the request is made once the line has been read whole rather
   // than where the name itself was taken.
-  //
-  // A list designates nothing, so it asks for no block: §34.5.25.1 defines the
-  // designation with a string, and a text that designated no key for its own
-  // keys asked for nothing to carry one.
+  // A list designates nothing and so asks for no block, a text that designated
+  // no key for its own keys having asked for nothing to carry one.
   if (!key_name.empty()) {
     names->key_keyname = key_name;
     reader->key_blocks.Designate(names->key_keyowner, key_name,
