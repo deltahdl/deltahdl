@@ -794,7 +794,7 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   // Every path text takes into the Preprocessor arrives here -- Preprocess for
   // a file named on the command line, ProcessIncludeFile for a `include, and
   // the protected-envelope cleartext Preprocessor::TakeDataBlockValue in
-  // src/preprocessor/preprocessor_protect_keys.cpp hands over -- so this is
+  // src/preprocessor/preprocessor_protect_values.cpp hands over -- so this is
   // the one place that has to hold for the marker to mean what Lexer takes it
   // to mean.
   std::string without_markers;

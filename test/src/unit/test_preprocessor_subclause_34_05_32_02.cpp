@@ -39,7 +39,7 @@ using namespace delta;
 // holds. Beyond that it is out of reach at this stage and is left so
 // deliberately: the preprocessor has no symbol table and never parses the
 // cleartext a data block recovers -- Preprocessor::TakeDataBlockValue in
-// src/preprocessor/preprocessor_protect_keys.cpp appends that text to the
+// src/preprocessor/preprocessor_protect_values.cpp appends that text to the
 // output and keeps no name out of it -- so nothing here can say whether
 // top.dut.mem is one of the objects the envelope contains. The phase that
 // resolves such a name is the elaborator, where HierPath in

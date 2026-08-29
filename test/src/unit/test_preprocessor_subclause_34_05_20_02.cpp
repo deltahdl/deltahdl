@@ -20,9 +20,11 @@
 //   digest_key_method, and those two decrypt the digest block.
 //
 // All four are preprocessor-stage rules. The line beneath the keyword is read
-// by Preprocessor::TakeDigestDecryptKeyValue and the default is applied by
-// Preprocessor::DigestDecryptKeyInEffect, both in
-// src/preprocessor/preprocessor_protect_keys.cpp; the pair written into a key
+// by Preprocessor::TakeDigestDecryptKeyValue in
+// src/preprocessor/preprocessor_protect_values.cpp and the default is applied
+// by Preprocessor::DigestDecryptKeyInEffect in
+// src/preprocessor/preprocessor_protect_in_effect.cpp; the pair written into a
+// key
 // block is built by ProtectDigestDecryptionContent in
 // src/preprocessor/protect_digest_key.cpp and placed by ProtectKeyBlockContent
 // in src/preprocessor/protect_key_block.cpp; the key a region's digests are

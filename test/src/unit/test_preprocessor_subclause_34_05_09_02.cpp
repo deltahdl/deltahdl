@@ -54,7 +54,7 @@
 // src/preprocessor/protect_key_block.cpp doing the same for the blocks they
 // write; src/preprocessor/protect_processing_cipher.cpp applies the writing to
 // what the cipher produced; and
-// src/preprocessor/preprocessor_protect_keys.cpp is where a reading takes the
+// src/preprocessor/preprocessor_protect_values.cpp is where a reading takes the
 // algorithm and the count back out.
 //
 // The inputs are the real syntax of the constructs this rule consumes.
@@ -535,7 +535,7 @@ TEST(ProtectEncodingEncryptionOutput, EachEnvelopeOfATextStatesItsWriting) {
 // The block stands on one line of the envelope, which is what keeps a line
 // break out of it. §34.5.15.2 has the block begin on the line beneath its
 // keyword, and Preprocessor::TakeDataBlockValue
-// (src/preprocessor/preprocessor_protect_keys.cpp) reads that one line and
+// (src/preprocessor/preprocessor_protect_values.cpp) reads that one line and
 // nothing after it, so EnvelopeBlockEncoding
 // (src/preprocessor/protect_envelope_output.h) writes the block under one of
 // the schemes ProtectEncodingFitsOneLine admits, and those write neither a
@@ -569,7 +569,7 @@ TEST(ProtectEncodingEncryptionOutput, TheBlockHoldsOnlyWhatASourceLineCarries) {
 //
 // §34.5.15.2 has the block begin on that line, and
 // Preprocessor::TakeDataBlockValue
-// (src/preprocessor/preprocessor_protect_keys.cpp) reads that one line and
+// (src/preprocessor/preprocessor_protect_values.cpp) reads that one line and
 // nothing after it, so EnvelopeBlockEncoding
 // (src/preprocessor/protect_envelope_output.h) drops the length a region stated
 // rather than breaking the writing at it. Issue #3431 covers reading a block

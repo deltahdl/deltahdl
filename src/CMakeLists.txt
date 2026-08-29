@@ -41,8 +41,10 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     preprocessor/preprocessor_inline.cpp
     preprocessor/preprocessor_directives.cpp
     preprocessor/preprocessor_macros.cpp
+    preprocessor/preprocessor_protect_in_effect.cpp
     preprocessor/preprocessor_protect_keynames.cpp
     preprocessor/preprocessor_protect_keys.cpp
+    preprocessor/preprocessor_protect_values.cpp
     preprocessor/preprocessor_protect_viewport.cpp
     lexer/keywords.cpp
     lexer/lexer.cpp

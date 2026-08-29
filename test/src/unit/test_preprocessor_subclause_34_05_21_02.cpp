@@ -28,7 +28,7 @@
 // src/preprocessor/protect_envelope_output.cpp and by KeyBlockContentFor in
 // src/preprocessor/protect_key_block.cpp; and the identifier a reading
 // regenerates a digest under is read by Preprocessor::DigestMethodInEffect in
-// src/preprocessor/preprocessor_protect_keys.cpp.
+// src/preprocessor/preprocessor_protect_in_effect.cpp.
 //
 // Which spelling puts which identifier in effect belongs to §34.5.21.1 and is
 // stated in test_preprocessor_subclause_34_05_21_01.cpp. What this file states

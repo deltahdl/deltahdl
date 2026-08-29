@@ -404,7 +404,7 @@ class Preprocessor {
   std::vector<OutputLineOrigin> line_origins_;
   // Whether lines being written now reach the output LineOrigins() describes.
   // False while Preprocessor::TakeKeyBlockValue in
-  // src/preprocessor/preprocessor_protect_keys.cpp runs a recovered protected
+  // src/preprocessor/preprocessor_protect_values.cpp runs a recovered protected
   // block for what it defines, because that run appends its text to no output:
   // an entry recorded for it would name a line the output does not have and
   // would displace every line after it.

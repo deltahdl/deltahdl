@@ -27,10 +27,13 @@
 // key a region is encrypted under from it, is
 // src/preprocessor/protect_processing.cpp; the half that writes the
 // designation back into the block it was used for is
-// src/preprocessor/protect_envelope_output.cpp; and the reading side --
-// consuming the announced line, putting the designation in effect, holding the
-// pair of designations to referring to one key, and selecting the key a block
-// opens with -- is src/preprocessor/preprocessor_protect_keys.cpp.
+// src/preprocessor/protect_envelope_output.cpp; and the reading side is split
+// across three files -- consuming the announced line and putting the
+// designation in effect is
+// src/preprocessor/preprocessor_protect_values.cpp, holding the pair of
+// designations to referring to one key is
+// src/preprocessor/preprocessor_protect_keys.cpp, and selecting the key a block
+// opens with is src/preprocessor/preprocessor_protect_in_effect.cpp.
 //
 // Every input below is written as the real `pragma directive syntax of §22.11,
 // with the envelopes of §34.5.1 and §34.5.2 delimiting the regions, the entity

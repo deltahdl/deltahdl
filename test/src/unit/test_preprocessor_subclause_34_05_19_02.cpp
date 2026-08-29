@@ -21,8 +21,9 @@
 //   opens the digest_block.
 //
 // All five are preprocessor-stage rules. The line beneath the keyword is read
-// by Preprocessor::TakeDigestPublicKeyValue and the pair is held to referring
-// to one key by Preprocessor::CheckDigestDesignationAgreement, both in
+// by Preprocessor::TakeDigestPublicKeyValue in
+// src/preprocessor/preprocessor_protect_values.cpp, and the pair is held to
+// referring to one key by Preprocessor::CheckDigestDesignationAgreement in
 // src/preprocessor/preprocessor_protect_keys.cpp. The designation standing
 // where a region wrote none is ProtectKeywordScope::DigestPublicKeyInEffect in
 // src/preprocessor/protect_keywords.cpp, and the key it reaches with the entity

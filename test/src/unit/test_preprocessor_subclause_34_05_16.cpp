@@ -31,10 +31,11 @@
 // src/preprocessor/protect_processing.cpp; the half that writes it into the
 // envelope in the clear, and the pairing that picks the key a digest block is
 // sealed under, are in src/preprocessor/protect_envelope_output.cpp; and the
-// reading side -- holding the three designations to being unique for the
-// entity, holding a digest key name to that entity's list, and selecting the
-// key a digest block opens with -- is
-// src/preprocessor/preprocessor_protect_keys.cpp.
+// reading side is split across two files -- holding the three designations to
+// being unique for the entity and holding a digest key name to that entity's
+// list is src/preprocessor/preprocessor_protect_keys.cpp, and selecting the key
+// a digest block opens with is
+// src/preprocessor/preprocessor_protect_in_effect.cpp.
 //
 // Every input below is written as the real `pragma directive syntax of §22.11.
 // The entity the default falls back on is named by §34.5.10's own keyword, the

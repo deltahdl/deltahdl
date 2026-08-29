@@ -26,7 +26,7 @@
 // bytes became rather than the design, so the identifier the envelope states is
 // checked before the block is opened
 // (Preprocessor::TakeDataBlockValue,
-// src/preprocessor/preprocessor_protect_keys.cpp).
+// src/preprocessor/preprocessor_protect_values.cpp).
 //
 // The third of those is covered here as well, and it is the one an envelope
 // carrying key blocks answers differently. §34.5.11.2 excepts a single case
@@ -304,7 +304,7 @@ TEST(ProtectDataMethodEncryptionOutput,
 // §34.5.11.2 relocates the identifier rather than discarding it, so the region
 // still opens and the design comes back. That the identifier arrived is what
 // this shows: Preprocessor::TakeDataBlockValue
-// (src/preprocessor/preprocessor_protect_keys.cpp) reads it out of the scope
+// (src/preprocessor/preprocessor_protect_values.cpp) reads it out of the scope
 // the recovered key block wrote, and it stands there under no other writing,
 // the envelope having stated none in the clear.
 TEST(ProtectDataMethodEncryptionOutput,
