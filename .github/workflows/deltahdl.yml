@@ -2010,9 +2010,18 @@ jobs:
                 if (identity in newest) print $2
                 newest[identity] = 1
               }')
+          # A failed deletion warns and the loop goes on. `run:` executes under
+          # `bash -e`, so without the `||` one transient error from the API ends
+          # the step, fails the job, reddens the whole run, and leaves every key
+          # after it unattempted. That is the wrong trade for this step: an entry
+          # that survives costs one extra generation against the 10 GB budget and
+          # the next run's prune takes it, while a red job says nothing about the
+          # commit that triggered it and reads exactly like a real break. Run
+          # 33227867139 lost the eighth of fifteen deletions to an HTTP 502 and
+          # failed for it.
           for key in ${keys}; do
             echo "Deleting superseded cache entry: ${key}"
-            gh cache delete "${key}"
+            gh cache delete "${key}" || echo "::warning::could not delete ${key}"
           done
   release:
     if: >-
