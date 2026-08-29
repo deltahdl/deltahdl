@@ -123,14 +123,21 @@ TimingCheckEntry MakeNegativeRecrem() {
 }
 
 // §31.9.3 for $recrem (accept path): the raw model inputs do not violate, but
-// the internally delayed data lands inside the shifted window, so the notifier
-// toggles off the delayed verdict.
+// the internally delayed data lands inside the window, so the notifier toggles
+// off the delayed verdict.
+//
+// MakeNegativeRecrem writes -10 as the recovery limit and 20 as the removal
+// limit, and Table 31-6 gives the removal limit the reference_event role, so
+// the removal limit bounds the side before the reference and the recovery limit
+// the side after. The window is (100 - 20, 100 + -10), which is (80, 90) and
+// lies wholly before the reference. §31.9.1 delays a signal rather than
+// advancing it, so the delayed time is the later of the two.
 TEST(NegativeTimingCheckNotifierToggle, RecremTogglesOnDelayedViolation) {
   SpecifyManager mgr;
   mgr.AddTimingCheck(MakeNegativeRecrem());
 
-  const bool kUndelayed = mgr.CheckRecremViolation("clk", 100, "data", 105);
-  const bool kDelayed = mgr.CheckRecremViolation("clk", 100, "data", 115);
+  const bool kUndelayed = mgr.CheckRecremViolation("clk", 100, "data", 75);
+  const bool kDelayed = mgr.CheckRecremViolation("clk", 100, "data", 85);
 
   EXPECT_FALSE(kUndelayed);
   EXPECT_TRUE(kDelayed);
@@ -145,13 +152,15 @@ TEST(NegativeTimingCheckNotifierToggle, RecremTogglesOnDelayedViolation) {
 }
 
 // §31.9.3 for $recrem (reject path): only the raw model inputs violate; the
-// delayed data has moved out of the window, so the notifier must stay put.
+// delayed data has moved out of the window, so the notifier must stay put. The
+// window is the (80, 90) the case above states, and the delayed time is again
+// the later of the two.
 TEST(NegativeTimingCheckNotifierToggle, RecremDoesNotToggleOnRawInputOnly) {
   SpecifyManager mgr;
   mgr.AddTimingCheck(MakeNegativeRecrem());
 
-  const bool kUndelayed = mgr.CheckRecremViolation("clk", 100, "data", 115);
-  const bool kDelayed = mgr.CheckRecremViolation("clk", 100, "data", 125);
+  const bool kUndelayed = mgr.CheckRecremViolation("clk", 100, "data", 85);
+  const bool kDelayed = mgr.CheckRecremViolation("clk", 100, "data", 95);
 
   EXPECT_TRUE(kUndelayed);
   EXPECT_FALSE(kDelayed);

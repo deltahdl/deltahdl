@@ -354,10 +354,20 @@ TEST(NegativeTimingCheckOptionFromSource, AllChecksOffSuppressesAndCollapses) {
   EXPECT_EQ(delayed.data_delay, 0);
 }
 
-// §31.9.4: the rules hold identically for $recrem (§31.3.6). With the option
-// on, the negative removal value shifts the window past the reference so a data
-// transition at ref+7 violates; without it the negative value is not handled,
-// that transition passes, and the ordinary removal side reports instead.
+// §31.9.4: the rules hold identically for $recrem (§31.3.6). The negative value
+// here is the recovery limit, Syntax 31-8 writing $recrem's recovery limit
+// first, and Table 31-6 gives the recovery limit the data_event role and the
+// removal limit the reference_event role. So the removal limit of 10 bounds the
+// side before the reference and the recovery limit of -5 bounds the side after
+// it, and the window with the option on is (100 - 10, 100 + -5), which is
+// (90, 95) and lies wholly before the reference.
+//
+// Without the option the negative value is not handled at all: it is clamped to
+// zero, the after side bounds nothing, and the before side reports every
+// transition within 10 of the reference. The option therefore narrows the
+// window here rather than moving it, so a transition at 97 violates only with
+// the option off, and one at 92 violates either way -- which is what says the
+// window with the option on is not empty.
 TEST(NegativeTimingCheckOptionFromSource, RecremFollowsTheSameOptionBehavior) {
   SimFixture f;
   auto c = ElaborateTimingCheck(
@@ -374,15 +384,15 @@ TEST(NegativeTimingCheckOptionFromSource, RecremFollowsTheSameOptionBehavior) {
   on.SetTimingCheckInvocationOptions({/*negative=*/true, /*all_off=*/false});
   on.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   EXPECT_TRUE(on.GetTimingChecks().front().negative_timing_check_enabled);
-  EXPECT_TRUE(on.CheckRecremViolation("clr", 100, "clk", 107));
-  EXPECT_FALSE(on.CheckRecremViolation("clr", 100, "clk", 95));
+  EXPECT_TRUE(on.CheckRecremViolation("clr", 100, "clk", 92));
+  EXPECT_FALSE(on.CheckRecremViolation("clr", 100, "clk", 97));
 
   SpecifyManager off;
   off.SetTimingCheckInvocationOptions({/*negative=*/false, /*all_off=*/false});
   off.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   EXPECT_FALSE(off.GetTimingChecks().front().negative_timing_check_enabled);
-  EXPECT_FALSE(off.CheckRecremViolation("clr", 100, "clk", 107));
-  EXPECT_TRUE(off.CheckRecremViolation("clr", 100, "clk", 95));
+  EXPECT_TRUE(off.CheckRecremViolation("clr", 100, "clk", 92));
+  EXPECT_TRUE(off.CheckRecremViolation("clr", 100, "clk", 97));
 
   SpecifyManager all_off;
   all_off.SetTimingCheckInvocationOptions(
@@ -587,11 +597,17 @@ TEST(NegativeTimingCheckOptionFromSource, DelayedDataOnlyDeclaredCollapses) {
   EXPECT_EQ(off.ref_delay, 0);
 }
 
-// §31.9.4 C1: for $recrem the negative value may sit on the second limit. With
-// the option on the window lies before the reference, so a data transition at
-// ref-8 violates and one at ref+5 does not; without the option the negative
-// value is dropped and exactly the opposite pair of verdicts comes out of the
-// ordinary two-sided treatment.
+// §31.9.4 C1: for $recrem the negative value may sit on the second limit, which
+// Syntax 31-8 writes as the removal limit. Table 31-6 gives that limit the
+// reference_event role, so it bounds the side before the reference, and the
+// recovery limit of 10 bounds the side after. The window with the option on is
+// (100 - -5, 100 + 10), which is (105, 110) and lies wholly after the
+// reference.
+//
+// Without the option the negative removal value is clamped to zero, the before
+// side bounds nothing, and the after side reports every transition within 10 of
+// the reference. So a transition at 102 violates only with the option off, and
+// one at 107 violates either way.
 TEST(NegativeTimingCheckOptionFromSource,
      RecremNegativeSecondLimitGatedByOption) {
   SimFixture f;
@@ -608,16 +624,16 @@ TEST(NegativeTimingCheckOptionFromSource,
   on.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   EXPECT_TRUE(on.GetTimingChecks().front().negative_timing_check_enabled);
   EXPECT_EQ(on.GetTimingChecks().front().signed_limit2, -5);
-  EXPECT_TRUE(on.CheckRecremViolation("clr", 100, "clk", 92));
-  EXPECT_FALSE(on.CheckRecremViolation("clr", 100, "clk", 105));
+  EXPECT_TRUE(on.CheckRecremViolation("clr", 100, "clk", 107));
+  EXPECT_FALSE(on.CheckRecremViolation("clr", 100, "clk", 102));
 
   SpecifyManager off;
   off.SetTimingCheckInvocationOptions({/*negative=*/false, /*all_off=*/false});
   off.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   EXPECT_FALSE(off.GetTimingChecks().front().negative_timing_check_enabled);
   EXPECT_EQ(off.GetTimingChecks().front().limit2, 0u);
-  EXPECT_FALSE(off.CheckRecremViolation("clr", 100, "clk", 92));
-  EXPECT_TRUE(off.CheckRecremViolation("clr", 100, "clk", 105));
+  EXPECT_TRUE(off.CheckRecremViolation("clr", 100, "clk", 107));
+  EXPECT_TRUE(off.CheckRecremViolation("clr", 100, "clk", 102));
 }
 
 // §31.9.4 C1, the constant forms the limit position does NOT admit: a negative
