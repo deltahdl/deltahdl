@@ -66,6 +66,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -96,10 +97,11 @@ constexpr std::string_view kBeginProtected =
     "`pragma protect begin_protected\n";
 constexpr std::string_view kEndProtected = "`pragma protect end_protected\n";
 
-// Where the reading meets the block an envelope carries. Everything a block is
-// read under has to stand ahead of this, so a directive written here is the
-// last word on the encoding in effect where the block is opened.
-constexpr std::string_view kBlockDirective = "`pragma protect data_block=";
+// The directive announcing the block an envelope carries, which §34.5.15.1
+// spells as the keyword standing alone. Everything a block is read under has to
+// stand ahead of this, so a directive written here is the last word on the
+// encoding in effect where the block is opened.
+constexpr std::string_view kBlockDirective = "`pragma protect data_block\n";
 
 // One of the two schemes Table 34-2 requires of every implementation, and the
 // one this tool can carry a block under as the value of the expression naming
@@ -171,6 +173,14 @@ std::string EnvelopeReadUnder(std::string_view directive) {
   size_t block = envelope.find(kBlockDirective);
   EXPECT_NE(block, std::string::npos);
   return envelope.insert(block, std::string(directive));
+}
+
+// The 1-based line of `envelope` its block is written on, which is the line a
+// report about that block stands at. §34.5.15.2 has the directive above it
+// indicate that a data block begins on the next line in the file, so the block
+// is one line past that directive (issue #3272).
+uint32_t WhereTheEncodedBlockStands(std::string_view envelope) {
+  return LineHolding(envelope, kBlockDirective) + 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -489,7 +499,7 @@ TEST(ProtectEncodingSyntax, ACountDisagreeingWithTheBlockIsReported) {
       f.diag.Diagnostics(),
       "protect pragma value stands for a different number of bytes from the "
       "one the encoding in effect states",
-      LineHolding(src, kBlockDirective), "34.5.9.2"));
+      WhereTheEncodedBlockStands(src), "34.5.9.2"));
 }
 
 // The same disagreeing count with a length written between it and the scheme,
@@ -507,7 +517,7 @@ TEST(ProtectEncodingSyntax, ALengthBetweenTheSchemeAndCountLeavesBoth) {
       f.diag.Diagnostics(),
       "protect pragma value stands for a different number of bytes from the "
       "one the encoding in effect states",
-      LineHolding(src, kBlockDirective), "34.5.9.2"));
+      WhereTheEncodedBlockStands(src), "34.5.9.2"));
 }
 
 // The same input with the length written as a string. §34.5.9.1 writes a
@@ -534,7 +544,7 @@ TEST(ProtectEncodingSyntax, ALengthWrittenAsAStringLeavesTheCountBeyondIt) {
       f.diag.Diagnostics(),
       "protect pragma value stands for a different number of bytes from the "
       "one the encoding in effect states",
-      LineHolding(src, kBlockDirective), "34.5.9.2"));
+      WhereTheEncodedBlockStands(src), "34.5.9.2"));
 }
 
 // The three names written in the reverse of the order the syntax line puts them
@@ -559,7 +569,7 @@ TEST(ProtectEncodingSyntax, TheNamesAreReadForThemselvesWhateverTheOrder) {
       f.diag.Diagnostics(),
       "protect pragma value stands for a different number of bytes from the "
       "one the encoding in effect states",
-      LineHolding(src, kBlockDirective), "34.5.9.2"));
+      WhereTheEncodedBlockStands(src), "34.5.9.2"));
 }
 
 // The same disagreeing count written as a string rather than as a number.
@@ -682,7 +692,7 @@ TEST(ProtectEncodingSyntax, ABareWordAmongTheSubkeywordsQualifiesNothing) {
       f.diag.Diagnostics(),
       "protect pragma value stands for a different number of bytes from the "
       "one the encoding in effect states",
-      LineHolding(src, kBlockDirective), "34.5.9.2"));
+      WhereTheEncodedBlockStands(src), "34.5.9.2"));
 }
 
 // The keyword written as an escaped identifier. A pragma_keyword is the simple

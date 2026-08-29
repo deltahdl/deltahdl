@@ -118,7 +118,8 @@ class Preprocessor {
   // in which case it belongs to the protected block above rather than being a
   // directive or a line of the design (§34.5.13, §34.5.14, §34.5.19, §34.5.20,
   // §34.5.22, §34.5.26, §34.5.27).
-  bool TookAnnouncedValue(std::string_view line, SourceLoc loc, int depth);
+  bool TookAnnouncedValue(std::string_view line, SourceLoc loc, int depth,
+                          std::string& output);
   void ProcessUndefDirective(std::string_view line, SourceLoc loc,
                              std::string& output);
   bool ProcessDirective(std::string_view line, uint32_t file_id,
@@ -320,6 +321,14 @@ class Preprocessor {
   // to the design, and the caller neither dispatches it as a directive nor
   // emits it.
   bool TakeDigestBlockValue(std::string_view line, SourceLoc loc);
+  // Takes `line` as the data block announced by a data_block expression on the
+  // line before it, and says whether it did. §34.5.15.2 has the block begin on
+  // that line, so what the line carries is the region's design in its encrypted
+  // and encoded form: it is opened here and the design it recovers to is
+  // appended to `output` in its place, the caller neither dispatching the line
+  // as a directive nor emitting it.
+  bool TakeDataBlockValue(std::string_view line, SourceLoc loc, int depth,
+                          std::string& output);
   // Takes `line` as the encoded value announced by a key_public_key expression
   // on the line before it, and says whether it did. A line taken this way is
   // the designation of a key rather than text of the design, so the caller
@@ -355,8 +364,6 @@ class Preprocessor {
   // been spent on the value just read (§34.5.9.2).
   void SpendEncodedValueSize();
   std::string_view ProtectKeyInEffect() const;
-  void DecryptDataBlock(const PragmaKeywordExpression& expr, SourceLoc loc,
-                        int depth, std::string& output);
   bool ProcessDelayModeDirective(std::string_view line, SourceLoc loc);
   bool ProcessSimpleStateDirective(std::string_view line, SourceLoc loc,
                                    int depth, std::string& output);
@@ -649,6 +656,8 @@ class Preprocessor {
   // is.
   bool digest_decrypt_key_value_next_ = false;
   bool digest_block_value_next_ = false;
+  // And for §34.5.15's, which says a data block begins on the line after it.
+  bool data_block_value_next_ = false;
   // The key §34.5.14 has open a protected region's data block, recovered from
   // the key block that carried it.
   //

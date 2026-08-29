@@ -189,10 +189,10 @@ bool ProtectEncodingIsAvailable(std::string_view enctype) {
 }
 
 // The identity transformation writes whatever the data hold, and the two
-// line-oriented schemes write a quotation mark for one byte in sixty-four and
-// break their output into lines besides. What is left are the two that write a
-// long run of characters drawn from an alphabet holding neither.
-bool ProtectEncodingFitsPragmaValue(std::string_view enctype) {
+// line-oriented schemes break their output into lines by construction. What is
+// left are the two that write a long run of characters drawn from an alphabet
+// holding no line break.
+bool ProtectEncodingFitsOneLine(std::string_view enctype) {
   return enctype == kBase64Enctype || enctype == kBlockEnctype;
 }
 

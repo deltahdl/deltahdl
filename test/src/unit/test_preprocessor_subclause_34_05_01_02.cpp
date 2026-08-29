@@ -20,10 +20,13 @@
 // expression and §34.5.4's, the blocks of §34.5.15 and §34.5.27 among it. Every
 // character standing between the opening expression and the closing one that
 // answers it -- comments and further protect pragmas included, unless some
-// other subclause has claimed one -- is encrypted and recorded on §34.5.15's
-// expression. The arbitrary comment text the subclause permits a tool to pad
-// the input with is a permission rather than an obligation, and this
-// implementation adds none.
+// other subclause has claimed one -- is encrypted and recorded in the block
+// §34.5.15's expression announces. That block stands on the line beneath the
+// expression: §34.5.15.1 spells the keyword standing alone and §34.5.15.2 has
+// the block begin on the next line in the file, and issue #3272 records that
+// this tool wrote the block as a pragma_value against the keyword instead. The
+// arbitrary comment text the subclause permits a tool to pad the input with is
+// a permission rather than an obligation, and this implementation adds none.
 //
 // DECRYPTION INPUT: none. The expression asks for nothing on that side, so a
 // text carrying one is decrypted exactly as the same text without it would be.
@@ -106,16 +109,17 @@ std::string Region(std::string_view described, std::string_view body) {
   return text;
 }
 
-// The characters a written envelope records its region on. §34.5.15 carries
-// them as a quoted pragma_value, so the block is what stands between the
-// quotes, and two regions differing in a single character of their text leave
+// The characters a written envelope records its region on. §34.5.15.1 spells
+// the announcing expression as the keyword standing alone and §34.5.15.2 has
+// the block begin on the next line, so the block is the line beneath the
+// keyword, and two regions differing in a single character of their text leave
 // two different runs of them.
 std::string DataBlockOf(const std::string& written) {
-  constexpr std::string_view kOpening = "`pragma protect data_block=\"";
-  size_t at = written.find(kOpening);
+  constexpr std::string_view kAnnouncement = "`pragma protect data_block\n";
+  size_t at = written.find(kAnnouncement);
   if (at == std::string::npos) return {};
-  size_t start = at + kOpening.size();
-  size_t end = written.find('"', start);
+  size_t start = at + kAnnouncement.size();
+  size_t end = written.find('\n', start);
   if (end == std::string::npos) return {};
   return written.substr(start, end - start);
 }
@@ -396,10 +400,16 @@ TEST(ProtectBeginEncryptionInput, TheBlockClosingMatchesItsOwnOpening) {
 // characters no reading here produced, and neither reaches the output: the
 // lines were encrypted as text rather than read as the description of the
 // envelope being written.
+//
+// The inner model announces its block the way §34.5.15.1 spells the
+// expression, the keyword standing alone with the block on the line §34.5.15.2
+// puts it on. That is what a previously generated block looks like, and it is
+// the spelling a reading acts on, so the marker beneath it is a line such a
+// reading would have taken for the block of the envelope being written.
 TEST(ProtectBeginEncryptionInput, ThatBlocksDescriptionDescribesNothing) {
   std::string inner = "`pragma protect begin_protected\n";
   inner += Writes("data_method", "acme-cipher");
-  inner += Writes("data_block", "NOTABLOCKOFTHISTOOLS");
+  inner += "`pragma protect data_block\nNOTABLOCKOFTHISTOOLS\n";
   inner += "`pragma protect end_protected\n";
   EncryptionRun run(Region("", inner));
   EXPECT_FALSE(Holds(run.text, "acme-cipher"));
@@ -534,7 +544,7 @@ TEST(ProtectBeginEncryptionOutput, NothingRequiredAsOutputFollowsTheClose) {
   EXPECT_FALSE(Holds(after, "`pragma protect encrypt_agent="));
   EXPECT_FALSE(Holds(after, "`pragma protect data_method="));
   EXPECT_FALSE(Holds(after, "`pragma protect encoding="));
-  EXPECT_FALSE(Holds(after, "`pragma protect data_block="));
+  EXPECT_FALSE(Holds(after, "`pragma protect data_block"));
   EXPECT_FALSE(Holds(after, "`pragma protect key_block"));
 }
 
@@ -600,8 +610,8 @@ TEST(ProtectBeginEncryptionOutput, EveryKeyBlockAskedForIsInsideTheEnvelope) {
 TEST(ProtectBeginEncryptionOutput, TwoWrittenEnvelopesInOneStreamBothOpen) {
   std::string first = Encrypted(Region("", "  int a = 1;\n"));
   std::string second = Encrypted(Region("", "  int b = 2;\n"));
-  EXPECT_EQ(TimesWritten(first, "`pragma protect data_block="), 1U);
-  EXPECT_EQ(TimesWritten(second, "`pragma protect data_block="), 1U);
+  EXPECT_EQ(TimesWritten(first, "`pragma protect data_block\n"), 1U);
+  EXPECT_EQ(TimesWritten(second, "`pragma protect data_block\n"), 1U);
   ReadSource run(first + second, kAuthorKey);
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, "int a = 1;"));
@@ -612,10 +622,10 @@ TEST(ProtectBeginEncryptionOutput, TwoWrittenEnvelopesInOneStreamBothOpen) {
 // ENCRYPTION OUTPUT: what the block between the delimiters records.
 // ---------------------------------------------------------------------------
 
-// The design between the delimiters is recorded on §34.5.15's expression rather
-// than merely dropped. Reading the produced envelope back under the key it was
-// formed under returns the design, so the characters missing from the output
-// went into the block.
+// The design between the delimiters is recorded in the block §34.5.15's
+// expression announces rather than merely dropped. Reading the produced
+// envelope back under the key it was formed under returns the design, so the
+// characters missing from the output went into the block.
 TEST(ProtectBeginEncryptionOutput, TheEnclosedTextIsRecordedOnTheBlock) {
   EncryptionRun run(Region("", kSealedDesign));
   EXPECT_FALSE(Holds(run.text, kSealedStatement));

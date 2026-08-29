@@ -219,13 +219,20 @@ std::string_view RegionDigestKey(const RegionKeyNames& names,
                                  const ProtectKeyList& keys);
 
 // The scheme the blocks of one envelope are written under: the one the
-// enclosed text asked for, where a block of that scheme can be carried on the
-// expression a block is written on, and this implementation's own otherwise.
+// enclosed text asked for, where a block of that scheme stands on one line, and
+// this implementation's own otherwise.
 //
 // A line length the text stated is not carried across. It is a maximum on the
-// characters of a line of the block, and a block written as the value of a
-// pragma expression is written on the directive's own line, so a break put in
-// to honor the maximum would end the directive rather than the line.
+// characters of a line of the block, and a break put in to honor it would put
+// the block on more lines than one. §34.5.15.2 has a block begin on the line
+// beneath its keyword and says nothing about where it ends, and this
+// implementation reads one line: Preprocessor::TakeDataBlockValue
+// (preprocessor/preprocessor.h) takes the line the keyword announced and
+// nothing after it, as Preprocessor::TakeKeyBlockValue and
+// Preprocessor::TakeDigestBlockValue do for the blocks §34.5.27 and §34.5.22
+// announce. Writing a block this tool could not read back is what the two
+// restrictions here prevent, and #3431 covers reading a block that spans
+// several lines.
 ProtectEncoding EnvelopeBlockEncoding(const ProtectEncoding& requested);
 
 // The decryption envelope one encryption envelope is transformed into: the

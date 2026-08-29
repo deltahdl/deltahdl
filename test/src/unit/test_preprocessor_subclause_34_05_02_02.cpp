@@ -100,18 +100,19 @@ std::string Encrypted(const std::string& src) {
   return EncryptEnvelopes(src, kAuthorKey);
 }
 
-// The characters a written envelope records its region on. §34.5.15 carries
-// them as a quoted pragma_value, so the block is what stands between the
-// quotes, and two regions the closing expression bounded differently leave two
-// different runs of them.
+// The characters a written envelope records its region on. §34.5.15.1 spells
+// the announcing expression as the keyword standing alone and §34.5.15.2 has
+// the block begin on the next line in the file, so the block is the line under
+// the keyword, and two regions the closing expression bounded differently leave
+// two different runs of them.
 std::string DataBlockOf(const std::string& written) {
-  constexpr std::string_view kOpening = "`pragma protect data_block=\"";
-  size_t at = written.find(kOpening);
+  constexpr std::string_view kAnnounces = "`pragma protect data_block\n";
+  size_t at = written.find(kAnnounces);
   if (at == std::string::npos) return {};
-  size_t start = at + kOpening.size();
-  size_t quoted = written.find('"', start);
-  return quoted == std::string::npos ? std::string()
-                                     : written.substr(start, quoted - start);
+  size_t start = at + kAnnounces.size();
+  size_t ends = written.find('\n', start);
+  return ends == std::string::npos ? std::string()
+                                   : written.substr(start, ends - start);
 }
 
 // What a user supplies for reading protected regions back. A test reading a
@@ -360,7 +361,7 @@ TEST(ProtectEndEncryptionOutput, ACommentAfterTheDelimiterIsNotCarried) {
 TEST(ProtectEndEncryptionOutput, TheReplacementFollowsTheBlockItCloses) {
   std::string written = Encrypted(Region(kSealedDesign));
   size_t opening = written.find("`pragma protect begin_protected");
-  size_t data_block = written.find("`pragma protect data_block=");
+  size_t data_block = written.find("`pragma protect data_block\n");
   size_t closing = written.find(kProducedClosing);
   ASSERT_NE(opening, std::string::npos);
   ASSERT_NE(data_block, std::string::npos);

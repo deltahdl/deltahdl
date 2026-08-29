@@ -85,9 +85,11 @@ constexpr std::string_view kBeginProtected =
     "`pragma protect begin_protected\n";
 constexpr std::string_view kEndProtected = "`pragma protect end_protected\n";
 
-// Where the expression carrying an envelope's encrypted region begins. What
-// follows it, up to the closing quotation mark, is the block itself.
-constexpr std::string_view kBlockOpening = "`pragma protect data_block=\"";
+// The expression announcing an envelope's encrypted region. §34.5.15.1 spells
+// it as the keyword standing alone and §34.5.15.2 has the block begin on the
+// next line in the file, so the block is the whole of the line beneath it
+// (issue #3272).
+constexpr std::string_view kBlockOpening = "`pragma protect data_block\n";
 
 // The keyword as it opens a directive of its own, for counting the expressions
 // a text holds in the clear without settling what is written against them. The
@@ -191,7 +193,7 @@ std::string OpenedBlockOf(const std::string& envelope) {
   size_t at = envelope.find(kBlockOpening);
   if (at == std::string::npos) return {};
   size_t start = at + kBlockOpening.size();
-  size_t end = envelope.find('"', start);
+  size_t end = envelope.find('\n', start);
   if (end == std::string::npos) return {};
   std::string cleartext;
   if (!DecryptProtectedRegion(envelope.substr(start, end - start), kRegionKey,

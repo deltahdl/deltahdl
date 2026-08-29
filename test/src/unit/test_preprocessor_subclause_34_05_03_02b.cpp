@@ -66,6 +66,14 @@ using namespace delta;
 
 namespace {
 
+// The expression a sealed model and a produced envelope alike announce their
+// block with. §34.5.15.1 spells it as the keyword standing alone and §34.5.15.2
+// has the block begin on the next line, so a report against a block stands one
+// line below this. Issue #3272 is where this tool stopped writing the block as
+// the keyword's own quoted value.
+constexpr std::string_view kCarriedBlockAnnouncement =
+    "`pragma protect data_block\n";
+
 // One region naming `owner` and `name` for its key, enclosing `statement`.
 // Two of these in one text are two regions encrypted under two keys, and each
 // becomes an envelope carrying its own account of which key opens it.
@@ -87,8 +95,8 @@ std::string RegionAroundAnUnclosedSealedModel() {
   std::string text = "`pragma protect begin\n";
   text.append("  ").append(kOuterStatement).append("\n");
   text.append("`pragma protect begin_protected\n");
-  text.append("`pragma protect data_block=\"").append(kSealedBlockMarker);
-  text.append("\"\n");
+  text.append(kCarriedBlockAnnouncement).append(kSealedBlockMarker);
+  text.push_back('\n');
   text.append("`pragma protect end\n");
   return text;
 }
@@ -290,7 +298,7 @@ TEST(ProtectBeginProtectedDescription,
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(),
       "protect pragma data block cannot be decrypted with the key supplied",
-      LineHolding(written, "data_block="), "34.3.2"));
+      LineHolding(written, kCarriedBlockAnnouncement) + 1, "34.3.2"));
   EXPECT_FALSE(Holds(run.text, kOuterStatement));
 }
 

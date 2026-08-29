@@ -51,10 +51,9 @@ inline constexpr std::string_view kEncodingSealedDesign =
 inline constexpr std::string_view kSecondDesign =
     "module sealed_n; endmodule\n";
 
-// A design chosen to make the writing work for its living. It carries the one
-// character that would end the value a block travels as, and a byte that cannot
-// be printed at all, so a block recording it holds bytes no source line could
-// carry until the writing has been applied.
+// A design chosen to make the writing work for its living. It carries a
+// quotation mark and a byte that cannot be printed at all, so a block recording
+// it holds bytes no source line could carry until the writing has been applied.
 //
 // The unprintable byte is 0x02 rather than kKeywordMarker, which is 0x01. A
 // source file may not hold that one: Preprocessor::ProcessSource reports it
@@ -65,11 +64,12 @@ inline constexpr std::string_view kSecondDesign =
 inline constexpr std::string_view kAwkwardDesign =
     "module sealed_q; // \" \x02\nendmodule\n";
 
-// Where a reading meets the block an envelope carries. Everything a block is
-// read under has to stand ahead of this, so a directive written here is the
-// last word on the writing in effect where the block is opened.
+// The expression announcing the block an envelope carries, which §34.5.15.1
+// spells as the keyword standing alone. Everything a block is read under has to
+// stand ahead of this, so a directive written here is the last word on the
+// writing in effect where the block is opened.
 inline constexpr std::string_view kEncodingBlockOpening =
-    "`pragma protect data_block=\"";
+    "`pragma protect data_block\n";
 
 // §34.5.3.1's word, as the encrypting half writes it. It is where one envelope
 // starts, so it is also how a text carrying two of them is cut in half.
@@ -213,15 +213,16 @@ inline std::string EnvelopeAround(std::string_view inside) {
   return EnvelopeOf(RegionHolding(inside));
 }
 
-// The characters recording one envelope's sealed region: what stands between
-// the quotation marks of its data_block expression, and empty where the text
-// carries no such expression.
+// The characters recording one envelope's sealed region: the line beneath its
+// data_block expression, and empty where the text carries no such expression.
+// §34.5.15.1 spells that expression as the keyword standing alone, and
+// §34.5.15.2 has the block begin on the next line.
 inline std::string EncodingDataBlockOf(std::string_view envelope) {
   size_t opens = envelope.find(kEncodingBlockOpening);
   if (opens == std::string_view::npos) return {};
   size_t from = opens + kEncodingBlockOpening.size();
-  size_t to = envelope.find('"', from);
-  if (to == std::string_view::npos) return {};
+  size_t to = envelope.find('\n', from);
+  if (to == std::string_view::npos) to = envelope.size();
   return std::string(envelope.substr(from, to - from));
 }
 

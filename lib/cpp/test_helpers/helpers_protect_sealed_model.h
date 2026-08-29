@@ -141,8 +141,10 @@ inline std::string SealedModel() {
   text.append("\"\n");
   text.append("`pragma protect data_keyname=\"").append(kSealerKeyName);
   text.append("\"\n");
-  text.append("`pragma protect data_block=\"").append(kSealedBlockMarker);
-  text.append("\"\n");
+  // §34.5.15.1 spells the expression as the keyword standing alone, and
+  // §34.5.15.2 has the block begin on the line beneath it.
+  text.append("`pragma protect data_block\n").append(kSealedBlockMarker);
+  text.push_back('\n');
   text.append("`pragma protect end_protected\n");
   return text;
 }

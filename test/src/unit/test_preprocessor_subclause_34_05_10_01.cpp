@@ -45,6 +45,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -90,10 +91,11 @@ constexpr std::string_view kExchangeKey = "one-key-of-the-authors-own";
 // block that opened.
 constexpr std::string_view kSealedDesign = "module sealed_m; endmodule\n";
 
-// Where the reading meets the block an envelope carries. Everything a block is
-// opened under has to stand ahead of this, so a directive written here is the
-// last word on the entity in effect where the block is read.
-constexpr std::string_view kBlockDirective = "`pragma protect data_block=";
+// The directive announcing the block an envelope carries, which §34.5.15.1
+// spells as the keyword standing alone. Everything a block is opened under has
+// to stand ahead of this, so a directive written here is the last word on the
+// entity in effect where the block is read.
+constexpr std::string_view kBlockDirective = "`pragma protect data_block\n";
 
 // Whether `text` writes `written` anywhere in it.
 bool Carries(std::string_view text, std::string_view written) {
@@ -229,6 +231,14 @@ std::string EnvelopeReadUnder(const std::string& envelope,
   size_t block = text.find(kBlockDirective);
   EXPECT_NE(block, std::string::npos);
   return text.insert(block, directive);
+}
+
+// The 1-based line of `envelope` its block is written on, which is the line a
+// report about that block stands at. §34.5.15.2 has the directive above it
+// indicate that a data block begins on the next line in the file, so the block
+// follows that directive by one line (issue #3272).
+uint32_t WhereTheNamedBlockIsRead(std::string_view envelope) {
+  return LineHolding(envelope, kBlockDirective) + 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -456,7 +466,7 @@ TEST(ProtectDataKeyownerSyntax,
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "protect pragma data block cannot be decrypted with the key supplied",
-      LineHolding(envelope, "data_block="), "34.3.2"));
+      WhereTheNamedBlockIsRead(envelope), "34.3.2"));
   EXPECT_FALSE(Carries(read, "module sealed_m"));
 }
 

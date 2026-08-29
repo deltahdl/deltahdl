@@ -125,14 +125,12 @@ std::string TwoKeyBlockEnvelope(std::string_view asked) {
 
 // Whether `line` opens a block by naming `keyword`.
 //
-// A block is looked for by the keyword the line starts with rather than by
-// what follows it, because this tool does not write its three blocks alike:
-// §34.5.27 has a key block announced by the keyword standing alone with the
-// encoded value on the line beneath, which is how ProtectKeyBlockDirectives in
-// src/preprocessor/protect_key_block.cpp writes one, while the data block goes
-// out with its value written against the keyword. #3272 is that difference and
-// what it costs a reader; what this file is about is the order the blocks
-// stand in, which either spelling states equally well.
+// A block is looked for by the keyword the line starts with rather than by what
+// follows it. §34.5.15.1, §34.5.22.1 and §34.5.27.1 each spell their keyword as
+// the bare word with the encoded value on the line beneath, so all three of
+// this tool's blocks are announced alike and the keyword is the whole of what
+// the line carries. What this file is about is the order the blocks stand in,
+// which the announcing line states on its own.
 bool Opens(const std::string& line, std::string_view keyword) {
   std::string opening = "`pragma protect ";
   opening.append(keyword);
@@ -170,13 +168,19 @@ std::string DigestOf(std::string_view cleartext) {
 
 // A data block as some other tool wrote it, holding `sealed` under the key an
 // author hands both halves, with the count §34.5.9 puts ahead of it.
+//
+// §34.5.15.1 spells the announcing expression as the keyword standing alone and
+// §34.5.15.2 has the block begin on the next line, so the encoded value stands
+// on a line of its own beneath the keyword. Issue #3272 is where this tool
+// stopped writing the block as the keyword's own quoted value; a block written
+// that way is read by nothing, so a digest here would follow no block at all.
 std::string DataBlockHolding(std::string_view sealed) {
   std::string text = ProtectEncodedValueDirective(
       TheScheme(), ProtectedRegionBlockSize(sealed));
-  text.append("`pragma protect data_block=\"");
+  text.append(kEncodingBlockOpening);
   text.append(EncryptProtectedRegion(sealed, kEncodingExchangeKey,
                                      TheScheme().enctype));
-  text.append("\"\n");
+  text.push_back('\n');
   return text;
 }
 

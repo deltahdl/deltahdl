@@ -51,6 +51,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -186,6 +187,15 @@ std::string WithTheKeyNameWrittenAsTheNaming(const std::string& written) {
   std::string replaced(written);
   replaced.replace(at, kKeyNameDirective.size(), NamesAuthor(kKeyName));
   return replaced;
+}
+
+// The 1-based line of `envelope` that its data block stands on, which is where
+// a report about that block is made. §34.5.15.1 spells the announcing
+// expression as the keyword standing alone and §34.5.15.2 has the block begin
+// on the next line in the file, so the block is one line past the keyword
+// (issue #3272).
+uint32_t TheNamedEnvelopesBlockLine(std::string_view envelope) {
+  return LineHolding(envelope, kBlockOpening) + 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -528,8 +538,7 @@ TEST(ProtectAuthorDescription, TwoEnvelopesDifferingOnlyInTheNameReadAlike) {
 TEST(ProtectAuthorDescription, ANamingPastTheBlockCostsTheReadingNothing) {
   std::string moved = WithTheNamingMovedPastTheBlock(
       Encrypted(RegionWriting(NamesAuthor(kAuthorName))));
-  ASSERT_LT(moved.find("`pragma protect data_block=\""),
-            moved.find(NamesAuthor(kAuthorName)));
+  ASSERT_LT(moved.find(kBlockOpening), moved.find(NamesAuthor(kAuthorName)));
   ReadSource read(moved);
   EXPECT_FALSE(read.diag.HasErrors());
   EXPECT_TRUE(read.Holds("module sealed_m"));
@@ -571,7 +580,7 @@ TEST(ProtectAuthorDescription, ANameSpellingAKeyNameOpensNothing) {
   EXPECT_TRUE(ReportedError(
       read.diag.Diagnostics(),
       "protect pragma data block cannot be decrypted with the key supplied",
-      LineHolding(replaced, "data_block="), "34.3.2"));
+      TheNamedEnvelopesBlockLine(replaced), "34.3.2"));
   EXPECT_FALSE(read.Holds("module sealed_m"));
 }
 

@@ -37,6 +37,14 @@ namespace {
 constexpr std::string_view kExchangeKey = "acme-exchange-key";
 constexpr std::string_view kOtherKey = "not-the-authors-key";
 
+// The expression an envelope announces its block with. §34.5.15.1 spells it as
+// the keyword standing alone and §34.5.15.2 has the block begin on the next
+// line, so a report against a block stands one line below this. Issue #3272 is
+// where this tool stopped writing the block as the keyword's own quoted value,
+// which moved that report a line down every envelope this file writes.
+constexpr std::string_view kRecoveredBlockAnnouncement =
+    "`pragma protect data_block\n";
+
 // What a user who supplies `key` gives the tool.
 PreprocConfig KeyConfig(std::string_view key) {
   PreprocConfig config;
@@ -116,8 +124,8 @@ TEST(EnvelopeDecryptionSimulation, AnEnclosedDesignStaysSealedUnderAnotherKey) {
   RecoveredDesignRun run(src, kOtherKey);
   EXPECT_TRUE(ReportedError(
       run.f.diag.Diagnostics(),
-      "protect pragma data block cannot be decrypted with the key supplied", 9,
-      "34.3.2"));
+      "protect pragma data block cannot be decrypted with the key supplied",
+      LineHolding(src, kRecoveredBlockAnnouncement) + 1, "34.3.2"));
   EXPECT_EQ(run.result, 1U);
 }
 

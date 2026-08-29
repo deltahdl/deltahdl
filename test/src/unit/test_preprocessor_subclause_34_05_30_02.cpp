@@ -39,8 +39,12 @@
 // The inputs are the real syntax of the dependencies this rule consumes.
 // §34.5.1.1 and §34.5.2.1 delimit the regions being encrypted, §34.5.10's
 // data_keyowner and §34.5.12's data_keyname are the names a region reaches its
-// key through, §34.5.15's data_block is where the text a region sealed is
-// carried, §34.5.9's encoding states the count of what that block holds, and
+// key through, §34.5.15's data_block announces the block the text a region
+// sealed is carried in -- §34.5.15.1 spelling the keyword standing alone and
+// §34.5.15.2 having the block begin on the next line in the file, which is why
+// the position this rule names is read against the keyword's own line and not
+// against a value written after an '=' -- §34.5.9's encoding states the count
+// of what that block holds, and
 // §34.5.27's key_block carries the key an envelope's own reader opens it with.
 // §34.5.3.1's word opens each model an earlier encryption sealed already and
 // §34.5.4.1's word closes it; §34.5.3 leaves the expressions inside such a

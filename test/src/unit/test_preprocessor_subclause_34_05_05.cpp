@@ -204,9 +204,8 @@ TEST(ProtectAuthorEncryptionOutput, TheDirectiveStandsAheadOfTheBlock) {
   std::string enclosed = ReachesTheKey();
   enclosed.append(NamesAuthor(kAuthorName)).append(kSealedDesign);
   std::string encrypted = Encrypted(RegionAround(enclosed));
-  EXPECT_NE(encrypted.find("`pragma protect data_block=\""), std::string::npos);
-  EXPECT_LT(encrypted.find(kAuthorDirective),
-            encrypted.find("`pragma protect data_block=\""));
+  EXPECT_NE(encrypted.find(kBlockOpening), std::string::npos);
+  EXPECT_LT(encrypted.find(kAuthorDirective), encrypted.find(kBlockOpening));
 }
 
 // The negative: a region whose text names no author has no expression to place,

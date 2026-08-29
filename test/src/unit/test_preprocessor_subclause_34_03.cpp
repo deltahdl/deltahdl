@@ -29,6 +29,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -76,21 +77,37 @@ std::string Encrypted(const std::string& src) {
   return EncryptEnvelopes(src, kAuthorKey);
 }
 
+// The expression announcing one recorded region. §34.5.15.1 spells the keyword
+// standing alone, so the word is the whole of the expression, and §34.5.15.2
+// has the block it announces begin on the next line in the file.
+constexpr std::string_view kBlockAnnouncement = "`pragma protect data_block\n";
+
 // The regions a transformed text records, in writing order -- one per
 // decryption envelope the transformation produced. Reading them back is how a
 // test sees what the encrypting half put where an envelope's body used to be
 // without any key having been applied to the text yet.
+//
+// Each region is the line beneath one announcement. The coding scheme an
+// envelope this tool writes is under is given no line length to break at, so
+// the line the keyword announces is the whole of the block.
 std::vector<std::string> RecordedRegions(std::string_view text) {
   std::vector<std::string> regions;
-  std::string_view opening = "data_block=\"";
-  size_t pos = text.find(opening);
+  size_t pos = text.find(kBlockAnnouncement);
   while (pos != std::string_view::npos) {
-    size_t start = pos + opening.size();
-    size_t close = text.find('"', start);
+    size_t start = pos + kBlockAnnouncement.size();
+    size_t close = text.find('\n', start);
     regions.emplace_back(text.substr(start, close - start));
-    pos = text.find(opening, close);
+    pos = text.find(kBlockAnnouncement, close);
   }
   return regions;
+}
+
+// The 1-based line of `written` that a recorded region stands on. §34.5.15.2
+// puts the block on the line after the expression announcing it, and that is
+// the line a report about the block stands at: the report is made where the
+// block was read, not where it was announced.
+uint32_t LineOfTheBlock(std::string_view written) {
+  return LineHolding(written, kBlockAnnouncement) + 1;
 }
 
 // The cleartext `region` stands for under `key`, or the empty string when the
@@ -116,9 +133,11 @@ std::string OneRegion(const std::string& src) {
   return regions.empty() ? "" : regions.front();
 }
 
-// One directive recording a region, in the syntax of §22.11.
+// One region recorded as §34.5.15.1 spells the announcement and §34.5.15.2
+// places what it announces: the keyword alone on a directive of §22.11's
+// syntax, and the region on the line beneath it.
 std::string DataBlockLine(const std::string& region) {
-  return "`pragma protect data_block=\"" + region + "\"\n";
+  return std::string(kBlockAnnouncement) + region + "\n";
 }
 
 // A decryption envelope written around one recorded region, and around
@@ -441,30 +460,29 @@ TEST(ProtectedEnvelopeProcessing, EveryRegionOfOneEnvelopeIsPutBack) {
             run.text.find("initial second = 2;"));
 }
 
-// The other position the same two regions can be written in. A run of
-// expressions means the same thing however it is spread over directives, so
-// two regions recorded on one directive are put back exactly as two directives
-// would have put them.
-TEST(ProtectedEnvelopeProcessing, TwoRegionsOnOneDirectiveArePutBack) {
-  std::string first = OneRegion(
+// The other position the announcing expression can be written in. §22.11 makes
+// a directive's expressions a comma-separated list and each expression of one
+// is spelled on its own, so the keyword written beside another expression is
+// still the keyword standing alone and still speaks for the line beneath the
+// directive.
+//
+// Two regions cannot be recorded on one directive at all. §34.5.15.2 has a
+// block begin on the next line in the file, and one directive has one next
+// line, so what one directive records is one region and whatever else describes
+// the envelope alongside it.
+TEST(ProtectedEnvelopeProcessing, ABlockBesideAnotherExpressionIsPutBack) {
+  std::string only = OneRegion(
       "`pragma protect begin\n"
-      "  initial first = 1;\n"
-      "`pragma protect end\n");
-  std::string second = OneRegion(
-      "`pragma protect begin\n"
-      "  initial second = 2;\n"
+      "  initial only_one = 7;\n"
       "`pragma protect end\n");
   ReadWithKey run(
       "`pragma protect begin_protected\n"
-      "`pragma protect data_block=\"" +
-          first + "\", data_block=\"" + second +
-          "\"\n`pragma protect end_protected\n",
+      "`pragma protect author=\"acme ip\", data_block\n" +
+          only + "\n`pragma protect end_protected\n",
       kAuthorKey);
   EXPECT_FALSE(run.diag.HasErrors());
-  EXPECT_TRUE(Holds(run.text, "initial first = 1;"));
-  EXPECT_TRUE(Holds(run.text, "initial second = 2;"));
-  EXPECT_LT(run.text.find("initial first = 1;"),
-            run.text.find("initial second = 2;"));
+  EXPECT_TRUE(Holds(run.text, "initial only_one = 7;"));
+  EXPECT_FALSE(Holds(run.text, only));
 }
 
 // The key is what makes the process possible, so a key that is not the one the
@@ -479,7 +497,7 @@ TEST(ProtectedEnvelopeProcessing, AKeyThatIsNotTheProperOneRecoversNothing) {
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(),
       "protect pragma data block cannot be decrypted with the key supplied",
-      LineHolding(sealed, "data_block="), "34.3.2"));
+      LineOfTheBlock(sealed), "34.3.2"));
   EXPECT_FALSE(Holds(run.text, "initial result = 42;"));
 }
 
@@ -494,7 +512,7 @@ TEST(ProtectedEnvelopeProcessing, NoKeySuppliedRecoversNothing) {
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(),
       "protect pragma data block cannot be decrypted with the key supplied",
-      LineHolding(sealed, "data_block="), "34.3.2"));
+      LineOfTheBlock(sealed), "34.3.2"));
   EXPECT_FALSE(Holds(run.text, "initial result = 42;"));
 }
 
@@ -515,15 +533,20 @@ TEST(ProtectedEnvelopeProcessing, AnEnvelopeRecordingNoRegionPassesQuietly) {
 // A recorded region is only a region of a decryption envelope. The same
 // expression written where no such envelope is open records nothing this
 // process is asked to put back, so it recovers nothing and reports nothing.
+//
+// §34.5.15.2 has the expression speak for the next line only where a previously
+// generated envelope encloses it, so the line beneath this one is source text
+// like any other: it reaches the step after the preprocessor as it was written,
+// which is what says it was passed over rather than read and discarded.
 TEST(ProtectedEnvelopeProcessing, ARegionOutsideAnEnvelopeIsNotRecovered) {
   std::string region = OneRegion(
       "`pragma protect begin\n"
       "  initial result = 42;\n"
       "`pragma protect end\n");
-  ReadWithKey run("`pragma protect data_block=\"" + region + "\"\n",
-                  kAuthorKey);
+  ReadWithKey run(DataBlockLine(region), kAuthorKey);
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_FALSE(Holds(run.text, "initial result = 42;"));
+  EXPECT_TRUE(Holds(run.text, region));
 }
 
 // ---------------------------------------------------------------------------
@@ -541,7 +564,7 @@ TEST(ProtectedEnvelopeProcessing, AValueOutsideTheAlphabetRecordsNoRegion) {
   ReadWithKey run(EnvelopeAround("AAAA*AAA", ""), kAuthorKey);
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(),
-      "protect pragma value is not written in the encoding in effect", 2,
+      "protect pragma value is not written in the encoding in effect", 3,
       "34.5.9.2"));
 }
 
@@ -555,7 +578,7 @@ TEST(ProtectedEnvelopeProcessing, AValueEndingMidGroupRecordsNoRegion) {
   ReadWithKey run(EnvelopeAround("AAAAA", ""), kAuthorKey);
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(),
-      "protect pragma value is not written in the encoding in effect", 2,
+      "protect pragma value is not written in the encoding in effect", 3,
       "34.5.9.2"));
 }
 
@@ -570,7 +593,7 @@ TEST(ProtectedEnvelopeProcessing, AValueShorterThanAFingerprintRecordsNone) {
   ReadWithKey run(EnvelopeAround("AAA", ""), kAuthorKey);
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(),
-      "protect pragma data block cannot be decrypted with the key supplied", 2,
+      "protect pragma data block cannot be decrypted with the key supplied", 3,
       "34.3.2"));
 }
 

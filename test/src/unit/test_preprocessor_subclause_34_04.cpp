@@ -843,9 +843,16 @@ TEST(ProtectPragmaDirectives, AParenthesizedListIsRecordedAsTheValue) {
 // ---------------------------------------------------------------------------
 
 // The keywords bearing on the envelope are written inside it and ahead of the
-// expression carrying its encrypted body, so whatever reads the envelope has
+// expression announcing its encrypted body, so whatever reads the envelope has
 // them in hand before it reaches the thing they describe.
+//
+// That expression is the keyword standing alone. §34.5.15.1 spells it that way
+// and §34.5.15.2 has the block begin on the line beneath it, which is what
+// issue #3272 changed here: the block was written as the keyword's own quoted
+// value, and a search for that spelling now finds nothing.
 TEST(ProtectPragmaDirectives, AWrittenEnvelopeCarriesItsOwnDescription) {
+  constexpr std::string_view kBlockAnnouncement =
+      "`pragma protect data_block\n";
   std::string written = Encrypted(
       "`pragma protect begin\n"
       "  initial result = 42;\n"
@@ -854,7 +861,7 @@ TEST(ProtectPragmaDirectives, AWrittenEnvelopeCarriesItsOwnDescription) {
   size_t agent = written.find("`pragma protect encrypt_agent=");
   size_t method = written.find("`pragma protect data_method=");
   size_t encoding = written.find("`pragma protect encoding=");
-  size_t block = written.find("`pragma protect data_block=");
+  size_t block = written.find(kBlockAnnouncement);
   EXPECT_NE(opening, std::string::npos);
   EXPECT_NE(agent, std::string::npos);
   EXPECT_NE(method, std::string::npos);

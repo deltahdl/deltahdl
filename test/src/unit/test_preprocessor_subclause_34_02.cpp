@@ -386,6 +386,15 @@ TEST(ProtectedEnvelopeOverview, ParenthesizedValueKeywordTakesTheSameRole) {
 
 // A decryption envelope splits the two roles the same way its encryption
 // counterpart does.
+//
+// §34.5.15.1 spells data_block as the keyword standing alone and §34.5.15.2 has
+// a block begin on the line beneath it, so the expression written here speaks
+// for the line after it. §34.5.4.2 ends the run of gathered expressions at the
+// word closing the envelope, which
+// Preprocessor::EndAccumulatedProtectPragmas in
+// src/preprocessor/preprocessor.cpp applies before any line is offered a taker,
+// so the closing expression below is read as the expression it is rather than
+// as this envelope's block.
 TEST(ProtectedEnvelopeOverview, BeginProtectedSplitsTheSameTwoRoles) {
   EnvelopeRun run(
       "`pragma protect key_keyowner = \"Acme Corp\"\n"
@@ -428,12 +437,17 @@ TEST(ProtectedEnvelopeOverview, EachEnvelopeKeepsItsOwnKeywords) {
 // A keyword written inside a region belongs to the innermost envelope open at
 // that point, not to the one enclosing it, so nesting splits the descriptions
 // the same way separate envelopes do.
+//
+// The keyword written inside the inner envelope is one that speaks for its own
+// line alone. §34.5.15.2 has data_block speak for the line beneath it, so a
+// data_block here would take the expression closing the inner envelope for this
+// envelope's block and the inner envelope would never close.
 TEST(ProtectedEnvelopeOverview, NestedEnvelopesKeepTheirKeywordsApart) {
   EnvelopeRun run(
       "`pragma protect begin_protected\n"
       "`pragma protect key_keyowner = \"Acme Corp\"\n"
       "`pragma protect begin\n"
-      "`pragma protect data_block\n"
+      "`pragma protect data_keyname = \"inner-region-key\"\n"
       "`pragma protect end\n"
       "`pragma protect end_protected\n");
   EXPECT_FALSE(run.diag.HasErrors());
@@ -442,7 +456,7 @@ TEST(ProtectedEnvelopeOverview, NestedEnvelopesKeepTheirKeywordsApart) {
   EXPECT_EQ(run.Envelopes().ClosedEnvelopes()[0].mode,
             EnvelopeMode::kEncryption);
   EXPECT_EQ(run.Envelopes().ClosedEnvelopes()[0].content_keywords,
-            std::vector<std::string>{"data_block"});
+            std::vector<std::string>{"data_keyname"});
   // The keyword written before the inner envelope opened is already inside the
   // enclosing region, so it describes that region's content.
   EXPECT_EQ(run.Envelopes().ClosedEnvelopes()[1].content_keywords,

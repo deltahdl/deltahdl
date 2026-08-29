@@ -718,6 +718,7 @@ void Preprocessor::EndAccumulatedProtectPragmas() {
   digest_public_key_value_next_ = false;
   digest_decrypt_key_value_next_ = false;
   digest_block_value_next_ = false;
+  data_block_value_next_ = false;
   data_decrypt_key_.clear();
   digest_decrypt_key_.clear();
   // §34.5.22 has the digest of a key block or a data block written in the
@@ -748,15 +749,20 @@ static void EmitStrippedActiveLine(const std::string& stripped,
 
 // Whether `line` carried a value the line before it announced, which is what
 // puts it beyond being a directive or a line of the design: it belongs to the
-// protected block above it. Seven keywords speak for the line after them this
+// protected block above it. Eight keywords speak for the line after them this
 // way -- the public key a region's keys are under (34.5.26), the block carrying
 // the key its data are under (34.5.27), that key itself (34.5.14), the public
 // key the data are under (34.5.13), the public key its digest is under
-// (34.5.19), the key that opens the region's digests (34.5.20), and the digest
-// a block is checked against (34.5.22) -- and a line answers at most one of
-// them, whichever announcement is outstanding.
+// (34.5.19), the key that opens the region's digests (34.5.20), the digest a
+// block is checked against (34.5.22), and the block holding the design itself
+// (34.5.15) -- and a line answers at most one of them, whichever announcement
+// is outstanding.
+//
+// The last of the eight is the one whose line recovers to text rather than to a
+// key: what a data block holds is the design, so it is appended to `output` in
+// place of the envelope it arrived in.
 bool Preprocessor::TookAnnouncedValue(std::string_view line, SourceLoc loc,
-                                      int depth) {
+                                      int depth, std::string& output) {
   // §34.5.4.2 ends the run of gathered expressions at the word closing the
   // envelope, so that word is read as the expression it is rather than as the
   // encoded value one of the seven above it is still waiting for. The word is
@@ -769,6 +775,7 @@ bool Preprocessor::TookAnnouncedValue(std::string_view line, SourceLoc loc,
   }
   if (TakeKeyPublicKeyValue(line, loc)) return true;
   if (TakeKeyBlockValue(line, loc, depth)) return true;
+  if (TakeDataBlockValue(line, loc, depth, output)) return true;
   if (TakeDataDecryptKeyValue(line, loc)) return true;
   if (TakeDataPublicKeyValue(line, loc)) return true;
   if (TakeDigestPublicKeyValue(line, loc)) return true;
@@ -786,7 +793,7 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
 
   // Every path text takes into the Preprocessor arrives here -- Preprocess for
   // a file named on the command line, ProcessIncludeFile for a `include, and
-  // the protected-envelope cleartext Preprocessor::DecryptDataBlock in
+  // the protected-envelope cleartext Preprocessor::TakeDataBlockValue in
   // src/preprocessor/preprocessor_protect_keys.cpp hands over -- so this is
   // the one place that has to hold for the marker to mean what Lexer takes it
   // to mean.
@@ -832,7 +839,9 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
       SkipBlockCommentLine(line, file_id, line_num, depth, output);
   };
   ops.run_directive = [&](std::string_view line) {
-    if (TookAnnouncedValue(line, {file_id, line_num, 1}, depth)) return true;
+    if (TookAnnouncedValue(line, {file_id, line_num, 1}, depth, output)) {
+      return true;
+    }
     return ProcessDirective(line, file_id, line_num, depth, output);
   };
   ops.emit_active_line = [&](std::string_view line) {

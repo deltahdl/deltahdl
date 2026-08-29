@@ -58,6 +58,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -193,6 +194,15 @@ std::string WithTheKeyNameWrittenAsTheOffering(const std::string& envelope) {
   std::string replaced(envelope);
   replaced.replace(stands, designation.size(), OffersFurther(kKeyName));
   return replaced;
+}
+
+// The 1-based line of `envelope` its data block is written on, which is the
+// line a report about that block stands at. §34.5.15.1 spells the announcing
+// expression as the keyword standing alone and §34.5.15.2 has the block begin
+// on the next line in the file, so the block follows the keyword by one line
+// (issue #3272).
+uint32_t WhereTheOfferedEnvelopesBlockIsWritten(std::string_view envelope) {
+  return LineHolding(envelope, kBlockOpening) + 1;
 }
 
 // One directive carrying two expressions: this subclause's, and §34.5.12's
@@ -677,7 +687,7 @@ TEST(ProtectEncryptAgentInfoDescription, AnOfferingSpellingAKeyNameOpensNone) {
   EXPECT_TRUE(ReportedError(
       read.diags.Diagnostics(),
       "protect pragma data block cannot be decrypted with the key supplied",
-      LineHolding(replaced, "data_block="), "34.3.2"));
+      WhereTheOfferedEnvelopesBlockIsWritten(replaced), "34.3.2"));
   EXPECT_FALSE(read.Produced("module sealed_m"));
 }
 

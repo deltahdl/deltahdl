@@ -69,6 +69,14 @@ namespace {
 // coincided with.
 constexpr std::string_view kNestedBlockMarker = "NESTEDMODELBLOCKMARKER";
 
+// The expression a sealed model and a produced envelope alike announce their
+// block with. §34.5.15.1 spells it as the keyword standing alone and §34.5.15.2
+// has the block begin on the next line, so a report against a block stands one
+// line below this. Issue #3272 is where this tool stopped writing the block as
+// the keyword's own quoted value.
+constexpr std::string_view kModelBlockAnnouncement =
+    "`pragma protect data_block\n";
+
 // SealedModel with a further sealed model written inside it and the sealing
 // entity's key name written after that inner model closes.
 //
@@ -84,13 +92,13 @@ std::string SealedModelHoldingAnother() {
   text.append("`pragma protect data_keyowner=\"").append(kSealerEntity);
   text.append("\"\n");
   text.append("`pragma protect begin_protected\n");
-  text.append("`pragma protect data_block=\"").append(kNestedBlockMarker);
-  text.append("\"\n");
+  text.append(kModelBlockAnnouncement).append(kNestedBlockMarker);
+  text.push_back('\n');
   text.append("`pragma protect end_protected\n");
   text.append("`pragma protect data_keyname=\"").append(kSealerKeyName);
   text.append("\"\n");
-  text.append("`pragma protect data_block=\"").append(kSealedBlockMarker);
-  text.append("\"\n");
+  text.append(kModelBlockAnnouncement).append(kSealedBlockMarker);
+  text.push_back('\n');
   text.append("`pragma protect end_protected\n");
   return text;
 }
@@ -102,8 +110,8 @@ std::string SealedModelHoldingAnother() {
 std::string SealedModelDeclaringAScheme() {
   std::string text = "`pragma protect begin_protected\n";
   text.append("`pragma protect encoding=(enctype=\"base64\")\n");
-  text.append("`pragma protect data_block=\"").append(kSealedBlockMarker);
-  text.append("\"\n");
+  text.append(kModelBlockAnnouncement).append(kSealedBlockMarker);
+  text.push_back('\n');
   text.append("`pragma protect end_protected\n");
   return text;
 }
@@ -232,7 +240,7 @@ TEST(ProtectBeginProtectedDescription,
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(),
       "protect pragma data block cannot be decrypted with the key supplied",
-      LineHolding(written, "data_block="), "34.3.2"));
+      LineHolding(written, kModelBlockAnnouncement) + 1, "34.3.2"));
   EXPECT_FALSE(Holds(run.text, kOuterStatement));
 }
 
@@ -300,7 +308,7 @@ TEST(ProtectBeginProtectedDescription,
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(),
       "protect pragma data block cannot be decrypted with the key supplied",
-      LineHolding(written, "data_block="), "34.3.2"));
+      LineHolding(written, kModelBlockAnnouncement) + 1, "34.3.2"));
   EXPECT_FALSE(Holds(run.text, kOuterStatement));
 }
 
@@ -326,7 +334,9 @@ TEST(ProtectBeginProtectedDescription,
   // text the outer block recovered to. That text is the region's body without
   // its opening line and without the author line §34.5.5 holds back from a
   // block, so the model's block stands two lines above where the region wrote
-  // it.
+  // it. §34.5.15.2 puts that block on the line beneath the keyword announcing
+  // it, and the marker is the whole of that line, so the marker's own line is
+  // where the report stands.
   std::string region = NamedRegionAround(SealedModel());
   ReadSource run(EncryptedUnderNames(region),
                  ReadSource::KeyConfig(kAuthorKey));
@@ -339,7 +349,7 @@ TEST(ProtectBeginProtectedDescription,
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(),
       "states an encryption algorithm this implementation does not provide",
-      LineHolding(region, "data_block=") - 2, "34.5.11.2"));
+      LineHolding(region, kSealedBlockMarker) - 2, "34.5.11.2"));
   EXPECT_TRUE(Holds(run.text, kOuterStatement));
 }
 

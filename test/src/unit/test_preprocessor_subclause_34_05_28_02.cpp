@@ -72,14 +72,16 @@ ProtectKeyList TheKey() {
   return keys;
 }
 
-// The characters recording one envelope's sealed region: what stands between
-// the quotation marks of its data_block expression.
+// The characters recording one envelope's sealed region: the line beneath its
+// data_block expression. §34.5.15.1 spells that expression as the keyword
+// standing alone and §34.5.15.2 has the block begin on the next line in the
+// file (issue #3272).
 std::string EncodingDataBlockOf(const std::string& envelope) {
-  constexpr std::string_view kOpening = "`pragma protect data_block=\"";
-  size_t opens = envelope.find(kOpening);
+  constexpr std::string_view kAnnouncement = "`pragma protect data_block\n";
+  size_t opens = envelope.find(kAnnouncement);
   EXPECT_NE(opens, std::string::npos) << envelope;
-  size_t from = opens + kOpening.size();
-  return envelope.substr(from, envelope.find('"', from) - from);
+  size_t from = opens + kAnnouncement.size();
+  return envelope.substr(from, envelope.find('\n', from) - from);
 }
 
 std::string Writes(std::string_view keyword, std::string_view value) {

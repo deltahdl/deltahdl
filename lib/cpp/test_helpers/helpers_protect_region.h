@@ -28,10 +28,11 @@ inline constexpr std::string_view kRegionKey = "acme-region-exchange-key";
 inline constexpr std::string_view kSealedDesign =
     "module sealed_m; endmodule\n";
 
-// Where the expression recording one envelope's sealed region begins. What
-// stands between the quotation marks after it is the block itself.
+// The expression announcing one envelope's sealed region. §34.5.15.1 spells it
+// as the keyword standing alone and §34.5.15.2 has the block begin on the next
+// line, so the block is what stands on the line beneath this.
 inline constexpr std::string_view kBlockOpening =
-    "`pragma protect data_block=\"";
+    "`pragma protect data_block\n";
 
 // The two words §34.5.3.1 and §34.5.4.1 define, which delimit a model an
 // encryption sealed already -- as the encrypting half writes them, and as a
@@ -117,15 +118,19 @@ inline std::string EncryptedWithoutTheKey(std::string_view source) {
   return EncryptEnvelopes(source, "", AKeyUnderAnotherName());
 }
 
-// The characters recording one envelope's sealed region: what stands between
-// the quotation marks of its data_block expression, and empty where the text
-// carries no such expression.
+// The characters recording one envelope's sealed region: the line beneath its
+// data_block expression, and empty where the text carries no such expression.
+//
+// The block is one line, EnvelopeBlockEncoding
+// (src/preprocessor/protect_envelope_output.h) leaving the coding scheme no
+// line length to break at, so the line the keyword announces is the whole of
+// it.
 inline std::string DataBlockOf(std::string_view envelope) {
   size_t opens = envelope.find(kBlockOpening);
   if (opens == std::string_view::npos) return {};
   size_t from = opens + kBlockOpening.size();
-  size_t to = envelope.find('"', from);
-  if (to == std::string_view::npos) return {};
+  size_t to = envelope.find('\n', from);
+  if (to == std::string_view::npos) to = envelope.size();
   return std::string(envelope.substr(from, to - from));
 }
 

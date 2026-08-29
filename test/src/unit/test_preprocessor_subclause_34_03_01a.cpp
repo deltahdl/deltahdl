@@ -76,19 +76,27 @@ bool Holds(std::string_view text, std::string_view needle) {
   return text.find(needle) != std::string_view::npos;
 }
 
+// The expression a transformed text announces each block with. §34.5.15.1
+// spells it as the keyword standing alone, and §34.5.15.2 has the block begin
+// on the next line, so the block is the whole of the line beneath this. Issue
+// #3272 is where this tool stopped writing the block as the keyword's own
+// quoted value.
+constexpr std::string_view kRecordedBlockOpening =
+    "`pragma protect data_block\n";
+
 // The blocks a transformed text records, in writing order -- one per
 // decryption envelope the transformation formed. Reading them back is how a
 // test sees what was put where the enclosed text used to be, before any key
 // has been applied to the text.
 std::vector<std::string> RecordedBlocks(std::string_view text) {
   std::vector<std::string> blocks;
-  std::string_view opening = "data_block=\"";
-  size_t pos = text.find(opening);
+  size_t pos = text.find(kRecordedBlockOpening);
   while (pos != std::string_view::npos) {
-    size_t start = pos + opening.size();
-    size_t close = text.find('"', start);
+    size_t start = pos + kRecordedBlockOpening.size();
+    size_t close = text.find('\n', start);
+    if (close == std::string_view::npos) close = text.size();
     blocks.emplace_back(text.substr(start, close - start));
-    pos = text.find(opening, close);
+    pos = text.find(kRecordedBlockOpening, close);
   }
   return blocks;
 }

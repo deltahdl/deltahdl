@@ -139,8 +139,12 @@ ProtectKeyList TheBlockKey() {
 // outside every region and is copied through in the clear, so a search of the
 // whole text finds that line and says nothing about whether a digest was
 // produced.
+//
+// The data block is found by the expression announcing it, which §34.5.15.1
+// spells as the keyword standing alone and §34.5.15.2 has speak for the next
+// line in the file (issue #3272).
 bool CarriesAGeneratedDigestBlock(const std::string& envelope) {
-  size_t data = envelope.find("`pragma protect data_block=\"");
+  size_t data = envelope.find("`pragma protect data_block\n");
   if (data == std::string::npos) return false;
   return envelope.find("`pragma protect digest_block", data) !=
          std::string::npos;

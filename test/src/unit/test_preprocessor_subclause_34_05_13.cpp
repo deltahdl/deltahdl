@@ -43,6 +43,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -281,6 +282,15 @@ struct ReadUnderKeys {
     return text.find(needle) != std::string::npos;
   }
 };
+
+// The 1-based line of `envelope` its data block is written on, which is the
+// line a report about that block stands at. §34.5.15.1 spells the announcing
+// expression as the keyword standing alone and §34.5.15.2 has the block begin
+// on the next line in the file, so the block stands one line past it (issue
+// #3272).
+uint32_t TheDesignatedBlocksLine(std::string_view envelope) {
+  return LineHolding(envelope, "`pragma protect data_block\n") + 1;
+}
 
 // How many times `needle` is written in `text`.
 size_t Occurrences(std::string_view text, std::string_view needle) {
@@ -554,7 +564,7 @@ TEST(ProtectDataPublicKeyDecryptionInput,
   EXPECT_TRUE(ReportedError(
       read.diag.Diagnostics(),
       "protect pragma data block cannot be decrypted with the key supplied",
-      LineHolding(envelope, "data_block="), "34.3.2"));
+      TheDesignatedBlocksLine(envelope), "34.3.2"));
 }
 
 // The line the keyword announced is key material of the protected block rather
@@ -775,7 +785,7 @@ TEST(ProtectDataPublicKeyDecryptionInput,
   EXPECT_TRUE(ReportedError(
       read.diag.Diagnostics(),
       "states an encryption algorithm this implementation does not provide",
-      LineHolding(retitled, "data_block"), "34.5.11.2"))
+      TheDesignatedBlocksLine(retitled), "34.5.11.2"))
       << read.text;
 }
 

@@ -56,13 +56,19 @@ TEST_F(ProtectedTest, AuthorInfoStringExpressionConsumed) {
 
 // The author_info expression carries arbitrary additional author text in its
 // string operand without disturbing the surrounding design source.
+//
+// The envelope carries no data block. §34.5.15.1 spells that expression as the
+// keyword standing alone and §34.5.15.2 has it indicate that a data block
+// begins on the next line in the file, so a data_block written here would take
+// the line beneath it as the block's characters and report that line for not
+// being written in the coding scheme in effect (issue #3272). A block is no
+// part of what this case claims, which is that the expression above it is
+// consumed and the design text on either side of the envelope is not.
 TEST_F(ProtectedTest, AuthorInfoInEnvelopePreservesSource) {
   auto result = Preprocess(
       "module m;\n"
       "`pragma protect begin_protected\n"
       "`pragma protect author_info = \"contact: ip-support@example.com\"\n"
-      "`pragma protect data_block\n"
-      "encrypted_payload\n"
       "`pragma protect end_protected\n"
       "endmodule\n");
   EXPECT_FALSE(diag_.HasErrors());

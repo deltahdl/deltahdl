@@ -148,13 +148,18 @@ TEST(ProtectBeginSyntax, ACommentAfterTheWordLeavesItStandingAlone) {
 // delimits there is the region replaced by an envelope for the other mode of
 // processing, so the word standing alone is what makes a region get encrypted
 // at all.
+//
+// The envelope announces its block with §34.5.15.1's keyword standing alone,
+// §34.5.15.2 putting the block on the line beneath. Issue #3272 records that
+// this tool wrote the block as a pragma_value against that keyword instead, so
+// the newline is part of what is looked for here.
 TEST(ProtectBeginSyntax, TheEncryptingHalfTakesTheWordAloneAsItsDelimiter) {
   std::string written = EncryptedByTheAuthor(
       "`pragma protect begin\n"
       "  initial result = 42;\n"
       "`pragma protect end\n");
   EXPECT_TRUE(Holds(written, "`pragma protect begin_protected\n"));
-  EXPECT_TRUE(Holds(written, "data_block=\""));
+  EXPECT_TRUE(Holds(written, "`pragma protect data_block\n"));
   EXPECT_FALSE(Holds(written, "initial result = 42;"));
 }
 

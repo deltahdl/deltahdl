@@ -40,7 +40,10 @@
 //
 // The inputs are the real syntax of the dependencies this rule consumes.
 // §34.5.3.1's word opens each of the models this one ends, §34.5.15's
-// data_block is the expression an envelope's own text is carried on, and
+// data_block is the expression announcing the block an envelope's own text is
+// carried in -- §34.5.15.1 spelling that keyword standing alone and §34.5.15.2
+// putting the block on the next line in the file, which issue #3272 records
+// this tool writing as a pragma_value against the keyword instead -- and
 // §34.5.11's data_method is the identifier an envelope states for the cipher
 // its block is under -- which is what "the current method" names. §34.5.10's
 // data_keyowner and §34.5.12's data_keyname are the values whose gathering the
@@ -55,6 +58,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -135,6 +139,12 @@ constexpr std::string_view kWordDirective = "`pragma protect end_protected\n";
 // block.
 constexpr std::string_view kValuedWordDirective =
     "`pragma protect end_protected=\"1\"\n";
+
+// The directive announcing an envelope's block, in the spelling §34.5.15.1
+// defines it with: the pragma_keyword standing alone, the block itself
+// beginning on the next line in the file as §34.5.15.2 has it.
+constexpr std::string_view kAnnouncesTheBlock = "`pragma protect data_block\n";
+
 // Both entities' keys, supplied to whichever half is running. Holding the
 // sealed model's key too is what makes the tests below discriminating: a run
 // that gathered the sealed model's names would find a key under them rather
@@ -285,8 +295,10 @@ std::string RegionOpeningWithAStrayWord() {
   text.append("  ").append(kOuterStatement).append("\n");
   text.append("`pragma protect begin_protected\n");
   text.append("`pragma protect author=\"").append(kSealerEntity).append("\"\n");
-  text.append("`pragma protect data_block=\"").append(kSealedBlockMarker);
-  text.append("\"\n");
+  // §34.5.15.1 spells the expression as the keyword standing alone, and
+  // §34.5.15.2 has the block begin on the next line in the file.
+  text.append("`pragma protect data_block\n").append(kSealedBlockMarker);
+  text.push_back('\n');
   text.append(kWordDirective);
   text.append("`pragma protect end\n");
   return text;
@@ -428,15 +440,27 @@ std::string WithLineMovedPastTheWord(const std::string& written,
 // a test can spell.
 std::string WithTheWordAheadOfTheBlock(const std::string& written) {
   constexpr std::string_view kClosing = "`pragma protect end_protected\n";
-  constexpr std::string_view kBlockDirective = "`pragma protect data_block=";
   size_t at = written.find(kClosing);
   if (at == std::string::npos) return written;
   std::string moved(written);
   moved.erase(at, kClosing.size());
-  size_t block = moved.find(kBlockDirective);
+  size_t block = moved.find(kAnnouncesTheBlock);
   if (block == std::string::npos) return written;
   moved.insert(block, kClosing);
   return moved;
+}
+
+// The 1-based line of `written` the block itself stands on, which is where a
+// report about that block is raised. §34.5.15.1 spells the announcing
+// expression as the keyword standing alone and §34.5.15.2 has the block begin
+// on the next line in the file, so the block stands one line past the keyword.
+//
+// Issue #3272 records that this tool wrote the block as a pragma_value against
+// the keyword, which put the two on one line. A case naming the keyword's line
+// would have gone on passing while the report moved.
+uint32_t TheBlocksLineIn(const std::string& written) {
+  uint32_t announced = LineHolding(written, kAnnouncesTheBlock);
+  return announced == 0 ? 0 : announced + 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -529,7 +553,7 @@ TEST(ProtectEndProtectedDescription, TheSealedModelsNamesSelectNoKeyForIt) {
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(),
       "protect pragma data block cannot be decrypted with the key supplied",
-      LineHolding(written, "data_block="), "34.3.2"));
+      TheBlocksLineIn(written), "34.3.2"));
   EXPECT_FALSE(Holds(run.text, kOuterStatement));
   EXPECT_EQ(run.Closed().size(), 1U);
 }
@@ -869,7 +893,7 @@ TEST(ProtectEndProtectedDescription, TheNextBlockIsNotOpenedByTheEarlierKey) {
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(),
       "protect pragma data block cannot be decrypted with the key supplied",
-      LineHolding(src, "data_block="), "34.3.2"));
+      TheBlocksLineIn(src), "34.3.2"));
   EXPECT_FALSE(Holds(run.text, kOuterStatement));
 }
 
@@ -887,7 +911,7 @@ TEST(ProtectEndProtectedDescription, AnExpressionPastTheWordIsOutsideTheRun) {
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(),
       "protect pragma data block cannot be decrypted with the key supplied",
-      LineHolding(written, "data_block="), "34.3.2"));
+      TheBlocksLineIn(written), "34.3.2"));
   EXPECT_FALSE(Holds(run.text, kOuterStatement));
 }
 

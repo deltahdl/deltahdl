@@ -179,7 +179,9 @@ TEST(ProtectEndSyntax, TheEncryptingHalfTakesTheWordAloneAsItsDelimiter) {
   std::string written =
       EncryptedByTheAuthor(RegionClosedWith("`pragma protect end\n"));
   EXPECT_TRUE(Holds(written, "`pragma protect end_protected\n"));
-  EXPECT_TRUE(Holds(written, "data_block=\""));
+  // §34.5.15.1 spells the announcing keyword standing alone and §34.5.15.2
+  // puts the block on the line after it, so the newline is what is looked for.
+  EXPECT_TRUE(Holds(written, "`pragma protect data_block\n"));
   EXPECT_FALSE(Holds(written, "initial result = 42;"));
 }
 
@@ -298,7 +300,7 @@ TEST(ProtectEndSyntax, AValuedWordIsEncryptedAsTextOfTheRegionItLeftOpen) {
   std::string closing = "`pragma protect end=\"now\"\n";
   closing.append("`pragma protect end\n");
   std::string written = EncryptedByTheAuthor(RegionClosedWith(closing));
-  EXPECT_TRUE(Holds(written, "data_block=\""));
+  EXPECT_TRUE(Holds(written, "`pragma protect data_block\n"));
   EXPECT_FALSE(Holds(written, "end=\"now\""));
 }
 

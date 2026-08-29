@@ -25,7 +25,7 @@
 // such a block under the cipher it does provide would hand back whatever those
 // bytes became rather than the design, so the identifier the envelope states is
 // checked before the block is opened
-// (Preprocessor::DecryptDataBlock,
+// (Preprocessor::TakeDataBlockValue,
 // src/preprocessor/preprocessor_protect_keys.cpp).
 //
 // The third of those is covered here as well, and it is the one an envelope
@@ -63,6 +63,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -133,6 +134,15 @@ struct ReadBack {
   }
 };
 
+// The 1-based line of `envelope` its data block is written on, which is the
+// line a report about that block stands at. §34.5.15.1 spells the announcing
+// expression as the keyword standing alone and §34.5.15.2 has the block begin
+// on the next line in the file, so the block is one line past that expression
+// (issue #3272).
+uint32_t TheCipheredBlocksLine(std::string_view envelope) {
+  return LineHolding(envelope, "`pragma protect data_block\n") + 1;
+}
+
 // §34.5.11.2: the data_method states the algorithm the data block is decrypted
 // with, and des-cbc is the identifier Table 34-3 requires of an implementation.
 // This one does not provide it, so a block naming it is not opened and the
@@ -142,7 +152,7 @@ TEST(ProtectDataMethodDescription,
      ABlockNamingARequiredCipherWeLackIsReported) {
   ReadBack run(EnvelopeNaming("des-cbc"));
   EXPECT_TRUE(ReportedError(run.f.diag.Diagnostics(), kNotProvided,
-                            LineHolding(run.source, "data_block"), "34.5.11.2"))
+                            TheCipheredBlocksLine(run.source), "34.5.11.2"))
       << run.text;
   EXPECT_FALSE(run.Recovered()) << run.text;
 }
@@ -154,7 +164,7 @@ TEST(ProtectDataMethodDescription,
      ABlockNamingAnOptionalCipherWeLackIsReported) {
   ReadBack run(EnvelopeNaming("aes128-cbc"));
   EXPECT_TRUE(ReportedError(run.f.diag.Diagnostics(), kNotProvided,
-                            LineHolding(run.source, "data_block"), "34.5.11.2"))
+                            TheCipheredBlocksLine(run.source), "34.5.11.2"))
       << run.text;
   EXPECT_FALSE(run.Recovered()) << run.text;
 }
@@ -164,7 +174,7 @@ TEST(ProtectDataMethodDescription,
 TEST(ProtectDataMethodDescription, ABlockNamingAnUnknownIdentifierIsReported) {
   ReadBack run(EnvelopeNaming("x-some-other-tools-cipher"));
   EXPECT_TRUE(ReportedError(run.f.diag.Diagnostics(), kNotProvided,
-                            LineHolding(run.source, "data_block"), "34.5.11.2"))
+                            TheCipheredBlocksLine(run.source), "34.5.11.2"))
       << run.text;
   EXPECT_FALSE(run.Recovered()) << run.text;
 }
@@ -293,7 +303,7 @@ TEST(ProtectDataMethodEncryptionOutput,
 // The excepted envelope read back by the provider whose key opens its block.
 // §34.5.11.2 relocates the identifier rather than discarding it, so the region
 // still opens and the design comes back. That the identifier arrived is what
-// this shows: Preprocessor::DecryptDataBlock
+// this shows: Preprocessor::TakeDataBlockValue
 // (src/preprocessor/preprocessor_protect_keys.cpp) reads it out of the scope
 // the recovered key block wrote, and it stands there under no other writing,
 // the envelope having stated none in the clear.

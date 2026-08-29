@@ -29,6 +29,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -106,6 +107,15 @@ std::string EnvelopeWithAKeyBlock() {
   return envelope;
 }
 
+// The 1-based line of `envelope` its data block is written on, which is the
+// line a report about that block stands at. §34.5.15.1 spells the announcing
+// expression as the keyword standing alone and §34.5.15.2 has the block begin
+// on the next line in the file, so the block is written one line below it
+// (issue #3272).
+uint32_t TheWrappedBlocksLine(std::string_view envelope) {
+  return LineHolding(envelope, "`pragma protect data_block\n") + 1;
+}
+
 // §34.5.14.2: the key is part of the encrypted content of the key block, so it
 // does not stand in the envelope as a directive of its own. An envelope writing
 // it in the clear would be handing out the key that opens its own data.
@@ -142,7 +152,7 @@ TEST(ProtectDataDecryptKeyDescription, WithoutTheBlocksKeyTheDataStaysShut) {
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "protect pragma data block cannot be decrypted with the key supplied",
-      LineHolding(envelope, "data_block"), "34.3.2"))
+      TheWrappedBlocksLine(envelope), "34.3.2"))
       << read;
 }
 

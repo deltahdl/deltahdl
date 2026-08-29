@@ -22,12 +22,20 @@
 // Each case below therefore names the report rather than asking whether the
 // text came back.
 //
-// §34.5.15.1's syntax -- the keyword written as the bare word -- is covered in
+// Every block below is written in the spelling §34.5.15.1 defines and placed
+// where §34.5.15.2 puts what that spelling announces: the keyword standing
+// alone on its directive, with the block on the line beneath it. The report is
+// made about the directive rather than about the line under it, that directive
+// being what §34.5.15 names.
+//
+// §34.5.15.1's syntax is covered in
 // test_preprocessor_subclause_34_05_15_01.cpp, on the reading that consumes the
-// directive. This file is about where a block may stand rather than how it is
-// spelled, so it is the encrypting half of §34.3 that is driven here:
-// src/preprocessor/protect_input_line.cpp decides whether a previously
-// generated block contains a line, and reports the ones it does not.
+// directive, and §34.5.15.2's two remaining sentences in
+// test_preprocessor_subclause_34_05_15_02.cpp. This file is about where a block
+// may stand rather than how it is spelled, so it is the encrypting half of
+// §34.3 that is driven here: src/preprocessor/protect_input_line.cpp decides
+// whether a previously generated block contains a line, and reports the ones it
+// does not.
 //
 // §34.5.3.1's and §34.5.4.1's words are what delimit a previously generated
 // block, and §34.5.1.1's and §34.5.2.1's pair delimits a region to be
@@ -48,17 +56,23 @@ using namespace delta;
 
 namespace {
 
-// A block written in the clear, as a tool reading a text would meet one. What
-// it says is deliberately not a value any coding scheme writes, so nothing here
-// turns on the characters being readable as a block: the rule is about where
-// the expression stands.
-constexpr std::string_view kBlockDirective =
-    "`pragma protect data_block=\"NOTABLOCKOFANYENVELOPE\"\n";
+// The characters each block below is written as. What they say is deliberately
+// not a value any coding scheme writes, so nothing here turns on the characters
+// being readable as a block: the rule is about where the expression stands.
+//
+// The two differ so that a text writing both can say which of them a report was
+// made about.
+constexpr std::string_view kFirstBlockCharacters = "NOTABLOCKOFANYENVELOPE";
+constexpr std::string_view kSecondBlockCharacters = "NORISTHISABLOCKOFANY";
 
-// A second one, differing in what it carries so that a report naming one of
-// them cannot be mistaken for a report naming the other.
-constexpr std::string_view kSecondBlockDirective =
-    "`pragma protect data_block=\"NORISTHISABLOCKOFANY\"\n";
+// One block as a tool reading a text meets it: §34.5.15.1's keyword standing
+// alone on its own directive, and §34.5.15.2's next line in the file carrying
+// `characters`.
+std::string BlockWriting(std::string_view characters) {
+  std::string text = "`pragma protect data_block\n";
+  text.append(characters).append("\n");
+  return text;
+}
 
 // The design an author seals, which stands inside a region wherever one is
 // written below. Nothing of it survives an encrypted block, so finding these
@@ -93,7 +107,7 @@ std::string Region(std::string_view inside) {
 // the author wrote it on.
 TEST(ProtectDataBlockEncryptionInput, ABlockContainedByNothingIsReported) {
   std::string src = "module m;\n";
-  src.append(kBlockDirective);
+  src.append(BlockWriting(kFirstBlockCharacters));
   src.append("endmodule\n");
   EncryptionRun run(src);
   EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
@@ -107,7 +121,7 @@ TEST(ProtectDataBlockEncryptionInput, ABlockContainedByNothingIsReported) {
 // what tells a report apart from a refusal to do the work.
 TEST(ProtectDataBlockEncryptionInput, TheReportedTextIsHandedBackUnchanged) {
   std::string src = "module m;\n";
-  src.append(kBlockDirective);
+  src.append(BlockWriting(kFirstBlockCharacters));
   src.append("endmodule\n");
   EncryptionRun run(src);
   EXPECT_EQ(run.text, src);
@@ -119,14 +133,16 @@ TEST(ProtectDataBlockEncryptionInput, TheReportedTextIsHandedBackUnchanged) {
 // would leave an author who fixed the line they were shown believing the file
 // was clean.
 TEST(ProtectDataBlockEncryptionInput, EachBlockContainedByNothingIsReported) {
-  std::string src(kBlockDirective);
-  src.append(kSecondBlockDirective);
+  std::string src(BlockWriting(kFirstBlockCharacters));
+  src.append(BlockWriting(kSecondBlockCharacters));
   EncryptionRun run(src);
   EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
                             "data_block is written where no previously", 1,
                             "34.5.15"));
+  // The second expression stands on the third line, the block the first one
+  // announced having taken the second. §34.5.15.2 puts it there.
   EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
-                            "data_block is written where no previously", 2,
+                            "data_block is written where no previously", 3,
                             "34.5.15"));
 }
 
@@ -141,7 +157,7 @@ TEST(ProtectDataBlockEncryptionInput, EachBlockContainedByNothingIsReported) {
 // its own, so a reading that treated the enclosure as enough would produce an
 // envelope and say nothing.
 TEST(ProtectDataBlockEncryptionInput, ABlockInsideARegionToSealIsReportedToo) {
-  std::string src = Region(kBlockDirective);
+  std::string src = Region(BlockWriting(kFirstBlockCharacters));
   EncryptionRun run(src);
   EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
                             "data_block is written where no previously", 2,
@@ -158,7 +174,7 @@ TEST(ProtectDataBlockEncryptionInput, ABlockInsideARegionToSealIsReportedToo) {
 // so §34.5.15 has it ignored rather than objected to and the run reports
 // nothing at all.
 TEST(ProtectDataBlockEncryptionInput, ABlockASealedModelContainsIsIgnored) {
-  EncryptionRun run(SealedModel(kBlockDirective));
+  EncryptionRun run(SealedModel(BlockWriting(kFirstBlockCharacters)));
   EXPECT_EQ(run.diag.ErrorCount(), 0U);
 }
 
@@ -168,9 +184,9 @@ TEST(ProtectDataBlockEncryptionInput, ABlockASealedModelContainsIsIgnored) {
 // the enclosing envelope as the bytes it is written with rather than staying
 // readable in the output.
 TEST(ProtectDataBlockEncryptionInput, ASealedModelInsideARegionCarriesItsOwn) {
-  EncryptionRun run(Region(SealedModel(kBlockDirective)));
+  EncryptionRun run(Region(SealedModel(BlockWriting(kFirstBlockCharacters))));
   EXPECT_EQ(run.diag.ErrorCount(), 0U);
-  EXPECT_FALSE(Holds(run.text, "NOTABLOCKOFANYENVELOPE"));
+  EXPECT_FALSE(Holds(run.text, kFirstBlockCharacters));
 }
 
 // Where the containment stops. The word §34.5.4.1 defines ends the previously
@@ -178,12 +194,14 @@ TEST(ProtectDataBlockEncryptionInput, ASealedModelInsideARegionCarriesItsOwn) {
 // and a reading that never came back out of the model would pass over this one
 // in the silence the case above is entitled to.
 TEST(ProtectDataBlockEncryptionInput, ABlockPastTheSealedModelIsReported) {
-  std::string src(SealedModel(kBlockDirective));
-  src.append(kSecondBlockDirective);
+  std::string src(SealedModel(BlockWriting(kFirstBlockCharacters)));
+  src.append(BlockWriting(kSecondBlockCharacters));
   EncryptionRun run(src);
+  // §34.5.15.2 has the block begin on the line after the keyword, so the
+  // expression the report is made about stands one line above its characters.
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(), "data_block is written where no previously",
-      LineHolding(src, "NORISTHISABLOCKOFANY"), "34.5.15"));
+      LineHolding(src, kSecondBlockCharacters) - 1, "34.5.15"));
 }
 
 }  // namespace

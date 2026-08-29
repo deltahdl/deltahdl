@@ -85,6 +85,13 @@ bool AnnouncesDigestBlock(const PragmaKeywordExpression& expr) {
   return expr.keyword == kDigestBlockKeyword && !expr.has_value;
 }
 
+// And for §34.5.15.1's, whose line the block holding the region's design begins
+// on. The same name carrying a pragma_value announces nothing about that line,
+// having been written in a spelling the keyword is not defined with.
+bool AnnouncesDataBlock(const PragmaKeywordExpression& expr) {
+  return expr.keyword == kDataBlockKeyword && !expr.has_value;
+}
+
 }  // namespace
 
 // §34.5.23 puts on the entity that provided the keys a region's own keys are
@@ -168,6 +175,7 @@ void Preprocessor::ApplyAnnouncedBlockKeywords(
   if (AnnouncesDataPublicKey(expr)) data_public_key_value_next_ = true;
   if (AnnouncesDigestPublicKey(expr)) digest_public_key_value_next_ = true;
   if (AnnouncesDigestDecryptKey(expr)) digest_decrypt_key_value_next_ = true;
+  if (AnnouncesDataBlock(expr)) data_block_value_next_ = true;
   // §34.5.22 has a digest block immediately follow the key block or data block
   // whose digest it holds, so an expression standing anywhere else holds the
   // digest of nothing and announces nothing about the line beneath it. That
@@ -707,7 +715,6 @@ void Preprocessor::ApplyProtectKeywords(
     ApplyKeyBlockKeywords(expr, loc);
     ApplyAnnouncedBlockKeywords(expr);
     ApplyViewport(expr, loc);
-    DecryptDataBlock(expr, loc, depth, output);
   }
 }
 
@@ -819,15 +826,23 @@ std::string_view Preprocessor::DigestBlockKeyInEffect() const {
 
 // §34.3: envelope decryption recognizes a decryption envelope and puts the
 // cleartext of the region it stands for back in its place, for the compilation
-// step that follows. The expression carrying that region is the one acted on
-// here, and the cleartext is emitted where the envelope was written, so the
-// text that leaves the preprocessor is the design.
+// step that follows. §34.5.15.2 has the data_block expression indicate "that a
+// data block begins on the next line in the file", so the line carrying that
+// region is the one acted on here, and the cleartext is emitted where the
+// envelope was written: the text that leaves the preprocessor is the design.
 //
-// An expression naming no region, or one written where no decryption envelope
-// is open, describes something other than a protected region and is left to
-// whatever else reads it. Where a region is named and the user's key is not
-// the one it was encrypted under, no cleartext can be put back, and saying so
-// is the only way the missing design does not read as an empty one.
+// The line is reached the way §34.5.27's key block and §34.5.22's digest block
+// are reached, all three keywords being spelled standing alone by their own
+// subclauses: ApplyAnnouncedBlockKeywords records that the keyword was written,
+// and Preprocessor::TookAnnouncedValue (preprocessor/preprocessor.cpp) offers
+// it the line beneath. Only an announcement made inside a decryption envelope
+// is recorded, so a data_block expression written anywhere else describes
+// something other than a protected region and the line beneath it is left to
+// whatever reads it.
+//
+// Where the user's key is not the one the region was encrypted under, no
+// cleartext can be put back, and saying so is the only way the missing design
+// does not read as an empty one.
 //
 // What the recovered text is then put through is what §34.3.2 settles. The
 // text a region records is source text like any other, so it may hold macro
@@ -839,28 +854,22 @@ std::string_view Preprocessor::DigestBlockKeyInEffect() const {
 // its envelopes the same way it reaches those of a file, one step behind the
 // replacement that produced them.
 //
-// §34.5.9 settles the other half of reading such an expression: the block is
+// §34.5.9 settles the other half of reading such a block: the block is
 // characters and what it records is bytes, so the scheme in effect turns the
-// one into the other, and the count that expression carries says how many bytes
-// should come out. Both are spent where every encoded value of an envelope is
-// read, so a block of the wrong size is turned away there -- before any key is
-// offered to it, and so never reported as a key that does not fit.
-void Preprocessor::DecryptDataBlock(const PragmaKeywordExpression& expr,
-                                    SourceLoc loc, int depth,
-                                    std::string& output) {
-  // §34.5.15.1 spells the expression as the keyword standing alone, with
-  // §34.5.15.2 putting the block on the lines beneath it, and this
-  // implementation writes the block as the keyword's own value and reads it
-  // back that way. An expression carrying no value therefore names a block this
-  // reading cannot reach; what a tool owes an envelope written that way is
-  // #3272, and it is not a report against source the standard admits.
-  if (expr.keyword != kDataBlockKeyword || expr.value.empty()) return;
-  if (!protect_envelopes_.InProtectedRegion()) return;
+// one into the other, and the count stated ahead of the block says how many
+// bytes should come out. Both are spent where every encoded value of an
+// envelope is read, so a block of the wrong size is turned away there -- before
+// any key is offered to it, and so never reported as a key that does not fit.
+bool Preprocessor::TakeDataBlockValue(std::string_view line, SourceLoc loc,
+                                      int depth, std::string& output) {
+  if (!data_block_value_next_) return false;
+  data_block_value_next_ = false;
   std::string block;
-  if (!ReadEncodedProtectValue(ProtectPragmaValueBody(expr.value), loc,
-                               &block)) {
-    return;
-  }
+  // A line that cannot be read out of the scheme in effect carries no block,
+  // and the line is consumed either way: the keyword above it said the line is
+  // where the block begins, so it is not text of the design whether or not a
+  // block came out of it.
+  if (!ReadEncodedProtectValue(Trim(line), loc, &block)) return true;
   // §34.5.14 has the key a key block carried open the data block that block was
   // written beside, so it is spent here rather than left standing over whatever
   // the text goes on to hold. A key made for one region says nothing about the
@@ -886,7 +895,7 @@ void Preprocessor::DecryptDataBlock(const PragmaKeywordExpression& expr,
                 "implementation does not provide: " +
                     method.value,
                 Subclause("34.5.11.2"));
-    return;
+    return true;
   }
   std::string cleartext;
   if (!DecryptProtectedBlock(block, region_key, &cleartext)) {
@@ -894,7 +903,7 @@ void Preprocessor::DecryptDataBlock(const PragmaKeywordExpression& expr,
                 "protect pragma data block cannot be decrypted with the key "
                 "supplied",
                 Subclause("34.3.2"));
-    return;
+    return true;
   }
   // §34.5.22 owes this block a digest of its own, written immediately after it,
   // so what the block recovered to is held for the digest that follows,
@@ -916,6 +925,7 @@ void Preprocessor::DecryptDataBlock(const PragmaKeywordExpression& expr,
   digest_decrypt_key_.clear();
   output.append(ProcessSource(cleartext, loc.file_id, depth));
   digest_target_ = std::move(target);
+  return true;
 }
 
 // The identifier is read where the reading stands rather than where the keys

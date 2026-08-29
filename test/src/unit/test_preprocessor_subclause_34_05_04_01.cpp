@@ -134,12 +134,19 @@ std::string WithValuedClosingWord(const std::string& written) {
   return valued;
 }
 
-// A block written in the clear, as a tool reading a text would meet one. It is
-// not the block of anything: what it says is deliberately not a value any
-// coding scheme writes, so a reading that took it for an envelope's block would
-// have to say so, and one that left it alone has nothing to say about it.
+// A block written in the clear, as a tool reading a text would meet one: the
+// keyword standing alone, which is how §34.5.15.1 spells the expression, and
+// the block on the next line, which is where §34.5.15.2 puts it. Issue #3272
+// records that this tool wrote and read the block as a pragma_value against the
+// keyword, a spelling no reading acts on, so the two lines are what make a
+// reading that takes this for an envelope's block reach it at all.
+//
+// The second line is not the block of anything: what it says is deliberately
+// not a value any coding scheme writes, so a reading that took it for an
+// envelope's block would have to say so, and one that left it alone has nothing
+// to say about it.
 constexpr std::string_view kStrayBlockDirective =
-    "`pragma protect data_block=\"not a block at all\"\n";
+    "`pragma protect data_block\nnot a block at all\n";
 
 // An encryption region holding a model that some earlier encryption sealed
 // already, whose closing directive is written as `closing`.
@@ -367,7 +374,7 @@ TEST(ProtectEndProtectedSyntax, TheWordAloneEndsASealedModelForEncrypting) {
   EncryptionRun run(src);
   EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
                             "data_block is written where no previously",
-                            LineHolding(src, "data_block="), "34.5.15"));
+                            LineHolding(src, "data_block"), "34.5.15"));
 }
 
 // What that ending is worth in the produced text. The lines past the word are
@@ -409,7 +416,7 @@ TEST(ProtectEndProtectedSyntax, TheWordLastAfterValuedExpressionsEndsTheModel) {
   EncryptionRun run(src);
   EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
                             "data_block is written where no previously",
-                            LineHolding(src, "data_block="), "34.5.15"));
+                            LineHolding(src, "data_block"), "34.5.15"));
 }
 
 // The other order over the same list, at the same half. A comma ends the
@@ -428,7 +435,7 @@ TEST(ProtectEndProtectedSyntax,
   EncryptionRun run(src);
   EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
                             "data_block is written where no previously",
-                            LineHolding(src, "data_block="), "34.5.15"));
+                            LineHolding(src, "data_block"), "34.5.15"));
 }
 
 // A comment is not a pragma expression here either, so a directive whose word
@@ -444,7 +451,7 @@ TEST(ProtectEndProtectedSyntax,
   EncryptionRun run(src);
   EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
                             "data_block is written where no previously",
-                            LineHolding(src, "data_block="), "34.5.15"));
+                            LineHolding(src, "data_block"), "34.5.15"));
 }
 
 // The word where two already-sealed models stand one inside the other, each of

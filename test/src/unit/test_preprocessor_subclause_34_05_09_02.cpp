@@ -527,13 +527,23 @@ TEST(ProtectEncodingEncryptionOutput, EachEnvelopeOfATextStatesItsWriting) {
 }
 
 // What the writing is for: everything an encryption produced comes out as text.
-// The design sealed here holds the character that would end the value its block
-// travels as and a byte that cannot be printed, and the cipher turns the whole
-// of it into arbitrary bytes besides -- and the block is still printable
-// characters alone, none of them a quotation mark.
+// The design sealed here holds a quotation mark and a byte that cannot be
+// printed, and the cipher turns the whole of it into arbitrary bytes besides --
+// and the block is still printable characters alone, none of them a quotation
+// mark.
+//
+// The block stands on one line of the envelope, which is what keeps a line
+// break out of it. §34.5.15.2 has the block begin on the line beneath its
+// keyword, and Preprocessor::TakeDataBlockValue
+// (src/preprocessor/preprocessor_protect_keys.cpp) reads that one line and
+// nothing after it, so EnvelopeBlockEncoding
+// (src/preprocessor/protect_envelope_output.h) writes the block under one of
+// the schemes ProtectEncodingFitsOneLine admits, and those write neither a
+// line break nor a quotation mark. Issue #3431 covers reading a block that
+// spans several lines.
 //
 // The block is opened as well as inspected: a reading that had found only the
-// first few characters -- stopping at a quotation mark inside them -- would
+// first few characters -- stopping at a line break inside them -- would
 // otherwise report those few as printable and pass.
 TEST(ProtectEncodingEncryptionOutput, TheBlockHoldsOnlyWhatASourceLineCarries) {
   std::string region = "`pragma protect begin\n";
@@ -553,18 +563,36 @@ TEST(ProtectEncodingEncryptionOutput, TheBlockHoldsOnlyWhatASourceLineCarries) {
 }
 
 // What the tool states is what the tool did, which is the point of stating it.
-// A block written as the value of one pragma expression is a block on one line,
-// so there is no length at which its writing was broken and the envelope states
+// A block written on the line beneath its keyword is a block on one line, so
+// there is no length at which its writing was broken and the envelope states
 // none -- not even the length the region asked for.
+//
+// §34.5.15.2 has the block begin on that line, and
+// Preprocessor::TakeDataBlockValue
+// (src/preprocessor/preprocessor_protect_keys.cpp) reads that one line and
+// nothing after it, so EnvelopeBlockEncoding
+// (src/preprocessor/protect_envelope_output.h) drops the length a region stated
+// rather than breaking the writing at it. Issue #3431 covers reading a block
+// that spans several lines.
 //
 // An envelope that repeated the request would send its reader looking for
 // breaks that are not there.
+//
+// The block the keyword announces is measured against the length the region
+// asked for, and it is longer. A writing broken at that length would have put
+// no more than that many characters on the announced line, so the measurement
+// is what says the length was dropped rather than honored. Asking instead
+// whether the announced line holds a line break would ask nothing:
+// EncodingDataBlockOf (test_fixtures/fixture_protect_encoding.h) reads up to
+// the first one, so its result holds none whatever the tool wrote.
 TEST(ProtectEncodingEncryptionOutput, AnEnvelopeStatesNoLengthItDidNotBreakAt) {
-  std::string envelope =
-      EnvelopeAround(StatesEncoding("(enctype=\"base64\", line_length=8)"));
+  constexpr size_t kLengthAskedFor = 8;
+  std::string list = "(enctype=\"base64\", line_length=";
+  list.append(std::to_string(kLengthAskedFor)).append(")");
+  std::string envelope = EnvelopeAround(StatesEncoding(list));
   ASSERT_TRUE(Holds(envelope, "enctype=\"base64\""));
   EXPECT_FALSE(Holds(envelope, "line_length"));
-  EXPECT_FALSE(Holds(EncodingDataBlockOf(envelope), "\n"));
+  EXPECT_GT(EncodingDataBlockOf(envelope).size(), kLengthAskedFor);
 }
 
 // The length itself, where the writing does break at it: the most characters

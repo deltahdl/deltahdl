@@ -53,6 +53,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -172,6 +173,14 @@ std::string WithTheKeyNameWrittenAsTheStatement(const std::string& envelope) {
   std::string replaced(envelope);
   replaced.replace(stands, designation.size(), StatesFurther(kKeyName));
   return replaced;
+}
+
+// The 1-based line of `envelope` its data block stands on, where a report about
+// that block is made. §34.5.15.1 spells the announcing expression as the
+// keyword standing alone and §34.5.15.2 has the block begin on the next line in
+// the file, so the block is written one line past the keyword (issue #3272).
+uint32_t WhereTheOfferingsBlockStands(std::string_view envelope) {
+  return LineHolding(envelope, kBlockOpening) + 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -550,8 +559,7 @@ TEST(ProtectAuthorInfoDescription, TwoEnvelopesDifferingOnlyInTheOfferingRead) {
 TEST(ProtectAuthorInfoDescription, AnOfferingPastTheBlockCostsTheReadingNone) {
   std::string moved = WithTheStatementMovedPastTheBlock(
       Encrypted(RegionWriting(StatesFurther(kFurtherWord))));
-  ASSERT_LT(moved.find("`pragma protect data_block=\""),
-            moved.find(StatesFurther(kFurtherWord)));
+  ASSERT_LT(moved.find(kBlockOpening), moved.find(StatesFurther(kFurtherWord)));
   ReadWithTheKeys read(moved);
   EXPECT_FALSE(read.diags.HasErrors());
   EXPECT_TRUE(read.Produced("module sealed_m"));
@@ -594,7 +602,7 @@ TEST(ProtectAuthorInfoDescription, AnOfferingSpellingAKeyNameOpensNothing) {
   EXPECT_TRUE(ReportedError(
       read.diags.Diagnostics(),
       "protect pragma data block cannot be decrypted with the key supplied",
-      LineHolding(replaced, "data_block="), "34.3.2"));
+      WhereTheOfferingsBlockStands(replaced), "34.3.2"));
   EXPECT_FALSE(read.Produced("module sealed_m"));
 }
 

@@ -38,7 +38,7 @@ using namespace delta;
 // which is the one case a reading can settle without knowing what the envelope
 // holds. Beyond that it is out of reach at this stage and is left so
 // deliberately: the preprocessor has no symbol table and never parses the
-// cleartext a data block recovers -- Preprocessor::DecryptDataBlock in
+// cleartext a data block recovers -- Preprocessor::TakeDataBlockValue in
 // src/preprocessor/preprocessor_protect_keys.cpp appends that text to the
 // output and keeps no name out of it -- so nothing here can say whether
 // top.dut.mem is one of the objects the envelope contains. The phase that

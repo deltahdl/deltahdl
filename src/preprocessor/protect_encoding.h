@@ -70,18 +70,20 @@ bool IsProtectEncodingAlgorithm(std::string_view enctype);
 // Whether the table marks `enctype` as one every implementation provides.
 bool IsRequiredProtectEncodingAlgorithm(std::string_view enctype);
 
-// Whether a block written under `enctype` can be carried as the pragma_value
-// of an expression: the characters that scheme writes hold neither a quotation
-// mark, which would close such a value, nor a line break, which would end the
-// directive carrying it.
+// Whether a block written under `enctype` stands on one line: the characters
+// that scheme writes hold no line break.
 //
 // §34.5.9 leaves a tool free to encode a block under whichever scheme a text
-// asks for, and this implementation writes its blocks as the value of the
-// expression naming the block, so a scheme spelling a block with either of
-// those cannot be the one a block is written under here. The two that can are
-// the ones the reading side accepts either way, so nothing is lost by writing
-// under one of them and saying so.
-bool ProtectEncodingFitsPragmaValue(std::string_view enctype);
+// asks for, and §34.5.15.2 has a block begin on the line beneath the keyword
+// announcing it and says nothing about where it ends. This implementation reads
+// one line -- Preprocessor::TakeDataBlockValue (preprocessor/preprocessor.h)
+// takes the line the keyword announced and nothing after it -- so a scheme
+// spelling a block over several lines is not one a block can be written under
+// here, and writing one would produce an envelope this tool could not read
+// back. The two schemes that stand on one line are accepted by the reading side
+// either way, so nothing is lost by writing under one of them and saying so.
+// #3431 covers reading a block that spans several lines.
+bool ProtectEncodingFitsOneLine(std::string_view enctype);
 
 // Whether this implementation can write and read a block under `enctype`.
 // That covers every tabulated identifier, the required ones because they have
