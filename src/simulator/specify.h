@@ -47,8 +47,6 @@ class SpecifyManager {
                             Arena& arena, bool default_pulse_limits = false,
                             std::string_view inst_prefix = {});
 
-  void IncrementPathDelay(const PathDelay& delta);
-
   // §32.4.1: apply one SDF delay entry to the module paths already declared.
   // A nonconditional entry reaches every path between the two ports it names;
   // a conditional or ifnone entry may reach only a path between those same two

@@ -612,19 +612,20 @@ void AddPathDelayValues(PathDelay& existing, const PathDelay& delta) {
   for (int i = 0; i < 12; ++i) existing.delays[i] += delta.delays[i];
 }
 
-// Adds `delta` to every existing path delay between the same ports (ignoring
-// condition/ifnone). Returns true if at least one entry matched.
-// `match_inst_prefix` means what it means in UpdateNonconditionalPathDelays
-// above: with it set, PathDelay::inst_prefix is compared too, which is what
-// tells the paths of one instance of a cell from those of another (§30.3).
+// Adds `delta` to every existing path delay between the same ports of the same
+// instance (ignoring condition/ifnone). Returns true if at least one entry
+// matched. PathDelay::inst_prefix is always compared, unlike in
+// UpdateNonconditionalPathDelays above: §30.3 puts a specify block inside a
+// module declaration, so two instances of one cell hold paths spelled alike,
+// and SpecifyManager::IncrementSdfPathDelay is the sole caller and knows which
+// instance the SDF entry named.
 bool IncrementNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
-                                       const PathDelay& delta,
-                                       bool match_inst_prefix) {
+                                       const PathDelay& delta) {
   bool matched = false;
   for (auto& existing : path_delays) {
     if (existing.src_port == delta.src_port &&
         existing.dst_port == delta.dst_port &&
-        (!match_inst_prefix || existing.inst_prefix == delta.inst_prefix)) {
+        existing.inst_prefix == delta.inst_prefix) {
       AddPathDelayValues(existing, delta);
       matched = true;
     }
@@ -632,16 +633,14 @@ bool IncrementNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
   return matched;
 }
 
-// Adds `delta` to the first existing path delay matching ports plus
-// condition/ifnone, and, when `match_inst_prefix` is set, the instance prefix
-// as well. Returns true if a matching entry was found.
+// Adds `delta` to the first existing path delay matching ports, instance prefix
+// and condition/ifnone. Returns true if a matching entry was found.
 bool IncrementConditionalPathDelay(std::vector<PathDelay>& path_delays,
-                                   const PathDelay& delta,
-                                   bool match_inst_prefix) {
+                                   const PathDelay& delta) {
   for (auto& existing : path_delays) {
     if (existing.src_port == delta.src_port &&
         existing.dst_port == delta.dst_port &&
-        (!match_inst_prefix || existing.inst_prefix == delta.inst_prefix) &&
+        existing.inst_prefix == delta.inst_prefix &&
         existing.condition == delta.condition &&
         existing.is_ifnone == delta.is_ifnone) {
       AddPathDelayValues(existing, delta);
@@ -653,33 +652,20 @@ bool IncrementConditionalPathDelay(std::vector<PathDelay>& path_delays,
 
 }  // namespace
 
-void SpecifyManager::IncrementPathDelay(const PathDelay& delta) {
-  const bool kSdfIsNonconditional = delta.condition.empty() && !delta.is_ifnone;
-  const bool kMatched =
-      kSdfIsNonconditional
-          ? IncrementNonconditionalPathDelays(path_delays_, delta,
-                                              /*match_inst_prefix=*/false)
-          : IncrementConditionalPathDelay(path_delays_, delta,
-                                          /*match_inst_prefix=*/false);
-  if (!kMatched) path_delays_.push_back(delta);
-}
-
 bool SpecifyManager::IncrementSdfPathDelay(const PathDelay& delta) {
   const bool kSdfIsNonconditional = delta.condition.empty() && !delta.is_ifnone;
   if (kSdfIsNonconditional) {
     // §32.9: the entry reaches the paths of the instance its cell named, which
     // AnnotateSdfIopathEntry (simulator/sdf_annotate.cpp) stamped onto
     // PathDelay::inst_prefix, so it is matched as AnnotateSdfPathDelay does.
-    if (!IncrementNonconditionalPathDelays(path_delays_, delta,
-                                           /*match_inst_prefix=*/true)) {
+    if (!IncrementNonconditionalPathDelays(path_delays_, delta)) {
       path_delays_.push_back(delta);
     }
     return true;
   }
   // §32.4.1, as above: with no declared path carrying that condition there is
   // nothing to add to.
-  return IncrementConditionalPathDelay(path_delays_, delta,
-                                       /*match_inst_prefix=*/true);
+  return IncrementConditionalPathDelay(path_delays_, delta);
 }
 
 namespace {
