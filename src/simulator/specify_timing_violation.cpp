@@ -302,26 +302,18 @@ bool ReportsTimeskewViolation(uint64_t ref_time, uint64_t next_event_time,
 Logic4Word ToggleNotifierOnViolation(Logic4Word current) {
   const bool kPreA = (current.aval & 1u) != 0u;
   const bool kPreB = (current.bval & 1u) != 0u;
-  Logic4Word result;
-  if (kPreB && !kPreA) {
-    // z. Table 31-13's fourth row leaves it where it is.
-    result.aval = 0u;
-    result.bval = 1u;
-  } else if (kPreB) {
-    // x. Table 31-13's first row gives "Either 0 or 1", so both answers
-    // conform and 1 is the one chosen here. Nothing in §31.6 prefers it.
-    result.aval = 1u;
-    result.bval = 0u;
-  } else if (kPreA) {
-    // 1, which Table 31-13's third row takes to 0.
-    result.aval = 0u;
-    result.bval = 0u;
-  } else {
-    // 0, which Table 31-13's second row takes to 1.
-    result.aval = 1u;
-    result.bval = 0u;
-  }
-  return result;
+  // z, which Table 31-13's fourth row leaves where it is.
+  if (kPreB && !kPreA) return Logic4Word{0u, 1u};
+
+  // 1, which Table 31-13's third row takes to 0.
+  if (kPreA && !kPreB) return Logic4Word{0u, 0u};
+
+  // 0, which Table 31-13's second row takes to 1, and x, whose row gives
+  // "Either 0 or 1". That row is a licence rather than a value, so 0 and 1 both
+  // conform and 1 is the answer chosen here; §31.6 prefers neither. The two
+  // rows share this return because they were given the same answer and not
+  // because the table joins them.
+  return Logic4Word{1u, 0u};
 }
 
 bool IsDeterministicTimingCheckCondition(TimingCheckConditionKind kind) {
