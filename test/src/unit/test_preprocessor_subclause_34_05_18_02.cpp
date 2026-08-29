@@ -30,11 +30,18 @@
 // src/preprocessor/protect_keywords.cpp, and it turns on whether a name was
 // specified rather than on whether the keyword was mentioned.
 //
-// The third is AppendClearNames in src/preprocessor/protect_envelope_output.cpp
-// and the reading that carries the name onto an envelope, TakeKeyDesignations
-// in src/preprocessor/protect_processing.cpp. This implementation offers no
-// digital envelope, so the exception has nowhere to send the name and every
-// name a region wrote stands in the clear.
+// The third is AppendClearDigestNames in
+// src/preprocessor/protect_envelope_output.cpp and the reading that carries the
+// name onto an envelope, TakeKeyDesignations in
+// src/preprocessor/protect_processing.cpp. §34.5.27.2 has an encrypting tool
+// form a key block when it is requested to use a digital signature, so an
+// envelope carrying a key block is the digital envelope the exception names,
+// and the name is absent from everything a reader can read without opening that
+// block. The envelope of a region whose data name reached a key of the author's
+// carries no key block, and states the name in the clear. One case reads the
+// excepted envelope back, so the name is shown relocated rather than dropped.
+// Issue #3268 is the defect: the name stood in the clear whether the envelope
+// carried key blocks or not.
 //
 // The fourth is ProtectDigestKey in src/preprocessor/protect_keywords.cpp,
 // reached through Preprocessor::DigestKeyInEffect, and it is what makes the
@@ -49,7 +56,10 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
+#include "fixture_protect_read.h"
+#include "helpers_protect_keys.h"
 #include "helpers_reported_error.h"
+#include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
@@ -365,6 +375,109 @@ TEST(ProtectDigestKeynameDecryptionInput,
      ThatNameUnderAnotherPartyReachesNone) {
   ReadingOf run(EnvelopeCarrying(Designates(kOtherProvider, kProviderName)));
   EXPECT_TRUE(run.DigestKey().empty());
+}
+
+// ---------------------------------------------------------------------------
+// The name travels in a key block where a digital envelope is used.
+// ---------------------------------------------------------------------------
+
+// The entity that provided the key a region's own keys travel under, with the
+// name picking that key out of its list and the key itself. §34.5.27.2 forms a
+// key block for a region designating one, and that block is where §34.5.18.2
+// sends the name of the key the digests are under.
+constexpr std::string_view kBlockProvider = "cerulean-vault";
+constexpr std::string_view kBlockProviderName = "wrapping-2033";
+constexpr std::string_view kBlockProviderKey = "cerulean-vault-wrapping-key";
+
+// The expression announcing a key block, which is how a case below tells an
+// envelope carrying one from an envelope that carries none.
+constexpr std::string_view kKeyBlockLine = "`pragma protect key_block\n";
+
+// The region every case below encrypts. It names a key for its digests, names
+// an entity and a key for its data, and designates a provider for its own keys,
+// so the text says nothing about which of the two arrangements it gets: what
+// decides is whether the tool holds the key the data name reaches.
+std::string RegionNamingBothProviders() {
+  std::string described = Designates(kProvider, kProviderName);
+  described += Written("data_keyowner", kDataParty);
+  described += Written("data_keyname", kDataName);
+  described += Written("key_keyowner", kBlockProvider);
+  described += Written("key_keyname", kBlockProviderName);
+  return Sealing(described);
+}
+
+// The block provider's key alone. The region's data name reaches none of these,
+// so the region is sealed behind the key block §34.5.27.2 writes.
+ProtectKeyList OnlyTheBlockProvidersKey() {
+  ProtectKeyList keys;
+  keys.Add(KeyOf(kBlockProvider, kBlockProviderName, kBlockProviderKey));
+  return keys;
+}
+
+// That key beside the one the region's data name reaches. The region is now
+// sealed under the second, and no key block is written at all.
+ProtectKeyList TheDataKeyAsWell() {
+  ProtectKeyList keys;
+  keys.Add(KeyOf(kBlockProvider, kBlockProviderName, kBlockProviderKey));
+  keys.Add(KeyOf(kDataParty, kDataName, kDataKey));
+  return keys;
+}
+
+// §34.5.18.2: the name is output as cleartext in the output file, except where
+// a digital envelope is used, in which case it travels inside the key_block
+// encrypted under the key_method and the key that key_keyname or key_public_key
+// designates. §34.5.27.2 forms a key block on a request for a digital
+// signature, so this envelope is the excepted one, and the name stands nowhere
+// a reader holding no key can read it.
+//
+// What the name is inside the block cannot be asserted here. The block is
+// encrypted and then encoded, so its characters say nothing about what went
+// into it, and the case reading the envelope back is what shows the name
+// arrived.
+//
+// The entity the name is read against is still in the clear, which is what the
+// last expectation states. §34.5.16.2 sends that entity to a digest_key_block
+// rather than to the key_block this envelope carries, and this tool writes no
+// digest_key_block; issue #3429 is that gap. The expectation is here because it
+// is what keeps the expectation above it from passing for an envelope that
+// dropped every mention of the digest's key.
+TEST(ProtectDigestKeynameEncryptionOutput,
+     TheDigestNameLeavesTheClearWhereAKeyBlockCarriesIt) {
+  std::string envelope = EncryptEnvelopes(RegionNamingBothProviders(), {},
+                                          OnlyTheBlockProvidersKey());
+  EXPECT_EQ(TimesWritten(envelope, kKeyBlockLine), 1U) << envelope;
+  EXPECT_FALSE(Holds(envelope, kHiddenDesign)) << envelope;
+  EXPECT_FALSE(Holds(envelope, "digest_keyname")) << envelope;
+  EXPECT_TRUE(Holds(envelope, Written("digest_keyowner", kProvider)))
+      << envelope;
+}
+
+// §34.5.18.2 excepts the digital envelope and nothing else, so an envelope
+// carrying no key block states the name in the clear. The source text is the
+// text the case above encrypted, character for character; what differs is that
+// the tool holds the key the region's data name reaches, so the exception does
+// not arise.
+TEST(ProtectDigestKeynameEncryptionOutput,
+     TheDigestNameStandsInTheClearWhereNoKeyBlockCarriesIt) {
+  std::string envelope =
+      EncryptEnvelopes(RegionNamingBothProviders(), {}, TheDataKeyAsWell());
+  EXPECT_EQ(TimesWritten(envelope, kKeyBlockLine), 0U) << envelope;
+  EXPECT_FALSE(Holds(envelope, kHiddenDesign)) << envelope;
+  EXPECT_TRUE(Holds(envelope, Written("digest_keyname", kProviderName)))
+      << envelope;
+}
+
+// The excepted envelope read back by the provider whose key opens its block.
+// §34.5.18.2 relocates the name rather than discarding it, so the region still
+// opens and the design comes back: an envelope that had dropped the name would
+// pass the first case above and fail here.
+TEST(ProtectDigestKeynameDecryptionInput,
+     TheDigestNameInTheBlockStillOpensTheRegion) {
+  std::string envelope = EncryptEnvelopes(RegionNamingBothProviders(), {},
+                                          OnlyTheBlockProvidersKey());
+  ReadSource run(envelope, ReadSource::KeysConfig(OnlyTheBlockProvidersKey()));
+  EXPECT_FALSE(run.diag.HasErrors()) << run.text;
+  EXPECT_TRUE(Holds(run.text, kHiddenDesign)) << run.text;
 }
 
 }  // namespace

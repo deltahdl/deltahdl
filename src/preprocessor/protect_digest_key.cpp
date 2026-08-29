@@ -85,8 +85,9 @@ std::string ProtectDigestDecryptKeyDirective(std::string_view encoded_key) {
 
 // The keyword naming the cipher comes first, because §34.5.20 has a reader take
 // the cipher and the key out of the block together and neither opens anything
-// without the other. The key comes last, on the line beneath the keyword
-// carrying it, which is where §34.5.20 puts it.
+// without the other. The name of the key follows the cipher, that being the
+// order §34.4 tabulates the two in. The key comes last, on the line beneath the
+// keyword carrying it, which is where §34.5.20 puts it.
 //
 // A region naming no cipher for its digests writes none here. §34.5.17 fills
 // that place from the cipher the region's data are under, which the envelope
@@ -101,6 +102,15 @@ std::string ProtectDigestDecryptionContent(
   std::string text;
   if (!digest.key_method.empty()) {
     AppendDirectiveAsWritten(text, kDigestKeyMethodKeyword, digest.key_method);
+  }
+  // §34.5.18.2 has the name of the key a region's digests are under encoded in
+  // this block wherever a digital envelope mechanism is used, rather than
+  // written in the clear beside it. A region that named no key for its digests
+  // writes none here: §34.5.18 fills that place from the name the region's data
+  // are under, and a name this tool put there would be a key the author never
+  // designated.
+  if (!digest.keyname.empty()) {
+    text.append(ProtectDigestKeynameDirective(digest.keyname));
   }
   // §34.5.21 has the algorithm a region's digests were computed under written
   // into this block wherever a digital signature is used, rather than in the

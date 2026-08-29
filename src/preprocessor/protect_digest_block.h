@@ -70,6 +70,15 @@ struct ProtectDigestBlockPolicy {
   // written beside the key for whatever reads the digest; this implementation
   // offers one cipher, so nothing here selects among ciphers with it.
   std::string key_method;
+  // The name the region gave the key its digest is encrypted with, as the text
+  // spelled it and empty where the text spelled none.
+  //
+  // §34.5.22 picks that key out by the designations the region wrote for it,
+  // and §34.5.18 defines this one. It is recorded because §34.5.18.2 has the
+  // name encoded in the key block wherever a digital envelope mechanism is
+  // used, rather than written in the clear, and a name nothing kept cannot be
+  // written there.
+  std::string keyname;
   // The key the digest is encrypted with, which §34.5.22 has picked out by the
   // designations the region wrote for its digest's key.
   std::string key;

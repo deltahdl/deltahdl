@@ -62,23 +62,38 @@ void AppendDigestPublicKey(std::string_view key,
 // ahead of the designations read against it.
 //
 // `signed_envelope` says the envelope carries the region's keys in key blocks
-// of its own, which is the digital signature the exceptions to those exceptions
-// are stated for. What one of them lifts out here, the other puts inside the
+// of its own. §34.5.27.2 has an encrypting tool form a key block when it is
+// requested to use a digital signature, so an envelope carrying one is an
+// envelope a digital signature was requested for -- and a digital signature is
+// the exception several of these subclauses make to the exception that lifted
+// the name out here. What one of them lifts out, the other puts inside the
 // block instead.
-void AppendClearNames(const EncryptionEnvelope& envelope,
-                      const ProtectEncoding& block_encoding,
-                      bool signed_envelope, std::string* text) {
-  // §34.5.10 has the entity whose keys the data are under unchanged in what
-  // the tool writes out, and §34.5.12 has the name of the key itself written
-  // as cleartext. Lifting them out is what the standard's exceptions for these
-  // two keywords are for; the exception the standard makes to the exception is
-  // the digital envelope mechanism, which this implementation does not offer,
-  // so both are always written in the clear. The entity comes first, the key
-  // name being read against it.
-  if (!envelope.names.data_keyowner.empty()) {
+//
+// The three groups below are the three keys §34.5 writes names for: the key a
+// region's data are under, the key its digest is under, and the key its own
+// keys are under. A designation is read against the entity written beside it,
+// so a name of one group reaches no key of another.
+
+// The designations §34.5.10 through §34.5.13 write for the key a region's data
+// are under.
+void AppendClearDataNames(const EncryptionEnvelope& envelope,
+                          const ProtectEncoding& block_encoding,
+                          bool signed_envelope, std::string* text) {
+  // §34.5.10.2 has the entity whose keys the data are under unchanged in the
+  // output file, except where a digital signature is used, in which case it is
+  // encrypted with the key_method and placed in a key_block. An envelope
+  // carrying key blocks writes the entity into those blocks, and one without
+  // them writes it here. It stands ahead of the designation read against it in
+  // either place.
+  if (!signed_envelope && !envelope.names.data_keyowner.empty()) {
     text->append(ProtectDataKeyownerDirective(envelope.names.data_keyowner));
   }
-  if (!envelope.names.data_keyname.empty()) {
+  // §34.5.12.2 has the name of the key itself output as cleartext in the output
+  // file except where a digital envelope is used, and for a digital envelope
+  // mechanism it is encrypted using the key_method and the key_keyname or
+  // key_public_key and encoded in the key_block. An envelope carrying key
+  // blocks writes the name into them, and one without them writes it here.
+  if (!signed_envelope && !envelope.names.data_keyname.empty()) {
     text->append(ProtectDataKeynameDirective(envelope.names.data_keyname));
   }
   // §34.5.13 has the other designation of that same key written into every
@@ -86,39 +101,50 @@ void AppendClearNames(const EncryptionEnvelope& envelope,
   // makes no exception for a digital signature the way the two names above do.
   // A region that designated its key this way is opened through this value, so
   // an envelope that kept it inside the block would be one nothing could pick
-  // the key for -- and a region that wrote no name for its data has nothing to
-  // fall back on.
+  // the key for.
   if (!envelope.names.data_public_key.empty()) {
     AppendDataPublicKey(envelope.names.data_public_key, block_encoding, text);
   }
-  // §34.5.16 has the entity whose key a region's digest is under unchanged in
-  // the output file, and the exception it makes is a digital signature, under
-  // which the name travels inside a block holding the digest's key. This
-  // implementation writes no such block, so the exception never arises and the
-  // name is always written in the clear. It stands ahead of the designations
-  // read against it, the way each entity does, since a name read against the
-  // wrong list picks out a key of somebody else.
+}
+
+// The designations §34.5.16 through §34.5.19 write for the key a region's
+// digest is under, with the identifier §34.5.17 names the cipher for that key
+// by and the identifier §34.5.21 names the algorithm computing the digest by.
+void AppendClearDigestNames(const EncryptionEnvelope& envelope,
+                            const ProtectEncoding& block_encoding,
+                            bool signed_envelope, std::string* text) {
+  // §34.5.16.2 has the entity whose key a region's digest is under unchanged in
+  // the output file, except where a digital signature is used, in which case it
+  // is encrypted with the digest_key_method and placed in a digest_key_block.
+  // The destination is a digest_key_block rather than the key_block the other
+  // two entities are sent to, and this implementation writes no
+  // digest_key_block, so the name is written here whether the envelope carries
+  // key blocks or not. It stands ahead of the designations read against it, the
+  // way each entity does, since a name read against the wrong list picks out a
+  // key of somebody else.
   if (!envelope.names.digest_keyowner.empty()) {
     text->append(
         ProtectDigestKeyownerDirective(envelope.names.digest_keyowner));
   }
-  // §34.5.17 has the identifier naming the cipher a region's digests are
-  // encrypted under unchanged in the output file, and makes one exception: a
-  // digital signature, where the identifier travels inside the key block
-  // encrypted under the cipher that block is under. A region carrying key
+  // §34.5.17.2 has the identifier naming the cipher a region's digests are
+  // encrypted under unchanged in the output file, except where a digital
+  // signature is used, in which case it is encrypted with the key_method
+  // algorithm and uses the key found in the key_block. A region carrying key
   // blocks has one, and its identifier is written into the block instead; a
   // region without one states it here, since a reader has to know what a digest
   // is under before it can check the block that digest vouches for.
   if (!signed_envelope && !envelope.digest_key_method.empty()) {
     text->append(ProtectDigestKeyMethodDirective(envelope.digest_key_method));
   }
-  // §34.5.18 has the name of the key the region's digest is under written as
-  // cleartext, and the exception it states is the digital envelope mechanism
-  // rather than the digital signature the line above answers to. This
-  // implementation offers no digital envelope, so the name is always written
-  // here, on the footing §34.5.12's name stands on and not §34.5.17's
-  // identifier.
-  if (!envelope.names.digest_keyname.empty()) {
+  // §34.5.18.2 has the name of the key the region's digest is under output as
+  // cleartext in the output file except where a digital envelope is used, and
+  // for a digital envelope mechanism it is encrypted using the key_method and
+  // the key_keyname or key_public_key and encoded in the key_block. An envelope
+  // carrying key blocks writes the name into them, and one without them writes
+  // it here. The entity the name is read against stands in the clear either
+  // way, §34.5.16.2 sending that entity to a block this implementation does not
+  // write.
+  if (!signed_envelope && !envelope.names.digest_keyname.empty()) {
     text->append(ProtectDigestKeynameDirective(envelope.names.digest_keyname));
   }
   // §34.5.19 has the other designation of that same key written into every
@@ -132,21 +158,31 @@ void AppendClearNames(const EncryptionEnvelope& envelope,
     AppendDigestPublicKey(envelope.names.digest_public_key, block_encoding,
                           text);
   }
-  // §34.5.21 makes the same exception for the identifier naming the algorithm
-  // the region's digests are computed with: a digital signature has it
-  // encrypted with the key_method and placed in a key block, and a region
-  // carrying key blocks has one. A region without them states it here, and it
-  // is written ahead of the blocks rather than after them, because what the
+  // §34.5.21.2 has the identifier naming the algorithm the region's digests are
+  // computed with unchanged in the output file, except where a digital
+  // signature is used, in which case it is encrypted with the key_method and
+  // placed in a key_block. A region carrying key blocks has one, and its
+  // identifier is written into the block instead. A region without them states
+  // it here, ahead of the blocks rather than after them, because what the
   // identifier is needed for is recomputing a digest of a block: a reader has
   // to have it in hand by the time the block is reached, and a key block puts
   // it in hand a line sooner than that.
   if (!signed_envelope && !envelope.digest_method.empty()) {
     text->append(ProtectDigestMethodDirective(envelope.digest_method));
   }
+}
+
+// The designations §34.5.23 through §34.5.26 write for the key a region's own
+// keys are under, with the identifier §34.5.24 names the cipher for that key
+// by. None of them is lifted into a key block: this is the entity whose key
+// opens that block, and what a reader combines with it to reach that key.
+void AppendClearKeyNames(const EncryptionEnvelope& envelope,
+                         const ProtectEncoding& block_encoding,
+                         std::string* text) {
   // §34.5.23 has the entity whose keys a region's own keys are under unchanged
-  // in what the tool writes out, and makes no exception at all: the exception
-  // the other two entities have is a key block, and this is the entity whose
-  // key opens that block.
+  // in what the tool writes out, and makes no exception at all: §34.5.10.2
+  // sends the entity named for the data into a key_block, and this is the
+  // entity whose key opens that block.
   if (!envelope.names.key_keyowner.empty()) {
     text->append(ProtectKeyKeyownerDirective(envelope.names.key_keyowner));
   }
@@ -174,6 +210,14 @@ void AppendClearNames(const EncryptionEnvelope& envelope,
   if (!envelope.names.key_public_key.empty()) {
     AppendKeyPublicKey(envelope.names.key_public_key, block_encoding, text);
   }
+}
+
+void AppendClearNames(const EncryptionEnvelope& envelope,
+                      const ProtectEncoding& block_encoding,
+                      bool signed_envelope, std::string* text) {
+  AppendClearDataNames(envelope, block_encoding, signed_envelope, text);
+  AppendClearDigestNames(envelope, block_encoding, signed_envelope, text);
+  AppendClearKeyNames(envelope, block_encoding, text);
 }
 
 }  // namespace

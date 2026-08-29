@@ -538,22 +538,26 @@ std::string ProtectAuthorInfoDirective(std::string_view author_info);
 // pragma_value from the one the source wrote.
 std::string ProtectCommentDirective(std::string_view comment);
 
-// The keyword written as a directive carrying `keyname`, for stating in the
-// clear which key a protected region's data are under. §34.5.12 has the name
-// output as cleartext, and encrypting it into the very block it names the key
-// for would leave a reader nothing to open that block with.
+// The keyword written as a directive carrying `keyname`, for stating which key
+// a protected region's data are under.
+//
+// §34.5.12.2 has the name output as cleartext in the output file except where a
+// digital envelope is used, and for a digital envelope mechanism it is
+// encrypted using the key_method and the key_keyname or key_public_key and
+// encoded in the key_block. The directive is the same in both places, what
+// differs being whether it is written beside the block or sealed inside it, so
+// a caller writes this where the subclause sends the name.
 std::string ProtectDataKeynameDirective(std::string_view keyname);
 
-// The keyword written as a directive carrying `keyname`, for stating in the
-// clear which key a protected region's digest is under.
+// The keyword written as a directive carrying `keyname`, for stating which key
+// a protected region's digest is under.
 //
-// §34.5.18 has that name output as cleartext, the one exception being a
-// digital envelope, where it travels inside the key block encrypted under the
-// key method and the key that method names. This implementation offers no
-// digital envelope, so the exception never arises and the name is always
-// written as it stands. A name swept into the encrypted block would leave a
-// reader unable to learn what opens the digest without opening the block
-// first.
+// §34.5.18.2 has that name output as cleartext in the output file except where
+// a digital envelope is used, and for a digital envelope mechanism it is
+// encrypted using the key_method and the key_keyname or key_public_key and
+// encoded in the key_block. The directive is the same in both places, what
+// differs being whether it is written beside the block or sealed inside it, so
+// a caller writes this where the subclause sends the name.
 std::string ProtectDigestKeynameDirective(std::string_view keyname);
 
 // The keyword written as a directive carrying `keyname`, for stating in the
@@ -565,27 +569,33 @@ std::string ProtectDigestKeynameDirective(std::string_view keyname);
 // is needed to open, so a reader would be left with no way in at all.
 std::string ProtectKeyKeynameDirective(std::string_view keyname);
 
-// The keyword written as a directive carrying `keyowner`, for stating in the
-// clear whose keys a protected region's data are under.
+// The keyword written as a directive carrying `keyowner`, for stating whose
+// keys a protected region's data are under.
 //
-// §34.5.10 has the entity's name unchanged in what an encrypting tool writes
-// out, the one exception being a digital signature, where it goes into a key
-// block under the key method instead. This implementation offers no digital
-// envelope, so the exception never arises and the name is always written as it
-// stands. A name swept into the block it identifies the keys for would leave a
-// reader unable to learn whose key opens that block without first opening it.
+// §34.5.10.2 has the entity's name unchanged in the output file, except where a
+// digital signature is used, in which case it is encrypted with the key_method
+// and placed in a key_block. The directive is the same in both places, what
+// differs being whether it is written beside the block or sealed inside it, so
+// a caller writes this where the subclause sends the name.
+//
+// `keyowner` is the pragma_value as the source wrote it, quotes and all where
+// it had them, and it is written back the same way. Unchanged is meant of the
+// value: a name written as a bare identifier and returned in quotes has been
+// changed, whatever it still denotes.
 std::string ProtectDataKeyownerDirective(std::string_view keyowner);
 
 // The keyword written as a directive carrying `keyowner`, for stating in the
 // clear whose keys a protected region's digest is under.
 //
-// §34.5.16 has the entity's name unchanged in the output file, the one
-// exception being a digital signature, where it is encrypted under the cipher
-// named for the digest's key and placed in a block holding that key. This
-// implementation writes no such block, so the exception never arises and the
-// name is always written as it stands. A name swept inside an encrypted block
-// would leave a reader unable to learn whose key opens the digest without
-// first opening the very thing that digest is there to vouch for.
+// §34.5.16.2 has the entity's name unchanged in the output file, except where a
+// digital signature is used, in which case it is encrypted with the
+// digest_key_method and placed in a digest_key_block. That destination is a
+// digest_key_block rather than the key_block the entities named for the data
+// and for the region's own keys are sent to, and this implementation writes no
+// digest_key_block, so the name is always written as it stands. A name swept
+// inside an encrypted block would leave a reader unable to learn whose key
+// opens the digest without first opening the very thing that digest is there to
+// vouch for.
 //
 // `keyowner` is the pragma_value as the source wrote it, quotes and all where
 // it had them, and it is written back the same way. Unchanged is meant of the

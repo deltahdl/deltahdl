@@ -150,9 +150,16 @@ ProtectDataDecryption DataDecryptionInEffect(const RegionKeyNames& names) {
   // §34.5.27 holds the blocks of one envelope to carrying the same data
   // decryption pragma expressions, and §34.5.10 and §34.5.13 define two of them
   // beside the name §34.5.12 does. They are taken here so that a region
-  // changing either between two of its blocks is a region whose blocks can be
-  // found to disagree.
+  // changing one of them between two of its blocks is a region whose blocks can
+  // be found to disagree, and the first two are taken to be written into the
+  // blocks as well: §34.5.10.2 places the entity in a key_block wherever a
+  // digital signature is used, and §34.5.12.2 places the name of the key there
+  // wherever a digital envelope is used.
   data.keyowner = ProtectPragmaValueBody(names.data_keyowner);
+  // §34.5.10.2 has the entity unchanged wherever it goes out, and the key block
+  // of a signed region is one of the places it goes, so the spelling the source
+  // used travels beside the body the name is read against.
+  data.stated_keyowner = std::string(names.data_keyowner);
   data.public_key = names.data_public_key;
   return data;
 }
@@ -682,6 +689,13 @@ ProtectDigestBlockPolicy DigestPolicyFor(const RegionKeyReader& in_effect) {
   // them, because §34.5.17 has the identifier unchanged wherever it is written
   // out and a value written bare that came back in quotes has been changed.
   policy.key_method = std::string(in_effect.digest_key_method);
+  // §34.5.18.2 has the name of the key a region's digests are under encoded in
+  // the key block of a signed region rather than written in the clear, so the
+  // name travels here to be written there. It is the pragma_value as the source
+  // wrote it, and empty where the source wrote none: §34.5.18 fills that place
+  // from the name the region's data are under, which the envelope settles for
+  // itself.
+  policy.keyname = std::string(in_effect.names.digest_keyname);
   return policy;
 }
 

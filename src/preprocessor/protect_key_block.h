@@ -60,25 +60,44 @@ struct ProtectDataDecryption {
   // The name §34.5.12 gives the key the data are under, empty where the region
   // gave none.
   //
-  // It is recorded rather than written into the buffer. §34.5.12 already has it
-  // in the clear in the envelope, so a copy inside the block would be read a
-  // second time by the same reading and say nothing the first did not. What it
-  // is here for is the requirement §34.5.27 makes of a region asking for
-  // several blocks: it is one of the data decryption pragma expressions those
-  // blocks are held to agreeing on, and an agreement cannot be checked against
-  // a value nothing kept.
-  std::string keyname;
-  // The entity §34.5.10 names as holding that key, and the public key §34.5.13
-  // designates it by, both recorded for the reason the name above is and
-  // neither written into the buffer for the reason it is not.
+  // §34.5.12.2 has that name output as cleartext in the output file except
+  // where a digital envelope is used, and for a digital envelope mechanism it
+  // is encrypted using the key_method and the key_keyname or key_public_key and
+  // encoded in the key_block. The key_block it names is the block this buffer
+  // becomes, so the name goes inside rather than beside it.
   //
-  // A name means nothing apart from the entity whose list it is a member of, so
-  // a region writing one name under two entities has asked its blocks for two
-  // different keys while writing one value; and §34.5.13 makes the public key a
-  // designation of a key in its own right, reaching one where no name was
-  // written at all. Either changing between two blocks is the change §34.5.27
-  // makes an error, and neither can be found changed unless it was kept.
+  // It answers a second question as well: §34.5.27 holds the blocks of one
+  // region to carrying the same data decryption pragma expressions, this is one
+  // of them, and an agreement cannot be checked against a value nothing kept.
+  std::string keyname;
+  // The entity §34.5.10 names as holding that key.
+  //
+  // §34.5.10.2 has it unchanged in the output file, except where a digital
+  // signature is used, in which case it is encrypted with the key_method and
+  // placed in a key_block, so it goes into the buffer for the reason the name
+  // above does. A name means nothing apart from the entity whose list it is a
+  // member of, so the two travel together and a reader that recovered the
+  // buffer holds the pair rather than half of it.
   std::string keyowner;
+  // That same entity as the source spelled it, quotation marks and all where it
+  // had them, beside the body of that value the field above holds.
+  //
+  // The two are kept apart because they answer different questions. Reading a
+  // name against a list of keys is a question about what the value denotes, and
+  // §34.5.12 identifies a key by the characters inside the quotation marks;
+  // writing the entity into the buffer is a question about what the value is,
+  // and §34.5.10.2 has it unchanged. §22.5.1 gives a pragma_value more than one
+  // spelling, so a name written bare and returned in quotes is a different
+  // pragma_value from the one the author wrote.
+  std::string stated_keyowner;
+  // The public key §34.5.13 designates that same key by, recorded for the
+  // reason the entity above is and not written into the buffer: §34.5.13.2
+  // states no exception for a digital signature and has the expression output
+  // in each protected block the designation was used for, so it stands in the
+  // clear beside the block. A region that wrote no name for its data reaches
+  // its key through this designation alone, and a region that changed it
+  // between two blocks changed one of the expressions §34.5.27 holds those
+  // blocks to agreeing on.
   std::string public_key;
 };
 
@@ -87,6 +106,10 @@ struct ProtectDataDecryption {
 // The key is not among them. One key serves every block of a region, being made
 // once for the region rather than once per block, so it is the same in every
 // request by construction and could never be what two of them differ over.
+//
+// Neither is the spelling the source gave the entity. §34.5.27 has the blocks
+// of one region agree in the value of these expressions, and one entity written
+// bare in one place and quoted in another is one value written twice.
 bool SameProtectDataDecryption(const ProtectDataDecryption& a,
                                const ProtectDataDecryption& b);
 
@@ -204,22 +227,26 @@ std::string ProtectGeneratedDataKey(std::string_view cleartext,
 // on the line beneath the keyword that carries it, encoded under `encoding` as
 // §34.5.14 requires of that value.
 //
-// The two it is formed from here are the two §34.5.14 has a reader take out of
-// a key block: the cipher the data block is under, and the key that opens it.
-// The subclause admits a wider set and requires none of it -- the buffer is
-// formed from any of them -- and the rest of that set is already written in the
-// clear beside the block, so a copy sealed inside would tell a reader nothing
-// it could not read without the key.
+// Two of what it holds are the two §34.5.14 has a reader take out of a key
+// block: the cipher the data block is under, and the key that opens it. The
+// entity and the name go in beside them, each sent there by its own subclause
+// -- §34.5.10.2 places the entity whose keys the data are under in a key_block
+// wherever a digital signature is used, and §34.5.12.2 places the name of that
+// key there wherever a digital envelope is used. The designation §34.5.13
+// writes is not among them: that subclause states no exception, so the public
+// key stays in the clear beside the block.
 //
 // `digest` adds what §34.5.20 stores in a key block beside them: the key that
-// opens the region's digests, the cipher §34.5.17 names for it, and the
-// algorithm §34.5.21 names for computing them. The key is in the block rather
-// than in the clear for the reason the data's own key is -- a key that opens a
-// digest is what an alteration would have to be hidden behind, so writing it
-// beside the digest would leave the digest vouching for nothing. The two
-// identifiers are here because their own subclauses put them here for exactly
-// this envelope: each states that it stands in the clear except where a digital
-// signature is used, and a region carrying key blocks has one.
+// opens the region's digests, the cipher §34.5.17 names for it, the name
+// §34.5.18 gives it, and the algorithm §34.5.21 names for computing them. The
+// key is in the block rather than in the clear for the reason the data's own
+// key is -- a key that opens a digest is what an alteration would have to be
+// hidden behind, so writing it beside the digest would leave the digest
+// vouching for nothing. The two identifiers are here because their own
+// subclauses put them here for exactly this envelope: each states that it
+// stands in the clear except where a digital signature is used, and a region
+// carrying key blocks has one. The name is here on the same footing, §34.5.18.2
+// having it encoded in the key_block instead of standing in the clear.
 //
 // It is a buffer of directives rather than of bytes because of what §34.5.27
 // has become of it at the other end: the recovered text is parsed to determine

@@ -48,14 +48,17 @@ std::string_view KeyOfRequest(const ProtectKeyBlockRequest& request,
 // same block.
 //
 // The cipher goes in whenever the region named one, that being where §34.5.17
-// has the identifier written for every envelope carrying key blocks, and the
+// has the identifier written for every envelope carrying key blocks; the
 // algorithm the digests are computed under goes in on the same footing, that
-// being where §34.5.21 has that identifier written for such an envelope. Both
-// go in as the region stated them and neither goes in where the region stated
-// nothing, a block filled from a default being a block claiming the author
-// chose what this tool chose. The digest's key goes in only where a digest was
-// asked for: a region generating no digest signs nothing, so a key written for
-// a digest that is never produced would be a key nothing is ever opened with.
+// being where §34.5.21 has that identifier written for such an envelope; and
+// the name the region gave the digest's key goes in on the same footing again,
+// that being where §34.5.18.2 has the name encoded for an envelope using a
+// digital envelope mechanism. All three go in as the region stated them and
+// none goes in where the region stated nothing, a block filled from a default
+// being a block claiming the author chose what this tool chose. The digest's
+// key goes in only where a digest was asked for: a region generating no digest
+// signs nothing, so a key written for a digest that is never produced would be
+// a key nothing is ever opened with.
 std::string KeyBlockContentFor(const ProtectKeyBlockRequest& request,
                                const ProtectKeyBlocks& blocks,
                                const ProtectDigestBlockPolicy& digest,
@@ -64,6 +67,7 @@ std::string KeyBlockContentFor(const ProtectKeyBlockRequest& request,
   data.decrypt_key = blocks.data_key;
   ProtectDigestDecryption digest_keys;
   digest_keys.key_method = digest.key_method;
+  digest_keys.keyname = digest.keyname;
   digest_keys.digest_method = digest.stated_method;
   if (digest.requested) digest_keys.decrypt_key = blocks.digest_key;
   return ProtectKeyBlockContent(data, digest_keys, encoding);
@@ -120,15 +124,31 @@ std::string ProtectGeneratedDataKey(std::string_view cleartext,
   return key;
 }
 
-// The keyword naming the cipher comes first, because §34.5.14 has a reader take
-// the cipher and the key out of the block together and neither opens anything
+// The entity comes first and the name of the key follows the cipher, which is
+// the order §34.4 tabulates the three in and the order a reader needs them in:
+// a name is a member of one entity's list and picks out nothing until the
+// entity it is read against is in hand. §34.5.10.2 sends the entity here
+// wherever a digital signature is used, and §34.5.12.2 sends the name here
+// wherever a digital envelope is used.
+//
+// Neither is written where the region wrote nothing. An envelope stating a name
+// its author never wrote would claim the author designated a key.
+//
+// The cipher comes ahead of the key, because §34.5.14 has a reader take the
+// cipher and the key out of the block together and neither opens anything
 // without the other. The key comes last, on the line beneath the keyword
 // carrying it, which is where §34.5.14 puts it.
 std::string ProtectKeyBlockContent(const ProtectDataDecryption& data,
                                    const ProtectDigestDecryption& digest,
                                    const ProtectEncoding& encoding) {
   std::string text;
+  if (!data.stated_keyowner.empty()) {
+    text.append(ProtectDataKeyownerDirective(data.stated_keyowner));
+  }
   AppendDirective(text, kDataMethodKeyword, data.method);
+  if (!data.keyname.empty()) {
+    text.append(ProtectDataKeynameDirective(data.keyname));
+  }
   // §34.5.9 governs this key as much as the block carrying it, and gives it a
   // count of its own. The expression has to be written here rather than left
   // to the one standing over the block, because that one describes the block:

@@ -166,16 +166,20 @@ TEST(ProtectKeyBlockDescription, TheBufferCarriesWhatOpensTheDataBlock) {
   EXPECT_TRUE(Holds(buffer, "`pragma protect data_decrypt_key\n")) << buffer;
 }
 
-// The subclause admits any of the expressions naming the data's key and this
-// buffer carries two of them. The designations already stand in the clear
-// beside the block, so a copy sealed inside would say nothing the envelope does
-// not, and a reader would have opened the block to learn what it knew already.
-TEST(ProtectKeyBlockDescription, TheDesignationsStayOutsideTheBlock) {
+// §34.5.27.2 names data_keyname among the expressions the buffer is formed
+// from, and §34.5.12.2 sends that name into the key_block wherever a digital
+// envelope is used, so the name is inside the block and not beside it. Issue
+// #3268 is the defect: it was written in the clear as well.
+//
+// The entity whose key opens the block stays outside. §34.5.23.2 states no
+// exception for it, and a reader that had to open the block to learn whose key
+// opens it would have no way in at all.
+TEST(ProtectKeyBlockDescription, TheDataNameIsInsideAndTheBlocksEntityOutside) {
   std::string envelope = EnvelopeWithOneBlock();
   std::string buffer = RecoveredBufferOf(envelope, kFirstKey);
-  EXPECT_FALSE(Holds(buffer, "data_keyname")) << buffer;
+  EXPECT_TRUE(Holds(buffer, Writes("data_keyname", kDataKeyName))) << buffer;
   EXPECT_FALSE(Holds(buffer, "key_keyowner")) << buffer;
-  EXPECT_TRUE(Holds(envelope, Writes("data_keyname", kDataKeyName)))
+  EXPECT_TRUE(Holds(envelope, Writes("key_keyowner", kFirstEntity)))
       << envelope;
 }
 

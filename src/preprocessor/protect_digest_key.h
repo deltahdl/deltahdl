@@ -109,6 +109,16 @@ struct ProtectDigestDecryption {
   // spells and the two identifiers are not the same identifier: one says how a
   // digest is computed and the other says how the result is put under a key.
   std::string key_method;
+  // The name §34.5.18 gives the key the region's digests are under, as the
+  // source spelled it and empty where the source spelled none.
+  //
+  // §34.5.18.2 has that name output as cleartext in the output file except
+  // where a digital envelope is used, and for a digital envelope mechanism it
+  // is encrypted using the key_method and the key_keyname or key_public_key and
+  // encoded in the key_block. It travels here for the reason the cipher above
+  // does, and it travels without the entity it is read against: §34.5.16.2
+  // sends that entity to a digest_key_block rather than to this block.
+  std::string keyname;
   // The identifier naming the algorithm the region's digests were computed
   // with, which is what §34.5.21.1 spells. It travels here for the reason the
   // cipher beside it does: §34.5.21 has the identifier unchanged in the output
@@ -130,9 +140,12 @@ struct ProtectDigestDecryption {
 // generating no digest signs nothing: there is no key made for a digest, so
 // there is nothing for the block to carry and nothing said by writing the
 // keyword with an empty line beneath it. The cipher goes in either way, that
-// being where §34.5.17 has it written whenever a signature is used, and the
+// being where §34.5.17 has it written whenever a signature is used; the
 // algorithm the digests were computed under goes in beside it, that being where
-// §34.5.21 has that identifier written whenever a signature is used.
+// §34.5.21 has that identifier written whenever a signature is used; and the
+// name the region gave the digest's key goes in as well, that being where
+// §34.5.18.2 has the name encoded whenever a digital envelope mechanism is
+// used.
 std::string ProtectDigestDecryptionContent(
     const ProtectDigestDecryption& digest, const ProtectEncoding& encoding);
 

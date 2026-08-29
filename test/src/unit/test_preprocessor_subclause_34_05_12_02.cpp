@@ -26,6 +26,18 @@
 // The third is what makes the first matter, and it is observed the way a
 // reading observes it: a region sealed under a key is opened again only where
 // the pair of names an envelope carries reaches that key.
+//
+// The second is AppendClearDataNames in
+// src/preprocessor/protect_envelope_output.cpp, and the exception it states is
+// covered here too. §34.5.27.2 has an encrypting tool form a key block when it
+// is requested to use a digital signature, so an envelope carrying a key block
+// is the digital envelope the exception names, and the name is absent from
+// everything a reader can read without opening that block. The envelope of a
+// region whose name reached a key of the author's carries no key block, and
+// states the name in the clear. The last case reads the excepted envelope back,
+// so the name is shown relocated rather than dropped. Issue #3268 is the
+// defect: the name stood in the clear whether the envelope carried key blocks
+// or not.
 
 #include <gtest/gtest.h>
 
@@ -33,7 +45,10 @@
 #include <string_view>
 
 #include "fixture_preprocessor.h"
+#include "fixture_protect_read.h"
+#include "helpers_protect_keys.h"
 #include "helpers_reported_error.h"
+#include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
@@ -169,6 +184,111 @@ TEST(ProtectDataKeynameDescription, TheNameStandsInTheEnvelopeAsCleartext) {
   std::string envelope = EncryptEnvelopes(Region(Names(kOwner, kOwnerKeyName)),
                                           "", KeysOfBothParties());
   EXPECT_NE(envelope.find(kOwnerKeyName), std::string::npos) << envelope;
+}
+
+// ---------------------------------------------------------------------------
+// The name travels in a key block where a digital envelope is used.
+// ---------------------------------------------------------------------------
+
+// The entity that provided the key a region's own keys travel under, with the
+// name picking that key out of its list and the key itself. §34.5.27.2 forms a
+// key block for a region designating one, and that block is where §34.5.12.2
+// sends the name of the key the data are under.
+constexpr std::string_view kBlockProvider = "aegis-custody";
+constexpr std::string_view kBlockProviderName = "wrapping-2031";
+constexpr std::string_view kBlockProviderKey = "aegis-custody-wrapping-key";
+
+// The expression announcing a key block, which is how a case below tells an
+// envelope carrying one from an envelope that carries none.
+constexpr std::string_view kKeyBlockLine = "`pragma protect key_block\n";
+
+// The directive §34.5.12.1 names the key the data are under with, on its own.
+// Names above writes it beside the entity §34.5.10.1 names, and what the cases
+// below ask is whether this one line reaches the envelope.
+std::string NamesTheDataKey(std::string_view keyname) {
+  std::string text = "`pragma protect data_keyname=\"";
+  text.append(keyname).append("\"\n");
+  return text;
+}
+
+// The two directives §34.5.23.1 and §34.5.25.1 designate the key a region's own
+// keys travel under with.
+std::string DesignatesTheBlocksKey() {
+  std::string text = "`pragma protect key_keyowner=\"";
+  text.append(kBlockProvider).append("\"\n");
+  text += "`pragma protect key_keyname=\"";
+  text.append(kBlockProviderName).append("\"\n");
+  return text;
+}
+
+// The region every case below encrypts. It names an entity and a key for its
+// data and designates a provider for its own keys, so the text says nothing
+// about which of the two arrangements it gets: what decides is whether the tool
+// holds the key the data name reaches.
+std::string RegionNamingBothProviders() {
+  return Region(Names(kOwner, kOwnerKeyName) + DesignatesTheBlocksKey());
+}
+
+// The block provider's key alone. The region's data name reaches none of these,
+// so the region is sealed behind the key block §34.5.27.2 writes.
+ProtectKeyList OnlyTheBlockProvidersKey() {
+  ProtectKeyList keys;
+  keys.Add(KeyOf(kBlockProvider, kBlockProviderName, kBlockProviderKey));
+  return keys;
+}
+
+// That key beside the one the region's data name reaches. The region is now
+// sealed under the second, and no key block is written at all.
+ProtectKeyList TheDataKeyAsWell() {
+  ProtectKeyList keys;
+  keys.Add(KeyOf(kBlockProvider, kBlockProviderName, kBlockProviderKey));
+  keys.Add(KeyOf(kOwner, kOwnerKeyName, kOwnerKey));
+  return keys;
+}
+
+// §34.5.12.2: the name is output as cleartext in the output file, except where
+// a digital envelope is used, in which case it is encrypted using the
+// key_method and the key the key_keyname or key_public_key designates, and
+// encoded in the key_block. §34.5.27.2 forms a key block on a request for a
+// digital signature, so this envelope is the excepted one, and the name stands
+// nowhere a reader holding no key can read it.
+//
+// What the name is inside the block cannot be asserted here. The block is
+// encrypted and then encoded, so its characters say nothing about what went
+// into it, and the case reading the envelope back is what shows the name
+// arrived.
+TEST(ProtectDataKeynameEncryptionOutput,
+     TheNameLeavesTheClearWhereAKeyBlockCarriesIt) {
+  std::string envelope = EncryptEnvelopes(RegionNamingBothProviders(), "",
+                                          OnlyTheBlockProvidersKey());
+  EXPECT_EQ(TimesWritten(envelope, kKeyBlockLine), 1U) << envelope;
+  EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
+  EXPECT_FALSE(Holds(envelope, "data_keyname")) << envelope;
+}
+
+// §34.5.12.2 excepts the digital envelope and nothing else, so an envelope
+// carrying no key block states the name in the clear. The source text is the
+// text the case above encrypted, character for character; what differs is that
+// the tool holds the key the name reaches, so the exception does not arise.
+TEST(ProtectDataKeynameEncryptionOutput,
+     TheNameStandsInTheClearWhereNoKeyBlockCarriesIt) {
+  std::string envelope =
+      EncryptEnvelopes(RegionNamingBothProviders(), "", TheDataKeyAsWell());
+  EXPECT_EQ(TimesWritten(envelope, kKeyBlockLine), 0U) << envelope;
+  EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
+  EXPECT_TRUE(Holds(envelope, NamesTheDataKey(kOwnerKeyName))) << envelope;
+}
+
+// The excepted envelope read back by the provider whose key opens its block.
+// §34.5.12.2 relocates the name rather than discarding it, so the region still
+// opens and the design comes back: an envelope that had dropped the name would
+// pass the case above and fail here.
+TEST(ProtectDataKeynameEncryptionOutput, TheNameInTheBlockStillOpensTheRegion) {
+  std::string envelope = EncryptEnvelopes(RegionNamingBothProviders(), "",
+                                          OnlyTheBlockProvidersKey());
+  ReadSource run(envelope, ReadSource::KeysConfig(OnlyTheBlockProvidersKey()));
+  EXPECT_FALSE(run.diag.HasErrors()) << run.text;
+  EXPECT_TRUE(Holds(run.text, kSealedDesign)) << run.text;
 }
 
 }  // namespace
