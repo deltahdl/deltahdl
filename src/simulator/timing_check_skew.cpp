@@ -34,10 +34,10 @@
 // so is every rule §31.4.2 and §31.4.3 key to remain_active_flag, each of which
 // governs a reference event whose `&&&` condition is false. ArmSkewWindow does
 // read TimingCheckEntry::ref_condition_expr and
-// TimingCheckEntry::data_condition_expr, through WatchConditionedEdge
+// TimingCheckEntry::data_condition_expr, through ArmTimingCheckEvents
 // (simulator/timing_check_driver_internal.h), so the MODE conditions of Figure
-// 31-1, Figure 31-2 and Figure 31-3 reach the run; the comment above those two
-// calls states which half of each of them is reproduced.
+// 31-1, Figure 31-2 and Figure 31-3 reach the run; the comment above that call
+// states which half of each of them is reproduced.
 //
 // The timer is a scheduled event, which is what makes the timer-based mode a
 // mechanism rather than a predicate: ArmTimeout below schedules the report at
@@ -317,28 +317,14 @@ void OnDataEdge(const std::shared_ptr<SkewWindow>& window, SimContext& ctx) {
 
 void ArmSkewWindow(const SpecifyManager& mgr, std::size_t index,
                    SimContext& ctx) {
-  const TimingCheckEntry& check = mgr.GetTimingChecks()[index];
-  std::string ref_signal = check.inst_prefix + check.ref_signal;
-  std::string data_signal = check.inst_prefix + check.data_signal;
-  Variable* ref_var = ctx.FindVariable(ref_signal);
-  Variable* data_var = ctx.FindVariable(data_signal);
-  if (ref_var == nullptr || data_var == nullptr) return;
-  TimingCheckEdge ref_edge = RefEdgeOf(check);
-  TimingCheckEdge data_edge = DataEdgeOf(check);
   auto window = std::make_shared<SkewWindow>();
   window->armed = ArmedCheck{&mgr, index};
-  window->ref_signal = std::move(ref_signal);
-  window->data_signal = std::move(data_signal);
-  // §31.7 gates each of the two events on the `&&&` condition it was declared
-  // with: a conditioned event "ties the occurrence of timing checks to the
-  // value of a conditioning signal", so a transition whose condition does not
-  // hold is not an occurrence of the check at all, and it therefore opens no
-  // window and closes none. The watcher on `ref_var` is the reference event and
-  // the watcher on `data_var` is the data event, which is what selects
-  // TimingCheckEntry::ref_condition_expr or
-  // TimingCheckEntry::data_condition_expr
-  // (simulator/specify_timing_check.h); an event written without a `&&&`
-  // condition carries a null one there and always occurs.
+  // ArmTimingCheckEvents (simulator/timing_check_driver_internal.h) arms one
+  // watcher on the reference_event and one on the data_event, each gated by
+  // §31.5's edge_control_specifier and §31.7's `&&&` condition its own event
+  // was written with. A transition whose condition does not hold is not an
+  // occurrence of the check at all, and it therefore opens no window and closes
+  // none.
   //
   // Suppressing the event outright is only half of what §31.4.2 and §31.4.3
   // give a conditioned *reference* event whose condition is false. Both clauses
@@ -354,23 +340,11 @@ void ArmSkewWindow(const SpecifyManager& mgr, std::size_t index,
   // through to the entry. TimeskewChecker and FullskewSecondTimestampAction
   // (simulator/specify_timing_check.h) already state the dormant-versus-discard
   // rule, and are exercised only by unit tests.
-  //
-  // Each watcher is armed with the edge_control_specifier its own
-  // timing_check_event was written with. RefEdgeOf and DataEdgeOf
-  // (simulator/timing_check_driver_internal.h) read that specifier off the
-  // entry: §31.5's general form travels as the list of edge_descriptors the
-  // event was written as, in TimingCheckEntry::ref_edge_descriptors or
-  // TimingCheckEntry::data_edge_descriptors, and the posedge and negedge
-  // shorthands travel as TimingCheckEntry::ref_edge or
-  // TimingCheckEntry::data_edge (simulator/specify_timing_check.h). An event
-  // written with no edge_control_specifier carries neither and matches every
-  // transition.
-  WatchConditionedEdge(ref_var, std::move(ref_edge),
-                       ConditionedEvent{window->armed, /*is_data_event=*/false},
-                       ctx, [window, &ctx]() { OnRefEdge(window, ctx); });
-  WatchConditionedEdge(data_var, std::move(data_edge),
-                       ConditionedEvent{window->armed, /*is_data_event=*/true},
-                       ctx, [window, &ctx]() { OnDataEdge(window, ctx); });
+  ArmedTimingCheckEvents events = ArmTimingCheckEvents(
+      window->armed, ctx, [window, &ctx]() { OnRefEdge(window, ctx); },
+      [window, &ctx]() { OnDataEdge(window, ctx); });
+  window->ref_signal = std::move(events.ref_signal);
+  window->data_signal = std::move(events.data_signal);
 }
 
 }  // namespace delta

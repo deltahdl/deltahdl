@@ -250,6 +250,49 @@ inline void WatchConditionedEdge(Variable* var, TimingCheckEdge edge,
       });
 }
 
+// The two timing_check_events a check writes in its own arguments, armed with
+// one watcher each. §31.3's six checks and §31.4.1 through §31.4.3's three each
+// write a reference_event and a data_event of their own, so both events carry a
+// signal, a §31.5 edge_control_specifier and a §31.7 `&&&` condition the
+// declaration named. §31.4.4's $width, §31.4.5's $period and §31.4.6's
+// $nochange derive one of their two edges from the other and do not go through
+// this.
+//
+// `on_ref` runs when the reference_event occurs and `on_data` when the
+// data_event does, each already gated by the edge_control_specifier and the
+// condition its own event was written with.
+//
+// Nothing is armed when either signal names no variable of the design, which is
+// what a check whose specify block was registered for a module the design never
+// elaborated leaves behind. Both callbacks are dropped in that case and the
+// returned names are empty.
+//
+// The two signal names are returned rather than written into the caller's
+// state, because the callbacks close over that state and it therefore exists
+// before this is called.
+struct ArmedTimingCheckEvents {
+  std::string ref_signal;
+  std::string data_signal;
+};
+
+inline ArmedTimingCheckEvents ArmTimingCheckEvents(
+    ArmedCheck armed, SimContext& ctx, const std::function<void()>& on_ref,
+    const std::function<void()>& on_data) {
+  const TimingCheckEntry& check = armed.Entry();
+  std::string ref_signal = check.inst_prefix + check.ref_signal;
+  std::string data_signal = check.inst_prefix + check.data_signal;
+  Variable* ref_var = ctx.FindVariable(ref_signal);
+  Variable* data_var = ctx.FindVariable(data_signal);
+  if (ref_var == nullptr || data_var == nullptr) return {};
+  WatchConditionedEdge(ref_var, RefEdgeOf(check),
+                       ConditionedEvent{armed, /*is_data_event=*/false}, ctx,
+                       on_ref);
+  WatchConditionedEdge(data_var, DataEdgeOf(check),
+                       ConditionedEvent{armed, /*is_data_event=*/true}, ctx,
+                       on_data);
+  return ArmedTimingCheckEvents{std::move(ref_signal), std::move(data_signal)};
+}
+
 // Reports one violation as a warning. §31.2's violation is a state the run
 // reached rather than a construct that is illegal, which is why it is a warning
 // and not an error, and it stands at SourceLoc::None() because TimingCheckEntry

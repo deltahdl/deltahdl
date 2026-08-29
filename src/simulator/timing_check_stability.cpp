@@ -367,55 +367,31 @@ void EvaluateStabilityPair(const StabilityPair& pair, StabilityEvent event,
 
 void ArmStabilityPair(const SpecifyManager& mgr, std::size_t index,
                       SimContext& ctx) {
-  const TimingCheckEntry& check = mgr.GetTimingChecks()[index];
-  std::string ref_signal = check.inst_prefix + check.ref_signal;
-  std::string data_signal = check.inst_prefix + check.data_signal;
-  Variable* ref_var = ctx.FindVariable(ref_signal);
-  Variable* data_var = ctx.FindVariable(data_signal);
-  if (ref_var == nullptr || data_var == nullptr) return;
-  TimingCheckEdge ref_edge = RefEdgeOf(check);
-  TimingCheckEdge data_edge = DataEdgeOf(check);
   auto pair = std::make_shared<StabilityPair>();
   pair->armed = ArmedCheck{&mgr, index};
-  pair->ref_signal = std::move(ref_signal);
-  pair->data_signal = std::move(data_signal);
-  // §31.7 ties "the occurrence of timing checks to the value of a conditioning
-  // signal", so an event whose `&&&` condition does not hold is not an
-  // occurrence of the check: it neither records a transition time in
-  // StabilityPair nor triggers an EvaluateStabilityPair call. Both watchers go
-  // through WatchConditionedEdge (simulator/timing_check_driver_internal.h)
-  // rather than WatchEdge, because §31.3.3's Table 31-3 and §31.3.6's Table
+  // ArmTimingCheckEvents (simulator/timing_check_driver_internal.h) arms one
+  // watcher on the reference_event and one on the data_event, each gated by
+  // §31.5's edge_control_specifier and §31.7's `&&&` condition its own event
+  // was written with. Both events need that gate here, and not just the one a
+  // check is evaluated at, because §31.3.3's Table 31-3 and §31.3.6's Table
   // 31-6 leave the timecheck event to whichever of the two "occurs first in the
-  // simulation" and either event can therefore be the one a check is evaluated
-  // at. Each watcher is gated on its own event's condition -- the reference
-  // watcher on TimingCheckEntry::ref_condition_expr, the data watcher on
-  // TimingCheckEntry::data_condition_expr -- which is what keeps a suppressed
-  // event from being read as the one that happened first: a transition that
-  // wrote StabilityPair::ref_ticks or StabilityPair::data_ticks under a false
-  // condition would stand as the other side of every window the surviving event
-  // closes.
-  //
-  // Each watcher is armed with the edge_control_specifier its own
-  // timing_check_event was written with. RefEdgeOf and DataEdgeOf
-  // (simulator/timing_check_driver_internal.h) carry §31.5's general form as
-  // the edge_descriptor list the event was written with, where one was written.
-  // They carry §31.5's posedge or negedge shorthand otherwise.
-  WatchConditionedEdge(
-      ref_var, std::move(ref_edge),
-      ConditionedEvent{.armed = pair->armed, .is_data_event = false}, ctx,
+  // simulation". A transition recorded in StabilityPair::ref_ticks or
+  // StabilityPair::data_ticks under a false condition would otherwise stand as
+  // the other side of every window the surviving event closes.
+  ArmedTimingCheckEvents events = ArmTimingCheckEvents(
+      pair->armed, ctx,
       [pair, &ctx]() {
         pair->has_ref = true;
         pair->ref_ticks = ctx.CurrentTime().ticks;
         EvaluateStabilityPair(*pair, StabilityEvent::kReference, ctx);
-      });
-  WatchConditionedEdge(
-      data_var, std::move(data_edge),
-      ConditionedEvent{.armed = pair->armed, .is_data_event = true}, ctx,
+      },
       [pair, &ctx]() {
         pair->has_data = true;
         pair->data_ticks = ctx.CurrentTime().ticks;
         EvaluateStabilityPair(*pair, StabilityEvent::kData, ctx);
       });
+  pair->ref_signal = std::move(events.ref_signal);
+  pair->data_signal = std::move(events.data_signal);
 }
 
 }  // namespace delta
