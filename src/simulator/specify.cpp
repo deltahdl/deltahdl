@@ -318,22 +318,31 @@ std::vector<PrimitiveDriver> BuildPrimitiveDriversFromGate(
   return drivers;
 }
 
-const PathDelay* SelectActivePath(const std::vector<PathCandidate>& candidates,
-                                  uint8_t transition_slot) {
-  if (candidates.empty()) return nullptr;
-
-  // The most recent transition is taken among the candidates that are eligible
-  // at all, which is why the condition is tested here and again below. §30.5.3
-  // states both halves in one sentence -- active paths are "those whose input
-  // has transitioned most recently in time, and either they have no condition
-  // or their conditions are true" -- and taking the time first lets a path
-  // whose condition is false set it and drop every live path at an earlier one,
-  // leaving nothing to govern an output that is plainly transitioning.
+// The greatest transition time among the candidates §30.5.3 admits: those that
+// name a path and whose condition holds.
+//
+// The condition is tested here and again in SelectActivePath below, and taking
+// it first is the point. §30.5.3 states both halves in one sentence -- active
+// paths are "those whose input has transitioned most recently in time, and
+// either they have no condition or their conditions are true" -- and reading
+// the time first lets a path whose condition is false set it and drop every
+// live path at an earlier one, leaving nothing to govern an output that is
+// plainly transitioning.
+static uint64_t GreatestAdmittedTransitionTime(
+    const std::vector<PathCandidate>& candidates) {
   uint64_t max_time = 0;
   for (const auto& c : candidates) {
     if (c.path == nullptr || !c.condition_true) continue;
     if (c.last_transition_time > max_time) max_time = c.last_transition_time;
   }
+  return max_time;
+}
+
+const PathDelay* SelectActivePath(const std::vector<PathCandidate>& candidates,
+                                  uint8_t transition_slot) {
+  if (candidates.empty()) return nullptr;
+
+  uint64_t max_time = GreatestAdmittedTransitionTime(candidates);
   const PathDelay* best_path = nullptr;
   uint64_t best = 0;
   for (const auto& c : candidates) {
