@@ -121,6 +121,9 @@ class Lowerer {
   // once every module has been lowered. A module declaring neither is not
   // recorded; either alone is enough.
   void RecordSpecifyScope(const RtlirModule* mod);
+  // Registers into the run's SpecifyManager everything RecordSpecifyScope
+  // gathered, once every module has been lowered.
+  void RegisterDesignTiming();
   void LowerChildModules(const RtlirModule* mod);
   void CreateChildModuleVariables(const std::string& inst_prefix,
                                   const RtlirModule* resolved);

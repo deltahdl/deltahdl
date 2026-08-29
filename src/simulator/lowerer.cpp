@@ -544,59 +544,10 @@ static void AttachCuMethodsToClasses(const RtlirDesign* design,
   }
 }
 
-void Lowerer::Lower(const RtlirDesign* design) {
-  if (!design) return;
-  // §20.10.1: a $fatal or $error elaboration severity task that survived
-  // generate expansion marks the design as not startable. Refuse to lower
-  // any part of it so the scheduler sees an empty event calendar.
-  if (design->simulation_blocked) return;
-  design_ = design;
-  // Annex D.11: the interactive scope consulted by the optional $scope system
-  // task starts at the first top-level module. A later $scope call retargets
-  // it.
-  if (!design->top_modules.empty()) {
-    ctx_.SetInteractiveScope(design->top_modules.front()->name);
-  }
-  // §20.4.1 / §3.14.3: seed the runtime timescale state read by
-  // $timeunit/$timeprecision. The simulation time unit and compilation-unit
-  // timescale come from the design; the top module is the initial current
-  // scope reported when those functions take no argument.
-  ctx_.SetGlobalPrecision(design->global_time_precision);
-  ctx_.SetCompUnitTimeScale(design->cu_timescale);
-  if (!design->top_modules.empty()) {
-    const RtlirModule* top = design->top_modules.front();
-    ctx_.SetCurrentTimeScale(top->timescale);
-    ctx_.SetCurrentScopeName(top->name);
-  }
-  for (auto* top : design->top_modules) {
-    RegisterScopeTimescales(top, ctx_);
-  }
-  RegisterDesignTypeWidths(design, ctx_);
-  InitPackageDataVariables(design, ctx_, arena_);
-
-  // §16.5.1 reads a concurrent assertion's variables as of the Preponed region
-  // of the time slot the clock tick falls in. No event reaches a Preponed
-  // region -- the scheduler drains it once, ahead of the iterative regions, and
-  // never returns to it -- and §4.4.2.1 makes that unnecessary: "Sampling in
-  // the Preponed region is equivalent to sampling in the previous Postponed
-  // region." The sample is therefore taken once a time slot has finished, where
-  // it is the next slot's Preponed value. Registering it here rather than
-  // beside the first assertion keeps it to one registration per run; it does
-  // nothing while no assertion has enrolled a variable.
-  ctx_.GetScheduler().AddPostTimestepCallback(
-      [ctx = &ctx_]() { ctx->AssertionSamples().Refill(ctx->GetArena()); });
-
-  for (auto* cls : design->cu_class_decls) {
-    if (!ctx_.FindClassType(cls->name)) {
-      LowerClassDecl(cls);
-    }
-  }
-
-  RegisterFreeCuFunctions(design, ctx_);
-  for (auto* mod : design->top_modules) {
-    LowerModule(mod);
-  }
-
+// §30.3, §32.4.1 and §6.20.5: the timing every module instance declared,
+// registered into the manager the run reads. Separate from Lower because it is
+// one step of it that grew its own paragraphs.
+void Lowerer::RegisterDesignTiming() {
   // §30.3's specify block declares the design's specify data. The manager is
   // acquired whether or not any module declared a specify block, because
   // §32.9's $sdf_annotate reads timing data into it and has nowhere to put what
@@ -650,6 +601,62 @@ void Lowerer::Lower(const RtlirDesign* design) {
   // registered, before the scheduler runs anything -- a source that transitions
   // before it is watched leaves no time behind for the selection to read.
   WatchModulePathSources(mgr, ctx_);
+}
+
+void Lowerer::Lower(const RtlirDesign* design) {
+  if (!design) return;
+  // §20.10.1: a $fatal or $error elaboration severity task that survived
+  // generate expansion marks the design as not startable. Refuse to lower
+  // any part of it so the scheduler sees an empty event calendar.
+  if (design->simulation_blocked) return;
+  design_ = design;
+  // Annex D.11: the interactive scope consulted by the optional $scope system
+  // task starts at the first top-level module. A later $scope call retargets
+  // it.
+  if (!design->top_modules.empty()) {
+    ctx_.SetInteractiveScope(design->top_modules.front()->name);
+  }
+  // §20.4.1 / §3.14.3: seed the runtime timescale state read by
+  // $timeunit/$timeprecision. The simulation time unit and compilation-unit
+  // timescale come from the design; the top module is the initial current
+  // scope reported when those functions take no argument.
+  ctx_.SetGlobalPrecision(design->global_time_precision);
+  ctx_.SetCompUnitTimeScale(design->cu_timescale);
+  if (!design->top_modules.empty()) {
+    const RtlirModule* top = design->top_modules.front();
+    ctx_.SetCurrentTimeScale(top->timescale);
+    ctx_.SetCurrentScopeName(top->name);
+  }
+  for (auto* top : design->top_modules) {
+    RegisterScopeTimescales(top, ctx_);
+  }
+  RegisterDesignTypeWidths(design, ctx_);
+  InitPackageDataVariables(design, ctx_, arena_);
+
+  // §16.5.1 reads a concurrent assertion's variables as of the Preponed region
+  // of the time slot the clock tick falls in. No event reaches a Preponed
+  // region -- the scheduler drains it once, ahead of the iterative regions, and
+  // never returns to it -- and §4.4.2.1 makes that unnecessary: "Sampling in
+  // the Preponed region is equivalent to sampling in the previous Postponed
+  // region." The sample is therefore taken once a time slot has finished, where
+  // it is the next slot's Preponed value. Registering it here rather than
+  // beside the first assertion keeps it to one registration per run; it does
+  // nothing while no assertion has enrolled a variable.
+  ctx_.GetScheduler().AddPostTimestepCallback(
+      [ctx = &ctx_]() { ctx->AssertionSamples().Refill(ctx->GetArena()); });
+
+  for (auto* cls : design->cu_class_decls) {
+    if (!ctx_.FindClassType(cls->name)) {
+      LowerClassDecl(cls);
+    }
+  }
+
+  RegisterFreeCuFunctions(design, ctx_);
+  for (auto* mod : design->top_modules) {
+    LowerModule(mod);
+  }
+
+  RegisterDesignTiming();
 
   for (auto* let_decl : design->cu_let_decls) {
     ctx_.RegisterLetDecl(let_decl->name, let_decl);
