@@ -167,7 +167,7 @@ TEST(InstanceArrayPublic, HandleExprDivertsForPrimitiveArray) {
 TEST(InstanceArrayModel, RangesRunLeftmostToRightmost) {
   VpiObject l0, r0, l1, r1;
   std::vector<VpiArrayDimension> dims =
-      MakeTwoFixedUnpackedDims(&l0, &r0, 4, &l1, &r1, 2);
+      MakeTwoFixedUnpackedDims({&l0, &r0, 4}, {&l1, &r1, 2});
 
   std::vector<VpiRangeDesc> ranges = VpiInstanceArrayRanges(dims);
   ASSERT_EQ(ranges.size(), 2u);

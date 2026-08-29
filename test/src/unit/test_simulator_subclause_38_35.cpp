@@ -64,7 +64,7 @@ TEST_F(VpiPutValueArraySim, RawFourStateValDecodesAvalAndBval) {
 // bvalbits group is ignored - the element keeps a known (bval 0) value.
 TEST_F(VpiPutValueArraySim, RawFourStateValIgnoresBvalForTwoStateArray) {
   VpiHandle arr =
-      MakeArray("t", {{0}}, 1, 8, vpiStaticArray, /*four_state=*/false);
+      MakeArray("t", {{0}}, 1, 8, {vpiStaticArray, /*four_state=*/false});
 
   PLI_BYTE8 raw[2] = {static_cast<PLI_BYTE8>(0xF0),
                       static_cast<PLI_BYTE8>(0xFF)};  // bval group all ones
@@ -173,7 +173,7 @@ TEST_F(VpiPutValueArraySim, IllegalFlagIsError) {
 // §38.35: the routine modifies only static unpacked arrays (vpiArrayType
 // vpiStaticArray). A non-static array is rejected and the array is unchanged.
 TEST_F(VpiPutValueArraySim, NonStaticArrayIsError) {
-  VpiHandle arr = MakeArray("d", {{0, 1}}, 2, 32, vpiDynamicArray);
+  VpiHandle arr = MakeArray("d", {{0, 1}}, 2, 32, {vpiDynamicArray});
 
   PLI_INT32 ints[2] = {1, 2};
   s_vpi_arrayvalue av = {};

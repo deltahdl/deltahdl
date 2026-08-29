@@ -8,6 +8,20 @@
 
 #include "model_keyword_table_sweeps.h"
 
+// How many entries of `tables`, counted across every table, spell `word`. A
+// word two of the tables both hold is counted once for each of them, which is
+// what a check for a table covering another table's ground reads.
+inline size_t CountWordInTables(std::initializer_list<KeywordTableSweep> tables,
+                                const std::string& word) {
+  size_t seen = 0;
+  for (const auto& table : tables) {
+    for (size_t i = 0; i < table.count; ++i) {
+      if (word == table.words[i]) ++seen;
+    }
+  }
+  return seen;
+}
+
 // A version_specifier's reserved word list is exactly the tables §22.14 says
 // that version names, put together. Both halves of that have to be checked: a
 // per-table sweep passing for each table on its own leaves it open that the
@@ -21,14 +35,9 @@ inline void ExpectTablesPartitionTheList(
 
   for (const auto& table : tables) {
     for (size_t i = 0; i < table.count; ++i) {
-      const std::string word = table.words[i];
-      size_t seen = 0;
-      for (const auto& other : tables) {
-        for (size_t j = 0; j < other.count; ++j) {
-          if (word == other.words[j]) ++seen;
-        }
-      }
-      EXPECT_EQ(seen, 1u) << word << " is counted twice";
+      const std::string kWord = table.words[i];
+      EXPECT_EQ(CountWordInTables(tables, kWord), 1u)
+          << kWord << " is counted twice";
     }
   }
 }

@@ -12,7 +12,11 @@ using namespace delta;
 
 // Selects which preprocessor state (if any) is propagated onto the
 // CompilationUnit before elaboration.
-enum class CuPropagation { kNone, kDefaultNetType, kUnconnectedDrive };
+enum class CuPropagation : std::uint8_t {
+  kNone,
+  kDefaultNetType,
+  kUnconnectedDrive
+};
 
 // Runs the full preprocess -> parse -> elaborate -> lower -> simulate pipeline
 // on an already-registered source file and returns the resulting value of

@@ -94,4 +94,21 @@ Checks: >-
   readability-redundant-smartptr-get,
   readability-simplify-boolean-expr,
   clang-diagnostic-unused-function
-HeaderFilterRegex: '(src|test)/.*\.h$'
+# lib/cpp is named because the fixtures, helpers and models every unit test is
+# built on live there and nothing else reads them. A diagnostic raised inside a
+# header is reported only where the header's path matches this expression, and
+# lib/cpp/test_fixtures/fixture_simulator.h has no src/ or test/ component in it
+# -- test_fixtures/ is not test/ -- so before lib/cpp was named here every
+# diagnostic in those 131 headers was suppressed, in this configuration and in
+# etc/clang_tidy/src.yml alike. assert-no-oversized-source-files already reads
+# the tree, running `find src test lib/cpp`, so the repository holds lib/cpp to a
+# standard and clang-tidy was the one gate skipping it.
+#
+# This configuration is the one that governs them, and etc/clang_tidy/src.yml
+# deliberately does not name lib/cpp. lib/cpp is test-tier code, so the
+# thresholds written for that tier are the ones it answers to; and no .cpp under
+# src/ includes a lib/cpp header, so naming it there would check nothing.
+#
+# test/ matches no header today, the test tree holding none. It stays because a
+# header added under test/src/unit/ is to be checked from the day it is written.
+HeaderFilterRegex: '(src|test|lib/cpp)/.*\.h$'

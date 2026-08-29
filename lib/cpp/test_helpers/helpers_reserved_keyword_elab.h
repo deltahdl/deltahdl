@@ -170,11 +170,11 @@ inline void ExpectDeclsFailInRegionButElaborateOutside(
     // "The declaration of a user-defined data type shall precede any reference
     // to its type_identifier" -- refuses it at elaboration, because inside the
     // region the word declares no type.
-    const bool has_packed_dim =
+    const bool kHasPackedDim =
         std::string_view(decl).find('[') != std::string_view::npos;
     std::string message = "expected ';', got '['";
     const char* subclause = "6.8";
-    if (!has_packed_dim) {
+    if (!kHasPackedDim) {
       std::string_view head_word(decl);
       head_word = head_word.substr(0, head_word.find(' '));
       message = "declaration of type '" + std::string(head_word) +
@@ -251,39 +251,39 @@ struct FreedHierarchyNames {
 // hierarchy, not one declaration inside one module.
 inline void ExpectFreedWordsNameModulePortsAndInstance(
     const char* spec, const FreedHierarchyNames& names) {
-  const std::string child_name = names.design_element;
-  const std::string in_name = names.input_port;
-  const std::string out_name = names.output_port;
+  const std::string kChildName = names.design_element;
+  const std::string kInName = names.input_port;
+  const std::string kOutName = names.output_port;
 
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
-      In(spec, "module " + child_name + " (input wire " + in_name +
-                   ",\n            output wire " + out_name + ");\n" +
-                   "  assign " + out_name + " = " + in_name +
+      In(spec, "module " + kChildName + " (input wire " + kInName +
+                   ",\n            output wire " + kOutName + ");\n" +
+                   "  assign " + kOutName + " = " + kInName +
                    ";\n"
                    "endmodule\n"
                    "module top;\n"
                    "  wire a, b;\n"
                    "  " +
-                   child_name + " " + names.instance + " (." + in_name +
-                   "(a), ." + out_name + "(b));\n" + "endmodule\n"),
+                   kChildName + " " + names.instance + " (." + kInName +
+                   "(a), ." + kOutName + "(b));\n" + "endmodule\n"),
       f, "top");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 
-  const auto* child = FindModule(design, child_name);
+  const auto* child = FindModule(design, kChildName);
   ASSERT_NE(child, nullptr);
   ASSERT_EQ(child->ports.size(), 2u);
-  EXPECT_EQ(child->ports[0].name, in_name);
+  EXPECT_EQ(child->ports[0].name, kInName);
   EXPECT_EQ(child->ports[0].direction, Direction::kInput);
-  EXPECT_EQ(child->ports[1].name, out_name);
+  EXPECT_EQ(child->ports[1].name, kOutName);
   EXPECT_EQ(child->ports[1].direction, Direction::kOutput);
 
   const auto* top = FindModule(design, "top");
   ASSERT_NE(top, nullptr);
   bool found_instance = false;
   for (const auto& inst : top->children) {
-    if (inst.inst_name == names.instance && inst.module_name == child_name) {
+    if (inst.inst_name == names.instance && inst.module_name == kChildName) {
       found_instance = true;
     }
   }
@@ -330,8 +330,8 @@ inline void ExpectEveryConstantFormResolves(const char* spec,
   EXPECT_TRUE(l->is_localparam);
   EXPECT_EQ(l->resolved_value, 8);
 
-  const char* kNames[] = {"from_literal", "from_parameter", "from_localparam",
-                          "from_function"};
+  constexpr const char* kNames[] = {"from_literal", "from_parameter",
+                                    "from_localparam", "from_function"};
   for (const char* name : kNames) {
     const auto* v = FindVar(design, "t", name);
     ASSERT_NE(v, nullptr) << name;

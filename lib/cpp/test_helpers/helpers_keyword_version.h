@@ -73,11 +73,11 @@ inline std::string InSv2012(const std::string& body) {
 // of the offset.
 inline uint32_t LineInRegion(uint32_t body_line) {
   static constexpr char kBodyMark[] = "\x02";
-  const std::string wrapped = In("", kBodyMark);
-  const std::string above = wrapped.substr(0, wrapped.find(kBodyMark));
-  const auto directive_lines =
-      static_cast<uint32_t>(std::count(above.begin(), above.end(), '\n'));
-  return directive_lines + body_line;
+  const std::string kWrapped = In("", kBodyMark);
+  const std::string kAbove = kWrapped.substr(0, kWrapped.find(kBodyMark));
+  const auto kDirectiveLines =
+      static_cast<uint32_t>(std::count(kAbove.begin(), kAbove.end(), '\n'));
+  return kDirectiveLines + body_line;
 }
 
 // A one-variable module declaring `word` as its variable name. A word the

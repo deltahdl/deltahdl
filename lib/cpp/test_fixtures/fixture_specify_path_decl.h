@@ -67,10 +67,9 @@ inline ElaboratedPathDecl ElaboratePathDecl(const std::string& port_header,
     for (auto* item : mod->items) {
       if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
       for (auto* si : item->specify_items) {
-        if (si->kind == SpecifyItemKind::kPathDecl) {
-          out.decl = &si->path;
-          return out;
-        }
+        if (si->kind != SpecifyItemKind::kPathDecl) continue;
+        out.decl = &si->path;
+        return out;
       }
     }
   }

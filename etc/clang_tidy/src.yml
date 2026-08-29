@@ -126,4 +126,8 @@ Checks: >-
   readability-redundant-smartptr-get,
   readability-simplify-boolean-expr,
   clang-diagnostic-unused-function
+# lib/cpp is deliberately absent. It holds the fixtures, helpers and models the
+# unit tests are built on, and etc/clang_tidy/test_src_unit.yml names it because
+# that is the tier whose thresholds those headers answer to. No .cpp under src/
+# includes one, so naming it here would check nothing.
 HeaderFilterRegex: '(src|test)/.*\.h$'

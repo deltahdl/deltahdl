@@ -26,22 +26,24 @@ inline QueueObject* MakeBoundedQueue(SimFixture& f, std::string_view name,
   return q;
 }
 
-// Registers an automatic void function `func_name(ref v)` whose body invokes
+// Registers an automatic void function `test_fn(ref v)` whose body invokes
 // `q.<method>(method_args)` and then assigns 99 to the reference `v`, then
 // calls it passing `q[select_idx]` by reference and evaluates the call. This
 // collapses the body-construction + call sequence shared by the QueueRef
 // reference tests.
-inline void RunQueueRefMethodThenAssign(
-    SimFixture& f, std::string_view queue_name, std::string_view method,
-    std::vector<Expr*> method_args, uint64_t select_idx,
-    std::string_view func_name = "test_fn") {
-  RegAutoFunc(f, func_name,
+inline void RunQueueRefMethodThenAssign(SimFixture& f,
+                                        std::string_view queue_name,
+                                        std::string_view method,
+                                        std::vector<Expr*> method_args,
+                                        uint64_t select_idx) {
+  constexpr std::string_view kFuncName = "test_fn";
+  RegAutoFunc(f, kFuncName,
               {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
               {MakeExprStmt(f.arena, MakeMethodCall(f.arena, queue_name, method,
                                                     std::move(method_args))),
                MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
 
-  auto* call = MakeCall(f.arena, func_name,
+  auto* call = MakeCall(f.arena, kFuncName,
                         {MakeSelect(f.arena, queue_name, select_idx)});
   EvalExpr(call, f.ctx, f.arena);
 }

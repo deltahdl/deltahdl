@@ -27,22 +27,31 @@ class VpiValueArraySimBase : public ::testing::Test {
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
+  // What kind of array MakeArray builds: the vpiStaticArray or vpiDynamicArray
+  // the handle reports, and whether its elements are 4-state. Both default to
+  // what most tests want, and they travel together so that MakeArray stays
+  // inside the five parameters readability-function-size.ParameterThreshold
+  // allows; stating them positionally took six.
+  struct ArrayKind {
+    int array_type = vpiStaticArray;
+    bool four_state = true;
+  };
+
   // Build a static unpacked array with `count` freshly created element
   // variables (all bits initialized to x) and retain the variable pointers.
   VpiHandle MakeArray(std::string_view name,
                       const std::vector<std::vector<int>>& dims, int count,
-                      uint32_t elem_width, int array_type = vpiStaticArray,
-                      bool four_state = true) {
+                      uint32_t elem_width, ArrayKind kind = {}) {
     elems_.clear();
     name_pool_.reserve(name_pool_.size() + count);
     for (int i = 0; i < count; ++i) {
       auto* v = sim_ctx_.CreateVariable(
           name_pool_.emplace_back(std::string(name) + std::to_string(i)),
           elem_width);
-      v->is_4state = four_state;
+      v->is_4state = kind.four_state;
       elems_.push_back(v);
     }
-    return vpi_ctx_.CreateRegArray(name, array_type, dims, elems_);
+    return vpi_ctx_.CreateRegArray(name, kind.array_type, dims, elems_);
   }
 
   // Install a known (aval, bval) into one element's first value word.

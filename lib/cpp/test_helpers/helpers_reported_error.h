@@ -62,10 +62,14 @@ inline uint32_t LineHolding(std::string_view where, std::string_view what) {
   return line;
 }
 
+// `severity` is the only thing that separates the two callers below, so the
+// word naming it in the failure message is derived here rather than passed
+// beside it: taking both would give this six parameters, and
+// readability-function-size.ParameterThreshold in
+// etc/clang_tidy/test_src_unit.yml allows five.
 inline ::testing::AssertionResult ReportedAt(
     const std::vector<Diagnostic>& diags, DiagSeverity severity,
-    std::string_view what, std::string_view message, uint32_t line,
-    std::string_view subclause) {
+    std::string_view message, uint32_t line, std::string_view subclause) {
   for (const auto& diag : diags) {
     if (diag.severity == severity &&
         diag.message.find(message) != std::string::npos &&
@@ -73,6 +77,7 @@ inline ::testing::AssertionResult ReportedAt(
       return ::testing::AssertionSuccess();
     }
   }
+  const char* what = severity == DiagSeverity::kError ? "error" : "warning";
   ::testing::AssertionResult failure = ::testing::AssertionFailure();
   failure << "no " << what << " containing \"" << message
           << "\" stands at line " << line << " under §" << subclause
@@ -91,13 +96,11 @@ inline ::testing::AssertionResult ReportedAt(
 inline ::testing::AssertionResult ReportedError(
     const std::vector<Diagnostic>& diags, std::string_view message,
     uint32_t line, std::string_view subclause) {
-  return ReportedAt(diags, DiagSeverity::kError, "error", message, line,
-                    subclause);
+  return ReportedAt(diags, DiagSeverity::kError, message, line, subclause);
 }
 
 inline ::testing::AssertionResult ReportedWarning(
     const std::vector<Diagnostic>& diags, std::string_view message,
     uint32_t line, std::string_view subclause) {
-  return ReportedAt(diags, DiagSeverity::kWarning, "warning", message, line,
-                    subclause);
+  return ReportedAt(diags, DiagSeverity::kWarning, message, line, subclause);
 }

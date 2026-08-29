@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <ios>
 #include <string>
 #include <vector>
 

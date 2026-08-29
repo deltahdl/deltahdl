@@ -54,17 +54,17 @@ struct PositionReport {
 // instead, which reads it as a variable declaration of an implicit type and
 // demands the semicolon under §6.8.
 inline PositionReport ReportForPosition(const IdentifierPosition& p) {
-  const std::string_view what(p.what);
-  if (what == "design element") {
+  const std::string_view kWhat(p.what);
+  if (kWhat == "design element") {
     return {"expected identifier, got ", 1, "23.2.1"};
   }
-  if (what == "port") return {"expected identifier, got ", 1, "23.2.2.2"};
-  if (what == "instance") return {"expected ';', got ", 6, "6.8"};
-  if (what == "task") return {"expected identifier, got ", 3, "13.3"};
-  if (what == "function") return {"expected identifier, got ", 3, "13.4"};
-  if (what == "gate instance") return {"expected '(', got ", 2, "28.3.6"};
-  if (what == "genvar") return {"expected identifier, got ", 2, "27.4"};
-  if (what == "named block") return {"expected identifier, got ", 3, "9.3.4"};
+  if (kWhat == "port") return {"expected identifier, got ", 1, "23.2.2.2"};
+  if (kWhat == "instance") return {"expected ';', got ", 6, "6.8"};
+  if (kWhat == "task") return {"expected identifier, got ", 3, "13.3"};
+  if (kWhat == "function") return {"expected identifier, got ", 3, "13.4"};
+  if (kWhat == "gate instance") return {"expected '(', got ", 2, "28.3.6"};
+  if (kWhat == "genvar") return {"expected identifier, got ", 2, "27.4"};
+  if (kWhat == "named block") return {"expected identifier, got ", 3, "9.3.4"};
   ADD_FAILURE() << p.what << " has no report recorded here";
   return {"", 0, ""};
 }
@@ -77,7 +77,7 @@ inline void ExpectWordsFillNoIdentifierPosition(
     std::initializer_list<std::string_view> positions = {}) {
   for (const auto& p : kIdentifierPositions) {
     if (positions.size() != 0 && !PositionIsOneOf(p, positions)) continue;
-    const PositionReport rep = ReportForPosition(p);
+    const PositionReport kRep = ReportForPosition(p);
     for (const char* word : words) {
       // Every message here stops before the token the report names, for the
       // reason given above ReportForPosition: a word that is itself a data
@@ -86,8 +86,8 @@ inline void ExpectWordsFillNoIdentifierPosition(
       // So the word under test is told apart by the failure message rather
       // than by the report.
       auto r = ParseWithPreprocessor(In(spec, AtPosition(p, word)));
-      EXPECT_TRUE(ReportedError(r.diags, rep.message,
-                                LineInRegion(rep.body_line), rep.subclause))
+      EXPECT_TRUE(ReportedError(r.diags, kRep.message,
+                                LineInRegion(kRep.body_line), kRep.subclause))
           << word << " cannot name a " << p.what << " under this version";
     }
   }
@@ -104,15 +104,15 @@ inline void ExpectWordsNameEntitiesUnder(
     std::initializer_list<std::string_view> positions = {}) {
   for (const auto& p : kIdentifierPositions) {
     if (positions.size() != 0 && !PositionIsOneOf(p, positions)) continue;
-    const PositionReport rep = ReportForPosition(p);
+    const PositionReport kRep = ReportForPosition(p);
     for (const char* word : words) {
       std::string src = AtPosition(p, word);
       EXPECT_TRUE(ParseWithPreprocessorOk(In(earlier, src)))
           << p.what << ": everything this version includes leaves " << word
           << " free";
       auto r = ParseWithPreprocessor(In(spec, src));
-      EXPECT_TRUE(ReportedError(r.diags, rep.message,
-                                LineInRegion(rep.body_line), rep.subclause))
+      EXPECT_TRUE(ReportedError(r.diags, kRep.message,
+                                LineInRegion(kRep.body_line), kRep.subclause))
           << p.what << ": this version reserves " << word;
     }
   }

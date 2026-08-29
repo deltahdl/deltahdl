@@ -88,6 +88,60 @@ inline bool IsTimescaleBody(const std::string& body) {
   return false;
 }
 
+// Consumes the scalar_value_change at toks[i], which is one token: a value
+// character immediately followed by the identifier code.
+//
+// Returns "" when one was consumed and a description of the violation
+// otherwise.
+inline std::string ConsumeScalarValueChange(
+    const std::vector<std::string>& toks, size_t& i) {
+  const std::string& t = toks[i];
+  if (t.size() < 2 || !IsPrintableAscii(t.substr(1))) {
+    return "malformed scalar_value_change: " + t;
+  }
+  ++i;
+  return "";
+}
+
+// Consumes the b-form vector_value_change at toks[i]: b or B and the binary
+// digits as one token, then the identifier code as a token of its own.
+//
+// Returns "" when one was consumed and a description of the violation
+// otherwise.
+inline std::string ConsumeBFormValueChange(const std::vector<std::string>& toks,
+                                           size_t& i) {
+  const std::string& t = toks[i];
+  if (t.size() < 2 || !IsFourStateDigits(t.substr(1))) {
+    return "malformed b-form vector_value_change: " + t;
+  }
+  if (i + 1 >= toks.size() || !IsPrintableAscii(toks[i + 1])) {
+    return "b-form value without identifier code: " + t;
+  }
+  i += 2;
+  return "";
+}
+
+// Consumes the r-form vector_value_change at toks[i]: r or R and the real
+// number as one token, then the identifier code as a token of its own.
+//
+// Returns "" when one was consumed and a description of the violation
+// otherwise.
+inline std::string ConsumeRFormValueChange(const std::vector<std::string>& toks,
+                                           size_t& i) {
+  const std::string& t = toks[i];
+  if (t.size() < 2) return "empty r-form real number";
+  char* endp = nullptr;
+  std::strtod(t.c_str() + 1, &endp);
+  if (endp != t.c_str() + t.size()) {
+    return "malformed r-form real number: " + t;
+  }
+  if (i + 1 >= toks.size() || !IsPrintableAscii(toks[i + 1])) {
+    return "r-form value without identifier code: " + t;
+  }
+  i += 2;
+  return "";
+}
+
 // Consumes the 4-state value_change at toks[i], advancing i past it. A
 // scalar_value_change is a single token -- a value character immediately
 // followed by the identifier code -- while a vector_value_change is a
@@ -103,36 +157,9 @@ inline std::string ConsumeFourStateValueChange(
     const std::vector<std::string>& toks, size_t& i, bool& handled) {
   handled = true;
   const std::string& t = toks[i];
-  if (IsValueChar(t[0])) {
-    if (t.size() < 2 || !IsPrintableAscii(t.substr(1))) {
-      return "malformed scalar_value_change: " + t;
-    }
-    ++i;
-    return "";
-  }
-  if (t[0] == 'b' || t[0] == 'B') {
-    if (t.size() < 2 || !IsFourStateDigits(t.substr(1))) {
-      return "malformed b-form vector_value_change: " + t;
-    }
-    if (i + 1 >= toks.size() || !IsPrintableAscii(toks[i + 1])) {
-      return "b-form value without identifier code: " + t;
-    }
-    i += 2;
-    return "";
-  }
-  if (t[0] == 'r' || t[0] == 'R') {
-    if (t.size() < 2) return "empty r-form real number";
-    char* endp = nullptr;
-    std::strtod(t.c_str() + 1, &endp);
-    if (endp != t.c_str() + t.size()) {
-      return "malformed r-form real number: " + t;
-    }
-    if (i + 1 >= toks.size() || !IsPrintableAscii(toks[i + 1])) {
-      return "r-form value without identifier code: " + t;
-    }
-    i += 2;
-    return "";
-  }
+  if (IsValueChar(t[0])) return ConsumeScalarValueChange(toks, i);
+  if (t[0] == 'b' || t[0] == 'B') return ConsumeBFormValueChange(toks, i);
+  if (t[0] == 'r' || t[0] == 'R') return ConsumeRFormValueChange(toks, i);
   handled = false;
   return "";
 }
@@ -155,6 +182,42 @@ struct VcdDeclarationCommand {
   std::vector<std::string> body;
 };
 
+// The declaration command body shapes both dump file grammars fix, whatever
+// the grammar in force adds to them: every command's text is printable ASCII,
+// a $timescale carries time_number time_unit, and $upscope and $enddefinitions
+// carry nothing.
+//
+// `handled` comes back false for a keyword whose body shape the grammar in
+// force states instead, which is not itself an error: the caller checks that
+// shape for itself.
+//
+// Returns "" when the command conforms, else a description of the violation.
+inline std::string CheckFixedDeclarationBody(const VcdDeclarationCommand& cmd,
+                                             bool& handled) {
+  handled = true;
+  for (const auto& b : cmd.body) {
+    if (!IsPrintableAscii(b)) {
+      return cmd.keyword + " body has non-ASCII token: " + b;
+    }
+  }
+  if (cmd.keyword == "$timescale") {
+    std::string joined;
+    for (const auto& b : cmd.body) joined += b;
+    if (!IsTimescaleBody(joined)) {
+      return "$timescale body is not time_number time_unit: " + joined;
+    }
+    return "";
+  }
+  if (cmd.keyword == "$upscope" || cmd.keyword == "$enddefinitions") {
+    if (!cmd.body.empty()) {
+      return cmd.keyword + " carries an unexpected body";
+    }
+    return "";
+  }
+  handled = false;
+  return "";
+}
+
 // Consumes the leading run of declaration commands, which is the
 // {declaration_command} half of a dump file's top production, advancing i to
 // the first token that does not open one.
@@ -162,10 +225,9 @@ struct VcdDeclarationCommand {
 // `opens_a_declaration` decides which keywords belong to that half, since a
 // keyword a grammar classes as a declaration command may still be written
 // among the simulation commands. Every declaration command is keyword,
-// command text, $end, and its text is printable ASCII; a $timescale carries
-// time_number time_unit; $upscope and $enddefinitions carry nothing. Those are
-// checked here, and `check_body` states the per-keyword shapes the grammar in
-// force defines for the rest.
+// command text, $end, which is checked here; CheckFixedDeclarationBody checks
+// the body shapes both grammars fix, and `check_body` states the per-keyword
+// shapes the grammar in force defines for the rest.
 //
 // Returns "" when the run conforms, else a description of the first violation.
 inline std::string ConsumeDeclarationCommands(
@@ -179,27 +241,79 @@ inline std::string ConsumeDeclarationCommands(
     while (i < toks.size() && toks[i] != "$end") cmd.body.push_back(toks[i++]);
     if (i >= toks.size()) return cmd.keyword + " not terminated by $end";
     ++i;  // past $end
-    for (const auto& b : cmd.body) {
-      if (!IsPrintableAscii(b)) {
-        return cmd.keyword + " body has non-ASCII token: " + b;
-      }
-    }
-    if (cmd.keyword == "$timescale") {
-      std::string joined;
-      for (const auto& b : cmd.body) joined += b;
-      if (!IsTimescaleBody(joined)) {
-        return "$timescale body is not time_number time_unit: " + joined;
-      }
-    } else if (cmd.keyword == "$upscope" || cmd.keyword == "$enddefinitions") {
-      if (!cmd.body.empty()) {
-        return cmd.keyword + " carries an unexpected body";
-      }
-    } else {
-      std::string err = check_body(cmd);
-      if (!err.empty()) return err;
-    }
+    bool handled = false;
+    std::string err = CheckFixedDeclarationBody(cmd, handled);
+    if (!err.empty()) return err;
+    if (handled) continue;
+    err = check_body(cmd);
+    if (!err.empty()) return err;
   }
   return "";
+}
+
+// Consumes a checkpoint section -- the keyword at toks[i], the value changes
+// inside it, and the $end closing it -- advancing i past that $end.
+//
+// Returns "" when the section conforms, else a description of the first
+// violation.
+inline std::string ConsumeCheckpointSection(
+    const std::vector<std::string>& toks, size_t& i,
+    const std::function<std::string(const std::vector<std::string>&, size_t&)>&
+        consume_value_change) {
+  const std::string& keyword = toks[i];
+  std::string prefix = keyword + " section: ";
+  ++i;
+  while (i < toks.size() && toks[i] != "$end") {
+    std::string err = consume_value_change(toks, i);
+    if (!err.empty()) return prefix + err;
+  }
+  if (i >= toks.size()) return keyword + " not terminated by $end";
+  ++i;
+  return "";
+}
+
+// Consumes the $comment at toks[i] and every token through the $end closing
+// it.
+//
+// Returns "" when it is closed, else a description of the violation.
+inline std::string ConsumeComment(const std::vector<std::string>& toks,
+                                  size_t& i) {
+  ++i;
+  while (i < toks.size() && toks[i] != "$end") ++i;
+  if (i >= toks.size()) return "$comment not terminated by $end";
+  ++i;
+  return "";
+}
+
+// Consumes the simulation_time at toks[i], which is one token: # followed by a
+// decimal_number.
+//
+// Returns "" when one was consumed, else a description of the violation.
+inline std::string ConsumeSimulationTime(const std::vector<std::string>& toks,
+                                         size_t& i) {
+  const std::string& t = toks[i];
+  if (t.size() < 2 || !IsDecimal(t.substr(1))) {
+    return "simulation_time is not # decimal_number: " + t;
+  }
+  ++i;
+  return "";
+}
+
+// Gives `consume_other` first refusal on the $-keyword at toks[i], for a
+// grammar that admits a simulation command of its own. It reports through
+// `handled` the way ConsumeFourStateValueChange does, and a grammar defining
+// no such command passes no `consume_other`, which handles nothing.
+//
+// Returns "" when nothing was consumed or the command conforms, else a
+// description of the violation.
+inline std::string ConsumeOtherSimulationCommand(
+    const std::vector<std::string>& toks, size_t& i,
+    const std::function<std::string(const std::vector<std::string>&, size_t&,
+                                    bool&)>& consume_other,
+    bool& handled) {
+  handled = false;
+  if (!consume_other) return "";
+  return consume_other(toks, i, handled);
 }
 
 // Consumes the simulation commands that follow, which is the
@@ -211,8 +325,7 @@ inline std::string ConsumeDeclarationCommands(
 // change are what every dump file's simulation half admits, and
 // `consume_value_change` reads one value change in the forms the grammar in
 // force defines. `consume_other` gets first refusal on any further $-keyword,
-// for a grammar that admits a command of its own here; it reports through
-// `handled` the way ConsumeFourStateValueChange does, and a keyword it leaves
+// for a grammar that admits a command of its own here, and a keyword it leaves
 // unhandled is a declaration command showing up after the simulation commands
 // began, which the top production forbids.
 //
@@ -226,39 +339,23 @@ inline std::string ConsumeSimulationCommands(
                                     bool&)>& consume_other = nullptr) {
   while (i < toks.size()) {
     const std::string& t = toks[i];
+    std::string err;
     if (opens_a_checkpoint_section(t)) {
-      std::string kw = t;
-      ++i;
-      while (i < toks.size() && toks[i] != "$end") {
-        std::string err = consume_value_change(toks, i);
-        if (!err.empty()) return kw + " section: " + err;
-      }
-      if (i >= toks.size()) return kw + " not terminated by $end";
-      ++i;
+      err = ConsumeCheckpointSection(toks, i, consume_value_change);
     } else if (t == "$comment") {
-      ++i;
-      while (i < toks.size() && toks[i] != "$end") ++i;
-      if (i >= toks.size()) return "$comment not terminated by $end";
-      ++i;
+      err = ConsumeComment(toks, i);
     } else if (t[0] == '#') {
-      if (t.size() < 2 || !IsDecimal(t.substr(1))) {
-        return "simulation_time is not # decimal_number: " + t;
-      }
-      ++i;
+      err = ConsumeSimulationTime(toks, i);
     } else if (t[0] == '$') {
-      if (consume_other) {
-        bool handled = false;
-        std::string err = consume_other(toks, i, handled);
-        if (handled) {
-          if (!err.empty()) return err;
-          continue;
-        }
+      bool handled = false;
+      err = ConsumeOtherSimulationCommand(toks, i, consume_other, handled);
+      if (!handled) {
+        return "declaration command after simulation commands: " + t;
       }
-      return "declaration command after simulation commands: " + t;
     } else {
-      std::string err = consume_value_change(toks, i);
-      if (!err.empty()) return err;
+      err = consume_value_change(toks, i);
     }
+    if (!err.empty()) return err;
   }
   return "";
 }

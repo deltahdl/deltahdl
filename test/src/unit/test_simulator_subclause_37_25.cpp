@@ -240,7 +240,7 @@ TEST(Typespec, ElemTypespecUnwindsUntilNoRangesRemain) {
 TEST(Typespec, RangeIterationYieldsOneRangePerDimension) {
   VpiObject l0, r0, l1, r1;
   std::vector<VpiArrayDimension> dims =
-      MakeTwoFixedUnpackedDims(&l0, &r0, 4, &l1, &r1, 3);
+      MakeTwoFixedUnpackedDims({&l0, &r0, 4}, {&l1, &r1, 3});
 
   std::vector<VpiRangeDesc> ranges = VpiTypespecRanges(dims);
   ASSERT_EQ(ranges.size(), 2u);

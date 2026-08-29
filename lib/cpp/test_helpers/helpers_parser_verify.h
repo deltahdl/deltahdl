@@ -4,7 +4,7 @@
 
 #include <initializer_list>
 #include <string>
-#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "fixture_parser.h"

@@ -1,8 +1,10 @@
 #pragma once
 
 #include <algorithm>
+#include <cstdint>
 #include <iostream>
 #include <sstream>
+#include <streambuf>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -21,7 +23,7 @@
 using namespace delta;
 
 // How a dump run produces its variable definitions.
-enum class VcdSignalRegistration {
+enum class VcdSignalRegistration : uint8_t {
   // Registers every variable the context holds, in name order, so identifier
   // codes are deterministic: the alphabetically first variable gets '!', the
   // next '"', and so on. A test that wants a known, unfiltered signal set to
@@ -160,13 +162,13 @@ class VcdMidRunReaderTestBase : public VcdDumpRunTestBase {
   // when the run produced no such pair -- which a test reads as the reader
   // never having run.
   std::string MidDump(const std::string& tag) const {
-    const std::string begin_marker = tag + "-BEGIN\n";
-    auto b = run_output_.find(begin_marker);
+    const std::string kBeginMarker = tag + "-BEGIN\n";
+    auto b = run_output_.find(kBeginMarker);
     auto e = run_output_.find(tag + "-END");
     if (b == std::string::npos || e == std::string::npos) {
       return "<no-snapshot>";
     }
-    b += begin_marker.size();
+    b += kBeginMarker.size();
     return run_output_.substr(b, e - b);
   }
 

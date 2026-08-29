@@ -14,18 +14,17 @@
 
 using namespace delta;
 
-// Registers an unpacked array `name[lo .. lo+size-1]` of `width`-bit elements,
-// each backed by a zero-initialized element variable named `name[index]` (the
-// naming convention the simulator uses), so the $readmem* / $writemem* / $fread
-// tasks have a memory to operate on. `four_state` selects whether the element
-// type is 4-state (the default) or a 2-state type; `descending` declares the
-// array address range as descending.
+// Registers an unpacked array `name[lo .. lo+size-1]` of `width`-bit 4-state
+// elements, each backed by a zero-initialized element variable named
+// `name[index]` (the naming convention the simulator uses), so the $readmem* /
+// $writemem* / $fread tasks have a memory to operate on. The address range
+// ascends. A test wanting a 2-state element type or a descending range states
+// the ArrayInfo itself and calls SimContext::RegisterArray.
 inline void SetupMem(SimFixture& f, const char* name, int lo, int size,
-                     uint32_t width, bool four_state = true,
-                     bool descending = false) {
+                     uint32_t width) {
   f.ctx.RegisterArray(
       name, {static_cast<uint32_t>(lo), static_cast<uint32_t>(size), width,
-             descending, false, false, four_state});
+             false, false, false, true});
   for (int i = 0; i < size; ++i) {
     std::string nm = std::string(name) + "[" + std::to_string(lo + i) + "]";
     auto* s = f.arena.AllocString(nm.c_str(), nm.size());

@@ -15,7 +15,7 @@ using VpiGetValueArraySim = VpiValueArraySimBase;
 // (vpiArrayType vpiStaticArray). A non-static array is rejected, an error is
 // recorded, and the value arm is set to NULL.
 TEST_F(VpiGetValueArraySim, NonStaticArrayIsError) {
-  VpiHandle arr = MakeArray("d", {{0, 1}}, 2, 32, vpiDynamicArray);
+  VpiHandle arr = MakeArray("d", {{0, 1}}, 2, 32, {vpiDynamicArray});
   SetElem(0, 7);
   SetElem(1, 8);
 
@@ -80,7 +80,7 @@ TEST_F(VpiGetValueArraySim, RawFourStateValEncodesAvalAndBval) {
 // back all zero even if such bits happen to sit in the element's storage.
 TEST_F(VpiGetValueArraySim, RawFourStateValZeroesBvalForTwoStateArray) {
   VpiHandle arr =
-      MakeArray("t", {{0}}, 1, 8, vpiStaticArray, /*four_state=*/false);
+      MakeArray("t", {{0}}, 1, 8, {vpiStaticArray, /*four_state=*/false});
   SetElem(0, 0xF0, 0xFF);  // a stray bval in storage
 
   s_vpi_arrayvalue av = {};

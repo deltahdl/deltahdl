@@ -13,7 +13,7 @@ using namespace delta;
 // declared-type tests, which differ only in the actual presented and the value
 // expected back.
 inline DpiArgValue CallTakeIntReportingFormal(DpiRuntime& rt,
-                                              DpiArgValue actual) {
+                                              const DpiArgValue& actual) {
   DpiRtFunction func;
   func.c_name = "c_take_int";
   func.sv_name = "take_int";

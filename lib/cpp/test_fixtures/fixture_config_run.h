@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <streambuf>
 #include <string>
 #include <string_view>
 
