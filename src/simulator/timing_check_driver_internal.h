@@ -48,16 +48,31 @@ enum class EdgeLevel : uint8_t {
   kUnknown,
 };
 
-// The level of a signal's least significant bit. §31.5 writes an edge over one
-// bit, so a vector signal is read at bit 0; §31.8's per-bit expansion of a
-// vector signal into an independent check for each bit is a separate rule and
-// is not applied here. A Logic4Vec with no words states no bit, which kAbsent
-// is the answer for. x is (aval 1, bval 1) and z is (aval 0, bval 1), and §31.5
-// reads the two alike, so the bval bit alone decides kUnknown.
-inline EdgeLevel LevelOfLsb(const Logic4Vec& v) {
-  if (v.nwords == 0) return EdgeLevel::kAbsent;
-  if ((v.words[0].bval & 1U) != 0U) return EdgeLevel::kUnknown;
-  return (v.words[0].aval & 1U) != 0U ? EdgeLevel::kOne : EdgeLevel::kZero;
+// The level of one bit of a signal's value. A bit at or beyond the words the
+// value holds states no level at all, which kAbsent is the answer for. x is
+// (aval 1, bval 1) and z is (aval 0, bval 1), and §31.5 has "edge transitions
+// involving z ... treated the same way as edge transitions involving x", so the
+// bval bit alone decides kUnknown.
+inline EdgeLevel LevelOfBit(const Logic4Vec& v, uint32_t bit) {
+  uint32_t word = bit / 64U;
+  if (word >= v.nwords) return EdgeLevel::kAbsent;
+  uint64_t mask = 1ULL << (bit % 64U);
+  if ((v.words[word].bval & mask) != 0U) return EdgeLevel::kUnknown;
+  return (v.words[word].aval & mask) != 0U ? EdgeLevel::kOne : EdgeLevel::kZero;
+}
+
+// The level of every bit of a value, indexed by bit position. §31.8 reads a
+// timing check's signal across all of its bits rather than at one of them --
+// "the transition of one or more bits of a vector is considered a single
+// transition of that vector" -- so a watcher compares bit against bit and needs
+// them all. A scalar has one bit and reads the same way.
+inline std::vector<EdgeLevel> LevelsOfBits(const Logic4Vec& v) {
+  std::vector<EdgeLevel> levels;
+  levels.reserve(v.width);
+  for (uint32_t bit = 0; bit < v.width; ++bit) {
+    levels.push_back(LevelOfBit(v, bit));
+  }
+  return levels;
 }
 
 // The level one half of an edge_descriptor names. TimingCheckEntry holds only
@@ -134,29 +149,63 @@ inline bool TimingCheckEdgeMatches(const TimingCheckEdge& edge, EdgeLevel from,
   return true;
 }
 
-// Arms on `var` a watcher that calls `on_edge` every time the variable's least
-// significant bit makes the transition `edge` names, for as long as the run
-// lasts.
+// §31.8: whether the change from `before` to `after` is a transition of the
+// signal that `edge` names. "Either or both signals in a timing check can be a
+// vector. This shall be interpreted as a single timing check where the
+// transition of one or more bits of a vector is considered a single transition
+// of that vector", so one bit making the transition is the whole signal making
+// it, and the check is evaluated once however many bits did. §31.8's own
+// example is a $setup whose data signal changes in six bits at once, and it
+// "shall still only report a single timing violation".
 //
-// The watcher keeps the level it last saw rather than trusting that a
+// §31.8 also lets a simulator "provide an option causing vectors in timing
+// checks to result in the creation of multiple single-bit timing checks", which
+// yields N checks for a $width or a $period and M*N for a check naming two
+// signals. That option is not one deltahdl offers, so no check registered here
+// is ever a per-bit one. TimingCheckExpandedCount and
+// VectorTransitionViolationCount (simulator/specify_timing_check.h) are what
+// the option would be built on, and
+// test/src/unit/test_simulator_subclause_31_08a.cpp is what exercises them.
+//
+// The two vectors are the same signal read at two moments, so they are the same
+// length; the shorter is walked in case a value arrives with fewer words than
+// its width claims.
+inline bool TimingCheckSignalTransitioned(const TimingCheckEdge& edge,
+                                          const std::vector<EdgeLevel>& before,
+                                          const std::vector<EdgeLevel>& after) {
+  std::size_t bits =
+      before.size() < after.size() ? before.size() : after.size();
+  for (std::size_t bit = 0; bit < bits; ++bit) {
+    if (TimingCheckEdgeMatches(edge, before[bit], after[bit])) return true;
+  }
+  return false;
+}
+
+// Arms on `var` a watcher that calls `on_edge` every time the variable makes
+// the transition `edge` names, for as long as the run lasts. §31.8 makes a
+// transition of any one bit a transition of the signal, so a vector is watched
+// across every bit it has.
+//
+// The watcher keeps the levels it last saw rather than trusting that a
 // notification means a change, for the reason WatchSourceVariable in
 // src/simulator/module_path_delay.cpp keeps its own copy of the value:
 // Variable::NotifyWatchers fires whenever a driver commits, and a driver may
 // commit the value already there -- Net::Resolve in src/simulator/net.cpp
-// notifies after every resolution. Comparing the level before the commit
-// against the level after is what keeps such a commit from being read as an
+// notifies after every resolution. Comparing the levels before the commit
+// against the levels after is what keeps such a commit from being read as an
 // edge and reporting a violation no signal caused.
 //
 // It returns false so that NotifyWatchers re-arms it: a signal a timing check
 // names transitions any number of times before the run ends.
 inline void WatchEdge(Variable* var, TimingCheckEdge edge,
                       std::function<void()> on_edge) {
-  auto seen = std::make_shared<EdgeLevel>(LevelOfLsb(var->value));
+  auto seen =
+      std::make_shared<std::vector<EdgeLevel>>(LevelsOfBits(var->value));
   var->AddWatcher(
       [var, edge = std::move(edge), seen, on_edge = std::move(on_edge)]() {
-        EdgeLevel before = *seen;
-        *seen = LevelOfLsb(var->value);
-        if (TimingCheckEdgeMatches(edge, before, *seen)) on_edge();
+        std::vector<EdgeLevel> before = std::move(*seen);
+        *seen = LevelsOfBits(var->value);
+        if (TimingCheckSignalTransitioned(edge, before, *seen)) on_edge();
         return false;
       });
 }

@@ -1,3 +1,20 @@
+// §31.8's vector rule as a predicate, asked directly rather than through a run:
+// which checks name one signal and which name two, how many checks the per-bit
+// option §31.8 allows would create for a given pair of widths, and how many
+// bits of a vector transition a violation covers.
+//
+// Every case here calls IsSingleSignalTimingCheck, TimingCheckExpandedCount,
+// VectorTransitionViolationCount or ToggleNotifierOnViolation
+// (simulator/specify_timing_check.h) with the kind, the widths or the pair of
+// values it wants tested. No case writes a design or reads a diagnostic, which
+// is what separates this file from test_simulator_subclause_31_08b.cpp beside
+// it: every case there drives a design whose timing check names a vector and
+// reads §31.8's answer back off what the run reported.
+//
+// TimingCheckVectorMode::kPerBit is the option §31.8 says "simulators may
+// provide" and deltahdl does not, so the counts below state what that option
+// would create rather than what any registered check does.
+
 #include <gtest/gtest.h>
 
 #include "common/types.h"
