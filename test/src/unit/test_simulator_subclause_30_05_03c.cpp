@@ -90,12 +90,11 @@
 // and no simulation time. Every time below is therefore the time `sa` was
 // written.
 //
-// MODE and C are parameters rather than variables because Lowerer::LowerParams
-// in src/simulator/lowerer.cpp creates a SimContext variable for each
-// parameter of a module, under the instance prefix that is empty for a top
-// module. A condition naming one is therefore a name EvalExpr resolves at run
-// time, and a case is one number in the source rather than an extra assignment
-// the stimulus has to get out of the way before the edge under test.
+// `act` is a locally declared variable rather than a parameter because
+// §30.4.4.1's list of permitted operands names "Locally defined variables or
+// nets or their bit-selects or part-selects" first, and a bit-select is what
+// each condition is. Its bits are written at the head of the stimulus, well
+// before the edge under test, so what a case varies is one literal.
 //
 // `armed` exists because `y` leaves its initial x somewhere in the first 21
 // time units, at a moment the delays §30.5.2 derives for the x and z slots

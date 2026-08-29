@@ -322,16 +322,24 @@ const PathDelay* SelectActivePath(const std::vector<PathCandidate>& candidates,
                                   uint8_t transition_slot) {
   if (candidates.empty()) return nullptr;
 
+  // The most recent transition is taken among the candidates that are eligible
+  // at all, which is why the condition is tested here and again below. §30.5.3
+  // states both halves in one sentence -- active paths are "those whose input
+  // has transitioned most recently in time, and either they have no condition
+  // or their conditions are true" -- and taking the time first lets a path
+  // whose condition is false set it and drop every live path at an earlier one,
+  // leaving nothing to govern an output that is plainly transitioning.
   uint64_t max_time = 0;
   for (const auto& c : candidates) {
+    if (c.path == nullptr || !c.condition_true) continue;
     if (c.last_transition_time > max_time) max_time = c.last_transition_time;
   }
   const PathDelay* best_path = nullptr;
   uint64_t best = 0;
   for (const auto& c : candidates) {
     if (c.path == nullptr) continue;
-    if (c.last_transition_time != max_time) continue;
     if (!c.condition_true) continue;
+    if (c.last_transition_time != max_time) continue;
     uint64_t d = c.path->delays[transition_slot];
     if (best_path == nullptr || d < best) {
       best = d;
