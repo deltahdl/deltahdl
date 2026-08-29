@@ -391,6 +391,34 @@ bool CellInScope(std::string_view instance, std::string_view scope) {
   return kSep == '/' || kSep == '.';
 }
 
+// §32.9: the cells the module_instance operand selects sit at or below the
+// level it names, so what tells two of them apart is the part of the SDF
+// instance path below that level. PathDelay::inst_prefix names the same thing
+// on the SystemVerilog side, in the spelling Lowerer::inst_prefix_ produces,
+// so the remainder is rewritten into that spelling here: '/' dividers become
+// '.', and a trailing '.' closes it. The scope root itself has no remainder
+// and answers empty, which is the prefix a module elaborated as a top carries.
+std::string SdfCellInstancePrefix(std::string_view instance,
+                                  std::string_view design_root) {
+  if (design_root.empty()) return {};
+  if (instance == design_root) return {};
+  std::string_view rest = instance;
+  // A file may write the cell's path from the root or from below it. Strip the
+  // root's own segment where it is there, and take what is left as written
+  // where it is not.
+  if (rest.size() > design_root.size() &&
+      rest.substr(0, design_root.size()) == design_root &&
+      (rest[design_root.size()] == '/' || rest[design_root.size()] == '.')) {
+    rest = rest.substr(design_root.size() + 1);
+  }
+  std::string prefix(rest);
+  for (char& divider : prefix) {
+    if (divider == '/') divider = '.';
+  }
+  if (!prefix.empty()) prefix.push_back('.');
+  return prefix;
+}
+
 namespace {
 
 // Builds the implicit construct ordering used when a cell does not carry an
@@ -528,6 +556,12 @@ SdfIopathPulseIncrement SdfIopathPulseIncrementOf(const SdfIopath& io,
 // limits the path already holds. Nothing here derives a limit from the
 // percentage settings: those supply a limit a construct did not state, and an
 // INCREMENT entry states a change to the limit already in place.
+//
+// The delays go through IncrementSdfPathDelay, which matches
+// PathDelay::inst_prefix, so they reach the one instance the entry names. The
+// two limits go through IncrementSdfPulseLimit, which is given the port pair
+// alone and reaches every in-scope instance, for the reason
+// AnnotateSdfPulseLimitEntry records.
 void AnnotateSdfIopathIncrementExtended(const PathDelay& pd,
                                         const SdfIopath& io,
                                         SpecifyManager& mgr, SdfMtm mtm) {
@@ -537,11 +571,17 @@ void AnnotateSdfIopathIncrementExtended(const PathDelay& pd,
                              kIncrement.error);
 }
 
-void AnnotateSdfIopathEntry(const SdfIopath& io, SpecifyManager& mgr,
-                            SdfMtm mtm) {
+// §32.4.1: an IOPATH names its terminals by the cell's own port names, so the
+// path it reaches is told from the identically spelled path of another instance
+// of the same cell by PathDelay::inst_prefix alone. The prefix the cell's
+// CELLINSTANCE gave (SdfCellInstancePrefix) is stamped on here, which is what
+// SpecifyManager::AnnotateSdfPathDelay and IncrementSdfPathDelay match on.
+void AnnotateSdfIopathEntry(const SdfIopath& io, std::string_view inst_prefix,
+                            SpecifyManager& mgr, SdfMtm mtm) {
   PathDelay pd;
   pd.src_port = io.src_port;
   pd.dst_port = io.dst_port;
+  pd.inst_prefix = inst_prefix;
 
   pd.condition = io.condition;
   pd.is_ifnone = io.is_ifnone;
@@ -663,6 +703,11 @@ std::vector<SdfDelayValue> SdfDeviceDelayValues(const SdfDevice& dev) {
 // manager is the one that finds out which. Both mappings of the entry's values
 // therefore travel with it: the Table 32-4 expansion over twelve slots, and the
 // reduction to three plus the delay to the x state.
+//
+// As with AnnotateSdfPulseLimitEntry above, the entry travels without the
+// instance prefix its cell's CELLINSTANCE named, because SdfDeviceAnnotation
+// (simulator/specify_sdf.h) has no field for it, so the delay reaches the
+// paths of every in-scope instance that has the named output.
 void AnnotateSdfDeviceEntry(const SdfDevice& dev, SpecifyManager& mgr,
                             SdfMtm mtm, SdfAnnotationResult& result) {
   SdfDeviceAnnotation ann;
@@ -693,6 +738,13 @@ int64_t SdfPulseLimitValue(const SdfDelayValue& dv, SdfMtm mtm,
 
 // §32.7: hand over one PATHPULSE or PATHPULSEPERCENT entry, in whichever mode
 // the section carrying it was written.
+//
+// The entry travels without the instance prefix SdfCellInstancePrefix worked
+// out for its cell, so SpecifyManager::AddSdfPulseLimit reaches every path
+// between the two ports rather than the paths of the one instance. Carrying it
+// would mean a field on SdfPulseLimitSpec (simulator/specify_sdf.h) or a sixth
+// parameter on AddSdfPulseLimit (simulator/specify.h), and neither header is
+// part of this change; issue #3387 names the IOPATH, which does carry it.
 void AnnotateSdfPulseLimitEntry(const SdfPulseLimit& pl, SpecifyManager& mgr,
                                 SdfMtm mtm) {
   mgr.AddSdfPulseLimit(SdfPulseLimitSpec{
@@ -770,11 +822,17 @@ void AnnotateSdfTimingCheckEntry(const SdfTimingCheck& tc, SpecifyManager& mgr,
 }
 
 // §32.5: the SDF source one annotation is taken from -- the cell whose entry is
-// being applied, and the file it sits in, which an INTERCONNECT entry resolves
-// its port names against.
+// being applied, the file it sits in, which an INTERCONNECT entry resolves its
+// port names against, and the instance prefix the cell's CELLINSTANCE names.
+//
+// `inst_prefix` is what SdfCellInstancePrefix (simulator/sdf_parser.h) made of
+// the cell's instance path against the §32.9 module_instance operand: the
+// hierarchical prefix of the module instance whose specify block declared the
+// paths this cell annotates, in the spelling PathDelay::inst_prefix carries.
 struct SdfCellSource {
   const SdfCell& cell;
   const SdfFile& file;
+  std::string_view inst_prefix;
 };
 
 void AnnotateSdfCellEntry(const SdfCellSource& src,
@@ -783,7 +841,8 @@ void AnnotateSdfCellEntry(const SdfCellSource& src,
   const SdfCell& cell = src.cell;
   switch (entry.kind) {
     case SdfCellEntryKind::kIopath:
-      AnnotateSdfIopathEntry(cell.iopaths[entry.index], mgr, mtm);
+      AnnotateSdfIopathEntry(cell.iopaths[entry.index], src.inst_prefix, mgr,
+                             mtm);
       break;
     case SdfCellEntryKind::kPulseLimit:
       AnnotateSdfPulseLimitEntry(cell.pulse_limits[entry.index], mgr, mtm);
@@ -812,17 +871,16 @@ void AnnotateSdfCellEntry(const SdfCellSource& src,
 // kind: a LABEL that reprices a specparam a module path delay expression reads
 // undoes an earlier IOPATH on that path, and an IOPATH written after the LABEL
 // undoes the LABEL's effect on that path instead.
-void AnnotateSdfCell(const SdfCell& cell, const SdfFile& file,
-                     SpecifyManager& mgr, SdfMtm mtm,
+void AnnotateSdfCell(const SdfCellSource& src, SpecifyManager& mgr, SdfMtm mtm,
                      SdfAnnotationResult& result) {
   std::vector<SdfCellEntryRef> derived;
-  const std::vector<SdfCellEntryRef>* order = &cell.entry_order;
+  const std::vector<SdfCellEntryRef>* order = &src.cell.entry_order;
   if (order->empty()) {
-    derived = BuildDerivedSdfCellOrder(cell);
+    derived = BuildDerivedSdfCellOrder(src.cell);
     order = &derived;
   }
   for (const auto& entry : *order) {
-    AnnotateSdfCellEntry({cell, file}, entry, mgr, mtm, result);
+    AnnotateSdfCellEntry(src, entry, mgr, mtm, result);
   }
 }
 
@@ -830,7 +888,8 @@ void AnnotateSdfCell(const SdfCell& cell, const SdfFile& file,
 
 SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
                                          SpecifyManager& mgr, SdfMtm mtm,
-                                         std::string_view scope) {
+                                         std::string_view scope,
+                                         std::string_view design_root) {
   SdfAnnotationResult result;
 
   // §32.3: every piece of SDF data the annotator could not take in gets its own
@@ -847,7 +906,12 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
   // nothing about keeps whatever it held before backannotation.
   for (const auto& cell : file.cells) {
     if (!CellInScope(cell.instance, scope)) continue;
-    AnnotateSdfCell(cell, file, mgr, mtm, result);
+    // §32.9: the operand selected the cell, and the part of its instance path
+    // below the operand's level is what says which instance of the cell the
+    // entries below annotate. Working it out once here keeps every entry of
+    // the cell reading the one answer.
+    std::string prefix = SdfCellInstancePrefix(cell.instance, design_root);
+    AnnotateSdfCell({cell, file, prefix}, mgr, mtm, result);
   }
   return result;
 }

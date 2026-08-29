@@ -398,8 +398,8 @@ SdfAnnotationResult RunSdfAnnotateTask(const SdfAnnotateTaskArgs& args,
   const SdfFile kScaled =
       ScaleSdfFile(file, kResolved.scale_type, kResolved.factors);
   const SdfMtm kMtm = ResolveSdfMtm(kResolved.mtm, tool_default);
-  SdfAnnotationResult annotated =
-      AnnotateSdfToManager(kScaled, mgr, kMtm, args.module_instance);
+  SdfAnnotationResult annotated = AnnotateSdfToManager(
+      kScaled, mgr, kMtm, args.module_instance, args.design_root);
   for (auto& warning : annotated.warnings) {
     result.warnings.push_back(std::move(warning));
   }
@@ -500,6 +500,11 @@ bool EvalSdfAnnotateTask(const Expr* call, SimContext& ctx, Arena& arena) {
   } else {
     args.module_instance = ctx.CurrentScopeName();
   }
+
+  // The root every hierarchical name in the run counts from. Lowerer::Lower
+  // sets it to the top module's own name, which is also what module_instance
+  // falls back to above when the call names no scope.
+  args.design_root = ctx.CurrentScopeName();
 
   args.config_file = SdfAnnotateStringArg(call, 2, ctx, arena);
   args.log_file = SdfAnnotateStringArg(call, 3, ctx, arena);

@@ -506,10 +506,12 @@ void ReplacePathDelayPreservingPulse(PathDelay& existing, PathDelay replacement,
 // one cell declare paths carrying the same src_port and dst_port and are told
 // apart only by PathDelay::inst_prefix. `match_inst_prefix` asks for that
 // comparison: SpecifyManager::AddPathDelay sets it, so registering a second
-// instance adds a path rather than overwriting the first instance's. The SDF
-// route leaves it off, since an SDF-built PathDelay carries no instance -- the
-// §32.9 module_instance operand has already selected the cells in scope in
-// CellInScope (simulator/sdf_annotate.cpp) before a path is reached.
+// instance adds a path rather than overwriting the first instance's.
+// SpecifyManager::AnnotateSdfPathDelay sets it too: SdfCellInstancePrefix
+// (simulator/sdf_annotate.cpp) turns an SDF cell's instance path, below the
+// §32.9 module_instance operand CellInScope filtered on, into the prefix
+// stamped on the PathDelay, so one entry no longer reaches both in-scope
+// instances of one cell.
 bool UpdateNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
                                     const PathDelay& delay,
                                     PathDelayPulseRetention retain,
@@ -565,7 +567,7 @@ bool SpecifyManager::AnnotateSdfPathDelay(PathDelay delay,
     // entry matching none is still kept, which is how §32.3 chose to hold on to
     // delay data that finds no home.
     if (!UpdateNonconditionalPathDelays(path_delays_, delay, retain,
-                                        /*match_inst_prefix=*/false)) {
+                                        /*match_inst_prefix=*/true)) {
       path_delays_.push_back(std::move(delay));
     }
     return true;
@@ -575,9 +577,12 @@ bool SpecifyManager::AnnotateSdfPathDelay(PathDelay delay,
   // path there is nothing for it to annotate, so it lands nowhere. Appending
   // one instead would conjure up a specify path the design never wrote, and
   // backannotation only ever updates what a design already declares.
+  // The path is one of the instance the entry's cell names (§32.9), so
+  // PathDelay::inst_prefix is compared alongside the ports and the condition.
   for (auto& existing : path_delays_) {
     if (existing.src_port == delay.src_port &&
         existing.dst_port == delay.dst_port &&
+        existing.inst_prefix == delay.inst_prefix &&
         existing.condition == delay.condition &&
         existing.is_ifnone == delay.is_ifnone) {
       ReplacePathDelayPreservingPulse(existing, std::move(delay), retain);
@@ -595,12 +600,17 @@ void AddPathDelayValues(PathDelay& existing, const PathDelay& delta) {
 
 // Adds `delta` to every existing path delay between the same ports (ignoring
 // condition/ifnone). Returns true if at least one entry matched.
+// `match_inst_prefix` means what it means in UpdateNonconditionalPathDelays
+// above: with it set, PathDelay::inst_prefix is compared too, which is what
+// tells the paths of one instance of a cell from those of another (§30.3).
 bool IncrementNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
-                                       const PathDelay& delta) {
+                                       const PathDelay& delta,
+                                       bool match_inst_prefix) {
   bool matched = false;
   for (auto& existing : path_delays) {
     if (existing.src_port == delta.src_port &&
-        existing.dst_port == delta.dst_port) {
+        existing.dst_port == delta.dst_port &&
+        (!match_inst_prefix || existing.inst_prefix == delta.inst_prefix)) {
       AddPathDelayValues(existing, delta);
       matched = true;
     }
@@ -609,12 +619,15 @@ bool IncrementNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
 }
 
 // Adds `delta` to the first existing path delay matching ports plus
-// condition/ifnone. Returns true if a matching entry was found.
+// condition/ifnone, and, when `match_inst_prefix` is set, the instance prefix
+// as well. Returns true if a matching entry was found.
 bool IncrementConditionalPathDelay(std::vector<PathDelay>& path_delays,
-                                   const PathDelay& delta) {
+                                   const PathDelay& delta,
+                                   bool match_inst_prefix) {
   for (auto& existing : path_delays) {
     if (existing.src_port == delta.src_port &&
         existing.dst_port == delta.dst_port &&
+        (!match_inst_prefix || existing.inst_prefix == delta.inst_prefix) &&
         existing.condition == delta.condition &&
         existing.is_ifnone == delta.is_ifnone) {
       AddPathDelayValues(existing, delta);
@@ -630,22 +643,29 @@ void SpecifyManager::IncrementPathDelay(const PathDelay& delta) {
   const bool kSdfIsNonconditional = delta.condition.empty() && !delta.is_ifnone;
   const bool kMatched =
       kSdfIsNonconditional
-          ? IncrementNonconditionalPathDelays(path_delays_, delta)
-          : IncrementConditionalPathDelay(path_delays_, delta);
+          ? IncrementNonconditionalPathDelays(path_delays_, delta,
+                                              /*match_inst_prefix=*/false)
+          : IncrementConditionalPathDelay(path_delays_, delta,
+                                          /*match_inst_prefix=*/false);
   if (!kMatched) path_delays_.push_back(delta);
 }
 
 bool SpecifyManager::IncrementSdfPathDelay(const PathDelay& delta) {
   const bool kSdfIsNonconditional = delta.condition.empty() && !delta.is_ifnone;
   if (kSdfIsNonconditional) {
-    if (!IncrementNonconditionalPathDelays(path_delays_, delta)) {
+    // §32.9: the entry reaches the paths of the instance its cell named, which
+    // AnnotateSdfIopathEntry (simulator/sdf_annotate.cpp) stamped onto
+    // PathDelay::inst_prefix, so it is matched as AnnotateSdfPathDelay does.
+    if (!IncrementNonconditionalPathDelays(path_delays_, delta,
+                                           /*match_inst_prefix=*/true)) {
       path_delays_.push_back(delta);
     }
     return true;
   }
   // §32.4.1, as above: with no declared path carrying that condition there is
   // nothing to add to.
-  return IncrementConditionalPathDelay(path_delays_, delta);
+  return IncrementConditionalPathDelay(path_delays_, delta,
+                                       /*match_inst_prefix=*/true);
 }
 
 namespace {
@@ -845,6 +865,12 @@ bool SpecifyManager::AnnotateSdfDeviceDelay(const SdfDeviceAnnotation& a) {
   // live with that submodule -- reaches nothing here.
   const bool kReachesAllOutputs = a.port_instance.empty();
 
+  // SdfDeviceAnnotation carries no instance prefix, so both scans reach the
+  // matching outputs of every in-scope instance rather than of the one instance
+  // the entry's cell named, as AnnotateSdfDeviceEntry
+  // (simulator/sdf_annotate.cpp) records. PrimitiveDriver
+  // (simulator/specify_path_delay.h) has no inst_prefix field at all, so the
+  // fallback scan could not tell them apart even were one carried.
   bool applied = false;
   for (auto& pd : path_delays_) {
     if (!kReachesAllOutputs && pd.dst_port != a.port_instance) continue;

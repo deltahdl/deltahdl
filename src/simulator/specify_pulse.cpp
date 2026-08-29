@@ -231,6 +231,13 @@ void PlaceSdfPulseLimits(PathDelay& pd, const SdfPulseLimitSpec& spec) {
 
 }  // namespace
 
+// §30.3 puts a specify block inside a module declaration, so two instances of
+// one cell hold paths spelled identically and PathDelay::inst_prefix is what
+// tells them apart. SdfPulseLimitSpec (simulator/specify_sdf.h) carries no such
+// prefix, so this scan reaches the named ports of every in-scope instance; the
+// §32.9 module_instance operand narrows the cells before a path is reached
+// (CellInScope in simulator/sdf_annotate.cpp) and nothing narrower is asked
+// here. AnnotateSdfPulseLimitEntry in that file records the same.
 void SpecifyManager::AddSdfPulseLimit(const SdfPulseLimitSpec& spec) {
   for (auto& pd : path_delays_) {
     if (pd.src_port != spec.src || pd.dst_port != spec.dst) continue;
@@ -284,6 +291,9 @@ void SpecifyManager::ApplyPathSpecificPulseControl(
   }
 }
 
+// As with AddSdfPulseLimit above, the port pair is all this is given, so the
+// amounts reach the paths of every in-scope instance rather than of the one
+// instance the SDF cell named.
 void SpecifyManager::IncrementSdfPulseLimit(std::string_view src,
                                             std::string_view dst,
                                             int64_t reject_delta,
@@ -371,6 +381,11 @@ void SpecifyManager::AddInterconnectDelay(InterconnectDelay delay) {
   interconnect_delays_.push_back(std::move(delay));
 }
 
+// The first path between the two ports, whichever instance declared it. §30.3
+// puts a specify block inside a module declaration, so two instances of one
+// cell hold paths spelled identically and this cannot tell them apart. A caller
+// that needs the delay of one named instance reads GetPathDelays() and compares
+// PathDelay::inst_prefix itself.
 uint64_t SpecifyManager::GetPathDelay(std::string_view src,
                                       std::string_view dst) const {
   for (const auto& pd : path_delays_) {
@@ -381,6 +396,10 @@ uint64_t SpecifyManager::GetPathDelay(std::string_view src,
   return 0;
 }
 
+// Whether any instance declares a path between the two ports. As with
+// GetPathDelay above, PathDelay::inst_prefix is not compared, so this cannot
+// say which instance holds the path; a caller needing that reads
+// GetPathDelays() and compares the prefix itself.
 bool SpecifyManager::HasPathDelay(std::string_view src,
                                   std::string_view dst) const {
   for (const auto& pd : path_delays_) {

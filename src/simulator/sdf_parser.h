@@ -283,6 +283,13 @@ bool ReadSdfFile(std::string_view path, SdfFile& out);
 struct SdfAnnotateTaskArgs {
   std::string sdf_file;
   std::string module_instance;
+
+  // The name of the module the design was elaborated as, which every
+  // hierarchical name in the run is relative to. It is not an operand of
+  // §32.9's $sdf_annotate; it is here because an SDF instance path is written
+  // from the root while PathDelay::inst_prefix counts from below it, and only
+  // the root's own name says where one becomes the other.
+  std::string design_root;
   std::string config_file;
   std::string log_file;
   std::string mtm_spec;
@@ -315,7 +322,8 @@ struct SdfAnnotationResult {
 
 SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
                                          SpecifyManager& mgr, SdfMtm mtm,
-                                         std::string_view scope = {});
+                                         std::string_view scope = {},
+                                         std::string_view design_root = {});
 
 // §32.9: carry out one $sdf_annotate call. The named SDF file is read, the
 // configuration file's keywords are taken and then overridden by whichever of
@@ -344,6 +352,30 @@ std::string SdfAnnotateScopeName(const Expr* e, SimContext& ctx, Arena& arena);
 // '/', so the two are compared level by level with either divider accepted.
 // An empty scope covers the whole design.
 bool CellInScope(std::string_view instance, std::string_view scope);
+
+// The instance prefix an SDF cell's paths belong to: `instance` expressed
+// relative to `design_root`, in the form PathDelay::inst_prefix carries --
+// dividers as `.`, a trailing `.`, and empty for the root itself.
+//
+// The root and not §32.9's module_instance operand is what it is measured
+// against, because PathDelay::inst_prefix counts from the module the design was
+// elaborated as -- Lowerer::inst_prefix_ is what fills it -- while the operand
+// may name any level below that. Measuring against the operand would shorten
+// every prefix by the levels between the two and land a cell's timing on the
+// scope's own paths instead. CellInScope is what the operand narrows, and it
+// runs before this.
+//
+// An SDF instance path divides its levels with `/` where a SystemVerilog
+// hierarchical name divides with `.`, which is the difference CellInScope
+// already accepts either way; a file may also write the path from below the
+// root, which is why the root's segment is stripped where it is present rather
+// than assumed.
+//
+// An empty `design_root` answers empty. Nothing is relative to nothing: with no
+// root the annotator cannot make an SDF instance path design-relative, and says
+// only that the cell belongs to whatever the manager holds at the top.
+std::string SdfCellInstancePrefix(std::string_view instance,
+                                  std::string_view design_root);
 
 // §32.9: run a parsed $sdf_annotate call against the SpecifyManager bound to
 // `ctx`. Returns false when the call names no SDF file or nothing is bound to

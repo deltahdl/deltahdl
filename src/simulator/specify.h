@@ -57,13 +57,12 @@ class SpecifyManager {
   // on a declared path. This is the backannotation counterpart of AddPathDelay,
   // which is how a declaration enters the manager in the first place.
   //
-  // Unlike AddPathDelay, this matches on the port pair alone and not on
-  // PathDelay::inst_prefix, because `delay` is built from an SDF record that
-  // carries its instance separately: CellInScope in
-  // simulator/sdf_annotate.cpp already filters whole cells by the §32.9
-  // module_instance operand before any path is reached, and an SDF-built
-  // PathDelay therefore has an empty inst_prefix. It follows that this cannot
-  // tell two in-scope instances of one cell apart, which issue #3387 covers.
+  // Like AddPathDelay, this matches on PathDelay::inst_prefix as well as the
+  // port pair. SdfCellInstancePrefix in simulator/sdf_annotate.cpp derives that
+  // prefix from the cell's own instance path, taken relative to the §32.9
+  // module_instance operand, so an SDF record reaches the instance it names and
+  // no other. CellInScope filters whole cells before any path is reached and is
+  // the coarser half of the same question.
   bool AnnotateSdfPathDelay(PathDelay delay,
                             PathDelayPulseRetention retain = {});
 
