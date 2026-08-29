@@ -231,6 +231,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/specify_pulse.cpp
     simulator/specify_register.cpp
     simulator/specify_timing_check.cpp
+    simulator/specify_interconnect.cpp
     simulator/specify_timing_violation.cpp
     simulator/udp_eval.cpp
     simulator/sdf_parser.cpp
@@ -345,11 +346,14 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/sdf_annotate_entry.cpp
     simulator/sdf_annotate_task.cpp
     simulator/sim_context_classgc.cpp
+    simulator/sim_context_name_tables.cpp
+    simulator/sim_context_random_stability.cpp
     simulator/sim_context_systask_state.cpp
     simulator/statement_assign_decl.cpp
     simulator/statement_assign_stream.cpp
     simulator/stmt_exec_control.cpp
     simulator/stmt_exec_randsequence.cpp
+    simulator/stmt_exec_randsequence_values.cpp
     simulator/stmt_exec_wait.cpp
     simulator/sva_engine_properties.cpp
     simulator/sva_engine_sampling.cpp

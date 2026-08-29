@@ -1,5 +1,19 @@
 #pragma once
 
+// The state one simulation run holds and the operations that read and write
+// it: the variables and nets a name resolves to, the scope stack a subroutine
+// call pushes, the processes the scheduler runs, the coverage database, the
+// VCD dump, the timescales, the file descriptors, the class objects and the
+// state each system task records.
+//
+// Three groups of it stand in headers of their own, included below. Two are
+// declared as base classes, so every call through a SimContext reads as it
+// did: simulator/sim_context_name_tables.h holds the tables keyed by a
+// declared name, and simulator/sim_context_random_stability.h holds the
+// §18.13 and §18.14 operations on a generator that lives on a ClassObject or
+// a Process. simulator/instance_prefix_override.h holds the §32.4.3 override
+// and its guard, which SimContext keeps as a member.
+
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -25,6 +39,8 @@
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/scope.h"
+#include "simulator/sim_context_name_tables.h"
+#include "simulator/sim_context_random_stability.h"
 #include "simulator/sim_context_types.h"
 // SpecifyManager, held by value behind the owning unique_ptr below. The
 // constructor of this class is defined inline, which instantiates that
@@ -44,7 +60,7 @@ class SpecifyManager;
 struct ModuleItem;
 struct Process;
 
-class SimContext {
+class SimContext : public DeclaredNameTables, public RandomStability {
  public:
   SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag,
              uint32_t seed = 0)
@@ -211,15 +227,6 @@ class SimContext {
 
   void RegisterFinalProcess(Process* proc);
   void RunFinalBlocks();
-
-  void RegisterFunction(std::string_view name, ModuleItem* item);
-  ModuleItem* FindFunction(std::string_view name);
-
-  void RegisterLetDecl(std::string_view name, ModuleItem* item);
-  ModuleItem* FindLetDecl(std::string_view name);
-
-  void RegisterSequenceDecl(std::string_view name, ModuleItem* item);
-  ModuleItem* FindSequenceDecl(std::string_view name);
 
   void PushScope();
   void PopScope();
@@ -437,46 +444,6 @@ class SimContext {
   // created child thread inherits per §18.14.2 hierarchical seeding.
   uint32_t DrawSeedForChild();
 
-  // §18.14.3 object stability: hand back the generator that belongs solely to
-  // this instance. Because every object draws from its own stream, the
-  // randomization of one instance is independent of any other instance and of
-  // the $random/$urandom and per-thread generators. The stream is materialized
-  // lazily from the seed installed at allocation (§18.14.1), so the draw
-  // sequence stays reproducible.
-  std::mt19937& ObjectRng(ClassObject* obj);
-
-  // §18.14.3: an instance can be reseeded at any time via srandom(), letting an
-  // object self-seed (typically inside its new method) so its randomization
-  // replays under the chosen seed.
-  void SeedObjectRng(ClassObject* obj, uint32_t seed);
-
-  // §18.13.4 get_randstate(): hand back the object's current RNG internal state
-  // as a string. mt19937 fully serializes its state through operator<<, so the
-  // returned value captures the complete generator state -- not merely the
-  // seed -- and reading it does not advance the stream. The string's length and
-  // contents are implementation dependent.
-  std::string GetRandState(ClassObject* obj);
-
-  // §18.13.4 get_randstate(): the same retrieval for the RNG owned by a process
-  // (the state obtained via the process's get_randstate() method).
-  std::string GetRandState(Process* proc);
-
-  // §18.13.5 set_randstate(): install `state` as the object's RNG internal
-  // state, the inverse of GetRandState. mt19937 round-trips its full state
-  // through operator>>, so a value previously produced by GetRandState restores
-  // the generator to the exact stream position it was read from. The stream is
-  // marked live so a later draw does not reseed over the restored state. The
-  // value is treated as an opaque string of implementation-dependent length and
-  // format; supplying one not obtained from GetRandState is undefined.
-  void SetRandState(ClassObject* obj, const std::string& state);
-
-  // §18.13.5 set_randstate(): the same install for the RNG owned by a process
-  // (the state given to the process's set_randstate() method).
-  void SetRandState(Process* proc, const std::string& state);
-
-  void RegisterRealVariable(std::string_view name);
-  bool IsRealVariable(std::string_view name) const;
-
   // §21.7.5 (Table 21-11): record the declared SystemVerilog data type of a
   // dumped variable so its $var declaration can masquerade as the matching
   // IEEE Std 1364-2005 var_type. `kind` is the effective type keyword the
@@ -485,38 +452,6 @@ class SimContext {
   // recorded kind reports kImplicit, which keeps the §21.7.2.3 net default.
   void SetVcdVarKind(std::string_view name, DataTypeKind kind);
   DataTypeKind GetVcdVarKind(std::string_view name) const;
-
-  // §26.3: a name a package import makes visible belongs to no module, so
-  // FindVariable answers it from inside an instance where §23.9 stops an
-  // enclosing module's variable. `name` must outlive the context.
-  void RegisterImportedName(std::string_view name);
-
-  // §23.4: records that the instance at `prefix` was declared inside the
-  // module holding it, whose outer name space is visible to it.
-  void RegisterNestedDeclScope(std::string_view prefix);
-
-  void RegisterStringVariable(std::string_view name);
-  bool IsStringVariable(std::string_view name) const;
-
-  // §21.2.1.6: chandle variables are tracked by name so the assignment-pattern
-  // renderer can print a null (zero) handle as the word "null".
-  void RegisterChandleVariable(std::string_view name);
-  bool IsChandleVariable(std::string_view name) const;
-
-  void RegisterUnboundedParam(std::string_view name);
-  bool IsUnboundedParam(std::string_view name) const;
-
-  void RegisterEnumType(std::string_view name, const EnumTypeInfo& info);
-  const EnumTypeInfo* FindEnumType(std::string_view name) const;
-  void SetVariableEnumType(std::string_view var_name,
-                           std::string_view type_name);
-  const EnumTypeInfo* GetVariableEnumType(std::string_view var_name) const;
-
-  void RegisterStructType(std::string_view name, const StructTypeInfo& info);
-  const StructTypeInfo* FindStructType(std::string_view name) const;
-  void SetVariableStructType(std::string_view var_name,
-                             std::string_view type_name);
-  const StructTypeInfo* GetVariableStructType(std::string_view var_name) const;
 
   // Like CreateVariable, keys on the string_view: `name` must outlive the
   // context, so intern a run-time-built name in the arena before calling. The
@@ -550,12 +485,6 @@ class SimContext {
   void SetVariableTag(std::string_view var_name, std::string_view tag);
   std::string_view GetVariableTag(std::string_view var_name) const;
 
-  void RegisterTypeWidth(std::string_view name, uint32_t width);
-  uint32_t FindTypeWidth(std::string_view name) const;
-
-  void RegisterInstanceType(std::string_view prefix, std::string_view type);
-  std::string_view FindInstanceType(std::string_view prefix) const;
-
   // §33.7: the resolved "library.cell" binding of a module instance, keyed by
   // the same instance-path prefix used for instance types and reported by the
   // %l/%L specifier. An unrecorded prefix reads back empty.
@@ -569,17 +498,6 @@ class SimContext {
   void SetDeferredBindingScope(std::optional<std::string> prefix);
   const std::optional<std::string>& DeferredBindingScope() const;
 
-  // §25.9 virtual interface runtime. A virtual interface variable carries a
-  // binding to the scope of the interface instance it currently refers to, or
-  // is unbound (the null state, which is also the value before initialization).
-  // Bindings are keyed by the variable object, so no name re-resolution is
-  // needed when the binding is later consulted.
-  void RegisterVirtualInterfaceVar(const Variable* v);
-  bool IsVirtualInterfaceVar(const Variable* v) const;
-  void BindVirtualInterface(const Variable* v, std::string_view scope);
-  void UnbindVirtualInterface(const Variable* v);
-  bool VirtualInterfaceIsBound(const Variable* v) const;
-  std::string_view VirtualInterfaceBinding(const Variable* v) const;
   // Full hierarchical scope of an interface instance named `ident` relative to
   // the current process, or empty if `ident` is not a known interface instance.
   std::string ResolveInstanceScope(std::string_view ident) const;
@@ -798,9 +716,6 @@ class SimContext {
   std::mt19937 rng_;
   std::unordered_map<std::string_view, Variable*> variables_;
   std::unordered_map<std::string_view, Net*> nets_;
-  std::unordered_map<std::string_view, ModuleItem*> functions_;
-  std::unordered_map<std::string_view, ModuleItem*> let_decls_;
-  std::unordered_map<std::string_view, ModuleItem*> sequence_decls_;
   std::vector<Scope> scope_stack_;
   Logic4Vec* rs_return_slot_ = nullptr;
 
@@ -884,29 +799,10 @@ class SimContext {
   bool stdio_descriptors_ready_ = false;
   void EnsureStdioDescriptors();
 
-  std::unordered_set<std::string_view> real_vars_;
-
   // §21.7.5 (Table 21-11): declared type keyword (enum base / packed struct
   // already resolved) of each dumped variable, consulted when its $var
   // declaration is written to pick the masquerading 1364-2005 var_type.
   std::unordered_map<std::string_view, DataTypeKind> vcd_var_kinds_;
-
-  // §26.3: see RegisterImportedName.
-  std::unordered_set<std::string_view> imported_names_;
-  // §23.4: see RegisterNestedDeclScope.
-  std::unordered_set<std::string> nested_decl_scopes_;
-
-  std::unordered_set<std::string_view> string_vars_;
-
-  std::unordered_set<std::string_view> chandle_vars_;
-
-  std::unordered_set<std::string_view> unbounded_params_;
-
-  std::unordered_map<std::string_view, EnumTypeInfo> enum_types_;
-  std::unordered_map<std::string_view, std::string_view> var_enum_types_;
-
-  std::unordered_map<std::string_view, StructTypeInfo> struct_types_;
-  std::unordered_map<std::string_view, std::string_view> var_struct_types_;
 
   std::unordered_map<std::string_view, ArrayInfo> array_infos_;
 
@@ -946,20 +842,11 @@ class SimContext {
   std::vector<std::vector<QueueRefBinding>> queue_ref_stack_;
   std::vector<std::vector<AssocRefBinding>> assoc_ref_stack_;
 
-  std::unordered_map<std::string_view, uint32_t> type_widths_;
-
-  std::unordered_map<std::string, std::string> instance_types_;
-
   // §33.7: per-instance resolved "library.cell" binding strings, keyed like
   // instance_types_ by instance-path prefix, and the call site a deferred
   // output command recorded for itself to be keyed in by ahead of the process.
   std::unordered_map<std::string, std::string> instance_bindings_;
   std::optional<std::string> deferred_binding_scope_;
-
-  // §25.9: virtual interface variables and their current interface-instance
-  // scope bindings (absence of a binding means null / uninitialized).
-  std::unordered_set<const Variable*> vi_vars_;
-  std::unordered_map<const Variable*, std::string> vi_bindings_;
 
   int assertion_fail_count_ = 0;
 

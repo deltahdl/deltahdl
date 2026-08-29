@@ -1,6 +1,20 @@
+// §18.16's randcase and the §18.17 randsequence statement: ExecRandcase and
+// ExecRandsequence, which src/simulator/stmt_exec.cpp reaches by name through
+// simulator/stmt_exec_internal.h. ExecRandsequence pushes the automatic scope
+// §18.17 gives the statement and generates its top production; SelectRule
+// draws one rule of a production against the weights §18.17.1 attaches to the
+// rules; ExecRsProd generates a production list in each of the forms
+// §18.17.2's if-else, §18.17.3's case and §18.17.4's repeat give it;
+// ExecRandJoinItems interleaves the operand sequences of §18.17.5's rand join;
+// and ClassifyRandseqResult decides what the break and return of §18.17.6, and
+// the disable of §9.6.2, do to the generation that is running.
+//
+// The values a production is called with and the values it returns stand in
+// src/simulator/stmt_exec_randsequence_values.cpp, which answers §18.17.7 and
+// is called from here alone.
+
 #include <cmath>
 #include <cstdint>
-#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
@@ -14,6 +28,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_internal.h"
+#include "simulator/stmt_exec_randsequence_internal.h"
 
 namespace delta {
 
@@ -61,57 +76,42 @@ ExecTask ExecRandcase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
-namespace {
-// §18.17.7: the implicit variables one rule declares for the value-returning
-// productions it names. `total` holds how many times the rule names each such
-// production, which decides whether its implicit variable is the scalar named
-// after the production or an element of an array indexed 1..N, and `ordinal`
-// gives each appearance its 1-based index in that array. The index is fixed by
-// where the appearance is written and not by when it generates: §18.17.7 says
-// of `if (cond) D(5) else D(20)` that the first element takes D(5)'s value and
-// the second D(20)'s, so the else branch writes the second element even when it
-// is the only branch that generated.
-struct RuleValueCapture {
-  std::unordered_map<std::string_view, int> total;
-  std::unordered_map<const RsProductionItem*, int> ordinal;
-};
-
-// §18.17.7: one appearance of a value-returning production within a rule. name
-// is the production's name, idx the 1-based ordinal of this appearance, and
-// total how many times the rule names the production: a total above one means
-// the implicit variable is the idx-th element of a 1..N array, a total of one
-// means the scalar named after the production. An idx of zero means the rule
-// declares no implicit variable for this generation.
-struct RuleProductionSlot {
-  std::string_view name;
-  int idx;
-  int total;
-};
-}  // namespace
+// The two types below are also defined in
+// src/simulator/stmt_exec_randsequence_values.cpp, which builds and reads them
+// on behalf of the generation below. A change to either definition has to be
+// made in both files.
 
 static ExecTask ExecRsProduction(const Stmt* stmt, const RsProductionItem& call,
                                  SimContext& ctx, Arena& arena,
                                  RuleValueCapture* cap);
 
-// §18.17.7: the rand join generation below declares and writes the implicit
-// variables of the rules it interleaves, so it calls these four ahead of their
-// definitions, which stand with the rest of the value-passing code at the end
-// of this file.
-static RuleValueCapture BuildRuleValueCapture(const Stmt* stmt,
-                                              const RsRule& selected,
-                                              SimContext& ctx);
-static RuleValueCapture BuildStepValueCapture(
-    const Stmt* stmt, const std::vector<const RsProd*>& steps, SimContext& ctx);
-static RuleProductionSlot SlotForAppearance(const RuleValueCapture* cap,
-                                            const RsProductionItem& call,
-                                            std::string_view name);
-static void StoreRuleProductionValue(const RuleProductionSlot& slot,
-                                     const RsProduction* child,
-                                     const Logic4Vec& ret_value,
-                                     SimContext& ctx, Arena& arena);
+// §18.17.7: the implicit variables a rule declares for the value-returning
+// productions it names, and the actual arguments a production is called with.
+// Defined in src/simulator/stmt_exec_randsequence_values.cpp.
+RuleValueCapture BuildRuleValueCapture(const Stmt* stmt, const RsRule& selected,
+                                       SimContext& ctx);
+RuleValueCapture BuildStepValueCapture(const Stmt* stmt,
+                                       const std::vector<const RsProd*>& steps,
+                                       SimContext& ctx);
+RuleProductionSlot SlotForAppearance(const RuleValueCapture* cap,
+                                     const RsProductionItem& call,
+                                     std::string_view name);
+void StoreRuleProductionValue(const RuleProductionSlot& slot,
+                              const RsProduction* child,
+                              const Logic4Vec& ret_value, SimContext& ctx,
+                              Arena& arena);
+std::vector<Logic4Vec> EvalProductionActuals(const RsProduction* production,
+                                             const RsProductionItem& call,
+                                             SimContext& ctx, Arena& arena);
+void BindProductionFormals(const RsProduction* production,
+                           const std::vector<Logic4Vec>& actuals,
+                           SimContext& ctx, Arena& arena);
 
-static const RsProduction* FindProduction(const Stmt* stmt,
-                                          std::string_view name) {
+// §18.17.7: which production of the randsequence statement a name reaches,
+// and whether it returns a value.
+// src/simulator/stmt_exec_randsequence_values.cpp reads all three, so they
+// carry external linkage.
+const RsProduction* FindProduction(const Stmt* stmt, std::string_view name) {
   for (const auto& prod : stmt->rs_productions) {
     if (prod.name == name) return &prod;
   }
@@ -121,7 +121,7 @@ static const RsProduction* FindProduction(const Stmt* stmt,
 // §18.17.7: a production yields a readable value only when it declares a
 // non-void return type. A production with no return type assumes a void return
 // type, so it contributes no implicit variable.
-static bool ProductionReturnsValue(const RsProduction* p) {
+bool ProductionReturnsValue(const RsProduction* p) {
   return p != nullptr && p->has_return_type &&
          p->return_type.kind != DataTypeKind::kVoid;
 }
@@ -131,7 +131,7 @@ static bool ProductionReturnsValue(const RsProduction* p) {
 // that was never written is "", the empty string, of zero length. Storage for
 // such a value is therefore sized by what was returned, and not by the 32-bit
 // carrier every other return type with no computable width falls back to.
-static bool ProductionReturnsString(const RsProduction* p) {
+bool ProductionReturnsString(const RsProduction* p) {
   return p != nullptr && p->has_return_type &&
          p->return_type.kind == DataTypeKind::kString;
 }
@@ -588,185 +588,6 @@ static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
   co_return StmtResult::kDone;
 }
 
-// §18.17.7: record one appearance of a value-returning production, giving it
-// the next ordinal in the rule. Every appearance counts, including one written
-// inside an if, repeat or case production: the clause gives the code block of
-// `if (cond) D(5) else D(20)` the implicit declaration `int D[1:2]`, and the
-// code block of `B repeat(5) C B` the declarations `int B[1:2]` and `int C`.
-// A repeat counts its item once however many times it goes on to generate it.
-static void CountRuleProductionItem(const Stmt* stmt,
-                                    const RsProductionItem& item,
-                                    RuleValueCapture& cap) {
-  if (!ProductionReturnsValue(FindProduction(stmt, item.name))) return;
-  cap.ordinal[&item] = ++cap.total[item.name];
-}
-
-// §18.17.7: count the appearances of every value-returning production one
-// production of a rule names, reaching the items an if, repeat or case
-// production generates as well as an item written directly in the rule.
-static void CountRuleProductions(const Stmt* stmt, const RsProd& prod,
-                                 RuleValueCapture& cap) {
-  switch (prod.kind) {
-    case RsProdKind::kItem:
-      CountRuleProductionItem(stmt, prod.item, cap);
-      return;
-    case RsProdKind::kIf:
-      CountRuleProductionItem(stmt, prod.if_true, cap);
-      if (prod.has_else) CountRuleProductionItem(stmt, prod.if_false, cap);
-      return;
-    case RsProdKind::kRepeat:
-      CountRuleProductionItem(stmt, prod.repeat_item, cap);
-      return;
-    case RsProdKind::kCase:
-      for (const auto& ci : prod.case_items)
-        CountRuleProductionItem(stmt, ci.item, cap);
-      return;
-    case RsProdKind::kCodeBlock:
-      return;
-  }
-}
-
-// §18.17.7: register the array shape of every production the counted
-// appearances name more than once, so a code block can read an element before
-// any generation has written one. A production named once needs no shape: its
-// implicit variable is the scalar StoreRuleProductionValue creates.
-static void RegisterRuleValueArrays(const Stmt* stmt,
-                                    const RuleValueCapture& cap,
-                                    SimContext& ctx) {
-  for (const auto& [name, n] : cap.total) {
-    if (n <= 1) continue;
-    const auto* child = FindProduction(stmt, name);
-    ArrayInfo info;
-    info.lo = 1;
-    info.size = static_cast<uint32_t>(n);
-    uint32_t w = EvalTypeWidth(child->return_type);
-    // §18.17.7: "the type is an array where the element type is the return
-    // type of the production", so record the return type's kind for a read of
-    // an element to consult. §6.16 then makes the element of a string array
-    // that no generation wrote "", the empty string, rather than 32 bits of x;
-    // every other return type EvalTypeWidth gives no width to keeps the
-    // 32-bit carrier.
-    info.elem_type_kind = child->return_type.kind;
-    info.elem_width = w ? w : (ProductionReturnsString(child) ? 0 : 32);
-    // §18.17: "The randsequence statement creates an automatic scope", and
-    // §18.17.7 declares this array "within a rule", so the name stands for the
-    // array only while that scope is on the stack. RegisterLocalArray puts the
-    // shape in the same scope as the implicit variables
-    // StoreRuleProductionValue creates, so PopScope takes both away together: a
-    // variable of the design that shares the name is read as itself again once
-    // the statement ends, and each activation of the rule sees its own shape.
-    // §18.17.7's Example 2 needs the last of those, giving one production three
-    // rules that name C once, twice and three times.
-    ctx.RegisterLocalArray(name, info);
-  }
-}
-
-// §18.17.7: within a rule, a variable is implicitly declared for each
-// value-returning production the rule names. A production named once yields a
-// scalar named after the production; a production named more than once yields
-// an array indexed 1..N, with element i holding the value returned by the i-th
-// appearance in syntactic order. Count the rule's appearances so a multiply
-// appearing production can be registered as an array before any code block
-// reads an element of it.
-static RuleValueCapture BuildRuleValueCapture(const Stmt* stmt,
-                                              const RsRule& selected,
-                                              SimContext& ctx) {
-  RuleValueCapture cap;
-  // Syntax 18-13 gives a rand join rule its productions as the
-  // rs_production_items written after the keywords, which stand in
-  // RsRule::rand_join_items and in no RsProd of RsRule::prods. A rule holds one
-  // list or the other, so both are walked and the empty one contributes
-  // nothing.
-  for (const auto& item : selected.rand_join_items) {
-    CountRuleProductionItem(stmt, item, cap);
-  }
-  for (const auto& prod : selected.prods) {
-    CountRuleProductions(stmt, prod, cap);
-  }
-  RegisterRuleValueArrays(stmt, cap, ctx);
-  return cap;
-}
-
-// §18.17.5 interleaves a rand join operand's productions to a depth of 1, so
-// what generates under the operand is the productions its own rule names rather
-// than the operand itself. Count the appearances over the steps that expansion
-// produced: for a nested rand join rule those are the wrappers
-// CollectRandJoinSteps built around its operands, and the wrapper is what
-// SlotForAppearance is given to look up.
-static RuleValueCapture BuildStepValueCapture(
-    const Stmt* stmt, const std::vector<const RsProd*>& steps,
-    SimContext& ctx) {
-  RuleValueCapture cap;
-  for (const auto* step : steps) {
-    CountRuleProductions(stmt, *step, cap);
-  }
-  RegisterRuleValueArrays(stmt, cap, ctx);
-  return cap;
-}
-
-// §18.17.7: the implicit variable this appearance of a production writes. An
-// appearance the rule recorded no ordinal for writes none: the top-level
-// production the randsequence statement names stands in no rule, and a
-// production that returns no value declares no variable to write.
-static RuleProductionSlot SlotForAppearance(const RuleValueCapture* cap,
-                                            const RsProductionItem& call,
-                                            std::string_view name) {
-  if (cap == nullptr) return RuleProductionSlot{name, 0, 0};
-  auto ord = cap->ordinal.find(&call);
-  if (ord == cap->ordinal.end()) return RuleProductionSlot{name, 0, 0};
-  auto total = cap->total.find(name);
-  return RuleProductionSlot{name, ord->second,
-                            total == cap->total.end() ? 1 : total->second};
-}
-
-// §18.17.7: create the implicit variable that holds a generated production's
-// return value. A production named more than once in the rule writes the
-// idx-th element of its 1..N array, whose name is built at run time and so must
-// be interned in the arena (the scope map keys on a stable string_view); a
-// production named once writes the scalar named after the production. The name
-// the variable was created under is reported through `created_name`; it
-// outlives the call in both forms, so a caller that has to name the variable
-// again does not have to rebuild the name.
-static Variable* CreateRuleProductionVariable(const RuleProductionSlot& slot,
-                                              uint32_t width, SimContext& ctx,
-                                              Arena& arena,
-                                              std::string_view* created_name) {
-  if (slot.total > 1) {
-    auto name = std::string(slot.name) + "[" + std::to_string(slot.idx) + "]";
-    const std::string& interned = *arena.Create<std::string>(std::move(name));
-    *created_name = interned;
-    return ctx.CreateLocalVariable(interned, width);
-  }
-  *created_name = slot.name;
-  return ctx.CreateLocalVariable(slot.name, width);
-}
-
-// §18.17.7: store one generated production's return value into its implicit
-// variable, at the moment it is generated so that a code block written to its
-// right observes the value and one written to its left does not.
-static void StoreRuleProductionValue(const RuleProductionSlot& slot,
-                                     const RsProduction* child,
-                                     const Logic4Vec& ret_value,
-                                     SimContext& ctx, Arena& arena) {
-  uint32_t w = EvalTypeWidth(child->return_type);
-  if (w == 0) w = ret_value.width;
-  // §6.16: a string is as wide as the characters it holds, so a string
-  // production that returned nothing leaves the empty string and not 32 bits
-  // of zero. Every other return type EvalTypeWidth gives no width to keeps the
-  // 32-bit carrier.
-  if (w == 0 && !ProductionReturnsString(child)) w = 32;
-  std::string_view created_name;
-  Variable* var =
-      CreateRuleProductionVariable(slot, w, ctx, arena, &created_name);
-  var->value = ret_value;
-  // §18.17.7 gives the implicit variable the production's return type, and
-  // what reads a string reads SimContext::IsStringVariable rather than the
-  // width, so register the name the variable was created under. The registry
-  // keys on a string_view it never erases, and both names
-  // CreateRuleProductionVariable reports outlive this call.
-  if (ProductionReturnsString(child)) ctx.RegisterStringVariable(created_name);
-}
-
 static ExecTask ExecRuleProds(const Stmt* stmt, const RsRule& selected,
                               SimContext& ctx, Arena& arena) {
   // §18.17.7: only the return values of productions already generated (to the
@@ -827,48 +648,6 @@ static ExecTask ExecSelectedRule(const Stmt* stmt, const RsRule& selected,
     if (ctx.StopRequested()) break;
   }
   co_return StmtResult::kDone;
-}
-
-// §18.17.7: passing data to a production uses the same syntax as a task call.
-// Evaluate the actual arguments in the caller's scope, before the production's
-// own scope is entered, sizing each to its formal's declared width.
-static std::vector<Logic4Vec> EvalProductionActuals(
-    const RsProduction* production, const RsProductionItem& call,
-    SimContext& ctx, Arena& arena) {
-  std::vector<Logic4Vec> actuals;
-  actuals.reserve(call.args.size());
-  for (size_t i = 0; i < call.args.size(); ++i) {
-    uint32_t w = i < production->ports.size()
-                     ? EvalTypeWidth(production->ports[i].data_type)
-                     : 0;
-    actuals.push_back(EvalExpr(call.args[i], ctx, arena, w));
-  }
-  return actuals;
-}
-
-// §18.17.7: a production creates a scope that encompasses all its rules and
-// code blocks; formal arguments bound here are therefore available throughout
-// the production. Bind each formal by position, falling back to its default
-// value, then to zero, when no actual is supplied. The caller must have entered
-// the production's scope.
-static void BindProductionFormals(const RsProduction* production,
-                                  const std::vector<Logic4Vec>& actuals,
-                                  SimContext& ctx, Arena& arena) {
-  for (size_t i = 0; i < production->ports.size(); ++i) {
-    const auto& port = production->ports[i];
-    uint32_t w = EvalTypeWidth(port.data_type);
-    Logic4Vec val;
-    if (i < actuals.size()) {
-      val = actuals[i];
-    } else if (port.default_value != nullptr) {
-      val = EvalExpr(port.default_value, ctx, arena, w);
-    } else {
-      val = MakeLogic4VecVal(arena, w ? w : 32, 0);
-    }
-    uint32_t vw = val.width ? val.width : (w ? w : 32);
-    auto* var = ctx.CreateLocalVariable(port.name, vw);
-    var->value = val;
-  }
 }
 
 static ExecTask ExecRsProduction(const Stmt* stmt, const RsProductionItem& call,
