@@ -103,10 +103,16 @@ struct ModulePathDrive {
 // gathered here is the candidate list it works on, whose transition times come
 // from Variable::last_change_ticks on each path's source.
 //
-// Every candidate is offered as active in its condition, because the condition
-// of a state-dependent path (§30.4.4) is held on PathDelay as the source text
-// that wrote it and is not evaluated. Issue #3389 covers that; it shows only
-// where two paths reach one output and one of them is conditional.
+// A candidate's condition is the other half of that activity test: §30.5.3 asks
+// for the paths whose input transitioned most recently "and either they have no
+// condition or their conditions are true". A path written without a condition
+// is active; a state-dependent one (§30.4.4) is active when
+// PathDelay::condition_expr evaluates true here, an x or z result counting as
+// true per §30.4.4.1. An ifnone path is §30.4.4.4's default, applying "when all
+// other conditions for the path are false", so it is active exactly when no
+// conditional path between the same two terminals evaluated true -- which also
+// leaves an ifnone path that no state-dependent path corresponds to active, the
+// unconditional simple module path that clause asks for.
 //
 // The pulse limits come from the same path and the same slot as the delay, so a
 // caller measuring a pulse against them is measuring it against the limits of

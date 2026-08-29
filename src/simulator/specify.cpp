@@ -138,6 +138,10 @@ PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
   pd.edge = decl.edge;
   pd.is_ifnone = decl.is_ifnone;
   pd.condition = SpecifyConditionText(decl.condition);
+  // §30.4.4: SelectModulePathDelay in simulator/module_path_delay.cpp evaluates
+  // this condition for §30.5.3's activity test, which the text above cannot
+  // answer, being rendered for §32.4.1's SDF COND matching.
+  pd.condition_expr = decl.condition;
 
   // The parser accepts only the one/two/three/six/twelve delay lists of
   // Syntax 30-6 (§30.5); an empty list defaults to a single typical delay.

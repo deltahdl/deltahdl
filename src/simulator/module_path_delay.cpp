@@ -118,6 +118,58 @@ static uint64_t SourceChangeTicks(const PathDelay& pd, SimContext& ctx) {
   return var != nullptr ? var->last_change_ticks : 0;
 }
 
+// §30.5.3's condition half for a candidate that is not an ifnone path: "either
+// they have no condition or their conditions are true". A path the specify
+// block wrote without a condition carries no PathDelay::condition_expr and is
+// always active. A state-dependent one (§30.4.4) is active when its condition
+// evaluates true, which §30.4.4.1 extends to an x or z result;
+// StateDependentPathConditionEnables in simulator/specify_path_delay.h is that
+// rule, and it reads the least-significant 4-state word because a multi-bit
+// condition is represented by its LSB. A result with no words states no bit and
+// so states no true condition.
+static bool ConditionalPathIsActive(const PathDelay& pd,
+                                    const ModulePathDrive& drive) {
+  if (pd.condition_expr == nullptr) return true;
+  Logic4Vec value = EvalExpr(pd.condition_expr, drive.ctx, drive.arena);
+  if (value.nwords == 0) return false;
+  return StateDependentPathConditionEnables(value.words[0]);
+}
+
+// Whether a conditional module path between the same two terminals as
+// `ifnone_path` came out true. §30.4.4.4 makes that the whole of the ifnone
+// question: the keyword "is used to specify a default state-dependent path
+// delay when all other conditions for the path are false", so the ifnone path
+// is active exactly when this answers false. The candidates are already
+// restricted to one path output and one set of sources, so src_port and
+// dst_port are what say two of them are paths between the same terminals.
+static bool CorrespondingConditionIsTrue(
+    const std::vector<PathCandidate>& candidates,
+    const PathDelay& ifnone_path) {
+  for (const PathCandidate& candidate : candidates) {
+    const PathDelay& pd = *candidate.path;
+    if (pd.is_ifnone || pd.condition_expr == nullptr) continue;
+    if (pd.src_port != ifnone_path.src_port) continue;
+    if (pd.dst_port != ifnone_path.dst_port) continue;
+    if (candidate.condition_true) return true;
+  }
+  return false;
+}
+
+// Settles every ifnone candidate against the conditional ones, which is why the
+// conditions are evaluated in a pass of their own first: §30.4.4.4 answers for
+// an ifnone path only once every corresponding condition has an answer. A path
+// output no state-dependent path reaches leaves each ifnone candidate active,
+// which is the clause's rule that an ifnone path with no corresponding
+// state-dependent module paths "shall be treated the same as an unconditional
+// simple module path".
+static void SettleIfnoneCandidates(std::vector<PathCandidate>& candidates) {
+  for (PathCandidate& candidate : candidates) {
+    if (!candidate.path->is_ifnone) continue;
+    candidate.condition_true =
+        !CorrespondingConditionIsTrue(candidates, *candidate.path);
+  }
+}
+
 ModulePathDelay SelectModulePathDelay(const ModulePathDrive& drive,
                                       const Logic4Vec& from,
                                       const Logic4Vec& to) {
@@ -126,9 +178,13 @@ ModulePathDelay SelectModulePathDelay(const ModulePathDrive& drive,
   for (const PathDelay& pd : drive.mgr.GetPathDelays()) {
     if (!PathEndsAt(pd, drive.output)) continue;
     if (!PathStartsAtOneOf(pd, drive.sources)) continue;
-    candidates.push_back(PathCandidate{&pd, SourceChangeTicks(pd, drive.ctx),
-                                       /*condition_true=*/true});
+    // An ifnone candidate is settled below, after every condition has an
+    // answer to be settled against.
+    bool active = pd.is_ifnone || ConditionalPathIsActive(pd, drive);
+    candidates.push_back(
+        PathCandidate{&pd, SourceChangeTicks(pd, drive.ctx), active});
   }
+  SettleIfnoneCandidates(candidates);
   const PathDelay* selected = SelectActivePath(candidates, slot);
   if (selected == nullptr) return ModulePathDelay{};
   // §30.7 measures a pulse against the limits of the delay that formed its

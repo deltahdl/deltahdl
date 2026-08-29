@@ -47,6 +47,14 @@ struct PathDelay {
 
   std::string condition;
 
+  // §30.4.4's condition as the parser built it, which is what decides at run
+  // time whether this path is one of the active ones §30.5.3 selects among. The
+  // `condition` string above is the same condition rendered for §32.4.1's SDF
+  // COND matching and cannot answer that question, a text comparison being all
+  // it is for. Null on an unconditional path and on an ifnone one, neither of
+  // which carries a condition to evaluate.
+  const Expr* condition_expr = nullptr;
+
   bool is_ifnone = false;
   uint8_t delay_count = 1;
   uint64_t delays[12] = {};
