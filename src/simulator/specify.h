@@ -624,9 +624,9 @@ class SpecifyManager {
 // The timing checks are registered through
 // SpecifyManager::AddTimingCheckUnderOptions, which is what gives §32.4.2's SDF
 // TIMINGCHECK annotation a declared check to land on. Registering a check does
-// not yet make a violation appear: nothing watches its reference and data
-// signals to call SpecifyManager::CheckSetupViolation or its siblings, which is
-// separate work from this.
+// not evaluate it: the watchers that report a violation are armed by
+// WatchTimingChecks (src/simulator/timing_check_driver.h), which runs once over
+// the whole design after every module has been registered.
 //
 // The specparam declarations are bound through
 // SpecifyManager::BindDesignSpecparams, which is what lets §32.4.3's LABEL

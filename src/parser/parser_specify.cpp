@@ -1,3 +1,5 @@
+#include <utility>
+
 #include "parser/parser.h"
 
 namespace delta {
@@ -679,6 +681,23 @@ SpecifyItem* Parser::ParseTimingCheck() {
       item->timing_check.data_condition = ParseExpr();
     }
     Expect(TokenKind::kComma, Subclause("31.2"));
+  }
+
+  // §31.3.1 is the one check of Clause 31 that names its data event first.
+  // Syntax 31-3 writes `$setup(data_event, reference_event, ...)` where Syntax
+  // 31-4, 31-5, 31-6, 31-7 and 31-8 write the reference event first, and Tables
+  // 31-1 through 31-6 say the same. The two terminals are read positionally
+  // above, so without this a $setup arrives with each in the field named for
+  // the other, and everything downstream -- BuildTimingCheckUnderOptions,
+  // SdfAnnotationMatchesCheck and the §31.3 verdicts -- reads them by name.
+  if (item->timing_check.check_kind == TimingCheckKind::kSetup) {
+    std::swap(item->timing_check.ref_terminal,
+              item->timing_check.data_terminal);
+    std::swap(item->timing_check.ref_edge, item->timing_check.data_edge);
+    std::swap(item->timing_check.ref_edge_descriptors,
+              item->timing_check.data_edge_descriptors);
+    std::swap(item->timing_check.ref_condition,
+              item->timing_check.data_condition);
   }
 
   item->timing_check.limits.push_back(ParseMinTypMaxExpr());

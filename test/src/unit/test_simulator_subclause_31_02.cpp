@@ -123,18 +123,14 @@ TEST(RegisteredDesignTimingChecks, DeclaredSetupCheckReachesTheManager) {
   const TimingCheckEntry* check =
       RegisteredCheckOfKind(*mgr, TimingCheckKind::kSetup);
   ASSERT_NE(check, nullptr);
-  // The two signal names are read as a pair rather than one field each.
-  // Syntax 31-3 writes `$setup(data_event, reference_event, limit)` and Syntax
-  // 31-4 writes `$hold(reference_event, data_event, limit)`, opposite orders
-  // that ParseTimingCheck in src/parser/parser_specify.cpp does not
-  // distinguish: it fills ref_terminal from the first argument for every check
-  // kind, so a $setup arrives with its two signals in the fields named for the
-  // other. That is issue #3407 and not what this case is about, and asserting
-  // either field by name would write the inversion down as though it were
-  // intended.
-  EXPECT_EQ(check->ref_signal == "d" || check->ref_signal == "clk", true);
-  EXPECT_EQ(check->data_signal == "d" || check->data_signal == "clk", true);
-  EXPECT_NE(check->ref_signal, check->data_signal);
+  // Syntax 31-3 writes `$setup(data_event, reference_event, limit)` where
+  // Syntax 31-4 writes `$hold(reference_event, data_event, limit)`, so the two
+  // clauses order their events oppositely. Parser::ParseTimingCheck reads the
+  // terminals positionally and swaps them for $setup alone, which is why `clk`
+  // is the reference here and `d` the data.
+  EXPECT_EQ(check->ref_signal, "clk");
+  EXPECT_EQ(check->ref_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(check->data_signal, "d");
   EXPECT_EQ(check->limit, 7u);
 }
 

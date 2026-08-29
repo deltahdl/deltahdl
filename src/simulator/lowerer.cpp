@@ -12,6 +12,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/rtlir.h"
 #include "simulator/module_path_delay.h"
+#include "simulator/timing_check_driver.h"
 // CollectExprReads, the walk over the names an expression reads.
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -601,6 +602,13 @@ void Lowerer::RegisterDesignTiming() {
   // registered, before the scheduler runs anything -- a source that transitions
   // before it is watched leaves no time behind for the selection to read.
   WatchModulePathSources(mgr, ctx_);
+  // §31.3 reports a timing violation when the data signal transitions inside
+  // the window the reference signal defines, and nothing watches the two
+  // signals a registered check names. This arms the watchers that do, on the
+  // $setup and $hold checks just registered and before the scheduler runs
+  // anything -- a signal that transitions before it is watched leaves no
+  // transition behind for the check to measure.
+  WatchTimingChecks(mgr, ctx_);
 }
 
 void Lowerer::Lower(const RtlirDesign* design) {
