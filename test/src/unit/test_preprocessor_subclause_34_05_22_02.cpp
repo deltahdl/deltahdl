@@ -278,7 +278,7 @@ TEST(ProtectDigestBlockEncryptionOutput, TheLineHoldsTheDigestAndNothingElse) {
   std::string opened;
   ASSERT_TRUE(DecryptProtectedBlock(carried, kEncodingExchangeKey, &opened))
       << envelope;
-  EXPECT_EQ(opened, DigestOf(RegionBody(kDigestBlockLine)));
+  EXPECT_EQ(opened, DigestOf(EncodingRegionBody(kDigestBlockLine)));
 }
 
 // §34.5.9 has a count written ahead of each value an envelope carries, and a
@@ -286,8 +286,8 @@ TEST(ProtectDigestBlockEncryptionOutput, TheLineHoldsTheDigestAndNothingElse) {
 // digest's size and not the size of the block the digest stands for.
 TEST(ProtectDigestBlockEncryptionOutput, TheDigestIsCountedAsAValueOfItsOwn) {
   std::string envelope = EnvelopeAround(kDigestBlockLine);
-  EXPECT_TRUE(Holds(envelope, TheCountOf(ProtectedRegionBlockSize(
-                                  DigestOf(RegionBody(kDigestBlockLine))))))
+  EXPECT_TRUE(Holds(envelope, TheCountOf(ProtectedRegionBlockSize(DigestOf(
+                                  EncodingRegionBody(kDigestBlockLine))))))
       << envelope;
 }
 

@@ -298,12 +298,33 @@ jobs:
       # and the last one on the line is not the one that ends the name. A
       # declaration written static rather than inline has internal linkage,
       # and two of those are not one name.
+      #
+      # A function is read as well as a variable, and it is keyed on its
+      # parameter types rather than on its name. Overloading one name across
+      # the fixtures is deliberate -- FindDiag takes an ElabFixture, a
+      # ParseResult, a SimFixture or a SynthFixture, one overload per header
+      # -- and a step keyed on the name alone would report those four and
+      # five families like them. What is not legal is one name with one
+      # parameter list and two bodies, which is what #3422 records for
+      # RegionBody and DataBlockOf. Parameter names are cut out of the key
+      # because they are the declaration's own words rather than part of its
+      # signature.
+      #
+      # The key is the declaration's own line, so a parameter list broken
+      # across lines is keyed on the part before the break. Two declarations
+      # in different headers that agree that far are reported, which is a
+      # report worth making even where a later parameter would tell them
+      # apart.
       - name: Check no name is declared in two lib/cpp headers
         run: |
           decls=$(mktemp)
           for f in $(find lib/cpp -name '*.h')
           do
-            sed -nE 's#^inline (constexpr|const) [^"=]*[ &*]([A-Za-z_][A-Za-z0-9_]*) *(\[[0-9]*\])? *=.*#\2#p' "$f" \
+            sed -nE \
+              -e 's#^inline (constexpr|const) [^"=]*[ &*]([A-Za-z_][A-Za-z0-9_]*) *(\[[0-9]*\])? *=.*#\2#p' \
+              -e 's#^inline [^"=(]*[ &*]([A-Za-z_][A-Za-z0-9_]*)\((.*)#\1(\2#p' "$f" \
+              | sed -E 's#\) *(const)? *\{? *$#)#' \
+              | sed -E 's#([A-Za-z_][A-Za-z0-9_]*)([,)])#\2#g; s# +##g' \
               | sort -u | sed "s|\$| $f|"
           done | sort > "$decls"
           fail=0

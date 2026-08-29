@@ -104,8 +104,8 @@ TEST(ProtectEncodingEncryptionInput, TheSchemeARegionNamesWritesItsBlock) {
   std::string envelope = EnvelopeAround(NamesScheme(kBase64Enctype));
   ASSERT_TRUE(Holds(envelope, "enctype=\"base64\""));
   std::string block;
-  ASSERT_TRUE(
-      DecodeProtectBlock(DataBlockOf(envelope), kBase64Enctype, &block));
+  ASSERT_TRUE(DecodeProtectBlock(EncodingDataBlockOf(envelope), kBase64Enctype,
+                                 &block));
   std::string recovered;
   EXPECT_TRUE(DecryptProtectedBlock(block, kEncodingExchangeKey, &recovered));
   EXPECT_TRUE(Holds(recovered, kEncodingSealedDesign));
@@ -121,7 +121,8 @@ TEST(ProtectEncodingEncryptionInput, TheSchemeARegionNamesWritesItsBlock) {
 TEST(ProtectEncodingEncryptionInput, TheBlockIsNotTheWritingOfAnotherScheme) {
   std::string envelope = EnvelopeAround(NamesScheme(kBase64Enctype));
   std::string block;
-  ASSERT_TRUE(DecodeProtectBlock(DataBlockOf(envelope), kRawEnctype, &block));
+  ASSERT_TRUE(
+      DecodeProtectBlock(EncodingDataBlockOf(envelope), kRawEnctype, &block));
   std::string recovered;
   EXPECT_FALSE(DecryptProtectedBlock(block, kEncodingExchangeKey, &recovered));
 }
@@ -140,8 +141,8 @@ TEST(ProtectEncodingEncryptionInput, ASchemeNamedAheadOfARegionWritesItsBlock) {
   std::string envelope = EnvelopeOf(source);
   ASSERT_TRUE(Holds(envelope, "enctype=\"base64\""));
   std::string block;
-  ASSERT_TRUE(
-      DecodeProtectBlock(DataBlockOf(envelope), kBase64Enctype, &block));
+  ASSERT_TRUE(DecodeProtectBlock(EncodingDataBlockOf(envelope), kBase64Enctype,
+                                 &block));
   std::string recovered;
   EXPECT_TRUE(DecryptProtectedBlock(block, kEncodingExchangeKey, &recovered));
   EXPECT_TRUE(Holds(recovered, kEncodingSealedDesign));
@@ -160,7 +161,7 @@ TEST(ProtectEncodingEncryptionInput, ACountWrittenInARegionReachesNoEnvelope) {
   std::string inside(
       StatesEncoding("(enctype=\"base64\", line_length=8, bytes=1)"));
   std::string envelope = EnvelopeAround(inside);
-  size_t held = ProtectedRegionBlockSize(RegionBody(inside));
+  size_t held = ProtectedRegionBlockSize(EncodingRegionBody(inside));
   EXPECT_TRUE(Holds(envelope, "enctype=\"base64\""));
   EXPECT_TRUE(Holds(envelope, TheCountOf(held)));
   EXPECT_FALSE(Holds(envelope, TheCountOf(1)));
@@ -388,7 +389,7 @@ TEST(ProtectEncodingEncryptionOutput, TheCountIsOfTheDataAndNotOfTheWriting) {
   EXPECT_NE(ProtectedRegionBlockSize(kEncodingSealedDesign),
             kEncodingSealedDesign.size());
   EXPECT_NE(ProtectedRegionBlockSize(kEncodingSealedDesign),
-            DataBlockOf(envelope).size());
+            EncodingDataBlockOf(envelope).size());
 }
 
 // An envelope carrying two blocks, the second being the digest §34.5.22 asks
@@ -401,7 +402,7 @@ TEST(ProtectEncodingEncryptionOutput, TheCountIsOfTheDataAndNotOfTheWriting) {
 // from another, an expression standing ahead of each field.
 TEST(ProtectEncodingEncryptionOutput, EachBlockOfAnEnvelopeStatesItsOwnCount) {
   std::string envelope = EnvelopeAround(kDigestBlockLine);
-  size_t held = ProtectedRegionBlockSize(RegionBody(kDigestBlockLine));
+  size_t held = ProtectedRegionBlockSize(EncodingRegionBody(kDigestBlockLine));
   ASSERT_TRUE(Holds(envelope, kDigestBlockLine));
   EXPECT_EQ(TimesWritten(envelope, kAnyEncoding), 3U);
   EXPECT_EQ(TimesWritten(envelope, "bytes="), 2U);
@@ -483,8 +484,8 @@ TEST(ProtectEncodingEncryptionOutput, AKeyBlockAndTheKeyInItAreUnderTheScheme) {
   ASSERT_TRUE(DecodeProtectBlock(LineAfter(carried, kDataDecryptKeyLine),
                                  kBase64Enctype, &region_key));
   std::string design;
-  EXPECT_TRUE(DecryptProtectedRegion(DataBlockOf(envelope), region_key, &design,
-                                     kBase64Enctype));
+  EXPECT_TRUE(DecryptProtectedRegion(EncodingDataBlockOf(envelope), region_key,
+                                     &design, kBase64Enctype));
   EXPECT_TRUE(Holds(design, kEncodingSealedDesign));
 }
 
@@ -538,7 +539,7 @@ TEST(ProtectEncodingEncryptionOutput, TheBlockHoldsOnlyWhatASourceLineCarries) {
   std::string region = "`pragma protect begin\n";
   region.append(kAwkwardDesign).append("`pragma protect end\n");
   std::string block =
-      DataBlockOf(EncryptEnvelopes(region, kEncodingExchangeKey));
+      EncodingDataBlockOf(EncryptEnvelopes(region, kEncodingExchangeKey));
   ASSERT_FALSE(block.empty());
   bool text_only = true;
   for (char c : block) {
@@ -563,7 +564,7 @@ TEST(ProtectEncodingEncryptionOutput, AnEnvelopeStatesNoLengthItDidNotBreakAt) {
       EnvelopeAround(StatesEncoding("(enctype=\"base64\", line_length=8)"));
   ASSERT_TRUE(Holds(envelope, "enctype=\"base64\""));
   EXPECT_FALSE(Holds(envelope, "line_length"));
-  EXPECT_FALSE(Holds(DataBlockOf(envelope), "\n"));
+  EXPECT_FALSE(Holds(EncodingDataBlockOf(envelope), "\n"));
 }
 
 // The length itself, where the writing does break at it: the most characters

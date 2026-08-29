@@ -160,7 +160,7 @@ inline std::string NamesScheme(std::string_view enctype) {
 // The text one region encloses: whatever it writes about itself, then the
 // design it seals. The design comes last so that a line the encryption passed
 // over is a line that went into the block ahead of it.
-inline std::string RegionBody(std::string_view inside) {
+inline std::string EncodingRegionBody(std::string_view inside) {
   std::string body(inside);
   body.append(kEncodingSealedDesign);
   return body;
@@ -170,7 +170,7 @@ inline std::string RegionBody(std::string_view inside) {
 // between them.
 inline std::string RegionHolding(std::string_view inside) {
   std::string region = "`pragma protect begin\n";
-  region.append(RegionBody(inside));
+  region.append(EncodingRegionBody(inside));
   region.append("`pragma protect end\n");
   return region;
 }
@@ -216,7 +216,7 @@ inline std::string EnvelopeAround(std::string_view inside) {
 // The characters recording one envelope's sealed region: what stands between
 // the quotation marks of its data_block expression, and empty where the text
 // carries no such expression.
-inline std::string DataBlockOf(std::string_view envelope) {
+inline std::string EncodingDataBlockOf(std::string_view envelope) {
   size_t opens = envelope.find(kEncodingBlockOpening);
   if (opens == std::string_view::npos) return {};
   size_t from = opens + kEncodingBlockOpening.size();

@@ -74,7 +74,7 @@ ProtectKeyList TheKey() {
 
 // The characters recording one envelope's sealed region: what stands between
 // the quotation marks of its data_block expression.
-std::string DataBlockOf(const std::string& envelope) {
+std::string EncodingDataBlockOf(const std::string& envelope) {
   constexpr std::string_view kOpening = "`pragma protect data_block=\"";
   size_t opens = envelope.find(kOpening);
   EXPECT_NE(opens, std::string::npos) << envelope;
@@ -129,8 +129,8 @@ TEST(ProtectDecryptLicenseDescription, TheLicenceIsNowhereInTheClear) {
 TEST(ProtectDecryptLicenseDescription,
      TheBlockRecoversToTheLicenceAndTheDesign) {
   std::string cleartext;
-  ASSERT_TRUE(DecryptProtectedRegion(DataBlockOf(EnvelopeOf(kLicense)), kTheKey,
-                                     &cleartext));
+  ASSERT_TRUE(DecryptProtectedRegion(EncodingDataBlockOf(EnvelopeOf(kLicense)),
+                                     kTheKey, &cleartext));
   EXPECT_TRUE(Holds(cleartext, kLicense)) << cleartext;
   EXPECT_TRUE(Holds(cleartext, kEncodingSealedDesign)) << cleartext;
 }
