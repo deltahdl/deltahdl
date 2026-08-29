@@ -737,6 +737,11 @@ struct ProtectEnvelopeDescription {
   // empty string against it would offer a reader nothing while stating that it
   // offers something.
   std::string_view encrypt_agent_info;
+  // §34.5.11's identifier for the cipher the region's data are under, empty
+  // where the envelope carries key blocks. §34.5.11.2 excepts that case in the
+  // words §34.5.10.2 excepts the data_keyowner in, and the cipher travels
+  // inside the block instead; an empty value is what says so here, the way an
+  // empty encrypt_agent_info says the tool offered nothing further.
   std::string_view data_method;
   std::string_view encoding;
 };

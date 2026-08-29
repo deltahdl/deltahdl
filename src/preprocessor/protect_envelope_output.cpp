@@ -285,10 +285,15 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   ProtectEncoding block_encoding =
       EnvelopeBlockEncoding(envelope.requested_encoding);
   std::string envelope_encoding = ProtectEncodingValue(block_encoding);
+  const bool kSignedEnvelope = !how.key_blocks.directives.empty();
+  // §34.5.11.2 sends the cipher the region's data are under into the key_block
+  // where a digital signature is used, which is what an envelope carrying key
+  // blocks is. The description then states no cipher and
+  // ProtectEnvelopeDescriptionDirectives writes none.
   text.append(ProtectEnvelopeDescriptionDirectives(
-      {kEncryptAgent, kEncryptAgentInfo, kDataMethod, envelope_encoding}));
-  AppendClearNames(envelope, block_encoding, !how.key_blocks.directives.empty(),
-                   &text);
+      {kEncryptAgent, kEncryptAgentInfo,
+       kSignedEnvelope ? std::string_view{} : kDataMethod, envelope_encoding}));
+  AppendClearNames(envelope, block_encoding, kSignedEnvelope, &text);
   // §34.5.27 has the blocks carrying the key the region's data are under
   // written into the envelope ahead of the block those keys open. A reader has
   // to hold the key before it reaches what the key is for, and there is nothing

@@ -516,7 +516,16 @@ std::string ProtectEnvelopeDescriptionDirectives(
     AppendKeywordDirective(text, kEncryptAgentInfoKeyword,
                            description.encrypt_agent_info);
   }
-  AppendKeywordDirective(text, "data_method", description.data_method);
+  // §34.5.11.2 has the cipher a region's data are under "unchanged in the
+  // output file, except where a digital signature is used, in which case it is
+  // encrypted with the key_method and placed in a key_block". An empty value is
+  // that exception in force: the caller passes none where the envelope carries
+  // key blocks, ProtectKeyBlockContent (preprocessor/protect_key_block.cpp)
+  // having written the cipher into them, and an envelope stating it twice would
+  // state in the clear what the signature put inside.
+  if (!description.data_method.empty()) {
+    AppendKeywordDirective(text, "data_method", description.data_method);
+  }
   // The coding scheme is written as a subkeyword of the encoding keyword's
   // value rather than as the keyword's own value, so what the description
   // carries is that whole value and it goes out as it stands.
