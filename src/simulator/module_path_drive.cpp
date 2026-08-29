@@ -15,6 +15,10 @@
 // not automatically a cancellation. It is one of three outcomes, and the limits
 // say which.
 //
+// A fourth stands beside those three. §30.7.4.2's negative pulse is what
+// unequal delays make when the two schedules cross, and it has no width for a
+// limit to be measured against; the showcancelled mode decides it instead.
+//
 // The selection of the delay and the limits is in
 // src/simulator/module_path_delay.cpp; this file spends them.
 
@@ -71,17 +75,53 @@ static ModulePathTransitionDelay ResolveTransitionDelay(
           mp.reject_limit, mp.error_limit};
 }
 
+// §30.7.4.2's negative pulse: the two schedules cross, so there is no pulse of
+// any width to measure. `target` is when the later of the two was scheduled for
+// and `trailing` the earlier; `settled` is the value the output already holds
+// and returns to.
+//
+// Without showcancelled the answer is that "the leading edge is cancelled. No
+// transition takes place when the initial and final states of the pulse are the
+// same, leaving no indication a schedule was ever present", which is a return
+// that drives nothing. With it, "this style causes the leading edge to be
+// scheduled to X and the trailing edge to be scheduled from X" -- the two edges
+// being the output's own, in time order, so the x begins at the earlier
+// schedule and the output leaves it at the later. Figure 30-7 is the case:
+// `(in => out) = (4, 6);` with `in` falling at 10 and rising at 11 schedules
+// `out` low at 16 and high at 15, and showcancelled shows x across 15 to 16 --
+// or from 11, the moment of detection, under on-detect.
+static ExecTask DriveCancelledPulse(const ModulePathDrive& drive,
+                                    const Logic4Vec& settled, SimTime target,
+                                    uint64_t trailing, bool* committed) {
+  SimContext& ctx = drive.ctx;
+  // `trailing` is what ScheduleNegativePulse calls the scheduled leading time.
+  // The two names agree: its parameter means the edge that comes first at the
+  // output, and for a negative pulse that is the schedule computed last.
+  NegativePulseSchedule neg =
+      ScheduleNegativePulse(drive.mgr.ResolveShowCancelled(drive.output),
+                            drive.mgr.ResolvePulseStyle(drive.output),
+                            ctx.CurrentTime().ticks, trailing);
+  if (!neg.force_x) co_return StmtResult::kDone;
+
+  uint64_t to_x = TicksUntil(neg.x_time, ctx);
+  if (to_x > 0) co_await DelayAwaiter{ctx, to_x};
+  drive.commit(MakeAllX(drive.arena, settled.width));
+
+  uint64_t to_settled = TicksUntil(target.ticks, ctx);
+  if (to_settled > 0) co_await DelayAwaiter{ctx, to_settled};
+  drive.commit(settled);
+  *committed = true;
+  co_return StmtResult::kDone;
+}
+
 // Carries out §30.7's answer for one pulse. `leading` is the value the pending
 // transition would have placed on the output and `settled` the value already
 // there, which the driver has now returned to; `target` is when the leading
 // edge was scheduled for, so the pulse runs from `target` to the trailing
 // edge.
 //
-// A negative pulse -- a trailing edge scheduled no later than the leading one,
-// which §30.7.4.2 covers -- measures as width zero here and so is rejected
-// under any nonzero reject limit. That is what noshowcancelled asks for and the
-// default. Issue #3386 covers showcancelled, which drives x instead and which
-// nothing calls ScheduleNegativePulse for yet.
+// A negative pulse has no width to measure and is handed to
+// DriveCancelledPulse above before the measurement is reached.
 static ExecTask FilterModulePathPulse(const ModulePathDrive& drive,
                                       const Logic4Vec& leading,
                                       const Logic4Vec& settled, SimTime target,
@@ -90,7 +130,14 @@ static ExecTask FilterModulePathPulse(const ModulePathDrive& drive,
   ModulePathTransitionDelay trail =
       ResolveTransitionDelay(drive, leading, settled);
   uint64_t trailing = ctx.CurrentTime().ticks + trail.ticks;
-  uint64_t width = trailing > target.ticks ? trailing - target.ticks : 0;
+  if (IsNegativePulse(target.ticks, trailing)) {
+    co_await DriveCancelledPulse(drive, settled, target, trailing, committed);
+    co_return StmtResult::kDone;
+  }
+
+  // Past that test the trailing edge is no earlier than the leading one, so the
+  // width is their difference and never a clamp of one.
+  uint64_t width = trailing - target.ticks;
 
   PulseClassification cls =
       ClassifyPulse(width, trail.reject_limit, trail.error_limit);
