@@ -408,6 +408,20 @@ static ExecTask RunInertialContAssignDelay(
   co_return StmtResult::kDone;
 }
 
+// The manager to consult for a module path delay onto `target`, or null when no
+// registered module path names it as a destination. Null is the answer for
+// every target in a design that declared no specify block, and for a target
+// that is not a plain name, which no module path can be written against.
+static const SpecifyManager* ModulePathManagerFor(SimContext& ctx,
+                                                  bool lhs_is_name,
+                                                  std::string_view target) {
+  if (!lhs_is_name) return nullptr;
+  const SpecifyManager* mgr = ctx.GetSpecifyManager();
+  if (mgr == nullptr) return nullptr;
+  if (!IsModulePathOutput(*mgr, target)) return nullptr;
+  return mgr;
+}
+
 // Everything the wait before a continuous assignment's commit needs. The wait
 // has two forms: §28's inertial delay, taken from the assignment's own delay
 // expressions, and §30.4's module path delay, which a specify block declares
@@ -488,14 +502,10 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
   // path output, and §30.7's pulse limits then decide what reaches it. The
   // manager is read here rather than at lowering because Lowerer::Lower
   // registers the specify blocks after it has lowered the modules; this body
-  // first runs when the scheduler resumes it, by which time they are in.
-  // `path_mgr` stays null for a target no module path names, which is every
-  // target in a design that declared no specify block, and such a driver takes
-  // exactly the route it took before.
-  const SpecifyManager* spec = lhs_is_name ? ctx.GetSpecifyManager() : nullptr;
+  // first runs when the scheduler resumes it, by which time they are in. A
+  // driver this answers null for takes exactly the route it took before.
   const SpecifyManager* path_mgr =
-      spec != nullptr && IsModulePathOutput(*spec, params.lhs->text) ? spec
-                                                                     : nullptr;
+      ModulePathManagerFor(ctx, lhs_is_name, params.lhs->text);
 
   // A continuous assignment must drive its left-hand side at least once when it
   // is activated, even if a simulation stop was already requested for the
