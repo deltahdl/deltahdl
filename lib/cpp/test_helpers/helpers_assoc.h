@@ -48,6 +48,7 @@ inline void RunAndExpectStringKeys(
   auto* aa = f.ctx.FindAssocArray(name);
   ASSERT_NE(aa, nullptr);
   std::vector<std::string> keys;
+  keys.reserve(aa->str_data.size());
   for (const auto& [key, val] : aa->str_data) keys.push_back(key);
   ASSERT_EQ(keys.size(), expected.size());
   size_t i = 0;

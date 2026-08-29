@@ -25,6 +25,58 @@ using namespace delta;
 // what is written, the specifier fixes what is in force, and inclusion is the
 // claim that the two go together for every specifier at or after the table's
 // own version.
+//
+// Each table's check hands an already-elaborated design to one helper per
+// claim it makes. Every helper takes the design the caller has already found
+// non-null, because an ASSERT_ in a helper returns from that helper alone: an
+// ASSERT_NE moved out of a table's own check would leave the check running on
+// a null design. What each helper does assert on is a pointer it looked up
+// itself, whose reads all stand below the assertion in the same body.
+
+// Table 22-1's nine net type words, each read back as the net type that word
+// makes it. A word that had decayed into a plain identifier would leave no net
+// of its name in the design at all.
+inline void ExpectTable221NetTypesElaborate(RtlirDesign* design) {
+  struct NetCase {
+    const char* name;
+    NetType type;
+  };
+  const NetCase kNets[] = {
+      {"wa", NetType::kWand},     {"wo", NetType::kWor},
+      {"ta", NetType::kTriand},   {"to", NetType::kTrior},
+      {"t0", NetType::kTri0},     {"t1", NetType::kTri1},
+      {"tr", NetType::kTrireg},   {"gnd", NetType::kSupply0},
+      {"vdd", NetType::kSupply1},
+  };
+  for (const auto& c : kNets) {
+    const auto* n = FindNet(design, "m", c.name);
+    ASSERT_NE(n, nullptr) << c.name;
+    EXPECT_EQ(n->net_type, c.type) << c.name;
+  }
+}
+
+// Table 22-1's variable type words, each read back as the width or the flag
+// that word carries: `reg [7:0]` eight bits, `integer` thirty-two, `time`
+// sixty-four, `real` the real flag and `event` the event flag. The width is
+// what separates the three integral words from one another, so a word that had
+// been taken for another would be caught here rather than by the name alone.
+inline void ExpectTable221VariableTypesElaborate(RtlirDesign* design) {
+  const auto* v = FindVar(design, "m", "r");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->width, 8u);
+  v = FindVar(design, "m", "i");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->width, 32u);
+  v = FindVar(design, "m", "rl");
+  ASSERT_NE(v, nullptr);
+  EXPECT_TRUE(v->is_real);
+  v = FindVar(design, "m", "tm");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->width, 64u);
+  v = FindVar(design, "m", "ev");
+  ASSERT_NE(v, nullptr);
+  EXPECT_TRUE(v->is_event);
+}
 
 // Table 22-1, the Verilog-1995 list: the net types, the variable types with
 // their widths and their four-state and real and event flags, a parameter, and
@@ -55,42 +107,30 @@ inline void ExpectTable221DeclarationsElaborate(const char* spec) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 
-  struct NetCase {
-    const char* name;
-    NetType type;
-  };
-  const NetCase kNets[] = {
-      {"wa", NetType::kWand},     {"wo", NetType::kWor},
-      {"ta", NetType::kTriand},   {"to", NetType::kTrior},
-      {"t0", NetType::kTri0},     {"t1", NetType::kTri1},
-      {"tr", NetType::kTrireg},   {"gnd", NetType::kSupply0},
-      {"vdd", NetType::kSupply1},
-  };
-  for (const auto& c : kNets) {
-    const auto* n = FindNet(design, "m", c.name);
-    ASSERT_NE(n, nullptr) << c.name;
-    EXPECT_EQ(n->net_type, c.type) << c.name;
-  }
-
-  const auto* v = FindVar(design, "m", "r");
-  ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->width, 8u);
-  v = FindVar(design, "m", "i");
-  ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->width, 32u);
-  v = FindVar(design, "m", "rl");
-  ASSERT_NE(v, nullptr);
-  EXPECT_TRUE(v->is_real);
-  v = FindVar(design, "m", "tm");
-  ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->width, 64u);
-  v = FindVar(design, "m", "ev");
-  ASSERT_NE(v, nullptr);
-  EXPECT_TRUE(v->is_event);
+  ExpectTable221NetTypesElaborate(design);
+  ExpectTable221VariableTypesElaborate(design);
 
   const auto* p = FindParam(design, "m", "P");
   ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->resolved_value, 8);
+}
+
+// Table 22-2's `signed` and `unsigned` words, read back off two variables and
+// a net that differ in nothing but the qualifier. The declared width is read
+// back alongside the signedness: what the keyword selects is the signedness and
+// not the storage.
+inline void ExpectTable222SignQualifiersElaborate(RtlirDesign* design) {
+  const auto* s = FindVar(design, "t", "s");
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(s->width, 8u);
+  EXPECT_TRUE(s->is_signed);
+  const auto* u = FindVar(design, "t", "u");
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(u->width, 8u);
+  EXPECT_FALSE(u->is_signed);
+  const auto* sn = FindNet(design, "t", "sn");
+  ASSERT_NE(sn, nullptr);
+  EXPECT_TRUE(sn->is_signed);
 }
 
 // Table 22-2, the Verilog-2001 list, as structure rather than as tokens.
@@ -132,20 +172,7 @@ inline void ExpectTable222DeclarationsElaborate(const char* spec) {
   EXPECT_EQ(CountVarsEndingIn(design, "t", "slot"), 4u);
   EXPECT_EQ(CountVarsEndingIn(design, "t", "picked"), 1u);
 
-  // The two variables differ in nothing but the qualifier, so the declared
-  // width is read back alongside the signedness: what the keyword selects is
-  // the signedness and not the storage.
-  const auto* s = FindVar(design, "t", "s");
-  ASSERT_NE(s, nullptr);
-  EXPECT_EQ(s->width, 8u);
-  EXPECT_TRUE(s->is_signed);
-  const auto* u = FindVar(design, "t", "u");
-  ASSERT_NE(u, nullptr);
-  EXPECT_EQ(u->width, 8u);
-  EXPECT_FALSE(u->is_signed);
-  const auto* sn = FindNet(design, "t", "sn");
-  ASSERT_NE(sn, nullptr);
-  EXPECT_TRUE(sn->is_signed);
+  ExpectTable222SignQualifiersElaborate(design);
 }
 
 // Table 22-3, the Verilog-2005 list, whose lone entry is a net type of its
@@ -171,6 +198,99 @@ inline void ExpectTable223DeclarationsElaborate(const char* spec) {
     EXPECT_EQ(n->net_type, NetType::kUwire) << c.name;
     EXPECT_EQ(n->width, c.width) << c.name;
   }
+}
+
+// Table 22-4's data type words, each read back as the width and the four-state
+// flag that word carries, together with the two words whose type is neither:
+// `string` and `chandle`. The two typedef'd names are read here as well, since
+// a variable of a user-defined type carries the width the type resolved to.
+inline void ExpectTable224DataTypesElaborate(RtlirDesign* design) {
+  struct TypedVar {
+    const char* name;
+    uint32_t width;
+    bool four_state;
+  };
+  const TypedVar kVars[] = {
+      {"as_logic", 8, true}, {"as_bit", 8, false},
+      {"as_byte", 8, false}, {"as_shortint", 16, false},
+      {"as_int", 32, false}, {"as_longint", 64, false},
+      {"as_var", 4, true},   {"as_reg", 8, true},
+      {"wide", 8, true},     {"phase", 2, true},
+  };
+  for (const auto& c : kVars) {
+    const auto* v = FindVar(design, "m", c.name);
+    ASSERT_NE(v, nullptr) << c.name;
+    EXPECT_EQ(v->width, c.width) << c.name;
+    EXPECT_EQ(v->is_4state, c.four_state) << c.name;
+  }
+
+  const auto* s = FindVar(design, "m", "as_string");
+  ASSERT_NE(s, nullptr);
+  EXPECT_TRUE(s->is_string);
+  const auto* h = FindVar(design, "m", "as_chandle");
+  ASSERT_NE(h, nullptr);
+  EXPECT_TRUE(h->is_chandle);
+}
+
+// Table 22-4's `enum` word, read back as the members the user-defined type
+// resolved to: three of them, in the order written, with the values §6.19
+// gives an enumeration whose first member is unassigned.
+inline void ExpectTable224EnumMembersElaborate(RtlirDesign* design) {
+  const auto* m = FindModule(design, "m");
+  ASSERT_NE(m, nullptr);
+  auto members = m->enum_types.find("state_t");
+  ASSERT_NE(members, m->enum_types.end());
+  ASSERT_EQ(members->second.size(), 3u);
+  EXPECT_EQ(members->second[0].name, "IDLE");
+  EXPECT_EQ(members->second[0].value, 0);
+  EXPECT_EQ(members->second[2].name, "DONE");
+  EXPECT_EQ(members->second[2].value, 2);
+}
+
+// Table 22-4's four procedural words, each read back as the process kind it
+// infers. A process carries no name, so the kind is the whole of what
+// distinguishes `always_comb` from `always_ff`, `always_latch` and `final`.
+inline void ExpectTable224ProcessesElaborate(RtlirDesign* design) {
+  EXPECT_TRUE(HasProcess(design, "m", RtlirProcessKind::kAlwaysComb));
+  EXPECT_TRUE(HasProcess(design, "m", RtlirProcessKind::kAlwaysFF));
+  EXPECT_TRUE(HasProcess(design, "m", RtlirProcessKind::kAlwaysLatch));
+  EXPECT_TRUE(HasProcess(design, "m", RtlirProcessKind::kFinal));
+}
+
+// Table 22-4's design elements beyond the module, read back as the elements
+// they make rather than as the words that wrote them: `package`/`endpackage`
+// leaves one package in the design, `import` leaves a wildcard import on the
+// module, and `interface`/`endinterface` leaves a design element the
+// elaborator marks as an interface.
+inline void ExpectTable224DesignElementsElaborate(RtlirDesign* design) {
+  EXPECT_EQ(design->packages.size(), 1u);
+
+  const auto* m = FindModule(design, "m");
+  ASSERT_NE(m, nullptr);
+  bool wildcard_import_seen = false;
+  for (const auto& imp : m->imports) {
+    if (imp.package_name == "pkg" && imp.is_wildcard)
+      wildcard_import_seen = true;
+  }
+  EXPECT_TRUE(wildcard_import_seen);
+
+  const auto* ifc = FindModule(design, "ifc");
+  ASSERT_NE(ifc, nullptr);
+  EXPECT_TRUE(ifc->is_interface);
+}
+
+// The closing leg: the same source under "1364-2005", the last specifier
+// before Table 22-4, where none of it elaborates. Every SystemVerilog word the
+// source is built from is an ordinary identifier there, so `package` at its
+// head reaches no top-level production and Parser::ParseTopLevel in
+// src/parser/parser.cpp reports "expected top-level declaration". That report
+// is this leg's subject, so the source is not required to parse.
+inline void ExpectTable224SourceRejectedUnder2005(const std::string& src) {
+  ElabFixture included;
+  ElaborateWithPreprocessorAllowingParseErrors(In2005(src), included, "m");
+  EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
+                            "expected top-level declaration", LineInRegion(1),
+                            "3.12.1"));
 }
 
 // Table 22-4, the SystemVerilog-2005 list, read back as elaborated structure:
@@ -217,68 +337,11 @@ inline void ExpectTable224DeclarationsElaborate(const char* spec) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 
-  struct TypedVar {
-    const char* name;
-    uint32_t width;
-    bool four_state;
-  };
-  const TypedVar kVars[] = {
-      {"as_logic", 8, true}, {"as_bit", 8, false},
-      {"as_byte", 8, false}, {"as_shortint", 16, false},
-      {"as_int", 32, false}, {"as_longint", 64, false},
-      {"as_var", 4, true},   {"as_reg", 8, true},
-      {"wide", 8, true},     {"phase", 2, true},
-  };
-  for (const auto& c : kVars) {
-    const auto* v = FindVar(design, "m", c.name);
-    ASSERT_NE(v, nullptr) << c.name;
-    EXPECT_EQ(v->width, c.width) << c.name;
-    EXPECT_EQ(v->is_4state, c.four_state) << c.name;
-  }
-
-  const auto* s = FindVar(design, "m", "as_string");
-  ASSERT_NE(s, nullptr);
-  EXPECT_TRUE(s->is_string);
-  const auto* h = FindVar(design, "m", "as_chandle");
-  ASSERT_NE(h, nullptr);
-  EXPECT_TRUE(h->is_chandle);
-
-  const auto* m = FindModule(design, "m");
-  ASSERT_NE(m, nullptr);
-  auto members = m->enum_types.find("state_t");
-  ASSERT_NE(members, m->enum_types.end());
-  ASSERT_EQ(members->second.size(), 3u);
-  EXPECT_EQ(members->second[0].name, "IDLE");
-  EXPECT_EQ(members->second[0].value, 0);
-  EXPECT_EQ(members->second[2].name, "DONE");
-  EXPECT_EQ(members->second[2].value, 2);
-
-  EXPECT_TRUE(HasProcess(design, "m", RtlirProcessKind::kAlwaysComb));
-  EXPECT_TRUE(HasProcess(design, "m", RtlirProcessKind::kAlwaysFF));
-  EXPECT_TRUE(HasProcess(design, "m", RtlirProcessKind::kAlwaysLatch));
-  EXPECT_TRUE(HasProcess(design, "m", RtlirProcessKind::kFinal));
-
-  EXPECT_EQ(design->packages.size(), 1u);
-  bool wildcard_import_seen = false;
-  for (const auto& imp : m->imports) {
-    if (imp.package_name == "pkg" && imp.is_wildcard)
-      wildcard_import_seen = true;
-  }
-  EXPECT_TRUE(wildcard_import_seen);
-  const auto* ifc = FindModule(design, "ifc");
-  ASSERT_NE(ifc, nullptr);
-  EXPECT_TRUE(ifc->is_interface);
-
-  ElabFixture included;
-  // Under "1364-2005" every SystemVerilog word this source is built from is an
-  // ordinary identifier, so `package` at its head reaches no top-level
-  // production and Parser::ParseTopLevel in src/parser/parser.cpp reports
-  // "expected top-level declaration". That report is this leg's
-  // subject, so the source is not required to parse.
-  ElaborateWithPreprocessorAllowingParseErrors(In2005(kSrc), included, "m");
-  EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
-                            "expected top-level declaration", LineInRegion(1),
-                            "3.12.1"));
+  ExpectTable224DataTypesElaborate(design);
+  ExpectTable224EnumMembersElaborate(design);
+  ExpectTable224ProcessesElaborate(design);
+  ExpectTable224DesignElementsElaborate(design);
+  ExpectTable224SourceRejectedUnder2005(kSrc);
 }
 
 // The two let declarations a source states the `let` and `untyped` words

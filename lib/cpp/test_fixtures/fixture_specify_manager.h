@@ -110,7 +110,7 @@ inline void RegisterPathPulseSpecparams(const ModuleDecl& mod, SimFixture& f,
       if (s.has_error) {
         s.error = EvalExpr(si->pathpulse_error, f.ctx, f.arena).ToUint64();
       }
-      specs.push_back(std::move(s));
+      specs.push_back(s);
     }
   }
   mgr.ResolvePulseControlSpecparams(specs);

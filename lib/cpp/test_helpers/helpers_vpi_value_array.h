@@ -17,6 +17,22 @@
 
 using namespace delta;
 
+// What kind of array VpiValueArraySimBase::MakeArray builds: the vpiStaticArray
+// or vpiDynamicArray the handle reports, and whether its elements are 4-state.
+// Both default to what most tests want, and they travel together so that
+// MakeArray stays inside the five parameters
+// readability-function-size.ParameterThreshold allows; stating them
+// positionally took six.
+//
+// It stands here rather than inside the class because a default argument
+// written `ArrayKind kind = {}` reads the struct's own default member
+// initializers, and those are not available inside the definition of a class
+// enclosing the struct.
+struct ArrayKind {
+  int array_type = vpiStaticArray;
+  bool four_state = true;
+};
+
 // Shared base fixture for the vpi_get_value_array / vpi_put_value_array tests.
 // It installs a global VPI context for the duration of a test and offers a
 // helper to build a static unpacked array of freshly created element variables,
@@ -26,16 +42,6 @@ class VpiValueArraySimBase : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
-
-  // What kind of array MakeArray builds: the vpiStaticArray or vpiDynamicArray
-  // the handle reports, and whether its elements are 4-state. Both default to
-  // what most tests want, and they travel together so that MakeArray stays
-  // inside the five parameters readability-function-size.ParameterThreshold
-  // allows; stating them positionally took six.
-  struct ArrayKind {
-    int array_type = vpiStaticArray;
-    bool four_state = true;
-  };
 
   // Build a static unpacked array with `count` freshly created element
   // variables (all bits initialized to x) and retain the variable pointers.

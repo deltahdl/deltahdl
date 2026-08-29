@@ -210,7 +210,7 @@ inline StrengthSignal CombineAmbiguousWithUnambiguous(StrengthSignal unambig,
                                                       StrengthSignal ambig) {
   bool vu_is_0 = unambig.value == Val4::kV0;
   StrengthLevel s_u = vu_is_0 ? unambig.strength0_hi : unambig.strength1_hi;
-  uint8_t s_u_idx = static_cast<uint8_t>(s_u);
+  auto s_u_idx = static_cast<uint8_t>(s_u);
 
   // Split the ambiguous signal into its component on the unambiguous value side
   // (Vu) and the opposite value side (!Vu).

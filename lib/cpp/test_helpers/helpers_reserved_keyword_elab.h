@@ -192,6 +192,41 @@ inline void ExpectDeclsFailInRegionButElaborateOutside(
   }
 }
 
+// The four freed words whose declaration states a width, read back off the
+// elaborated design: each names a variable carrying the storage the
+// declaration asked for. `reg [63:0]`, `reg [7:0]`, `integer` and `time` are
+// the declarations, so 64, 8, 32 and 64 are the widths §6.11 gives them.
+inline void ExpectFreedWordsNameVariablesOfDeclaredWidth(RtlirDesign* design) {
+  const auto* v = FindVar(design, "m", "logic");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->width, 64u);
+
+  v = FindVar(design, "m", "bit");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->width, 8u);
+
+  v = FindVar(design, "m", "int");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->width, 32u);
+
+  v = FindVar(design, "m", "longint");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->width, 64u);
+}
+
+// The two freed words whose declaration states a kind rather than a width.
+// `real` is one of the real types of §6.12 and `event` is the event of §6.17,
+// so each variable is read back by what it is and not by how wide it is.
+inline void ExpectFreedWordsNameRealAndEventVariables(RtlirDesign* design) {
+  const auto* v = FindVar(design, "m", "shortreal");
+  ASSERT_NE(v, nullptr);
+  EXPECT_TRUE(v->is_real);
+
+  v = FindVar(design, "m", "package");
+  ASSERT_NE(v, nullptr);
+  EXPECT_TRUE(v->is_event);
+}
+
 // Words a later standard reserves, staying ordinary identifiers all the way
 // into the elaborated design: each names a variable that really exists there,
 // carrying the storage its declaration asked for. Getting past the parser is
@@ -211,29 +246,8 @@ inline void ExpectFreedWordsNameElaboratedVariables(const char* spec) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 
-  const auto* v = FindVar(design, "m", "logic");
-  ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->width, 64u);
-
-  v = FindVar(design, "m", "bit");
-  ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->width, 8u);
-
-  v = FindVar(design, "m", "int");
-  ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->width, 32u);
-
-  v = FindVar(design, "m", "shortreal");
-  ASSERT_NE(v, nullptr);
-  EXPECT_TRUE(v->is_real);
-
-  v = FindVar(design, "m", "longint");
-  ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->width, 64u);
-
-  v = FindVar(design, "m", "package");
-  ASSERT_NE(v, nullptr);
-  EXPECT_TRUE(v->is_event);
+  ExpectFreedWordsNameVariablesOfDeclaredWidth(design);
+  ExpectFreedWordsNameRealAndEventVariables(design);
 }
 
 // The four names a two-module hierarchy is built from. A word free under one
@@ -339,6 +353,70 @@ inline void ExpectEveryConstantFormResolves(const char* spec,
   }
 }
 
+// The three ports `child` declares in its module header, each carrying the
+// data type written on it into the elaborated design. §23.2.2.1 gives that
+// header form -- an ansi_port_declaration states a port's direction and its
+// data type in the one place -- so the type and the direction are both read
+// back off the port rather than off a body declaration.
+inline void ExpectAnsiHeaderPortsCarryDeclaredTypes(RtlirDesign* design) {
+  const auto* child = FindModule(design, "child");
+  ASSERT_NE(child, nullptr);
+  ASSERT_EQ(child->ports.size(), 3u);
+  EXPECT_EQ(child->ports[0].type_kind, DataTypeKind::kLogic);
+  EXPECT_EQ(child->ports[0].width, 8u);
+  EXPECT_EQ(child->ports[1].type_kind, DataTypeKind::kByte);
+  EXPECT_EQ(child->ports[1].width, 8u);
+  EXPECT_EQ(child->ports[2].type_kind, DataTypeKind::kInt);
+  EXPECT_EQ(child->ports[2].direction, Direction::kOutput);
+  EXPECT_EQ(child->ports[2].width, 32u);
+}
+
+// The parent's own objects, including the one whose declaration carries its
+// value rather than taking it from a separate assignment. §6.8 admits that
+// initializer on a variable declaration, so the elaborated variable has to
+// hold an initializing expression as well as its width.
+inline void ExpectParentObjectsAndInitializerElaborate(RtlirDesign* design) {
+  const auto* dst = FindVar(design, "top", "dst");
+  ASSERT_NE(dst, nullptr);
+  EXPECT_EQ(dst->width, 32u);
+  const auto* counted = FindVar(design, "top", "counted");
+  ASSERT_NE(counted, nullptr);
+  EXPECT_EQ(counted->width, 32u);
+  EXPECT_NE(counted->init_expr, nullptr);
+}
+
+// A port typed in the module body rather than in the header, under `spec`.
+// §23.2.2.2 gives that separate style -- the header lists only port
+// identifiers and the body declares them -- and a port so declared may take a
+// variable declaration beside its port declaration, which is what `output
+// [7:0] y;` followed by `logic [7:0] y;` is. The design has to carry the
+// direction from the one and the variable from the other.
+//
+// This leg elaborates its own source and asserts on its own pointer, so the
+// ASSERT_NE below returns from this function with nothing left in it that
+// would read a null design.
+inline void ExpectNonAnsiPortDeclarationsElaborate(const char* spec) {
+  ElabFixture non_ansi;
+  auto* design = ElaborateWithPreprocessor(In(spec,
+                                              "module ch (a, y);\n"
+                                              "  input  [7:0] a;\n"
+                                              "  output [7:0] y;\n"
+                                              "  logic  [7:0] y;\n"
+                                              "  always_comb y = a + a;\n"
+                                              "endmodule\n"),
+                                           non_ansi, "ch");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(non_ansi.has_errors);
+  const auto* m = FindModule(design, "ch");
+  ASSERT_NE(m, nullptr);
+  ASSERT_EQ(m->ports.size(), 2u);
+  EXPECT_EQ(m->ports[1].name, "y");
+  EXPECT_EQ(m->ports[1].direction, Direction::kOutput);
+  const auto* y = FindVar(design, "ch", "y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->width, 8u);
+}
+
 // The declaration forms a word sweep does not reach, carried into the
 // elaborated design. A declaration may bring its own initializer along, a port
 // may be typed in the module header, and a port may instead be typed in the
@@ -375,44 +453,7 @@ inline void ExpectEveryDeclarationFormElaborates(const char* spec) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(ansi.has_errors);
 
-  const auto* child = FindModule(design, "child");
-  ASSERT_NE(child, nullptr);
-  ASSERT_EQ(child->ports.size(), 3u);
-  EXPECT_EQ(child->ports[0].type_kind, DataTypeKind::kLogic);
-  EXPECT_EQ(child->ports[0].width, 8u);
-  EXPECT_EQ(child->ports[1].type_kind, DataTypeKind::kByte);
-  EXPECT_EQ(child->ports[1].width, 8u);
-  EXPECT_EQ(child->ports[2].type_kind, DataTypeKind::kInt);
-  EXPECT_EQ(child->ports[2].direction, Direction::kOutput);
-  EXPECT_EQ(child->ports[2].width, 32u);
-
-  // The parent's own objects, including the one whose declaration carries its
-  // value rather than taking it from a separate assignment.
-  const auto* dst = FindVar(design, "top", "dst");
-  ASSERT_NE(dst, nullptr);
-  EXPECT_EQ(dst->width, 32u);
-  const auto* counted = FindVar(design, "top", "counted");
-  ASSERT_NE(counted, nullptr);
-  EXPECT_EQ(counted->width, 32u);
-  EXPECT_NE(counted->init_expr, nullptr);
-
-  ElabFixture non_ansi;
-  design = ElaborateWithPreprocessor(In(spec,
-                                        "module ch (a, y);\n"
-                                        "  input  [7:0] a;\n"
-                                        "  output [7:0] y;\n"
-                                        "  logic  [7:0] y;\n"
-                                        "  always_comb y = a + a;\n"
-                                        "endmodule\n"),
-                                     non_ansi, "ch");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(non_ansi.has_errors);
-  const auto* m = FindModule(design, "ch");
-  ASSERT_NE(m, nullptr);
-  ASSERT_EQ(m->ports.size(), 2u);
-  EXPECT_EQ(m->ports[1].name, "y");
-  EXPECT_EQ(m->ports[1].direction, Direction::kOutput);
-  const auto* y = FindVar(design, "ch", "y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->width, 8u);
+  ExpectAnsiHeaderPortsCarryDeclaredTypes(design);
+  ExpectParentObjectsAndInitializerElaborate(design);
+  ExpectNonAnsiPortDeclarationsElaborate(spec);
 }

@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <iterator>
 #include <string>
+#include <vector>
 
 #include "fixture_parser.h"
 #include "helpers_keyword_version.h"
@@ -178,6 +179,84 @@ inline void ExpectTable223ConstructsParse(const char* spec) {
   }
 }
 
+// The design elements Table 22-4 adds beside the module, each read back by the
+// name its declaration gave it: `package` heads a package, `interface` heads an
+// interface with a `modport` in it, and `class` heads a class. A word that
+// stayed reserved but stopped heading its declaration would leave one of these
+// lists empty.
+inline void ExpectTable224DesignElementsParse(CompilationUnit* cu) {
+  ASSERT_EQ(cu->packages.size(), 1u);
+  EXPECT_EQ(cu->packages[0]->name, "pkg");
+  ASSERT_EQ(cu->interfaces.size(), 1u);
+  EXPECT_EQ(cu->interfaces[0]->name, "ifc");
+  ASSERT_EQ(cu->classes.size(), 1u);
+  EXPECT_EQ(cu->classes[0]->name, "base");
+}
+
+// Table 22-4's user-defined types, inferred process forms and verification
+// declarations, read off `items`: `typedef` names the enumeration, the packed
+// structure and the plain alias; `always_comb`, `always_ff`, `always_latch` and
+// `final` each build the process form their word exists to infer; and
+// `property` and `sequence` each build the declaration their word opens.
+inline void ExpectTable224TypesAndProcessesParse(
+    const std::vector<ModuleItem*>& items) {
+  for (const char* name : {"byte_t", "state_t", "pair_t"}) {
+    EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kTypedef, name))
+        << name;
+  }
+  EXPECT_NE(FindItemByKind(items, ModuleItemKind::kAlwaysCombBlock), nullptr);
+  EXPECT_NE(FindItemByKind(items, ModuleItemKind::kAlwaysFFBlock), nullptr);
+  EXPECT_NE(FindItemByKind(items, ModuleItemKind::kAlwaysLatchBlock), nullptr);
+  EXPECT_NE(FindItemByKind(items, ModuleItemKind::kFinalBlock), nullptr);
+  EXPECT_TRUE(
+      HasItemKindNamed(items, ModuleItemKind::kPropertyDecl, "p_handshake"));
+  EXPECT_TRUE(
+      HasItemKindNamed(items, ModuleItemKind::kSequenceDecl, "s_pulse"));
+}
+
+// Table 22-4's data type words in the role each holds: every entry of the table
+// below heads a variable declaration in `items`, and the declaration carries
+// the DataTypeKind its word names. Reading the kind back is what separates a
+// word that still types a declaration from one the parser merely accepted.
+inline void ExpectTable224DataTypeKindsParse(
+    const std::vector<ModuleItem*>& items) {
+  struct TypedDecl {
+    const char* name;
+    DataTypeKind kind;
+  };
+  const TypedDecl kDecls[] = {
+      {"as_bit", DataTypeKind::kBit},
+      {"as_byte", DataTypeKind::kByte},
+      {"as_shortint", DataTypeKind::kShortint},
+      {"as_int", DataTypeKind::kInt},
+      {"as_longint", DataTypeKind::kLongint},
+      {"as_string", DataTypeKind::kString},
+      {"as_chandle", DataTypeKind::kChandle},
+  };
+  for (const auto& d : kDecls) {
+    bool found = false;
+    for (auto* item : items) {
+      if (item->kind != ModuleItemKind::kVarDecl || item->name != d.name)
+        continue;
+      found = true;
+      EXPECT_EQ(item->data_type.kind, d.kind) << d.name;
+    }
+    EXPECT_TRUE(found) << d.name;
+  }
+}
+
+// The closing leg the accepting checks above rest on: "1364-2005", the last
+// specifier before Table 22-4, reserves none of the words `src` is written in,
+// so `package` on its first line heads no top-level declaration and
+// Parser::ParseTopLevel in src/parser/parser.cpp says so. Without this leg an
+// accepting check would hold for any source that happened to parse.
+inline void ExpectTable224SourceUnwritableBeforeSystemVerilog(
+    const std::string& src) {
+  auto before = ParseWithPreprocessor(In2005(src));
+  EXPECT_TRUE(ReportedError(before.diags, "expected top-level declaration",
+                            LineInRegion(1), "3.12.1"));
+}
+
 // Table 22-4, the SystemVerilog-2005 list, the largest thing a later specifier
 // inherits: the design elements beyond the module, the data types with their
 // kinds, the user-defined types, the inferred process forms, and the
@@ -235,57 +314,11 @@ inline void ExpectTable224ConstructsParse(const char* spec) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->name, "base");
-
+  ExpectTable224DesignElementsParse(r.cu);
   auto& items = r.cu->modules[0]->items;
-  for (const char* name : {"byte_t", "state_t", "pair_t"}) {
-    EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kTypedef, name))
-        << name;
-  }
-  EXPECT_NE(FindItemByKind(items, ModuleItemKind::kAlwaysCombBlock), nullptr);
-  EXPECT_NE(FindItemByKind(items, ModuleItemKind::kAlwaysFFBlock), nullptr);
-  EXPECT_NE(FindItemByKind(items, ModuleItemKind::kAlwaysLatchBlock), nullptr);
-  EXPECT_NE(FindItemByKind(items, ModuleItemKind::kFinalBlock), nullptr);
-  EXPECT_TRUE(
-      HasItemKindNamed(items, ModuleItemKind::kPropertyDecl, "p_handshake"));
-  EXPECT_TRUE(
-      HasItemKindNamed(items, ModuleItemKind::kSequenceDecl, "s_pulse"));
-
-  struct TypedDecl {
-    const char* name;
-    DataTypeKind kind;
-  };
-  const TypedDecl kDecls[] = {
-      {"as_bit", DataTypeKind::kBit},
-      {"as_byte", DataTypeKind::kByte},
-      {"as_shortint", DataTypeKind::kShortint},
-      {"as_int", DataTypeKind::kInt},
-      {"as_longint", DataTypeKind::kLongint},
-      {"as_string", DataTypeKind::kString},
-      {"as_chandle", DataTypeKind::kChandle},
-  };
-  for (const auto& d : kDecls) {
-    bool found = false;
-    for (auto* item : items) {
-      if (item->kind != ModuleItemKind::kVarDecl || item->name != d.name)
-        continue;
-      found = true;
-      EXPECT_EQ(item->data_type.kind, d.kind) << d.name;
-    }
-    EXPECT_TRUE(found) << d.name;
-  }
-
-  // "1364-2005" reserves none of the words the source above is written in, so
-  // `package` on its first line heads no top-level declaration and
-  // Parser::ParseTopLevel in src/parser/parser.cpp says so.
-  auto before = ParseWithPreprocessor(In2005(kSrc));
-  EXPECT_TRUE(ReportedError(before.diags, "expected top-level declaration",
-                            LineInRegion(1), "3.12.1"));
+  ExpectTable224TypesAndProcessesParse(items);
+  ExpectTable224DataTypeKindsParse(items);
+  ExpectTable224SourceUnwritableBeforeSystemVerilog(kSrc);
 }
 
 // The reserving half at this stage, table by table. Every entry of `t` is put
@@ -329,6 +362,40 @@ inline void ExpectKeywordTableIsReservedAtParse(const char* spec,
   EXPECT_EQ(swept, t.expected_swept) << t.what;
 }
 
+// The design element and the ports of the source
+// ExpectFreedWordsNameDeclaredEntities below parses: `bit` names the module and
+// `logic` and `byte` name its two ports, each read back off the declaration the
+// parser built.
+inline void ExpectFreedWordNamesModuleAndPorts(ModuleDecl* m) {
+  EXPECT_EQ(m->name, "bit");
+  ASSERT_EQ(m->ports.size(), 2u);
+  EXPECT_EQ(m->ports[0].name, "logic");
+  EXPECT_EQ(m->ports[1].name, "byte");
+}
+
+// The declarations inside that same module, one freed word per declaration
+// kind: `int` names the parameter, `string` the net, `longint` the variable and
+// `shortint` the task. Each is looked up by kind as well as by name, so a word
+// read back off some other declaration does not answer for its own.
+inline void ExpectFreedWordsNameModuleDeclarations(
+    const std::vector<ModuleItem*>& items) {
+  EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kParamDecl, "int"));
+  EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kNetDecl, "string"));
+  EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kVarDecl, "longint"));
+  EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kTaskDecl, "shortint"));
+}
+
+// The instantiation that source writes in its second module: `bit` names the
+// module being instantiated and `interface` names the instance, a position no
+// declaration reaches.
+inline void ExpectFreedWordNamesInstance(
+    const std::vector<ModuleItem*>& items) {
+  auto* u = FindItemByKind(items, ModuleItemKind::kModuleInst);
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(u->inst_module, "bit");
+  EXPECT_EQ(u->inst_name, "interface");
+}
+
 // A word no list in force reserves is an ordinary identifier, so it can name
 // anything an identifier names. Declarations are only the most obvious
 // position: this runs words a later standard reserves through the module name,
@@ -355,22 +422,9 @@ inline void ExpectFreedWordsNameDeclaredEntities(const char* spec) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 2u);
 
-  auto* m = r.cu->modules[0];
-  EXPECT_EQ(m->name, "bit");
-  ASSERT_EQ(m->ports.size(), 2u);
-  EXPECT_EQ(m->ports[0].name, "logic");
-  EXPECT_EQ(m->ports[1].name, "byte");
-  EXPECT_TRUE(HasItemKindNamed(m->items, ModuleItemKind::kParamDecl, "int"));
-  EXPECT_TRUE(HasItemKindNamed(m->items, ModuleItemKind::kNetDecl, "string"));
-  EXPECT_TRUE(HasItemKindNamed(m->items, ModuleItemKind::kVarDecl, "longint"));
-  EXPECT_TRUE(
-      HasItemKindNamed(m->items, ModuleItemKind::kTaskDecl, "shortint"));
-
-  auto* u =
-      FindItemByKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst);
-  ASSERT_NE(u, nullptr);
-  EXPECT_EQ(u->inst_module, "bit");
-  EXPECT_EQ(u->inst_name, "interface");
+  ExpectFreedWordNamesModuleAndPorts(r.cu->modules[0]);
+  ExpectFreedWordsNameModuleDeclarations(r.cu->modules[0]->items);
+  ExpectFreedWordNamesInstance(r.cu->modules[1]->items);
 }
 
 // The same freed word as an expression operand and as the target of a

@@ -118,6 +118,74 @@ inline void ExpectWordsNameEntitiesUnder(
   }
 }
 
+// `word` names a design element under `spec`: the module declaration parses and
+// the name is read back off it. This is the "design element" position of
+// kIdentifierPositions on its accepting side.
+inline void ExpectUnlistedWordNamesDesignElement(const char* spec,
+                                                 const char* word) {
+  std::string as_module = std::string("module ") + word + ";\nendmodule\n";
+  auto named_module = ParseWithPreprocessor(In(spec, as_module));
+  ASSERT_NE(named_module.cu, nullptr) << word;
+  EXPECT_FALSE(named_module.has_errors) << word;
+  ASSERT_EQ(named_module.cu->modules.size(), 1u) << word;
+  EXPECT_EQ(named_module.cu->modules[0]->name, word);
+}
+
+// `word` names a port under `spec`: the port declaration parses, the word is
+// referred to again in the continuous assignment below it, and the name is read
+// back off the port list. This is the "port" position of kIdentifierPositions
+// on its accepting side.
+inline void ExpectUnlistedWordNamesPort(const char* spec, const char* word) {
+  std::string as_port = std::string("module m (input wire ") + word +
+                        ", output wire y);\n  assign y = " + word +
+                        ";\nendmodule\n";
+  auto named_port = ParseWithPreprocessor(In(spec, as_port));
+  ASSERT_NE(named_port.cu, nullptr) << word;
+  EXPECT_FALSE(named_port.has_errors) << word;
+  ASSERT_EQ(named_port.cu->modules[0]->ports.size(), 2u) << word;
+  EXPECT_EQ(named_port.cu->modules[0]->ports[0].name, word);
+}
+
+// `word` names a module instance under `spec`: the instantiation parses and the
+// instance name is read back off the item the parser built for it. This is the
+// "instance" position of kIdentifierPositions on its accepting side.
+inline void ExpectUnlistedWordNamesInstance(const char* spec,
+                                            const char* word) {
+  std::string as_instance = std::string(
+                                "module ch (input wire a, output wire y);\n"
+                                "  assign y = a;\n"
+                                "endmodule\n"
+                                "module top;\n"
+                                "  wire a, b;\n"
+                                "  ch ") +
+                            word + " (.a(a), .y(b));\nendmodule\n";
+  auto named_instance = ParseWithPreprocessor(In(spec, as_instance));
+  ASSERT_NE(named_instance.cu, nullptr) << word;
+  EXPECT_FALSE(named_instance.has_errors) << word;
+  ASSERT_EQ(named_instance.cu->modules.size(), 2u) << word;
+  auto* inst = FindItemByKind(named_instance.cu->modules[1]->items,
+                              ModuleItemKind::kModuleInst);
+  ASSERT_NE(inst, nullptr) << word;
+  EXPECT_EQ(inst->inst_name, word);
+}
+
+// `word` names a task and a named block under `spec`, the two positions of
+// kIdentifierPositions whose acceptance is answered for by the parse alone: the
+// task declaration is followed by a call spelling the same word, and the block
+// label is the word by itself.
+inline void ExpectUnlistedWordNamesTaskAndBlock(const char* spec,
+                                                const char* word) {
+  std::string as_task = std::string("module m;\n  reg [7:0] r;\n  task ") +
+                        word + "; r = 8'd1; endtask\n  initial begin : blk " +
+                        word + "; end\nendmodule\n";
+  EXPECT_TRUE(ParseWithPreprocessorOk(In(spec, as_task))) << word;
+
+  std::string as_block =
+      std::string("module m;\n  reg [7:0] r;\n  initial begin : ") + word +
+      " r = 8'd1; end\nendmodule\n";
+  EXPECT_TRUE(ParseWithPreprocessorOk(In(spec, as_block))) << word;
+}
+
 // Every word of `words` accepted in each of five identifier positions under
 // `spec` -- design element, port, instance, task and named block -- with three
 // of the five read back off the parsed tree.
@@ -131,47 +199,9 @@ inline void ExpectWordsNameEntitiesUnder(
 inline void ExpectUnlistedWordsNameEveryEntity(
     const char* spec, std::initializer_list<const char*> words) {
   for (const char* word : words) {
-    std::string as_module = std::string("module ") + word + ";\nendmodule\n";
-    auto named_module = ParseWithPreprocessor(In(spec, as_module));
-    ASSERT_NE(named_module.cu, nullptr) << word;
-    EXPECT_FALSE(named_module.has_errors) << word;
-    ASSERT_EQ(named_module.cu->modules.size(), 1u) << word;
-    EXPECT_EQ(named_module.cu->modules[0]->name, word);
-
-    std::string as_port = std::string("module m (input wire ") + word +
-                          ", output wire y);\n  assign y = " + word +
-                          ";\nendmodule\n";
-    auto named_port = ParseWithPreprocessor(In(spec, as_port));
-    ASSERT_NE(named_port.cu, nullptr) << word;
-    EXPECT_FALSE(named_port.has_errors) << word;
-    ASSERT_EQ(named_port.cu->modules[0]->ports.size(), 2u) << word;
-    EXPECT_EQ(named_port.cu->modules[0]->ports[0].name, word);
-
-    std::string as_instance = std::string(
-                                  "module ch (input wire a, output wire y);\n"
-                                  "  assign y = a;\n"
-                                  "endmodule\n"
-                                  "module top;\n"
-                                  "  wire a, b;\n"
-                                  "  ch ") +
-                              word + " (.a(a), .y(b));\nendmodule\n";
-    auto named_instance = ParseWithPreprocessor(In(spec, as_instance));
-    ASSERT_NE(named_instance.cu, nullptr) << word;
-    EXPECT_FALSE(named_instance.has_errors) << word;
-    ASSERT_EQ(named_instance.cu->modules.size(), 2u) << word;
-    auto* inst = FindItemByKind(named_instance.cu->modules[1]->items,
-                                ModuleItemKind::kModuleInst);
-    ASSERT_NE(inst, nullptr) << word;
-    EXPECT_EQ(inst->inst_name, word);
-
-    std::string as_task = std::string("module m;\n  reg [7:0] r;\n  task ") +
-                          word + "; r = 8'd1; endtask\n  initial begin : blk " +
-                          word + "; end\nendmodule\n";
-    EXPECT_TRUE(ParseWithPreprocessorOk(In(spec, as_task))) << word;
-
-    std::string as_block =
-        std::string("module m;\n  reg [7:0] r;\n  initial begin : ") + word +
-        " r = 8'd1; end\nendmodule\n";
-    EXPECT_TRUE(ParseWithPreprocessorOk(In(spec, as_block))) << word;
+    ExpectUnlistedWordNamesDesignElement(spec, word);
+    ExpectUnlistedWordNamesPort(spec, word);
+    ExpectUnlistedWordNamesInstance(spec, word);
+    ExpectUnlistedWordNamesTaskAndBlock(spec, word);
   }
 }
