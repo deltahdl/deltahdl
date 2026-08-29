@@ -541,8 +541,17 @@ bool UpdateNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
 void SpecifyManager::AddPathDelay(PathDelay delay, bool preserve_pulse_limits) {
   const PathDelayPulseRetention kRetain{preserve_pulse_limits,
                                         preserve_pulse_limits};
-  const bool kSdfIsNonconditional = delay.condition.empty() && !delay.is_ifnone;
-  if (kSdfIsNonconditional) {
+  // A declared path is unconditional when it carries no condition expression,
+  // not when its condition renders to no text. SpecifyConditionText spells a
+  // condition for §32.4.1's SDF COND matching and says outright that one it
+  // cannot spell yields nothing, so `if (act[0])` and `if (act[4])` both render
+  // empty; reading that as unconditional sends five of §30.5.3's Example 2
+  // paths through the overwrite-all branch below and leaves one. A path built
+  // from an SDF record carries no expression and is judged by its text, which
+  // is the only thing such a record has.
+  const bool kIsNonconditional = delay.condition_expr == nullptr &&
+                                 delay.condition.empty() && !delay.is_ifnone;
+  if (kIsNonconditional) {
     if (!UpdateNonconditionalPathDelays(path_delays_, delay, kRetain,
                                         /*match_inst_prefix=*/true)) {
       path_delays_.push_back(std::move(delay));
@@ -554,6 +563,7 @@ void SpecifyManager::AddPathDelay(PathDelay delay, bool preserve_pulse_limits) {
         existing.dst_port == delay.dst_port &&
         existing.inst_prefix == delay.inst_prefix &&
         existing.condition == delay.condition &&
+        existing.condition_expr == delay.condition_expr &&
         existing.is_ifnone == delay.is_ifnone) {
       ReplacePathDelayPreservingPulse(existing, std::move(delay), kRetain);
       return;
