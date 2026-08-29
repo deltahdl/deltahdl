@@ -227,6 +227,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/module_path_delay.cpp
     simulator/module_path_drive.cpp
     simulator/specify.cpp
+    simulator/specify_condition_text.cpp
     simulator/specify_pulse.cpp
     simulator/specify_register.cpp
     simulator/specify_timing_check.cpp

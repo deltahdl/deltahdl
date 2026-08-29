@@ -58,73 +58,6 @@ void ExpandTransitionDelays(PathDelay& pd) {
   pd.delays[11] = std::min(pd.delays[3], pd.delays[5]);
 }
 
-namespace {
-
-// The spelling of an operator a state-dependent path condition may be built
-// from (§30.4.4.1). An operator with no spelling here is one the condition text
-// below cannot render.
-std::string_view SpecifyConditionOperator(TokenKind op) {
-  switch (op) {
-    case TokenKind::kBang:
-      return "!";
-    case TokenKind::kTilde:
-      return "~";
-    case TokenKind::kAmpAmp:
-      return "&&";
-    case TokenKind::kPipePipe:
-      return "||";
-    case TokenKind::kEqEq:
-      return "==";
-    case TokenKind::kBangEq:
-      return "!=";
-    case TokenKind::kEqEqEq:
-      return "===";
-    case TokenKind::kBangEqEq:
-      return "!==";
-    case TokenKind::kAmp:
-      return "&";
-    case TokenKind::kPipe:
-      return "|";
-    case TokenKind::kCaret:
-      return "^";
-    default:
-      return {};
-  }
-}
-
-}  // namespace
-
-// §32.4.1: render a module path's condition as the text an SDF COND condition
-// is compared against. Backannotation matches a conditional delay to a specify
-// path by names *and* condition, so the condition a state-dependent path was
-// declared with has to travel with the path in a comparable form. A condition
-// this cannot spell out yields no text, leaving the path matched on names
-// alone, exactly as an unconditional one is.
-std::string SpecifyConditionText(const Expr* cond) {
-  if (cond == nullptr) return {};
-  switch (cond->kind) {
-    case ExprKind::kIdentifier:
-      return std::string(cond->text);
-    case ExprKind::kIntegerLiteral:
-      return std::to_string(cond->int_val);
-    case ExprKind::kUnary: {
-      const std::string_view kOp = SpecifyConditionOperator(cond->op);
-      std::string operand = SpecifyConditionText(cond->lhs);
-      if (kOp.empty() || operand.empty()) return {};
-      return std::string(kOp) + operand;
-    }
-    case ExprKind::kBinary: {
-      const std::string_view kOp = SpecifyConditionOperator(cond->op);
-      std::string lhs = SpecifyConditionText(cond->lhs);
-      std::string rhs = SpecifyConditionText(cond->rhs);
-      if (kOp.empty() || lhs.empty() || rhs.empty()) return {};
-      return lhs + " " + std::string(kOp) + " " + rhs;
-    }
-    default:
-      return {};
-  }
-}
-
 PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
                                  Arena& arena) {
   PathDelay pd;
@@ -559,13 +492,14 @@ void SpecifyManager::AddPathDelay(PathDelay delay, bool preserve_pulse_limits) {
   const PathDelayPulseRetention kRetain{preserve_pulse_limits,
                                         preserve_pulse_limits};
   // A declared path is unconditional when it carries no condition expression,
-  // not when its condition renders to no text. SpecifyConditionText spells a
-  // condition for §32.4.1's SDF COND matching and says outright that one it
-  // cannot spell yields nothing, so `if (act[0])` and `if (act[4])` both render
-  // empty; reading that as unconditional sends five of §30.5.3's Example 2
-  // paths through the overwrite-all branch below and leaves one. A path built
-  // from an SDF record carries no expression and is judged by its text, which
-  // is the only thing such a record has.
+  // not when its condition renders to no text. SpecifyConditionText in
+  // simulator/specify_condition_text.cpp spells a condition for §32.4.1's SDF
+  // COND matching and says outright that one it cannot spell yields nothing, so
+  // `if (act[i])` and `if (act[j])` both render empty when `i` and `j` are not
+  // literals; reading that as unconditional would send every such path through
+  // the overwrite-all branch below and leave one. A path built from an SDF
+  // record carries no expression and is judged by its text, which is the only
+  // thing such a record has.
   const bool kIsNonconditional = delay.condition_expr == nullptr &&
                                  delay.condition.empty() && !delay.is_ifnone;
   if (kIsNonconditional) {
