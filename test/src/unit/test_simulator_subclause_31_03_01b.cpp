@@ -52,10 +52,10 @@
 // match another case's.
 //
 // Each source drives both signals to a known level before either transition
-// that matters. TimingCheckEdgeMatches in src/simulator/timing_check_driver.cpp
-// reads no edge out of a transition from x, so the x-to-0 assignments at time 0
-// are not transitions any case counts, and each case's timeline begins at the
-// first delay.
+// that matters. TimingCheckEdgeMatches in
+// src/simulator/timing_check_driver_internal.h reads no edge out of a
+// transition from x, so the x-to-0 assignments at time 0 are not transitions
+// any case counts, and each case's timeline begins at the first delay.
 //
 // Each source is one module named `top`, and it is the only module, because
 // ElaborateSrc in lib/cpp/test_fixtures/fixture_simulator.h elaborates

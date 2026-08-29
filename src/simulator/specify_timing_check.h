@@ -24,6 +24,30 @@ struct TimingCheckEntry {
   std::string data_signal;
   SpecifyEdge data_edge = SpecifyEdge::kNone;
 
+  // §31.5: the edge_descriptor list each of the check's two timing_check_events
+  // was written with, empty for an event written with posedge, negedge or no
+  // edge_control_specifier at all. Each pair is one transition Syntax 31-15
+  // names, its first character the level left and its second the level
+  // arrived at.
+  //
+  // Only '0', '1' and 'x' are stored. Syntax 31-15 also admits 'X', 'z' and
+  // 'Z', and §31.5 has "edge transitions involving z ... treated the same way
+  // as edge transitions involving x", so BuildTimingCheckUnderOptions
+  // (simulator/specify_timing_check.cpp) folds the four spellings into 'x' as
+  // it copies the list off TimingCheckDecl::ref_edge_descriptors
+  // (parser/ast_specify.h). The parser keeps the spelling the source used,
+  // which is what test/src/unit/test_parser_subclause_31_05.cpp asserts.
+  //
+  // These stand beside ref_edge and data_edge rather than replacing them.
+  // §31.5 makes posedge the shorthand for edge[01, 0x, x1] and negedge the
+  // shorthand for edge[10, x0, 1x], and the parser records which of the two
+  // forms was written rather than expanding the shorthand, so an event written
+  // with a shorthand is answered by its SpecifyEdge and one written with the
+  // general form by its list. TimingCheckEdgeMatches
+  // (simulator/timing_check_driver_internal.h) is where the two meet.
+  std::vector<std::pair<char, char>> ref_edge_descriptors;
+  std::vector<std::pair<char, char>> data_edge_descriptors;
+
   // The hierarchical prefix of the module instance whose specify block declared
   // this check, ending in a `.` and empty for a module elaborated as a top.
   // §31.2 puts a system timing check inside a specify block and §30.3 puts that

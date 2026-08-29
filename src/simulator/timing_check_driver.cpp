@@ -70,13 +70,17 @@ bool HoldWindowViolated(uint64_t limit, uint64_t timestamp_ticks,
 }
 
 // Which of the two signals a §31.3 check names is its timestamp event and which
-// is its timecheck event, each with the edge it was written with and qualified
-// by the instance prefix the check was registered under.
+// is its timecheck event, each with the §31.5 edge_control_specifier it was
+// written with and qualified by the instance prefix the check was registered
+// under. The edge is a TimingCheckEdge
+// (simulator/timing_check_driver_internal.h) rather than a SpecifyEdge, so an
+// event written in §31.5's general form carries the edge_descriptor list it
+// named and is matched on that list.
 struct StabilityWindowEvents {
   std::string timestamp_signal;
-  SpecifyEdge timestamp_edge = SpecifyEdge::kNone;
+  TimingCheckEdge timestamp_edge;
   std::string timecheck_signal;
-  SpecifyEdge timecheck_edge = SpecifyEdge::kNone;
+  TimingCheckEdge timecheck_edge;
 };
 
 // Table 31-1 makes $setup's data_event the timestamp event and its
@@ -102,12 +106,12 @@ struct StabilityWindowEvents {
 StabilityWindowEvents EventsOf(const TimingCheckEntry& check) {
   if (check.kind == TimingCheckKind::kSetup) {
     return StabilityWindowEvents{
-        check.inst_prefix + check.data_signal, check.data_edge,
-        check.inst_prefix + check.ref_signal, check.ref_edge};
+        check.inst_prefix + check.data_signal, DataEdgeOf(check),
+        check.inst_prefix + check.ref_signal, RefEdgeOf(check)};
   }
   return StabilityWindowEvents{
-      check.inst_prefix + check.ref_signal, check.ref_edge,
-      check.inst_prefix + check.data_signal, check.data_edge};
+      check.inst_prefix + check.ref_signal, RefEdgeOf(check),
+      check.inst_prefix + check.data_signal, DataEdgeOf(check)};
 }
 
 // One §31.3 check between the two transitions it measures: which entry it is,
@@ -188,8 +192,8 @@ void ArmStabilityWindow(const SpecifyManager& mgr, std::size_t index,
   Variable* timestamp_var = ctx.FindVariable(events.timestamp_signal);
   Variable* timecheck_var = ctx.FindVariable(events.timecheck_signal);
   if (timestamp_var == nullptr || timecheck_var == nullptr) return;
-  SpecifyEdge timestamp_edge = events.timestamp_edge;
-  SpecifyEdge timecheck_edge = events.timecheck_edge;
+  TimingCheckEdge timestamp_edge = events.timestamp_edge;
+  TimingCheckEdge timecheck_edge = events.timecheck_edge;
   auto window = std::make_shared<StabilityWindow>();
   window->armed = ArmedCheck{&mgr, index};
   window->events = std::move(events);
@@ -203,15 +207,15 @@ void ArmStabilityWindow(const SpecifyManager& mgr, std::size_t index,
   // states which of the two an armed watcher is on, and
   // ConditionedEvent::Condition reads TimingCheckEntry::data_condition_expr or
   // TimingCheckEntry::ref_condition_expr accordingly.
-  WatchConditionedEdge(timestamp_var, timestamp_edge,
+  WatchConditionedEdge(timestamp_var, std::move(timestamp_edge),
                        ConditionedEvent{window->armed, is_setup}, ctx,
                        [window, &ctx]() {
                          window->has_timestamp = true;
                          window->timestamp_ticks = ctx.CurrentTime().ticks;
                        });
   WatchConditionedEdge(
-      timecheck_var, timecheck_edge, ConditionedEvent{window->armed, !is_setup},
-      ctx, [window, &ctx]() {
+      timecheck_var, std::move(timecheck_edge),
+      ConditionedEvent{window->armed, !is_setup}, ctx, [window, &ctx]() {
         EvaluateStabilityWindow(*window, ctx.CurrentTime().ticks, ctx);
       });
 }

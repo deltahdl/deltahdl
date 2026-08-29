@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
@@ -59,28 +60,75 @@ inline EdgeLevel LevelOfLsb(const Logic4Vec& v) {
   return (v.words[0].aval & 1U) != 0U ? EdgeLevel::kOne : EdgeLevel::kZero;
 }
 
-// Whether a change from `from` to `to` is the edge `edge` names. §31.5 makes
-// posedge the shorthand for edge[01, 0x, x1] and negedge the shorthand for
-// edge[10, x0, 1x], so posedge is every transition that leaves 0 or arrives at
-// 1, and negedge every transition that leaves 1 or arrives at 0. A value that
-// did not change is no transition at all and is neither.
+// The level one half of an edge_descriptor names. TimingCheckEntry holds only
+// the '0', '1' and 'x' that BuildTimingCheckUnderOptions
+// (simulator/specify_timing_check.cpp) folded z and the upper-case spellings
+// into, so anything that is not '0' or '1' is the x §31.5 treats z as.
+inline EdgeLevel LevelOfDescriptorChar(char c) {
+  if (c == '0') return EdgeLevel::kZero;
+  if (c == '1') return EdgeLevel::kOne;
+  return EdgeLevel::kUnknown;
+}
+
+// §31.5's edge_control_specifier as a watcher matches it: the shorthand the
+// timing_check_event was written with, together with the edge_descriptor list
+// where the general form was written instead. §31.5 gives the two forms
+// separately -- posedge is a shorthand for edge[01, 0x, x1] rather than a
+// second name for it -- and the parser records which was written, so both
+// travel to the watcher and TimingCheckEdgeMatches picks between them.
+//
+// The list is held by value because a watcher outlives the arming call:
+// WatchEdge moves it into the lambda it installs on the variable, which fires
+// for the rest of the run.
+struct TimingCheckEdge {
+  SpecifyEdge edge = SpecifyEdge::kNone;
+  std::vector<std::pair<char, char>> descriptors;
+};
+
+// The edge_control_specifier of a check's reference_event and of its
+// data_event, read off the entry the two were built into.
+inline TimingCheckEdge RefEdgeOf(const TimingCheckEntry& check) {
+  return TimingCheckEdge{check.ref_edge, check.ref_edge_descriptors};
+}
+
+inline TimingCheckEdge DataEdgeOf(const TimingCheckEntry& check) {
+  return TimingCheckEdge{check.data_edge, check.data_edge_descriptors};
+}
+
+// Whether a change from `from` to `to` is a transition `edge` names. A value
+// that did not change is no transition at all and is never one.
+//
+// An edge_control_specifier written in the general form names its transitions
+// outright, and §31.5 admits six of them -- 01, 0x, 10, 1x, x0 and x1 -- so the
+// list is compared against the two levels directly and a transition it does not
+// list is not the event. The list is what decides wherever one was written,
+// SpecifyEdge::kEdge saying only that the general form was used.
+//
+// Where no list was written, §31.5 makes posedge the shorthand for edge[01, 0x,
+// x1] and negedge the shorthand for edge[10, x0, 1x], so posedge is every
+// transition that leaves 0 or arrives at 1, and negedge every transition that
+// leaves 1 or arrives at 0.
 //
 // SpecifyEdge::kNone is a timing_check_event written without an
 // edge_control_specifier, which Syntax 31-2 (§31.2) allows and which no edge
-// restricts, so every transition matches it. SpecifyEdge::kEdge is answered the
-// same way and that answer is not exact: the edge_descriptor list an
-// edge-control specifier was written with is parsed into
-// TimingCheckDecl::ref_edge_descriptors (src/parser/ast_specify.h) and
-// TimingCheckEntry (src/simulator/specify_timing_check.h) carries no field for
-// it, so `edge[01]` cannot be told apart from `edge[10]` here.
-inline bool TimingCheckEdgeMatches(SpecifyEdge edge, EdgeLevel from,
+// restricts, so every transition matches it.
+inline bool TimingCheckEdgeMatches(const TimingCheckEdge& edge, EdgeLevel from,
                                    EdgeLevel to) {
   if (from == EdgeLevel::kAbsent || to == EdgeLevel::kAbsent) return false;
   if (from == to) return false;
-  if (edge == SpecifyEdge::kPosedge) {
+  if (!edge.descriptors.empty()) {
+    for (const std::pair<char, char>& descriptor : edge.descriptors) {
+      if (LevelOfDescriptorChar(descriptor.first) == from &&
+          LevelOfDescriptorChar(descriptor.second) == to) {
+        return true;
+      }
+    }
+    return false;
+  }
+  if (edge.edge == SpecifyEdge::kPosedge) {
     return from == EdgeLevel::kZero || to == EdgeLevel::kOne;
   }
-  if (edge == SpecifyEdge::kNegedge) {
+  if (edge.edge == SpecifyEdge::kNegedge) {
     return from == EdgeLevel::kOne || to == EdgeLevel::kZero;
   }
   return true;
@@ -101,15 +149,16 @@ inline bool TimingCheckEdgeMatches(SpecifyEdge edge, EdgeLevel from,
 //
 // It returns false so that NotifyWatchers re-arms it: a signal a timing check
 // names transitions any number of times before the run ends.
-inline void WatchEdge(Variable* var, SpecifyEdge edge,
+inline void WatchEdge(Variable* var, TimingCheckEdge edge,
                       std::function<void()> on_edge) {
   auto seen = std::make_shared<EdgeLevel>(LevelOfLsb(var->value));
-  var->AddWatcher([var, edge, seen, on_edge = std::move(on_edge)]() {
-    EdgeLevel before = *seen;
-    *seen = LevelOfLsb(var->value);
-    if (TimingCheckEdgeMatches(edge, before, *seen)) on_edge();
-    return false;
-  });
+  var->AddWatcher(
+      [var, edge = std::move(edge), seen, on_edge = std::move(on_edge)]() {
+        EdgeLevel before = *seen;
+        *seen = LevelOfLsb(var->value);
+        if (TimingCheckEdgeMatches(edge, before, *seen)) on_edge();
+        return false;
+      });
 }
 
 // Which entry a watcher was armed for, held as a position in
@@ -188,16 +237,17 @@ struct ConditionedEvent {
 // this rather than through WatchEdge: an event written without a `&&&`
 // condition carries a null one and is enabled unconditionally, so there is no
 // second case to keep.
-inline void WatchConditionedEdge(Variable* var, SpecifyEdge edge,
+inline void WatchConditionedEdge(Variable* var, TimingCheckEdge edge,
                                  ConditionedEvent event, SimContext& ctx,
                                  std::function<void()> on_edge) {
-  WatchEdge(var, edge, [event, &ctx, on_edge = std::move(on_edge)]() {
-    if (!TimingCheckEventEnabled(event.Condition(),
-                                 event.armed.Entry().inst_prefix, ctx)) {
-      return;
-    }
-    on_edge();
-  });
+  WatchEdge(
+      var, std::move(edge), [event, &ctx, on_edge = std::move(on_edge)]() {
+        if (!TimingCheckEventEnabled(event.Condition(),
+                                     event.armed.Entry().inst_prefix, ctx)) {
+          return;
+        }
+        on_edge();
+      });
 }
 
 // Reports one violation as a warning. §31.2's violation is a state the run

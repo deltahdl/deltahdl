@@ -373,8 +373,8 @@ void ArmStabilityPair(const SpecifyManager& mgr, std::size_t index,
   Variable* ref_var = ctx.FindVariable(ref_signal);
   Variable* data_var = ctx.FindVariable(data_signal);
   if (ref_var == nullptr || data_var == nullptr) return;
-  SpecifyEdge ref_edge = check.ref_edge;
-  SpecifyEdge data_edge = check.data_edge;
+  TimingCheckEdge ref_edge = RefEdgeOf(check);
+  TimingCheckEdge data_edge = DataEdgeOf(check);
   auto pair = std::make_shared<StabilityPair>();
   pair->armed = ArmedCheck{&mgr, index};
   pair->ref_signal = std::move(ref_signal);
@@ -394,8 +394,14 @@ void ArmStabilityPair(const SpecifyManager& mgr, std::size_t index,
   // wrote StabilityPair::ref_ticks or StabilityPair::data_ticks under a false
   // condition would stand as the other side of every window the surviving event
   // closes.
+  //
+  // Each watcher is armed with the edge_control_specifier its own
+  // timing_check_event was written with. RefEdgeOf and DataEdgeOf
+  // (simulator/timing_check_driver_internal.h) carry §31.5's general form as
+  // the edge_descriptor list the event was written with, where one was written.
+  // They carry §31.5's posedge or negedge shorthand otherwise.
   WatchConditionedEdge(
-      ref_var, ref_edge,
+      ref_var, std::move(ref_edge),
       ConditionedEvent{.armed = pair->armed, .is_data_event = false}, ctx,
       [pair, &ctx]() {
         pair->has_ref = true;
@@ -403,7 +409,7 @@ void ArmStabilityPair(const SpecifyManager& mgr, std::size_t index,
         EvaluateStabilityPair(*pair, StabilityEvent::kReference, ctx);
       });
   WatchConditionedEdge(
-      data_var, data_edge,
+      data_var, std::move(data_edge),
       ConditionedEvent{.armed = pair->armed, .is_data_event = true}, ctx,
       [pair, &ctx]() {
         pair->has_data = true;

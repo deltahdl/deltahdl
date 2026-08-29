@@ -24,6 +24,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -118,6 +119,23 @@ int64_t EvalTimingCheckLimit(Expr* limit, SimContext& ctx, Arena& arena) {
   return SignExtend(value.ToUint64(), kWidth);
 }
 
+// §31.5: the edge_descriptor list a run reads, from the one the parser
+// collected. Syntax 31-15 writes z_or_x as any of `x`, `X`, `z` and `Z`, and
+// the clause has "edge transitions involving z ... treated the same way as edge
+// transitions involving x", so all four fold to 'x' here and the run has three
+// levels to compare rather than five spellings. `0` and `1` are carried
+// through as written.
+std::vector<std::pair<char, char>> RunTimeEdgeDescriptors(
+    const std::vector<std::pair<char, char>>& parsed) {
+  auto fold = [](char c) { return c == '0' || c == '1' ? c : 'x'; };
+  std::vector<std::pair<char, char>> folded;
+  folded.reserve(parsed.size());
+  for (const std::pair<char, char>& descriptor : parsed) {
+    folded.emplace_back(fold(descriptor.first), fold(descriptor.second));
+  }
+  return folded;
+}
+
 // §31.9.4: the unsigned limit a check evaluates with once negative values are
 // not being handled. Only the ordinary two-sided treatment is left, where a
 // negative value has no meaning and counts as zero.
@@ -137,6 +155,16 @@ TimingCheckEntry BuildTimingCheckUnderOptions(
   entry.data_signal = std::string(decl.data_terminal.name);
   entry.data_edge = decl.data_edge;
   entry.notifier = std::string(decl.notifier);
+
+  // §31.5: the edge_control_specifier each event was written with, in the two
+  // forms the clause gives it. The SpecifyEdge above says which form was
+  // written and answers posedge and negedge on its own; the list is what an
+  // event written `edge[...]` is matched against, and it is empty for the
+  // other events.
+  entry.ref_edge_descriptors =
+      RunTimeEdgeDescriptors(decl.ref_edge_descriptors);
+  entry.data_edge_descriptors =
+      RunTimeEdgeDescriptors(decl.data_edge_descriptors);
 
   // §32.4.1: backannotation looks for a timing check of the same type whose
   // names *and* conditions match, so a check declared with a conditioned event

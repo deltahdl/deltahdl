@@ -323,8 +323,8 @@ void ArmSkewWindow(const SpecifyManager& mgr, std::size_t index,
   Variable* ref_var = ctx.FindVariable(ref_signal);
   Variable* data_var = ctx.FindVariable(data_signal);
   if (ref_var == nullptr || data_var == nullptr) return;
-  const SpecifyEdge kRefEdge = check.ref_edge;
-  const SpecifyEdge kDataEdge = check.data_edge;
+  TimingCheckEdge ref_edge = RefEdgeOf(check);
+  TimingCheckEdge data_edge = DataEdgeOf(check);
   auto window = std::make_shared<SkewWindow>();
   window->armed = ArmedCheck{&mgr, index};
   window->ref_signal = std::move(ref_signal);
@@ -354,10 +354,21 @@ void ArmSkewWindow(const SpecifyManager& mgr, std::size_t index,
   // through to the entry. TimeskewChecker and FullskewSecondTimestampAction
   // (simulator/specify_timing_check.h) already state the dormant-versus-discard
   // rule, and are exercised only by unit tests.
-  WatchConditionedEdge(ref_var, kRefEdge,
+  //
+  // Each watcher is armed with the edge_control_specifier its own
+  // timing_check_event was written with. RefEdgeOf and DataEdgeOf
+  // (simulator/timing_check_driver_internal.h) read that specifier off the
+  // entry: §31.5's general form travels as the list of edge_descriptors the
+  // event was written as, in TimingCheckEntry::ref_edge_descriptors or
+  // TimingCheckEntry::data_edge_descriptors, and the posedge and negedge
+  // shorthands travel as TimingCheckEntry::ref_edge or
+  // TimingCheckEntry::data_edge (simulator/specify_timing_check.h). An event
+  // written with no edge_control_specifier carries neither and matches every
+  // transition.
+  WatchConditionedEdge(ref_var, std::move(ref_edge),
                        ConditionedEvent{window->armed, /*is_data_event=*/false},
                        ctx, [window, &ctx]() { OnRefEdge(window, ctx); });
-  WatchConditionedEdge(data_var, kDataEdge,
+  WatchConditionedEdge(data_var, std::move(data_edge),
                        ConditionedEvent{window->armed, /*is_data_event=*/true},
                        ctx, [window, &ctx]() { OnDataEdge(window, ctx); });
 }

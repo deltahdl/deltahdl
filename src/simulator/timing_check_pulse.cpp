@@ -58,21 +58,39 @@ bool AllTimingChecksOff(const ArmedCheck& armed) {
 }
 
 // The edge §31.4.4 derives its data event with: "data event = reference event
-// signal with opposite edge". posedge and negedge are each other's opposite.
+// signal with opposite edge".
 //
-// SpecifyEdge::kEdge is returned unchanged, and that answer is not exact. An
-// edge-control specifier is an edge specification, so §31.4.4's "A compilation
-// error shall occur if the reference event is not an edge specification" does
-// not rule one out, and ValidateTimingCheckEdgeRequired
-// (src/parser/parser_specify.cpp) rejects only SpecifyEdge::kNone. The
-// edge_descriptor list is parsed into TimingCheckDecl::ref_edge_descriptors and
-// TimingCheckEntry carries no field for it, so `edge[01]` cannot be told from
-// `edge[10]` here and its opposite cannot be named. Both watchers then match
-// every transition, and the check measures between consecutive transitions of
-// any direction.
-SpecifyEdge OppositeEdge(SpecifyEdge edge) {
-  if (edge == SpecifyEdge::kPosedge) return SpecifyEdge::kNegedge;
-  if (edge == SpecifyEdge::kNegedge) return SpecifyEdge::kPosedge;
+// An edge_control_specifier written in §31.5's general form is inverted
+// edge_descriptor by edge_descriptor, the two characters of each one reversed,
+// so edge[01] gives edge[10], edge[0x] gives edge[x0] and edge[x1] gives
+// edge[1x]. §31.4.4 does not define the opposite of an arbitrary
+// edge_control_specifier, so that is the generalization chosen here rather than
+// a rule the clause states. §31.5 makes posedge the shorthand for edge[01, 0x,
+// x1] and negedge the shorthand for edge[10, x0, 1x], and reversing every
+// edge_descriptor of the first list yields exactly the second, so reversing
+// each edge_descriptor is the reading of "opposite edge" that agrees with the
+// two shorthands §31.4.4 and §31.4.6 were written over.
+//
+// Where no edge_descriptor list was written, posedge and negedge are each
+// other's opposite. Every other SpecifyEdge is returned unchanged.
+// SpecifyEdge::kNone and a SpecifyEdge::kEdge carrying no edge_descriptor list
+// therefore match every transition in both of the watchers a check arms.
+TimingCheckEdge OppositeEdge(const TimingCheckEdge& edge) {
+  if (!edge.descriptors.empty()) {
+    TimingCheckEdge opposite;
+    opposite.edge = edge.edge;
+    opposite.descriptors.reserve(edge.descriptors.size());
+    for (const std::pair<char, char>& descriptor : edge.descriptors) {
+      opposite.descriptors.emplace_back(descriptor.second, descriptor.first);
+    }
+    return opposite;
+  }
+  if (edge.edge == SpecifyEdge::kPosedge) {
+    return TimingCheckEdge{SpecifyEdge::kNegedge, {}};
+  }
+  if (edge.edge == SpecifyEdge::kNegedge) {
+    return TimingCheckEdge{SpecifyEdge::kPosedge, {}};
+  }
   return edge;
 }
 
@@ -169,17 +187,23 @@ void EvaluatePulseWindow(const PulseWindow& window, uint64_t timecheck_ticks,
 // closing edges for one pulse, and without the clear the second would be
 // measured against the same opening edge and reported again.
 //
-// The closing watcher is armed before the opening one, which decides nothing
-// for the posedge and negedge a $width is written with -- no transition matches
-// both -- and gives the SpecifyEdge::kEdge that OppositeEdge cannot invert the
-// interval since the previous transition rather than an interval of zero.
+// The closing watcher is armed before the opening one. That decides nothing for
+// the posedge and negedge a $width is written with, no transition matching
+// both, and nothing for an edge_control_specifier written in §31.5's general
+// form, whose opposite OppositeEdge names edge_descriptor by edge_descriptor.
+// It matters for the two edges OppositeEdge returns unchanged: a
+// SpecifyEdge::kEdge carrying no edge_descriptor list, and the
+// SpecifyEdge::kNone of a timing_check_event written without an
+// edge_control_specifier. Both watchers match every transition for those two,
+// so arming the closing one first gives such a check the interval since the
+// previous transition rather than an interval of zero.
 void ArmWidthWindow(const SpecifyManager& mgr, std::size_t index,
                     SimContext& ctx) {
   const TimingCheckEntry& check = mgr.GetTimingChecks()[index];
   std::string signal = check.inst_prefix + check.ref_signal;
   Variable* var = ctx.FindVariable(signal);
   if (var == nullptr) return;
-  SpecifyEdge opening_edge = check.ref_edge;
+  TimingCheckEdge opening_edge = RefEdgeOf(check);
   auto window = std::make_shared<PulseWindow>();
   window->armed = ArmedCheck{&mgr, index};
   window->signal = std::move(signal);
@@ -197,10 +221,11 @@ void ArmWidthWindow(const SpecifyManager& mgr, std::size_t index,
         EvaluatePulseWindow(*window, ctx.CurrentTime().ticks, ctx);
         window->has_timestamp = false;
       });
-  WatchConditionedEdge(var, opening_edge, ref_event, ctx, [window, &ctx]() {
-    window->has_timestamp = true;
-    window->timestamp_ticks = ctx.CurrentTime().ticks;
-  });
+  WatchConditionedEdge(var, std::move(opening_edge), ref_event, ctx,
+                       [window, &ctx]() {
+                         window->has_timestamp = true;
+                         window->timestamp_ticks = ctx.CurrentTime().ticks;
+                       });
 }
 
 // Arms the one watcher a §31.4.5 check needs. §31.4.5 derives the data event as
@@ -213,7 +238,7 @@ void ArmPeriodWindow(const SpecifyManager& mgr, std::size_t index,
   std::string signal = check.inst_prefix + check.ref_signal;
   Variable* var = ctx.FindVariable(signal);
   if (var == nullptr) return;
-  SpecifyEdge edge = check.ref_edge;
+  TimingCheckEdge edge = RefEdgeOf(check);
   auto window = std::make_shared<PulseWindow>();
   window->armed = ArmedCheck{&mgr, index};
   window->signal = std::move(signal);
@@ -225,7 +250,8 @@ void ArmPeriodWindow(const SpecifyManager& mgr, std::size_t index,
   // one written for it -- so there is a single condition to read whichever edge
   // arrived, and ConditionedEvent::is_data_event is false to read
   // TimingCheckEntry::ref_condition_expr.
-  WatchConditionedEdge(var, edge, ConditionedEvent{window->armed, false}, ctx,
+  WatchConditionedEdge(var, std::move(edge),
+                       ConditionedEvent{window->armed, false}, ctx,
                        [window, &ctx]() {
                          uint64_t now = ctx.CurrentTime().ticks;
                          EvaluatePulseWindow(*window, now, ctx);
@@ -350,8 +376,9 @@ void ArmNochangeWindow(const SpecifyManager& mgr, std::size_t index,
   Variable* ref_var = ctx.FindVariable(ref_signal);
   Variable* data_var = ctx.FindVariable(data_signal);
   if (ref_var == nullptr || data_var == nullptr) return;
-  SpecifyEdge leading_edge = check.ref_edge;
-  SpecifyEdge data_edge = check.data_edge;
+  TimingCheckEdge leading_edge = RefEdgeOf(check);
+  TimingCheckEdge trailing_edge = OppositeEdge(leading_edge);
+  TimingCheckEdge data_edge = DataEdgeOf(check);
   auto window = std::make_shared<NochangeWindow>();
   window->armed = ArmedCheck{&mgr, index};
   window->ref_signal = std::move(ref_signal);
@@ -369,19 +396,21 @@ void ArmNochangeWindow(const SpecifyManager& mgr, std::size_t index,
   // is_data_event true.
   ConditionedEvent ref_event{window->armed, false};
   ConditionedEvent data_event{window->armed, true};
-  WatchConditionedEdge(ref_var, leading_edge, ref_event, ctx, [window, &ctx]() {
-    window->has_leading = true;
-    window->has_trailing = false;
-    window->leading_ticks = ctx.CurrentTime().ticks;
-    window->pending.clear();
-  });
+  WatchConditionedEdge(ref_var, std::move(leading_edge), ref_event, ctx,
+                       [window, &ctx]() {
+                         window->has_leading = true;
+                         window->has_trailing = false;
+                         window->leading_ticks = ctx.CurrentTime().ticks;
+                         window->pending.clear();
+                       });
   WatchConditionedEdge(
-      ref_var, OppositeEdge(leading_edge), ref_event, ctx, [window, &ctx]() {
+      ref_var, std::move(trailing_edge), ref_event, ctx, [window, &ctx]() {
         CloseNochangeWindow(*window, ctx.CurrentTime().ticks, ctx);
       });
-  WatchConditionedEdge(data_var, data_edge, data_event, ctx, [window, &ctx]() {
-    RecordNochangeData(*window, ctx.CurrentTime().ticks, ctx);
-  });
+  WatchConditionedEdge(
+      data_var, std::move(data_edge), data_event, ctx, [window, &ctx]() {
+        RecordNochangeData(*window, ctx.CurrentTime().ticks, ctx);
+      });
 }
 
 }  // namespace
