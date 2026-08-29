@@ -20,7 +20,7 @@ namespace delta {
 void ValidateTimingCheckLimitOperands(const ModuleDecl* mod, DiagEngine& diag) {
   for (auto* item : mod->items) {
     if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-    SignalSet specparams = CollectSpecparams(item);
+    SignalSet specparams = CollectSpecparamsInScope(mod, item);
     for (auto* si : item->specify_items) {
       if (si->kind != SpecifyItemKind::kTimingCheck) continue;
       for (auto* lim : si->timing_check.limits) {

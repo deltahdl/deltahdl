@@ -552,6 +552,18 @@ struct RtlirModule {
   // several assignments. RegisterModuleGates (src/simulator/specify.h) walks
   // this list once per module instance to register those drivers.
   std::vector<ModuleItem*> gate_insts;
+  // §6.20.5's specparams declared in the module body, outside every specify
+  // block: "A specparam ... may be declared inside a specify block or in the
+  // module body." Each entry is the name the specparam was lowered under, which
+  // is Elaborator::ScopedName of the declared name, so a specparam declared in
+  // a generate block carries that block's prefix. §32.4.3 has an SDF LABEL
+  // section annotate to specparams and states no exception for either
+  // declaration site, so RegisterModuleSpecparams (src/simulator/specify.h)
+  // binds these to SpecifyManager beside the in-block ones
+  // RegisterSpecifyBlocks binds. Names rather than ModuleItem pointers, because
+  // the name a LABEL has to reach is the scoped one and the ModuleItem carries
+  // only the bare name.
+  std::vector<std::string_view> specparam_names;
   std::vector<ModuleItem*> sequence_decls;
   std::vector<ClassDecl*> class_decls;
   std::vector<RtlirImport> imports;

@@ -554,8 +554,9 @@ class SpecifyManager {
 // The specparam declarations are bound through
 // SpecifyManager::BindDesignSpecparams, which is what lets §32.4.3's LABEL
 // annotation reach them. Only the specparams declared inside a specify block
-// are bound, because only the blocks are passed in; a specparam declared at
-// module level, outside every specify block, is not reachable from here.
+// are bound, because only the blocks are passed in; §6.20.5's other declaration
+// site, the module body outside every specify block, is bound by
+// RegisterModuleSpecparams below.
 //
 // The module path delays are registered before the PATHPULSE$ specparams are
 // resolved, and every PATHPULSE$ specparam of every block is resolved in one
@@ -599,5 +600,30 @@ void RegisterSpecifyBlocks(const std::vector<ModuleItem*>& blocks,
 void RegisterModuleGates(const std::vector<ModuleItem*>& gates,
                          std::string_view inst_prefix, SimContext& ctx,
                          Arena& arena, SpecifyManager& mgr);
+
+// §6.20.5: bind the specparams one module instance declared in its module body,
+// outside every specify block -- "A specparam ... may be declared inside a
+// specify block or in the module body" -- to SpecifyManager, so §32.4.3's LABEL
+// annotation reaches them as it reaches the ones RegisterSpecifyBlocks binds.
+// §32.4.3 states no exception for either declaration site.
+// `names` is RtlirModule::specparam_names (src/elaborator/rtlir.h), each entry
+// the name the specparam was lowered under.
+//
+// This is a sibling of RegisterSpecifyBlocks rather than a sixth parameter of
+// it, for the reason RegisterModuleGates is: five is what
+// readability-function-size.ParameterThreshold in etc/clang_tidy/src.yml
+// allows.
+//
+// The names are bound under `inst_prefix` because §6.20.5 has the declaration
+// name the specparam by a bare name, while Lowerer::CreateChildModuleVariables
+// keys an instantiated module's specparam under its instance prefix. Only the
+// name has to reach `mgr`: the storage the annotated value is written into
+// already exists, Elaborator::ElaborateSpecparam
+// (src/elaborator/elaborator_items.cpp) having lowered the specparam as a
+// variable of the module declaring it. `ctx` and `arena` are where
+// SpecifyManager::ApplyAnnotatedSpecparam finds and rewrites that storage.
+void RegisterModuleSpecparams(const std::vector<std::string_view>& names,
+                              std::string_view inst_prefix, SimContext& ctx,
+                              Arena& arena, SpecifyManager& mgr);
 
 }  // namespace delta

@@ -689,7 +689,7 @@ void CheckItemDelayOperands(const SpecifyItem* si, const SignalSet& specparams,
 void ValidateDelayOperands(const ModuleDecl* mod, DiagEngine& diag) {
   for (auto* item : mod->items) {
     if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-    SignalSet specparams = CollectSpecparams(item);
+    SignalSet specparams = CollectSpecparamsInScope(mod, item);
     for (auto* si : item->specify_items) {
       CheckItemDelayOperands(si, specparams, diag);
     }
@@ -801,6 +801,17 @@ SignalSet CollectSpecparams(const ModuleItem* item) {
   for (auto* si : item->specify_items) {
     if (si->kind == SpecifyItemKind::kSpecparam && !si->param_name.empty()) {
       specparams.insert(si->param_name);
+    }
+  }
+  return specparams;
+}
+
+SignalSet CollectSpecparamsInScope(const ModuleDecl* mod,
+                                   const ModuleItem* block) {
+  SignalSet specparams = CollectSpecparams(block);
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kSpecparam && !item->name.empty()) {
+      specparams.insert(item->name);
     }
   }
   return specparams;

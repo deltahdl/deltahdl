@@ -48,9 +48,9 @@ static void RegisterPathDelays(const std::vector<ModuleItem*>& blocks,
 // keys an instantiated module's specparam under its instance prefix.
 //
 // Only the specparams declared inside a specify block are collected, `blocks`
-// being all this is given. CollectDeclaredSpecparams in
-// simulator/specify_path_delay.h also reads the specparams declared at module
-// level, outside every specify block, and needs the ModuleDecl to do it.
+// being all this is given. §6.20.5's other declaration site, the module body
+// outside every specify block, is bound by RegisterModuleSpecparams below,
+// which reads the names off RtlirModule::specparam_names.
 static void RegisterSpecparams(const std::vector<ModuleItem*>& blocks,
                                std::string_view inst_prefix, SimContext& ctx,
                                Arena& arena, SpecifyManager& mgr) {
@@ -153,6 +153,18 @@ void RegisterModuleGates(const std::vector<ModuleItem*>& gates,
     if (gate == nullptr) continue;
     mgr.AddPrimitiveDriversFromGate(*gate, ctx, arena, inst_prefix);
   }
+}
+
+void RegisterModuleSpecparams(const std::vector<std::string_view>& names,
+                              std::string_view inst_prefix, SimContext& ctx,
+                              Arena& arena, SpecifyManager& mgr) {
+  std::vector<std::string> bound;
+  bound.reserve(names.size());
+  for (std::string_view name : names) {
+    if (name.empty()) continue;
+    bound.emplace_back(name);
+  }
+  mgr.BindDesignSpecparams(std::move(bound), ctx, arena, inst_prefix);
 }
 
 }  // namespace delta

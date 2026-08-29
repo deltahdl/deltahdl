@@ -43,6 +43,15 @@ void Elaborator::ElaborateSpecparam(ModuleItem* item, RtlirModule* mod) {
   }
   var.init_expr = item->init_expr;
   mod->variables.push_back(var);
+  // §32.4.3 has an SDF LABEL section annotate to specparams, and §6.20.5 admits
+  // this declaration site as much as the one inside a specify block: "A
+  // specparam ... may be declared inside a specify block or in the module
+  // body." RegisterModuleSpecparams (src/simulator/specify.h) binds these names
+  // to SpecifyManager, and it is the lowered name -- var.name, already scoped
+  // by ScopedName -- that a LABEL has to reach, because
+  // SpecifyManager::ApplyAnnotatedSpecparam looks the storage up as the
+  // instance prefix followed by this name.
+  mod->specparam_names.push_back(var.name);
 }
 
 bool IsNameDeclared(std::string_view name, const RtlirModule* mod) {

@@ -298,16 +298,26 @@ void RegisterInstanceKeyBinding(const std::string& inst_prefix,
   ctx.RegisterInstanceBinding(key, library, name);
 }
 
-// A scope is recorded for the §30.3 specify blocks the module declares and for
-// the §28.4 gate instantiations it declares, because Lower registers both from
-// it. Both lists matter and either one on its own is enough: §32.4.1 has a
-// DEVICE entry fall back to the primitives driving an output when the module
-// declares no specify path for it, so a module with gates and no specify block
-// still has timing data an SDF file can annotate. A module declaring neither is
-// not recorded, having nothing for RegisterSpecifyBlocks or RegisterModuleGates
-// to walk.
+// A scope is recorded for the §30.3 specify blocks the module declares, for the
+// §28.4 gate instantiations it declares, and for the §6.20.5 specparams it
+// declares in its module body, because Lower registers all three from it. Any
+// one of the three on its own is enough. §32.4.1 has a DEVICE entry fall back
+// to the primitives driving an output when the module declares no specify path
+// for it, so a module with gates and no specify block still has timing data an
+// SDF file can annotate. A module that declares only a module-body specparam
+// has no path and no gate for §32.4.3's LABEL annotation to rebuild, but the
+// annotation still has work to do there:
+// SpecifyManager::ApplyAnnotatedSpecparam writes the annotated value into the
+// specparam's own storage, and §32.4.3 has every later evaluation of an
+// expression containing that specparam -- a §9.4.1 delay control among them --
+// read the annotated value back out of it. A module declaring none of the three
+// is not recorded, having nothing for RegisterSpecifyBlocks,
+// RegisterModuleGates or RegisterModuleSpecparams to walk.
 void Lowerer::RecordSpecifyScope(const RtlirModule* mod) {
-  if (mod->specify_blocks.empty() && mod->gate_insts.empty()) return;
+  if (mod->specify_blocks.empty() && mod->gate_insts.empty() &&
+      mod->specparam_names.empty()) {
+    return;
+  }
   specify_scopes_.push_back(SpecifyScope{inst_prefix_, mod});
 }
 
@@ -620,6 +630,18 @@ void Lowerer::Lower(const RtlirDesign* design) {
     // SimContext::FindVariable reaches the specparam of this instance.
     RegisterModuleGates(scope.module->gate_insts, scope.inst_prefix, ctx_,
                         arena_, mgr);
+    // §6.20.5 admits two declaration sites for a specparam -- "inside a specify
+    // block or in the module body" -- and §32.4.3 states no exception for
+    // either, so the module-body ones are bound beside the in-block ones
+    // RegisterSpecifyBlocks binds. Only the name has to be bound: the storage
+    // the annotated value lands in was lowered above, because
+    // Elaborator::ElaborateSpecparam (src/elaborator/elaborator_items.cpp)
+    // makes the declaration a variable of the module declaring it, which
+    // Lowerer::LowerModule lowers for a top and
+    // Lowerer::CreateChildModuleVariables lowers under the instance prefix for
+    // an instantiated module.
+    RegisterModuleSpecparams(scope.module->specparam_names, scope.inst_prefix,
+                             ctx_, arena_, mgr);
   }
   ctx_.SetLoweringInstancePrefix("");
   // §30.5.3 selects among the module paths "whose input has transitioned most
