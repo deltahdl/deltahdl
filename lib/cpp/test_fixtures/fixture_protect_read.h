@@ -16,11 +16,17 @@ using namespace delta;
 // The key an author's own regions are sealed under. Every test that reads a
 // produced envelope back needs the key it was formed under, or the region would
 // stay sealed and its absence from the output would say nothing at all.
-inline constexpr std::string_view kExchangeKey = "acme-exchange-key";
+//
+// The name says which fixture the key belongs to because
+// test_fixtures/fixture_protect_encoding.h declares one of its own, and both
+// are inline at namespace scope. A file including both took the two under one
+// name until issue #3416, which a compiler reports as a redefinition naming a
+// line in neither file and a linker need not report at all.
+inline constexpr std::string_view kReadingExchangeKey = "acme-exchange-key";
 
 // Envelope encryption over a source text, under that key.
 inline std::string EncryptedByTheAuthor(const std::string& src) {
-  return EncryptEnvelopes(src, kExchangeKey);
+  return EncryptEnvelopes(src, kReadingExchangeKey);
 }
 
 // The same, with the reports the transformation made about its input kept
@@ -37,7 +43,7 @@ struct EncryptionRun {
   std::string text;
 
   explicit EncryptionRun(const std::string& src)
-      : text(EncryptEnvelopes(src, kExchangeKey, ProtectKeyList(), &diag,
+      : text(EncryptEnvelopes(src, kReadingExchangeKey, ProtectKeyList(), &diag,
                               mgr.AddFile("<test>", src))) {}
 };
 

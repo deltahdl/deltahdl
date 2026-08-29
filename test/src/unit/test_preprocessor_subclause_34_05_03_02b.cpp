@@ -152,7 +152,7 @@ TEST(ProtectBeginProtectedDescription,
      TheSealedModelsDelimitersComeBackOutOfTheBlock) {
   ReadSource run(EncryptedByTheAuthor(UnnamedRegionAround(
                      EncryptedByTheAuthor(Design(kInnerStatement)))),
-                 ReadSource::KeyConfig(kExchangeKey));
+                 ReadSource::KeyConfig(kReadingExchangeKey));
   EXPECT_EQ(run.Closed().size(), 2U);
   EXPECT_EQ(run.OpenDecryptionEnvelopes(), 0U);
 }
@@ -196,7 +196,7 @@ TEST(ProtectBeginProtectedDescription,
 TEST(ProtectBeginProtectedDescription,
      TheExpressionIsWhatBeginsTheRegionTheBlockBelongsTo) {
   ReadSource run(EncryptedByTheAuthor(Design(kOuterStatement)),
-                 ReadSource::KeyConfig(kExchangeKey));
+                 ReadSource::KeyConfig(kReadingExchangeKey));
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, kOuterStatement));
 }
@@ -210,7 +210,7 @@ TEST(ProtectBeginProtectedDescription,
      ABlockWithNoExpressionBeginningItsRegionIsNotOpened) {
   ReadSource run(Without(EncryptedByTheAuthor(Design(kOuterStatement)),
                          OpeningDirective()),
-                 ReadSource::KeyConfig(kExchangeKey));
+                 ReadSource::KeyConfig(kReadingExchangeKey));
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_FALSE(Holds(run.text, kOuterStatement));
 }
@@ -233,7 +233,7 @@ TEST(ProtectBeginProtectedDescription,
      TheLineBelowAnAnnouncedKeyOutsideEveryRegionIsSourceText) {
   std::string src = "`pragma protect data_decrypt_key\n";
   src.append("  ").append(kOuterStatement).append("\n");
-  ReadSource run(src, ReadSource::KeyConfig(kExchangeKey));
+  ReadSource run(src, ReadSource::KeyConfig(kReadingExchangeKey));
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, kOuterStatement));
 }
@@ -248,7 +248,7 @@ TEST(ProtectBeginProtectedDescription,
   src.append("`pragma protect data_decrypt_key\n");
   src.append("  ").append(kOuterStatement).append("\n");
   src.append("`pragma protect end_protected\n");
-  ReadSource run(src, ReadSource::KeyConfig(kExchangeKey));
+  ReadSource run(src, ReadSource::KeyConfig(kReadingExchangeKey));
   EXPECT_FALSE(Holds(run.text, kOuterStatement));
 }
 
@@ -344,7 +344,7 @@ TEST(ProtectBeginProtectedDescription,
      TheCodingSchemeStatedInTheRegionIsWhatItsBlockIsReadUnder) {
   std::string written = EncryptedByTheAuthor(DesignUnderDeclaredEncoding());
   ASSERT_TRUE(Holds(written, "enctype=\"base64\""));
-  ReadSource run(written, ReadSource::KeyConfig(kExchangeKey));
+  ReadSource run(written, ReadSource::KeyConfig(kReadingExchangeKey));
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, kOuterStatement));
 }

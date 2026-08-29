@@ -171,7 +171,7 @@ TEST(ProtectBeginSyntax, ARegionTheWordOpenedComesBackUnderTheAuthorsKey) {
       "`pragma protect begin\n"
       "  initial result = 42;\n"
       "`pragma protect end\n");
-  ReadSource run(written, kExchangeKey);
+  ReadSource run(written, kReadingExchangeKey);
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, "initial result = 42;"));
   EXPECT_FALSE(Holds(run.text, "data_block"));
@@ -278,7 +278,7 @@ TEST(ProtectBeginSyntax, AValuedWordLeavesTheDesignUnprotectedEndToEnd) {
       "`pragma protect begin=\"now\"\n"
       "  initial result = 42;\n"
       "`pragma protect end\n");
-  ReadSource run(written, kExchangeKey);
+  ReadSource run(written, kReadingExchangeKey);
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(),
       "protect pragma begin keyword is written on its own and takes no "

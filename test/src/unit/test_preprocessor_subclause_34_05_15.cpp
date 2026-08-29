@@ -63,7 +63,7 @@ constexpr std::string_view kSecondBlockDirective =
 // The design an author seals, which stands inside a region wherever one is
 // written below. Nothing of it survives an encrypted block, so finding these
 // characters in a produced text is finding a region that was not sealed.
-constexpr std::string_view kSealedDesign = "  initial result = 42;\n";
+constexpr std::string_view kEncodingSealedDesign = "  initial result = 42;\n";
 
 // A previously generated protected block, delimited by the two words §34.5.3.1
 // and §34.5.4.1 define, holding `inside`.
@@ -78,7 +78,7 @@ std::string SealedModel(std::string_view inside) {
 // define, holding `inside` and then the design.
 std::string Region(std::string_view inside) {
   std::string text = "`pragma protect begin\n";
-  text.append(inside).append(kSealedDesign);
+  text.append(inside).append(kEncodingSealedDesign);
   text.append("`pragma protect end\n");
   return text;
 }

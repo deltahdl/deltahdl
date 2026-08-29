@@ -315,7 +315,7 @@ TEST(ProtectEndProtectedSyntax, TheWordClosesOneOfTwoNestedEnvelopes) {
 TEST(ProtectEndProtectedSyntax, TextAfterTheWordIsOutsideTheRegionItClosed) {
   std::string src = EncryptedByTheAuthor(Design());
   src.append(kStrayBlockDirective);
-  ReadSource run(src, kExchangeKey);
+  ReadSource run(src, kReadingExchangeKey);
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_FALSE(run.Protected());
 }
@@ -325,7 +325,7 @@ TEST(ProtectEndProtectedSyntax, TextAfterTheWordIsOutsideTheRegionItClosed) {
 // read back under that key, and the design arrives at the step after the
 // preprocessor with none of the envelope left in it.
 TEST(ProtectEndProtectedSyntax, ARegionTheWordClosesComesBackUnderTheKey) {
-  ReadSource run(EncryptedByTheAuthor(Design()), kExchangeKey);
+  ReadSource run(EncryptedByTheAuthor(Design()), kReadingExchangeKey);
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, "initial result = 42;"));
   EXPECT_FALSE(Holds(run.text, "data_block"));
@@ -346,7 +346,7 @@ TEST(ProtectEndProtectedSyntax,
      ARegionUnderADeclaredEncodingComesBackThroughTheWord) {
   std::string written = EncryptedByTheAuthor(DesignUnderDeclaredEncoding());
   ASSERT_TRUE(Holds(written, "enctype=\"base64\""));
-  ReadSource run(written, kExchangeKey);
+  ReadSource run(written, kReadingExchangeKey);
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, "initial result = 42;"));
   EXPECT_FALSE(run.Protected());
@@ -543,7 +543,7 @@ TEST(ProtectEndProtectedSyntax, AWordWrittenProperlyAfterAReportedOneCloses) {
 TEST(ProtectEndProtectedSyntax, TextAfterAValuedWordIsStillReadAsProtected) {
   std::string src = WithValuedClosingWord(EncryptedByTheAuthor(Design()));
   src.append(kStrayBlockDirective);
-  ReadSource run(src, kExchangeKey);
+  ReadSource run(src, kReadingExchangeKey);
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(),
       "protect pragma end_protected keyword is written on its own and takes "

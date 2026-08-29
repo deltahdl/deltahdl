@@ -121,7 +121,8 @@ constexpr std::string_view kEntityKey = "meridian-trust-wrapping-key";
 // author's.
 constexpr std::string_view kDataKeyName = "design-2027";
 
-constexpr std::string_view kSealedDesign = "module sealed_m; endmodule\n";
+constexpr std::string_view kEncodingSealedDesign =
+    "module sealed_m; endmodule\n";
 
 // The announcement §34.5.27.1 defines, as the tool writes it.
 constexpr std::string_view kKeyBlockLine = "`pragma protect key_block\n";
@@ -146,10 +147,10 @@ std::string EnvelopeWithAKeyBlock() {
   region.append(Writes("key_keyowner", kEntity));
   region.append(Writes("key_keyname", kKeyName));
   region.append(Writes("data_keyname", kDataKeyName));
-  region.append(kSealedDesign);
+  region.append(kEncodingSealedDesign);
   region.append("`pragma protect end\n");
   std::string envelope = EncryptEnvelopes(region, {}, TheEntitysKey());
-  EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
+  EXPECT_FALSE(Holds(envelope, kEncodingSealedDesign)) << envelope;
   EXPECT_TRUE(Holds(envelope, kKeyBlockLine)) << envelope;
   return envelope;
 }
@@ -182,7 +183,7 @@ TEST(ProtectKeyBlockSyntax, TheKeywordSpeaksForTheLineBeneathIt) {
   ReadSource run(EnvelopeWithAKeyBlock(),
                  ReadSource::KeysConfig(TheEntitysKey()));
   EXPECT_FALSE(run.diag.HasErrors()) << run.text;
-  EXPECT_TRUE(Holds(run.text, kSealedDesign)) << run.text;
+  EXPECT_TRUE(Holds(run.text, kEncodingSealedDesign)) << run.text;
 }
 
 // The other half of speaking for a line: the line spoken for is key material
@@ -201,7 +202,7 @@ TEST(ProtectKeyBlockSyntax, TheKeywordCarryingAValueSpeaksForNoLine) {
   std::string envelope =
       EnvelopeAnnouncing("`pragma protect key_block=\"a-value-of-its-own\"\n");
   ReadSource run(envelope, ReadSource::KeysConfig(TheEntitysKey()));
-  EXPECT_FALSE(Holds(run.text, kSealedDesign)) << run.text;
+  EXPECT_FALSE(Holds(run.text, kEncodingSealedDesign)) << run.text;
   EXPECT_TRUE(Holds(run.text, BlockLineOf(EnvelopeWithAKeyBlock())))
       << run.text;
 }
@@ -213,7 +214,7 @@ TEST(ProtectKeyBlockSyntax, AListAgainstTheKeywordSpeaksForNoLine) {
   ReadSource run(
       EnvelopeAnnouncing("`pragma protect key_block=(bytes=\"20\")\n"),
       ReadSource::KeysConfig(TheEntitysKey()));
-  EXPECT_FALSE(Holds(run.text, kSealedDesign)) << run.text;
+  EXPECT_FALSE(Holds(run.text, kEncodingSealedDesign)) << run.text;
 }
 
 // §34.5.27.1 spells one name, and a name that merely opens with those
@@ -223,7 +224,7 @@ TEST(ProtectKeyBlockSyntax, AListAgainstTheKeywordSpeaksForNoLine) {
 TEST(ProtectKeyBlockSyntax, ANameMerelyOpeningWithTheKeywordIsNotIt) {
   ReadSource run(EnvelopeAnnouncing("`pragma protect key_block_of_theirs\n"),
                  ReadSource::KeysConfig(TheEntitysKey()));
-  EXPECT_FALSE(Holds(run.text, kSealedDesign)) << run.text;
+  EXPECT_FALSE(Holds(run.text, kEncodingSealedDesign)) << run.text;
 }
 
 // The '=' written after the keyword with nothing following it. The spelling

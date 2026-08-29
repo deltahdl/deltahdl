@@ -187,7 +187,7 @@ TEST(ProtectBeginProtectedDescription,
      ASealedModelIsResealedAsPartOfTheLargerModel) {
   ReadSource run(EncryptedByTheAuthor(UnnamedRegionAround(
                      EncryptedByTheAuthor(Design(kInnerStatement)))),
-                 ReadSource::KeyConfig(kExchangeKey));
+                 ReadSource::KeyConfig(kReadingExchangeKey));
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, kOuterStatement));
   EXPECT_TRUE(Holds(run.text, kInnerStatement));

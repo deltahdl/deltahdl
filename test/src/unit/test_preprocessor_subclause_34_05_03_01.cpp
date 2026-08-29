@@ -270,7 +270,7 @@ TEST(ProtectBeginProtectedSyntax, TheWordOpensAnEnvelopeInsideOneAlreadyOpen) {
 // read back under that key, and the design arrives at the step after the
 // preprocessor with none of the envelope left in it.
 TEST(ProtectBeginProtectedSyntax, ARegionTheWordOpensComesBackUnderTheKey) {
-  ReadSource run(EncryptedByTheAuthor(Design()), kExchangeKey);
+  ReadSource run(EncryptedByTheAuthor(Design()), kReadingExchangeKey);
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, "initial result = 42;"));
   EXPECT_FALSE(Holds(run.text, "data_block"));
@@ -291,7 +291,7 @@ TEST(ProtectBeginProtectedSyntax,
      ARegionUnderADeclaredEncodingComesBackThroughTheWord) {
   std::string written = EncryptedByTheAuthor(DesignUnderDeclaredEncoding());
   ASSERT_TRUE(Holds(written, "enctype=\"base64\""));
-  ReadSource run(written, kExchangeKey);
+  ReadSource run(written, kReadingExchangeKey);
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, "initial result = 42;"));
 }
@@ -405,7 +405,7 @@ TEST(ProtectBeginProtectedSyntax, AWordWrittenProperlyAfterAReportedOneOpens) {
 // author being left to wonder where their design went.
 TEST(ProtectBeginProtectedSyntax, AValuedOpeningWordLeavesTheDesignSealed) {
   std::string written = WithValuedOpeningWord(EncryptedByTheAuthor(Design()));
-  ReadSource run(written, kExchangeKey);
+  ReadSource run(written, kReadingExchangeKey);
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(),
       "protect pragma begin_protected keyword is written on its own and takes "

@@ -63,7 +63,8 @@ constexpr std::string_view kSecondKey = "cerulean-vault-wrapping-key";
 // author's.
 constexpr std::string_view kDataKeyName = "design-2027";
 
-constexpr std::string_view kSealedDesign = "module sealed_m; endmodule\n";
+constexpr std::string_view kEncodingSealedDesign =
+    "module sealed_m; endmodule\n";
 constexpr std::string_view kKeyBlockLine = "`pragma protect key_block\n";
 
 std::string Writes(std::string_view keyword, std::string_view value) {
@@ -105,7 +106,7 @@ ProtectKeyList OnlyTheSecondEntitysKey() {
 // A region designating `described`, sealing the design behind key blocks.
 std::string Region(const std::string& described) {
   std::string text = "`pragma protect begin\n";
-  text.append(described).append(kSealedDesign);
+  text.append(described).append(kEncodingSealedDesign);
   text.append("`pragma protect end\n");
   return text;
 }
@@ -117,7 +118,7 @@ std::string EnvelopeWithTwoBlocks() {
       EncryptEnvelopes(Region(Designates(kFirstEntity, kFirstKeyName) +
                               Designates(kSecondEntity, kSecondKeyName)),
                        {}, KeysOfBothEntities());
-  EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
+  EXPECT_FALSE(Holds(envelope, kEncodingSealedDesign)) << envelope;
   EXPECT_EQ(TimesWritten(envelope, kKeyBlockLine), 2U) << envelope;
   return envelope;
 }
@@ -127,7 +128,7 @@ std::string EnvelopeWithOneBlock() {
   std::string envelope =
       EncryptEnvelopes(Region(Designates(kFirstEntity, kFirstKeyName)), {},
                        OnlyTheFirstEntitysKey());
-  EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
+  EXPECT_FALSE(Holds(envelope, kEncodingSealedDesign)) << envelope;
   EXPECT_EQ(TimesWritten(envelope, kKeyBlockLine), 1U) << envelope;
   return envelope;
 }
@@ -202,8 +203,8 @@ TEST(ProtectKeyBlockDescription, AReaderOpeningEitherBlockReachesTheDesign) {
   ReadSource first(envelope, ReadSource::KeysConfig(OnlyTheFirstEntitysKey()));
   ReadSource second(envelope,
                     ReadSource::KeysConfig(OnlyTheSecondEntitysKey()));
-  EXPECT_TRUE(Holds(first.text, kSealedDesign)) << first.text;
-  EXPECT_TRUE(Holds(second.text, kSealedDesign)) << second.text;
+  EXPECT_TRUE(Holds(first.text, kEncodingSealedDesign)) << first.text;
+  EXPECT_TRUE(Holds(second.text, kEncodingSealedDesign)) << second.text;
 }
 
 // The two blocks encode the same data decryption key data, which is what makes
@@ -226,7 +227,7 @@ TEST(ProtectKeyBlockDescription, TwoBlocksAreWaysIntoOneEnvelope) {
 TEST(ProtectKeyBlockDescription, AReaderHoldingNeitherKeyOpensNeitherBlock) {
   ReadSource run(EnvelopeWithTwoBlocks(),
                  ReadSource::KeysConfig(ProtectKeyList()));
-  EXPECT_FALSE(Holds(run.text, kSealedDesign)) << run.text;
+  EXPECT_FALSE(Holds(run.text, kEncodingSealedDesign)) << run.text;
 }
 
 // -- What the recovered text is read as --------------------------------------
@@ -241,7 +242,7 @@ TEST(ProtectKeyBlockDescription, AReaderHoldingNeitherKeyOpensNeitherBlock) {
 TEST(ProtectKeyBlockDescription, TheRecoveredTextIsReadAsDirectivesNotDesign) {
   std::string envelope = EnvelopeWithOneBlock();
   ReadSource run(envelope, ReadSource::KeysConfig(OnlyTheFirstEntitysKey()));
-  EXPECT_TRUE(Holds(run.text, kSealedDesign)) << run.text;
+  EXPECT_TRUE(Holds(run.text, kEncodingSealedDesign)) << run.text;
   EXPECT_FALSE(Holds(run.text, "`pragma protect data_decrypt_key")) << run.text;
   EXPECT_FALSE(Holds(run.text, BlockLineOf(envelope))) << run.text;
 }

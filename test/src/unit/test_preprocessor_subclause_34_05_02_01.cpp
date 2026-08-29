@@ -205,7 +205,7 @@ TEST(ProtectEndSyntax, TheTextAfterTheWordIsOutsideTheRegionItClosed) {
 TEST(ProtectEndSyntax, ARegionTheWordClosedComesBackUnderTheAuthorsKey) {
   std::string written =
       EncryptedByTheAuthor(RegionClosedWith("`pragma protect end\n"));
-  ReadSource run(written, kExchangeKey);
+  ReadSource run(written, kReadingExchangeKey);
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, "initial result = 42;"));
   EXPECT_FALSE(Holds(run.text, "data_block"));
@@ -310,7 +310,7 @@ TEST(ProtectEndSyntax, AValuedWordIsEncryptedAsTextOfTheRegionItLeftOpen) {
 TEST(ProtectEndSyntax, AValuedWordLeavesTheDesignUnprotectedEndToEnd) {
   std::string closing = "`pragma protect end=\"now\"\n";
   std::string written = EncryptedByTheAuthor(RegionClosedWith(closing));
-  ReadSource run(written, kExchangeKey);
+  ReadSource run(written, kReadingExchangeKey);
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(),
       "protect pragma end keyword is written on its own and takes no "

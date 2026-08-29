@@ -262,6 +262,60 @@ jobs:
             done
           done
           exit $fail
+      # This step fails when one name is declared inline at namespace scope
+      # in two headers under lib/cpp. Such a pair is one name with two
+      # definitions, and inline gives each of them external linkage. A test
+      # file that includes both headers does not compile: the report is a
+      # redefinition standing at a line in neither of the two headers the
+      # test was written to use. Two translation units of one executable
+      # that took different definitions break the one-definition rule, and
+      # no linker is obliged to say so.
+      #
+      # No unit test can cover this. Observing the collision means including
+      # both headers in one translation unit, which is the compile failure
+      # the step exists to prevent.
+      #
+      # #3416 is the pair that prompted the step.
+      # lib/cpp/test_fixtures/fixture_protect_read.h and
+      # lib/cpp/test_fixtures/fixture_protect_encoding.h each declared
+      # kExchangeKey, with a different key in each, and nothing broke only
+      # because no translation unit includes both. Adding the step reported
+      # kSealedDesign and kBlockOpening as well, declared by
+      # fixture_protect_encoding.h and lib/cpp/test_helpers/
+      # helpers_protect_region.h, and all three pairs were renamed apart.
+      #
+      # The match is anchored at column 0 because clang-format
+      # --style=google leaves a namespace-scope declaration there and
+      # indents one written inside a struct, a class or a function body.
+      # `grep -rE '^[[:space:]]+inline (constexpr|const) '` over lib/cpp
+      # reports nothing, so the anchor drops no declaration the step is
+      # written to read.
+      #
+      # The `=` is what tells a variable from a function, so ElaborateSrc in
+      # lib/cpp/test_fixtures/fixture_synthesizer.h is not read as a name.
+      # The span before it admits no quote, because a value such as
+      # kAnyEncoding's "`pragma protect encoding=" carries an `=` of its own
+      # and the last one on the line is not the one that ends the name. A
+      # declaration written static rather than inline has internal linkage,
+      # and two of those are not one name.
+      - name: Check no name is declared in two lib/cpp headers
+        run: |
+          decls=$(mktemp)
+          for f in $(find lib/cpp -name '*.h')
+          do
+            sed -nE 's#^inline (constexpr|const) [^"=]*[ &*]([A-Za-z_][A-Za-z0-9_]*) *(\[[0-9]*\])? *=.*#\2#p' "$f" \
+              | sort -u | sed "s|\$| $f|"
+          done | sort > "$decls"
+          fail=0
+          for n in $(cut -d' ' -f1 "$decls" | uniq -d)
+          do
+            files=$(grep "^$n " "$decls" | cut -d' ' -f2 | tr '\n' ' ')
+            echo "::error::$n is declared inline at namespace scope in" \
+              "$files; inline gives each declaration external linkage, so" \
+              "rename all but one"
+            fail=1
+          done
+          exit $fail
   # This job fails when a file under src/elaborator/ names one of Stmt's
   # scalar child-statement links -- then_branch, else_branch or for_body --
   # and is not listed in etc/elaborator_stmt_link_allowlist.txt. It also fails

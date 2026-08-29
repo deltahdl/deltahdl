@@ -119,7 +119,7 @@ std::string TwoKeyBlockEnvelope(std::string_view asked) {
   described.append(Designates(kSecondProvider, kSecondKeyName));
   std::string envelope =
       EncryptEnvelopes(RegionHolding(described), {}, KeysOfBothProviders());
-  EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
+  EXPECT_FALSE(Holds(envelope, kEncodingSealedDesign)) << envelope;
   return envelope;
 }
 
@@ -174,8 +174,8 @@ std::string DataBlockHolding(std::string_view sealed) {
   std::string text = ProtectEncodedValueDirective(
       TheScheme(), ProtectedRegionBlockSize(sealed));
   text.append("`pragma protect data_block=\"");
-  text.append(
-      EncryptProtectedRegion(sealed, kExchangeKey, TheScheme().enctype));
+  text.append(EncryptProtectedRegion(sealed, kEncodingExchangeKey,
+                                     TheScheme().enctype));
   text.append("\"\n");
   return text;
 }
@@ -187,7 +187,7 @@ std::string DigestBlockVouchingFor(std::string_view vouched_for) {
   ProtectDigestBlockPolicy policy;
   policy.requested = true;
   policy.method = std::string(kDefaultDigestMethod);
-  policy.key = std::string(kExchangeKey);
+  policy.key = std::string(kEncodingExchangeKey);
   return ProtectDigestBlockDirectives(vouched_for, policy, TheScheme());
 }
 
@@ -237,7 +237,7 @@ TEST(ProtectDigestBlockEncryptionInput, ARequestInsideAProtectedBlockAsksNot) {
   source.append(RegionHolding(Designates(kFirstProvider, kFirstKeyName) +
                               Designates(kSecondProvider, kSecondKeyName)));
   std::string produced = EncryptEnvelopes(source, {}, KeysOfBothProviders());
-  EXPECT_FALSE(Holds(produced, kSealedDesign)) << produced;
+  EXPECT_FALSE(Holds(produced, kEncodingSealedDesign)) << produced;
   EXPECT_EQ(TimesWritten(produced, kDigestBlockLine), 1U) << produced;
 }
 
@@ -276,7 +276,7 @@ TEST(ProtectDigestBlockEncryptionOutput, TheLineHoldsTheDigestAndNothingElse) {
                                  TheScheme().enctype, &carried))
       << envelope;
   std::string opened;
-  ASSERT_TRUE(DecryptProtectedBlock(carried, kExchangeKey, &opened))
+  ASSERT_TRUE(DecryptProtectedBlock(carried, kEncodingExchangeKey, &opened))
       << envelope;
   EXPECT_EQ(opened, DigestOf(RegionBody(kDigestBlockLine)));
 }
@@ -297,8 +297,9 @@ TEST(ProtectDigestBlockEncryptionOutput, TheDigestIsCountedAsAValueOfItsOwn) {
 // and compares it against the one the block carries. A digest computed over the
 // text the block holds agrees with it.
 TEST(ProtectDigestBlockDecryptionInput, ADigestOfTheBlockItFollowsAgrees) {
-  ReadEnvelope run(EnvelopeCarrying(DataBlockHolding(kSealedDesign) +
-                                    DigestBlockVouchingFor(kSealedDesign)));
+  ReadEnvelope run(
+      EnvelopeCarrying(DataBlockHolding(kEncodingSealedDesign) +
+                       DigestBlockVouchingFor(kEncodingSealedDesign)));
   EXPECT_FALSE(run.diag.HasErrors()) << run.text;
   EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kMatched);
 }
@@ -308,7 +309,7 @@ TEST(ProtectDigestBlockDecryptionInput, ADigestOfTheBlockItFollowsAgrees) {
 // digest of some other text, which is the one thing separating it from the
 // envelope above, and the reading reports it.
 TEST(ProtectDigestBlockDecryptionInput, ADigestOfOtherTextIsReported) {
-  std::string src = EnvelopeCarrying(DataBlockHolding(kSealedDesign) +
+  std::string src = EnvelopeCarrying(DataBlockHolding(kEncodingSealedDesign) +
                                      DigestBlockVouchingFor(kSecondDesign));
   ReadEnvelope run(src);
   EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kAltered);
@@ -324,9 +325,10 @@ TEST(ProtectDigestBlockDecryptionInput, ADigestOfOtherTextIsReported) {
 // it vouches for other text, and a reading that had checked it would report the
 // disagreement the case above reports.
 TEST(ProtectDigestBlockDecryptionInput, ASecondDigestFollowsNoBlockOfItsOwn) {
-  ReadEnvelope run(EnvelopeCarrying(DataBlockHolding(kSealedDesign) +
-                                    DigestBlockVouchingFor(kSealedDesign) +
-                                    DigestBlockVouchingFor(kSecondDesign)));
+  ReadEnvelope run(
+      EnvelopeCarrying(DataBlockHolding(kEncodingSealedDesign) +
+                       DigestBlockVouchingFor(kEncodingSealedDesign) +
+                       DigestBlockVouchingFor(kSecondDesign)));
   EXPECT_FALSE(run.diag.HasErrors()) << run.text;
   EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kMatched);
 }
@@ -338,8 +340,9 @@ TEST(ProtectDigestBlockDecryptionInput, ASecondDigestFollowsNoBlockOfItsOwn) {
 // a reading that reached it would report a match where nothing was checked.
 TEST(ProtectDigestBlockDecryptionInput,
      ADigestReachesNoBlockOfAnotherEnvelope) {
-  ReadEnvelope run(EnvelopeCarrying(DataBlockHolding(kSealedDesign)) +
-                   EnvelopeCarrying(DigestBlockVouchingFor(kSealedDesign)));
+  ReadEnvelope run(
+      EnvelopeCarrying(DataBlockHolding(kEncodingSealedDesign)) +
+      EnvelopeCarrying(DigestBlockVouchingFor(kEncodingSealedDesign)));
   EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kNotChecked);
 }
 

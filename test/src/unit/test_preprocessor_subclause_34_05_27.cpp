@@ -75,7 +75,7 @@ constexpr std::string_view kKeyBlockDirective =
     "`pragma protect key_block=\"NOTAKEYBLOCKOFANYENVELOPE\"\n";
 
 // The design the regions below enclose.
-constexpr std::string_view kSealedDesign = "  initial result = 42;\n";
+constexpr std::string_view kEncodingSealedDesign = "  initial result = 42;\n";
 
 // The entities that provided the keys the regions' own keys travel under, and
 // one key of each. §34.5.27 owes a block to each designation a region writes,
@@ -133,7 +133,7 @@ std::string Designation(std::string_view provider, std::string_view key_name,
 // §34.5.27 writes key blocks for.
 std::string Region(std::string_view described) {
   std::string text = "`pragma protect begin\n";
-  text.append(described).append(kSealedDesign);
+  text.append(described).append(kEncodingSealedDesign);
   text.append("`pragma protect end\n");
   return text;
 }

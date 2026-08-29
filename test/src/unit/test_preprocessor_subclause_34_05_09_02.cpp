@@ -107,8 +107,8 @@ TEST(ProtectEncodingEncryptionInput, TheSchemeARegionNamesWritesItsBlock) {
   ASSERT_TRUE(
       DecodeProtectBlock(DataBlockOf(envelope), kBase64Enctype, &block));
   std::string recovered;
-  EXPECT_TRUE(DecryptProtectedBlock(block, kExchangeKey, &recovered));
-  EXPECT_TRUE(Holds(recovered, kSealedDesign));
+  EXPECT_TRUE(DecryptProtectedBlock(block, kEncodingExchangeKey, &recovered));
+  EXPECT_TRUE(Holds(recovered, kEncodingSealedDesign));
 }
 
 // The same block read by another of the tabulated algorithms. The identity
@@ -123,7 +123,7 @@ TEST(ProtectEncodingEncryptionInput, TheBlockIsNotTheWritingOfAnotherScheme) {
   std::string block;
   ASSERT_TRUE(DecodeProtectBlock(DataBlockOf(envelope), kRawEnctype, &block));
   std::string recovered;
-  EXPECT_FALSE(DecryptProtectedBlock(block, kExchangeKey, &recovered));
+  EXPECT_FALSE(DecryptProtectedBlock(block, kEncodingExchangeKey, &recovered));
 }
 
 // The expression standing in the input stream ahead of the region rather than
@@ -143,8 +143,8 @@ TEST(ProtectEncodingEncryptionInput, ASchemeNamedAheadOfARegionWritesItsBlock) {
   ASSERT_TRUE(
       DecodeProtectBlock(DataBlockOf(envelope), kBase64Enctype, &block));
   std::string recovered;
-  EXPECT_TRUE(DecryptProtectedBlock(block, kExchangeKey, &recovered));
-  EXPECT_TRUE(Holds(recovered, kSealedDesign));
+  EXPECT_TRUE(DecryptProtectedBlock(block, kEncodingExchangeKey, &recovered));
+  EXPECT_TRUE(Holds(recovered, kEncodingSealedDesign));
 }
 
 // The count written where the subclause says a count is ignored. The region
@@ -181,8 +181,8 @@ TEST(ProtectEncodingEncryptionInput,
   std::string envelope = ProtectedPartOf(EnvelopeOf(source));
   ASSERT_FALSE(envelope.empty());
   EXPECT_TRUE(Holds(envelope, "enctype=\"base64\""));
-  EXPECT_TRUE(
-      Holds(envelope, TheCountOf(ProtectedRegionBlockSize(kSealedDesign))));
+  EXPECT_TRUE(Holds(
+      envelope, TheCountOf(ProtectedRegionBlockSize(kEncodingSealedDesign))));
   EXPECT_FALSE(Holds(envelope, TheCountOf(1)));
 }
 
@@ -207,7 +207,7 @@ TEST(ProtectEncodingEncryptionInput,
       f.diag.Diagnostics(),
       "protect pragma value stands for a different number of bytes from the "
       "one the encoding in effect states",
-      LineHolding(src, kBlockOpening), "34.5.9.2"));
+      LineHolding(src, kEncodingBlockOpening), "34.5.9.2"));
   EXPECT_FALSE(Holds(read, "module sealed_m"));
 }
 
@@ -280,7 +280,7 @@ TEST(ProtectEncodingTable, TheToolsOwnIdentifierIsNoneOfTheTabulatedFour) {
 TEST(ProtectEncodingTable, TheRequiredBase64IdentifierReadsADesignation) {
   std::string sealed =
       SealedByDesignation(kBase64Enctype, kDesignationInBase64, kDesignatedKey);
-  EXPECT_FALSE(Holds(sealed, kSealedDesign));
+  EXPECT_FALSE(Holds(sealed, kEncodingSealedDesign));
   EXPECT_TRUE(Holds(sealed, kKeyBlockLine));
 }
 
@@ -292,7 +292,7 @@ TEST(ProtectEncodingTable, TheRequiredBase64IdentifierReadsADesignation) {
 TEST(ProtectEncodingTable, TheRequiredUuencodeIdentifierReadsADesignation) {
   std::string sealed = SealedByDesignation(
       kUuencodeEnctype, kDesignationInUuencode, kDesignatedKey);
-  EXPECT_FALSE(Holds(sealed, kSealedDesign));
+  EXPECT_FALSE(Holds(sealed, kEncodingSealedDesign));
   EXPECT_TRUE(Holds(sealed, kKeyBlockLine));
 }
 
@@ -305,7 +305,7 @@ TEST(ProtectEncodingTable,
      TheOptionalQuotedPrintableIdentifierReadsADesignation) {
   std::string sealed = SealedByDesignation(
       kQuotedPrintableEnctype, kDesignationInQuotedPrintable, kDesignatedKey);
-  EXPECT_FALSE(Holds(sealed, kSealedDesign));
+  EXPECT_FALSE(Holds(sealed, kEncodingSealedDesign));
   EXPECT_TRUE(Holds(sealed, kKeyBlockLine));
 }
 
@@ -325,8 +325,8 @@ TEST(ProtectEncodingTable, TheSameLineStandsForAnotherValueUnderRaw) {
       kRawEnctype, kDesignationInBase64, kDesignationInBase64);
   std::string as_base64 = SealedByDesignation(
       kBase64Enctype, kDesignationInBase64, kDesignationInBase64);
-  EXPECT_FALSE(Holds(as_written, kSealedDesign));
-  EXPECT_TRUE(Holds(as_base64, kSealedDesign));
+  EXPECT_FALSE(Holds(as_written, kEncodingSealedDesign));
+  EXPECT_TRUE(Holds(as_base64, kEncodingSealedDesign));
 }
 
 // The rest of the raw row: the data such a block carries may hold characters
@@ -336,7 +336,7 @@ TEST(ProtectEncodingTable, TheSameLineStandsForAnotherValueUnderRaw) {
 TEST(ProtectEncodingTable, ARawDesignationMayHoldAnUnprintableCharacter) {
   std::string sealed = SealedByDesignation(kRawEnctype, kUnprintableDesignation,
                                            kUnprintableDesignation);
-  EXPECT_FALSE(Holds(sealed, kSealedDesign));
+  EXPECT_FALSE(Holds(sealed, kEncodingSealedDesign));
   EXPECT_TRUE(Holds(sealed, kKeyBlockLine));
 }
 
@@ -349,7 +349,7 @@ TEST(ProtectEncodingTable, ARawDesignationMayHoldAnUnprintableCharacter) {
 TEST(ProtectEncodingTable, AnIdentifierNothingProvidesReadsNoDesignation) {
   std::string untouched = SealedByDesignation(
       kUnprovidedEnctype, kDesignationInBase64, kDesignatedKey);
-  EXPECT_TRUE(Holds(untouched, kSealedDesign));
+  EXPECT_TRUE(Holds(untouched, kEncodingSealedDesign));
   EXPECT_FALSE(Holds(untouched, kKeyBlockLine));
 }
 
@@ -383,10 +383,11 @@ TEST(ProtectEncodingEncryptionOutput, EveryEnvelopeStatesItsOwnWriting) {
 // the text's length would.
 TEST(ProtectEncodingEncryptionOutput, TheCountIsOfTheDataAndNotOfTheWriting) {
   std::string envelope = EnvelopeAround("");
-  EXPECT_TRUE(
-      Holds(envelope, TheCountOf(ProtectedRegionBlockSize(kSealedDesign))));
-  EXPECT_NE(ProtectedRegionBlockSize(kSealedDesign), kSealedDesign.size());
-  EXPECT_NE(ProtectedRegionBlockSize(kSealedDesign),
+  EXPECT_TRUE(Holds(
+      envelope, TheCountOf(ProtectedRegionBlockSize(kEncodingSealedDesign))));
+  EXPECT_NE(ProtectedRegionBlockSize(kEncodingSealedDesign),
+            kEncodingSealedDesign.size());
+  EXPECT_NE(ProtectedRegionBlockSize(kEncodingSealedDesign),
             DataBlockOf(envelope).size());
 }
 
@@ -451,7 +452,7 @@ TEST(ProtectEncodingEncryptionOutput, TheDataKeyDesignationIsRewrittenAsWell) {
 TEST(ProtectEncodingEncryptionOutput, TheKeyDesignationIsRewrittenAsWell) {
   std::string envelope = SealedByDesignation(
       kUuencodeEnctype, kDesignationInUuencode, kDesignatedKey);
-  ASSERT_FALSE(Holds(envelope, kSealedDesign));
+  ASSERT_FALSE(Holds(envelope, kEncodingSealedDesign));
   std::string written = LineAfter(envelope, kKeyPublicKeyLine);
   EXPECT_NE(written, kDesignationInUuencode);
   std::string key;
@@ -471,7 +472,7 @@ TEST(ProtectEncodingEncryptionOutput, TheKeyDesignationIsRewrittenAsWell) {
 TEST(ProtectEncodingEncryptionOutput, AKeyBlockAndTheKeyInItAreUnderTheScheme) {
   std::string envelope =
       SealedByDesignation(kBase64Enctype, kDesignationInBase64, kDesignatedKey);
-  ASSERT_FALSE(Holds(envelope, kSealedDesign));
+  ASSERT_FALSE(Holds(envelope, kEncodingSealedDesign));
   ASSERT_TRUE(Holds(envelope, "enctype=\"base64\""));
   std::string block;
   ASSERT_TRUE(DecodeProtectBlock(LineAfter(envelope, kKeyBlockLine),
@@ -484,7 +485,7 @@ TEST(ProtectEncodingEncryptionOutput, AKeyBlockAndTheKeyInItAreUnderTheScheme) {
   std::string design;
   EXPECT_TRUE(DecryptProtectedRegion(DataBlockOf(envelope), region_key, &design,
                                      kBase64Enctype));
-  EXPECT_TRUE(Holds(design, kSealedDesign));
+  EXPECT_TRUE(Holds(design, kEncodingSealedDesign));
 }
 
 // The same envelope counted rather than opened. It carries several encoded
@@ -508,8 +509,8 @@ TEST(ProtectEncodingEncryptionOutput, AnExpressionStandsAheadOfEveryField) {
 // The halves are searched separately. A count over the whole text would be met
 // by a tool that described one envelope twice and the other not at all.
 TEST(ProtectEncodingEncryptionOutput, EachEnvelopeOfATextStatesItsWriting) {
-  std::string text = EncryptEnvelopes(TwoRegions(), kExchangeKey);
-  EXPECT_FALSE(Holds(text, kSealedDesign));
+  std::string text = EncryptEnvelopes(TwoRegions(), kEncodingExchangeKey);
+  EXPECT_FALSE(Holds(text, kEncodingSealedDesign));
   EXPECT_FALSE(Holds(text, kSecondDesign));
   size_t first = text.find(kProtectedOpening);
   ASSERT_NE(first, std::string::npos);
@@ -536,7 +537,8 @@ TEST(ProtectEncodingEncryptionOutput, EachEnvelopeOfATextStatesItsWriting) {
 TEST(ProtectEncodingEncryptionOutput, TheBlockHoldsOnlyWhatASourceLineCarries) {
   std::string region = "`pragma protect begin\n";
   region.append(kAwkwardDesign).append("`pragma protect end\n");
-  std::string block = DataBlockOf(EncryptEnvelopes(region, kExchangeKey));
+  std::string block =
+      DataBlockOf(EncryptEnvelopes(region, kEncodingExchangeKey));
   ASSERT_FALSE(block.empty());
   bool text_only = true;
   for (char c : block) {
@@ -545,7 +547,7 @@ TEST(ProtectEncodingEncryptionOutput, TheBlockHoldsOnlyWhatASourceLineCarries) {
   }
   EXPECT_TRUE(text_only);
   std::string recovered;
-  EXPECT_TRUE(DecryptProtectedRegion(block, kExchangeKey, &recovered));
+  EXPECT_TRUE(DecryptProtectedRegion(block, kEncodingExchangeKey, &recovered));
   EXPECT_TRUE(Holds(recovered, kAwkwardDesign));
 }
 
@@ -574,7 +576,7 @@ TEST(ProtectEncodingEncryptionOutput, TheStatedLengthBreaksTheWriting) {
   ProtectEncoding stated =
       ParseProtectEncoding("(enctype=\"base64\", line_length=8)");
   ASSERT_EQ(stated.line_length, 8U);
-  std::string written = EncodeProtectBlock(kSealedDesign, stated);
+  std::string written = EncodeProtectBlock(kEncodingSealedDesign, stated);
   EXPECT_TRUE(Holds(written, "\n"));
   size_t at = 0;
   while (at < written.size()) {
@@ -585,7 +587,7 @@ TEST(ProtectEncodingEncryptionOutput, TheStatedLengthBreaksTheWriting) {
   }
   std::string recovered;
   EXPECT_TRUE(DecodeProtectBlock(written, kBase64Enctype, &recovered));
-  EXPECT_EQ(recovered, kSealedDesign);
+  EXPECT_EQ(recovered, kEncodingSealedDesign);
 }
 
 // The negative of the length: the one row of the table with nothing for it to
@@ -601,8 +603,9 @@ TEST(ProtectEncodingEncryptionOutput, TheIdentityTransformationBreaksNoLine) {
       ParseProtectEncoding("(enctype=\"raw\", line_length=8)");
   ASSERT_EQ(stated.enctype, kRawEnctype);
   ASSERT_EQ(stated.line_length, 8U);
-  ASSERT_GT(kSealedDesign.size(), stated.line_length);
-  EXPECT_EQ(EncodeProtectBlock(kSealedDesign, stated), kSealedDesign);
+  ASSERT_GT(kEncodingSealedDesign.size(), stated.line_length);
+  EXPECT_EQ(EncodeProtectBlock(kEncodingSealedDesign, stated),
+            kEncodingSealedDesign);
 }
 
 // ---------------------------------------------------------------------------
@@ -634,7 +637,7 @@ TEST(ProtectEncodingDecryptionInput, ABlockDeclaredWronglyDoesNotOpen) {
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "protect pragma data block cannot be decrypted with the key supplied",
-      LineHolding(src, kBlockOpening), "34.3.2"));
+      LineHolding(src, kEncodingBlockOpening), "34.3.2"));
   EXPECT_FALSE(Holds(read, "module sealed_m"));
 }
 
@@ -652,7 +655,8 @@ TEST(ProtectEncodingDecryptionInput, ABlockUnderAnUnprovidedSchemeIsNotRead) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "protect pragma encoding names an enctype this "
                             "implementation does not provide",
-                            LineHolding(src, kBlockOpening), "34.5.9.2"));
+                            LineHolding(src, kEncodingBlockOpening),
+                            "34.5.9.2"));
   EXPECT_FALSE(Holds(read, "module sealed_m"));
 }
 
@@ -705,7 +709,7 @@ TEST(ProtectEncodingDecryptionInput, ADigestBlockIsReadUnderTheSameScheme) {
 // the count over would turn it away for its size.
 TEST(ProtectEncodingDecryptionInput, TheCountIsSpentOnTheBlockItStandsAheadOf) {
   std::string envelope = EnvelopeAround("");
-  size_t block = envelope.find(kBlockOpening);
+  size_t block = envelope.find(kEncodingBlockOpening);
   ASSERT_NE(block, std::string::npos);
   size_t ends = envelope.find('\n', block);
   ASSERT_NE(ends, std::string::npos);

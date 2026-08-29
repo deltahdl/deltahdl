@@ -30,13 +30,19 @@ using namespace delta;
 // reading what that half produced. Without one nothing is sealed and nothing is
 // opened, so a reading that found no design text could not be told apart from a
 // key that was never supplied.
-inline constexpr std::string_view kExchangeKey = "globex-exchange-key";
+//
+// The name says which fixture the key belongs to because
+// test_fixtures/fixture_protect_read.h declares one of its own, and both are
+// inline at namespace scope. A file including both took the two under one name
+// until issue #3416, which a compiler reports as a redefinition naming a line
+// in neither file and a linker need not report at all.
+inline constexpr std::string_view kEncodingExchangeKey = "globex-exchange-key";
 
 // The design a region seals. Nothing of it survives any of the alphabets a
 // block is written in, so finding it outside a block is finding a region that
 // was never sealed, and finding it in what a reading produced is finding a
 // block that opened.
-inline constexpr std::string_view kSealedDesign =
+inline constexpr std::string_view kEncodingSealedDesign =
     "module sealed_m; endmodule\n";
 
 // A second design, for the text that writes two regions. Two envelopes come
@@ -62,7 +68,7 @@ inline constexpr std::string_view kAwkwardDesign =
 // Where a reading meets the block an envelope carries. Everything a block is
 // read under has to stand ahead of this, so a directive written here is the
 // last word on the writing in effect where the block is opened.
-inline constexpr std::string_view kBlockOpening =
+inline constexpr std::string_view kEncodingBlockOpening =
     "`pragma protect data_block=\"";
 
 // §34.5.3.1's word, as the encrypting half writes it. It is where one envelope
@@ -156,7 +162,7 @@ inline std::string NamesScheme(std::string_view enctype) {
 // over is a line that went into the block ahead of it.
 inline std::string RegionBody(std::string_view inside) {
   std::string body(inside);
-  body.append(kSealedDesign);
+  body.append(kEncodingSealedDesign);
   return body;
 }
 
@@ -184,7 +190,7 @@ inline std::string TheCountOf(size_t bytes) {
 // carries, which is the key and nothing besides.
 inline PreprocConfig HoldingTheKey() {
   PreprocConfig config;
-  config.protect_key = std::string(kExchangeKey);
+  config.protect_key = std::string(kEncodingExchangeKey);
   return config;
 }
 
@@ -196,8 +202,8 @@ inline PreprocConfig HoldingTheKey() {
 // was never sealed at all, the design being present in that text for the
 // plainest of reasons and no block having been opened to put it there.
 inline std::string EnvelopeOf(const std::string& source) {
-  std::string envelope = EncryptEnvelopes(source, kExchangeKey);
-  EXPECT_FALSE(Holds(envelope, kSealedDesign));
+  std::string envelope = EncryptEnvelopes(source, kEncodingExchangeKey);
+  EXPECT_FALSE(Holds(envelope, kEncodingSealedDesign));
   return envelope;
 }
 
@@ -211,9 +217,9 @@ inline std::string EnvelopeAround(std::string_view inside) {
 // the quotation marks of its data_block expression, and empty where the text
 // carries no such expression.
 inline std::string DataBlockOf(std::string_view envelope) {
-  size_t opens = envelope.find(kBlockOpening);
+  size_t opens = envelope.find(kEncodingBlockOpening);
   if (opens == std::string_view::npos) return {};
-  size_t from = opens + kBlockOpening.size();
+  size_t from = opens + kEncodingBlockOpening.size();
   size_t to = envelope.find('"', from);
   if (to == std::string_view::npos) return {};
   return std::string(envelope.substr(from, to - from));
@@ -246,7 +252,7 @@ inline std::string LineAfter(std::string_view text, std::string_view opening) {
 // whatever the envelope stated about itself further up.
 inline std::string EnvelopeReadUnder(std::string_view directive) {
   std::string envelope = EnvelopeAround("");
-  size_t block = envelope.find(kBlockOpening);
+  size_t block = envelope.find(kEncodingBlockOpening);
   EXPECT_NE(block, std::string::npos);
   return envelope.insert(block, std::string(directive));
 }
@@ -267,7 +273,7 @@ inline std::string EnvelopeOpeningWith(std::string_view directive) {
 // own.
 inline std::string TwoRegions() {
   std::string source = "`pragma protect begin\n";
-  source.append(kSealedDesign).append("`pragma protect end\n");
+  source.append(kEncodingSealedDesign).append("`pragma protect end\n");
   source.append("`pragma protect begin\n");
   source.append(kSecondDesign).append("`pragma protect end\n");
   return source;

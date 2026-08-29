@@ -58,7 +58,8 @@ constexpr std::string_view kLicense =
 // looking at the output could pick out.
 constexpr std::string_view kLibrary = "liblic.so";
 
-constexpr std::string_view kSealedDesign = "module sealed_m; endmodule\n";
+constexpr std::string_view kEncodingSealedDesign =
+    "module sealed_m; endmodule\n";
 
 // The entity whose key opens the region, and the key itself.
 constexpr std::string_view kEntity = "meridian-trust";
@@ -92,7 +93,7 @@ std::string Region(std::string_view described) {
   std::string text = "`pragma protect begin\n";
   text.append(Writes("data_keyowner", kEntity));
   text.append(Writes("data_keyname", kKeyName));
-  text.append(described).append(kSealedDesign);
+  text.append(described).append(kEncodingSealedDesign);
   text.append("`pragma protect end\n");
   return text;
 }
@@ -100,7 +101,7 @@ std::string Region(std::string_view described) {
 // The envelope this tool writes for that region.
 std::string EnvelopeOf(std::string_view described) {
   std::string envelope = EncryptEnvelopes(Region(described), {}, TheKey());
-  EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
+  EXPECT_FALSE(Holds(envelope, kEncodingSealedDesign)) << envelope;
   return envelope;
 }
 
@@ -131,7 +132,7 @@ TEST(ProtectDecryptLicenseDescription,
   ASSERT_TRUE(DecryptProtectedRegion(DataBlockOf(EnvelopeOf(kLicense)), kTheKey,
                                      &cleartext));
   EXPECT_TRUE(Holds(cleartext, kLicense)) << cleartext;
-  EXPECT_TRUE(Holds(cleartext, kSealedDesign)) << cleartext;
+  EXPECT_TRUE(Holds(cleartext, kEncodingSealedDesign)) << cleartext;
 }
 
 // The contrast that says the region decided this. §34.5.5 has the author's name
@@ -164,7 +165,7 @@ TEST(ProtectDecryptLicenseDescription, ALicenceOutsideTheRegionStaysWhereItIs) {
 // design, the licence the author stated deciding nothing.
 TEST(ProtectDecryptLicenseDescription, TheDesignIsReachedWithNoLicenceChecked) {
   ReadSource run(EnvelopeOf(kLicense), ReadSource::KeysConfig(TheKey()));
-  EXPECT_TRUE(Holds(run.text, kSealedDesign)) << run.text;
+  EXPECT_TRUE(Holds(run.text, kEncodingSealedDesign)) << run.text;
 }
 
 // And the run says nothing about it. §34.5.28.2 has an unlicensed tool produce

@@ -467,7 +467,7 @@ TEST(ProtectEndProtectedDescription, AWordWithNoPreviousBlockEndsNothing) {
 TEST(ProtectEndProtectedDescription, AWordWithNoPreviousRegionClosesNothing) {
   std::string src(kWordDirective);
   src.append(EncryptedByTheAuthor(Design(kOuterStatement)));
-  ReadSource run(src, ReadSource::KeyConfig(kExchangeKey));
+  ReadSource run(src, ReadSource::KeyConfig(kReadingExchangeKey));
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_EQ(run.Closed().size(), 1U);
   EXPECT_EQ(run.OpenDecryptionEnvelopes(), 0U);
@@ -729,7 +729,7 @@ TEST(ProtectEndProtectedDescription, AProducedModelsOwnWordGoesIntoTheBlock) {
 TEST(ProtectEndProtectedDescription, AProducedModelsWordComesBackAndEndsIt) {
   std::string written = EncryptedByTheAuthor(RegionAroundAProducedModel(
       EncryptedByTheAuthor(Design(kInnerStatement))));
-  ReadSource run(written, ReadSource::KeyConfig(kExchangeKey));
+  ReadSource run(written, ReadSource::KeyConfig(kReadingExchangeKey));
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, kInnerStatement));
   EXPECT_TRUE(Holds(run.text, kAfterStatement));
@@ -753,7 +753,7 @@ TEST(ProtectEndProtectedDescription, AProducedModelsWordComesBackAndEndsIt) {
 // pragma.
 TEST(ProtectEndProtectedDescription, TheWordAnswersAKeyLeftAwaitingItsLine) {
   ReadSource run(EnvelopeAnnouncingNothing("data_decrypt_key"),
-                 ReadSource::KeyConfig(kExchangeKey));
+                 ReadSource::KeyConfig(kReadingExchangeKey));
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_EQ(run.OpenDecryptionEnvelopes(), 0U);
   EXPECT_EQ(run.Closed().size(), 1U);
@@ -766,7 +766,7 @@ TEST(ProtectEndProtectedDescription, TheWordAnswersAKeyLeftAwaitingItsLine) {
 TEST(ProtectEndProtectedDescription,
      TheWordAnswersADesignationLeftAwaitingItsLine) {
   ReadSource run(EnvelopeAnnouncingNothing("data_public_key"),
-                 ReadSource::KeyConfig(kExchangeKey));
+                 ReadSource::KeyConfig(kReadingExchangeKey));
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_EQ(run.OpenDecryptionEnvelopes(), 0U);
   EXPECT_EQ(run.Closed().size(), 1U);
@@ -780,7 +780,7 @@ TEST(ProtectEndProtectedDescription,
 TEST(ProtectEndProtectedDescription,
      TheWordAnswersAKeyBlockLeftAwaitingItsLine) {
   ReadSource run(EnvelopeAnnouncingNothing("key_block"),
-                 ReadSource::KeyConfig(kExchangeKey));
+                 ReadSource::KeyConfig(kReadingExchangeKey));
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_EQ(run.OpenDecryptionEnvelopes(), 0U);
   EXPECT_EQ(run.Closed().size(), 1U);
@@ -799,7 +799,7 @@ TEST(ProtectEndProtectedDescription, TheWordEndsTheRunItsOwnDirectiveOpened) {
   std::string src = "`pragma protect begin_protected\n";
   src.append("`pragma protect data_decrypt_key, end_protected\n");
   src.append("  ").append(kOuterStatement).append("\n");
-  ReadSource run(src, ReadSource::KeyConfig(kExchangeKey));
+  ReadSource run(src, ReadSource::KeyConfig(kReadingExchangeKey));
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_EQ(run.OpenDecryptionEnvelopes(), 0U);
   EXPECT_TRUE(Holds(run.text, kOuterStatement));
@@ -820,7 +820,7 @@ TEST(ProtectEndProtectedDescription,
   std::string written =
       EncryptedByTheAuthor(RegionStatingASchemePastTheWord(kWordDirective));
   ASSERT_TRUE(Holds(written, "enctype=\"base64\""));
-  ReadSource run(written, ReadSource::KeyConfig(kExchangeKey));
+  ReadSource run(written, ReadSource::KeyConfig(kReadingExchangeKey));
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, kOuterStatement));
 }
@@ -833,7 +833,7 @@ TEST(ProtectEndProtectedDescription,
 TEST(ProtectEndProtectedDescription, ABlockLeftPastTheWordBelongsToNoRun) {
   ReadSource run(
       WithTheWordAheadOfTheBlock(EncryptedByTheAuthor(Design(kOuterStatement))),
-      ReadSource::KeyConfig(kExchangeKey));
+      ReadSource::KeyConfig(kReadingExchangeKey));
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_FALSE(Holds(run.text, kOuterStatement));
 }
@@ -850,7 +850,7 @@ TEST(ProtectEndProtectedDescription, ABlockLeftPastTheWordBelongsToNoRun) {
 TEST(ProtectEndProtectedDescription, AKeyOneRunGatheredDoesNotOpenTheNext) {
   std::string src = EnvelopeCarryingAnUnspentKey(kOtherReaderKey);
   src.append(EncryptedByTheAuthor(RegionUnderTheAuthorsKey()));
-  ReadSource run(src, ReadSource::KeyConfig(kExchangeKey));
+  ReadSource run(src, ReadSource::KeyConfig(kReadingExchangeKey));
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, kOuterStatement));
 }
@@ -861,7 +861,7 @@ TEST(ProtectEndProtectedDescription, AKeyOneRunGatheredDoesNotOpenTheNext) {
 // not. The run ended at the word, so what the reader holds is what the block is
 // tried with, and the design does not come back.
 TEST(ProtectEndProtectedDescription, TheNextBlockIsNotOpenedByTheEarlierKey) {
-  std::string src = EnvelopeCarryingAnUnspentKey(kExchangeKey);
+  std::string src = EnvelopeCarryingAnUnspentKey(kReadingExchangeKey);
   src.append(EncryptedByTheAuthor(RegionUnderTheAuthorsKey()));
   ReadSource run(src, ReadSource::KeyConfig(kOtherReaderKey));
   // The envelope ahead of it carries a key and no block, so the one block in
