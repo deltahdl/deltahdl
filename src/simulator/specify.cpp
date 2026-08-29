@@ -766,10 +766,16 @@ void SpecifyManager::AddPrimitiveDriversFromGate(const ModuleItem& gate,
     driver.inst_prefix = inst_prefix;
     AddPrimitiveDriver(std::move(driver));
   }
-  for (const auto* seen : gate_decls_) {
-    if (seen == &gate) return;
+  // §29.8 puts a primitive instance inside a module, so one gate declaration is
+  // registered once per instance of the cell holding it and the declaration
+  // alone does not identify what was already recorded. The instance travels
+  // with it because RebuildGateDriversForSpecparam evaluates the delay
+  // expression in, and files the rebuilt driver back at, the instance the
+  // declaration came from.
+  for (const auto& seen : gate_decls_) {
+    if (seen.gate == &gate && seen.inst_prefix == inst_prefix) return;
   }
-  gate_decls_.push_back(&gate);
+  gate_decls_.push_back({&gate, std::string(inst_prefix)});
 }
 
 namespace {

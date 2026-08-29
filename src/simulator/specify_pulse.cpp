@@ -90,9 +90,16 @@ void SpecifyManager::RebuildTimingChecksForSpecparam(
 // Overwrite the driver already recorded for each output the rebuilt gate
 // drives, so a DEVICE delay still finds one entry per output rather than a
 // stale one beside a fresh one.
+//
+// The instance is compared alongside the output port. §29.8 puts a primitive
+// instance inside a module and §28.4 names its terminals by the declaring
+// module's own port names, so two instances of one cell drive outputs spelled
+// identically and the port alone would overwrite whichever instance's driver
+// stands first.
 void SpecifyManager::ReplacePrimitiveDriver(PrimitiveDriver rebuilt) {
   for (auto& existing : primitive_drivers_) {
-    if (existing.output_port == rebuilt.output_port) {
+    if (existing.output_port == rebuilt.output_port &&
+        existing.inst_prefix == rebuilt.inst_prefix) {
       existing = std::move(rebuilt);
       return;
     }
@@ -105,13 +112,29 @@ void SpecifyManager::ReplacePrimitiveDriver(PrimitiveDriver rebuilt) {
 // registered. A gate whose delay expression reads the changed specparam is
 // rebuilt from its declaration.
 void SpecifyManager::RebuildGateDriversForSpecparam(
-    const std::vector<std::string>& changed) {
-  for (const auto* gate : gate_decls_) {
+    std::string_view inst_prefix, const std::vector<std::string>& changed) {
+  for (const auto& registered : gate_decls_) {
+    // §29.8 puts a primitive instance inside a module, and a specparam of one
+    // instance is not the one an identically spelled declaration in another
+    // reads, so only that instance's gates are rebuilt.
+    if (registered.inst_prefix != inst_prefix) continue;
+    const ModuleItem* gate = registered.gate;
     const Expr* const kDelays[3] = {gate->gate_delay, gate->gate_delay_fall,
                                     gate->gate_delay_decay};
     if (!AnyExprReadsSpecparam(kDelays, changed)) continue;
+    // A gate delay written as a specparam is read by its bare name, and it must
+    // read the one belonging to the instance that declared the gate.
+    // SimContext resolves a bare name against the running process's instance,
+    // which during a run is whichever process called $sdf_annotate.
+    InstancePrefixOverride scope(specparam_ctx_->InstancePrefixOverride(),
+                                 registered.inst_prefix);
     for (auto& rebuilt : BuildPrimitiveDriversFromGate(*gate, *specparam_ctx_,
                                                        *specparam_arena_)) {
+      // The rebuilt driver is filed back at the instance the declaration was
+      // registered under (§28.4): ReplacePrimitiveDriver compares
+      // PrimitiveDriver::inst_prefix, so a rebuild at the empty prefix
+      // overwrites another instance's driver.
+      rebuilt.inst_prefix = registered.inst_prefix;
       ReplacePrimitiveDriver(std::move(rebuilt));
     }
   }
@@ -142,7 +165,7 @@ void SpecifyManager::ApplyAnnotatedSpecparam(std::string_view inst_prefix,
   const std::vector<std::string> kChanged{name};
   RebuildPathDelaysForSpecparam(inst_prefix, kChanged);
   RebuildTimingChecksForSpecparam(kChanged);
-  RebuildGateDriversForSpecparam(kChanged);
+  RebuildGateDriversForSpecparam(inst_prefix, kChanged);
 }
 
 void SpecifyManager::SetSpecparamValue(SpecparamValue spec,

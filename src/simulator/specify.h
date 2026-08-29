@@ -31,6 +31,24 @@ struct RegisteredPathDecl {
   std::string inst_prefix;
 };
 
+// §32.4.3: a gate instantiation together with the module instance it was
+// registered under. SpecifyManager::RebuildGateDriversForSpecparam recomputes a
+// gate's propagation delays from its declaration when an SDF LABEL changes a
+// specparam that delay expression reads, and the rebuilt drivers have to be
+// filed back at the instance the declaration came from. §29.8 puts a primitive
+// instance inside a module the way §30.3 puts a specify block there, and §28.4
+// has a gate name its terminals by the declaring module's own port names, so
+// the declaration alone spells an output identically for every instance of the
+// cell: a rebuild left at the empty prefix overwrites whichever instance's
+// driver stands first, SpecifyManager::ReplacePrimitiveDriver comparing
+// PrimitiveDriver::inst_prefix. The prefix is also what the delay expression is
+// evaluated under, a gate delay written as a specparam being read by its bare
+// name.
+struct RegisteredGateDecl {
+  const ModuleItem* gate = nullptr;
+  std::string inst_prefix;
+};
+
 // §32.4.3: a specparam the design declared, together with the module instance
 // that declared it. An SDF LABEL annotates to specparams, so the manager has to
 // know which names are specparams at all. §30.3 has a specify block declare its
@@ -119,8 +137,10 @@ class SpecifyManager {
   // declaring module's own port names, so two instances of one cell drive
   // outputs spelled identically; the prefix is recorded on each driver as
   // PrimitiveDriver::inst_prefix, which is what tells the two instances apart.
-  // It defaults to the empty prefix so a caller registering the gates of one
-  // module can name the gate alone.
+  // It travels with the kept declaration as well, as RegisteredGateDecl above,
+  // because RebuildGateDriversForSpecparam files a rebuilt driver back at the
+  // instance the declaration came from. It defaults to the empty prefix so a
+  // caller registering the gates of one module can name the gate alone.
   void AddPrimitiveDriversFromGate(const ModuleItem& gate, SimContext& ctx,
                                    Arena& arena,
                                    std::string_view inst_prefix = {});
@@ -454,16 +474,23 @@ class SpecifyManager {
   // filed back at that same instance.
   void RebuildPathDelaysForSpecparam(std::string_view inst_prefix,
                                      const std::vector<std::string>& changed);
-  // §32.4.3: the same recomputation for the constraint limits of a timing check
-  // and for the propagation delays of a gate primitive. Neither is held to an
-  // instance. TimingCheckEntry (simulator/specify_timing_check.h) carries no
-  // instance field, so it has none to be held to. A gate primitive does now --
-  // RegisterModuleGates (simulator/specify_register.cpp) stamps
-  // PrimitiveDriver::inst_prefix -- but gate_decls_ below records the
-  // ModuleItem alone, so a rebuild has no prefix to restamp and
-  // ReplacePrimitiveDriver matches on the output port alone.
+  // §32.4.3: the same recomputation for the constraint limits of a timing
+  // check. It is not held to an instance: TimingCheckEntry
+  // (simulator/specify_timing_check.h) carries no instance field, so it has
+  // none to be held to.
   void RebuildTimingChecksForSpecparam(const std::vector<std::string>& changed);
-  void RebuildGateDriversForSpecparam(const std::vector<std::string>& changed);
+  // §32.4.3: the same recomputation for the propagation delays of a gate
+  // primitive, held to an instance the way RebuildPathDelaysForSpecparam is.
+  // Only the gates registered in the instance `inst_prefix` names are
+  // considered, a specparam of one instance not being the one an identical
+  // declaration in another instance reads, and each rebuilt driver is filed
+  // back at that same instance.
+  void RebuildGateDriversForSpecparam(std::string_view inst_prefix,
+                                      const std::vector<std::string>& changed);
+  // §32.4.3: overwrite the driver already recorded for `rebuilt`'s output port
+  // in `rebuilt`'s instance. §29.8 puts a primitive instance inside a module,
+  // so the output port alone does not name one driver and the instance is
+  // compared as well.
   void ReplacePrimitiveDriver(PrimitiveDriver rebuilt);
 
   // §32.4.3: is `name`, read in the instance `inst_prefix` names, a specparam
@@ -513,15 +540,15 @@ class SpecifyManager {
 
   // §32.4.3: the design side of a LABEL annotation -- the specparams the
   // design's scopes declared, each with the instance that declared it, the
-  // context and arena their values live in, and the module path declarations
-  // kept so their delay expressions can be reevaluated, each likewise with the
-  // instance it was registered under.
+  // context and arena their values live in, and the module path and gate
+  // declarations kept so their delay expressions can be reevaluated, each
+  // likewise with the instance it was registered under.
   std::vector<DeclaredSpecparam> declared_specparams_;
   SimContext* specparam_ctx_ = nullptr;
   Arena* specparam_arena_ = nullptr;
   std::vector<RegisteredPathDecl> path_decls_;
   std::vector<const TimingCheckDecl*> timing_check_decls_;
-  std::vector<const ModuleItem*> gate_decls_;
+  std::vector<RegisteredGateDecl> gate_decls_;
 
   uint8_t reject_pulse_pct_ = 100;
   uint8_t error_pulse_pct_ = 100;

@@ -33,6 +33,29 @@
 // cannot pass by holding the value meant for the instance it did name. No case
 // rests on 0, which is both what an unset delay slot holds and what a lookup
 // that matched nothing would leave behind.
+//
+// The last three cases cover the §32.4.3 rebuild of those same drivers rather
+// than the §32.4.1 annotation of them, and they are issue #3401's. A gate's
+// propagation delay may be written as a specparam, and §32.4.3 has every
+// expression reading a specparam reevaluated when an SDF LABEL annotates a
+// value to it, so the rebuilt driver has to reach the gate of the instance
+// whose specparam was annotated and no other instance's.
+// SpecifyManager::ReplacePrimitiveDriver matched a driver by its output port
+// alone, and SpecifyManager's gate_decls_ recorded a gate declaration with no
+// instance beside it where path_decls_ recorded one, so a rebuild had no
+// instance to file its driver back at and overwrote whichever instance's driver
+// stood first.
+//
+// Those three run one further cell, gate_timed, whose gate delay is the
+// specparam tgate declared at 13. A LABEL section names the second of its two
+// instances and annotates tgate to 23 where the reading is the named instance's
+// delay, to 29 where the reading is the sibling that must stay at 13, and to 41
+// where the reading is how many drivers the manager holds. None of 13, 23, 29
+// and 41 is 0, none is one of the 7, 19 and 31 the DEVICE cases write, and no
+// two quantities a case tells apart share a value, so a driver holding its
+// declaration, a driver holding the value meant for its sibling and a driver
+// holding a value another case's SDF file supplied are three different
+// readings.
 
 #include <gtest/gtest.h>
 
@@ -77,6 +100,46 @@ std::string DeviceOnBOut(const std::string& instance_path,
   return "(DELAYFILE (CELL (CELLTYPE \"gate_body\") (INSTANCE " +
          instance_path + ") (DELAY (ABSOLUTE (DEVICE b_out (" + value +
          "))))))";
+}
+
+// The cell the §32.4.3 cases instantiate: one output port driven by one `and`
+// gate whose §28.16 delay is not a literal but the specparam tgate, declared at
+// 13. §6.20.5 permits a specparam "both within the specify block (see
+// Clause 30) and in the main module body" and requires of the second site only
+// that the declaration "be declared before it is referenced", which is the site
+// used here: the gate reading tgate is a module item, so the cell needs no
+// specify block and declares no module path at all.
+const char* TimedCellText() {
+  return "module gate_timed(input t_in0, input t_in1, output t_out);\n"
+         "  specparam tgate = 13;\n"
+         "  and #tgate g_timed(t_out, t_in0, t_in1);\n"
+         "endmodule\n";
+}
+
+// A whole SDF file whose one CELL record for the gate_timed instance
+// `instance_path` carries a LABEL section annotating the value `value` to the
+// specparam tgate. §32.4.3 has such a section carry new values for the
+// specparams the cell its CELL record names declares.
+std::string LabelOnTGate(const std::string& instance_path,
+                         const std::string& value) {
+  return "(DELAYFILE (CELL (CELLTYPE \"gate_timed\") (INSTANCE " +
+         instance_path + ") (LABEL (ABSOLUTE (tgate " + value + ")))))";
+}
+
+// The design each §32.4.3 case runs: gate_timed instantiated twice inside
+// gate_board, which annotates from `sdf_path`. gate_board is declared last, so
+// SdfDesign::Lower elaborates it as the top and the SDF instance path of an
+// instance declared in it begins "gate_board/".
+std::string TwoInstanceDesign(const std::string& sdf_path) {
+  return TimedCellText() +
+         std::string(
+             "module gate_board;\n"
+             "  logic first_out;\n"
+             "  logic second_out;\n"
+             "  gate_timed u_first(1'b0, 1'b1, first_out);\n"
+             "  gate_timed u_second(1'b0, 1'b1, second_out);\n"
+             "  initial $sdf_annotate(\"") +
+         sdf_path + "\");\nendmodule\n";
 }
 
 // Lowers and runs `src`, answering the SpecifyManager the run installed, or
@@ -191,6 +254,64 @@ TEST(GateDriverRegistration, DeviceEntryLeavesTheUnnamedInstancesGateAlone) {
   const PrimitiveDriver* other = DriverFound(*mgr, "u_other.", "b_out");
   ASSERT_NE(other, nullptr);
   EXPECT_EQ(other->delays[kRiseSlot], 7u);
+}
+
+// §32.4.3: a LABEL section annotates to the specparams of the cell instance its
+// CELL record names, and an expression reading one of them is reevaluated, so
+// the gate whose propagation delay is written as tgate ends up carrying the
+// delay the annotated 23 produces rather than the 13 its declaration produced.
+// The reevaluation is where the instance is needed twice over: tgate is read by
+// its bare name, and the driver the reevaluation produces has to be filed back
+// at the instance whose gate it came from.
+TEST(GateDriverSpecparamRebuild, LabelReachesTheNamedInstancesGateDelay) {
+  const std::string kSdf =
+      SavedSdf("label_named", LabelOnTGate("gate_board/u_second", "23"));
+
+  SdfDesign design;
+  SpecifyManager* mgr = ManagerOfRun(design, TwoInstanceDesign(kSdf));
+  ASSERT_NE(mgr, nullptr);
+
+  const PrimitiveDriver* named = DriverFound(*mgr, "u_second.", "t_out");
+  ASSERT_NE(named, nullptr);
+  EXPECT_EQ(named->delays[kRiseSlot], 23u);
+}
+
+// §32.4.3 with §32.9's CELL record: the LABEL section belongs to the instance
+// its CELL record names, so annotating tgate in one of the two instances of
+// gate_timed leaves the other instance's gate carrying the 13 the cell
+// declared. Both gates drive an output spelled t_out and both read a specparam
+// spelled tgate, so PrimitiveDriver::inst_prefix is the whole of what keeps the
+// rebuilt driver off the sibling.
+TEST(GateDriverSpecparamRebuild,
+     LabelLeavesTheOtherInstancesGateDelayDeclared) {
+  const std::string kSdf =
+      SavedSdf("label_other", LabelOnTGate("gate_board/u_second", "29"));
+
+  SdfDesign design;
+  SpecifyManager* mgr = ManagerOfRun(design, TwoInstanceDesign(kSdf));
+  ASSERT_NE(mgr, nullptr);
+
+  const PrimitiveDriver* other = DriverFound(*mgr, "u_first.", "t_out");
+  ASSERT_NE(other, nullptr);
+  EXPECT_EQ(other->delays[kRiseSlot], 13u);
+}
+
+// §32.4.3: reevaluating a gate delay expression that reads an annotated
+// specparam replaces the driver the gate already registered rather than adding
+// a second one beside it. The design registers one driver per instance, so it
+// still holds two after the annotation; a rebuild filed under a prefix no
+// instance carries would leave both originals standing and append a third,
+// which reading a delay off either instance would not show.
+TEST(GateDriverSpecparamRebuild,
+     RebuildReplacesTheInstanceDriverRatherThanAddingOne) {
+  const std::string kSdf =
+      SavedSdf("label_count", LabelOnTGate("gate_board/u_second", "41"));
+
+  SdfDesign design;
+  SpecifyManager* mgr = ManagerOfRun(design, TwoInstanceDesign(kSdf));
+  ASSERT_NE(mgr, nullptr);
+
+  EXPECT_EQ(mgr->GetPrimitiveDrivers().size(), 2u);
 }
 
 }  // namespace
