@@ -23,6 +23,11 @@
 // so a case that answered out of another case's registration would be caught.
 // Nothing here is asserted at zero.
 //
+// No module here is named `cell`, which is what the shorthand would want.
+// `cell` is a keyword -- §33.4 gives it to a config declaration's cell clause
+// -- and Parser rejects it as a module name with "expected identifier, got
+// 'cell'" (§23.2.1). The names below all carry a suffix for that reason.
+//
 // Every source puts the cell first and the top last, because
 // ElaborateSrc in lib/cpp/test_fixtures/fixture_simulator.h elaborates
 // cu->modules.back()->name.
@@ -79,16 +84,17 @@ const PathDelay* PathInInstance(const SpecifyManager& mgr,
 // to instance u1 rather than only that some path was registered.
 TEST(SpecifyBlockOfInstantiatedCell, InstantiatedCellRegistersItsModulePath) {
   SimFixture f;
-  SpecifyManager* mgr = ManagerAfterRunning(f,
-                                            "module cell(input a, output y);\n"
-                                            "  specify\n"
-                                            "    (a => y) = 5;\n"
-                                            "  endspecify\n"
-                                            "endmodule\n"
-                                            "module top;\n"
-                                            "  logic out;\n"
-                                            "  cell u1(1'b0, out);\n"
-                                            "endmodule\n");
+  SpecifyManager* mgr =
+      ManagerAfterRunning(f,
+                          "module timed_cell(input a, output y);\n"
+                          "  specify\n"
+                          "    (a => y) = 5;\n"
+                          "  endspecify\n"
+                          "endmodule\n"
+                          "module top;\n"
+                          "  logic out;\n"
+                          "  timed_cell u1(1'b0, out);\n"
+                          "endmodule\n");
   ASSERT_NE(mgr, nullptr);
   const PathDelay* path = PathEndingAt(*mgr, "y");
   ASSERT_NE(path, nullptr);
@@ -102,18 +108,19 @@ TEST(SpecifyBlockOfInstantiatedCell, InstantiatedCellRegistersItsModulePath) {
 // port names alone could not hold.
 TEST(SpecifyBlockOfInstantiatedCell, TwoInstancesOfOneCellRegisterSeparately) {
   SimFixture f;
-  SpecifyManager* mgr = ManagerAfterRunning(f,
-                                            "module cell(input a, output y);\n"
-                                            "  specify\n"
-                                            "    (a => y) = 13;\n"
-                                            "  endspecify\n"
-                                            "endmodule\n"
-                                            "module top;\n"
-                                            "  logic first_out;\n"
-                                            "  logic second_out;\n"
-                                            "  cell u1(1'b0, first_out);\n"
-                                            "  cell u2(1'b0, second_out);\n"
-                                            "endmodule\n");
+  SpecifyManager* mgr =
+      ManagerAfterRunning(f,
+                          "module timed_cell(input a, output y);\n"
+                          "  specify\n"
+                          "    (a => y) = 13;\n"
+                          "  endspecify\n"
+                          "endmodule\n"
+                          "module top;\n"
+                          "  logic first_out;\n"
+                          "  logic second_out;\n"
+                          "  timed_cell u1(1'b0, first_out);\n"
+                          "  timed_cell u2(1'b0, second_out);\n"
+                          "endmodule\n");
   ASSERT_NE(mgr, nullptr);
   EXPECT_EQ(mgr->PathDelayCount(), 2u);
   const PathDelay* first = PathInInstance(*mgr, "u1.", "y");
