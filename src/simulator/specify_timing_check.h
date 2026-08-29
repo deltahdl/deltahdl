@@ -68,6 +68,22 @@ struct TimingCheckEntry {
 
   uint64_t threshold = 0;
 
+  // §31.4.2's Table 31-8 and §31.4.3's Table 31-9 give $timeskew and $fullskew
+  // an optional event_based_flag and an optional remain_active_flag, each a
+  // constant expression, and both decide what the check does rather than what
+  // it measures. event_based_flag switches the check off its default
+  // timer-based detection: §31.4.2 has it "behave like the $skew check when
+  // both the event_based_flag and the remain_active_flag are set".
+  // remain_active_flag decides what a reference event whose `&&&` condition is
+  // false does, which §31.4.3 states for both modes: "If the flag is set, then
+  // the second timestamp event is simply ignored. If the flag is not set and if
+  // the timing check is active, then the timing check turns dormant."
+  //
+  // A flag written by no declaration is clear, which is the default each clause
+  // describes. Neither is read by any check but those two.
+  bool event_based_flag = false;
+  bool remain_active_flag = false;
+
   int64_t start_edge_offset = 0;
   int64_t end_edge_offset = 0;
   std::string notifier;

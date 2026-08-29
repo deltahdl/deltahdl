@@ -216,16 +216,19 @@ void ArmWidthWindow(const SpecifyManager& mgr, std::size_t index,
   // whichever edge arrived, and both events set ConditionedEvent::is_data_event
   // false to read TimingCheckEntry::ref_condition_expr.
   ConditionedEvent ref_event{window->armed, false};
-  WatchConditionedEdge(
-      var, OppositeEdge(opening_edge), ref_event, ctx, [window, &ctx]() {
-        EvaluatePulseWindow(*window, ctx.CurrentTime().ticks, ctx);
-        window->has_timestamp = false;
-      });
+  WatchConditionedEdge(var, OppositeEdge(opening_edge), ref_event, ctx,
+                       {[window, &ctx]() {
+                          EvaluatePulseWindow(*window, ctx.CurrentTime().ticks,
+                                              ctx);
+                          window->has_timestamp = false;
+                        },
+                        nullptr});
   WatchConditionedEdge(var, std::move(opening_edge), ref_event, ctx,
-                       [window, &ctx]() {
-                         window->has_timestamp = true;
-                         window->timestamp_ticks = ctx.CurrentTime().ticks;
-                       });
+                       {[window, &ctx]() {
+                          window->has_timestamp = true;
+                          window->timestamp_ticks = ctx.CurrentTime().ticks;
+                        },
+                        nullptr});
 }
 
 // Arms the one watcher a §31.4.5 check needs. §31.4.5 derives the data event as
@@ -252,12 +255,13 @@ void ArmPeriodWindow(const SpecifyManager& mgr, std::size_t index,
   // TimingCheckEntry::ref_condition_expr.
   WatchConditionedEdge(var, std::move(edge),
                        ConditionedEvent{window->armed, false}, ctx,
-                       [window, &ctx]() {
-                         uint64_t now = ctx.CurrentTime().ticks;
-                         EvaluatePulseWindow(*window, now, ctx);
-                         window->has_timestamp = true;
-                         window->timestamp_ticks = now;
-                       });
+                       {[window, &ctx]() {
+                          uint64_t now = ctx.CurrentTime().ticks;
+                          EvaluatePulseWindow(*window, now, ctx);
+                          window->has_timestamp = true;
+                          window->timestamp_ticks = now;
+                        },
+                        nullptr});
 }
 
 // One §31.4.6 check: which entry it is, the two signals it names under the
@@ -435,20 +439,25 @@ void ArmNochangeWindow(const SpecifyManager& mgr, std::size_t index,
   ConditionedEvent ref_event{window->armed, false};
   ConditionedEvent data_event{window->armed, true};
   WatchConditionedEdge(ref_var, std::move(leading_edge), ref_event, ctx,
-                       [window, &ctx]() {
-                         window->has_leading = true;
-                         window->has_trailing = false;
-                         window->leading_ticks = ctx.CurrentTime().ticks;
-                         DropTransitionsBefore(*window, window->leading_ticks);
-                       });
-  WatchConditionedEdge(
-      ref_var, std::move(trailing_edge), ref_event, ctx, [window, &ctx]() {
-        CloseNochangeWindow(*window, ctx.CurrentTime().ticks, ctx);
-      });
-  WatchConditionedEdge(
-      data_var, std::move(data_edge), data_event, ctx, [window, &ctx]() {
-        RecordNochangeData(*window, ctx.CurrentTime().ticks, ctx);
-      });
+                       {[window, &ctx]() {
+                          window->has_leading = true;
+                          window->has_trailing = false;
+                          window->leading_ticks = ctx.CurrentTime().ticks;
+                          DropTransitionsBefore(*window, window->leading_ticks);
+                        },
+                        nullptr});
+  WatchConditionedEdge(ref_var, std::move(trailing_edge), ref_event, ctx,
+                       {[window, &ctx]() {
+                          CloseNochangeWindow(*window, ctx.CurrentTime().ticks,
+                                              ctx);
+                        },
+                        nullptr});
+  WatchConditionedEdge(data_var, std::move(data_edge), data_event, ctx,
+                       {[window, &ctx]() {
+                          RecordNochangeData(*window, ctx.CurrentTime().ticks,
+                                             ctx);
+                        },
+                        nullptr});
 }
 
 }  // namespace

@@ -157,6 +157,16 @@ TimingCheckEntry BuildTimingCheckUnderOptions(
   entry.notifier = std::string(decl.notifier);
   entry.loc = decl.loc;
 
+  // §31.4.2's Table 31-8 and §31.4.3's Table 31-9 write both flags as constant
+  // expressions, so each is evaluated the way a timing_check_limit is and is
+  // set by any non-zero value. A flag the declaration omits carries the null
+  // EvalTimingCheckLimit answers zero for, which is the clear state both
+  // clauses describe as the default.
+  entry.event_based_flag =
+      EvalTimingCheckLimit(decl.event_based_flag, ctx, arena) != 0;
+  entry.remain_active_flag =
+      EvalTimingCheckLimit(decl.remain_active_flag, ctx, arena) != 0;
+
   // §31.5: the edge_control_specifier each event was written with, in the two
   // forms the clause gives it. The SpecifyEdge above says which form was
   // written and answers posedge and negedge on its own; the list is what an

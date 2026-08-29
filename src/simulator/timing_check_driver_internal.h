@@ -282,6 +282,18 @@ struct ConditionedEvent {
   }
 };
 
+// What a watcher does with a transition, split by whether §31.7's condition
+// held. `on_edge` runs for an occurrence of the check. `on_suppressed` runs for
+// a transition the condition ruled out, and is empty for every check whose
+// clause gives such a transition no effect at all -- which is every check but
+// §31.4.2's $timeskew and §31.4.3's $fullskew, each of which turns dormant on a
+// conditioned reference event whose condition is false unless its
+// remain_active_flag is set.
+struct ConditionedEdgeActions {
+  std::function<void()> on_edge;
+  std::function<void()> on_suppressed;
+};
+
 // Arms the watcher WatchEdge arms and calls `on_edge` only for a transition
 // that §31.7 makes an occurrence of the check. Every §31 watcher goes through
 // this rather than through WatchEdge: an event written without a `&&&`
@@ -289,14 +301,15 @@ struct ConditionedEvent {
 // second case to keep.
 inline void WatchConditionedEdge(Variable* var, TimingCheckEdge edge,
                                  ConditionedEvent event, SimContext& ctx,
-                                 std::function<void()> on_edge) {
+                                 ConditionedEdgeActions actions) {
   WatchEdge(
-      var, std::move(edge), [event, &ctx, on_edge = std::move(on_edge)]() {
-        if (!TimingCheckEventEnabled(event.Condition(),
-                                     event.armed.Entry().inst_prefix, ctx)) {
+      var, std::move(edge), [event, &ctx, actions = std::move(actions)]() {
+        if (TimingCheckEventEnabled(event.Condition(),
+                                    event.armed.Entry().inst_prefix, ctx)) {
+          actions.on_edge();
           return;
         }
-        on_edge();
+        if (actions.on_suppressed) actions.on_suppressed();
       });
 }
 
@@ -311,6 +324,13 @@ inline void WatchConditionedEdge(Variable* var, TimingCheckEdge edge,
 // `on_ref` runs when the reference_event occurs and `on_data` when the
 // data_event does, each already gated by the edge_control_specifier and the
 // condition its own event was written with.
+//
+// `on_ref_suppressed` runs instead of `on_ref` for a reference event §31.7's
+// condition ruled out, and is null for every check whose clause gives such a
+// transition no effect. §31.4.2 and §31.4.3 are the two that give it one: each
+// turns the check dormant on a conditioned reference event whose condition is
+// false, unless the check's remain_active_flag is set. A data event the
+// condition ruled out has no effect under any clause of §31.
 //
 // Nothing is armed when either signal names no variable of the design, which is
 // what a check whose specify block was registered for a module the design never
@@ -327,7 +347,8 @@ struct ArmedTimingCheckEvents {
 
 inline ArmedTimingCheckEvents ArmTimingCheckEvents(
     ArmedCheck armed, SimContext& ctx, const std::function<void()>& on_ref,
-    const std::function<void()>& on_data) {
+    const std::function<void()>& on_data,
+    const std::function<void()>& on_ref_suppressed = nullptr) {
   const TimingCheckEntry& check = armed.Entry();
   std::string ref_signal = check.inst_prefix + check.ref_signal;
   std::string data_signal = check.inst_prefix + check.data_signal;
@@ -336,10 +357,10 @@ inline ArmedTimingCheckEvents ArmTimingCheckEvents(
   if (ref_var == nullptr || data_var == nullptr) return {};
   WatchConditionedEdge(ref_var, RefEdgeOf(check),
                        ConditionedEvent{armed, /*is_data_event=*/false}, ctx,
-                       on_ref);
+                       {on_ref, on_ref_suppressed});
   WatchConditionedEdge(data_var, DataEdgeOf(check),
                        ConditionedEvent{armed, /*is_data_event=*/true}, ctx,
-                       on_data);
+                       {on_data, nullptr});
   return ArmedTimingCheckEvents{std::move(ref_signal), std::move(data_signal)};
 }
 

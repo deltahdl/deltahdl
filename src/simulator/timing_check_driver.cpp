@@ -220,10 +220,11 @@ void ArmStabilityWindow(const SpecifyManager& mgr, std::size_t index,
   // TimingCheckEntry::ref_condition_expr accordingly.
   WatchConditionedEdge(timestamp_var, std::move(timestamp_edge),
                        ConditionedEvent{window->armed, is_setup}, ctx,
-                       [window, &ctx]() {
-                         window->has_timestamp = true;
-                         window->timestamp_ticks = ctx.CurrentTime().ticks;
-                       });
+                       {[window, &ctx]() {
+                          window->has_timestamp = true;
+                          window->timestamp_ticks = ctx.CurrentTime().ticks;
+                        },
+                        nullptr});
   // §31.3 evaluates a check at its timecheck event, so only that watcher asks
   // for an evaluation and a timestamp event on its own still asks for none.
   // What the deferral changes is that the evaluation reads a timestamp event
@@ -231,12 +232,14 @@ void ArmStabilityWindow(const SpecifyManager& mgr, std::size_t index,
   // order used to decide.
   WatchConditionedEdge(
       timecheck_var, std::move(timecheck_edge),
-      ConditionedEvent{window->armed, !is_setup}, ctx, [window, &ctx]() {
-        window->timecheck_ticks = ctx.CurrentTime().ticks;
-        ScheduleTimingCheckEvaluation(window->pending, ctx, [window, &ctx]() {
-          EvaluateStabilityWindow(*window, window->timecheck_ticks, ctx);
-        });
-      });
+      ConditionedEvent{window->armed, !is_setup}, ctx,
+      {[window, &ctx]() {
+         window->timecheck_ticks = ctx.CurrentTime().ticks;
+         ScheduleTimingCheckEvaluation(window->pending, ctx, [window, &ctx]() {
+           EvaluateStabilityWindow(*window, window->timecheck_ticks, ctx);
+         });
+       },
+       nullptr});
 }
 
 }  // namespace
