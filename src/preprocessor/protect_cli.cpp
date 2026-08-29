@@ -1,5 +1,6 @@
 #include "preprocessor/protect_cli.h"
 
+#include <iostream>
 #include <string>
 #include <string_view>
 
@@ -27,6 +28,13 @@ bool AddNamedKey(std::string_view value, ProtectKeyList& keys) {
   return true;
 }
 
+// Reports an option that was recognized and whose value the command line ended
+// before, and records the refusal so the caller's parse fails.
+void ReportMissingValue(std::string_view name, ProtectCliOptions& opts) {
+  std::cerr << name << " expects a value\n";
+  opts.rejected_argument = true;
+}
+
 }  // namespace
 
 bool TryParseProtectArg(std::string_view arg, int& i, int argc,
@@ -35,14 +43,39 @@ bool TryParseProtectArg(std::string_view arg, int& i, int argc,
     opts.encrypt = true;
     return true;
   }
-  if (arg == "--protect-key" && i + 1 < argc) {
-    opts.exchange_key = argv[++i];
+  if (arg == "--protect-key") {
+    if (i + 1 >= argc) {
+      ReportMissingValue("--protect-key", opts);
+      return true;
+    }
+    std::string_view key = argv[++i];
+    // §34.5.10 gives an empty key no meaning, which is why AddNamedKey refuses
+    // one written as the third part of a named key. The single exchange key is
+    // refused on the same ground rather than stored as a key of nothing.
+    if (key.empty()) {
+      std::cerr << "--protect-key expects a key\n";
+      opts.rejected_argument = true;
+      return true;
+    }
+    opts.exchange_key = key;
     return true;
   }
-  if (arg == "--protect-named-key" && i + 1 < argc) {
-    return AddNamedKey(argv[++i], opts.keys);
+  if (arg != "--protect-named-key") return false;
+  if (i + 1 >= argc) {
+    ReportMissingValue("--protect-named-key", opts);
+    return true;
   }
-  return false;
+  std::string_view value = argv[++i];
+  if (!AddNamedKey(value, opts.keys)) {
+    // §34.5.10 selects a key by the entity that owns it and the name it was
+    // given, so all three parts of `<owner>:<name>=<key>` have to be there and
+    // none of them empty. The value is named in the report because which part
+    // was missing is not something the option's name says.
+    std::cerr << "--protect-named-key expects <owner>:<name>=<key>: " << value
+              << "\n";
+    opts.rejected_argument = true;
+  }
+  return true;
 }
 
 }  // namespace delta

@@ -25,6 +25,16 @@ struct ProtectCliOptions {
   bool encrypt = false;
   std::string exchange_key;
   ProtectKeyList keys;
+
+  // Whether one of these options was recognized and its value refused, either
+  // because the command line ended before it or because §34.5.10's three-part
+  // form was not what was written. The caller carries it into its own such
+  // field so the parse fails, and it is separate from TryParseProtectArg's
+  // answer for the reason CliOptions::rejected_argument
+  // (driver/cli_options.h) is separate from an unrecognized option: an option
+  // that has already said what is wrong with its own value must not then be
+  // reported as one that does not exist.
+  bool rejected_argument = false;
 };
 
 // Reads one command-line argument into `opts`, answering whether it was one of
@@ -32,11 +42,12 @@ struct ProtectCliOptions {
 // option takes, so a caller loops over argv and consults this before its own
 // options, exactly as it does for every other group.
 //
-// An option whose value is missing is not consumed, so the caller reports it as
-// the unknown option it then appears to be rather than reading past the end of
-// argv. That is the same answer the other option groups give, and it is what
-// makes `--protect-key` with nothing after it an error rather than a key of
-// nothing.
+// An option whose value is missing, and one whose value §34.5.10's form does
+// not admit, are both answered true: the argument was this option, and what is
+// wrong with it has been reported here and recorded in
+// ProtectCliOptions::rejected_argument. Answering false would hand the option
+// back to a caller that knows only that no parser took it, and it would report
+// an option that exists as one that does not.
 bool TryParseProtectArg(std::string_view arg, int& i, int argc,
                         const char* const argv[], ProtectCliOptions& opts);
 

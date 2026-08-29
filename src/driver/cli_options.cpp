@@ -278,7 +278,13 @@ bool TryParseSingleArg(std::string_view arg, int& i, int argc,
   if (TryParseSimArg(arg, i, argc, argv, opts)) return true;
   if (TryParseSynthArg(arg, i, argc, argv, opts)) return true;
   if (TryParseLibArg(arg, i, argc, argv, opts)) return true;
-  if (delta::TryParseProtectArg(arg, i, argc, argv, opts.protect)) return true;
+  if (delta::TryParseProtectArg(arg, i, argc, argv, opts.protect)) {
+    // §34.3.1's options record a refused value on their own struct, which is
+    // the one they are handed. Carrying it here is what makes ParseArgs fail
+    // the parse for one, as it does for every other option group.
+    if (opts.protect.rejected_argument) opts.rejected_argument = true;
+    return true;
+  }
   return false;
 }
 
