@@ -44,10 +44,42 @@
 // separates $skew from §31.4.2's $timeskew, whose timer-based default reports
 // once the limit elapses with no data event at all.
 //
-// The three cases share one design and differ in their stimulus alone. That is
-// what shows a check being run rather than one answer being handed to all
-// three: a driver that reported unconditionally would fail the two quiet cases,
-// and a driver that reported nothing would fail the violating one.
+// The first three cases share one design and differ in their stimulus alone.
+// That is what shows a check being run rather than one answer being handed to
+// all three: a driver that reported unconditionally would fail the two quiet
+// cases, and a driver that reported nothing would fail the violating one.
+//
+// The last two cases share a second design. In both of them a reference event
+// stands at an earlier time and both signals then transition at one later
+// simulation time, and neither case reports anything. §31.4.1 settles that
+// twice over. "A new reference event shall cancel the old wait for the data
+// event and begin a new one", so the reference event standing at the later time
+// has cancelled the wait the data event of that same time would otherwise be
+// judged against. "Simultaneous transitions on the reference and data signals
+// shall not cause $skew to report a timing violation, even when the skew limit
+// value is zero" states the verdict outright.
+//
+// The two cases differ in which of the two signals the design assigns first at
+// that later time, and the pair is what says the answer follows the times the
+// design gives the two events rather than the order two assignments were
+// written in. Issue #3421 is that it followed the order the two assignments
+// were written in: a watcher ran as part of the commit that woke it, so a check
+// evaluated inside that commit saw only the events committed before it. With
+// the data signal assigned first, the data event was judged against the
+// timestamp the earlier reference event had left behind, and it was reported
+// whenever the two reference edges stood further apart than the limit.
+//
+// The earlier reference event is what makes the pair a regression test. Without
+// it no timestamp stands when the two signals move together, OnSkewDataEvent in
+// src/simulator/timing_check_skew.cpp returns on a window that was never
+// opened, and both cases pass under the driver issue #3421 names as readily as
+// under the one that replaced it.
+//
+// Each of those two cases writes its two assignments at the later time as two
+// statements of one initial block with no delay between them. That is what
+// makes the order the two signals commit in explicit and deterministic. A pair
+// of continuous assignments would leave that order to the order the two were
+// lowered in.
 //
 // The message substring stops before the signal name the report goes on to
 // spell. What the violating case claims is that the violation was found and
@@ -64,10 +96,21 @@
 // case's design would compare two numbers that disagree rather than two that
 // coincide.
 //
+// The two simultaneous cases run a second design, whose limit is 34 and whose
+// first reference edge stands at time 620, `ref_sig` falling at time 650 and
+// both signals transitioning at time 673. The 53 time units between the two
+// reference edges exceed that limit, which is what the pair needs: a limit of
+// 53 or more would put the data event inside the window measured from the
+// earlier reference event, and both cases would then report nothing whichever
+// timestamp the driver read. None of 34, 620, 650, 673 and 53 is a limit or a
+// time the first three cases use.
+//
 // Each source drives both signals to a known level before either transition
 // that matters. §31.5 makes posedge the shorthand for edge[01, 0x, x1], so the
 // x-to-0 assignments at time 0 are no posedge and the timeline of each case
-// begins at the first delay.
+// begins at the first delay. `ref_sig` falls between its two rises in the last
+// two cases for the same reason: a signal already at 1 has to reach 0 before it
+// can make a second posedge, and that fall is no event of the check.
 //
 // Each source is one module named `top`, and it is the only module, because
 // ElaborateSrc in lib/cpp/test_fixtures/fixture_simulator.h elaborates
@@ -89,9 +132,9 @@ using namespace delta;
 
 namespace {
 
-// The design every case here runs, up to the point the stimulus is spliced in.
-// It is a named constant rather than a literal inside the call below so that a
-// case can name the line its $skew stands on with LineHolding
+// The design the first three cases run, up to the point the stimulus is spliced
+// in. It is a named constant rather than a literal inside the call below so
+// that a case can name the line its $skew stands on with LineHolding
 // (lib/cpp/test_helpers/helpers_reported_error.h). The stimulus follows the
 // check, so a line of this text is that line of the whole source.
 constexpr const char* kDesignBeforeStimulus =
@@ -105,13 +148,27 @@ constexpr const char* kDesignBeforeStimulus =
     "    ref_sig = 1'b0;\n"
     "    data_sig = 1'b0;\n";
 
-// Elaborates, lowers and runs the one design these cases share, with `stimulus`
-// as the body of its initial block. False when the source did not elaborate
-// cleanly, which a case asserts on before reading anything off the fixture: a
-// design rejected before it ran says nothing about §31.4.1 whatever the case
-// was written to expect.
-bool RanWithStimulus(const std::string& stimulus, SimFixture& f) {
-  auto* rtl = ElaborateSrc(std::string(kDesignBeforeStimulus) + stimulus +
+// The design the two simultaneous cases run, up to the point the stimulus is
+// spliced in. It differs from kDesignBeforeStimulus in its limit alone.
+constexpr const char* kSimultaneousDesignBeforeStimulus =
+    "module top;\n"
+    "  logic ref_sig;\n"
+    "  logic data_sig;\n"
+    "  specify\n"
+    "    $skew(posedge ref_sig, posedge data_sig, 34);\n"
+    "  endspecify\n"
+    "  initial begin\n"
+    "    ref_sig = 1'b0;\n"
+    "    data_sig = 1'b0;\n";
+
+// Elaborates, lowers and runs `design` with `stimulus` as the rest of the body
+// of its initial block. False when the source did not elaborate cleanly, which
+// a case asserts on before reading anything off the fixture: a design rejected
+// before it ran says nothing about §31.4.1 whatever the case was written to
+// expect.
+bool RanWithStimulus(const char* design, const std::string& stimulus,
+                     SimFixture& f) {
+  auto* rtl = ElaborateSrc(std::string(design) + stimulus +
                                "  end\n"
                                "endmodule\n",
                            f);
@@ -124,10 +181,10 @@ bool RanWithStimulus(const std::string& stimulus, SimFixture& f) {
 // data signal follows the reference by 71 time units against a limit of 46.
 TEST(DrivenTimingCheckEvaluation, SkewViolationInARunIsReported) {
   SimFixture f;
-  ASSERT_TRUE(
-      RanWithStimulus("    #502 ref_sig = 1'b1;\n"
-                      "    #71 data_sig = 1'b1;\n",
-                      f));
+  ASSERT_TRUE(RanWithStimulus(kDesignBeforeStimulus,
+                              "    #502 ref_sig = 1'b1;\n"
+                              "    #71 data_sig = 1'b1;\n",
+                              f));
   EXPECT_TRUE(ReportedWarning(
       f.diag.Diagnostics(), "$skew violation: data signal",
       LineHolding(kDesignBeforeStimulus, "$skew(posedge ref_sig"), "31.4.1"));
@@ -145,10 +202,10 @@ TEST(DrivenTimingCheckEvaluation, SkewViolationInARunIsReported) {
 // there is no other report this case would tolerate.
 TEST(DrivenTimingCheckEvaluation, SkewSatisfiedInARunReportsNothing) {
   SimFixture f;
-  ASSERT_TRUE(
-      RanWithStimulus("    #530 ref_sig = 1'b1;\n"
-                      "    #39 data_sig = 1'b1;\n",
-                      f));
+  ASSERT_TRUE(RanWithStimulus(kDesignBeforeStimulus,
+                              "    #530 ref_sig = 1'b1;\n"
+                              "    #39 data_sig = 1'b1;\n",
+                              f));
   EXPECT_EQ(FindDiag(f, "$skew violation: data signal"), nullptr);
 }
 
@@ -161,7 +218,38 @@ TEST(DrivenTimingCheckEvaluation, SkewSatisfiedInARunReportsNothing) {
 TEST(DrivenTimingCheckEvaluation,
      SkewReferenceWithNoDataEventInARunReportsNothing) {
   SimFixture f;
-  ASSERT_TRUE(RanWithStimulus("    #566 ref_sig = 1'b1;\n", f));
+  ASSERT_TRUE(
+      RanWithStimulus(kDesignBeforeStimulus, "    #566 ref_sig = 1'b1;\n", f));
+  EXPECT_EQ(FindDiag(f, "$skew violation: data signal"), nullptr);
+}
+
+// §31.4.1's simultaneous transitions, with the reference signal assigned first
+// at the time the two share: `ref_sig` rises at time 620, falls at time 650 and
+// rises again at time 673, and `data_sig` rises at time 673 as well.
+TEST(DrivenTimingCheckEvaluation,
+     SkewSimultaneousEventsWithReferenceAssignedFirstReportNothing) {
+  SimFixture f;
+  ASSERT_TRUE(RanWithStimulus(kSimultaneousDesignBeforeStimulus,
+                              "    #620 ref_sig = 1'b1;\n"
+                              "    #30 ref_sig = 1'b0;\n"
+                              "    #23 ref_sig = 1'b1;\n"
+                              "    data_sig = 1'b1;\n",
+                              f));
+  EXPECT_EQ(FindDiag(f, "$skew violation: data signal"), nullptr);
+}
+
+// §31.4.1 again, the same design and the same three times: only which of the
+// two signals is assigned first at time 673 changes. `data_sig` rises there
+// before `ref_sig` does, and the verdict is the one the case above reads.
+TEST(DrivenTimingCheckEvaluation,
+     SkewSimultaneousEventsWithDataAssignedFirstReportNothing) {
+  SimFixture f;
+  ASSERT_TRUE(RanWithStimulus(kSimultaneousDesignBeforeStimulus,
+                              "    #620 ref_sig = 1'b1;\n"
+                              "    #30 ref_sig = 1'b0;\n"
+                              "    #23 data_sig = 1'b1;\n"
+                              "    ref_sig = 1'b1;\n",
+                              f));
   EXPECT_EQ(FindDiag(f, "$skew violation: data signal"), nullptr);
 }
 

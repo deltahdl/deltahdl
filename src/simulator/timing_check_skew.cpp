@@ -120,6 +120,16 @@ struct SkewWindow {
   bool ref_is_timestamp = true;
   uint64_t timestamp_ticks = 0;
   std::shared_ptr<bool> timeout_cancelled;
+
+  // Which of the check's two events happened in the slot running now, and
+  // whether the pass that applies them is already scheduled for it.
+  // ApplySlotEvents below is that pass, and ScheduleTimingCheckEvaluation
+  // (simulator/timing_check_driver_internal.h) is what defers it to
+  // Region::kPrePostponed so that both events of one slot are known before
+  // either is applied.
+  bool ref_moved = false;
+  bool data_moved = false;
+  std::shared_ptr<bool> pending = std::make_shared<bool>(false);
 };
 
 // §31.4.3: "The first limit is the maximum time by which the data event should
@@ -313,6 +323,33 @@ void OnDataEdge(const std::shared_ptr<SkewWindow>& window, SimContext& ctx) {
   OnTimeskewDataEvent(*window);
 }
 
+// Applies the events the check saw in the slot whose active and reactive region
+// sets have just drained, the reference event before the data event.
+//
+// All three clauses state the answer for a reference event and a data event at
+// one time, in the same words: "simultaneous transitions on the reference and
+// data signals shall not cause $skew to report a timing violation, even when
+// the skew limit value is zero" in §31.4.1, and the same sentence naming
+// $timeskew in §31.4.2 and $fullskew in §31.4.3. Applying the reference event
+// first is what reaches it. §31.4.1 says why that is the right order and not
+// merely a chosen one: "A new reference event shall cancel the old wait for the
+// data event and begin a new one", so a reference event standing at the same
+// time as a data event has already cancelled the wait the data event would
+// otherwise be judged against.
+//
+// The order decides nothing for a $fullskew, whose two events §31.4.3 treats
+// alike: OnFullskewEvent makes whichever is applied second the timecheck event
+// of the window the first opened, so either order leaves the check dormant.
+void ApplySlotEvents(const std::shared_ptr<SkewWindow>& window,
+                     SimContext& ctx) {
+  const bool kRefMoved = window->ref_moved;
+  const bool kDataMoved = window->data_moved;
+  window->ref_moved = false;
+  window->data_moved = false;
+  if (kRefMoved) OnRefEdge(window, ctx);
+  if (kDataMoved) OnDataEdge(window, ctx);
+}
+
 }  // namespace
 
 void ArmSkewWindow(const SpecifyManager& mgr, std::size_t index,
@@ -340,9 +377,40 @@ void ArmSkewWindow(const SpecifyManager& mgr, std::size_t index,
   // through to the entry. TimeskewChecker and FullskewSecondTimestampAction
   // (simulator/specify_timing_check.h) already state the dormant-versus-discard
   // rule, and are exercised only by unit tests.
+  //
+  // Each watcher records that its event happened and asks for one deferred
+  // pass, which ApplySlotEvents runs once the slot's regions are drained. A
+  // check evaluated inside the commit that woke a watcher saw only the events
+  // committed before it, so a data event committing before the reference event
+  // of the same time was judged against the previous reference; issue #3421 is
+  // that defect.
+  //
+  // Cancelling the timer stays in the watcher and is not deferred. A timeout
+  // due in this slot already stands in the slot's Region::kPrePostponed queue,
+  // which the deferred pass joins behind, so a timeout left armed would report
+  // before the pass could apply the event that stops it. §31.4.2 and §31.4.3
+  // both rule that the check "shall also not report a violation if a new
+  // timestamp event occurs exactly at the expiration of the time limit", and
+  // cancelling while the watcher runs is what keeps that. Every path
+  // ApplySlotEvents takes either arms a fresh timer through OnTimestampEvent or
+  // closes the window, so nothing that should have stayed armed is left
+  // cancelled, and a $skew arms no timer at all.
   ArmedTimingCheckEvents events = ArmTimingCheckEvents(
-      window->armed, ctx, [window, &ctx]() { OnRefEdge(window, ctx); },
-      [window, &ctx]() { OnDataEdge(window, ctx); });
+      window->armed, ctx,
+      [window, &ctx]() {
+        CancelTimeout(*window);
+        window->ref_moved = true;
+        ScheduleTimingCheckEvaluation(window->pending, ctx, [window, &ctx]() {
+          ApplySlotEvents(window, ctx);
+        });
+      },
+      [window, &ctx]() {
+        CancelTimeout(*window);
+        window->data_moved = true;
+        ScheduleTimingCheckEvaluation(window->pending, ctx, [window, &ctx]() {
+          ApplySlotEvents(window, ctx);
+        });
+      });
   window->ref_signal = std::move(events.ref_signal);
   window->data_signal = std::move(events.data_signal);
 }
