@@ -229,6 +229,15 @@ enum class FullskewWindowAction : uint8_t {
 FullskewWindowAction FullskewSecondTimestampAction(
     bool timestamp_condition_holds, bool remain_active_flag);
 
+// §31.6's Table 31-13, which states the whole of what a violation does to a
+// notifier: 0 becomes 1, 1 becomes 0, z stays z, and x becomes "Either 0 or 1".
+// The x row is a licence rather than a value, and 1 is what this returns for
+// it; §31.6 prefers neither, so a reader should not take 1 for the only
+// conforming answer.
+//
+// Only one bit is read and only one is answered, §31.6's notifier being a
+// scalar. ToggleNotifier (simulator/timing_check_driver_internal.h) is what
+// applies the answer to the variable a check named.
 Logic4Word ToggleNotifierOnViolation(Logic4Word current);
 
 enum class TimingCheckConditionKind : uint8_t {

@@ -303,13 +303,21 @@ Logic4Word ToggleNotifierOnViolation(Logic4Word current) {
   const bool kPreA = (current.aval & 1u) != 0u;
   const bool kPreB = (current.bval & 1u) != 0u;
   Logic4Word result;
-  if (kPreA && kPreB) {
-    result.aval = 1u;
+  if (kPreB && !kPreA) {
+    // z. Table 31-13's fourth row leaves it where it is.
+    result.aval = 0u;
     result.bval = 1u;
-  } else if (kPreB || kPreA) {
+  } else if (kPreB) {
+    // x. Table 31-13's first row gives "Either 0 or 1", so both answers
+    // conform and 1 is the one chosen here. Nothing in §31.6 prefers it.
+    result.aval = 1u;
+    result.bval = 0u;
+  } else if (kPreA) {
+    // 1, which Table 31-13's third row takes to 0.
     result.aval = 0u;
     result.bval = 0u;
   } else {
+    // 0, which Table 31-13's second row takes to 1.
     result.aval = 1u;
     result.bval = 0u;
   }
