@@ -1,0 +1,3 @@
+test/src/e2e/specify_manager_installed.sv:26:1: warning: SDF annotator: unable to read SDF file test/src/e2e/specify_manager_installed_missing.sdf (§32.9)
+  $sdf_annotate("test/src/e2e/specify_manager_installed_missing.sdf");
+  ^

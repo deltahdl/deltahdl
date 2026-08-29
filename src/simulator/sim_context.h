@@ -297,6 +297,11 @@ class SimContext {
   // $sdf_annotate call has nowhere to put what it reads.
   void SetSpecifyManager(SpecifyManager* mgr) { specify_manager_ = mgr; }
   SpecifyManager* GetSpecifyManager() { return specify_manager_; }
+  // §30.3's specify data for the design, created on the first call and
+  // installed as the manager GetSpecifyManager answers with. The context owns
+  // it because it outlives the Lowerer that fills it: a $sdf_annotate call
+  // reads it during the run.
+  SpecifyManager& AcquireSpecifyManager();
 
   // §21.7.2.1: register the model's dumpable objects with a VCD writer, in
   // name order so identifier codes are deterministic. Memories are not dumped
@@ -798,6 +803,7 @@ class SimContext {
   // acts through was installed by SetVcdWriter and belongs to its caller.
   std::unique_ptr<VcdWriter> owned_vcd_writer_;
   SpecifyManager* specify_manager_ = nullptr;
+  std::unique_ptr<SpecifyManager> owned_specify_manager_;
   std::string dump_file_name_ = "dump.vcd";
   // §21.7.2.3: unevaluated source form of the $dumpfile filename argument.
   std::string dump_file_literal_;

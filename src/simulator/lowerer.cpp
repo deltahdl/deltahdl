@@ -25,6 +25,7 @@
 #include "simulator/process.h"
 #include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
+#include "simulator/specify.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
 
@@ -569,6 +570,24 @@ void Lowerer::Lower(const RtlirDesign* design) {
   RegisterFreeCuFunctions(design, ctx_);
   for (auto* mod : design->top_modules) {
     LowerModule(mod);
+  }
+
+  // §30.3's specify block declares the design's specify data. The manager is
+  // acquired whether or not any module declared a specify block, because
+  // §32.9's $sdf_annotate reads timing data into it and has nowhere to put what
+  // it reads without one -- EvalSdfAnnotateTask in
+  // src/simulator/sdf_annotate_task.cpp returns immediately when
+  // GetSpecifyManager is null. Registration comes after the modules are lowered
+  // because a module path delay may be written as a specparam, and
+  // RegisterSpecifyBlockSpecparams in
+  // src/elaborator/elaborator_validate_specify.cpp lowers a specparam as a
+  // variable of the module declaring it. Only a top module's specify block is
+  // registered, because SpecifyManager keys a module path on the bare names of
+  // the two ports it joins and so cannot tell two instances of a cell apart;
+  // issue #3383 covers the specify block of an instantiated module.
+  SpecifyManager& mgr = ctx_.AcquireSpecifyManager();
+  for (auto* mod : design->top_modules) {
+    RegisterSpecifyBlocks(mod->specify_blocks, ctx_, arena_, mgr);
   }
 
   for (auto* let_decl : design->cu_let_decls) {

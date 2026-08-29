@@ -820,7 +820,7 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       return true;
     case ModuleItemKind::kSpecifyBlock:
       RegisterSpecifyBlockSpecparams(item, mod, specparam_names_, const_names_);
-      mod->let_decls.push_back(item);
+      mod->specify_blocks.push_back(item);
       return true;
     case ModuleItemKind::kCovergroupDecl:
       // §19.3 (footnote 29): the extends form of a covergroup is legal only

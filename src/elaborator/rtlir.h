@@ -529,6 +529,16 @@ struct RtlirModule {
   // src/simulator/lowerer_register.cpp would answer the exported subroutine's
   // own name with a let expansion of nothing, ahead of the function itself.
   std::vector<ModuleItem*> dpi_export_decls;
+  // §30.3's specify blocks, declared in this module: §30.3 states that a
+  // specify block "shall appear inside a module declaration". What one declares
+  // -- the module paths of §30.4, the PATHPULSE$ pulse limits of §30.7.1 and
+  // the §30.7.4 pulse styles -- is timing data about the module rather than a
+  // name a reference resolves to. They are held apart from let_decls for that
+  // reason: RegisterModuleSubroutines in src/simulator/lowerer_register.cpp
+  // registers each let_decls entry under item->name, which a specify block
+  // leaves empty, and RangeHasName in
+  // src/elaborator/elaborator_scope_rules_hier.cpp searches let_decls by name.
+  std::vector<ModuleItem*> specify_blocks;
   std::vector<ModuleItem*> sequence_decls;
   std::vector<ClassDecl*> class_decls;
   std::vector<RtlirImport> imports;

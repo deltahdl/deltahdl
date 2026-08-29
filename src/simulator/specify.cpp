@@ -855,8 +855,11 @@ void SpecifyManager::AnnotateSdf(SdfAnnotation annotation) {
 }
 
 void SpecifyManager::AddPathDelayFromDecl(const SpecifyPathDecl& decl,
-                                          SimContext& ctx, Arena& arena) {
-  AddPathDelay(BuildPathDelayFromDecl(decl, ctx, arena));
+                                          SimContext& ctx, Arena& arena,
+                                          bool default_pulse_limits) {
+  PathDelay pd = BuildPathDelayFromDecl(decl, ctx, arena);
+  if (default_pulse_limits) InitDefaultPulseLimits(pd);
+  AddPathDelay(std::move(pd));
   path_decls_.push_back(&decl);
 }
 

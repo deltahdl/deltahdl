@@ -27,8 +27,17 @@ class SpecifyManager {
   // delay expression reads a specparam has to follow that specparam when an SDF
   // LABEL changes it, rather than staying at the value the predecessor
   // produced.
+  //
+  // Pass `default_pulse_limits` when the declaration is a design's own. §30.7
+  // states that by default both the error limit and the reject limit are set
+  // equal to the delay, so the flag applies InitDefaultPulseLimits (declared in
+  // simulator/specify_path_delay.h) to the built path. That is the state a
+  // PATHPULSE$ specparam (§30.7.1), a global pulse limit invocation option
+  // (§30.7.2) or an SDF pulse limit (§30.7.3) then replaces. A caller whose
+  // subject is the delay alone leaves the flag off, and the path's two limits
+  // stay at zero.
   void AddPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
-                            Arena& arena);
+                            Arena& arena, bool default_pulse_limits = false);
 
   void IncrementPathDelay(const PathDelay& delta);
 
@@ -394,5 +403,35 @@ class SpecifyManager {
   bool has_global_showcancelled_ = false;
   ShowCancelled global_showcancelled_ = ShowCancelled::kNoshowcancelled;
 };
+
+// Registers onto `mgr` what one module's specify blocks declare, so a design's
+// own specify blocks reach the run rather than being parsed and dropped.
+// `blocks` are that module's ModuleItem entries of kind
+// ModuleItemKind::kSpecifyBlock, in declaration order.
+//
+// Syntax 30-1 (§30.3) lists five kinds of specify_item: specparam_declaration,
+// pulsestyle_declaration, showcancelled_declaration, path_declaration and
+// system_timing_check. Four of the five are registered here -- the module path
+// delays of §30.4, the PATHPULSE$ pulse limits of §30.7.1, and the pulsestyle
+// and showcancelled declarations of §30.7.4. The system timing checks of
+// Clause 31 are NOT registered: nothing under src/ calls
+// SpecifyManager::AddTimingCheckUnderOptions, and closing that is separate work
+// from this.
+//
+// The module path delays are registered before the PATHPULSE$ specparams are
+// resolved, and every PATHPULSE$ specparam of every block is resolved in one
+// call to SpecifyManager::ResolvePulseControlSpecparams at the end. §30.7.1
+// requires both orderings: a PATHPULSE$ specparam naming no module path applies
+// to all module paths defined in the module, so the paths have to exist first,
+// and a path-specific PATHPULSE$ specparam takes precedence over a
+// nonpath-specific one for the paths it names, which is a rule about
+// specificity and not about the order the specparams were declared in.
+//
+// Call this only after the module's specparams have been lowered as variables
+// in `ctx`. The delay expressions of §30.5 and the limit expressions of
+// Syntax 30-7 are evaluated in `ctx`, and a specparam an expression reads is
+// read from there.
+void RegisterSpecifyBlocks(const std::vector<ModuleItem*>& blocks,
+                           SimContext& ctx, Arena& arena, SpecifyManager& mgr);
 
 }  // namespace delta

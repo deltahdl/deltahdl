@@ -13,6 +13,7 @@
 #include "simulator/coverage.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
+#include "simulator/specify.h"
 
 namespace delta {
 
@@ -27,6 +28,14 @@ CoverageDB& SimContext::CoverageData() {
   if (coverage_db_ != nullptr) return *coverage_db_;
   if (!owned_coverage_db_) owned_coverage_db_ = std::make_unique<CoverageDB>();
   return *owned_coverage_db_;
+}
+
+SpecifyManager& SimContext::AcquireSpecifyManager() {
+  if (owned_specify_manager_ == nullptr) {
+    owned_specify_manager_ = std::make_unique<SpecifyManager>();
+  }
+  specify_manager_ = owned_specify_manager_.get();
+  return *owned_specify_manager_;
 }
 
 namespace {

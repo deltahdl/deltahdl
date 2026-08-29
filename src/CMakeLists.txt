@@ -226,6 +226,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/constraint_solver.cpp
     simulator/specify.cpp
     simulator/specify_pulse.cpp
+    simulator/specify_register.cpp
     simulator/specify_timing_check.cpp
     simulator/udp_eval.cpp
     simulator/sdf_parser.cpp
