@@ -155,6 +155,7 @@ TimingCheckEntry BuildTimingCheckUnderOptions(
   entry.data_signal = std::string(decl.data_terminal.name);
   entry.data_edge = decl.data_edge;
   entry.notifier = std::string(decl.notifier);
+  entry.loc = decl.loc;
 
   // §31.5: the edge_control_specifier each event was written with, in the two
   // forms the clause gives it. The SpecifyEdge above says which form was

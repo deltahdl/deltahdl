@@ -21,9 +21,14 @@
 // is legal and the run reaches a state the design said it should not, so
 // ReportTimingViolation in src/simulator/timing_check_driver_internal.h calls
 // DiagEngine::Warning; the cases below read it through ReportedWarning rather
-// than ReportedError. It stands at SourceLoc::None(), whose line is 0, because
-// TimingCheckEntry records no source position for the declaration it was built
-// from.
+// than ReportedError. The report stands on the line the check was written on.
+// TimingCheckEntry::loc in src/simulator/specify_timing_check.h carries that
+// line, Parser::ParseTimingCheck in src/parser/parser_specify.cpp having
+// recorded the check's own first token into the declaration it was built from.
+// Each case names that line through LineHolding rather than writing a number,
+// so a case cannot drift when its design gains or loses a line. Issue #3414 is
+// that the report stood at SourceLoc::None(), whose line is 0, before
+// TimingCheckEntry carried a source position.
 //
 // §31.5 gives six edge_descriptors and no more: Syntax 31-15 writes
 // `edge_descriptor ::= 01 | 10 | z_or_x zero_or_one | zero_or_one z_or_x`, and
@@ -146,21 +151,21 @@ bool DrivenToCompletion(const std::string& design, SimFixture& f) {
 // there is no other report this case would tolerate.
 TEST(EdgeControlSpecifierEvaluation, SetupEdge01IgnoresAZeroToXTransition) {
   SimFixture f;
-  ASSERT_TRUE(
-      DrivenToCompletion("module top;\n"
-                         "  logic d;\n"
-                         "  logic clk;\n"
-                         "  specify\n"
-                         "    $setup(d, edge[01] clk, 23);\n"
-                         "  endspecify\n"
-                         "  initial begin\n"
-                         "    d = 1'b0;\n"
-                         "    clk = 1'b0;\n"
-                         "    #101 d = 1'b1;\n"
-                         "    #5 clk = 1'bx;\n"
-                         "  end\n"
-                         "endmodule\n",
-                         f));
+  const std::string kDesign =
+      "module top;\n"
+      "  logic d;\n"
+      "  logic clk;\n"
+      "  specify\n"
+      "    $setup(d, edge[01] clk, 23);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    d = 1'b0;\n"
+      "    clk = 1'b0;\n"
+      "    #101 d = 1'b1;\n"
+      "    #5 clk = 1'bx;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
   EXPECT_EQ(FindDiag(f, "$setup violation: data signal"), nullptr);
 }
 
@@ -175,23 +180,24 @@ TEST(EdgeControlSpecifierEvaluation, SetupEdge01IgnoresAZeroToXTransition) {
 // each reached the report through as well.
 TEST(EdgeControlSpecifierEvaluation, SetupEdge01AnswersToAZeroToOneTransition) {
   SimFixture f;
-  ASSERT_TRUE(
-      DrivenToCompletion("module top;\n"
-                         "  logic d;\n"
-                         "  logic clk;\n"
-                         "  specify\n"
-                         "    $setup(d, edge[01] clk, 23);\n"
-                         "  endspecify\n"
-                         "  initial begin\n"
-                         "    d = 1'b0;\n"
-                         "    clk = 1'b0;\n"
-                         "    #101 d = 1'b1;\n"
-                         "    #5 clk = 1'b1;\n"
-                         "  end\n"
-                         "endmodule\n",
-                         f));
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "$setup violation: data signal", 0, "31.3.1"));
+  const std::string kDesign =
+      "module top;\n"
+      "  logic d;\n"
+      "  logic clk;\n"
+      "  specify\n"
+      "    $setup(d, edge[01] clk, 23);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    d = 1'b0;\n"
+      "    clk = 1'b0;\n"
+      "    #101 d = 1'b1;\n"
+      "    #5 clk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(), "$setup violation: data signal",
+      LineHolding(kDesign, "$setup(d, edge[01] clk"), "31.3.1"));
 }
 
 // §31.5: `edge[01, 0x, x1] clr` is what the clause makes `posedge clr`
@@ -200,23 +206,24 @@ TEST(EdgeControlSpecifierEvaluation, SetupEdge01AnswersToAZeroToOneTransition) {
 // limit of 31.
 TEST(EdgeControlSpecifierEvaluation, PosedgeListAnswersToAZeroToOneTransition) {
   SimFixture f;
-  ASSERT_TRUE(
-      DrivenToCompletion("module top;\n"
-                         "  logic d;\n"
-                         "  logic clk;\n"
-                         "  specify\n"
-                         "    $setup(d, edge[01, 0x, x1] clk, 31);\n"
-                         "  endspecify\n"
-                         "  initial begin\n"
-                         "    d = 1'b0;\n"
-                         "    clk = 1'b0;\n"
-                         "    #113 d = 1'b1;\n"
-                         "    #7 clk = 1'b1;\n"
-                         "  end\n"
-                         "endmodule\n",
-                         f));
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "$setup violation: data signal", 0, "31.3.1"));
+  const std::string kDesign =
+      "module top;\n"
+      "  logic d;\n"
+      "  logic clk;\n"
+      "  specify\n"
+      "    $setup(d, edge[01, 0x, x1] clk, 31);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    d = 1'b0;\n"
+      "    clk = 1'b0;\n"
+      "    #113 d = 1'b1;\n"
+      "    #7 clk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(), "$setup violation: data signal",
+      LineHolding(kDesign, "$setup(d, edge[01, 0x, x1] clk"), "31.3.1"));
 }
 
 // §31.5 with the same design and the same limit as the case above: the second
@@ -227,23 +234,24 @@ TEST(EdgeControlSpecifierEvaluation, PosedgeListAnswersToAZeroToOneTransition) {
 // units of setup against a limit of 31.
 TEST(EdgeControlSpecifierEvaluation, PosedgeListAnswersToAZeroToXTransition) {
   SimFixture f;
-  ASSERT_TRUE(
-      DrivenToCompletion("module top;\n"
-                         "  logic d;\n"
-                         "  logic clk;\n"
-                         "  specify\n"
-                         "    $setup(d, edge[01, 0x, x1] clk, 31);\n"
-                         "  endspecify\n"
-                         "  initial begin\n"
-                         "    d = 1'b0;\n"
-                         "    clk = 1'b0;\n"
-                         "    #127 d = 1'b1;\n"
-                         "    #9 clk = 1'bx;\n"
-                         "  end\n"
-                         "endmodule\n",
-                         f));
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "$setup violation: data signal", 0, "31.3.1"));
+  const std::string kDesign =
+      "module top;\n"
+      "  logic d;\n"
+      "  logic clk;\n"
+      "  specify\n"
+      "    $setup(d, edge[01, 0x, x1] clk, 31);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    d = 1'b0;\n"
+      "    clk = 1'b0;\n"
+      "    #127 d = 1'b1;\n"
+      "    #9 clk = 1'bx;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(), "$setup violation: data signal",
+      LineHolding(kDesign, "$setup(d, edge[01, 0x, x1] clk"), "31.3.1"));
 }
 
 // §31.5 with the same design and the same limit again: the third of the three
@@ -254,23 +262,24 @@ TEST(EdgeControlSpecifierEvaluation, PosedgeListAnswersToAZeroToXTransition) {
 // time units of setup against a limit of 31.
 TEST(EdgeControlSpecifierEvaluation, PosedgeListAnswersToAnXToOneTransition) {
   SimFixture f;
-  ASSERT_TRUE(
-      DrivenToCompletion("module top;\n"
-                         "  logic d;\n"
-                         "  logic clk;\n"
-                         "  specify\n"
-                         "    $setup(d, edge[01, 0x, x1] clk, 31);\n"
-                         "  endspecify\n"
-                         "  initial begin\n"
-                         "    d = 1'b0;\n"
-                         "    clk = 1'bx;\n"
-                         "    #149 d = 1'b1;\n"
-                         "    #11 clk = 1'b1;\n"
-                         "  end\n"
-                         "endmodule\n",
-                         f));
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "$setup violation: data signal", 0, "31.3.1"));
+  const std::string kDesign =
+      "module top;\n"
+      "  logic d;\n"
+      "  logic clk;\n"
+      "  specify\n"
+      "    $setup(d, edge[01, 0x, x1] clk, 31);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    d = 1'b0;\n"
+      "    clk = 1'bx;\n"
+      "    #149 d = 1'b1;\n"
+      "    #11 clk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(), "$setup violation: data signal",
+      LineHolding(kDesign, "$setup(d, edge[01, 0x, x1] clk"), "31.3.1"));
 }
 
 // §31.5: `edge[1x]` names the `1x` of `negedge`'s list and not the `10` beside
@@ -282,21 +291,21 @@ TEST(EdgeControlSpecifierEvaluation, PosedgeListAnswersToAnXToOneTransition) {
 // from `negedge`'s three descriptors as a negedge would report here.
 TEST(EdgeControlSpecifierEvaluation, SetupEdge1xIgnoresAOneToZeroTransition) {
   SimFixture f;
-  ASSERT_TRUE(
-      DrivenToCompletion("module top;\n"
-                         "  logic d;\n"
-                         "  logic clk;\n"
-                         "  specify\n"
-                         "    $setup(d, edge[1x] clk, 43);\n"
-                         "  endspecify\n"
-                         "  initial begin\n"
-                         "    d = 1'b0;\n"
-                         "    clk = 1'b1;\n"
-                         "    #167 d = 1'b1;\n"
-                         "    #13 clk = 1'b0;\n"
-                         "  end\n"
-                         "endmodule\n",
-                         f));
+  const std::string kDesign =
+      "module top;\n"
+      "  logic d;\n"
+      "  logic clk;\n"
+      "  specify\n"
+      "    $setup(d, edge[1x] clk, 43);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    d = 1'b0;\n"
+      "    clk = 1'b1;\n"
+      "    #167 d = 1'b1;\n"
+      "    #13 clk = 1'b0;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
   EXPECT_EQ(FindDiag(f, "$setup violation: data signal"), nullptr);
 }
 
@@ -307,23 +316,24 @@ TEST(EdgeControlSpecifierEvaluation, SetupEdge1xIgnoresAOneToZeroTransition) {
 // units of setup against a limit of 59.
 TEST(EdgeControlSpecifierEvaluation, SetupEdgeZ1AnswersToAnXToOneTransition) {
   SimFixture f;
-  ASSERT_TRUE(
-      DrivenToCompletion("module top;\n"
-                         "  logic d;\n"
-                         "  logic clk;\n"
-                         "  specify\n"
-                         "    $setup(d, edge[z1] clk, 59);\n"
-                         "  endspecify\n"
-                         "  initial begin\n"
-                         "    d = 1'b0;\n"
-                         "    clk = 1'bx;\n"
-                         "    #181 d = 1'b1;\n"
-                         "    #17 clk = 1'b1;\n"
-                         "  end\n"
-                         "endmodule\n",
-                         f));
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "$setup violation: data signal", 0, "31.3.1"));
+  const std::string kDesign =
+      "module top;\n"
+      "  logic d;\n"
+      "  logic clk;\n"
+      "  specify\n"
+      "    $setup(d, edge[z1] clk, 59);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    d = 1'b0;\n"
+      "    clk = 1'bx;\n"
+      "    #181 d = 1'b1;\n"
+      "    #17 clk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(), "$setup violation: data signal",
+      LineHolding(kDesign, "$setup(d, edge[z1] clk"), "31.3.1"));
 }
 
 // §31.4.4 with a reference event written in §31.5's general form: `edge[01]`
@@ -334,21 +344,22 @@ TEST(EdgeControlSpecifierEvaluation, SetupEdgeZ1AnswersToAnXToOneTransition) {
 // `01` nor `10`, so it neither opens a pulse nor closes one.
 TEST(EdgeControlSpecifierEvaluation, WidthEdge01ClosesOnAOneToZeroTransition) {
   SimFixture f;
-  ASSERT_TRUE(
-      DrivenToCompletion("module top;\n"
-                         "  logic clk;\n"
-                         "  specify\n"
-                         "    $width(edge[01] clk, 71, 0);\n"
-                         "  endspecify\n"
-                         "  initial begin\n"
-                         "    clk = 1'b0;\n"
-                         "    #191 clk = 1'b1;\n"
-                         "    #3 clk = 1'b0;\n"
-                         "  end\n"
-                         "endmodule\n",
-                         f));
+  const std::string kDesign =
+      "module top;\n"
+      "  logic clk;\n"
+      "  specify\n"
+      "    $width(edge[01] clk, 71, 0);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    clk = 1'b0;\n"
+      "    #191 clk = 1'b1;\n"
+      "    #3 clk = 1'b0;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
   EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), "$width violation: signal",
-                              0, "31.4.4"));
+                              LineHolding(kDesign, "$width(edge[01] clk"),
+                              "31.4.4"));
 }
 
 // §31.4.4 with the same design and the same limit as the case above, the value
@@ -359,19 +370,19 @@ TEST(EdgeControlSpecifierEvaluation, WidthEdge01ClosesOnAOneToZeroTransition) {
 // time 211 and reaches x at time 215.
 TEST(EdgeControlSpecifierEvaluation, WidthEdge01IgnoresAOneToXTransition) {
   SimFixture f;
-  ASSERT_TRUE(
-      DrivenToCompletion("module top;\n"
-                         "  logic clk;\n"
-                         "  specify\n"
-                         "    $width(edge[01] clk, 71, 0);\n"
-                         "  endspecify\n"
-                         "  initial begin\n"
-                         "    clk = 1'b0;\n"
-                         "    #211 clk = 1'b1;\n"
-                         "    #4 clk = 1'bx;\n"
-                         "  end\n"
-                         "endmodule\n",
-                         f));
+  const std::string kDesign =
+      "module top;\n"
+      "  logic clk;\n"
+      "  specify\n"
+      "    $width(edge[01] clk, 71, 0);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    clk = 1'b0;\n"
+      "    #211 clk = 1'b1;\n"
+      "    #4 clk = 1'bx;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
   EXPECT_EQ(FindDiag(f, "$width violation: signal"), nullptr);
 }
 

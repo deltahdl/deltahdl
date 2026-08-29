@@ -342,13 +342,19 @@ inline ArmedTimingCheckEvents ArmTimingCheckEvents(
   return ArmedTimingCheckEvents{std::move(ref_signal), std::move(data_signal)};
 }
 
-// Reports one violation as a warning. §31.2's violation is a state the run
-// reached rather than a construct that is illegal, which is why it is a warning
-// and not an error, and it stands at SourceLoc::None() because TimingCheckEntry
-// records no source position for the declaration it was built from.
+// Reports one violation as a warning at `loc`, which is where the check that
+// raised it stands. §31.2's violation is a state the run reached rather than a
+// construct that is illegal, which is why it is a warning and not an error.
+//
+// Callers pass TimingCheckEntry::loc (simulator/specify_timing_check.h). It is
+// SourceLoc::None() only for an entry no source of the design declared, which
+// is what §32.9's $sdf_annotate registers, and DiagEngine::Warning
+// (common/diagnostic.cpp) renders such a report with no source line and no
+// caret.
 inline void ReportTimingViolation(std::string_view message,
-                                  std::string_view subclause, SimContext& ctx) {
-  ctx.GetDiag().Warning(SourceLoc::None(), std::string(message),
+                                  std::string_view subclause, SourceLoc loc,
+                                  SimContext& ctx) {
+  ctx.GetDiag().Warning(loc, std::string(message),
                         Subclause(std::string(subclause)));
 }
 

@@ -142,14 +142,14 @@ void ReportPulseViolation(const TimingCheckEntry& check,
         std::format("$width violation: signal {} held its level for {} time "
                     "units, short of the {} the check requires",
                     signal, elapsed, check.limit),
-        "31.4.4", ctx);
+        "31.4.4", check.loc, ctx);
     return;
   }
   ReportTimingViolation(
       std::format("$period violation: signal {} repeated its edge after {} "
                   "time units, short of the {} the check requires",
                   signal, elapsed, check.limit),
-      "31.4.5", ctx);
+      "31.4.5", check.loc, ctx);
 }
 
 // The edge that closes a $width or a $period window has arrived at
@@ -318,7 +318,7 @@ void EvaluateNochangeData(const NochangeWindow& window, uint64_t data_ticks,
       std::format("$nochange violation: data signal {} transitioned inside "
                   "the window bounded by reference signal {}",
                   window.data_signal, window.ref_signal),
-      "31.4.6", ctx);
+      "31.4.6", check.loc, ctx);
   ToggleNotifier(check, ctx);
 }
 

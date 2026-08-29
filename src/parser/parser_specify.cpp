@@ -657,6 +657,14 @@ SpecifyItem* Parser::ParseTimingCheck() {
   auto* item = arena_.Create<SpecifyItem>();
   item->kind = SpecifyItemKind::kTimingCheck;
   item->loc = CurrentLoc();
+  // The check's own first token, which is the keyword §31.2's Syntax 31-1 opens
+  // every system_timing_check production with. TimingCheckDecl::loc
+  // (parser/ast_specify.h) is what carries it past the parse:
+  // BuildTimingCheckUnderOptions (simulator/specify_timing_check.cpp) copies it
+  // into TimingCheckEntry::loc, and that is where a §31 violation is reported.
+  // A reader given the specify block's own position instead would be sent to
+  // the block and left to guess which of its checks fired.
+  item->timing_check.loc = item->loc;
 
   auto name = CurrentToken().text;
   item->timing_check.check_kind = ParseTimingCheckKind(name);

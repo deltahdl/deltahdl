@@ -62,9 +62,16 @@
 // A timing violation is reported as a warning and not as an error. The design
 // is legal and the run reaches a state the design said it should not, so
 // ReportViolation in src/simulator/timing_check_driver.cpp calls
-// DiagEngine::Warning under §31.3.1. The report stands at SourceLoc::None(),
-// whose line is 0, because TimingCheckEntry records no source position for the
-// declaration it was built from.
+// DiagEngine::Warning under §31.3.1. The report stands on the line the check
+// was written on. TimingCheckEntry::loc in
+// src/simulator/specify_timing_check.h carries that line, and
+// Parser::ParseTimingCheck in src/parser/parser_specify.cpp sets it to the
+// location of the check's own first token. Each case below names the line
+// through LineHolding in lib/cpp/test_helpers/helpers_reported_error.h rather
+// than writing a number, so no case drifts when its design gains or loses a
+// line. Issue #3414 is the defect that left the line 0: nothing carried the
+// position from the declaration to the run, so the report stood at
+// SourceLoc::None().
 //
 // The literals are picked so that no two quantities a case tells apart share a
 // value. The limits are 37, 41, 43, 47 and 29, one per case and none of them
@@ -170,11 +177,12 @@ std::string NotifierDesign(std::string_view initial_value, unsigned limit,
 // answered 0 for a notifier holding z.
 TEST(NotifierUpdateDriven, ZNotifierSurvivesADrivenViolation) {
   SimFixture f;
-  auto* notifier =
-      RunAndFindVar(NotifierDesign("1'bz", 37, 101, 13), f, "setup_notifier");
+  const std::string kDesign = NotifierDesign("1'bz", 37, 101, 13);
+  auto* notifier = RunAndFindVar(kDesign, f, "setup_notifier");
   ASSERT_NE(notifier, nullptr);
-  EXPECT_TRUE(
-      ReportedWarning(f.diag.Diagnostics(), kSetupViolation, 0, "31.3.1"));
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), kSetupViolation,
+                              LineHolding(kDesign, "$setup(d, posedge clk,"),
+                              "31.3.1"));
   EXPECT_EQ(notifier->value.words[0].aval & 1u, 0u);
   EXPECT_EQ(notifier->value.words[0].bval & 1u, 1u);
 }
@@ -189,11 +197,12 @@ TEST(NotifierUpdateDriven, ZNotifierSurvivesADrivenViolation) {
 // the implementation. Issue #3413 is that the answer was x, which this rejects.
 TEST(NotifierUpdateDriven, XNotifierBecomesKnownAfterADrivenViolation) {
   SimFixture f;
-  auto* notifier =
-      RunAndFindVar(NotifierDesign("1'bx", 41, 107, 17), f, "setup_notifier");
+  const std::string kDesign = NotifierDesign("1'bx", 41, 107, 17);
+  auto* notifier = RunAndFindVar(kDesign, f, "setup_notifier");
   ASSERT_NE(notifier, nullptr);
-  EXPECT_TRUE(
-      ReportedWarning(f.diag.Diagnostics(), kSetupViolation, 0, "31.3.1"));
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), kSetupViolation,
+                              LineHolding(kDesign, "$setup(d, posedge clk,"),
+                              "31.3.1"));
   EXPECT_EQ(notifier->value.words[0].bval & 1u, 0u);
 }
 
@@ -203,11 +212,12 @@ TEST(NotifierUpdateDriven, XNotifierBecomesKnownAfterADrivenViolation) {
 // the update §31.6 requires and not a value the variable started at.
 TEST(NotifierUpdateDriven, ZeroNotifierBecomesOneAfterADrivenViolation) {
   SimFixture f;
-  auto* notifier =
-      RunAndFindVar(NotifierDesign("1'b0", 43, 109, 19), f, "setup_notifier");
+  const std::string kDesign = NotifierDesign("1'b0", 43, 109, 19);
+  auto* notifier = RunAndFindVar(kDesign, f, "setup_notifier");
   ASSERT_NE(notifier, nullptr);
-  EXPECT_TRUE(
-      ReportedWarning(f.diag.Diagnostics(), kSetupViolation, 0, "31.3.1"));
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), kSetupViolation,
+                              LineHolding(kDesign, "$setup(d, posedge clk,"),
+                              "31.3.1"));
   EXPECT_EQ(notifier->value.words[0].aval & 1u, 1u);
   EXPECT_EQ(notifier->value.words[0].bval & 1u, 0u);
 }
@@ -221,11 +231,12 @@ TEST(NotifierUpdateDriven, ZeroNotifierBecomesOneAfterADrivenViolation) {
 // whichever value it wrote.
 TEST(NotifierUpdateDriven, OneNotifierBecomesZeroAfterADrivenViolation) {
   SimFixture f;
-  auto* notifier =
-      RunAndFindVar(NotifierDesign("1'b1", 47, 113, 23), f, "setup_notifier");
+  const std::string kDesign = NotifierDesign("1'b1", 47, 113, 23);
+  auto* notifier = RunAndFindVar(kDesign, f, "setup_notifier");
   ASSERT_NE(notifier, nullptr);
-  EXPECT_TRUE(
-      ReportedWarning(f.diag.Diagnostics(), kSetupViolation, 0, "31.3.1"));
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), kSetupViolation,
+                              LineHolding(kDesign, "$setup(d, posedge clk,"),
+                              "31.3.1"));
   EXPECT_EQ(notifier->value.words[0].aval & 1u, 0u);
   EXPECT_EQ(notifier->value.words[0].bval & 1u, 0u);
 }

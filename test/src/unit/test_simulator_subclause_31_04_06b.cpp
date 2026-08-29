@@ -16,8 +16,14 @@
 // is legal and the run reaches a state the design said it should not, so
 // ReportTimingViolation in src/simulator/timing_check_driver_internal.h calls
 // DiagEngine::Warning; the cases below read it through ReportedWarning rather
-// than ReportedError. It stands at SourceLoc::None(), whose line is 0, because
-// TimingCheckEntry records no position for the declaration it was built from.
+// than ReportedError. It stands on the line the check was written on, which
+// TimingCheckEntry::loc in src/simulator/specify_timing_check.h carries from
+// Parser::ParseTimingCheck in src/parser/parser_specify.cpp. Issue #3414 is
+// that it did not: the report stood at SourceLoc::None(), whose line is 0,
+// because nothing carried the check's position from the declaration to the run.
+// The violating case below names that line with LineHolding over
+// kDesignBeforeStimulus rather than writing a number, so the case cannot drift
+// when the design gains or loses a line above the $nochange.
 //
 // §31.4.6 "reports a timing violation if the data event occurs during the
 // specified level of the control signal (the reference event)", so both edges
@@ -87,22 +93,29 @@ using namespace delta;
 
 namespace {
 
+// The design every case here runs, up to the point the stimulus is spliced in.
+// It is a named constant rather than a literal inside the call below so that a
+// case can name the line its $nochange stands on with LineHolding
+// (lib/cpp/test_helpers/helpers_reported_error.h). The stimulus follows the
+// check, so a line of this text is that line of the whole source.
+constexpr const char* kDesignBeforeStimulus =
+    "module top;\n"
+    "  logic ctl;\n"
+    "  logic d;\n"
+    "  specify\n"
+    "    $nochange(posedge ctl, d, 0, 0);\n"
+    "  endspecify\n"
+    "  initial begin\n"
+    "    ctl = 1'b0;\n"
+    "    d = 1'b0;\n";
+
 // Elaborates, lowers and runs the one design these cases share, with `stimulus`
 // as the body of its initial block. False when the source did not elaborate
 // cleanly, which a case asserts on before reading anything off the fixture: a
 // design rejected before it ran says nothing about §31.4.6 whatever the case
 // was written to expect.
 bool RanWithStimulus(const std::string& stimulus, SimFixture& f) {
-  auto* rtl = ElaborateSrc(std::string("module top;\n"
-                                       "  logic ctl;\n"
-                                       "  logic d;\n"
-                                       "  specify\n"
-                                       "    $nochange(posedge ctl, d, 0, 0);\n"
-                                       "  endspecify\n"
-                                       "  initial begin\n"
-                                       "    ctl = 1'b0;\n"
-                                       "    d = 1'b0;\n") +
-                               stimulus +
+  auto* rtl = ElaborateSrc(std::string(kDesignBeforeStimulus) + stimulus +
                                "  end\n"
                                "endmodule\n",
                            f);
@@ -120,8 +133,9 @@ TEST(DrivenTimingCheckEvaluation, NochangeViolationInARunIsReported) {
                       "    #12 d = 1'b1;\n"
                       "    #20 ctl = 1'b0;\n",
                       f));
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "$nochange violation: data signal", 0, "31.4.6"));
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(), "$nochange violation: data signal",
+      LineHolding(kDesignBeforeStimulus, "$nochange(posedge ctl"), "31.4.6"));
 }
 
 // §31.4.6 again, and the same design: only the stimulus changes. `ctl` rises at

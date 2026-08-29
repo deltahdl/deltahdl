@@ -75,4 +75,63 @@ TEST(SystemTimingCheckParsing, SystemTaskRejectedInSpecifyBlock) {
       r.diags, "system task cannot appear in specify block", 3, "31.2"));
 }
 
+// §31.2, Syntax 31-1: a system_timing_check opens with its own keyword, and
+// TimingCheckDecl::loc (src/parser/ast_specify.h) is where the parser records
+// the position of that keyword. A §31 violation is reported at that position,
+// so a check whose position went unrecorded sends the reader to line 0 with
+// nothing to open. The $setup below stands on line 4 of the source and starts
+// at column 6. Neither number can be right by accident: a default-constructed
+// SourceLoc (src/common/source_loc.h) carries line 0 and column 0, line 1 is
+// the module header rather than the check, and column 1 is what an off-by-one
+// or a position taken from the start of the line would give.
+TEST(SystemTimingCheckParsing, TimingCheckRecordsItsKeywordPosition) {
+  const std::string src =
+      "module m(input d, clk);\n"
+      "  wire w;\n"
+      "  specify\n"
+      "     $setup(d, posedge clk, 5);\n"
+      "  endspecify\n"
+      "endmodule\n";
+  auto r = Parse(src);
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->loc.line, LineHolding(src, "$setup"));
+  // Five spaces precede the keyword on that line, so it starts at column 6.
+  EXPECT_EQ(tc->loc.column, 6u);
+}
+
+// §31.2, Syntax 31-1: every system_timing_check a specify block holds records
+// its own keyword's position. The $setup and the $hold below stand on lines 4
+// and 5, so a position copied from the enclosing specify block or left over
+// from whatever was parsed last would give the two declarations one line.
+// Neither line is 1, which is what a default-constructed SourceLoc
+// (src/common/source_loc.h) and the module header would give. Reaching the
+// second check means walking ModuleItem::specify_items, because
+// GetSoleTimingCheck in lib/cpp/test_helpers/helpers_parser_verify.h returns
+// the first timing check of a block.
+TEST(SystemTimingCheckParsing, TwoTimingChecksRecordSeparateLines) {
+  const std::string src =
+      "module m(input d, clk);\n"
+      "  wire w;\n"
+      "  specify\n"
+      "     $setup(d, posedge clk, 5);\n"
+      "       $hold(posedge clk, d, 3);\n"
+      "  endspecify\n"
+      "endmodule\n";
+  auto r = Parse(src);
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  ASSERT_EQ(spec->specify_items.size(), 2u);
+  EXPECT_EQ(spec->specify_items[0]->timing_check.loc.line,
+            LineHolding(src, "$setup"));
+  EXPECT_EQ(spec->specify_items[1]->timing_check.loc.line,
+            LineHolding(src, "$hold"));
+  EXPECT_NE(spec->specify_items[0]->timing_check.loc.line,
+            spec->specify_items[1]->timing_check.loc.line);
+}
+
 }  // namespace

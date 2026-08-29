@@ -20,9 +20,14 @@
 // is legal and the run reaches a state the design said it should not, so
 // ReportViolation in src/simulator/timing_check_driver.cpp calls
 // DiagEngine::Warning; the cases below read it through ReportedWarning rather
-// than ReportedError. It stands at SourceLoc::None(), whose line is 0, because
-// TimingCheckEntry records no source position for the declaration it was built
-// from.
+// than ReportedError. The report stands on the line the check was written on.
+// TimingCheckEntry::loc in src/simulator/specify_timing_check.h carries that
+// line, Parser::ParseTimingCheck in src/parser/parser_specify.cpp having
+// recorded the check's own first token into the declaration it was built from.
+// Each case names that line through LineHolding rather than writing a number,
+// so a case cannot drift when its design gains or loses a line. Issue #3414 is
+// that the report stood at SourceLoc::None(), whose line is 0, before
+// TimingCheckEntry carried a source position.
 //
 // The first two cases share one design and one stimulus and differ in the value
 // of the conditioning signal alone. That is what shows the condition being read
@@ -128,23 +133,23 @@ bool DrivenToCompletion(const std::string& design, SimFixture& f) {
 // there is no other report this case would tolerate.
 TEST(ConditionedTimingCheckEvaluation, SetupWithFalseConditionReportsNothing) {
   SimFixture f;
-  ASSERT_TRUE(
-      DrivenToCompletion("module top;\n"
-                         "  logic d;\n"
-                         "  logic clk;\n"
-                         "  logic en;\n"
-                         "  specify\n"
-                         "    $setup(d, posedge clk &&& en, 29);\n"
-                         "  endspecify\n"
-                         "  initial begin\n"
-                         "    d = 1'b0;\n"
-                         "    clk = 1'b0;\n"
-                         "    en = 1'b0;\n"
-                         "    #13 d = 1'b1;\n"
-                         "    #6 clk = 1'b1;\n"
-                         "  end\n"
-                         "endmodule\n",
-                         f));
+  const std::string kDesign =
+      "module top;\n"
+      "  logic d;\n"
+      "  logic clk;\n"
+      "  logic en;\n"
+      "  specify\n"
+      "    $setup(d, posedge clk &&& en, 29);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    d = 1'b0;\n"
+      "    clk = 1'b0;\n"
+      "    en = 1'b0;\n"
+      "    #13 d = 1'b1;\n"
+      "    #6 clk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
   EXPECT_EQ(FindDiag(f, "$setup violation: data signal"), nullptr);
 }
 
@@ -159,25 +164,26 @@ TEST(ConditionedTimingCheckEvaluation, SetupWithFalseConditionReportsNothing) {
 // each reached the report through as well.
 TEST(ConditionedTimingCheckEvaluation, SetupWithTrueConditionIsReported) {
   SimFixture f;
-  ASSERT_TRUE(
-      DrivenToCompletion("module top;\n"
-                         "  logic d;\n"
-                         "  logic clk;\n"
-                         "  logic en;\n"
-                         "  specify\n"
-                         "    $setup(d, posedge clk &&& en, 29);\n"
-                         "  endspecify\n"
-                         "  initial begin\n"
-                         "    d = 1'b0;\n"
-                         "    clk = 1'b0;\n"
-                         "    en = 1'b1;\n"
-                         "    #13 d = 1'b1;\n"
-                         "    #6 clk = 1'b1;\n"
-                         "  end\n"
-                         "endmodule\n",
-                         f));
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "$setup violation: data signal", 0, "31.3.1"));
+  const std::string kDesign =
+      "module top;\n"
+      "  logic d;\n"
+      "  logic clk;\n"
+      "  logic en;\n"
+      "  specify\n"
+      "    $setup(d, posedge clk &&& en, 29);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    d = 1'b0;\n"
+      "    clk = 1'b0;\n"
+      "    en = 1'b1;\n"
+      "    #13 d = 1'b1;\n"
+      "    #6 clk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(), "$setup violation: data signal",
+      LineHolding(kDesign, "$setup(d, posedge clk &&& en"), "31.3.1"));
 }
 
 // §31.7: "When comparisons are deterministic, an x value on the conditioning
@@ -188,23 +194,23 @@ TEST(ConditionedTimingCheckEvaluation, SetupWithTrueConditionIsReported) {
 // the check enabled at all.
 TEST(ConditionedTimingCheckEvaluation, PlainConditionAtXReportsNothing) {
   SimFixture f;
-  ASSERT_TRUE(
-      DrivenToCompletion("module top;\n"
-                         "  logic d;\n"
-                         "  logic clk;\n"
-                         "  logic en;\n"
-                         "  specify\n"
-                         "    $setup(d, posedge clk &&& en, 37);\n"
-                         "  endspecify\n"
-                         "  initial begin\n"
-                         "    d = 1'b0;\n"
-                         "    clk = 1'b0;\n"
-                         "    en = 1'bx;\n"
-                         "    #22 d = 1'b1;\n"
-                         "    #8 clk = 1'b1;\n"
-                         "  end\n"
-                         "endmodule\n",
-                         f));
+  const std::string kDesign =
+      "module top;\n"
+      "  logic d;\n"
+      "  logic clk;\n"
+      "  logic en;\n"
+      "  specify\n"
+      "    $setup(d, posedge clk &&& en, 37);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    d = 1'b0;\n"
+      "    clk = 1'b0;\n"
+      "    en = 1'bx;\n"
+      "    #22 d = 1'b1;\n"
+      "    #8 clk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
   EXPECT_EQ(FindDiag(f, "$setup violation: data signal"), nullptr);
 }
 
@@ -215,25 +221,27 @@ TEST(ConditionedTimingCheckEvaluation, PlainConditionAtXReportsNothing) {
 // against a limit of 41.
 TEST(ConditionedTimingCheckEvaluation, EqualityConditionAtXIsReported) {
   SimFixture f;
-  ASSERT_TRUE(
-      DrivenToCompletion("module top;\n"
-                         "  logic d;\n"
-                         "  logic clk;\n"
-                         "  logic en;\n"
-                         "  specify\n"
-                         "    $setup(d, posedge clk &&& (en == 1'b1), 41);\n"
-                         "  endspecify\n"
-                         "  initial begin\n"
-                         "    d = 1'b0;\n"
-                         "    clk = 1'b0;\n"
-                         "    en = 1'bx;\n"
-                         "    #44 d = 1'b1;\n"
-                         "    #11 clk = 1'b1;\n"
-                         "  end\n"
-                         "endmodule\n",
-                         f));
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "$setup violation: data signal", 0, "31.3.1"));
+  const std::string kDesign =
+      "module top;\n"
+      "  logic d;\n"
+      "  logic clk;\n"
+      "  logic en;\n"
+      "  specify\n"
+      "    $setup(d, posedge clk &&& (en == 1'b1), 41);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    d = 1'b0;\n"
+      "    clk = 1'b0;\n"
+      "    en = 1'bx;\n"
+      "    #44 d = 1'b1;\n"
+      "    #11 clk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(), "$setup violation: data signal",
+      LineHolding(kDesign, "$setup(d, posedge clk &&& (en == 1'b1)"),
+      "31.3.1"));
 }
 
 // §31.7 reads the value of the conditioning signal and applies the `~` itself,
@@ -244,25 +252,26 @@ TEST(ConditionedTimingCheckEvaluation, EqualityConditionAtXIsReported) {
 // reads a 1 as disabled -- and would report nothing here.
 TEST(ConditionedTimingCheckEvaluation, NegatedConditionAtZeroIsReported) {
   SimFixture f;
-  ASSERT_TRUE(
-      DrivenToCompletion("module top;\n"
-                         "  logic d;\n"
-                         "  logic clk;\n"
-                         "  logic en;\n"
-                         "  specify\n"
-                         "    $setup(d, posedge clk &&& ~en, 53);\n"
-                         "  endspecify\n"
-                         "  initial begin\n"
-                         "    d = 1'b0;\n"
-                         "    clk = 1'b0;\n"
-                         "    en = 1'b0;\n"
-                         "    #61 d = 1'b1;\n"
-                         "    #15 clk = 1'b1;\n"
-                         "  end\n"
-                         "endmodule\n",
-                         f));
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "$setup violation: data signal", 0, "31.3.1"));
+  const std::string kDesign =
+      "module top;\n"
+      "  logic d;\n"
+      "  logic clk;\n"
+      "  logic en;\n"
+      "  specify\n"
+      "    $setup(d, posedge clk &&& ~en, 53);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    d = 1'b0;\n"
+      "    clk = 1'b0;\n"
+      "    en = 1'b0;\n"
+      "    #61 d = 1'b1;\n"
+      "    #15 clk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(), "$setup violation: data signal",
+      LineHolding(kDesign, "$setup(d, posedge clk &&& ~en"), "31.3.1"));
 }
 
 // §31.7 attaches a condition to the timing_check_event it follows, and here
@@ -276,23 +285,23 @@ TEST(ConditionedTimingCheckEvaluation, NegatedConditionAtZeroIsReported) {
 TEST(ConditionedTimingCheckEvaluation,
      HoldWithFalseDataConditionReportsNothing) {
   SimFixture f;
-  ASSERT_TRUE(
-      DrivenToCompletion("module top;\n"
-                         "  logic d;\n"
-                         "  logic clk;\n"
-                         "  logic en;\n"
-                         "  specify\n"
-                         "    $hold(posedge clk, d &&& en, 67);\n"
-                         "  endspecify\n"
-                         "  initial begin\n"
-                         "    d = 1'b0;\n"
-                         "    clk = 1'b0;\n"
-                         "    en = 1'b0;\n"
-                         "    #83 clk = 1'b1;\n"
-                         "    #9 d = 1'b1;\n"
-                         "  end\n"
-                         "endmodule\n",
-                         f));
+  const std::string kDesign =
+      "module top;\n"
+      "  logic d;\n"
+      "  logic clk;\n"
+      "  logic en;\n"
+      "  specify\n"
+      "    $hold(posedge clk, d &&& en, 67);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    d = 1'b0;\n"
+      "    clk = 1'b0;\n"
+      "    en = 1'b0;\n"
+      "    #83 clk = 1'b1;\n"
+      "    #9 d = 1'b1;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
   EXPECT_EQ(FindDiag(f, "$hold violation: data signal"), nullptr);
 }
 

@@ -35,9 +35,15 @@
 // is legal and the run reaches a state the design said it should not, so
 // ReportTimingViolation in src/simulator/timing_check_driver_internal.h calls
 // DiagEngine::Warning; the cases below read it through ReportedWarning rather
-// than ReportedError. It stands at SourceLoc::None(), whose line is 0, because
-// TimingCheckEntry records no source position for the declaration it was built
-// from.
+// than ReportedError. It stands on the line the check was written on.
+// TimingCheckEntry::loc in src/simulator/specify_timing_check.h carries that
+// line, and Parser::ParseTimingCheck in src/parser/parser_specify.cpp sets it
+// to the location of the check's own first token. Each case below names the
+// line through LineHolding in lib/cpp/test_helpers/helpers_reported_error.h
+// rather than writing a number, so no case drifts when its design gains or
+// loses a line. Issue #3414 is the defect that left the line 0: nothing
+// carried the position from the declaration to the run, so the report stood at
+// SourceLoc::None().
 //
 // Two cases count reports rather than name one, which is what §31.8 states
 // outright for them. Of a $setup whose 8-bit data signal changes in six bits at
@@ -229,12 +235,13 @@ std::string VectorDataDesign(const std::string& stimulus) {
 TEST(VectorSignalsInTimingChecksDriven,
      VectorReferenceUpperBitRisingAloneIsReported) {
   SimFixture f;
-  ASSERT_TRUE(
-      DrivenToCompletion(VectorReferenceDesign("    #223 d = 1'b1;\n"
-                                               "    #11 clk = 2'b10;\n"),
-                         f));
-  EXPECT_TRUE(
-      ReportedWarning(f.diag.Diagnostics(), kSetupViolation, 0, "31.3.1"));
+  const std::string kDesign = VectorReferenceDesign(
+      "    #223 d = 1'b1;\n"
+      "    #11 clk = 2'b10;\n");
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), kSetupViolation,
+                              LineHolding(kDesign, "$setup(d, posedge clk,"),
+                              "31.3.1"));
 }
 
 // §31.8 with the same design as the case above, the bit that rises alone
@@ -247,12 +254,13 @@ TEST(VectorSignalsInTimingChecksDriven,
 TEST(VectorSignalsInTimingChecksDriven,
      VectorReferenceLowerBitRisingAloneIsReported) {
   SimFixture f;
-  ASSERT_TRUE(
-      DrivenToCompletion(VectorReferenceDesign("    #229 d = 1'b1;\n"
-                                               "    #13 clk = 2'b01;\n"),
-                         f));
-  EXPECT_TRUE(
-      ReportedWarning(f.diag.Diagnostics(), kSetupViolation, 0, "31.3.1"));
+  const std::string kDesign = VectorReferenceDesign(
+      "    #229 d = 1'b1;\n"
+      "    #13 clk = 2'b01;\n");
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), kSetupViolation,
+                              LineHolding(kDesign, "$setup(d, posedge clk,"),
+                              "31.3.1"));
 }
 
 // §31.8: "This shall be interpreted as a single timing check where the
@@ -275,12 +283,13 @@ TEST(VectorSignalsInTimingChecksDriven,
 TEST(VectorSignalsInTimingChecksDriven,
      VectorReferenceBothBitsRisingAtOnceReportsOnce) {
   SimFixture f;
-  ASSERT_TRUE(
-      DrivenToCompletion(VectorReferenceDesign("    #233 d = 1'b1;\n"
-                                               "    #17 clk = 2'b11;\n"),
-                         f));
-  EXPECT_TRUE(
-      ReportedWarning(f.diag.Diagnostics(), kSetupViolation, 0, "31.3.1"));
+  const std::string kDesign = VectorReferenceDesign(
+      "    #233 d = 1'b1;\n"
+      "    #17 clk = 2'b11;\n");
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), kSetupViolation,
+                              LineHolding(kDesign, "$setup(d, posedge clk,"),
+                              "31.3.1"));
   std::size_t first = PositionOfFirstDiag(f, kSetupViolation);
   EXPECT_EQ(FindDiagFrom(f, first + 1, kSetupViolation), nullptr);
 }
@@ -300,11 +309,13 @@ TEST(VectorSignalsInTimingChecksDriven,
 TEST(VectorSignalsInTimingChecksDriven,
      VectorDataUpperBitTransitioningAloneIsReported) {
   SimFixture f;
-  ASSERT_TRUE(DrivenToCompletion(VectorDataDesign("    #239 d = 4'b1000;\n"
-                                                  "    #23 clk = 1'b1;\n"),
-                                 f));
-  EXPECT_TRUE(
-      ReportedWarning(f.diag.Diagnostics(), kSetupViolation, 0, "31.3.1"));
+  const std::string kDesign = VectorDataDesign(
+      "    #239 d = 4'b1000;\n"
+      "    #23 clk = 1'b1;\n");
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), kSetupViolation,
+                              LineHolding(kDesign, "$setup(d, posedge clk,"),
+                              "31.3.1"));
 }
 
 // §31.8's own example in miniature. The clause's is a `module DFF` with `input
@@ -324,11 +335,13 @@ TEST(VectorSignalsInTimingChecksDriven,
 TEST(VectorSignalsInTimingChecksDriven,
      VectorDataSeveralBitsTransitioningAtOnceReportsOnce) {
   SimFixture f;
-  ASSERT_TRUE(DrivenToCompletion(VectorDataDesign("    #241 d = 4'b1110;\n"
-                                                  "    #29 clk = 1'b1;\n"),
-                                 f));
-  EXPECT_TRUE(
-      ReportedWarning(f.diag.Diagnostics(), kSetupViolation, 0, "31.3.1"));
+  const std::string kDesign = VectorDataDesign(
+      "    #241 d = 4'b1110;\n"
+      "    #29 clk = 1'b1;\n");
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), kSetupViolation,
+                              LineHolding(kDesign, "$setup(d, posedge clk,"),
+                              "31.3.1"));
   std::size_t first = PositionOfFirstDiag(f, kSetupViolation);
   EXPECT_EQ(FindDiagFrom(f, first + 1, kSetupViolation), nullptr);
 }
@@ -345,21 +358,22 @@ TEST(VectorSignalsInTimingChecksDriven,
 TEST(VectorSignalsInTimingChecksDriven,
      VectorWidthPulseOnUpperBitAloneIsReported) {
   SimFixture f;
-  ASSERT_TRUE(
-      DrivenToCompletion("module top;\n"
-                         "  logic [3:2] clk;\n"
-                         "  specify\n"
-                         "    $width(posedge clk, 89, 0);\n"
-                         "  endspecify\n"
-                         "  initial begin\n"
-                         "    clk = 2'b00;\n"
-                         "    #251 clk = 2'b10;\n"
-                         "    #31 clk = 2'b00;\n"
-                         "  end\n"
-                         "endmodule\n",
-                         f));
-  EXPECT_TRUE(
-      ReportedWarning(f.diag.Diagnostics(), kWidthViolation, 0, "31.4.4"));
+  const std::string kDesign =
+      "module top;\n"
+      "  logic [3:2] clk;\n"
+      "  specify\n"
+      "    $width(posedge clk, 89, 0);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    clk = 2'b00;\n"
+      "    #251 clk = 2'b10;\n"
+      "    #31 clk = 2'b00;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), kWidthViolation,
+                              LineHolding(kDesign, "$width(posedge clk,"),
+                              "31.4.4"));
 }
 
 }  // namespace

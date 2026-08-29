@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/source_loc.h"
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulator/specify_path_delay.h"
@@ -72,6 +73,16 @@ struct TimingCheckEntry {
   std::string notifier;
 
   std::string condition;
+
+  // §31.2: where the system_timing_check this entry was built from stands, so
+  // that the violation it reports names a line a reader can open. It is the
+  // check's own first token and not the specify block's, TimingCheckDecl::loc
+  // (parser/ast_specify.h) being what Parser::ParseTimingCheck
+  // (parser/parser_specify.cpp) records it into. A design declaring several
+  // checks over one clock is otherwise given several reports it cannot tell
+  // apart. It is SourceLoc::None() for an entry §32.9's $sdf_annotate
+  // registered, no source of the design having declared one.
+  SourceLoc loc;
 
   // §31.7: the `&&&` condition each of the check's two timing_check_events was
   // declared with, held as the expression the parser built and null for an

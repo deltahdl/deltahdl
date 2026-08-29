@@ -17,8 +17,17 @@
 // is legal and the run reaches a state the design said it should not, so
 // ReportTimingViolation in src/simulator/timing_check_driver_internal.h calls
 // DiagEngine::Warning; the cases below read it through ReportedWarning rather
-// than ReportedError. It stands at SourceLoc::None(), whose line is 0, because
-// TimingCheckEntry records no position for the declaration it was built from.
+// than ReportedError. The report stands on the line the check was written on.
+// TimingCheckEntry::loc (src/simulator/specify_timing_check.h) carries that
+// position: Parser::ParseTimingCheck (src/parser/parser_specify.cpp) records
+// the check's own first token into it, and BuildTimingCheckUnderOptions
+// (src/simulator/specify_timing_check.cpp) copies it across. Issue #3414 was
+// that the report stood at SourceLoc::None(), whose line is 0, because nothing
+// carried that position from the declaration to the run. Each case below names
+// the line through LineHolding (lib/cpp/test_helpers/helpers_reported_error.h),
+// which reads it off the design text, rather than writing a number down. A
+// number goes stale the moment the design gains or loses a line above the
+// check.
 //
 // One $setuphold declaration stands for two constraints. §31.3.3 makes
 //
@@ -78,26 +87,31 @@ using namespace delta;
 
 namespace {
 
+// The design every case here runs, up to the stimulus each case supplies. A
+// case hands it to LineHolding, which reads the line the `$setuphold` keyword
+// stands on out of this text. The declaration stands above the stimulus, so the
+// line it holds here is the line it holds in the whole source.
+constexpr const char* kDesignThroughTheCheck =
+    "module top;\n"
+    "  logic d;\n"
+    "  logic clk;\n"
+    "  specify\n"
+    "    $setuphold(posedge clk, d, 21, 6);\n"
+    "  endspecify\n"
+    "  initial begin\n"
+    "    d = 1'b0;\n"
+    "    clk = 1'b0;\n";
+
 // Elaborates, lowers and runs the one design these cases share, with `stimulus`
 // as the body of its initial block. False when the source did not elaborate
 // cleanly, which a case asserts on before reading anything off the fixture: a
 // design rejected before it ran says nothing about §31.3.3 whatever the case
 // was written to expect.
 bool RanWithStimulus(const std::string& stimulus, SimFixture& f) {
-  auto* rtl =
-      ElaborateSrc(std::string("module top;\n"
-                               "  logic d;\n"
-                               "  logic clk;\n"
-                               "  specify\n"
-                               "    $setuphold(posedge clk, d, 21, 6);\n"
-                               "  endspecify\n"
-                               "  initial begin\n"
-                               "    d = 1'b0;\n"
-                               "    clk = 1'b0;\n") +
-                       stimulus +
-                       "  end\n"
-                       "endmodule\n",
-                   f);
+  auto* rtl = ElaborateSrc(std::string(kDesignThroughTheCheck) + stimulus +
+                               "  end\n"
+                               "endmodule\n",
+                           f);
   if (rtl == nullptr || f.has_errors) return false;
   LowerAndRun(rtl, f);
   return true;
@@ -113,7 +127,8 @@ TEST(DrivenTimingCheckEvaluation, SetupholdSetupSideViolationInARunIsReported) {
                       "    #13 clk = 1'b1;\n",
                       f));
   EXPECT_TRUE(ReportedWarning(
-      f.diag.Diagnostics(), "$setuphold violation: data signal", 0, "31.3.3"));
+      f.diag.Diagnostics(), "$setuphold violation: data signal",
+      LineHolding(kDesignThroughTheCheck, "$setuphold(posedge clk"), "31.3.3"));
 }
 
 // §31.3.3, hold side: the window begins at the reference edge and closes
@@ -127,7 +142,8 @@ TEST(DrivenTimingCheckEvaluation, SetupholdHoldSideViolationInARunIsReported) {
                       "    #4 d = 1'b1;\n",
                       f));
   EXPECT_TRUE(ReportedWarning(
-      f.diag.Diagnostics(), "$setuphold violation: data signal", 0, "31.3.3"));
+      f.diag.Diagnostics(), "$setuphold violation: data signal",
+      LineHolding(kDesignThroughTheCheck, "$setuphold(posedge clk"), "31.3.3"));
 }
 
 // §31.3.3 again, and the same design: only the stimulus changes. `d` rises at

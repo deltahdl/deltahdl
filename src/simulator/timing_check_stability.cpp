@@ -283,14 +283,14 @@ void ReportSetuphold(StabilitySide side, const StabilityPair& pair,
         std::format("$setuphold violation: data signal {} transitioned inside "
                     "the setup window ending at reference signal {}",
                     pair.data_signal, pair.ref_signal),
-        "31.3.3", ctx);
+        "31.3.3", pair.armed.Entry().loc, ctx);
     return;
   }
   ReportTimingViolation(
       std::format("$setuphold violation: data signal {} transitioned inside "
                   "the hold window beginning at reference signal {}",
                   pair.data_signal, pair.ref_signal),
-      "31.3.3", ctx);
+      "31.3.3", pair.armed.Entry().loc, ctx);
 }
 
 // §31.3.6's two messages, named for the two checks §31.3.6 makes $recrem
@@ -304,14 +304,14 @@ void ReportRecrem(StabilitySide side, const StabilityPair& pair,
         std::format("$recrem violation: data signal {} transitioned inside the "
                     "removal window ending at reference signal {}",
                     pair.data_signal, pair.ref_signal),
-        "31.3.6", ctx);
+        "31.3.6", pair.armed.Entry().loc, ctx);
     return;
   }
   ReportTimingViolation(
       std::format("$recrem violation: data signal {} transitioned inside the "
                   "recovery window beginning at reference signal {}",
                   pair.data_signal, pair.ref_signal),
-      "31.3.6", ctx);
+      "31.3.6", pair.armed.Entry().loc, ctx);
 }
 
 // Reports the violation a check just detected, naming the signal that
@@ -333,14 +333,14 @@ void ReportViolation(TimingCheckKind kind, StabilitySide side,
         std::format("$removal violation: data signal {} transitioned inside "
                     "the window ending at reference signal {}",
                     pair.data_signal, pair.ref_signal),
-        "31.3.4", ctx);
+        "31.3.4", pair.armed.Entry().loc, ctx);
     return;
   }
   ReportTimingViolation(
       std::format("$recovery violation: data signal {} transitioned inside the "
                   "window beginning at reference signal {}",
                   pair.data_signal, pair.ref_signal),
-      "31.3.5", ctx);
+      "31.3.5", pair.armed.Entry().loc, ctx);
 }
 
 // One of the two signals a §31.3 check names has just made its transition, and

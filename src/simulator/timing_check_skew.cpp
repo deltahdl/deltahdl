@@ -155,13 +155,13 @@ void ReportSkewViolation(const SkewWindow& window, uint64_t limit,
         std::format("$fullskew violation: signals {} and {} moved more than "
                     "the {} time units the check allows apart",
                     window.ref_signal, window.data_signal, limit),
-        "31.4.3", ctx);
+        "31.4.3", check.loc, ctx);
   } else if (check.kind == TimingCheckKind::kSkew) {
     ReportTimingViolation(
         std::format("$skew violation: data signal {} followed reference signal "
                     "{} by more than the {} time units the check allows",
                     window.data_signal, window.ref_signal, limit),
-        "31.4.1", ctx);
+        "31.4.1", check.loc, ctx);
   } else {
     // $timeskew's message states what the timer detects rather than what
     // $skew's states. The timer fires at reference+limit, when the data signal
@@ -176,7 +176,7 @@ void ReportSkewViolation(const SkewWindow& window, uint64_t limit,
                     "reference signal {} within the {} time units the check "
                     "allows",
                     window.data_signal, window.ref_signal, limit),
-        "31.4.2", ctx);
+        "31.4.2", check.loc, ctx);
   }
   ToggleNotifier(check, ctx);
 }

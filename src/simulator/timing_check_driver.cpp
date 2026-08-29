@@ -138,11 +138,11 @@ struct StabilityWindow {
 // one the reference event, and they put them at opposite ends of the window,
 // which is why the two messages differ in more than the name of the check.
 //
-// The report stands at SourceLoc::None(): §31.2's violation is a state the run
-// reached rather than a construct that is illegal, and TimingCheckEntry records
-// no source position for the declaration it was built from. Both signals are
-// named under the instance prefix the check was registered with, so a reader
-// can tell two instances of one cell apart.
+// The report stands where the check was written, which TimingCheckEntry::loc
+// (simulator/specify_timing_check.h) carries from the declaration. A design
+// declaring several checks over one clock is otherwise given several reports it
+// cannot tell apart. Both signals are named under the instance prefix the check
+// was registered with, so a reader can tell two instances of one cell apart.
 void ReportViolation(TimingCheckKind kind, const StabilityWindow& window,
                      SimContext& ctx) {
   if (kind == TimingCheckKind::kSetup) {
@@ -151,7 +151,7 @@ void ReportViolation(TimingCheckKind kind, const StabilityWindow& window,
                     "window ending at reference signal {}",
                     window.events.timestamp_signal,
                     window.events.timecheck_signal),
-        "31.3.1", ctx);
+        "31.3.1", window.armed.Entry().loc, ctx);
     return;
   }
   ReportTimingViolation(
@@ -159,7 +159,7 @@ void ReportViolation(TimingCheckKind kind, const StabilityWindow& window,
                   "window beginning at reference signal {}",
                   window.events.timecheck_signal,
                   window.events.timestamp_signal),
-      "31.3.2", ctx);
+      "31.3.2", window.armed.Entry().loc, ctx);
 }
 
 // The timecheck event of a §31.3 check has arrived at `timecheck_ticks`.

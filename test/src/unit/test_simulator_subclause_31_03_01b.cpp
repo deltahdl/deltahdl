@@ -19,8 +19,17 @@
 // is legal and the run reaches a state the design said it should not, so
 // ReportViolation in src/simulator/timing_check_driver.cpp calls
 // DiagEngine::Warning; the cases below read it through ReportedWarning rather
-// than ReportedError. It stands at SourceLoc::None(), whose line is 0, because
-// TimingCheckEntry records no position for the declaration it was built from.
+// than ReportedError. The report stands on the line the check was written on.
+// TimingCheckEntry::loc (src/simulator/specify_timing_check.h) carries that
+// position: Parser::ParseTimingCheck (src/parser/parser_specify.cpp) records
+// the check's own first token into it, and BuildTimingCheckUnderOptions
+// (src/simulator/specify_timing_check.cpp) copies it across. Issue #3414 was
+// that the report stood at SourceLoc::None(), whose line is 0, because nothing
+// carried that position from the declaration to the run. Each case below names
+// the line through LineHolding (lib/cpp/test_helpers/helpers_reported_error.h),
+// which reads it off the design text, rather than writing a number down. A
+// number goes stale the moment the design gains or loses a line above the
+// check.
 //
 // The two $setup cases share one design and differ in their stimulus alone.
 // That is what shows a check being run rather than one answer being handed to
@@ -120,23 +129,24 @@ bool DrivenToCompletion(const std::string& design, SimFixture& f) {
 // each reached the report through as well.
 TEST(DesignTimingCheckEvaluation, SetupViolationInARunIsReported) {
   SimFixture f;
-  ASSERT_TRUE(
-      DrivenToCompletion("module top;\n"
-                         "  logic d;\n"
-                         "  logic clk;\n"
-                         "  specify\n"
-                         "    $setup(d, posedge clk, 23);\n"
-                         "  endspecify\n"
-                         "  initial begin\n"
-                         "    d = 1'b0;\n"
-                         "    clk = 1'b0;\n"
-                         "    #31 d = 1'b1;\n"
-                         "    #9 clk = 1'b1;\n"
-                         "  end\n"
-                         "endmodule\n",
-                         f));
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "$setup violation: data signal", 0, "31.3.1"));
+  const std::string kDesign =
+      "module top;\n"
+      "  logic d;\n"
+      "  logic clk;\n"
+      "  specify\n"
+      "    $setup(d, posedge clk, 23);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    d = 1'b0;\n"
+      "    clk = 1'b0;\n"
+      "    #31 d = 1'b1;\n"
+      "    #9 clk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
+  EXPECT_TRUE(
+      ReportedWarning(f.diag.Diagnostics(), "$setup violation: data signal",
+                      LineHolding(kDesign, "$setup(d, posedge clk"), "31.3.1"));
 }
 
 // §31.3.1 again, and the same design: only the stimulus changes. `d` rises at
@@ -205,23 +215,24 @@ TEST(DesignTimingCheckEvaluation, SetupViolationInARunTogglesTheNotifier) {
 // `d` rises at time 33, leaving 5 time units of hold against a limit of 17.
 TEST(DesignTimingCheckEvaluation, HoldViolationInARunIsReported) {
   SimFixture f;
-  ASSERT_TRUE(
-      DrivenToCompletion("module top;\n"
-                         "  logic d;\n"
-                         "  logic clk;\n"
-                         "  specify\n"
-                         "    $hold(posedge clk, d, 17);\n"
-                         "  endspecify\n"
-                         "  initial begin\n"
-                         "    d = 1'b0;\n"
-                         "    clk = 1'b0;\n"
-                         "    #28 clk = 1'b1;\n"
-                         "    #5 d = 1'b1;\n"
-                         "  end\n"
-                         "endmodule\n",
-                         f));
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "$hold violation: data signal", 0, "31.3.2"));
+  const std::string kDesign =
+      "module top;\n"
+      "  logic d;\n"
+      "  logic clk;\n"
+      "  specify\n"
+      "    $hold(posedge clk, d, 17);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    d = 1'b0;\n"
+      "    clk = 1'b0;\n"
+      "    #28 clk = 1'b1;\n"
+      "    #5 d = 1'b1;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
+  EXPECT_TRUE(
+      ReportedWarning(f.diag.Diagnostics(), "$hold violation: data signal",
+                      LineHolding(kDesign, "$hold(posedge clk, d"), "31.3.2"));
 }
 
 }  // namespace
