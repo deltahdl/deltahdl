@@ -331,17 +331,31 @@ TEST(DeclarationAssignmentParsing, DefparamMissingEqualsIsError) {
                             "23.10.1"));
 }
 
-TEST(DeclarationAssignmentParsing, PulseControlSpecparamMissingParensIsError) {
+// A.2.4 writes both alternatives of pulse_control_specparam with the limit list
+// in parentheses, and §30.7.1's Syntax 30-7 prints the same production. The
+// worked example under that same subclause ends `PATHPULSE$ = 3;` and its prose
+// reads the value back off it, so the standard's grammar and its own example
+// disagree. A source written from the example has to parse; issue #3384 settled
+// that, and this case is where the annex records it. §30.7.1 says what a lone
+// limit means -- "If only the reject limit value is specified, it shall apply
+// to both the reject limit and the error limit" -- which is why no error limit
+// is expected here.
+TEST(DeclarationAssignmentParsing, PulseControlSpecparamNeedsNoParens) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
       "    specparam PATHPULSE$ = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // §30.7.1 owns the PATHPULSE$ value form, which is parenthesized; A.2.4
-  // states the pulse_control_specparam production alone.
-  EXPECT_TRUE(
-      ReportedError(r.diags, "expected '(', got integer literal", 3, "30.7.1"));
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* block = r.cu->modules[0]->items[0];
+  ASSERT_EQ(block->kind, ModuleItemKind::kSpecifyBlock);
+  ASSERT_EQ(block->specify_items.size(), 1u);
+  auto* sp = block->specify_items[0];
+  EXPECT_TRUE(sp->is_pathpulse);
+  EXPECT_NE(sp->pathpulse_reject, nullptr);
+  EXPECT_EQ(sp->pathpulse_error, nullptr);
 }
 
 }  // namespace
