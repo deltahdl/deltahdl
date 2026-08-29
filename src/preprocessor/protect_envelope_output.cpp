@@ -116,12 +116,29 @@ void AppendClearDigestNames(const EncryptionEnvelope& envelope,
   // §34.5.16.2 has the entity whose key a region's digest is under unchanged in
   // the output file, except where a digital signature is used, in which case it
   // is encrypted with the digest_key_method and placed in a digest_key_block.
-  // The destination is a digest_key_block rather than the key_block the other
-  // two entities are sent to, and this implementation writes no
-  // digest_key_block, so the name is written here whether the envelope carries
-  // key blocks or not. It stands ahead of the designations read against it, the
-  // way each entity does, since a name read against the wrong list picks out a
-  // key of somebody else.
+  //
+  // The name is written here whether the envelope carries key blocks or not,
+  // because the standard defines no digest_key_block. §34.4 states that "this
+  // standard defines the pragma keyword names listed in Table 34-1 for use with
+  // the protect pragma", Table 34-1 lists key_block and no digest_key_block,
+  // and §34.5 runs from §34.5.1 to §34.5.32 without a subclause for one, so the
+  // construct has neither a syntax nor a description. §34.5.1.2 enumerates the
+  // blocks an envelope holds as "the data_block and key_block pragma
+  // expressions" and names no third. A tool writing a digest_key_block would be
+  // writing a directive whose keyword §34.4 does not admit, and no reader could
+  // be required to open it, so the sentence's exception has no destination and
+  // its main clause is the whole of what a conforming tool can act on.
+  //
+  // The neighbouring subclauses send their values into the key_block instead,
+  // which is why this one stands alone: §34.5.17.2 has the digest_key_method
+  // "encrypted with the key_method algorithm" and using "the key found in the
+  // key_block", and §34.5.18.2 has the digest_keyname "encoded in the
+  // key_block". §34.5.16.2 is the only one naming a digest_key_method cipher
+  // and a digest_key_block destination. Issue #3429 settled this reading.
+  //
+  // It stands ahead of the designations read against it, the way each entity
+  // does, since a name read against the wrong list picks out a key of somebody
+  // else.
   if (!envelope.names.digest_keyowner.empty()) {
     text->append(
         ProtectDigestKeyownerDirective(envelope.names.digest_keyowner));
