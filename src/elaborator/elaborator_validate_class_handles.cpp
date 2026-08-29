@@ -686,7 +686,7 @@ static void CheckClassHandleAssignTarget(const Stmt* s,
   CheckNonClassLiteralAssign(s, diag);
 }
 
-void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
+void ElaboratorClassRules::WalkStmtsForClassHandleOps(const Stmt* s) {
   if (!s) return;
 
   if (s->kind == StmtKind::kVarDecl &&
@@ -744,7 +744,7 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
       s, [this](Stmt* const& sub) { WalkStmtsForClassHandleOps(sub); });
 }
 
-void Elaborator::ValidateClassHandleOps(const ModuleDecl* decl) {
+void ElaboratorClassRules::ValidateClassHandleOps(const ModuleDecl* decl) {
   // Block-local class handles are not seeded into class_var_names_ (only
   // module-scope handles are); they are collected during the walk itself
   // (WalkStmtsForClassHandleOps records each kVarDecl in source order before
@@ -767,7 +767,8 @@ void Elaborator::ValidateClassHandleOps(const ModuleDecl* decl) {
   }
 }
 
-void Elaborator::ValidateClassHandleContAssign(const ModuleItem* item) {
+void ElaboratorClassRules::ValidateClassHandleContAssign(
+    const ModuleItem* item) {
   if (item->kind != ModuleItemKind::kContAssign) return;
   auto lhs_class =
       item->assign_lhs && IsClassVar(item->assign_lhs, class_var_names_);

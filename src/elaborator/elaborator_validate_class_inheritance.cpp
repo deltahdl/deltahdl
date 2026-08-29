@@ -430,7 +430,8 @@ static void CheckInterfaceMethods(const ClassDecl* cls,
   }
 }
 
-void Elaborator::ValidateImplementsInterfaceMethods(const ClassDecl* cls) {
+void ElaboratorClassRules::ValidateImplementsInterfaceMethods(
+    const ClassDecl* cls) {
   if (cls->is_virtual) return;
   std::vector<InterfaceRef> all_ifaces;
   CollectImplementedInterfaces(cls, unit_, all_ifaces);
@@ -483,7 +484,7 @@ static bool VirtualClassAddressesPrototype(const ClassDecl* cls,
 // re-declared is illegal. Only the interfaces named directly in this virtual
 // class's `implements` clause create the obligation here; a prototype inherited
 // through a base class is the implementing base's responsibility.
-void Elaborator::ValidateVirtualClassInterfaceObligations(
+void ElaboratorClassRules::ValidateVirtualClassInterfaceObligations(
     const ClassDecl* cls, const ScopeMap& params) {
   if (!cls->is_virtual || cls->is_interface || cls->implements_types.empty())
     return;
@@ -686,8 +687,8 @@ CollectImplementedTypedefOwners(const ClassDecl* cls, const ClassLookup& look) {
   return owning_iface;
 }
 
-void Elaborator::ValidateImplementsTypeAccess(const ClassDecl* cls,
-                                              const ScopeMap& params) {
+void ElaboratorClassRules::ValidateImplementsTypeAccess(
+    const ClassDecl* cls, const ScopeMap& params) {
   if (cls->is_interface || cls->implements_types.empty()) return;
 
   ClassLookup look{unit_, params};
@@ -705,7 +706,7 @@ void Elaborator::ValidateImplementsTypeAccess(const ClassDecl* cls,
 // §8.26.5: a type name an interface class declares is reachable unqualified
 // only where `implements` inherits it. Report a use of one of those names that
 // is not otherwise visible in the class or the compilation unit.
-void Elaborator::CheckImplementsTypeAccessOfType(
+void ElaboratorClassRules::CheckImplementsTypeAccessOfType(
     const DataType& dt, SourceLoc loc,
     const std::unordered_map<std::string_view, std::string_view>& owning_iface,
     const std::unordered_set<std::string_view>& visible) {
@@ -726,7 +727,7 @@ void Elaborator::CheckImplementsTypeAccessOfType(
 // type and argument types of a method. §8.26.3 governs each of them alike —
 // the name a method spells for its return or for one of its arguments is
 // resolved in the implementing class exactly as the name a data member spells.
-void Elaborator::CheckImplementsTypeAccessOfMember(
+void ElaboratorClassRules::CheckImplementsTypeAccessOfMember(
     const ClassMember* m,
     const std::unordered_map<std::string_view, std::string_view>& owning_iface,
     const std::unordered_set<std::string_view>& visible) {
@@ -861,7 +862,7 @@ static void ValidateSpecializationArgsInInheritance(const ClassDecl* cls,
                                         formals, diag);
 }
 
-void Elaborator::ValidateInterfaceClassRules() {
+void ElaboratorClassRules::ValidateInterfaceClassRules() {
   for (const auto& scope : DeclaredClassScopes(unit_)) {
     ScopeMap params = ScopeParamValues(scope, cu_param_scope_);
     ClassLookup look{unit_, params};

@@ -267,7 +267,7 @@ static std::unordered_set<std::string_view> CollectStaticMethodLocalNames(
   return locals;
 }
 
-void Elaborator::ValidateOneClassStaticMethods(const ClassDecl* cls) {
+void ElaboratorClassRules::ValidateOneClassStaticMethods(const ClassDecl* cls) {
   CheckStaticMethodsForThisSuper(cls, diag_);
 
   std::unordered_set<std::string_view> non_static =
@@ -292,7 +292,7 @@ void Elaborator::ValidateOneClassStaticMethods(const ClassDecl* cls) {
   }
 }
 
-void Elaborator::ValidateStaticMethodBodies(const ModuleDecl* decl) {
+void ElaboratorClassRules::ValidateStaticMethodBodies(const ModuleDecl* decl) {
   for (const auto* cls : unit_->classes) {
     ValidateOneClassStaticMethods(cls);
   }
@@ -303,7 +303,7 @@ void Elaborator::ValidateStaticMethodBodies(const ModuleDecl* decl) {
   }
 }
 
-void Elaborator::ValidateThisInItem(const ModuleItem* item) {
+void ElaboratorClassRules::ValidateThisInItem(const ModuleItem* item) {
   bool is_proc = IsProceduralItemKind(item->kind);
   if (is_proc && item->body && StmtRefsThisOrSuper(item->body)) {
     diag_.Error(item->loc,
@@ -325,7 +325,7 @@ void Elaborator::ValidateThisInItem(const ModuleItem* item) {
   }
 }
 
-void Elaborator::ValidateThisUsage(const ModuleDecl* decl) {
+void ElaboratorClassRules::ValidateThisUsage(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     ValidateThisInItem(item);
   }

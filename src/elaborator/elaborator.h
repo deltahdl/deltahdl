@@ -15,6 +15,7 @@
 #include "elaborator/elaborator_bind_scope.h"
 #include "elaborator/elaborator_data.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/elaborator_validate_operations.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
@@ -22,8 +23,6 @@
 #include "parser/ast.h"
 
 namespace delta {
-
-struct ClassScope;
 
 class Arena;
 class DiagEngine;
@@ -34,7 +33,14 @@ struct RtlirVariable;
 struct RtlirModuleInst;
 struct RtlirParamDecl;
 
-class Elaborator : public ElaboratorOperationRules {
+// The elaborator: it reads the compilation unit the parser produced and builds
+// the RtlirDesign the simulator runs. Two groups of rules that turn on nothing
+// elaboration resolves stand in the classes it derives from, one header each:
+// ElaboratorClassRules in src/elaborator/elaborator_validate_classes.h holds
+// the Clause 8 rules on a class declaration, and ElaboratorOperationRules in
+// src/elaborator/elaborator_validate_operations.h, which that one derives
+// from, holds the Clause 11 rules on an expression.
+class Elaborator : public ElaboratorClassRules {
  public:
   // §23.10.2: a module instance parameter value assignment "supplies values for
   // particular instances of a module to any parameters that have been specified
@@ -88,11 +94,6 @@ class Elaborator : public ElaboratorOperationRules {
   friend struct ItemElaborationStateSaver;  // per-module state save/restore
 
   void RunPreElaborationValidations();
-
-  // Clause 8 and Clause 18: the checks over the class declarations of the
-  // compilation unit, run as one step of RunPreElaborationValidations and in
-  // the position it calls them from.
-  void RunPreElaborationClassValidations();
 
   RtlirDesign* ElaborateTops(const std::vector<ModuleDecl*>& top_decls);
   // Elaborates each top-level module declaration into `design`; returns false
@@ -758,94 +759,10 @@ class Elaborator : public ElaboratorOperationRules {
   void WalkExprForEnumCalls(const Expr* e);
   void CheckEnumCallArguments(const Expr* call);
 
-  void ValidateClassHandleOps(const ModuleDecl* decl);
-
-  void WalkStmtsForClassHandleOps(const Stmt* s);
-
-  void ValidateClassHandleContAssign(const ModuleItem* item);
-
-  void ValidateStaticMethodBodies(const ModuleDecl* decl);
-  void ValidateOneClassStaticMethods(const ClassDecl* cls);
-
-  void ValidateThisUsage(const ModuleDecl* decl);
-  void ValidateThisInItem(const ModuleItem* item);
-
-  void ValidateFinalClassExtension();
-
-  void ValidateWeakReferenceMembers();
-
   void ValidateClassMethodBodies(const ModuleDecl* decl);
-
-  void ApplyClassMethodAutomaticDefault();
 
   void DefaultPackageTaskFuncLifetimes();
   void ValidatePackageValueParams();
-
-  void ValidateChainingConstructors();
-  void ValidateOneClassChainingCtor(const ClassDecl* cls);
-  void ValidateOneClassDefaultKeyword(const ClassDecl* cls);
-
-  void ValidateEmbeddedCovergroupAssign();
-  void ValidateDerivedCovergroupBase();
-
-  void ValidateLocalProtectedAccess(const ModuleDecl* decl);
-
-  void ValidateConstClassProperties();
-
-  void ValidateVirtualMethodOverrides();
-  void ValidateOneMethodOverride(const ClassDecl* cls, const ClassMember* m);
-
-  void ValidateAbstractClassRules();
-  void ValidateAbstractClassUnimplemented(const ClassDecl* cls);
-  void ValidateSuperRules();
-
-  void ValidateOutOfBlockDeclarations();
-
-  void ValidateParameterizedScopeResolution(const ModuleDecl* decl);
-
-  // §8.23: an incomplete forward type, a type defined by an interface-based
-  // typedef (§6.18) and a type parameter (§6.20.3) may prefix the class scope
-  // resolution operator only in a typedef declaration, the type operator, or a
-  // type parameter assignment, never in an ordinary expression.
-  void ValidateRestrictedScopePrefixUsage(const ModuleDecl* decl);
-
-  // §6.20.3: the same restriction over the body of a class declared at the
-  // outermost level, whose enclosing scope is the compilation unit. This is the
-  // position the subclause writes its own example in, `C::T x;` in the body of
-  // `class P#(type C)`.
-  void ValidateRestrictedScopePrefixInClasses();
-
-  // §6.20.3: a type parameter used as a class scope resolution prefix shall
-  // resolve to a class.
-  void ValidateTypeParamScopePrefixResolvesToClass(const ModuleDecl* decl);
-
-  void ValidateInterfaceClassRules();
-
-  void ValidateForwardClassTypedefs();
-
-  void ValidateForwardTypedefsInScope(const ModuleDecl* decl);
-
-  void ValidateForwardTypedefScopePrefix(const ModuleDecl* decl);
-  void ValidateInterfaceClassMembers(const ClassDecl* cls);
-  void ValidateInterfaceClassInheritance(const ClassDecl* cls,
-                                         const ClassScope& scope);
-  void ValidateRegularClassInheritance(const ClassDecl* cls,
-                                       const ClassScope& scope);
-  void ValidateImplementsInterfaceMethods(const ClassDecl* cls);
-  void ValidateVirtualClassInterfaceObligations(const ClassDecl* cls,
-                                                const ScopeMap& params);
-  void ValidateImplementsTypeAccess(const ClassDecl* cls,
-                                    const ScopeMap& params);
-  void CheckImplementsTypeAccessOfMember(
-      const ClassMember* m,
-      const std::unordered_map<std::string_view, std::string_view>&
-          owning_iface,
-      const std::unordered_set<std::string_view>& visible);
-  void CheckImplementsTypeAccessOfType(
-      const DataType& dt, SourceLoc loc,
-      const std::unordered_map<std::string_view, std::string_view>&
-          owning_iface,
-      const std::unordered_set<std::string_view>& visible);
 
   void ValidateSequenceEventArgs(const ModuleDecl* decl);
 

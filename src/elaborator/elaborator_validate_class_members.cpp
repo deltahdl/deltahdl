@@ -21,7 +21,7 @@
 
 namespace delta {
 
-void Elaborator::ValidateFinalClassExtension() {
+void ElaboratorClassRules::ValidateFinalClassExtension() {
   auto check = [&](const ClassDecl* cls) {
     if (cls->base_class.empty()) return;
 
@@ -46,7 +46,7 @@ void Elaborator::ValidateFinalClassExtension() {
 // subroutine argument — its type argument shall name a class type. Any other
 // type argument is a compile error, mirroring the variable-declaration and
 // subroutine-argument checks elsewhere in the elaborator.
-void Elaborator::ValidateWeakReferenceMembers() {
+void ElaboratorClassRules::ValidateWeakReferenceMembers() {
   auto check_member = [&](const ClassMember* m) {
     if (m->kind != ClassMemberKind::kProperty) return;
     if (m->data_type.kind != DataTypeKind::kNamed) return;
@@ -192,7 +192,7 @@ static void ReportGuardedSuperNew(const ModuleItem* method, DiagEngine& diag) {
   }
 }
 
-void Elaborator::ValidateOneClassChainingCtor(const ClassDecl* cls) {
+void ElaboratorClassRules::ValidateOneClassChainingCtor(const ClassDecl* cls) {
   if (cls->base_class.empty()) return;
   const ClassMember* ctor = FindClassConstructor(cls);
   if (!ctor || !ctor->method) return;
@@ -289,7 +289,7 @@ static void CheckClassMethodsForCovergroupAssign(
   }
 }
 
-void Elaborator::ValidateEmbeddedCovergroupAssign() {
+void ElaboratorClassRules::ValidateEmbeddedCovergroupAssign() {
   for (const auto* cls : unit_->classes) {
     std::unordered_set<std::string_view> cg_names = CollectCovergroupNames(cls);
     if (cg_names.empty()) continue;
@@ -321,7 +321,7 @@ static bool BaseClassDefinesCovergroup(const ClassDecl* cls,
   return false;
 }
 
-void Elaborator::ValidateDerivedCovergroupBase() {
+void ElaboratorClassRules::ValidateDerivedCovergroupBase() {
   for (const auto* cls : unit_->classes) {
     for (const auto* m : cls->members) {
       if (m->kind != ClassMemberKind::kCovergroup) continue;
@@ -368,7 +368,7 @@ static void ApplyAutoToClassMethods(const ClassDecl* cls) {
   }
 }
 
-void Elaborator::ApplyClassMethodAutomaticDefault() {
+void ElaboratorClassRules::ApplyClassMethodAutomaticDefault() {
   for (auto* cls : unit_->classes) ApplyAutoToClassMethods(cls);
   for (auto* mod : unit_->modules) {
     for (auto* item : mod->items) {
@@ -578,7 +578,7 @@ static void CheckSuperParamInConstantExpr(const ClassDecl* cls,
 // 'super' rather than either rule because whether a class extends another
 // decides which of the two it can breach, so neither name would cover the
 // classes this walks.
-void Elaborator::ValidateSuperRules() {
+void ElaboratorClassRules::ValidateSuperRules() {
   for (const auto* cls : unit_->classes) {
     // §8.15 states two rules about 'super' and whether the class extends
     // another decides which one it can breach: a class with no base class may
@@ -703,7 +703,8 @@ static void CheckDefaultCtorArgRefsBaseLocal(const ClassDecl* base,
 
 // §8.17: enforces the rules governing the 'default' keyword in a subclass
 // constructor argument list and in an explicit super.new() call.
-void Elaborator::ValidateOneClassDefaultKeyword(const ClassDecl* cls) {
+void ElaboratorClassRules::ValidateOneClassDefaultKeyword(
+    const ClassDecl* cls) {
   const ModuleItem* ctor = FindClassCtorMethod(cls);
 
   bool ctor_has_default = CtorArgListUsesDefault(ctor);
@@ -743,7 +744,7 @@ void Elaborator::ValidateOneClassDefaultKeyword(const ClassDecl* cls) {
   CheckDefaultCtorArgRefsBaseLocal(base, ctor, base_ctor, diag_);
 }
 
-void Elaborator::ValidateChainingConstructors() {
+void ElaboratorClassRules::ValidateChainingConstructors() {
   for (const auto* cls : unit_->classes) {
     ValidateOneClassChainingCtor(cls);
     ValidateOneClassDefaultKeyword(cls);

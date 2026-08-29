@@ -108,8 +108,8 @@ static void ValidateOverrideSignature(const ModuleItem* base_method,
   }
 }
 
-void Elaborator::ValidateOneMethodOverride(const ClassDecl* cls,
-                                           const ClassMember* m) {
+void ElaboratorClassRules::ValidateOneMethodOverride(const ClassDecl* cls,
+                                                     const ClassMember* m) {
   auto* method = m->method;
   // §8.20's rule that `:initial` and `:extends` are mutually exclusive is
   // reported by Parser::ParseDynamicOverrideSpecifiers, which consumes the
@@ -141,7 +141,7 @@ void Elaborator::ValidateOneMethodOverride(const ClassDecl* cls,
   }
 }
 
-void Elaborator::ValidateVirtualMethodOverrides() {
+void ElaboratorClassRules::ValidateVirtualMethodOverrides() {
   for (const auto* cls : unit_->classes) {
     for (const auto* m : cls->members) {
       if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
@@ -168,7 +168,8 @@ static void CollectPureVirtualMethods(
   }
 }
 
-void Elaborator::ValidateAbstractClassUnimplemented(const ClassDecl* cls) {
+void ElaboratorClassRules::ValidateAbstractClassUnimplemented(
+    const ClassDecl* cls) {
   // §8.26: an interface class inherits pure virtual methods from the interfaces
   // it extends; it does not implement them. Only a non-virtual, non-interface
   // class is required to provide implementations.
@@ -199,7 +200,7 @@ static void CheckPureFinalMember(const ClassMember* m, DiagEngine& diag) {
   }
 }
 
-void Elaborator::ValidateAbstractClassRules() {
+void ElaboratorClassRules::ValidateAbstractClassRules() {
   for (const auto* cls : unit_->classes) {
     for (const auto* m : cls->members) {
       CheckPureFinalMember(m, diag_);
@@ -275,7 +276,7 @@ static void CheckInterfaceClassMethodArgDefaults(const ClassMember* m,
   }
 }
 
-void Elaborator::ValidateInterfaceClassMembers(const ClassDecl* cls) {
+void ElaboratorClassRules::ValidateInterfaceClassMembers(const ClassDecl* cls) {
   // §8.26.8: a method-argument default is evaluated in the scope that contains
   // the subroutine declaration -- the interface class body. A value parameter
   // or local parameter of the class is a constant visible there by its bare
@@ -385,8 +386,8 @@ bool ValidateInheritedInterfaceName(const ClassDecl* cls, std::string_view name,
 
 }  // namespace
 
-void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls,
-                                                   const ClassScope& scope) {
+void ElaboratorClassRules::ValidateInterfaceClassInheritance(
+    const ClassDecl* cls, const ClassScope& scope) {
   if (!cls->implements_types.empty()) {
     diag_.Error(cls->range.start,
                 std::format("interface class '{}' shall not use "
@@ -424,8 +425,8 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls,
   }
 }
 
-void Elaborator::ValidateRegularClassInheritance(const ClassDecl* cls,
-                                                 const ClassScope& scope) {
+void ElaboratorClassRules::ValidateRegularClassInheritance(
+    const ClassDecl* cls, const ClassScope& scope) {
   if (!cls->base_class.empty()) {
     const auto* base = FindClassDecl(cls->base_class, unit_);
     if (base && base->is_interface) {

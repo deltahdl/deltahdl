@@ -132,7 +132,8 @@ ScopePrefixedType ScopePrefixedTypeOfItem(const ModuleItem* item) {
 
 }  // namespace
 
-void Elaborator::ValidateForwardTypedefsInScope(const ModuleDecl* decl) {
+void ElaboratorClassRules::ValidateForwardTypedefsInScope(
+    const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kTypedef) continue;
     if (item->typedef_type.kind != DataTypeKind::kImplicit) continue;
@@ -150,7 +151,8 @@ void Elaborator::ValidateForwardTypedefsInScope(const ModuleDecl* decl) {
   }
 }
 
-void Elaborator::ValidateForwardTypedefScopePrefix(const ModuleDecl* decl) {
+void ElaboratorClassRules::ValidateForwardTypedefScopePrefix(
+    const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     auto declared = ScopePrefixedTypeOfItem(item);
     if (declared.type == nullptr) continue;

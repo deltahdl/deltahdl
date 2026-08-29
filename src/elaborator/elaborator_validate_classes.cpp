@@ -198,7 +198,8 @@ static void CollectBlockClassVarDecls(
   });
 }
 
-void Elaborator::ValidateLocalProtectedAccess(const ModuleDecl* decl) {
+void ElaboratorClassRules::ValidateLocalProtectedAccess(
+    const ModuleDecl* decl) {
   if (class_names_.empty()) return;
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
@@ -307,7 +308,7 @@ static void CheckConstClassPropsInMethod(
   if (is_ctor) CheckInstanceConstSingleAssign(method, instance_consts, diag);
 }
 
-void Elaborator::ValidateConstClassProperties() {
+void ElaboratorClassRules::ValidateConstClassProperties() {
   for (const auto* cls : unit_->classes) {
     std::unordered_set<std::string_view> global_consts;
     std::unordered_set<std::string_view> instance_consts;
@@ -364,7 +365,8 @@ static void WalkStmtsForParamScope(
   });
 }
 
-void Elaborator::ValidateParameterizedScopeResolution(const ModuleDecl* decl) {
+void ElaboratorClassRules::ValidateParameterizedScopeResolution(
+    const ModuleDecl* decl) {
   if (parameterized_class_names_.empty()) return;
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
@@ -577,7 +579,8 @@ static void CheckItemForRestrictedScopePrefix(const ModuleItem* item,
   }
 }
 
-void Elaborator::ValidateRestrictedScopePrefixUsage(const ModuleDecl* decl) {
+void ElaboratorClassRules::ValidateRestrictedScopePrefixUsage(
+    const ModuleDecl* decl) {
   RestrictedScopePrefixes restricted =
       CollectModuleRestrictedPrefixes(decl, unit_, class_names_);
   if (restricted.Empty()) return;
@@ -586,7 +589,7 @@ void Elaborator::ValidateRestrictedScopePrefixUsage(const ModuleDecl* decl) {
   }
 }
 
-void Elaborator::ValidateRestrictedScopePrefixInClasses() {
+void ElaboratorClassRules::ValidateRestrictedScopePrefixInClasses() {
   for (const auto* cls : unit_->classes) {
     RestrictedScopePrefixes restricted;
     restricted.type_params = cls->type_param_names;
@@ -661,7 +664,7 @@ static void CheckItemScopePrefixResolvesToClass(
   }
 }
 
-void Elaborator::ValidateTypeParamScopePrefixResolvesToClass(
+void ElaboratorClassRules::ValidateTypeParamScopePrefixResolvesToClass(
     const ModuleDecl* decl) {
   // §6.20.3: a type parameter may prefix the class scope resolution operator in
   // an allowed context (such as a typedef declaration) only when it resolves to
@@ -693,7 +696,7 @@ static bool ForwardClassTypedefIsResolved(const ModuleItem* item,
   return false;
 }
 
-void Elaborator::ValidateForwardClassTypedefs() {
+void ElaboratorClassRules::ValidateForwardClassTypedefs() {
   for (const auto* item : unit_->cu_items) {
     if (item->kind != ModuleItemKind::kTypedef) continue;
     if (item->typedef_type.kind != DataTypeKind::kImplicit) continue;

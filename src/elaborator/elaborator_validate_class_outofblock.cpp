@@ -255,7 +255,7 @@ static void ValidateClassOutOfBlockBody(const ClassDecl* cls, ModuleItem* item,
       proto, item, {item->method_class, "::", Subclause("8.24")}, diag);
 }
 
-void Elaborator::ValidateOutOfBlockDeclarations() {
+void ElaboratorClassRules::ValidateOutOfBlockDeclarations() {
   std::unordered_set<std::string> linked;
   for (auto* item : unit_->cu_items) {
     if (item->method_class.empty()) continue;
