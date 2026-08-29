@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -102,9 +103,9 @@ bool TakeNumber(std::string_view arg, std::string_view name, ArgCursor cur,
     return true;
   }
   T value = 0;
-  const char* end = text.data() + text.size();
-  auto [stop, ec] = std::from_chars(text.data(), end, value);
-  if (ec != std::errc() || stop != end) {
+  auto [stop, ec] =
+      std::from_chars(text.data(), text.data() + text.size(), value);
+  if (ec != std::errc() || stop != text.data() + text.size()) {
     std::cerr << name << " expects a number: " << text << "\n";
     cur.opts.rejected_argument = true;
     return true;
@@ -339,17 +340,26 @@ bool TryParsePlusArg(std::string_view arg, CliOptions& opts) {
   return false;
 }
 
+// Reads the options file `-f` names at `i`, and answers whether the parse may
+// go on. A `-f` written last has no file to read, which is reported the way
+// every other missing value is and leaves the parse to run to its end; a file
+// that could not be read, or that nests too deep, stops it.
+bool TakeOptionsFile(int& i, int argc, char* argv[], CliOptions& opts,
+                     int depth) {
+  if (i + 1 >= argc) {
+    ReportMissingValue("-f", opts);
+    return true;
+  }
+  return ReadOptionsFile(argv[++i], opts, depth);
+}
+
 bool ParseArgsAtDepth(int argc, char* argv[], CliOptions& opts, int depth) {
   for (int i = 1; i < argc; ++i) {
     std::string_view arg = argv[i];
     if (TryParseSingleArg(arg, i, argc, argv, opts)) continue;
     if (TryParsePlusArg(arg, opts)) continue;
     if (arg == "-f") {
-      if (i + 1 >= argc) {
-        ReportMissingValue("-f", opts);
-        continue;
-      }
-      if (!ReadOptionsFile(argv[++i], opts, depth)) return false;
+      if (!TakeOptionsFile(i, argc, argv, opts, depth)) return false;
       continue;
     }
     if (arg.starts_with("-") || arg.starts_with("+")) {
