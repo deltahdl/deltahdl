@@ -539,6 +539,19 @@ struct RtlirModule {
   // leaves empty, and RangeHasName in
   // src/elaborator/elaborator_scope_rules_hier.cpp searches let_decls by name.
   std::vector<ModuleItem*> specify_blocks;
+  // §28.4's gate instantiations, declared in this module, kept after
+  // ElaborateGateInst (src/elaborator/elaborator_gates.cpp) has rewritten each
+  // one into an RtlirContAssign on `assigns`. §32.4.1 has an SDF DEVICE entry
+  // annotate the delay of the primitive instance itself, and
+  // BuildPrimitiveDriversFromGate (src/simulator/specify_path_delay.h) reads
+  // that delay off ModuleItem::gate_delay, gate_delay_fall and
+  // gate_delay_decay. The continuous assignment the rewrite produces cannot
+  // answer for it: ApplyGateDelays copies the three expressions onto
+  // RtlirContAssign but drops which gate primitive and which output terminal
+  // they belonged to, and one gate instantiation with several outputs becomes
+  // several assignments. RegisterModuleGates (src/simulator/specify.h) walks
+  // this list once per module instance to register those drivers.
+  std::vector<ModuleItem*> gate_insts;
   std::vector<ModuleItem*> sequence_decls;
   std::vector<ClassDecl*> class_decls;
   std::vector<RtlirImport> imports;

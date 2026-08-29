@@ -666,6 +666,15 @@ bool ExpandInstanceArray(
 }
 
 void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
+  // The declaration is kept alongside the continuous assignments it is about to
+  // become, because §32.4.1 has an SDF DEVICE entry annotate the delay of the
+  // primitive instance itself and only the declaration still says which
+  // primitive that is. RtlirModule::gate_insts (src/elaborator/rtlir.h) states
+  // the rest. It is recorded here rather than in ElaborateOneGate so that an
+  // instance array is recorded once, as the one instantiation §28.3.6 declares
+  // it to be, rather than once per expanded element.
+  mod->gate_insts.push_back(item);
+
   // §28.3.6: an instance array whose terminals carry more than one bit is
   // expanded into one scalar primitive per array element. Rebuilding each
   // element from bit-selects reproduces the per-element connection for every

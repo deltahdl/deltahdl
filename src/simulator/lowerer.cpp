@@ -298,8 +298,16 @@ void RegisterInstanceKeyBinding(const std::string& inst_prefix,
   ctx.RegisterInstanceBinding(key, library, name);
 }
 
+// A scope is recorded for the §30.3 specify blocks the module declares and for
+// the §28.4 gate instantiations it declares, because Lower registers both from
+// it. Both lists matter and either one on its own is enough: §32.4.1 has a
+// DEVICE entry fall back to the primitives driving an output when the module
+// declares no specify path for it, so a module with gates and no specify block
+// still has timing data an SDF file can annotate. A module declaring neither is
+// not recorded, having nothing for RegisterSpecifyBlocks or RegisterModuleGates
+// to walk.
 void Lowerer::RecordSpecifyScope(const RtlirModule* mod) {
-  if (mod->specify_blocks.empty()) return;
+  if (mod->specify_blocks.empty() && mod->gate_insts.empty()) return;
   specify_scopes_.push_back(SpecifyScope{inst_prefix_, mod});
 }
 
@@ -602,6 +610,16 @@ void Lowerer::Lower(const RtlirDesign* design) {
     ctx_.SetLoweringInstancePrefix(scope.inst_prefix);
     RegisterSpecifyBlocks(scope.module->specify_blocks, scope.inst_prefix, ctx_,
                           arena_, mgr);
+    // §32.4.1: the primitives driving a module output are what a DEVICE entry
+    // annotates when the module declares no specify path for that output, so
+    // the gate instantiations are registered beside the specify blocks. They
+    // are registered here rather than where LowerModule rewrote them into
+    // continuous assignments for the reason the specify blocks are: a gate's
+    // propagation delay may be written as a specparam, and it is evaluated
+    // under the same lowering instance prefix so that
+    // SimContext::FindVariable reaches the specparam of this instance.
+    RegisterModuleGates(scope.module->gate_insts, scope.inst_prefix, ctx_,
+                        arena_, mgr);
   }
   ctx_.SetLoweringInstancePrefix("");
   // §30.5.3 selects among the module paths "whose input has transitioned most

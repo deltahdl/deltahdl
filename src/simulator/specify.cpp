@@ -754,9 +754,13 @@ void SpecifyManager::AddPrimitiveDriver(PrimitiveDriver driver) {
 }
 
 void SpecifyManager::AddPrimitiveDriversFromGate(const ModuleItem& gate,
-                                                 SimContext& ctx,
-                                                 Arena& arena) {
+                                                 SimContext& ctx, Arena& arena,
+                                                 std::string_view inst_prefix) {
   for (auto& driver : BuildPrimitiveDriversFromGate(gate, ctx, arena)) {
+    // §28.4 names a gate's terminals by the declaring module's own port names,
+    // so the instance is what tells two instances of one cell apart when
+    // AnnotateSdfDeviceDelay looks for the primitives driving an output.
+    driver.inst_prefix = inst_prefix;
     AddPrimitiveDriver(std::move(driver));
   }
   for (const auto* seen : gate_decls_) {
@@ -841,9 +845,9 @@ bool SpecifyManager::AnnotateSdfDeviceDelay(const SdfDeviceAnnotation& a,
   // the twelve-slot expansion the paths above take.
   for (auto& driver : primitive_drivers_) {
     // PrimitiveDriver::inst_prefix is compared for the reason
-    // PathDelay::inst_prefix is compared above, though nothing under src/ fills
-    // it yet: issue #3395 covers a design's gates never reaching the manager,
-    // and until they do every driver here was registered by a test.
+    // PathDelay::inst_prefix is compared above. RegisterModuleGates
+    // (simulator/specify_register.cpp) fills it, once per module instance, from
+    // the gate instantiations RtlirModule::gate_insts kept.
     if (driver.inst_prefix != inst_prefix) continue;
     if (!kReachesAllOutputs && driver.output_port != a.port_instance) continue;
     ApplySdfDeviceThreeStateValues(driver, a);

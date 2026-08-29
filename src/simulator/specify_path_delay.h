@@ -109,7 +109,9 @@ struct PrimitiveDriver {
   // form PathDelay::inst_prefix carries. §29.8 puts a primitive instance inside
   // a module the way §30.3 puts a specify block there, so two instances of one
   // cell declare gates with the same output port names and this is what tells
-  // them apart.
+  // them apart. SpecifyManager::AddPrimitiveDriversFromGate (simulator/
+  // specify.h) stamps it; BuildPrimitiveDriversFromGate below leaves it empty,
+  // a gate declaration naming no instance of its own.
   std::string inst_prefix;
   uint8_t delay_count = 1;
   uint64_t delays[12] = {};

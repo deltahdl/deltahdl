@@ -112,8 +112,18 @@ class SpecifyManager {
   // instantiation contributes, keeping the gate declaration so its propagation
   // delay expression can be recomputed if an SDF LABEL changes a specparam that
   // expression reads.
+  //
+  // `inst_prefix` is the hierarchical prefix of the module instance the gate
+  // was instantiated in, ending in a `.`, and is empty for a module elaborated
+  // as a top. §28.4 has a gate instantiation name its terminals by the
+  // declaring module's own port names, so two instances of one cell drive
+  // outputs spelled identically; the prefix is recorded on each driver as
+  // PrimitiveDriver::inst_prefix, which is what tells the two instances apart.
+  // It defaults to the empty prefix so a caller registering the gates of one
+  // module can name the gate alone.
   void AddPrimitiveDriversFromGate(const ModuleItem& gate, SimContext& ctx,
-                                   Arena& arena);
+                                   Arena& arena,
+                                   std::string_view inst_prefix = {});
 
   const std::vector<PrimitiveDriver>& GetPrimitiveDrivers() const {
     return primitive_drivers_;
@@ -446,9 +456,12 @@ class SpecifyManager {
                                      const std::vector<std::string>& changed);
   // §32.4.3: the same recomputation for the constraint limits of a timing check
   // and for the propagation delays of a gate primitive. Neither is held to an
-  // instance, because neither has one to be held to: TimingCheckEntry
-  // (simulator/specify_timing_check.h) carries no instance field, and
-  // PrimitiveDriver::inst_prefix is filled by nothing under src/ (issue #3395).
+  // instance. TimingCheckEntry (simulator/specify_timing_check.h) carries no
+  // instance field, so it has none to be held to. A gate primitive does now --
+  // RegisterModuleGates (simulator/specify_register.cpp) stamps
+  // PrimitiveDriver::inst_prefix -- but gate_decls_ below records the
+  // ModuleItem alone, so a rebuild has no prefix to restamp and
+  // ReplacePrimitiveDriver matches on the output port alone.
   void RebuildTimingChecksForSpecparam(const std::vector<std::string>& changed);
   void RebuildGateDriversForSpecparam(const std::vector<std::string>& changed);
   void ReplacePrimitiveDriver(PrimitiveDriver rebuilt);
@@ -568,5 +581,23 @@ class SpecifyManager {
 void RegisterSpecifyBlocks(const std::vector<ModuleItem*>& blocks,
                            std::string_view inst_prefix, SimContext& ctx,
                            Arena& arena, SpecifyManager& mgr);
+
+// §32.4.1: register the module-output drivers of `gates`, the §28.4 gate
+// instantiations of one module instance, so that a DEVICE entry finding no
+// specify path for an output can still land on the primitive driving it.
+// `gates` is RtlirModule::gate_insts (src/elaborator/rtlir.h).
+//
+// This is a sibling of RegisterSpecifyBlocks rather than a sixth parameter of
+// it: five is what readability-function-size.ParameterThreshold in
+// etc/clang_tidy/src.yml allows.
+//
+// Call it under the same conditions RegisterSpecifyBlocks is called under. A
+// gate's propagation delay may be written as a specparam, so it is evaluated in
+// `ctx` the way a module path delay is and the module's specparams must already
+// be lowered as variables there. `inst_prefix` is the instance the gates were
+// instantiated in, recorded on each driver as PrimitiveDriver::inst_prefix.
+void RegisterModuleGates(const std::vector<ModuleItem*>& gates,
+                         std::string_view inst_prefix, SimContext& ctx,
+                         Arena& arena, SpecifyManager& mgr);
 
 }  // namespace delta

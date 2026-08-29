@@ -146,4 +146,13 @@ void RegisterSpecifyBlocks(const std::vector<ModuleItem*>& blocks,
   RegisterPathPulseSpecparams(blocks, inst_prefix, ctx, arena, mgr);
 }
 
+void RegisterModuleGates(const std::vector<ModuleItem*>& gates,
+                         std::string_view inst_prefix, SimContext& ctx,
+                         Arena& arena, SpecifyManager& mgr) {
+  for (const auto* gate : gates) {
+    if (gate == nullptr) continue;
+    mgr.AddPrimitiveDriversFromGate(*gate, ctx, arena, inst_prefix);
+  }
+}
+
 }  // namespace delta
