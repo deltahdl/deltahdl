@@ -38,6 +38,16 @@
 // so the name is shown relocated rather than dropped. Issue #3268 is the
 // defect: the name stood in the clear whether the envelope carried key blocks
 // or not.
+//
+// A fourth claim follows from the spelling §34.5.12.1 gives the expression,
+// `data_keyname = <string>`. §22.5.1 makes a parenthesized pragma_value a list
+// of further expressions rather than one written thing, so a list written
+// against the keyword names no key. The last three cases read what the tool
+// wrote rather than what a Preprocessor holds: a list leaves the envelope with
+// no data_keyname directive at all, a string in the same place puts one there,
+// and a list written after a string leaves the earlier name standing. Issue
+// #3273 is the defect: the list was taken as the name and written into the
+// envelope quoted, which is no pragma_expression §22.11 admits.
 
 #include <gtest/gtest.h>
 
@@ -289,6 +299,76 @@ TEST(ProtectDataKeynameEncryptionOutput, TheNameInTheBlockStillOpensTheRegion) {
   ReadSource run(envelope, ReadSource::KeysConfig(OnlyTheBlockProvidersKey()));
   EXPECT_FALSE(run.diag.HasErrors()) << run.text;
   EXPECT_TRUE(Holds(run.text, kSealedDesign)) << run.text;
+}
+
+// ---------------------------------------------------------------------------
+// A parenthesized list against the keyword names no key.
+// ---------------------------------------------------------------------------
+
+// The key the three regions below are sealed under, supplied as the single key
+// a user holds rather than through a list of them. §34.5.12.2 writes the name
+// out whichever key the region went under, so supplying the key this way leaves
+// what the name does the only thing these cases turn on.
+constexpr std::string_view kSealingKey = "vault-region-exchange-key";
+
+// The parenthesized pragma_value §22.5.1 defines: expressions between
+// parentheses rather than one written thing. What stands inside is a keyword of
+// somebody's own with a value against it, which is what such a list carries.
+constexpr std::string_view kKeynameList =
+    "(sealed_by=\"thales-hsm\", rotates=2031)";
+
+// A name written the way §34.5.12.1 defines the expression, for the case that
+// holds the region fixed and varies only the spelling of the value.
+constexpr std::string_view kVaultedKeyName = "vault-2031";
+
+// The characters an envelope writes ahead of this keyword's value. A case
+// asking whether the envelope names a key at all searches for these, a list
+// taken as the value having been written back quoted like any other value.
+constexpr std::string_view kKeynameDirectiveHead = "data_keyname=\"";
+
+// One protect pragma directive writing `value` against the keyword exactly as
+// given, with no quotation marks of its own, so a parenthesized list reaches
+// the reading as the list §22.5.1 defines rather than as a string that happens
+// to hold parentheses.
+std::string WritesTheDataKeyname(std::string_view value) {
+  std::string text = "`pragma protect data_keyname=";
+  text.append(value).append("\n");
+  return text;
+}
+
+// §34.5.12.1 spells the expression `data_keyname = <string>`, and §22.5.1 makes
+// a parenthesized pragma_value a list of further expressions rather than one
+// written thing, so a list names no key. §34.5.12.2 writes the name into the
+// envelope in the clear, so a tool taking the list publishes it there as though
+// it were the name of a key. Issue #3273 is that defect.
+TEST(ProtectDataKeynameEncryptionOutput, AListWritesNoNameIntoTheEnvelope) {
+  std::string envelope =
+      EncryptEnvelopes(Region(WritesTheDataKeyname(kKeynameList)), kSealingKey);
+  EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
+  EXPECT_EQ(TimesWritten(envelope, kKeynameDirectiveHead), 0U) << envelope;
+}
+
+// The same region with the string §34.5.12.1 defines standing where the list
+// stood. The name reaches the envelope, so the case above is about the list
+// rather than about a tool that writes no name at all.
+TEST(ProtectDataKeynameEncryptionOutput, AStringWritesItsNameIntoTheEnvelope) {
+  std::string envelope =
+      EncryptEnvelopes(Region(NamesTheDataKey(kVaultedKeyName)), kSealingKey);
+  EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
+  EXPECT_TRUE(Holds(envelope, NamesTheDataKey(kVaultedKeyName))) << envelope;
+}
+
+// A list written after a string had already named the key. Naming no key is not
+// naming an empty one, so the envelope carries the name the earlier string
+// gave: an expression naming nothing has no standing to take a name away.
+TEST(ProtectDataKeynameEncryptionOutput,
+     AListLeavesTheNameTheEnvelopeCarriesStanding) {
+  std::string described = NamesTheDataKey(kVaultedKeyName);
+  described += WritesTheDataKeyname(kKeynameList);
+  std::string envelope = EncryptEnvelopes(Region(described), kSealingKey);
+  EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
+  EXPECT_EQ(TimesWritten(envelope, kKeynameDirectiveHead), 1U) << envelope;
+  EXPECT_TRUE(Holds(envelope, NamesTheDataKey(kVaultedKeyName))) << envelope;
 }
 
 }  // namespace

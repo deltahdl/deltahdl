@@ -44,6 +44,14 @@
 // reading. Regions are delimited by §34.5.1 and §34.5.2 where a tool's output
 // is what is being observed, and by §34.5.3 and §34.5.4 where the input is an
 // envelope some other tool wrote.
+//
+// A sixth claim follows from the spelling §34.5.16.1 gives the expression,
+// `digest_keyowner = <string>`. §22.5.1 makes a parenthesized pragma_value a
+// list of further expressions rather than one written thing, so a list written
+// against the keyword names no entity. The last four cases read what the tool
+// wrote rather than what a Preprocessor holds. Issue #3273 is the defect: the
+// list was taken as the entity and written into the envelope quoted, which is
+// no pragma_expression §22.11 admits.
 
 #include <gtest/gtest.h>
 
@@ -844,6 +852,98 @@ TEST(ProtectDigestDesignationUniqueness, AnAnnouncedSessionKeyIsHeldToTheRule) {
       LineHolding(src, EncodeProtectBlock(std::string(kSharedValue),
                                           DefaultProtectEncoding())),
       "34.5.16"));
+}
+
+// ---------------------------------------------------------------------------
+// A parenthesized list against the keyword names no entity.
+// ---------------------------------------------------------------------------
+
+// The parenthesized pragma_value §22.5.1 defines: expressions between
+// parentheses rather than the one written thing §34.5.16.1 spells the
+// expression with. What stands inside is a keyword of somebody's own.
+constexpr std::string_view kEntityList = "(division=\"notary\", desk=\"emea\")";
+
+// The characters an envelope writes ahead of this keyword's value, which is
+// what a list taken as the value was written back quoted between.
+constexpr std::string_view kEntityDirectiveHead = "digest_keyowner=\"";
+
+// The expression §34.5.22 writes a digest with, which the comparison below
+// looks for so that two envelopes are not found equal in carrying no digest.
+constexpr std::string_view kDigestBlockLine = "`pragma protect digest_block";
+
+// One protect pragma directive writing `value` against `keyword` exactly as
+// given, so a parenthesized list reaches the reading as the list §22.5.1
+// defines rather than as a string that happens to hold parentheses.
+std::string WritesUnquoted(std::string_view keyword, std::string_view value) {
+  std::string text = "`pragma protect ";
+  text.append(keyword).append("=").append(value).append("\n");
+  return text;
+}
+
+// §34.5.16.1 spells the expression `digest_keyowner = <string>`, so a list
+// names no entity. §34.5.16.2 leaves this name in the clear whatever blocks the
+// envelope carries -- issue #3429 settled that the digest_key_block its
+// exception names is defined nowhere -- so a tool taking the list publishes it
+// there as the entity. Issue #3273 is that defect.
+TEST(ProtectDigestKeyownerEncryptionOutput, AListPutsNoEntityIntoTheEnvelope) {
+  std::string encrypted = Encrypted(
+      Region(WritesUnquoted("digest_keyowner", kEntityList), kSealedDesign));
+  EXPECT_EQ(encrypted.find(kSealedDesign), std::string::npos);
+  EXPECT_EQ(Occurrences(encrypted, kEntityDirectiveHead), 0U);
+}
+
+// The same region with the string §34.5.16.1 defines standing where the list
+// stood. The entity reaches the envelope, so the case above is about the list
+// rather than about a tool that writes no entity at all.
+TEST(ProtectDigestKeyownerEncryptionOutput,
+     AStringPutsItsEntityIntoTheEnvelope) {
+  std::string named = Writes("digest_keyowner", kDigestOwner);
+  std::string encrypted = Encrypted(Region(named, kSealedDesign));
+  EXPECT_EQ(encrypted.find(kSealedDesign), std::string::npos);
+  EXPECT_EQ(Occurrences(encrypted, named), 1U);
+}
+
+// A list written after a string had already named the entity. Naming no entity
+// is not naming an empty one, so the envelope carries the name the earlier
+// string gave: an expression naming nothing takes no name away.
+TEST(ProtectDigestKeyownerEncryptionOutput,
+     AListLeavesTheEntityTheEnvelopeCarriesStanding) {
+  std::string described = Writes("digest_keyowner", kDigestOwner);
+  described += WritesUnquoted("digest_keyowner", kEntityList);
+  std::string encrypted = Encrypted(Region(described, kSealedDesign));
+  EXPECT_EQ(encrypted.find(kSealedDesign), std::string::npos);
+  EXPECT_EQ(Occurrences(encrypted, kEntityDirectiveHead), 1U);
+  EXPECT_NE(encrypted.find(Writes("digest_keyowner", kDigestOwner)),
+            std::string::npos);
+}
+
+// §34.5.16 has the entity in effect for a region's data stand where the digest
+// named none, and a list names none, so a region writing a list has its digest
+// sealed under the key that default reaches. The tool here holds the digest's
+// key under the data's party, so that default reaches a key other than the one
+// the data are under, and the choice between the two is a thing the tool makes.
+//
+// The key a digest was sealed under is stated nowhere a reader can read, the
+// block being encrypted and then encoded, so the claim is put as an equality
+// between two envelopes: the region writing the list and the region writing the
+// keyword nowhere produce the same output. A list taken as the entity reaches
+// no key of the user's and writes itself into the envelope besides, so it
+// breaks that equality twice over.
+TEST(ProtectDigestKeyownerEncryptionOutput,
+     AListLeavesTheDigestUnderTheDefaultedEntitysKey) {
+  std::string described = Writes("data_keyowner", kDataOwner);
+  described += Writes("data_keyname", kDataKeyName);
+  described += Writes("digest_keyname", kDigestKeyName);
+  std::string listed =
+      described + WritesUnquoted("digest_keyowner", kEntityList);
+  std::string under_the_default =
+      EncryptedUnderNames(RequestsDigest() + Region(described, kSealedDesign),
+                          KeysBothUnderTheDataParty());
+  std::string after_the_list =
+      EncryptedUnderNames(RequestsDigest() + Region(listed, kSealedDesign),
+                          KeysBothUnderTheDataParty());
+  EXPECT_NE(under_the_default.find(kDigestBlockLine), std::string::npos);
+  EXPECT_EQ(after_the_list, under_the_default);
 }
 
 }  // namespace

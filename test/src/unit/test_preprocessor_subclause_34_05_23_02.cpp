@@ -34,6 +34,22 @@
 // Preprocessor::CheckKeyBlockDesignation in
 // src/preprocessor/preprocessor_protect_keys.cpp reports both of two, and it
 // cites §34.5.23 rather than the subclause the constraint was borrowed from.
+//
+// The last three cases below state what an encrypting run writes for a region
+// that named its entity with a parenthesized list. §34.5.23.1 spells the
+// expression key_keyowner = <string>, and §22.5.1 makes a parenthesized
+// pragma_value a list of further pragma expressions rather than the one written
+// thing a string is, so a list names no entity. An envelope therefore carries
+// no key_keyowner directive at all where the region wrote only a list, and
+// carries the string where one stood before the list. #3273 is the defect they
+// close: the list was taken as the value and published on the envelope, where a
+// reader pairing it with key_keyname reaches no key of anybody's.
+//
+// These read the text the tool wrote rather than the value a Preprocessor
+// holds. ProtectKeywordScope::Apply in src/preprocessor/protect_keywords.cpp
+// already refuses a list, so a case reading the value back off a reading passes
+// whatever the writing side does; the cases in
+// test_preprocessor_subclause_34_05_23_01.cpp are of that kind.
 
 #include <gtest/gtest.h>
 
@@ -75,6 +91,14 @@ constexpr std::string_view kEntityKey = "acme-wrapping-key";
 
 // The key an author hands the encrypting half where no key block is asked for.
 constexpr std::string_view kAuthorsKey = "one-key-of-the-authors-own";
+
+// A pragma_value written in the parenthesized spelling §22.5.1 defines, which
+// is a list of further pragma expressions rather than the one written thing
+// §34.5.23.1 writes against this keyword. Its subkeywords are names §34.4
+// tabulates nowhere, so what the list says is beside the point and its spelling
+// is the whole of what the cases below read.
+constexpr std::string_view kEntityList =
+    "(chartered_in=\"delaware\", registry=\"dun-and-bradstreet\")";
 
 // The design a region seals.
 constexpr std::string_view kSealedDesign = "module sealed_m; endmodule\n";
@@ -224,6 +248,50 @@ TEST(ProtectKeyKeyownerDescription, TheEntityIsUnchangedInABlocksOwnDirective) {
   EXPECT_TRUE(Holds(envelope, "`pragma protect key_block")) << envelope;
   EXPECT_EQ(TimesWritten(envelope, "key_keyowner=\""), 0U) << envelope;
   EXPECT_EQ(TimesWritten(envelope, NamesEntity(kEntity)), 2U) << envelope;
+}
+
+// -- A parenthesized list names no entity ------------------------------------
+
+// §34.5.23.1 writes a string against this keyword, and §22.5.1 makes a
+// parenthesized pragma_value a list of further pragma expressions rather than
+// one written thing, so a list names no entity. A region that wrote nothing
+// else about the entity whose keys its own keys are under leaves the envelope
+// with no key_keyowner directive to carry.
+//
+// What is counted is the keyword and its '=' rather than a quoted value.
+// ProtectKeyKeyownerDirective in src/preprocessor/protect_keywords.cpp writes
+// this value as the source spelled it, so a list taken as the value goes out
+// with its parentheses bare and a search for the quoted spelling would miss it.
+//
+// The design is checked gone first because an unencrypted region comes back as
+// its own source text, and that text writes the directive under test.
+TEST(ProtectKeyKeyownerDescription, AListLeavesNoEntityDirectiveOnTheEnvelope) {
+  std::string envelope =
+      EncryptEnvelopes(Region(NamesEntity(kEntityList)), kAuthorsKey);
+  EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
+  EXPECT_EQ(TimesWritten(envelope, "key_keyowner="), 0U) << envelope;
+}
+
+// The control beside it: the spelling §34.5.23.1 does define reaches the
+// envelope. Without this the case above would hold of a tool that wrote no
+// key_keyowner directive whatever the region named.
+TEST(ProtectKeyKeyownerDescription, AStringNamesTheEntityTheEnvelopeCarries) {
+  std::string envelope =
+      EncryptEnvelopes(Region(Writes("key_keyowner", kEntity)), kAuthorsKey);
+  EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
+  EXPECT_TRUE(Holds(envelope, Writes("key_keyowner", kEntity))) << envelope;
+}
+
+// A list written after a string has named nobody, so the entity the string
+// named still stands and it is that string §34.5.23.2 has unchanged in the
+// output file. The list itself appears nowhere, which is also what says the
+// region was encrypted rather than handed back.
+TEST(ProtectKeyKeyownerDescription, AListLeavesTheStringNamedBeforeItStanding) {
+  std::string envelope = EncryptEnvelopes(
+      Region(Writes("key_keyowner", kEntity) + NamesEntity(kEntityList)),
+      kAuthorsKey);
+  EXPECT_TRUE(Holds(envelope, Writes("key_keyowner", kEntity))) << envelope;
+  EXPECT_FALSE(Holds(envelope, kEntityList)) << envelope;
 }
 
 // -- The key a reader reaches -----------------------------------------------

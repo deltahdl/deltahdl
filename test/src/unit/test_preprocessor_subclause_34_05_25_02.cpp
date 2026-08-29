@@ -33,6 +33,23 @@
 //
 // Which spelling of the expression puts which name in effect is §34.5.25.1's
 // and is stated in test_preprocessor_subclause_34_05_25_01.cpp.
+//
+// The last five cases below state what an encrypting run writes for a region
+// that designated its key with a parenthesized list. §34.5.25.1 spells the
+// expression key_keyname = <string>, and §22.5.1 makes a parenthesized
+// pragma_value a list of further pragma expressions rather than the one written
+// thing a string is, so a list names no key. Two consequences follow, and the
+// cases take them in turn: no name is output as cleartext, and §34.5.27.2 forms
+// no key block, a block being owed to each key a region designates for its own
+// keys. #3273 is the defect they close: the list was taken as the name, so the
+// envelope published it quoted as though a reader could pair it with the
+// key_keyowner and reach the key that opens the block.
+//
+// These read the text the tool wrote rather than the name a Preprocessor holds.
+// ProtectKeywordScope::Apply in src/preprocessor/protect_keywords.cpp already
+// refuses a list, so a case reading the name back off a reading passes whatever
+// the writing side does; the cases in
+// test_preprocessor_subclause_34_05_25_01.cpp are of that kind.
 
 #include <gtest/gtest.h>
 
@@ -73,6 +90,31 @@ constexpr std::string_view kStrangerEntity = "aegis-custody";
 
 constexpr std::string_view kSealedDesign = "module sealed_m; endmodule\n";
 
+// A pragma_value written in the parenthesized spelling §22.5.1 defines, which
+// is a list of further pragma expressions rather than the one written thing
+// §34.5.25.1 writes against this keyword. Its subkeywords are names §34.4
+// tabulates nowhere, so what the list says is beside the point and its spelling
+// is the whole of what the cases at the foot of this file read.
+constexpr std::string_view kNameList =
+    "(rotation=\"quarterly\", escrowed_with=\"northwind-escrow\")";
+
+// The key an author hands an encrypting run for a region that asks for no key
+// block of its own. It is what seals such a region, and a region nothing seals
+// comes back as its own source text -- where the directive under test is still
+// standing, so a case reading what the tool wrote needs the region encrypted.
+constexpr std::string_view kAuthorsExchangeKey = "the-authors-own-exchange-key";
+
+// The key the entity holds under the characters the list spells. It is what
+// lets the two key block cases fail: a run taking the list as a name reaches
+// this key and writes the block §34.5.27.2 owes it, where an entity holding
+// nothing under those characters writes no block either way.
+constexpr std::string_view kKeyHeldUnderTheListsCharacters =
+    "meridian-trust-escrowed-key";
+
+// The expression §34.5.27.1 spells for a key block, which is the keyword
+// standing alone on a directive of its own with the block beneath it.
+constexpr std::string_view kKeyBlockExpression = "`pragma protect key_block\n";
+
 // The report §34.5.25 draws from a name outside the entity's list.
 constexpr std::string_view kNoSuchKey =
     "key_keyname names no key held by the key_keyowner in effect";
@@ -89,6 +131,15 @@ std::string Writes(std::string_view keyword, std::string_view value) {
 std::string Designates(std::string_view entity, std::string_view name) {
   std::string text = Writes("key_keyowner", entity);
   text.append(Writes("key_keyname", name));
+  return text;
+}
+
+// The keyword with `value` written against it as the source spelled it. Writes
+// above puts quotation marks around what it is given, and a list in quotation
+// marks is a string rather than the parenthesized spelling of a pragma_value.
+std::string WritesAsSpelled(std::string_view keyword, std::string_view value) {
+  std::string text = "`pragma protect ";
+  text.append(keyword).append("=").append(value).append("\n");
   return text;
 }
 
@@ -223,6 +274,85 @@ TEST(ProtectKeyKeynameDescription,
 TEST(ProtectKeyKeynameDescription, ARegionNamingAKeyNobodyHoldsIsSealedByNone) {
   std::string region = Region(Designates(kEntity, kUnheldName));
   EXPECT_EQ(EncryptEnvelopes(region, {}, KeysOfBothEntities()), region);
+}
+
+// -- A parenthesized list names no key ---------------------------------------
+
+// §34.5.25.1 writes a string against this keyword, and §22.5.1 makes a
+// parenthesized pragma_value a list of further pragma expressions rather than
+// one written thing, so a list names no key. §34.5.25.2 outputs the name as
+// cleartext, and a region that named none leaves the envelope with no
+// key_keyname directive to output.
+//
+// The design is checked gone first because a region nothing sealed comes back
+// as its own source text, and that text writes the directive under test.
+TEST(ProtectKeyKeynameDescription, AListPutsNoKeyNameOnTheEnvelope) {
+  std::string envelope = EncryptEnvelopes(
+      Region(WritesAsSpelled("key_keyname", kNameList)), kAuthorsExchangeKey);
+  EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
+  EXPECT_EQ(TimesWritten(envelope, "key_keyname="), 0U) << envelope;
+}
+
+// The control beside it: the spelling §34.5.25.1 does define is output as
+// cleartext. Without this the case above would hold of a tool that wrote no
+// key_keyname directive whatever the region designated.
+TEST(ProtectKeyKeynameDescription, AStringNamesTheKeyTheEnvelopeOutputs) {
+  std::string envelope = EncryptEnvelopes(
+      Region(Writes("key_keyname", kEntitysKeyName)), kAuthorsExchangeKey);
+  EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
+  EXPECT_TRUE(Holds(envelope, Writes("key_keyname", kEntitysKeyName)))
+      << envelope;
+}
+
+// A list written after a string has named no key, so the key the string named
+// still stands and that string is the cleartext the envelope outputs. The list
+// itself appears nowhere, which is also what says the region was encrypted
+// rather than handed back.
+TEST(ProtectKeyKeynameDescription,
+     AListLeavesTheStringWrittenBeforeItStanding) {
+  std::string envelope =
+      EncryptEnvelopes(Region(Writes("key_keyname", kEntitysKeyName) +
+                              WritesAsSpelled("key_keyname", kNameList)),
+                       kAuthorsExchangeKey);
+  EXPECT_TRUE(Holds(envelope, Writes("key_keyname", kEntitysKeyName)))
+      << envelope;
+  EXPECT_FALSE(Holds(envelope, kNameList)) << envelope;
+}
+
+// -- The key block the designation asks for ----------------------------------
+
+// The entity's list holding a key under its own name and a second under the
+// characters the list spells. Both cases below are handed this one list, so
+// what separates them is the spelling the region designated its key in.
+ProtectKeyList KeysHeldUnderBothSpellings() {
+  ProtectKeyList keys;
+  keys.Add(KeyOf(kEntity, kEntitysKeyName, kEntitysKey));
+  keys.Add(KeyOf(kEntity, kNameList, kKeyHeldUnderTheListsCharacters));
+  return keys;
+}
+
+// §34.5.27.2 forms a key block for a region designating a key for its own keys,
+// and §34.5.25.1 writes a string for that designation, so a list designates
+// none and the region asks for no block. The entity holds a key under the
+// characters the list spells, so a run that took the list would find that key
+// and write the block.
+TEST(ProtectKeyKeynameDescription, AListAsksForNoKeyBlock) {
+  std::string region = Region(Writes("key_keyowner", kEntity) +
+                              WritesAsSpelled("key_keyname", kNameList));
+  std::string envelope =
+      EncryptEnvelopes(region, {}, KeysHeldUnderBothSpellings());
+  EXPECT_EQ(TimesWritten(envelope, kKeyBlockExpression), 0U) << envelope;
+}
+
+// The control beside it: the string spelling designates the entity's key and
+// the envelope carries the one block that key opens. Without it the case above
+// would hold of a run that wrote no key block for this region however the
+// region designated its key.
+TEST(ProtectKeyKeynameDescription, AStringAsksForTheOneKeyBlock) {
+  std::string region = Region(Designates(kEntity, kEntitysKeyName));
+  std::string envelope =
+      EncryptEnvelopes(region, {}, KeysHeldUnderBothSpellings());
+  EXPECT_EQ(TimesWritten(envelope, kKeyBlockExpression), 1U) << envelope;
 }
 
 }  // namespace
