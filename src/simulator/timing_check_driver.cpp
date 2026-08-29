@@ -1,10 +1,17 @@
-// §31.3's $setup and $hold, evaluated against a running design.
-// WatchTimingChecks, declared in simulator/timing_check_driver.h, arms the
-// watchers that do it. Everything else here answers one of the three questions
-// evaluating a stability window asks: which transition of which signal closes
-// the window (§31.3.1's Table 31-1 and §31.3.2's Table 31-2), whether a change
-// of value is the edge the check was written with (§31.5), and what a violation
-// does once found (§31.2's report and §31.6's notifier).
+// §31.3.1's $setup and §31.3.2's $hold, evaluated against a running design,
+// and the dispatch that arms Clause 31's other ten checks.
+// WatchTimingChecks, declared in simulator/timing_check_driver.h, is that
+// dispatch: it reads each entry's kind and hands the entry to the file written
+// for the shape that kind measures -- simulator/timing_check_stability.h for
+// §31.3's remaining four, simulator/timing_check_pulse.h for §31.4.4, §31.4.5
+// and §31.4.6, simulator/timing_check_skew.h for §31.4.1 through §31.4.3.
+// simulator/timing_check_driver_internal.h holds what all four need: §31.5's
+// edge matching, the watcher that arms on an edge, §31.2's report and §31.6's
+// notifier.
+//
+// What is left here answers the one question a $setup or a $hold asks that the
+// others do not: which transition of which signal closes the window, which
+// §31.3.1's Table 31-1 and §31.3.2's Table 31-2 decide.
 //
 // SetupWindowViolated and HoldWindowViolated below restate the arithmetic of
 // SpecifyManager::CheckSetupViolation and SpecifyManager::CheckHoldViolation
@@ -14,103 +21,30 @@
 // TimingCheckEntry::inst_prefix -- so with one check registered per module
 // instance a single call answers for every instance of the cell, and answers
 // true when any of them is violated. A watcher already knows which entry it was
-// armed for, so it evaluates that entry and no other.
+// armed for, so it evaluates that entry and no other. Every file this dispatch
+// reaches follows that rule for the same reason.
 
 #include "simulator/timing_check_driver.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <format>
-#include <functional>
-#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "common/diagnostic.h"
-#include "common/source_loc.h"
-#include "common/types.h"
 #include "parser/ast_specify.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/specify_timing_check.h"
+#include "simulator/timing_check_driver_internal.h"
+#include "simulator/timing_check_pulse.h"
+#include "simulator/timing_check_skew.h"
+#include "simulator/timing_check_stability.h"
 #include "simulator/variable.h"
 
 namespace delta {
 namespace {
-
-// The values §31.5's edge_descriptors are written over -- 0, 1 and the x that
-// "edge transitions involving z are treated the same way as" -- plus the answer
-// for a value that states no bit at all.
-enum class EdgeLevel : uint8_t {
-  kAbsent,
-  kZero,
-  kOne,
-  kUnknown,
-};
-
-// The level of a signal's least significant bit. §31.5 writes an edge over one
-// bit, so a vector signal is read at bit 0; §31.8's per-bit expansion of a
-// vector signal into an independent check for each bit is a separate rule and
-// is not applied here. A Logic4Vec with no words states no bit, which kAbsent
-// is the answer for. x is (aval 1, bval 1) and z is (aval 0, bval 1), and §31.5
-// reads the two alike, so the bval bit alone decides kUnknown.
-EdgeLevel LevelOfLsb(const Logic4Vec& v) {
-  if (v.nwords == 0) return EdgeLevel::kAbsent;
-  if ((v.words[0].bval & 1U) != 0U) return EdgeLevel::kUnknown;
-  return (v.words[0].aval & 1U) != 0U ? EdgeLevel::kOne : EdgeLevel::kZero;
-}
-
-// Whether a change from `from` to `to` is the edge `edge` names. §31.5 makes
-// posedge the shorthand for edge[01, 0x, x1] and negedge the shorthand for
-// edge[10, x0, 1x], so posedge is every transition that leaves 0 or arrives at
-// 1, and negedge every transition that leaves 1 or arrives at 0. A value that
-// did not change is no transition at all and is neither.
-//
-// SpecifyEdge::kNone is a timing_check_event written without an
-// edge_control_specifier, which Syntax 31-2 (§31.2) allows and which no edge
-// restricts, so every transition matches it. SpecifyEdge::kEdge is answered the
-// same way and that answer is not exact: the edge_descriptor list an
-// edge-control specifier was written with is parsed into
-// TimingCheckDecl::ref_edge_descriptors (src/parser/ast_specify.h) and
-// TimingCheckEntry (src/simulator/specify_timing_check.h) carries no field for
-// it, so `edge[01]` cannot be told apart from `edge[10]` here.
-bool TimingCheckEdgeMatches(SpecifyEdge edge, EdgeLevel from, EdgeLevel to) {
-  if (from == EdgeLevel::kAbsent || to == EdgeLevel::kAbsent) return false;
-  if (from == to) return false;
-  if (edge == SpecifyEdge::kPosedge) {
-    return from == EdgeLevel::kZero || to == EdgeLevel::kOne;
-  }
-  if (edge == SpecifyEdge::kNegedge) {
-    return from == EdgeLevel::kOne || to == EdgeLevel::kZero;
-  }
-  return true;
-}
-
-// Arms on `var` a watcher that calls `on_edge` every time the variable's least
-// significant bit makes the transition `edge` names, for as long as the run
-// lasts.
-//
-// The watcher keeps the level it last saw rather than trusting that a
-// notification means a change, for the reason WatchSourceVariable in
-// src/simulator/module_path_delay.cpp keeps its own copy of the value:
-// Variable::NotifyWatchers fires whenever a driver commits, and a driver may
-// commit the value already there -- Net::Resolve in src/simulator/net.cpp
-// notifies after every resolution. Comparing the level before the commit
-// against the level after is what keeps such a commit from being read as an
-// edge and reporting a violation no signal caused.
-//
-// It returns false so that NotifyWatchers re-arms it: a signal a timing check
-// names transitions any number of times before the run ends.
-void WatchEdge(Variable* var, SpecifyEdge edge, std::function<void()> on_edge) {
-  auto seen = std::make_shared<EdgeLevel>(LevelOfLsb(var->value));
-  var->AddWatcher([var, edge, seen, on_edge = std::move(on_edge)]() {
-    EdgeLevel before = *seen;
-    *seen = LevelOfLsb(var->value);
-    if (TimingCheckEdgeMatches(edge, before, *seen)) on_edge();
-    return false;
-  });
-}
 
 // §31.3.1: "(beginning of time window) = (timecheck time) - limit" and "(end of
 // time window) = (timecheck time)", and the check "reports a timing violation"
@@ -187,8 +121,7 @@ StabilityWindowEvents EventsOf(const TimingCheckEntry& check) {
 // annotation exists to change it; reading the entry back at every timecheck
 // event is what lets an annotation reach a check already armed.
 struct StabilityWindow {
-  const SpecifyManager* mgr = nullptr;
-  std::size_t index = 0;
+  ArmedCheck armed;
   StabilityWindowEvents events;
   bool has_timestamp = false;
   uint64_t timestamp_ticks = 0;
@@ -208,48 +141,20 @@ struct StabilityWindow {
 void ReportViolation(TimingCheckKind kind, const StabilityWindow& window,
                      SimContext& ctx) {
   if (kind == TimingCheckKind::kSetup) {
-    ctx.GetDiag().Warning(
-        SourceLoc::None(),
+    ReportTimingViolation(
         std::format("$setup violation: data signal {} transitioned inside the "
                     "window ending at reference signal {}",
                     window.events.timestamp_signal,
                     window.events.timecheck_signal),
-        Subclause("31.3.1"));
+        "31.3.1", ctx);
     return;
   }
-  ctx.GetDiag().Warning(
-      SourceLoc::None(),
+  ReportTimingViolation(
       std::format("$hold violation: data signal {} transitioned inside the "
                   "window beginning at reference signal {}",
                   window.events.timecheck_signal,
                   window.events.timestamp_signal),
-      Subclause("31.3.2"));
-}
-
-// §31.6: "Whenever a timing violation occurs, the timing check updates the
-// value of the notifier", and Table 31-13 gives the value it updates to.
-// ToggleNotifierOnViolation (src/simulator/specify_timing_check.h) is that
-// table. §31.6 has the notifier "declared in the module where timing check
-// tasks are invoked", which is the module whose specify block declared the
-// check, so it is looked up under the same instance prefix the check's two
-// signals are.
-//
-// Only the least significant bit is written and the rest of the variable is
-// left as it stands, Table 31-13 stating one value and §31.6's notifier being a
-// scalar. The write goes through Variable::NotifyWatchers because §31.6 has a
-// model "use the notifier to make behavior a function of timing check
-// violations", and an `always @(notifier)` sees the new value only once the
-// watchers have been notified.
-void ToggleNotifier(const TimingCheckEntry& check, SimContext& ctx) {
-  if (check.notifier.empty()) return;
-  Variable* var = ctx.FindVariable(check.inst_prefix + check.notifier);
-  if (var == nullptr || var->value.nwords == 0) return;
-  Logic4Word toggled = ToggleNotifierOnViolation(var->value.words[0]);
-  var->value.words[0].aval =
-      (var->value.words[0].aval & ~1ULL) | (toggled.aval & 1ULL);
-  var->value.words[0].bval =
-      (var->value.words[0].bval & ~1ULL) | (toggled.bval & 1ULL);
-  var->NotifyWatchers();
+      "31.3.2", ctx);
 }
 
 // The timecheck event of a §31.3 check has arrived at `timecheck_ticks`.
@@ -260,7 +165,7 @@ void ToggleNotifier(const TimingCheckEntry& check, SimContext& ctx) {
 void EvaluateStabilityWindow(const StabilityWindow& window,
                              uint64_t timecheck_ticks, SimContext& ctx) {
   if (!window.has_timestamp) return;
-  const TimingCheckEntry& check = window.mgr->GetTimingChecks()[window.index];
+  const TimingCheckEntry& check = window.armed.Entry();
   bool violated = check.kind == TimingCheckKind::kSetup
                       ? SetupWindowViolated(check.limit, window.timestamp_ticks,
                                             timecheck_ticks)
@@ -283,8 +188,7 @@ void ArmStabilityWindow(const SpecifyManager& mgr, std::size_t index,
   SpecifyEdge timestamp_edge = events.timestamp_edge;
   SpecifyEdge timecheck_edge = events.timecheck_edge;
   auto window = std::make_shared<StabilityWindow>();
-  window->mgr = &mgr;
-  window->index = index;
+  window->armed = ArmedCheck{&mgr, index};
   window->events = std::move(events);
   WatchEdge(timestamp_var, timestamp_edge, [window, &ctx]() {
     window->has_timestamp = true;
@@ -300,14 +204,28 @@ void ArmStabilityWindow(const SpecifyManager& mgr, std::size_t index,
 void WatchTimingChecks(const SpecifyManager& mgr, SimContext& ctx) {
   const std::vector<TimingCheckEntry>& checks = mgr.GetTimingChecks();
   for (std::size_t i = 0; i < checks.size(); ++i) {
-    TimingCheckKind kind = checks[i].kind;
-    // §31.3's other four stability-window checks, §31.4's clock and control
-    // signal checks and §31.9's negative timing checks name their two
-    // transitions differently, and none of them is armed here.
-    if (kind != TimingCheckKind::kSetup && kind != TimingCheckKind::kHold) {
-      continue;
+    switch (checks[i].kind) {
+      case TimingCheckKind::kSetup:
+      case TimingCheckKind::kHold:
+        ArmStabilityWindow(mgr, i, ctx);
+        break;
+      case TimingCheckKind::kSetuphold:
+      case TimingCheckKind::kRecovery:
+      case TimingCheckKind::kRemoval:
+      case TimingCheckKind::kRecrem:
+        ArmStabilityPair(mgr, i, ctx);
+        break;
+      case TimingCheckKind::kWidth:
+      case TimingCheckKind::kPeriod:
+      case TimingCheckKind::kNochange:
+        ArmPulseWindow(mgr, i, ctx);
+        break;
+      case TimingCheckKind::kSkew:
+      case TimingCheckKind::kTimeskew:
+      case TimingCheckKind::kFullskew:
+        ArmSkewWindow(mgr, i, ctx);
+        break;
     }
-    ArmStabilityWindow(mgr, i, ctx);
   }
 }
 

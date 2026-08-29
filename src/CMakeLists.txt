@@ -353,6 +353,9 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/statement_assign_stream.cpp
     simulator/stmt_exec_control.cpp
     simulator/timing_check_driver.cpp
+    simulator/timing_check_pulse.cpp
+    simulator/timing_check_skew.cpp
+    simulator/timing_check_stability.cpp
     simulator/stmt_exec_randsequence.cpp
     simulator/stmt_exec_randsequence_values.cpp
     simulator/stmt_exec_wait.cpp

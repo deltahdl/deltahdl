@@ -30,11 +30,14 @@ class SpecifyManager;
 // the check's notifier when it names one, which §31.6 makes the design-visible
 // half of a violation.
 //
-// Only §31.3's $setup and $hold are armed. $setuphold, $recovery, $removal and
-// $recrem stand in the same subclause and are not, nor are §31.4's clock and
-// control-signal checks, §31.4.4's $width, §31.4.5's $period or §31.9's
-// negative timing checks; each names its two transitions differently and needs
-// reading against its own clause.
+// Every kind Clause 31 defines is armed. The twelve divide into four shapes by
+// what each measures between, and WatchTimingChecks hands an entry to the file
+// written for its shape: §31.3.1's $setup and §31.3.2's $hold below,
+// §31.3.3's $setuphold with §31.3.4's $removal, §31.3.5's $recovery and
+// §31.3.6's $recrem in simulator/timing_check_stability.h, §31.4.4's $width
+// with §31.4.5's $period and §31.4.6's $nochange in
+// simulator/timing_check_pulse.h, and §31.4.1's $skew with §31.4.2's $timeskew
+// and §31.4.3's $fullskew in simulator/timing_check_skew.h.
 //
 // Call this after every module has been lowered and before the scheduler runs
 // anything, beside WatchModulePathSources (src/simulator/module_path_delay.h):
