@@ -292,10 +292,9 @@ bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,
   // §31.9.4: with the invocation option that switches all timing checks off,
   // nothing is checked and so no violation is reported.
   if (timing_check_options_.all_timing_checks_off) return false;
-  return CheckTimingViolation(
-      timing_checks_, TimingCheckKind::kSetuphold,
-      {ref, ref_time, data, data_time},
-      {&TimingCheckEntry::limit, &TimingCheckEntry::limit2});
+  return CheckTimingViolation(timing_checks_, TimingCheckKind::kSetuphold,
+                              {ref, ref_time, data, data_time},
+                              TwoSidedLimitOrder::kFirstBoundsBefore);
 }
 
 }  // namespace delta

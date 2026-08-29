@@ -1,3 +1,20 @@
+// §31.9.1's requirements for accurate simulation, over the free functions in
+// src/simulator/specify_timing_violation.cpp and over
+// SpecifyManager::CheckSetupholdViolation and
+// SpecifyManager::CheckRecremViolation.
+//
+// The NegativeTimingChecks cases below build a TimingCheckEntry with
+// negative_timing_check_enabled set and read the violation window back through
+// a SpecifyManager. Four of them claim that each kind puts its declared limits
+// on the side §31.3.3's Table 31-3 and §31.3.6's Table 31-6 give them:
+// $setuphold's first declared limit, setup_limit, bounds the side before the
+// reference time, and $recrem's second declared limit, removal_limit, bounds
+// that side. Each of the four supplies a data time that falls inside one kind's
+// window and outside the window the other kind's order would build, so a run
+// that reads one order for both kinds goes red. That is issue #3419, where
+// CheckRecremViolation built its negative window in declaration order and so
+// checked a $recrem against a window with its two limits swapped.
+
 #include <gtest/gtest.h>
 
 #include "parser/ast.h"
@@ -15,6 +32,23 @@ TimingCheckEntry MakeSignedSetuphold(int64_t setup, int64_t hold) {
   tc.negative_timing_check_enabled = true;
   tc.signed_limit = setup;
   tc.signed_limit2 = hold;
+  return tc;
+}
+
+// Syntax 31-8 writes $recrem(reference_event, data_event, recovery_limit,
+// removal_limit), so recovery is the first declared limit and removal the
+// second. limit and limit2 are left at zero: a check with
+// negative_timing_check_enabled set is answered from the signed pair alone, so
+// a run that reached the unsigned comparison instead would report no violation
+// at all.
+TimingCheckEntry MakeSignedRecrem(int64_t recovery, int64_t removal) {
+  TimingCheckEntry tc;
+  tc.kind = TimingCheckKind::kRecrem;
+  tc.ref_signal = "clk";
+  tc.data_signal = "rst";
+  tc.negative_timing_check_enabled = true;
+  tc.signed_limit = recovery;
+  tc.signed_limit2 = removal;
   return tc;
 }
 
@@ -251,6 +285,58 @@ TEST(NegativeTimingChecks, RuntimeNegativeHoldWindowInteriorYieldsViolation) {
   EXPECT_TRUE(mgr.CheckSetupholdViolation("clk", 100, "data", 92));
   EXPECT_FALSE(mgr.CheckSetupholdViolation("clk", 100, "data", 90));
   EXPECT_FALSE(mgr.CheckSetupholdViolation("clk", 100, "data", 95));
+}
+
+TEST(NegativeTimingChecks, RuntimeRecremRemovalBoundsTheEarlierSide) {
+  SpecifyManager mgr;
+  // $recrem with recovery_limit -4 and removal_limit 14. Table 31-6 gives the
+  // removal limit the reference_event role, so removal bounds the side before
+  // the reference time and recovery the side after it: the window §31.9.1
+  // requirement (a) opens is (200 - 14, 200 + -4) = (186, 196). Reading the two
+  // limits in declaration order instead would bound the earlier side by
+  // recovery and the later side by removal, giving (200 - -4, 200 + 14) =
+  // (204, 214). The two intervals are disjoint. A data event at 190 is strictly
+  // inside (186, 196) and nowhere near (204, 214).
+  mgr.AddTimingCheck(MakeSignedRecrem(-4, 14));
+
+  EXPECT_TRUE(mgr.CheckRecremViolation("clk", 200, "rst", 190));
+}
+
+TEST(NegativeTimingChecks, RuntimeRecremRecoveryDoesNotBoundTheEarlierSide) {
+  SpecifyManager mgr;
+  // The same $recrem, and the mirror of the case above: the window is
+  // (186, 196) and the declaration-order window would be (204, 214). A data
+  // event at 209 is strictly inside (204, 214) and outside (186, 196), so the
+  // only order that reports a violation here is the wrong one.
+  mgr.AddTimingCheck(MakeSignedRecrem(-4, 14));
+
+  EXPECT_FALSE(mgr.CheckRecremViolation("clk", 200, "rst", 209));
+}
+
+TEST(NegativeTimingChecks, RuntimeSetupholdSetupBoundsTheEarlierSide) {
+  SpecifyManager mgr;
+  // $setuphold with setup_limit -6 and hold_limit 22. Table 31-3 gives the
+  // setup limit the reference_event role, so setup bounds the side before the
+  // reference time and hold the side after it: the window is
+  // (300 - -6, 300 + 22) = (306, 322). $recrem's order applied here would bound
+  // the earlier side by hold and the later side by setup, giving
+  // (300 - 22, 300 + -6) = (278, 294). A data event at 314 is strictly inside
+  // (306, 322) and outside (278, 294).
+  mgr.AddTimingCheck(MakeSignedSetuphold(-6, 22));
+
+  EXPECT_TRUE(mgr.CheckSetupholdViolation("clk", 300, "data", 314));
+}
+
+TEST(NegativeTimingChecks, RuntimeSetupholdHoldDoesNotBoundTheEarlierSide) {
+  SpecifyManager mgr;
+  // The same $setuphold, and the mirror of the case above: the window is
+  // (306, 322) and $recrem's order would give (278, 294). A data event at 285
+  // is strictly inside (278, 294) and outside (306, 322). This case and the one
+  // above fail if $recrem's fix is made by swapping the shared derivation, so
+  // the two kinds cannot trade the defect between them.
+  mgr.AddTimingCheck(MakeSignedSetuphold(-6, 22));
+
+  EXPECT_FALSE(mgr.CheckSetupholdViolation("clk", 300, "data", 285));
 }
 
 }  // namespace

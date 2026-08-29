@@ -86,56 +86,74 @@ bool SpecifyManager::CheckRecoveryViolation(std::string_view ref,
   return false;
 }
 
-// Shared implementation for the two-sided timing checks (recrem / setuphold).
-// Both checks share an identical structure: filter by kind/signals, handle the
-// negative-timing-check window, then compare the elapsed time against a pair of
-// limits. The only behavioral difference is which limit applies on each side of
-// the reference time: recrem uses limit2 for the "before" side and limit for
-// the "after" side, while setuphold uses the opposite. `lower_side_limit`
-// selects which member is compared when data_time <= ref_time, and
-// `upper_side_limit` when data_time > ref_time.
+// Shared implementation for the two-sided timing checks, $recrem and
+// $setuphold. Both filter by kind and signals, then compare the data event
+// against a pair of limits, and the only difference between them is which
+// declared limit bounds which side of the reference time. TwoSidedLimitOrder
+// (simulator/specify_internal.h) is that difference, stated once per kind by
+// the member that names the kind.
 namespace {
 
-// True when `data_time` falls inside the negative-timing-check window centered
-// on `ref_time` and spanning [-signed_limit, +signed_limit2].
-bool NegativeTimingWindowViolated(const TimingCheckEntry& check,
-                                  uint64_t ref_time, uint64_t data_time) {
+// The two limits of a two-sided check, each named for the side of the reference
+// time it bounds rather than for the constraint that declared it. The signed
+// pair carries the same two limits as §31.9 wrote them.
+struct SidedLimits {
+  uint64_t before = 0;
+  uint64_t after = 0;
+  int64_t signed_before = 0;
+  int64_t signed_after = 0;
+};
+
+SidedLimits SidedLimitsOf(const TimingCheckEntry& check,
+                          TwoSidedLimitOrder order) {
+  if (order == TwoSidedLimitOrder::kSecondBoundsBefore) {
+    return SidedLimits{check.limit2, check.limit, check.signed_limit2,
+                       check.signed_limit};
+  }
+  return SidedLimits{check.limit, check.limit2, check.signed_limit,
+                     check.signed_limit2};
+}
+
+// §31.9.1 requirement (a): "A timing violation shall be triggered if the signal
+// changes in the violation window, exclusive of the end points." A negative
+// limit moves an end point across the reference time rather than bounding one
+// side of it, so the window is the one open interval the two signed limits mark
+// out around that time and neither side is answered on its own.
+bool NegativeTimingWindowViolated(const SidedLimits& limits, uint64_t ref_time,
+                                  uint64_t data_time) {
   const auto kRefT = static_cast<int64_t>(ref_time);
   const auto kDataT = static_cast<int64_t>(data_time);
-  const int64_t kLower = kRefT - check.signed_limit;
-  const int64_t kUpper = kRefT + check.signed_limit2;
-  return kDataT > kLower && kDataT < kUpper;
+  return kDataT > kRefT - limits.signed_before &&
+         kDataT < kRefT + limits.signed_after;
 }
 
 // True when the elapsed time between `ref_time` and `data_time` violates the
-// side-specific limit (lower side for data on/before ref, upper side after).
-bool TwoSidedLimitViolated(const TimingCheckEntry& check, uint64_t ref_time,
-                           uint64_t data_time,
-                           uint64_t TimingCheckEntry::* lower_side_limit,
-                           uint64_t TimingCheckEntry::* upper_side_limit) {
-  if (check.limit == 0 && check.limit2 == 0) return false;
-  if (data_time <= ref_time) {
-    return ref_time - data_time < check.*lower_side_limit;
-  }
-  return data_time - ref_time < check.*upper_side_limit;
+// limit bounding the side the data event fell on.
+bool TwoSidedLimitViolated(const SidedLimits& limits, uint64_t ref_time,
+                           uint64_t data_time) {
+  if (limits.before == 0 && limits.after == 0) return false;
+  if (data_time <= ref_time) return ref_time - data_time < limits.before;
+  return data_time - ref_time < limits.after;
 }
 
 }  // namespace
 
 bool CheckTimingViolation(const std::vector<TimingCheckEntry>& timing_checks,
                           TimingCheckKind kind, const TimingCheckEvent& event,
-                          const TwoSidedLimitSelector& selector) {
+                          TwoSidedLimitOrder order) {
   for (const auto& check : timing_checks) {
     if (check.kind != kind) continue;
     if (check.ref_signal != event.ref) continue;
     if (check.data_signal != event.data) continue;
+    const SidedLimits kLimits = SidedLimitsOf(check, order);
     if (check.negative_timing_check_enabled) {
-      if (NegativeTimingWindowViolated(check, event.ref_time, event.data_time))
+      if (NegativeTimingWindowViolated(kLimits, event.ref_time,
+                                       event.data_time)) {
         return true;
+      }
       continue;
     }
-    if (TwoSidedLimitViolated(check, event.ref_time, event.data_time,
-                              selector.lower, selector.upper)) {
+    if (TwoSidedLimitViolated(kLimits, event.ref_time, event.data_time)) {
       return true;
     }
   }
@@ -149,10 +167,9 @@ bool SpecifyManager::CheckRecremViolation(std::string_view ref,
   // §31.9.4: the option that switches all timing checks off suppresses this
   // check the same way it suppresses $setuphold.
   if (timing_check_options_.all_timing_checks_off) return false;
-  return CheckTimingViolation(
-      timing_checks_, TimingCheckKind::kRecrem,
-      {ref, ref_time, data, data_time},
-      {&TimingCheckEntry::limit2, &TimingCheckEntry::limit});
+  return CheckTimingViolation(timing_checks_, TimingCheckKind::kRecrem,
+                              {ref, ref_time, data, data_time},
+                              TwoSidedLimitOrder::kSecondBoundsBefore);
 }
 
 bool SpecifyManager::CheckSkewViolation(std::string_view ref, uint64_t ref_time,

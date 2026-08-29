@@ -19,17 +19,29 @@ struct TimingCheckEvent {
   uint64_t data_time;
 };
 
-// Selects which TimingCheckEntry limit applies on each side of the reference
-// time for two-sided checks (recrem / setuphold): `lower` is compared when the
-// data event is on/before the reference, `upper` when it is after.
-struct TwoSidedLimitSelector {
-  uint64_t TimingCheckEntry::* lower;
-  uint64_t TimingCheckEntry::* upper;
+// Which of a two-sided check's two declared limits bounds the side of the
+// reference time a data event before it falls on.
+//
+// §31.3.3's Table 31-3 gives $setuphold's setup_limit the reference_event role
+// and its hold_limit the data_event role, and Syntax 31-5 writes setup first,
+// so its first declared limit bounds the earlier side. §31.3.6's Table 31-6
+// gives $recrem's removal_limit the reference_event role and its recovery_limit
+// the data_event role, and Syntax 31-8 writes recovery first, so its second
+// declared limit does.
+//
+// One value settles both paths CheckTimingViolation takes: the unsigned pair a
+// check compares elapsed time against, and the signed pair §31.9.1's window is
+// built from. Stating the two separately is what let them disagree, which is
+// issue #3419 -- the unsigned path read the order its caller passed and the
+// signed one read the declaration order for every kind.
+enum class TwoSidedLimitOrder : uint8_t {
+  kFirstBoundsBefore,
+  kSecondBoundsBefore,
 };
 
 bool CheckTimingViolation(const std::vector<TimingCheckEntry>& timing_checks,
                           TimingCheckKind kind, const TimingCheckEvent& event,
-                          const TwoSidedLimitSelector& selector);
+                          TwoSidedLimitOrder order);
 void DerivePulseLimitsFromDelays(const uint64_t (&delays)[12],
                                  uint8_t reject_pct, uint8_t error_pct,
                                  uint64_t (&reject_limit)[12],
