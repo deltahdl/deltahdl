@@ -48,8 +48,31 @@ std::vector<const ConfigDecl*> ConfigsInForce(const CompilationUnit& unit) {
 }
 
 RtlirDesign* ElaborateCommandLine(Elaborator& elab, const CompilationUnit& unit,
-                                  std::string_view top, DiagEngine& diag) {
+                                  std::string_view top, std::string_view config,
+                                  DiagEngine& diag) {
   auto in_force = ConfigsInForce(unit);
+
+  // §33.5.4: the config to be used is one of the two things the command line
+  // gives a binding tool, so a named one settles the design outright and the
+  // count of configurations in force decides nothing.
+  if (!config.empty()) {
+    for (const auto* cfg : in_force) {
+      if (cfg->name == config) return elab.Elaborate(cfg);
+    }
+    // The name came from the command line rather than from a source
+    // description, so there is nothing written anywhere for the report to
+    // stand at. A configuration the unit holds but that no design statement
+    // gives a design, or that another configuration delegates an instance to,
+    // is not in force and is not selectable: ConfigsInForce is what says which
+    // names this option takes.
+    diag.Error(SourceLoc::None(),
+               std::format("no configuration named '{}' is in force; the "
+                           "command line put {} in force",
+                           config, in_force.size()),
+               Subclause("33.5.4"));
+    return nullptr;
+  }
+
   if (in_force.size() > 1) {
     // Each of them names a whole design, and a run builds one. Which was meant
     // is not something the source descriptions record, so the command line is
@@ -57,7 +80,8 @@ RtlirDesign* ElaborateCommandLine(Elaborator& elab, const CompilationUnit& unit,
     diag.Error(
         SourceLoc::None(),
         std::format("command line puts {} configurations in force; "
-                    "'{}' and '{}' each name a design of their own",
+                    "'{}' and '{}' each name a design of their own; name one "
+                    "with --config",
                     in_force.size(), in_force[0]->name, in_force[1]->name),
         Subclause("33.5.4"));
     return nullptr;

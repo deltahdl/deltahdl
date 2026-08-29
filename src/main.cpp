@@ -14,9 +14,11 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/separate_compilation_bind.h"
 #include "lexer/lexer.h"
 #include "parser/library_map.h"
 #include "parser/parser.h"
+#include "parser/precompiled_library.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_cli.h"
 #include "preprocessor/protect_processing.h"
@@ -43,6 +45,22 @@ struct CliOptions {
   std::vector<std::string> lib_files;
 
   std::vector<std::string> lib_search_order;
+  // §33.5.4: "the tool that actually does the binding only needs to be given
+  // the lib.cell specification for the top-level cell(s) and/or the config to
+  // be used". `config` is that config, named by --config, and
+  // `precompiled_libs` are the files --load-lib names for the separate
+  // compilation flow of §33.5.3, whose cells "shall persist" between the
+  // invocation that compiled them and the one that binds them.
+  std::string config;
+  std::vector<std::string> precompiled_libs;
+  // The library --precompile-into compiles this invocation's source
+  // descriptions into, and the file it writes them to. §33.5.3 has a separate
+  // compilation tool put cells into a library that a later invocation binds
+  // from, and both are needed: a cell belongs to a library and the compiled
+  // form has to live somewhere.
+  std::string precompile_library;
+  std::string precompile_output;
+
   std::vector<std::pair<std::string, std::string>> defines;
   uint64_t max_time = 0;
   // §27.4 bounds a loop generate scheme's iteration count nowhere, so this is
@@ -121,6 +139,12 @@ void PrintHelp() {
             << "  --target <name>      Target technology\n"
             << "  --lut-size <n>       LUT input count (default 4)\n"
             << "  --lib <file>         Liberty timing library\n"
+            << "  --config <name>      Configuration to bind (33.5.4)\n"
+            << "  --load-lib <file>    Precompiled library to bind from\n"
+            << "  --precompile-into <library>\n"
+            << "                       Library to compile sources into\n"
+            << "  --precompile-out <file>\n"
+            << "                       File the precompiled cells go to\n"
             << "  --format <fmt>       Output format (blif/verilog/json/edif)\n"
             << "  --no-opt             Skip optimization passes\n"
             << "  --area               Area-oriented optimization\n"
@@ -308,6 +332,22 @@ bool TryParseLibArg(std::string_view arg, int& i, int argc,
 
   if (arg == "-L" && i + 1 < argc) {
     opts.lib_search_order.emplace_back(argv[++i]);
+    return true;
+  }
+  if (arg == "--config" && i + 1 < argc) {
+    opts.config = argv[++i];
+    return true;
+  }
+  if (arg == "--load-lib" && i + 1 < argc) {
+    opts.precompiled_libs.emplace_back(argv[++i]);
+    return true;
+  }
+  if (arg == "--precompile-into" && i + 1 < argc) {
+    opts.precompile_library = argv[++i];
+    return true;
+  }
+  if (arg == "--precompile-out" && i + 1 < argc) {
+    opts.precompile_output = argv[++i];
     return true;
   }
   return false;
@@ -591,7 +631,8 @@ const delta::RtlirDesign* ElaborateDesign(const CliOptions& opts,
   // line settles the design, so the top-level cell named here is what a command
   // line that put no configuration in force is elaborated from.
   auto top = ResolveTopModule(opts, cu);
-  const auto* design = delta::ElaborateCommandLine(elaborator, *cu, top, diag);
+  const auto* design =
+      delta::ElaborateCommandLine(elaborator, *cu, top, opts.config, diag);
   if (diag.HasErrors() || design == nullptr) return nullptr;
   if (opts.dump_ir) DumpIr(design);
   return design;
@@ -678,6 +719,65 @@ int RunEnvelopeEncryption(const CliOptions& opts, delta::SourceManager& src_mgr,
   return diag.HasErrors() ? 1 : 0;
 }
 
+// §33.5.3's separate compilation tool: the invocation that compiles source
+// descriptions into a library rather than binding a design. "It is essential
+// that library cells persist, and the compiled forms shall, therefore, exist
+// somewhere in the filesystem", which is what --precompile-out names and what a
+// later --load-lib reads.
+//
+// Both options are required together. A library name with nowhere to write it
+// leaves nothing that persists, and a file with no library name holds cells
+// belonging to no library, which §33.5.3 has a bind select from.
+int RunPrecompile(const CliOptions& opts, delta::DiagEngine& diag) {
+  if (opts.precompile_library.empty() || opts.precompile_output.empty()) {
+    std::cerr << "--precompile-into and --precompile-out are used together\n";
+    return 1;
+  }
+  for (const auto& path : opts.source_files) {
+    auto content = ReadFile(path);
+    if (content.empty()) return 1;
+    if (!delta::PrecompiledLibrary::Save(content, opts.precompile_library,
+                                         opts.precompile_output)) {
+      std::cerr << "could not precompile " << path << " into "
+                << opts.precompile_output << "\n";
+      return 1;
+    }
+  }
+  return diag.HasErrors() ? 1 : 0;
+}
+
+// §33.5.4's binding invocation: "the tool that actually does the binding only
+// needs to be given the lib.cell specification for the top-level cell(s) and/or
+// the config to be used. In this strategy, the config itself shall also be
+// precompiled."
+//
+// So the cells come from the libraries --load-lib names and from nowhere else,
+// and what roots the design is either --config or the top-level cells --top
+// names. A configuration is looked for among the precompiled cells for the same
+// reason every other cell is: this invocation reads no source description.
+int RunSeparateCompilationBind(const CliOptions& opts,
+                               delta::SourceManager& src_mgr,
+                               delta::DiagEngine& diag) {
+  delta::Arena arena;
+  delta::SeparateCompilationBinder binder(src_mgr, arena, diag);
+  for (const auto& path : opts.precompiled_libs) {
+    if (!binder.LoadLibrary(path)) return 1;
+  }
+
+  const delta::RtlirDesign* design = nullptr;
+  if (!opts.config.empty()) {
+    design = binder.BindConfig(opts.config);
+  } else if (!opts.top_module.empty()) {
+    design = binder.Bind({opts.top_module});
+  } else {
+    std::cerr << "a separate compilation bind names --config or --top\n";
+    return 1;
+  }
+  if (design == nullptr || diag.HasErrors()) return 1;
+  if (opts.dump_ir) DumpIr(design);
+  return 0;
+}
+
 int main(int argc, char* argv[]) {
   CliOptions opts;
   if (!ParseArgs(argc, argv, opts)) {
@@ -700,6 +800,14 @@ int main(int argc, char* argv[]) {
 
   if (opts.protect.encrypt) {
     return RunEnvelopeEncryption(opts, src_mgr, diag);
+  }
+
+  if (!opts.precompile_library.empty() || !opts.precompile_output.empty()) {
+    return RunPrecompile(opts, diag);
+  }
+
+  if (!opts.precompiled_libs.empty()) {
+    return RunSeparateCompilationBind(opts, src_mgr, diag);
   }
 
   auto pp = PreprocessSources(opts, src_mgr, diag);

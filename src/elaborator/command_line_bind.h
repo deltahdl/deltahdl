@@ -41,13 +41,25 @@ std::vector<const ConfigDecl*> ConfigsInForce(const CompilationUnit& unit);
 // Elaborates the design the command line describes and returns it, or nullptr
 // having reported.
 //
+// `config` is the configuration the command line named to be used, which
+// §33.5.4 makes one of the two things a binding tool is given: "the tool that
+// actually does the binding only needs to be given the lib.cell specification
+// for the top-level cell(s) and/or the config to be used". It is empty when
+// none was named, and a name that reaches no configuration in force is
+// reported rather than passed over.
+//
 // With a configuration in force the design is the one its design statement
 // names, bound under that configuration's rules. `top` is not consulted there,
 // because the design statement is what says which cell is the top-level one.
+// A unit holding more than one configuration in force is what `config`
+// resolves: without it there is nothing saying which was meant and the
+// ambiguity is reported.
+//
 // With none in force the design is rooted at the cell `top` names, or -- when
 // the command line named no top-level cell either, leaving `top` empty -- at
 // every cell no instance names, bound under the library map's default rules.
 RtlirDesign* ElaborateCommandLine(Elaborator& elab, const CompilationUnit& unit,
-                                  std::string_view top, DiagEngine& diag);
+                                  std::string_view top, std::string_view config,
+                                  DiagEngine& diag);
 
 }  // namespace delta

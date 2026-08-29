@@ -41,6 +41,21 @@ namespace {
 // and read back by §33.5.3's binder. What the rules turn on is precisely which
 // descriptions a command line named, so a compilation unit assembled by a test
 // would settle nothing.
+//
+// A command line names the configuration to be used as well as the source
+// descriptions. §33.5.4 puts that name beside the top-level cell's: the tool
+// that actually does the binding "only needs to be given the lib.cell
+// specification for the top-level cell(s) and/or the config to be used". The
+// cases below that name one are given a compilation unit holding two
+// configurations that each name a design, and each case gets back the design
+// the configuration it named describes. Naming neither of the two leaves
+// nothing on the command line saying which design was meant, so the command
+// line is reported. Naming a configuration the command line did not put in
+// force is reported as well, both where the unit holds no configuration of
+// that name and where it holds one that is not in force. Issue #3267 is the
+// defect these carry: nothing on the command line named a configuration, so a
+// compilation unit holding two configurations that each name a design could not
+// be elaborated at all.
 
 // The infrastructure one command line is compiled and elaborated against.
 struct CommandLineHarness {
@@ -62,12 +77,12 @@ struct CommandLineHarness {
   // or the run was reported, which is what a test about a rejected command
   // line reads together with `diag`.
   RtlirDesign* Run(const fs::path& dir, const std::vector<fs::path>& line,
-                   std::string_view top = "") {
+                   std::string_view top = "", std::string_view config = "") {
     if (!libs.LoadMapFile(dir / "lib.map")) return nullptr;
     if (!compiler.CompileCommandLine(line, unit)) return nullptr;
     if (diag.HasErrors()) return nullptr;
     elab.emplace(arena, diag, &unit);
-    return ElaborateCommandLine(*elab, unit, top, diag);
+    return ElaborateCommandLine(*elab, unit, top, config, diag);
   }
 };
 
@@ -205,6 +220,52 @@ std::vector<std::string_view> NamesBoundUnderTheRoot(RtlirDesign* design) {
   return names;
 }
 
+// A command line naming two configurations that each name a design of their
+// own, with a root apiece. cfg_top's design statement names top and
+// cfg_other's names other, so the two designs have roots of different names
+// and a run says which configuration it was given by the name of the root it
+// comes back with. Neither root instantiates the other, so a design rooted at
+// one of them holds no trace of the other.
+struct TwoConfigSources {
+  fs::path child;
+  fs::path top;
+  fs::path other;
+  fs::path cfg_top;
+  fs::path cfg_other;
+};
+
+TwoConfigSources WriteTwoConfigSources(ScratchDir& tmp) {
+  tmp.Write("lib.map", "library rtlLib src/*.v;\n");
+  TwoConfigSources s;
+  s.child = tmp.Write("src/child.v",
+                      "module child;\n"
+                      "endmodule\n");
+  s.top = tmp.Write("src/top.v",
+                    "module top;\n"
+                    "  child c();\n"
+                    "endmodule\n");
+  s.other = tmp.Write("src/other.v",
+                      "module other;\n"
+                      "  child o();\n"
+                      "endmodule\n");
+  s.cfg_top = tmp.Write("src/cfg_top.v",
+                        "config cfg_top;\n"
+                        "  design top;\n"
+                        "endconfig\n");
+  s.cfg_other = tmp.Write("src/cfg_other.v",
+                          "config cfg_other;\n"
+                          "  design other;\n"
+                          "endconfig\n");
+  return s;
+}
+
+// Every description of TwoConfigSources, in the order a command line names
+// them. Each case below names all five, so what separates the cases is the
+// configuration the command line names and nothing else.
+std::vector<fs::path> TwoConfigCommandLine(const TwoConfigSources& s) {
+  return {s.child, s.top, s.other, s.cfg_top, s.cfg_other};
+}
+
 // ---------------------------------------------------------------------------
 // Claim: in the single-pass use models the configuration is put in force by
 // naming its source description on the command line, and where that
@@ -257,7 +318,7 @@ TEST(CommandLineBinding, ConfigHeldInTheLibraryOffThisCommandLineIsNotInForce) {
   ASSERT_TRUE(h.compiler.CompileCommandLine(line, h.unit));
 
   Elaborator elab(h.arena, h.diag, &h.unit);
-  auto* design = ElaborateCommandLine(elab, h.unit, "", h.diag);
+  auto* design = ElaborateCommandLine(elab, h.unit, "", "", h.diag);
   ASSERT_FALSE(h.diag.HasErrors());
   ASSERT_NE(design, nullptr);
   ASSERT_EQ(design->top_modules.size(), 2u);
@@ -465,6 +526,115 @@ TEST(CommandLineBinding, TwoConfigsNamingDesignsOfTheirOwnAreReported) {
                             "'cfg' and 'cfg_spare' each name a design of their "
                             "own",
                             0, "33.5.4"));
+}
+
+// ---------------------------------------------------------------------------
+// Claim: a command line names the configuration to be used, and the design
+// that configuration's design statement describes is what comes back. The name
+// picks out one of the configurations the command line put in force, and a
+// name reaching none of them is reported.
+// ---------------------------------------------------------------------------
+
+TEST(CommandLineBinding, NamedConfigPicksItsOwnDesignFromTwoInForce) {
+  // Two configurations name designs of their own on this command line and the
+  // command line names cfg_top. The design comes back rooted at top, which is
+  // the cell cfg_top's design statement names. other is on the same command
+  // line and no instance names it, so it would root a design of its own were
+  // the configuration named not what settles the roots.
+  ScratchDir tmp;
+  auto s = WriteTwoConfigSources(tmp);
+
+  CommandLineHarness h;
+  auto* design = h.Run(tmp.dir, TwoConfigCommandLine(s), "", "cfg_top");
+  ASSERT_FALSE(h.diag.HasErrors());
+  ASSERT_NE(design, nullptr);
+  ASSERT_EQ(design->top_modules.size(), 1u);
+  EXPECT_EQ(design->top_modules[0]->name, "top");
+  EXPECT_FALSE(design->all_modules.contains("other"));
+}
+
+TEST(CommandLineBinding, NamingTheOtherConfigInForcePicksTheOtherDesign) {
+  // The same command line with the other configuration named. The design comes
+  // back rooted at other, so the name is what chooses between the two rather
+  // than the first configuration in force being taken whatever was named.
+  ScratchDir tmp;
+  auto s = WriteTwoConfigSources(tmp);
+
+  CommandLineHarness h;
+  auto* design = h.Run(tmp.dir, TwoConfigCommandLine(s), "", "cfg_other");
+  ASSERT_FALSE(h.diag.HasErrors());
+  ASSERT_NE(design, nullptr);
+  ASSERT_EQ(design->top_modules.size(), 1u);
+  EXPECT_EQ(design->top_modules[0]->name, "other");
+  EXPECT_FALSE(design->all_modules.contains("top"));
+}
+
+TEST(CommandLineBinding, TwoConfigsInForceAreStillReportedWithNoConfigNamed) {
+  // The same command line with no configuration named on it. Both
+  // configurations stay in force and the command line is reported, which is
+  // what says naming one resolves the ambiguity rather than the option's
+  // arrival having removed the report.
+  ScratchDir tmp;
+  auto s = WriteTwoConfigSources(tmp);
+
+  CommandLineHarness h;
+  auto* design = h.Run(tmp.dir, TwoConfigCommandLine(s));
+  EXPECT_EQ(design, nullptr);
+  // The report is about the command line rather than about anything written in
+  // a source description, so it stands at no position.
+  EXPECT_TRUE(ReportedError(h.diag.Diagnostics(),
+                            "command line puts 2 configurations in force", 0,
+                            "33.5.4"));
+}
+
+TEST(CommandLineBinding, ConfigNameMatchingNothingInTheUnitIsReported) {
+  // The name on the command line reaches no configuration the compilation unit
+  // holds. The run is reported rather than falling back on the two
+  // configurations that are in force, either of which a fallback could have
+  // picked.
+  ScratchDir tmp;
+  auto s = WriteTwoConfigSources(tmp);
+
+  CommandLineHarness h;
+  auto* design = h.Run(tmp.dir, TwoConfigCommandLine(s), "", "cfg_absent");
+  EXPECT_EQ(design, nullptr);
+  // The name came off the command line, so it is written in no source
+  // description for the report to stand at.
+  EXPECT_TRUE(ReportedError(
+      h.diag.Diagnostics(),
+      "no configuration named 'cfg_absent' is in force; the command line put 2 "
+      "in force",
+      0, "33.5.4"));
+}
+
+TEST(CommandLineBinding, ConfigNamingNoDesignIsNotSelectableByName) {
+  // The compilation unit holds the configuration the command line names and
+  // ConfigsInForce leaves it out, so naming it is reported. The exclusion this
+  // case rests on is the one ConfigsInForce applies to a configuration whose
+  // design statement names no cell: cfg_empty describes no design, so there is
+  // no design for the command line to have meant by naming it.
+  //
+  // cfg is on the same command line and does name a design, so one
+  // configuration is in force while the run is reported. A unit holding
+  // cfg_empty alone would report the same sentence with a count of zero, and
+  // could not tell a name excluded by ConfigsInForce from a command line that
+  // put no configuration in force at all.
+  ScratchDir tmp;
+  auto s = WriteSources(tmp);
+  auto empty = tmp.Write("src/cfg_empty.v",
+                         "config cfg_empty;\n"
+                         "  design;\n"
+                         "endconfig\n");
+
+  CommandLineHarness h;
+  auto* design =
+      h.Run(tmp.dir, {s.child, s.top, s.spare, s.cfg, empty}, "", "cfg_empty");
+  EXPECT_EQ(design, nullptr);
+  EXPECT_TRUE(ReportedError(
+      h.diag.Diagnostics(),
+      "no configuration named 'cfg_empty' is in force; the command line put 1 "
+      "in force",
+      0, "33.5.4"));
 }
 
 // ---------------------------------------------------------------------------
