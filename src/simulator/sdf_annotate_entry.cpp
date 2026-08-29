@@ -764,14 +764,27 @@ std::string_view SdfCheckTypeName(SdfCheckType type) {
 
 }  // namespace
 
-void AnnotateSdfTimingCheckEntry(const SdfTimingCheck& tc, SpecifyManager& mgr,
-                                 SdfMtm mtm, SdfAnnotationResult& result) {
+// §32.4.2 Table 32-2: hand one TIMINGCHECK entry to the manager, which updates
+// whichever declared checks it matches.
+//
+// §31.2 puts a system timing check inside a specify block and §30.3 puts that
+// block inside a module declaration, so two instances of one cell declare
+// checks naming identically spelled signals. `inst_prefix` is what
+// SdfCellInstancePrefix made of the cell's CELLINSTANCE, and it travels beside
+// the annotation rather than on it because SdfTcAnnotation
+// (simulator/specify_sdf.h) has no field for it, as with AnnotateSdfDeviceEntry
+// above. It is what holds the constraint to the checks of the one instance the
+// entry names.
+void AnnotateSdfTimingCheckEntry(const SdfTimingCheck& tc,
+                                 std::string_view inst_prefix,
+                                 SpecifyManager& mgr, SdfMtm mtm,
+                                 SdfAnnotationResult& result) {
   // An SDF check offers several candidate annotations so it can update
   // whichever form the specify block happens to declare; landing any one of
   // them means the constraint was placed.
   bool placed = false;
   for (const auto& target : ExpandSdfTimingCheckTargets(tc, mtm)) {
-    if (mgr.AnnotateSdfTimingCheck(target)) placed = true;
+    if (mgr.AnnotateSdfTimingCheck(target, inst_prefix)) placed = true;
   }
   // §32.3: a constraint the design declares no check for is data the annotator
   // understood but could not put anywhere, so it warns rather than dropping the

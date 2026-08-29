@@ -720,10 +720,14 @@ bool SdfAnnotationMatchesCheck(const TimingCheckEntry& existing,
                                std::string_view inst_prefix) {
   // §31.2 puts a system timing check inside a specify block, so two instances
   // of one cell declare checks naming identically spelled signals and the
-  // instance is what tells them apart. An empty prefix names no instance and
-  // reaches the checks of every one, exactly as the SpecifyEdge::kNone and the
-  // empty condition below reach a check carrying any edge or any condition.
-  if (!inst_prefix.empty() && existing.inst_prefix != inst_prefix) return false;
+  // instance is what tells them apart. The prefixes are compared exactly, an
+  // empty one naming the module the design was elaborated as rather than every
+  // instance: SdfCellInstancePrefix (simulator/sdf_parser.h) answers a definite
+  // prefix for every cell, so no annotation arrives with its instance left
+  // unspecified. The SpecifyEdge::kNone and the empty condition below do reach
+  // a check carrying any edge or any condition, which is what §32.4.2 rules for
+  // an SDF check whose signals the file wrote no edge and no condition on.
+  if (existing.inst_prefix != inst_prefix) return false;
   if (existing.kind != a.kind) return false;
   if (existing.ref_signal != a.ref_signal) return false;
   if (existing.data_signal != a.data_signal) return false;

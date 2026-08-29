@@ -38,8 +38,10 @@ void AnnotateSdfDeviceEntry(const SdfDevice& dev, std::string_view inst_prefix,
 void AnnotateSdfSpecparamEntry(const SdfSpecparam& sp,
                                std::string_view inst_prefix,
                                SpecifyManager& mgr, SdfMtm mtm);
-void AnnotateSdfTimingCheckEntry(const SdfTimingCheck& tc, SpecifyManager& mgr,
-                                 SdfMtm mtm, SdfAnnotationResult& result);
+void AnnotateSdfTimingCheckEntry(const SdfTimingCheck& tc,
+                                 std::string_view inst_prefix,
+                                 SpecifyManager& mgr, SdfMtm mtm,
+                                 SdfAnnotationResult& result);
 
 // §32.9: a module_instance operand names a level of the design hierarchy, and
 // the annotator works from that level down. A SystemVerilog hierarchical name
@@ -161,8 +163,8 @@ void AnnotateSdfCellEntry(const SdfCellSource& src,
                                 mgr, mtm);
       break;
     case SdfCellEntryKind::kTimingCheck:
-      AnnotateSdfTimingCheckEntry(cell.timing_checks[entry.index], mgr, mtm,
-                                  result);
+      AnnotateSdfTimingCheckEntry(cell.timing_checks[entry.index],
+                                  src.inst_prefix, mgr, mtm, result);
       break;
   }
 }

@@ -140,14 +140,20 @@ class SpecifyManager {
   // latter).
   //
   // `inst_prefix` is the module instance the annotation reaches, in the
-  // spelling TimingCheckEntry::inst_prefix carries. §31.2 puts a system timing
-  // check inside a specify block, so two instances of one cell declare checks
-  // naming identically spelled signals and the instance is what tells them
-  // apart. An empty prefix names no instance and so reaches a matching check in
-  // every one, the way an annotation carrying SpecifyEdge::kNone reaches a
-  // check of any edge: SdfTcAnnotation (simulator/specify_sdf.h) carries no
-  // instance of its own, so AnnotateSdfTimingCheckEntry
-  // (simulator/sdf_annotate_entry.cpp) has none to pass and passes none.
+  // spelling TimingCheckEntry::inst_prefix carries, and it is matched exactly:
+  // the annotation reaches the checks of that instance and of no other. An
+  // empty prefix names the module the design was elaborated as, which is the
+  // prefix a check declared in that module carries; it is not a wildcard.
+  // §31.2 puts a system timing check inside a specify block, so two instances
+  // of one cell declare checks naming identically spelled signals and the
+  // instance is what tells them apart.
+  //
+  // The annotation's edge and condition stay permissive where its instance does
+  // not, because §32.4.2 rules that an SDF check naming no edge and no
+  // condition matches every corresponding declared check. No such unspecified
+  // instance exists: SdfCellInstancePrefix (simulator/sdf_parser.h) answers a
+  // definite prefix for every cell, so an empty value stands for the root
+  // rather than for an instance the file left out.
   bool AnnotateSdfTimingCheck(const SdfTcAnnotation& annotation,
                               std::string_view inst_prefix = {});
 

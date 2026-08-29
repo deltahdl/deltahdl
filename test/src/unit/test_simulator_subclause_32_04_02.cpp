@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
+#include <string_view>
 
 #include "fixture_simulator.h"
 #include "fixture_specify_manager.h"
@@ -548,6 +550,191 @@ TEST(SdfTimingCheckBothSignalEdges, EveryEdgeNamedMustMatchBeforeAnnotation) {
       EXPECT_EQ(tc.limit2, 3u);
     }
   }
+}
+
+// The rest of this file is about which module *instance* an SDF timing check
+// reaches. §32.4.2 settles which declared check a record lands on -- its type,
+// its two signals, their edges and their conditions -- and §32.9 settles which
+// instance it lands in: "the SDF annotator uses the hierarchy level of the
+// specified instance for running the annotation", so a record written under
+// (INSTANCE u_first) reaches u_first and no other instance of that cell. §31.2
+// puts a system timing check in a specify block and §30.3 has that block
+// "appear inside a module declaration", so two instances of one cell declare
+// checks whose signals are spelled identically, and the instance is the only
+// thing that separates them.
+//
+// Every case below hands AnnotateSdfToManager a design root, which no case
+// above does. SdfCellInstancePrefix (src/simulator/sdf_parser.h) answers empty
+// for an empty design root, so an annotation made without one carries the empty
+// prefix and could not name an instance however strictly the prefix were
+// compared; the root is what makes the SDF instance path design-relative. The
+// cases above pass no root, and their declarations and their annotations both
+// stand at the empty prefix for that reason.
+//
+// Every case builds its SystemVerilog side by elaborating, lowering and running
+// real source, rather than by registering one ModuleDecl's checks the way the
+// cases above do. Lowerer::RegisterDesignTiming files each instance's specify
+// block under that instance's own hierarchical prefix, and that is what gives a
+// case two entries to tell apart.
+//
+// The limits are picked so that no two quantities a case tells apart share a
+// value. 31 is what the two-instance cell declares, 41 and 59 are what the two
+// records of the first case annotate, and 67 is what the single record of the
+// second annotates: a check reached by the wrong record reads as another of
+// those, a check never reached reads as 31, and neither can be mistaken for the
+// right answer. The design-root case declares 23 at the top and 37 in the
+// instance and annotates 83, all three distinct. No limit is 0, which is what
+// TimingCheckEntry::limit holds before a limit expression is evaluated into it.
+
+// The SpecifyManager `source` leaves on `f.ctx` once it has been elaborated,
+// lowered and run -- the one Lowerer::Lower installed, which holds each
+// instance's checks under that instance's prefix. Null when the source did not
+// elaborate cleanly, so a case asserts on the pointer before annotating onto
+// it.
+SpecifyManager* ManagerAfterRun(const std::string& source, SimFixture& f) {
+  auto* design = ElaborateSrc(source, f);
+  if (design == nullptr || f.has_errors) return nullptr;
+  LowerAndRun(design, f);
+  return f.ctx.GetSpecifyManager();
+}
+
+// Annotates real SDF text onto a manager filled by a run, naming the module the
+// design was elaborated as. §32.9's instance paths are written from the design
+// root, and that fifth argument is what AnnotateSdfToManager measures them
+// against.
+void AnnotateUnderDesignRoot(const std::string& sdf, SpecifyManager& mgr,
+                             std::string_view design_root) {
+  SdfFile file;
+  ASSERT_TRUE(ParseSdf(sdf, file));
+  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical, /*scope=*/{}, design_root);
+}
+
+// One CELL record carrying one SETUP entry on the signals `d` and `clk`. An SDF
+// timing check writes its data signal before its reference signal -- §32.4.2's
+// own example is (SETUPHOLD data clk (3) (4)) -- so `d` is the data signal here
+// and `clk` the reference, which is also the order §31.2's
+// $setup(data_event, reference_event, timing_check_limit) writes them in.
+std::string SetupRecord(const std::string& cell_type,
+                        const std::string& instance, const std::string& limit) {
+  return "  (CELL (CELLTYPE \"" + cell_type + "\") (INSTANCE " + instance +
+         ") (TIMINGCHECK (SETUP d (posedge clk) (" + limit + "))))\n";
+}
+
+std::string DelayFileOf(const std::string& records) {
+  return "(DELAYFILE\n" + records + ")\n";
+}
+
+// The limit of the one $setup registered under the instance whose hierarchical
+// prefix is `prefix`. Both fields are needed: §31.2 has a timing check name its
+// signals by the port names of the module declaring it, so two instances of one
+// cell register checks agreeing on kind, on ref_signal and on data_signal.
+uint64_t SetupLimitIn(const SpecifyManager& mgr, std::string_view prefix) {
+  for (const auto& tc : mgr.GetTimingChecks()) {
+    if (tc.kind == TimingCheckKind::kSetup && tc.inst_prefix == prefix) {
+      return tc.limit;
+    }
+  }
+  ADD_FAILURE() << "no $setup was registered under the instance prefix '"
+                << prefix << "'";
+  return 0;
+}
+
+// One cell instantiated twice under a top named `top`, so the two instances
+// declare $setup checks spelled identically and separated only by their
+// prefixes, "u_first." and "u_second.". The cell stands first because
+// ElaborateSrc (lib/cpp/test_fixtures/fixture_simulator.h) elaborates
+// cu->modules.back()->name. It is not named `cell`, which §33.4 gives to a
+// config declaration's cell clause.
+const char* const kTwoInstanceDesign =
+    "module annotated_cell(input d, input clk, output q);\n"
+    "  specify\n"
+    "    $setup(d, posedge clk, 31);\n"
+    "  endspecify\n"
+    "endmodule\n"
+    "module top;\n"
+    "  logic first_q;\n"
+    "  logic second_q;\n"
+    "  annotated_cell u_first(1'b0, 1'b0, first_q);\n"
+    "  annotated_cell u_second(1'b0, 1'b0, second_q);\n"
+    "endmodule\n";
+
+// §32.9: each record annotates the instance its (INSTANCE ...) operand names,
+// so two records naming two instances of one cell give those instances
+// different limits for the identically spelled §31.2 check both declared. 41
+// and 59 differ from one another and from the 31 the cell declared, so a check
+// reached by the other instance's record and a check reached by no record read
+// as different wrong numbers.
+TEST(SdfTimingCheckInstanceScope,
+     EachInstanceTakesTheLimitOfTheRecordNamingIt) {
+  SimFixture f;
+  SpecifyManager* mgr = ManagerAfterRun(kTwoInstanceDesign, f);
+  ASSERT_NE(mgr, nullptr);
+  ASSERT_EQ(mgr->TimingCheckCount(), 2u);
+
+  AnnotateUnderDesignRoot(
+      DelayFileOf(SetupRecord("annotated_cell", "top/u_first", "41") +
+                  SetupRecord("annotated_cell", "top/u_second", "59")),
+      *mgr, "top");
+
+  EXPECT_EQ(SetupLimitIn(*mgr, "u_first."), 41u);
+  EXPECT_EQ(SetupLimitIn(*mgr, "u_second."), 59u);
+}
+
+// §32.9: a file that names one instance annotates that instance alone, so the
+// other instance of the same cell keeps the limit its own declaration gave it.
+// The declared 31 is what says the record stopped where its operand did; 67 is
+// distinct from it and from the 41 and 59 the case above annotates, so a check
+// reached by the record reads as neither.
+TEST(SdfTimingCheckInstanceScope,
+     ARecordNamingOneInstanceLeavesTheOtherAsDeclared) {
+  SimFixture f;
+  SpecifyManager* mgr = ManagerAfterRun(kTwoInstanceDesign, f);
+  ASSERT_NE(mgr, nullptr);
+  ASSERT_EQ(mgr->TimingCheckCount(), 2u);
+
+  AnnotateUnderDesignRoot(
+      DelayFileOf(SetupRecord("annotated_cell", "top/u_second", "67")), *mgr,
+      "top");
+
+  EXPECT_EQ(SetupLimitIn(*mgr, "u_second."), 67u);
+  EXPECT_EQ(SetupLimitIn(*mgr, "u_first."), 31u);
+}
+
+// A top declaring a $setup of its own beside an instance declaring one, so the
+// two checks agree on everything §32.4.2 matches on and differ only in the
+// instance: the top's prefix is empty and the instance's is "u_inner.".
+const char* const kRootAndInstanceDesign =
+    "module rooted_cell(input d, input clk, output q);\n"
+    "  specify\n"
+    "    $setup(d, posedge clk, 37);\n"
+    "  endspecify\n"
+    "endmodule\n"
+    "module top;\n"
+    "  logic d;\n"
+    "  logic clk;\n"
+    "  logic inner_q;\n"
+    "  rooted_cell u_inner(1'b0, 1'b0, inner_q);\n"
+    "  specify\n"
+    "    $setup(d, posedge clk, 23);\n"
+    "  endspecify\n"
+    "endmodule\n";
+
+// §32.9: a record whose instance path is the design root itself names the top,
+// whose prefix is empty, and reaches the check the top declared. The empty
+// prefix names that one instance rather than every instance, so the check
+// declared inside u_inner keeps its own 37 while the top takes 83.
+TEST(SdfTimingCheckInstanceScope,
+     ARecordNamingTheDesignRootReachesTheTopsOwnCheck) {
+  SimFixture f;
+  SpecifyManager* mgr = ManagerAfterRun(kRootAndInstanceDesign, f);
+  ASSERT_NE(mgr, nullptr);
+  ASSERT_EQ(mgr->TimingCheckCount(), 2u);
+
+  AnnotateUnderDesignRoot(DelayFileOf(SetupRecord("top", "top", "83")), *mgr,
+                          "top");
+
+  EXPECT_EQ(SetupLimitIn(*mgr, ""), 83u);
+  EXPECT_EQ(SetupLimitIn(*mgr, "u_inner."), 37u);
 }
 
 }  // namespace
