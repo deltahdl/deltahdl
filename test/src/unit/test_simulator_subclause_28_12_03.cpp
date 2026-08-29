@@ -1,3 +1,13 @@
+// §28.12.3: combining a signal of known value and unambiguous strength with a
+// signal of ambiguous strength, under that subclause's rules a), b) and c).
+//
+// Every StrengthSignal operand below is written in the encoding StrengthSignal
+// states in lib/cpp/test_models/model_strength.h, where a side is occupied when
+// its _hi is above kHighz and then occupies every level from its _lo up to that
+// _hi. UnambiguousSignal and AmbiguousRange below build the two kinds of
+// operand, so each case names the kind it means rather than listing four
+// fields.
+
 #include <gtest/gtest.h>
 
 #include <initializer_list>
@@ -80,10 +90,51 @@ NetStrength ResolveSrcNetW(const std::string& src) {
   return net == nullptr ? NetStrength{} : net->resolved_strength;
 }
 
+// The signal of known value and unambiguous strength §28.12.3 combines an
+// ambiguous signal with, driving `value` at the single level `level`. Such a
+// signal occupies one cell of Figure 28-2's scale, so StrengthSignal in
+// lib/cpp/test_models/model_strength.h writes it with _lo equal to _hi on the
+// side its value stands on. §28.12.3's unambiguous signal has a known value, so
+// `value` is Val4::kV0 or Val4::kV1.
+StrengthSignal UnambiguousSignal(Val4 value, StrengthLevel level) {
+  StrengthSignal signal;
+  signal.value = value;
+  if (value == Val4::kV0) {
+    signal.strength0_hi = level;
+    signal.strength0_lo = level;
+  } else {
+    signal.strength1_hi = level;
+    signal.strength1_lo = level;
+  }
+  return signal;
+}
+
+// A signal of ambiguous strength occupying every level from `lo` up to `hi`.
+// The value names the side the range stands on: Val4::kV0 the strength0 side,
+// Val4::kV1 the strength1 side, and Val4::kX both sides, which is the signal
+// §28.12.2 makes out of two equally strong drivers of opposite value. A range
+// left at StrengthLevel::kHighz on its low end reaches high impedance, which is
+// what §28.12.3's rules a) and b) trim.
+StrengthSignal AmbiguousRange(Val4 value, StrengthLevel lo, StrengthLevel hi) {
+  bool on_side_0 = value == Val4::kV0 || value == Val4::kX;
+  bool on_side_1 = value == Val4::kV1 || value == Val4::kX;
+  StrengthSignal signal;
+  signal.value = value;
+  if (on_side_0) {
+    signal.strength0_hi = hi;
+    signal.strength0_lo = lo;
+  }
+  if (on_side_1) {
+    signal.strength1_hi = hi;
+    signal.strength1_lo = lo;
+  }
+  return signal;
+}
+
 TEST(StrengthCombineAmbigUnambig, RuleAPreservesHighEndOfRange) {
-  StrengthSignal unambig{Val4::kV0, StrengthLevel::kSmall,
-                         StrengthLevel::kHighz};
-  StrengthSignal ambig{Val4::kV1, StrengthLevel::kHighz, StrengthLevel::kWeak};
+  StrengthSignal unambig = UnambiguousSignal(Val4::kV0, StrengthLevel::kSmall);
+  StrengthSignal ambig =
+      AmbiguousRange(Val4::kV1, StrengthLevel::kHighz, StrengthLevel::kWeak);
   auto result = CombineAmbiguousWithUnambiguous(unambig, ambig);
   EXPECT_EQ(result.value, Val4::kX);
   EXPECT_EQ(result.strength0_hi, StrengthLevel::kSmall);
@@ -91,10 +142,9 @@ TEST(StrengthCombineAmbigUnambig, RuleAPreservesHighEndOfRange) {
 }
 
 TEST(StrengthCombineAmbigUnambig, RuleATrimsLowEndButKeepsHigh) {
-  StrengthSignal unambig{Val4::kV0, StrengthLevel::kPull,
-                         StrengthLevel::kHighz};
-  StrengthSignal ambig{Val4::kV1, StrengthLevel::kHighz,
-                       StrengthLevel::kStrong};
+  StrengthSignal unambig = UnambiguousSignal(Val4::kV0, StrengthLevel::kPull);
+  StrengthSignal ambig =
+      AmbiguousRange(Val4::kV1, StrengthLevel::kHighz, StrengthLevel::kStrong);
   auto result = CombineAmbiguousWithUnambiguous(unambig, ambig);
   EXPECT_EQ(result.value, Val4::kX);
   EXPECT_EQ(result.strength1_hi, StrengthLevel::kStrong);
@@ -102,9 +152,9 @@ TEST(StrengthCombineAmbigUnambig, RuleATrimsLowEndButKeepsHigh) {
 }
 
 TEST(StrengthCombineAmbigUnambig, RuleBEliminatesAmbigAtOrBelowSu) {
-  StrengthSignal unambig{Val4::kV0, StrengthLevel::kStrong,
-                         StrengthLevel::kHighz};
-  StrengthSignal ambig{Val4::kV1, StrengthLevel::kHighz, StrengthLevel::kWeak};
+  StrengthSignal unambig = UnambiguousSignal(Val4::kV0, StrengthLevel::kStrong);
+  StrengthSignal ambig =
+      AmbiguousRange(Val4::kV1, StrengthLevel::kHighz, StrengthLevel::kWeak);
   auto result = CombineAmbiguousWithUnambiguous(unambig, ambig);
   EXPECT_EQ(result.value, Val4::kV0);
   EXPECT_EQ(result.strength0_hi, StrengthLevel::kStrong);
@@ -114,19 +164,18 @@ TEST(StrengthCombineAmbigUnambig, RuleBEliminatesAmbigAtOrBelowSu) {
 }
 
 TEST(StrengthCombineAmbigUnambig, RuleBEliminatesAmbigAtExactlySu) {
-  StrengthSignal unambig{Val4::kV0, StrengthLevel::kPull,
-                         StrengthLevel::kHighz};
-  StrengthSignal ambig{Val4::kV1, StrengthLevel::kHighz, StrengthLevel::kPull};
+  StrengthSignal unambig = UnambiguousSignal(Val4::kV0, StrengthLevel::kPull);
+  StrengthSignal ambig =
+      AmbiguousRange(Val4::kV1, StrengthLevel::kHighz, StrengthLevel::kPull);
   auto result = CombineAmbiguousWithUnambiguous(unambig, ambig);
   EXPECT_EQ(result.value, Val4::kV0);
   EXPECT_EQ(result.strength1_hi, StrengthLevel::kHighz);
 }
 
 TEST(StrengthCombineAmbigUnambig, RuleBSameValueMergeWithUnambig) {
-  StrengthSignal unambig{Val4::kV0, StrengthLevel::kWeak,
-                         StrengthLevel::kHighz};
-  StrengthSignal ambig{Val4::kV0, StrengthLevel::kStrong,
-                       StrengthLevel::kHighz};
+  StrengthSignal unambig = UnambiguousSignal(Val4::kV0, StrengthLevel::kWeak);
+  StrengthSignal ambig =
+      AmbiguousRange(Val4::kV0, StrengthLevel::kHighz, StrengthLevel::kStrong);
   auto result = CombineAmbiguousWithUnambiguous(unambig, ambig);
   EXPECT_EQ(result.value, Val4::kV0);
   EXPECT_EQ(result.strength0_hi, StrengthLevel::kStrong);
@@ -135,15 +184,9 @@ TEST(StrengthCombineAmbigUnambig, RuleBSameValueMergeWithUnambig) {
 }
 
 TEST(StrengthCombineAmbigUnambig, RuleCFillsGapOnOppositeSide) {
-  StrengthSignal unambig{Val4::kV0, StrengthLevel::kPull,
-                         StrengthLevel::kHighz};
-  StrengthSignal ambig{
-      .value = Val4::kV1,
-      .strength0_hi = StrengthLevel::kHighz,
-      .strength1_hi = StrengthLevel::kSupply,
-      .strength0_lo = StrengthLevel::kHighz,
-      .strength1_lo = StrengthLevel::kSupply,
-  };
+  StrengthSignal unambig = UnambiguousSignal(Val4::kV0, StrengthLevel::kPull);
+  StrengthSignal ambig =
+      AmbiguousRange(Val4::kV1, StrengthLevel::kSupply, StrengthLevel::kSupply);
   auto result = CombineAmbiguousWithUnambiguous(unambig, ambig);
   EXPECT_EQ(result.value, Val4::kX);
   EXPECT_EQ(result.strength1_hi, StrengthLevel::kSupply);
@@ -153,15 +196,9 @@ TEST(StrengthCombineAmbigUnambig, RuleCFillsGapOnOppositeSide) {
 }
 
 TEST(StrengthCombineAmbigUnambig, RuleCFillsMultiLevelGap) {
-  StrengthSignal unambig{Val4::kV0, StrengthLevel::kWeak,
-                         StrengthLevel::kHighz};
-  StrengthSignal ambig{
-      .value = Val4::kV1,
-      .strength0_hi = StrengthLevel::kHighz,
-      .strength1_hi = StrengthLevel::kSupply,
-      .strength0_lo = StrengthLevel::kHighz,
-      .strength1_lo = StrengthLevel::kStrong,
-  };
+  StrengthSignal unambig = UnambiguousSignal(Val4::kV0, StrengthLevel::kWeak);
+  StrengthSignal ambig =
+      AmbiguousRange(Val4::kV1, StrengthLevel::kStrong, StrengthLevel::kSupply);
   auto result = CombineAmbiguousWithUnambiguous(unambig, ambig);
   EXPECT_EQ(result.value, Val4::kX);
   EXPECT_EQ(result.strength1_hi, StrengthLevel::kSupply);
@@ -169,15 +206,9 @@ TEST(StrengthCombineAmbigUnambig, RuleCFillsMultiLevelGap) {
 }
 
 TEST(StrengthCombineAmbigUnambig, RuleCDoesNotFillSameSideGap) {
-  StrengthSignal unambig{Val4::kV0, StrengthLevel::kWeak,
-                         StrengthLevel::kHighz};
-  StrengthSignal ambig{
-      .value = Val4::kV0,
-      .strength0_hi = StrengthLevel::kSupply,
-      .strength1_hi = StrengthLevel::kHighz,
-      .strength0_lo = StrengthLevel::kStrong,
-      .strength1_lo = StrengthLevel::kHighz,
-  };
+  StrengthSignal unambig = UnambiguousSignal(Val4::kV0, StrengthLevel::kWeak);
+  StrengthSignal ambig =
+      AmbiguousRange(Val4::kV0, StrengthLevel::kStrong, StrengthLevel::kSupply);
   auto result = CombineAmbiguousWithUnambiguous(unambig, ambig);
   EXPECT_EQ(result.value, Val4::kV0);
   EXPECT_EQ(result.strength0_hi, StrengthLevel::kSupply);
@@ -186,10 +217,9 @@ TEST(StrengthCombineAmbigUnambig, RuleCDoesNotFillSameSideGap) {
 }
 
 TEST(StrengthCombineAmbigUnambig, RulesAAndBApplyPerSide) {
-  StrengthSignal unambig{Val4::kV0, StrengthLevel::kPull,
-                         StrengthLevel::kHighz};
-  StrengthSignal ambig{Val4::kX, StrengthLevel::kStrong,
-                       StrengthLevel::kStrong};
+  StrengthSignal unambig = UnambiguousSignal(Val4::kV0, StrengthLevel::kPull);
+  StrengthSignal ambig =
+      AmbiguousRange(Val4::kX, StrengthLevel::kHighz, StrengthLevel::kStrong);
   auto result = CombineAmbiguousWithUnambiguous(unambig, ambig);
   EXPECT_EQ(result.value, Val4::kX);
   EXPECT_EQ(result.strength0_hi, StrengthLevel::kStrong);
@@ -199,10 +229,9 @@ TEST(StrengthCombineAmbigUnambig, RulesAAndBApplyPerSide) {
 }
 
 TEST(StrengthCombineAmbigUnambig, SupplyUnambigWipesAllAmbig) {
-  StrengthSignal unambig{Val4::kV0, StrengthLevel::kSupply,
-                         StrengthLevel::kHighz};
-  StrengthSignal ambig{Val4::kV1, StrengthLevel::kHighz,
-                       StrengthLevel::kSupply};
+  StrengthSignal unambig = UnambiguousSignal(Val4::kV0, StrengthLevel::kSupply);
+  StrengthSignal ambig =
+      AmbiguousRange(Val4::kV1, StrengthLevel::kHighz, StrengthLevel::kSupply);
   auto result = CombineAmbiguousWithUnambiguous(unambig, ambig);
   EXPECT_EQ(result.value, Val4::kV0);
   EXPECT_EQ(result.strength0_hi, StrengthLevel::kSupply);
@@ -210,10 +239,9 @@ TEST(StrengthCombineAmbigUnambig, SupplyUnambigWipesAllAmbig) {
 }
 
 TEST(StrengthCombineAmbigUnambig, MirrorWithV1Unambig) {
-  StrengthSignal unambig{Val4::kV1, StrengthLevel::kHighz,
-                         StrengthLevel::kPull};
-  StrengthSignal ambig{Val4::kV0, StrengthLevel::kStrong,
-                       StrengthLevel::kHighz};
+  StrengthSignal unambig = UnambiguousSignal(Val4::kV1, StrengthLevel::kPull);
+  StrengthSignal ambig =
+      AmbiguousRange(Val4::kV0, StrengthLevel::kHighz, StrengthLevel::kStrong);
   auto result = CombineAmbiguousWithUnambiguous(unambig, ambig);
   EXPECT_EQ(result.value, Val4::kX);
   EXPECT_EQ(result.strength1_hi, StrengthLevel::kPull);
@@ -223,15 +251,9 @@ TEST(StrengthCombineAmbigUnambig, MirrorWithV1Unambig) {
 }
 
 TEST(StrengthCombineAmbigUnambig, RuleCFillsGapOnOppositeSideMirror) {
-  StrengthSignal unambig{Val4::kV1, StrengthLevel::kHighz,
-                         StrengthLevel::kPull};
-  StrengthSignal ambig{
-      .value = Val4::kV0,
-      .strength0_hi = StrengthLevel::kSupply,
-      .strength1_hi = StrengthLevel::kHighz,
-      .strength0_lo = StrengthLevel::kSupply,
-      .strength1_lo = StrengthLevel::kHighz,
-  };
+  StrengthSignal unambig = UnambiguousSignal(Val4::kV1, StrengthLevel::kPull);
+  StrengthSignal ambig =
+      AmbiguousRange(Val4::kV0, StrengthLevel::kSupply, StrengthLevel::kSupply);
   auto result = CombineAmbiguousWithUnambiguous(unambig, ambig);
   EXPECT_EQ(result.value, Val4::kX);
   EXPECT_EQ(result.strength0_hi, StrengthLevel::kSupply);
@@ -241,9 +263,9 @@ TEST(StrengthCombineAmbigUnambig, RuleCFillsGapOnOppositeSideMirror) {
 }
 
 TEST(StrengthCombineAmbigUnambig, HighZUnambigPreservesEntireAmbig) {
-  StrengthSignal unambig{Val4::kV0, StrengthLevel::kHighz,
-                         StrengthLevel::kHighz};
-  StrengthSignal ambig{Val4::kV1, StrengthLevel::kHighz, StrengthLevel::kPull};
+  StrengthSignal unambig = UnambiguousSignal(Val4::kV0, StrengthLevel::kHighz);
+  StrengthSignal ambig =
+      AmbiguousRange(Val4::kV1, StrengthLevel::kHighz, StrengthLevel::kPull);
   auto result = CombineAmbiguousWithUnambiguous(unambig, ambig);
   EXPECT_EQ(result.value, Val4::kX);
   EXPECT_EQ(result.strength1_hi, StrengthLevel::kPull);

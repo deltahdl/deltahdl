@@ -17,12 +17,24 @@ enum class StrengthLevel : uint8_t {
   kSupply = 7,
 };
 
-// A strength signal carries a value and a range of strength levels per side.
-// Sides are independent: side 0 carries value-0 levels, side 1 carries value-1
-// levels. Unambiguous signals occupy a single level on the value side and
-// kHighz on the other; ambiguous signals occupy a range on one or both sides.
-// The _lo fields are exposed so §28.12.3 results — which can have a non-kHighz
-// lower bound after rule b) trims a side — are representable.
+// A strength signal as Figure 28-2 draws one: a span of the sixteen cells the
+// strength scale holds, which are Su0 St0 Pu0 La0 We0 Me0 Sm0 HiZ0 on the
+// strength0 side and HiZ1 Sm1 Me1 We1 La1 Pu1 St1 Su1 on the strength1 side.
+//
+// A side is occupied when its _hi is above kHighz, and it then occupies every
+// level from its _lo up to its _hi. An unambiguous signal occupies one cell, so
+// it is written with _lo equal to _hi on its value's side and kHighz on the
+// other; a signal built with _lo left at kHighz occupies its side down to high
+// impedance, which is what a switch network's output does and what §28.12.3's
+// rules a) and b) trim. A signal occupying cells on both sides has the value x,
+// one occupying neither has the value z, and `value` says which.
+//
+// Both _lo and _hi are read. CombineAmbiguous and CombineWithWiredLogic below
+// take the extremes over these spans, which §28.12.2 states as "a range that
+// includes the extremes of the signals and all the strengths between them";
+// before issue #3423 the two functions read _hi alone and answered a signal
+// anchored above high impedance, such as Figure 28-12's Pu1 to St1, as though
+// it reached high impedance.
 struct StrengthSignal {
   Val4 value = Val4::kZ;
   StrengthLevel strength0_hi = StrengthLevel::kHighz;
@@ -31,7 +43,12 @@ struct StrengthSignal {
   StrengthLevel strength1_lo = StrengthLevel::kHighz;
 };
 
-enum class ModelWiredLogicKind : uint8_t { kNone, kAnd, kOr };
+// The two logic functions §28.12.4 resolves a wired net with. The clause names
+// triand and wand for the first and trior and wor for the second, and no fifth
+// case: a net that is not one of the four is resolved by §28.12.2 and never
+// reaches CombineWithWiredLogic. WiredLogicKind (simulator/net.h) declares the
+// same two enumerators for the same reason.
+enum class ModelWiredLogicKind : uint8_t { kAnd, kOr };
 
 inline StrengthLevel MapStrengthKeyword(uint8_t keyword_index);
 
@@ -91,8 +108,10 @@ inline bool ValidateStrengthPair(StrengthLevel s0, StrengthLevel s1) {
 }
 
 inline StrengthSignal CombineUnambiguous(StrengthSignal a, StrengthSignal b) {
-  // Effective strength is the maximum of the two strength fields,
-  // since for an unambiguous signal one side is always highz.
+  // Effective strength is the maximum of the two strength fields, since for an
+  // unambiguous signal one side is always highz. The result is written with its
+  // _lo equal to its _hi, an unambiguous signal occupying one cell of Figure
+  // 28-2's scale, which is the encoding StrengthSignal above states.
   auto effective = [](const StrengthSignal& s) -> StrengthLevel {
     return std::max(s.strength0_hi, s.strength1_hi);
   };
@@ -107,10 +126,10 @@ inline StrengthSignal CombineUnambiguous(StrengthSignal a, StrengthSignal b) {
     StrengthLevel max_str = std::max(eff_a, eff_b);
     if (a.value == Val4::kV0) {
       result.strength0_hi = max_str;
-      result.strength1_hi = StrengthLevel::kHighz;
+      result.strength0_lo = max_str;
     } else {
-      result.strength0_hi = StrengthLevel::kHighz;
       result.strength1_hi = max_str;
+      result.strength1_lo = max_str;
     }
     return result;
   }
@@ -122,11 +141,90 @@ inline StrengthSignal CombineUnambiguous(StrengthSignal a, StrengthSignal b) {
     return b;
   }
 
-  // Equal strength, unlike values: produce x.
+  // Equal strength, unlike values: produce x. §28.12.1 gives the result that
+  // one strength on each side, so it occupies one cell of each rather than a
+  // range, and both _lo fields match their _hi.
   StrengthSignal result;
   result.value = Val4::kX;
   result.strength0_hi = eff_a;
+  result.strength0_lo = eff_a;
   result.strength1_hi = eff_a;
+  result.strength1_lo = eff_a;
+  return result;
+}
+
+// A cell of Figure 28-2's scale, as a position running from Su0 at 0 to Su1 at
+// 15. Ordering the sixteen cells on one line is what lets "all the strengths
+// between them" be a span rather than two separate ranges: §28.12.2's own
+// Figure 28-10 draws a range crossing from We0 through HiZ0 and HiZ1 to Pu1,
+// which no per-side pair of levels expresses on its own.
+inline int ScalePositionOf(StrengthLevel level, bool side_is_1) {
+  int index = static_cast<int>(level);
+  return side_is_1 ? 8 + index : 7 - index;
+}
+
+// The cells one signal occupies, as the closed span [lo, hi] of scale
+// positions. `occupied` is false for a signal that occupies none, which is the
+// z §28.12 leaves out of every combination.
+struct ScaleSpan {
+  bool occupied = false;
+  int lo = 0;
+  int hi = 0;
+};
+
+inline void ExtendSpan(ScaleSpan& span, int position) {
+  if (!span.occupied) {
+    span = ScaleSpan{true, position, position};
+    return;
+  }
+  span.lo = std::min(span.lo, position);
+  span.hi = std::max(span.hi, position);
+}
+
+inline ScaleSpan SpanOf(const StrengthSignal& s) {
+  ScaleSpan span;
+  if (s.strength0_hi != StrengthLevel::kHighz) {
+    ExtendSpan(span, ScalePositionOf(s.strength0_hi, false));
+    ExtendSpan(span, ScalePositionOf(s.strength0_lo, false));
+  }
+  if (s.strength1_hi != StrengthLevel::kHighz) {
+    ExtendSpan(span, ScalePositionOf(s.strength1_lo, true));
+    ExtendSpan(span, ScalePositionOf(s.strength1_hi, true));
+  }
+  return span;
+}
+
+// The signal a span of the scale stands for. A span reaching both sides holds
+// cells of both values, which is the x §28.12.2 gives "because its range
+// includes the values 1 and 0"; one reaching neither is z.
+//
+// A signal occupying HiZ0 alone, or HiZ1 alone, is the one thing StrengthSignal
+// cannot say, a side being occupied only when its _hi is above kHighz. Nothing
+// asks it to: SpanOf reads a side only when that side's _hi is above kHighz, so
+// the spans it produces always reach a cell off positions 7 and 8, and a pair
+// of such spans cannot resolve to position 7 or 8 alone. §28.12 combines no
+// such signal either, high impedance being what a driver contributes when it
+// drives nothing.
+inline StrengthSignal SignalOfSpan(const ScaleSpan& span) {
+  StrengthSignal result;
+  if (!span.occupied) return result;
+  bool has0 = span.lo <= 7;
+  bool has1 = span.hi >= 8;
+  if (has0) {
+    result.strength0_hi = static_cast<StrengthLevel>(7 - span.lo);
+    result.strength0_lo = static_cast<StrengthLevel>(7 - std::min(span.hi, 7));
+  }
+  if (has1) {
+    result.strength1_lo = static_cast<StrengthLevel>(std::max(span.lo, 8) - 8);
+    result.strength1_hi = static_cast<StrengthLevel>(span.hi - 8);
+  }
+  if (has0 && has1) {
+    result.value = Val4::kX;
+  } else if (has0) {
+    result.value = Val4::kV0;
+  } else {
+    result.value = Val4::kV1;
+  }
   return result;
 }
 
@@ -136,92 +234,71 @@ inline StrengthSignal CombineUnambiguous(StrengthSignal a, StrengthSignal b) {
 // an and gate" or "an or gate" with the two values as inputs, and "the strength
 // of the result is the same as the strength of the combined signals".
 //
-// Three of the clause's cases this function answers wrongly, all recorded in
-// issue #3423 and none of them asserted by
-// test_simulator_subclause_28_12_04.cpp:
-//
-// An operand spanning more than one level is collapsed to one by the max below,
-// so the union §28.12.4 asks for -- "all combinations of each of the strength
-// levels in the first signal with each of the strength levels in the second
-// signal" -- is never formed. Figure 28-25 is the counterexample: a value 0
-// over levels 6 and 5 combined by or logic with a value 1 at level 5 leaves a
-// value-1 component surviving, and this returns an unambiguous 0.
-//
-// An x operand is answered by the complement of the one case tested for, where
-// an and gate gives x for `1 and x` and an or gate gives x for `0 or x`.
-// WiredAnd and WiredOr (simulator/net.cpp) answer those correctly.
-//
-// ModelWiredLogicKind::kNone falls to the or arm, so a check that names no
-// wired logic resolves a strong 0 against a strong 1 to a definite 1 where
-// §28.12.2 makes it ambiguous. §28.12.4 names four net types and no such case,
-// and WiredLogicKind (simulator/net.h) declares no kNone.
-inline StrengthSignal CombineWithWiredLogic(StrengthSignal a, StrengthSignal b,
-                                            ModelWiredLogicKind logic) {
-  // For different strengths, the stronger signal dominates (same as
-  // unambiguous combination). Wired logic only applies when two
-  // same-strength opposite-value signals combine.
-  auto effective = [](const StrengthSignal& s) -> StrengthLevel {
-    return std::max(s.strength0_hi, s.strength1_hi);
-  };
-
-  StrengthLevel eff_a = effective(a);
-  StrengthLevel eff_b = effective(b);
-
-  // If same value or different strengths, defer to unambiguous rules
-  // (like values merge, stronger dominates).
-  if (a.value == b.value || eff_a != eff_b) {
-    return CombineUnambiguous(a, b);
-  }
-
-  // Same strength, opposite values: apply wired logic.
-  Val4 resolved = Val4::kX;
-  if (logic == ModelWiredLogicKind::kAnd) {
-    // AND: 1&0=0, 1&1=1, 0&0=0
-    if (a.value == Val4::kV1 && b.value == Val4::kV1) {
-      resolved = Val4::kV1;
-    } else {
-      resolved = Val4::kV0;
-    }
-  } else {
-    // OR: 1|0=1, 0|0=0, 1|1=1
-    if (a.value == Val4::kV0 && b.value == Val4::kV0) {
-      resolved = Val4::kV0;
-    } else {
-      resolved = Val4::kV1;
-    }
-  }
-
-  StrengthSignal result;
-  result.value = resolved;
-  if (resolved == Val4::kV0) {
-    result.strength0_hi = eff_a;
-    result.strength1_hi = StrengthLevel::kHighz;
-  } else {
-    result.strength0_hi = StrengthLevel::kHighz;
-    result.strength1_hi = eff_a;
-  }
-  return result;
+// Two cells of unequal strength are not a conflict, and Figure 28-25's charts
+// resolve such a pair to the stronger cell under both kinds of logic. The gate
+// decides a pair of equal strength alone, and each cell carries the value of
+// the side it stands on, so the gate is only ever handed a 0 and a 1.
+inline int WiredPairPosition(int a, int b, ModelWiredLogicKind logic) {
+  int stronger_a = a <= 7 ? 7 - a : a - 8;
+  int stronger_b = b <= 7 ? 7 - b : b - 8;
+  if (stronger_a > stronger_b) return a;
+  if (stronger_b > stronger_a) return b;
+  if (a == b) return a;
+  // Equal strength and opposite values. `and` gives the 0 cell and `or` the 1
+  // cell, the 0 cells being the positions at or below 7.
+  bool want_zero = logic == ModelWiredLogicKind::kAnd;
+  return want_zero ? std::min(a, b) : std::max(a, b);
 }
 
-// §28.12.2: combining two ambiguous-strength signals yields an ambiguous
-// signal whose strength range on each side of the scale covers both inputs.
-// Widening the range is a max on each side, and values merge with x wherever
-// the inputs disagree.
+// §28.12.4: "When ambiguous strength signals combine in wired logic, it is
+// necessary to consider the results of all combinations of each of the strength
+// levels in the first signal with each of the strength levels in the second
+// signal, as shown in Figure 28-25." Every cell of one signal is resolved
+// against every cell of the other, and the results are taken together as one
+// range.
 //
-// The per-side lower bound is left at kHighz and is not computed, which is
-// right only where both components already reach high impedance. §28.12.2's
-// own figures show components that do not: Figure 28-12 draws a 651 signal
-// spanning Pu1 to St1 and Figure 28-13 a 530 signal spanning We0 to Pu0. Two
-// same-value components anchored above high impedance are the case the clause
-// illustrates nowhere and this function answers wrongly; issue #3423 records
-// it, and test_simulator_subclause_28_12_02.cpp asserts only the shapes
-// §28.12.2 settles.
+// Figure 28-25 is what fixes both halves. Its signal 1 occupies St0 and Pu0 and
+// its signal 2 occupies Pu1. Under and logic the chart gives (5,0) and (6,0)
+// and draws a result running from St0 to Pu0; under or logic it gives (5,1) and
+// (6,0) and draws one running from St0 across to Pu1. The second is a range
+// crossing both sides, which is why the result of a wired net can be ambiguous
+// where neither of its two drivers was.
+inline StrengthSignal CombineWithWiredLogic(StrengthSignal a, StrengthSignal b,
+                                            ModelWiredLogicKind logic) {
+  ScaleSpan span_a = SpanOf(a);
+  ScaleSpan span_b = SpanOf(b);
+  if (!span_a.occupied) return b;
+  if (!span_b.occupied) return a;
+
+  ScaleSpan result;
+  for (int pa = span_a.lo; pa <= span_a.hi; ++pa) {
+    for (int pb = span_b.lo; pb <= span_b.hi; ++pb) {
+      ExtendSpan(result, WiredPairPosition(pa, pb, logic));
+    }
+  }
+  return SignalOfSpan(result);
+}
+
+// §28.12.2: "The combination of two signals of ambiguous strength shall result
+// in a signal of ambiguous strength. The resulting signal shall have a range of
+// strength levels that includes the strength levels in its component signals",
+// which Figure 28-9 and Figure 28-10 draw as "a range that includes the
+// extremes of the signals and all the strengths between them".
+//
+// The extremes are taken over Figure 28-2's scale rather than per side, so a
+// range whose two components sit on opposite sides crosses high impedance and
+// covers it, and one whose components sit on one side keeps the lower bound
+// they leave. Reading _hi alone gave every result a lower bound of high
+// impedance, which is issue #3423.
 inline StrengthSignal CombineAmbiguous(StrengthSignal a, StrengthSignal b) {
-  StrengthSignal result;
-  result.strength0_hi = std::max(a.strength0_hi, b.strength0_hi);
-  result.strength1_hi = std::max(a.strength1_hi, b.strength1_hi);
-  result.value = (a.value == b.value) ? a.value : Val4::kX;
-  return result;
+  ScaleSpan span_a = SpanOf(a);
+  ScaleSpan span_b = SpanOf(b);
+  if (!span_a.occupied) return b;
+  if (!span_b.occupied) return a;
+  ScaleSpan result = span_a;
+  ExtendSpan(result, span_b.lo);
+  ExtendSpan(result, span_b.hi);
+  return SignalOfSpan(result);
 }
 
 // §28.12.3: rules a/b/c for combining a known-value, single-level unambig

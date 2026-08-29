@@ -4,11 +4,22 @@
 // The last group, AmbiguousStrengthModelCombine, calls CombineAmbiguous in
 // lib/cpp/test_models/model_strength.h. Issue #3417 found that function called
 // from nowhere in the repository, so the claim it states about §28.12.2 was
-// evaluated by no run. Its four cases assert the result the clause states:
-// Figure 28-10's 35x, Figure 28-14's 56x, Figure 28-15's strong x, and the
-// range covering two value-H components. The earlier groups resolve a Net,
-// classify a NetStrength, call the simulator's own CombineAmbiguousStrength,
-// and run drive-strength source end to end.
+// evaluated by no run. Its five cases assert the result the clause states:
+// Figure 28-10's 35x, Figure 28-14's 56x, Figure 28-15's strong x, the range
+// covering two value-H components, and the range covering two value-1
+// components that reach no lower than We1.
+//
+// The last of the five is the case issue #3423 records. It is the only one
+// whose result holds no high-impedance level, the other four each answering a
+// range whose strength0_lo and strength1_lo fields are high impedance. Those
+// four therefore passed while CombineAmbiguous read strength0_hi and
+// strength1_hi alone and left every result's two _lo fields at high impedance,
+// and their expectations are unchanged: Figure 28-10, Figure 28-14 and Figure
+// 28-15 each draw a range that does reach high impedance.
+//
+// The earlier groups resolve a Net, classify a NetStrength, call the
+// simulator's own CombineAmbiguousStrength, and run drive-strength source end
+// to end.
 
 #include <gtest/gtest.h>
 
@@ -477,6 +488,45 @@ TEST(AmbiguousStrengthModelCombine, PullHAndStrongHGiveStrongHRange) {
 
   EXPECT_EQ(r.strength1_hi, StrengthLevel::kStrong);
   EXPECT_EQ(r.strength1_lo, StrengthLevel::kHighz);
+  EXPECT_EQ(r.strength0_hi, StrengthLevel::kHighz);
+  EXPECT_EQ(r.strength0_lo, StrengthLevel::kHighz);
+}
+
+// Two components of the same value, neither of which reaches high impedance: a
+// value-1 signal spanning Pu1 through St1 combines with a value-1 signal
+// spanning We1 through La1 into a value-1 signal spanning We1 through St1.
+// "The combination of two signals of ambiguous strength shall result in a
+// signal of ambiguous strength. The resulting signal shall have a range of
+// strength levels that includes the strength levels in its component signals",
+// which Figure 28-9 draws as "a range that includes the extremes of the signals
+// and all the strengths between them". We1 is the lower extreme of the two
+// components and St1 the upper, so the range runs from one to the other and no
+// further.
+//
+// This is the case issue #3423 records. Before that issue CombineAmbiguous read
+// the strength0_hi and strength1_hi fields alone, so it answered this
+// combination a strength1_lo of high impedance, which is a range down to HiZ1
+// holding six levels that neither component holds.
+//
+// The value is asserted here and not in PullHAndStrongHGiveStrongHRange above,
+// because a range clear of HiZ1 is one §28.12.2 gives a defined value. Of
+// Figure 28-12's Pu1 through St1 range the clause says the upper configuration
+// of Figure 28-11 "produces a signal with a value of 1 and a range of strengths
+// (651)".
+TEST(AmbiguousStrengthModelCombine,
+     ValueOneRangesClearOfHighzKeepTheirExtreme) {
+  StrengthSignal pull_to_strong_one =
+      Strength1Range(StrengthLevel::kPull, StrengthLevel::kStrong);
+  StrengthSignal weak_to_large_one =
+      Strength1Range(StrengthLevel::kWeak, StrengthLevel::kLarge);
+
+  StrengthSignal r = CombineAmbiguous(pull_to_strong_one, weak_to_large_one);
+
+  EXPECT_EQ(r.value, Val4::kV1);
+  EXPECT_EQ(r.strength1_hi, StrengthLevel::kStrong);
+  EXPECT_EQ(r.strength1_lo, StrengthLevel::kWeak);
+  // No strength0 level lies between We1 and St1, so none of them is in the
+  // result.
   EXPECT_EQ(r.strength0_hi, StrengthLevel::kHighz);
   EXPECT_EQ(r.strength0_lo, StrengthLevel::kHighz);
 }

@@ -27,14 +27,33 @@ namespace {
 // The WiredLogicModel tests at the end of this file cover
 // CombineWithWiredLogic in lib/cpp/test_models/model_strength.h, which nothing
 // called before issue #3417 and which therefore stated a reading of §28.12.4
-// that no run evaluated. They claim three things the clause decides about
+// that no run evaluated. They claim five things the clause decides about
 // combining two signals on a wand, triand, wor or trior net. The result value
 // is the value an `and` gate or an `or` gate gives for the two signal values
 // when the two signals carry one strength level each and carry the same level.
 // The result strength is that shared level. Where the two levels differ, the
 // signal at the stronger level is the whole result, whichever logic function
-// the net type names. Each test quotes the sentence or the Figure 28-25 chart
-// row it rests on.
+// the net type names. Where an operand spans several strength levels, both of
+// Figure 28-25's charts are read at every pair of levels and the rows are taken
+// together as one range, which can reach both sides of the scale and give a
+// result of value x where neither operand had one. An x operand is itself a
+// signal holding cells on both sides, and an `and` gate or an `or` gate hands
+// back x for it at equal strength. Each test quotes the sentence or the Figure
+// 28-25 chart row it rests on.
+//
+// Issue #3423 is what the last three of those tests close.
+// CombineWithWiredLogic read each operand's _hi field alone, so it collapsed an
+// operand spanning several strength levels to its top level and never formed
+// Figure 28-25's union of the chart rows. It answered an x operand by the
+// complement of the case it tested for. ModelWiredLogicKind also carried a
+// kNone enumerator that fell through to the or arm, and it now declares kAnd
+// and kOr and nothing else.
+//
+// model_strength.h records a strength signal as a span of Figure 28-2's sixteen
+// cells. A side is occupied when its _hi is above kHighz, and it then holds
+// every level from its _lo up to its _hi. UnambiguousSignal below builds the
+// one-cell form that a driver of known value and one strength level puts on a
+// net, so no case here repeats the four strength fields.
 
 // Elaborates, lowers, and runs `src`, then returns the settled net named "w".
 static Net* RunAndFindNetW(SimFixture& f, const char* src) {
@@ -440,6 +459,38 @@ TEST(WiredLogicAmbig, EmptyInputProducesEmptyRange) {
   EXPECT_EQ(r.s1_hi, Strength::kHighz);
 }
 
+// The signal one driver of known value and one strength level puts on a net.
+// model_strength.h holds an unambiguous signal as one cell of Figure 28-2's
+// scale, so the level is written to both _lo and _hi on the side the value
+// names and kHighz is left on the other side. A three-field aggregate
+// initializer leaves both _lo at kHighz instead, which builds a signal
+// occupying its side all the way down to high impedance.
+static StrengthSignal UnambiguousSignal(Val4 value, StrengthLevel level) {
+  StrengthSignal s;
+  s.value = value;
+  if (value == Val4::kV0) {
+    s.strength0_hi = level;
+    s.strength0_lo = level;
+  } else {
+    s.strength1_hi = level;
+    s.strength1_lo = level;
+  }
+  return s;
+}
+
+// The signal one driver of value x and one strength level puts on a net: that
+// level on the strength0 side and on the strength1 side at once.
+// model_strength.h reads a signal holding cells on both sides as the value x.
+static StrengthSignal UnknownValueSignal(StrengthLevel level) {
+  StrengthSignal s;
+  s.value = Val4::kX;
+  s.strength0_hi = level;
+  s.strength0_lo = level;
+  s.strength1_hi = level;
+  s.strength1_lo = level;
+  return s;
+}
+
 // §28.12.4: "The combination of the signals in Figure 28-24, using wired and
 // logic, produces a result with the same value as the result produced by an
 // and gate with the value of the two signals as its inputs." Figure 28-24
@@ -450,8 +501,8 @@ TEST(WiredLogicAmbig, EmptyInputProducesEmptyRange) {
 // unambiguous signal as its level on the side its value names and kHighz on
 // the other side, which is what the strength1_hi assertion reads.
 TEST(WiredLogicModel, WiredAndOfOppositeValuesAtEqualLevelGivesZero) {
-  StrengthSignal a{Val4::kV0, StrengthLevel::kStrong, StrengthLevel::kHighz};
-  StrengthSignal b{Val4::kV1, StrengthLevel::kHighz, StrengthLevel::kStrong};
+  auto a = UnambiguousSignal(Val4::kV0, StrengthLevel::kStrong);
+  auto b = UnambiguousSignal(Val4::kV1, StrengthLevel::kStrong);
 
   auto r = CombineWithWiredLogic(a, b, ModelWiredLogicKind::kAnd);
 
@@ -468,8 +519,8 @@ TEST(WiredLogicModel, WiredAndOfOppositeValuesAtEqualLevelGivesZero) {
 // strength of the result is the same as the strength of the combined signals
 // in both cases" fixes the level at 6 (St1) here as it does there.
 TEST(WiredLogicModel, WiredOrOfOppositeValuesAtEqualLevelGivesOne) {
-  StrengthSignal a{Val4::kV0, StrengthLevel::kStrong, StrengthLevel::kHighz};
-  StrengthSignal b{Val4::kV1, StrengthLevel::kHighz, StrengthLevel::kStrong};
+  auto a = UnambiguousSignal(Val4::kV0, StrengthLevel::kStrong);
+  auto b = UnambiguousSignal(Val4::kV1, StrengthLevel::kStrong);
 
   auto r = CombineWithWiredLogic(a, b, ModelWiredLogicKind::kOr);
 
@@ -486,8 +537,8 @@ TEST(WiredLogicModel, WiredOrOfOppositeValuesAtEqualLevelGivesOne) {
 // level. The level here is 3 (We1) rather than Figure 28-24's 6, the sentence
 // naming no particular level.
 TEST(WiredLogicModel, WiredLogicOfLikeOnesGivesOneUnderBothKinds) {
-  StrengthSignal a{Val4::kV1, StrengthLevel::kHighz, StrengthLevel::kWeak};
-  StrengthSignal b{Val4::kV1, StrengthLevel::kHighz, StrengthLevel::kWeak};
+  auto a = UnambiguousSignal(Val4::kV1, StrengthLevel::kWeak);
+  auto b = UnambiguousSignal(Val4::kV1, StrengthLevel::kWeak);
 
   auto r_and = CombineWithWiredLogic(a, b, ModelWiredLogicKind::kAnd);
   auto r_or = CombineWithWiredLogic(a, b, ModelWiredLogicKind::kOr);
@@ -509,8 +560,8 @@ TEST(WiredLogicModel, WiredLogicOfLikeOnesGivesOneUnderBothKinds) {
 // so it decides two unambiguous signals as well as two levels drawn from
 // ambiguous ones.
 TEST(WiredLogicModel, WiredAndOfStrongerZeroWithWeakerOneGivesZero) {
-  StrengthSignal a{Val4::kV0, StrengthLevel::kStrong, StrengthLevel::kHighz};
-  StrengthSignal b{Val4::kV1, StrengthLevel::kHighz, StrengthLevel::kPull};
+  auto a = UnambiguousSignal(Val4::kV0, StrengthLevel::kStrong);
+  auto b = UnambiguousSignal(Val4::kV1, StrengthLevel::kPull);
 
   auto r = CombineWithWiredLogic(a, b, ModelWiredLogicKind::kAnd);
 
@@ -527,8 +578,8 @@ TEST(WiredLogicModel, WiredAndOfStrongerZeroWithWeakerOneGivesZero) {
 // together are what distinguishes applying the logic function at every pair of
 // levels from applying it only where the levels are equal.
 TEST(WiredLogicModel, WiredOrOfStrongerZeroWithWeakerOneGivesZero) {
-  StrengthSignal a{Val4::kV0, StrengthLevel::kStrong, StrengthLevel::kHighz};
-  StrengthSignal b{Val4::kV1, StrengthLevel::kHighz, StrengthLevel::kPull};
+  auto a = UnambiguousSignal(Val4::kV0, StrengthLevel::kStrong);
+  auto b = UnambiguousSignal(Val4::kV1, StrengthLevel::kPull);
 
   auto r = CombineWithWiredLogic(a, b, ModelWiredLogicKind::kOr);
 
@@ -542,18 +593,15 @@ TEST(WiredLogicModel, WiredOrOfStrongerZeroWithWeakerOneGivesZero) {
 // holding strength level 5 (Pu1), and the two rows of the and chart give
 // strength 5 value 0 and strength 6 value 0. The figure draws that result as a
 // value 0 spanning levels 5 through 6 with the whole strength1 half of the
-// scale empty, which the four strength assertions read. The lower bound is
-// what makes the operand ambiguous, so it is the field that separates this
-// case from the unambiguous ones above.
+// scale empty, which the four strength assertions read. The lower bound is Pu0
+// and not high impedance, because level 5 is the weakest level any chart row
+// returns and the figure's arrow starts there.
 TEST(WiredLogicModel, WiredAndOfAmbiguousZeroRangeWithWeakerOneKeepsRange) {
   StrengthSignal a;
   a.value = Val4::kV0;
   a.strength0_lo = StrengthLevel::kPull;
   a.strength0_hi = StrengthLevel::kStrong;
-  StrengthSignal b;
-  b.value = Val4::kV1;
-  b.strength1_lo = StrengthLevel::kPull;
-  b.strength1_hi = StrengthLevel::kPull;
+  auto b = UnambiguousSignal(Val4::kV1, StrengthLevel::kPull);
 
   auto r = CombineWithWiredLogic(a, b, ModelWiredLogicKind::kAnd);
 
@@ -562,6 +610,70 @@ TEST(WiredLogicModel, WiredAndOfAmbiguousZeroRangeWithWeakerOneKeepsRange) {
   EXPECT_EQ(r.strength0_hi, StrengthLevel::kStrong);
   EXPECT_EQ(r.strength1_hi, StrengthLevel::kHighz);
   EXPECT_EQ(r.strength1_lo, StrengthLevel::kHighz);
+}
+
+// §28.12.4's Figure 28-25 read whole, under or logic, on the operands the test
+// above combines. The or chart gives strength 5 value 1 for its first row and
+// strength 6 value 0 for its second, and the figure draws the result as one
+// arrow running from St0 across to Pu1. That range holds cells of value 0 and
+// cells of value 1, so the result has the value x. It reaches St0 on the
+// strength0 side and Pu1 on the strength1 side, and it covers high impedance
+// on both sides because it crosses the middle of Figure 28-2's scale, which is
+// what the two _lo assertions read. Neither operand has the value x and the
+// result does, so this case is the one that shows the chart's rows being taken
+// together as one range rather than one row being answered alone.
+TEST(WiredLogicModel,
+     WiredOrOfAmbiguousZeroRangeWithWeakerOneCrossesToUnknown) {
+  StrengthSignal a;
+  a.value = Val4::kV0;
+  a.strength0_lo = StrengthLevel::kPull;
+  a.strength0_hi = StrengthLevel::kStrong;
+  auto b = UnambiguousSignal(Val4::kV1, StrengthLevel::kPull);
+
+  auto r = CombineWithWiredLogic(a, b, ModelWiredLogicKind::kOr);
+
+  EXPECT_EQ(r.value, Val4::kX);
+  EXPECT_EQ(r.strength0_hi, StrengthLevel::kStrong);
+  EXPECT_EQ(r.strength0_lo, StrengthLevel::kHighz);
+  EXPECT_EQ(r.strength1_lo, StrengthLevel::kHighz);
+  EXPECT_EQ(r.strength1_hi, StrengthLevel::kPull);
+}
+
+// §28.12.4 fixes the result value as "the same value as the result produced by
+// an and gate with the value of the two signals as its inputs", and an and
+// gate of 1 and x gives x. The two signals carry strength level 6 here, so
+// "The strength of the result is the same as the strength of the combined
+// signals in both cases" puts the result at level 6 on both sides of the
+// scale. The x operand is built as a signal holding cells on the strength0
+// side and on the strength1 side, which is the form model_strength.h reads as
+// the value x.
+TEST(WiredLogicModel, WiredAndOfOneWithUnknownAtEqualLevelGivesUnknown) {
+  auto a = UnambiguousSignal(Val4::kV1, StrengthLevel::kStrong);
+  auto b = UnknownValueSignal(StrengthLevel::kStrong);
+
+  auto r = CombineWithWiredLogic(a, b, ModelWiredLogicKind::kAnd);
+
+  EXPECT_EQ(r.value, Val4::kX);
+  EXPECT_EQ(r.strength0_hi, StrengthLevel::kStrong);
+  EXPECT_EQ(r.strength1_hi, StrengthLevel::kStrong);
+}
+
+// §28.12.4 fixes the result value as "the same value as the result produced by
+// an or gate with the values of the two signals as its inputs", and an or gate
+// of 0 and x gives x. This is the or counterpart of the test above, and the
+// pair is what separates the two logic functions on an x operand: neither
+// value is controlling for its own gate here, so neither result is decided by
+// the known operand. "The strength of the result is the same as the strength
+// of the combined signals in both cases" puts this result at level 6 as well.
+TEST(WiredLogicModel, WiredOrOfZeroWithUnknownAtEqualLevelGivesUnknown) {
+  auto a = UnambiguousSignal(Val4::kV0, StrengthLevel::kStrong);
+  auto b = UnknownValueSignal(StrengthLevel::kStrong);
+
+  auto r = CombineWithWiredLogic(a, b, ModelWiredLogicKind::kOr);
+
+  EXPECT_EQ(r.value, Val4::kX);
+  EXPECT_EQ(r.strength0_hi, StrengthLevel::kStrong);
+  EXPECT_EQ(r.strength1_hi, StrengthLevel::kStrong);
 }
 
 }  // namespace
