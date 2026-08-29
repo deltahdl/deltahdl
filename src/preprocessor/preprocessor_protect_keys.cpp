@@ -638,13 +638,15 @@ bool Preprocessor::ReportDelimiterWrittenWithValue(
 // next, so the same run of expressions leaves the same envelopes behind
 // whether it was written as one directive or spread over several.
 //
-// This is also where a tool that processes SystemVerilog source text meets the
-// obligation §34.3 puts on it: the protected regions the text carries are
-// decrypted as they are read, so what the step after this one analyses is the
-// design rather than the envelope it arrived in.
+// No text comes back from here. §34.5.15.1 spells the expression carrying a
+// region as the keyword standing alone, and §34.5.15.2 has the block begin on
+// the line beneath it, so the design a region records is recovered by
+// Preprocessor::TakeDataBlockValue when that line arrives rather than by any
+// expression this reads. What an expression here does is record that the
+// keyword was written, which ApplyAnnouncedBlockKeywords does for all eight
+// keywords whose definitions speak for the line after them.
 void Preprocessor::ApplyProtectKeywords(
-    const std::vector<PragmaKeywordExpression>& keywords, SourceLoc loc,
-    int depth, std::string& output) {
+    const std::vector<PragmaKeywordExpression>& keywords, SourceLoc loc) {
   for (const PragmaKeywordExpression& expr : keywords) {
     // A reserved word that delimits an envelope, written in a spelling it is
     // not defined with, delimits nothing: nothing is put in effect for it and

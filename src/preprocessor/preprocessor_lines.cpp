@@ -441,7 +441,7 @@ bool Preprocessor::ProcessSimpleStateDirective(std::string_view line,
     // it, the same way `timescale and `default_nettype treat their operands.
     std::string expanded = ExpandInlineMacros(AfterDirective(line, "pragma"),
                                               loc.file_id, loc.line);
-    HandlePragma(expanded, loc, depth, output);
+    HandlePragma(expanded, loc);
     return true;
   }
   if (StartsWithDirective(line, "line")) {
@@ -461,8 +461,7 @@ bool Preprocessor::ProcessSimpleStateDirective(std::string_view line,
 // recognize: it is reserved for describing protected envelopes, so its
 // expressions -- and no other pragma's, however they are spelled -- decide
 // which regions of text an envelope covers.
-void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc, int depth,
-                                std::string& output) {
+void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc) {
   PragmaTokens toks;
   bool block_comment_open = false;
   bool tokenized = TokenizePragma(rest, toks, block_comment_open);
@@ -494,7 +493,7 @@ void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc, int depth,
   }
   std::string_view name = toks.front().text;
   if (name == kProtectPragmaName) {
-    ApplyProtectKeywords(keywords, loc, depth, output);
+    ApplyProtectKeywords(keywords, loc);
     return;
   }
   // §22.11.1: the reset pragma restores the state of every pragma_name written
