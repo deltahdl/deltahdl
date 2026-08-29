@@ -30,11 +30,12 @@
 // cpp tabulates the name, holds the value a directive wrote in effect from
 // there on, and writes the keyword back out as a directive of an envelope;
 // src/preprocessor/protect_pragma_line.cpp is where a value's spelling is told
-// from a list of further expressions; src/preprocessor/protect_processing.cpp
-// is the encrypting half, which takes the name off a region's own lines and
-// carries it onto the envelope; and src/preprocessor/preprocessor_protect_keys.
-// cpp is the reading half, where the name in effect selects the key a block is
-// opened with.
+// from a list of further expressions;
+// src/preprocessor/protect_region_lines.cpp takes the name off a region's own
+// lines and src/preprocessor/protect_processing.cpp carries it onto the
+// envelope, those two being the encrypting half; and
+// src/preprocessor/preprocessor_protect_keys.cpp is the reading half, where the
+// name in effect selects the key a block is opened with.
 //
 // Every input below is written as the real `pragma directive syntax of §22.11.
 // §34.5.1.1's and §34.5.2.1's words delimit the region the encrypting half is

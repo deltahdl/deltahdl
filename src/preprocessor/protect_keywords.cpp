@@ -162,10 +162,13 @@ std::span<const ProtectPragmaKeyword> ProtectPragmaKeywords() {
 // three takes, so refusing one would refuse everything they are ever written
 // with.
 //
-// This is the reading a consuming tool makes. #3273 covers the writing side,
-// where TakeKeyDesignations in src/preprocessor/protect_processing.cpp takes a
-// list as the value of four of these names and puts it on the envelope it
-// produces.
+// This is the reading a consuming tool makes. TakeKeyDesignations and
+// TakeMethodKeywords in src/preprocessor/protect_region_lines.cpp are the
+// reading an encrypting tool makes, and they answer the same question by
+// calling KeywordSingleValueOnLine rather than by asking this: a keyword is
+// read off a line there rather than off a pragma expression, so there is no
+// PragmaKeywordExpression for the two readings to share. #3277 covers
+// digest_method and digest_key_method, which that side still reads whole.
 constexpr std::string_view kStringValuedKeywords[] = {
     kAuthorKeyword,           kAuthorInfoKeyword,     kEncryptAgentKeyword,
     kEncryptAgentInfoKeyword, kDataKeyownerKeyword,   kDataMethodKeyword,

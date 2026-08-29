@@ -21,10 +21,11 @@
 // carrying it are in src/preprocessor/protect_keywords.cpp; the name this
 // implementation identifies itself by is in
 // src/preprocessor/protect_envelope_output.h, and the envelope carrying it is
-// written in src/preprocessor/protect_envelope_output.cpp; the half that reads
-// an encrypting tool's input, and takes nothing out of it for this keyword, is
-// src/preprocessor/protect_processing.cpp; and the reading side, which consumes
-// the directive and puts none of it into the design text, is
+// written in src/preprocessor/protect_envelope_output.cpp; the reading that
+// takes the keyword values off an encrypting tool's input, and takes nothing
+// out of it for this keyword, is src/preprocessor/protect_region_lines.cpp;
+// and the reading side, which consumes the directive and puts none of it into
+// the design text, is
 // src/preprocessor/preprocessor_protect_keys.cpp.
 //
 // Every input below is written as the real `pragma directive syntax of §22.11,

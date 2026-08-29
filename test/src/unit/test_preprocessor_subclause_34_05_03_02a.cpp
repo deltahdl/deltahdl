@@ -17,9 +17,10 @@
 //
 // All of it is preprocessor-stage. src/preprocessor/protect_processing.cpp
 // carries the encrypting half: it walks a source text through a counter of the
-// previously sealed models it stands inside, holds the lines of one back from
-// every reading that puts a value in effect, and hands them unread to the block
-// of the enclosing region.
+// previously sealed models it stands inside and hands the lines of one unread
+// to the block of the enclosing region, and
+// src/preprocessor/protect_region_lines.cpp holds those lines back from every
+// reading that puts a value in effect.
 // src/preprocessor/protect_envelope_output.cpp writes the envelope that block
 // goes into. src/preprocessor/protect_envelope.cpp opens the region on the
 // decrypting side and accumulates the expressions written inside it, and

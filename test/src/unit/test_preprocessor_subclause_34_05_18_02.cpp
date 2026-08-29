@@ -33,7 +33,7 @@
 // The third is AppendClearDigestNames in
 // src/preprocessor/protect_envelope_output.cpp and the reading that carries the
 // name onto an envelope, TakeKeyDesignations in
-// src/preprocessor/protect_processing.cpp. §34.5.27.2 has an encrypting tool
+// src/preprocessor/protect_region_lines.cpp. §34.5.27.2 has an encrypting tool
 // form a key block when it is requested to use a digital signature, so an
 // envelope carrying a key block is the digital envelope the exception names,
 // and the name is absent from everything a reader can read without opening that

@@ -31,10 +31,10 @@
 // All of it is preprocessor-stage. src/preprocessor/protect_keywords.h holds
 // the name, and src/preprocessor/protect_pragma_line.cpp holds the reading of a
 // line that decides which keyword a directive named and what was written
-// against it. The half that acts on the answer is
-// src/preprocessor/protect_processing.cpp, which asks twice over every line an
-// encryption envelope encloses -- once to hold the line back from the block,
-// once to take the name for the envelope -- and
+// against it. The half that acts on the answer asks twice over every line an
+// encryption envelope encloses: src/preprocessor/protect_processing.cpp holds
+// the line back from the block and
+// src/preprocessor/protect_region_lines.cpp takes the name for the envelope.
 // src/preprocessor/protect_envelope_output.cpp writes the expression back out
 // through src/preprocessor/protect_keywords.cpp. The reading half meets the
 // same directive as tokens instead, through the pragma grammar in

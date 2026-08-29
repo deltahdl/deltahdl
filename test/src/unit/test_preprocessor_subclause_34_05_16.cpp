@@ -27,7 +27,8 @@
 // the name back out are in src/preprocessor/protect_keywords.cpp; the entity
 // paired with the public key one of its keys is lives in
 // src/preprocessor/protect_digest_block.cpp; the half that reads an encrypting
-// tool's input for the name and carries it onto the envelope is
+// tool's input for the name is src/preprocessor/protect_region_lines.cpp and
+// the half that carries it onto the envelope is
 // src/preprocessor/protect_processing.cpp; the half that writes it into the
 // envelope in the clear, and the pairing that picks the key a digest block is
 // sealed under, are in src/preprocessor/protect_envelope_output.cpp; and the

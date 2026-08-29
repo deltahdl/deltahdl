@@ -35,6 +35,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     preprocessor/protect_cli.cpp
     preprocessor/protect_processing.cpp
     preprocessor/protect_processing_cipher.cpp
+    preprocessor/protect_region_lines.cpp
     preprocessor/protect_viewport.cpp
     preprocessor/preprocessor.cpp
     preprocessor/preprocessor_lines.cpp

@@ -46,7 +46,7 @@
 // All of it is preprocessor-stage. src/preprocessor/protect_encoding.cpp holds
 // Table 34-2 and reads a value into the three parts it is spelled with;
 // src/preprocessor/protect_encoding_codecs.cpp carries the four algorithms;
-// src/preprocessor/protect_processing.cpp is the encrypting half, which takes
+// src/preprocessor/protect_region_lines.cpp is the encrypting half, which takes
 // the scheme a text asked for and reads the region's own encoded values under
 // it; src/preprocessor/protect_envelope_output.cpp writes the directive into
 // each envelope and states the count of each block, with

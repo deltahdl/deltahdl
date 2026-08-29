@@ -53,7 +53,7 @@
 // src/preprocessor/protect_encoding.cpp reads that list into the three parts
 // this line spells it with and writes one back out in the same shape;
 // src/preprocessor/preprocessor_protect_values.cpp is where the parts reach a
-// block being opened; and src/preprocessor/protect_processing.cpp with
+// block being opened; and src/preprocessor/protect_region_lines.cpp with
 // src/preprocessor/protect_envelope_output.cpp are the encrypting half, which
 // takes the scheme a region asked for off the same spelling.
 //

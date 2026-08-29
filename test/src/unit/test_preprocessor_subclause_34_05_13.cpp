@@ -23,10 +23,10 @@
 //
 // All five are preprocessor-stage rules. The keyword and the two-line
 // directive carrying it are in src/preprocessor/protect_keywords.cpp; the half
-// that reads an encrypting tool's input for the designation, and selects the
-// key a region is encrypted under from it, is
-// src/preprocessor/protect_processing.cpp; the half that writes the
-// designation back into the block it was used for is
+// that reads an encrypting tool's input for the designation is
+// src/preprocessor/protect_region_lines.cpp, and selecting the key a region is
+// encrypted under from it is src/preprocessor/protect_processing.cpp; the half
+// that writes the designation back into the block it was used for is
 // src/preprocessor/protect_envelope_output.cpp; and the reading side is split
 // across three files -- consuming the announced line and putting the
 // designation in effect is

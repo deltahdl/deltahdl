@@ -22,11 +22,12 @@
 // block -- so an envelope carrying one is read exactly as far as an envelope
 // carrying none.
 //
-// All of it is preprocessor-stage. src/preprocessor/protect_processing.cpp
-// carries the encrypting half: it reads each line an encryption envelope
-// encloses for the expression, keeps what it says beside the region rather
-// than among the lines that are about to stop being readable, and holds the
-// line carrying it back from the text the block records.
+// All of it is preprocessor-stage. The encrypting half is split across two
+// files: src/preprocessor/protect_region_lines.cpp reads each line an
+// encryption envelope encloses for the expression and keeps what it says beside
+// the region rather than among the lines that are about to stop being readable,
+// and src/preprocessor/protect_processing.cpp holds the line carrying it back
+// from the text the block records.
 // src/preprocessor/protect_envelope_output.cpp writes it into the envelope
 // taking that region's place, through the directive
 // src/preprocessor/protect_keywords.cpp spells, and

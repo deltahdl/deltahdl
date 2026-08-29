@@ -20,10 +20,12 @@
 //   A decrypting tool draws nothing from it.
 //
 // All of them are preprocessor-stage rules. The keyword and the directive
-// carrying it are in src/preprocessor/protect_keywords.cpp; the half that reads
-// an encrypting tool's input for the expression and holds it back from the text
-// a block records is src/preprocessor/protect_processing.cpp; the half that
-// writes it inside the envelope taking that region's place is
+// carrying it are in src/preprocessor/protect_keywords.cpp; the reading that
+// takes the expression off an encrypting tool's input is
+// src/preprocessor/protect_region_lines.cpp, and holding the line carrying it
+// back from the text a block records is
+// src/preprocessor/protect_processing.cpp; the half that writes it inside the
+// envelope taking that region's place is
 // src/preprocessor/protect_envelope_output.cpp; and the reading side, which
 // consumes the directive and puts none of it into the design text, is
 // src/preprocessor/preprocessor.cpp.
