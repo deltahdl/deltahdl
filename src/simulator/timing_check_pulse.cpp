@@ -341,22 +341,60 @@ void CloseNochangeWindow(NochangeWindow& window, uint64_t trailing_ticks,
   }
 }
 
-// A data transition of a §31.4.6 check at `data_ticks`. It is held until the
-// trailing reference edge settles the end of the window, and answered straight
-// away once that edge has arrived: §31.4.6's end_edge_offset can extend the
-// region past the trailing edge, so a transition after the window closed is
-// still inside it while that extension lasts.
+// Drops the data transitions held for a window beginning `start_edge_offset`
+// before `reference_ticks`. §31.4.6 puts "(beginning of time window) = (leading
+// reference edge time) - start_edge_offset" and reports a violation only for
+// "(beginning of time window) < (data event time)", so a transition at or
+// before that beginning falls outside and is discarded.
 //
-// Nothing is held or answered before a leading reference edge has been seen,
-// there being no window to place a transition in.
+// It is called from two places for two reasons. At a leading reference edge it
+// keeps the transitions that edge's own window can hold, which is what lets a
+// transition standing before the edge be reported at all. Between windows it
+// bounds what is held: a window still to come opens at some later leading edge
+// L and begins at L - start_edge_offset, so a transition at or before
+// `now - start_edge_offset` can fall in none of them.
+void DropTransitionsBefore(NochangeWindow& window, uint64_t reference_ticks) {
+  const TimingCheckEntry& check = window.armed.Entry();
+  const int64_t kBegin =
+      static_cast<int64_t>(reference_ticks) - check.start_edge_offset;
+  std::vector<uint64_t> kept;
+  for (uint64_t data_ticks : window.pending) {
+    if (static_cast<int64_t>(data_ticks) > kBegin) kept.push_back(data_ticks);
+  }
+  window.pending = std::move(kept);
+}
+
+// A data transition of a §31.4.6 check at `data_ticks`.
+//
+// It is measured against the window standing closed, if one is, because
+// §31.4.6's end_edge_offset can extend that window past its trailing reference
+// edge and a transition after the edge is still inside it while the extension
+// lasts.
+//
+// It is held either way, because the next leading reference edge may open a
+// window that reaches back past it: §31.4.6 begins a window at "(leading
+// reference edge time) - start_edge_offset", so a positive offset puts the
+// beginning before the edge that opens it. Issue #3424 was that such a
+// transition was dropped, first by an early return while no leading edge had
+// been seen and then by the leading edge clearing everything held, which made
+// the interval a positive offset adds one no violation could be reported in.
+// One transition standing inside two windows violates both, which is why the
+// hold is not conditional on the immediate measurement having found nothing.
 void RecordNochangeData(NochangeWindow& window, uint64_t data_ticks,
                         SimContext& ctx) {
-  if (!window.has_leading) return;
-  if (!window.has_trailing) {
-    window.pending.push_back(data_ticks);
-    return;
+  if (window.has_leading && window.has_trailing) {
+    EvaluateNochangeData(window, data_ticks, ctx);
   }
-  EvaluateNochangeData(window, data_ticks, ctx);
+  // Nothing held is dropped while a window stands open, every transition in it
+  // being one that window's trailing reference edge has still to measure. The
+  // bound applies between windows, where what is held can only serve one still
+  // to come. It is taken before the transition is added, since a check whose
+  // start_edge_offset is zero has a bound of the current time and would
+  // otherwise discard what it has just been handed.
+  if (!window.has_leading || window.has_trailing) {
+    DropTransitionsBefore(window, data_ticks);
+  }
+  window.pending.push_back(data_ticks);
 }
 
 // Arms the three watchers a §31.4.6 check needs. §31.4.6 says so outright:
@@ -401,7 +439,7 @@ void ArmNochangeWindow(const SpecifyManager& mgr, std::size_t index,
                          window->has_leading = true;
                          window->has_trailing = false;
                          window->leading_ticks = ctx.CurrentTime().ticks;
-                         window->pending.clear();
+                         DropTransitionsBefore(*window, window->leading_ticks);
                        });
   WatchConditionedEdge(
       ref_var, std::move(trailing_edge), ref_event, ctx, [window, &ctx]() {
