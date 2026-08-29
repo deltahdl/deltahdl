@@ -11,8 +11,8 @@
 // annotation is placeable.
 //
 // Issue #3387 is that it was not placed. AnnotateSdfIopathEntry in
-// src/simulator/sdf_annotate.cpp built its PathDelay from the two port names
-// and left inst_prefix empty, and SpecifyManager::AnnotateSdfPathDelay
+// src/simulator/sdf_annotate_entry.cpp built its PathDelay from the two port
+// names and left inst_prefix empty, and SpecifyManager::AnnotateSdfPathDelay
 // overwrote every entry carrying that port pair, so one IOPATH reached every
 // in-scope instance of the cell and two instances of one cell both took the
 // delay meant for one. No test in the tree could catch that: every §32.6 and

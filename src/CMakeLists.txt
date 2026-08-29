@@ -231,6 +231,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/specify_pulse.cpp
     simulator/specify_register.cpp
     simulator/specify_timing_check.cpp
+    simulator/specify_timing_violation.cpp
     simulator/udp_eval.cpp
     simulator/sdf_parser.cpp
     simulator/svdpi.cpp
@@ -341,6 +342,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/lowerer_class.cpp
     simulator/lowerer_var.cpp
     simulator/sdf_annotate.cpp
+    simulator/sdf_annotate_entry.cpp
     simulator/sdf_annotate_task.cpp
     simulator/sim_context_classgc.cpp
     simulator/sim_context_systask_state.cpp

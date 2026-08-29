@@ -607,7 +607,7 @@ bool SpecifyManager::IncrementSdfPathDelay(const PathDelay& delta) {
   const bool kSdfIsNonconditional = delta.condition.empty() && !delta.is_ifnone;
   if (kSdfIsNonconditional) {
     // §32.9: the entry reaches the paths of the instance its cell named, which
-    // AnnotateSdfIopathEntry (simulator/sdf_annotate.cpp) stamped onto
+    // AnnotateSdfIopathEntry (simulator/sdf_annotate_entry.cpp) stamped onto
     // PathDelay::inst_prefix, so it is matched as AnnotateSdfPathDelay does.
     if (!IncrementNonconditionalPathDelays(path_delays_, delta)) {
       path_delays_.push_back(delta);
