@@ -235,4 +235,26 @@ TEST(ProtectRuntimeLicenseSyntax, ANameMerelyOpeningWithTheKeywordIsNotIt) {
                   .defaulted);
 }
 
+// §34.5.29.1 defines the keyword with a list, so `runtime_license` is absent
+// from kStringValuedKeywords in src/preprocessor/protect_keywords.cpp. That
+// array names the keywords §34.5 defines as `keyword = <string>`, and
+// ProtectKeywordScope::Apply records nothing for one of them written with a
+// parenthesized value, §22.5.1 making such a value a list of further
+// expressions rather than one written thing. #3269 named this keyword among the
+// ones to put in that array, and the syntax line is why it is not there: a list
+// is the only value the keyword is ever written with, so a membership would
+// refuse every spelling the subclause defines. This case is what turns that
+// addition red, a keyword in the array leaving the value empty where the whole
+// list stands now.
+//
+// The value is written out here rather than built by LicenseList, so all five
+// names §34.5.29.1 spells stand in the case defending them.
+TEST(ProtectRuntimeLicenseSyntax, EveryNameOfTheListSurvivesTheKeywordArray) {
+  constexpr std::string_view kSpelledOut =
+      "(library=\"libgrant.so\", entry=\"acquire\", feature=\"execute\", "
+      "exit=\"surrender\", match=9)";
+  EXPECT_EQ(LicenseAfter(StatesLicense(kSpelledOut)).value, kSpelledOut);
+  EXPECT_FALSE(LicenseAfter(StatesLicense(kSpelledOut)).defaulted);
+}
+
 }  // namespace

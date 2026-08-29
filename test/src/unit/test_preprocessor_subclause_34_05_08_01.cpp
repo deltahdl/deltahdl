@@ -38,6 +38,16 @@
 // other pragma expression rather than distinguished, no reading having a value
 // to draw from them to distinguish them by.
 //
+// §34.4 puts the value written against a tabulated name in effect for that name
+// from the directive on, and the spelling decides whether an expression writes
+// a value at all. A parenthesized list is not the string §34.5.8.1 writes, so
+// an expression carrying one offers nothing further about any tool: a word a
+// string offered earlier is still the one in effect, and where no string
+// offered one the keyword stands at its default. That is what the two cases
+// under "What a list leaves in effect for the keyword" claim, and #3269 is the
+// defect they cover -- the punctuation of such a list was stored as what an
+// encrypting tool had said about itself.
+//
 // All of it is preprocessor-stage. src/preprocessor/protect_keywords.cpp
 // tabulates the name, which is what makes a value written against it a value
 // the protect pragma puts in effect rather than one nothing records; the
@@ -61,8 +71,12 @@
 #include <string>
 #include <string_view>
 
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
 #include "helpers_reported_error.h"
+#include "preprocessor/preprocessor.h"
+#include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
 
 using namespace delta;
@@ -474,6 +488,78 @@ TEST(ProtectEncryptAgentInfoSyntax, AParenthesizedListIsNotOneWrittenThing) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_FALSE(Carries(read, "Globex"));
   EXPECT_TRUE(Carries(read, "module m;"));
+}
+
+// ---------------------------------------------------------------------------
+// What a list leaves in effect for the keyword.
+// ---------------------------------------------------------------------------
+//
+// Every case above observes a directive consumed and a design text none of its
+// characters reached, which is what any pragma expression the grammar admits
+// leaves behind. The two below observe something the spellings differ in: §34.4
+// gives the value written against a tabulated name the text after the
+// directive, so the value in effect is read off the preprocessor once the whole
+// text has passed through rather than looked for in the text a reading
+// produced.
+//
+// §34.5.8.2 gives an encrypting tool no input to draw this word from and has
+// the tool provide it, so a word a source offered against the keyword reaches
+// no envelope this implementation writes. The scope is where such a word is
+// observable at all.
+
+struct OfferingInEffect {
+  SourceManager sources;
+  DiagEngine diag{sources};
+  Preprocessor reader{sources, diag, PreprocConfig{}};
+  std::string produced;
+
+  explicit OfferingInEffect(const std::string& src) {
+    produced = reader.Preprocess(sources.AddFile("<test>", src));
+  }
+
+  ProtectKeywordValue Offered() const {
+    return reader.ProtectKeywords().ValueOf(kEncryptAgentInfoKeyword);
+  }
+};
+
+// A list written against the keyword after a string had already offered a word
+// about the tool. §34.5.8.1 defines the expression with a string, and §22.5.1
+// makes the parenthesized spelling a list of further expressions rather than
+// one written thing, so the list offers nothing.
+//
+// Offering nothing is a different thing from offering an empty word. The word
+// the string offered is still the one in effect, an expression offering nothing
+// having no standing to take it away.
+//
+// The string standing before the list is what tells the two readings apart.
+// With the list alone there would be no earlier word for it to take away, so a
+// reading that wiped the word and a reading that left it alone would both end
+// with nothing offered.
+TEST(ProtectEncryptAgentInfoSyntax, AListLeavesTheOfferingAlreadyMadeStanding) {
+  std::string src = OffersFurther(kFurtherWord);
+  src.append(kAnyOffering);
+  src.append("(site=\"North Haverbrook\", batch=\"42\")\n");
+  OfferingInEffect run(src);
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_FALSE(run.Offered().defaulted);
+  EXPECT_EQ(run.Offered().value, kFurtherWord);
+}
+
+// The same list where no string had offered anything before it. It offers
+// nothing, so the keyword stands at the value ProtectKeywordScope::ValueOf
+// gives a keyword no directive has written: an empty value, reported as
+// defaulted.
+//
+// That is what makes the case above about the list rather than about the string
+// that happened to precede it. A reading that took the list for a word about a
+// tool would leave the keyword standing at somebody's parentheses here.
+TEST(ProtectEncryptAgentInfoSyntax, AListOnItsOwnOffersNothingFurther) {
+  std::string src(kAnyOffering);
+  src.append("(site=\"North Haverbrook\", batch=\"42\")\n");
+  OfferingInEffect run(src);
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_TRUE(run.Offered().defaulted);
+  EXPECT_TRUE(run.Offered().value.empty());
 }
 
 // ---------------------------------------------------------------------------

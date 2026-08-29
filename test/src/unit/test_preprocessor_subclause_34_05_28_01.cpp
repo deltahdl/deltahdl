@@ -247,4 +247,22 @@ TEST(ProtectDecryptLicenseSyntax, ANameMerelyOpeningWithTheKeywordIsNotIt) {
                   .defaulted);
 }
 
+// §34.5.28.1 defines the keyword with a list, so `decrypt_license` is absent
+// from kStringValuedKeywords in src/preprocessor/protect_keywords.cpp. That
+// array names the keywords §34.5 defines as `keyword = <string>`, and
+// ProtectKeywordScope::Apply records nothing for one of them written with a
+// parenthesized value, §22.5.1 making such a value a list of further
+// expressions rather than one written thing. #3269 named this keyword among the
+// ones to put in that array, and the syntax line is why it is not there: a list
+// is the only value the keyword is ever written with, so a membership would
+// refuse every spelling the subclause defines. This case is what turns that
+// addition red, the five names being recorded here and a keyword in the array
+// leaving the value empty and defaulted.
+TEST(ProtectDecryptLicenseSyntax, TheFullListOutlivesTheStringValuedArray) {
+  const std::string kFiveNames = LicenseList(", exit=\"revoke\", match=7");
+  const ProtectKeywordValue kRecorded = LicenseAfter(StatesLicense(kFiveNames));
+  EXPECT_FALSE(kRecorded.defaulted);
+  EXPECT_EQ(kRecorded.value, kFiveNames);
+}
+
 }  // namespace

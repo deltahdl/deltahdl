@@ -144,21 +144,34 @@ std::span<const ProtectPragmaKeyword> ProtectPragmaKeywords() {
   return kProtectPragmaKeywords;
 }
 
-// §34.5.10.1, §34.5.11.1, §34.5.12.1, §34.5.16.1, §34.5.17.1, §34.5.18.1,
-// §34.5.21.1, §34.5.23.1, §34.5.24.1, §34.5.25.1 and §34.5.30.1 are the ones
-// whose subclauses have been taken; the rest of the table's `= <string>`
-// keywords join them as theirs are.
+// Every keyword §34.4 tabulates whose own subclause defines its expression as
+// `keyword = <string>`. Each was read there before it was written here:
+// §34.5.5.1 author, §34.5.6.1 author_info, §34.5.7.1 encrypt_agent, §34.5.8.1
+// encrypt_agent_info, §34.5.10.1 data_keyowner, §34.5.11.1 data_method,
+// §34.5.12.1 data_keyname, §34.5.16.1 digest_keyowner, §34.5.17.1
+// digest_key_method, §34.5.18.1 digest_keyname, §34.5.21.1 digest_method,
+// §34.5.23.1 key_keyowner, §34.5.24.1 key_method, §34.5.25.1 key_keyname and
+// §34.5.30.1 comment.
 //
-// This is the reading a consuming tool makes. #3269 covers the keywords still
-// outside the list, and #3273 the writing side, where TakeKeyDesignations in
-// src/preprocessor/protect_processing.cpp takes a list as the value of four of
-// these names and puts it on the envelope it produces. All four of those are in
-// this list now, which is the state #3273 describes itself as starting from.
+// Three tabulated keywords take a value and are absent, their subclauses
+// defining them with a parenthesized list rather than a string. §34.5.9.1
+// defines `encoding = (enctype = <string> [, ...])`. §34.5.28.1 defines
+// `decrypt_license = ( library = <string> , entry = <string> , feature =
+// <string> [, exit = <string>] [, match = <number> ] )`, and §34.5.29.1 defines
+// runtime_license with the same five parts. A list is the value each of those
+// three takes, so refusing one would refuse everything they are ever written
+// with.
+//
+// This is the reading a consuming tool makes. #3273 covers the writing side,
+// where TakeKeyDesignations in src/preprocessor/protect_processing.cpp takes a
+// list as the value of four of these names and puts it on the envelope it
+// produces.
 constexpr std::string_view kStringValuedKeywords[] = {
-    kDataKeyownerKeyword,   kDataMethodKeyword,      kDataKeynameKeyword,
-    kDigestKeyownerKeyword, kDigestKeyMethodKeyword, kDigestKeynameKeyword,
-    kDigestMethodKeyword,   kKeyKeyownerKeyword,     kKeyMethodKeyword,
-    kKeyKeynameKeyword,     kCommentKeyword,
+    kAuthorKeyword,           kAuthorInfoKeyword,     kEncryptAgentKeyword,
+    kEncryptAgentInfoKeyword, kDataKeyownerKeyword,   kDataMethodKeyword,
+    kDataKeynameKeyword,      kDigestKeyownerKeyword, kDigestKeyMethodKeyword,
+    kDigestKeynameKeyword,    kDigestMethodKeyword,   kKeyKeyownerKeyword,
+    kKeyMethodKeyword,        kKeyKeynameKeyword,     kCommentKeyword,
 };
 
 bool IsProtectStringValuedKeyword(std::string_view name) {

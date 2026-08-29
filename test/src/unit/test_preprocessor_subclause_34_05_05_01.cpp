@@ -48,6 +48,13 @@
 // reached a key; §34.5.3.1's and §34.5.4.1's words delimit a model an earlier
 // encryption sealed already; and §34.5.9.1's parenthesized value is the real
 // syntax the list form is written from.
+//
+// The value the keyword records is read back off the preprocessor as well as
+// looked for in the produced text. A list written against the keyword records
+// no name, so a name an earlier directive wrote still stands and a keyword no
+// directive named stands at its default. #3269 is the defect those two
+// readings close: the parentheses and the subkeywords of a list were recorded
+// as the author §34.5.5.1 defines the keyword to name.
 
 #include <gtest/gtest.h>
 
@@ -76,6 +83,13 @@ constexpr std::string_view kAuthorDirective =
 // The opening of any such directive, for the readings that ask whether an
 // envelope names an author at all rather than which one.
 constexpr std::string_view kAnyAuthorDirective = "`pragma protect author=";
+
+// The parenthesized spelling §22.5.1 gives a pragma_value, written against this
+// keyword: a list of further expressions, whose subkeywords are somebody's own
+// devising. It is the sharpest near miss the defined value has, every letter of
+// the name being on the line and in its order.
+constexpr std::string_view kListAgainstTheKeyword =
+    "`pragma protect author=(first=\"Ada\", last=\"Lovelace\")\n";
 
 // The text standing where a region writing `written` inside itself was, for a
 // tool holding that region's key.
@@ -276,6 +290,50 @@ TEST(ProtectAuthorSyntax, AParenthesizedListAgainstTheKeywordIsSealed) {
   std::string listed =
       "`pragma protect author=(first=\"Ada\", last=\"Lovelace\")\n";
   EXPECT_TRUE(Holds(OpenedBlockWriting(listed), listed));
+}
+
+// ---------------------------------------------------------------------------
+// What a list leaves the keyword recording.
+// ---------------------------------------------------------------------------
+
+// The two readings above ask what the encrypting half publishes, which is
+// nothing either way. What a reading records for the keyword is a separate
+// answer, and it is read off the preprocessor once the whole text has passed
+// through: it belongs to the point the reading has reached rather than to any
+// one line of output.
+
+// A list written against the keyword on a text that already named an author.
+// The list names nobody, and naming nobody is not naming an empty author, so
+// the name the earlier directive wrote is still the name the keyword records.
+//
+// Only the earlier directive tells the two apart. With the list standing alone
+// there is no name for it to take away, so a reading that wiped the name and a
+// reading that let it stand both end with no name recorded. #3269 is the defect
+// this closes: the list was recorded as the author, punctuation and subkeywords
+// and all.
+TEST(ProtectAuthorSyntax, AListLeavesTheAuthorAlreadyNamedStanding) {
+  std::string src(kAuthorDirective);
+  src += kListAgainstTheKeyword;
+  ReadWithTheKeys run(src);
+  EXPECT_FALSE(run.diags.HasErrors());
+  EXPECT_FALSE(run.reader.ProtectKeywords().ValueOf(kAuthorKeyword).defaulted);
+  EXPECT_EQ(run.reader.ProtectKeywords().ValueOf(kAuthorKeyword).value,
+            kAuthorName);
+}
+
+// The same list on a text no directive named an author in. It names nobody, so
+// the keyword stands at the default ProtectKeywordScope::ValueOf in
+// src/preprocessor/protect_keywords.cpp gives a keyword no directive wrote: the
+// empty string, reported as defaulted.
+//
+// That is what makes the case above about the spelling of the value rather than
+// about the name that happened to stand ahead of it.
+TEST(ProtectAuthorSyntax, AListWithNoAuthorNamedBeforeItLeavesTheDefault) {
+  ReadWithTheKeys run{std::string(kListAgainstTheKeyword)};
+  EXPECT_FALSE(run.diags.HasErrors());
+  EXPECT_TRUE(run.reader.ProtectKeywords().ValueOf(kAuthorKeyword).defaulted);
+  EXPECT_TRUE(
+      run.reader.ProtectKeywords().ValueOf(kAuthorKeyword).value.empty());
 }
 
 // ---------------------------------------------------------------------------

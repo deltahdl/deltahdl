@@ -32,13 +32,12 @@ bool IsProtectPragmaKeyword(std::string_view name);
 // pragma_value a list of further expressions rather than one written thing, so
 // an expression writing one against such a keyword states no value for it.
 //
-// The set grows as each keyword's subclause is taken: §34.5.10.1 defines the
-// entity that provided a region's keys this way, §34.5.11.1 the algorithm its
-// data are encrypted under, §34.5.12.1 the name picking that entity's key out,
-// §34.5.16.1 the entity that provided the key its digest is under, and
-// §34.5.17.1 the algorithm that key is encrypted with. A
-// keyword whose subclause defines it with a list -- §34.5.9.1's encoding is the
-// one that does -- is not in it and never will be.
+// The set is every tabulated keyword whose subclause defines it that way, and
+// each was read in §34.5 before it was put there. Three tabulated keywords take
+// a value and are outside it, their subclauses defining them with a list:
+// §34.5.9.1's encoding, §34.5.28.1's decrypt_license and §34.5.29.1's
+// runtime_license. A list is what each of those is written with, so none of the
+// three will ever join.
 bool IsProtectStringValuedKeyword(std::string_view name);
 
 // What the table says `name` does. A name outside the table has no entry, so

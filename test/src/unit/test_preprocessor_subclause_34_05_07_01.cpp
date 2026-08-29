@@ -36,6 +36,15 @@
 // what this subclause contributes to it is which spellings a conforming
 // producer may have used.
 //
+// §34.4 puts the value written against a tabulated name in effect for that name
+// from the directive on, and the spelling decides whether an expression writes
+// a value at all. A parenthesized list is not the string §34.5.7.1 writes, so
+// an expression carrying one names no tool: a tool a string named earlier is
+// still the one in effect, and where no string named one the keyword stands at
+// its default. That is what the two cases under "What a list leaves in effect
+// for the keyword" claim, and #3269 is the defect they cover -- the punctuation
+// of such a list was stored as the name of the tool that sealed an envelope.
+//
 // All of it is preprocessor-stage. src/preprocessor/protect_keywords.h holds
 // the name and src/preprocessor/protect_keywords.cpp writes the expression, in
 // the keyword-equals-string form, out of the description an envelope carries;
@@ -63,6 +72,7 @@
 #include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope_output.h"
+#include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
 
 using namespace delta;
@@ -441,6 +451,74 @@ TEST(ProtectEncryptAgentSyntax, AStringSpellingTheExpressionIsOneValue) {
   ReadBack read("`pragma protect encrypt_agent=\"encrypt_agent=globex\"\n");
   EXPECT_FALSE(read.diag.HasErrors());
   EXPECT_FALSE(read.Holds("encrypt_agent"));
+}
+
+// ---------------------------------------------------------------------------
+// What a list leaves in effect for the keyword.
+// ---------------------------------------------------------------------------
+
+// A reading of `src` with the preprocessor kept alive afterwards, so the value
+// §34.4 has in effect for the keyword can be read off it once the whole text
+// has passed through. The value belongs to the point the reading has reached
+// rather than to any one line of output, which is why it is read here rather
+// than looked for in the text a reading produced.
+//
+// §34.5.7.2 gives an encrypting tool no input to draw the name from and has it
+// generate the expression itself, so a name a source wrote against the keyword
+// reaches no envelope this implementation writes. The scope is where such a
+// name is observable at all.
+struct AgentInEffect {
+  SourceManager mgr;
+  DiagEngine diag{mgr};
+  Preprocessor pp{mgr, diag, PreprocConfig{}};
+  std::string text;
+
+  explicit AgentInEffect(const std::string& src) {
+    text = pp.Preprocess(mgr.AddFile("<test>", src));
+  }
+
+  ProtectKeywordValue Named() const {
+    return pp.ProtectKeywords().ValueOf(kEncryptAgentKeyword);
+  }
+};
+
+// A list written against the keyword after a string had already named a tool.
+// §34.5.7.1 defines the expression with a string, and §22.5.1 makes the
+// parenthesized spelling a list of further expressions rather than one written
+// thing, so the list names no tool.
+//
+// Naming none is a different thing from naming an empty one. The tool the
+// string named is still the one in effect, an expression naming nothing having
+// no standing to take it away.
+//
+// The string standing before the list is what tells the two readings apart.
+// With the list alone there would be no earlier name for it to take away, so a
+// reading that wiped the name and a reading that left it alone would both end
+// with no tool named.
+TEST(ProtectEncryptAgentSyntax, AListLeavesTheToolAlreadyNamedStanding) {
+  std::string src(kAgentDirective);
+  src.append(kAnyAgentExpression);
+  src.append("(vendor=\"Ogdenville\", release=\"11\")\n");
+  AgentInEffect run(src);
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_FALSE(run.Named().defaulted);
+  EXPECT_EQ(run.Named().value, kAgentName);
+}
+
+// The same list where no string had named a tool before it. It names none, so
+// the keyword stands at the value ProtectKeywordScope::ValueOf gives a keyword
+// no directive has written: an empty value, reported as defaulted.
+//
+// That is what makes the case above about the list rather than about the string
+// that happened to precede it. A reading that took the list for a name would
+// leave the keyword standing at somebody's parentheses here.
+TEST(ProtectEncryptAgentSyntax, AListOnItsOwnNamesNoTool) {
+  std::string src(kAnyAgentExpression);
+  src.append("(vendor=\"Ogdenville\", release=\"11\")\n");
+  AgentInEffect run(src);
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_TRUE(run.Named().defaulted);
+  EXPECT_TRUE(run.Named().value.empty());
 }
 
 // ---------------------------------------------------------------------------

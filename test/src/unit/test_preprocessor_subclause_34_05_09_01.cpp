@@ -23,6 +23,19 @@
 // what the standard writes and a single word against the keyword is what
 // invents something.
 //
+// The keyword is therefore absent from kStringValuedKeywords in
+// src/preprocessor/protect_keywords.cpp. That array names the keywords §34.5
+// defines as `keyword = <string>`, and ProtectKeywordScope::Apply records
+// nothing for one of them written with a parenthesized value. #3269 is the
+// defect that array closes. Adding this keyword to the array would refuse every
+// value §34.5.9.1 defines, a list being the only value the keyword is ever
+// written with, and
+// ProtectEncodingSyntax.TheSchemeNamedInARegionIsTheEnvelopesOwn below is the
+// case that would go red on the addition: the envelope that case reads states
+// base64 only because the list reached the keyword, and a region whose request
+// was dropped is written under the scheme DefaultProtectEncoding in
+// src/preprocessor/protect_encoding.cpp supplies instead.
+//
 // What a reading draws from the expression is real, which is what separates the
 // observations below from the ones a keyword nothing is taken from admits. The
 // scheme names the writing a block's characters were produced by, so it decides
