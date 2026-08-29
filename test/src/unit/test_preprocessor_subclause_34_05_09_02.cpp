@@ -208,7 +208,7 @@ TEST(ProtectEncodingEncryptionInput,
       f.diag.Diagnostics(),
       "protect pragma value stands for a different number of bytes from the "
       "one the encoding in effect states",
-      LineHolding(src, kEncodingBlockOpening), "34.5.9.2"));
+      LineHolding(src, kEncodingBlockOpening) + 1, "34.5.9.2"));
   EXPECT_FALSE(Holds(read, "module sealed_m"));
 }
 
@@ -666,7 +666,7 @@ TEST(ProtectEncodingDecryptionInput, ABlockDeclaredWronglyDoesNotOpen) {
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "protect pragma data block cannot be decrypted with the key supplied",
-      LineHolding(src, kEncodingBlockOpening), "34.3.2"));
+      LineHolding(src, kEncodingBlockOpening) + 1, "34.3.2"));
   EXPECT_FALSE(Holds(read, "module sealed_m"));
 }
 
@@ -684,7 +684,7 @@ TEST(ProtectEncodingDecryptionInput, ABlockUnderAnUnprovidedSchemeIsNotRead) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "protect pragma encoding names an enctype this "
                             "implementation does not provide",
-                            LineHolding(src, kEncodingBlockOpening),
+                            LineHolding(src, kEncodingBlockOpening) + 1,
                             "34.5.9.2"));
   EXPECT_FALSE(Holds(read, "module sealed_m"));
 }
@@ -740,7 +740,11 @@ TEST(ProtectEncodingDecryptionInput, TheCountIsSpentOnTheBlockItStandsAheadOf) {
   std::string envelope = EnvelopeAround("");
   size_t block = envelope.find(kEncodingBlockOpening);
   ASSERT_NE(block, std::string::npos);
-  size_t ends = envelope.find('\n', block);
+  // §34.5.15.2 puts the block on the line beneath its keyword, so the line the
+  // designation is written after is the one past the announcement rather than
+  // the announcement's own: written between the two it would be taken as the
+  // block, and the block as a key.
+  size_t ends = envelope.find('\n', block + kEncodingBlockOpening.size());
   ASSERT_NE(ends, std::string::npos);
   std::string written(kDataPublicKeyLine);
   written.append(EncodeProtectBlock(kDesignatedKey, DefaultProtectEncoding()));

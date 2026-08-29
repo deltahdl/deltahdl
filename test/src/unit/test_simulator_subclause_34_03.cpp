@@ -92,7 +92,7 @@ TEST(ProtectedEnvelopeProcessingSimulation, ProtectedDesignStaysSealedWithout) {
       kStrangerKey);
   EXPECT_TRUE(ReportedError(
       run.f.diag.Diagnostics(),
-      "protect pragma data block cannot be decrypted with the key supplied", 9,
+      "protect pragma data block cannot be decrypted with the key supplied", 10,
       "34.3.2"));
   EXPECT_EQ(run.result, 1U);
 }
