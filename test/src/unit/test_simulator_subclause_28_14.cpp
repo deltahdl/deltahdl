@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <vector>
 
 #include "common/arena.h"
@@ -9,6 +10,7 @@
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_switch_network.h"
+#include "model_strength.h"
 #include "simulator/net.h"
 #include "simulator/switch_network.h"
 #include "simulator/variable.h"
@@ -16,6 +18,22 @@
 using namespace delta;
 
 namespace {
+
+// This file covers the rule of §28.14: "The rnmos, rpmos, rcmos, rtran,
+// rtranif1, and rtranif0 devices shall reduce the strength of signals that pass
+// through them according to Table 28-8."
+//
+// The ModelAndSimulator... cases claim more than the cases around them: at
+// every row of Table 28-8, ModelReduceResistive in
+// lib/cpp/test_models/model_strength.h and ReduceResistive in
+// src/common/types.h each produce the reduced strength the table gives. Both
+// functions are asserted against the table, so a row where the two agree with
+// each other and not with Table 28-8 fails here.
+//
+// Issue #3417 is the defect those cases answer. The model's function was named
+// ReduceResistive as well, so every call written in this file passed a Strength
+// and reached the simulator's function in src/common/types.h. The shared name
+// is what made the model read as covered while nothing ever called it.
 
 // Row-by-row coverage of Table 28-8 against the exact reduction function the
 // simulator lowerer applies for resistive devices.
@@ -49,6 +67,77 @@ TEST(StrengthReductionResistive, SmallStaysSmall) {
 
 TEST(StrengthReductionResistive, HighzStaysHighz) {
   EXPECT_EQ(ReduceResistive(Strength::kHighz), Strength::kHighz);
+}
+
+// ModelReduceResistive states Table 28-8 independently of the simulator. Its
+// StrengthLevel and the simulator's Strength in src/common/types.h carry the
+// same eight levels of §28.11's Table 28-7 at the same underlying values, so a
+// level converts by its number.
+Strength ToStrength(StrengthLevel level) {
+  return static_cast<Strength>(static_cast<uint8_t>(level));
+}
+
+// One case per row of Table 28-8, which reads: supply drive to pull drive,
+// strong drive to pull drive, pull drive to weak drive, large capacitor to
+// medium capacitor, weak drive to medium capacitor, medium capacitor to small
+// capacitor, small capacitor to small capacitor, high impedance to high
+// impedance.
+TEST(StrengthReductionResistive, ModelAndSimulatorReduceSupplyDriveToPull) {
+  const StrengthLevel kInput = StrengthLevel::kSupply;
+  const StrengthLevel kTableRow = StrengthLevel::kPull;
+  EXPECT_EQ(ModelReduceResistive(kInput), kTableRow);
+  EXPECT_EQ(ReduceResistive(ToStrength(kInput)), ToStrength(kTableRow));
+}
+
+TEST(StrengthReductionResistive, ModelAndSimulatorReduceStrongDriveToPull) {
+  const StrengthLevel kInput = StrengthLevel::kStrong;
+  const StrengthLevel kTableRow = StrengthLevel::kPull;
+  EXPECT_EQ(ModelReduceResistive(kInput), kTableRow);
+  EXPECT_EQ(ReduceResistive(ToStrength(kInput)), ToStrength(kTableRow));
+}
+
+TEST(StrengthReductionResistive, ModelAndSimulatorReducePullDriveToWeak) {
+  const StrengthLevel kInput = StrengthLevel::kPull;
+  const StrengthLevel kTableRow = StrengthLevel::kWeak;
+  EXPECT_EQ(ModelReduceResistive(kInput), kTableRow);
+  EXPECT_EQ(ReduceResistive(ToStrength(kInput)), ToStrength(kTableRow));
+}
+
+TEST(StrengthReductionResistive,
+     ModelAndSimulatorReduceLargeCapacitorToMedium) {
+  const StrengthLevel kInput = StrengthLevel::kLarge;
+  const StrengthLevel kTableRow = StrengthLevel::kMedium;
+  EXPECT_EQ(ModelReduceResistive(kInput), kTableRow);
+  EXPECT_EQ(ReduceResistive(ToStrength(kInput)), ToStrength(kTableRow));
+}
+
+TEST(StrengthReductionResistive, ModelAndSimulatorReduceWeakDriveToMedium) {
+  const StrengthLevel kInput = StrengthLevel::kWeak;
+  const StrengthLevel kTableRow = StrengthLevel::kMedium;
+  EXPECT_EQ(ModelReduceResistive(kInput), kTableRow);
+  EXPECT_EQ(ReduceResistive(ToStrength(kInput)), ToStrength(kTableRow));
+}
+
+TEST(StrengthReductionResistive,
+     ModelAndSimulatorReduceMediumCapacitorToSmall) {
+  const StrengthLevel kInput = StrengthLevel::kMedium;
+  const StrengthLevel kTableRow = StrengthLevel::kSmall;
+  EXPECT_EQ(ModelReduceResistive(kInput), kTableRow);
+  EXPECT_EQ(ReduceResistive(ToStrength(kInput)), ToStrength(kTableRow));
+}
+
+TEST(StrengthReductionResistive, ModelAndSimulatorKeepSmallCapacitorSmall) {
+  const StrengthLevel kInput = StrengthLevel::kSmall;
+  const StrengthLevel kTableRow = StrengthLevel::kSmall;
+  EXPECT_EQ(ModelReduceResistive(kInput), kTableRow);
+  EXPECT_EQ(ReduceResistive(ToStrength(kInput)), ToStrength(kTableRow));
+}
+
+TEST(StrengthReductionResistive, ModelAndSimulatorKeepHighImpedanceHighz) {
+  const StrengthLevel kInput = StrengthLevel::kHighz;
+  const StrengthLevel kTableRow = StrengthLevel::kHighz;
+  EXPECT_EQ(ModelReduceResistive(kInput), kTableRow);
+  EXPECT_EQ(ReduceResistive(ToStrength(kInput)), ToStrength(kTableRow));
 }
 
 // End-to-end observation that §28.14's reduction rule is what the simulator

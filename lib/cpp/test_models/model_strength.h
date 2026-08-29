@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 
 #include "model_val4.h"
@@ -32,9 +33,7 @@ struct StrengthSignal {
 
 enum class ModelWiredLogicKind : uint8_t { kNone, kAnd, kOr };
 
-inline StrengthLevel MapStrengthKeyword0(uint8_t keyword_index);
-
-inline StrengthLevel MapStrengthKeyword1(uint8_t keyword_index);
+inline StrengthLevel MapStrengthKeyword(uint8_t keyword_index);
 
 inline bool ValidateStrengthPair(StrengthLevel s0, StrengthLevel s1);
 
@@ -48,13 +47,23 @@ inline StrengthSignal CombineAmbiguous(StrengthSignal a, StrengthSignal b);
 inline StrengthSignal CombineAmbiguousWithUnambiguous(StrengthSignal unambig,
                                                       StrengthSignal ambig);
 
-inline StrengthLevel ReduceNonresistive(StrengthLevel input);
+inline StrengthLevel ModelReduceNonresistive(StrengthLevel input);
 
-inline StrengthLevel ReduceResistive(StrengthLevel input);
+inline StrengthLevel ModelReduceResistive(StrengthLevel input);
 
 // --- Implementations ---
-inline StrengthLevel MapStrengthKeyword0(uint8_t keyword_index) {
-  // 0=none, 1=highz, 2=weak, 3=pull, 4=strong, 5=supply
+// §28.11's Table 28-7, which gives a strength name a level. One function
+// answers both halves of a strength specification because the table gives
+// `supply0` and `supply1` the level 7, `strong0` and `strong1` the level 6, and
+// so on down to `highz0` and `highz1` at 0: the suffix says which portion of
+// the net value the strength belongs to and does not change the level.
+//
+// The index is a position in the drive_strength keyword list §28.11 writes out
+// -- none, highz, weak, pull, strong, supply -- and not a strength level.
+// Table 28-7 also carries large, medium and small, which are the charge storage
+// strengths of §28.15.2 rather than drive strengths, and which §28.11's two
+// lists do not admit.
+inline StrengthLevel MapStrengthKeyword(uint8_t keyword_index) {
   switch (keyword_index) {
     case 0:
     case 1:
@@ -72,27 +81,12 @@ inline StrengthLevel MapStrengthKeyword0(uint8_t keyword_index) {
   }
 }
 
-inline StrengthLevel MapStrengthKeyword1(uint8_t keyword_index) {
-  // 0=none, 1=highz, 2=weak, 3=pull, 4=strong, 5=supply
-  switch (keyword_index) {
-    case 0:
-    case 1:
-      return StrengthLevel::kHighz;
-    case 2:
-      return StrengthLevel::kWeak;
-    case 3:
-      return StrengthLevel::kPull;
-    case 4:
-      return StrengthLevel::kStrong;
-    case 5:
-      return StrengthLevel::kSupply;
-    default:
-      return StrengthLevel::kHighz;
-  }
-}
-
+// §28.11: "The combinations (highz0, highz1) and (highz1, highz0) shall be
+// considered illegal." Both spellings name one pair once the two keywords are
+// read as levels, so the rule is that the two sides are not both kHighz. Every
+// other pair of the two lists is legal, the clause ruling out these and no
+// others.
 inline bool ValidateStrengthPair(StrengthLevel s0, StrengthLevel s1) {
-  // Both highz is illegal; all other combinations are legal.
   return s0 != StrengthLevel::kHighz || s1 != StrengthLevel::kHighz;
 }
 
@@ -136,6 +130,31 @@ inline StrengthSignal CombineUnambiguous(StrengthSignal a, StrengthSignal b) {
   return result;
 }
 
+// §28.12.4: the net types triand, wand, trior and wor "shall resolve conflicts
+// when multiple drivers have the same strength", by "treating signals as inputs
+// of logic functions". The result has "the same value as the result produced by
+// an and gate" or "an or gate" with the two values as inputs, and "the strength
+// of the result is the same as the strength of the combined signals".
+//
+// Three of the clause's cases this function answers wrongly, all recorded in
+// issue #3423 and none of them asserted by
+// test_simulator_subclause_28_12_04.cpp:
+//
+// An operand spanning more than one level is collapsed to one by the max below,
+// so the union §28.12.4 asks for -- "all combinations of each of the strength
+// levels in the first signal with each of the strength levels in the second
+// signal" -- is never formed. Figure 28-25 is the counterexample: a value 0
+// over levels 6 and 5 combined by or logic with a value 1 at level 5 leaves a
+// value-1 component surviving, and this returns an unambiguous 0.
+//
+// An x operand is answered by the complement of the one case tested for, where
+// an and gate gives x for `1 and x` and an or gate gives x for `0 or x`.
+// WiredAnd and WiredOr (simulator/net.cpp) answer those correctly.
+//
+// ModelWiredLogicKind::kNone falls to the or arm, so a check that names no
+// wired logic resolves a strong 0 against a strong 1 to a definite 1 where
+// §28.12.2 makes it ambiguous. §28.12.4 names four net types and no such case,
+// and WiredLogicKind (simulator/net.h) declares no kNone.
 inline StrengthSignal CombineWithWiredLogic(StrengthSignal a, StrengthSignal b,
                                             ModelWiredLogicKind logic) {
   // For different strengths, the stronger signal dominates (same as
@@ -186,10 +205,17 @@ inline StrengthSignal CombineWithWiredLogic(StrengthSignal a, StrengthSignal b,
 
 // §28.12.2: combining two ambiguous-strength signals yields an ambiguous
 // signal whose strength range on each side of the scale covers both inputs.
-// In the hi-only range encoding used here — the per-side lower bound is
-// implicitly kHighz — widening the range is a max on each side. Values merge
-// with x wherever the inputs disagree, otherwise the shared value carries
-// through.
+// Widening the range is a max on each side, and values merge with x wherever
+// the inputs disagree.
+//
+// The per-side lower bound is left at kHighz and is not computed, which is
+// right only where both components already reach high impedance. §28.12.2's
+// own figures show components that do not: Figure 28-12 draws a 651 signal
+// spanning Pu1 to St1 and Figure 28-13 a 530 signal spanning We0 to Pu0. Two
+// same-value components anchored above high impedance are the case the clause
+// illustrates nowhere and this function answers wrongly; issue #3423 records
+// it, and test_simulator_subclause_28_12_02.cpp asserts only the shapes
+// §28.12.2 settles.
 inline StrengthSignal CombineAmbiguous(StrengthSignal a, StrengthSignal b) {
   StrengthSignal result;
   result.strength0_hi = std::max(a.strength0_hi, b.strength0_hi);
@@ -260,7 +286,12 @@ inline StrengthSignal CombineAmbiguousWithUnambiguous(StrengthSignal unambig,
   return result;
 }
 
-inline StrengthLevel ReduceNonresistive(StrengthLevel input) {
+// §28.13, modelled independently of ReduceNonresistive in src/common/types.h,
+// which is the simulator's own and takes a Strength rather than a
+// StrengthLevel. The two names were one until issue #3417, which is how this
+// header read as covered by test_simulator_subclause_28_13.cpp when every call
+// there reached the simulator's function and none reached this one.
+inline StrengthLevel ModelReduceNonresistive(StrengthLevel input) {
   // supply → strong; all others unchanged.
   if (input == StrengthLevel::kSupply) {
     return StrengthLevel::kStrong;
@@ -268,7 +299,9 @@ inline StrengthLevel ReduceNonresistive(StrengthLevel input) {
   return input;
 }
 
-inline StrengthLevel ReduceResistive(StrengthLevel input) {
+// §28.14's Table 28-8, modelled independently of ReduceResistive in
+// src/common/types.h for the reason ModelReduceNonresistive above is.
+inline StrengthLevel ModelReduceResistive(StrengthLevel input) {
   // Per Table 28-8:
   //   supply → pull, strong → pull, pull → weak, large → medium,
   //   weak → medium, medium → small, small → small, highz → highz.
