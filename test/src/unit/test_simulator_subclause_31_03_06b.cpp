@@ -41,10 +41,33 @@
 // only one side would report nothing for the case written for the other, and
 // both would pass a case that drove both sides at once.
 //
-// The three cases share one design and differ in their stimulus alone. That is
-// what shows a check being run rather than one answer being handed to all
-// three: a driver that reported unconditionally would fail the satisfied case,
-// and a driver that reported nothing would fail the two violating ones.
+// The first three cases share one design and differ in their stimulus alone.
+// That is what shows a check being run rather than one answer being handed to
+// all three: a driver that reported unconditionally would fail the satisfied
+// case, and a driver that reported nothing would fail the two violating ones.
+//
+// The last two cases share a second design, and in both of them the reference
+// event and the data event fall at one simulation time. §31.3.6 states the
+// verdict for that outright: "The $recrem check shall report a timing violation
+// when the reference and data events occur simultaneously". Nothing tested that
+// sentence before, and the two cases pin it from both of the orders the clause
+// says the verdict must not depend on: "when both the removal limit and the
+// recovery limit are positive, either the reference event or the data event can
+// be the timecheck event. It shall depend upon which occurs first in the
+// simulation".
+//
+// Neither case is regression coverage for issue #3415, and neither would have
+// failed under the driver that issue names. A $recrem is evaluated at whichever
+// of its two events occurs first, so both watchers ask for an evaluation, and
+// the second of the two to run under that driver had both times recorded
+// whichever order the two committed in. The $hold pair in
+// test_simulator_subclause_31_03_01b.cpp is what catches the defect, $hold
+// being evaluated at one of its two events alone.
+//
+// Each of those two cases writes its two assignments as two statements of one
+// initial block with no delay between them. That is what makes the order the
+// two signals commit in explicit and deterministic. A pair of continuous
+// assignments would leave that order to the order the two were lowered in.
 //
 // The message substring stops before the signal name the report goes on to
 // spell, and the two sides of the window share it. What each case claims is
@@ -63,6 +86,20 @@
 // `clr` edges stand at times 404, 438 and 450, so a case that read its
 // interval, its limit or its edge out of another case's design would compare
 // two numbers that disagree rather than two that coincide.
+//
+// The two simultaneous cases run a second design, whose limits are 45
+// (recovery) and 27 (removal) and whose two transitions both stand at time 466.
+// None of those three numbers is a limit or a time the first three cases use,
+// so a case that read a limit or an edge out of the other design would again
+// compare two numbers that disagree. Neither limit is 0, which is the condition
+// §31.3.6 states the simultaneous rule under: TwoSidedWindowViolated
+// (src/simulator/timing_check_stability.cpp) reports nothing at all for a check
+// whose two limits are zero, so a zero limit would make both cases pass without
+// the simultaneous rule holding. A simultaneous pair is read against the limit
+// bounding the side the window ends on, which for $recrem is the removal limit:
+// LimitsOf in that same file puts TimingCheckEntry::limit2 there, and
+// TwoSidedWindowViolated compares against it whenever the data event does not
+// follow the reference event.
 //
 // Each source drives both signals to a known level before either transition
 // that matters. §31.5 makes posedge the shorthand for edge[01, 0x, x1], so the
@@ -90,8 +127,8 @@ using namespace delta;
 
 namespace {
 
-// The design every case here runs, up to the stimulus each case supplies. A
-// case hands it to LineHolding, which reads the line the `$recrem` keyword
+// The design the first three cases run, up to the stimulus each case supplies.
+// A case hands it to LineHolding, which reads the line the `$recrem` keyword
 // stands on out of this text. The declaration stands above the stimulus, so the
 // line it holds here is the line it holds in the whole source.
 constexpr const char* kDesignThroughTheCheck =
@@ -105,13 +142,28 @@ constexpr const char* kDesignThroughTheCheck =
     "    clr = 1'b0;\n"
     "    clk = 1'b0;\n";
 
-// Elaborates, lowers and runs the one design these cases share, with `stimulus`
-// as the body of its initial block. False when the source did not elaborate
-// cleanly, which a case asserts on before reading anything off the fixture: a
-// design rejected before it ran says nothing about §31.3.6 whatever the case
-// was written to expect.
-bool RanWithStimulus(const std::string& stimulus, SimFixture& f) {
-  auto* rtl = ElaborateSrc(std::string(kDesignThroughTheCheck) + stimulus +
+// The design the two simultaneous cases run, up to the stimulus each of them
+// supplies. It differs from kDesignThroughTheCheck in its two limits alone, and
+// LineHolding reads the `$recrem` line off it the same way.
+constexpr const char* kSimultaneousDesignThroughTheCheck =
+    "module top;\n"
+    "  logic clr;\n"
+    "  logic clk;\n"
+    "  specify\n"
+    "    $recrem(posedge clr, posedge clk, 45, 27);\n"
+    "  endspecify\n"
+    "  initial begin\n"
+    "    clr = 1'b0;\n"
+    "    clk = 1'b0;\n";
+
+// Elaborates, lowers and runs `design` with `stimulus` as the rest of the body
+// of its initial block. False when the source did not elaborate cleanly, which
+// a case asserts on before reading anything off the fixture: a design rejected
+// before it ran says nothing about §31.3.6 whatever the case was written to
+// expect.
+bool RanWithStimulus(const char* design, const std::string& stimulus,
+                     SimFixture& f) {
+  auto* rtl = ElaborateSrc(std::string(design) + stimulus +
                                "  end\n"
                                "endmodule\n",
                            f);
@@ -125,10 +177,10 @@ bool RanWithStimulus(const std::string& stimulus, SimFixture& f) {
 // at time 423, leaving 19 time units against a recovery limit of 24.
 TEST(DrivenTimingCheckEvaluation, RecremRecoverySideViolationInARunIsReported) {
   SimFixture f;
-  ASSERT_TRUE(
-      RanWithStimulus("    #404 clr = 1'b1;\n"
-                      "    #19 clk = 1'b1;\n",
-                      f));
+  ASSERT_TRUE(RanWithStimulus(kDesignThroughTheCheck,
+                              "    #404 clr = 1'b1;\n"
+                              "    #19 clk = 1'b1;\n",
+                              f));
   EXPECT_TRUE(ReportedWarning(
       f.diag.Diagnostics(), "$recrem violation: data signal",
       LineHolding(kDesignThroughTheCheck, "$recrem(posedge clr"), "31.3.6"));
@@ -140,10 +192,10 @@ TEST(DrivenTimingCheckEvaluation, RecremRecoverySideViolationInARunIsReported) {
 // leaving 2 time units against a removal limit of 14.
 TEST(DrivenTimingCheckEvaluation, RecremRemovalSideViolationInARunIsReported) {
   SimFixture f;
-  ASSERT_TRUE(
-      RanWithStimulus("    #436 clk = 1'b1;\n"
-                      "    #2 clr = 1'b1;\n",
-                      f));
+  ASSERT_TRUE(RanWithStimulus(kDesignThroughTheCheck,
+                              "    #436 clk = 1'b1;\n"
+                              "    #2 clr = 1'b1;\n",
+                              f));
   EXPECT_TRUE(ReportedWarning(
       f.diag.Diagnostics(), "$recrem violation: data signal",
       LineHolding(kDesignThroughTheCheck, "$recrem(posedge clr"), "31.3.6"));
@@ -162,11 +214,49 @@ TEST(DrivenTimingCheckEvaluation, RecremRemovalSideViolationInARunIsReported) {
 // there is no other report this case would tolerate.
 TEST(DrivenTimingCheckEvaluation, RecremSatisfiedInARunReportsNothing) {
   SimFixture f;
-  ASSERT_TRUE(
-      RanWithStimulus("    #450 clr = 1'b1;\n"
-                      "    #38 clk = 1'b1;\n",
-                      f));
+  ASSERT_TRUE(RanWithStimulus(kDesignThroughTheCheck,
+                              "    #450 clr = 1'b1;\n"
+                              "    #38 clk = 1'b1;\n",
+                              f));
   EXPECT_EQ(FindDiag(f, "$recrem violation: data signal"), nullptr);
+}
+
+// §31.3.6: "The $recrem check shall report a timing violation when the
+// reference and data events occur simultaneously." The reference event and the
+// data event both stand at time 466, the reference signal `clr` being assigned
+// first, and the two limits are the 45 and the 27 the clause requires to be
+// positive for the sentence to apply.
+TEST(DrivenTimingCheckEvaluation,
+     RecremSimultaneousEventsWithReferenceAssignedFirstAreReported) {
+  SimFixture f;
+  ASSERT_TRUE(RanWithStimulus(kSimultaneousDesignThroughTheCheck,
+                              "    #466 clr = 1'b1;\n"
+                              "    clk = 1'b1;\n",
+                              f));
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(), "$recrem violation: data signal",
+      LineHolding(kSimultaneousDesignThroughTheCheck, "$recrem(posedge clr"),
+      "31.3.6"));
+}
+
+// §31.3.6's simultaneous sentence again, with the data signal `clk` assigned
+// first. This case and
+// RecremSimultaneousEventsWithReferenceAssignedFirstAreReported above differ in
+// the order of two assignments at one simulation time and in nothing else,
+// which is what makes the two of them say the verdict follows the times the
+// design gives the two events rather than the order the assignments were
+// written in.
+TEST(DrivenTimingCheckEvaluation,
+     RecremSimultaneousEventsWithDataAssignedFirstAreReported) {
+  SimFixture f;
+  ASSERT_TRUE(RanWithStimulus(kSimultaneousDesignThroughTheCheck,
+                              "    #466 clk = 1'b1;\n"
+                              "    clr = 1'b1;\n",
+                              f));
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(), "$recrem violation: data signal",
+      LineHolding(kSimultaneousDesignThroughTheCheck, "$recrem(posedge clr"),
+      "31.3.6"));
 }
 
 }  // namespace

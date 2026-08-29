@@ -130,6 +130,17 @@ struct StabilityWindow {
   StabilityWindowEvents events;
   bool has_timestamp = false;
   uint64_t timestamp_ticks = 0;
+
+  // When the timecheck event last happened, and whether an evaluation of this
+  // check is already scheduled for the slot running now.
+  // ScheduleTimingCheckEvaluation (simulator/timing_check_driver_internal.h)
+  // defers the comparison to Region::kPrePostponed so that a timestamp event
+  // committed later in the same slot has been recorded before the two times are
+  // compared. The time is kept rather than read at the evaluation, because
+  // SimContext::CurrentTime is the same at both points and the timecheck event
+  // is what the clauses measure from.
+  uint64_t timecheck_ticks = 0;
+  std::shared_ptr<bool> pending = std::make_shared<bool>(false);
 };
 
 // Reports the violation a check just detected, naming the signal that
@@ -213,10 +224,18 @@ void ArmStabilityWindow(const SpecifyManager& mgr, std::size_t index,
                          window->has_timestamp = true;
                          window->timestamp_ticks = ctx.CurrentTime().ticks;
                        });
+  // §31.3 evaluates a check at its timecheck event, so only that watcher asks
+  // for an evaluation and a timestamp event on its own still asks for none.
+  // What the deferral changes is that the evaluation reads a timestamp event
+  // committed later in the same slot, which the clause counts and the commit
+  // order used to decide.
   WatchConditionedEdge(
       timecheck_var, std::move(timecheck_edge),
       ConditionedEvent{window->armed, !is_setup}, ctx, [window, &ctx]() {
-        EvaluateStabilityWindow(*window, ctx.CurrentTime().ticks, ctx);
+        window->timecheck_ticks = ctx.CurrentTime().ticks;
+        ScheduleTimingCheckEvaluation(window->pending, ctx, [window, &ctx]() {
+          EvaluateStabilityWindow(*window, window->timecheck_ticks, ctx);
+        });
       });
 }
 

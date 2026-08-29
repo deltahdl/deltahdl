@@ -36,6 +36,38 @@
 // both: a driver that reported unconditionally would fail the satisfied case,
 // and a driver that reported nothing would fail the violating one.
 //
+// Three cases put a check's two events in one time step, which is where
+// §31.3.1 and §31.3.2 disagree. §31.3.2 writes its window as "(beginning of
+// time window) = (timestamp time)" and its violation region as "(beginning of
+// time window) <= (timecheck time) < (end of time window)", so a $hold whose
+// two events fall in one time step is a violation for every nonzero limit.
+// §31.3.1 writes its window as "(end of time window) = (timecheck time)" and
+// its violation region as "(beginning of time window) < (timestamp time) < (end
+// of time window)", so a $setup whose two events fall in one time step is not
+// one. The two clauses differ exactly at that end point, which is why one
+// stimulus shape gives the two checks opposite answers.
+//
+// §31.3 decides which of two such events happened first, and the order the
+// design's drivers committed does not. Issue #3415 is that the commit order
+// decided it. A watcher runs as part of the commit that woke it, so a check
+// evaluated inside a watcher saw only what had committed before it, and a $hold
+// whose data event committed before its reference event found no timestamp
+// recorded and reported nothing. ScheduleTimingCheckEvaluation
+// (src/simulator/timing_check_driver_internal.h) defers the comparison to
+// Region::kPrePostponed of the same time slot, and Scheduler::ExecuteTimeSlot
+// (src/simulator/scheduler.cpp) reaches that region only once the slot's active
+// and reactive region sets are drained.
+//
+// The two $hold cases whose events fall in one time step share one design and
+// one time and differ in the order of two assignments, and in nothing else.
+// That is what makes them say the answer follows what the design does rather
+// than how it was written.
+//
+// Each of the three writes its two events as two statements of one initial
+// block with no delay between them. That makes the commit order explicit and
+// deterministic, and the commit order is what one of the three cases varies; a
+// pair of continuous assignments would leave it to lowering order instead.
+//
 // Only $setup (§31.3.1) and $hold (§31.3.2) are covered. The two windows run in
 // opposite directions -- §31.3.1 ends its window at the reference edge and
 // §31.3.2 begins its window there -- so the $hold case is not a restatement of
@@ -53,6 +85,14 @@
 // case that read its interval, its limit or its edge out of another case's
 // design would compare two numbers that disagree rather than two that happen to
 // coincide.
+//
+// The three cases whose events fall in one time step add two limits and two
+// times: 13 and 46 for the two $hold cases, which are one design, and 29 and 52
+// for the $setup case. Those four values are distinct from each other and from
+// every literal above. Neither limit is 0, which §31.3.1 and §31.3.2 both make
+// never issue a violation, so a limit of 0 would pass all three cases for the
+// wrong reason. Each limit is smaller than its case's time, so no window a case
+// evaluates reaches back to the x-to-0 assignments at time 0.
 //
 // The notifier case does not reuse the violating $setup design's own literals,
 // because doing so would put its reference edge at a time another case's edge
@@ -233,6 +273,100 @@ TEST(DesignTimingCheckEvaluation, HoldViolationInARunIsReported) {
   EXPECT_TRUE(
       ReportedWarning(f.diag.Diagnostics(), "$hold violation: data signal",
                       LineHolding(kDesign, "$hold(posedge clk, d"), "31.3.2"));
+}
+
+// §31.3.2 with the check's two events in one time step: `clk` rises at time 46
+// and `d` rises at time 46, against a limit of 13. Table 31-2 makes the
+// reference_event the timestamp event and the data_event the timecheck event,
+// so `clk` opens the window and `d` is what is measured against it. The
+// violation region is "(beginning of time window) <= (timecheck time) < (end of
+// time window)" and the beginning is "(timestamp time)", so the two events
+// falling together is a violation of every nonzero limit.
+//
+// `clk` is assigned before `d`, so the reference event commits first.
+TEST(DesignTimingCheckEvaluation,
+     HoldViolationInOneTimeStepWithTheClockAssignedFirst) {
+  SimFixture f;
+  const std::string kDesign =
+      "module top;\n"
+      "  logic d;\n"
+      "  logic clk;\n"
+      "  specify\n"
+      "    $hold(posedge clk, d, 13);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    d = 1'b0;\n"
+      "    clk = 1'b0;\n"
+      "    #46 clk = 1'b1;\n"
+      "    d = 1'b1;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
+  EXPECT_TRUE(
+      ReportedWarning(f.diag.Diagnostics(), "$hold violation: data signal",
+                      LineHolding(kDesign, "$hold(posedge clk, d"), "31.3.2"));
+}
+
+// §31.3.2 again, and the design of the case above with its two assignments at
+// time 46 exchanged: `d` is assigned before `clk`, so the timecheck event
+// commits before the timestamp event. The two cases differ in the order of two
+// assignments at one simulation time and in nothing else, which is what makes
+// them say the answer follows what the design does rather than how it was
+// written. The limit is 13 in both and the time is 46 in both.
+TEST(DesignTimingCheckEvaluation,
+     HoldViolationInOneTimeStepWithTheDataAssignedFirst) {
+  SimFixture f;
+  const std::string kDesign =
+      "module top;\n"
+      "  logic d;\n"
+      "  logic clk;\n"
+      "  specify\n"
+      "    $hold(posedge clk, d, 13);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    d = 1'b0;\n"
+      "    clk = 1'b0;\n"
+      "    #46 d = 1'b1;\n"
+      "    clk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
+  EXPECT_TRUE(
+      ReportedWarning(f.diag.Diagnostics(), "$hold violation: data signal",
+                      LineHolding(kDesign, "$hold(posedge clk, d"), "31.3.2"));
+}
+
+// §31.3.1 with the check's two events in one time step: `d` rises at time 52
+// and `clk` rises at time 52, against a limit of 29, and nothing is reported.
+// "(end of time window) = (timecheck time)", "The end points of the time window
+// are not part of the violation region", and Table 31-1 makes the data_event
+// the timestamp event, so a data transition standing on the reference edge is
+// outside the window. §31.3.2 includes the end point its window opens on and
+// §31.3.1 excludes both of its own, which is why this stimulus shape is a
+// violation for the two $hold cases above and is none here.
+//
+// `d` is assigned before `clk`, the order in which the timestamp event is
+// recorded before the timecheck event is evaluated. A run that included the end
+// point would report on this source, so the exclusion is the only thing keeping
+// it quiet.
+TEST(DesignTimingCheckEvaluation, SetupInOneTimeStepReportsNothing) {
+  SimFixture f;
+  ASSERT_TRUE(
+      DrivenToCompletion("module top;\n"
+                         "  logic d;\n"
+                         "  logic clk;\n"
+                         "  specify\n"
+                         "    $setup(d, posedge clk, 29);\n"
+                         "  endspecify\n"
+                         "  initial begin\n"
+                         "    d = 1'b0;\n"
+                         "    clk = 1'b0;\n"
+                         "    #52 d = 1'b1;\n"
+                         "    clk = 1'b1;\n"
+                         "  end\n"
+                         "endmodule\n",
+                         f));
+  EXPECT_EQ(FindDiag(f, "$setup violation: data signal"), nullptr);
 }
 
 }  // namespace

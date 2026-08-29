@@ -231,12 +231,17 @@ StabilitySide ViolatedSide(const SpecifyManager& mgr,
              : StabilitySide::kNone;
 }
 
-// Whether the transition just seen is the check's timecheck event, which is the
-// event §31.3 evaluates a check at. Table 31-4 makes $removal's reference event
-// the timecheck event and Table 31-5 makes $recovery's data event the timecheck
+// Whether the event `event` is the check's timecheck event, which is the event
+// §31.3 evaluates a check at. Table 31-4 makes $removal's reference event the
+// timecheck event and Table 31-5 makes $recovery's data event the timecheck
 // event; Table 31-3 and Table 31-6 leave $setuphold's and $recrem's to
 // whichever of the two "occurs first in the simulation", so for those two
-// either transition closes a window.
+// either event closes a window.
+//
+// This is asked once per watcher when the check is armed, rather than of each
+// transition as it arrives, because the evaluation no longer runs inside the
+// commit that woke a watcher. A watcher whose event never closes a window
+// records its time and asks for nothing.
 bool ClosesWindow(TimingCheckKind kind, StabilityEvent event) {
   if (kind == TimingCheckKind::kRemoval) {
     return event == StabilityEvent::kReference;
@@ -271,6 +276,13 @@ struct StabilityPair {
   uint64_t ref_ticks = 0;
   bool has_data = false;
   uint64_t data_ticks = 0;
+
+  // Whether an evaluation of this check is already scheduled for the slot
+  // running now. ScheduleTimingCheckEvaluation
+  // (simulator/timing_check_driver_internal.h) defers the comparison to
+  // Region::kPrePostponed, and a check whose two events both fall in one slot
+  // is evaluated once there rather than once per event.
+  std::shared_ptr<bool> pending = std::make_shared<bool>(false);
 };
 
 // §31.3.3's two messages. The check stands for two constraints, and the clause
@@ -343,19 +355,21 @@ void ReportViolation(TimingCheckKind kind, StabilitySide side,
       "31.3.5", pair.armed.Entry().loc, ctx);
 }
 
-// One of the two signals a §31.3 check names has just made its transition, and
-// `event` says which. Reports a violation when the transition closes the
-// check's window and the other signal's last transition falls inside it.
+// A §31.3 check whose timecheck event happened in the slot running now.
+// Reports a violation when the two signals' last transitions leave one inside
+// the window the other bounds.
 //
 // Nothing is evaluated until both signals have transitioned at least once:
 // §31.3 defines a window with respect to one transition and places the other
 // inside it, so before the first of each there is no window and nothing to
 // place.
-void EvaluateStabilityPair(const StabilityPair& pair, StabilityEvent event,
-                           SimContext& ctx) {
+//
+// Whether the transition that asked for this closed a window was settled when
+// the check was armed, ClosesWindow being asked of the watcher rather than of
+// the transition.
+void EvaluateStabilityPair(const StabilityPair& pair, SimContext& ctx) {
   if (!pair.has_ref || !pair.has_data) return;
   const TimingCheckEntry& check = pair.armed.Entry();
-  if (!ClosesWindow(check.kind, event)) return;
   StabilitySide side =
       ViolatedSide(*pair.armed.mgr, check, pair.ref_ticks, pair.data_ticks);
   if (side == StabilitySide::kNone) return;
@@ -378,17 +392,34 @@ void ArmStabilityPair(const SpecifyManager& mgr, std::size_t index,
   // simulation". A transition recorded in StabilityPair::ref_ticks or
   // StabilityPair::data_ticks under a false condition would otherwise stand as
   // the other side of every window the surviving event closes.
+  //
+  // Each watcher records its own time and asks for an evaluation only where
+  // ClosesWindow makes its event the timecheck event, which is what
+  // Scheduler::ExecuteTimeSlot then runs once the slot's active and reactive
+  // region sets are drained. Two events falling in one time slot are therefore
+  // both recorded before either is compared against the other, where a check
+  // evaluated inside the commit that woke a watcher saw only what had committed
+  // before it.
+  const TimingCheckKind kKind = mgr.GetTimingChecks()[index].kind;
+  const bool kRefCloses = ClosesWindow(kKind, StabilityEvent::kReference);
+  const bool kDataCloses = ClosesWindow(kKind, StabilityEvent::kData);
   ArmedTimingCheckEvents events = ArmTimingCheckEvents(
       pair->armed, ctx,
-      [pair, &ctx]() {
+      [pair, kRefCloses, &ctx]() {
         pair->has_ref = true;
         pair->ref_ticks = ctx.CurrentTime().ticks;
-        EvaluateStabilityPair(*pair, StabilityEvent::kReference, ctx);
+        if (!kRefCloses) return;
+        ScheduleTimingCheckEvaluation(pair->pending, ctx, [pair, &ctx]() {
+          EvaluateStabilityPair(*pair, ctx);
+        });
       },
-      [pair, &ctx]() {
+      [pair, kDataCloses, &ctx]() {
         pair->has_data = true;
         pair->data_ticks = ctx.CurrentTime().ticks;
-        EvaluateStabilityPair(*pair, StabilityEvent::kData, ctx);
+        if (!kDataCloses) return;
+        ScheduleTimingCheckEvaluation(pair->pending, ctx, [pair, &ctx]() {
+          EvaluateStabilityPair(*pair, ctx);
+        });
       });
   pair->ref_signal = std::move(events.ref_signal);
   pair->data_signal = std::move(events.data_signal);

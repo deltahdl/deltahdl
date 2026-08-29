@@ -15,6 +15,7 @@
 #include "parser/ast_specify.h"
 #include "simulator/evaluation.h"
 #include "simulator/instance_prefix_override.h"
+#include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/specify_timing_check.h"
@@ -340,6 +341,45 @@ inline ArmedTimingCheckEvents ArmTimingCheckEvents(
                        ConditionedEvent{armed, /*is_data_event=*/true}, ctx,
                        on_data);
   return ArmedTimingCheckEvents{std::move(ref_signal), std::move(data_signal)};
+}
+
+// Schedules `evaluate` into Region::kPrePostponed of the time slot running now,
+// once however many of a check's events fire in that slot. `pending` is that
+// once: it is set when this schedules and cleared when the scheduled event
+// runs, so a caller holding one flag per check gets one evaluation per slot.
+//
+// §31.3 decides a check from two events, and which of them is the timecheck
+// event follows the times they happened at. Table 31-3 and Table 31-6 say so
+// outright, leaving it to whichever of the two "occurs first in the
+// simulation", and §31.3.2's window includes the endpoint it opens on so that a
+// $hold whose events fall together is a violation. A watcher runs as part of
+// the commit that woke it, so a check evaluated inside a watcher sees only the
+// events committed before it, and two events falling in one time slot would be
+// ordered by the order their drivers committed rather than by the clause.
+// Scheduler::ExecuteTimeSlot (simulator/scheduler.cpp) reaches kPrePostponed
+// only once the active and reactive region sets of the slot are drained, so
+// every transition committed at that time has been recorded before the
+// evaluation runs.
+//
+// The region is kPrePostponed and not Scheduler::AddPostTimestepCallback, which
+// runs after the slot is over. §31.6 has a design respond to the notifier a
+// violation updates, and ToggleNotifier below calls Variable::NotifyWatchers so
+// that an `always @(notifier)` sees it; a process woken after the slot ended
+// would schedule into a slot Scheduler::Run has finished with. ArmTimeout
+// (simulator/timing_check_skew.cpp) schedules §31.4.2's and §31.4.3's timer
+// into the same region for the same drained-region property.
+inline void ScheduleTimingCheckEvaluation(const std::shared_ptr<bool>& pending,
+                                          SimContext& ctx,
+                                          std::function<void()> evaluate) {
+  if (*pending) return;
+  *pending = true;
+  Event* event = ctx.GetScheduler().GetEventPool().Acquire();
+  event->callback = [pending, evaluate = std::move(evaluate)]() {
+    *pending = false;
+    evaluate();
+  };
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kPrePostponed,
+                                   event);
 }
 
 // Reports one violation as a warning at `loc`, which is where the check that
