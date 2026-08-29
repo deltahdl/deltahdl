@@ -48,9 +48,18 @@
 // expressions specifying the key, it writes digest_key_keyowner, and §34.4
 // tabulates no such keyword: the name it tabulates is digest_keyowner, which
 // §34.5.16 defines. This file reads the list as naming that one.
+//
+// One case here is about the key the digest is under rather than about the
+// arrangement of blocks. §34.5.22.2 has the consuming tool decrypt the digest
+// the block carries, and a digest block is the shortest block an envelope
+// carries, so it is where the fewest characters of a key decided whether a
+// digest was accepted. Issue #3274 is the defect that made that a number
+// rather than the whole key. The cases about the cipher itself stand in
+// test/src/unit/test_preprocessor_subclause_34_03.cpp.
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -81,6 +90,14 @@ constexpr std::string_view kFirstKey = "meridian-trust-wrapping-key";
 constexpr std::string_view kSecondProvider = "cerulean-vault";
 constexpr std::string_view kSecondKeyName = "wrapping-2027";
 constexpr std::string_view kSecondKey = "cerulean-vault-wrapping-key";
+
+// A key of the first entity long enough to hold a whole digest block inside
+// it. §34.5.22.2's digest block is a fingerprint and a digest and nothing
+// else, so it is the shortest block an envelope carries; a key shorter than
+// that block could not state the relation #3274 turns on, there being no
+// characters of it left over to differ at.
+constexpr std::string_view kLongDigestKey =
+    "meridian-trust-digest-sealing-key-of-2026";
 
 // The name a region gives the key its data are under. A name with no key held
 // for it is what sends the region to key blocks rather than to a key of its
@@ -184,15 +201,22 @@ std::string DataBlockHolding(std::string_view sealed) {
   return text;
 }
 
-// A digest block vouching for `vouched_for`, written by the writer an
-// encrypting run uses so that the case varies what the digest was computed
-// over and nothing else about how it was written.
-std::string DigestBlockVouchingFor(std::string_view vouched_for) {
+// A digest block vouching for `vouched_for` and sealed under `key`, written by
+// the writer an encrypting run uses so that a case varies what the digest was
+// computed over and what it was sealed under, and nothing else about how it
+// was written.
+std::string DigestBlockUnder(std::string_view vouched_for,
+                             std::string_view key) {
   ProtectDigestBlockPolicy policy;
   policy.requested = true;
   policy.method = std::string(kDefaultDigestMethod);
-  policy.key = std::string(kEncodingExchangeKey);
+  policy.key = std::string(key);
   return ProtectDigestBlockDirectives(vouched_for, policy, TheScheme());
+}
+
+// The same block under the key an author hands both halves of a run.
+std::string DigestBlockVouchingFor(std::string_view vouched_for) {
+  return DigestBlockUnder(vouched_for, kEncodingExchangeKey);
 }
 
 // A decryption envelope as some other tool wrote it, holding `described`.
@@ -348,6 +372,49 @@ TEST(ProtectDigestBlockDecryptionInput,
       EnvelopeCarrying(DataBlockHolding(kEncodingSealedDesign)) +
       EnvelopeCarrying(DigestBlockVouchingFor(kEncodingSealedDesign)));
   EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kNotChecked);
+}
+
+// -- The key the digest is under --------------------------------------------
+
+// §34.5.22.2 has the consuming tool decrypt the digest the block carries. A
+// block that does not open is unreadable rather than altered, the reading never
+// having been in a position to compare, and a key agreeing with the sealing key
+// over the whole of the digest block is such a key.
+//
+// Issue #3274 is the defect this states the absence of. CombineWithKey in
+// src/preprocessor/protect_processing_cipher.cpp read the key only as far into
+// itself as the block was long, so two keys agreeing over that many characters
+// opened one another's digest blocks and this returned kMatched for a digest
+// sealed under a key the reader never held.
+//
+// The shared length is computed from ProtectedRegionBlockSize rather than
+// written down, a number written here having stopped being the block's length
+// the moment the digest algorithm changed. The sealing key is checked beside
+// the other one because kUnreadable is also what a block nothing at all can
+// open returns.
+TEST(ProtectDigestBlockDecryptionInput,
+     AKeyMatchingTheDigestBlocksLengthReadsNothing) {
+  const std::string kSealedDigest = DigestOf(kEncodingSealedDesign);
+  const size_t kBlockBytes = ProtectedRegionBlockSize(kSealedDigest);
+  ASSERT_GE(kLongDigestKey.size(), kBlockBytes);
+  const std::string kImpostorKey =
+      std::string(kLongDigestKey.substr(0, kBlockBytes)) + "-impostor";
+  ASSERT_EQ(kImpostorKey.substr(0, kBlockBytes),
+            std::string(kLongDigestKey.substr(0, kBlockBytes)));
+  ASSERT_NE(kImpostorKey, std::string(kLongDigestKey));
+  std::string written = DigestBlockUnder(kEncodingSealedDesign, kLongDigestKey);
+  std::string block;
+  ASSERT_TRUE(DecodeProtectBlock(LineAfter(written, kDigestBlockLine),
+                                 TheScheme().enctype, &block))
+      << written;
+  ProtectDigestTarget target;
+  target.cleartext = std::string(kEncodingSealedDesign);
+  target.key = std::string(kLongDigestKey);
+  EXPECT_EQ(CheckProtectDigestBlock(block, target, kDefaultDigestMethod),
+            ProtectDigestCheck::kMatched);
+  target.key = kImpostorKey;
+  EXPECT_EQ(CheckProtectDigestBlock(block, target, kDefaultDigestMethod),
+            ProtectDigestCheck::kUnreadable);
 }
 
 }  // namespace

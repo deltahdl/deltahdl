@@ -25,6 +25,24 @@
 // reached by way of directives the preprocessor tokenized and parsed for
 // itself. What a decrypted design goes on to compute is observed at the
 // simulator stage instead.
+//
+// The section headed "Every character of the key decides whether a region
+// opens" states just that. §34.3.2 makes the proper key what envelope
+// decryption requires, and a key that agrees with the proper key over the
+// length of the block is still not the proper key. Issue #3274 is the defect
+// those cases were written for: CombineWithKey in
+// src/preprocessor/protect_processing_cipher.cpp combined byte n of a block
+// with character n of the key, so a key was read only as far into itself as
+// the block was long, and two keys agreeing over that many characters
+// produced the same block and opened one another's regions.
+//
+// §34.5.22's digest block is where the fewest characters of a key decided
+// anything, a digest block being a fingerprint and a digest and nothing else.
+// The case stating that a key agreeing over the whole of one leaves it
+// unreadable stands in
+// test/src/unit/test_preprocessor_subclause_34_05_22_02.cpp, beside the rest
+// of what CheckProtectDigestBlock in src/preprocessor/protect_digest_block.h
+// answers.
 
 #include <gtest/gtest.h>
 
@@ -38,6 +56,7 @@
 #include "common/source_mgr.h"
 #include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
+#include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_processing.h"
 
 using namespace delta;
@@ -547,6 +566,79 @@ TEST(ProtectedEnvelopeProcessing, ARegionOutsideAnEnvelopeIsNotRecovered) {
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_FALSE(Holds(run.text, "initial result = 42;"));
   EXPECT_TRUE(Holds(run.text, region));
+}
+
+// ---------------------------------------------------------------------------
+// Every character of the key decides whether a region opens.
+// ---------------------------------------------------------------------------
+
+// The region the three cases of this section seal, and the key they seal it
+// under.
+//
+// The key is longer than the block recording the region. That is the relation
+// #3274 turned on: a key no longer than its block is one the defective cipher
+// read to the end of, so the defect left no trace on it and no case built on
+// such a key could have found it. kStrangerKey above differs from kAuthorKey
+// at its first character, which the defective cipher already told apart.
+constexpr std::string_view kSealedBody = "  initial guarded = 7;\n";
+constexpr std::string_view kSealingKey = "acme-exchange-key-of-the-year-2026";
+
+// A key agreeing with the sealing key over the whole of the block, and parting
+// from it after that, opens nothing.
+//
+// The shared length is computed from ProtectedRegionBlockSize rather than
+// written down. A number written here would stop being the block's length the
+// moment kSealedBody changed, and the case would then be about two keys
+// differing inside the block, which the defective cipher already told apart.
+// The two assertions on the keys are what hold the case to its own claim: they
+// state that the keys agree over a whole block and differ somewhere after it,
+// so the case cannot degrade into two unrelated keys not opening each other.
+TEST(ProtectedEnvelopeProcessing, AKeyMatchingTheBlocksLengthOpensNothing) {
+  const size_t kBlockBytes = ProtectedRegionBlockSize(kSealedBody);
+  ASSERT_GE(kSealingKey.size(), kBlockBytes);
+  const std::string kImpostorKey =
+      std::string(kSealingKey.substr(0, kBlockBytes)) + "-impostor";
+  ASSERT_EQ(kImpostorKey.substr(0, kBlockBytes),
+            std::string(kSealingKey.substr(0, kBlockBytes)));
+  ASSERT_NE(kImpostorKey, std::string(kSealingKey));
+  std::string bytes;
+  ASSERT_TRUE(DecodeProtectBlock(
+      EncryptProtectedRegion(kSealedBody, kSealingKey), kBlockEnctype, &bytes));
+  std::string cleartext;
+  EXPECT_FALSE(DecryptProtectedBlock(bytes, kImpostorKey, &cleartext));
+}
+
+// The writing side of the same rule. Two keys differing only in their last
+// character seal one region into two different blocks.
+//
+// The differing character stands past the block's length, which the case
+// asserts rather than assumes. Before #3274 the cipher never read that far into
+// either key, so the two blocks came out identical and either key opened both.
+TEST(ProtectedEnvelopeProcessing, KeysAlikeButForTheirLastCharacterSealApart) {
+  const size_t kBlockBytes = ProtectedRegionBlockSize(kSealedBody);
+  ASSERT_LT(kBlockBytes, kSealingKey.size());
+  std::string sibling_key(kSealingKey);
+  sibling_key.back() = static_cast<char>(sibling_key.back() + 1);
+  ASSERT_EQ(sibling_key.substr(0, sibling_key.size() - 1),
+            std::string(kSealingKey.substr(0, kSealingKey.size() - 1)));
+  ASSERT_NE(sibling_key, std::string(kSealingKey));
+  EXPECT_NE(EncryptProtectedRegion(kSealedBody, kSealingKey),
+            EncryptProtectedRegion(kSealedBody, sibling_key));
+}
+
+// The control the two cases above rest on, and the digest case in
+// test/src/unit/test_preprocessor_subclause_34_05_22_02.cpp with them: the key
+// the region was sealed under still opens the block, and what comes back is
+// the region character for character. A cipher that refused every key would
+// satisfy all three without this.
+TEST(ProtectedEnvelopeProcessing, TheKeyTheRegionWasSealedUnderOpensIt) {
+  std::string region = EncryptProtectedRegion(kSealedBody, kSealingKey);
+  std::string bytes;
+  ASSERT_TRUE(DecodeProtectBlock(region, kBlockEnctype, &bytes));
+  std::string cleartext;
+  EXPECT_TRUE(DecryptProtectedBlock(bytes, kSealingKey, &cleartext));
+  EXPECT_EQ(cleartext, kSealedBody);
+  EXPECT_EQ(Recovered(region, kSealingKey), kSealedBody);
 }
 
 // ---------------------------------------------------------------------------

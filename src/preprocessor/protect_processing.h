@@ -43,9 +43,10 @@ namespace delta {
 // not, so a region here is encrypted under the exchange key directly and the
 // envelope records no key beside it.
 
-// The pragma expression that carries an encrypted region across a decryption
-// envelope. The region's own text is not written in the envelope, so the
-// expression's value is where envelope decryption looks for it.
+// The pragma expression that announces an encrypted region in a decryption
+// envelope. §34.5.15.1 spells it as the keyword standing alone, and §34.5.15.2
+// has the block begin on the line beneath, so that line is where envelope
+// decryption looks for the region's own text.
 inline constexpr std::string_view kDataBlockKeyword = "data_block";
 
 // How many bytes the block recording `cleartext` holds before that block is
@@ -60,13 +61,12 @@ size_t ProtectedRegionBlockSize(std::string_view cleartext);
 // Encrypts one region of cleartext under `key` and returns the text that
 // records it, written in the coding scheme `enctype` names. An empty key
 // encrypts nothing and returns an empty block, and so does a scheme this
-// implementation does not provide.
+// implementation does not provide and a key no keyed run can be derived from.
 //
 // The scheme defaults to this implementation's own, which is what a region
-// encrypted by a text that stated no encoding is written in. Its alphabet
-// holds letters, digits and two punctuation characters only, so a block of it
-// can be written as the value of a pragma expression without any of it being
-// read as something else.
+// encrypted by a text that stated no encoding is written in. Its alphabet holds
+// letters, digits and two punctuation characters only and no line break, so a
+// block of it stands on the one line §34.5.15.2 begins it on.
 std::string EncryptProtectedRegion(std::string_view cleartext,
                                    std::string_view key,
                                    std::string_view enctype = kBlockEnctype);
