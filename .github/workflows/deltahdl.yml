@@ -4,7 +4,16 @@ concurrency:
   group: deltahdl-${{ github.ref_name }}
 jobs:
   assert-coverage:
-    needs: e2e-test-coverage
+    # The three tiers whose counters this job merges are named here one by one.
+    # Each of unit-test-coverage, integration-test-coverage and
+    # e2e-test-coverage descends from build-coverage-lib and from nothing the
+    # other two produce, so none of them orders another and naming one would
+    # leave this job downloading an artifact a tier still running has not
+    # uploaded.
+    needs:
+      - e2e-test-coverage
+      - integration-test-coverage
+      - unit-test-coverage
     permissions:
       id-token: write
       pages: write
@@ -1412,7 +1421,7 @@ jobs:
   # rebuilt on the next push rather than waiting on an upstream commit.
   cache-sv-tests:
     needs:
-      - unit-test-coverage
+      - build-coverage-lib
     outputs:
       sv-tests-sha: ${{ steps.sv-tests-ref.outputs.sha }}
     runs-on: ubuntu-latest
@@ -1743,8 +1752,8 @@ jobs:
   e2e-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
-    if: ${{ !cancelled() && needs.integration-test-coverage.result == 'success' }}
-    needs: integration-test-coverage
+    if: ${{ !cancelled() && needs.build-coverage-lib.result == 'success' }}
+    needs: build-coverage-lib
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -1860,12 +1869,11 @@ jobs:
       - name: Run sv-tests
         run: PYTHONPATH=.:scripts python3 -m run_sv_tests
   # This job downloads the simulator build-coverage-lib uploads, and cache-sv-tests
-  # is what orders the two: it needs unit-test-coverage, which needs
-  # build-coverage-lib, so the artifact is uploaded before this job is scheduled
-  # and naming build-coverage-lib here as well would add no ordering. The
-  # condition is covered along the same path -- build-coverage-lib failing skips
-  # unit-test-coverage and so cache-sv-tests, whose result is then 'skipped'
-  # rather than 'success', which is what this job tests.
+  # is what orders the two: it needs build-coverage-lib, so the artifact is
+  # uploaded before this job is scheduled and naming build-coverage-lib here as
+  # well would add no ordering. The condition is covered along the same path --
+  # build-coverage-lib failing skips cache-sv-tests, whose result is then
+  # 'skipped' rather than 'success', which is what this job tests.
   integration-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
@@ -2024,11 +2032,10 @@ jobs:
     # Nothing is pruned out from under a job that has not restored yet. The five
     # jobs below are the last in this graph to write a cache, and two of the
     # others that do — build-coverage-lib and the coverage unit-test shards — are
-    # ancestors of all five by way of cache-sv-tests, through assert-coverage, so
-    # naming them here as well would add no ordering. The clang-tidy shards start
-    # at the root of the graph and nothing waits on them, so they can still be
-    # running when this job does; what protects them is the rule below rather than
-    # any ordering. The newest entry per identity is what is kept and the newest
+    # ancestors of all five through assert-coverage, so naming them here as well
+    # would add no ordering. The clang-tidy shards start at the root of the graph
+    # and nothing waits on them, so they can still be running when this job does;
+    # what protects them is the rule below rather than any ordering. The newest entry per identity is what is kept and the newest
     # is what a restore-key match would have found, so a shard yet to restore
     # finds the same entry it would have found had this job never run, and one
     # that has already restored is retiring a generation it is done with.
@@ -2474,10 +2481,9 @@ jobs:
       # unit-test-coverage-shard-03 failed one test and saved nothing; in run
       # 31064569103 it restored the entry written for 6745a665a two commits back,
       # missed 133 of 157 and spent 267 seconds building against a 63-second
-      # median across the matrix. Everything downstream waits on the slowest
-      # shard -- cache-sv-tests, then integration-test-coverage, then
-      # e2e-test-coverage, then assert-coverage, which gates the rest of this
-      # file -- and it finished 91 seconds after the next-slowest.
+      # median across the matrix. assert-coverage waits on the slowest shard and
+      # gates the rest of this file, and that shard finished 91 seconds after the
+      # next-slowest.
       #
       # Placed before the tests rather than after them so the objects also
       # survive a run the concurrency group cancels mid-test. The key is read
@@ -2553,7 +2559,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09',
-                '10', '11', '12', '13', '14', '15', '16', '17', '18', '19']
+                '10', '11', '12', '13', '14', '15', '16', '17']
   unit-test-macos-26-arm64-clang:
     needs: build-macos-26-arm64-clang
     runs-on: macos-26
