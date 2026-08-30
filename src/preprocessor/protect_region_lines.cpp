@@ -327,7 +327,10 @@ void TakeKeyDesignations(std::string_view line, uint32_t line_num,
   // though it were the name picking one key of the region's entity out.
   std::string_view keyname =
       KeywordSingleValueOnLine(line, kDataKeynameKeyword);
-  if (!keyname.empty()) names->data_keyname = keyname;
+  if (!keyname.empty()) {
+    names->data_keyname = keyname;
+    reader->data_keyname_line = line_num;
+  }
   // §34.5.10.1 writes the value as a string, so taking a parenthesized list
   // would write a list of somebody's subkeywords onto the envelope in the
   // clear, quoted as though it were the entity that provided the region's keys.
@@ -339,7 +342,10 @@ void TakeKeyDesignations(std::string_view line, uint32_t line_num,
   // though it were the name of the key a region's digest is under.
   std::string_view digest =
       KeywordSingleValueOnLine(line, kDigestKeynameKeyword);
-  if (!digest.empty()) names->digest_keyname = digest;
+  if (!digest.empty()) {
+    names->digest_keyname = digest;
+    reader->digest_keyname_line = line_num;
+  }
   // §34.5.16 names the entity that provided the key the digest is under, which
   // the digest's own key name is read against rather than the data's entity.
   // §34.5.16.1 writes the value as a string, and §34.5.16.2 sends the name to a
@@ -366,6 +372,7 @@ void TakeKeyDesignations(std::string_view line, uint32_t line_num,
   // no key for its own keys having asked for nothing to carry one.
   if (!key_name.empty()) {
     names->key_keyname = key_name;
+    reader->key_keyname_line = line_num;
     reader->key_blocks.Designate(names->key_keyowner, key_name,
                                  DataDecryptionInEffect(*names), line_num);
   }

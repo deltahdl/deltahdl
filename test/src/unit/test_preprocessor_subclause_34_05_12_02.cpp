@@ -297,7 +297,7 @@ TEST(ProtectDataKeynameEncryptionOutput, TheNameInTheBlockStillOpensTheRegion) {
   std::string envelope = EncryptEnvelopes(RegionNamingBothProviders(), "",
                                           OnlyTheBlockProvidersKey());
   ReadSource run(envelope, ReadSource::KeysConfig(OnlyTheBlockProvidersKey()));
-  EXPECT_FALSE(run.diag.HasErrors()) << run.text;
+  EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
   EXPECT_TRUE(Holds(run.text, kSealedDesign)) << run.text;
 }
 
@@ -369,6 +369,65 @@ TEST(ProtectDataKeynameEncryptionOutput,
   EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
   EXPECT_EQ(TimesWritten(envelope, kKeynameDirectiveHead), 1U) << envelope;
   EXPECT_TRUE(Holds(envelope, NamesTheDataKey(kVaultedKeyName))) << envelope;
+}
+
+// ---------------------------------------------------------------------------
+// The rule an encrypting run makes.
+// ---------------------------------------------------------------------------
+
+// One encrypting run over `src`, with the reports it made kept beside the text
+// it wrote out. The source is added to the manager so that a report stands at
+// the line of it the author wrote the name on.
+struct SealingRun {
+  PreprocFixture f;
+  std::string text;
+
+  explicit SealingRun(const std::string& src)
+      : text(EncryptEnvelopes(src, {}, KeysOfBothParties(), &f.diag,
+                              f.mgr.AddFile("<test>", src))) {}
+};
+
+// §34.5.12.2 states the rule under ENCRYPTION INPUT, which is the tool being
+// handed a text to seal, and until #3279 no encrypting run made the report:
+// RunEnvelopeEncryption constructs no Preprocessor, so
+// Preprocessor::CheckDataKeyname was never reached from that mode. What an
+// author got was silence and a file, and the file carried the design in the
+// clear, a region whose designations reach no key being returned exactly as it
+// was written.
+//
+// The name stands on the third line, the region opening on the first and
+// closing on the fifth, so a report placed at either delimiter fails this.
+TEST(ProtectDataKeynameEncryptionInput,
+     ANameOutsideTheListIsReportedWhenSealing) {
+  SealingRun run(Region(Names(kOwner, kOtherKeyName)));
+  EXPECT_TRUE(ReportedError(run.f.diag.Diagnostics(), kNoSuchKey, 3, "34.5.12"))
+      << run.text;
+}
+
+// The consequence the report is instead of, stated once: the region comes back
+// exactly as it was written, design and all.
+TEST(ProtectDataKeynameEncryptionInput,
+     ARegionReachingNoKeyComesBackAsWritten) {
+  SealingRun run(Region(Names(kOwner, kOtherKeyName)));
+  EXPECT_NE(run.text.find(kSealedDesign), std::string::npos) << run.text;
+}
+
+// The control: a name the entity does hold. Without it the case above would
+// hold of a tool that reported every region it was handed.
+TEST(ProtectDataKeynameEncryptionInput, ANameTheEntityHoldsIsSealedInSilence) {
+  SealingRun run(Region(Names(kOwner, kOwnerKeyName)));
+  EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
+  EXPECT_EQ(run.text.find(kSealedDesign), std::string::npos) << run.text;
+}
+
+// A name written under an entity the tool holds no list for. A name cannot be
+// found missing from a list that was never supplied, so nothing is reported and
+// the name stands. That reading is what Preprocessor::CheckDataKeyname already
+// gave, and a report made where both modes reach it must leave it standing.
+TEST(ProtectDataKeynameEncryptionInput,
+     ANameUnderAnUnknownEntityIsNotReported) {
+  SealingRun run(Region(Names("a-party-holding-nothing-here", kOwnerKeyName)));
+  EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
 }
 
 }  // namespace

@@ -480,4 +480,53 @@ TEST(ProtectDigestKeynameDecryptionInput,
   EXPECT_TRUE(Holds(run.text, kHiddenDesign)) << run.text;
 }
 
+// ---------------------------------------------------------------------------
+// The rule an encrypting run makes.
+// ---------------------------------------------------------------------------
+
+// One encrypting run over `src`, with the reports it made kept beside the text
+// it wrote. The source is added to the manager so a report stands at the line
+// of it the author wrote the name on.
+struct DigestSealingRun {
+  PreprocFixture f;
+  std::string text;
+
+  explicit DigestSealingRun(const std::string& src)
+      : text(EncryptEnvelopes(src, {}, KeysOfEveryParty(), &f.diag,
+                              f.mgr.AddFile("<test>", src))) {}
+};
+
+// §34.5.18.2 states the rule under ENCRYPTION INPUT, which is the tool being
+// handed a text to seal, and until #3279 no encrypting run made the report:
+// RunEnvelopeEncryption constructs no Preprocessor, so
+// Preprocessor::CheckDigestKeyname was never reached from that mode.
+//
+// The name stands on the third line, the region opening on the first and
+// closing on the fifth, so a report at either delimiter fails this.
+TEST(ProtectDigestKeynameEncryptionInput,
+     AnUnheldDigestNameIsReportedWhenSealing) {
+  DigestSealingRun run(Sealing(Designates(kProvider, kUnheld)));
+  EXPECT_TRUE(ReportedError(run.f.diag.Diagnostics(), kNoSuchKey, 3, "34.5.18"))
+      << run.text;
+}
+
+// The control: the name that entity does hold. Without it the case above would
+// hold of a tool that reported every region it was handed.
+TEST(ProtectDigestKeynameEncryptionInput, AHeldDigestNameIsSealedInSilence) {
+  DigestSealingRun run(Sealing(Designates(kProvider, kProviderName)));
+  EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
+}
+
+// §34.5.16 fills the entity where a text named none for its digest: the digest
+// is under the entity the data name. So a name written with no digest_keyowner
+// beside it is read against the data's party, and a name that party does hold
+// is not reported. Reading it against no entity at all would report a name the
+// text designated correctly.
+TEST(ProtectDigestKeynameEncryptionInput, ANameFallsBackToTheDatasEntity) {
+  std::string described = Written("data_keyowner", kDataParty);
+  described += Written("digest_keyname", kDataName);
+  DigestSealingRun run(Sealing(described));
+  EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
+}
+
 }  // namespace

@@ -34,9 +34,8 @@ void Preprocessor::CheckDataKeyname(const PragmaKeywordExpression& expr,
                                     SourceLoc loc) {
   if (expr.keyword != kDataKeynameKeyword || !expr.has_value) return;
   ProtectKeywordValue owner = protect_keywords_.ValueOf(kDataKeyownerKeyword);
-  if (!config_.protect_keys.KnowsOwner(owner.value)) return;
-  if (config_.protect_keys.KnowsKey(owner.value,
-                                    ProtectPragmaValueBody(expr.value))) {
+  if (!ProtectKeynameReachesNoKey(config_.protect_keys, owner.value,
+                                  ProtectPragmaValueBody(expr.value))) {
     return;
   }
   diag_.Error(loc,
@@ -68,9 +67,8 @@ void Preprocessor::CheckDigestKeyname(const PragmaKeywordExpression& expr,
                                       SourceLoc loc) {
   if (expr.keyword != kDigestKeynameKeyword || !expr.has_value) return;
   ProtectKeywordValue owner = protect_keywords_.DigestKeyownerInEffect();
-  if (!config_.protect_keys.KnowsOwner(owner.value)) return;
-  if (config_.protect_keys.KnowsKey(owner.value,
-                                    ProtectPragmaValueBody(expr.value))) {
+  if (!ProtectKeynameReachesNoKey(config_.protect_keys, owner.value,
+                                  ProtectPragmaValueBody(expr.value))) {
     return;
   }
   diag_.Error(loc,
@@ -97,9 +95,8 @@ void Preprocessor::CheckKeyKeyname(const PragmaKeywordExpression& expr,
                                    SourceLoc loc) {
   if (expr.keyword != kKeyKeynameKeyword || !expr.has_value) return;
   ProtectKeywordValue owner = protect_keywords_.ValueOf(kKeyKeyownerKeyword);
-  if (!config_.protect_keys.KnowsOwner(owner.value)) return;
-  if (config_.protect_keys.KnowsKey(owner.value,
-                                    ProtectPragmaValueBody(expr.value))) {
+  if (!ProtectKeynameReachesNoKey(config_.protect_keys, owner.value,
+                                  ProtectPragmaValueBody(expr.value))) {
     return;
   }
   diag_.Error(loc,

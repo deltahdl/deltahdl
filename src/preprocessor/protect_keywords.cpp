@@ -178,6 +178,13 @@ constexpr std::string_view kStringValuedKeywords[] = {
     kKeyMethodKeyword,        kKeyKeynameKeyword,     kCommentKeyword,
 };
 
+bool ProtectKeynameReachesNoKey(const ProtectKeyList& keys,
+                                std::string_view owner, std::string_view name) {
+  if (name.empty()) return false;
+  if (!keys.KnowsOwner(owner)) return false;
+  return !keys.KnowsKey(owner, name);
+}
+
 bool IsProtectStringValuedKeyword(std::string_view name) {
   for (std::string_view keyword : kStringValuedKeywords) {
     if (keyword == name) return true;

@@ -299,6 +299,56 @@ void ReportUnprovidedKeyMethod(const RegionKeyReader& in_effect,
               Subclause("34.5.24.2"));
 }
 
+// The reports a region designating a key by a name the entity in effect beside
+// it holds no key under is owed.
+//
+// §34.5.12.2, §34.5.18.2 and §34.5.25.2 each state the rule under ENCRYPTION
+// INPUT, which is the tool being handed a text to seal, and until #3279 no
+// encrypting run made any of the three: RunEnvelopeEncryption (driver/main.cpp)
+// constructs no Preprocessor, so the three Preprocessor::Check*Keyname
+// functions that state the rule on the reading side were never reached. What an
+// author got instead was silence and a file. A region whose designations reach
+// no key is returned exactly as it was written, so a mistyped name shipped the
+// design in the clear and the run reported nothing.
+//
+// The entity each name is read against is the one in effect beside it, which is
+// what ProtectKeynameReachesNoKey (preprocessor/protect_keywords.h) asks, and
+// the reading side asks the same function so that one rule is enforced once.
+// §34.5.16 is what fills the digest's entity where the text named none: a
+// design silent about whose key its digest is under has it under the entity its
+// data name.
+void ReportKeynamesReachingNoKey(const RegionKeyReader& in_effect,
+                                 const ProtectKeyList& keys, DiagEngine* diag,
+                                 uint32_t file_id) {
+  if (diag == nullptr) return;
+  const RegionKeyNames& names = in_effect.names;
+  std::string_view data_owner = ProtectPragmaValueBody(names.data_keyowner);
+  if (ProtectKeynameReachesNoKey(keys, data_owner,
+                                 ProtectPragmaValueBody(names.data_keyname))) {
+    diag->Error(LineOf(file_id, in_effect.data_keyname_line),
+                "protect pragma data_keyname names no key held by the "
+                "data_keyowner in effect",
+                Subclause("34.5.12"));
+  }
+  std::string_view digest_owner = ProtectPragmaValueBody(names.digest_keyowner);
+  if (digest_owner.empty()) digest_owner = data_owner;
+  if (ProtectKeynameReachesNoKey(
+          keys, digest_owner, ProtectPragmaValueBody(names.digest_keyname))) {
+    diag->Error(LineOf(file_id, in_effect.digest_keyname_line),
+                "protect pragma digest_keyname names no key held by the "
+                "digest_keyowner in effect",
+                Subclause("34.5.18"));
+  }
+  if (ProtectKeynameReachesNoKey(keys,
+                                 ProtectPragmaValueBody(names.key_keyowner),
+                                 ProtectPragmaValueBody(names.key_keyname))) {
+    diag->Error(LineOf(file_id, in_effect.key_keyname_line),
+                "protect pragma key_keyname names no key held by the "
+                "key_keyowner in effect",
+                Subclause("34.5.25"));
+  }
+}
+
 // What §34.5.22 has settled about a region's digests by the time the region
 // closes, apart from the key, which is not known until the region's own key is.
 //
@@ -535,6 +585,7 @@ std::string EncryptEnvelopes(std::string_view source_text,
       ReportUnprovidedDataMethod(in_effect, diag, file_id);
       ReportUnavailableDigestMethod(in_effect, diag, file_id);
       ReportUnprovidedKeyMethod(in_effect, how, diag, file_id);
+      ReportKeynamesReachingNoKey(in_effect, keys, diag, file_id);
       transformed.append(
           ClosedRegionText(region, in_effect, line, delimiter, how));
       in_envelope = false;

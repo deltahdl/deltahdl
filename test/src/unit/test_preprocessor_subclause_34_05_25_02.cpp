@@ -355,4 +355,51 @@ TEST(ProtectKeyKeynameDescription, AStringAsksForTheOneKeyBlock) {
   EXPECT_EQ(TimesWritten(envelope, kKeyBlockExpression), 1U) << envelope;
 }
 
+// ---------------------------------------------------------------------------
+// The rule an encrypting run makes.
+// ---------------------------------------------------------------------------
+
+// One encrypting run over `src`, with the reports it made kept beside the text
+// it wrote. The source is added to the manager so a report stands at the line
+// of it the author wrote the name on.
+struct SigningRun {
+  PreprocFixture f;
+  std::string text;
+
+  explicit SigningRun(const std::string& src)
+      : text(EncryptEnvelopes(src, {}, KeysOfBothEntities(), &f.diag,
+                              f.mgr.AddFile("<test>", src))) {}
+};
+
+// §34.5.25.2 states the rule under ENCRYPTION INPUT, which is the tool being
+// handed a text to seal, and until #3279 no encrypting run made the report:
+// RunEnvelopeEncryption constructs no Preprocessor, so
+// Preprocessor::CheckKeyKeyname was never reached from that mode. An author who
+// mistyped the name shipped the design in the clear and was told the run was
+// clean, a region whose designations reach no key being returned as written.
+//
+// The name stands on the third line, the region opening on the first and
+// closing on the fifth, so a report at either delimiter fails this.
+TEST(ProtectKeyKeynameEncryptionInput, AnUnheldNameIsReportedWhenSealing) {
+  SigningRun run(Region(Designates(kEntity, kUnheldName)));
+  EXPECT_TRUE(ReportedError(run.f.diag.Diagnostics(), kNoSuchKey, 3, "34.5.25"))
+      << run.text;
+}
+
+// The control: the name the entity does hold. Without it the case above would
+// hold of a tool that reported every region it was handed.
+TEST(ProtectKeyKeynameEncryptionInput, AHeldNameIsSealedInSilence) {
+  SigningRun run(Region(Designates(kEntity, kEntitysKeyName)));
+  EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
+}
+
+// A name written under an entity the tool holds no list for. A name cannot be
+// found missing from a list that was never supplied, so nothing is reported.
+// That reading is what Preprocessor::CheckKeyKeyname already gave, and a report
+// made where both modes reach it leaves it standing.
+TEST(ProtectKeyKeynameEncryptionInput, ANameUnderAnUnheldEntityIsNotReported) {
+  SigningRun run(Region(Designates(kStrangerEntity, kUnheldName)));
+  EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
+}
+
 }  // namespace

@@ -27,6 +27,27 @@ std::span<const ProtectPragmaKeyword> ProtectPragmaKeywords();
 // Whether `name` is one of them.
 bool IsProtectPragmaKeyword(std::string_view name);
 
+// Whether a name written to designate a key of `owner` designates none of the
+// keys held for that entity, which §34.5.12.2, §34.5.18.2 and §34.5.25.2 each
+// make an error in an encrypting tool's input.
+//
+// Which list the name is read against is decided by the entity in effect where
+// the name was written, because the same name under another entity is another
+// key or none. Reading it against every key a tool holds would let a name
+// belonging to one entity stand for a key held by a different one.
+//
+// A tool holding no keys for that entity holds no list of them either, and a
+// name cannot be found missing from a list that was never supplied, so this
+// answers false there and the name stands.
+//
+// Both modes ask it. Preprocessor::CheckDataKeyname and the two beside it
+// (preprocessor/preprocessor_protect_keynames.cpp) ask it of a text being read,
+// and EncryptEnvelopes (preprocessor/protect_processing.h) asks it of a text
+// being sealed, so one rule is enforced once and reported the same way from
+// both.
+bool ProtectKeynameReachesNoKey(const ProtectKeyList& keys,
+                                std::string_view owner, std::string_view name);
+
 // Whether `name` is a protect pragma keyword whose own subclause defines its
 // expression as `keyword = <string>`. §22.5.1 makes a parenthesized
 // pragma_value a list of further expressions rather than one written thing, so

@@ -101,6 +101,13 @@ struct RegionKeyReader {
   // the report about the identifier is made where the region closes, and what
   // it is about is the expression the author wrote.
   uint32_t key_method_line = 0;
+  // The lines the three names designating a key by name stand on. §34.5.12.2,
+  // §34.5.18.2 and §34.5.25.2 each make it an error to write a name the entity
+  // in effect beside it holds no key under, and the report about one stands at
+  // the line the author wrote it on rather than where the region closes.
+  uint32_t data_keyname_line = 0;
+  uint32_t digest_keyname_line = 0;
+  uint32_t key_keyname_line = 0;
   // The identifier §34.5.11 has the text name the cipher its data are to be
   // encrypted under by, empty where the text named none, and the line the
   // naming stands on. The line is carried because the report is made where the
