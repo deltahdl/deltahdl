@@ -543,9 +543,19 @@ class Preprocessor {
   // and §34.4 filling an unwritten keyword from a default that is not there to
   // fill it.
   //
-  // What a reading does with the answer is nothing: no key block is held to the
-  // identifier, one named or not, and #3278 records that along with what stands
-  // in the way of holding it to one.
+  // What a reading does with the answer is nothing, and a key block under a
+  // cipher this implementation does not provide is passed over rather than
+  // reported. §34.5.27.2 makes several key blocks alternative ways into one
+  // envelope, so a block written for some other reader is not an error here:
+  // it fails to open, and Preprocessor::TakeKeyBlockValue
+  // (preprocessor/preprocessor_protect_values.cpp) consumes its line and says
+  // nothing, which is where a block whose key the reader does not hold is left
+  // as well.
+  //
+  // Where an author is told instead is the encrypting half.
+  // ReportUnprovidedKeyMethod (preprocessor/protect_processing.cpp) refuses a
+  // region naming a cipher this tool cannot encrypt its keys under, so every
+  // envelope this tool writes states the cipher its blocks are really under.
   //
   // Like the value it is built from, it belongs to the position the reading has
   // reached rather than to any one directive, which is why it is read off the

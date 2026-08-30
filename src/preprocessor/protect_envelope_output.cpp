@@ -195,7 +195,7 @@ void AppendClearDigestNames(const EncryptionEnvelope& envelope,
 // opens that block, and what a reader combines with it to reach that key.
 void AppendClearKeyNames(const EncryptionEnvelope& envelope,
                          const ProtectEncoding& block_encoding,
-                         std::string* text) {
+                         bool signed_envelope, std::string* text) {
   // §34.5.23 has the entity whose keys a region's own keys are under unchanged
   // in what the tool writes out, and makes no exception at all: §34.5.10.2
   // sends the entity named for the data into a key_block, and this is the
@@ -203,13 +203,26 @@ void AppendClearKeyNames(const EncryptionEnvelope& envelope,
   if (!envelope.names.key_keyowner.empty()) {
     text->append(ProtectKeyKeyownerDirective(envelope.names.key_keyowner));
   }
-  // §34.5.24 has the identifier naming the algorithm a region's own keys are
-  // encrypted under unchanged in the output file, and it is written ahead of
-  // the blocks rather than after them: what the identifier is needed for is
-  // opening the block those keys are held in, so a reader has to have it in
-  // hand by the time a block is reached.
-  if (!envelope.key_method.empty()) {
-    text->append(ProtectKeyMethodDirective(envelope.key_method));
+  // §34.5.24.2 has a region's own keys encrypted under the algorithm this
+  // identifier names, and has the identifier unchanged in the output file. The
+  // identifier written is this implementation's own, which is what makes both
+  // true at once: the keys are encrypted under the one cipher this tool has,
+  // ProtectKeyBlockDirective (preprocessor/protect_key_block.cpp) sealing the
+  // block with EncryptProtectedRegion, so stating anything else would state a
+  // cipher the block is not under. A region naming another cipher is reported
+  // where the region closes rather than written out as though it had been
+  // honoured, so every source this tool accepts has its identifier unchanged
+  // and every envelope states the cipher its keys are really under. §34.5.11.2
+  // is settled the same way for the cipher the data are under, and #3278 is
+  // where this one was.
+  //
+  // It is written ahead of the blocks rather than after them: what the
+  // identifier is needed for is opening the block those keys are held in, so a
+  // reader has to have it in hand by the time a block is reached. A region
+  // whose keys travel in no block has none of them encrypted, so no cipher
+  // describes anything and none is stated.
+  if (signed_envelope) {
+    text->append(ProtectKeyMethodDirective(kDataMethod));
   }
   // §34.5.25 has the name of the key a region's own keys are under written as
   // cleartext as well. It is the name a reader combines with the entity beside
@@ -234,7 +247,7 @@ void AppendClearNames(const EncryptionEnvelope& envelope,
                       bool signed_envelope, std::string* text) {
   AppendClearDataNames(envelope, block_encoding, signed_envelope, text);
   AppendClearDigestNames(envelope, block_encoding, signed_envelope, text);
-  AppendClearKeyNames(envelope, block_encoding, text);
+  AppendClearKeyNames(envelope, block_encoding, signed_envelope, text);
 }
 
 }  // namespace

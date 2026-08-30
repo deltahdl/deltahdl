@@ -262,6 +262,43 @@ void ReportUnavailableDigestMethod(const RegionKeyReader& in_effect,
               Subclause("34.5.21.2"));
 }
 
+// The report a region naming a cipher for its own keys that this implementation
+// does not provide is owed.
+//
+// §34.5.24.2 has the region's keys encrypted under the algorithm the key_method
+// expression names and has the identifier unchanged in the output file. This
+// tool has one cipher, so the two rules pull one field two ways: writing the
+// author's identifier out unchanged would state a cipher the block is not
+// under, and encrypting under the identifier written is what it cannot do.
+// Refusing the region settles it. Every source this tool accepts then has its
+// identifier unchanged, because the only identifiers it accepts are the one it
+// writes and none at all, and every envelope states the cipher its keys are
+// really under. §34.5.11.2 is settled the same way for the cipher the data are
+// under.
+//
+// A region whose keys travel in no key block is refused nothing: none of its
+// keys is encrypted, so no cipher was asked for. Neither is one naming no
+// identifier, §34.5.24 leaving the place empty rather than filled by the
+// author.
+void ReportUnprovidedKeyMethod(const RegionKeyReader& in_effect,
+                               const RegionEncryption& how, DiagEngine* diag,
+                               uint32_t file_id) {
+  if (diag == nullptr || how.key_blocks.directives.empty()) return;
+  std::string_view stated = ProtectPragmaValueBody(in_effect.key_method);
+  if (stated.empty() || stated == kDataMethod) return;
+  std::string message(
+      "protect pragma key_method asks for an encryption algorithm this "
+      "implementation does not provide: ");
+  message.append(stated);
+  message.append(IsRequiredProtectEncryptionAlgorithm(stated)
+                     ? ", which IEEE 1800-2023 Table 34-3 requires of every "
+                       "implementation"
+                     : ", which IEEE 1800-2023 Table 34-3 does not require of "
+                       "every implementation");
+  diag->Error(LineOf(file_id, in_effect.key_method_line), message,
+              Subclause("34.5.24.2"));
+}
+
 // What §34.5.22 has settled about a region's digests by the time the region
 // closes, apart from the key, which is not known until the region's own key is.
 //
@@ -497,6 +534,7 @@ std::string EncryptEnvelopes(std::string_view source_text,
       }
       ReportUnprovidedDataMethod(in_effect, diag, file_id);
       ReportUnavailableDigestMethod(in_effect, diag, file_id);
+      ReportUnprovidedKeyMethod(in_effect, how, diag, file_id);
       transformed.append(
           ClosedRegionText(region, in_effect, line, delimiter, how));
       in_envelope = false;

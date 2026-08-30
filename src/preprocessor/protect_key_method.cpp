@@ -77,14 +77,19 @@ bool IsRequiredProtectEncryptionAlgorithm(std::string_view identifier) {
 // any more than leaving the keyword out did, so nothing stands in effect in
 // either case and both are reported the same way.
 //
-// Nothing in a run asks this. §34.5.24 has a reader decrypt a key block under
+// Nothing in a run asks this. §34.5.24.2 has a reader decrypt a key block under
 // the algorithm the identifier names, and this implementation opens one under
-// the single cipher it has whatever the envelope says; #3278 records that, and
-// records why the obvious remedy is not free -- the same subclause has the
-// identifier written out unchanged, so an envelope this tool produced states
-// whichever cipher its author named rather than the one its blocks are under,
-// and a reader holding a block to the stated identifier would turn away its own
-// tool's output.
+// the single cipher it has whatever the envelope says. A block under any other
+// cipher fails to open and is passed over in silence, which §34.5.27.2 calls
+// for whatever the reason: several key blocks are alternative ways into one
+// envelope, so a block written for some other reader is not an error.
+//
+// An envelope this tool writes states the cipher its blocks are really under.
+// #3278 settled that: the same subclause has the identifier unchanged in the
+// output file and has the keys encrypted under the algorithm it names, and a
+// tool with one cipher cannot honour both for a region naming another, so
+// ReportUnprovidedKeyMethod (preprocessor/protect_processing.cpp) refuses such
+// a region rather than writing out an identifier its blocks contradict.
 ProtectKeywordValue ProtectKeyMethodInEffect(const ProtectKeywordScope& scope) {
   ProtectKeywordValue written = scope.ValueOf(kKeyMethodKeyword);
   if (!written.defaulted && !written.value.empty()) return written;

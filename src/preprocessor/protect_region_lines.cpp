@@ -118,7 +118,10 @@ void TakeMethodKeywords(std::string_view line, uint32_t line_num,
   // above are read without that question being asked, and #3277 covers them.
   std::string_view key_method =
       KeywordSingleValueOnLine(line, kKeyMethodKeyword);
-  if (!key_method.empty()) reader->key_method = key_method;
+  if (!key_method.empty()) {
+    reader->key_method = key_method;
+    reader->key_method_line = line_num;
+  }
 }
 
 // Takes from `line` whatever it says about the keys a region is under. What is

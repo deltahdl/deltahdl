@@ -97,6 +97,10 @@ struct RegionKeyReader {
   // in the output file, so it belongs to the description of the envelope rather
   // than to the lines about to stop being readable.
   std::string_view key_method;
+  // The line that naming stands on, carried for the reason data_method_line is:
+  // the report about the identifier is made where the region closes, and what
+  // it is about is the expression the author wrote.
+  uint32_t key_method_line = 0;
   // The identifier §34.5.11 has the text name the cipher its data are to be
   // encrypted under by, empty where the text named none, and the line the
   // naming stands on. The line is carried because the report is made where the
