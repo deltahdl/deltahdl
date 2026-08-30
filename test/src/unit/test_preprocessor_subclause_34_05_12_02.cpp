@@ -297,7 +297,7 @@ TEST(ProtectDataKeynameEncryptionOutput, TheNameInTheBlockStillOpensTheRegion) {
   std::string envelope = EncryptEnvelopes(RegionNamingBothProviders(), "",
                                           OnlyTheBlockProvidersKey());
   ReadSource run(envelope, ReadSource::KeysConfig(OnlyTheBlockProvidersKey()));
-  EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
+  EXPECT_FALSE(run.diag.HasErrors()) << run.text;
   EXPECT_TRUE(Holds(run.text, kSealedDesign)) << run.text;
 }
 
