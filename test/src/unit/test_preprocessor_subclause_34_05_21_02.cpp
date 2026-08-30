@@ -54,6 +54,20 @@
 // requires, so every identifier that draws the report is one the table does not
 // require. The report's "requires of every implementation" half would need a
 // required identifier this tool had no algorithm for, and there is none.
+//
+// A second thing the identifier decides is what a region spelling it in a
+// spelling §34.5.21.1 does not define gets. §34.5.21.1 spells the expression
+// `digest_method = <string>`, and §22.5.1 makes a parenthesized pragma_value a
+// list of further pragma expressions rather than the one written thing a string
+// is, so a list names no algorithm. Issue #3277 is the defect:
+// TakeMethodKeywords in src/preprocessor/protect_region_lines.cpp read the
+// value through KeywordValueOnLine, which hands back whatever stood against the
+// '=', parentheses and all. AppendClearDigestNames wrote that list onto the
+// envelope, where it names no algorithm for a reader to regenerate the digest
+// under, and DigestPolicyFor in src/preprocessor/protect_processing.cpp took it
+// as the algorithm, so ProtectMessageDigest found none of that name and
+// ProtectDigestBlockDirectives wrote no digest block at all -- a region that
+// asked for a digest got an envelope with none.
 
 #include <gtest/gtest.h>
 
@@ -117,6 +131,22 @@ constexpr std::string_view kDigestKey = "seals-the-digest-of-this-region";
 std::string Writes(std::string_view keyword, std::string_view value) {
   std::string text = "`pragma protect ";
   text.append(keyword).append("=\"").append(value).append("\"\n");
+  return text;
+}
+
+// A pragma_value written in the parenthesized spelling §22.5.1 defines. Its
+// subkeywords are names §34.4 tabulates nowhere, so what the list says is
+// beside the point and its spelling is the whole of what the cases reading it
+// ask about.
+constexpr std::string_view kAListOfExpressions =
+    "(rounds=\"64\", salt=\"none\")";
+
+// The identifier's keyword with `value` written against it as it stands here.
+// Writes above puts quotation marks around what it is given, and a list inside
+// quotation marks is a string rather than a list.
+std::string WritesUnquoted(std::string_view value) {
+  std::string text = "`pragma protect ";
+  text.append(kIdentifierKeyword).append("=").append(value).append("\n");
   return text;
 }
 
@@ -359,6 +389,7 @@ TEST(ProtectDigestMethodEncryptionInput,
 // output for the region it wrote is reading for that region's own text.
 constexpr std::string_view kRequestedDesign = "module lattice_m; endmodule\n";
 constexpr std::string_view kUnrequestedDesign = "module trellis_m; endmodule\n";
+constexpr std::string_view kListingDesign = "module bezel_m; endmodule\n";
 
 // An identifier Table 34-4 does not list. §34.5.21.2 admits further identifiers
 // and leaves them to the implementation, and this implementation defines none,
@@ -511,6 +542,26 @@ TEST(ProtectDigestMethodEncryptionInput,
   EXPECT_TRUE(CarriesAGeneratedDigestBlock(run.text)) << run.text;
 }
 
+// A list names no algorithm, so §34.5.21 leaves the default standing and the
+// region asked for the digest kDefaultDigestMethod computes. The block is
+// written and the run reports nothing.
+//
+// This is the half of issue #3277 that cost a region its digest. The list was
+// taken as the algorithm, ProtectMessageDigest found none of that name, and
+// ProtectDigestBlockDirectives wrote nothing, so the envelope came back with no
+// digest block in it.
+TEST(ProtectDigestMethodEncryptionInput,
+     AListLeavesTheDefaultToComputeTheBlockUnder) {
+  std::string src = "`pragma protect begin\n";
+  src.append(WritesUnquoted(kAListOfExpressions));
+  src.append(RequestsDigest());
+  src.append(kListingDesign);
+  src += "`pragma protect end\n";
+  DigestingRun run(src);
+  EXPECT_TRUE(CarriesAGeneratedDigestBlock(run.text)) << run.text;
+  EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
+}
+
 // -- Unchanged in the output file -------------------------------------------
 
 // §34.5.21.2: the identifier is unchanged in the output file. An envelope
@@ -529,6 +580,34 @@ TEST(ProtectDigestMethodEncryptionOutput, AnUnsignedEnvelopeStatesItAsWritten) {
 TEST(ProtectDigestMethodEncryptionOutput, ARegionStatingNoneGetsNone) {
   std::string envelope = UnsignedEnvelope("");
   EXPECT_EQ(envelope.find(kIdentifierKeyword), std::string::npos) << envelope;
+}
+
+// A list names no algorithm either, so there is none to leave unchanged and the
+// envelope states none. The control for this is
+// AnUnsignedEnvelopeStatesItAsWritten above, which writes the same region with
+// the spelling §34.5.21.1 defines and reads the directive back off the
+// envelope.
+//
+// This is the half of issue #3277 that reached the envelope: the list was
+// written out as the identifier, where a reader regenerating the digest of the
+// data block would have found an expression naming no algorithm.
+TEST(ProtectDigestMethodEncryptionOutput, AListStatesNoAlgorithmOnTheEnvelope) {
+  std::string envelope = UnsignedEnvelope(WritesUnquoted(kAListOfExpressions));
+  EXPECT_EQ(envelope.find(kIdentifierKeyword), std::string::npos) << envelope;
+}
+
+// A list written after a string names no algorithm, so the identifier the
+// string named still stands and the envelope states it unchanged. An expression
+// naming no algorithm has no standing to take away the one named before it, and
+// the list reaches the envelope nowhere.
+TEST(ProtectDigestMethodEncryptionOutput,
+     AListDoesNotUnstateTheAlgorithmBeforeIt) {
+  std::string envelope = UnsignedEnvelope(Writes(kIdentifierKeyword, kStated) +
+                                          WritesUnquoted(kAListOfExpressions));
+  EXPECT_NE(envelope.find(Writes(kIdentifierKeyword, kStated)),
+            std::string::npos)
+      << envelope;
+  EXPECT_EQ(envelope.find(kAListOfExpressions), std::string::npos) << envelope;
 }
 
 // §34.5.21.2's exception: where a digital signature is used the identifier is

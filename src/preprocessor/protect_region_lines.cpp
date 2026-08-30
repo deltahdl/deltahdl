@@ -82,8 +82,18 @@ void TakeMethodKeywords(std::string_view line, uint32_t line_num,
   // §34.5.21 puts the identifier in effect for the blocks written after it, so
   // the value standing where a region ends is the one that region's digests
   // belong to.
+  //
+  // §34.5.21.1 spells the expression with a string, so a parenthesized
+  // pragma_value names no algorithm and the identifier stated earlier stands.
+  // Taking the list would spend it twice over: DigestPolicyFor
+  // (preprocessor/protect_processing.cpp) computes the digest under it, and
+  // ProtectMessageDigest finds no algorithm of that name, so a region asking
+  // for a digest would get none -- and AppendClearDigestNames
+  // (preprocessor/protect_envelope_output.cpp) would write the list onto the
+  // envelope, where it states no algorithm for a reader to regenerate the
+  // digest under.
   std::string_view digest_method =
-      KeywordValueOnLine(line, kDigestMethodKeyword);
+      KeywordSingleValueOnLine(line, kDigestMethodKeyword);
   if (!digest_method.empty()) {
     reader->digest_method = digest_method;
     reader->digest_method_line = line_num;
@@ -91,8 +101,13 @@ void TakeMethodKeywords(std::string_view line, uint32_t line_num,
   // §34.5.17 names the cipher those digests are encrypted under, which is a
   // separate identifier from the one computing them: a digest is computed and
   // then put under a key, and neither step says anything about the other.
+  //
+  // §34.5.17.1 spells this expression with a string as well, and §34.5.17.2 has
+  // the identifier written into the key block of a signed region, so a list
+  // taken here would be encoded into that block where the cipher a reader opens
+  // the digest with belongs.
   std::string_view digest_key_method =
-      KeywordValueOnLine(line, kDigestKeyMethodKeyword);
+      KeywordSingleValueOnLine(line, kDigestKeyMethodKeyword);
   if (!digest_key_method.empty()) reader->digest_key_method = digest_key_method;
   // §34.5.24 names the algorithm the region's own keys are encrypted under.
   // §34.5.24.1 spells the expression with a string, so a parenthesized

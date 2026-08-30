@@ -167,8 +167,9 @@ std::span<const ProtectPragmaKeyword> ProtectPragmaKeywords() {
 // reading an encrypting tool makes, and they answer the same question by
 // calling KeywordSingleValueOnLine rather than by asking this: a keyword is
 // read off a line there rather than off a pragma expression, so there is no
-// PragmaKeywordExpression for the two readings to share. #3277 covers
-// digest_method and digest_key_method, which that side still reads whole.
+// PragmaKeywordExpression for the two readings to share. Every name in this
+// list that an encrypting tool reads off a line is read there through that
+// call, so the two readings now answer alike.
 constexpr std::string_view kStringValuedKeywords[] = {
     kAuthorKeyword,           kAuthorInfoKeyword,     kEncryptAgentKeyword,
     kEncryptAgentInfoKeyword, kDataKeyownerKeyword,   kDataMethodKeyword,
