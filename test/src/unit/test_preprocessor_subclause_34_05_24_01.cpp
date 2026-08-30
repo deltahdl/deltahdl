@@ -87,7 +87,9 @@ std::string StatesMethod(std::string_view value) {
   return directive;
 }
 
-// A pragma_value written as the string §34.5.24.1 defines the expression with.
+// The design a region seals, which no envelope may carry in the clear.
+constexpr std::string_view kSealedDesign = "module sealed_m; endmodule\n";
+
 // The identifier in effect once `src` has been read.
 ProtectKeywordValue MethodAfter(const std::string& src) {
   SourceManager mgr;
