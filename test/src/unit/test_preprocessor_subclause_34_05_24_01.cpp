@@ -6,6 +6,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
+#include "helpers_protect_keys.h"
 #include "helpers_protect_keyword_value.h"
 #include "helpers_reported_error.h"
 #include "helpers_text_lines.h"
@@ -79,10 +80,6 @@ constexpr std::string_view kStated = "des-cbc";
 // rejected for the token the hyphen is rather than read as a value at all.
 constexpr std::string_view kIdentifierStated = "rsa";
 
-// The design a region seals, and the key an author hands the encrypting half.
-constexpr std::string_view kSealedDesign = "module sealed_m; endmodule\n";
-constexpr std::string_view kAuthorsKey = "one-key-of-the-authors-own";
-
 // A directive writing `value` against the keyword, spelled as it stands here.
 std::string StatesMethod(std::string_view value) {
   std::string directive = "`pragma protect key_method=";
@@ -103,13 +100,34 @@ ProtectKeywordValue MethodAfter(const std::string& src) {
 
 // The envelope this tool writes for a region stating `described`, checked on
 // the way out to be one that sealed its design.
-std::string EnvelopeStating(const std::string& described) {
+// The entity whose key opens a region's key block, and the key it holds. A
+// region designating this entity and naming a key the tool does not hold for
+// its data has its own keys sealed into a block, which is the arrangement
+// §34.5.24.2's cipher is asked for in.
+constexpr std::string_view kBlockProvider = "orrery-labs";
+constexpr std::string_view kBlockKeyName = "wrapping-2029";
+constexpr std::string_view kBlockProviderKey = "orrery-labs-wrapping-key";
+
+ProtectKeyList TheBlockProvidersKey() {
+  ProtectKeyList keys;
+  keys.Add(KeyOf(kBlockProvider, kBlockKeyName, kBlockProviderKey));
+  return keys;
+}
+
+// A region whose keys travel in a key block of its own, stating `described`
+// about itself.
+std::string SignedRegionStating(const std::string& described) {
   std::string region = "`pragma protect begin\n";
+  region.append("`pragma protect key_keyowner=\"")
+      .append(kBlockProvider)
+      .append("\"\n");
+  region.append("`pragma protect key_keyname=\"")
+      .append(kBlockKeyName)
+      .append("\"\n");
+  region.append("`pragma protect data_keyname=\"design-2029\"\n");
   region.append(described).append(kSealedDesign);
   region.append("`pragma protect end\n");
-  std::string envelope = EncryptEnvelopes(region, kAuthorsKey);
-  EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
-  return envelope;
+  return region;
 }
 
 // §34.5.24.1: the expression is `key_method = <string>`, and what stands in
@@ -199,22 +217,40 @@ TEST(ProtectKeyMethodSyntax, ANameMerelyOpeningWithTheKeywordIsNotIt) {
       MethodAfter("`pragma protect key_methods=\"des-cbc\"\n").defaulted);
 }
 
-// The other half of the tool asks the same line the same question. §34.5.24.2
-// has the identifier unchanged in the output file, so a region stating one in
-// the spelling §34.5.24.1 defines has it written onto the envelope as it stood.
-TEST(ProtectKeyMethodSyntax, TheAlgorithmStatedReachesTheEnvelope) {
-  EXPECT_TRUE(Holds(EnvelopeStating(StatesMethod(InQuotes(kStated))),
-                    StatesMethod(InQuotes(kStated))));
+// The other half of the tool asks the same line the same question, and what it
+// does with the answer is refuse the region. §34.5.24.2 has a region's keys
+// encrypted under the algorithm the identifier names and has the identifier
+// unchanged in the output file, and #3278 settled that a tool with one cipher
+// cannot honour both: it refuses a region naming another cipher rather than
+// writing out an identifier its blocks contradict. So the spelling §34.5.24.1
+// defines is what carries an author's request as far as that refusal.
+//
+// The region here designates a key of an entity whose key the tool does not
+// hold, which is what sends its keys into a key block and makes a cipher for
+// them something the region asked for.
+TEST(ProtectKeyMethodSyntax, TheAlgorithmStatedInThatSpellingIsRefused) {
+  SourceManager mgr;
+  DiagEngine diag{mgr};
+  std::string src = SignedRegionStating(StatesMethod(InQuotes(kStated)));
+  EncryptEnvelopes(src, {}, TheBlockProvidersKey(), &diag,
+                   mgr.AddFile("<test>", src));
+  EXPECT_TRUE(ReportedError(
+      diag.Diagnostics(),
+      "protect pragma key_method asks for an encryption algorithm this "
+      "implementation does not provide: des-cbc",
+      LineHolding(src, "key_method"), "34.5.24.2"));
 }
 
-// And the same list read by that half. An expression naming no algorithm has
-// none to write out, so the envelope states none: an encrypting tool that took
-// the list would put an expression §22.11 does not admit onto the envelope it
-// produced, where a reader looking for the identifier that opens the key blocks
-// would find that instead.
-TEST(ProtectKeyMethodSyntax, AListReachesTheEnvelopeAsNothingAtAll) {
-  EXPECT_FALSE(
-      Holds(EnvelopeStating(StatesMethod("(padding=\"pss\")")), "key_method"));
+// And the same list read by that half. An expression naming no algorithm asks
+// for none, so nothing is refused: what the list would have asked for is the
+// thing §34.5.24.1's spelling is needed to ask for at all.
+TEST(ProtectKeyMethodSyntax, AListAsksForNoAlgorithmAndIsRefusedNothing) {
+  SourceManager mgr;
+  DiagEngine diag{mgr};
+  std::string src = SignedRegionStating(StatesMethod("(padding=\"pss\")"));
+  EncryptEnvelopes(src, {}, TheBlockProvidersKey(), &diag,
+                   mgr.AddFile("<test>", src));
+  EXPECT_FALSE(diag.HasErrors());
 }
 
 }  // namespace

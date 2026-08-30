@@ -48,6 +48,7 @@
 #include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_encoding.h"
+#include "preprocessor/protect_envelope_output.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
 
@@ -280,15 +281,20 @@ TEST(ProtectKeyPublicKeyDescription, ADesignationReachingNoKeyHeadsNoBlock) {
 
 // §34.5.26.2 combines the entity and the identifier naming the cipher with this
 // designation to decide whether the private key is known, and this reading
-// combines the entity and the designation. A block opens under an envelope
-// naming a cipher its blocks are not under, the identifier deciding nothing.
-// #3278 is where that stops being read.
+// combines the entity and the designation alone: the identifier decides nothing
+// about whether a block opens.
+//
+// The envelope names the cipher its blocks are really under, which is not
+// necessarily the one the region asked for. #3278 settled that a region asking
+// for a cipher this tool does not provide is refused rather than written out
+// with an identifier its blocks contradict, so the case names the cipher the
+// tool provides and the claim it makes is about the designation.
 TEST(ProtectKeyPublicKeyDescription, TheCipherNamedDecidesNothingAboutOpening) {
   std::string envelope =
-      EncryptEnvelopes(RegionDesignating(Writes("key_method", "rsa") +
+      EncryptEnvelopes(RegionDesignating(Writes("key_method", kDataMethod) +
                                          DesignatesByPublicKey(kPublicKey)),
                        {}, HeldUnderThePublicKey());
-  EXPECT_TRUE(Holds(envelope, Writes("key_method", "rsa"))) << envelope;
+  EXPECT_TRUE(Holds(envelope, Writes("key_method", kDataMethod))) << envelope;
   SourceManager mgr;
   DiagEngine diag{mgr};
   PreprocConfig config;
