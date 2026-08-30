@@ -218,6 +218,50 @@ ProtectKeyBlockRequests DesignatedKeyBlocks(const RegionKeyNames& names,
 // region designated a reader for carries that made key. A region that
 // designated no reader the tool holds a key for is left with neither, which is
 // a region there is nothing to encrypt.
+// The report a region asking for a digest under an algorithm this
+// implementation does not provide is owed.
+//
+// §34.5.22.2 has the encrypting tool generate the message digest "using the
+// algorithm specified by the digest_method pragma expression", so a region
+// asking for a digest under an identifier is asking for that algorithm's value
+// and no other. ProtectDigestBlockDirectives
+// (preprocessor/protect_digest_block.cpp) writes nothing where it cannot
+// compute one, which is the right answer where it stands -- a digest is the
+// value the named algorithm produces or it is nothing, and a block written
+// under another algorithm would be worse -- but it holds no engine to say so.
+// Saying so is what leaves an author knowing the file carries nothing to detect
+// tampering with.
+//
+// The report says nothing about which half of Table 34-4 the identifier came
+// from, where the one for §34.5.11.2's cipher does. Both halves would be the
+// same answer here: §34.5.21.2 marks sha1 and md5 required, this implementation
+// provides both, and ProtectDigestIsAvailable
+// (preprocessor/protect_digest.cpp) answers for exactly the required
+// identifiers, so an identifier it cannot compute is one the table left
+// optional. Writing the other half would be writing a sentence no input can
+// reach. The cipher's report keeps both because §34.5.11.2 marks des-cbc
+// required and this implementation provides it under no identifier at all,
+// which #3430 covers.
+//
+// A region asking for no digest is refused nothing, and neither is one naming
+// no identifier: §34.5.21 gives the keyword a default, and the default is one
+// this implementation provides.
+void ReportUnavailableDigestMethod(const RegionKeyReader& in_effect,
+                                   DiagEngine* diag, uint32_t file_id) {
+  if (diag == nullptr || !in_effect.digest_requested) return;
+  std::string_view stated = ProtectPragmaValueBody(in_effect.digest_method);
+  if (stated.empty() || ProtectDigestIsAvailable(stated)) return;
+  std::string message(
+      "protect pragma digest_method asks for a message digest algorithm this "
+      "implementation does not provide: ");
+  message.append(stated);
+  message.append(
+      ", which IEEE 1800-2023 Table 34-4 does not require of every "
+      "implementation");
+  diag->Error(LineOf(file_id, in_effect.digest_method_line), message,
+              Subclause("34.5.21.2"));
+}
+
 // What §34.5.22 has settled about a region's digests by the time the region
 // closes, apart from the key, which is not known until the region's own key is.
 //
@@ -452,6 +496,7 @@ std::string EncryptEnvelopes(std::string_view source_text,
             Subclause("34.5.27"));
       }
       ReportUnprovidedDataMethod(in_effect, diag, file_id);
+      ReportUnavailableDigestMethod(in_effect, diag, file_id);
       transformed.append(
           ClosedRegionText(region, in_effect, line, delimiter, how));
       in_envelope = false;

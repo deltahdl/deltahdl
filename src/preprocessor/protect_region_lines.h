@@ -74,6 +74,11 @@ struct RegionKeyReader {
   // what an encrypting tool writes out, so it belongs to the description of the
   // envelope rather than to the lines about to stop being readable.
   std::string_view digest_method;
+  // The line that naming stands on, carried for the reason data_method_line is:
+  // the report about the identifier is made where the region closes, that being
+  // where the value in effect for the region is settled, while what the report
+  // is about is the expression the author wrote.
+  uint32_t digest_method_line = 0;
   // The identifier the text named the cipher its digests are encrypted under,
   // empty where the text named none. It is carried beside the names for the
   // reason they are carried at all: §34.5.17 has the identifier unchanged in

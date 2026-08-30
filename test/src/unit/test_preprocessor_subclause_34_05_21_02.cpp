@@ -33,6 +33,27 @@
 // Which spelling puts which identifier in effect belongs to §34.5.21.1 and is
 // stated in test_preprocessor_subclause_34_05_21_01.cpp. What this file states
 // is what the identifier then does.
+//
+// One thing the identifier decides is what happens where this implementation
+// has no algorithm for it. §34.5.22.2 has the encrypting tool generate the
+// message digest "using the algorithm specified by the digest_method pragma
+// expression", so a region asking for a digest under such an identifier asked
+// for a value this tool cannot produce. ProtectDigestBlockDirectives writes no
+// block there, which is the right answer where it stands -- a digest is the
+// value the named algorithm produces or it is nothing -- and issue #3276 is the
+// defect: it was the whole answer, so the author was handed an envelope with
+// nothing in it to detect tampering with and nothing said about the absence.
+// ReportUnavailableDigestMethod in src/preprocessor/protect_processing.cpp is
+// the report, and the cases below it hold it to §34.5.22.2's request rather
+// than to the keyword: a region that named such an identifier without writing a
+// digest_block expression asked for nothing and is refused nothing.
+//
+// Only one half of that report is reachable here. Table 34-4 marks sha1 and md5
+// required and md2 and ripemd-160 optional, and ProtectDigestIsAvailable in
+// src/preprocessor/protect_digest.cpp answers yes for exactly the two the table
+// requires, so every identifier that draws the report is one the table does not
+// require. The report's "requires of every implementation" half would need a
+// required identifier this tool had no algorithm for, and there is none.
 
 #include <gtest/gtest.h>
 
@@ -42,8 +63,10 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_preprocessor.h"
 #include "helpers_protect_keys.h"
 #include "helpers_protect_keyword_value.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_digest.h"
 #include "preprocessor/protect_digest_block.h"
@@ -328,6 +351,164 @@ TEST(ProtectDigestMethodEncryptionInput,
   EXPECT_EQ(ProtectDigestBlockDirectives(kDigestedText, policy,
                                          DefaultProtectEncoding()),
             "");
+}
+
+// -- A digest asked for under an algorithm this tool has none for ------------
+
+// The designs the regions below seal. Two spellings, so that a case reading an
+// output for the region it wrote is reading for that region's own text.
+constexpr std::string_view kRequestedDesign = "module lattice_m; endmodule\n";
+constexpr std::string_view kUnrequestedDesign = "module trellis_m; endmodule\n";
+
+// An identifier Table 34-4 does not list. §34.5.21.2 admits further identifiers
+// and leaves them to the implementation, and this implementation defines none,
+// so a value outside the table reaches an algorithm here no more than one of
+// the table's optional rows does.
+constexpr std::string_view kUnlistedIdentifier = "x-ferrule-fingerprint-64";
+
+// The report a region asking for a digest under an algorithm this
+// implementation has none for draws, up to the identifier that region named.
+constexpr std::string_view kNoSuchDigest =
+    "asks for a message digest algorithm this implementation does not "
+    "provide: ";
+
+// The half of Table 34-4 the report names in every case below, for the reason
+// the file's header gives: the identifiers this implementation provides are
+// exactly the ones the table requires, so an identifier that draws the report
+// at all is one the table did not require.
+constexpr std::string_view kTableLeavesItOptional =
+    ", which IEEE 1800-2023 Table 34-4 does not require of every "
+    "implementation";
+
+// The whole of that report for the identifier a region named.
+std::string AsksForDigestUnder(std::string_view identifier) {
+  std::string message(kNoSuchDigest);
+  message.append(identifier).append(kTableLeavesItOptional);
+  return message;
+}
+
+// Envelope encryption over a source text an author wrote, with the reports the
+// run made kept beside the text it wrote out. The source is added to the
+// manager so that a report stands at the line of it the author wrote the
+// identifier on, that line being what the cases below name.
+struct DigestingRun {
+  PreprocFixture f;
+  std::string text;
+
+  explicit DigestingRun(const std::string& src)
+      : text(EncryptEnvelopes(src, kExchangeKey, ProtectKeyList(), &f.diag,
+                              f.mgr.AddFile("<test>", src))) {}
+};
+
+// §34.5.22.2 has the encrypting tool generate the digest under the algorithm
+// the digest_method pragma expression specifies, so a region asking for a
+// digest under md2 asked for md2's value and no other. Table 34-4 marks md2
+// optional and ProtectDigestIsAvailable answers no for it, so this tool has no
+// such value to write and the report is what says so. Issue #3276 is the defect
+// the case was written for: the envelope came back with no digest block in it
+// and the run said nothing, so the author held a file with nothing to detect
+// tampering with and no way to learn that.
+//
+// The identifier stands on the third line, the request on the first and the
+// closing expression on the fifth, so a report placed at either delimiter of
+// the region fails this.
+TEST(ProtectDigestMethodEncryptionInput,
+     AnOptionalIdentifierAskedForIsReportedOnItsOwnLine) {
+  std::string src = RequestsDigest();
+  src += "`pragma protect begin\n";
+  src.append(Writes(kIdentifierKeyword, kMd2DigestMethod));
+  src.append(kRequestedDesign);
+  src += "`pragma protect end\n";
+  DigestingRun run(src);
+  EXPECT_TRUE(ReportedError(run.f.diag.Diagnostics(),
+                            AsksForDigestUnder(kMd2DigestMethod), 3,
+                            "34.5.21.2"))
+      << run.text;
+}
+
+// §34.5.21.2 leaves an identifier outside Table 34-4 to the implementation, and
+// this implementation defines none, so such a region asked for a value it
+// cannot be given either. The report says the table does not require the
+// identifier, which is what the table says of a value it never listed.
+//
+// §34.4 makes the scope of the keyword lexical, so the identifier written ahead
+// of the region is in effect inside it and states what that region's digest is
+// to be computed with. The report therefore stands on the first line, where the
+// author wrote it, rather than on the fourth or the sixth, where the region
+// opens and closes.
+TEST(ProtectDigestMethodEncryptionInput,
+     AnUntabulatedIdentifierAskedForIsReported) {
+  std::string src = Writes(kIdentifierKeyword, kUnlistedIdentifier);
+  src += "module frame_m; endmodule\n";
+  src.append(RequestsDigest());
+  src += "`pragma protect begin\n";
+  src += "  initial spindle = 5;\n";
+  src += "`pragma protect end\n";
+  DigestingRun run(src);
+  EXPECT_TRUE(ReportedError(run.f.diag.Diagnostics(),
+                            AsksForDigestUnder(kUnlistedIdentifier), 1,
+                            "34.5.21.2"))
+      << run.text;
+}
+
+// §34.5.21.2 governs what the identifier asks for, and md5 asks for something
+// this implementation provides: Table 34-4 requires it and
+// ProtectDigestIsAvailable answers yes. Such a region is refused nothing, so
+// the run reports nothing and the envelope carries the digest block the region
+// asked for.
+//
+// Both halves are asserted because the first alone is what issue #3276 already
+// satisfied: a tool that wrote no digest block and said nothing about it
+// reports no error. The block is the half that says the request was met.
+//
+// The identifier is md5 rather than sha1 so that it is not the identifier
+// kDefaultDigestMethod would have supplied had the region named none.
+TEST(ProtectDigestMethodEncryptionInput,
+     AnAvailableIdentifierAskedForWritesItsBlockInSilence) {
+  std::string src = "`pragma protect begin\n";
+  src.append(Writes(kIdentifierKeyword, kMd5DigestMethod));
+  src.append(RequestsDigest());
+  src.append(kRequestedDesign);
+  src += "`pragma protect end\n";
+  DigestingRun run(src);
+  EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
+  EXPECT_TRUE(CarriesAGeneratedDigestBlock(run.text)) << run.text;
+}
+
+// §34.5.22.2 makes the digest_block expression the request for a digest, so an
+// identifier written without one asks for nothing. This region names
+// ripemd-160, which Table 34-4 marks optional and ProtectDigestIsAvailable
+// answers no for, and it writes no digest_block expression: it was refused
+// nothing, so it is told nothing, and no digest block is written for it.
+//
+// This is what holds the report to the request rather than to the keyword.
+// Without it a report fired wherever the identifier was written would pass the
+// two reported cases above.
+TEST(ProtectDigestMethodEncryptionInput,
+     AnIdentifierNamedWithoutARequestIsNotReported) {
+  std::string src = "`pragma protect begin\n";
+  src.append(Writes(kIdentifierKeyword, kRipemd160DigestMethod));
+  src.append(kUnrequestedDesign);
+  src += "`pragma protect end\n";
+  DigestingRun run(src);
+  EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
+  EXPECT_FALSE(CarriesAGeneratedDigestBlock(run.text)) << run.text;
+}
+
+// §34.5.21 fills the keyword's place from a default where the text named no
+// identifier, and TheDefaultIsAnIdentifierTheTableRequires above holds that
+// default to a row Table 34-4 requires. A region asking for a digest and naming
+// no identifier therefore asked for one this implementation provides: the run
+// reports nothing and the envelope carries the block.
+TEST(ProtectDigestMethodEncryptionInput,
+     NoIdentifierAskedForWritesItsBlockUnderTheDefault) {
+  std::string src = RequestsDigest();
+  src += "`pragma protect begin\n";
+  src.append(kRequestedDesign);
+  src += "`pragma protect end\n";
+  DigestingRun run(src);
+  EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
+  EXPECT_TRUE(CarriesAGeneratedDigestBlock(run.text)) << run.text;
 }
 
 // -- Unchanged in the output file -------------------------------------------

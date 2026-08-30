@@ -84,7 +84,10 @@ void TakeMethodKeywords(std::string_view line, uint32_t line_num,
   // belong to.
   std::string_view digest_method =
       KeywordValueOnLine(line, kDigestMethodKeyword);
-  if (!digest_method.empty()) reader->digest_method = digest_method;
+  if (!digest_method.empty()) {
+    reader->digest_method = digest_method;
+    reader->digest_method_line = line_num;
+  }
   // §34.5.17 names the cipher those digests are encrypted under, which is a
   // separate identifier from the one computing them: a digest is computed and
   // then put under a key, and neither step says anything about the other.
