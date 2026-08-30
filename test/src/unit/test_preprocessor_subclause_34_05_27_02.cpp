@@ -27,6 +27,18 @@
 //
 // Which spelling of the keyword announces the block is §34.5.27.1's and is
 // stated in test_preprocessor_subclause_34_05_27_01.cpp.
+//
+// A block this reader cannot open costs it no report, and the last case below
+// is what holds the reading to that. §34.5.24.2 has an encrypting tool seal a
+// region's keys under the algorithm the key_method expression names, has that
+// identifier unchanged in the output file, and has a reader decrypt a key block
+// under the algorithm the identifier names. This implementation has one cipher,
+// so #3278 settled the first two by refusing a region that named any other:
+// ReportUnprovidedKeyMethod in src/preprocessor/protect_processing.cpp makes
+// that report where the region closes. The third is left saying nothing,
+// because §34.5.27.2's alternatives are what a block under some other cipher
+// arrives as, and a reader that reported one would report every envelope
+// written for two readers.
 
 #include <gtest/gtest.h>
 
@@ -232,6 +244,27 @@ TEST(ProtectKeyBlockDescription, AReaderHoldingNeitherKeyOpensNeitherBlock) {
   ReadSource run(EnvelopeWithTwoBlocks(),
                  ReadSource::KeysConfig(ProtectKeyList()));
   EXPECT_FALSE(Holds(run.text, kEncodingSealedDesign)) << run.text;
+}
+
+// The reader between those two: it holds the second entity's key and not the
+// first's, so the first block it reaches is one it cannot open and the second
+// is one it can. §34.5.27.2 makes the two alternatives rather than obligations,
+// so what the reading owes this reader is the design and not one word about the
+// block it passed over. Preprocessor::TakeKeyBlockValue
+// (src/preprocessor/preprocessor_protect_values.cpp) consumes that line and
+// says nothing, which is where a block under a cipher this implementation does
+// not provide is left as well.
+//
+// Nothing reported is the claim rather than no error reported, a warning about
+// the passed-over block being as much a report about it as an error would be.
+// A report added to the reading half for §34.5.24.2 would land here: #3278
+// settled that subclause on the encrypting half alone, and this case is what
+// goes red if the settlement moves.
+TEST(ProtectKeyBlockDescription, TheBlockThisReaderCannotOpenCostsItNoReport) {
+  ReadSource run(EnvelopeWithTwoBlocks(),
+                 ReadSource::KeysConfig(OnlyTheSecondEntitysKey()));
+  EXPECT_TRUE(Holds(run.text, kEncodingSealedDesign)) << run.text;
+  EXPECT_TRUE(run.diag.Diagnostics().empty()) << run.text;
 }
 
 // -- What the recovered text is read as --------------------------------------

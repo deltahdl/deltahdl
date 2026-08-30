@@ -1,45 +1,47 @@
 // §34.5.24 key_method, Description.
 //
-// §34.5.24.2 says four things about the keyword §34.5.24.1 spells.
+// §34.5.24.2 says three things about the keyword §34.5.24.1 spells, and this
+// implementation cannot honour the first two at once for a region naming a
+// cipher it does not have.
 //
-//   The expression names the encryption algorithm that encrypts the keys the
-//   data block is encrypted under.
+//   ENCRYPTION INPUT: the expression indicates the encryption algorithm that
+//   shall be used to encrypt the keys used to encrypt the data_block. A region
+//   naming one has stated what its own key block is to be sealed with.
 //
-//   The identifiers naming those algorithms are the ones written for the cipher
-//   the data are under. The subclause tabulates none of its own.
+//   ENCRYPTION OUTPUT: the key_method is unchanged in the output file. No
+//   exception is stated, where the cipher of the data, the entity of the digest
+//   and the algorithm computing a digest each have one for a digital signature.
 //
-//   The identifier is unchanged in the output file. No exception is stated,
-//   where the cipher of the data, the entity of the digest and the algorithm
-//   computing a digest each have one for a digital signature.
+//   DECRYPTION INPUT: the expression indicates the algorithm that shall be used
+//   to decrypt the key_block.
 //
-//   On the way back it names the algorithm the key block is decrypted with.
+// This implementation has one cipher and names it kDataMethod
+// (src/preprocessor/protect_envelope_output.h). Sealing a region's key block
+// under that while writing out whichever identifier its author named would hand
+// back an envelope claiming an algorithm nobody used, so #3278 settled the pair
+// the way #3270 settled it for the cipher the data are under. A region naming
+// any other identifier is reported where it closes, by
+// ReportUnprovidedKeyMethod in src/preprocessor/protect_processing.cpp, and the
+// envelope states the cipher its blocks are really under, AppendClearKeyNames
+// in src/preprocessor/protect_envelope_output.cpp writing it. Every source this
+// tool accepts then has its identifier unchanged, the only identifiers it
+// accepts being the one it writes and none at all.
 //
-// The first three are what a run can be held to and are what this file states.
+// The identifier is written only where the envelope carries key blocks. A
+// region whose keys travel in no block has none of them encrypted, so no cipher
+// describes anything and none is stated.
 //
-// The first two are the pair a tool with one cipher cannot honour together, and
-// #3278 settled which gives way. Writing the author's identifier out unchanged
-// would state a cipher the block is not under, this tool sealing every key
-// block with the one cipher it has; encrypting under the identifier written is
-// what it cannot do. So a region naming another cipher is refused, and the
-// identifier every accepted source carries is unchanged because the only ones
-// accepted are the one this tool writes and none at all.
-// ReportUnprovidedKeyMethod in src/preprocessor/protect_processing.cpp is the
-// refusal and AppendClearKeyNames in
-// src/preprocessor/protect_envelope_output.cpp is the writing.
-//
-// The last is answerable because of that: an envelope states the cipher its
-// blocks are really under, so a reader is told which algorithm decrypts the key
-// block. Nothing in a run asks it yet. A block under any other cipher fails to
-// open and is passed over in silence, which §34.5.27.2 calls for whatever the
-// reason -- several key blocks are alternative ways into one envelope, so a
-// block written for some other reader is not an error, and
-// ProtectKeyBlockDescription.TwoBlocksAreWaysIntoOneEnvelope in
-// test_preprocessor_subclause_34_05_27_02.cpp is what holds that standing.
+// DECRYPTION INPUT is answered by the reading side, and the reading side says
+// nothing at all: a key block under a cipher this implementation does not
+// provide fails to open and is passed over in silence. §34.5.27.2 makes several
+// key blocks alternative ways into one envelope, so a block written for some
+// other reader is not an error, and
+// ProtectKeyBlockDescription.TheBlockThisReaderCannotOpenCostsItNoReport in
+// test_preprocessor_subclause_34_05_27_02.cpp is what holds the reading to it.
 //
 // Which spelling of the expression puts which identifier in effect is
 // §34.5.24.1's and is stated in test_preprocessor_subclause_34_05_24_01.cpp,
-// along with the identifier reaching the envelope as written and a
-// parenthesized list reaching it as nothing.
+// along with a parenthesized list reaching the envelope as nothing.
 //
 // Whether the table marks an identifier as one every implementation provides is
 // §34.5.11.2's, and three cases below state the answer for this keyword.
@@ -49,10 +51,10 @@
 // §34.5.11.2 says the required methods are standard in every implementation,
 // and leaves an additional identifier and the cipher behind it to the
 // implementation. IsRequiredProtectEncryptionAlgorithm in
-// src/preprocessor/protect_key_method.h is what answers the question, and
-// ReportUnprovidedDataMethod in src/preprocessor/protect_processing.cpp asks it
-// to say, of a cipher this tool does not provide, whether the standard required
-// it. #3270 is where that reading came from.
+// src/preprocessor/protect_key_method.h is what answers the question, and the
+// report names the half of the table the identifier came from. #3430 covers
+// providing the ciphers the table requires of every implementation, and the
+// report is what stands in their place until that lands.
 
 #include <gtest/gtest.h>
 
@@ -89,11 +91,12 @@ constexpr std::string_view kEntityKey = "meridian-trust-wrapping-key";
 // author's.
 constexpr std::string_view kDataKeyName = "design-2027";
 
-// The identifier a region names for the cipher its own keys are under, and the
-// one it names for the algorithm its digests are computed with. The second is
-// there to be looked for and not found: §34.5.21.2 excuses it from the clear
-// wherever a digital signature is used and §34.5.24.2 excuses this one from
-// nothing.
+// The identifier Table 34-3 requires of every implementation, which is the one
+// a region names below to ask for a cipher this implementation does not have,
+// and the identifier a region names for the algorithm its digests are computed
+// with. The second is there to be looked for and not found: §34.5.21.2 excuses
+// it from the clear wherever a digital signature is used and §34.5.24.2 excuses
+// this one from nothing.
 constexpr std::string_view kKeyCipher = "des-cbc";
 constexpr std::string_view kDigestAlgorithm = "md5";
 
@@ -106,6 +109,45 @@ constexpr std::string_view kOptionalCipher = "aes256-cbc";
 constexpr std::string_view kProvidedCipher = kDataMethod;
 
 constexpr std::string_view kSealedDesign = "module sealed_m; endmodule\n";
+
+// A third tabulated identifier, named by the one region below whose keys travel
+// in no key block. It is spelled apart from the two above so that the case
+// reading that envelope reads for the cipher its own region asked for.
+constexpr std::string_view kUnblockedCipher = "cast128-cbc";
+
+// The entity a region names for its data, the name picking that entity's key
+// out of its list, and the key itself. A region whose data name reaches a key
+// the tool holds is sealed under that key directly, so it designates no key of
+// its own and no key block is written for it.
+constexpr std::string_view kDirectEntity = "harbour-labs";
+constexpr std::string_view kDirectKeyName = "direct-2028";
+constexpr std::string_view kDirectKey = "harbour-labs-direct-key";
+
+// The expression announcing a key block, which is how a case below tells an
+// envelope carrying one from an envelope carrying none.
+constexpr std::string_view kKeyBlockLine = "`pragma protect key_block\n";
+
+// The directive an envelope states this keyword with, up to the value. The case
+// claiming no such directive was written searches for this much of it, the
+// value being the part it claims is absent.
+constexpr std::string_view kKeyMethodDirective = "`pragma protect key_method=";
+
+// The report a region asking for a cipher this implementation cannot seal its
+// keys under draws, up to the identifier that region named. The keyword is part
+// of it, so the report §34.5.11.2 makes about the cipher the data are under
+// does not answer for this one.
+constexpr std::string_view kNoCipherOfOurs =
+    "protect pragma key_method asks for an encryption algorithm this "
+    "implementation does not provide: ";
+
+// The two halves of Table 34-3 as that report names them. Which half the
+// identifier came from is the whole of what separates the two reported cases
+// below from each other.
+constexpr std::string_view kTableObligesEveryTool =
+    ", which IEEE 1800-2023 Table 34-3 requires of every implementation";
+constexpr std::string_view kTableLeavesItOptional =
+    ", which IEEE 1800-2023 Table 34-3 does not require of every "
+    "implementation";
 
 std::string Writes(std::string_view keyword, std::string_view value) {
   std::string text = "`pragma protect ";
@@ -149,6 +191,63 @@ std::string ReadBack(const std::string& envelope) {
   config.protect_keys = TheEntitysKey();
   Preprocessor pp(mgr, diag, std::move(config));
   return pp.Preprocess(mgr.AddFile("<test>", envelope));
+}
+
+// The whole of that report for one identifier taken from one half of the table.
+std::string AskingFor(std::string_view identifier, std::string_view tabulated) {
+  std::string message(kNoCipherOfOurs);
+  message.append(identifier).append(tabulated);
+  return message;
+}
+
+ProtectKeyList TheDirectEntitysKey() {
+  ProtectKeyList keys;
+  keys.Add(KeyOf(kDirectEntity, kDirectKeyName, kDirectKey));
+  return keys;
+}
+
+// A region whose data name reaches a key the tool holds, stating `described`
+// about itself. Its keys travel in no key block: the key it is sealed under is
+// one the reader already holds, so there is nothing to encrypt and nothing to
+// carry.
+std::string DirectRegion(const std::string& described) {
+  std::string text = "`pragma protect begin\n";
+  text.append(Writes("data_keyowner", kDirectEntity));
+  text.append(Writes("data_keyname", kDirectKeyName));
+  text.append(described).append(kSealedDesign);
+  text.append("`pragma protect end\n");
+  return text;
+}
+
+// Envelope encryption over a source an author wrote, with the reports it made
+// kept beside the envelope it produced. The source is added to the manager so
+// that a report stands at the line of it the author wrote the identifier on,
+// which is the line the cases below name.
+struct AuthorsRun {
+  SourceManager mgr;
+  DiagEngine diag{mgr};
+  std::string envelope;
+
+  AuthorsRun(const std::string& source, const ProtectKeyList& keys)
+      : envelope(EncryptEnvelopes(source, {}, keys, &diag,
+                                  mgr.AddFile("<test>", source))) {}
+};
+
+// The identifier `envelope` states against `keyword`, with the quotation marks
+// it was written with, if any, removed. §22.5.1 gives a pragma_value more than
+// one spelling, and what §34.5.24.2 settles is which algorithm the identifier
+// names rather than which spelling states it, so what a case reads back is the
+// characters naming the algorithm. Empty where the envelope states the keyword
+// nowhere.
+std::string_view IdentifierStatedFor(std::string_view envelope,
+                                     std::string_view keyword) {
+  std::string directive = "`pragma protect ";
+  directive.append(keyword).append("=");
+  size_t at = envelope.find(directive);
+  if (at == std::string_view::npos) return {};
+  size_t from = at + directive.size();
+  size_t end = envelope.find('\n', from);
+  return ProtectPragmaValueBody(envelope.substr(from, end - from));
 }
 
 // -- The identifiers the keyword admits --------------------------------------
@@ -268,23 +367,42 @@ TEST(ProtectKeyMethodDescription, TheIdentifiersAreTheOnesTheOtherCiphersUse) {
 // §34.5.21.2, and the algorithm its keys are under stands in the clear all the
 // same. What it is needed for is opening the very block the others hide in, so
 // one swept inside would have to be read out of the block it opens.
+//
+// The identifier the region names is the one this implementation writes, which
+// is what leaves it unchanged: the region asked for the cipher its block was
+// going to be sealed under, so neither rule gave way. A region naming any other
+// identifier is reported instead, and the cases under
+// ProtectKeyMethodEncryptionInput below are where that stands.
 TEST(ProtectKeyMethodDescription,
      TheAlgorithmStandsUnchangedOnASignedEnvelope) {
   std::string envelope =
       SignedEnvelope(Writes("key_method", kProvidedCipher) +
                      Writes("digest_method", kDigestAlgorithm));
-  EXPECT_TRUE(Holds(envelope, Writes("key_method", kProvidedCipher)))
+  EXPECT_EQ(IdentifierStatedFor(envelope, "key_method"), kProvidedCipher)
       << envelope;
   EXPECT_FALSE(Holds(envelope, "digest_method")) << envelope;
+}
+
+// §34.5.24.2 has the keys of a signed region encrypted under the algorithm the
+// identifier names, so the envelope of a region that named none states the
+// cipher its blocks are really under rather than leaving a reader with nothing
+// to open them with. That cipher is this implementation's own:
+// ProtectKeyBlockDirective in src/preprocessor/protect_key_block.cpp seals a
+// key block with EncryptProtectedRegion and with nothing else.
+TEST(ProtectKeyMethodDescription,
+     ASignedEnvelopeStatesTheCipherItsKeyBlocksAreUnder) {
+  std::string envelope = SignedEnvelope("");
+  EXPECT_EQ(IdentifierStatedFor(envelope, "key_method"), kProvidedCipher)
+      << envelope;
 }
 
 // The identifier stands ahead of the blocks it governs. A reader has to hold it
 // by the time a key block is reached, so an envelope stating it after the block
 // would state it too late to be of use.
 TEST(ProtectKeyMethodDescription, TheAlgorithmStandsAheadOfTheBlocksItGoverns) {
-  std::string envelope = SignedEnvelope(Writes("key_method", kProvidedCipher));
-  size_t stated = envelope.find(Writes("key_method", kProvidedCipher));
-  size_t block = envelope.find("`pragma protect key_block");
+  std::string envelope = SignedEnvelope("");
+  size_t stated = envelope.find(kKeyMethodDirective);
+  size_t block = envelope.find(kKeyBlockLine);
   ASSERT_NE(stated, std::string::npos) << envelope;
   ASSERT_NE(block, std::string::npos) << envelope;
   EXPECT_LT(stated, block) << envelope;
@@ -292,12 +410,11 @@ TEST(ProtectKeyMethodDescription, TheAlgorithmStandsAheadOfTheBlocksItGoverns) {
 
 // -- What an envelope stating one is still read as ---------------------------
 
-// #3278 is where the identifier stops being read, and these two stand where a
-// fix for it would land. §34.5.24.2 has the identifier written out unchanged,
-// so an envelope this tool produced states whichever algorithm its author named
-// rather than the one its blocks are really under. A reading that held a block
-// to the stated identifier would turn away this tool's own output, which is
-// what makes the remedy a choice rather than an omission.
+// The round trip §34.5.24.2's DECRYPTION INPUT rests on, and the one the
+// reports added for #3278 had to leave standing: a region sealed behind a key
+// block is read back by a tool holding the key that opens that block, and the
+// design comes out. The identifier the region states is the one this
+// implementation writes, so nothing the region asked for was refused.
 TEST(ProtectKeyMethodDescription, AnEnvelopeStatingOneIsReadBackAllTheSame) {
   EXPECT_TRUE(
       Holds(ReadBack(SignedEnvelope(Writes("key_method", kProvidedCipher))),
@@ -311,112 +428,78 @@ TEST(ProtectKeyMethodDescription, AnEnvelopeStatingNoneIsReadBackToo) {
   EXPECT_TRUE(Holds(ReadBack(SignedEnvelope("")), kSealedDesign));
 }
 
-// -- The cipher a region asks its keys be put under -------------------------
+// -- The cipher a region asks for its own keys -------------------------------
 
-// §34.5.24.2 has a region's own keys encrypted under the algorithm this
-// identifier names and has the identifier unchanged in the output file. A tool
-// with one cipher cannot honour both for a region naming another: writing the
-// author's identifier out would state a cipher the block is not under, and
-// encrypting under it is what the tool cannot do. Refusing the region settles
-// it, so every source this tool accepts has its identifier unchanged and every
-// envelope states the cipher its keys are really under. Issue #3278 is where
-// that was settled, and §34.5.11.2's cipher was settled the same way in #3270.
+// §34.5.24.2's ENCRYPTION INPUT has the identifier indicate "the encryption
+// algorithm that shall be used to encrypt the keys used to encrypt the
+// data_block", so a region naming des-cbc has stated what its own key block is
+// to be sealed with. This implementation seals one under the cipher it names
+// kDataMethod and under no other, so the region asked for something it cannot
+// be given and is told so. Table 34-3 marks des-cbc Required and the report
+// says so, §34.5.11.2 calling a required method standard in every
+// implementation and this implementation being the one falling short.
 //
-// The report stands at the line the author wrote the expression on.
-std::string SignedSourceNaming(std::string_view cipher) {
-  std::string text = "`pragma protect begin\n";
-  text.append(Writes("key_keyowner", kEntity));
-  text.append(Writes("key_method", cipher));
-  text.append(Writes("key_keyname", kKeyName));
-  text.append(Writes("data_keyname", kDataKeyName));
-  text.append(kSealedDesign);
-  text.append("`pragma protect end\n");
-  return text;
-}
-
-// One encrypting run over such a source, with the reports it made kept beside
-// the text it wrote.
-struct SigningRun {
-  SourceManager mgr;
-  DiagEngine diag{mgr};
-  std::string text;
-
-  explicit SigningRun(const std::string& src)
-      : text(EncryptEnvelopes(src, {}, TheEntitysKey(), &diag,
-                              mgr.AddFile("<test>", src))) {}
-};
-
-// The message the report carries, up to the half naming the table's column.
-std::string AsksForCipher(std::string_view cipher) {
-  std::string message(
-      "protect pragma key_method asks for an encryption algorithm this "
-      "implementation does not provide: ");
-  message.append(cipher);
-  return message;
-}
-
-// Table 34-3 marks des-cbc required, which §34.5.11.2 says is standard in every
-// implementation, so a text naming it assumed nothing and this tool is what
-// falls short. #3430 covers providing that cipher.
-//
-// The expression stands on the third line, the region opening on the first and
+// The identifier stands on the fifth line, the region opening on the first and
 // closing on the seventh, so a report placed at either delimiter fails this.
-TEST(ProtectKeyMethodDescription, ARequiredCipherAskedForIsReported) {
-  SigningRun run(SignedSourceNaming(kKeyCipher));
-  EXPECT_TRUE(ReportedError(
-      run.diag.Diagnostics(),
-      AsksForCipher(kKeyCipher) +
-          ", which IEEE 1800-2023 Table 34-3 requires of every implementation",
-      3, "34.5.24.2"))
-      << run.text;
-}
-
-// The same for one of the fifteen rows the table leaves optional. Which half of
-// the table the identifier came from is the whole of what separates this case
-// from the one above, so the message is read for that half.
-TEST(ProtectKeyMethodDescription, AnOptionalCipherAskedForIsReportedToo) {
-  SigningRun run(SignedSourceNaming(kOptionalCipher));
+TEST(ProtectKeyMethodEncryptionInput,
+     ARegionAskingForTheRequiredCipherForItsKeysIsReported) {
+  AuthorsRun run(SignedRegion(Writes("key_method", kKeyCipher)),
+                 TheEntitysKey());
   EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
-                            AsksForCipher(kOptionalCipher) +
-                                ", which IEEE 1800-2023 Table 34-3 does not "
-                                "require of every implementation",
-                            3, "34.5.24.2"))
-      << run.text;
+                            AskingFor(kKeyCipher, kTableObligesEveryTool), 5,
+                            "34.5.24.2"))
+      << run.envelope;
 }
 
-// The identifier this tool writes, asked for by name: the keys really are put
-// under that cipher, so nothing is refused and the envelope states it. Without
-// this the two cases above would hold of a tool that refused every region.
-TEST(ProtectKeyMethodDescription, TheCipherWeProvideAskedForIsSealedInSilence) {
-  SigningRun run(SignedSourceNaming(kProvidedCipher));
-  EXPECT_FALSE(run.diag.HasErrors()) << run.text;
-  EXPECT_TRUE(Holds(run.text, Writes("key_method", kProvidedCipher)))
-      << run.text;
+// §34.5.24.2 sends this keyword to the identifiers written for data_method, and
+// Table 34-3 marks aes256-cbc Optional, so the report says the table did not
+// require it. An implementation offering that cipher is required to offer it
+// under this identifier, and this one offers it under no identifier at all.
+// Which half of the table the identifier came from is the whole of what
+// separates this case from the one above.
+//
+// The source writes a design element around the region, so the identifier
+// stands on the sixth line here rather than the fifth, and the delimiters stand
+// on the second and the eighth.
+TEST(ProtectKeyMethodEncryptionInput,
+     ARegionAskingForAnOptionalCipherForItsKeysIsToldTheTableDoesNotRequireIt) {
+  std::string source = "module bulkhead_m;\n";
+  source.append(SignedRegion(Writes("key_method", kOptionalCipher)));
+  source.append("endmodule\n");
+  AuthorsRun run(source, TheEntitysKey());
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            AskingFor(kOptionalCipher, kTableLeavesItOptional),
+                            6, "34.5.24.2"))
+      << run.envelope;
 }
 
-// A region whose keys travel in no key block is refused nothing, whatever it
-// names: none of its keys is encrypted, so no cipher was asked for and none
-// describes anything. The envelope states no identifier at all.
-TEST(ProtectKeyMethodDescription, ACipherNamedWithNoKeyBlockIsNotReported) {
-  std::string src = "`pragma protect begin\n";
-  src.append(Writes("key_method", kKeyCipher));
-  src.append(kSealedDesign);
-  src.append("`pragma protect end\n");
-  SourceManager mgr;
-  DiagEngine diag{mgr};
-  std::string written = EncryptEnvelopes(src, kEntityKey, ProtectKeyList(),
-                                         &diag, mgr.AddFile("<test>", src));
-  EXPECT_FALSE(diag.HasErrors()) << written;
-  EXPECT_FALSE(Holds(written, "`pragma protect key_method")) << written;
+// A region naming the identifier this implementation writes has asked for the
+// cipher its key block is sealed under, so nothing it asked for is refused and
+// the envelope states what the region named. Without this case the two above
+// would hold of a tool that reported every region whatever cipher it asked for.
+TEST(ProtectKeyMethodEncryptionInput,
+     ARegionAskingForTheCipherOurKeyBlocksUseDrawsNoReport) {
+  AuthorsRun run(SignedRegion(Writes("key_method", kProvidedCipher)),
+                 TheEntitysKey());
+  EXPECT_FALSE(run.diag.HasErrors()) << run.envelope;
+  EXPECT_EQ(IdentifierStatedFor(run.envelope, "key_method"), kProvidedCipher)
+      << run.envelope;
+  EXPECT_FALSE(Holds(run.envelope, kSealedDesign)) << run.envelope;
 }
 
-// A signed region naming no identifier at all still gets one on its envelope,
-// and it is the cipher the blocks are under. That is what leaves §34.5.24.2's
-// last rule answerable: a reader is told which algorithm to decrypt the key
-// block with, where before it was told whichever algorithm the author named or
-// nothing.
-TEST(ProtectKeyMethodDescription, ASignedEnvelopeStatesTheCipherItsBlocksUse) {
-  EXPECT_TRUE(Holds(SignedEnvelope(""), Writes("key_method", kProvidedCipher)));
+// §34.5.24.2 is about the keys that get encrypted, and the region below has
+// none of them encrypted: its data name reaches a key the tool holds, so it is
+// sealed under that key directly and no key block is written for it. The cipher
+// it named describes nothing, so it is neither honoured nor refused, and the
+// envelope states no identifier for this keyword at all.
+TEST(ProtectKeyMethodEncryptionInput,
+     ARegionWhoseKeysTravelInNoBlockStatesNoCipherForThem) {
+  AuthorsRun run(DirectRegion(Writes("key_method", kUnblockedCipher)),
+                 TheDirectEntitysKey());
+  EXPECT_FALSE(run.diag.HasErrors()) << run.envelope;
+  EXPECT_EQ(TimesWritten(run.envelope, kKeyBlockLine), 0U) << run.envelope;
+  EXPECT_FALSE(Holds(run.envelope, kKeyMethodDirective)) << run.envelope;
+  EXPECT_FALSE(Holds(run.envelope, kSealedDesign)) << run.envelope;
 }
 
 }  // namespace

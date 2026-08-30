@@ -8,6 +8,7 @@
 #include "preprocessor/protect_digest_key.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_key_block.h"
+#include "preprocessor/protect_key_method.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
 
@@ -221,8 +222,18 @@ void AppendClearKeyNames(const EncryptionEnvelope& envelope,
   // reader has to have it in hand by the time a block is reached. A region
   // whose keys travel in no block has none of them encrypted, so no cipher
   // describes anything and none is stated.
+  //
+  // It is written as the string §34.5.24.1 spells the expression with rather
+  // than through ProtectKeyMethodDirective, which writes a value as the source
+  // spelled it and is for carrying an author's pragma_value back out unchanged.
+  // The value here is this file's own identifier rather than anything a source
+  // wrote, and written bare it would be no pragma_value at all: §22.5.1 admits
+  // a simple identifier, and x-deltahdl-stream holds a character that ends one,
+  // so every envelope would carry a line Preprocessor::HandlePragma reports as
+  // an illegal token.
   if (signed_envelope) {
-    text->append(ProtectKeyMethodDirective(kDataMethod));
+    text->append("`pragma protect ").append(kKeyMethodKeyword).append("=\"");
+    text->append(kDataMethod).append("\"\n");
   }
   // §34.5.25 has the name of the key a region's own keys are under written as
   // cleartext as well. It is the name a reader combines with the entity beside
