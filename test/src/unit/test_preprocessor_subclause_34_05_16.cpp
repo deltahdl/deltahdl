@@ -580,15 +580,29 @@ TEST(ProtectDigestKeyownerEncryptionOutput, ARegionThatNamedNoneGetsNone) {
 }
 
 // A directive standing ahead of a region is outside the envelope, and the
-// characters outside an envelope come back exactly as they were written. So the
-// name appears once in what the tool wrote: once where the input put it, and
-// nowhere else.
-TEST(ProtectDigestKeyownerEncryptionOutput, ANameAheadOfTheRegionIsCopiedOnce) {
+// characters outside an envelope come back exactly as they were written. The
+// envelope states the name as well, so it stands twice in what the tool wrote.
+//
+// Both are needed and neither is the other. The copy outside is §34.5.16.2
+// asking for the name unchanged in the output file, the reading having taken it
+// where the author wrote it. The copy inside is §34.5.1.2 asking that
+// "protected envelopes should be completely self-contained to avoid any
+// undesired interaction when multiple encrypted models exist in the decryption
+// input stream": §34.5.31 has the reset each envelope ends with put the
+// keywords back to their defaults, so an envelope leaning on the copy outside
+// would be read under it once and every envelope after it under nothing.
+// Issue #3275 is the defect that left, and this case asserted the state it left
+// behind.
+TEST(ProtectDigestKeyownerEncryptionOutput, ANameAheadOfTheRegionStandsTwice) {
   std::string named = Writes("digest_keyowner", kDigestOwner);
   std::string encrypted =
       Encrypted(named + Region(std::string(), kSealedDesign));
   EXPECT_EQ(encrypted.find(kSealedDesign), std::string::npos);
-  EXPECT_EQ(Occurrences(encrypted, named), 1U);
+  EXPECT_EQ(Occurrences(encrypted, named), 2U);
+  // The one the author wrote stands ahead of the envelope, which is where the
+  // reading found it, so the envelope's own copy is the second of the two.
+  EXPECT_LT(encrypted.find(named),
+            encrypted.find("`pragma protect begin_protected\n"));
 }
 
 // A region naming the provider of its digest's key and the name of that key

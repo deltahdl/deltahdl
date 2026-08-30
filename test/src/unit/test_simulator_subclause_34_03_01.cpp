@@ -51,12 +51,25 @@ PreprocConfig KeyConfig(std::string_view key) {
 struct SpecifiedDesignRun {
   SimFixture f;
   Preprocessor pp;
+  // The envelope the encrypting half produced, kept because a report about a
+  // block stands at a line of this rather than of the source: §34.5.15.2 puts
+  // the block on the line beneath the keyword announcing it, and how many lines
+  // the envelope writes ahead of that keyword is the encrypting half's business
+  // rather than something a case should count.
+  std::string written;
   uint64_t result = 0;
 
   SpecifiedDesignRun(const std::string& src, std::string_view key)
-      : pp(f.mgr, f.diag, KeyConfig(key)) {
-    auto fid = f.mgr.AddFile("<test>", EncryptEnvelopes(src, kExchangeKey));
+      : pp(f.mgr, f.diag, KeyConfig(key)),
+        written(EncryptEnvelopes(src, kExchangeKey)) {
+    auto fid = f.mgr.AddFile("<test>", written);
     result = RunPreprocessedSim(f, fid, "result", pp);
+  }
+
+  // The line the produced envelope's block stands on, which is the line beneath
+  // the expression announcing it.
+  uint32_t BlockLine() const {
+    return LineHolding(written, "`pragma protect data_block\n") + 1;
   }
 };
 
@@ -119,8 +132,8 @@ TEST(EnvelopeEncryptionSimulation, ASpecifiedEnvelopeStaysSealedUnderAnother) {
       kOtherKey);
   EXPECT_TRUE(ReportedError(
       run.f.diag.Diagnostics(),
-      "protect pragma data block cannot be decrypted with the key supplied", 10,
-      "34.3.2"));
+      "protect pragma data block cannot be decrypted with the key supplied",
+      run.BlockLine(), "34.3.2"));
   EXPECT_EQ(run.result, 1U);
 }
 
