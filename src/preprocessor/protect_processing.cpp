@@ -346,29 +346,33 @@ std::string ClosedRegionText(const ReadRegion& region,
   // stream unchanged where it stands, and lifting it into the envelope as well
   // would write it out twice.
   envelope.comment_directives = region.written_inside.comment_directives;
-  envelope.names = region.written_inside.names;
-  // §34.5.13 asks for this one designation in each protected block it was used
-  // for, so it is taken from what stands in effect where the region closes
-  // rather than from what the region wrote between its own delimiters.
+  // Everything a reader needs to open this envelope's blocks is taken from what
+  // stands in effect where the region closes rather than from what the region
+  // wrote between its own delimiters. §34.4 makes the scope of a protect pragma
+  // keyword lexical, so a value written ahead of the region is as much this
+  // region's as one written inside it, and an envelope stating it is stating
+  // what was in effect where it was written.
   //
-  // The two differ where an expression ahead of the region designated the key,
-  // which §34.4's lexical scope makes as much this region's designation as one
-  // written inside it. Left to what the region restated, such a block would say
-  // nothing about the key that opens it: a reader reaching the envelope on its
-  // own, or reaching it after the keywords have been put back to their
-  // defaults, would have nowhere to learn the designation from. The names
-  // beside it are governed by subclauses that ask only for their values
-  // unchanged in the output, so they are left as they were.
-  envelope.names.data_public_key = in_effect.names.data_public_key;
-  // §34.5.19 asks the same of the designation a region wrote for its digest's
-  // key, and for the same reason: a block relying on a designation made ahead
-  // of the region would say nothing about the key its digest is under, so a
-  // reader reaching the envelope on its own would have nowhere to learn it
-  // from.
-  envelope.names.digest_public_key = in_effect.names.digest_public_key;
-  envelope.digest_method = region.written_inside.digest_method;
-  envelope.digest_key_method = region.written_inside.digest_key_method;
-  envelope.key_method = region.written_inside.key_method;
+  // §34.5.1.2 asks for exactly this: "protected envelopes should be completely
+  // self-contained to avoid any undesired interaction when multiple encrypted
+  // models exist in the decryption input stream". An envelope left to what its
+  // region restated relies on text standing ahead of it, and §34.5.31 has the
+  // reset every envelope ends with put the keywords back to their defaults, so
+  // the second envelope of a text stating a value once would be read under
+  // nothing: the value it needed was taken away by the envelope before it.
+  // #3255 covers the reset, which does not yet do what §34.5.31 defines, and
+  // #3275 is this.
+  //
+  // The three the region restates instead are the three whose subclauses ask
+  // for what the encryption envelope itself held: §34.5.5's author, §34.5.6's
+  // author_info and §34.5.30's comment. Each has its own treatment for a value
+  // written outside the region -- it is copied into the output stream unchanged
+  // where it stands -- and none of the three is anything a block is opened
+  // with.
+  envelope.names = in_effect.names;
+  envelope.digest_method = in_effect.digest_method;
+  envelope.digest_key_method = in_effect.digest_key_method;
+  envelope.key_method = in_effect.key_method;
   envelope.requested_encoding = region.written_inside.encoding;
   return DecryptionEnvelopeText(envelope, how);
 }

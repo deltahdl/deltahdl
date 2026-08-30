@@ -28,6 +28,26 @@
 // arbitrary comment text the subclause permits a tool to pad the input with is
 // a permission rather than an obligation, and this implementation adds none.
 //
+// ENCRYPTION OUTPUT, continued: what the envelope has to state is what stood in
+// effect where the region closed, rather than what the region restated between
+// its own delimiters. §34.5.1.2 asks for it outright -- "protected envelopes
+// should be completely self-contained to avoid any undesired interaction when
+// multiple encrypted models exist in the decryption input stream". §34.4 makes
+// the scope of a protect pragma keyword lexical, so a value written ahead of a
+// region is that region's as much as one written inside it, and §34.5.31's
+// reset, which src/preprocessor/protect_envelope_output.cpp writes at the end
+// of every envelope, puts the keywords back to their defaults. A text stating a
+// value once ahead of two regions would therefore leave the second envelope
+// with nothing to be read under, were that envelope to rely on the text ahead
+// of it. Issue #3275 is the envelope that did. The cases below state a value
+// once ahead of two regions and read both envelopes for it.
+//
+// Three expressions are excepted, and the fourth case holds the rule to them:
+// §34.5.5's author, §34.5.6's author_info and §34.5.30's comment. §34.5.5.2 has
+// an author written outside a region copied into the output stream unchanged
+// where it stands, so an envelope carrying one as well would write it out
+// twice.
+//
 // DECRYPTION INPUT: none. The expression asks for nothing on that side, so a
 // text carrying one is decrypted exactly as the same text without it would be.
 //
@@ -92,6 +112,25 @@ constexpr std::string_view kKeyProviderKey = "aegis-custody-wrapping-key";
 constexpr std::string_view kSecondProvider = "borealis-trust";
 constexpr std::string_view kSecondProviderKeyName = "wrapping-2027";
 constexpr std::string_view kSecondProviderKey = "borealis-trust-wrapping-key";
+
+// The entity whose keys a region's data are under, as §34.5.10 names one, and
+// the name picking one of that entity's keys out, as §34.5.12 writes one. No
+// key is supplied under either: what the pair is here for is a designation an
+// envelope has to carry, and §34.5.10 selects a key with it only among keys a
+// user supplied under names.
+constexpr std::string_view kDataKeyOwner = "meridian-ip";
+constexpr std::string_view kDataKeyName = "sealing-2026";
+
+// The identifier §34.5.21 names the algorithm a region's digests are computed
+// with. It is one of the two Table 34-4 marks required, and it is the one that
+// is not kDefaultDigestMethod in src/preprocessor/protect_digest.h: an envelope
+// stating the default states nothing a tool writing the default unasked would
+// not have written anyway.
+constexpr std::string_view kDigestAlgorithm = "md5";
+
+// The name §34.5.5 writes for whoever wrote a design.
+constexpr std::string_view kDesignAuthor = "Acme Corp";
+
 // One protect pragma expression with a value written against it, as a directive
 // of its own.
 std::string Writes(std::string_view keyword, std::string_view value) {
@@ -127,6 +166,50 @@ std::string DataBlockOf(const std::string& written) {
 // Envelope encryption over a source text under the author's key.
 std::string Encrypted(const std::string& src) {
   return EncryptEnvelopes(src, kAuthorKey);
+}
+
+// A text writing `ahead` once and then two regions, each writing `described`
+// between its own delimiters and sealing a design of its own.
+//
+// Two regions rather than one, because a rule about what every envelope states
+// is not observed by reading one envelope. Two designs rather than one, because
+// two regions sealing the same characters leave two envelopes there is nothing
+// to tell apart.
+std::string TwoSealedModels(std::string_view ahead,
+                            std::string_view described) {
+  std::string src(ahead);
+  src += Region(described, "  int first = 1;\n");
+  src += Region(described, "  int second = 2;\n");
+  return src;
+}
+
+// The word §34.5.3 defines, which is where the envelope standing in a region's
+// place opens. A text sealing two regions writes it twice, so it is also where
+// such a text is cut in two.
+constexpr std::string_view kEnvelopeOpening = "`pragma protect begin_protected";
+
+// The two envelopes such a text leaves, each cut out at the word opening it:
+// the first runs from its own opening to the second's, and the second runs to
+// the end of the text.
+//
+// Cutting is what makes the reading say anything. Text outside every envelope
+// is carried across as the bytes the source wrote, so a directive written ahead
+// of the regions is still standing in the output, and a search of the whole
+// text would find it and take it for one an envelope stated.
+struct WrittenEnvelopes {
+  std::string first;
+  std::string second;
+};
+
+WrittenEnvelopes EnvelopesOf(const std::string& written) {
+  size_t first = written.find(kEnvelopeOpening);
+  EXPECT_NE(first, std::string::npos);
+  if (first == std::string::npos) return {};
+  size_t second =
+      written.find(kEnvelopeOpening, first + kEnvelopeOpening.size());
+  EXPECT_NE(second, std::string::npos);
+  if (second == std::string::npos) return {};
+  return {written.substr(first, second - first), written.substr(second)};
 }
 
 // The same, with the reports the reading made about the input kept beside the
@@ -616,6 +699,83 @@ TEST(ProtectBeginEncryptionOutput, TwoWrittenEnvelopesInOneStreamBothOpen) {
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, "int a = 1;"));
   EXPECT_TRUE(Holds(run.text, "int b = 2;"));
+}
+
+// ---------------------------------------------------------------------------
+// ENCRYPTION OUTPUT: an envelope states what stood in effect over its region.
+// ---------------------------------------------------------------------------
+
+// §34.5.21's identifier written once, ahead of two regions, and read back off
+// both envelopes. §34.4 makes the scope of the keyword lexical, so the
+// identifier is in effect where each of the two regions closes and each of the
+// two envelopes is one that was written under it.
+//
+// The second envelope is what the case is for. §34.5.1.2 has a protected
+// envelope completely self-contained, and §34.5.31's reset closing the first
+// envelope puts the keywords back to their defaults, so a second envelope that
+// stated nothing would be read under kDefaultDigestMethod in
+// src/preprocessor/protect_digest.h rather than under what the author wrote.
+TEST(ProtectBeginEncryptionOutput, EachEnvelopeStatesTheDigestMethodInEffect) {
+  std::string stated = Writes("digest_method", kDigestAlgorithm);
+  WrittenEnvelopes written =
+      EnvelopesOf(Encrypted(TwoSealedModels(stated, "")));
+  EXPECT_TRUE(Holds(written.first, stated));
+  EXPECT_TRUE(Holds(written.second, stated));
+}
+
+// The same shape for the designation §34.5.10 and §34.5.12 write between them,
+// which is what a reader picks the key of a block out by. An envelope stating
+// no designation at all leaves a reader holding a list of keys with nothing to
+// select one with, so this is the rule at its most consequential: the value is
+// not a description of the envelope but the way into it.
+TEST(ProtectBeginEncryptionOutput, EachEnvelopeCarriesTheKeyNamesInEffect) {
+  std::string owner = Writes("data_keyowner", kDataKeyOwner);
+  std::string named = Writes("data_keyname", kDataKeyName);
+  WrittenEnvelopes written =
+      EnvelopesOf(Encrypted(TwoSealedModels(owner + named, "")));
+  EXPECT_TRUE(Holds(written.first, owner));
+  EXPECT_TRUE(Holds(written.first, named));
+  EXPECT_TRUE(Holds(written.second, owner));
+  EXPECT_TRUE(Holds(written.second, named));
+}
+
+// The two cases above read against the arrangement they are a generalization
+// of, and against the arrangement they say nothing about. Written between each
+// region's own delimiters the identifier is stated by both envelopes, which is
+// the ordinary way an author asks for it; written nowhere at all it is stated
+// by neither.
+//
+// The second half is what keeps the first two honest. A tool writing the
+// identifier into every envelope it produces, whether or not anything asked for
+// one, satisfies every assertion above, and this is the reading that turns such
+// a tool away.
+TEST(ProtectBeginEncryptionOutput, ADigestMethodIsStatedOnlyWhereOneIsAsked) {
+  std::string stated = Writes("digest_method", kDigestAlgorithm);
+  WrittenEnvelopes inside = EnvelopesOf(Encrypted(TwoSealedModels("", stated)));
+  WrittenEnvelopes neither = EnvelopesOf(Encrypted(TwoSealedModels("", "")));
+  EXPECT_TRUE(Holds(inside.first, stated));
+  EXPECT_TRUE(Holds(inside.second, stated));
+  EXPECT_FALSE(Holds(neither.first, "`pragma protect digest_method"));
+  EXPECT_FALSE(Holds(neither.second, "`pragma protect digest_method"));
+}
+
+// The expression the rule stops at, and the reason it stops there. §34.5.5.2
+// has an author written outside a region copied into the output stream
+// unchanged where it stands, so the name is already in the text an envelope was
+// written into; an envelope lifting it in as well would write it out twice.
+//
+// The name is written once ahead of both regions and it stands once in what
+// comes back -- the line the source wrote -- with neither envelope carrying one
+// of its own. §34.5.6's author_info and §34.5.30's comment are excepted for the
+// same reason and are not read here, this subclause's rule being about what an
+// envelope generates between its delimiters rather than about those three.
+TEST(ProtectBeginEncryptionOutput, NoEnvelopeCarriesAnAuthorWrittenAhead) {
+  std::string written =
+      Encrypted(TwoSealedModels(Writes("author", kDesignAuthor), ""));
+  WrittenEnvelopes envelopes = EnvelopesOf(written);
+  EXPECT_EQ(TimesWritten(written, "`pragma protect author="), 1U);
+  EXPECT_FALSE(Holds(envelopes.first, "`pragma protect author="));
+  EXPECT_FALSE(Holds(envelopes.second, "`pragma protect author="));
 }
 
 // ---------------------------------------------------------------------------
