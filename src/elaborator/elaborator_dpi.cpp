@@ -209,15 +209,15 @@ TypedefMap DpiScopeTypedefs(const std::vector<ModuleItem*>& items,
   return typedefs;
 }
 
-// §35.5.6: follow a formal argument's type name to the type it stands for, so
-// the clause's permitted set is applied to that type rather than to the name.
-// A built-in keyword wins over a table entry, and a name that resolves to
-// another name is followed in turn, under a depth bound because a typedef table
-// built from erroneous source can cycle. Returns the type reached, which is the
-// argument's own type when nothing resolved -- the prevailing treatment of an
-// unresolved name is to stay silent about it.
-DataType ResolveDpiFormalType(const DataType& type,
-                              const TypedefMap& typedefs) {
+// Follow a type name to the type it stands for, so that the permitted set
+// §35.5.5 gives a function result and the one §35.5.6 gives a formal argument
+// are applied to that type rather than to the name. A built-in keyword wins
+// over a table entry, and a name that resolves to another name is followed in
+// turn, under a depth bound because a typedef table built from erroneous source
+// can cycle. Returns the type reached, which is the type passed in when nothing
+// resolved -- the prevailing treatment of an unresolved name is to stay silent
+// about it.
+DataType ResolveDpiTypeName(const DataType& type, const TypedefMap& typedefs) {
   DataType dt = type;
   for (int depth = 0; depth < 16 && dt.kind == DataTypeKind::kNamed; ++depth) {
     DataType builtin = TypeNameToDataType(dt.type_name);
@@ -239,12 +239,36 @@ DataType ResolveDpiFormalType(const DataType& type,
 // name that does not resolve is left alone. The report names the typedef the
 // source wrote, which is what a reader has in front of them, and one import
 // reports once however many of its formals are at fault.
+// §35.5.5: an imported function's result written as a typedef name is
+// permitted only where the type behind the name is. The parser holds such a
+// result as a kNamed type and has no typedef table to look it up in, so
+// ValidateDpiResultType in src/parser/parser_dpi_validate.cpp passes it and the
+// rule is enforced here, over the names the enclosing scope resolves. A name
+// that does not resolve is left alone. The report names the typedef the source
+// wrote, which is what a reader has in front of them.
+void CheckImportResultTypedefType(const ModuleItem* item,
+                                  const TypedefMap& typedefs,
+                                  DiagEngine& diag) {
+  if (item->dpi_is_task) return;
+  if (item->return_type.kind != DataTypeKind::kNamed) return;
+  DataType resolved = ResolveDpiTypeName(item->return_type, typedefs);
+  if (resolved.kind == DataTypeKind::kNamed) return;
+  if (IsPermittedDpiResultType(resolved)) return;
+  diag.Error(
+      item->loc,
+      std::format("imported function '{}' has result type '{}', which is not "
+                  "permitted for DPI; function results are restricted to small "
+                  "values",
+                  item->name, item->return_type.type_name),
+      Subclause("35.5.5"));
+}
+
 void CheckImportFormalTypedefTypes(const ModuleItem* item,
                                    const TypedefMap& typedefs,
                                    DiagEngine& diag) {
   for (const auto& arg : item->func_args) {
     if (arg.data_type.kind != DataTypeKind::kNamed) continue;
-    DataType resolved = ResolveDpiFormalType(arg.data_type, typedefs);
+    DataType resolved = ResolveDpiTypeName(arg.data_type, typedefs);
     if (resolved.kind == DataTypeKind::kNamed) continue;
     DpiFormalTypeVerdict verdict = ClassifyDpiFormalType(resolved);
     if (verdict == DpiFormalTypeVerdict::kPermitted) continue;
@@ -279,7 +303,7 @@ void CheckExportFormalTypes(const ModuleItem* callable, const ModuleItem* item,
                             const TypedefMap& typedefs, DiagEngine& diag) {
   for (const auto& arg : callable->func_args) {
     DpiFormalTypeVerdict verdict =
-        ClassifyDpiFormalType(ResolveDpiFormalType(arg.data_type, typedefs));
+        ClassifyDpiFormalType(ResolveDpiTypeName(arg.data_type, typedefs));
     if (verdict == DpiFormalTypeVerdict::kPermitted) continue;
     if (verdict == DpiFormalTypeVerdict::kUnpackedUnion) {
       diag.Error(
@@ -307,9 +331,10 @@ void CheckExportFormalTypes(const ModuleItem* callable, const ModuleItem* item,
 // only when the exported routine is a function and its message needs no word
 // taken from the declaration.
 void CheckExportResultType(const ModuleItem* callable, const ModuleItem* item,
-                           DiagEngine& diag) {
+                           const TypedefMap& typedefs, DiagEngine& diag) {
   if (callable->kind == ModuleItemKind::kFunctionDecl &&
-      !IsPermittedDpiResultType(callable->return_type)) {
+      !IsPermittedDpiResultType(
+          ResolveDpiTypeName(callable->return_type, typedefs))) {
     diag.Error(item->loc,
                std::format("exported function '{}' has a result type that is "
                            "not permitted for DPI; function results are "
@@ -455,7 +480,7 @@ void ValidateExportDeclaration(
   CheckExportRefArguments(callable, item, diag);
   CheckExportDynamicArrayArguments(callable, item, diag);
   CheckExportFormalTypes(callable, item, scope.typedefs, diag);
-  CheckExportResultType(callable, item, diag);
+  CheckExportResultType(callable, item, scope.typedefs, diag);
   CheckExportSignatureEquivalence(callable, link_name, item, export_signatures,
                                   diag);
 }
@@ -556,6 +581,7 @@ void ProcessDpiGlobalNameItem(const ModuleItem* item, ExportScopeContext& scope,
 
   if (item->kind == ModuleItemKind::kDpiImport) {
     CheckImportFormalTypedefTypes(item, scope.typedefs, diag);
+    CheckImportResultTypedefType(item, scope.typedefs, diag);
   }
 
   CheckDpiVersionStringAgreement(item, link_name, global.link_version, diag);
