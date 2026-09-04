@@ -60,7 +60,7 @@ TEST(PureDpiImportRestrictions, PureFunctionRejectsInoutArgument) {
 
 TEST(PureDpiImportRestrictions, PureCannotApplyToImportedTask) {
   // §35.5.2 says pure applies to nonvoid functions; an imported task can
-  // never be pure. Two sites reject this source: parser_port.cpp:630 under
+  // never be pure. Two sites reject this source: parser_dpi.cpp under
   // §35.5.4 with "an imported task cannot be declared pure", and
   // elaborator_dpi.cpp:23 under §35.5.2 with "imported task cannot be declared
   // pure", which is a substring of the parser's message. This case is about the
@@ -109,7 +109,7 @@ TEST(PureDpiImportRestrictions, PureFunctionRejectsLateOutputArgument) {
 }
 
 // The two cases below read the elaborator's report over a pure imported task,
-// and parser_port.cpp:627 rejects the same source with "an imported task cannot
+// and parser_dpi.cpp rejects the same source with "an imported task cannot
 // be declared pure" under §35.5.4, whose message contains the elaborator's. The
 // subclause each case names is what tells the two apart, since a search on the
 // message alone answers with the parser's report first.

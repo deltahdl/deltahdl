@@ -399,19 +399,24 @@ TEST(FunctionDeclParsing, DpiSpecStringInvalidIsError) {
       "DPI specification string must be \"DPI-C\" or \"DPI\"", 2, "35.5.4"));
 }
 
+// §35.5.4: "Use of the string "DPI" shall generate a compile-time warning or
+// error. The tool-generated message shall contain the following information",
+// and it then lists two items: that "DPI" is deprecated and should be replaced
+// with "DPI-C", and that use of the "DPI-C" string may require changes in the
+// DPI application's C code. Both items are the requirement, so the report is
+// named by its whole sentence. A warning count is satisfied by any warning the
+// run happened to write, including one about something else entirely.
 TEST(FunctionDeclParsing, DpiDeprecatedStringWarnsButParses) {
-  SourceManager mgr;
-  Arena arena;
-  auto fid = mgr.AddFile("<test>",
-                         "module m;\n"
-                         "  import \"DPI\" function void foo();\n"
-                         "endmodule\n");
-  DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  parser.Parse();
-  EXPECT_FALSE(diag.HasErrors());
-  EXPECT_GT(diag.WarningCount(), 0u);
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI\" function void foo();\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(ReportedWarning(
+      r.diags,
+      "\"DPI\" is deprecated and should be replaced with \"DPI-C\"; use of the "
+      "\"DPI-C\" string may require changes in the DPI application's C code",
+      2, "35.5.4"));
 }
 
 TEST(FunctionDeclParsing, DpiCanonicalStringEmitsNoWarning) {
@@ -486,7 +491,7 @@ TEST(FunctionDeclParsing, DpiExportCIdentifierWithDollarIsError) {
 // Syntax 35-1 in §35.5.4 writes every import declaration with `task` or
 // `function` after the optional properties, so an import naming neither
 // breaches §35.5.4. The report Parser::ParseDpiImport in
-// src/parser/parser_port.cpp writes for it names `function`. The first report
+// src/parser/parser_dpi.cpp writes for it names `function`. The first report
 // is this one: it is written before the parser goes on to read what follows as
 // a return type and a name.
 TEST(FunctionDeclParsing, DpiImportMissingFunctionKeywordNames35_5_4) {
@@ -495,6 +500,182 @@ TEST(FunctionDeclParsing, DpiImportMissingFunctionKeywordNames35_5_4) {
       "  import \"DPI-C\" foo(input int x);\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedError(r.diags, "expected 'function'", 2, "35.5.4"));
+}
+
+// §35.5.4 attaches the deprecation to the dpi_spec_string itself, and both
+// export alternatives of dpi_import_export in Syntax 35-1 are written with
+// that same dpi_spec_string, so an export naming "DPI" draws the same report
+// as an import does.
+TEST(FunctionDeclParsing, DpiExportDeprecatedStringWarns) {
+  auto r = Parse(
+      "module m;\n"
+      "  export \"DPI\" function f;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(ReportedWarning(
+      r.diags,
+      "\"DPI\" is deprecated and should be replaced with \"DPI-C\"; use of the "
+      "\"DPI-C\" string may require changes in the DPI application's C code",
+      2, "35.5.4"));
+}
+
+// §35.5.4: "If not provided, this defaults to the same identifier as the
+// SystemVerilog subroutine name. In either case, this linkage name shall
+// conform to C identifier syntax. An error shall occur if the c_identifier,
+// either directly or indirectly, does not conform to these rules." §5.6 admits
+// '$' after the first character of a simple identifier, so `foo$bar` is one
+// SystemVerilog identifier; standing in for an absent c_identifier it is the
+// linkage name, and it is the indirect breach the clause names.
+TEST(FunctionDeclParsing, DpiImportDefaultedLinkageNameWithDollarIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function void foo$bar();\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "DPI linkage name 'foo$bar', defaulted from the "
+                            "subroutine name, must match "
+                            "[a-zA-Z_][a-zA-Z0-9_]*",
+                            2, "35.5.4"));
+}
+
+// §35.5.4 states the c_identifier rule once for the whole of
+// dpi_import_export, and both export alternatives in Syntax 35-1 write the
+// c_identifier as optional, so an export that omits it defaults its linkage
+// name from the exported subroutine's name and is held to the same rule.
+TEST(FunctionDeclParsing, DpiExportDefaultedLinkageNameWithDollarIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  export \"DPI-C\" function foo$bar;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "DPI linkage name 'foo$bar', defaulted from the "
+                            "subroutine name, must match "
+                            "[a-zA-Z_][a-zA-Z0-9_]*",
+                            2, "35.5.4"));
+}
+
+// §35.5.4: "An error shall occur if the c_identifier, either directly or
+// indirectly, does not conform to these rules." An escaped identifier is the
+// other way a subroutine name reaches characters C forbids: §5.6.1 has
+// LexEscapedIdentifier in src/lexer/lexer.cpp drop the leading backslash and
+// the terminating white space, so the name recorded here is `my-task`, and the
+// hyphen in it is what the rule rejects.
+TEST(FunctionDeclParsing, DpiImportDefaultedLinkageNameFromEscapedNameIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function void \\my-task ();\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "DPI linkage name 'my-task', defaulted from the "
+                            "subroutine name, must match "
+                            "[a-zA-Z_][a-zA-Z0-9_]*",
+                            2, "35.5.4"));
+}
+
+// §35.5.4: "The c_identifier provides the linkage name for this subroutine in
+// the foreign language." The rule is about that linkage name and not about the
+// SystemVerilog subroutine name, so a c_identifier written out conforms on its
+// own and the SystemVerilog name beside it is free to hold a '$' §5.6 allows.
+TEST(FunctionDeclParsing, DpiImportExplicitCIdentifierLeavesSvNameFree) {
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" foo_c = function void foo$bar();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->dpi_c_name, "foo_c");
+  EXPECT_EQ(item->name, "foo$bar");
+}
+
+// Footnote 25 of Syntax 35-1 in §35.5.4: "The dynamic_override_specifiers
+// shall only be legal on method declarations inside a non-interface class
+// scope." An import declaration declares no class method, so `:initial` on one
+// is illegal wherever the import is written.
+TEST(FunctionDeclParsing, DpiImportFunctionDynamicOverrideSpecifierIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function :initial void f();\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "dynamic_override_specifiers shall only be legal "
+                            "on method declarations inside a non-interface "
+                            "class scope",
+                            2, "35.5.4"));
+}
+
+// Footnote 25 of Syntax 35-1 in §35.5.4 governs the task form as well:
+// task_prototype is written "task [ dynamic_override_specifiers ]
+// task_identifier", carrying the same footnote, and an imported task is no
+// more a class method declaration than an imported function is.
+TEST(FunctionDeclParsing, DpiImportTaskDynamicOverrideSpecifierIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" task :final t();\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "dynamic_override_specifiers shall only be legal "
+                            "on method declarations inside a non-interface "
+                            "class scope",
+                            2, "35.5.4"));
+}
+
+// §35.5.4: "Formal argument names are optional unless argument binding by name
+// is needed." Neither formal below is named, and the import is still a
+// complete declaration of two arguments.
+TEST(FunctionDeclParsing, DpiImportUnnamedFormalsAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function void f(input int, output bit [7:0]);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 2u);
+  EXPECT_TRUE(item->func_args[0].name.empty());
+  EXPECT_TRUE(item->func_args[1].name.empty());
+}
+
+// §35.5.4: "A formal argument name is required to separate the packed and the
+// unpacked dimensions of an array." The name `a` stands between the two
+// bracket groups, so `[7:0]` closes the packed part of the type and `[0:3]`
+// opens the unpacked part. The two ranges differ, so a formal that took both
+// groups into one part could not report one packed and one unpacked dimension.
+TEST(FunctionDeclParsing, DpiImportNamedFormalSeparatesPackedFromUnpacked) {
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function void f(input bit [7:0] a [0:3]);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 1u);
+  const auto& arg = item->func_args[0];
+  EXPECT_EQ(arg.name, "a");
+  EXPECT_NE(arg.data_type.packed_dim_left, nullptr);
+  EXPECT_TRUE(arg.data_type.extra_packed_dims.empty());
+  ASSERT_EQ(arg.unpacked_dims.size(), 1u);
+  EXPECT_NE(arg.unpacked_dims[0], nullptr);
+}
+
+// §35.5.4 requires the name because the name is the only separator there is:
+// with it left out of the same declaration, nothing stands between the two
+// bracket groups and both belong to the packed part of the type. This is the
+// reading that makes the sentence quoted above true.
+TEST(FunctionDeclParsing, DpiImportUnnamedFormalKeepsBothGroupsPacked) {
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function void f(input bit [7:0] [0:3]);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 1u);
+  const auto& arg = item->func_args[0];
+  EXPECT_TRUE(arg.name.empty());
+  EXPECT_NE(arg.data_type.packed_dim_left, nullptr);
+  ASSERT_EQ(arg.data_type.extra_packed_dims.size(), 1u);
+  EXPECT_TRUE(arg.unpacked_dims.empty());
 }
 
 }  // namespace

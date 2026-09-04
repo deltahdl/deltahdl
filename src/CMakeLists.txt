@@ -53,6 +53,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/parser.cpp
     parser/parser_timeunit.cpp
     parser/parser_port.cpp
+    parser/parser_dpi.cpp
     parser/parser_dpi_validate.cpp
     parser/parser_declaration.cpp
     parser/parser_types.cpp
@@ -263,6 +264,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_decls.cpp
     elaborator/elaborator_decls_var.cpp
     elaborator/elaborator_dpi.cpp
+    elaborator/elaborator_dpi_signature.cpp
     elaborator/elaborator_generate.cpp
     elaborator/elaborator_generate_naming.cpp
     elaborator/elaborator_module_inst.cpp

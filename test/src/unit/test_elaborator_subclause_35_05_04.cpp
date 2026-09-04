@@ -87,8 +87,8 @@ TEST(DpiDeclElab, PureVsContextDifferenceUnderSameLinkageIsError) {
   // The qualifier precedes the c_identifier: §35.5.4 gives
   // `import "DPI-C" pure function real sin(real);` and
   // `import "DPI-C" newQueue=function chandle newAnonQueue(...);` on printed
-  // page 978, and Parser::ParseDpiImport in src/parser/parser_port.cpp reads
-  // pure/context before ParserPortHelpers::TryParseDpiCName. Written the other
+  // page 978, and Parser::ParseDpiImport in src/parser/parser_dpi.cpp reads
+  // pure/context before ParserDpiHelpers::TryParseDpiCName. Written the other
   // way round the source does not parse, and the signature rule is never
   // reached.
   ElabFixture f;
@@ -108,6 +108,12 @@ TEST(DpiDeclElab, PureVsContextDifferenceUnderSameLinkageIsError) {
 }
 
 TEST(DpiDeclElab, MatchingSignatureUnderSameLinkageOk) {
+  // The two declarations agree in every component the signature holds, and
+  // they differ in the one thing outside it: the name of the formal, 'x' in
+  // one and 'y' in the other. §35.5.4 licenses exactly that difference: "It is
+  // permitted to have multiple declarations of the same imported or exported
+  // subroutine in different scopes; therefore, argument names and default
+  // values can vary, provided the type compatibility constraints are met."
   ElabFixture f;
   Elaborate(R"(
     module m;
@@ -115,6 +121,25 @@ TEST(DpiDeclElab, MatchingSignatureUnderSameLinkageOk) {
     endmodule
     module n;
       import "DPI-C" link = function int g(input int y);
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §35.5.4: "It is permitted to have multiple declarations of the same imported
+// or exported subroutine in different scopes; therefore, argument names and
+// default values can vary, provided the type compatibility constraints are
+// met." A default value is no part of the type signature the clause
+// enumerates, so two declarations differing in nothing else are both accepted.
+TEST(DpiDeclElab, DifferingDefaultValuesUnderSameLinkageOk) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      import "DPI-C" link = function int f(input int x = 1);
+    endmodule
+    module n;
+      import "DPI-C" link = function int g(input int x = 2);
     endmodule
   )",
             f, "m");
@@ -167,6 +192,110 @@ TEST(DpiDeclElab, SignatureArgDirectionMismatchUnderSameLinkageIsError) {
     endmodule
     module n;
       import "DPI-C" link = function void g(output int x);
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI declaration of linkage name 'link' disagrees "
+                            "with the earlier declaration's type signature",
+                            6, "35.5.4"));
+}
+
+// §35.5.4: "The type includes dimensions and bounds of any arrays or array
+// dimensions." Two packed dimensions of different widths are two types, and
+// the declarations below agree in every other component of the signature, so
+// the packed bounds are what this rejection rests on.
+TEST(DpiDeclElab, SignaturePackedBoundsMismatchUnderSameLinkageIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      import "DPI-C" link = function int f(input bit [7:0] a);
+    endmodule
+    module n;
+      import "DPI-C" link = function int g(input bit [15:0] a);
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI declaration of linkage name 'link' disagrees "
+                            "with the earlier declaration's type signature",
+                            6, "35.5.4"));
+}
+
+// §35.5.4: "The type includes dimensions and bounds of any arrays or array
+// dimensions." The sentence names the bounds and not the width, so [0:7] and
+// [7:0] are two types although each is eight bits wide.
+TEST(DpiDeclElab, SignaturePackedBoundsReversedUnderSameLinkageIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      import "DPI-C" link = function int f(input bit [0:7] a);
+    endmodule
+    module n;
+      import "DPI-C" link = function int g(input bit [7:0] a);
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI declaration of linkage name 'link' disagrees "
+                            "with the earlier declaration's type signature",
+                            6, "35.5.4"));
+}
+
+// §35.5.4: "The type includes dimensions and bounds of any arrays or array
+// dimensions", which says the same of an unpacked dimension as of a packed
+// one. The two formals below are both arrays of int and differ in the bounds
+// alone.
+TEST(DpiDeclElab, SignatureUnpackedBoundsMismatchUnderSameLinkageIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      import "DPI-C" link = function int f(input int a [0:3]);
+    endmodule
+    module n;
+      import "DPI-C" link = function int g(input int a [0:7]);
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI declaration of linkage name 'link' disagrees "
+                            "with the earlier declaration's type signature",
+                            6, "35.5.4"));
+}
+
+// §35.5.4 makes the bounds part of the type, and §7.4.1 writes each of them as
+// a constant_expression -- "Each packed dimension in a packed array
+// declaration shall be specified by a range specification of the form [
+// constant_expression : constant_expression ]" -- so a bound is the value its
+// expression evaluates to and not the text it was written with. [3+4:0] and
+// [7:0] are one type, and the two declarations agree.
+TEST(DpiDeclElab, SignaturePackedBoundsAgreeingAfterFoldingUnderSameLinkageOk) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      import "DPI-C" link = function int f(input bit [7:0] a);
+    endmodule
+    module n;
+      import "DPI-C" link = function int g(input bit [3+4:0] a);
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §35.5.4: "The signature includes the return type and the number, order,
+// direction, and types of each and every argument." The two declarations below
+// give the same two arguments in opposite order, and the arguments differ in
+// their direction and in their type, which are what the signature records of
+// an argument. The order is therefore the only thing left between them.
+TEST(DpiDeclElab, SignatureArgOrderMismatchUnderSameLinkageIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      import "DPI-C" link = function void f(input int a, output bit b);
+    endmodule
+    module n;
+      import "DPI-C" link = function void g(output bit b, input int a);
     endmodule
   )",
             f, "m");

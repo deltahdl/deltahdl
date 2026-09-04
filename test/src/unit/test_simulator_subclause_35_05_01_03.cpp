@@ -32,7 +32,7 @@ using namespace delta;
 //   manipulating a global variable.
 //
 // The task sentence is answered where a declaration is read, by ParseDpiImport
-// in src/parser/parser_port.cpp, and is covered in
+// in src/parser/parser_dpi.cpp, and is covered in
 // test_parser_subclause_35_05_01_03.cpp. What is left for a run is the third
 // state, which no other subclause of §35.5 describes: §35.5.2 says what a pure
 // function may do and §35.5.3 what a context one may, and neither says

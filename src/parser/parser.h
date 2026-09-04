@@ -76,6 +76,7 @@ class Parser {
   friend struct ParserStmtHelpers;
   friend struct ParserStmtBlockHelpers;
   friend struct ParserPortHelpers;
+  friend struct ParserDpiHelpers;
   friend struct ParserAssertHelpers;
   friend struct ParserClassHelpers;
   friend struct ParserClassOverrideHelpers;

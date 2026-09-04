@@ -9,6 +9,7 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_dpi_signature.h"
 #include "elaborator/let_construct.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -46,59 +47,6 @@ void Elaborator::ValidateDpiImport(const ModuleItem* item) {
 
 namespace {
 
-// §35.5.4: the linkage name is the explicit c_identifier when given, otherwise
-// it defaults to the SystemVerilog subroutine name.
-std::string_view DpiLinkageName(const ModuleItem* item) {
-  return item->dpi_c_name.empty() ? item->name : item->dpi_c_name;
-}
-
-// §35.5.4 enumerates the parts of the type signature that must match across
-// every declaration sharing one linkage name: return type, argument count,
-// per-argument direction and type, plus the pure/context qualifiers and the
-// dpi_spec_string itself.
-struct DpiSignatureKey {
-  DataTypeKind return_type;
-  bool is_pure;
-  bool is_context;
-  bool is_task;
-  std::string_view spec_string;
-  std::vector<std::pair<Direction, DataTypeKind>> args;
-};
-
-DpiSignatureKey BuildDpiSignature(const ModuleItem* item) {
-  DpiSignatureKey key;
-  key.return_type = item->return_type.kind;
-  key.is_pure = item->dpi_is_pure;
-  key.is_context = item->dpi_is_context;
-  key.is_task = item->dpi_is_task;
-  key.spec_string = item->dpi_spec_string;
-  key.args.reserve(item->func_args.size());
-  for (const auto& arg : item->func_args) {
-    key.args.emplace_back(arg.direction, arg.data_type.kind);
-  }
-  return key;
-}
-
-bool DpiSignaturesMatch(const DpiSignatureKey& a, const DpiSignatureKey& b) {
-  return a.return_type == b.return_type && a.is_pure == b.is_pure &&
-         a.is_context == b.is_context && a.is_task == b.is_task &&
-         a.spec_string == b.spec_string && a.args == b.args;
-}
-
-// §35.4: an export declaration borrows its type signature from the
-// SystemVerilog function or task it names. The parts that matter for
-// equivalence — the return type, the function-vs-task distinction, and
-// each formal argument's direction and type kind — are extracted here so
-// that two exports sharing one linkage identifier across scopes can be
-// compared without paying attention to identifiers, default values, or
-// other non-signature details.
-struct DpiExportSignature {
-  DataTypeKind return_type;
-  bool is_task;
-  std::vector<std::pair<Direction, DataTypeKind>> args;
-  bool operator==(const DpiExportSignature&) const = default;
-};
-
 // §35.5.5: "The same restrictions apply for the result types of exported
 // functions." An exported function's result is therefore limited to the same
 // small-value set imposed on imported function results: void, the C-compatible
@@ -129,17 +77,6 @@ bool IsPermittedDpiResultType(const DataType& type) {
     default:
       return false;
   }
-}
-
-DpiExportSignature BuildDpiExportSignature(const ModuleItem* callable) {
-  DpiExportSignature key;
-  key.return_type = callable->return_type.kind;
-  key.is_task = callable->kind == ModuleItemKind::kTaskDecl;
-  key.args.reserve(callable->func_args.size());
-  for (const auto& arg : callable->func_args) {
-    key.args.emplace_back(arg.direction, arg.data_type.kind);
-  }
-  return key;
 }
 
 // §35.5.4: "multiple imports of the same subroutine name into the same scope
