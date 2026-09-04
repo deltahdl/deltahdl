@@ -42,7 +42,7 @@ bool TookNumber(const ListedKeyword& listed, std::string_view name,
   uint64_t number = 0;
   for (char c : listed.value) {
     if (c < '0' || c > '9') return false;
-    uint64_t digit = static_cast<uint64_t>(c - '0');
+    auto digit = static_cast<uint64_t>(c - '0');
     if (number > (std::numeric_limits<uint64_t>::max() - digit) / 10) {
       return false;
     }
