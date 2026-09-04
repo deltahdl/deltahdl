@@ -142,7 +142,14 @@ struct DpiRtExport {
   // function. The runtime uses it to enforce that an imported function may
   // never invoke an exported task; see CallExportFromImport.
   bool is_task = false;
+  // §35.2.2: the SystemVerilog types crossing when foreign code calls this
+  // export in. An absent position and a kVoid result leave a value as it is.
+  DataTypeKind return_type = DataTypeKind::kVoid;
+  std::vector<DpiArg> args;
 };
+
+// §35.6.1: `v` converted to `target`, unchanged when already of that type.
+DpiArgValue CoerceArgValue(const DpiArgValue& v, DataTypeKind target);
 
 // §35.4: the name in the global name space that a declaration resolves to.
 // Every imported subroutine resolves to a global symbol and every exported one

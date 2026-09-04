@@ -6,6 +6,53 @@
 
 namespace delta {
 
+namespace {
+
+// §35.2.2: "SystemVerilog data types are the sole data types that can cross the
+// boundary between SystemVerilog and a foreign language in either direction",
+// and the direction named second is foreign code calling an exported
+// SystemVerilog function. The actuals such a call supplies are therefore the
+// SystemVerilog types the export's formals declare, whatever the foreign side
+// built them as, exactly as DpiRuntime::CallImportWithArgs makes an import's
+// actuals the types its formals declare on the way in. A position the export
+// does not describe is left as it stands, which is what every export got
+// before one could describe any.
+std::vector<DpiArgValue> ActualsAsDeclaredTypes(
+    const DpiRtExport& exp, const std::vector<DpiArgValue>& args) {
+  std::vector<DpiArgValue> coerced = args;
+  for (size_t i = 0; i < exp.args.size() && i < coerced.size(); ++i) {
+    coerced[i] = CoerceArgValue(coerced[i], exp.args[i].type);
+  }
+  return coerced;
+}
+
+// §35.2.2: the value handed back across the boundary is a SystemVerilog value
+// too, so it is the type the export's declaration gives its result. An export
+// declaring no result type yields nothing for the clause to type, and neither
+// does one declaring void.
+DpiArgValue ResultAsDeclaredType(const DpiRtExport& exp,
+                                 const DpiArgValue& result) {
+  if (exp.return_type == DataTypeKind::kVoid) return result;
+  return CoerceArgValue(result, exp.return_type);
+}
+
+// The body of one export, entered with its actuals already the SystemVerilog
+// types it declares and leaving its result the type it declares.
+DpiArgValue CallExportBody(const DpiRtExport& exp,
+                           const std::vector<DpiArgValue>& args) {
+  if (!exp.impl) return DpiArgValue::FromInt(0);
+  return ResultAsDeclaredType(exp, exp.impl(ActualsAsDeclaredTypes(exp, args)));
+}
+
+}  // namespace
+
+DpiArgValue DpiRuntime::CallExport(std::string_view sv_name,
+                                   const std::vector<DpiArgValue>& args) const {
+  const auto* exp = FindExport(sv_name);
+  if (!exp || !exp->impl) return DpiArgValue::FromInt(0);
+  return CallExportBody(*exp, args);
+}
+
 DpiExportCallStatus DpiRuntime::CheckExportCallPermitted(
     const DpiRtExport* exp, std::string_view sv_name) {
   // §35.9 item d): once an imported subroutine has entered the disabled state,
@@ -75,7 +122,7 @@ DpiExportCallStatus DpiRuntime::CallExportFromImport(
   // CallExport, which looks the export up by name and so would enter whichever
   // instance holds the name index rather than the one this scope declares.
   DpiArgValue result =
-      (exp != nullptr && exp->impl) ? exp->impl(args) : DpiArgValue::FromInt(0);
+      exp != nullptr ? CallExportBody(*exp, args) : DpiArgValue::FromInt(0);
   current_scope_ = saved_scope;
   if (exp != nullptr && exp->is_task) {
     // §35.8: "SystemVerilog tasks do not have return value types. The return

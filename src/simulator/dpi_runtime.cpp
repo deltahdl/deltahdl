@@ -183,6 +183,38 @@ double NumericToReal(const DpiArgValue& v) {
   }
 }
 
+// §35.6.2: equality of two same-typed actual-argument values. After an
+// imported function returns, the copy-back leaves an output/inout actual with
+// its own declared type, so the value before the call and the value after it
+// share a type; this compares them so a value-change event is propagated only
+// when the call genuinely changed the actual, matching SystemVerilog
+// value-change semantics where an assignment of an unchanged value is inert.
+bool SameArgValue(const DpiArgValue& a, const DpiArgValue& b) {
+  if (a.type != b.type) return false;
+  switch (a.type) {
+    case DataTypeKind::kReal:
+    case DataTypeKind::kShortreal:
+    case DataTypeKind::kRealtime:
+      return a.AsReal() == b.AsReal();
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kTime:
+      return a.AsLongint() == b.AsLongint();
+    case DataTypeKind::kString:
+      return a.AsString() == b.AsString();
+    case DataTypeKind::kChandle:
+      return a.AsChandle() == b.AsChandle();
+    case DataTypeKind::kBit:
+      return a.AsBit() == b.AsBit();
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+      return a.AsLogic() == b.AsLogic();
+    default:
+      return a.AsInt() == b.AsInt();
+  }
+}
+
+}  // namespace
+
 // §35.6.1: when a coercion is needed, the value crosses the interface through a
 // temporary that is created with the appropriate coercion. This realizes that
 // temporary: it returns `v` converted to `target`, following SystemVerilog
@@ -242,38 +274,6 @@ DpiArgValue CoerceArgValue(const DpiArgValue& v, DataTypeKind target) {
     }
   }
 }
-
-// §35.6.2: equality of two same-typed actual-argument values. After an
-// imported function returns, the copy-back leaves an output/inout actual with
-// its own declared type, so the value before the call and the value after it
-// share a type; this compares them so a value-change event is propagated only
-// when the call genuinely changed the actual, matching SystemVerilog
-// value-change semantics where an assignment of an unchanged value is inert.
-bool SameArgValue(const DpiArgValue& a, const DpiArgValue& b) {
-  if (a.type != b.type) return false;
-  switch (a.type) {
-    case DataTypeKind::kReal:
-    case DataTypeKind::kShortreal:
-    case DataTypeKind::kRealtime:
-      return a.AsReal() == b.AsReal();
-    case DataTypeKind::kLongint:
-    case DataTypeKind::kTime:
-      return a.AsLongint() == b.AsLongint();
-    case DataTypeKind::kString:
-      return a.AsString() == b.AsString();
-    case DataTypeKind::kChandle:
-      return a.AsChandle() == b.AsChandle();
-    case DataTypeKind::kBit:
-      return a.AsBit() == b.AsBit();
-    case DataTypeKind::kLogic:
-    case DataTypeKind::kReg:
-      return a.AsLogic() == b.AsLogic();
-    default:
-      return a.AsInt() == b.AsInt();
-  }
-}
-
-}  // namespace
 
 void DpiRuntime::RegisterImport(DpiRtFunction func) {
   // §35.4: the declaration also resolves to a symbol in the global name space,
@@ -546,13 +546,6 @@ DpiArgValue DpiRuntime::CallImportDetectingChanges(
     changes.push_back(DpiArgValueChange{i, before[i], actuals[i]});
   }
   return result;
-}
-
-DpiArgValue DpiRuntime::CallExport(std::string_view sv_name,
-                                   const std::vector<DpiArgValue>& args) const {
-  const auto* exp = FindExport(sv_name);
-  if (!exp || !exp->impl) return DpiArgValue::FromInt(0);
-  return exp->impl(args);
 }
 
 void DpiRuntime::PushScope(DpiScope scope) {
