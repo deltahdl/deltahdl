@@ -129,4 +129,41 @@ TEST(DpiTwoLayers, ForeignInternalStateIsOpaqueToSvLayer) {
   EXPECT_EQ(rt.CallImport("sv_next", {}).AsInt(), 3);
 }
 
+// §35.3 / S4: "SystemVerilog code shall look identical and its semantics shall
+// be unchanged for any foreign language layer." The four cases above ask that
+// of the direction where SystemVerilog calls out. It is one sentence about the
+// interface and not about one direction of it, so it holds where foreign code
+// calls in: an exported SystemVerilog function is written once and behaves the
+// same however the foreign layer reaches it. DpiRuntime offers two ways in --
+// CallExport, and CallExportFromImport, which is the entry a foreign body
+// running inside an import call takes -- and they are two foreign call
+// protocols reaching one SystemVerilog body.
+TEST(DpiTwoLayers, ExportedSvBodyIsUnchangedByWhichForeignEntryCallsIt) {
+  DpiRuntime rt;
+  DpiRtExport exp;
+  exp.c_name = "c_scale";
+  exp.sv_name = "sv_scale";
+  exp.return_type = DataTypeKind::kInt;
+  exp.args = {DpiArg{"x", DataTypeKind::kInt, Direction::kInput}};
+  exp.impl = [](const std::vector<DpiArgValue>& args) {
+    return DpiArgValue::FromInt(args[0].AsInt() * 3);
+  };
+  rt.RegisterExport(exp);
+
+  const DpiArgValue kDirect =
+      rt.CallExport("sv_scale", {DpiArgValue::FromInt(14)});
+
+  DpiScope scope;
+  scope.name = "top";
+  rt.EnterContextImportCall("ctx_import", scope);
+  DpiArgValue from_import;
+  rt.CallExportFromImport("sv_scale", {DpiArgValue::FromInt(14)}, &from_import);
+
+  // The body multiplies by three, so 42 is what either entry has to produce.
+  // Asserting the value and not merely that the two agree is what makes the
+  // case fail when one entry reaches a different body, or none.
+  EXPECT_EQ(kDirect.AsInt(), 42);
+  EXPECT_EQ(from_import.AsInt(), 42);
+}
+
 }  // namespace

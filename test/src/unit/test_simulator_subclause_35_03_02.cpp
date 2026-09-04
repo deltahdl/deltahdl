@@ -33,10 +33,13 @@ using namespace delta;
 // through either of two foreign data-access methods — the input-only protocol
 // (impl / CallImport) or the direction-aware protocol (arg_impl /
 // CallImportWithArgs). These tests observe that production code applying the
-// rules. They are deliberately the foreign-layer mirror of the §35.3.1 tests:
-// where §35.3.1 watches the SystemVerilog side stay independent using only
-// input reads, here the lever is the argument-passing/access mechanism itself,
-// including the output and inout write-back path that §35.3.1 never exercises.
+// rules. They are deliberately the foreign-layer mirror of the DpiTwoLayers
+// tests in test_simulator_subclause_35_03.cpp: where those watch the
+// SystemVerilog side stay independent using only input reads, here the lever is
+// the argument-passing and access mechanism itself, including the output and
+// inout write-back path those never exercise. §35.3.1 has no test file of its
+// own, its sentences being the ones §35.3 and §35.3.2 state and these two files
+// assert; a third file restating them would cover one rule twice.
 namespace {
 
 // §35.3.2 / S2: the simulator generates and uses the argument-passing mechanism
