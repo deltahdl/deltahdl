@@ -38,9 +38,13 @@
 // The third rule is performed by nothing, and it is where the two licence
 // keywords part: §34.5.28.2's check stands before the decrypted text is
 // processed, which is inside the preprocessor, and this one stands before the
-// model is executed, which is a later phase this value never reaches. #3281
-// records both, and records that a runtime_license is consumed with its
-// directive and gone before a run begins.
+// model is executed, which is a later phase this value never reaches. What
+// happens instead is the second case below. Preprocessor::ApplyLicense
+// (src/preprocessor/preprocessor_protect_license.cpp) reports the expression
+// where it meets one in an encrypted model, naming the library, the entry
+// function and the feature that no call was made with. #3443 records what is
+// still not done -- the call itself, and carrying the value out of the
+// preprocessor to the phase §34.5.29.2 names.
 
 #include <gtest/gtest.h>
 
@@ -49,7 +53,9 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_protect_read.h"
 #include "helpers_protect_keys.h"
+#include "helpers_reported_error.h"
 #include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_processing.h"
@@ -104,6 +110,61 @@ TEST(ProtectRuntimeLicenseDescription,
   EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
   EXPECT_TRUE(Holds(envelope, kAuthor)) << envelope;
   EXPECT_FALSE(Holds(envelope, kLibrary)) << envelope;
+}
+
+// The characters recording one envelope's sealed region: the line beneath its
+// data_block expression. §34.5.15.1 spells that expression as the keyword
+// standing alone and §34.5.15.2 has the block begin on the next line in the
+// file (issue #3272).
+std::string DataBlockOf(const std::string& envelope) {
+  constexpr std::string_view kAnnouncement = "`pragma protect data_block\n";
+  size_t opens = envelope.find(kAnnouncement);
+  EXPECT_NE(opens, std::string::npos) << envelope;
+  size_t from = opens + kAnnouncement.size();
+  return envelope.substr(from, envelope.find('\n', from) - from);
+}
+
+// The envelope this tool writes for a region stating the licence.
+std::string EnvelopeStatingTheLicence() {
+  std::string region = "`pragma protect begin\n";
+  region.append(Writes("data_keyowner", kEntity));
+  region.append(Writes("data_keyname", kKeyName));
+  region.append(kLicense).append(kSealedDesign);
+  region.append("`pragma protect end\n");
+  std::string envelope = EncryptEnvelopes(region, {}, TheKey());
+  EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
+  return envelope;
+}
+
+// §34.5.29.2 has the tool load the library, call the entry function with the
+// feature string, and refuse to begin execution where what comes back does not
+// match. None of that is done, and this is what a reader of the run is told
+// instead: the expression is answered with a warning naming the library, the
+// entry function and the feature no call was made with.
+//
+// The line is the licence's own line inside the recovered text, that being what
+// the reading of that text numbers from, so the report stands at the directive
+// rather than at the block that carried it.
+TEST(ProtectRuntimeLicenseDescription, TheLicenceNotCheckedIsReported) {
+  std::string envelope = EnvelopeStatingTheLicence();
+  std::string cleartext;
+  ASSERT_TRUE(
+      DecryptProtectedRegion(DataBlockOf(envelope), kTheKey, &cleartext));
+  ReadSource run(envelope, ReadSource::KeysConfig(TheKey()));
+  EXPECT_TRUE(ReportedWarning(
+      run.diag.Diagnostics(),
+      "protect pragma runtime_license expression is not acted on: this tool "
+      "loads no library a source text names, so the entry function "
+      "\"checkout\" in \"liblic.so\" is not called for feature \"simulate\"",
+      LineHolding(cleartext, kLicense), "34.5.29.2"));
+}
+
+// And the model is run all the same. §34.5.29.2 has execution not begin where
+// the tool is not licensed; a run that never asked reports no error, so nothing
+// holds the design back and the warning above is the whole of what it produced.
+TEST(ProtectRuntimeLicenseDescription, NoErrorStopsTheModelBeingReached) {
+  ReadSource run(EnvelopeStatingTheLicence(), ReadSource::KeysConfig(TheKey()));
+  EXPECT_TRUE(Holds(run.text, kSealedDesign)) << run.text;
 }
 
 }  // namespace

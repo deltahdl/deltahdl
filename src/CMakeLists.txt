@@ -31,6 +31,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     preprocessor/protect_key_block.cpp
     preprocessor/protect_key_method.cpp
     preprocessor/protect_keywords.cpp
+    preprocessor/protect_license.cpp
     preprocessor/protect_pragma_line.cpp
     preprocessor/protect_cli.cpp
     preprocessor/protect_processing.cpp
@@ -45,6 +46,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     preprocessor/preprocessor_protect_in_effect.cpp
     preprocessor/preprocessor_protect_keynames.cpp
     preprocessor/preprocessor_protect_keys.cpp
+    preprocessor/preprocessor_protect_license.cpp
     preprocessor/preprocessor_protect_values.cpp
     preprocessor/preprocessor_protect_viewport.cpp
     lexer/keywords.cpp

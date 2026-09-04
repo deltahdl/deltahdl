@@ -9,6 +9,7 @@
 #include "preprocessor/protect_digest_key.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_key_method.h"
+#include "preprocessor/protect_license.h"
 #include "preprocessor/protect_pragma_line.h"
 
 namespace delta {
@@ -48,8 +49,8 @@ constexpr ProtectPragmaKeyword kProtectPragmaKeywords[] = {
     {"key_keyname", "names the key that encrypts the keys"},
     {"key_public_key", "gives the public key that encrypts the keys"},
     {"key_block", "starts an encoded block holding the key data"},
-    {"decrypt_license", "states what a decryption is licensed on"},
-    {"runtime_license", "states what a simulation is licensed on"},
+    {kDecryptLicenseKeyword, "states what a decryption is licensed on"},
+    {kRuntimeLicenseKeyword, "states what a simulation is licensed on"},
     {kCommentKeyword,
      "carries documentation that nothing goes on to interpret"},
     {kResetKeyword, "puts the protect pragma keywords back to their defaults"},

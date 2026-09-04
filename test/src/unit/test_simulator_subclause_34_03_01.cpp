@@ -100,12 +100,18 @@ TEST(EnvelopeEncryptionSimulation, ASpecifiedEnvelopeDeliversItsDesign) {
 // where the whole of it has to be carried across as one value -- a carry that
 // stopped at the comma inside the parentheses would leave a directive the
 // pragma grammar rejects, and the design would not reach this value.
+//
+// The list names all three of the names §34.5.29.1 writes outside brackets,
+// since a list short of one of them is reported by
+// Preprocessor::ApplyLicense
+// (src/preprocessor/preprocessor_protect_license.cpp) and this case asserts the
+// run reported nothing.
 TEST(EnvelopeEncryptionSimulation, AParenthesizedValueIsCarriedWhole) {
   SpecifiedDesignRun run(
       "module t;\n"
       "  int result = 1;\n"
       "`pragma protect runtime_license=(library=\"lic.so\", "
-      "feature=\"runIt\"), begin\n"
+      "entry=\"acquire\", feature=\"runIt\"), begin\n"
       "  initial result = 42;\n"
       "`pragma protect end\n"
       "endmodule\n",

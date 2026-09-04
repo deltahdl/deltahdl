@@ -355,6 +355,7 @@ void Preprocessor::ApplyProtectKeywords(
     ApplyKeyBlockKeywords(expr, loc);
     ApplyAnnouncedBlockKeywords(expr);
     ApplyViewport(expr, loc);
+    ApplyLicense(expr, loc);
   }
 }
 

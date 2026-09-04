@@ -279,6 +279,18 @@ class Preprocessor {
   // of protection, and this tool applies no protection for it to relax, so
   // the expression is answered with a warning rather than acted on.
   void ApplyViewport(const PragmaKeywordExpression& expr, SourceLoc loc);
+  // What §34.5.28 and §34.5.29 have one protect pragma expression say about
+  // the tool reading it. Each states a licence the tool is to obtain before it
+  // decrypts a model or before it executes one, and the value naming that
+  // licence is read here so that a value not written in the spelling either
+  // Syntax subclause defines is reported rather than stored as though it named
+  // something.
+  //
+  // A licence written in the spelling and met in an encrypted model is reported
+  // as well. Both Description subclauses have the tool load the library the
+  // value names and call into it, this tool loads no library a source text
+  // names, and #3443 carries what it would take to.
+  void ApplyLicense(const PragmaKeywordExpression& expr, SourceLoc loc);
   // Finishes the run of pragma expressions gathered for the block a decryption
   // envelope carries. §34.5.4.2 has the expression closing such an envelope
   // mark where that run ends and state that what it holds suffices to open the

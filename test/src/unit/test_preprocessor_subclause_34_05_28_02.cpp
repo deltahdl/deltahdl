@@ -23,11 +23,16 @@
 // naming a key are, so it rides into the data block with the design and comes
 // back with it.
 //
-// The third is not performed at all. #3281 records that: the five names inside
-// the value are never separated from the text around them, no library is
-// loaded, no function is called, and nothing is reported. Two cases here state
-// the consequence rather than the rule -- a licensed model decrypts for a
-// reader who was never asked for a licence, and the run says nothing about it.
+// The third is not performed. The five names inside the value are separated
+// from the text around them by ParseProtectLicense
+// (src/preprocessor/protect_license.h), and Preprocessor::ApplyLicense
+// (src/preprocessor/preprocessor_protect_license.cpp) reports the expression
+// rather than acting on it; #3443 records what is still not done, which is the
+// whole of the call: no library is loaded, no entry function is called, and no
+// return value is compared. The last three cases here state that consequence --
+// a licensed model decrypts for a reader who was never asked for a licence, the
+// run says so, and it says so only where the expression stood in an encrypted
+// model.
 //
 // Which spelling the expression is written in is §34.5.28.1's and is stated in
 // test_preprocessor_subclause_34_05_28_01.cpp.
@@ -39,8 +44,10 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_preprocessor.h"
 #include "fixture_protect_read.h"
 #include "helpers_protect_keys.h"
+#include "helpers_reported_error.h"
 #include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_processing.h"
@@ -170,11 +177,47 @@ TEST(ProtectDecryptLicenseDescription, TheDesignIsReachedWithNoLicenceChecked) {
   EXPECT_TRUE(Holds(run.text, kEncodingSealedDesign)) << run.text;
 }
 
-// And the run says nothing about it. §34.5.28.2 has an unlicensed tool produce
-// an error carrying the value the entry function returned; a tool that called
-// no function has no value to carry, and reports neither that nor the fact that
-// it never looked.
-TEST(ProtectDecryptLicenseDescription, NothingIsReportedAboutTheLicence) {
+// And the run says so. §34.5.28.2 has an unlicensed tool produce an error
+// carrying the value the entry function returned; a tool that called no
+// function has no such value to carry, so what it can say is which call it did
+// not make, and the report names the library, the entry function and the
+// feature the value asked about.
+//
+// The line is the licence's own line inside the recovered text, that being what
+// the reading of that text numbers from, so the report stands at the directive
+// rather than at the block that carried it.
+TEST(ProtectDecryptLicenseDescription, TheLicenceNotCheckedIsReported) {
+  std::string envelope = EnvelopeOf(kLicense);
+  std::string cleartext;
+  ASSERT_TRUE(DecryptProtectedRegion(EncodingDataBlockOf(envelope), kTheKey,
+                                     &cleartext));
+  ReadSource run(envelope, ReadSource::KeysConfig(TheKey()));
+  EXPECT_TRUE(ReportedWarning(
+      run.diag.Diagnostics(),
+      "protect pragma decrypt_license expression is not acted on: this tool "
+      "loads no library a source text names, so the entry function "
+      "\"checkout\" in \"liblic.so\" is not called for feature \"decrypt\"",
+      LineHolding(cleartext, kLicense), "34.5.28.2"));
+}
+
+// The control on where that report is made. §34.5.28.2 puts its question on
+// meeting the expression in an encrypted model, so a licence standing in
+// cleartext the tool is about to encrypt asks nothing of this run: that is the
+// ENCRYPTION INPUT case the subclause opens with, and the expression speaks to
+// whoever reads the shipped output rather than to whoever wrote it. Without
+// this the case above would hold of a reading that reported every licence it
+// ever met.
+TEST(ProtectDecryptLicenseDescription, ALicenceInCleartextIsNotReportedOn) {
+  PreprocFixture f;
+  Preprocess(std::string(kLicense), f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+}
+
+// And no error stops the design being reached. §34.5.28.2 has an unlicensed
+// tool perform no decryption, so a run that decrypted is a run that did not
+// find the tool unlicensed -- it never asked -- and the warning above is the
+// whole of what it produced.
+TEST(ProtectDecryptLicenseDescription, NoErrorStopsTheDesignBeingReached) {
   ReadSource run(EnvelopeOf(kLicense), ReadSource::KeysConfig(TheKey()));
   EXPECT_FALSE(run.diag.HasErrors()) << run.text;
 }

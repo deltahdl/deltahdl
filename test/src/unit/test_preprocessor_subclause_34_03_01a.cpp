@@ -327,16 +327,24 @@ TEST(EnvelopeEncryption, ADelimiterStandingAloneIsCarriedAlone) {
 // puts a licensing expression there, and this is that arrangement: the
 // expression is nowhere in the transformed text, and it comes back with the
 // design when the block is opened.
+//
+// The value is written as §34.5.29.1 spells it, all three of the names that
+// subclause writes outside brackets being present. A list short of one of them
+// is reported by Preprocessor::ApplyLicense
+// (src/preprocessor/preprocessor_protect_license.cpp), and a case about where
+// an expression is encrypted should not rest on one the reading turns away.
 TEST(EnvelopeEncryption, AnExpressionInsideTheEnvelopeIsEncryptedWithIt) {
   std::string written = Encrypted(
       "`pragma protect begin\n"
-      "`pragma protect runtime_license=(library=\"lic.so\")\n"
+      "`pragma protect runtime_license=(library=\"lic.so\", "
+      "entry=\"acquire\", feature=\"simulate\")\n"
       "  initial result = 42;\n"
       "`pragma protect end\n");
   EXPECT_FALSE(Holds(written, "runtime_license"));
   ASSERT_EQ(RecordedBlocks(written).size(), 1U);
   EXPECT_EQ(Recovered(RecordedBlocks(written)[0], kExchangeKey),
-            "`pragma protect runtime_license=(library=\"lic.so\")\n"
+            "`pragma protect runtime_license=(library=\"lic.so\", "
+            "entry=\"acquire\", feature=\"simulate\")\n"
             "  initial result = 42;\n");
 }
 
@@ -346,11 +354,14 @@ TEST(EnvelopeEncryption, AnExpressionInsideTheEnvelopeIsEncryptedWithIt) {
 // bytes the author wrote, and no block records it.
 TEST(EnvelopeEncryption, TheSameExpressionOutsideTheEnvelopeIsNotEncrypted) {
   std::string written = Encrypted(
-      "`pragma protect runtime_license=(library=\"lic.so\")\n"
+      "`pragma protect runtime_license=(library=\"lic.so\", "
+      "entry=\"acquire\", feature=\"simulate\")\n"
       "`pragma protect begin\n"
       "  initial result = 42;\n"
       "`pragma protect end\n");
-  EXPECT_TRUE(Holds(written, "runtime_license=(library=\"lic.so\")\n"));
+  EXPECT_TRUE(Holds(written,
+                    "runtime_license=(library=\"lic.so\", entry=\"acquire\", "
+                    "feature=\"simulate\")\n"));
   ASSERT_EQ(RecordedBlocks(written).size(), 1U);
   EXPECT_EQ(Recovered(RecordedBlocks(written)[0], kExchangeKey),
             "  initial result = 42;\n");

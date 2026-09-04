@@ -11,6 +11,7 @@
 #include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_keywords.h"
+#include "preprocessor/protect_license.h"
 #include "preprocessor/protect_processing.h"
 
 using namespace delta;
@@ -118,10 +119,13 @@ TEST_F(ProtectDecryptLicenseSyntaxTest,
 //
 // So the questions are the ones a list raises. Whether the value is kept whole,
 // where it may stand among other expressions, and which near misses the reading
-// turns away. What is inside it is read by nothing -- #3281 records that the
-// five names are never separated from the text around them and that no library
-// is ever loaded -- so a case here asks what the reading did with the
-// characters and not what it made of them.
+// turns away, and then what the reading makes of the characters it kept.
+// ParseProtectLicense (src/preprocessor/protect_license.h) separates the five
+// names, and Preprocessor::ApplyLicense
+// (src/preprocessor/preprocessor_protect_license.cpp) reports a value written
+// in any other spelling than this one. What is still done with the names is
+// nothing: #3443 records that no library is loaded, no entry function is
+// called and no return value is compared.
 
 // The value in the shape the syntax line writes it: the three required names
 // with strings against them, and `after` standing where the two optional names
@@ -195,13 +199,18 @@ TEST(ProtectDecryptLicenseSyntax, TheListReadsTheSameWrittenLast) {
 }
 
 // §34.5.28.1 writes a list against the keyword, and a single string is not one.
-// The keyword takes what was written whatever its shape, nothing here reading
-// the value for the names it should hold, so what a case can state is that the
-// two spellings are told apart rather than that one of them is turned away.
+// A string names no library to load, so there is no entry function in one for
+// a feature to be asked about, and the expression states no licence for a tool
+// to be held to.
 TEST(ProtectDecryptLicenseSyntax, AStringAgainstTheKeywordIsNotTheList) {
-  EXPECT_EQ(
-      LicenseAfter("`pragma protect decrypt_license=\"liblic.so\"\n").value,
-      "liblic.so");
+  PreprocFixture f;
+  Preprocess("`pragma protect decrypt_license=\"liblic.so\"\n", f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "protect pragma decrypt_license expression is written "
+                    "as a library, an entry and a feature, each "
+                    "against a string",
+                    1, "34.5.28.1"));
 }
 
 // The parenthesized spelling written empty. That spelling holds a list of
@@ -263,6 +272,117 @@ TEST(ProtectDecryptLicenseSyntax, TheFullListOutlivesTheStringValuedArray) {
   const ProtectKeywordValue kRecorded = LicenseAfter(StatesLicense(kFiveNames));
   EXPECT_FALSE(kRecorded.defaulted);
   EXPECT_EQ(kRecorded.value, kFiveNames);
+}
+
+// -- What the names inside the list are read as ------------------------------
+
+// §34.5.28.1 writes five names inside the parentheses, and this is all five
+// read back out. ParseProtectLicense (src/preprocessor/protect_license.h) is
+// what separates them from the text around them.
+//
+// The number is 7 rather than 0 because 0 is what ProtectLicense::match holds
+// where nothing wrote one, so a reading that never took the value would answer
+// this case correctly.
+TEST(ProtectDecryptLicenseSyntax, TheFiveNamesAreReadOutOfTheList) {
+  ProtectLicense license =
+      ParseProtectLicense(LicenseList(", exit=\"revoke\", match=7"));
+  ASSERT_TRUE(license.stated);
+  EXPECT_EQ(license.library, "liblic.so");
+  EXPECT_EQ(license.entry, "checkout");
+  EXPECT_EQ(license.feature, "decrypt");
+  EXPECT_TRUE(license.has_exit);
+  EXPECT_EQ(license.exit, "revoke");
+  EXPECT_TRUE(license.has_match);
+  EXPECT_EQ(license.match, 7U);
+}
+
+// The names are expressions of a list rather than positions in one, so each is
+// read for itself. §22.5.1 spells the value as a list of pragma expressions,
+// which name what they carry. The order here is the reverse of the syntax
+// line's, which is what a reading taking the first string for the library
+// would fail.
+TEST(ProtectDecryptLicenseSyntax,
+     TheNamesAreReadForThemselvesWhateverTheOrder) {
+  ProtectLicense license = ParseProtectLicense(
+      "(match=7, exit=\"revoke\", feature=\"decrypt\", "
+      "entry=\"checkout\", library=\"liblic.so\")");
+  ASSERT_TRUE(license.stated);
+  EXPECT_EQ(license.library, "liblic.so");
+  EXPECT_EQ(license.entry, "checkout");
+  EXPECT_EQ(license.feature, "decrypt");
+}
+
+// The two optional names left out. §34.4 has a tool use a keyword's default
+// value where the keyword is absent, and no default is stated for either of
+// these: not in §34.5.28.1, not in the Description beside it, and not in Table
+// 34-1, which carries a name and a description and no default column at all.
+// So the absence is recorded as an absence rather than filled in.
+//
+// It matters most for the number. Zero is the value the NOTE in the
+// Description has a forged library return in order to pass the check, so a
+// licence read as stating zero would be read as asking for exactly the
+// comparison that NOTE describes.
+TEST(ProtectDecryptLicenseSyntax,
+     TheOptionalNamesAreAbsentWhereTheTextOmitsThem) {
+  ProtectLicense license = ParseProtectLicense(LicenseList(""));
+  ASSERT_TRUE(license.stated);
+  EXPECT_FALSE(license.has_exit);
+  EXPECT_FALSE(license.has_match);
+}
+
+// Each of the three names the syntax line writes outside the brackets, left out
+// in turn. The Description spends all three in the one sentence that carries
+// the check out -- the tool loads the library, calls the entry function in it,
+// and passes that function the feature string -- so a list short of any one of
+// them asks for nothing that can be carried out. Taking them one at a time is
+// what tells a reading that requires all three from one that requires only the
+// first.
+TEST(ProtectDecryptLicenseSyntax, AListShortOfARequiredNameStatesNoLicence) {
+  EXPECT_FALSE(
+      ParseProtectLicense("(entry=\"checkout\", feature=\"decrypt\")").stated);
+  EXPECT_FALSE(
+      ParseProtectLicense("(library=\"liblic.so\", feature=\"decrypt\")")
+          .stated);
+  EXPECT_FALSE(
+      ParseProtectLicense("(library=\"liblic.so\", entry=\"checkout\")")
+          .stated);
+}
+
+// §34.5.28.1 writes a <string> against each of the three, and §22.5.1 spells a
+// string with the quotation marks around it. A bare word is one of the other
+// three spellings a pragma_value has, so a list writing one names no library
+// however much the characters read like a file name.
+TEST(ProtectDecryptLicenseSyntax, ALibraryWrittenAsABareWordNamesNoLibrary) {
+  EXPECT_FALSE(ParseProtectLicense("(library=liblic.so, entry=\"checkout\", "
+                                   "feature=\"decrypt\")")
+                   .stated);
+}
+
+// §34.5.28.1 writes a <number> against match, so a value written as a string
+// states none. The licence still stands, match being optional, and what it
+// states is a licence with no number to compare against rather than one whose
+// number is whatever the string reads like.
+TEST(ProtectDecryptLicenseSyntax, AMatchWrittenAsAStringStatesNoNumber) {
+  ProtectLicense license = ParseProtectLicense(LicenseList(", match=\"7\""));
+  ASSERT_TRUE(license.stated);
+  EXPECT_FALSE(license.has_match);
+}
+
+// The same list met as a directive rather than handed to the reading, so that
+// what the preprocessor does with it is what is observed. §34.5.28.1 is what
+// the report cites, the spelling being what the list failed.
+TEST(ProtectDecryptLicenseSyntax, AListShortOfARequiredNameIsReported) {
+  PreprocFixture f;
+  Preprocess(
+      "`pragma protect decrypt_license=(library=\"liblic.so\", "
+      "entry=\"checkout\")\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "protect pragma decrypt_license expression is written "
+                    "as a library, an entry and a feature, each "
+                    "against a string",
+                    1, "34.5.28.1"));
 }
 
 }  // namespace
