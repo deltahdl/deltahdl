@@ -34,8 +34,10 @@ struct Logic4Vec {
 
   // Numeric/boolean projection, not a raw-word accessor: x and z bits read as
   // 0 (the SystemVerilog 4-state-to-2-state cast). Code that rebuilds a 4-state
-  // value must read words[w].aval / words[w].bval directly — going through
-  // ToUint64 collapses x=(1,1) into z=(0,1).
+  // value must read words[w].aval / words[w].bval directly. Going through
+  // ToUint64 reads x=(1,1) and z=(0,1) alike as 0, and it returns words[0]
+  // alone, so a value rebuilt from what it hands back is two-state and no
+  // wider than 64 bits.
   uint64_t ToUint64() const;
   std::string ToString() const;
 };
