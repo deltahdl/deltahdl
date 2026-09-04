@@ -710,7 +710,7 @@ static void RunPreprocLoop(std::string_view src, uint32_t& line_num,
 // untouched here -- §34.4 gives those values a lexical scope that runs past the
 // envelope, and the expression that puts them back to their defaults is a
 // keyword of its own.
-void Preprocessor::EndAccumulatedProtectPragmas() {
+void Preprocessor::ResetAnnouncementsAndRecoveredKeys() {
   key_public_key_value_next_ = false;
   key_block_value_next_ = false;
   data_decrypt_key_value_next_ = false;
@@ -721,6 +721,10 @@ void Preprocessor::EndAccumulatedProtectPragmas() {
   data_block_value_next_ = false;
   data_decrypt_key_.clear();
   digest_decrypt_key_.clear();
+}
+
+void Preprocessor::EndAccumulatedProtectPragmas() {
+  ResetAnnouncementsAndRecoveredKeys();
   // §34.5.22 has the digest of a key block or a data block written in the
   // digest block immediately following that block, so the block a digest can
   // still be owed belongs to the envelope it was recovered from. An envelope

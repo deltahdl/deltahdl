@@ -516,7 +516,18 @@ void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc) {
 // holding nothing reports.
 void Preprocessor::ResetPragma(std::string_view pragma_name) {
   if (!IsRecognizedPragmaName(pragma_name)) return;
-  if (pragma_name == kProtectPragmaName) protect_keywords_.Reset();
+  if (pragma_name != kProtectPragmaName) return;
+  protect_keywords_.Reset();
+  // §22.11.1 restores the state of the pragma_keywords as well as their values,
+  // and the keyword scope holds only what a directive wrote against a name. Two
+  // kinds of protect pragma keyword state are held apart from it and go back
+  // here: a keyword still waiting for the line its definition speaks for, and a
+  // key §34.5.14 or §34.5.20 gave a keyword that came out of a key block as the
+  // key itself. Preprocessor::ProtectKeyInEffect answers with the first of
+  // those ahead of every name a text writes, so a reset that left it standing
+  // would open the next data block with a key the reset was written to take
+  // away.
+  ResetAnnouncementsAndRecoveredKeys();
 }
 
 bool Preprocessor::ProcessExpandedStateDirective(std::string_view line,

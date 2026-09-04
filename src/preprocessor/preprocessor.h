@@ -313,6 +313,21 @@ class Preprocessor {
   // once the line has survived being taken for something else. Calling it twice
   // over one directive settles the same state twice, which costs nothing.
   void EndAccumulatedProtectPragmas();
+  // Puts back the protect pragma keyword state this class holds outside
+  // `protect_keywords_`: the eight keywords whose definitions speak for the
+  // line beneath them and are waiting for it, and the two keys a key block
+  // recovered.
+  //
+  // §22.11.1 has a reset restore the default values and the state of the
+  // pragma_keywords belonging to the pragma it names, and both kinds are that.
+  // A keyword still waiting for its line has been written and not yet answered,
+  // which is the state half of that sentence; a key recovered from a key block
+  // is the value §34.5.14 and §34.5.20 give their keywords, held as the key
+  // itself because that is what came out of the block.
+  //
+  // The default of each is the same thing: nothing announced and no key
+  // carried, which is where a reading stands before any text is read.
+  void ResetAnnouncementsAndRecoveredKeys();
   // Takes `line` as the key block announced by a key_block expression on the
   // line before it, and says whether it did. A line taken this way is key
   // material of the protected block above it rather than text of the design, so
