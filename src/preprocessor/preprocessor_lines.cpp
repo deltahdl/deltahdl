@@ -528,19 +528,6 @@ void Preprocessor::ResetPragma(std::string_view pragma_name) {
   // would open the next data block with a key the reset was written to take
   // away.
   ResetAnnouncementsAndRecoveredKeys();
-  // §34.5.32's value goes back here as well. Table 34-1 tabulates viewport like
-  // any other name, and Preprocessor::ApplyViewport parses what a directive
-  // wrote against it into protect_viewports_, so the keyword's value is held in
-  // two places: the scope above, which the reset clears, and that vector. Left
-  // standing, one keyword would answer two ways after a reset --
-  // ProtectKeywords().ValueOf reporting it defaulted while ProtectViewports
-  // reported the objects the text named.
-  //
-  // It is cleared here rather than in the method above, which
-  // EndAccumulatedProtectPragmas calls too. §34.5.32.2 has a viewport describe
-  // objects of the envelope in force, so ApplyViewport drops the list at every
-  // envelope boundary, and that is a different schedule from this one.
-  protect_viewports_.clear();
 }
 
 bool Preprocessor::ProcessExpandedStateDirective(std::string_view line,

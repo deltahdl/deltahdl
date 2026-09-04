@@ -8,7 +8,6 @@
 #include "fixture_preprocessor.h"
 #include "helpers_protect_keyword_value.h"
 #include "helpers_protect_region.h"
-#include "helpers_protect_viewport.h"
 #include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_digest.h"
@@ -16,7 +15,6 @@
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
-#include "preprocessor/protect_viewport.h"
 
 using namespace delta;
 
@@ -418,64 +416,6 @@ TEST(ProtectResetDescription, TheDigestSessionKeyGoesBackToo) {
 TEST(ProtectResetDescription, WithoutItThatDigestKeyOpensTheDigest) {
   ReadHoldingTheBlockKey run(VouchedForUnderTheDigestKey(""));
   EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kMatched);
-}
-
-// The object a viewport names and the access it asks for it. §34.5.32.2 leaves
-// the access value an implementation-specific relaxation of protection, so no
-// spelling of it is better than another and nothing here judges one.
-constexpr std::string_view kViewportObject = "top.dut.mem";
-constexpr std::string_view kOtherViewportObject = "top.dut.regfile";
-constexpr std::string_view kViewportAccess = "read";
-
-// A decryption envelope left open. §34.5.32.2 has a viewport describe objects
-// of the envelope in force, and Preprocessor::ApplyViewport drops the list
-// where an envelope opens or closes, so a case asking what a reset did to that
-// list reads it back while the envelope that holds it still stands.
-std::string OpensADecryptionEnvelope() {
-  return "`pragma protect begin_protected\n";
-}
-
-// §34.5.31.2 restores all protect pragma keywords to their default values, and
-// §34.4 tabulates viewport among them. Its default is no viewport, so an
-// envelope that stated one and then reset describes nothing.
-TEST(ProtectResetDescription, TheViewportsATextStatedGoBackToo) {
-  ReadingViewports reading(OpensADecryptionEnvelope() +
-                           ViewportOf(kViewportObject, kViewportAccess) +
-                           Restores());
-  EXPECT_EQ(reading.Count(), 0U) << reading.text;
-}
-
-// The same envelope without the reset, which is what makes the case above about
-// the reset rather than about a viewport no reading ever gathered.
-TEST(ProtectResetDescription, WithoutItThoseViewportsAreStillStanding) {
-  ReadingViewports reading(OpensADecryptionEnvelope() +
-                           ViewportOf(kViewportObject, kViewportAccess));
-  EXPECT_EQ(reading.Count(), 1U) << reading.text;
-}
-
-// §34.4 gives a keyword's value the position the reading has got to, so a
-// viewport written after the reset is stated after it. Without this case a
-// reading that gathered no viewport at all would answer the two above.
-TEST(ProtectResetDescription, AViewportWrittenAfterItIsRecorded) {
-  ReadingViewports reading(OpensADecryptionEnvelope() +
-                           ViewportOf(kViewportObject, kViewportAccess) +
-                           Restores() +
-                           ViewportOf(kOtherViewportObject, kViewportAccess));
-  ASSERT_EQ(reading.Count(), 1U) << reading.text;
-  EXPECT_EQ(reading.Viewports().front().object, kOtherViewportObject);
-}
-
-// The defect stated directly: one keyword read both ways. What a directive
-// wrote against the name is held in ProtectKeywordScope and the value parsed
-// out of it in Preprocessor::protect_viewports_, and a reset that reached one
-// and not the other would have the keyword report itself defaulted while the
-// objects it named still stood.
-TEST(ProtectResetDescription, TheTwoReadingsOfTheKeywordAgreeAfterIt) {
-  ReadingViewports reading(OpensADecryptionEnvelope() +
-                           ViewportOf(kViewportObject, kViewportAccess) +
-                           Restores());
-  EXPECT_TRUE(reading.pp.ProtectKeywords().ValueOf(kViewportKeyword).defaulted);
-  EXPECT_EQ(reading.Count(), 0U) << reading.text;
 }
 
 }  // namespace

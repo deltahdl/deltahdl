@@ -200,6 +200,17 @@ TEST(ProtectViewportDescription, TheInnerEnvelopeIsDescribedByItsOwn) {
 // the envelope already made, as §34.5.30.2's comment is an output already owed
 // where a reset follows it. So the description an envelope carries survives a
 // reset written inside that envelope, and only the envelope ending takes it.
+//
+// The keyword's own value does go back, and the two are different things. What
+// a directive wrote against the name is held in ProtectKeywordScope
+// (src/preprocessor/protect_keywords.h), which ProtectKeywordScope::Reset
+// clears, so after this reset ProtectKeywords().ValueOf(kViewportKeyword)
+// reports the keyword defaulted while the objects below still stand. That is
+// not two answers to one question: the first says what value is in effect for
+// the keyword from here on, and the second says which objects the envelope has
+// been asked to permit access to. #3444 was filed calling the difference a
+// defect and closed on this case, so a reading that takes the two for one
+// thing has been tried.
 TEST(ProtectViewportDescription, AResetLeavesWhatTheEnvelopeWasDescribedBy) {
   ReadingViewports reading(std::string(kOpensDecryption) +
                            ViewportOf(kObject, kAccess) +
