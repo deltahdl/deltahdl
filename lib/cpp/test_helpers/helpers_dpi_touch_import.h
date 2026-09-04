@@ -27,10 +27,10 @@ inline void RegisterTouchImport(DpiContext& dpi, Direction direction,
   func.sv_name = "touch";
   func.return_type = DataTypeKind::kInt;
   func.args = {DpiArg{"a", DataTypeKind::kInt, direction}};
-  func.arg_impl = [wrote, seen](std::vector<uint64_t>& args) -> uint64_t {
-    *seen = args[0];
-    args[0] = wrote;
-    return 0;
+  func.arg_impl = [wrote, seen](std::vector<Logic4Word>& args) -> Logic4Word {
+    *seen = args[0].aval;
+    args[0] = Logic4Word{wrote, 0};
+    return Logic4Word{0, 0};
   };
   dpi.RegisterImport(func);
 }

@@ -1,4 +1,3 @@
-#include <cstdint>
 #include <vector>
 
 #include "fixture_simulator.h"
@@ -15,19 +14,19 @@ TEST(Dpi, CallFunction) {
   DpiFunction func;
   func.c_name = "c_add";
   func.sv_name = "sv_add";
-  func.impl = [](const std::vector<uint64_t>& args) -> uint64_t {
-    return args[0] + args[1];
+  func.impl = [](const std::vector<Logic4Word>& args) -> Logic4Word {
+    return Logic4Word{args[0].aval + args[1].aval, 0};
   };
   ctx.RegisterImport(func);
 
-  auto result = ctx.Call("sv_add", {10, 20});
-  EXPECT_EQ(result, 30u);
+  auto result = ctx.Call("sv_add", {Logic4Word{10, 0}, Logic4Word{20, 0}});
+  EXPECT_EQ(result.aval, 30u);
 }
 
 TEST(Dpi, CallMissingReturnsZero) {
   DpiContext ctx;
-  auto result = ctx.Call("nonexistent", {1, 2});
-  EXPECT_EQ(result, 0u);
+  auto result = ctx.Call("nonexistent", {Logic4Word{1, 0}, Logic4Word{2, 0}});
+  EXPECT_EQ(result.aval, 0u);
 }
 
 // §35.6 — Calling imported functions: the usage and syntax for calling an
@@ -51,8 +50,8 @@ static void RegisterProbe(DpiContext& dpi, SimFixture& f) {
   b.default_value = ParseExprFrom("99", f);
   fn.args = {a, b};
 
-  fn.impl = [](const std::vector<uint64_t>& v) -> uint64_t {
-    return v[0] * 1000 + v[1];
+  fn.impl = [](const std::vector<Logic4Word>& v) -> Logic4Word {
+    return Logic4Word{v[0].aval * 1000 + v[1].aval, 0};
   };
   dpi.RegisterImport(fn);
 }

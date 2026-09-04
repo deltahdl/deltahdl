@@ -26,7 +26,13 @@ struct DpiFunction {
   std::string_view sv_name;
   DataTypeKind return_type = DataTypeKind::kVoid;
   std::vector<DpiArg> args;
-  std::function<uint64_t(const std::vector<uint64_t>&)> impl;
+  // §35.2.2.1: "The implementation (representation and layout) of 4-state
+  // values ... is irrelevant for SystemVerilog semantics and can only impact
+  // the foreign side of the interface." A value crosses as the aval/bval pair
+  // Logic4Word holds, because a 4-state bit needs two bits to say it is x or z
+  // and a bare word has one. Carried as a word instead, a design's x came back
+  // 0 and no import could return one.
+  std::function<Logic4Word(const std::vector<Logic4Word>&)> impl;
   // The same foreign function, reached where it writes its arguments as well as
   // reading them. §35.5.1.2 has the changes an imported function makes to an
   // output or an inout formal be visible outside the call, and `impl` is handed
@@ -34,7 +40,7 @@ struct DpiFunction {
   // direction needs this form to say anything through them. A function with
   // input formals alone is complete as `impl`, which is what most imports are
   // and what every import written before the directions were carried is.
-  std::function<uint64_t(std::vector<uint64_t>&)> arg_impl;
+  std::function<Logic4Word(std::vector<Logic4Word>&)> arg_impl;
 };
 
 struct DpiImport {
@@ -53,14 +59,14 @@ class DpiContext {
   void RegisterImport(DpiFunction func);
   void RegisterExport(DpiExport exp);
   const DpiFunction* FindImport(std::string_view sv_name) const;
-  uint64_t Call(std::string_view sv_name,
-                const std::vector<uint64_t>& args) const;
+  Logic4Word Call(std::string_view sv_name,
+                  const std::vector<Logic4Word>& args) const;
   // Calls the import with arguments it may write, and leaves in `args` what the
   // foreign function left there. Which of those values reaches the call site is
   // §35.5.1.2's question rather than this one's: the answer is applied by the
   // caller, which knows the actual each formal was written against.
-  uint64_t CallWithArgs(std::string_view sv_name,
-                        std::vector<uint64_t>& args) const;
+  Logic4Word CallWithArgs(std::string_view sv_name,
+                          std::vector<Logic4Word>& args) const;
   uint32_t ImportCount() const {
     return static_cast<uint32_t>(imports_.size());
   }

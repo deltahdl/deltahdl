@@ -3,8 +3,14 @@
 #include <cstdint>
 #include <vector>
 
+#include "common/types.h"
+#include "fixture_simulator.h"
 #include "helpers_dpi_take_int.h"
+#include "parser/ast.h"
+#include "simulator/dpi.h"
 #include "simulator/dpi_runtime.h"
+#include "simulator/evaluation.h"
+#include "simulator/sim_context.h"
 
 using namespace delta;
 
@@ -191,6 +197,102 @@ TEST(DpiArgumentPassing, OutputRealRoundedToIntegerActualOnCopyOut) {
   // 2.9 is rounded to 3 as it is converted to the int actual on copy-out.
   EXPECT_EQ(actuals[0].type, DataTypeKind::kInt);
   EXPECT_EQ(actuals[0].AsInt(), 3);
+}
+
+// ---------------------------------------------------------------------------
+// The same copy-in and copy-out, asked of a call a design writes with an
+// argument whose bits are not all known.
+//
+// The cases above call the foreign function through DpiRuntime, the registry
+// the DPI C layer in src/simulator/svdpi.cpp works against. A call written in
+// SystemVerilog does not reach it: EvalDpiCall in
+// src/simulator/eval_function.cpp evaluates the call site's actuals and calls
+// the import through the DpiContext the run holds. §35.2.2.1 rules that "The
+// implementation (representation and layout) of 4-state values, structures,
+// and arrays is irrelevant for SystemVerilog semantics and can only impact the
+// foreign side of the interface", so an x or a z the design wrote has to
+// survive that crossing in both directions.
+// ---------------------------------------------------------------------------
+
+// A design holding one four-bit variable `a` set to `actual`, handed to an
+// import declared in `direction`. `seen` is the aval/bval pair the foreign
+// body was handed, `wrote` is what that body leaves in the formal, and
+// Actual() is what the variable holds once the call has returned.
+//
+// The formal is declared integer, which §35.5.6 lists among the permitted
+// types of a formal argument and which is four-state, so a value with an
+// unknown bit is one the formal can hold.
+struct FourStateActual {
+  DpiContext dpi;
+  SimFixture f;
+  Logic4Word seen;
+
+  FourStateActual(Direction direction, Logic4Word actual, Logic4Word wrote) {
+    DpiFunction func;
+    func.c_name = "c_touch_4state";
+    func.sv_name = "touch4";
+    func.return_type = DataTypeKind::kInt;
+    func.args = {DpiArg{"a", DataTypeKind::kInteger, direction}};
+    Logic4Word* seen_slot = &seen;
+    func.arg_impl = [seen_slot,
+                     wrote](std::vector<Logic4Word>& args) -> Logic4Word {
+      *seen_slot = args[0];
+      args[0] = wrote;
+      return Logic4Word{};
+    };
+    dpi.RegisterImport(func);
+    f.ctx.SetDpiContext(&dpi);
+    auto* var = f.ctx.CreateVariable("a", 4);
+    var->value = MakeLogic4Vec(f.arena, 4);
+    var->value.words[0] = actual;
+    EvalFunctionCall(ParseExprFrom("touch4(a)", f), f.ctx, f.arena);
+  }
+
+  Logic4Word Actual() { return f.ctx.FindVariable("a")->value.words[0]; }
+};
+
+// §35.6.1: "For input and inout arguments, the temporary variable is
+// initialized with the value of the actual argument with the appropriate
+// coercion." The actual is 4'b10x1, so the foreign body is handed a 1, a 0 and
+// an x; an x is aval 1 with bval 1, which one word per bit cannot record.
+TEST(DpiArgumentPassingInADesign, AnInputActualsUnknownBitReachesTheImport) {
+  FourStateActual run(Direction::kInput, Logic4Word{0b1011, 0b0010},
+                      Logic4Word{});
+
+  // Both halves are asserted because either alone is met by a carrier that
+  // drops one of them: Logic4Vec::ToUint64 reads 4'b10x1 as 4'b1001, which is
+  // neither this aval nor this bval.
+  EXPECT_EQ(run.seen.aval, 0b1011U);
+  EXPECT_EQ(run.seen.bval, 0b0010U);
+}
+
+// §35.2.2.1 has the representation of a 4-state value be "irrelevant for
+// SystemVerilog semantics", so §35.6.1's copy-in delivers a z as a z rather
+// than as "not known". The actual is 4'b10z1, a z being aval 0 with bval 1.
+TEST(DpiArgumentPassingInADesign, AnInputActualsHighImpedanceBitIsNotAnX) {
+  FourStateActual run(Direction::kInput, Logic4Word{0b1001, 0b0010},
+                      Logic4Word{});
+
+  // The bval says bit 1 is unknown, which a two-state crossing cannot say at
+  // all. The aval is what separates this from the case above, whose x puts
+  // 4'b1011 there; asserted alone it would pass a two-state crossing, which
+  // projects 4'b10z1 to the same 4'b1001.
+  EXPECT_EQ(run.seen.bval, 0b0010U);
+  EXPECT_EQ(run.seen.aval, 0b1001U);
+}
+
+// §35.6.1: "For output or inout arguments, the value of the temporary variable
+// is assigned to the actual argument with the appropriate conversion." The
+// foreign body leaves 4'b0x10 in the formal, so that is what the variable the
+// call site named holds once the call has returned.
+TEST(DpiArgumentPassingInADesign, AnOutputFormalsUnknownBitReachesTheActual) {
+  FourStateActual run(Direction::kOutput, Logic4Word{},
+                      Logic4Word{0b0110, 0b0100});
+
+  // aval 4'b0110 with bval 4'b0100 is 4'b0x10. Copied out through one word per
+  // bit, bit 2 arrives known and the actual reads 4'b0010.
+  EXPECT_EQ(run.Actual().aval, 0b0110U);
+  EXPECT_EQ(run.Actual().bval, 0b0100U);
 }
 
 }  // namespace

@@ -361,10 +361,10 @@ TEST(DpiArgumentDirectionsInADesign, ANamedActualTakesItsOwnFormalsValue) {
   func.return_type = DataTypeKind::kInt;
   func.args = {DpiArg{"first", DataTypeKind::kInt, Direction::kOutput},
                DpiArg{"second", DataTypeKind::kInt, Direction::kOutput}};
-  func.arg_impl = [](std::vector<uint64_t>& args) -> uint64_t {
-    args[0] = 11;
-    args[1] = 22;
-    return 0;
+  func.arg_impl = [](std::vector<Logic4Word>& args) -> Logic4Word {
+    args[0] = Logic4Word{11, 0};
+    args[1] = Logic4Word{22, 0};
+    return Logic4Word{0, 0};
   };
   dpi.RegisterImport(func);
   f.ctx.SetDpiContext(&dpi);
@@ -389,8 +389,8 @@ TEST(DpiArgumentDirectionsInADesign, AnImportWritingNothingYieldsItsResult) {
   func.sv_name = "twice";
   func.return_type = DataTypeKind::kInt;
   func.args = {DpiArg{"a", DataTypeKind::kInt, Direction::kInput}};
-  func.impl = [](const std::vector<uint64_t>& args) -> uint64_t {
-    return args[0] * 2;
+  func.impl = [](const std::vector<Logic4Word>& args) -> Logic4Word {
+    return Logic4Word{args[0].aval * 2, 0};
   };
   dpi.RegisterImport(func);
   f.ctx.SetDpiContext(&dpi);
