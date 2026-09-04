@@ -306,12 +306,16 @@ std::string ProtectDataKeyownerDirective(std::string_view keyowner) {
 
 // §34.5.16.2 asks for the entity's name unchanged in the output file, and the
 // exception it makes is a digital signature, under which the name is encrypted
-// with the digest_key_method and placed in a digest_key_block. This
-// implementation writes no digest_key_block, so the name is written here in
-// either case, and the value goes out spelled as the source spelled it rather
-// than in whichever spelling this file settles on elsewhere: §22.5.1 gives a
-// pragma_value more than one spelling, and a name written bare and returned in
-// quotes is a different pragma_value from the one the author wrote.
+// with the digest_key_method and placed in a digest_key_block. The name is
+// written here in either case, because §34.4 defines the keyword names Table
+// 34-1 lists and digest_key_block is not among them, so the exception names a
+// destination no conforming tool writes and no reader could be required to
+// open. §34.5.17.2 and §34.5.21.2 except their identifiers into the key_block,
+// which Table 34-1 does list, and this tool sends those two there. The value
+// goes out spelled as the source spelled it rather than in whichever spelling
+// this file settles on elsewhere: §22.5.1 gives a pragma_value more than one
+// spelling, and a name written bare and returned in quotes is a different
+// pragma_value from the one the author wrote.
 std::string ProtectDigestKeyownerDirective(std::string_view keyowner) {
   std::string text;
   AppendKeywordDirectiveAsWritten(text, kDigestKeyownerKeyword, keyowner);

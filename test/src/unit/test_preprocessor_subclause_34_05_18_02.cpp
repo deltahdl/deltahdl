@@ -437,10 +437,11 @@ ProtectKeyList TheDataKeyAsWell() {
 //
 // The entity the name is read against is still in the clear, which is what the
 // last expectation states. §34.5.16.2 sends that entity to a digest_key_block
-// rather than to the key_block this envelope carries, and this tool writes no
-// digest_key_block; issue #3429 is that gap. The expectation is here because it
-// is what keeps the expectation above it from passing for an envelope that
-// dropped every mention of the digest's key.
+// rather than to the key_block this envelope carries, and §34.4 tabulates no
+// digest_key_block keyword, so no conforming tool writes one; issue #3429
+// settled that reading. The expectation is here because it is what keeps the
+// expectation above it from passing for an envelope that dropped every mention
+// of the digest's key.
 TEST(ProtectDigestKeynameEncryptionOutput,
      TheDigestNameLeavesTheClearWhereAKeyBlockCarriesIt) {
   std::string envelope = EncryptEnvelopes(RegionNamingBothProviders(), {},

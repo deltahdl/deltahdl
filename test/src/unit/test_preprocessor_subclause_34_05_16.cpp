@@ -621,9 +621,9 @@ TEST(ProtectDigestKeyownerEncryptionOutput,
 
 // The one arrangement the subclause makes an exception of: an envelope carrying
 // its own keys in blocks, which is where a digital signature puts them.
-// §34.5.16 sends the entity's name into a block holding the digest's key there,
-// and this implementation writes no such block, so the exception has nowhere to
-// send the name and it stays in the clear. A name sealed inside instead would
+// §34.5.16.2 sends the entity's name into a digest_key_block there, and §34.4
+// tabulates no keyword of that name, so the exception has nowhere to send the
+// name and it stays in the clear. A name sealed inside instead would
 // have to be read out from behind the very digest it says whose key opens.
 TEST(ProtectDigestKeyownerEncryptionOutput, AnEnvelopeCarryingKeysStatesItToo) {
   std::string described = Writes("key_keyowner", kKeyProvider);

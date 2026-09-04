@@ -609,13 +609,14 @@ std::string ProtectDataKeyownerDirective(std::string_view keyowner);
 //
 // §34.5.16.2 has the entity's name unchanged in the output file, except where a
 // digital signature is used, in which case it is encrypted with the
-// digest_key_method and placed in a digest_key_block. That destination is a
-// digest_key_block rather than the key_block the entities named for the data
-// and for the region's own keys are sent to, and this implementation writes no
-// digest_key_block, so the name is always written as it stands. A name swept
-// inside an encrypted block would leave a reader unable to learn whose key
-// opens the digest without first opening the very thing that digest is there to
-// vouch for.
+// digest_key_method and placed in a digest_key_block. The name is always
+// written as it stands, because §34.4 defines the keyword names Table 34-1
+// lists, digest_key_block is not among them, and §34.5 runs from §34.5.1 to
+// §34.5.32 without a subclause for one, so the exception has no destination.
+// §34.5.17.2 and §34.5.21.2 except their identifiers into the key_block
+// instead, which Table 34-1 does list. A name swept inside an encrypted block
+// would leave a reader unable to learn whose key opens the digest without first
+// opening the very thing that digest is there to vouch for.
 //
 // `keyowner` is the pragma_value as the source wrote it, quotes and all where
 // it had them, and it is written back the same way. Unchanged is meant of the

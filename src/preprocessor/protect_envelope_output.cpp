@@ -160,8 +160,8 @@ void AppendClearDigestNames(const EncryptionEnvelope& envelope,
   // the key_keyname or key_public_key and encoded in the key_block. An envelope
   // carrying key blocks writes the name into them, and one without them writes
   // it here. The entity the name is read against stands in the clear either
-  // way, §34.5.16.2 sending that entity to a block this implementation does not
-  // write.
+  // way, §34.5.16.2 sending that entity to a digest_key_block that §34.4
+  // tabulates no keyword for.
   if (!signed_envelope && !envelope.names.digest_keyname.empty()) {
     text->append(ProtectDigestKeynameDirective(envelope.names.digest_keyname));
   }
