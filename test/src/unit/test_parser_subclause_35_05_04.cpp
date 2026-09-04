@@ -598,8 +598,9 @@ TEST(FunctionDeclParsing, DpiImportFunctionDynamicOverrideSpecifierIsError) {
       "  import \"DPI-C\" function :initial void f();\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedError(r.diags,
-                            "dynamic_override_specifiers shall only be legal "
-                            "on method declarations inside a non-interface "
+                            "a DPI import declaration cannot carry "
+                            "dynamic_override_specifiers, which are legal only "
+                            "on a method declaration inside a non-interface "
                             "class scope",
                             2, "35.5.4"));
 }
@@ -614,8 +615,9 @@ TEST(FunctionDeclParsing, DpiImportTaskDynamicOverrideSpecifierIsError) {
       "  import \"DPI-C\" task :final t();\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedError(r.diags,
-                            "dynamic_override_specifiers shall only be legal "
-                            "on method declarations inside a non-interface "
+                            "a DPI import declaration cannot carry "
+                            "dynamic_override_specifiers, which are legal only "
+                            "on a method declaration inside a non-interface "
                             "class scope",
                             2, "35.5.4"));
 }

@@ -95,7 +95,11 @@ struct ParserDpiHelpers {
   // function_prototype and task_prototype admit "shall only be legal on method
   // declarations inside a non-interface class scope", and an import
   // declaration is never one. Consuming them here is what lets the report name
-  // that rule rather than the identifier the parser went on to expect.
+  // that rule rather than the identifier the parser went on to expect. The
+  // message names the import declaration because §8.20 states the same rule
+  // for an ordinary subroutine declaration and Elaborator reports it there:
+  // one message reported under two clauses tells neither site apart, which is
+  // what assert-subclause-citations fails a build for.
   static void RejectDynamicOverrideSpecifiers(Parser& p, ModuleItem* item) {
     auto loc = p.CurrentLoc();
     p.ParseDynamicOverrideSpecifiers(item);
@@ -104,8 +108,9 @@ struct ParserDpiHelpers {
       return;
     }
     p.diag_.Error(loc,
-                  "dynamic_override_specifiers shall only be legal on method "
-                  "declarations inside a non-interface class scope",
+                  "a DPI import declaration cannot carry "
+                  "dynamic_override_specifiers, which are legal only on a "
+                  "method declaration inside a non-interface class scope",
                   Subclause("35.5.4"));
   }
 };
