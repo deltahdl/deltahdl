@@ -264,4 +264,69 @@ TEST(RandsequenceSim, CodeBlockLocalsAreAutomaticPerInvocation) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
+// §18.17: "each code block within the randsequence block creates an anonymous
+// automatic scope". CodeBlockLocalsAreAutomaticPerInvocation above covers the
+// block written as a production of its own, which ExecRsProdCodeBlock pushes a
+// scope for. This is the other place Syntax 18-14 puts a code block:
+// `rs_rule ::= rs_production_list [ := rs_weight_specification [ rs_code_block
+// ] ]`, the block a rule carries after its weight. That one ran in the
+// enclosing production's scope, so its declaration outlived it and was still
+// standing when the same rule was selected again.
+//
+// Production a is selected twice and its block increments a local. Automatic
+// lifetime makes each run observe y == 1, so the block contributes 1 + 1; a
+// declaration that survived would contribute 1 + 2. p adds 10 each time it
+// generates, so the total tells the two apart as 22 against 23 and also says
+// the rule really was activated twice rather than once.
+TEST(RandsequenceSim, WeightCodeBlockLocalsAreAutomaticPerActivation) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  integer acc;\n"
+      "  initial begin\n"
+      "    acc = 0;\n"
+      "    randsequence(main)\n"
+      "      main : a a;\n"
+      "      a : p := 1 { int y; y = y + 1; acc = acc + y; };\n"
+      "      p : { acc = acc + 10; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f, "acc");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 22u);
+}
+
+// The same rule for the trailing block of a production named as a rand join
+// operand, which is a second execution path: §18.17.5's interleaving runs each
+// operand production's selected rule through a helper of its own rather than
+// through the one the case above exercises. §18.17 puts no condition on where
+// a code block stands, so both want the scope.
+//
+// m is generated twice and each generation interleaves p and q, so p's trailing
+// block runs twice and s generates four times. Automatic lifetime gives
+// 40 + 1 + 1; a surviving declaration gives 40 + 1 + 2. The interleaving order
+// §18.17.5 leaves unspecified does not reach the total, every contribution
+// being a sum.
+TEST(RandsequenceSim, RandJoinOperandWeightCodeBlockLocalsAreAutomatic) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  integer acc;\n"
+      "  initial begin\n"
+      "    acc = 0;\n"
+      "    randsequence(main)\n"
+      "      main : m m;\n"
+      "      m : rand join p q;\n"
+      "      p : s := 1 { int y; y = y + 1; acc = acc + y; };\n"
+      "      q : s;\n"
+      "      s : { acc = acc + 10; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f, "acc");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
 }  // namespace

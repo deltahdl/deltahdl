@@ -407,10 +407,21 @@ static size_t ChooseRandJoinOperand(const std::vector<RandJoinSeq>& seqs,
 // leaving rule_aborted set so the caller emits no steps for it.
 static ExecTask RunRandJoinRuleWeightCode(const RsRule& rule, SimContext& ctx,
                                           Arena& arena, bool& rule_aborted) {
+  // §18.17 gives every code block within the randsequence an anonymous
+  // automatic scope, and puts no condition on where the block stands, so an
+  // operand production's trailing block gets one exactly as the block in
+  // ExecSelectedRule does. The unwinding result is carried out of the loop
+  // rather than returned from inside it, so the scope is popped however the
+  // block ends.
+  ctx.PushScope();
+  StmtResult unwind = StmtResult::kDone;
   for (auto* s : rule.weight_code) {
     auto r = co_await ExecStmt(s, ctx, arena);
     auto action = ClassifyRandseqResult(r);
-    if (action == RandseqAction::kUnwind) co_return r;
+    if (action == RandseqAction::kUnwind) {
+      unwind = r;
+      break;
+    }
     if (action == RandseqAction::kAbortProduction) {
       rule_aborted = true;
       break;
@@ -419,7 +430,8 @@ static ExecTask RunRandJoinRuleWeightCode(const RsRule& rule, SimContext& ctx,
     // code does not run.
     if (ctx.StopRequested()) break;
   }
-  co_return StmtResult::kDone;
+  ctx.PopScope();
+  co_return unwind;
 }
 
 namespace {
@@ -637,16 +649,32 @@ static ExecTask ExecSelectedRule(const Stmt* stmt, const RsRule& selected,
     prods_result = co_await ExecRuleProds(stmt, selected, ctx, arena);
   }
   if (prods_result != StmtResult::kDone) co_return prods_result;
+  // §18.17: "each code block within the randsequence block creates an
+  // anonymous automatic scope", and Syntax 18-14 makes this one of them --
+  // `rs_rule ::= rs_production_list [ := rs_weight_specification [
+  // rs_code_block ] ]`. It ran in the enclosing production's scope instead, so
+  // a data declaration A.6.12 admits at the head of an rs_code_block outlived
+  // the block: visible to the rest of the production, and still standing when
+  // the same rule was selected again. ExecRsProdCodeBlock above pushes the
+  // scope for the block written as a production of its own.
+  //
+  // The result is carried out of the loop rather than returned from inside it,
+  // because a break, a return or a disable leaves the block early and a scope
+  // left on the stack is worse than one never pushed.
+  ctx.PushScope();
+  StmtResult block_result = StmtResult::kDone;
   for (auto* s : selected.weight_code) {
     auto result = co_await ExecStmt(s, ctx, arena);
     if (ClassifyRandseqResult(result) != RandseqAction::kKeepGenerating) {
-      co_return result;
+      block_result = result;
+      break;
     }
     // §20.2: a $finish here exits the simulator, so the rest of this code block
     // does not run.
     if (ctx.StopRequested()) break;
   }
-  co_return StmtResult::kDone;
+  ctx.PopScope();
+  co_return block_result;
 }
 
 static ExecTask ExecRsProduction(const Stmt* stmt, const RsProductionItem& call,
