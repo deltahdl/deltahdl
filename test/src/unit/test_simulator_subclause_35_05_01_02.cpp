@@ -1,13 +1,13 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_dpi_touch_import.h"
 #include "parser/ast.h"
-#include "simulator/dpi.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -270,14 +270,12 @@ TEST(DpiArgumentDirections, LegacyInputOnlyCallbackLeavesActualUnchanged) {
 // ---------------------------------------------------------------------------
 // The same three rules, asked of a call a design makes.
 //
-// The cases above call the foreign function through DpiRuntime, which is the
-// registry the DPI C layer in src/simulator/svdpi.cpp works against. A call
-// written in SystemVerilog does not reach it: EvalDpiCall in
-// src/simulator/eval_function.cpp evaluates the call site's actuals, calls the
-// import through the DpiContext the run holds, and is where a value the foreign
-// function wrote has to arrive if it is to be visible to the design at all.
-// §35.5.1.2 is a rule about what the calling code sees, so it is asked here of
-// the code that does the seeing.
+// The cases above call the foreign function through DpiRuntime directly.
+// EvalDpiCall in src/simulator/eval_function_dpi.cpp evaluates the call site's
+// actuals, calls the import through the DpiRuntime the run holds, and is where
+// a value the foreign function wrote has to arrive if it is to be visible to
+// the design at all. §35.5.1.2 is a rule about what the calling code sees, so
+// it is asked here of the code that does the seeing.
 // ---------------------------------------------------------------------------
 
 // A design holding one variable `a`, which is handed to that import and read
@@ -285,13 +283,13 @@ TEST(DpiArgumentDirections, LegacyInputOnlyCallbackLeavesActualUnchanged) {
 // the foreign function was handed is `seen`, and what the call site is left
 // holding is Actual().
 struct TouchingAnActual {
-  DpiContext dpi;
+  DpiRuntime dpi;
   SimFixture f;
   uint64_t seen = 0;
 
   TouchingAnActual(Direction direction, uint64_t wrote, uint64_t actual) {
     RegisterTouchImport(dpi, direction, wrote, &seen);
-    f.ctx.SetDpiContext(&dpi);
+    f.ctx.SetDpiRuntime(&dpi);
     auto* var = f.ctx.CreateVariable("a", 32);
     var->value = MakeLogic4VecVal(f.arena, 32, actual);
     EvalFunctionCall(ParseExprFrom("touch(a)", f), f.ctx, f.arena);
@@ -353,21 +351,21 @@ TEST(DpiArgumentDirectionsInADesign, AnInoutActualTakesWhatTheImportWrote) {
 // name therefore leaves each value with the variable that formal was named
 // against, and not with the one standing in that position.
 TEST(DpiArgumentDirectionsInADesign, ANamedActualTakesItsOwnFormalsValue) {
-  DpiContext dpi;
+  DpiRuntime dpi;
   SimFixture f;
-  DpiFunction func;
+  DpiRtFunction func;
   func.c_name = "c_pair";
   func.sv_name = "pair";
   func.return_type = DataTypeKind::kInt;
   func.args = {DpiArg{"first", DataTypeKind::kInt, Direction::kOutput},
                DpiArg{"second", DataTypeKind::kInt, Direction::kOutput}};
-  func.arg_impl = [](std::vector<Logic4Word>& args) -> Logic4Word {
-    args[0] = Logic4Word{11, 0};
-    args[1] = Logic4Word{22, 0};
-    return Logic4Word{0, 0};
+  func.arg_impl = [](std::vector<DpiArgValue>& args) -> DpiArgValue {
+    args[0] = DpiArgValue::FromInt(11);
+    args[1] = DpiArgValue::FromInt(22);
+    return DpiArgValue::FromInt(0);
   };
-  dpi.RegisterImport(func);
-  f.ctx.SetDpiContext(&dpi);
+  dpi.RegisterImport(std::move(func));
+  f.ctx.SetDpiRuntime(&dpi);
   f.ctx.CreateVariable("one", 32)->value = MakeLogic4VecVal(f.arena, 32, 0);
   f.ctx.CreateVariable("two", 32)->value = MakeLogic4VecVal(f.arena, 32, 0);
 
@@ -382,18 +380,18 @@ TEST(DpiArgumentDirectionsInADesign, ANamedActualTakesItsOwnFormalsValue) {
 // one is answered by it as before: nothing the call copies back is a value the
 // foreign function did not write, so the result is what it computed.
 TEST(DpiArgumentDirectionsInADesign, AnImportWritingNothingYieldsItsResult) {
-  DpiContext dpi;
+  DpiRuntime dpi;
   SimFixture f;
-  DpiFunction func;
+  DpiRtFunction func;
   func.c_name = "c_double";
   func.sv_name = "twice";
   func.return_type = DataTypeKind::kInt;
   func.args = {DpiArg{"a", DataTypeKind::kInt, Direction::kInput}};
-  func.impl = [](const std::vector<Logic4Word>& args) -> Logic4Word {
-    return Logic4Word{args[0].aval * 2, 0};
+  func.impl = [](const std::vector<DpiArgValue>& args) -> DpiArgValue {
+    return DpiArgValue::FromInt(args[0].AsInt() * 2);
   };
-  dpi.RegisterImport(func);
-  f.ctx.SetDpiContext(&dpi);
+  dpi.RegisterImport(std::move(func));
+  f.ctx.SetDpiRuntime(&dpi);
   f.ctx.CreateVariable("a", 32)->value = MakeLogic4VecVal(f.arena, 32, 6);
 
   auto result =

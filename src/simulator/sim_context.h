@@ -55,7 +55,7 @@
 namespace delta {
 
 class DiagEngine;
-class DpiContext;
+class DpiRuntime;
 class SpecifyManager;
 struct ModuleItem;
 struct Process;
@@ -355,8 +355,12 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // records its time; a later call passes only when it matches.
   bool RegisterDumpportsTime(uint64_t time);
 
-  void SetDpiContext(DpiContext* dpi) { dpi_context_ = dpi; }
-  DpiContext* GetDpiContext() { return dpi_context_; }
+  // §35: the one registry the run's DPI calls go through. EvalDpiCall reaches
+  // an import through it, so the clause 35 rules DpiRuntime holds -- §35.5.2's
+  // pure-result reuse, §35.5.3's call chain, §35.6.2's value changes, §35.9's
+  // disable protocol -- are the rules a design's calls meet.
+  void SetDpiRuntime(DpiRuntime* dpi) { dpi_runtime_ = dpi; }
+  DpiRuntime* GetDpiRuntime() { return dpi_runtime_; }
 
   void SetCurrentProcess(Process* proc);
   Process* CurrentProcess() const { return current_process_; }
@@ -742,7 +746,7 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // execute, recorded by the first call.
   bool have_dumpports_time_ = false;
   uint64_t dumpports_time_ = 0;
-  DpiContext* dpi_context_ = nullptr;
+  DpiRuntime* dpi_runtime_ = nullptr;
   Process* current_process_ = nullptr;
   // The instance being built. See SetLoweringInstancePrefix.
   std::string lowering_inst_prefix_;

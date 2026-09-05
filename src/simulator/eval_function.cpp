@@ -8,14 +8,12 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
-#include "simulator/dpi.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
-#include "simulator/statement_assign.h"
 
 namespace delta {
 
@@ -219,171 +217,6 @@ void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
       obj->properties[scoped] = val;
     }
   }
-}
-
-static int ResolveDpiActualIndex(const DpiFunction* import, const Expr* expr,
-                                 size_t i, size_t positional_count) {
-  if (i < positional_count) {
-    return static_cast<int>(i);
-  }
-  for (size_t j = 0; j < expr->arg_names.size(); ++j) {
-    if (expr->arg_names[j] == import->args[i].name) {
-      return static_cast<int>(positional_count + j);
-    }
-  }
-  return -1;
-}
-
-// The aval/bval pair a value crosses the DPI boundary as. §35.2.2.1 rules that
-// the representation of a 4-state value "is irrelevant for SystemVerilog
-// semantics", so an x or a z a design wrote has to survive the crossing; a
-// projection through Logic4Vec::ToUint64 reads both as 0 and cannot.
-static Logic4Word DpiWordOf(const Logic4Vec& v) {
-  if (v.nwords == 0) return Logic4Word{};
-  return v.words[0];
-}
-
-// §35.5.5 lists the types an imported function's result may have and §35.5.6
-// the types its formals may have; this is the width each carries. Built at a
-// fixed width instead, a longint or a chandle result lost its upper half and a
-// byte arrived padded with bits its type does not have. A void result falls to
-// the default with everything else the clauses do not name: §35.5.5 gives such
-// a call no value, so nothing reads what width it came out at.
-static uint32_t DpiValueWidth(DataTypeKind kind) {
-  switch (kind) {
-    case DataTypeKind::kBit:
-    case DataTypeKind::kLogic:
-    case DataTypeKind::kReg:
-      return 1;
-    case DataTypeKind::kByte:
-      return 8;
-    case DataTypeKind::kShortint:
-      return 16;
-    case DataTypeKind::kLongint:
-    case DataTypeKind::kChandle:
-    case DataTypeKind::kTime:
-    case DataTypeKind::kReal:
-    case DataTypeKind::kShortreal:
-    case DataTypeKind::kRealtime:
-      return 64;
-    default:
-      return 32;
-  }
-}
-
-// A value of the declared type carrying what crossed the boundary, unknown bits
-// included. A real is carried as its own bit pattern in a 64-bit vector marked
-// is_real, which is the shape MakeRealVec in src/simulator/evaluation.cpp
-// builds and what the rest of the evaluator reads a real out of.
-static Logic4Vec DpiValueOfType(Arena& arena, DataTypeKind kind,
-                                Logic4Word word) {
-  uint32_t width = DpiValueWidth(kind);
-  Logic4Vec v = MakeLogic4Vec(arena, width);
-  uint64_t mask = width >= 64 ? ~0ULL : ((1ULL << width) - 1);
-  v.words[0].aval = word.aval & mask;
-  v.words[0].bval = word.bval & mask;
-  v.is_real = kind == DataTypeKind::kReal || kind == DataTypeKind::kShortreal ||
-              kind == DataTypeKind::kRealtime;
-  return v;
-}
-
-static Logic4Word EvalDpiActualForFormal(const DpiFunction* import, size_t i,
-                                         const ActualBindingCtx& b) {
-  // §35.5.1.2: an imported function shall not assume anything about the initial
-  // value of an output formal, whose value is undetermined, so the actual the
-  // call site wrote is not what the foreign function is handed for one. Zero is
-  // the undetermined value supplied here, as it is for the foreign layer in
-  // DpiRuntime::UndeterminedOutputValue.
-  if (import->args[i].direction == Direction::kOutput) return Logic4Word{};
-  int ai = ResolveDpiActualIndex(import, b.call, i, b.positional_count);
-  if (ai >= 0 && b.call->args[static_cast<size_t>(ai)] != nullptr) {
-    return DpiWordOf(
-        EvalExpr(b.call->args[static_cast<size_t>(ai)], b.ctx, b.arena));
-  }
-  if (import->args[i].default_value) {
-    return DpiWordOf(EvalExpr(import->args[i].default_value, b.ctx, b.arena));
-  }
-  return Logic4Word{};
-}
-
-static std::vector<Logic4Word> BindDpiActualsFromImport(
-    const DpiFunction* import, const Expr* expr, SimContext& ctx,
-    Arena& arena) {
-  size_t positional_count = expr->args.size() - expr->arg_names.size();
-  ActualBindingCtx binding{expr, positional_count, ctx, arena};
-  std::vector<Logic4Word> args;
-  args.reserve(import->args.size());
-  for (size_t i = 0; i < import->args.size(); ++i) {
-    args.push_back(EvalDpiActualForFormal(import, i, binding));
-  }
-  return args;
-}
-
-static std::vector<Logic4Word> BindDpiActualsPositional(const Expr* expr,
-                                                        SimContext& ctx,
-                                                        Arena& arena) {
-  std::vector<Logic4Word> args;
-  args.reserve(expr->args.size());
-  for (auto* arg : expr->args) {
-    args.push_back(DpiWordOf(EvalExpr(arg, ctx, arena)));
-  }
-  return args;
-}
-
-static std::vector<Logic4Word> BindDpiCallActuals(const DpiFunction* import,
-                                                  const Expr* expr,
-                                                  SimContext& ctx,
-                                                  Arena& arena) {
-  if (import && !import->args.empty()) {
-    return BindDpiActualsFromImport(import, expr, ctx, arena);
-  }
-  return BindDpiActualsPositional(expr, ctx, arena);
-}
-
-// §35.5.1.2: assigns to each output and inout actual what the foreign function
-// left in the formal written against it, which is what makes the change the
-// function made visible outside the call. An input formal is passed over: the
-// foreign function was handed a copy of that actual, so whatever it did to the
-// copy is discarded here and the actual is not changed. §13.5.2 has
-// WritebackOutputArgs in eval_function_args.cpp do this for a native
-// subroutine, reading the values out of the callee's local variables; a foreign
-// callee has none, so the values are read out of the vector it was called with.
-static void WritebackDpiOutputArgs(const DpiFunction* import, const Expr* expr,
-                                   const std::vector<Logic4Word>& args,
-                                   SimContext& ctx, Arena& arena) {
-  size_t positional_count = expr->args.size() - expr->arg_names.size();
-  for (size_t i = 0; i < import->args.size() && i < args.size(); ++i) {
-    Direction dir = import->args[i].direction;
-    if (dir != Direction::kOutput && dir != Direction::kInout) continue;
-    int ai = ResolveDpiActualIndex(import, expr, i, positional_count);
-    if (ai < 0) continue;
-    // The value arrives at the width the formal declares, unknown bits and
-    // all, and the assignment narrows it to whatever the actual holds, as an
-    // assignment to that actual would anywhere else.
-    PerformBlockingAssign(expr->args[static_cast<size_t>(ai)],
-                          DpiValueOfType(arena, import->args[i].type, args[i]),
-                          ctx, arena);
-  }
-}
-
-static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
-  auto* dpi = ctx.GetDpiContext();
-  if (!dpi || !dpi->HasImport(expr->callee)) {
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-  // §35.6: calling an imported function uses the same usage and syntax as a
-  // native function call. When the import's formals are known, resolve the
-  // call-site actuals against them so that named-argument binding and omitted
-  // arguments backed by defaults behave exactly as for native subroutine calls.
-  const DpiFunction* import = dpi->FindImport(expr->callee);
-  std::vector<Logic4Word> args = BindDpiCallActuals(import, expr, ctx, arena);
-  Logic4Word result = dpi->CallWithArgs(expr->callee, args);
-  if (import != nullptr && !import->args.empty()) {
-    WritebackDpiOutputArgs(import, expr, args, ctx, arena);
-  }
-  return DpiValueOfType(
-      arena, import != nullptr ? import->return_type : DataTypeKind::kInt,
-      result);
 }
 
 // ClassMethodTarget and the ExecClassMethod prototype live in

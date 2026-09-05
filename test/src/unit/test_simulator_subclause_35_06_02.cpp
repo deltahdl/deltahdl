@@ -1,10 +1,15 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <utility>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "helpers_dpi_bump_import.h"
+#include "parser/ast.h"
 #include "simulator/dpi_runtime.h"
+#include "simulator/evaluation.h"
+#include "simulator/sim_context.h"
 
 using namespace delta;
 
@@ -262,6 +267,77 @@ TEST(DpiOutputInoutValueChanges, ChangedArgReportedAtItsDeclaredIndex) {
   EXPECT_EQ(changes[0].old_value.AsInt(), 20);
   EXPECT_EQ(changes[0].new_value.AsInt(), 25);
   EXPECT_EQ(actuals[0].AsInt(), 10);  // first inout unchanged, no event
+}
+
+// ---------------------------------------------------------------------------
+// The same rule, asked of a call a design makes.
+//
+// The cases above read the events out of the vector DpiRuntime fills. A design
+// has no such vector: what §35.6.2 calls handling the change is the assignment
+// to the actual, and what a design observes is the propagation that assignment
+// starts. EvalDpiCall in src/simulator/eval_function_dpi.cpp is where the two
+// meet, and Variable::NotifyWatchers is what a value change reaches.
+// ---------------------------------------------------------------------------
+
+// A design holding one variable `a` set to `actual`, handed to an import whose
+// foreign body leaves `wrote` in its output formal. `events` counts the times
+// the variable's value change was propagated, and Actual() is what it holds
+// once the call has returned.
+struct AnOutputActualInADesign {
+  DpiRuntime rt;
+  SimFixture f;
+  int events = 0;
+
+  AnOutputActualInADesign(int32_t actual, int32_t wrote) {
+    DpiRtFunction func;
+    func.c_name = "c_set_out";
+    func.sv_name = "set_out";
+    func.return_type = DataTypeKind::kVoid;
+    func.args = {DpiArg{"o", DataTypeKind::kInt, Direction::kOutput}};
+    func.arg_impl = [wrote](std::vector<DpiArgValue>& a) {
+      a[0] = DpiArgValue::FromInt(wrote);
+      return DpiArgValue::FromInt(0);
+    };
+    rt.RegisterImport(std::move(func));
+    f.ctx.SetDpiRuntime(&rt);
+    auto* var = f.ctx.CreateVariable("a", 32);
+    var->value = MakeLogic4VecVal(f.arena, 32, static_cast<uint64_t>(actual));
+    int* events_slot = &events;
+    // Returning false keeps the watcher registered, so a second propagation
+    // would be counted too rather than going unseen.
+    var->AddWatcher([events_slot]() {
+      ++*events_slot;
+      return false;
+    });
+    EvalFunctionCall(ParseExprFrom("set_out(a)", f), f.ctx, f.arena);
+  }
+
+  uint64_t Actual() { return f.ctx.FindVariable("a")->value.ToUint64(); }
+};
+
+// §35.6.2: the value change of an output actual is detected and handled after
+// control returns from the imported function, and handling it is one
+// propagation of one assignment. The foreign body writes 99 over a 7, so the
+// design sees the change once.
+TEST(DpiValueChangeInADesign, AnOutputActualAlteredByAnImportRaisesOneEvent) {
+  AnOutputActualInADesign run(/*actual=*/7, /*wrote=*/99);
+  EXPECT_EQ(run.events, 1);
+}
+
+// The change that was propagated is the one the import made, which is what
+// makes the count above a value change rather than a bare notification.
+TEST(DpiValueChangeInADesign, ThePropagatedValueIsWhatTheImportWrote) {
+  AnOutputActualInADesign run(/*actual=*/7, /*wrote=*/99);
+  EXPECT_EQ(run.Actual(), 99U);
+}
+
+// §35.6.2 has the propagation happen "as if the actual argument was assigned
+// the formal output value immediately after the return", and an assignment of
+// the value a variable already holds is not a value change. The foreign body
+// writes back the 50 the actual came in with, so the design sees nothing.
+TEST(DpiValueChangeInADesign, AnUnalteredOutputActualRaisesNoEvent) {
+  AnOutputActualInADesign run(/*actual=*/50, /*wrote=*/50);
+  EXPECT_EQ(run.events, 0);
 }
 
 }  // namespace

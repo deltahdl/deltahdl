@@ -1,9 +1,15 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
 #include <utility>
 #include <vector>
 
+#include "fixture_simulator.h"
+#include "parser/ast.h"
 #include "simulator/dpi_runtime.h"
+#include "simulator/evaluation.h"
+#include "simulator/sim_context.h"
 
 using namespace delta;
 
@@ -189,6 +195,73 @@ TEST(PureDpiCallRemoval, AnOrdinaryCallIsMadeAfterAReusableOneWasAnswered) {
   declared.Squaring(7);
   declared.rt.CallImport("square", {DpiArgValue::FromInt(7)});
   EXPECT_EQ(declared.entries, 2);
+}
+
+// ---------------------------------------------------------------------------
+// The same rule, asked of a call a design makes.
+//
+// The cases above reach the reuse by calling DpiRuntime's entry point. A call
+// written in SystemVerilog reaches it through EvalDpiCall in
+// src/simulator/eval_function_dpi.cpp, which is where §35.5.2 has to be applied
+// if a design is to get the optimization at all.
+// ---------------------------------------------------------------------------
+
+// A design calling `square(v)` twice, against an import declared `is_pure`
+// whose foreign body counts the times it was entered.
+struct CallingASquaringImportTwice {
+  DpiRuntime rt;
+  SimFixture f;
+  int entries = 0;
+  uint64_t first = 0;
+  uint64_t second = 0;
+
+  CallingASquaringImportTwice(bool is_pure, int actual) {
+    DpiRtFunction func;
+    func.c_name = "c_square";
+    func.sv_name = "square";
+    func.return_type = DataTypeKind::kInt;
+    func.args = {DpiArg{"v", DataTypeKind::kInt, Direction::kInput}};
+    func.is_pure = is_pure;
+    int* entries_slot = &entries;
+    func.impl = [entries_slot](const std::vector<DpiArgValue>& a) {
+      ++*entries_slot;
+      return DpiArgValue::FromInt(a[0].AsInt() * a[0].AsInt());
+    };
+    rt.RegisterImport(std::move(func));
+    f.ctx.SetDpiRuntime(&rt);
+    const Expr* call =
+        ParseExprFrom("square(" + std::to_string(actual) + ")", f);
+    first = EvalFunctionCall(call, f.ctx, f.arena).ToUint64();
+    second = EvalFunctionCall(call, f.ctx, f.arena).ToUint64();
+  }
+};
+
+// §35.5.2: a call to a pure function "can be ... replaced with the value
+// previously computed for the same values of the input arguments". The two call
+// sites present the same input value, so the foreign function is entered once
+// and the second call is answered from what the first computed.
+TEST(DpiPureCallInADesign, ASecondCallOnEqualInputsReusesTheFirstResult) {
+  CallingASquaringImportTwice run(/*is_pure=*/true, 6);
+  EXPECT_EQ(run.entries, 1);
+}
+
+// The other half of the same rule: the value the second call is answered with
+// is the value a fresh call would have computed. Asserted separately because a
+// design that skipped the second call and left the expression valueless would
+// satisfy the case above on its own.
+TEST(DpiPureCallInADesign, TheReusedResultIsTheValueTheCallWouldCompute) {
+  CallingASquaringImportTwice run(/*is_pure=*/true, 6);
+  EXPECT_EQ(run.second, 36U);
+  EXPECT_EQ(run.first, 36U);
+}
+
+// §35.5.1.3 leaves an import declared with neither special property free to
+// have side effects, so its call is made every time the design writes one
+// however often the same values have been presented before. This is what keeps
+// the reuse above confined to §35.5.2's subject.
+TEST(DpiPureCallInADesign, AnImportWithoutThePropertyIsEnteredOnEveryCall) {
+  CallingASquaringImportTwice run(/*is_pure=*/false, 6);
+  EXPECT_EQ(run.entries, 2);
 }
 
 }  // namespace

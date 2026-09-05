@@ -3,7 +3,6 @@
 
 #include "fixture_simulator.h"
 #include "parser/ast.h"
-#include "simulator/dpi.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/evaluation.h"
 
@@ -11,16 +10,19 @@ using namespace delta;
 
 namespace {
 
-TEST(Dpi, RegisterExport) {
-  DpiContext ctx;
-  DpiExport exp;
+// §35.7: the exports a registry answers for are the ones some declaration
+// gave it. DpiRuntime.RegisterExportAndCall below makes the positive claim --
+// a registered name is found and its body runs; this one makes the negative,
+// which no other case states: a name no export declaration gave is not an
+// export of the design, however many others were registered.
+TEST(DpiRuntime, HasExportIsFalseForAnUndeclaredName) {
+  DpiRuntime rt;
+  DpiRtExport exp;
   exp.c_name = "c_callback";
   exp.sv_name = "sv_callback";
-  ctx.RegisterExport(exp);
+  rt.RegisterExport(exp);
 
-  EXPECT_EQ(ctx.ExportCount(), 1u);
-  EXPECT_TRUE(ctx.HasExport("sv_callback"));
-  EXPECT_FALSE(ctx.HasExport("missing"));
+  EXPECT_FALSE(rt.HasExport("missing"));
 }
 
 TEST(DpiRuntime, RegisterExportAndCall) {

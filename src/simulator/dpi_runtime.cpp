@@ -129,6 +129,13 @@ DpiArgValue DpiArgValue::FromLogic(SvLogic v) {
   return a;
 }
 
+DpiArgValue DpiArgValue::FromLogicVec(SvLogicVecVal v) {
+  DpiArgValue a;
+  a.type = DataTypeKind::kInteger;
+  a.data.logic_vec_val = v;
+  return a;
+}
+
 int32_t DpiArgValue::AsInt() const { return data.int_val; }
 int64_t DpiArgValue::AsLongint() const { return data.longint_val; }
 double DpiArgValue::AsReal() const { return data.real_val; }
@@ -136,6 +143,7 @@ const std::string& DpiArgValue::AsString() const { return string_val; }
 SvChandle DpiArgValue::AsChandle() const { return data.chandle_val; }
 SvBit DpiArgValue::AsBit() const { return data.bit_val; }
 SvLogic DpiArgValue::AsLogic() const { return data.logic_val; }
+SvLogicVecVal DpiArgValue::AsLogicVec() const { return data.logic_vec_val; }
 
 namespace {
 
@@ -157,6 +165,12 @@ int64_t NumericToInt(const DpiArgValue& v) {
     case DataTypeKind::kLogic:
     case DataTypeKind::kReg:
       return v.AsLogic();
+    // §35.2.2.1: an `integer` crosses as the aval/bval pair, so its numeric
+    // value is the aval half. A bit the bval marks unknown reads as whatever
+    // the aval says, which is the projection any coercion to a two-state type
+    // has to make and the one the standard leaves to the implementation.
+    case DataTypeKind::kInteger:
+      return static_cast<int32_t>(v.AsLogicVec().aval);
     default:
       return v.AsInt();
   }
@@ -178,6 +192,8 @@ double NumericToReal(const DpiArgValue& v) {
     case DataTypeKind::kLogic:
     case DataTypeKind::kReg:
       return static_cast<double>(v.AsLogic());
+    case DataTypeKind::kInteger:
+      return static_cast<double>(static_cast<int32_t>(v.AsLogicVec().aval));
     default:
       return static_cast<double>(v.AsInt());
   }
@@ -192,6 +208,12 @@ double NumericToReal(const DpiArgValue& v) {
 bool SameArgValue(const DpiArgValue& a, const DpiArgValue& b) {
   if (a.type != b.type) return false;
   switch (a.type) {
+    // §35.2.2.1: two four-state values are the same value when both halves
+    // agree. Comparing the aval alone would call an actual left at x equal to
+    // one the call set to 1, and raise no §35.6.2 event for the change.
+    case DataTypeKind::kInteger:
+      return a.AsLogicVec().aval == b.AsLogicVec().aval &&
+             a.AsLogicVec().bval == b.AsLogicVec().bval;
     case DataTypeKind::kReal:
     case DataTypeKind::kShortreal:
     case DataTypeKind::kRealtime:
@@ -245,6 +267,14 @@ DpiArgValue CoerceArgValue(const DpiArgValue& v, DataTypeKind target) {
       r.type = target;
       return r;
     }
+    // §35.2.2.1: coercing toward `integer` yields the four-state pair. A value
+    // that already is one arrives here only when the types differ, so the pair
+    // is built from the numeric reading and carries no unknown bit; an
+    // `integer` actual passed to an `integer` formal is returned untouched by
+    // the identity check above, x and z bits included.
+    case DataTypeKind::kInteger:
+      return DpiArgValue::FromLogicVec(
+          SvLogicVecVal{static_cast<uint32_t>(NumericToInt(v)), 0});
     case DataTypeKind::kByte: {
       DpiArgValue r =
           DpiArgValue::FromInt(static_cast<int8_t>(NumericToInt(v)));
@@ -396,6 +426,11 @@ std::string PureCallArgKey(std::string_view sv_name,
       case DataTypeKind::kReg:
         key += std::to_string(static_cast<int>(arg.AsLogic()));
         break;
+      case DataTypeKind::kInteger:
+        key += std::to_string(arg.AsLogicVec().aval);
+        key += '/';
+        key += std::to_string(arg.AsLogicVec().bval);
+        break;
       case DataTypeKind::kLongint:
       case DataTypeKind::kTime:
         key += std::to_string(arg.AsLongint());
@@ -455,6 +490,8 @@ DpiArgValue DpiRuntime::UndeterminedOutputValue(DataTypeKind type) {
     case DataTypeKind::kLogic:
     case DataTypeKind::kReg:
       return DpiArgValue::FromLogic(0);
+    case DataTypeKind::kInteger:
+      return DpiArgValue::FromLogicVec(SvLogicVecVal{});
     default:
       return DpiArgValue::FromInt(0);
   }

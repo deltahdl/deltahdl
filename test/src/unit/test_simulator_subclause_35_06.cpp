@@ -1,33 +1,14 @@
+#include <utility>
 #include <vector>
 
 #include "fixture_simulator.h"
 #include "parser/ast.h"
-#include "simulator/dpi.h"
+#include "simulator/dpi_runtime.h"
 #include "simulator/evaluation.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(Dpi, CallFunction) {
-  DpiContext ctx;
-  DpiFunction func;
-  func.c_name = "c_add";
-  func.sv_name = "sv_add";
-  func.impl = [](const std::vector<Logic4Word>& args) -> Logic4Word {
-    return Logic4Word{args[0].aval + args[1].aval, 0};
-  };
-  ctx.RegisterImport(func);
-
-  auto result = ctx.Call("sv_add", {Logic4Word{10, 0}, Logic4Word{20, 0}});
-  EXPECT_EQ(result.aval, 30u);
-}
-
-TEST(Dpi, CallMissingReturnsZero) {
-  DpiContext ctx;
-  auto result = ctx.Call("nonexistent", {Logic4Word{1, 0}, Logic4Word{2, 0}});
-  EXPECT_EQ(result.aval, 0u);
-}
 
 // §35.6 — Calling imported functions: the usage and syntax for calling an
 // imported function is identical to a native SystemVerilog function call.
@@ -37,8 +18,8 @@ TEST(Dpi, CallMissingReturnsZero) {
 
 // Registers an imported function `sv_probe(a, b = 99)` whose body encodes the
 // values it received in formal order: a * 1000 + b.
-static void RegisterProbe(DpiContext& dpi, SimFixture& f) {
-  DpiFunction fn;
+static void RegisterProbe(DpiRuntime& dpi, SimFixture& f) {
+  DpiRtFunction fn;
   fn.c_name = "c_probe";
   fn.sv_name = "sv_probe";
   fn.return_type = DataTypeKind::kInt;
@@ -50,19 +31,19 @@ static void RegisterProbe(DpiContext& dpi, SimFixture& f) {
   b.default_value = ParseExprFrom("99", f);
   fn.args = {a, b};
 
-  fn.impl = [](const std::vector<Logic4Word>& v) -> Logic4Word {
-    return Logic4Word{v[0].aval * 1000 + v[1].aval, 0};
+  fn.impl = [](const std::vector<DpiArgValue>& v) -> DpiArgValue {
+    return DpiArgValue::FromInt(v[0].AsInt() * 1000 + v[1].AsInt());
   };
-  dpi.RegisterImport(fn);
+  dpi.RegisterImport(std::move(fn));
 }
 
 // C1/C2: a plain positional call binds actuals to formals in order, just like a
 // native call.
 TEST(DpiCallArgumentBinding, PositionalCallBindsInOrder) {
   SimFixture f;
-  DpiContext dpi;
+  DpiRuntime dpi;
   RegisterProbe(dpi, f);
-  f.ctx.SetDpiContext(&dpi);
+  f.ctx.SetDpiRuntime(&dpi);
 
   auto* call = ParseExprFrom("sv_probe(2, 8)", f);
   auto result = EvalFunctionCall(call, f.ctx, f.arena).ToUint64();
@@ -73,9 +54,9 @@ TEST(DpiCallArgumentBinding, PositionalCallBindsInOrder) {
 // matching formal regardless of the written order.
 TEST(DpiCallArgumentBinding, NamedArgumentsBindToMatchingFormals) {
   SimFixture f;
-  DpiContext dpi;
+  DpiRuntime dpi;
   RegisterProbe(dpi, f);
-  f.ctx.SetDpiContext(&dpi);
+  f.ctx.SetDpiRuntime(&dpi);
 
   auto* call = ParseExprFrom("sv_probe(.b(7), .a(3))", f);
   auto result = EvalFunctionCall(call, f.ctx, f.arena).ToUint64();
@@ -86,9 +67,9 @@ TEST(DpiCallArgumentBinding, NamedArgumentsBindToMatchingFormals) {
 // declared default is supplied for the missing formal.
 TEST(DpiCallArgumentBinding, OmittedArgumentUsesDefault) {
   SimFixture f;
-  DpiContext dpi;
+  DpiRuntime dpi;
   RegisterProbe(dpi, f);
-  f.ctx.SetDpiContext(&dpi);
+  f.ctx.SetDpiRuntime(&dpi);
 
   auto* call = ParseExprFrom("sv_probe(5)", f);
   auto result = EvalFunctionCall(call, f.ctx, f.arena).ToUint64();
@@ -99,9 +80,9 @@ TEST(DpiCallArgumentBinding, OmittedArgumentUsesDefault) {
 // actual binds correctly (edge case mixing both forms).
 TEST(DpiCallArgumentBinding, MixedPositionalAndNamedBinding) {
   SimFixture f;
-  DpiContext dpi;
+  DpiRuntime dpi;
   RegisterProbe(dpi, f);
-  f.ctx.SetDpiContext(&dpi);
+  f.ctx.SetDpiRuntime(&dpi);
 
   auto* call = ParseExprFrom("sv_probe(4, .b(6))", f);
   auto result = EvalFunctionCall(call, f.ctx, f.arena).ToUint64();
@@ -112,9 +93,9 @@ TEST(DpiCallArgumentBinding, MixedPositionalAndNamedBinding) {
 // other entirely; the omitted formal has a default, so the default is supplied.
 TEST(DpiCallArgumentBinding, NamedBindingOmittingDefaultedFormal) {
   SimFixture f;
-  DpiContext dpi;
+  DpiRuntime dpi;
   RegisterProbe(dpi, f);
-  f.ctx.SetDpiContext(&dpi);
+  f.ctx.SetDpiRuntime(&dpi);
 
   auto* call = ParseExprFrom("sv_probe(.a(3))", f);
   auto result = EvalFunctionCall(call, f.ctx, f.arena).ToUint64();

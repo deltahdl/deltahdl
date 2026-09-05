@@ -1,13 +1,13 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_dpi_take_int.h"
 #include "parser/ast.h"
-#include "simulator/dpi.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -203,15 +203,13 @@ TEST(DpiArgumentPassing, OutputRealRoundedToIntegerActualOnCopyOut) {
 // The same copy-in and copy-out, asked of a call a design writes with an
 // argument whose bits are not all known.
 //
-// The cases above call the foreign function through DpiRuntime, the registry
-// the DPI C layer in src/simulator/svdpi.cpp works against. A call written in
-// SystemVerilog does not reach it: EvalDpiCall in
-// src/simulator/eval_function.cpp evaluates the call site's actuals and calls
-// the import through the DpiContext the run holds. §35.2.2.1 rules that "The
-// implementation (representation and layout) of 4-state values, structures,
-// and arrays is irrelevant for SystemVerilog semantics and can only impact the
-// foreign side of the interface", so an x or a z the design wrote has to
-// survive that crossing in both directions.
+// The cases above call the foreign function through DpiRuntime directly.
+// EvalDpiCall in src/simulator/eval_function_dpi.cpp evaluates the call site's
+// actuals and calls the import through the DpiRuntime the run holds. §35.2.2.1
+// rules that "The implementation (representation and layout) of 4-state values,
+// structures, and arrays is irrelevant for SystemVerilog semantics and can only
+// impact the foreign side of the interface", so an x or a z the design wrote
+// has to survive that crossing in both directions.
 // ---------------------------------------------------------------------------
 
 // A design holding one four-bit variable `a` set to `actual`, handed to an
@@ -223,28 +221,29 @@ TEST(DpiArgumentPassing, OutputRealRoundedToIntegerActualOnCopyOut) {
 // types of a formal argument and which is four-state, so a value with an
 // unknown bit is one the formal can hold.
 struct FourStateActual {
-  DpiContext dpi;
+  DpiRuntime dpi;
   SimFixture f;
-  Logic4Word seen;
+  SvLogicVecVal seen = {};
 
-  FourStateActual(Direction direction, Logic4Word actual, Logic4Word wrote) {
-    DpiFunction func;
+  FourStateActual(Direction direction, SvLogicVecVal actual,
+                  SvLogicVecVal wrote) {
+    DpiRtFunction func;
     func.c_name = "c_touch_4state";
     func.sv_name = "touch4";
     func.return_type = DataTypeKind::kInt;
     func.args = {DpiArg{"a", DataTypeKind::kInteger, direction}};
-    Logic4Word* seen_slot = &seen;
+    SvLogicVecVal* seen_slot = &seen;
     func.arg_impl = [seen_slot,
-                     wrote](std::vector<Logic4Word>& args) -> Logic4Word {
-      *seen_slot = args[0];
-      args[0] = wrote;
-      return Logic4Word{};
+                     wrote](std::vector<DpiArgValue>& args) -> DpiArgValue {
+      *seen_slot = args[0].AsLogicVec();
+      args[0] = DpiArgValue::FromLogicVec(wrote);
+      return DpiArgValue::FromInt(0);
     };
-    dpi.RegisterImport(func);
-    f.ctx.SetDpiContext(&dpi);
+    dpi.RegisterImport(std::move(func));
+    f.ctx.SetDpiRuntime(&dpi);
     auto* var = f.ctx.CreateVariable("a", 4);
     var->value = MakeLogic4Vec(f.arena, 4);
-    var->value.words[0] = actual;
+    var->value.words[0] = Logic4Word{actual.aval, actual.bval};
     EvalFunctionCall(ParseExprFrom("touch4(a)", f), f.ctx, f.arena);
   }
 
@@ -256,8 +255,8 @@ struct FourStateActual {
 // coercion." The actual is 4'b10x1, so the foreign body is handed a 1, a 0 and
 // an x; an x is aval 1 with bval 1, which one word per bit cannot record.
 TEST(DpiArgumentPassingInADesign, AnInputActualsUnknownBitReachesTheImport) {
-  FourStateActual run(Direction::kInput, Logic4Word{0b1011, 0b0010},
-                      Logic4Word{});
+  FourStateActual run(Direction::kInput, SvLogicVecVal{0b1011, 0b0010},
+                      SvLogicVecVal{});
 
   // Both halves are asserted because either alone is met by a carrier that
   // drops one of them: Logic4Vec::ToUint64 reads 4'b10x1 as 4'b1001, which is
@@ -270,8 +269,8 @@ TEST(DpiArgumentPassingInADesign, AnInputActualsUnknownBitReachesTheImport) {
 // SystemVerilog semantics", so §35.6.1's copy-in delivers a z as a z rather
 // than as "not known". The actual is 4'b10z1, a z being aval 0 with bval 1.
 TEST(DpiArgumentPassingInADesign, AnInputActualsHighImpedanceBitIsNotAnX) {
-  FourStateActual run(Direction::kInput, Logic4Word{0b1001, 0b0010},
-                      Logic4Word{});
+  FourStateActual run(Direction::kInput, SvLogicVecVal{0b1001, 0b0010},
+                      SvLogicVecVal{});
 
   // The bval says bit 1 is unknown, which a two-state crossing cannot say at
   // all. The aval is what separates this from the case above, whose x puts
@@ -286,8 +285,8 @@ TEST(DpiArgumentPassingInADesign, AnInputActualsHighImpedanceBitIsNotAnX) {
 // foreign body leaves 4'b0x10 in the formal, so that is what the variable the
 // call site named holds once the call has returned.
 TEST(DpiArgumentPassingInADesign, AnOutputFormalsUnknownBitReachesTheActual) {
-  FourStateActual run(Direction::kOutput, Logic4Word{},
-                      Logic4Word{0b0110, 0b0100});
+  FourStateActual run(Direction::kOutput, SvLogicVecVal{},
+                      SvLogicVecVal{0b0110, 0b0100});
 
   // aval 4'b0110 with bval 4'b0100 is 4'b0x10. Copied out through one word per
   // bit, bit 2 arrives known and the actual reads 4'b0010.

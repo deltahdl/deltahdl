@@ -226,7 +226,6 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/assertion.cpp
     simulator/sva_engine.cpp
     simulator/coverage.cpp
-    simulator/dpi.cpp
     simulator/dpi_runtime.cpp
     simulator/compiled_sim.cpp
     simulator/mt_sim.cpp
@@ -333,6 +332,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_array_queue.cpp
     simulator/eval_function_args.cpp
     simulator/eval_function_body.cpp
+    simulator/eval_function_dpi.cpp
     simulator/eval_let.cpp
     simulator/eval_select.cpp
     simulator/eval_streaming.cpp

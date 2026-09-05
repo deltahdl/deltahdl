@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -10,7 +11,6 @@
 #include "helpers_dpi_bump_import.h"
 #include "helpers_dpi_touch_import.h"
 #include "parser/ast.h"
-#include "simulator/dpi.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
@@ -242,13 +242,12 @@ TEST(DpiInstantCompletion, ChangeDetectingImportCallConsumesZeroTime) {
 // ---------------------------------------------------------------------------
 // The same rule, asked of a call a design makes.
 //
-// The cases above call the foreign function through DpiRuntime. A call written
-// in SystemVerilog does not reach it: EvalDpiCall in
-// src/simulator/eval_function.cpp is what evaluates one, and §35.5.1.2 has it
-// assign to the actual written against an output or an inout formal once the
-// foreign function returns. An assignment is the one thing in that call that
-// can put work on the calendar, so the rule is asked here of the call site that
-// makes them.
+// The cases above call the foreign function through DpiRuntime directly.
+// EvalDpiCall in src/simulator/eval_function_dpi.cpp is what evaluates a call
+// written in SystemVerilog, and §35.5.1.2 has it assign to the actual written
+// against an output or an inout formal once the foreign function returns. An
+// assignment is the one thing in that call that can put work on the calendar,
+// so the rule is asked here of the call site that makes them.
 // ---------------------------------------------------------------------------
 
 // One call to `touch(a)`, made from inside an event running at kCallTime.
@@ -259,7 +258,7 @@ TEST(DpiInstantCompletion, ChangeDetectingImportCallConsumesZeroTime) {
 // point, because a value that only arrives later is exactly what a call
 // consuming simulation time would produce.
 struct CallingFromAnEvent {
-  DpiContext dpi;
+  DpiRuntime dpi;
   SimFixture f;
   uint64_t seen = 0;
   uint64_t time_after = 0;
@@ -267,7 +266,7 @@ struct CallingFromAnEvent {
 
   CallingFromAnEvent(Direction direction, uint64_t wrote) {
     RegisterTouchImport(dpi, direction, wrote, &seen);
-    f.ctx.SetDpiContext(&dpi);
+    f.ctx.SetDpiRuntime(&dpi);
     f.ctx.CreateVariable("a", 32)->value = MakeLogic4VecVal(f.arena, 32, 5);
     const Expr* call = ParseExprFrom("touch(a)", f);
     Event* ev = f.scheduler.GetEventPool().Acquire();

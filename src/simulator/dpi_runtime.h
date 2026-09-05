@@ -11,86 +11,16 @@
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulator/coverage_control.h"
-#include "simulator/dpi.h"
+#include "simulator/dpi_arg_value.h"
 #include "simulator/sva_engine_sequences.h"
 
 namespace delta {
-
-using SvBit = uint8_t;
-using SvScalar = uint8_t;
-
-using SvLogic = uint8_t;
-
-using SvBitVecVal = uint32_t;
-
-struct SvLogicVecVal {
-  uint32_t aval = 0;
-  uint32_t bval = 0;
-};
-
-using SvChandle = void*;
-
-struct SvOpenArrayHandle {
-  void* data = nullptr;
-  uint32_t size = 0;
-  uint32_t elem_width = 0;
-};
 
 struct DpiScope {
   std::string name;
   std::string_view module_name;
   void* user_data = nullptr;
 };
-
-struct DpiArgValue {
-  DataTypeKind type = DataTypeKind::kInt;
-  union {
-    int32_t int_val;
-    int64_t longint_val;
-    double real_val;
-    SvChandle chandle_val;
-    SvBit bit_val;
-    SvLogic logic_val;
-  } data = {};
-  std::string string_val;
-
-  static DpiArgValue FromInt(int32_t v);
-  static DpiArgValue FromLongint(int64_t v);
-  static DpiArgValue FromReal(double v);
-  static DpiArgValue FromString(std::string v);
-  static DpiArgValue FromChandle(SvChandle v);
-  static DpiArgValue FromBit(SvBit v);
-  static DpiArgValue FromLogic(SvLogic v);
-
-  int32_t AsInt() const;
-  int64_t AsLongint() const;
-  double AsReal() const;
-  const std::string& AsString() const;
-  SvChandle AsChandle() const;
-  SvBit AsBit() const;
-  SvLogic AsLogic() const;
-};
-
-// §35.6.2: a value-change event the SystemVerilog simulator raises for an
-// output or inout actual after an imported function returns. `index` is the
-// argument's position in the call; `old_value` and `new_value` bracket the
-// change. The simulator is responsible for detecting and handling these
-// changes once control has returned from the import, never while it runs.
-struct DpiArgValueChange {
-  size_t index = 0;
-  DpiArgValue old_value;
-  DpiArgValue new_value;
-};
-
-using DpiRtCallback =
-    std::function<DpiArgValue(const std::vector<DpiArgValue>&)>;
-
-// §35.5.1.2: an import implementation that participates in output and inout
-// argument passing. The argument vector is mutable so the foreign function can
-// deposit values into its output and inout formals; the return value is the
-// function result. Unlike DpiRtCallback (input-only), values written here to
-// output/inout positions become visible outside the call.
-using DpiRtArgCallback = std::function<DpiArgValue(std::vector<DpiArgValue>&)>;
 
 // Annex H.14: how an import's declaration has its packed data arguments passed
 // to the foreign code. IEEE Std 1800 marshals packed data into the canonical
@@ -147,9 +77,6 @@ struct DpiRtExport {
   DataTypeKind return_type = DataTypeKind::kVoid;
   std::vector<DpiArg> args;
 };
-
-// §35.6.1: `v` converted to `target`, unchanged when already of that type.
-DpiArgValue CoerceArgValue(const DpiArgValue& v, DataTypeKind target);
 
 // §35.4: the name in the global name space that a declaration resolves to.
 // Every imported subroutine resolves to a global symbol and every exported one

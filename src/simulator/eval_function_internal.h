@@ -44,14 +44,21 @@ void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
 // "Let construct" each describe them: the call-site expression, the boundary
 // between the positional actuals and the named ones, and the environment the
 // actuals are evaluated in. It is declared here rather than in either caller
-// because both take it -- the DPI import binding in eval_function.cpp and the
-// let-construct binding in eval_let.cpp.
+// because both take it -- the DPI import binding in eval_function_dpi.cpp and
+// the let-construct binding in eval_let.cpp.
 struct ActualBindingCtx {
   const Expr* call;
   size_t positional_count;
   SimContext& ctx;
   Arena& arena;
 };
+
+// §35.6: a call to an imported subroutine, evaluated against the DpiRuntime
+// SimContext holds. It is the fallback of EvalFunctionCall in
+// eval_function.cpp, which reaches it once no native subroutine of that name is
+// found; the body is in eval_function_dpi.cpp, where the conversion between the
+// evaluator's Logic4Vec and the DpiArgValue the registry speaks lives.
+Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena);
 
 // Runs a resolved class method on a concrete object (sets `this`, binds args,
 // writes back). Defined in eval_function.cpp; reused by eval_randomize.cpp to

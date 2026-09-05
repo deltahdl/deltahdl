@@ -1,14 +1,16 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
-#include "simulator/dpi.h"
+#include "simulator/dpi_runtime.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/svdpi.h"
 
 using namespace delta;
 
@@ -23,41 +25,43 @@ namespace {
 //
 // The declared type decides what the value a call site receives can hold, and
 // these cases ask that of the value a design is actually left with. EvalDpiCall
-// in src/simulator/eval_function.cpp builds it, and §35.2.2.1 rules that "The
-// implementation (representation and layout) of 4-state values, structures, and
-// arrays is irrelevant for SystemVerilog semantics and can only impact the
-// foreign side of the interface", so a result the declared type admits has to
-// arrive whatever the carrier between the two sides looks like.
+// in src/simulator/eval_function_dpi.cpp builds it, and §35.2.2.1 rules that
+// "The implementation (representation and layout) of 4-state values,
+// structures, and arrays is irrelevant for SystemVerilog semantics and can only
+// impact the foreign side of the interface", so a result the declared type
+// admits has to arrive whatever the carrier between the two sides looks like.
 
 // An import `sv_result()` declared with `kind` as its result type, whose
-// foreign body returns `word`. `result` is what the call site `sv_result()` is
+// foreign body returns `value`. `result` is what the call site `sv_result()` is
 // left holding: the width the declared type gives it, and the aval/bval pair
 // carrying the value.
 struct ImportResultOfType {
-  DpiContext dpi;
+  DpiRuntime dpi;
   SimFixture f;
   Logic4Vec result;
 
-  ImportResultOfType(DataTypeKind kind, Logic4Word word) {
-    DpiFunction func;
+  ImportResultOfType(DataTypeKind kind, DpiArgValue value) {
+    DpiRtFunction func;
     func.c_name = "c_result";
     func.sv_name = "sv_result";
     func.return_type = kind;
-    func.impl = [word](const std::vector<Logic4Word>&) -> Logic4Word {
-      return word;
+    func.impl = [value](const std::vector<DpiArgValue>&) -> DpiArgValue {
+      return value;
     };
-    dpi.RegisterImport(func);
-    f.ctx.SetDpiContext(&dpi);
+    dpi.RegisterImport(std::move(func));
+    f.ctx.SetDpiRuntime(&dpi);
     result = EvalFunctionCall(ParseExprFrom("sv_result()", f), f.ctx, f.arena);
   }
 };
 
 // §35.5.5 admits "Scalar values of type bit and logic" as a result type, and a
-// logic has four values, so a body returning x gives the call site x. An x is
-// aval 1 with bval 1; a result assembled from one word per bit has nowhere to
-// put the bval and gives the call site 1.
+// logic has four values, so a body returning x gives the call site x. §35.2.2.1
+// leaves the foreign side's representation to the interface, and sv_x is the
+// spelling svdpi.h gives x there; an x is aval 1 with bval 1 on this side, and
+// a result carried as one word per bit has nowhere to put the bval and gives
+// the call site 1.
 TEST(DpiFunctionResultInADesign, AScalarLogicResultCarriesAnUnknownBit) {
-  ImportResultOfType run(DataTypeKind::kLogic, Logic4Word{1, 1});
+  ImportResultOfType run(DataTypeKind::kLogic, DpiArgValue::FromLogic(sv_x));
 
   // The bval is what says the bit is unknown rather than one. The aval is
   // asserted with it because x (1, 1) and z (0, 1) differ in nothing else.
@@ -71,7 +75,7 @@ TEST(DpiFunctionResultInADesign, AScalarLogicResultCarriesAnUnknownBit) {
 // width of 32 keeps those and drops the rest.
 TEST(DpiFunctionResultInADesign, ALongintResultCarriesItsUpperWord) {
   ImportResultOfType run(DataTypeKind::kLongint,
-                         Logic4Word{0x123456789ABCDEF0ULL, 0});
+                         DpiArgValue::FromLongint(0x123456789ABCDEF0LL));
 
   EXPECT_EQ(run.result.width, 64U);
   EXPECT_EQ(run.result.words[0].aval, 0x123456789ABCDEF0ULL);
@@ -83,7 +87,8 @@ TEST(DpiFunctionResultInADesign, ALongintResultCarriesItsUpperWord) {
 // does not have, so a result built at 64 bits keeps that bit and reads
 // 0x100000007 rather than 7.
 TEST(DpiFunctionResultInADesign, AnIntResultIsThirtyTwoBitsWide) {
-  ImportResultOfType run(DataTypeKind::kInt, Logic4Word{0x100000007ULL, 0});
+  ImportResultOfType run(DataTypeKind::kInt,
+                         DpiArgValue::FromLongint(0x100000007LL));
 
   EXPECT_EQ(run.result.width, 32U);
   EXPECT_EQ(run.result.words[0].aval, 7U);

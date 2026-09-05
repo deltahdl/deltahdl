@@ -1,10 +1,14 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/dpi_runtime.h"
+#include "simulator/evaluation.h"
+#include "simulator/sim_context.h"
 #include "simulator/svdpi.h"
 
 using namespace delta;
@@ -564,6 +568,75 @@ TEST(DpiDisableProtocol, TheFirstDisableProtocolViolationIsTheRecordedError) {
             std::string::npos);
   EXPECT_EQ(err.find("35.9 item d)"), std::string::npos);
   ResetDisableState();
+}
+
+// ---------------------------------------------------------------------------
+// The same protocol, asked of a call a design makes.
+//
+// The cases above open and leave the import frame themselves. A call written in
+// SystemVerilog opens one through EvalDpiCall in
+// src/simulator/eval_function_dpi.cpp, which is where §35.9's "a fatal
+// simulation error is issued" has to be reached from if a design's imports are
+// checked at all.
+// ---------------------------------------------------------------------------
+
+// A design calling an imported function whose foreign body enters the disabled
+// state, as a disable somewhere in the design targeting the call would put it
+// there, and returns having acknowledged it or not.
+struct AnImportDisabledInADesign {
+  DpiRuntime rt;
+  SimFixture f;
+
+  explicit AnImportDisabledInADesign(bool acknowledge) {
+    ResetDisableState();
+    DpiRtFunction func;
+    func.c_name = "c_wander";
+    func.sv_name = "wander";
+    func.return_type = DataTypeKind::kInt;
+    func.args = {DpiArg{"v", DataTypeKind::kInt, Direction::kInput}};
+    func.impl = [acknowledge](const std::vector<DpiArgValue>&) {
+      DpiSetCurrentDisabledState(true);
+      if (acknowledge) DpiAckCurrentDisable();
+      return DpiArgValue::FromInt(0);
+    };
+    rt.RegisterImport(std::move(func));
+    f.ctx.SetDpiRuntime(&rt);
+    // Leaving the import call ends the chain the disable was propagating
+    // through, so the thread-local state is clear again by the time the case
+    // reads what the check recorded.
+    EvalFunctionCall(ParseExprFrom("wander(1)", f), f.ctx, f.arena);
+  }
+};
+
+// §35.9 item c): "An imported function that returns while a disable is in
+// effect shall call svAckDisabledState() before returning", and "if any
+// protocol item is not correctly followed, a fatal simulation error is issued".
+// The body returns without acknowledging, and the design's call site is where
+// the check has to happen.
+TEST(DpiDisableInADesign,
+     AnImportReturningWithoutAcknowledgingADisableIsFatal) {
+  AnImportDisabledInADesign run(/*acknowledge=*/false);
+  EXPECT_TRUE(run.rt.DisableProtocolFatalErrorIssued());
+}
+
+// The error names item c) and the import that breached it, so a run stopping on
+// it says which subroutine to look at rather than only that something was
+// wrong.
+TEST(DpiDisableInADesign, TheFatalErrorNamesTheImportThatBreachedItemC) {
+  AnImportDisabledInADesign run(/*acknowledge=*/false);
+  EXPECT_NE(run.rt.DisableProtocolFatalError().find("wander"),
+            std::string::npos);
+  EXPECT_NE(run.rt.DisableProtocolFatalError().find("35.9 item c)"),
+            std::string::npos);
+}
+
+// The other side of item c): a body that does acknowledge the disable before
+// returning has followed the protocol, so no error is issued. Without this the
+// case above would hold of a design that called every import's return a
+// breach.
+TEST(DpiDisableInADesign, AnImportThatAcknowledgedTheDisableIsNotFatal) {
+  AnImportDisabledInADesign run(/*acknowledge=*/true);
+  EXPECT_FALSE(run.rt.DisableProtocolFatalErrorIssued());
 }
 
 }  // namespace
