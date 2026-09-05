@@ -14,6 +14,12 @@ TEST(Functions, DefaultArgumentValue) {
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "add";
+  // §13.4: a function whose return type is left implicit returns a `logic`
+  // scalar, and §13.4.1's internal variable then truncates the returned
+  // expression to that one bit. This fixture is about how an argument reaches
+  // the body, not about an implicit return type, so it declares one wide
+  // enough to carry the value the call is checked for.
+  func->return_type.kind = DataTypeKind::kInt;
   func->func_args = {
       {Direction::kInput, false, false, false, {}, "a", nullptr, {}},
       {Direction::kInput,
@@ -44,6 +50,7 @@ TEST(Functions, DefaultArgumentMultiple) {
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "compute";
+  func->return_type.kind = DataTypeKind::kInt;
   func->func_args = {
       {Direction::kInput,
        false,
@@ -104,6 +111,7 @@ TEST(DefaultArgumentSim, DefaultExpressionEvaluated) {
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "get_size";
+  func->return_type.kind = DataTypeKind::kInt;
   func->func_args = {
       {Direction::kInput,
        false,
@@ -184,6 +192,7 @@ TEST(DefaultArgumentSim, EmptyPlaceholderUsesDefault) {
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "calc";
+  func->return_type.kind = DataTypeKind::kInt;
   func->func_args = {
       {Direction::kInput,
        false,

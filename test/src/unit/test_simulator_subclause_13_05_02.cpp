@@ -49,6 +49,12 @@ TEST(PassByRef, PassByRefReadsCaller) {
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "read_ref";
+  // §13.4: a function whose return type is left implicit returns a `logic`
+  // scalar, and §13.4.1's internal variable then truncates the returned
+  // expression to that one bit. This fixture is about how an argument reaches
+  // the body, not about an implicit return type, so it declares one wide
+  // enough to carry the value the call is checked for.
+  func->return_type.kind = DataTypeKind::kInt;
   func->func_args = {
       {Direction::kRef, false, false, false, {}, "r", nullptr, {}}};
   auto* body_expr = MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "r"),
@@ -67,6 +73,7 @@ TEST(QueueRef, RefReadsCurrentValue) {
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "read_ref";
+  func->return_type.kind = DataTypeKind::kInt;
   func->is_automatic = true;
   func->func_args = {
       {Direction::kRef, false, false, false, {}, "v", nullptr, {}}};
@@ -86,6 +93,7 @@ TEST(PassByRef, RefImmediateVisibility) {
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "write_and_read";
+  func->return_type.kind = DataTypeKind::kInt;
   func->func_args = {
       {Direction::kRef, false, false, false, {}, "r", nullptr, {}}};
 
@@ -430,6 +438,7 @@ TEST(PassByRef, CallSyntaxTransparentForRef) {
   auto* by_ref = f.arena.Create<ModuleItem>();
   by_ref->kind = ModuleItemKind::kFunctionDecl;
   by_ref->name = "triple_ref";
+  by_ref->return_type.kind = DataTypeKind::kInt;
   by_ref->func_args = {
       {Direction::kRef, false, false, false, {}, "v", nullptr, {}}};
   by_ref->func_body_stmts = {MakeReturn(
@@ -440,6 +449,7 @@ TEST(PassByRef, CallSyntaxTransparentForRef) {
   auto* by_val = f.arena.Create<ModuleItem>();
   by_val->kind = ModuleItemKind::kFunctionDecl;
   by_val->name = "triple_val";
+  by_val->return_type.kind = DataTypeKind::kInt;
   by_val->func_args = {
       {Direction::kInput, false, false, false, {}, "v", nullptr, {}}};
   by_val->func_body_stmts = {MakeReturn(
