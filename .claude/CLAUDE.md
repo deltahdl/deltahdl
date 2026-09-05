@@ -18,9 +18,9 @@ Longer: [lrm-source-of-truth](rules/lrm-source-of-truth.md).
 
 CI is the source of truth for build and test results. Make the edits, format, commit explicit paths, push to `main`, then read the run with `gh run list` and `gh run view`.
 
-Never build locally, and never run any local tool that CI also runs. Nothing exempts a bug on the grounds that it only shows up while the simulator is running. Find a coroutine, scheduler or event-watcher bug by reading the code and the LRM clause, not by reading a local print. When a defect really does hide in run-time state, read more closely rather than build.
+Never build locally, and never run any local tool that CI also runs. Outside the sv-tests case below, nothing exempts a bug on the grounds that it only shows up while the simulator is running. Find a coroutine, scheduler or event-watcher bug by reading the code and the LRM clause, not by reading a local print. When a defect really does hide in run-time state, read more closely rather than build.
 
-`clang-format` is the single exception, because it rewrites files rather than judging them. See Formatting below.
+There are two exceptions. `clang-format` rewrites files rather than judging them, so running it is how the committed bytes come to exist; see Formatting below. And the simulator may be built and run over a single sv-tests file that a run has already reported failing, because the CI log carries every rejection but drops the rest of a simulation's stdout, keeping only the first `:assert:` line that did not hold. Read the log before building: a file that fails by being rejected is already diagnosed there.
 
 Every gate is covered by this, not just the build and the tests. `clang-tidy`, the formatting check, the file-size cap, the assertions about suppressions and configuration files, the unit test registration checks and the copy-paste detectors are CI jobs like any other, so verify a lint sweep by pushing and reading `gh run view --log-failed`. Neither "it is not a build or a test" nor "it reproduces in a second" exempts a tool. The cost of running one locally is the tokens spent reading its output, and CI is free.
 
@@ -34,7 +34,7 @@ Longer: [verifying-through-ci](rules/verifying-through-ci.md).
 
 ## Formatting
 
-Run `clang-format -i --style=google` on every file a change touches. It is the one tool to run locally, and it is allowed because it rewrites files rather than judging them: running it produces the bytes that get committed, so it is part of authoring a change rather than part of checking one. The style flag is required because the repository has no `.clang-format` file. Without the flag, clang-format falls back to the LLVM default, reformats whole files and buries the real change.
+Run `clang-format -i --style=google` on every file a change touches. It is the one tool to run locally over what CI would otherwise judge, and it is allowed because it rewrites files rather than judging them: running it produces the bytes that get committed, so it is part of authoring a change rather than part of checking one. The style flag is required because the repository has no `.clang-format` file. Without the flag, clang-format falls back to the LLVM default, reformats whole files and buries the real change.
 
 Longer: [clang-format](rules/clang-format.md).
 
