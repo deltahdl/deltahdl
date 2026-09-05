@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
@@ -375,6 +376,76 @@ TEST(RandsequenceSim, UnknownWeightIsReported) {
                             "randsequence rule weight shall evaluate to an "
                             "integral non-negative value",
                             6, "18.17.1"));
+}
+
+// Runs `main_rule` `iterations` times over three counted productions and
+// reports how often each was generated. The seeded fixture makes the draw
+// repeatable, so a case asserting a distribution asserts the same one on every
+// run. `c` is declared whether the rule names it or not, an unnamed production
+// simply never generating.
+void RunAbcTrial(SimFixtureSeeded& f, std::string_view main_rule,
+                 int iterations, std::vector<uint64_t>& counts) {
+  std::string src =
+      "module t;\n"
+      "  logic [31:0] na, nb, nc;\n"
+      "  integer i;\n"
+      "  initial begin\n"
+      "    na = 0; nb = 0; nc = 0;\n"
+      "    for (i = 0; i < " +
+      std::to_string(iterations) +
+      "; i = i + 1)\n"
+      "      randsequence(main)\n"
+      "        main : " +
+      std::string(main_rule) +
+      ";\n"
+      "        a : { na = na + 1; };\n"
+      "        b : { nb = nb + 1; };\n"
+      "        c : { nc = nc + 1; };\n"
+      "      endsequence\n"
+      "  end\n"
+      "endmodule\n";
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  for (const char* name : {"na", "nb", "nc"}) {
+    auto* var = f.ctx.FindVariable(name);
+    ASSERT_NE(var, nullptr);
+    counts.push_back(var->value.ToUint64());
+  }
+}
+
+// §18.17.1: "the probability that a particular production list is generated is
+// proportional to its specified weight". SelectRule drew a single Urandom32
+// against a 64-bit total, so the drawn number never reached 2^32 and every rule
+// whose cumulative interval began at or beyond that was unreachable.
+//
+// Two rules of 2^32 each put the boundary exactly at the end of the first, so a
+// narrow draw lands in the first every time and b is selected with probability
+// zero. Both counts are asserted rather than b's alone, so a fix that always
+// answered the last rule would not pass either. A total under 2^32 makes the
+// narrow and the wide draw the same draw and cannot fail.
+TEST(RandsequenceSim, WeightsSummingPastThirtyTwoBitsReachEveryRule) {
+  SimFixtureSeeded f;
+  std::vector<uint64_t> counts;
+  RunAbcTrial(f, "a := 64'h1_0000_0000 | b := 64'h1_0000_0000", 40, counts);
+  EXPECT_GT(counts[0], 0u);
+  EXPECT_GT(counts[1], 0u);
+}
+
+// The same rule for an interval that begins two whole 2^32 blocks along, which
+// the case above cannot show: a fix widening the draw by one bit would let b be
+// reached and leave c as unreachable as before. Every rule of the three carries
+// the same weight, so each is generated about a third of the time.
+TEST(RandsequenceSim, AThirdRuleBeyondTwoBlocksIsStillReachable) {
+  SimFixtureSeeded f;
+  std::vector<uint64_t> counts;
+  RunAbcTrial(
+      f, "a := 64'h1_0000_0000 | b := 64'h1_0000_0000 | c := 64'h1_0000_0000",
+      60, counts);
+  EXPECT_GT(counts[0], 0u);
+  EXPECT_GT(counts[2], 0u);
 }
 
 }  // namespace

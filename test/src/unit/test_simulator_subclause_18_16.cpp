@@ -460,4 +460,39 @@ TEST(RandcaseWeightedCase, AllZeroWeightsWarningNames18_16) {
                               "randcase: all weights are zero", 5, "18.16"));
 }
 
+// §18.16: a randcase "can result in multiple calls to $urandom_range() to
+// handle numbers greater than 32 bits", so a sum wider than 32 bits is drawn
+// against in full rather than against its low half. Two branches of 2^32 each
+// put the second branch's interval entirely at or beyond 2^32, so a single
+// 32-bit draw would land in the first every time.
+//
+// randcase composed the wide draw already and the randsequence beside it did
+// not, which is what #3335 records; the two share one DrawBelow in
+// src/simulator/stmt_exec_randsequence.cpp now, and this case is what keeps the
+// randcase half of that shared rule stated in the file for its own subclause
+// rather than only in the file for §18.17.1.
+TEST(RandcaseWeightedCase, WeightsSummingPastThirtyTwoBitsReachEveryBranch) {
+  SimFixtureSeeded f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int unsigned n1, n2;\n"
+      "  integer i;\n"
+      "  initial begin\n"
+      "    n1 = 0; n2 = 0;\n"
+      "    for (i = 0; i < 40; i = i + 1)\n"
+      "      randcase\n"
+      "        64'h1_0000_0000 : n1 = n1 + 1;\n"
+      "        64'h1_0000_0000 : n2 = n2 + 1;\n"
+      "      endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_GT(f.ctx.FindVariable("n1")->value.ToUint64(), 0u);
+  EXPECT_GT(f.ctx.FindVariable("n2")->value.ToUint64(), 0u);
+}
+
 }  // namespace
