@@ -76,6 +76,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/sequence_operator_precedence.cpp
     parser/parser_clocking.cpp
     parser/parser_verify.cpp
+    parser/parser_randsequence.cpp
     parser/parser_specify.cpp
     parser/parser_config.cpp
     parser/parser_inst.cpp
