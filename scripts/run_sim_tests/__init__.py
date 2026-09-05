@@ -24,6 +24,27 @@ STATUS_TEXT = re.compile(r"[+-]?[0-9]+")
 # .expected records.
 BEFORE_SUFFIX = ".before"
 
+# The suffix of the file a case names a written file in, and the suffix of the
+# file holding a recording of that file's contents. A case whose subject is
+# what a run writes rather than what it prints has nowhere else to say so,
+# because .expected records the two streams and nothing else.
+ARTIFACT_SUFFIX = ".artifact"
+ARTIFACT_RECORD_SUFFIX = ".artifact.expected"
+
+# The one section of §21.7.2.3's Table 21-10 that holds a different text every
+# run. "The $date section indicates the date on which the VCD file was
+# generated", so a recorded copy of it matches on the run that recorded it
+# alone. The other seven declaration commands of that table do not vary:
+# $comment, $scope, $timescale, $upscope and $var are written from the design,
+# $enddefinitions carries nothing, and $version -- "which version of the VCD
+# writer was used ... and the $dumpfile system task used to create the file" --
+# is a fixed string and the call the design wrote. So this is the whole of what
+# is skipped, and everything else a run writes is compared as it stands.
+#
+# `$end` is matched to a word boundary so that the terminator is told from the
+# start of `$enddefinitions`.
+VCD_DATE_SECTION = re.compile(r"\$date\b.*?\$end\b", re.DOTALL)
+
 
 def visible_output(result: subprocess.CompletedProcess[str]) -> str:
     """Return what a user running deltahdl by hand would see on their terminal.
@@ -162,6 +183,76 @@ def expected_status(sv_path: Path) -> int | None:
     return int(text)
 
 
+def artifact_name(sv_path: Path) -> Path | None:
+    """Return the file a case named in the .artifact file beside its source.
+
+    A case whose subject is a file the run writes -- §21.7's whole subject is
+    one, since a VCD file holds value changes "stored by VCD system tasks" and
+    a design calling $dumpfile and $dumpvars is right or wrong by what lands in
+    the file rather than by what it prints -- has nowhere else to name that
+    file. The file holds that one name, relative to the directory the run is
+    given.
+
+    Returns None where the file is absent, which leaves the case judged on its
+    printed text alone and running where the runner itself was started. That is
+    what every case did before this file existed.
+
+    Raises ValueError where the file names anything but one file, naming the
+    file and how many names were found. One .artifact names one file because
+    the recording beside it is one file too, and a case whose own definition
+    cannot be read is worth a report that says which case it is rather than a
+    traceback into this module.
+    """
+    named = sv_path.with_suffix(ARTIFACT_SUFFIX)
+    if not named.exists():
+        return None
+    lines = [line for line in named.read_text().splitlines() if line]
+    if len(lines) != 1:
+        msg = f"{named}: expected one file name, got {len(lines)}"
+        raise ValueError(msg)
+    return Path(lines[0])
+
+
+def normalise_artifact(text: str) -> str:
+    """Return `text` with the sections a run fills in afresh cut out of it.
+
+    Only §21.7.2.3's $date section is cut, and VCD_DATE_SECTION above says why
+    that one and no other. A file that is not a VCD file holds no such section,
+    so this returns it unchanged and the comparison is byte for byte.
+    """
+    return VCD_DATE_SECTION.sub("$date $end", text)
+
+
+def compare_artifact(sv_path: Path, artifact: Path, work_dir: str) -> str | None:
+    """Return what to report of the file a case wrote, or None where it holds.
+
+    `artifact` is the name the .artifact file gave, resolved under `work_dir`,
+    which is the directory the invocation under test ran in. The recording is
+    the .artifact.expected file beside the source.
+
+    A file the run did not write is reported as missing rather than read as an
+    empty one, because a design whose dump task did nothing produces exactly
+    that and would otherwise pass against an empty recording. A recording that
+    is absent is reported too: a case naming a file with nothing to compare it
+    against reads as covered while checking nothing.
+
+    Both sides are normalised before the comparison and the report shows what
+    was compared, so a maintainer reading a difference is reading the same text
+    the runner was.
+    """
+    record = sv_path.with_name(sv_path.stem + ARTIFACT_RECORD_SUFFIX)
+    if not record.exists():
+        return f"{record.name}: no recorded contents for {artifact}"
+    written = Path(work_dir) / artifact
+    if not written.exists():
+        return f"{artifact}: the run wrote no such file"
+    actual = normalise_artifact(written.read_text())
+    recorded = normalise_artifact(record.read_text())
+    if actual.rstrip("\n") == recorded.rstrip("\n"):
+        return None
+    return f"{artifact} expected:\n{recorded}got:\n{actual}"
+
+
 def collect_tests() -> list[tuple[Path, Path]]:
     """Collect all .sv files that have a matching .expected file."""
     tests: list[tuple[Path, Path]] = []
@@ -176,19 +267,30 @@ def run_test(sv_path: Path, expected_path: Path) -> tuple[bool, str]:
     """Run deltahdl on a .sv file and compare what it printed to .expected.
 
     A case is a .sv file and a .expected file of the same stem, and the
-    .expected file is what makes the .sv file a case at all. Three further
-    files of that stem are optional: .args names the arguments to pass after
-    the source path, .exit names the status the run has to exit with, and
-    .before names the arguments of an invocation to run before the one under
-    test. A case that carries none of them is judged on its printed text alone.
+    .expected file is what makes the .sv file a case at all. Five further files
+    of that stem are optional: .args names the arguments to pass after the
+    source path, .exit names the status the run has to exit with, .before names
+    the arguments of an invocation to run before the one under test, and
+    .artifact names a file the run writes with .artifact.expected holding a
+    recording of its contents. A case that carries none of them is judged on
+    its printed text alone.
 
     A case that names an earlier invocation fails on it where it stands, so
     that the report names that invocation rather than whatever the invocation
     under test made of what the earlier one did not leave behind. Both
     invocations of such a case run in one temporary directory, which is where a
-    library file the earlier one writes lands. A case that names no earlier
-    invocation runs where the runner itself was started, which is where every
-    case ran before .before existed.
+    library file the earlier one writes lands.
+
+    A case naming a file it writes runs in such a directory too, which is where
+    that file lands: the runner is started at the repository root, so a design
+    writing a relative path would otherwise drop the file into test/src/e2e/
+    for `git status` to report. A case naming neither runs where the runner
+    itself was started, which is where every case ran before either file
+    existed.
+
+    The written file is compared last, so a case whose printed text or exit
+    status is already wrong is reported on that rather than on a file whose
+    difference follows from it.
 
     The arguments go after the source path because deltahdl parses an option
     wherever it stands: ParseArgs in src/driver/cli_options.cpp loops over the
@@ -204,14 +306,21 @@ def run_test(sv_path: Path, expected_path: Path) -> tuple[bool, str]:
     expected_text = expected_path.read_text()
     try:
         status = expected_status(sv_path)
+        artifact = artifact_name(sv_path)
     except ValueError as exc:
         return False, str(exc)
 
     before = before_arguments(sv_path)
+    artifact_detail: str | None = None
     with contextlib.ExitStack() as stack:
-        work_dir: str | None = None
-        if before is not None:
+        # An empty string is the case that runs where the runner was started,
+        # which is every case naming neither an earlier invocation nor a file
+        # it writes. cwd below turns it back into None, the value subprocess
+        # takes for "inherit".
+        work_dir = ""
+        if before is not None or artifact is not None:
             work_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        if before is not None:
             detail = run_before(sv_path, before, work_dir)
             if detail is not None:
                 return False, detail
@@ -222,16 +331,22 @@ def run_test(sv_path: Path, expected_path: Path) -> tuple[bool, str]:
                 text=True,
                 timeout=30,
                 check=False,
-                cwd=work_dir,
+                cwd=work_dir or None,
             )
         except subprocess.TimeoutExpired:
             return False, "TIMEOUT"
+        # Read inside the stack, because the directory the file was written
+        # into is removed as the stack unwinds.
+        if artifact is not None:
+            artifact_detail = compare_artifact(sv_path, artifact, work_dir)
 
     actual = visible_output(result)
     if actual.rstrip("\n") != expected_text.rstrip("\n"):
         return False, f"expected:\n{expected_text}got:\n{actual}"
     if status is not None and result.returncode != status:
         return False, f"expected exit status {status}, got {result.returncode}"
+    if artifact_detail is not None:
+        return False, artifact_detail
     return True, ""
 
 

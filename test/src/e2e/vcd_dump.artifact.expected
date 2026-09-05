@@ -1,0 +1,14 @@
+$date
+  Jan 01, 2026 00:00:00
+$end
+$version
+  DeltaHDL 0.1.0
+  $dumpfile("dump.vcd")
+$end
+$timescale
+  1ns
+$end
+$scope module vcd_dump $end
+$var reg 1 ! clk $end
+$upscope $end
+$enddefinitions $end

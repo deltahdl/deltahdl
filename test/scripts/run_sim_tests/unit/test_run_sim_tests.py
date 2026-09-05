@@ -439,3 +439,232 @@ class TestBeforeArguments:
             rst, tmp_path, "--precompile-into\ncells\n", None,
         )[1]
         assert outcome == (False, "two.before: TIMEOUT")
+
+def _run_over_artifact(
+    rst: ModuleType,
+    tmp_path: Path,
+    named: str,
+    written: str | None,
+    recorded: str | None,
+) -> tuple[list[str], tuple[bool, str]]:
+    """Run run_test() over a case whose .artifact file holds named.
+
+    The .sv and .expected files are written for the caller and are made to
+    agree, so a case fails on its artifact alone. `named` is what the .artifact
+    file holds, `written` is what the stub writes into the directory it runs in
+    under that name -- None writes nothing, which is a run that produced no such
+    file -- and `recorded` is what the .artifact.expected file holds, with None
+    writing no such file at all.
+
+    The directory each invocation ran in comes back so that a test can read
+    where the file was expected to land.
+    """
+    sv = tmp_path / "artifact.sv"
+    sv.write_text("module artifact; endmodule\n")
+    (tmp_path / "artifact.artifact").write_text(named)
+    if recorded is not None:
+        (tmp_path / "artifact.artifact.expected").write_text(recorded)
+    expected_path = tmp_path / "artifact.expected"
+    expected_path.write_text("ran\n")
+
+    directories: list[str] = []
+
+    def fake_run(cmd: list[str], **kwargs: object) -> MagicMock:
+        del cmd
+        work_dir = str(kwargs["cwd"])
+        directories.append(work_dir)
+        if written is not None:
+            (Path(work_dir) / named.strip()).write_text(written)
+        stub = MagicMock()
+        stub.stdout = "ran\n"
+        stub.stderr = ""
+        stub.returncode = 0
+        return stub
+
+    with patch.object(rst.subprocess, "run", side_effect=fake_run):
+        outcome: tuple[bool, str] = rst.run_test(sv, expected_path)
+    return directories, outcome
+
+
+# A four-state VCD header carrying the two declaration commands of §21.7.2.3's
+# Table 21-10 that a test needs to tell apart: $date, whose section names when
+# the file was written, and $timescale, which does not vary. The {} is where a
+# test puts a date, so that two headers differing in nothing else can be
+# compared.
+_VCD_HEADER = (
+    "$date\n  {}\n$end\n"
+    "$version\n  DeltaHDL 0.1.0\n$end\n"
+    "$timescale 1ns $end\n"
+    "$enddefinitions $end\n"
+)
+
+
+class TestArtifactComparison:
+    """Tests for the file a case names in its .artifact file."""
+
+    def test_a_matching_artifact_passes_the_case(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should pass where the written file matches its record."""
+        _, outcome = _run_over_artifact(
+            rst, tmp_path, "dump.vcd\n", "same\n", "same\n",
+        )
+        assert outcome == (True, "")
+
+    def test_a_differing_artifact_fails_the_case(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should fail where the written file differs.
+
+        The stub prints what .expected holds and exits zero, so the case is
+        judged on the file alone: a runner comparing stdout alone passes it.
+        """
+        _, outcome = _run_over_artifact(
+            rst, tmp_path, "dump.vcd\n", "written\n", "recorded\n",
+        )
+        assert outcome[0] is False
+
+    def test_a_differing_artifact_is_named_in_the_detail(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should name the file and both sides of the difference."""
+        _, outcome = _run_over_artifact(
+            rst, tmp_path, "dump.vcd\n", "written\n", "recorded\n",
+        )
+        assert outcome[1] == "dump.vcd expected:\nrecorded\ngot:\nwritten\n"
+
+    def test_a_date_section_may_differ_without_failing_the_case(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should compare a VCD header past its $date section.
+
+        §21.7.2.3: "The $date section indicates the date on which the VCD file
+        was generated", so it holds a different text every run and a recorded
+        copy of it could match on the run that recorded it alone.
+        """
+        _, outcome = _run_over_artifact(
+            rst,
+            tmp_path,
+            "dump.vcd\n",
+            _VCD_HEADER.format("June 25, 1989 09:24:35"),
+            _VCD_HEADER.format("May 2, 2026 11:00:00"),
+        )
+        assert outcome == (True, "")
+
+    def test_a_difference_past_the_date_section_still_fails_the_case(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should still compare what the $date section is not.
+
+        Without this the case above is satisfied by a normalisation that
+        discards the whole header, which is the failure mode a normalisation
+        has.
+        """
+        _, outcome = _run_over_artifact(
+            rst,
+            tmp_path,
+            "dump.vcd\n",
+            _VCD_HEADER.format("June 25, 1989 09:24:35")
+            + "$var wire 1 ! clk $end\n",
+            _VCD_HEADER.format("May 2, 2026 11:00:00"),
+        )
+        assert outcome[0] is False
+
+    def test_a_file_the_run_did_not_write_fails_the_case(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should fail where the run wrote no such file.
+
+        A missing file is what a design whose dump task did nothing produces,
+        and reading it as an empty one would pass against an empty record.
+        """
+        _, outcome = _run_over_artifact(
+            rst, tmp_path, "dump.vcd\n", None, "recorded\n",
+        )
+        assert outcome[0] is False
+
+    def test_a_file_the_run_did_not_write_is_named_in_the_detail(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should name the file the run was to have written."""
+        _, outcome = _run_over_artifact(
+            rst, tmp_path, "dump.vcd\n", None, "recorded\n",
+        )
+        assert outcome[1] == "dump.vcd: the run wrote no such file"
+
+    def test_an_artifact_without_a_recorded_copy_fails_the_case(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should fail a case whose record is missing.
+
+        A .artifact naming a file with nothing to compare it against is a case
+        that cannot be judged, and passing it would leave the file unchecked
+        while the case reads as covered.
+        """
+        _, outcome = _run_over_artifact(
+            rst, tmp_path, "dump.vcd\n", "written\n", None,
+        )
+        assert outcome[0] is False
+
+    def test_an_artifact_without_a_recorded_copy_is_named_in_the_detail(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should name the record it looked for and did not find."""
+        _, outcome = _run_over_artifact(
+            rst, tmp_path, "dump.vcd\n", "written\n", None,
+        )
+        assert outcome[1] == (
+            "artifact.artifact.expected: no recorded contents for dump.vcd"
+        )
+
+    def test_an_artifact_file_naming_no_file_fails_the_case(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should fail rather than raise on a blank .artifact."""
+        _, outcome = _run_over_artifact(
+            rst, tmp_path, "\n", None, "recorded\n",
+        )
+        assert outcome[0] is False
+
+    def test_an_artifact_file_naming_two_files_is_named_in_the_detail(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should name the file and how many names it held.
+
+        One .artifact names one file, because the record beside it is one file
+        too. int() and open() would each raise on the malformed case without
+        naming which case carries it, which leaves a maintainer reading a
+        traceback into this module.
+        """
+        _, outcome = _run_over_artifact(
+            rst, tmp_path, "one.vcd\ntwo.vcd\n", None, "recorded\n",
+        )
+        assert outcome[1].endswith(
+            "artifact.artifact: expected one file name, got 2",
+        )
+
+    def test_the_run_writes_its_artifact_outside_the_repository(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should run a case with an artifact in its own directory.
+
+        The runner is started at the repository root, so a design writing
+        dump.vcd under a relative path would drop it into the source tree for
+        `git status` to report and a later `git add` to commit.
+        """
+        directories, _ = _run_over_artifact(
+            rst, tmp_path, "dump.vcd\n", "same\n", "same\n",
+        )
+        assert rst.REPO_ROOT not in Path(directories[0]).parents
+
+    def test_a_case_without_an_artifact_file_judges_the_text_alone(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should compare no file where the case names none.
+
+        Every case that stood before this file existed carries no .artifact,
+        and runs where the runner was started rather than in a directory of its
+        own.
+        """
+        _, outcome = _run_over_case(rst, tmp_path, "plain", 0)
+        assert outcome == (True, "")
