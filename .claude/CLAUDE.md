@@ -2,7 +2,9 @@
 
 deltahdl is a SystemVerilog simulator and elaborator pursuing IEEE 1800-2023 conformance. This file holds the standing conventions for working in this repository. Each section links the longer write-up behind it, one note per topic under `.claude/rules/`. Record a convention learned in a session the same way: a section here and a note there.
 
-## Source of truth
+## Rules
+
+### Source of truth
 
 `~/LRM.pdf` (IEEE 1800-2023) decides what the code must do. Check any non-cosmetic change against the relevant clause, and make the code conform to the standard rather than to a linter. When a linter and the standard disagree, the standard wins. Say so rather than quietly breaking conformance.
 
@@ -10,7 +12,7 @@ The standard also guides how code is structured. When grouping parameters into a
 
 Longer: [lrm-source-of-truth](rules/lrm-source-of-truth.md).
 
-## Verification
+### Verification
 
 CI is the source of truth for build and test results. Make the edits, format, commit explicit paths, push to `main`, then read the run with `gh run list` and `gh run view`.
 
@@ -28,13 +30,13 @@ Fix a red run in the session that finds it, whoever caused it. A gate that scans
 
 Longer: [verifying-through-ci](rules/verifying-through-ci.md).
 
-## Formatting
+### Formatting
 
 Run `clang-format -i --style=google` on every file a change touches. It is the one tool to run locally over what CI would otherwise judge, and it is allowed because it rewrites files rather than judging them: running it produces the bytes that get committed, so it is part of authoring a change rather than part of checking one. The style flag is required because the repository has no `.clang-format` file. Without the flag, clang-format falls back to the LLVM default, reformats whole files and buries the real change.
 
 Longer: [clang-format](rules/clang-format.md).
 
-## Commits and pushes
+### Commits and pushes
 
 Commit straight to `main`. There is no pull-request cycle, so CI is the only review buffer there is.
 
@@ -50,7 +52,7 @@ Write the commit subject at the length that states the change, and leave the bod
 
 Longer: [pushing-to-main](rules/pushing-to-main.md), [staging-explicit-paths](rules/staging-explicit-paths.md), [issue-closing-keywords](rules/issue-closing-keywords.md).
 
-## Tests
+### Tests
 
 Write the tests first, in the same commit as the code they cover. `.github/workflows/scripts.yml` runs `pytest --cov-fail-under=100` over the `unit/` directory of every Python script and library module, so production code without matching unit tests fails on push. Test-first here means authoring order; the red-green observation belongs to CI.
 
@@ -64,7 +66,7 @@ A test that expects a source rejected names the report rather than the count, wi
 
 Longer: [test-driven-development](rules/test-driven-development.md), [test-file-letter-suffixes](rules/test-file-letter-suffixes.md), [unique-test-names](rules/unique-test-names.md).
 
-## Reading the LRM
+### Reading the LRM
 
 Read `~/LRM.pdf` with the Read tool, one page per call, and wait for each result before issuing the next. Several page reads in one message exhaust a content-filter budget that does not recover for the rest of the turn, after which every tool result is suppressed. Extracting page text through `pypdf` does the same, and reading a very large source file in one call can do it too, so prefer a bounded window or a search.
 
