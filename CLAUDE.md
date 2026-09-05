@@ -1,6 +1,6 @@
 # Working in deltahdl
 
-deltahdl is a SystemVerilog simulator and elaborator pursuing IEEE 1800-2023 conformance. This file holds the standing conventions for working in this repository. Each section links the longer write-up behind it, one note per topic under `docs/claude/`, and [docs/claude/README.md](docs/claude/README.md) indexes them all. Record a convention learned in a session the same way: a section here and a note there. Do not keep it in a session's own memory, which travels with one machine and is reviewed by nobody ([where-notes-live](docs/claude/where-notes-live.md)).
+deltahdl is a SystemVerilog simulator and elaborator pursuing IEEE 1800-2023 conformance. This file holds the standing conventions for working in this repository. Each section links the longer write-up behind it, one note per topic under `.claude/memories/`, and [.claude/memories/README.md](.claude/memories/README.md) indexes them all. Record a convention learned in a session the same way: a section here and a note there. `.claude/memories/` is tracked by git; do not keep the note in the session tool's local memory directory under `~/.claude/projects/` instead, which travels with one machine and is reviewed by nobody ([where-notes-live](.claude/memories/where-notes-live.md)).
 
 ## Source of truth
 
@@ -8,7 +8,7 @@ deltahdl is a SystemVerilog simulator and elaborator pursuing IEEE 1800-2023 con
 
 The standard also guides how code is structured. When grouping parameters into a struct, mirror the entities the standard defines for that feature rather than inventing a container of convenience.
 
-Longer: [lrm-source-of-truth](docs/claude/lrm-source-of-truth.md).
+Longer: [lrm-source-of-truth](.claude/memories/lrm-source-of-truth.md).
 
 ## Verification
 
@@ -28,13 +28,13 @@ Fix a red run in the session that finds it, whoever caused it. A gate that scans
 
 Two constraints shape the job graph in `.github/workflows/deltahdl.yml` and appear nowhere in it. The repository runs a fixed number of jobs at once, and that number is smaller than the number of jobs waiting to start, so unblocking a job moves it into a full window rather than into an idle one. The lanes held behind `assert-coverage` are held there deliberately, for the same reason. Measure what a change to the graph displaces before proposing it, and read the note before concluding that a `needs:` is accidental.
 
-Longer: [verifying-through-ci](docs/claude/verifying-through-ci.md), [inheriting-a-red-gate](docs/claude/inheriting-a-red-gate.md), [diagnosing-sv-tests-failures](docs/claude/diagnosing-sv-tests-failures.md), [workflow-worktrees](docs/claude/workflow-worktrees.md), [runner-cap-and-the-coverage-gate](docs/claude/runner-cap-and-the-coverage-gate.md).
+Longer: [verifying-through-ci](.claude/memories/verifying-through-ci.md), [inheriting-a-red-gate](.claude/memories/inheriting-a-red-gate.md), [diagnosing-sv-tests-failures](.claude/memories/diagnosing-sv-tests-failures.md), [workflow-worktrees](.claude/memories/workflow-worktrees.md), [runner-cap-and-the-coverage-gate](.claude/memories/runner-cap-and-the-coverage-gate.md).
 
 ## Formatting
 
 Run `clang-format -i --style=google` on every file a change touches. It is the one tool to run locally, and it is allowed because it rewrites files rather than judging them: running it produces the bytes that get committed, so it is part of authoring a change rather than part of checking one. The style flag is required because the repository has no `.clang-format` file. Without the flag, clang-format falls back to the LLVM default, reformats whole files and buries the real change.
 
-Longer: [clang-format](docs/claude/clang-format.md).
+Longer: [clang-format](.claude/memories/clang-format.md).
 
 ## Commits and pushes
 
@@ -50,7 +50,7 @@ Describe a change to a shared module in that module's own terms. A docstring, co
 
 Write the commit subject at the length that states the change, and leave the body unwrapped. Nothing measures the width of a commit message, and the shorter word chosen to fit a column is paid for out of the accuracy the message exists to carry.
 
-Longer: [pushing-to-main](docs/claude/pushing-to-main.md), [staging-explicit-paths](docs/claude/staging-explicit-paths.md), [issue-closing-keywords](docs/claude/issue-closing-keywords.md), [commit-and-docstring-scope](docs/claude/commit-and-docstring-scope.md).
+Longer: [pushing-to-main](.claude/memories/pushing-to-main.md), [staging-explicit-paths](.claude/memories/staging-explicit-paths.md), [issue-closing-keywords](.claude/memories/issue-closing-keywords.md), [commit-and-docstring-scope](.claude/memories/commit-and-docstring-scope.md).
 
 ## Issues
 
@@ -66,7 +66,7 @@ Give each issue one scope it can close by finishing, and never write an issue th
 
 A subclause with a Syntax and a Description beneath it has an issue for each of the three, and `next_subclause` prints the parent. Find the other two by looking up the numbers around it rather than by searching titles, which has returned the parent alone while both children stood open. Close all three in the commit that satisfies them.
 
-Longer: [how-issues-are-written](docs/claude/how-issues-are-written.md), [issue-blocked-by-sequence](docs/claude/issue-blocked-by-sequence.md), [filing-what-a-session-finds](docs/claude/filing-what-a-session-finds.md), [finding-a-subclauses-issues](docs/claude/finding-a-subclauses-issues.md).
+Longer: [how-issues-are-written](.claude/memories/how-issues-are-written.md), [issue-blocked-by-sequence](.claude/memories/issue-blocked-by-sequence.md), [filing-what-a-session-finds](.claude/memories/filing-what-a-session-finds.md), [finding-a-subclauses-issues](.claude/memories/finding-a-subclauses-issues.md).
 
 ## Prose
 
@@ -82,7 +82,7 @@ Say what a thing is for before naming its parts, in a document written for a rea
 
 Nothing enforces any of this. No linter here judges wording, so a green run is not agreement.
 
-Longer: [answer-the-question-asked](docs/claude/answer-the-question-asked.md), [write-the-exact-name](docs/claude/write-the-exact-name.md), [lead-with-what-it-is-for](docs/claude/lead-with-what-it-is-for.md).
+Longer: [answer-the-question-asked](.claude/memories/answer-the-question-asked.md), [write-the-exact-name](.claude/memories/write-the-exact-name.md), [lead-with-what-it-is-for](.claude/memories/lead-with-what-it-is-for.md).
 
 ## Tenets
 
@@ -92,7 +92,7 @@ A tenet is generic. It names no language, no tool, no directory and no count, so
 
 One tenet has already cost this repository a defect: an input that cannot fail proves nothing. Some values make two quantities coincide, such as an offset and a count at zero, or a position and its name in a range that starts where counting starts. For such a value, code that confuses the two returns the right answer, so every test built on it passes whether the behaviour exists or not. §11.5.1 rules that a declaration decides which bit an index reaches, and that rule went untested for exactly this reason: every test declared its vectors `[N:0]`, where the index and the storage offset are the same number, and two elaborator paths computed offsets where indices were required without one test noticing.
 
-Longer: [docs/tenets/tests/UNIT_TESTS.md](docs/tenets/tests/UNIT_TESTS.md), [docs/tenets/conventions/README.md](docs/tenets/conventions/README.md), [reading-the-tenets](docs/claude/reading-the-tenets.md).
+Longer: [docs/tenets/tests/UNIT_TESTS.md](docs/tenets/tests/UNIT_TESTS.md), [docs/tenets/conventions/README.md](docs/tenets/conventions/README.md), [reading-the-tenets](.claude/memories/reading-the-tenets.md).
 
 ## Tests
 
@@ -106,12 +106,12 @@ Write exactly one assertion in a Python test, counting a `with pytest.raises(...
 
 A test that expects a source rejected names the report rather than the count, with one call to `ReportedError` in `lib/cpp/test_helpers/helpers_reported_error.h`. It names three things: a substring of the message, the line of the test's own source the report stands at, and the exact `Subclause("…")` text the emission site passes. `EXPECT_TRUE(f.diag.HasErrors())`, `EXPECT_TRUE(f.has_errors)`, `EXPECT_FALSE(ParseOk(...))`, `EXPECT_EQ(..., CompileOutcome::kFailed)`, `ASSERT_EQ(r.diags.size(), 1u)`, `ASSERT_FALSE(r.diags.empty())`, `EXPECT_EQ(f.diag.ErrorCount(), 1U)` and `EXPECT_TRUE(errors)` off an `auto [tokens, errors] = LexWithDiag(…)` binding are each satisfied by any rejection, so a test written for one rule passes when a different rule fired and passes when the source never reached the construct under test. A count is worse than the boolean rather than better: it states how many reports a run made and nothing about which rule any of them enforced, and it goes red when a second report is added for an unrelated reason. `FindDiag` selects a report by its message alone and matches a warning as readily as an error, and `r.diags.front()` is the wrong report to read when a source is rejected twice, so a body reading either names the report through `ReportedError` instead. Where the rule is one the program enforces with a warning, `ReportedWarning` in the same header answers the same three questions. Two kinds of site are not converted: one that varies only the construct under test while holding the rest of the source fixed, where a rejection is already attributable, and one whose rule nothing reports, which needs an issue about the program instead. A test asserting a source was accepted is sound as it stands, since there is no report to name, and so is one that reports the diagnostic itself and reads it back.
 
-Longer: [test-driven-development](docs/claude/test-driven-development.md), [test-file-letter-suffixes](docs/claude/test-file-letter-suffixes.md), [unique-test-names](docs/claude/unique-test-names.md), [one-assert-per-pytest](docs/claude/one-assert-per-pytest.md), [asserting-which-rule-was-reported](docs/claude/asserting-which-rule-was-reported.md).
+Longer: [test-driven-development](.claude/memories/test-driven-development.md), [test-file-letter-suffixes](.claude/memories/test-file-letter-suffixes.md), [unique-test-names](.claude/memories/unique-test-names.md), [one-assert-per-pytest](.claude/memories/one-assert-per-pytest.md), [asserting-which-rule-was-reported](.claude/memories/asserting-which-rule-was-reported.md).
 
 ## Reading the LRM
 
 Read `~/LRM.pdf` with the Read tool, one page per call, and wait for each result before issuing the next. Several page reads in one message exhaust a content-filter budget that does not recover for the rest of the turn, after which every tool result is suppressed. Extracting page text through `pypdf` does the same, and reading a very large source file in one call can do it too, so prefer a bounded window or a search.
 
-Printed page number plus one gives the PDF page. [locating-a-clause](docs/claude/locating-a-clause.md) carries a snippet that resolves a clause to a page from the bookmarks without touching page content.
+Printed page number plus one gives the PDF page. [locating-a-clause](.claude/memories/locating-a-clause.md) carries a snippet that resolves a clause to a page from the bookmarks without touching page content.
 
-Longer: [reading-the-lrm](docs/claude/reading-the-lrm.md), [oversized-tool-output](docs/claude/oversized-tool-output.md).
+Longer: [reading-the-lrm](.claude/memories/reading-the-lrm.md), [oversized-tool-output](.claude/memories/oversized-tool-output.md).
