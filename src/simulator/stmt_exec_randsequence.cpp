@@ -336,6 +336,10 @@ struct RandJoinSeq {
   size_t cursor = 0;
   const RsProductionItem* item = nullptr;
   const RsProduction* production = nullptr;
+  // §18.17.7: the rule whose production list these steps are, kept so that the
+  // rs_code_block Syntax 18-14 lets that rule carry after its weight can be run
+  // once the last of them has generated.
+  const RsRule* rule = nullptr;
   RuleValueCapture cap;
   Logic4Vec ret_value;
   bool returns_value = false;
@@ -401,29 +405,25 @@ static size_t ChooseRandJoinOperand(const std::vector<RandJoinSeq>& seqs,
   return chosen;
 }
 
-// 18.17.5: run one operand rule's weight code in declaration order. A break or
-// a disable must propagate out and end the whole interleaving (signalled via
-// the returned StmtResult); a return only aborts this rule's contribution,
-// leaving rule_aborted set so the caller emits no steps for it.
+// §18.17.5 / §18.17.7: run one operand rule's trailing rs_code_block, and
+// return what it did so the caller can act on a break, a disable or a return.
+// This is ExecSelectedRule's loop over the same kind of block, and it is
+// deliberately the same: the two used to differ, which is what made one rule
+// text behave one way as an ordinary production and another as a rand join
+// operand.
+//
+// §18.17 gives every code block within the randsequence an anonymous automatic
+// scope and puts no condition on where the block stands, so this one gets one
+// too. The result is carried out of the loop rather than returned from inside
+// it, so the scope is popped however the block ends.
 static ExecTask RunRandJoinRuleWeightCode(const RsRule& rule, SimContext& ctx,
-                                          Arena& arena, bool& rule_aborted) {
-  // §18.17 gives every code block within the randsequence an anonymous
-  // automatic scope, and puts no condition on where the block stands, so an
-  // operand production's trailing block gets one exactly as the block in
-  // ExecSelectedRule does. The unwinding result is carried out of the loop
-  // rather than returned from inside it, so the scope is popped however the
-  // block ends.
+                                          Arena& arena) {
   ctx.PushScope();
-  StmtResult unwind = StmtResult::kDone;
+  StmtResult block_result = StmtResult::kDone;
   for (auto* s : rule.weight_code) {
     auto r = co_await ExecStmt(s, ctx, arena);
-    auto action = ClassifyRandseqResult(r);
-    if (action == RandseqAction::kUnwind) {
-      unwind = r;
-      break;
-    }
-    if (action == RandseqAction::kAbortProduction) {
-      rule_aborted = true;
+    if (ClassifyRandseqResult(r) != RandseqAction::kKeepGenerating) {
+      block_result = r;
       break;
     }
     // §20.2: a $finish here exits the simulator, so the rest of this weight
@@ -431,7 +431,7 @@ static ExecTask RunRandJoinRuleWeightCode(const RsRule& rule, SimContext& ctx,
     if (ctx.StopRequested()) break;
   }
   ctx.PopScope();
-  co_return unwind;
+  co_return block_result;
 }
 
 namespace {
@@ -448,9 +448,9 @@ struct RandseqEngine {
 }  // namespace
 
 // 18.17.5: expand one rand join operand to depth 1 into its production-item
-// steps. Selects the operand's rule, runs that rule's weight code, and (unless
-// the rule returned) collects its steps into seq. A break in the weight code is
-// surfaced via the returned StmtResult so the caller can abort the whole join.
+// steps. Selects the operand's rule and collects its steps into seq, keeping
+// the rule so the interleaving can run its trailing code block once the last
+// of those steps has generated.
 //
 // §18.17.7: record what the operand names and size the storage its generation
 // returns into, and declare the implicit variables of the rule the steps came
@@ -471,35 +471,24 @@ static ExecTask BuildOneRandJoinSeq(const RandseqEngine& eng,
     if (w == 0 && !ProductionReturnsString(production)) w = 32;
     seq.ret_value = MakeLogic4VecVal(eng.arena, w, 0);
   }
-  const auto& rule = SelectRule(*production, eng.ctx, eng.arena);
-  bool rule_aborted = false;
-  auto r = co_await RunRandJoinRuleWeightCode(rule, eng.ctx, eng.arena,
-                                              rule_aborted);
-  if (ClassifyRandseqResult(r) == RandseqAction::kUnwind) co_return r;
-  if (rule_aborted) co_return StmtResult::kDone;
-  CollectRandJoinSteps(rule, eng.arena, seq.steps);
+  seq.rule = &SelectRule(*production, eng.ctx, eng.arena);
+  CollectRandJoinSteps(*seq.rule, eng.arena, seq.steps);
   seq.cap = BuildStepValueCapture(eng.stmt, seq.steps, eng.ctx);
   co_return StmtResult::kDone;
 }
 
 // 18.17.5: expand each rand join operand one level into the production items of
-// its selected rule, running that rule's weight code in declaration order
-// first. A rule whose weight code breaks or is disabled ends the whole
-// interleaving; one that returns contributes no steps. Sets aborted, and
-// returns the result the caller must propagate, when the expansion must not
-// finish.
+// its selected rule. Nothing here can end the interleaving any more: expansion
+// selects a rule and reads its production list, and the code block that could
+// break, disable or return now runs after the operand's own steps rather than
+// before them.
 static ExecTask BuildRandJoinSeqs(const RandseqEngine& eng,
                                   const RsRule& selected,
-                                  std::vector<RandJoinSeq>& seqs,
-                                  bool& aborted) {
+                                  std::vector<RandJoinSeq>& seqs) {
   seqs.reserve(selected.rand_join_items.size());
   for (const auto& item : selected.rand_join_items) {
     RandJoinSeq seq;
-    auto r = co_await BuildOneRandJoinSeq(eng, item, seq);
-    if (ClassifyRandseqResult(r) == RandseqAction::kUnwind) {
-      aborted = true;
-      co_return r;
-    }
+    co_await BuildOneRandJoinSeq(eng, item, seq);
     seqs.push_back(std::move(seq));
   }
   co_return StmtResult::kDone;
@@ -567,10 +556,8 @@ static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
   RuleValueCapture cap = BuildRuleValueCapture(stmt, selected, ctx);
 
   std::vector<RandJoinSeq> seqs;
-  bool aborted = false;
   RandseqEngine eng{stmt, ctx, arena};
-  auto build = co_await BuildRandJoinSeqs(eng, selected, seqs, aborted);
-  if (aborted) co_return build;
+  co_await BuildRandJoinSeqs(eng, selected, seqs);
 
   // §20.2: a $finish executed by any operand exits the simulator, so the steps
   // the other operands have not contributed yet do not generate. The interleave
@@ -594,6 +581,29 @@ static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
     // contributed has generated.
     if (seqs[chosen].Remaining() == 0) {
       StoreRandJoinOperandValue(seqs[chosen], cap, ctx, arena);
+      // §18.17.7 reads a rule's trailing code block against what stands to its
+      // left -- "only the return values of productions already generated (i.e.,
+      // to the left of the code block accessing them) can be retrieved" -- and
+      // an operand's whole production list is written to its left. So the block
+      // runs as that operand's last step, which is also the only place inside
+      // its own sequence that keeps it to the right of its own productions;
+      // §18.17.5 says where an operand's productions go and nothing about where
+      // a block trailing its rule lands, and "maintaining the relative order of
+      // each sequence" is what puts it inside that sequence rather than before
+      // every sequence.
+      //
+      // An operand is chosen only while it has steps remaining, so this runs
+      // once per operand and never twice.
+      auto block =
+          co_await RunRandJoinRuleWeightCode(*seqs[chosen].rule, ctx, arena);
+      // §18.17.6: a break or a disable ends the whole randsequence. A return
+      // aborts the current production, which by this point has generated, so it
+      // is absorbed here exactly as ExecRsProduction absorbs one at the end of
+      // an ordinary production -- the two paths agreeing being the point of
+      // running the block here at all.
+      if (ClassifyRandseqResult(block) == RandseqAction::kUnwind) {
+        co_return block;
+      }
     }
   }
   co_return StmtResult::kDone;

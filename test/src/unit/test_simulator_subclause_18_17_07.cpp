@@ -756,4 +756,40 @@ TEST(RandseqValuePassingSim,
   EXPECT_EQ(r2, 6u);
 }
 
+// §18.17.7: "only the return values of productions already generated (i.e., to
+// the left of the code block accessing them) can be retrieved", and an
+// operand's whole production list is written to the left of the code block its
+// rule carries after the weight. So each operand's block reads what that
+// operand's own production returned.
+//
+// It read nothing until the block moved. §18.17.5's interleaving expanded each
+// operand one level and ran that operand's block at expansion time, before any
+// of its steps had generated, so the same rule text answered one way here and
+// another as an ordinary production -- which is the disagreement this case
+// exists to hold shut.
+//
+// Each operand reads its own production and not its sibling's, which one block
+// could not show. Both values are the same whichever operand the draw leads
+// with, §18.17.5 leaving that unspecified.
+TEST(RandseqValuePassingSim, RandJoinOperandRuleReadsItsOwnProductionValue) {
+  SimFixture f;
+  auto [r1, r2] = RunModuleTwoVars(f,
+                                   "module t;\n"
+                                   "  int r1, r2;\n"
+                                   "  initial begin\n"
+                                   "    r1 = 0; r2 = 0;\n"
+                                   "    randsequence(main)\n"
+                                   "      void main : rand join a b;\n"
+                                   "      void a : p := 1 { r1 = p; };\n"
+                                   "      void b : q := 1 { r2 = q; };\n"
+                                   "      int p : { return 5; };\n"
+                                   "      int q : { return 6; };\n"
+                                   "    endsequence\n"
+                                   "  end\n"
+                                   "endmodule\n",
+                                   "r1", "r2");
+  EXPECT_EQ(r1, 5u);
+  EXPECT_EQ(r2, 6u);
+}
+
 }  // namespace

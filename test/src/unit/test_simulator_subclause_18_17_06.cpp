@@ -310,32 +310,45 @@ TEST(RandsequenceSim, BreakInRandJoinWeightCodeTerminatesRandsequence) {
                                  "module t;\n"
                                  "  int x;\n"
                                  "  int y;\n"
+                                 "  int z;\n"
                                  "  initial begin\n"
                                  "    x = 0;\n"
                                  "    y = 0;\n"
+                                 "    z = 0;\n"
                                  "    randsequence(main)\n"
                                  "      main : j tail;\n"
                                  "      j    : rand join s1 s2;\n"
                                  "      s1   : p := 1 { x = x + 3; break; };\n"
                                  "      p    : { x = x + 900; };\n"
-                                 "      s2   : { x = x + 7; };\n"
+                                 "      s2   : { z = z + 7; };\n"
                                  "      tail : { x = x + 50; };\n"
                                  "    endsequence\n"
                                  "    y = y + 6;\n"
                                  "  end\n"
                                  "endmodule\n",
                                  "x", "y");
-  // Operands are expanded in the order written, so s1's weight code runs first
-  // and its break leaves s2 (7), p (900) and tail (50) ungenerated.
-  EXPECT_EQ(x, 3u);
+  // s1's code block runs once s1 has generated, so p (900) contributes and the
+  // break then leaves tail (50) ungenerated: x == 903.
+  //
+  // s2 writes z rather than x so that the expectation does not depend on the
+  // draw. §18.17.5 leaves the interleaving unspecified, so s2's step may run
+  // before s1's or not at all -- the break ends the randsequence either way --
+  // and a sibling contributing to x would read 903 or 910 by chance.
+  EXPECT_EQ(x, 903u);
   EXPECT_EQ(y, 6u);  // execution resumed after the randsequence
 }
 
-// 18.17.6: return aborts only the current production, so a return in the
-// weight code of a rand join operand drops that operand's contribution and
-// leaves the interleaving intact. The sibling operand still generates, and so
-// does the production written after the rand join.
-TEST(RandsequenceSim, ReturnInRandJoinWeightCodeAbortsOperandOnly) {
+// §18.17.6: "return aborts only the current production". An operand rule's
+// code block runs once that operand has generated, so the production the
+// return aborts has already finished and there is nothing left to drop: the
+// interleaving carries on and the production written after the rand join still
+// generates.
+//
+// That is the same absorption ExecRsProduction performs at the end of an
+// ordinary production, which is the point. The block used to run at expansion
+// time, before any of the operand's own steps, so the same rule text dropped a
+// production here and dropped nothing as an ordinary production.
+TEST(RandsequenceSim, ReturnInRandJoinWeightCodeIsAbsorbedOnceItHasGenerated) {
   SimFixture f;
   uint64_t x = RunModule(f,
                          "module t;\n"
@@ -353,10 +366,13 @@ TEST(RandsequenceSim, ReturnInRandJoinWeightCodeAbortsOperandOnly) {
                          "  end\n"
                          "endmodule\n",
                          "x");
-  // s1's weight code adds 2 and aborts s1, so p (900) contributes nothing; s2
-  // (4) is still interleaved and tail (30) still follows the join. A break
-  // there would have left 2, and ignoring the return would have left 936.
-  EXPECT_EQ(x, 36u);
+  // p (900) generates, s1's block adds 2 and returns, and the return is
+  // absorbed because s1 has finished; s2 (4) is still interleaved and tail (30)
+  // still follows the join. A break there would have left 902 and ended the
+  // randsequence, and a return that unwound the whole join would have left 902
+  // too without tail. Every one of the four contributes whatever order the
+  // draw gives, so the total does not depend on it.
+  EXPECT_EQ(x, 936u);
 }
 
 }  // namespace
