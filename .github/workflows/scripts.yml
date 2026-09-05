@@ -269,6 +269,29 @@ jobs:
           python3 -m pylint --recursive=y
           lib/python/ test/scripts/ test/lib/python/
           --fail-on=C,R,W --fail-under=10.0
+  test-assert-no-duplicate-type-definitions:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-scripts-test-script-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-script-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run unit tests with 100% coverage gate
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/assert_no_duplicate_type_definitions/unit/ -v
+          --cov=assert_no_duplicate_type_definitions
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
   test-assert-subclause-citations:
     runs-on: ubuntu-24.04
     steps:
