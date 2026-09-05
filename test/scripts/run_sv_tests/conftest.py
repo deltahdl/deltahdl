@@ -26,10 +26,10 @@ def capture_run_cmd() -> Callable[[ModuleType, Callable[[], Any]], list[str]]:
     deltahdl was given, and the case over the corpus revision reads the command
     git was given.
     """
-    def capture(rst: ModuleType, call: Callable[[], Any]) -> list[str]:
+    def capture(module: ModuleType, call: Callable[[], Any]) -> list[str]:
         mock_result = MagicMock(returncode=0, stderr="")
         with patch.object(
-            rst.subprocess, "run", return_value=mock_result,
+            module.subprocess, "run", return_value=mock_result,
         ) as mock_run:
             call()
         cmd: list[str] = mock_run.call_args[0][0]
