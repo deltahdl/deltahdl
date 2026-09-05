@@ -112,7 +112,13 @@ on:
   push:
     branches: [main]
     paths:
+      # A path filter matches a dot-prefixed directory only where the pattern
+      # spells the dot out, so '**/*.md' passes over .claude/ and the entry
+      # below is what starts this workflow on a change to the notes or the
+      # skill. Eight pushes carrying nothing but .claude/skills/autopilot/
+      # SKILL.md started no run at all before it was added.
       - '**/*.md'
+      - .claude/**/*.md
       - docs/**/*.json
       - .github/workflows/documentation.yml
   workflow_dispatch: {}
