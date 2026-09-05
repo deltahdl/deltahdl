@@ -155,4 +155,31 @@ TEST(PrimarySim, BitsResultUsableAsLocalparamValue) {
   EXPECT_EQ(n->value.ToUint64(), 16u);
 }
 
+// §20.6.2: "the $bits system function returns the number of bits required to
+// hold an expression as a bit stream", and the 0 it also defines is reserved
+// for "a dynamically sized expression that is currently empty", which
+// BitsOfCurrentlyEmptyQueueReturnsZero above covers. `byte` is fixed-size, so
+// §6.11 Table 6-8's eight bits is the only answer here.
+//
+// The declaration takes its type through a class scope prefix, and the class is
+// written inside the module. That resolution happens in the elaborator, but
+// EvalBits in src/simulator/eval_systask.cpp answers from the run-time value's
+// own width, so a width that survives elaboration can still be lost between
+// Lowerer::LowerVar and the read. This is the assertion that spans both.
+TEST(PrimarySim, BitsOfAModuleLocalClassScopedTypedefVariable) {
+  SimFixture f;
+  auto* n = RunAndFindVar(
+      "module t;\n"
+      "  class Cfg;\n"
+      "    typedef byte my_type;\n"
+      "  endclass\n"
+      "  Cfg::my_type v;\n"
+      "  int n;\n"
+      "  initial n = $bits(v);\n"
+      "endmodule\n",
+      f, "n");
+  ASSERT_NE(n, nullptr);
+  EXPECT_EQ(n->value.ToUint64(), 8u);
+}
+
 }  // namespace

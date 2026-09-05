@@ -731,6 +731,14 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   // y`) resolves the referenced object's width/signedness before the net is
   // built.
   ResolveTypeRef(item, mod);
+
+  // §8.23: and `wire Cfg::beat_t w;` names a type declared in a class, which a
+  // net reaches by this path and not by ElaborateVarDecl's. It has to be
+  // resolved before var_types_ below records the kind and before EvalTypeWidth
+  // sizes the net, or the net is built zero bits wide and unsigned.
+  ResolveClassScopedDeclType(item->data_type, typedefs_, unit_);
+  ReportUnresolvedClassScopedType(item->data_type, item->loc, typedefs_, unit_,
+                                  diag_);
   CheckDeclRedeclaration(
       item, {item->data_type, typedefs_},
       {ansi_port_names_, non_ansi_complete_ports_, non_ansi_partial_ports_,

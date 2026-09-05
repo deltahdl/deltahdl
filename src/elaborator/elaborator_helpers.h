@@ -247,6 +247,55 @@ const DataType* FindClassScopedTypedefType(std::string_view cls_name,
                                            std::string_view type_name,
                                            const CompilationUnit* unit);
 
+// §8.23: rewrites `dtype` in place when it is a type name carrying a class
+// scope prefix -- the `Cfg::my_type` of `Cfg::my_type x;` -- and that prefix
+// names a visible class declaring that typedef. Returns false, leaving `dtype`
+// untouched, wherever that does not hold. Defined in
+// elaborator_validate_struct_types.cpp.
+//
+// `typedefs` is asked first and left in charge wherever it answers, because
+// "scope_name::type_name" is also the key a package typedef and a
+// compilation-unit class typedef are recorded under, and the class walk cannot
+// tell a package from a class of the same name. What this adds is the case that
+// key never covers: RegisterClassTypedefs fills the map from
+// CompilationUnit::classes, which the parser fills from a top-of-file class
+// alone, so a class written inside a module contributes no key at all.
+// FindClassDecl reaches one, which is why `type(Cfg::my_type)` resolves against
+// a module-local class while the bare declaration beside it sized itself at
+// zero bits and unsigned.
+//
+// Registering module-local classes into the map instead would be the other way
+// round, and TypedefMap is one flat map for the whole compilation unit: two
+// modules each declaring a `class Cfg` would write one "Cfg::my_type" key and
+// silently take each other's type. FindClassDecl answers null on that ambiguity
+// through TakeUniqueMatch.
+//
+// DataType::scope_name is left as written rather than cleared, so a prefix that
+// a later pass judges under §8.23's restriction on which contexts may carry one
+// still has the prefix to judge.
+bool ResolveClassScopedDeclType(DataType& dtype, const TypedefMap& typedefs,
+                                const CompilationUnit* unit);
+
+// §8.23: "When a type name is used, the name shall resolve to a type after
+// elaboration." Reports a declared type whose class scope prefix names a
+// visible class that declares nothing under that name, which otherwise sizes
+// the declared object at zero bits and says nothing at all. `loc` is where the
+// declaration stands. Defined in elaborator_validate_struct_types.cpp.
+//
+// Only that one shape is reported, and the guards are what keep the report off
+// the other prefixes the same clause admits: the left operand may be "a class
+// type name, package name (see 26.2), covergroup type name, coverpoint name,
+// cross name (see 19.5, 19.6), typedef name, or type parameter name", and
+// FindClassDecl answering a class is what separates the first from the rest. A
+// prefix this tool resolves by no route stays as silent as it was rather than
+// becoming a report about a legal declaration. A class that extends another is
+// left alone for the same reason, since the members walked are the class's own
+// and not the ones it inherits, and a prefix carrying specialization arguments
+// is ResolveParameterizedType's to resolve.
+void ReportUnresolvedClassScopedType(const DataType& dtype, SourceLoc loc,
+                                     const CompilationUnit* unit,
+                                     DiagEngine& diag);
+
 // §8.25: rewrites `dtype` in place when it names a member of a specialization
 // of a parameterized class, substituting the arguments DataType::type_params
 // carries for the class's own parameters. Returns false, leaving `dtype`

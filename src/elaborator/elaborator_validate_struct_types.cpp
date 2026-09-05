@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <format>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -234,6 +235,64 @@ const DataType* FindClassScopedTypedefType(std::string_view cls_name,
   const auto* td = FindClassTypedef(cls, type_name);
   if (td == nullptr) return nullptr;
   return &td->typedef_type;
+}
+
+// The key RegisterScopedTypedef writes a scope-qualified type name under, and
+// the one ResolveNamed looks it up by. Both functions below ask whether that
+// key is present before reaching for a class, so the string is built in one
+// place.
+static std::string QualifiedTypeKey(const DataType& dtype) {
+  return std::string(dtype.scope_name) + "::" + std::string(dtype.type_name);
+}
+
+bool ResolveClassScopedDeclType(DataType& dtype, const TypedefMap& typedefs,
+                                const CompilationUnit* unit) {
+  if (dtype.kind != DataTypeKind::kNamed || dtype.scope_name.empty()) {
+    return false;
+  }
+  if (typedefs.count(QualifiedTypeKey(dtype)) > 0) return false;
+  const DataType* resolved =
+      FindClassScopedTypedefType(dtype.scope_name, dtype.type_name, unit);
+  if (resolved == nullptr) return false;
+  dtype.kind = resolved->kind;
+  dtype.is_signed = resolved->is_signed;
+  dtype.type_name = resolved->type_name;
+  dtype.packed_dim_left = resolved->packed_dim_left;
+  dtype.packed_dim_right = resolved->packed_dim_right;
+  dtype.extra_packed_dims = resolved->extra_packed_dims;
+  return true;
+}
+
+// Whether `cls` declares anything at all under `name`. §8.23 puts a nested
+// class declaration and a typedef in one list -- "the class scope resolution
+// operator applies to all static elements of a class: static class properties,
+// static methods, typedefs, enumerations, parameters, local parameters,
+// constraints, structures, unions, and nested class declarations" -- so a name
+// this tool does not resolve to a type is still a name the class declared, and
+// `StringList::Node n;` is the case that is.
+static bool ClassDeclaresMember(const ClassDecl* cls, std::string_view name) {
+  for (const auto* m : cls->members) {
+    if (m->name == name) return true;
+  }
+  return false;
+}
+
+void ReportUnresolvedClassScopedType(const DataType& dtype, SourceLoc loc,
+                                     const TypedefMap& typedefs,
+                                     const CompilationUnit* unit,
+                                     DiagEngine& diag) {
+  if (dtype.kind != DataTypeKind::kNamed || dtype.scope_name.empty()) return;
+  if (!dtype.type_params.empty()) return;
+  if (typedefs.count(QualifiedTypeKey(dtype)) > 0) return;
+  const ClassDecl* cls = FindClassDecl(dtype.scope_name, unit);
+  if (cls == nullptr) return;
+  if (!cls->base_class.empty() || !cls->extends_interfaces.empty()) return;
+  if (cls->members.empty()) return;
+  if (ClassDeclaresMember(cls, dtype.type_name)) return;
+  diag.Error(loc,
+             std::format("class '{}' declares no type '{}'", dtype.scope_name,
+                         dtype.type_name),
+             Subclause("8.23"));
 }
 
 // What each parameter of `cls` stands for in the specialization `args` writes,

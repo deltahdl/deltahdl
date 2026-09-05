@@ -684,4 +684,108 @@ TEST(ClassScopeResolutionElaboration,
                     6, "8.23"));
 }
 
+// §8.23: "Type declarations nested inside a class scope are public and can be
+// accessed outside the class", and nothing in the clause makes where the class
+// itself stands part of the rule. ScopedTypedefSizesWithNoUnqualifiedName above
+// is this source with `class Cfg` written above the module instead, and that is
+// the one arrangement the typedef map covered: RegisterClassTypedefs in
+// src/elaborator/elaborator_resolve.cpp walks CompilationUnit::classes, which
+// the parser fills from a top-of-file class alone, so no "Cfg::my_type" key was
+// ever recorded for a class written inside a module.
+//
+// The module declares an unqualified my_type of a different width for the
+// reason ScopedTypedefSizesFromTheNamedClass gives: 32 is the class's int, 8
+// would be a fallback to the module's byte, and 0 is what an unresolved kNamed
+// evaluates to. Only one of the three is the prefix being read.
+TEST(ClassScopeResolutionElaboration,
+     ScopedTypedefFromAModuleLocalClassSizesTheVariable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  class Cfg;\n"
+      "    typedef int my_type;\n"
+      "  endclass\n"
+      "  typedef byte my_type;\n"
+      "  Cfg::my_type x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* x = FindVar(design, "m", "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->width, 32u);
+}
+
+// The signedness of the same declaration, which is a second case because
+// Elaborator::ElaborateVarDecl asks IsSignedType and EvalTypeWidth separately,
+// at src/elaborator/elaborator_decls_var.cpp:760 and :763. A width fix that
+// left IsSignedType reading the unresolved DataType would size the variable at
+// 8 and still read it unsigned, which is what printed 4294967295 for
+// test/src/e2e/decl_class_scope.sv.
+//
+// §6.11 Table 6-8 gives `byte` as an 8-bit signed integer, so both values below
+// come from the typedef rather than from the declaration, which writes no
+// signing and no dimension of its own.
+TEST(ClassScopeResolutionElaboration,
+     ScopedTypedefFromAModuleLocalClassSignsTheVariable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  class Cfg;\n"
+      "    typedef byte my_type;\n"
+      "  endclass\n"
+      "  Cfg::my_type x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* x = FindVar(design, "m", "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->width, 8u);
+  EXPECT_TRUE(x->is_signed);
+}
+
+// A net reaches EvalTypeWidth and IsSignedType from
+// Elaborator::ElaborateNetDecl rather than from ElaborateVarDecl, so it is a
+// path of its own and not a restatement of the two above. §6.7.1 requires a
+// net's data type to be 4-state, which is why the typedef is `logic [7:0]` and
+// not the `byte` beside it.
+TEST(ClassScopeResolutionElaboration,
+     ScopedTypedefFromAModuleLocalClassSizesTheNet) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  class Cfg;\n"
+      "    typedef logic [7:0] beat_t;\n"
+      "  endclass\n"
+      "  wire Cfg::beat_t w;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* w = FindNet(design, "m", "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->width, 8u);
+}
+
+// §8.23: "When a type name is used, the name shall resolve to a type after
+// elaboration." A prefix naming a visible class that declares no such type
+// resolves to nothing, and what that produced was a zero-bit unsigned object
+// and silence -- which is how test/src/e2e/decl_class_scope.sv ran all the way
+// to printing a 0 with nothing said about why.
+TEST(ClassScopeResolutionElaboration, ScopedTypedefNamingNoSuchTypeIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class Cfg;\n"
+      "    typedef int my_type;\n"
+      "  endclass\n"
+      "  Cfg::absent_t x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class 'Cfg' declares no type 'absent_t'", 5,
+                            "8.23"));
+}
+
 }  // namespace

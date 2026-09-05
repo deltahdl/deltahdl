@@ -716,6 +716,15 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
 
   ResolveDeclaredTypeName(item, unit_, typedefs_, class_names_, diag_);
 
+  // §8.23: `Cfg::my_type x;` names a type declared in a class, and the map
+  // ResolveNamed reads carries a "Cfg::my_type" key only where that class
+  // stands at compilation-unit scope. A class written inside this module
+  // reaches the declaration through here instead, and a declaration that
+  // resolved by neither route earns the report below.
+  ResolveClassScopedDeclType(item->data_type, typedefs_, unit_);
+  ReportUnresolvedClassScopedType(item->data_type, item->loc, typedefs_, unit_,
+                                  diag_);
+
   std::string_view adopted_array_typedef =
       AdoptTypedefArrayDims(item, typedefs_, td_array_dims_);
 
