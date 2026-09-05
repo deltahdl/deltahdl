@@ -12,10 +12,6 @@ A defect the commit in hand fixes. The commit message states it and the issue wo
 
 A defect an open issue already covers. Cite that issue. A second issue over one defect puts two entries in the sequence for one piece of work, and closing either leaves the other claiming there is something left.
 
-## Filing includes placing
-
-An issue joins the blocked-by sequence at the moment it is created, by being prepended, appended or interposed. A filed issue with no edge is a filing that broke the sequence, and the report that it was filed is then wrong about the one thing that matters for what gets worked next.
-
 ## Splitting what one reading found
 
 One reading often turns up more than one scope. `LowerBinaryBit`'s `default` arm answers a constant for the arithmetic operators, for the comparisons and for the shifts, and those became three issues rather than one, because each closes by finishing and the third does not wait on the first two to be worth reading. Deciding this is the work of filing, and an issue that would only close when a whole family did is the shape to avoid.
