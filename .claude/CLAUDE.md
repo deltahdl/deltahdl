@@ -2,7 +2,7 @@
 
 ## Table of Contents
 
-- [Overview](#overview)
+- [Recording what a session learns](#recording-what-a-session-learns)
 - [Rules](#rules)
   - [Commits and pushes](#commits-and-pushes)
   - [Formatting](#formatting)
@@ -11,15 +11,15 @@
   - [Tests](#tests)
   - [Verification](#verification)
 
-## Overview
+## Recording what a session learns
 
-deltahdl is a SystemVerilog simulator and elaborator pursuing IEEE 1800-2023 conformance. Record a convention learned in a session as a section here and a longer note under `.claude/rules/`.
+Write it down under `.claude/`, in the directory its kind belongs to: `rules/` for an instruction with a gate or a mechanism behind it, `conventions/` for a chosen form that a different choice would serve as well, `memories/` for a fact or a decision already taken, and `references/` for lookup material. A rule also gets a section under Rules below; a memory also gets a line in `memories/MEMORY.md`. Open every file with a top-level heading, which markdownlint's MD041 requires across `**/*.md`.
 
 ## Rules
 
 ### Commits and pushes
 
-Longer: [pushing-to-main](rules/pushing-to-main.md), [staging-explicit-paths](rules/staging-explicit-paths.md), [issue-closing-keywords](rules/issue-closing-keywords.md).
+Longer: [pushing-to-main](rules/pushing-to-main.md), [staging-explicit-paths](rules/staging-explicit-paths.md), [issue-closing-keywords](rules/issue-closing-keywords.md), [commit-message-width](conventions/commit-message-width.md).
 
 Commit straight to `main`. There is no pull-request cycle.
 
@@ -45,7 +45,7 @@ Longer: [reading-the-lrm](rules/reading-the-lrm.md), [oversized-tool-output](rul
 
 Read `~/LRM.pdf` with the Read tool, one page per call, waiting for each result before the next. Several page reads in one message exhaust a content-filter budget that does not recover for the rest of the turn, after which every tool result is suppressed. Extracting page text through `pypdf` does the same, and so can reading a very large source file in one call, so prefer a bounded window or a search.
 
-Printed page number plus one gives the PDF page. [locating-a-clause](rules/locating-a-clause.md) carries a snippet that resolves a clause to a page from the bookmarks without touching page content.
+Printed page number plus one gives the PDF page. [locating-a-clause](references/locating-a-clause.md) carries a snippet that resolves a clause to a page from the bookmarks without touching page content.
 
 ### Source of truth
 
@@ -57,7 +57,7 @@ The standard also guides how code is structured. When grouping parameters into a
 
 ### Tests
 
-Longer: [test-driven-development](rules/test-driven-development.md), [test-file-letter-suffixes](rules/test-file-letter-suffixes.md), [unique-test-names](rules/unique-test-names.md).
+Longer: [test-driven-development](rules/test-driven-development.md), [test-file-letter-suffixes](conventions/test-file-letter-suffixes.md), [unique-test-names](rules/unique-test-names.md).
 
 Write the tests first, in the same commit as the code they cover. `.github/workflows/scripts.yml` runs `pytest --cov-fail-under=100` over the `unit/` directory of every Python script and library module. Test-first here means authoring order; the red-green observation belongs to CI.
 
@@ -71,7 +71,7 @@ A test that expects a source rejected names the report with `ReportedError` in `
 
 ### Verification
 
-Longer: [verifying-through-ci](rules/verifying-through-ci.md).
+Longer: [verifying-through-ci](rules/verifying-through-ci.md), [diagnosing-sv-tests-failures](rules/diagnosing-sv-tests-failures.md).
 
 CI is the source of truth. Make the edits, format, commit explicit paths, push to `main`, then read the run with `gh run list` and `gh run view`.
 

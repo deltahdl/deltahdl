@@ -1,4 +1,4 @@
 # Memories
 
-- [Where rules and memories live](memory-directory-location.md) — conventions go to `.claude/rules/`, memories to `.claude/memories/`.
-- [Diagnosing sv-tests failures](diagnosing-sv-tests-failures.md) — how to run one failing file locally, the second exception to never-build-locally.
+- [Where the notes live](note-directories.md) — `.claude/` in the repository, split four ways by kind since 2026-09-05.
+- [The unpinned CI toolchain](unpinned-ci-toolchain.md) — everything floats to latest; Actions tags stay at their major version.

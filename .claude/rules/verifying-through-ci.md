@@ -25,4 +25,4 @@ Read the CI log first, because most of the answer is already there. `print_reaso
 
 The one thing the log drops is the rest of a simulation's stdout. `run_test` scores a simulated file through `check_assertions`, which walks the `:assert:` lines and returns `Assertion failed: <expr>` for the first that does not hold; every other line the run printed is discarded on the way. When the failing assertion and its two values do not themselves say why they differ, the surrounding output is what says it, and running the file is the only way to see it. That gap is the whole of the exception, and closing it in `run_sv_tests` would end the exception rather than widen it.
 
-[diagnosing-sv-tests-failures](../memories/diagnosing-sv-tests-failures.md) carries how to fetch the file and run it.
+[diagnosing-sv-tests-failures](diagnosing-sv-tests-failures.md) carries how to fetch the file and run it.
