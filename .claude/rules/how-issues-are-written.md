@@ -31,6 +31,6 @@ The regression section is those three sections read forwards, and it is where th
 
 Take the vocabulary from the standard. Clause and subclause, elaboration, declaration, net and variable — the words `~/LRM.pdf` uses for the thing being described, with the clause number cited wherever a claim rests on one.
 
-Write the issue to the same rules as everything else written here. They are in [write-the-exact-name](write-the-exact-name.md) for the words a name is written in, in [lead-with-what-it-is-for](lead-with-what-it-is-for.md) for what comes before the first identifier.
+Write the issue to the same rules as everything else written here. They are in [write-the-exact-name](write-the-exact-name.md) for the words a name is written in.
 
 What closes the issue when the fix lands is in [issue-closing-keywords](issue-closing-keywords.md).
