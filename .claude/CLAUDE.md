@@ -1,6 +1,6 @@
 # Working in deltahdl
 
-deltahdl is a SystemVerilog simulator and elaborator pursuing IEEE 1800-2023 conformance. This file holds the standing conventions for working in this repository. Each section links the longer write-up behind it, one note per topic under `.claude/rules/`, and [.claude/rules/README.md](rules/README.md) indexes them all. Record a convention learned in a session the same way: a section here and a note there. `.claude/rules/` holds the rules a person writes, and `.claude/memories/` holds what the session tool writes by itself. `.claude/settings.json` sets `autoMemoryEnabled` to `true` and `autoMemoryDirectory` to `.claude/memories/`, so an automatic memory lands in the repository and is committed and reviewed like any other file, rather than under `~/.claude/projects/` where it would travel with one machine and be seen by nobody ([where-notes-live](rules/where-notes-live.md)).
+deltahdl is a SystemVerilog simulator and elaborator pursuing IEEE 1800-2023 conformance. This file holds the standing conventions for working in this repository. Each section links the longer write-up behind it, one note per topic under `.claude/rules/`. Record a convention learned in a session the same way: a section here and a note there. `.claude/rules/` holds the rules a person writes, and `.claude/memories/` holds what the session tool writes by itself. `.claude/settings.json` sets `autoMemoryEnabled` to `true` and `autoMemoryDirectory` to `.claude/memories/`, so an automatic memory lands in the repository and is committed and reviewed like any other file, rather than under `~/.claude/projects/` where it would travel with one machine and be seen by nobody ([where-notes-live](rules/where-notes-live.md)).
 
 ## Source of truth
 
@@ -28,7 +28,7 @@ Fix a red run in the session that finds it, whoever caused it. A gate that scans
 
 Two constraints shape the job graph in `.github/workflows/deltahdl.yml` and appear nowhere in it. The repository runs a fixed number of jobs at once, and that number is smaller than the number of jobs waiting to start, so unblocking a job moves it into a full window rather than into an idle one. The lanes held behind `assert-coverage` are held there deliberately, for the same reason. Measure what a change to the graph displaces before proposing it, and read the note before concluding that a `needs:` is accidental.
 
-Longer: [verifying-through-ci](rules/verifying-through-ci.md), [inheriting-a-red-gate](rules/inheriting-a-red-gate.md), [diagnosing-sv-tests-failures](rules/diagnosing-sv-tests-failures.md), [workflow-worktrees](rules/workflow-worktrees.md), [runner-cap-and-the-coverage-gate](rules/runner-cap-and-the-coverage-gate.md).
+Longer: [verifying-through-ci](rules/verifying-through-ci.md), [inheriting-a-red-gate](rules/inheriting-a-red-gate.md), [workflow-worktrees](rules/workflow-worktrees.md), [runner-cap-and-the-coverage-gate](rules/runner-cap-and-the-coverage-gate.md).
 
 ## Formatting
 
@@ -50,7 +50,7 @@ Describe a change to a shared module in that module's own terms. A docstring, co
 
 Write the commit subject at the length that states the change, and leave the body unwrapped. Nothing measures the width of a commit message, and the shorter word chosen to fit a column is paid for out of the accuracy the message exists to carry.
 
-Longer: [pushing-to-main](rules/pushing-to-main.md), [staging-explicit-paths](rules/staging-explicit-paths.md), [issue-closing-keywords](rules/issue-closing-keywords.md), [commit-and-docstring-scope](rules/commit-and-docstring-scope.md).
+Longer: [pushing-to-main](rules/pushing-to-main.md), [staging-explicit-paths](rules/staging-explicit-paths.md), [issue-closing-keywords](rules/issue-closing-keywords.md).
 
 ## Tests
 
@@ -66,7 +66,7 @@ Write exactly one assertion in a Python test, counting a `with pytest.raises(...
 
 A test that expects a source rejected names the report rather than the count, with one call to `ReportedError` in `lib/cpp/test_helpers/helpers_reported_error.h`. It names three things: a substring of the message, the line of the test's own source the report stands at, and the exact `Subclause("…")` text the emission site passes. `EXPECT_TRUE(f.diag.HasErrors())`, `EXPECT_TRUE(f.has_errors)`, `EXPECT_FALSE(ParseOk(...))`, `EXPECT_EQ(..., CompileOutcome::kFailed)`, `ASSERT_EQ(r.diags.size(), 1u)`, `ASSERT_FALSE(r.diags.empty())`, `EXPECT_EQ(f.diag.ErrorCount(), 1U)` and `EXPECT_TRUE(errors)` off an `auto [tokens, errors] = LexWithDiag(…)` binding are each satisfied by any rejection, so a test written for one rule passes when a different rule fired and passes when the source never reached the construct under test. A count is worse than the boolean rather than better: it states how many reports a run made and nothing about which rule any of them enforced, and it goes red when a second report is added for an unrelated reason. `FindDiag` selects a report by its message alone and matches a warning as readily as an error, and `r.diags.front()` is the wrong report to read when a source is rejected twice, so a body reading either names the report through `ReportedError` instead. Where the rule is one the program enforces with a warning, `ReportedWarning` in the same header answers the same three questions. Two kinds of site are not converted: one that varies only the construct under test while holding the rest of the source fixed, where a rejection is already attributable, and one whose rule nothing reports, which needs an issue about the program instead. A test asserting a source was accepted is sound as it stands, since there is no report to name, and so is one that reports the diagnostic itself and reads it back.
 
-Longer: [test-driven-development](rules/test-driven-development.md), [test-file-letter-suffixes](rules/test-file-letter-suffixes.md), [unique-test-names](rules/unique-test-names.md), [one-assert-per-pytest](rules/one-assert-per-pytest.md), [asserting-which-rule-was-reported](rules/asserting-which-rule-was-reported.md).
+Longer: [test-driven-development](rules/test-driven-development.md), [test-file-letter-suffixes](rules/test-file-letter-suffixes.md), [unique-test-names](rules/unique-test-names.md), [one-assert-per-pytest](rules/one-assert-per-pytest.md).
 
 ## Reading the LRM
 

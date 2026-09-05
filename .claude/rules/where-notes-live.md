@@ -1,6 +1,6 @@
 # Where a new note belongs
 
-Put a working convention learned in a session into this repository, and never into a directory outside it. `.claude/CLAUDE.md` carries the short form, one paragraph under the matching heading. `.claude/rules/` gets the long form as one file per topic, linked from `.claude/CLAUDE.md` and from `.claude/rules/README.md`. Both are read at the start of a session, and both travel with the code.
+Put a working convention learned in a session into this repository, and never into a directory outside it. `.claude/CLAUDE.md` carries the short form, one paragraph under the matching heading. `.claude/rules/` gets the long form as one file per topic, linked from `.claude/CLAUDE.md`. Both are read at the start of a session, and both travel with the code.
 
 `.claude/rules/` is where a person writes a rule. `.claude/memories/` is where the session tool writes one by itself: `.claude/settings.json` sets `autoMemoryEnabled` to `true` and `autoMemoryDirectory` to `.claude/memories/`, so an automatic memory is written inside the working tree and is committed, reviewed and diffed like any other file. Neither directory is the session tool's default local memory directory, which is `~/.claude/projects/<slug>/memory/` and outside any repository.
 
