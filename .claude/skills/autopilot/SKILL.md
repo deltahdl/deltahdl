@@ -19,7 +19,7 @@ Create seven jobs with `CronCreate`, exactly as listed below. Use `recurring: tr
 
 `start bysubclause` solves the issue `next_subclause` names and nothing else. Where a defect this work files while solving that issue stops it from closing, it solves the filed issue first and returns to the subclause. Every other issue the work files is filed and left. Matching is on the canonical `Satisfy IEEE 1800-2023 §<subclause>` title, so those issues are outside this form by construction, and the one exception is bounded by the subclause in hand rather than by an issue number.
 
-`start byissuefloor <issue-number>` runs no resolver. It works the open issues above the number, lowest first, and that order is the one the numbers already give rather than a claim that the lower issue has to come first. Nothing records a dependency order over these issues.
+`start byissuefloor <issue-number>` runs no resolver. It works the open issues above the number, and it says nothing about which of them comes first. Nothing records an order over these issues, so the loop takes one and takes another when it closes.
 
 The number belongs to `byissuefloor` alone. A floor applied to the subclause form would rule out every subclause there is to take, because the issue tracking a subclause was opened when the subclause was catalogued rather than when the campaign reached it, so it sits below anything the work has filed since.
 
@@ -36,7 +36,7 @@ REMINDER: Continue autonomously, unless you need human feedback about ANYTHING �
 `start byissuefloor <issue-number>`, with the number the user gave substituted for `{X}` in all three places:
 
 ```text
-REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. Run gh issue list --state open --limit 1000 --json number,title --jq 'map(select(.number > {X})) | min_by(.number)' for the lowest open issue above #{X}; solve that issue, and when it closes the same command names the next. The issues at or below #{X} are a person's to take rather than this loop's.
+REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. Run gh issue list --state open --limit 1000 --json number,title --jq 'map(select(.number > {X}))' for the open issues above #{X}; take one, solve it, and run the same command again when it closes. The issues at or below #{X} are a person's to take rather than this loop's.
 ```
 
 ### The six reminders both forms carry
@@ -56,11 +56,11 @@ Then run the form's own selector once and tell the user where the work stands.
 
 For `start bysubclause`, run `PYTHONPATH=.:scripts python3 -m next_subclause` and name the subclause and issue it printed.
 
-For `start byissuefloor <issue-number>`, run the `gh issue list` command from that form's prompt and name the issue it printed, the floor it was given, and how many open issues stand above that floor.
+For `start byissuefloor <issue-number>`, run the `gh issue list` command from that form's prompt and name the floor it was given, how many open issues stand above it, and which of them the first iteration will take.
 
 Either way, a selector that names nothing is where this stops: say so and do not create the jobs, because every firing would report the same. Otherwise say that seven reminders are running and give the two limits that come with them — the jobs live in this session only and are gone when it ends, and recurring jobs auto-expire after seven days.
 
-Then start the first iteration in the same turn, without waiting for a reminder to arrive. Take the issue the selector just named and begin solving it under the seven prompts listed above.
+Then start the first iteration in the same turn, without waiting for a reminder to arrive. Take the issue the selector named, or one of the issues it listed, and begin solving it under the seven prompts listed above.
 
 ## Stop
 
@@ -80,9 +80,9 @@ The floor is an argument rather than a constant because the set it bounds has no
 
 `start bysubclause` takes one issue beyond the subclause, and that one is bounded by the subclause rather than by a number: a defect filed while solving it that stops it from closing. Bounding it that way is what keeps the form from reading as an instruction to work the backlog, since a number would select issues by when they were filed, which says nothing about whether the subclause can close without them. Where the caller does want the backlog worked, `start byissuefloor` is the form that says so, and it says it instead of the subclause rather than alongside it — a loop is worth having where it selects one set, and two forms are worth having where each names its own.
 
-`start byissuefloor` exists because the subclause selector cannot reach the issues the work files for itself. `issue_title_for` in `lib/python/github/__init__.py` builds `Satisfy IEEE 1800-2023 §<subclause>`, and `next_subclause` looks issues up by that string alone, while those issues are titled by the defect they describe. So no run of the command will ever name one, whatever the campaign does next, and an issue number is the only handle the skill has on them. It is a weaker handle than the one the subclauses get: `next_subclause` answers from a recorded dependency order, while a floor only says where to start counting, and the order the issues above it are taken in is the order their numbers already give.
+`start byissuefloor` exists because the subclause selector cannot reach the issues the work files for itself. `issue_title_for` in `lib/python/github/__init__.py` builds `Satisfy IEEE 1800-2023 §<subclause>`, and `next_subclause` looks issues up by that string alone, while those issues are titled by the defect they describe. So no run of the command will ever name one, whatever the campaign does next, and an issue number is the only handle the skill has on them. It is a weaker handle than the one the subclauses get: `next_subclause` answers from a recorded dependency order, while a floor says only which issues are in scope.
 
-The first reminder of either form names a command rather than an issue, and both halves of that matter. A cron prompt is fixed when the job is created while the work moves on without it, so a reminder naming the issue it started on would be wrong before the session ended and would say nothing about it. And an instruction to work through the open issues has only one way of being obeyed — read them all, then choose — which costs the whole backlog on every choice and grows with each issue the work files for itself. Both prompts name a query instead: `next_subclause` answers from the dependency order, which cannot be wrong about what has to come first, and the `gh issue list` filter answers from the floor, which is what keeps the listing from being the whole backlog. What `next_subclause` matches on and why is in its own docstrings.
+The first reminder of either form names a command rather than an issue, and both halves of that matter. A cron prompt is fixed when the job is created while the work moves on without it, so a reminder naming the issue it started on would be wrong before the session ended and would say nothing about it. And an instruction to work through the open issues has only one way of being obeyed — read them all, then choose — which costs the whole backlog on every choice and grows with each issue the work files for itself. Both prompts name a query instead: `next_subclause` answers from the dependency order, which cannot be wrong about what has to come first, and the `gh issue list` filter answers from the floor, which is what keeps the listing from being the whole backlog. Where the subclause form gets an order out of that, the floor form gets a set and chooses within it. What `next_subclause` matches on and why is in its own docstrings.
 
 Reminder :04 names parallel agents because that is what solves an issue here, and the collision it rules out is two agents writing one file or two agents pushing where the run needs one push. It replaced two reminders that named a list of indivisible Claude tasks. Splitting one rule across two reminders bought nothing, and the list was never what did the work.
 
