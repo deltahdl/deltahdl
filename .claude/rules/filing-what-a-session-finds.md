@@ -10,7 +10,7 @@ Most findings arrive while working on something else. Reading `SynthLower::Lower
 
 A defect the commit in hand fixes. The commit message states it and the issue would close on the same push.
 
-A defect an open issue already covers. Cite that issue. A second issue over one defect puts two entries in the sequence for one piece of work, and closing either leaves the other claiming there is something left.
+A defect an open issue already covers. Cite that issue. A second issue over one defect gives one piece of work two entries, and closing either leaves the other claiming there is something left.
 
 ## Splitting what one reading found
 
