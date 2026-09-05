@@ -8,4 +8,6 @@ Each file is its own CMake target, so a rename means editing the `add_unit_test(
 
 ## Check for the letter before writing the file
 
-Run `ls test/src/unit/ | grep <subclause>` before choosing a suffix. The name one letter past the end of a family is easy to guess wrong, because an earlier split may already have claimed it. On 2026-07-26 a split of `test_parser_annex_a_09_03.cpp` wrote its second half straight to `test_parser_annex_a_09_03a.cpp` with a `>` redirect. That file already existed — commit `c30f5c7ce` had created it — and the redirect destroyed the ten test cases in it. Nothing caught this until CMake refused the duplicate `add_unit_test` line, and by then the loss was committed. The check costs one call, and it is the only thing standing between a split and silently deleted coverage.
+Run `ls test/src/unit/ | grep <subclause>` before choosing a suffix. The name one letter past the end of a family is easy to guess wrong, because an earlier split may already have claimed it, and writing over that file destroys the cases in it. The check costs one call, and it is the only thing standing between a split and silently deleted coverage.
+
+Related: [overwritten-test-file](../memories/overwritten-test-file.md) for the split that cost ten cases.

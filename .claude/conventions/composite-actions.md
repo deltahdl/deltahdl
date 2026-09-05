@@ -4,4 +4,4 @@ Write a CI mechanism as a composite action, not as a shell script. The house pat
 
 A job uses the action and then has a small `run:` step for ccache, pip or pmd, since a `uses:` step cannot also `run:`.
 
-The first attempt at the unpinned toolchain used raw `scripts/ci/*.sh` and the user rejected it. See [unpinned-ci-toolchain](../memories/unpinned-ci-toolchain.md) for the change that occasioned the pattern.
+See [unpinned-ci-toolchain](../memories/unpinned-ci-toolchain.md) for the change that occasioned the pattern, and for the shell-script attempt the user rejected.

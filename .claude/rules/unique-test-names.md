@@ -14,7 +14,7 @@ Delete a declaration only when the two really do make one claim. In practice tha
 
 ## Naming the survivors
 
-Derive the qualifier from what the body actually asserts, in the standard's own terms. §11.3.2 once had `Precedence.BitwiseOrHigherThanLogicalAnd` in two files: `a && b | c` in one and `a | b && c` in the other, the right-operand and left-operand cases of one precedence rule. The right-operand case became `BitwiseOrHigherThanLogicalAndOnRight` (`30aff9f54`). Where the difference is the pipeline stage rather than the claim, the repository already says `…Parses`, `…Elaborates` and `…ThroughPreprocessor`; use those rather than a new shape.
+Derive the qualifier from what the body actually asserts, in the standard's own terms. Where the difference is the pipeline stage rather than the claim, the repository already says `…Parses`, `…Elaborates` and `…ThroughPreprocessor`; use those rather than a new shape.
 
 Write a comment above a renamed declaration saying what it covers and which sibling file carries the other case. That keeps the pair discoverable from either end.
 
@@ -29,4 +29,4 @@ TEST(SubroutineCallExprElaboration,
 
 856 of the 28,798 declarations in the tree are shaped like that, so a line-at-a-time grep sees 97% of them and reports a clean run over the rest. The check joins each file's lines before matching.
 
-Related: [test-file-letter-suffixes](../conventions/test-file-letter-suffixes.md) for the family a deletion case usually belongs to, and [verifying-through-ci](verifying-through-ci.md) for reading the result.
+Related: [test-file-letter-suffixes](../conventions/test-file-letter-suffixes.md) for the family a deletion case usually belongs to, and [verifying-through-ci](verifying-through-ci.md) for reading the result. [duplicate-precedence-test-name](../memories/duplicate-precedence-test-name.md) is the rename this is drawn from.
