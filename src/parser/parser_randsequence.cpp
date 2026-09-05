@@ -287,6 +287,28 @@ RsProduction Parser::ParseRsProduction() {
     has_return_type = !Check(TokenKind::kLParen) && !Check(TokenKind::kColon);
     lexer_.RestorePos(saved);
   }
+  // Syntax 18-13 asks for a data_type_or_void, and A.2.2.1 writes `data_type
+  // ::= integer_vector_type [ signing ] { packed_dimension } | ...`, so a
+  // signing and a packed dimension follow a type keyword rather than standing
+  // alone. A bare one is an implicit_data_type, which data_type_or_implicit
+  // admits and which nothing in Syntax 18-13 reaches.
+  //
+  // AtDataTypeOrVoid answers for the wider set on purpose, because
+  // ParseFunctionReturnType consumes it: §13.4 gives a function a
+  // function_data_type_or_implicit, which really does admit an implicit type. A
+  // production is not a function, so the narrowing is stated here rather than
+  // there. The type is then parsed anyway, so the rest of the production is
+  // read and reported on as usual instead of the statement collapsing at its
+  // first production.
+  if (has_return_type &&
+      (Check(TokenKind::kKwSigned) || Check(TokenKind::kKwUnsigned) ||
+       Check(TokenKind::kLBracket))) {
+    diag_.Error(CurrentLoc(),
+                "a randsequence production return type shall be a data type or "
+                "'void', and a signing or a packed dimension does not stand as "
+                "one on its own",
+                Subclause("18.17"));
+  }
   if (has_return_type) {
     prod.return_type = ParseFunctionReturnType();
     prod.has_return_type = true;

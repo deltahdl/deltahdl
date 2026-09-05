@@ -3,6 +3,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -319,6 +320,37 @@ TEST(RandseqValuePassingParse, RegSignedVectorReturnTypeCaptured) {
   EXPECT_EQ(v->return_type.kind, DataTypeKind::kReg);
   EXPECT_TRUE(v->return_type.is_signed);
   EXPECT_NE(v->return_type.packed_dim_left, nullptr);
+}
+
+// Syntax 18-13 writes `rs_production ::= [ data_type_or_void ]
+// rs_production_identifier ...`, and A.2.2.1 gives `data_type ::=
+// integer_vector_type [ signing ] { packed_dimension } | ...`, so a signing
+// follows a type keyword rather than standing alone. A bare one is an
+// implicit_data_type, reachable from data_type_or_implicit and from nothing in
+// Syntax 18-13.
+//
+// It parsed because Parser::AtDataTypeOrVoid answers for what
+// ParseFunctionReturnType can consume, and §13.4 gives a function a
+// function_data_type_or_implicit, which does admit an implicit type. A
+// production is not a function.
+TEST(RandseqValuePassingParse, BareSigningReturnTypeIsRejected) {
+  auto r = ParseProductionReturnType("", "signed [7:0]");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a randsequence production return type shall be a "
+                            "data type or 'void'",
+                            5, "18.17"));
+}
+
+// The same rule reached by the other token: a packed dimension with no type
+// keyword before it. It is a case of its own because AtDataTypeOrVoid answers
+// for `[` separately from the two signing keywords, and a check written over
+// the keywords alone would leave this one accepted.
+TEST(RandseqValuePassingParse, BarePackedDimensionReturnTypeIsRejected) {
+  auto r = ParseProductionReturnType("", "[7:0]");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a randsequence production return type shall be a "
+                            "data type or 'void'",
+                            5, "18.17"));
 }
 
 }  // namespace
