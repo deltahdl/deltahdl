@@ -52,38 +52,6 @@ Write the commit subject at the length that states the change, and leave the bod
 
 Longer: [pushing-to-main](rules/pushing-to-main.md), [staging-explicit-paths](rules/staging-explicit-paths.md), [issue-closing-keywords](rules/issue-closing-keywords.md), [commit-and-docstring-scope](rules/commit-and-docstring-scope.md).
 
-## Issues
-
-Give an issue about the program six sections in a fixed order: "Problem", "Why Unit Tests Did Not Catch It?", "Why Integration Tests Did Not Catch It?", "Why E2E Tests Did Not Catch It?", "Which Unit, Integration, or E2E regression tests would prevent this from happening again?", "Proposed Solution". Write all six every time. Where a tier does not exist for the code in question, say so in its section: that is the finding, and not a reason to drop the section. The regression section names the tests to write, each with its tier and its assertion. It is separate from the solution so that a fix cannot ship with the coverage folded into its last paragraph.
-
-The four test sections belong to the program and to nothing else. The program is what a test tier can run: the C++ and the Python that ship the simulator and the scripts around it. Give an issue about a workflow file, a linter configuration, a build file or the documentation two sections, "Problem" and "Proposed Solution", and no tests. A test over a file no tier runs only reads a value back and asserts what it just read, and it goes red when somebody renames a step. That a module could be extended to police such a file does not make the file program code. `test/` falls on both sides. The Python and C++ under `test/` that computes the values assertions rest on is program code and gets six sections, because a defect in it can make a whole tier report the wrong answer. The assertions themselves, and the SystemVerilog sources they read, get two, since asking why the unit tests did not catch a defective unit test answers itself. What the defect is in decides this, not what the fix touches. Take the vocabulary from the standard, and cite the clause a claim rests on.
-
-File the issue when the session finds the defect, and do not ask first. A defect described in a reply and nowhere else is gone when the session ends, because the next session reads the repository and the issue tracker and not the transcript. This holds for a defect found while working on something else, which is most of them: finish the work in hand, and file what the reading turned up rather than offering to. A defect the commit in hand fixes needs no issue, and neither does one an open issue already covers; cite that issue instead.
-
-Every open issue numbered above #2939 sits in one linear sequence, ordered by GitHub's blocked-by relation, and exactly one of them is blocked by nothing open. That one is what gets worked next. Put a new issue into the sequence when you create it, by prepending it, appending it, or interposing it between two links, and read its neighbours first so the placement says something true about the order. An issue created with no blocked-by edge leaves two issues claiming to be next.
-
-Give each issue one scope it can close by finishing, and never write an issue that indexes other issues. Such an issue can never leave the sequence, because what it tracks always has something left, and everything behind it waits on the whole programme. Cite another issue wherever it settles something; a citation keeps an issue self-contained, and a list of children is what is barred.
-
-A subclause with a Syntax and a Description beneath it has an issue for each of the three, and `next_subclause` prints the parent. Find the other two by looking up the numbers around it rather than by searching titles, which has returned the parent alone while both children stood open. Close all three in the commit that satisfies them.
-
-Longer: [how-issues-are-written](rules/how-issues-are-written.md), [issue-blocked-by-sequence](rules/issue-blocked-by-sequence.md), [filing-what-a-session-finds](rules/filing-what-a-session-finds.md), [finding-a-subclauses-issues](rules/finding-a-subclauses-issues.md).
-
-## Prose
-
-Answer the question that was asked, and stop. These rules hold for a reply in a session, an issue body, a commit message, a docstring and a comment in a source file exactly as they hold for a file under `docs/`.
-
-State the instruction before the reasoning for it, give each sentence one instruction, and never leave a figure of speech to carry a rule on its own. Those three hold wherever prose is written, this file included, and so do the three rules below.
-
-Write every noun that has a name by that name. A name is something the reader can open: a path, a symbol with the source file holding it, a clause of `~/LRM.pdf`, a fully-qualified `Suite.Name`, a CMake target, a job in a workflow file. The coined collective noun is the failure to avoid, because a phrase like "the machinery" or "the layer" reads as vocabulary this repository already uses and sends the reader looking for something that is not there. Say the directory, the source file, the clause or the test case instead. Verify a name before writing it, since a wrong name costs more than a vague one.
-
-Put the answer in the first sentence, and give it the fewest sentences that state it. Add a reason only where the reason changes what the reader would do next, and cut every sentence that is in the draft because it is true rather than because it is needed. Explain a check, a gate or a test by what makes it fail, and say that before anything else about it.
-
-Say what a thing is for before naming its parts, in a document written for a reader who asked no question: an issue body, a note under `docs/`, a docstring. Say what a defect costs in ordinary words near the top rather than in the seventh paragraph. Then cut, because a detail earns its place by changing what somebody would do. Cutting a correct detail is not vagueness; replacing it with a coined noun is.
-
-Nothing enforces any of this. No linter here judges wording, so a green run is not agreement.
-
-Longer: [answer-the-question-asked](rules/answer-the-question-asked.md), [write-the-exact-name](rules/write-the-exact-name.md), [lead-with-what-it-is-for](rules/lead-with-what-it-is-for.md).
-
 ## Tests
 
 Write the tests first, in the same commit as the code they cover. `.github/workflows/scripts.yml` runs `pytest --cov-fail-under=100` over the `unit/` directory of every Python script and library module, so production code without matching unit tests fails on push. Test-first here means authoring order; the red-green observation belongs to CI.
