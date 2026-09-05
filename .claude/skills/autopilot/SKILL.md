@@ -48,7 +48,7 @@ REMINDER: Continue autonomously, unless you need human feedback about ANYTHING �
 | :04 | `4,14,24,34,44,54 * * * *` | `REMINDER: Solve the issue through parallel agents, without collisions.` |
 | :05 | `5,15,25,35,45,55 * * * *` | `REMINDER: After pushing, deltahdl.yml might fail at integration tests. You can ignore that.` |
 | :07 | `7,17,27,37,47,57 * * * *` | `REMINDER: Do not do anything but wait while a workflow is running.` |
-| :09 | `9,19,29,39,49,59 * * * *` | `REMINDER: When you come up against a new problem, file a GitHub issue. A problem in the program — src/, lib/, scripts/, and the machinery under test/ — gets the sub-headers "Problem", "Why Unit Tests Did Not Catch It?", "Why Integration Tests Did Not Catch It?", "Why E2E Tests Did Not Catch It?", "Which Unit, Integration, or E2E regression tests would prevent this from happening again?", and "Proposed Solution". A problem in a workflow file, a linter configuration, a build file or the docs gets "Problem" and "Proposed Solution" only, and owes no tests.` |
+| :09 | `9,19,29,39,49,59 * * * *` | `REMINDER: When you come up against a new problem, file a GitHub issue.` |
 
 ### What to report
 
@@ -90,6 +90,3 @@ No reminder tells the loop to compact, because a session cannot compact itself. 
 
 Reminder :05 exists because `.github/workflows/deltahdl.yml` is red on every push and that is the standing state rather than a break. `scripts/run_sv_tests/__init__.py` ends in `sys.exit(min(failed, 1))`, so the `integration-test-coverage` job fails while any sv-test does, and 146 of 830 do. Issues #2910 through #2939 track those failures. Without the reminder, the standing instruction in `.claude/CLAUDE.md` to fix a red run in the session that finds it sends every iteration of the loop at the same 146 tests it was not started to fix.
 
-The issue sub-headers in the last reminder are the user's wording, and reminder :09 is now the only place they are written down. Nothing else in the repository states them, so an issue is written from the reminder itself, `Proposed Solution` included.
-
-That reminder carries the two-section form as well as the six, because it used to carry only the six and firing them alone every ten minutes was enough to produce the tests they asked for. A defect in a workflow file or a linter configuration was arriving beside a standing instruction to name the regression tests that would prevent it, and the instruction won: an issue over three copies of one yamllint rule set answered all four test sections and asked for two unit tests over a reading that would exist only because the rule set is written three times. A reminder that names only one case is read as though that case were the whole rule.
