@@ -28,7 +28,7 @@ Fix a red run in the session that finds it, whoever caused it. A gate that scans
 
 Two constraints shape the job graph in `.github/workflows/deltahdl.yml` and appear nowhere in it. The repository runs a fixed number of jobs at once, and that number is smaller than the number of jobs waiting to start, so unblocking a job moves it into a full window rather than into an idle one. The lanes held behind `assert-coverage` are held there deliberately, for the same reason. Measure what a change to the graph displaces before proposing it, and read the note before concluding that a `needs:` is accidental.
 
-Longer: [verifying-through-ci](rules/verifying-through-ci.md), [inheriting-a-red-gate](rules/inheriting-a-red-gate.md), [workflow-worktrees](rules/workflow-worktrees.md), [runner-cap-and-the-coverage-gate](rules/runner-cap-and-the-coverage-gate.md).
+Longer: [verifying-through-ci](rules/verifying-through-ci.md), [workflow-worktrees](rules/workflow-worktrees.md), [runner-cap-and-the-coverage-gate](rules/runner-cap-and-the-coverage-gate.md).
 
 ## Formatting
 

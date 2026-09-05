@@ -18,4 +18,4 @@ An issue joins the blocked-by sequence at the moment it is created, by being pre
 
 ## Splitting what one reading found
 
-One reading often turns up more than one scope. `LowerBinaryBit`'s `default` arm answers a constant for the arithmetic operators, for the comparisons and for the shifts, and those became three issues rather than one, because each closes by finishing and the third does not wait on the first two to be worth reading. Deciding this is the work of filing: [how-issues-are-written](how-issues-are-written.md) says what one scope looks like, and an issue that would only close when a whole family did is the shape to avoid.
+One reading often turns up more than one scope. `LowerBinaryBit`'s `default` arm answers a constant for the arithmetic operators, for the comparisons and for the shifts, and those became three issues rather than one, because each closes by finishing and the third does not wait on the first two to be worth reading. Deciding this is the work of filing, and an issue that would only close when a whole family did is the shape to avoid.

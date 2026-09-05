@@ -16,6 +16,6 @@ Cite a source location as the symbol and the path, with no line number: `Parser:
 
 This note settles which words a name is written in, and not where in the paragraph it goes. A plain sentence saying what the thing is and what it does comes before the first identifier, and a correct detail that changes nothing anybody would do is cut rather than kept. Nothing enforces this, so a green `Documentation` run is not agreement.
 
-Name the thing itself rather than the category it belongs to. This note is that rule applied to this repository, and it adds what a name has to be. The rules that sit on top of it for an issue — the six sections, the standard's vocabulary and the clause citation — are in [how-issues-are-written](how-issues-are-written.md).
+Name the thing itself rather than the category it belongs to. This note is that rule applied to this repository, and it adds what a name has to be.
 
 The rule was written down on 2026-08-02 in `10U-Labs/wan-graph-synthesizer`, after two drafts of one issue there were rejected for breaking it. The first said "the delivered-design layer", a phrase appearing nowhere on disk. The second said "the post-deployment fixture", which narrowed the vagueness without removing it, since several fixtures sat in the file meant. The third named the function and the file holding it, and that is the standard. Nothing in the rule is specific to that repository.
