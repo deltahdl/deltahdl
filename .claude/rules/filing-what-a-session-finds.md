@@ -14,7 +14,7 @@ A defect an open issue already covers. Cite that issue. A second issue over one 
 
 ## Filing includes placing
 
-An issue joins the blocked-by sequence at the moment it is created, by being prepended, appended or interposed. [issue-blocked-by-sequence](issue-blocked-by-sequence.md) carries the commands and the check. A filed issue with no edge is a filing that broke the sequence, and the report that it was filed is then wrong about the one thing that matters for what gets worked next.
+An issue joins the blocked-by sequence at the moment it is created, by being prepended, appended or interposed. A filed issue with no edge is a filing that broke the sequence, and the report that it was filed is then wrong about the one thing that matters for what gets worked next.
 
 ## Splitting what one reading found
 

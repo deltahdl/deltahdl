@@ -21,12 +21,12 @@ Neither form takes a number. If the user gave neither `subclauses` nor `sequence
 
 `start subclauses` solves the issue `next_subclause` names. Where a defect this work files while solving that issue stops it from closing, the form solves the filed issue first and returns to the subclause. It leaves every other issue the work files, and `start sequence` is the form that takes those. Matching is on the canonical `Satisfy IEEE 1800-2023 §<subclause>` title, so those issues are outside this form by construction, and the one exception is bounded by the subclause in hand rather than by an issue number.
 
-`start sequence` takes every open issue above 2939, in the order `.claude/rules/issue-blocked-by-sequence.md` records. 2939 belongs to this form alone: it is the boundary that defines the sequence, and it is not a floor the other form could apply.
+`start sequence` takes every open issue above 2939, in the order GitHub's blocked-by relation records. 2939 belongs to this form alone: it is the boundary that defines the sequence, and it is not a floor the other form could apply.
 
 | Form | Cron | Prompt |
 | --- | --- | --- |
 | `start subclauses` | `1,11,21,31,41,51 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. Run PYTHONPATH=.:scripts python3 -m next_subclause for the subclause in force and the issue tracking it; solve that issue whatever its number, and when it closes the same command names the next. Where a defect you file while solving that issue stops it from closing, solve what you filed first and then return to the subclause. File and leave everything else: the open issues the command does not name are not this form's work.` |
-| `start sequence` | `1,11,21,31,41,51 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. Run the sequence walk in .claude/rules/issue-blocked-by-sequence.md and solve the single open issue it reports as the head. When that issue closes, run the walk again for the next one.` |
+| `start sequence` | `1,11,21,31,41,51 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. Walk the blocked-by relation over every open issue above 2939 with gh api repos/deltahdl/deltahdl/issues/<N>/dependencies/blocked_by, and solve the single one blocked by nothing open. When that issue closes, run the walk again for the next one.` |
 
 ### The six reminders both forms carry
 
@@ -45,7 +45,7 @@ Then run the selector once and tell the user where the work stands.
 
 For `start subclauses`, run `PYTHONPATH=.:scripts python3 -m next_subclause` and name the subclause and issue it printed. If the command reports there is nothing tracked, say so and do not start the reminders: the form has nothing left to select, and every firing would report the same.
 
-For `start sequence`, run the walk in [issue-blocked-by-sequence](../../rules/issue-blocked-by-sequence.md) and name the head it reported. If it reports anything but one head, say so and do not start the reminders: the sequence is broken, and a loop taking its head would take an arbitrary one of several.
+For `start sequence`, walk the blocked-by relation over every open issue above 2939 with `gh api repos/deltahdl/deltahdl/issues/<N>/dependencies/blocked_by` and name the single one blocked by nothing open. If anything but one issue is unblocked, say so and do not start the reminders: the sequence is broken, and a loop taking its head would take an arbitrary one of several.
 
 Either way, say that seven reminders are running and give the two limits that come with them — the jobs live in this session only and are gone when it ends, and recurring jobs auto-expire after seven days.
 
@@ -67,7 +67,7 @@ Neither form takes an issue number, and `start subclauses` used to. The number w
 
 The one issue the subclauses form takes beyond the subclause is bounded by that subclause and not by a number: a defect filed while solving it that stops it from closing. State such a bound by what the work in hand needs. A bound stated as a number selects issues by when they were filed, which says nothing about whether the subclause can close without them, and every wording of it read as an instruction to work the backlog.
 
-`start sequence` exists because the subclause resolver cannot reach the issues above 2939. `issue_title_for` in `lib/python/github/__init__.py` builds `Satisfy IEEE 1800-2023 §<subclause>`, and `next_subclause` looks issues up by that string alone. The issues the work files for itself are titled by the defect they describe, so no run of the command will ever name one, whatever the campaign does next. `.claude/rules/issue-blocked-by-sequence.md` holds the order that does reach them: every open issue above 2939 sits in one linear sequence, exactly one is blocked by nothing open, and that one is what gets worked next.
+`start sequence` exists because the subclause resolver cannot reach the issues above 2939. `issue_title_for` in `lib/python/github/__init__.py` builds `Satisfy IEEE 1800-2023 §<subclause>`, and `next_subclause` looks issues up by that string alone. The issues the work files for itself are titled by the defect they describe, so no run of the command will ever name one, whatever the campaign does next. GitHub's blocked-by relation holds the order that does reach them: every open issue above 2939 sits in one linear sequence, exactly one is blocked by nothing open, and that one is what gets worked next.
 
 The first reminder of either form names a command rather than an issue, and both halves of that matter. A cron prompt is fixed when the job is created while the work moves on without it, so a reminder naming the issue it started on would be wrong before the session ended and would say nothing about it. And an instruction to work through the open issues has only one way of being obeyed — read them all, then choose — which costs the whole backlog on every choice and grows with each issue the work files for itself. Both selectors answer instead from a recorded order, which cannot be wrong about what has to come first. What `next_subclause` matches on and why is in its own docstrings.
 
