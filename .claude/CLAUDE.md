@@ -19,7 +19,7 @@ Write it down under `.claude/`, in the directory its kind belongs to: `rules/` f
 
 ### Commits and pushes
 
-Longer: [pushing-to-main](rules/pushing-to-main.md), [staging-explicit-paths](rules/staging-explicit-paths.md), [issue-closing-keywords](rules/issue-closing-keywords.md), [commit-message-width](conventions/commit-message-width.md).
+Longer: [pushing-to-main](rules/pushing-to-main.md), [staging-explicit-paths](rules/staging-explicit-paths.md), [issue-closing-keywords](rules/issue-closing-keywords.md), [commit-message-width](conventions/commit-message-width.md), [closing-keyword-form](conventions/closing-keyword-form.md).
 
 Commit straight to `main`. There is no pull-request cycle.
 
@@ -71,7 +71,7 @@ A test that expects a source rejected names the report with `ReportedError` in `
 
 ### Verification
 
-Longer: [verifying-through-ci](rules/verifying-through-ci.md), [diagnosing-sv-tests-failures](rules/diagnosing-sv-tests-failures.md).
+Longer: [verifying-through-ci](rules/verifying-through-ci.md), [diagnosing-sv-tests-failures](rules/diagnosing-sv-tests-failures.md), [fetching-an-sv-tests-file](references/fetching-an-sv-tests-file.md).
 
 CI is the source of truth. Make the edits, format, commit explicit paths, push to `main`, then read the run with `gh run list` and `gh run view`.
 
