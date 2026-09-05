@@ -40,7 +40,7 @@ struct ImportResultOfType {
   SimFixture f;
   Logic4Vec result;
 
-  ImportResultOfType(DataTypeKind kind, DpiArgValue value) {
+  ImportResultOfType(DataTypeKind kind, const DpiArgValue& value) {
     DpiRtFunction func;
     func.c_name = "c_result";
     func.sv_name = "sv_result";

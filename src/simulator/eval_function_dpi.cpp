@@ -98,7 +98,7 @@ Logic4Word WordOfSvLogic(SvLogic v) {
 SvChandle ChandleOfWord(Logic4Word w) {
   SvChandle handle = nullptr;
   auto bits = static_cast<uintptr_t>(w.aval);
-  std::memcpy(&handle, &bits, sizeof(handle));
+  std::memcpy(static_cast<void*>(&handle), &bits, sizeof(handle));
   return handle;
 }
 

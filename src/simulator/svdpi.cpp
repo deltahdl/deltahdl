@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include "simulator/dpi.h"
 #include "simulator/dpi_runtime.h"
 
 static thread_local svScope g_current_scope = nullptr;
