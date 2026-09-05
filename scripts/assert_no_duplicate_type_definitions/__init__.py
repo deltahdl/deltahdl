@@ -51,47 +51,48 @@ TYPE_HEAD_RE = re.compile(
 HEADER_SUFFIX = ".h"
 
 
+# Everything that looks like code but is not: a line comment, a block comment
+# terminated or running to the end of the file, a string literal terminated or
+# running to the end of the file, and a character literal of one character.
+#
+# The unterminated alternatives follow their terminated ones so that a
+# well-formed comment or literal is taken whole; the regex engine tries them in
+# the order written and the terminated one wins wherever it matches.
+#
+# A character literal is held to exactly one character so that the digit
+# separators of `1'000'000` are not read as one. A `{` written as '{' is why
+# character literals are read at all.
+_COMMENT_OR_LITERAL = re.compile(
+    r"//[^\n]*"
+    r"|/\*.*?\*/"
+    r"|/\*.*"
+    r'|"(?:\\.|[^"\\])*"'
+    r'|"(?:\\.|[^"\\])*'
+    r"|'(?:\\.|[^'\\\n])'",
+    re.DOTALL,
+)
+
+
+def _blank(match: "re.Match[str]") -> str:
+    """Return `match` as spaces, keeping every newline it spans."""
+    return "".join("\n" if char == "\n" else " " for char in match.group(0))
+
+
 def strip_comments_and_strings(text: str) -> str:
     """Return `text` with every comment and literal blanked, line for line.
 
     A comment holding the word `class` or a brace would otherwise be read as
-    code, and a string literal holding a brace would throw the depth count off
-    for the rest of the file.
+    code, and a brace inside a string literal would throw the depth count off
+    for the rest of the file, which puts every later definition at the wrong
+    scope.
 
-    Every newline is kept and every other removed character is replaced by a
-    space, because the line a definition stands on is what this module reports
-    and a stripper that collapsed a block comment would move every line after
-    it.
+    Every newline is kept and every other removed character becomes a space.
+    The line a definition stands on is what this module reports, so a stripper
+    that collapsed a block comment would move every definition after it; and a
+    space rather than nothing keeps the tokens on either side of a comment from
+    being joined into one that was never written.
     """
-    out: list[str] = []
-    i = 0
-    end = len(text)
-    while i < end:
-        pair = text[i:i + 2]
-        if pair == "//":
-            while i < end and text[i] != "\n":
-                out.append(" ")
-                i += 1
-        elif pair == "/*":
-            close = text.find("*/", i + 2)
-            stop = end if close == -1 else close + 2
-            while i < stop:
-                out.append("\n" if text[i] == "\n" else " ")
-                i += 1
-        elif text[i] in "\"'":
-            quote = text[i]
-            out.append(" ")
-            i += 1
-            while i < end and text[i] != quote:
-                out.append("\n" if text[i] == "\n" else " ")
-                i += 2 if text[i] == "\\" and i + 1 < end else 1
-            if i < end:
-                out.append(" ")
-                i += 1
-        else:
-            out.append(text[i])
-            i += 1
-    return "".join(out)
+    return _COMMENT_OR_LITERAL.sub(_blank, text)
 
 
 def _opens_a_body(lines: list[str], start: int) -> bool:

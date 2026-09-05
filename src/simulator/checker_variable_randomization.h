@@ -4,6 +4,12 @@
 #include <cstdint>
 
 #include "common/types.h"
+// §17.7.2 says a checker instance "may be static or procedural (see 17.3)", so
+// the kind it reasons about is the one §17.3 defines and this header takes it
+// from there rather than restating it. The two declared it separately until
+// assert-no-duplicate-type-definitions reported them: a translation unit
+// including both failed to compile, and none did.
+#include "simulator/checker_instance_scheduling.h"
 
 namespace delta {
 
@@ -107,12 +113,6 @@ int AssumeSetsPerCheckerInstance();
 
 // §17.7.2: a checker instance's assume set may be empty.
 bool AssumeSetMayBeEmpty();
-
-// §17.7.2: a checker instance may be static or procedural (see §17.3).
-enum class CheckerInstanceKind : uint8_t {
-  kStatic,
-  kProcedural,
-};
 
 // §17.7.2: checker assume sets are considered to exist at every time step,
 // regardless of whether the checker instance is static or procedural. Returns
