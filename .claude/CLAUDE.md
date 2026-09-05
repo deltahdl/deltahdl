@@ -2,6 +2,10 @@
 
 deltahdl is a SystemVerilog simulator and elaborator pursuing IEEE 1800-2023 conformance. This file holds the standing conventions for working in this repository. Each section links the longer write-up behind it, one note per topic under `.claude/rules/`. Record a convention learned in a session the same way: a section here and a note there.
 
+## Rules and memories
+
+Two directories, and they hold different things. `.claude/rules/` holds the standing conventions, one note per topic, each linked from a section of this file. `.claude/memories/` holds memories in the memory format — who the user is, feedback on how to work, ongoing project state, external references — one fact per file, with a one-line pointer in `.claude/memories/MEMORY.md` beside it. Write memories there rather than to the per-project directory under `~/.claude/projects/`.
+
 ## Source of truth
 
 `~/LRM.pdf` (IEEE 1800-2023) decides what the code must do. Check any non-cosmetic change against the relevant clause, and make the code conform to the standard rather than to a linter. When a linter and the standard disagree, the standard wins. Say so rather than quietly breaking conformance.

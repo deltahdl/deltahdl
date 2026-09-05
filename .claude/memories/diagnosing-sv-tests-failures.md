@@ -1,3 +1,10 @@
+---
+name: diagnosing-sv-tests-failures
+description: Root-cause a failing sv-tests file by running the binary on it, not by reading the source; predates the never-build-locally rule.
+metadata:
+  type: project
+---
+
 # Diagnosing sv-tests failures
 
 To root-cause a failing sv-tests file, run the binary on that file. Do not reason about the failure from the source alone.
