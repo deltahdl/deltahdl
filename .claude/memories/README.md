@@ -2,7 +2,7 @@
 
 `CLAUDE.md` at the repository root carries the standing conventions in short form and is read at the start of every session. These files carry the longer versions: the reasoning, the incidents that produced each rule, and the details that are needed occasionally rather than constantly. One note per topic, so a session can read the one rule it needs.
 
-These were kept as local memory files until 2026-07-26 and were committed so they survive the machine they were written on. The local copies have been deleted, so these files are the only version there is. Read [where-notes-live](where-notes-live.md) before writing a new note.
+These were kept as local memory files until 2026-07-26 and were committed so they survive the machine they were written on. The local copies have been deleted, so these files are the only version there is, and `.claude/settings.json` sets `autoMemoryEnabled` to `false` so that a session cannot start a second copy. Read [where-notes-live](where-notes-live.md) before writing a new note.
 
 ## The standard
 
