@@ -1,27 +1,37 @@
 ---
 name: autopilot
-description: Start or stop the standing reminders that keep an autonomous issue-solving session on the rails. Use when the user says "start autopilot", "go autonomous on the subclauses", "stop autopilot", or asks to clear the reminders. Takes "start" or "stop".
+description: Start or stop the standing reminders that keep an autonomous issue-solving session on the rails. Use when the user says "start autopilot", "go autonomous on the subclauses", "go autonomous on issues above N", "stop autopilot", or asks to clear the reminders. Takes "start", "start <issue-number>" or "stop".
 ---
 
 # Autopilot
 
 Seven recurring reminders, one per standing rule, that fire back into this session while it works through open issues on its own. Each rule gets its own reminder so that no rule can be quietly dropped from a merged block of text, and the fire times are staggered across the ten-minute period so they arrive one at a time rather than as a wall.
 
-The argument selects the mode: `start` or `stop`. `start subclauses` asks for the same thing, since the subclause is the only work this skill selects.
+The argument selects the mode: `start`, `start <issue-number>`, or `stop`. `start subclauses` asks for the same thing as a bare `start`, since the subclause is the work this skill selects on its own.
 
 ## Start
 
-The work is the subclause the dependency order points at, and `next_subclause` is what names it. The skill takes no issue number: reminder :01 names that command rather than an issue.
+The work is the subclause the dependency order points at, and `next_subclause` is what names it. The issue number is optional, and it is a floor rather than a starting point: giving one puts every open issue above it in scope alongside the subclause.
 
-Create seven jobs with `CronCreate`, exactly as listed below. Use `recurring: true` (the default) and leave every prompt verbatim. Each `cron` field is a distinct offset within the same ten-minute period, so the seven reminders never land together.
+Create seven jobs with `CronCreate`, exactly as listed below. Use `recurring: true` (the default). Take `:01` from the form the user asked for, substituting the number they gave for `{X}` where the form carries it, and leave the other six verbatim. Each `cron` field is a distinct offset within the same ten-minute period, so the seven reminders never land together.
 
-Reminder :01 solves the issue `next_subclause` names. Where a defect this work files while solving that issue stops it from closing, it solves the filed issue first and returns to the subclause. Every other issue the work files is filed and left. Matching is on the canonical `Satisfy IEEE 1800-2023 §<subclause>` title, so those issues are outside the loop by construction, and the one exception is bounded by the subclause in hand rather than by an issue number.
+### The reminder that selects the work
 
-### The seven reminders
+A bare `start` solves the issue `next_subclause` names and nothing else. Where a defect this work files while solving that issue stops it from closing, it solves the filed issue first and returns to the subclause. Every other issue the work files is filed and left. Matching is on the canonical `Satisfy IEEE 1800-2023 §<subclause>` title, so those issues are outside the loop by construction, and the one exception is bounded by the subclause in hand rather than by an issue number.
+
+`start <issue-number>` adds the issues the resolver cannot name: those above the number, which are what this work has filed for itself. The floor bounds that direction and only that direction. The issue tracking a subclause was opened when the subclause was catalogued rather than when the campaign reached it, so it sits below anything the work has filed since, and a floor applied to it would rule out every subclause there is to take.
+
+Do not ask for a number. A caller who gives none is asking for the subclauses alone, which is a form of its own rather than a missing argument.
+
+| Form | Cron | Prompt |
+| --- | --- | --- |
+| `start` | `1,11,21,31,41,51 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. Run PYTHONPATH=.:scripts python3 -m next_subclause for the subclause in force and the issue tracking it; solve that issue whatever its number, and when it closes the same command names the next. Where a defect you file while solving that issue stops it from closing, solve what you filed first and then return to the subclause. File and leave everything else: the open issues the command does not name are not this loop's work.` |
+| `start <issue-number>` | `1,11,21,31,41,51 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. Run PYTHONPATH=.:scripts python3 -m next_subclause for the subclause in force and the issue tracking it; solve that issue whatever its number, and when it closes the same command names the next. Among the issues it does not name, the ones above #{X} are in scope alongside it and are what this work has filed for itself; the ones at or below #{X} are not. Where a defect you file while solving the subclause stops it from closing, solve what you filed first and then return to the subclause.` |
+
+### The six reminders both forms carry
 
 | Offset | Cron | Prompt |
 | --- | --- | --- |
-| :01 | `1,11,21,31,41,51 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. Run PYTHONPATH=.:scripts python3 -m next_subclause for the subclause in force and the issue tracking it; solve that issue whatever its number, and when it closes the same command names the next. Where a defect you file while solving that issue stops it from closing, solve what you filed first and then return to the subclause. File and leave everything else: the open issues the command does not name are not this loop's work.` |
 | :02 | `2,12,22,32,42,52 * * * *` | `REMINDER: ~/LRM.pdf is the source of truth.` |
 | :03 | `3,13,23,33,43,53 * * * *` | `REMINDER: Solve the issue with a single commit and push.` |
 | :04 | `4,14,24,34,44,54 * * * *` | `REMINDER: Solve the issue through parallel agents, without collisions.` |
@@ -33,11 +43,11 @@ Reminder :01 solves the issue `next_subclause` names. Where a defect this work f
 
 Then run the selector once and tell the user where the work stands.
 
-Run `PYTHONPATH=.:scripts python3 -m next_subclause` and name the subclause and issue it printed. If the command reports there is nothing tracked, say so and do not start the reminders: there is nothing left to select, and every firing would report the same.
+Run `PYTHONPATH=.:scripts python3 -m next_subclause` and name the subclause and issue it printed, and the floor if the user gave one. If the command reports there is nothing tracked, that decides different things in the two forms: a bare `start` has nothing left to select and every firing would report the same, so say so and do not start the reminders, while `start <issue-number>` still has the issues above the floor, so start them and say the subclauses are exhausted.
 
 Say that seven reminders are running and give the two limits that come with them — the jobs live in this session only and are gone when it ends, and recurring jobs auto-expire after seven days.
 
-Then start the first iteration in the same turn, without waiting for a reminder to arrive. Take the issue the selector just named and begin solving it under the seven prompts listed above. The one case that stops here is the case the report already names: a selector with nothing to take, where no jobs were created either.
+Then start the first iteration in the same turn, without waiting for a reminder to arrive. Take the issue the selector just named, or the lowest open issue above the floor where it named none, and begin solving it under the seven prompts listed above. The one case that stops here is the case the report already names: a bare `start` with nothing to take, where no jobs were created either.
 
 ## Stop
 
@@ -51,13 +61,13 @@ Cron jobs fire only while the session is idle, never mid-turn, because a turn ca
 
 Starting the reminders starts the work, in the same turn. It used to end the turn instead and leave the first iteration to the first firing, which spent up to ten minutes on an idle session and needed nothing that was not in context already: this file lists all seven prompts, and invoking the skill is what reads them in. A reminder restarts a loop that has stalled, so until a first iteration has run there is no loop for one to restart.
 
-The skill takes no issue number, and it used to. The number was a floor over the issues `next_subclause` cannot name, which left the caller deciding how much of the backlog came into scope on every invocation. The floor went rather than acquiring a fixed value, because a loop that selects one set is worth having and a loop whose set moves with an argument is not.
+The floor is an argument rather than a constant because the set it bounds has no boundary written down anywhere. It was fixed at 2939 for one commit, on the grounds that every open issue above 2939 sat in one blocked-by sequence; that sequence is not something this repository keeps any more, so 2939 names nothing now, and no other number does either. Which of the issues this work has filed for itself are worth taking is a judgement about the backlog on the day, and the caller is who makes it.
 
-The one issue the loop takes beyond the subclause is bounded by that subclause and not by a number: a defect filed while solving it that stops it from closing. State such a bound by what the work in hand needs. A bound stated as a number selects issues by when they were filed, which says nothing about whether the subclause can close without them, and every wording of it read as an instruction to work the backlog.
+A bare `start` takes one issue beyond the subclause, and that one is bounded by the subclause rather than by a number: a defect filed while solving it that stops it from closing. Bounding it that way is what keeps a form with no floor from reading as an instruction to work the backlog, since a number would select issues by when they were filed, which says nothing about whether the subclause can close without them. Where the caller does want the backlog worked, `start <issue-number>` is how they say so, and the reminder then says it in the number's own terms rather than leaving it to be inferred.
 
-The selector cannot reach the issues the work files for itself. `issue_title_for` in `lib/python/github/__init__.py` builds `Satisfy IEEE 1800-2023 §<subclause>`, and `next_subclause` looks issues up by that string alone, while those issues are titled by the defect they describe. So no run of the command will ever name one, whatever the campaign does next, and taking one is a person's decision rather than the loop's.
+The floor exists because the selector cannot reach the issues the work files for itself. `issue_title_for` in `lib/python/github/__init__.py` builds `Satisfy IEEE 1800-2023 §<subclause>`, and `next_subclause` looks issues up by that string alone, while those issues are titled by the defect they describe. So no run of the command will ever name one, whatever the campaign does next, and an issue number is the only handle the skill has on them.
 
-The first reminder names a command rather than an issue, and both halves of that matter. A cron prompt is fixed when the job is created while the work moves on without it, so a reminder naming the issue it started on would be wrong before the session ended and would say nothing about it. And an instruction to work through the open issues has only one way of being obeyed — read them all, then choose — which costs the whole backlog on every choice and grows with each issue the work files for itself. `next_subclause` answers instead from the dependency order, which cannot be wrong about what has to come first. What `next_subclause` matches on and why is in its own docstrings.
+The first reminder of either form names a command rather than an issue, and both halves of that matter. A cron prompt is fixed when the job is created while the work moves on without it, so a reminder naming the issue it started on would be wrong before the session ended and would say nothing about it. And an instruction to work through the open issues has only one way of being obeyed — read them all, then choose — which costs the whole backlog on every choice and grows with each issue the work files for itself. `next_subclause` answers instead from the dependency order, which cannot be wrong about what has to come first, and the floor narrows the rest to a set small enough to read. What `next_subclause` matches on and why is in its own docstrings.
 
 Reminder :04 names parallel agents because that is what solves an issue here, and the collision it rules out is two agents writing one file or two agents pushing where the run needs one push. It replaced two reminders that named a list of indivisible Claude tasks. Splitting one rule across two reminders bought nothing, and the list was never what did the work.
 
