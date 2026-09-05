@@ -14,7 +14,9 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast.h"
 
 namespace delta {
@@ -106,18 +108,43 @@ void CheckRandsequenceNames(const Stmt* s, DiagEngine& diag) {
       s, [&](Stmt* const& sub) { CheckRandsequenceNames(sub, diag); });
 }
 
+// §6.18 / §18.17.7: rewrites each production's return type where it is written
+// as a typedef name, so the value the production returns is sized by the type
+// that name stands for. The simulator has no typedef table -- every site under
+// src/simulator/ that sizes a production's return value reads the DataType and
+// turns an unresolved 0 into 32 -- and this walk is the only one the elaborator
+// has that reaches a randsequence statement at all.
+//
+// It walks beside CheckRandsequenceNames rather than inside it because the two
+// answer different questions, and it takes a mutable statement because it
+// writes: ForEachChildStmt hands out `Stmt* const&`, so the children of a
+// statement reached from a const ModuleDecl are still writable.
+void ResolveRandsequenceReturnTypes(Stmt* s, const TypedefMap& typedefs) {
+  if (!s) return;
+  if (s->kind == StmtKind::kRandsequence) {
+    for (auto& production : s->rs_productions) {
+      ResolveNamedReturnType(production.return_type, typedefs);
+    }
+  }
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    ResolveRandsequenceReturnTypes(sub, typedefs);
+  });
+}
+
 }  // namespace
 
 void Elaborator::ValidateRandsequenceProductionNames(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (IsProceduralItemKind(item->kind)) {
       CheckRandsequenceNames(item->body, diag_);
+      ResolveRandsequenceReturnTypes(item->body, typedefs_);
       continue;
     }
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
-      for (const auto* s : item->func_body_stmts) {
+      for (auto* s : item->func_body_stmts) {
         CheckRandsequenceNames(s, diag_);
+        ResolveRandsequenceReturnTypes(s, typedefs_);
       }
     }
   }

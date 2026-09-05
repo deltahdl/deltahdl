@@ -813,6 +813,10 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
           declared_names_, diag_);
       ValidateFunctionBody(item);
       ValidateFunctionArgDefaultsScope(item);
+      // §6.18: a return type written as a typedef name is resolved here,
+      // because the table it resolves against is the elaborator's and the
+      // simulator sizes the return variable from the DataType alone.
+      ResolveNamedReturnType(item->return_type, typedefs_);
       mod->function_decls.push_back(item);
       return true;
     case ModuleItemKind::kElabSystemTask:
