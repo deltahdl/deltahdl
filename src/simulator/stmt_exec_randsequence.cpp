@@ -24,6 +24,7 @@
 #include "parser/ast.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
+#include "simulator/scope.h"
 #include "simulator/sim_context.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_internal.h"
@@ -340,6 +341,13 @@ struct RandJoinSeq {
   // rs_code_block Syntax 18-14 lets that rule carry after its weight can be run
   // once the last of them has generated.
   const RsRule* rule = nullptr;
+  // §18.17.7: "a production creates a scope, which encompasses all its rules
+  // and code blocks". This operand's steps interleave with another operand's,
+  // so that scope cannot sit on the shared stack for the duration -- the next
+  // step taken would be some other operand's and would run inside it. Each
+  // operand keeps a stack of its own instead, the caller's frames with the
+  // production's frame on top, swapped in for a step and back out after.
+  std::vector<Scope> scopes;
   RuleValueCapture cap;
   Logic4Vec ret_value;
   bool returns_value = false;
@@ -471,9 +479,29 @@ static ExecTask BuildOneRandJoinSeq(const RandseqEngine& eng,
     if (w == 0 && !ProductionReturnsString(production)) w = 32;
     seq.ret_value = MakeLogic4VecVal(eng.arena, w, 0);
   }
+  // §18.17.7: "passing data to a production is similar to a task call and uses
+  // the same syntax", and ExecRsProduction evaluates a call's actuals in the
+  // caller's scope before entering the production's own. Nothing evaluated them
+  // here at all, so `rand join D(5) D(20)` ran D with its formal unbound.
+  std::vector<Logic4Vec> actuals =
+      EvalProductionActuals(production, item, eng.ctx, eng.arena);
+
+  // The rest is ExecRsProduction's order: enter the production's scope, bind
+  // the formals into it, and select the rule inside it, so a weight expression
+  // naming a formal reads the bound value. The stack is built on a copy of the
+  // caller's frames and taken back out, leaving the caller's exactly as it was.
+  std::vector<Scope> caller = eng.ctx.SwapScopeStack({});
+  eng.ctx.SwapScopeStack(caller);
+  eng.ctx.PushScope();
+  BindProductionFormals(production, actuals, eng.ctx, eng.arena);
   seq.rule = &SelectRule(*production, eng.ctx, eng.arena);
   CollectRandJoinSteps(*seq.rule, eng.arena, seq.steps);
+  // §18.17.7 declares a rule's implicit variables in the scope of the
+  // production that rule belongs to, so they are created here rather than in
+  // the caller's frame. Two operands naming one production used to share one
+  // set of them.
   seq.cap = BuildStepValueCapture(eng.stmt, seq.steps, eng.ctx);
+  seq.scopes = eng.ctx.SwapScopeStack(std::move(caller));
   co_return StmtResult::kDone;
 }
 
@@ -507,11 +535,15 @@ static ExecTask BuildRandJoinSeqs(const RandseqEngine& eng,
 static ExecTask ExecOneRandJoinStep(const RandseqEngine& eng,
                                     RandJoinSeq& seq) {
   const RsProd* step = seq.steps[seq.cursor++];
+  // §18.17.7: the step generates inside the operand production's own scope,
+  // which is where its formals and its rule's implicit variables stand.
+  std::vector<Scope> caller = eng.ctx.SwapScopeStack(std::move(seq.scopes));
   Logic4Vec* prev_slot =
       eng.ctx.SetRsReturnSlot(seq.returns_value ? &seq.ret_value : nullptr);
   auto result =
       co_await ExecRsProd(eng.stmt, *step, eng.ctx, eng.arena, &seq.cap);
   eng.ctx.SetRsReturnSlot(prev_slot);
+  seq.scopes = eng.ctx.SwapScopeStack(std::move(caller));
   co_return result;
 }
 
@@ -576,11 +608,7 @@ static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
       // this operand's sequence and keep interleaving the others.
       seqs[chosen].cursor = seqs[chosen].steps.size();
     }
-    // §18.17.7: only the return value of a production already generated can be
-    // read, so the operand's value is written the moment the last production it
-    // contributed has generated.
     if (seqs[chosen].Remaining() == 0) {
-      StoreRandJoinOperandValue(seqs[chosen], cap, ctx, arena);
       // §18.17.7 reads a rule's trailing code block against what stands to its
       // left -- "only the return values of productions already generated (i.e.,
       // to the left of the code block accessing them) can be retrieved" -- and
@@ -590,12 +618,23 @@ static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
       // §18.17.5 says where an operand's productions go and nothing about where
       // a block trailing its rule lands, and "maintaining the relative order of
       // each sequence" is what puts it inside that sequence rather than before
-      // every sequence.
+      // every sequence. An operand is chosen only while it has steps remaining,
+      // so this runs once per operand and never twice.
       //
-      // An operand is chosen only while it has steps remaining, so this runs
-      // once per operand and never twice.
+      // The block runs in the production's own scope and with the production's
+      // own return slot, both for the reason §18.17.7 gives the rest of the
+      // production them: it is part of the production. It ran in the enclosing
+      // production's scope with the enclosing production's slot still active,
+      // so it read the wrong variables and a `return <expr>` in it wrote the
+      // wrong production's value.
+      std::vector<Scope> caller =
+          ctx.SwapScopeStack(std::move(seqs[chosen].scopes));
+      Logic4Vec* prev_slot = ctx.SetRsReturnSlot(
+          seqs[chosen].returns_value ? &seqs[chosen].ret_value : nullptr);
       auto block =
           co_await RunRandJoinRuleWeightCode(*seqs[chosen].rule, ctx, arena);
+      ctx.SetRsReturnSlot(prev_slot);
+      seqs[chosen].scopes = ctx.SwapScopeStack(std::move(caller));
       // §18.17.6: a break or a disable ends the whole randsequence. A return
       // aborts the current production, which by this point has generated, so it
       // is absorbed here exactly as ExecRsProduction absorbs one at the end of
@@ -604,6 +643,15 @@ static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
       if (ClassifyRandseqResult(block) == RandseqAction::kUnwind) {
         co_return block;
       }
+      // §18.17.7: the operand's value is written once the whole production has
+      // generated, its trailing block included, because a `return <expr>` in
+      // that block is one of the ways the production produces it.
+      // ExecRsProduction stores after ExecSelectedRule for the same reason, and
+      // storing before the block would have published a value the block had not
+      // yet had the chance to set. The store writes the enclosing rule's
+      // implicit variable, so it runs in the caller's scope rather than the
+      // operand's.
+      StoreRandJoinOperandValue(seqs[chosen], cap, ctx, arena);
     }
   }
   co_return StmtResult::kDone;

@@ -792,4 +792,96 @@ TEST(RandseqValuePassingSim, RandJoinOperandRuleReadsItsOwnProductionValue) {
   EXPECT_EQ(r2, 6u);
 }
 
+// §18.17.7: "passing data to a production is similar to a task call and uses
+// the same syntax". A rand join operand is a production call like any other, so
+// its actuals are evaluated and bound to its formals. Nothing evaluated them at
+// all until the interleaving went through the same steps ExecRsProduction does:
+// D ran with prm unbound and neither 5 nor 20 was ever evaluated.
+//
+// Both elements are read because an operand taking no argument passes whether
+// the actuals are bound or not, and the two differ so that one bound value
+// cannot stand for the other. §18.17.7 numbers the elements "according to the
+// syntactic order of appearance", which §18.17.5's interleaving does not
+// reorder, so the expectation does not depend on the draw.
+TEST(RandseqValuePassingSim, RandJoinOperandBindsItsActualArguments) {
+  SimFixture f;
+  auto [r1, r2] = RunModuleTwoVars(
+      f,
+      "module t;\n"
+      "  int r1, r2;\n"
+      "  initial begin\n"
+      "    r1 = 0; r2 = 0;\n"
+      "    randsequence(main)\n"
+      "      void main : rand join D(5) D(20) := 1 { r1 = D[1]; r2 = D[2]; };\n"
+      "      int D(int prm) : { return prm; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      "r1", "r2");
+  EXPECT_EQ(r1, 5u);
+  EXPECT_EQ(r2, 20u);
+}
+
+// §18.17.7: "a production creates a scope, which encompasses all its rules and
+// code blocks", so two operands naming one production hold two of that
+// production's scopes rather than sharing one. The interleaving expanded each
+// operand's rule in the enclosing production's scope instead, where the second
+// operand's formals and implicit variables landed on top of the first's.
+//
+// Both operands name w, and each is given a different argument, so each
+// operand's block reads the k its own call bound. §18.17.5 leaves which operand
+// draws first unspecified, so which of r1 and r2 receives the earlier v is not
+// fixed -- but with a scope each the two blocks take different branches and
+// write one variable each, and v generates once per operand, so the two hold 1
+// and 2 in some order. Sharing one scope gives both blocks the same k: they
+// take the same branch, write the same variable, and leave the other at zero.
+TEST(RandseqValuePassingSim, TwoRandJoinOperandsOfOneProductionDoNotAlias) {
+  SimFixture f;
+  auto [r1, r2] = RunModuleTwoVars(f,
+                                   "module t;\n"
+                                   "  int r1, r2, n;\n"
+                                   "  initial begin\n"
+                                   "    r1 = 0; r2 = 0; n = 0;\n"
+                                   "    randsequence(main)\n"
+                                   "      void main : rand join w(1) w(2);\n"
+                                   "      void w(int k) : v := 1 "
+                                   "{ if (k == 1) r1 = v; else r2 = v; };\n"
+                                   "      int v : { n = n + 1; return n; };\n"
+                                   "    endsequence\n"
+                                   "  end\n"
+                                   "endmodule\n",
+                                   "r1", "r2");
+  EXPECT_EQ(r1 + r2, 3u);
+  EXPECT_NE(r1, r2);
+}
+
+// §18.17.7: a `return <expr>` assigns to the production whose code block holds
+// it, so a return in an operand's trailing block gives the operand its value
+// and leaves the enclosing production's alone. The block ran with the enclosing
+// production's return slot still active, so 41 landed on top and a read 0.
+//
+// The enclosing production returns a value of its own, because a void one
+// cannot show that it was written to.
+TEST(RandseqValuePassingSim, RandJoinOperandReturnWritesItsOwnValue) {
+  SimFixture f;
+  auto [r1, r2] = RunModuleTwoVars(
+      f,
+      "module t;\n"
+      "  int r1, r2;\n"
+      "  initial begin\n"
+      "    r1 = 0; r2 = 0;\n"
+      "    randsequence(main)\n"
+      "      void main : top := 1 { r1 = top; };\n"
+      "      int top : rand join a b := 1 { r2 = a; return 7; };\n"
+      "      int a : p := 1 { return 41; };\n"
+      "      void b : p;\n"
+      "      void p : { };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      "r1", "r2");
+  EXPECT_EQ(r1, 7u);
+  EXPECT_EQ(r2, 41u);
+}
+
 }  // namespace
