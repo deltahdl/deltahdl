@@ -20,6 +20,9 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
+# The helper the capture_run_cmd fixture in ../conftest.py hands back.
+CaptureRunCmd = Callable[[ModuleType, Callable[[], Any]], list[str]]
+
 
 def test_chapter_from_path_extracts_chapter_directory(rst: ModuleType) -> None:
     """chapter_from_path() should return the parent directory name."""
@@ -357,14 +360,16 @@ class TestCorpusRevision:
         with patch.object(rst.subprocess, "run", return_value=stub):
             assert rst.corpus_revision() == self._SHA
 
-    def test_invokes_git_against_the_test_directory(self, rst: ModuleType) -> None:
+    def test_invokes_git_against_the_test_directory(
+        self, rst: ModuleType, capture_run_cmd: CaptureRunCmd,
+    ) -> None:
         """corpus_revision() should ask git about the sv-tests checkout.
 
         Asking about the working directory instead reports the commit of
         whatever repository the run was started from, which is a commit the
         corpus never had.
         """
-        assert _capture_run_cmd(rst, rst.corpus_revision) == [
+        assert capture_run_cmd(rst, rst.corpus_revision) == [
             "git", "-C", str(rst.TEST_DIR), "rev-parse", "HEAD",
         ]
 

@@ -15,14 +15,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
-def _capture_run_cmd(rst: ModuleType, call: Callable[[], Any]) -> list[str]:
-    """Run *call* with rst.subprocess.run stubbed; return the command invoked."""
-    mock_result = MagicMock(returncode=0, stderr="")
-    with patch.object(rst.subprocess, "run", return_value=mock_result) as mock_run:
-        call()
-    cmd: list[str] = mock_run.call_args[0][0]
-    return cmd
+# The helper the capture_run_cmd fixture in ../conftest.py hands back.
+CaptureRunCmd = Callable[[ModuleType, Callable[[], Any]], list[str]]
 
 
 def _d_flag_values(cmd: list[str]) -> list[str]:
@@ -139,9 +133,11 @@ class TestRunTest:
             actual = rst.run_test("/fake/test.sv", simulate=True)
         assert actual == (False, "error\n", 1)
 
-    def test_defines_passed_as_dash_d_flags(self, rst: ModuleType) -> None:
+    def test_defines_passed_as_dash_d_flags(
+        self, rst: ModuleType, capture_run_cmd: CaptureRunCmd,
+    ) -> None:
         """run_test(defines=...) should include -D flags in the command."""
-        cmd = _capture_run_cmd(
+        cmd = capture_run_cmd(
             rst, lambda: rst.run_test("/fake/test.sv", defines=["FOO", "BAR=2"]),
         )
         assert _d_flag_values(cmd) == ["FOO", "BAR=2"]
@@ -453,7 +449,10 @@ class TestBuildResult:
         assert result["should_fail"] is True
 
     def test_defines_passed_to_command(
-        self, rst: ModuleType, tmp_path: Path,
+        self,
+        rst: ModuleType,
+        tmp_path: Path,
+        capture_run_cmd: CaptureRunCmd,
     ) -> None:
         """build_result() should pass :defines: metadata as -D flags."""
         sv = tmp_path / "chapter-5" / "defs.sv"
@@ -462,7 +461,7 @@ class TestBuildResult:
             "/*\n:name: defs\n:tags: 5.6.4\n"
             ":defines: TEST_VAR VAR_1=2\n*/\nmodule m; endmodule\n"
         )
-        cmd = _capture_run_cmd(rst, lambda: rst.build_result(str(sv)))
+        cmd = capture_run_cmd(rst, lambda: rst.build_result(str(sv)))
         assert _d_flag_values(cmd) == ["TEST_VAR", "VAR_1=2"]
 
     def test_simulation_mode_used_for_simulation_type(

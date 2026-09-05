@@ -3,6 +3,8 @@
 from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
+from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -13,6 +15,27 @@ _PKG = Path(__file__).resolve().parents[3] / "scripts" / "run_sv_tests"
 def rst(module_loader: Callable[[str, Path], ModuleType]) -> ModuleType:
     """Load the run_sv_tests module."""
     return module_loader("run_sv_tests", _PKG / "__init__.py")
+
+
+@pytest.fixture()
+def capture_run_cmd() -> Callable[[ModuleType, Callable[[], Any]], list[str]]:
+    """Return a helper giving the command line a call asked subprocess to run.
+
+    It lives here rather than in either test module because both need it: the
+    cases over what the runner does with a corpus file read the command
+    deltahdl was given, and the case over the corpus revision reads the command
+    git was given.
+    """
+    def capture(rst: ModuleType, call: Callable[[], Any]) -> list[str]:
+        mock_result = MagicMock(returncode=0, stderr="")
+        with patch.object(
+            rst.subprocess, "run", return_value=mock_result,
+        ) as mock_run:
+            call()
+        cmd: list[str] = mock_run.call_args[0][0]
+        return cmd
+
+    return capture
 
 
 @pytest.fixture()
