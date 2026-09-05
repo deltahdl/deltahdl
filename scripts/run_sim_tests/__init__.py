@@ -263,6 +263,35 @@ def collect_tests() -> list[tuple[Path, Path]]:
     return tests
 
 
+def case_outcome(
+    expected_text: str,
+    result: subprocess.CompletedProcess[str],
+    status: int | None,
+    artifact_detail: str | None,
+) -> tuple[bool, str]:
+    """Judge a finished run against everything the case recorded.
+
+    The order is what the case is judged on first. Printed text comes first
+    because it is what every case records and is the report a maintainer can
+    read without knowing anything else about the case; the exit status and the
+    written file follow, and each is skipped by the case that named neither.
+
+    `artifact_detail` is what compare_artifact already found, since the file it
+    read lives in a directory that is gone by the time this is called.
+
+    This is separate from run_test so that the checks can be added to without
+    run_test growing a return statement each time.
+    """
+    actual = visible_output(result)
+    if actual.rstrip("\n") != expected_text.rstrip("\n"):
+        return False, f"expected:\n{expected_text}got:\n{actual}"
+    if status is not None and result.returncode != status:
+        return False, f"expected exit status {status}, got {result.returncode}"
+    if artifact_detail is not None:
+        return False, artifact_detail
+    return True, ""
+
+
 def run_test(sv_path: Path, expected_path: Path) -> tuple[bool, str]:
     """Run deltahdl on a .sv file and compare what it printed to .expected.
 
@@ -340,14 +369,7 @@ def run_test(sv_path: Path, expected_path: Path) -> tuple[bool, str]:
         if artifact is not None:
             artifact_detail = compare_artifact(sv_path, artifact, work_dir)
 
-    actual = visible_output(result)
-    if actual.rstrip("\n") != expected_text.rstrip("\n"):
-        return False, f"expected:\n{expected_text}got:\n{actual}"
-    if status is not None and result.returncode != status:
-        return False, f"expected exit status {status}, got {result.returncode}"
-    if artifact_detail is not None:
-        return False, artifact_detail
-    return True, ""
+    return case_outcome(expected_text, result, status, artifact_detail)
 
 
 def main() -> None:
