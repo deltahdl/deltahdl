@@ -279,6 +279,53 @@ static ExecTask ExecRsProd(const Stmt* stmt, const RsProd& prod,
 // evaluated at most once (implementations can cache identical expressions) in
 // an unspecified order." A rule that specifies no weight counts 1, which is
 // what §18.17.1 makes the weight of a production list written without ':='.
+// §18.17.1: whether `v` reads as a negative value, which for a signed value is
+// its sign bit being set. The signedness is the evaluated value's rather than
+// anything read off the expression's text, because Syntax 18-14 gives
+// `rs_weight_specification ::= integral_number | ps_identifier | ( expression
+// )` and a parameter named through the second form can be declared signed.
+static bool WeightIsNegative(const Logic4Vec& v) {
+  if (!v.is_signed || v.width == 0 || v.nwords == 0) return false;
+  uint32_t top = v.width - 1;
+  return ((v.words[top / 64].aval >> (top % 64)) & 1ULL) != 0;
+}
+
+// §18.17.1: "an rs_weight_specification shall evaluate to an integral
+// non-negative value". Returns the weight to draw against, reporting a value
+// that is not one and counting it as zero.
+//
+// Zero is what a reported weight counts as, because it is the one value that
+// cannot decide the draw. A negative weight read through ToUint64 arrived as
+// its two's-complement value, so `a := (-1) | b := 1` gave a a weight of
+// 18446744073709551615 and made b unreachable, and the total then wrapped to
+// zero and SelectRule returned the first rule outright. An unknown weight was
+// already zero there -- ToUint64 reads x and z alike as 0 -- so for that one
+// nothing changes but the report.
+//
+// The run carries on afterwards, as it does after every other error the
+// simulator raises while executing; §18.17.1 says nothing about what follows
+// one, and stopping the generation would take the rest of the statement's
+// reports with it.
+static uint64_t WeightOrReport(const Logic4Vec& val, const Expr* weight,
+                               SimContext& ctx) {
+  if (!val.IsKnown()) {
+    ctx.GetDiag().Error(weight->range.start,
+                        "randsequence rule weight shall evaluate to an "
+                        "integral non-negative value, and this one has unknown "
+                        "bits",
+                        Subclause("18.17.1"));
+    return 0;
+  }
+  if (WeightIsNegative(val)) {
+    ctx.GetDiag().Error(weight->range.start,
+                        "randsequence rule weight shall evaluate to an "
+                        "integral non-negative value, and this one is negative",
+                        Subclause("18.17.1"));
+    return 0;
+  }
+  return val.ToUint64();
+}
+
 static const RsRule& SelectRule(const RsProduction& production, SimContext& ctx,
                                 Arena& arena) {
   if (production.rules.size() <= 1) return production.rules[0];
@@ -286,7 +333,10 @@ static const RsRule& SelectRule(const RsProduction& production, SimContext& ctx,
   weights.reserve(production.rules.size());
   uint64_t total_weight = 0;
   for (const auto& rule : production.rules) {
-    uint64_t w = rule.weight ? EvalExpr(rule.weight, ctx, arena).ToUint64() : 1;
+    uint64_t w = 1;
+    if (rule.weight) {
+      w = WeightOrReport(EvalExpr(rule.weight, ctx, arena), rule.weight, ctx);
+    }
     weights.push_back(w);
     total_weight += w;
   }

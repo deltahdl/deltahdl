@@ -3,6 +3,7 @@
 #include <string_view>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -314,6 +315,66 @@ TEST(RandsequenceSim, WeightReadingItsOwnIncrementSelectsFromTheSummedWeights) {
   ASSERT_NE(x, nullptr);
   // Weights 0 and 1: the zero-weight list is unreachable and 'b' is generated.
   EXPECT_EQ(x->value.ToUint64(), 2u);
+}
+
+// The source RunWeightOnce writes, with `main_rule` as the whole of the
+// production list. The weight stands on line 6 of it whatever the rule says,
+// which is the line the reports below name. One iteration rather than the many
+// RunNaNbTrial runs, because a weight the run reports is reported once per
+// evaluation and a loop would say nothing a single pass does not.
+void RunWeightOnce(SimFixture& f, std::string_view main_rule) {
+  std::string src =
+      "module t;\n"
+      "  logic [31:0] na, nb;\n"
+      "  initial begin\n"
+      "    na = 0; nb = 0;\n"
+      "    randsequence(main)\n"
+      "      main : " +
+      std::string(main_rule) +
+      ";\n"
+      "      a : { na = na + 1; };\n"
+      "      b : { nb = nb + 1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n";
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+}
+
+// §18.17.1: "an rs_weight_specification shall evaluate to an integral
+// non-negative value". A negative one was read through ToUint64 as its
+// two's-complement value, so this rule carried a weight of
+// 18446744073709551615, `b` could not be reached, and the total then wrapped to
+// zero and the first rule was returned outright. Nothing said so.
+//
+// The weight is parenthesized because Syntax 18-14 writes
+// `rs_weight_specification ::= integral_number | ps_identifier | ( expression
+// )`, and -1 is an expression rather than an integral_number. Two rules,
+// because SelectRule returns a lone rule without evaluating its weight at all.
+TEST(RandsequenceSim, NegativeWeightIsReported) {
+  SimFixture f;
+  RunWeightOnce(f, "a := (-1) | b := 1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "randsequence rule weight shall evaluate to an "
+                            "integral non-negative value",
+                            6, "18.17.1"));
+}
+
+// An unknown value is not an integral non-negative value either, and it reaches
+// the same site by a different route: ToUint64 reads x and z alike as 0, so
+// such a weight was already a weight of zero and its rule was simply never
+// selected. It is written as an integral_number, which is the form Syntax 18-14
+// admits without parentheses.
+TEST(RandsequenceSim, UnknownWeightIsReported) {
+  SimFixture f;
+  RunWeightOnce(f, "a := 1'bx | b := 1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "randsequence rule weight shall evaluate to an "
+                            "integral non-negative value",
+                            6, "18.17.1"));
 }
 
 }  // namespace
