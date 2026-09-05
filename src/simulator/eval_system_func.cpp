@@ -411,10 +411,37 @@ static Logic4Vec EvalTimeformatTask(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
+// §20.1 catalogues the system tasks and system functions SystemVerilog has,
+// each under the subclause that defines it, and states that "Clause 21
+// presents additional system tasks and system functions that are specific to
+// I/O operations". A name no classifier claimed is one this tool can carry out
+// no part of, whether it is a misspelling, a task of the standard not
+// implemented here, or a name the standard has never had. The three are not
+// told apart, which would take the standard's whole catalogue; what they share
+// is that the call does nothing, and that is what is said.
+//
+// A value is still returned, because the caller is an expression evaluator and
+// the run carries on to whatever else it can report. What changed is that the
+// value is no longer the only thing produced.
+static Logic4Vec ReportUnknownSysCall(const Expr* expr, SimContext& ctx,
+                                      Arena& arena, std::string_view name) {
+  ctx.GetDiag().Error(expr->range.start,
+                      std::string(name) +
+                          " is not a system task or system function this tool "
+                          "implements",
+                      Subclause("20.1"));
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
 // Dispatch the system calls selected by a name-family classifier (math,
-// utility, IO, file IO, array-query, verification) and, when none match, the
-// PRNG family that consumes any remaining name. Kept separate from the
-// timekeeping/output dispatch so each chain stays self-contained.
+// utility, IO, file IO, array-query, verification, PRNG), and report a name
+// none of them claims. Kept separate from the timekeeping/output dispatch so
+// each chain stays self-contained.
+//
+// EvalPrngCall stood at the end without a predicate of its own, answering
+// every name it did not match with a one-bit zero, so the chain ran out
+// silently rather than running out at all. IsPrngSysCall is what lets it
+// decline, and declining is what makes the line below reachable.
 static Logic4Vec EvalClassifiedSysCall(const Expr* expr, SimContext& ctx,
                                        Arena& arena, std::string_view name) {
   if (IsMathSysCall(name)) return EvalMathSysCall(expr, ctx, arena, name);
@@ -425,7 +452,8 @@ static Logic4Vec EvalClassifiedSysCall(const Expr* expr, SimContext& ctx,
   if (IsArrayQuerySysCall(name))
     return EvalArrayQuerySysCall(expr, ctx, arena, name);
   if (IsVerifSysCall(name)) return EvalVerifSysCall(expr, ctx, arena, name);
-  return EvalPrngCall(expr, ctx, arena, name);
+  if (IsPrngSysCall(name)) return EvalPrngCall(expr, ctx, arena, name);
+  return ReportUnknownSysCall(expr, ctx, arena, name);
 }
 
 static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,

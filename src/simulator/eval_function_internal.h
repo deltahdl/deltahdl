@@ -16,6 +16,11 @@ class Arena;
 // Shared between eval_system_task.cpp and eval_system_func.cpp. The system-task
 // helpers are defined once in eval_system_task.cpp; the system-function
 // dispatch in eval_system_func.cpp routes to them.
+// §20.14: the three probabilistic functions EvalPrngCall answers for. It is
+// asked before that function is called rather than after, so that a name it
+// does not match reaches the end of the dispatch chain instead of being given
+// a value by the last matcher tried.
+bool IsPrngSysCall(std::string_view name);
 Logic4Vec EvalPrngCall(const Expr* expr, SimContext& ctx, Arena& arena,
                        std::string_view name);
 bool IsDisplayOrWriteTask(std::string_view name);

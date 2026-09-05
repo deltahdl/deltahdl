@@ -20,6 +20,10 @@
 
 namespace delta {
 
+bool IsPrngSysCall(std::string_view name) {
+  return name == "$random" || name == "$urandom" || name == "$urandom_range";
+}
+
 Logic4Vec EvalPrngCall(const Expr* expr, SimContext& ctx, Arena& arena,
                        std::string_view name) {
   if (name == "$random") {
@@ -42,20 +46,22 @@ Logic4Vec EvalPrngCall(const Expr* expr, SimContext& ctx, Arena& arena,
     }
     return MakeLogic4VecVal(arena, 32, ctx.Urandom32());
   }
-  if (name == "$urandom_range") {
-    uint32_t max_val = 0;
-    uint32_t min_val = 0;
-    if (!expr->args.empty()) {
-      max_val =
-          static_cast<uint32_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
-    }
-    if (expr->args.size() > 1) {
-      min_val =
-          static_cast<uint32_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
-    }
-    return MakeLogic4VecVal(arena, 32, ctx.UrandomRange(min_val, max_val));
+  // $urandom_range is the only name IsPrngSysCall admits that is left, and
+  // this function is reached through that predicate alone. It used to end in a
+  // one-bit zero for every other name instead, which made it the accidental
+  // end of the whole dispatch chain: an unrecognised $name was answered here
+  // rather than reported.
+  uint32_t max_val = 0;
+  uint32_t min_val = 0;
+  if (!expr->args.empty()) {
+    max_val =
+        static_cast<uint32_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
   }
-  return MakeLogic4VecVal(arena, 1, 0);
+  if (expr->args.size() > 1) {
+    min_val =
+        static_cast<uint32_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
+  }
+  return MakeLogic4VecVal(arena, 32, ctx.UrandomRange(min_val, max_val));
 }
 
 // The integer kinds whose unformatted decimal rendering is signed, so a member
