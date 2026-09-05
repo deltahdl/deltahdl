@@ -218,6 +218,11 @@ struct FuncExecCtx {
   std::string_view func_name;
   SimContext& ctx;
   Arena& arena;
+  // The declared width of the return value, or zero where the return type has
+  // no packed width -- void, a string, a class handle, a parameterized method's
+  // type. ExecFuncReturn reads zero as "leave the expression's own vector
+  // alone".
+  uint32_t ret_width;
 };
 
 static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec);
@@ -575,13 +580,32 @@ static bool ExecFuncForeach(const Stmt* stmt, const FuncExecCtx& exec) {
   return returned;
 }
 
+// Carries out a `return <expr>;`. §13.4.1: the function definition implicitly
+// declares a variable internal to the function, and "this variable has the same
+// type as the function return value", so a return is an assignment to a typed
+// object rather than a replacement of it. §10.7 then decides the value: the
+// expression is extended or truncated to the declared width, extending by the
+// expression's own signedness, and the object keeps the signedness its
+// declaration gave it. The other form §13.4.1 offers -- assigning to the
+// function's name -- goes through the ordinary assignment executor and has
+// always done this; a `return` that took the expression's vector whole handed
+// the caller a `logic [7:0]` function's result 32 bits wide, and let a 1-bit
+// comparison's signedness stand in for an `int`'s.
+static void ExecFuncReturn(const Stmt* stmt, const FuncExecCtx& exec) {
+  Logic4Vec val =
+      EvalExpr(stmt->expr, exec.ctx, exec.arena, exec.ret_var->value.width);
+  if (exec.ret_width != 0) {
+    val = ResizeToWidth(val, exec.ret_width, exec.arena);
+    val.is_signed = exec.ret_var->is_signed;
+  }
+  exec.ret_var->value = val;
+}
+
 static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
   if (!stmt) return false;
   switch (stmt->kind) {
     case StmtKind::kReturn:
-      if (stmt->expr)
-        exec.ret_var->value = EvalExpr(stmt->expr, exec.ctx, exec.arena,
-                                       exec.ret_var->value.width);
+      if (stmt->expr) ExecFuncReturn(stmt, exec);
       return true;
     case StmtKind::kBlockingAssign:
       ExecFuncBlockingAssign(stmt, exec.ctx, exec.arena);
@@ -638,7 +662,12 @@ static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
 
 void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
                       SimContext& ctx, Arena& arena) {
-  FuncExecCtx exec{ret_var, func->name, ctx, arena};
+  // A return type EvalTypeWidth cannot size -- void, a string, a class handle,
+  // a parameterized method's type -- leaves the return statement to take the
+  // expression's own vector, which is what it has always done.
+  uint32_t ret_width =
+      EvalTypeWidth(func->return_type) == 0 ? 0 : ret_var->value.width;
+  FuncExecCtx exec{ret_var, func->name, ctx, arena, ret_width};
   for (auto* s : func->func_body_stmts) {
     if (ExecFuncStmt(s, exec)) return;
   }

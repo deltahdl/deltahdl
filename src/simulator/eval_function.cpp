@@ -422,8 +422,6 @@ void ExecClassMethod(ClassMethodTarget target, const Expr* expr,
   }
   ExecFunctionBody(method, ret_var, ctx, arena);
   out = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
-  // `return <expr>;` overwrote the vector, so restore the declared signedness.
-  if (!is_void) out.is_signed = ret_var->is_signed;
 }
 
 static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
@@ -649,12 +647,6 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   WritebackQueueRefs(ctx);
   WritebackAssocRefs(ctx);
   result = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
-  // A `return <expr>;` replaces the return variable's whole vector with the
-  // expression's, so the flag set when the variable was created does not
-  // survive a body that returns one. Re-impose it here, as EvalIdentifier does
-  // on an ordinary read: an object's signedness comes from its own
-  // declaration, never from a value that flowed into it.
-  if (!is_void) result.is_signed = ret_var->is_signed;
 
   if (is_static) {
     ctx.PopStaticScope(func->name);

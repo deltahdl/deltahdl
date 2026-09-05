@@ -278,4 +278,47 @@ TEST(FunctionReturnSim, BuiltinMethodCallAsImplicitVariableInExpression) {
   EXPECT_EQ(r, 7u);
 }
 
+// §13.4.1: the implicitly declared internal variable "has the same type as
+// the function return value", so a `return` of a wider expression is an
+// assignment to that variable rather than a replacement of it, and the caller
+// sees the declared eight bits. The value returned here needs nine to survive
+// whole, so a result that kept the expression's own width would read 0x134.
+TEST(FunctionReturnSim, ReturnValueTakesTheDeclaredWidthOfTheFunction) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [15:0] x;\n"
+      "  function logic [7:0] low();\n"
+      "    return 16'h134;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = low();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x34u);
+}
+
+// §13.4.1 x §10.7: the same assignment widens a narrower expression, and §10.7
+// extends it by the expression's own signedness rather than the variable's. A
+// comparison yields one unsigned bit, so an `int` function returning one hands
+// the caller 1 -- sign-extending that bit to the declared thirty-two would give
+// -1, which is what an assignment carrying the variable's signedness into the
+// extension produces.
+TEST(FunctionReturnSim, ReturnOfUnsignedBitZeroExtendsIntoSignedReturnType) {
+  uint64_t r = RunAndGet(
+      "module t;\n"
+      "  int r;\n"
+      "  function int same(int a, int b);\n"
+      "    return (a == b);\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    r = same(5, 5);\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(r, 1u);
+}
+
 }  // namespace
