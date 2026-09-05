@@ -1,4 +1,4 @@
-# Working in deltahdl
+# CLAUDE.md
 
 deltahdl is a SystemVerilog simulator and elaborator pursuing IEEE 1800-2023 conformance. This file holds the standing conventions for working in this repository. Each section links the longer write-up behind it, one note per topic under `.claude/rules/`. Record a convention learned in a session the same way: a section here and a note there.
 
