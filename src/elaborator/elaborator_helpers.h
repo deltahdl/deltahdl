@@ -293,6 +293,7 @@ bool ResolveClassScopedDeclType(DataType& dtype, const TypedefMap& typedefs,
 // and not the ones it inherits, and a prefix carrying specialization arguments
 // is ResolveParameterizedType's to resolve.
 void ReportUnresolvedClassScopedType(const DataType& dtype, SourceLoc loc,
+                                     const TypedefMap& typedefs,
                                      const CompilationUnit* unit,
                                      DiagEngine& diag);
 
