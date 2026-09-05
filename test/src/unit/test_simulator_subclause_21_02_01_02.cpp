@@ -289,4 +289,101 @@ TEST(SizeOfDisplayedData, NegativeFieldWidthIsRejected) {
   EXPECT_NE(out.find("%-"), std::string::npos);
 }
 
+// §21.2.1.2 (C1 x §6.11.3): a function call is an expression argument like any
+// other, so its automatic decimal field comes from the return type. §6.11.3
+// makes `integer` signed, so the field is eleven columns (ten digits plus the
+// sign of the most negative value) -- the same field the identically typed
+// declaration in AutoSizedIntTypeUsesSignedField gets.
+TEST(SizeOfDisplayedData, AutoSizedDecimalIntegerFunctionReturn) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  function integer add(integer a, integer b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    $display(\":%d:\", add(10, 20));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, ":         30:\n");
+}
+
+// §21.2.1.2 (C1 x §6.11.3): the signedness of a signed function return governs
+// the numeral as well as the field. The same 32 bits rendered unsigned read
+// 4294967291, so this pins -5 and not merely its eleven-column placement.
+TEST(SizeOfDisplayedData, AutoSizedDecimalNegativeIntegerFunctionReturn) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  function integer neg();\n"
+      "    return -5;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    $display(\":%d:\", neg());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, ":         -5:\n");
+}
+
+// §21.2.1.2 (C1): the control on the two above -- a function whose return type
+// is an unsigned 8-bit vector keeps the three-column field its largest
+// possible value (255) requires. A return marked signed regardless of its
+// declared type would widen this to four.
+TEST(SizeOfDisplayedData,
+     AutoSizedDecimalUnsignedFunctionReturnKeepsNarrowField) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  function logic [7:0] lo();\n"
+      "    return 30;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    $display(\":%d:\", lo());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, ": 30:\n");
+}
+
+// §21.2.1.2 (C1 x §5.7.1 x §6.11.3): two arguments of one type take one field.
+// An unsized decimal literal expression is signed 32-bit by §5.7.1 and an
+// `integer` function result is signed 32-bit by §6.11.3, so `add(2, 3)` and
+// `2 + 3` are the same expression type and must be sized alike.
+TEST(SizeOfDisplayedData,
+     AutoSizedDecimalFunctionReturnMatchesLiteralExpression) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  function integer add(integer a, integer b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    $display(\":%d::%d:\", add(2, 3), 2 + 3);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, ":          5::          5:\n");
+}
+
+// §21.2.1.2 (C1 x §6.11.3): the formals carry their declared signedness too,
+// not just the return variable. A signed `integer` formal holding -6 divides
+// to -3; an unsigned formal would take the unsigned division path and produce
+// a large positive quotient in a ten-column field instead.
+TEST(SizeOfDisplayedData, AutoSizedDecimalIntegerFormalIsSigned) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  function integer half(integer a);\n"
+      "    return a / 2;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    $display(\":%d:\", half(-6));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, ":         -3:\n");
+}
+
 }  // namespace

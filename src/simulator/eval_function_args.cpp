@@ -374,8 +374,15 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
     }
   }
 
-  auto* var = ctx.CreateLocalVariable(param.name, val.width);
+  // §6.11.3: a formal is an object declared with a type, so `integer a` is a
+  // signed object however the actual arrived. Taking the signedness from the
+  // declaration rather than leaving the formal unsigned is what makes `a + b`
+  // in the body signed arithmetic; the value copied in below carries the
+  // actual's flag, so re-impose the declaration's on the cell too.
+  auto* var = ctx.CreateLocalVariable(param.name, val.width,
+                                      IsSignedType(param.data_type, {}));
   var->value = val;
+  var->value.is_signed = var->is_signed;
   if (is_static_sub) ctx.SaveStaticFuncVar(func->name, param.name, var);
   // A named-type struct formal (input s_t arg) has kind kNamed, not kStruct, so
   // resolve from the actual argument unconditionally; the resolver is a no-op

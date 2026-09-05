@@ -214,4 +214,30 @@ TEST(SignedAndUnsigned, DefaultUnsignedVectorComparesAsUnsignedOperand) {
   EXPECT_EQ(result->value.ToUint64(), 1u);
 }
 
+TEST(SignedAndUnsigned, DefaultSignedIntegerReturnValueSignExtends) {
+  // integer defaults to signed, and a function's result carries the
+  // signedness of its declared return type, so widening a -1 result to a
+  // longint sign-extends. This observes the default through its arithmetic
+  // consequence at the one place a return type declares it: an unsigned
+  // integer return would zero-extend to 0x00000000FFFFFFFF instead.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  longint d;\n"
+      "  function integer f();\n"
+      "    return -1;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    d = f();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* d = f.ctx.FindVariable("d");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->value.width, 64u);
+  EXPECT_EQ(d->value.ToUint64(), 0xFFFFFFFFFFFFFFFFull);
+}
+
 }  // namespace

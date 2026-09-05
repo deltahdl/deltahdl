@@ -413,11 +413,17 @@ void ExecClassMethod(ClassMethodTarget target, const Expr* expr,
   Variable dummy_ret;
   Variable* ret_var = &dummy_ret;
   if (!is_void) {
+    // §6.11.3: a method's return type decides the signedness of the variable
+    // that holds its result, exactly as a plain function's does in
+    // EvalFunctionCall below.
     ret_var = ctx.CreateLocalVariable(
-        method->name, ComputeMethodReturnWidth(method, ctx, target.param_cls));
+        method->name, ComputeMethodReturnWidth(method, ctx, target.param_cls),
+        IsSignedType(method->return_type, {}));
   }
   ExecFunctionBody(method, ret_var, ctx, arena);
   out = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
+  // `return <expr>;` overwrote the vector, so restore the declared signedness.
+  if (!is_void) out.is_signed = ret_var->is_signed;
 }
 
 static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
@@ -615,8 +621,16 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     auto* existing = is_static ? ctx.FindLocalVariable(func->name) : nullptr;
     uint32_t ret_width = EvalTypeWidth(func->return_type);
     if (ret_width == 0) ret_width = 32;
-    ret_var =
-        existing ? existing : ctx.CreateLocalVariable(func->name, ret_width);
+    // §6.11.3: `byte`, `shortint`, `int`, `integer` and `longint` default to
+    // signed, and an explicit `signed`/`unsigned` settles the rest, so the
+    // implicit variable that holds the result takes the return type's declared
+    // signedness. Built from the width alone it would be unsigned whatever the
+    // function returns, and §21.2.1.2's automatic %d field would then lose the
+    // sign column an `integer` result is entitled to.
+    bool ret_signed = IsSignedType(func->return_type, {});
+    ret_var = existing
+                  ? existing
+                  : ctx.CreateLocalVariable(func->name, ret_width, ret_signed);
   }
 
   // §20.17.2: a function body is a calling context on the $stacktrace chain,
@@ -635,6 +649,12 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   WritebackQueueRefs(ctx);
   WritebackAssocRefs(ctx);
   result = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
+  // A `return <expr>;` replaces the return variable's whole vector with the
+  // expression's, so the flag set when the variable was created does not
+  // survive a body that returns one. Re-impose it here, as EvalIdentifier does
+  // on an ordinary read: an object's signedness comes from its own
+  // declaration, never from a value that flowed into it.
+  if (!is_void) result.is_signed = ret_var->is_signed;
 
   if (is_static) {
     ctx.PopStaticScope(func->name);

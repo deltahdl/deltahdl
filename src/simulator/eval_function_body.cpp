@@ -418,7 +418,10 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   bool is_class = !type.type_name.empty() && ctx.FindClassType(type.type_name);
   uint32_t w = is_class ? 64 : EvalTypeWidth(type);
   if (w == 0) w = 32;
-  auto* v = ctx.CreateLocalVariable(name, w);
+  // §6.11.3: a body local carries its declared signedness exactly as a
+  // module-scope declaration does (Lowerer sets the same flag there), so an
+  // `integer` local is a signed operand rather than an unsigned one.
+  auto* v = ctx.CreateLocalVariable(name, w, IsSignedType(type, {}));
   if (is_class) ctx.SetVariableClassType(name, type.type_name);
   RecordVariableEnumType(name, type, ctx);
   if (init == nullptr) return v;

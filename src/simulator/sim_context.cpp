@@ -425,10 +425,15 @@ Variable* SimContext::FindLocalVariable(std::string_view name) {
   return nullptr;
 }
 
-Variable* SimContext::CreateLocalVariable(std::string_view name,
-                                          uint32_t width) {
+Variable* SimContext::CreateLocalVariable(std::string_view name, uint32_t width,
+                                          bool is_signed) {
   auto* var = arena_.Create<Variable>();
   var->value = MakeLogic4VecVal(arena_, width, 0);
+  // The declaration's signedness belongs both to the object and to the value
+  // standing in it: reads go through the variable's flag, while a value taken
+  // straight out of the cell carries its own.
+  var->is_signed = is_signed;
+  var->value.is_signed = is_signed;
   if (!scope_stack_.empty()) {
     scope_stack_.back().vars[name] = var;
   }
