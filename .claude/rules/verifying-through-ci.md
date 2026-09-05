@@ -13,6 +13,10 @@ The same reasoning kills the smaller justifications, which have all been used an
 - "It reproduces the gate in 1.3 seconds" — the seconds are not the cost. The tokens spent reading its output are.
 - "Local caught a regression, so it was worth it" — CI would have surfaced the same diff for nothing.
 
+When a defect really does hide in run-time state, read the code and the clause instead of probing for it. Two defects were closed that way on 2026-07-29 without running anything. An unqualified call in a constraint failed because `TryEvalEnclosingInstanceCall` needs both `CurrentThis()` and `CurrentMethodClass()`. A `const` at the head of a subroutine body was eaten as a `tf_port_declaration` because A.2.7 allows `const` there only before `ref`. Neither needed a print.
+
+Read the result with `gh run view`, `gh run list` and `gh api repos/deltahdl/deltahdl/actions/jobs/<id>/logs`. Never push while a run is in flight, because a push cancels it; check `gh run list --limit 1` first. Compare two runs over the tests that reported a definite `Passed` or `***…` result in both, never over failure counts or bare set differences, and confirm that every shard reached its CTest summary.
+
 ## Diagnosing one sv-tests file
 
 Build the simulator and run it on a single sv-tests file to find out why that file fails. The exception covers one named file that a CI run has already reported failing, run to see what the simulator does with it. It does not cover running the suite, running anything under `test/`, or rebuilding to check whether the fix worked — a fix is verified by pushing, like everything else.
@@ -22,8 +26,3 @@ Read the CI log first, because most of the answer is already there. `print_reaso
 The one thing the log drops is the rest of a simulation's stdout. `run_test` scores a simulated file through `check_assertions`, which walks the `:assert:` lines and returns `Assertion failed: <expr>` for the first that does not hold; every other line the run printed is discarded on the way. When the failing assertion and its two values do not themselves say why they differ, the surrounding output is what says it, and running the file is the only way to see it. That gap is the whole of the exception, and closing it in `run_sv_tests` would end the exception rather than widen it.
 
 [diagnosing-sv-tests-failures](../memories/diagnosing-sv-tests-failures.md) carries how to fetch the file and run it.
-
-
-When a defect really does hide in run-time state, read the code and the clause instead of probing for it. Two defects were closed that way on 2026-07-29 without running anything. An unqualified call in a constraint failed because `TryEvalEnclosingInstanceCall` needs both `CurrentThis()` and `CurrentMethodClass()`. A `const` at the head of a subroutine body was eaten as a `tf_port_declaration` because A.2.7 allows `const` there only before `ref`. Neither needed a print.
-
-Read the result with `gh run view`, `gh run list` and `gh api repos/deltahdl/deltahdl/actions/jobs/<id>/logs`. Never push while a run is in flight, because a push cancels it; check `gh run list --limit 1` first. Compare two runs over the tests that reported a definite `Passed` or `***…` result in both, never over failure counts or bare set differences, and confirm that every shard reached its CTest summary.
