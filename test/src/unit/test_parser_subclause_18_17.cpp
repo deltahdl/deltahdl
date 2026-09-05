@@ -256,4 +256,34 @@ TEST(RandseqBaseParse, TypeNameBeforeProductionIdentifierIsNotTheName) {
   EXPECT_EQ(FindProd(stmt, "word"), nullptr);
 }
 
+// §18.17: the location an rs_production_item carries is the identifier it
+// names, recorded where the parser reads that identifier rather than inferred
+// later. The elaborator's reports about a name stand there, and asserting the
+// field here states the claim where it is set: a report read back through the
+// elaborator says only that some location reached the diagnostic.
+//
+// `a` is used on line 4 and declared on line 5, so the location recorded is the
+// use rather than the declaration, and neither of them is the randsequence
+// keyword on line 3.
+TEST(RandseqBaseParse, ProductionItemCarriesTheLineOfTheNameItUses) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : a ;\n"
+      "      a : { ; } ;\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto* stmt = RandseqStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  const auto* main = FindProd(stmt, "main");
+  ASSERT_NE(main, nullptr);
+  ASSERT_EQ(main->rules.size(), 1u);
+  ASSERT_EQ(main->rules[0].prods.size(), 1u);
+  EXPECT_EQ(main->rules[0].prods[0].item.loc.line, 4u);
+}
+
 }  // namespace

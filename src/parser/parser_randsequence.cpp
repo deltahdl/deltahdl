@@ -36,7 +36,9 @@ Stmt* Parser::ParseRandcaseStmt() {
 
 RsProductionItem Parser::ParseRsProductionItem() {
   RsProductionItem item;
-  item.name = ExpectIdentifier(Subclause("18.17")).text;
+  Token name = ExpectIdentifier(Subclause("18.17"));
+  item.name = name.text;
+  item.loc = name.loc;
   if (Check(TokenKind::kLParen)) {
     Consume();
     if (!Check(TokenKind::kRParen)) {

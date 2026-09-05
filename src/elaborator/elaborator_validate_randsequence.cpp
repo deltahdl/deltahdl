@@ -42,21 +42,22 @@ NameSet DeclaredProductions(const Stmt* s) {
 // costs the sequence that production and everything below it, silently.
 //
 // An item carrying no name is not one. Parser::ParseRsProd in
-// src/parser/parser_verify.cpp fills the RsProd member its form uses and leaves
-// the others default-constructed, so every rs_prod that is not an rs_if_else
-// carries an empty RsProd::if_true. An empty name also stands where
+// src/parser/parser_randsequence.cpp fills the RsProd member its form uses and
+// leaves the others default-constructed, so every rs_prod that is not an
+// rs_if_else carries an empty RsProd::if_true. An empty name also stands where
 // Parser::ParseRsProductionItem found no identifier, which it has reported
-// already.
+// already. That check runs before the location is read, and a
+// default-constructed item is the only one carrying none.
 //
-// The report stands at the randsequence keyword because that is the nearest
-// position the tree records. RsProductionItem, RsCaseItem, RsProd, RsRule and
-// RsProduction in src/parser/ast_stmt.h carry no SourceRange, so Stmt::range is
-// the only location on the path to a production identifier.
+// The report stands at the item's own identifier. It used to stand at the
+// randsequence keyword, that being the only location the tree recorded, so two
+// rules misspelling two different names produced two reports on one line and
+// neither said which rule it was about.
 void CheckProductionItem(const RsProductionItem& item, const NameSet& declared,
-                         const Stmt* s, DiagEngine& diag) {
+                         DiagEngine& diag) {
   if (item.name.empty()) return;
   if (declared.count(item.name) != 0) return;
-  diag.Error(s->range.start,
+  diag.Error(item.loc,
              std::format("randsequence production item names '{}', which is "
                          "not one of the productions this randsequence "
                          "statement declares",
@@ -85,7 +86,7 @@ void CheckRandsequence(const Stmt* s, DiagEngine& diag) {
   // elaborator_validate_internal.h, which is the one list of the positions an
   // rs_production_item stands in.
   ForEachRandsequenceItem(s, [&](const RsProductionItem& item) {
-    CheckProductionItem(item, declared, s, diag);
+    CheckProductionItem(item, declared, diag);
   });
 }
 

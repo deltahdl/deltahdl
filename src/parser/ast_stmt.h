@@ -94,6 +94,18 @@ enum class RsProdKind : uint8_t {
 struct RsProductionItem {
   std::string_view name;
   std::vector<Expr*> args;
+  // §18.17: where the identifier this item names stands, so a report about the
+  // name is made at the name. Nothing else on the path from a randsequence
+  // statement to a production identifier carries a location -- RsCaseItem,
+  // RsProd, RsRule and RsProduction hold none -- so every such report used to
+  // stand at the randsequence keyword, and a statement whose rules misspell two
+  // names produced two reports on one line with nothing to tell them apart.
+  //
+  // Parser::ParseRsProductionItem fills it from the identifier token it was
+  // already reading. An item that is default-constructed rather than parsed
+  // carries no name either, and CheckProductionItem in
+  // elaborator_validate_randsequence.cpp returns on that before reading this.
+  SourceLoc loc;
 };
 
 struct RsCaseItem {

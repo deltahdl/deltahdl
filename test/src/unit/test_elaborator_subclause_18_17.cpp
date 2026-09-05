@@ -42,23 +42,24 @@ std::string RandsequenceOver(std::string_view top, std::string_view rules) {
 }
 
 // Elaborates the randsequence RandsequenceOver builds and asserts the
-// elaborator reported `message` against it.
+// elaborator reported `message` on the line holding `anchor`.
 //
-// The report stands on the line of the randsequence keyword whichever position
-// the offending name was written in, because that is the nearest position the
-// tree records: RsProductionItem, RsCaseItem, RsProd, RsRule and RsProduction
-// in src/parser/ast_stmt.h carry no SourceRange, so Stmt::range is the only
-// location on the path to a production identifier. The line is read off the
-// source rather than written as a number because RandsequenceOver, not the
-// case, writes the lines around the production list.
+// The anchor is passed rather than fixed because the report stands at the
+// offending name now: RsProductionItem carries the location of the identifier
+// it names, so a case whose name is written on the rule line is reported there
+// and not at the randsequence keyword. Every case below therefore anchors on
+// its own rule, and only the one about the name in the parentheses anchors on
+// the keyword. Naming the line by a string it holds rather than by a number
+// keeps the cases from counting the lines RandsequenceOver writes around them.
 void ExpectReportedOverRandsequence(std::string_view top,
                                     std::string_view rules,
-                                    std::string_view message) {
+                                    std::string_view message,
+                                    std::string_view anchor) {
   ElabFixture f;
   std::string src = RandsequenceOver(top, rules);
   ElaborateSrc(src, f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message,
-                            LineHolding(src, "randsequence("), "18.17"));
+                            LineHolding(src, anchor), "18.17"));
 }
 
 // §18.17 makes every production identifier local to the randsequence statement
@@ -70,7 +71,7 @@ TEST(RandsequenceProductionNames, ItemNamingNoDeclaredProductionIsRejected) {
   ExpectReportedOverRandsequence("main",
                                  "      main : first second;\n"
                                  "      first : { ; };\n",
-                                 kItemNamesNoProduction);
+                                 kItemNamesNoProduction, "main : first second");
 }
 
 // §18.17 states that the randsequence keyword "can be followed by an optional
@@ -83,7 +84,7 @@ TEST(RandsequenceProductionNames, ItemNamingNoDeclaredProductionIsRejected) {
 TEST(RandsequenceProductionNames,
      TopLevelNameDesignatingNoProductionIsRejected) {
   ExpectReportedOverRandsequence("mian", "      main : { ; };\n",
-                                 kTopNameNamesNoProduction);
+                                 kTopNameNamesNoProduction, "randsequence(");
 }
 
 // §18.17.2's rs_if_else names a production for the true branch, which the
@@ -95,7 +96,8 @@ TEST(RandsequenceProductionNames,
   ExpectReportedOverRandsequence("main",
                                  "      main : if (1) missing else other;\n"
                                  "      other : { ; };\n",
-                                 kItemNamesNoProduction);
+                                 kItemNamesNoProduction,
+                                 "if (1) missing else other");
 }
 
 // §18.17.2's rs_if_else names a second production for the else branch, which
@@ -107,7 +109,8 @@ TEST(RandsequenceProductionNames,
   ExpectReportedOverRandsequence("main",
                                  "      main : if (1) other else missing;\n"
                                  "      other : { ; };\n",
-                                 kItemNamesNoProduction);
+                                 kItemNamesNoProduction,
+                                 "if (1) other else missing");
 }
 
 // §18.17.4's rs_repeat names the production it repeats, which the resolver
@@ -116,7 +119,7 @@ TEST(RandsequenceProductionNames,
 // name reachable or unreachable by accident.
 TEST(RandsequenceProductionNames, RepeatNamingNoDeclaredProductionIsRejected) {
   ExpectReportedOverRandsequence("main", "      main : repeat(2) missing;\n",
-                                 kItemNamesNoProduction);
+                                 kItemNamesNoProduction, "repeat(2) missing");
 }
 
 // §18.17.3's rs_case names a production in each of its arms, which the resolver
@@ -128,7 +131,7 @@ TEST(RandsequenceProductionNames, CaseArmNamingNoDeclaredProductionIsRejected) {
       "main",
       "      main : case (0) 0: missing; default: other; endcase;\n"
       "      other : { ; };\n",
-      kItemNamesNoProduction);
+      kItemNamesNoProduction, "0: missing; default: other");
 }
 
 // §18.17.5's rand join names the productions it interleaves in a list of its
@@ -140,7 +143,8 @@ TEST(RandsequenceProductionNames,
   ExpectReportedOverRandsequence("main",
                                  "      main : rand join missing other;\n"
                                  "      other : { ; };\n",
-                                 kItemNamesNoProduction);
+                                 kItemNamesNoProduction,
+                                 "rand join missing other");
 }
 
 // The control the seven cases above rest on: a randsequence every one of whose
@@ -165,6 +169,40 @@ TEST(RandsequenceProductionNames, EveryNameResolvingIsReportedNowhere) {
   EXPECT_EQ(FindDiag(f, kItemNamesNoProduction), nullptr);
   EXPECT_EQ(FindDiag(f, kTopNameNamesNoProduction), nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// The claim the seven cases above rest on, stated on its own: the report stands
+// at the offending name and not at the statement. The randsequence keyword is
+// three lines above the rule that breaks, and `first` on the rule before it
+// resolves, so a report made at the statement or at the first rule reads a
+// different line from this one.
+TEST(RandsequenceProductionNames, ReportStandsOnTheLineOfTheOffendingItem) {
+  ElabFixture f;
+  std::string src = RandsequenceOver("main",
+                                     "      main : first;\n"
+                                     "      first : { ; };\n"
+                                     "      spare : second;\n");
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kItemNamesNoProduction,
+                            LineHolding(src, "spare : second"), "18.17"));
+}
+
+// Two rules naming two different undeclared productions are reported on their
+// own lines. One report cannot show that the location follows the item rather
+// than the statement: a location fixed at the randsequence keyword satisfies a
+// case that asserts one report on one line, and satisfies it twice over when
+// two reports land on that same line with nothing to tell them apart.
+TEST(RandsequenceProductionNames, TwoBadNamesAreReportedOnTwoLines) {
+  ElabFixture f;
+  std::string src = RandsequenceOver("main",
+                                     "      main : alpha;\n"
+                                     "      alpha : missing_one;\n"
+                                     "      spare : missing_two;\n");
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "'missing_one'",
+                            LineHolding(src, "alpha : missing_one"), "18.17"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "'missing_two'",
+                            LineHolding(src, "spare : missing_two"), "18.17"));
 }
 
 }  // namespace
