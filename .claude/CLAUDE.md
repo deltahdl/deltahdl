@@ -96,11 +96,13 @@ The standard also guides how code is structured. When grouping parameters into a
 
 ### Tests
 
-Longer: [test-driven-development](rules/test-driven-development.md), [unique-test-names](rules/unique-test-names.md).
+Longer: [test-driven-development](rules/test-driven-development.md), [unique-test-names](rules/unique-test-names.md), [const-local-naming](rules/const-local-naming.md).
 
 Write the tests first, in the same commit as the code they cover. `.github/workflows/scripts.yml` runs `pytest --cov-fail-under=100` over the `unit/` directory of every Python script and library module. Test-first here means authoring order; the red-green observation belongs to CI.
 
 Choose every input so that incorrect code would give a different answer from correct code. Some values make two quantities coincide — an offset and a count at zero, or an index and a storage offset in a vector declared `[N:0]` — and a test built on one passes whether the behaviour exists or not.
+
+Name a `const` local `kCamelCase`, or drop the `const` where it is carrying nothing. `readability-identifier-naming.LocalConstantPrefix` in `etc/clang_tidy/test_src_unit.yml` and `etc/clang_tidy/src.yml` is what decides it, and the clang-tidy shards are otherwise the only thing that says so.
 
 Give a fully-qualified name `Suite.Name` to one declaration only; CI fails on a repeated name. Two files covering one rule is fine and often deliberate, so rename the declaration to state its own claim rather than dropping the coverage.
 
