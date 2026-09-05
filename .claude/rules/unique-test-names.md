@@ -29,4 +29,4 @@ TEST(SubroutineCallExprElaboration,
 
 856 of the 28,798 declarations in the tree are shaped like that, so a line-at-a-time grep sees 97% of them and reports a clean run over the rest. The check joins each file's lines before matching.
 
-Related: [test-file-letter-suffixes](../conventions/test-file-letter-suffixes.md) for the family a deletion case usually belongs to, and [verifying-through-ci](verifying-through-ci.md) for reading the result. [duplicate-precedence-test-name](../memories/duplicate-precedence-test-name.md) is the rename this is drawn from.
+Related: [test-file-letter-suffixes](../conventions/test-file-letter-suffixes.md) for the family a deletion case usually belongs to, and [verifying-through-ci](verifying-through-ci.md) for reading the result. [duplicate-precedence-test-name](../incidents/duplicate-precedence-test-name.md) is the rename this is drawn from.

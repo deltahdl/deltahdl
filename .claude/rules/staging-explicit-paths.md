@@ -8,4 +8,4 @@ Name a removed path to `git rm` and an added or modified path to `git add`, and 
 
 Read the index back with `git status --porcelain` after staging and before committing, and compare what it lists against what the change touched. A failed staging command returns non-zero, and that decides nothing when `git add` and `git commit` are separate lines rather than one `&&` chain, because nothing reads the exit status. Reading the index is what makes the failure visible whatever caused it, and it costs one command.
 
-Related: [git-add-all-swept-scratch](../memories/git-add-all-swept-scratch.md) and [git-add-partial-staging](../memories/git-add-partial-staging.md) for what each of those has cost.
+Related: [git-add-all-swept-scratch](../incidents/git-add-all-swept-scratch.md) and [git-add-partial-staging](../incidents/git-add-partial-staging.md) for what each of those has cost.

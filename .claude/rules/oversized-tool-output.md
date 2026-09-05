@@ -6,4 +6,4 @@ One very large tool result exhausts the same content-filter budget that batched 
 
 That matters because verification depends on reading tool output. Once the output is blocked, the turn cannot be finished. If output starts truncating, stop issuing calls and resume in a fresh turn rather than working blind.
 
-Related: [content-filter-budget](../memories/content-filter-budget.md) for the reads that have tripped it.
+Related: [content-filter-budget](../incidents/content-filter-budget.md) for the reads that have tripped it.

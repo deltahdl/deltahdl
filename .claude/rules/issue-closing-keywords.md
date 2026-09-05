@@ -14,4 +14,4 @@ Closes #P
 
 That form has closed ten issues in a single commit here. After a multi-issue close, read the states back with `gh issue view <N> --json state` rather than trusting the shape of the message.
 
-Related: [closing-keyword-in-a-title](../memories/closing-keyword-in-a-title.md) for the issue this closed by accident.
+Related: [closing-keyword-in-a-title](../incidents/closing-keyword-in-a-title.md) for the issue this closed by accident.

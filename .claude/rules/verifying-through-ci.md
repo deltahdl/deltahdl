@@ -4,7 +4,7 @@ Never build locally, and never run any local tool that CI also runs. The user se
 
 Push everything else and read the run. Build, test, `clang-tidy`, the formatting check, the file-size cap, the assertions about suppressions and configuration files, the unit test registration checks, the copy-paste detectors and the whole Python side — pytest, the coverage gates, pylint, `mypy --strict`, `assert-one-assert-per-pytest` — all run in `.github/workflows/deltahdl.yml` and `.github/workflows/scripts.yml` for free. As the user put it: "CI does all checks. doing things locally costs Claude tokens. CI is free."
 
-Do not build locally for a bug that only shows up while the simulator is running. An earlier version of this note allowed exactly that, for coroutine, scheduler and event-watcher bugs, and the permission is gone. The sv-tests exception below is not that permission coming back: it is bounded by one named file that a run has already reported failing, and by the single thing the log drops. [local-build-bought-twenty-minutes](../memories/local-build-bought-twenty-minutes.md) is what retired it.
+Do not build locally for a bug that only shows up while the simulator is running. An earlier version of this note allowed exactly that, for coroutine, scheduler and event-watcher bugs, and the permission is gone. The sv-tests exception below is not that permission coming back: it is bounded by one named file that a run has already reported failing, and by the single thing the log drops. [local-build-bought-twenty-minutes](../incidents/local-build-bought-twenty-minutes.md) is what retired it.
 
 The smaller justifications go the same way, and have all been used and corrected:
 

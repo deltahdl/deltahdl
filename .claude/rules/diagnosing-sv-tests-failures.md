@@ -6,4 +6,4 @@ Read the CI log before building, because that printing means a file rejected by 
 
 Fetch the file — [fetching-an-sv-tests-file](../references/fetching-an-sv-tests-file.md) carries the command — and run it from an isolated Debug build directory; `ninja src/deltahdl` rebuilds incrementally. A file passes when each `:assert:` line reports equal values. Verify the fix by pushing, not by rebuilding.
 
-Related: [sv-tests-hypotheses-were-wrong](../memories/sv-tests-hypotheses-were-wrong.md) for what reading the source alone produced.
+Related: [sv-tests-hypotheses-were-wrong](../incidents/sv-tests-hypotheses-were-wrong.md) for what reading the source alone produced.

@@ -6,4 +6,4 @@ The user is the one running these orchestrators. Silent partial-success runs dis
 
 Reserve quiet returns for the genuinely fine no-op, such as `commit_mutator_result` in `scripts/satisfy_subclause/mutators.py` returning `False` on an empty diff, because the subclause was already satisfied.
 
-Related: [quiet-return-in-an-orchestrator](../memories/quiet-return-in-an-orchestrator.md) for the handler that prompted this.
+Related: [quiet-return-in-an-orchestrator](../incidents/quiet-return-in-an-orchestrator.md) for the handler that prompted this.

@@ -13,7 +13,7 @@
 
 ## Recording what a session learns
 
-Write it down under `.claude/`, in the directory its kind belongs to: `rules/` for an instruction with a gate or a mechanism behind it, `conventions/` for a chosen form that a different choice would serve as well, `memories/` for a fact or a decision already taken, and `references/` for lookup material. A rule also gets a section under Rules below; a memory also gets a line in `memories/MEMORY.md`. Open every file with a top-level heading, which markdownlint's MD041 requires across `**/*.md`.
+Write it down under `.claude/`, in the directory its kind belongs to: `rules/` for an instruction with a gate or a mechanism behind it, `conventions/` for a chosen form that a different choice would serve as well, `incidents/` for one thing that happened, with its date and what it cost, `memories/` for a standing fact about the user or the project that the repository does not record on its own, and `references/` for lookup material. A rule also gets a section under Rules below, a memory a line in `memories/MEMORY.md`, and an incident a link from the rule it stands behind. Open every file with a top-level heading, which markdownlint's MD041 requires across `**/*.md`.
 
 ## Rules
 

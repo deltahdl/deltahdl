@@ -10,4 +10,4 @@ Each file is its own CMake target, so a rename means editing the `add_unit_test(
 
 Run `ls test/src/unit/ | grep <subclause>` before choosing a suffix. The name one letter past the end of a family is easy to guess wrong, because an earlier split may already have claimed it, and writing over that file destroys the cases in it. The check costs one call, and it is the only thing standing between a split and silently deleted coverage.
 
-Related: [overwritten-test-file](../memories/overwritten-test-file.md) for the split that cost ten cases.
+Related: [overwritten-test-file](../incidents/overwritten-test-file.md) for the split that cost ten cases.

@@ -8,4 +8,4 @@ Do not bulk-extract page text through `pypdf`. Calling `page.extract_text()` on 
 
 Do not convert PDFs to text at all. `pdftotext` and friends lose layout, tables, figures and structure, and produce interleaved text with footers cut mid-sentence and table columns scrambled. The Read tool renders pages directly and handles figures and tables, and that path survives even after Bash output has been poisoned.
 
-Related: [content-filter-budget](../memories/content-filter-budget.md) for what exhausting it looked like.
+Related: [content-filter-budget](../incidents/content-filter-budget.md) for what exhausting it looked like.
