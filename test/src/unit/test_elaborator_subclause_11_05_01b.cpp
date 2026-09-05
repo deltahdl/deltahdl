@@ -598,7 +598,7 @@ TEST(SelectElaboration, IndexedPartSelectWidthInAConcatenationIsRejected) {
 // bit and 16'h0001 puts a 1 there. Reading the index as a distance above the
 // least significant end asks for offset 17 of a sixteen-bit value and answers
 // 0. Neither bound is 0, so no index makes the two coincide and the case can
-// fail, which docs/tenets/tests/UNIT_TESTS.md requires of the input.
+// fail, which the "Tests" section of CLAUDE.md requires of the input.
 //
 // This fails while Elaborator::ProcessPendingGenerate in
 // src/elaborator/elaborator_generate.cpp opens no ParamRangeRegistryGuard:

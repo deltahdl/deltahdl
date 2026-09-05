@@ -72,7 +72,7 @@ Longer: [how-issues-are-written](.claude/memories/how-issues-are-written.md), [i
 
 Answer the question that was asked, and stop. These rules hold for a reply in a session, an issue body, a commit message, a docstring and a comment in a source file exactly as they hold for a file under `docs/`.
 
-State the instruction before the reasoning for it, give each sentence one instruction, and never leave a figure of speech to carry a rule on its own. `docs/tenets/conventions/README.md` states those three in full for the documents that say how work is done, and it governs this file as much as any other. Here they hold wherever prose is written, and so do the three rules below.
+State the instruction before the reasoning for it, give each sentence one instruction, and never leave a figure of speech to carry a rule on its own. Those three hold wherever prose is written, this file included, and so do the three rules below.
 
 Write every noun that has a name by that name. A name is something the reader can open: a path, a symbol with the source file holding it, a clause of `~/LRM.pdf`, a fully-qualified `Suite.Name`, a CMake target, a job in a workflow file. The coined collective noun is the failure to avoid, because a phrase like "the machinery" or "the layer" reads as vocabulary this repository already uses and sends the reader looking for something that is not there. Say the directory, the source file, the clause or the test case instead. Verify a name before writing it, since a wrong name costs more than a vague one.
 
@@ -84,19 +84,11 @@ Nothing enforces any of this. No linter here judges wording, so a green run is n
 
 Longer: [answer-the-question-asked](.claude/memories/answer-the-question-asked.md), [write-the-exact-name](.claude/memories/write-the-exact-name.md), [lead-with-what-it-is-for](.claude/memories/lead-with-what-it-is-for.md).
 
-## Tenets
-
-`docs/tenets/` holds the rules a piece of work is held to, whatever the repository happens to contain: one tree for test suites, one for the documents that state how the work is done. Read the tenets covering what is being touched before writing it, not after. They decide what the work has to do to count, and a change that satisfies every gate can still fail them.
-
-A tenet is generic. It names no language, no tool, no directory and no count, so nothing in it restates what this repository already states correctly elsewhere. Where a tenet and the repository disagree, the repository is what changes. This file is held to the convention tenets in turn: it carries rules, and leaves thresholds, inventories and current shapes to the gate or the tree that decides them.
-
-One tenet has already cost this repository a defect: an input that cannot fail proves nothing. Some values make two quantities coincide, such as an offset and a count at zero, or a position and its name in a range that starts where counting starts. For such a value, code that confuses the two returns the right answer, so every test built on it passes whether the behaviour exists or not. §11.5.1 rules that a declaration decides which bit an index reaches, and that rule went untested for exactly this reason: every test declared its vectors `[N:0]`, where the index and the storage offset are the same number, and two elaborator paths computed offsets where indices were required without one test noticing.
-
-Longer: [docs/tenets/tests/UNIT_TESTS.md](docs/tenets/tests/UNIT_TESTS.md), [docs/tenets/conventions/README.md](docs/tenets/conventions/README.md), [reading-the-tenets](.claude/memories/reading-the-tenets.md).
-
 ## Tests
 
 Write the tests first, in the same commit as the code they cover. `.github/workflows/scripts.yml` runs `pytest --cov-fail-under=100` over the `unit/` directory of every Python script and library module, so production code without matching unit tests fails on push. Test-first here means authoring order; the red-green observation belongs to CI.
+
+Choose every input so that incorrect code would give a different answer from correct code. Some values make two quantities coincide, such as an offset and a count at zero, or a position and its name in a range that starts where counting starts. For such a value, code that confuses the two returns the right answer, so every test built on it passes whether the behaviour exists or not. §11.5.1 rules that a declaration decides which bit an index reaches, and that rule went untested for exactly this reason: every test declared its vectors `[N:0]`, where the index and the storage offset are the same number, and two elaborator paths computed offsets where indices were required without one test noticing.
 
 When more than one unit test file covers the same subclause, end every file in that family with a letter — `…_11_04_11a.cpp`, `…_11_04_11b.cpp` — and reserve the bare name for a subclause that fits in one file. Splitting a one-file subclause renames the original to `a`. Run `ls test/src/unit/` for the subclause before choosing a suffix: an earlier split may already hold the letter, and writing over that file destroys its cases.
 

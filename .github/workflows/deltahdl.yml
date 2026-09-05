@@ -462,11 +462,10 @@ jobs:
   # its author sees this job go red after writing the change rather than before
   # starting it, and the cheapest repair is to take a line back out of the same
   # change. cc443c650 is that move: it returned src/parser/parser_port.cpp to
-  # 1000 by folding a three-line comment into two. docs/tenets/conventions/
-  # README.md rules that the shorter word chosen to fit a column is paid for
-  # out of the accuracy the prose exists to carry, so the warning exists to put
-  # the split in front of the author instead, while there are still 50 lines to
-  # write it in.
+  # 1000 by folding a three-line comment into two. CLAUDE.md rules that the
+  # shorter word chosen to fit a column is paid for out of the accuracy the
+  # prose exists to carry, so the warning exists to put the split in front of
+  # the author instead, while there are still 50 lines to write it in.
   assert-no-oversized-source-files:
     runs-on: ubuntu-latest
     steps:

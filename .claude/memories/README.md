@@ -41,7 +41,6 @@ These three hold everywhere prose is written here, and not in these notes alone:
 
 ## Code
 
-- [reading-the-tenets](reading-the-tenets.md) — `docs/tenets/` is read before the code, and why the tenets say nothing about this repository
 - [test-driven-development](test-driven-development.md) — tests first, in the same commit, enforced by a 100% coverage gate
 - [test-file-letter-suffixes](test-file-letter-suffixes.md) — every file in a split test family ends in a letter, and check the letter first
 - [unique-test-names](unique-test-names.md) — one declaration per `Suite.Name`, because CTest registers the bare name and nothing else

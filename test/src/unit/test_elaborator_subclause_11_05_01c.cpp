@@ -20,8 +20,8 @@ using namespace delta;
 // Every vector below is declared [7:4] rather than [7:0] so that an index and
 // the storage offset it reaches are different numbers. On [7:0] the two
 // coincide, and a check that computed an offset where §11.5.1 requires an index
-// would answer such a case the same way the rule does, which
-// docs/tenets/tests/UNIT_TESTS.md bars.
+// would answer such a case the same way the rule does, which the "Tests"
+// section of CLAUDE.md bars.
 
 namespace {
 
