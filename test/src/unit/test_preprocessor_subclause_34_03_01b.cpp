@@ -10,10 +10,10 @@
 // A refusal here is asserted through TryParseProtectArg's return value and
 // ProtectCliOptions::rejected_argument together. The return value says the
 // argument was one of these options; the field says the option refused the
-// value written after it. CLAUDE.md otherwise has a test naming the report
-// through ReportedError, which applies to a rule the program reports through
-// common/diagnostic.h; TryParseProtectArg writes to std::cerr and returns a
-// bool instead, so there is no diagnostic for a case to name.
+// value written after it. .claude/CLAUDE.md otherwise has a test naming the
+// report through ReportedError, which applies to a rule the program reports
+// through common/diagnostic.h; TryParseProtectArg writes to std::cerr and
+// returns a bool instead, so there is no diagnostic for a case to name.
 //
 // Issue #3427 is why a refused value is asserted as that pair rather than as
 // either half. TryParseProtectArg matched `arg == "--protect-key" && i + 1 <

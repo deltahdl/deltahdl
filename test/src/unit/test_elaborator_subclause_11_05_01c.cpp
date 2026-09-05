@@ -21,7 +21,7 @@ using namespace delta;
 // the storage offset it reaches are different numbers. On [7:0] the two
 // coincide, and a check that computed an offset where §11.5.1 requires an index
 // would answer such a case the same way the rule does, which the "Tests"
-// section of CLAUDE.md bars.
+// section of .claude/CLAUDE.md bars.
 
 namespace {
 

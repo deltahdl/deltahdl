@@ -4,7 +4,7 @@ These fixtures supply the table of contents the dependency tests judge
 oracle answers against, and they patch the two functions those tests must
 not really call. A table that stopped holding an entry with numbered
 subclauses beneath it would leave every aggregate-rejection test passing
-over an input that cannot be rejected, which is the failure CLAUDE.md
+over an input that cannot be rejected, which is the failure .claude/CLAUDE.md
 calls an input that cannot fail.
 """
 

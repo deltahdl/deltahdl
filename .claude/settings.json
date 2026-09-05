@@ -1,3 +1,4 @@
 {
-  "autoMemoryEnabled": false
+  "autoMemoryDirectory": ".claude/memories/",
+  "autoMemoryEnabled": true
 }

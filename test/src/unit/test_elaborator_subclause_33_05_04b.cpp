@@ -20,12 +20,13 @@
 // written to.
 //
 // A rejection here is asserted through ParseArgs's return value, which is the
-// whole of what ParseArgs answers about an unrecognized option. CLAUDE.md
-// otherwise has a test naming the report through ReportedError; that applies
-// to a rule the program reports through common/diagnostic.h, and ParseArgs
-// writes to std::cerr and returns a bool instead. A rejection an option made
-// itself is asserted through CliOptions::rejected_argument as well, which
-// ParseArgs sets for an option it recognized and whose value it refused.
+// whole of what ParseArgs answers about an unrecognized option.
+// .claude/CLAUDE.md otherwise has a test naming the report through
+// ReportedError; that applies to a rule the program reports through
+// common/diagnostic.h, and ParseArgs writes to std::cerr and returns a bool
+// instead. A rejection an option made itself is asserted through
+// CliOptions::rejected_argument as well, which ParseArgs sets for an option it
+// recognized and whose value it refused.
 //
 // Issue #3425 is why this half exists. CliOptions and ParseArgs were in
 // src/main.cpp's anonymous namespace, where no test could name them, so an

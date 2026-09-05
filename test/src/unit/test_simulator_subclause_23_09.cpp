@@ -30,10 +30,10 @@
 // and asks SimContext::FindVariable for a name the child does not declare.
 //
 // Every case holds distinct nonzero values on the two sides of the module
-// boundary, because the "Tests" section of CLAUDE.md rules that an input
-// that cannot fail proves nothing: a child and a top holding the same value --
-// or a pair of 4-state variables both left at x -- yield the answer §23.9
-// requires even when the initializer read the wrong scope.
+// boundary, because the "Tests" section of .claude/CLAUDE.md rules that an
+// input that cannot fail proves nothing: a child and a top holding the same
+// value -- or a pair of 4-state variables both left at x -- yield the answer
+// §23.9 requires even when the initializer read the wrong scope.
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"

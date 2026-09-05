@@ -593,7 +593,7 @@ TEST(NetStrengthAmbigUnambig, DominatedUnambigSignalOpensNoGapToFill) {
 // and for every other shape in this file the rendering is the same whether they
 // were combined or dropped, so a case reading it alone would pass on the
 // behavior and on its absence alike -- which the "Tests" section of
-// CLAUDE.md rules out.
+// .claude/CLAUDE.md rules out.
 // The bounds stand beside the rendering for the same reason: they are what
 // §28.12.3 decides, and they say so whatever the renderer does with them.
 //

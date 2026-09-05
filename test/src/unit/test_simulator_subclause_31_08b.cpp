@@ -258,11 +258,11 @@ TEST(VectorSignalsInTimingChecksDriven,
 // 233, leaving 17 time units of setup against the same limit of 73 the two
 // cases above use.
 //
-// The number of reports is the claim here, which CLAUDE.md otherwise warns
-// against: a count states how many reports a run made and nothing about which
-// rule any of them enforced. §31.8 states the number outright, so here the
-// number is the rule rather than a stand-in for it, and a run that treated each
-// transitioned bit as its own check would report twice and satisfy every
+// The number of reports is the claim here, which .claude/CLAUDE.md otherwise
+// warns against: a count states how many reports a run made and nothing about
+// which rule any of them enforced. §31.8 states the number outright, so here
+// the number is the rule rather than a stand-in for it, and a run that treated
+// each transitioned bit as its own check would report twice and satisfy every
 // assertion that only asked whether §31.3.1 had fired. The two steps are
 // ReportedWarning, which says the report was made and names the rule it
 // enforces, and FindDiagFrom started one past that report, which says there is

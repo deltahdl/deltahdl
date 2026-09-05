@@ -221,13 +221,13 @@
 // §31.4.3's event-based mode continues the check whatever its
 // remain_active_flag says.
 //
-// The number of reports is the claim there, where CLAUDE.md otherwise has a
-// case name the rule a report enforces rather than count reports. The rule
-// §31.4.3 states is that the window continues, and a run in which it does not
-// continue reports a strict subset of what a run in which it does reports, so
-// the second report is the only observable the rule has. The case still names
-// the rule: ReportedWarning answers the message, the line and the subclause of
-// the first report, and FindDiagFrom
+// The number of reports is the claim there, where .claude/CLAUDE.md otherwise
+// has a case name the rule a report enforces rather than count reports. The
+// rule §31.4.3 states is that the window continues, and a run in which it does
+// not continue reports a strict subset of what a run in which it does reports,
+// so the second report is the only observable the rule has. The case still
+// names the rule: ReportedWarning answers the message, the line and the
+// subclause of the first report, and FindDiagFrom
 // (lib/cpp/test_fixtures/fixture_simulator.h) started one past that report's
 // position is what asks for the second.
 //
