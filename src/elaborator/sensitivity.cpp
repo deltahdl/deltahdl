@@ -20,6 +20,34 @@ static void CollectSelectReads(const Expr* expr,
     }
     cur = cur->base;
   }
+  // §9.2.2.2.1 asks for "the expansions of the longest static prefix of each
+  // net or variable identifier or select expression that is read", and the
+  // prefix itself is not always one of those expansions. Where the index folds,
+  // BuildSelectPrefix returns the text `b[3]`, which names a position within a
+  // vector and no object: SimContext::FindVariable resolves a declared name
+  // against variables_, and `logic [3:0] b` is one Variable named `b`. So the
+  // name reached nothing and AnyChangeAwaiter::await_suspend armed no watcher
+  // at all -- silently, since it drops a name it cannot resolve. The identifier
+  // the chain stands on is the coarsest expansion, and it is always an object.
+  //
+  // It is the only name a distributed instance-array terminal ever gets:
+  // InstanceArrayElementTerminals in elaborator_gates.cpp connects element p
+  // through MakeBitSelect with a literal index, so every element of
+  // `udp_and2 ga [3:0] (y, a, b)` watched nothing and evaluated once. Where the
+  // index does not fold the prefix is already the bare name, which is why the
+  // genvar-indexed form in test/src/e2e/udp_generate.sv kept working.
+  //
+  // The added name over-triggers: a change anywhere in `b` wakes a process that
+  // reads `b[3]` alone. Every consumer re-reads what it watches -- a UDP
+  // coroutine its terminals, a continuous assignment its right-hand side, a
+  // wait its condition -- so a wake with nothing changed commits the value that
+  // already stood. An always_comb keeps its own output out of its list by the
+  // same root name, since CollectAssignLhsName below walks a written select
+  // down to the identifier it stands on, which is what §9.2.2.2.1's exception
+  // (b) needs it to be.
+  if (cur && cur->kind == ExprKind::kIdentifier && !cur->text.empty()) {
+    out.insert(std::string(cur->text));
+  }
 }
 
 void CollectExprReads(const Expr* expr, std::unordered_set<std::string>& out) {

@@ -89,4 +89,44 @@ TEST(GateArrayRuntime, DistributedEnableAppliesPerElementControl) {
   EXPECT_EQ(w.aval & 0xFu, 0x5u);
 }
 
+// §28.3.6's Example 2 states that `bufif0 ar[3:0] (out, in, en);` and the four
+// separate declarations `bufif0 ar3 (out[3], in[3], en);` and so on are
+// "equivalent except for indexed instance names", so an element of an array
+// answers a later change of its own input bit exactly as the separate
+// declaration would. The three cases above drive their inputs once and read the
+// settled value, which holds however the elements are woken.
+//
+// b alone changes at time 10 and a is held still, so a watcher armed on a
+// cannot carry it: 1100 & 1010 is 1000 and 1100 & 0101 is 0100. An array whose
+// elements stopped after their first evaluation reads 1000.
+//
+// A gate array reaches the same watch-list walk a UDP array does -- both expand
+// through ExpandInstanceArray, and the coroutine collects its reads with
+// CollectExprReads -- so this case and the §29.8 one stand over one collection
+// through two lowerings.
+TEST(GateArrayRuntime, DistributedTerminalChangeReevaluatesEachElement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic [3:0] a, b;\n"
+      "  wire [3:0] y;\n"
+      "  initial begin\n"
+      "    a = 4'b1100; b = 4'b1010;\n"
+      "    #10 b = 4'b0101;\n"
+      "  end\n"
+      "  and g[0:3](y, a, b);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* net = f.ctx.FindNet("y");
+  ASSERT_NE(net, nullptr);
+  ASSERT_NE(net->resolved, nullptr);
+  ASSERT_GT(net->resolved->value.nwords, 0u);
+  const auto& w = net->resolved->value.words[0];
+  // 1100 & 0101 == 0100
+  EXPECT_EQ(w.aval & 0xFu, 0x4u);
+  EXPECT_EQ(w.bval & 0xFu, 0x0u);
+}
+
 }  // namespace

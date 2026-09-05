@@ -256,13 +256,21 @@ Expr* MakeMember(Arena& arena, Expr* obj, std::string_view field) {
   return e;
 }
 
+// §9.2.2.2.1 asks for "the expansions of the longest static prefix of each net
+// or variable identifier or select expression that is read", so the prefix
+// `a[1]` and the identifier it stands on are both collected. The bare name is
+// there because it is the only one of the two that names a simulation object:
+// `logic [3:0] a` is one Variable named `a`, so a watcher can be armed on `a`
+// and cannot be armed on `a[1]`. This case asserted the bare name absent until
+// an array of UDP instances -- whose every terminal is a literal bit-select --
+// was found watching nothing at all.
 TEST(AlwaysCombSensitivityCollection, SelectConstIdxUsesLSP) {
   Arena arena;
   auto* expr = SensSelect(arena, SensId(arena, "a"), SensIntLit(arena, 1));
   std::unordered_set<std::string> reads;
   CollectExprReads(expr, reads);
   EXPECT_TRUE(reads.count("a[1]"));
-  EXPECT_FALSE(reads.count("a"));
+  EXPECT_TRUE(reads.count("a"));
 }
 
 TEST(AlwaysCombSensitivityCollection, NestedSelectUsesLSP) {
@@ -273,7 +281,10 @@ TEST(AlwaysCombSensitivityCollection, NestedSelectUsesLSP) {
   CollectExprReads(outer, reads);
   EXPECT_TRUE(reads.count("a[1]"));
   EXPECT_TRUE(reads.count("i"));
-  EXPECT_FALSE(reads.count("a"));
+  // The identifier the whole chain stands on, for the reason
+  // SelectConstIdxUsesLSP above gives: it is the expansion that names an
+  // object.
+  EXPECT_TRUE(reads.count("a"));
 }
 
 TEST(AlwaysCombSensitivityCollection, SelectVarIdxUsesLSP) {

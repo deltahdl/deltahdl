@@ -262,4 +262,33 @@ TEST(LevelSensitiveEventSimulation, WaitTwoStateIntConditionUnblocks) {
   EXPECT_EQ(val, 42u);
 }
 
+// §9.4.3: "the wait statement shall evaluate a condition; if it is false, the
+// procedural statements following the wait statement shall remain blocked until
+// that condition becomes true." Every case above writes its condition on a
+// whole variable. This one writes it on a single bit, which is the operand
+// whose collected name is BuildSelectPrefix's `v[1]` -- a position within a
+// vector, which SimContext::FindVariable resolves to no object, so
+// ExecWaitStatement armed no watcher and the condition was never re-tested.
+//
+// v starts all zero and x starts at 0, so a wait that never resumes leaves x
+// at 0 rather than at 42, and only the bit the condition reads is set at time
+// 10.
+TEST(LevelSensitiveEventSimulation, WaitOnABitSelectResumesWhenThatBitChanges) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [3:0] v;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    v = 4'b0000;\n"
+      "    x = 8'd0;\n"
+      "    #10 v = 4'b0010;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    wait (v[1]) x = 8'd42;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 42u);
+}
+
 }  // namespace

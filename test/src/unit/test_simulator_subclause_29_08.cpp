@@ -286,4 +286,64 @@ TEST(UdpInstanceSim, InstanceArrayDrivesEachOutputBitFromItsOwnElement) {
             "1100");
 }
 
+// §29.4 rules that in a combinational UDP "the output state is determined
+// solely as a function of the current input states", and that "Whenever an
+// input state changes, the UDP is evaluated and the output state is set to the
+// value indicated by the row in the state table that matches all the input
+// states". The case above drives its inputs once and reads the value the single
+// evaluation every element gets at time zero, so it holds whether or not a
+// later change is ever seen. This one changes b alone at time 10 and asks for
+// the row that change selects.
+//
+// a is held still across the change so that a watcher armed on a cannot carry
+// the assertion: 1100 & 1010 is 1000 and 1100 & 0101 is 0100, so an element
+// that stopped after its first evaluation reads 1000 here.
+//
+// §28.3.6, which §29.8 sends the terminal connection rules to, distributes both
+// terminals bit by bit, so each element reads b[p] -- a select on a literal
+// index, which is the only form InstanceArrayElementTerminals builds.
+TEST(UdpInstanceSim,
+     InstanceArrayReevaluatesOnALaterChangeOfADistributedInput) {
+  EXPECT_EQ(SettledValue(std::string(kAndPrimitive) +
+                             "module m;\n"
+                             "  reg [3:0] a, b;\n"
+                             "  wire [3:0] y;\n"
+                             "  udp_and g [3:0] (y, a, b);\n"
+                             "  initial begin\n"
+                             "    a = 4'b1100; b = 4'b1010;\n"
+                             "    #10 b = 4'b0101;\n"
+                             "  end\n"
+                             "endmodule\n",
+                         "y"),
+            "0100");
+}
+
+// The same rule where one terminal is broadcast rather than distributed.
+// §28.3.6 gives every element the whole of a terminal whose width matches the
+// single-instance port, so `enable` reaches each element as a plain identifier
+// and a[p] as a bit-select.
+//
+// This is the half the case above cannot show. An element woken by the
+// broadcast terminal re-reads its distributed one correctly, so a design whose
+// later change writes the broadcast terminal is right whatever the bit-selects
+// watch. Here the later change writes a alone, holding enable still, so the
+// only name that can wake an element is the one that resolves to nothing:
+// 1100 & 1 is 1100 and 0011 & 1 is 0011.
+TEST(UdpInstanceSim,
+     InstanceArrayWithABroadcastTerminalReevaluatesOnADistributedInput) {
+  EXPECT_EQ(SettledValue(std::string(kAndPrimitive) +
+                             "module m;\n"
+                             "  reg [3:0] a;\n"
+                             "  reg enable;\n"
+                             "  wire [3:0] z;\n"
+                             "  udp_and g [3:0] (z, a, enable);\n"
+                             "  initial begin\n"
+                             "    a = 4'b1100; enable = 1'b1;\n"
+                             "    #10 a = 4'b0011;\n"
+                             "  end\n"
+                             "endmodule\n",
+                         "z"),
+            "0011");
+}
+
 }  // namespace
