@@ -333,24 +333,22 @@ class TestMain:
         assert "line=1::F is defined by 2 headers" in capsys.readouterr().out
 
 
-class TestModuleEntryPoint:
-    """Tests for running the package as a module."""
+# A module-level case rather than a class of one, which pylint's R0903 reports.
+def test_running_the_module_exits_with_the_status_main_returned(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`python3 -m ...` should exit with what main answered.
 
-    def test_running_the_module_exits_with_the_status_main_returned(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        """`python3 -m ...` should exit with what main answered.
+    The CI job runs the package this way and reads nothing but the status, so
+    an entry point that swallowed the status would leave the gate green over a
+    tree it had just reported on.
 
-        The CI job runs the package this way and reads nothing but the status,
-        so an entry point that swallowed the status would leave the gate green
-        over a tree it had just reported on.
-
-        The three roots are read relative to the working directory, so this
-        runs in an empty tree of them: a run over the repository would answer
-        whatever the repository holds on the day.
-        """
-        for root in ("src", "lib", "test"):
-            (tmp_path / root).mkdir()
-        monkeypatch.chdir(tmp_path)
-        with pytest.raises(SystemExit, match="^0$"):
-            runpy.run_module("assert_no_duplicate_type_definitions")
+    The three roots are read relative to the working directory, so this runs in
+    an empty tree of them: a run over the repository would answer whatever the
+    repository holds on the day.
+    """
+    for root in ("src", "lib", "test"):
+        (tmp_path / root).mkdir()
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(SystemExit, match="^0$"):
+        runpy.run_module("assert_no_duplicate_type_definitions")
