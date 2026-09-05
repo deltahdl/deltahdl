@@ -15,5 +15,3 @@ A defect an open issue already covers. Cite that issue. A second issue over one 
 ## Splitting what one reading found
 
 One reading often turns up more than one scope, and a scope that closes by finishing on its own is an issue of its own rather than a part of somebody else's. Deciding this is the work of filing, and an issue that would only close when a whole family did is the shape to avoid.
-
-Related: [lowerbinarybit-default-arm](../incidents/lowerbinarybit-default-arm.md) for the reading these rules were drawn from.

@@ -7,19 +7,20 @@
   - [Commits and pushes](#commits-and-pushes)
   - [Formatting](#formatting)
   - [Reading the LRM](#reading-the-lrm)
+  - [Scripts](#scripts)
   - [Source of truth](#source-of-truth)
   - [Tests](#tests)
   - [Verification](#verification)
 
 ## Recording what a session learns
 
-Write it down under `.claude/`, in the directory its kind belongs to: `rules/` for an instruction with a gate or a mechanism behind it, `conventions/` for a chosen form that a different choice would serve as well, `incidents/` for one thing that happened, with its date and what it cost, `memories/` for a standing fact about the user or the project that the repository does not record on its own, and `references/` for lookup material. A rule also gets a section under Rules below, a memory a line in `memories/MEMORY.md`, and an incident a link from the rule it stands behind. Open every file with a top-level heading, which markdownlint's MD041 requires across `**/*.md`.
+Write it down under `.claude/`, in the directory its kind belongs to: `rules/` for an instruction with a gate or a mechanism behind it, `conventions/` for a chosen form that a different choice would serve as well, `memories/` for a standing fact about the user or the project that the repository does not record on its own, and `references/` for lookup material. A rule also gets a section under Rules below, and a memory a line in `memories/MEMORY.md`. A note earns its place by changing what a session would otherwise get wrong; what only explains why a rule is right belongs in the rule, in a clause. Open every file with a top-level heading, which markdownlint's MD041 requires across `**/*.md`.
 
 ## Rules
 
 ### Commits and pushes
 
-Longer: [pushing-to-main](rules/pushing-to-main.md), [staging-explicit-paths](rules/staging-explicit-paths.md), [issue-closing-keywords](rules/issue-closing-keywords.md), [commit-message-width](conventions/commit-message-width.md), [closing-keyword-form](conventions/closing-keyword-form.md).
+Longer: [pushing-to-main](rules/pushing-to-main.md), [staging-explicit-paths](rules/staging-explicit-paths.md), [issue-closing-keywords](rules/issue-closing-keywords.md), [closing-keyword-form](conventions/closing-keyword-form.md).
 
 Commit straight to `main`. There is no pull-request cycle.
 
@@ -46,6 +47,14 @@ Longer: [reading-the-lrm](rules/reading-the-lrm.md), [oversized-tool-output](rul
 Read `~/LRM.pdf` with the Read tool, one page per call, waiting for each result before the next. Several page reads in one message exhaust a content-filter budget that does not recover for the rest of the turn, after which every tool result is suppressed. Extracting page text through `pypdf` does the same, and so can reading a very large source file in one call, so prefer a bounded window or a search.
 
 Printed page number plus one gives the PDF page. [locating-a-clause](references/locating-a-clause.md) carries a snippet that resolves a clause to a page from the bookmarks without touching page content.
+
+### Scripts
+
+Longer: [failing-loudly](rules/failing-loudly.md), [positive-prompts](conventions/positive-prompts.md), [composite-actions](conventions/composite-actions.md).
+
+Crash the run when something goes wrong inside an orchestrator under `scripts/`, rather than skipping the item and carrying on. Record the human-resolvable state first if it helps, then raise or exit non-zero.
+
+Write a CI mechanism as a composite action under `.github/actions/<name>/action.yml`, not as a shell script. Phrase a prompt these scripts generate as the action wanted rather than the one forbidden. Give an inserted pipeline step a real position or a descriptive name, never "Step 0".
 
 ### Source of truth
 

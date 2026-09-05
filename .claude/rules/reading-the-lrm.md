@@ -7,5 +7,3 @@ Reading the copyrighted standard consumes a content-filter budget. Several page 
 Do not bulk-extract page text through `pypdf`. Calling `page.extract_text()` on any page blows the same budget. The suppression then reaches everything else in the turn: `echo`, local file reads, all of it.
 
 Do not convert PDFs to text at all. `pdftotext` and friends lose layout, tables, figures and structure, and produce interleaved text with footers cut mid-sentence and table columns scrambled. The Read tool renders pages directly and handles figures and tables, and that path survives even after Bash output has been poisoned.
-
-Related: [content-filter-budget](../incidents/content-filter-budget.md) for what exhausting it looked like.
