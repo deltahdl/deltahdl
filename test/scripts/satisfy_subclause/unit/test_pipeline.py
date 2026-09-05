@@ -128,13 +128,13 @@ def _run_inner_for_deps(deps: list[str]) -> tuple[bool, bool]:
 def test_inner_no_deps_invokes_no_deps_mutator() -> None:
     """Inner orch with no deps dispatches to the no-deps mutator."""
     no_called, with_called = _run_inner_for_deps([])
-    assert no_called and not with_called
+    assert (no_called, with_called) == (True, False)
 
 
 def test_inner_with_deps_invokes_with_deps_mutator() -> None:
     """Inner orch with deps dispatches to the with-deps mutator."""
     no_called, with_called = _run_inner_for_deps(["33.6.1"])
-    assert with_called and not no_called
+    assert (no_called, with_called) == (False, True)
 
 
 def test_inner_returns_satisfied_after_dispatch() -> None:
@@ -164,7 +164,20 @@ def test_inner_detects_cycle_in_own_deps() -> None:
                 model="opus", labels=_LABELS,
                 in_progress=frozenset({"33.4.1.5", "33.4"}),
             )
-    assert result["status"] == "cycle" and "33.4" in result["members"]
+    assert result["status"] == "cycle"
+
+
+def test_inner_names_the_dependency_that_closed_the_cycle() -> None:
+    """The cycle marker includes the dependency already in progress."""
+    mock_deps, mock_satisfy = _patched_inner(["33.4"])
+    with mock_deps:
+        with mock_satisfy:
+            result = satisfy_unsatisfied_subclause(
+                _target("33.4.1.5"), "~/LRM.pdf",
+                model="opus", labels=_LABELS,
+                in_progress=frozenset({"33.4.1.5", "33.4"}),
+            )
+    assert "33.4" in result["members"]
 
 
 def test_inner_includes_self_in_cycle_members() -> None:
@@ -393,7 +406,7 @@ def test_satisfy_propagates_cycle_when_nested() -> None:
     result, mock_dispatch = _run_satisfy_with_cycle(
         "33.4.1.5", ["33.4", "33.4.1.5"], in_progress=frozenset({"33.4"}),
     )
-    assert result["status"] == "cycle" and not mock_dispatch.called
+    assert (result["status"], mock_dispatch.called) == ("cycle", False)
 
 
 def test_satisfy_dispatches_cycle_at_outermost_frame() -> None:
@@ -417,7 +430,7 @@ def test_satisfy_propagates_cycle_when_self_not_in_members() -> None:
     result, mock_dispatch = _run_satisfy_with_cycle(
         "7.2", ["33.4", "33.6"], in_progress=frozenset({"R"}),
     )
-    assert result["status"] == "cycle" and not mock_dispatch.called
+    assert (result["status"], mock_dispatch.called) == ("cycle", False)
 
 
 def test_satisfy_logs_subclause_to_stderr(capsys: pytest.CaptureFixture[str]) -> None:

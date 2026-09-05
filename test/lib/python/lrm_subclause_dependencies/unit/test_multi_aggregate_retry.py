@@ -75,7 +75,8 @@ def test_aggregate_rejection_message_names_every_identifier() -> None:
         parse_dependencies('["8", "A"]', toc=AGGREGATE_TOC)
     except AggregateRejection as exc:
         captured = str(exc)
-    assert "'8'" in captured and "'A'" in captured
+    missing = [i for i in ("'8'", "'A'") if i not in captured]
+    assert not missing
 
 
 # --- build_parse_retry_prompt: multi-aggregate signature --------------------
@@ -87,7 +88,8 @@ def test_build_parse_retry_prompt_lists_each_rejected_aggregate() -> None:
         "reason", aggregates=["13", "24"],
         alternatives_map={"13": ["13.1"], "24": ["24.1"]},
     )
-    assert "'13'" in prompt and "'24'" in prompt
+    missing = [i for i in ("'13'", "'24'") if i not in prompt]
+    assert not missing
 
 
 def test_build_parse_retry_prompt_lists_first_aggregate_children() -> None:
@@ -96,7 +98,8 @@ def test_build_parse_retry_prompt_lists_first_aggregate_children() -> None:
         "reason", aggregates=["13", "24"],
         alternatives_map={"13": ["13.3", "13.4"], "24": ["24.6", "24.7"]},
     )
-    assert "13.3" in prompt and "13.4" in prompt
+    missing = [c for c in ("13.3", "13.4") if c not in prompt]
+    assert not missing
 
 
 def test_build_parse_retry_prompt_lists_second_aggregate_children() -> None:
@@ -105,7 +108,8 @@ def test_build_parse_retry_prompt_lists_second_aggregate_children() -> None:
         "reason", aggregates=["13", "24"],
         alternatives_map={"13": ["13.3", "13.4"], "24": ["24.6", "24.7"]},
     )
-    assert "24.6" in prompt and "24.7" in prompt
+    missing = [c for c in ("24.6", "24.7") if c not in prompt]
+    assert not missing
 
 
 def test_build_parse_retry_prompt_preserves_aggregate_order() -> None:
@@ -143,7 +147,8 @@ def test_compute_subclause_dependencies_retry_prompt_names_all_aggregates() -> N
     ) as mock_run, _patched_multi_agg_toc():
         compute_subclause_dependencies("14.12", "lrm.pdf", model="opus")
     retry_prompt = mock_run.call_args_list[1].args[0]
-    assert "'13'" in retry_prompt and "'24'" in retry_prompt
+    missing = [i for i in ("'13'", "'24'") if i not in retry_prompt]
+    assert not missing
 
 
 def test_compute_subclause_dependencies_retry_prompt_enumerates_each_aggregates_children() -> None:
@@ -153,7 +158,8 @@ def test_compute_subclause_dependencies_retry_prompt_enumerates_each_aggregates_
     ) as mock_run, _patched_multi_agg_toc():
         compute_subclause_dependencies("14.12", "lrm.pdf", model="opus")
     retry_prompt = mock_run.call_args_list[1].args[0]
-    assert "13.3" in retry_prompt and "24.3" in retry_prompt
+    missing = [c for c in ("13.3", "24.3") if c not in retry_prompt]
+    assert not missing
 
 
 def test_compute_subclause_dependencies_resolves_multi_aggregate_in_single_retry() -> None:
@@ -164,7 +170,7 @@ def test_compute_subclause_dependencies_resolves_multi_aggregate_in_single_retry
         deps = compute_subclause_dependencies(
             "14.12", "lrm.pdf", model="opus",
         )
-    assert deps == ["13.3", "24.3"] and mock_run.call_count == 2
+    assert (deps, mock_run.call_count) == (["13.3", "24.3"], 2)
 
 
 # --- compute_subclause_dependencies: bumped retry budget --------------------

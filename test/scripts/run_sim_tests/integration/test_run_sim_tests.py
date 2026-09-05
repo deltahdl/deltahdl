@@ -31,7 +31,7 @@ class TestCollectAndRunPipeline:
                 ok, _ = rst.run_test(sv, expected_path)
             results.append(ok)
 
-        assert all(results) and len(results) == 2
+        assert results == [True, True]
 
     def test_mixed_pass_fail_scenario(
         self, rst: ModuleType, sim_test_tree: Path,

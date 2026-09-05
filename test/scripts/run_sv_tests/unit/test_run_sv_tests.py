@@ -30,6 +30,20 @@ def _d_flag_values(cmd: list[str]) -> list[str]:
     ]
 
 
+def _simulate_over_a_failing_assertion(
+    rst: ModuleType,
+) -> tuple[bool, str, int]:
+    """Run run_test(simulate=True) over a run whose printed assertion is false."""
+    mock_result = MagicMock(
+        returncode=0, stdout=":assert: (1 == 2)\n", stderr=""
+    )
+    with patch.object(rst.subprocess, "run", return_value=mock_result):
+        outcome: tuple[bool, str, int] = rst.run_test(
+            "/fake/test.sv", simulate=True,
+        )
+    return outcome
+
+
 class TestCollectTests:
     """Tests for the collect_tests() function."""
 
@@ -108,12 +122,13 @@ class TestRunTest:
 
     def test_simulate_fail_on_assertion(self, rst: ModuleType) -> None:
         """run_test(simulate=True) should fail when assertion fails."""
-        mock_result = MagicMock(
-            returncode=0, stdout=":assert: (1 == 2)\n", stderr=""
-        )
-        with patch.object(rst.subprocess, "run", return_value=mock_result):
-            ok, detail, _ = rst.run_test("/fake/test.sv", simulate=True)
-        assert ok is False and "Assertion failed" in detail
+        ok, _, _ = _simulate_over_a_failing_assertion(rst)
+        assert ok is False
+
+    def test_simulate_names_the_failed_assertion(self, rst: ModuleType) -> None:
+        """run_test(simulate=True) should say the assertion is what failed."""
+        _, detail, _ = _simulate_over_a_failing_assertion(rst)
+        assert "Assertion failed" in detail
 
     def test_simulate_fail_on_nonzero_exit(self, rst: ModuleType) -> None:
         """run_test(simulate=True) should fail when exit code is non-zero."""
@@ -141,13 +156,12 @@ class TestParseMetadata:
             ":tags: 7.3.2\n:should_fail_because: bad code\n*/\n"
             "module top; endmodule\n"
         )
-        meta = rst.parse_metadata(str(sv))
-        assert (
-            meta["name"] == "foo"
-            and meta["type"] == "simulation elaboration parsing"
-            and meta["tags"] == "7.3.2"
-            and meta["should_fail_because"] == "bad code"
-        )
+        assert rst.parse_metadata(str(sv)) == {
+            "name": "foo",
+            "type": "simulation elaboration parsing",
+            "tags": "7.3.2",
+            "should_fail_because": "bad code",
+        }
 
     def test_returns_empty_dict_when_no_comment(
         self, rst: ModuleType, tmp_path: Path,
@@ -163,8 +177,7 @@ class TestParseMetadata:
         """parse_metadata() should omit 'type' key when not present."""
         sv = tmp_path / "no_type.sv"
         sv.write_text("/*\n:name: no_type\n:tags: 5.10\n*/\nmodule m; endmodule\n")
-        meta = rst.parse_metadata(str(sv))
-        assert "name" in meta and "type" not in meta
+        assert set(rst.parse_metadata(str(sv))) == {"name", "tags"}
 
 
 class TestEvalNode:
@@ -223,6 +236,13 @@ class TestEvalNode:
         assert raised
 
 
+def _check_without_ast(rst: ModuleType, line: str) -> tuple[bool, str]:
+    """Run check_assertions() over line with ast.parse refusing to parse."""
+    with patch("ast.parse", side_effect=SyntaxError):
+        outcome: tuple[bool, str] = rst.check_assertions(line)
+    return outcome
+
+
 class TestCheckAssertions:
     """Tests for the check_assertions() function."""
 
@@ -231,9 +251,12 @@ class TestCheckAssertions:
         assert rst.check_assertions(":assert: (True)") == (True, "")
 
     def test_failing_assertion(self, rst: ModuleType) -> None:
-        """check_assertions() should return (False, detail) for failing assert."""
-        ok, detail = rst.check_assertions(":assert: (1 == 2)")
-        assert ok is False and "Assertion failed" in detail
+        """check_assertions() should return False for a failing assert."""
+        assert rst.check_assertions(":assert: (1 == 2)")[0] is False
+
+    def test_failing_assertion_names_the_failure(self, rst: ModuleType) -> None:
+        """check_assertions() should say the assertion is what failed."""
+        assert "Assertion failed" in rst.check_assertions(":assert: (1 == 2)")[1]
 
     def test_no_assertions_passes(self, rst: ModuleType) -> None:
         """check_assertions() should pass when stdout has no :assert: lines."""
@@ -252,8 +275,11 @@ class TestCheckAssertions:
 
     def test_syntax_error_fails(self, rst: ModuleType) -> None:
         """check_assertions() should fail on malformed expression."""
-        ok, detail = rst.check_assertions(":assert: (!!!)")
-        assert ok is False and "Assertion parse error" in detail
+        assert rst.check_assertions(":assert: (!!!)")[0] is False
+
+    def test_syntax_error_names_the_parse_failure(self, rst: ModuleType) -> None:
+        """check_assertions() should say a malformed expression would not parse."""
+        assert "Assertion parse error" in rst.check_assertions(":assert: (!!!)")[1]
 
     def test_string_equality_pass(self, rst: ModuleType) -> None:
         """try_string_equality() should return True for matching strings."""
@@ -265,19 +291,18 @@ class TestCheckAssertions:
 
     def test_string_equality_fallback_pass(self, rst: ModuleType) -> None:
         """check_assertions() should pass via string fallback on ast failure."""
-        with patch("ast.parse", side_effect=SyntaxError):
-            ok, detail = rst.check_assertions(
-                ":assert: ('same' == 'same')"
-            )
-        assert ok is True and detail == ""
+        assert _check_without_ast(rst, ":assert: ('same' == 'same')") == (True, "")
 
     def test_string_equality_fallback_fail(self, rst: ModuleType) -> None:
         """check_assertions() should fail via string fallback on mismatch."""
-        with patch("ast.parse", side_effect=SyntaxError):
-            ok, detail = rst.check_assertions(
-                ":assert: ('abc' == 'xyz')"
-            )
-        assert ok is False and "Assertion failed" in detail
+        assert _check_without_ast(rst, ":assert: ('abc' == 'xyz')")[0] is False
+
+    def test_string_equality_fallback_names_the_failure(
+        self, rst: ModuleType,
+    ) -> None:
+        """The string fallback should say the assertion is what failed."""
+        detail = _check_without_ast(rst, ":assert: ('abc' == 'xyz')")[1]
+        assert "Assertion failed" in detail
 
 
 def test_chapter_from_path_extracts_chapter_directory(rst: ModuleType) -> None:
@@ -320,8 +345,8 @@ def test_print_chapter_breakdown_shows_correct_values(
     row6 = next(ln for ln in captured.splitlines() if ln.startswith("│ 6"))
     cells5 = [c.strip() for c in row5.strip("│").split("│")]
     cells6 = [c.strip() for c in row6.strip("│").split("│")]
-    assert cells5 == ["5", "2", "1", "50.0%"] and cells6 == [
-        "6", "1", "0", "100.0%",
+    assert [cells5, cells6] == [
+        ["5", "2", "1", "50.0%"], ["6", "1", "0", "100.0%"],
     ]
 
 
@@ -362,6 +387,31 @@ def _score_expected_rejection(
         return scored
 
 
+def _build_result_over_a_simulation_file(
+    rst: ModuleType, tmp_path: Path,
+) -> tuple[dict[str, Any], int, list[str]]:
+    """Score a file whose ``:type:`` names simulation and whose assertion holds.
+
+    The command the stubbed tool was asked to run comes back beside the
+    result, so a test about which mode was chosen can read it.
+    """
+    sv = tmp_path / "chapter-7" / "sim.sv"
+    sv.parent.mkdir(parents=True)
+    sv.write_text(
+        "/*\n:name: sim\n:type: simulation elaboration parsing\n"
+        ":tags: 7.3.2\n*/\nmodule m; endmodule\n"
+    )
+    mock_result = MagicMock(
+        returncode=0, stdout=":assert: (True)\n", stderr=""
+    )
+    with patch.object(
+        rst.subprocess, "run", return_value=mock_result,
+    ) as mock_run:
+        result, ok = rst.build_result(str(sv))
+    cmd: list[str] = mock_run.call_args[0][0]
+    return result, ok, cmd
+
+
 class TestBuildResult:
     """Tests for the build_result() function."""
 
@@ -375,12 +425,8 @@ class TestBuildResult:
         mock_result = MagicMock(returncode=0, stderr="")
         with patch.object(rst.subprocess, "run", return_value=mock_result):
             result, ok = rst.build_result(str(sv))
-        assert (
-            ok == 1
-            and result["name"] == "5.10--foo.sv"
-            and result["chapter"] == "chapter-5"
-            and result["status"] == "pass"
-        )
+        verdict = (ok, result["name"], result["chapter"], result["status"])
+        assert verdict == (1, "5.10--foo.sv", "chapter-5", "pass")
 
     def test_fail_returns_correct_dict(
         self, rst: ModuleType, tmp_path: Path,
@@ -392,7 +438,7 @@ class TestBuildResult:
         mock_result = MagicMock(returncode=1, stderr="error\n")
         with patch.object(rst.subprocess, "run", return_value=mock_result):
             result, ok = rst.build_result(str(sv))
-        assert ok == 0 and result["status"] == "fail"
+        assert (ok, result["status"]) == (0, "fail")
 
     def test_timeout_returns_timeout_status(
         self, rst: ModuleType, tmp_path: Path,
@@ -406,7 +452,7 @@ class TestBuildResult:
             side_effect=subprocess.TimeoutExpired(cmd="x", timeout=30),
         ):
             result, ok = rst.build_result(str(sv))
-        assert ok == 0 and result["status"] == "timeout"
+        assert (ok, result["status"]) == (0, "timeout")
 
     def test_clean_rejection_still_scores_a_pass_for_an_expected_rejection(
         self, rst: ModuleType, tmp_path: Path,
@@ -415,7 +461,7 @@ class TestBuildResult:
         result, ok = _score_expected_rejection(
             rst, tmp_path, 1, "xfail.sv:1:1: error: redeclaration of 'v'\n",
         )
-        assert ok == 1 and result["status"] == "pass"
+        assert (ok, result["status"]) == (1, "pass")
 
     def test_signal_death_does_not_score_a_pass_for_an_expected_rejection(
         self, rst: ModuleType, tmp_path: Path,
@@ -426,21 +472,21 @@ class TestBuildResult:
         was counted as the file conforming to the clause it was written for.
         """
         result, ok = _score_expected_rejection(rst, tmp_path, -11, "")
-        assert ok == 0 and result["status"] == "fail"
+        assert (ok, result["status"]) == (0, "fail")
 
     def test_exit_one_with_no_diagnostic_does_not_score_a_pass(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
         """A refusal that names no reason is not a refusal that was reasoned."""
         result, ok = _score_expected_rejection(rst, tmp_path, 1, "")
-        assert ok == 0 and result["status"] == "fail"
+        assert (ok, result["status"]) == (0, "fail")
 
     def test_acceptance_does_not_score_a_pass_for_an_expected_rejection(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
         """A file the corpus says is illegal, and the tool took, is a failure."""
         result, ok = _score_expected_rejection(rst, tmp_path, 0, "")
-        assert ok == 0 and result["status"] == "fail"
+        assert (ok, result["status"]) == (0, "fail")
 
     def test_expected_rejection_carries_should_fail_into_the_result(
         self, rst: ModuleType, tmp_path: Path,
@@ -480,22 +526,15 @@ class TestBuildResult:
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
         """build_result() should run simulation when type contains 'simulation'."""
-        sv = tmp_path / "chapter-7" / "sim.sv"
-        sv.parent.mkdir(parents=True)
-        sv.write_text(
-            "/*\n:name: sim\n:type: simulation elaboration parsing\n"
-            ":tags: 7.3.2\n*/\nmodule m; endmodule\n"
-        )
-        mock_result = MagicMock(
-            returncode=0, stdout=":assert: (True)\n", stderr=""
-        )
-        with patch.object(rst.subprocess, "run", return_value=mock_result) as mock_run:
-            result, ok = rst.build_result(str(sv))
-        assert (
-            ok == 1
-            and result["status"] == "pass"
-            and "--lint-only" not in mock_run.call_args[0][0]
-        )
+        cmd = _build_result_over_a_simulation_file(rst, tmp_path)[2]
+        assert "--lint-only" not in cmd
+
+    def test_a_simulated_file_whose_assertions_hold_scores_a_pass(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """build_result() should pass a simulated file whose assertions held."""
+        result, ok, _ = _build_result_over_a_simulation_file(rst, tmp_path)
+        assert (ok, result["status"]) == (1, "pass")
 
     def test_name_includes_clause_number_from_tags(
         self, rst: ModuleType, tmp_path: Path,
@@ -602,7 +641,7 @@ class TestScoringARejectionAgainstTheTag:
             "xfail.sv:1:1: error: enum has an x assignment (§6.19)\n",
             "6.19",
         )
-        assert ok == 1 and result["status"] == "pass"
+        assert (ok, result["status"]) == (1, "pass")
 
     def test_rejection_naming_a_different_clause_does_not_score_a_pass(
         self, rst: ModuleType, tmp_path: Path,
@@ -618,7 +657,7 @@ class TestScoringARejectionAgainstTheTag:
             "xfail.sv:1:1: error: net type mismatch (§7.3)\n",
             "6.19",
         )
-        assert ok == 0 and result["status"] == "fail"
+        assert (ok, result["status"]) == (0, "fail")
 
     def test_rejection_naming_no_clause_scores_a_pass(
         self, rst: ModuleType, tmp_path: Path,
@@ -634,7 +673,7 @@ class TestScoringARejectionAgainstTheTag:
             "xfail.sv:1:1: error: cannot open include file 'x.svh'\n",
             "6.19",
         )
-        assert ok == 1 and result["status"] == "pass"
+        assert (ok, result["status"]) == (1, "pass")
 
     def test_rejection_for_a_file_with_no_clause_tag_scores_a_pass(
         self, rst: ModuleType, tmp_path: Path,
@@ -650,7 +689,7 @@ class TestScoringARejectionAgainstTheTag:
             "xfail.sv:1:1: error: net type mismatch (§7.3)\n",
             "",
         )
-        assert ok == 1 and result["status"] == "pass"
+        assert (ok, result["status"]) == (1, "pass")
 
     def test_subclause_of_the_tagged_clause_scores_a_pass(
         self, rst: ModuleType, tmp_path: Path,
@@ -666,7 +705,7 @@ class TestScoringARejectionAgainstTheTag:
             "xfail.sv:1:1: error: bad randomize() call (§16.12.17)\n",
             "16.12",
         )
-        assert ok == 1 and result["status"] == "pass"
+        assert (ok, result["status"]) == (1, "pass")
 
     def test_the_tagged_clause_reaches_the_result(
         self, rst: ModuleType, tmp_path: Path,
@@ -682,6 +721,16 @@ class TestScoringARejectionAgainstTheTag:
             "6.19",
         )
         assert result["clause"] == "6.19"
+
+
+def _print_status_for_a_clause_mismatch(rst: ModuleType) -> None:
+    """Print a file tagged §6.19 that was rejected under §7.3 instead."""
+    rst.print_status(
+        {"name": "y.sv", "status": "fail", "should_fail": True,
+         "stderr": "y.sv:4:2: error: net type mismatch (§7.3)",
+         "returncode": 1, "clause": "6.19"},
+        0,
+    )
 
 
 class TestPrintStatus:
@@ -781,14 +830,16 @@ class TestPrintStatus:
         should_fail_because passes on. Only the two clause numbers side by
         side show why this one failed, so both are printed.
         """
-        rst.print_status(
-            {"name": "y.sv", "status": "fail", "should_fail": True,
-             "stderr": "y.sv:4:2: error: net type mismatch (§7.3)",
-             "returncode": 1, "clause": "6.19"},
-            0,
-        )
+        _print_status_for_a_clause_mismatch(rst)
         out = capsys.readouterr().out
-        assert "7.3" in out and "6.19" in out and "exited" not in out
+        assert all(clause in out for clause in ("7.3", "6.19"))
+
+    def test_says_nothing_about_the_exit_code_when_the_clauses_disagree(
+        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """The two clause numbers are the finding, so the exit code is not one."""
+        _print_status_for_a_clause_mismatch(rst)
+        assert "exited" not in capsys.readouterr().out
 
     def test_prints_the_exit_code_when_the_tagged_clause_was_named(
         self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
@@ -859,11 +910,9 @@ class TestWriteJunitXml:
 
         tree = ET.parse(filepath)
         failures = tree.findall(".//failure")
-        assert (
-            len(failures) == 1
-            and "b.sv" in failures[0].attrib["message"]
-            and failures[0].text == "error msg"
-        )
+        assert [(f.attrib["message"], f.text) for f in failures] == [
+            ("b.sv failed lint", "error msg"),
+        ]
 
     def test_error_elements_present(
         self, rst: ModuleType, tmp_path: Path,
@@ -875,12 +924,9 @@ class TestWriteJunitXml:
 
         tree = ET.parse(filepath)
         errors = tree.findall(".//error")
-        error_text = errors[0].text or ""
-        assert (
-            len(errors) == 1
-            and "c.sv" in errors[0].attrib["message"]
-            and "30s timeout" in error_text
-        )
+        assert [(e.attrib["message"], e.text) for e in errors] == [
+            ("c.sv timed out", "Process exceeded 30s timeout."),
+        ]
 
 
 class TestMainBrokenPipe:

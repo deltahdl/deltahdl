@@ -65,7 +65,7 @@ def test_build_commit_prompt_names_every_cycle_member() -> None:
     prompt = build_commit_prompt(
         ["33.4.1.5", "33.4.1.6"], ["foo.cpp"], [], [],
     )
-    assert "§33.4.1.5" in prompt and "§33.4.1.6" in prompt
+    assert all(member in prompt for member in ("§33.4.1.5", "§33.4.1.6"))
 
 
 def test_build_commit_prompt_lists_added_paths() -> None:

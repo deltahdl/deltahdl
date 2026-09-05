@@ -371,7 +371,9 @@ def test_resolve_linked_closed_prints_skip_to_stdout(
 ) -> None:
     """CLOSED prints a skip line to stdout naming the issue and line."""
     out, _err = _run_resolve_linked_closed(capsys)
-    assert "skipping closed sub-issue #1307" in out and "line 4" in out
+    assert all(
+        text in out for text in ("skipping closed sub-issue #1307", "line 4")
+    )
 
 
 def test_resolve_linked_closed_does_not_write_to_stderr(
@@ -393,7 +395,7 @@ def _run_resolve_linked_open_garbage() -> str:
 def test_resolve_linked_open_unparseable_title_raises() -> None:
     """OPEN issue with no recognised subclause shape raises with issue and title named."""
     msg = _run_resolve_linked_open_garbage()
-    assert "#1307" in msg and "totally unrelated" in msg
+    assert all(text in msg for text in ("#1307", "totally unrelated"))
 
 
 # --- _patch_master_body -----------------------------------------------------
@@ -527,7 +529,7 @@ def test_resolve_unlinked_announces_link_on_stdout(
 ) -> None:
     """_resolve_unlinked announces the §X.Y → #NNN link on stdout."""
     out, _err = _run_resolve_unlinked_capturing(capsys)
-    assert "§6.18" in out and "#42" in out
+    assert all(text in out for text in ("§6.18", "#42"))
 
 
 def test_resolve_unlinked_does_not_write_to_stderr(
@@ -721,7 +723,10 @@ def test_from_issue_warns_on_non_entry_line_to_stdout(
     linked = {1307: ("OPEN", "Satisfy IEEE 1800-2023 §6.19")}
     _run_from_issue_with_body(body, linked)
     captured = capsys.readouterr()
-    assert "ignoring non-entry line" in captured.out and "stray free text" in captured.out
+    assert all(
+        text in captured.out
+        for text in ("ignoring non-entry line", "stray free text")
+    )
 
 
 def test_from_issue_blank_lines_are_quietly_skipped(

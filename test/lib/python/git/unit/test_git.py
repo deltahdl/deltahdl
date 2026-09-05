@@ -124,7 +124,7 @@ def test_commit_and_push_commit_uses_stdin(
     captured = stub_subprocess_success(monkeypatch)
     commit_and_push([str(Path("/a/b.cpp"))], [], "msg")
     commit_cmd = next(c for c in captured if c[:2] == ["git", "commit"])
-    assert "-F" in commit_cmd and "-" in commit_cmd
+    assert commit_cmd == ["git", "commit", "-F", "-"]
 
 
 def test_commit_and_push_calls_git_push(

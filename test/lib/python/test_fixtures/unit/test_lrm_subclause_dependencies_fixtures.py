@@ -19,12 +19,12 @@ from lib.python.test_fixtures.lrm_subclause_dependencies import (
 
 def test_aggregate_toc_holds_a_clause_with_a_subclause_beneath_it() -> None:
     """§8 carries §8.1, so an answer naming §8 has something to be rejected for."""
-    assert "8" in AGGREGATE_TOC and "8.1" in AGGREGATE_TOC
+    assert {"8", "8.1"} <= set(AGGREGATE_TOC)
 
 
 def test_aggregate_toc_holds_an_annex_with_a_subclause_beneath_it() -> None:
     """Annex A carries A.1, so the annex arm of the rejection is reachable too."""
-    assert "A" in AGGREGATE_TOC and "A.1" in AGGREGATE_TOC
+    assert {"A", "A.1"} <= set(AGGREGATE_TOC)
 
 
 def test_retry_toc_holds_the_corrected_answer() -> None:

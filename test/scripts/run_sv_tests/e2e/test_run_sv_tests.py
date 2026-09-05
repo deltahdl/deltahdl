@@ -176,20 +176,29 @@ def _run_sv_tests(
     return _run_over_tree(test_dir, binary, extra_args)
 
 
-def test_all_pass_exit_zero_and_pass_in_output(tmp_path: Path) -> None:
-    """With exit-0 stub, script exits 0 and stdout contains PASS."""
-    result = _run_sv_tests(tmp_path, exit_code=0)
-    assert (
-        result.returncode == 0
-        and "PASS" in result.stdout
-        and "summary" in result.stdout
-    )
+def test_all_pass_exit_zero(tmp_path: Path) -> None:
+    """With exit-0 stub, the script exits 0."""
+    assert _run_sv_tests(tmp_path, exit_code=0).returncode == 0
 
 
-def test_all_fail_exit_one_and_fail_in_output(tmp_path: Path) -> None:
-    """With exit-1 stub, script exits 1 and stdout contains FAIL."""
-    result = _run_sv_tests(tmp_path, exit_code=1)
-    assert result.returncode == 1 and "FAIL" in result.stdout
+def test_all_pass_prints_pass(tmp_path: Path) -> None:
+    """With exit-0 stub, the script reports the file as a pass."""
+    assert "PASS" in _run_sv_tests(tmp_path, exit_code=0).stdout
+
+
+def test_all_pass_prints_a_summary(tmp_path: Path) -> None:
+    """With exit-0 stub, the script closes the run with a summary."""
+    assert "summary" in _run_sv_tests(tmp_path, exit_code=0).stdout
+
+
+def test_all_fail_exit_one(tmp_path: Path) -> None:
+    """With exit-1 stub, the script exits 1."""
+    assert _run_sv_tests(tmp_path, exit_code=1).returncode == 1
+
+
+def test_all_fail_prints_fail(tmp_path: Path) -> None:
+    """With exit-1 stub, the script reports the file as a failure."""
+    assert "FAIL" in _run_sv_tests(tmp_path, exit_code=1).stdout
 
 
 def test_expected_rejection_prints_the_stub_diagnostic(tmp_path: Path) -> None:
@@ -246,7 +255,8 @@ def test_crashing_stub_reports_fail_for_an_expected_rejection(
         exit_code=-11,
         metadata="/*\n:should_fail_because: Variable redeclaration\n*/\n",
     )
-    assert "FAIL" in result.stdout and "exited -11" in result.stdout
+    missing = [t for t in ("FAIL", "exited -11") if t not in result.stdout]
+    assert not missing
 
 
 def test_junit_xml_exit_code(tmp_path: Path) -> None:
@@ -255,7 +265,14 @@ def test_junit_xml_exit_code(tmp_path: Path) -> None:
     result = _run_sv_tests(
         tmp_path, exit_code=0, extra_args=["--junit-xml", xml_path]
     )
-    assert result.returncode == 0 and Path(xml_path).exists()
+    assert result.returncode == 0
+
+
+def test_junit_xml_writes_the_report(tmp_path: Path) -> None:
+    """With --junit-xml, the script writes the report at the path given."""
+    xml_path = str(tmp_path / "report.xml")
+    _run_sv_tests(tmp_path, exit_code=0, extra_args=["--junit-xml", xml_path])
+    assert Path(xml_path).exists()
 
 
 def test_junit_xml_structure(tmp_path: Path) -> None:

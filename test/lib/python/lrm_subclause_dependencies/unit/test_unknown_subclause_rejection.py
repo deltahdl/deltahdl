@@ -99,7 +99,8 @@ def test_rejection_message_quotes_every_absent_identifier() -> None:
         parse_dependencies('["23.3.7", "23.9.1"]', toc=_NET_TOC)
     except UnknownSubclauseRejection as exc:
         captured = str(exc)
-    assert "'23.3.7'" in captured and "'23.9.1'" in captured
+    missing = [i for i in ("'23.3.7'", "'23.9.1'") if i not in captured]
+    assert not missing
 
 
 # --- validate_dependencies: an empty table of contents ----------------------
@@ -155,7 +156,8 @@ def test_unknown_retry_prompt_embeds_the_reason() -> None:
 def test_unknown_retry_prompt_quotes_every_identifier() -> None:
     """Naming only the first offender would spend a retry on each of the rest."""
     prompt = build_unknown_retry_prompt("reason", ["23.3.7", "23.9.1"])
-    assert "'23.3.7'" in prompt and "'23.9.1'" in prompt
+    missing = [i for i in ("'23.3.7'", "'23.9.1'") if i not in prompt]
+    assert not missing
 
 
 def test_unknown_retry_prompt_warns_about_a_neighbouring_number() -> None:

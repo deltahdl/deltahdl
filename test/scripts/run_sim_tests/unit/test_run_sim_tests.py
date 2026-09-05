@@ -69,7 +69,7 @@ class TestCollectTests:
         with patch.object(rst, "TEST_DIR", sim_test_tree):
             pairs = rst.collect_tests()
         names = [sv.stem for sv, _ in pairs]
-        assert "hello" in names and "fail" in names
+        assert {"hello", "fail"} <= set(names)
 
     def test_ignores_sv_without_expected(
         self, rst: ModuleType, sim_test_tree: Path,
@@ -128,18 +128,22 @@ class TestRunTest:
     def test_returns_false_on_mismatched_output(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should return (False, diff) when stdout differs."""
-        sv = tmp_path / "test.sv"
-        sv.write_text("module test; endmodule\n")
-        expected = tmp_path / "test.expected"
-        expected.write_text("expected output\n")
+        """run_test() should return False when stdout differs from expected."""
+        ok, _ = _run_over_streams(
+            rst, tmp_path, "wrong output\n", "", "expected output\n",
+        )
+        assert not ok
 
-        mock_result = MagicMock()
-        mock_result.stdout = "wrong output\n"
-        mock_result.stderr = ""
-        with patch.object(rst.subprocess, "run", return_value=mock_result):
-            ok, detail = rst.run_test(sv, expected)
-        assert not ok and "expected output" in detail and "wrong output" in detail
+    def test_the_detail_holds_both_sides_of_a_mismatch(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test()'s detail should quote the recorded text and the run's."""
+        detail = _run_over_streams(
+            rst, tmp_path, "wrong output\n", "", "expected output\n",
+        )[1]
+        missing = [t for t in ("expected output", "wrong output")
+                   if t not in detail]
+        assert not missing
 
     def test_strips_trailing_newlines_before_comparing(
         self, rst: ModuleType, tmp_path: Path,
@@ -250,8 +254,15 @@ class TestExpectedStatus:
     ) -> None:
         """run_test() should fail when the status differs from the .exit file."""
         (tmp_path / "silent.exit").write_text("1\n")
-        _, (ok, detail) = _run_over_case(rst, tmp_path, "silent", 0)
-        assert not ok and "expected exit status 1, got 0" in detail
+        assert not _run_over_case(rst, tmp_path, "silent", 0)[1][0]
+
+    def test_a_differing_status_is_named_in_the_detail(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should name the status it wanted and the one it got."""
+        (tmp_path / "silent.exit").write_text("1\n")
+        detail = _run_over_case(rst, tmp_path, "silent", 0)[1][1]
+        assert "expected exit status 1, got 0" in detail
 
     def test_a_case_without_an_exit_file_judges_the_text_alone(
         self, rst: ModuleType, tmp_path: Path,
@@ -274,7 +285,8 @@ class TestExpectedStatus:
         status_path = tmp_path / "unreadable.exit"
         status_path.write_text("yes\n")
         detail = _run_over_case(rst, tmp_path, "unreadable", 4)[1][1]
-        assert str(status_path) in detail and "'yes'" in detail
+        missing = [t for t in (str(status_path), "'yes'") if t not in detail]
+        assert not missing
 
     def test_a_negative_status_is_accepted(
         self, rst: ModuleType, tmp_path: Path,
@@ -348,7 +360,7 @@ class TestBeforeArguments:
         )
         assert calls[0][0][2:] == ["--precompile-into", "cells"]
 
-    def test_both_invocations_run_in_one_directory_outside_the_repository(
+    def test_both_invocations_run_in_one_directory(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
         """run_test() should run both invocations in one directory it made.
@@ -356,18 +368,28 @@ class TestBeforeArguments:
         A precompiled library the earlier invocation writes under a relative
         path lands in the directory that invocation ran in, and the bind after
         it reads the library back from the directory it runs in, so the two
-        directories being one is what lets a case name that file once. It is
-        outside the repository so that the library is not left in test/src/e2e/
-        for `git status` to report.
+        directories being one is what lets a case name that file once.
         """
         calls, _ = _run_over_two_invocations(
             rst, tmp_path, "--precompile-into\ncells\n", 0,
         )
         directories = [work_dir for _, work_dir in calls]
-        assert (
-            directories[0] == directories[1]
-            and rst.REPO_ROOT not in Path(directories[0]).parents
+        assert directories[0] == directories[1]
+
+    def test_the_invocations_run_outside_the_repository(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """run_test() should run an invocation outside the repository.
+
+        A precompiled library is written under the directory an invocation
+        runs in, so running inside the repository would leave the library in
+        test/src/e2e/ for `git status` to report.
+        """
+        calls, _ = _run_over_two_invocations(
+            rst, tmp_path, "--precompile-into\ncells\n", 0,
         )
+        work_dir = calls[0][1]
+        assert rst.REPO_ROOT not in Path(work_dir).parents
 
     def test_only_the_invocation_under_test_is_compared_to_expected(
         self, rst: ModuleType, tmp_path: Path,

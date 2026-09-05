@@ -60,29 +60,51 @@ def test_exit_zero_when_all_pass(
     assert result.returncode == 0
 
 
-def test_exit_one_with_diff_on_mismatch(
+def _run_mismatching_case(
     tmp_path: Path, stub_binary: Callable[..., Path],
-) -> None:
-    """Script should exit 1 and show diff when output mismatches."""
+) -> subprocess.CompletedProcess[str]:
+    """Run the script over one case whose stub contradicts its recorded output."""
     test_dir = tmp_path / "tests"
     test_dir.mkdir()
     (test_dir / "bad.sv").write_text("module bad; endmodule\n")
     (test_dir / "bad.expected").write_text("expected output\n")
-
-    binary = stub_binary(exit_code=0, stdout="wrong output\n")
-    result = _run_sim_script(test_dir, binary)
-
-    assert result.returncode == 1 and "expected" in result.stdout
+    return _run_sim_script(test_dir, stub_binary(exit_code=0, stdout="wrong output\n"))
 
 
-def test_exit_one_with_error_when_no_pairs(
+def _run_over_a_directory_holding_no_pair(
     tmp_path: Path, stub_binary: Callable[..., Path],
-) -> None:
-    """Script should exit 1 and print error when no test pairs exist."""
+) -> subprocess.CompletedProcess[str]:
+    """Run the script over a directory with no .sv/.expected pair in it."""
     test_dir = tmp_path / "tests"
     test_dir.mkdir()
+    return _run_sim_script(test_dir, stub_binary(exit_code=0, stdout=""))
 
-    binary = stub_binary(exit_code=0, stdout="")
-    result = _run_sim_script(test_dir, binary)
 
-    assert result.returncode == 1 and "error" in result.stderr
+def test_exit_one_on_mismatch(
+    tmp_path: Path, stub_binary: Callable[..., Path],
+) -> None:
+    """Script should exit 1 when a case's output differs from its recording."""
+    assert _run_mismatching_case(tmp_path, stub_binary).returncode == 1
+
+
+def test_diff_shown_on_mismatch(
+    tmp_path: Path, stub_binary: Callable[..., Path],
+) -> None:
+    """Script should print the recorded text a mismatching case was judged by."""
+    assert "expected" in _run_mismatching_case(tmp_path, stub_binary).stdout
+
+
+def test_exit_one_when_no_pairs(
+    tmp_path: Path, stub_binary: Callable[..., Path],
+) -> None:
+    """Script should exit 1 when the directory holds no test pair."""
+    assert _run_over_a_directory_holding_no_pair(tmp_path, stub_binary).returncode == 1
+
+
+def test_error_printed_when_no_pairs(
+    tmp_path: Path, stub_binary: Callable[..., Path],
+) -> None:
+    """Script should report on standard error when the directory holds no pair."""
+    assert "error" in _run_over_a_directory_holding_no_pair(
+        tmp_path, stub_binary,
+    ).stderr

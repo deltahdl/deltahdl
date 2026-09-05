@@ -95,7 +95,7 @@ def test_build_steps_with_deps_lists_dependencies() -> None:
         ["33.4.1.5"], "~/LRM.pdf",
         satisfied_dependencies=["33.6.1", "33.4.1.4"],
     )
-    assert "§33.6.1" in steps[0][1] and "§33.4.1.4" in steps[0][1]
+    assert all(dep in steps[0][1] for dep in ("§33.6.1", "§33.4.1.4"))
 
 
 def test_build_steps_with_deps_says_reference_them() -> None:
@@ -149,10 +149,9 @@ def test_build_steps_non_normative_deletion_names_descriptive_examples() -> None
     """The non-normative-deletion step names introductions/overviews/roadmaps as worked examples."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
     prompt = steps[2][1]
-    assert (
-        "introductions" in prompt
-        and "overviews" in prompt
-        and "roadmaps" in prompt
+    assert all(
+        example in prompt
+        for example in ("introductions", "overviews", "roadmaps")
     )
 
 
@@ -269,7 +268,7 @@ def test_build_steps_cycle_lists_each_member() -> None:
     steps = build_steps(
         ["33.4.1.5", "33.4.1.6"], "~/LRM.pdf", satisfied_dependencies=[],
     )
-    assert "§33.4.1.5" in steps[0][1] and "§33.4.1.6" in steps[0][1]
+    assert all(member in steps[0][1] for member in ("§33.4.1.5", "§33.4.1.6"))
 
 
 def test_build_steps_cycle_describes_one_pass() -> None:
@@ -378,10 +377,8 @@ def test_audit_src_names_constant_expression_forms() -> None:
     """Step 1 names the 11.2.1 constant forms so parameter widths get covered."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
     prompt = steps[0][1]
-    assert (
-        "11.2.1" in prompt
-        and "a parameter" in prompt
-        and "a localparam" in prompt
+    assert all(
+        form in prompt for form in ("11.2.1", "a parameter", "a localparam")
     )
 
 
@@ -407,9 +404,9 @@ def test_writing_tests_covers_each_input_form() -> None:
     """The writing-missing-tests step requires one test per enumerated input form."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
     prompt = steps[3][1]
-    assert (
-        "per enumerated INPUT FORM" in prompt
-        and "a literal AND a parameter" in prompt
+    assert all(
+        phrase in prompt
+        for phrase in ("per enumerated INPUT FORM", "a literal AND a parameter")
     )
 
 
@@ -425,7 +422,9 @@ def test_writing_tests_requires_dependency_composed_end_to_end() -> None:
         ["7.12.3"], "~/LRM.pdf", satisfied_dependencies=["7.5", "10.10"],
     )
     prompt = steps[3][1]
-    assert "END-TO-END test" in prompt and "full pipeline" in prompt
+    assert all(
+        phrase in prompt for phrase in ("END-TO-END test", "full pipeline")
+    )
 
 
 # --- verification ownership -------------------------------------------------

@@ -859,7 +859,7 @@ def test_cycle_logs_subclauses_to_stderr(
                 _two_member_cycle(), "~/LRM.pdf", [], model="opus",
             )
     err = capsys.readouterr().err
-    assert "33.4.1.5" in err and "33.4.1.6" in err
+    assert all(member in err for member in ("33.4.1.5", "33.4.1.6"))
 
 
 # --- CycleMember dataclass --------------------------------------------------

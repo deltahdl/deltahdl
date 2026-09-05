@@ -90,7 +90,7 @@ def test_parse_args_issue_value_int(make_lrm: Path) -> None:
         "--issue", "1",
         "--labels", "IEEE 1800-2023",
     ])
-    assert args.issue == 1 and args.subclauses is None
+    assert (args.issue, args.subclauses) == (1, None)
 
 
 def test_parse_args_subclauses_mode_leaves_issue_unset(make_lrm: Path) -> None:
