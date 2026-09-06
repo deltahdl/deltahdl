@@ -380,4 +380,57 @@ TEST(ProgramSubroutineCall,
   EXPECT_FALSE(f.has_errors);
 }
 
+// §24.5 says "Calling program subroutines from within design modules is illegal
+// and shall result in an error" and names no position the call may stand in. A
+// class declared in the module is within that design module, so a method of it
+// is reached exactly as a task of the module is. The rule read the module's
+// items and no class among them, so this source elaborated clean.
+TEST(ProgramSubroutineCall,
+     AProgramSubroutineCallInAModuleClassMethodIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  program p;\n"
+      "    task go; endtask\n"
+      "  endprogram\n"
+      "  class driver;\n"
+      "    function void run();\n"
+      "      p.go();\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "calling a program subroutine from within a design "
+                            "module is not permitted",
+                            7, "24.5"));
+}
+
+// The acceptance beside it: §23.9 makes the method a scope of its own, so the
+// handle declared at the head of its body is what `p.go()` calls a method of
+// and the program's task is not reached. The class route reads the method
+// through WalkSubroutineBodyForProgramCall, which erases that declaration.
+TEST(ProgramSubroutineCall,
+     AMethodLocalOfAProgramInstanceNameIsNotAProgramSubroutineCall) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  class pkt;\n"
+      "    function void go(); endfunction\n"
+      "  endclass\n"
+      "  program p;\n"
+      "    task go; endtask\n"
+      "  endprogram\n"
+      "  class driver;\n"
+      "    function void run();\n"
+      "      pkt p;\n"
+      "      p.go();\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

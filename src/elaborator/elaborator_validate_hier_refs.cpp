@@ -386,6 +386,32 @@ static void CheckContAssignForProgramRef(
                Subclause("24.3"));
 }
 
+// A class declared in a module, and a class an anonymous program declares, both
+// reach this: §24.3's first sentence bars a reference to a program signal "from
+// outside any program block" and its third bars one out of an anonymous
+// program, and neither says where in the enclosing scope the reference may
+// stand. A method is inside the module, and inside the anonymous program, as
+// plainly as a task beside it is -- and a class is where a verification
+// environment puts its code. A method is a subroutine, so it is read the way
+// one is, formals and body-head declarations erased.
+//
+// A class nested in a class is reached by neither caller: ClassMember carries
+// it in nested_class, which no walk in this file reads.
+//
+// The §24.6 rule below keeps a class arm of its own rather than sharing this
+// one, because it reads the other direction -- a reference into an anonymous
+// program rather than out of one.
+static void CheckClassMethodsForProgramRef(
+    const ClassDecl* cls,
+    const std::unordered_set<std::string_view>& program_names,
+    DiagEngine& diag) {
+  if (cls == nullptr) return;
+  for (const auto* member : cls->members) {
+    if (member == nullptr || member->method == nullptr) continue;
+    WalkSubroutineBodyForProgramRef(member->method, program_names, diag);
+  }
+}
+
 void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
   if (program_inst_names_.empty()) return;
   if (decl->decl_kind == ModuleDeclKind::kProgram) return;
@@ -412,6 +438,8 @@ void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
     if (item->kind == ModuleItemKind::kTaskDecl ||
         item->kind == ModuleItemKind::kFunctionDecl)
       WalkSubroutineBodyForProgramRef(item, program_inst_names_, diag_);
+    CheckClassMethodsForProgramRef(item->class_decl, program_inst_names_,
+                                   diag_);
   }
 }
 
@@ -422,26 +450,6 @@ void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
 // 3.12.1)" and A.1.11 makes anonymous_program a package_item, so a package's
 // items and the compilation unit's items are two lists this one body reads
 // rather than two rules.
-// A.1.11 admits a class_declaration as an anonymous_program_item, and §24.3
-// says "anonymous programs shall not contain hierarchical references to other
-// program scopes" without saying where in the anonymous program the reference
-// may stand. A method of such a class is in it, and the walk over an anonymous
-// program's items read task and function bodies alone.
-//
-// This is the other direction from the §24.6 rule below -- a reference out of
-// an anonymous program rather than into one -- which is why each rule has a
-// class arm of its own rather than the two sharing one.
-static void CheckClassMethodsForProgramRef(
-    const ClassDecl* cls,
-    const std::unordered_set<std::string_view>& program_names,
-    DiagEngine& diag) {
-  if (cls == nullptr) return;
-  for (const auto* member : cls->members) {
-    if (member == nullptr || member->method == nullptr) continue;
-    WalkSubroutineBodyForProgramRef(member->method, program_names, diag);
-  }
-}
-
 static void CheckScopeItemsForAnonymousProgramHierRefs(
     const std::vector<ModuleItem*>& items,
     const std::unordered_set<std::string_view>& program_names,
@@ -875,6 +883,22 @@ void Elaborator::ValidateProgramWideSpaceAccessInPackageAndCuScopes() {
   }
 }
 
+// §24.5 says "Calling program subroutines from within design modules is illegal
+// and shall result in an error" and names no position the call may stand in, so
+// a method of a class the module declares is reached exactly as a task of the
+// module is. This is CheckClassMethodsForProgramRef with the §24.5 walk in
+// place of the §24.3 one, and it reads nested_class no more than that one does.
+static void CheckClassMethodsForProgramCall(
+    const ClassDecl* cls,
+    const std::unordered_set<std::string_view>& program_names,
+    DiagEngine& diag) {
+  if (cls == nullptr) return;
+  for (const auto* member : cls->members) {
+    if (member == nullptr || member->method == nullptr) continue;
+    WalkSubroutineBodyForProgramCall(member->method, program_names, diag);
+  }
+}
+
 void Elaborator::ValidateProgramSubroutineCall(const ModuleDecl* decl) {
   if (program_inst_names_.empty()) return;
   if (decl->decl_kind == ModuleDeclKind::kProgram) return;
@@ -903,6 +927,8 @@ void Elaborator::ValidateProgramSubroutineCall(const ModuleDecl* decl) {
     if (item->kind == ModuleItemKind::kTaskDecl ||
         item->kind == ModuleItemKind::kFunctionDecl)
       WalkSubroutineBodyForProgramCall(item, program_inst_names_, diag_);
+    CheckClassMethodsForProgramCall(item->class_decl, program_inst_names_,
+                                    diag_);
   }
 }
 

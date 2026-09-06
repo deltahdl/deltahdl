@@ -686,4 +686,59 @@ TEST(ProgramConstruct, AFormalOfAProgramInstanceNameIsNotAProgramSignalRef) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §24.3 says "References to program signals from outside any program block
+// shall be an error" and names no position the reference may stand in. A class
+// declared in the module is outside every program block, so a method of it is
+// reached exactly as a task of the module is -- and a class is where a
+// verification environment puts its code. The rule read the module's items and
+// no class among them, so this source elaborated clean.
+TEST(ProgramConstruct, AProgramSignalRefInAModuleClassMethodIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  program p;\n"
+      "    int a;\n"
+      "  endprogram\n"
+      "  int q;\n"
+      "  class driver;\n"
+      "    function void run();\n"
+      "      q = p.a;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference to program signal from "
+                            "outside the program is not permitted",
+                            8, "24.3"));
+}
+
+// The acceptance beside it: a method is a subroutine, so §23.9 makes it a scope
+// of its own and a declaration at the head of its body is what `p.a` selects
+// from. The class route reads the method through
+// WalkSubroutineBodyForProgramRef, which erases that declaration; one that
+// walked a method's statements with the module's set unnarrowed would pass the
+// case above and fail this one.
+TEST(ProgramConstruct,
+     AMethodLocalOfAProgramInstanceNameIsNotAProgramSignalRef) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  program p;\n"
+      "    int a;\n"
+      "  endprogram\n"
+      "  typedef struct { int a; } s_t;\n"
+      "  int q;\n"
+      "  class driver;\n"
+      "    function void run();\n"
+      "      s_t p;\n"
+      "      q = p.a;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
