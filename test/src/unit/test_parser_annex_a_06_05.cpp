@@ -833,7 +833,7 @@ TEST(TimingControlSyntaxParsing, WaitOrderOperandThatIsAnExpressionIsRejected) {
       "  end\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedError(
-      r.diags, "wait_order operand shall be a hierarchical identifier", 4,
+      r.diags, "wait_order operand shall be a hierarchical identifier", 3,
       "15.5.4"));
 }
 
@@ -850,7 +850,7 @@ TEST(TimingControlSyntaxParsing, WaitOrderOperandThatIsACallIsRejected) {
       "  end\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedError(
-      r.diags, "wait_order operand shall be a hierarchical identifier", 4,
+      r.diags, "wait_order operand shall be a hierarchical identifier", 3,
       "15.5.4"));
 }
 
