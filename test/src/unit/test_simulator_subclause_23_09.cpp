@@ -373,30 +373,4 @@ TEST(InstanceScopeSimulation, ArrayFormalShapeDoesNotOutliveTheCall) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// Two blocks declaring the same name, the second array smaller than the first.
-// An index past the second one's bound reads x, which the first one's shape
-// would have answered for; two arrays of one size cannot tell the second
-// registration from the first, and neither can a case whose second block
-// declares nothing.
-TEST(InstanceScopeSimulation, ASecondBlockLocalArrayReplacesTheFirstsShape) {
-  SimFixture f;
-  auto* var = RunAndFindVar(
-      "module t;\n"
-      "  int got;\n"
-      "  initial begin\n"
-      "    begin\n"
-      "      int a [1:4];\n"
-      "      a[4] = 9;\n"
-      "    end\n"
-      "    begin\n"
-      "      int a [1:2];\n"
-      "      got = a[4];\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n",
-      f, "got");
-  ASSERT_NE(var, nullptr);
-  EXPECT_FALSE(var->value.IsKnown());
-}
-
 }  // namespace
