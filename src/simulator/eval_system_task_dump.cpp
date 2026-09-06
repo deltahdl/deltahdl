@@ -651,12 +651,24 @@ static void ExecVcdClose(SimContext& ctx, VcdWriter* vcd) {
   ctx.CloseVcdDump();
 }
 
-// The system tasks of §21.7 that write a value change dump. Every task named in
-// §21.7.1 and §21.7.3.1 through §21.7.3.5 shares the $dump prefix; $vcdclose is
-// the one that does not, being the keyword command §21.7.3.6 adds to the
-// extended format rather than a member of the $dumpports family.
+// The system tasks of §21.7 that write a value change dump: the seven §21.7.1
+// gives the 4-state file, the six §21.7.3.1 through §21.7.3.5 give the extended
+// one, and $vcdclose, the keyword command §21.7.3.6 adds to the extended format
+// rather than a member of the $dumpports family.
+//
+// Stated as the fourteen names rather than as the $dump prefix they nearly all
+// share. A prefix claims a name this file does not implement -- $dumpvasr and
+// the like -- and EvalVcdSysCall then answers it with a zero, where a name no
+// classifier claims is reported under §20.1 as one this tool does not
+// implement. §20.1 catalogues what the language has, and a misspelling is in no
+// clause of it.
 bool IsVcdSysCall(std::string_view name) {
-  return name.starts_with("$dump") || name == "$vcdclose";
+  return name == "$dumpfile" || name == "$dumpvars" || name == "$dumpoff" ||
+         name == "$dumpon" || name == "$dumpall" || name == "$dumplimit" ||
+         name == "$dumpflush" || name == "$dumpports" ||
+         name == "$dumpportsoff" || name == "$dumpportson" ||
+         name == "$dumpportsall" || name == "$dumpportslimit" ||
+         name == "$dumpportsflush" || name == "$vcdclose";
 }
 
 Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,

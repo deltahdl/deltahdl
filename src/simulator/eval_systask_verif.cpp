@@ -7,6 +7,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "elaborator/global_clocking_sampled_value.h"
 #include "parser/assertion_control_task.h"
 #include "parser/ast.h"
 #include "simulator/coverage_control.h"
@@ -496,7 +497,7 @@ static std::optional<Logic4Vec> EvalSampledValueFunc(const Expr* expr,
     return EvalExpr(expr->args[0], ctx, arena);
   }
   if (name == "$rose" || name == "$fell" || name == "$stable" ||
-      name == "$changed" || name.ends_with("_gclk")) {
+      name == "$changed" || IsGlobalClockingSampledFunction(name)) {
     return MakeLogic4VecVal(arena, 1, 0);
   }
   return std::nullopt;
@@ -507,12 +508,10 @@ static std::optional<Logic4Vec> EvalSampledValueOrAssert(
   if (auto sampled = EvalSampledValueFunc(expr, ctx, arena, name))
     return sampled;
 
-  if (name.starts_with("$assert")) {
+  if (IsAssertionControlTaskName(name)) {
     // §20.11: an assertion control system task takes effect when executed; the
     // call itself yields no meaningful value.
-    if (IsAssertionControlTaskName(name)) {
-      ApplyGlobalAssertionControlTask(expr, ctx, arena, name);
-    }
+    ApplyGlobalAssertionControlTask(expr, ctx, arena, name);
     return MakeLogic4VecVal(arena, 1, 0);
   }
 
@@ -534,8 +533,6 @@ static std::optional<Logic4Vec> EvalCoverageSysCall(const Expr* expr,
   if (name == "$coverage_merge") return EvalCoverageMerge(expr, ctx, arena);
 
   if (name == "$coverage_save") return EvalCoverageSave(expr, ctx, arena);
-
-  if (name.starts_with("$coverage")) return MakeLogic4VecVal(arena, 32, 0);
 
   return std::nullopt;
 }

@@ -6,7 +6,9 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "elaborator/global_clocking_sampled_value.h"
 #include "elaborator/type_eval.h"
+#include "parser/assertion_control_task.h"
 #include "parser/ast.h"
 #include "simulator/coverage.h"
 #include "simulator/eval_function_internal.h"
@@ -196,14 +198,32 @@ static bool IsArrayQuerySysCall(std::string_view n) {
          n == "$size";
 }
 
+// The verification system functions and tasks EvalVerifSysCall answers, named
+// one by one out of the clauses that define them: §20.12 Syntax 20-13 for the
+// six sampled value functions and, through IsGlobalClockingSampledFunction, the
+// ten global clocking functions §16.9.4 describes; §20.11 Syntax 20-12 for the
+// ten assertion control tasks, through the parser's own predicate over them;
+// §20.13 for the five coverage functions; §20.15 for the five stochastic queue
+// tasks.
+//
+// A prefix or a suffix stood for four of those lists and claimed a misspelling
+// with them -- $assertofff, $coverage_gett, $q_ad, $risen_gclk -- which
+// EvalVerifSysCall then answered with a zero. A name no classifier claims is
+// reported under §20.1 instead, and a misspelling is what that report is for.
+//
+// The §20.16 PLA names are gone from here with the $async$/$sync$ prefixes that
+// held them: ClassifyPlaTask generates exactly the sixteen of Table 20-12 and
+// TryEvalPlaSystemTask consults it ahead of every other classifier, so a
+// well-formed PLA name never reaches this point and a malformed one is not a
+// name of the language.
 static bool IsVerifSysCall(std::string_view n) {
-  // §16.9.4: the global clocking sampled value functions all carry the `_gclk`
-  // suffix ($past_gclk, $rose_gclk, …, $changing_gclk).
   return n == "$sampled" || n == "$rose" || n == "$fell" || n == "$stable" ||
-         n == "$past" || n == "$changed" || n.ends_with("_gclk") ||
-         n.starts_with("$assert") || n.starts_with("$coverage") ||
-         n.starts_with("$q_") || n.starts_with("$async$") ||
-         n.starts_with("$sync$");
+         n == "$past" || n == "$changed" ||
+         IsGlobalClockingSampledFunction(n) || IsAssertionControlTaskName(n) ||
+         n == "$coverage_control" || n == "$coverage_get_max" ||
+         n == "$coverage_get" || n == "$coverage_merge" ||
+         n == "$coverage_save" || n == "$q_initialize" || n == "$q_add" ||
+         n == "$q_remove" || n == "$q_full" || n == "$q_exam";
 }
 
 // §21.3.2 file-output tasks: $fdisplay, $fwrite, $fstrobe, $fmonitor and their
