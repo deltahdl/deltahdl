@@ -741,4 +741,61 @@ TEST(ProgramConstruct,
   EXPECT_FALSE(f.has_errors);
 }
 
+// §23.9 makes a class nested in a class a scope within the enclosing one, so a
+// method of it stands exactly where a method of the outer class stands: inside
+// the module and outside every program block, which is what §24.3's first
+// sentence reaches. ClassMember carries a nested class in nested_class rather
+// than in the class_decl of a method, so the class arm followed methods alone
+// and stopped at the outer class.
+TEST(ProgramConstruct, AProgramSignalRefInANestedClassMethodIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  program p;\n"
+      "    int a;\n"
+      "  endprogram\n"
+      "  int q;\n"
+      "  class outer;\n"
+      "    class inner;\n"
+      "      function void run();\n"
+      "        q = p.a;\n"
+      "      endfunction\n"
+      "    endclass\n"
+      "  endclass\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference to program signal from "
+                            "outside the program is not permitted",
+                            9, "24.3"));
+}
+
+// The acceptance beside it: the nested class is reached through the same
+// subroutine helper as any other method, so a declaration at the head of the
+// body still shadows. A recursion that walked a nested method's statements with
+// the module set unnarrowed would pass the case above and fail this one.
+TEST(ProgramConstruct,
+     ANestedClassMethodLocalOfAProgramInstanceNameIsNotAProgramSignalRef) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  program p;\n"
+      "    int a;\n"
+      "  endprogram\n"
+      "  typedef struct { int a; } s_t;\n"
+      "  int q;\n"
+      "  class outer;\n"
+      "    class inner;\n"
+      "      function void run();\n"
+      "        s_t p;\n"
+      "        q = p.a;\n"
+      "      endfunction\n"
+      "    endclass\n"
+      "  endclass\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

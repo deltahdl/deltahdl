@@ -294,6 +294,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_clocking.cpp
     elaborator/elaborator_validate_global_clocking.cpp
     elaborator/elaborator_validate_assertion_actions.cpp
+    elaborator/elaborator_validate_checker_refs.cpp
     elaborator/elaborator_validate_config.cpp
     elaborator/elaborator_validate_config_rules.cpp
     elaborator/elaborator_validate_datatype_ops.cpp

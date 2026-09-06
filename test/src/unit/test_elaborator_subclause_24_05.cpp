@@ -433,4 +433,60 @@ TEST(ProgramSubroutineCall,
   EXPECT_FALSE(f.has_errors);
 }
 
+// §23.9 makes a class nested in a class a scope within the enclosing one, so a
+// method of it is within the design module exactly as a method of the outer
+// class is, which is what §24.5 reaches. ClassMember carries a nested class in
+// nested_class rather than in the class_decl of a method, so the class arm
+// followed methods alone and stopped at the outer class.
+TEST(ProgramSubroutineCall,
+     AProgramSubroutineCallInANestedClassMethodIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  program p;\n"
+      "    task go; endtask\n"
+      "  endprogram\n"
+      "  class outer;\n"
+      "    class inner;\n"
+      "      function void run();\n"
+      "        p.go();\n"
+      "      endfunction\n"
+      "    endclass\n"
+      "  endclass\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "calling a program subroutine from within a design "
+                            "module is not permitted",
+                            8, "24.5"));
+}
+
+// The acceptance beside it: the nested class reaches the same subroutine
+// helper, so the handle declared at the head of the body still shadows the
+// program instance name.
+TEST(ProgramSubroutineCall,
+     ANestedClassMethodLocalOfAProgramInstanceNameIsNotASubroutineCall) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  class pkt;\n"
+      "    function void go(); endfunction\n"
+      "  endclass\n"
+      "  program p;\n"
+      "    task go; endtask\n"
+      "  endprogram\n"
+      "  class outer;\n"
+      "    class inner;\n"
+      "      function void run();\n"
+      "        pkt p;\n"
+      "        p.go();\n"
+      "      endfunction\n"
+      "    endclass\n"
+      "  endclass\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

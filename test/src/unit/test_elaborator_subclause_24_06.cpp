@@ -574,4 +574,58 @@ TEST(AnonymousProgramWideSpace, AClassMethodLocalOfTheSameNameIsNotReported) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// A class nested in a class reaches the class arm by a member of its own:
+// ClassMember carries it in nested_class, while the item walk the arm sends a
+// method through reads the class_decl of that method. So the two cases above
+// would pass over a fix that read only the class a method declares, and §23.9
+// puts a method of the nested class outside every program block exactly as a
+// method of the outer class is.
+TEST(AnonymousProgramWideSpace, ACallFromANestedClassMethodIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "program;\n"
+      "  task t(); endtask\n"
+      "endprogram\n"
+      "module top;\n"
+      "  class outer;\n"
+      "    class inner;\n"
+      "      function void work();\n"
+      "        t();\n"
+      "      endfunction\n"
+      "    endclass\n"
+      "  endclass\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an identifier declared inside an anonymous "
+                            "program cannot be referenced outside any program "
+                            "block",
+                            8, "24.6"));
+}
+
+// The acceptance beside it, for the reason AClassMethodLocalOfTheSameNameIsNot
+// Reported above gives: the arm selects the reference and not the name, and a
+// nested method declaring `t` of its own is reading its own.
+TEST(AnonymousProgramWideSpace,
+     ANestedClassMethodLocalOfTheSameNameIsNotReported) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "program;\n"
+      "  task t(); endtask\n"
+      "endprogram\n"
+      "module top;\n"
+      "  class outer;\n"
+      "    class inner;\n"
+      "      function void work();\n"
+      "        int t;\n"
+      "        t = 1;\n"
+      "      endfunction\n"
+      "    endclass\n"
+      "  endclass\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

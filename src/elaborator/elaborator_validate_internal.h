@@ -325,6 +325,21 @@ uint32_t ExtractLiteralWidth(std::string_view text);
 // Defined in elaborator_validate.cpp.
 std::optional<int64_t> ComputeDimSize(const Expr* dim);
 std::string_view LhsBaseName(const Expr* e);
+// §23.6 gives a hierarchical name as a sequence of components separated by
+// periods, and §23.7 makes what the first of them resolves to decide whether
+// the name is a hierarchical reference or a member select. Every rule that bars
+// a reference by the scope its leftmost component names starts here, so the
+// reduction is stated once for the elaborator rather than once per rule file.
+// Returns an empty view for anything that is neither an identifier nor a member
+// access chain ending in one.
+inline std::string_view HierRefLeftmost(const Expr* e) {
+  if (e == nullptr) return {};
+  if (e->kind == ExprKind::kIdentifier) return e->text;
+  if (e->kind == ExprKind::kMemberAccess && e->lhs)
+    return HierRefLeftmost(e->lhs);
+  return {};
+}
+
 bool ExprContainsIdent(const Expr* e, std::string_view name);
 bool ExprUsesInterconnect(const Expr* e,
                           const std::unordered_set<std::string_view>& names);
