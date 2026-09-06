@@ -347,17 +347,23 @@ TEST_F(ExtendedVcdStrengthFromSource,
 // strong, which writes ?|66.
 // §21.7.4.3: the record carries one 0_strength_component and one
 // 1_strength_component for the whole port_value, so a vector port reports one
-// pair however many bits it has -- and the pair has to describe the port. A
-// (weak0, pull1) assignment of 2'b01 drives bit 0 to 1 at pull and bit 1 to 0
-// at weak, so both sides of the port are driven and at different levels: the
-// digits are 3 and 5. The case fails on a record whose components come from one
-// bit of the value, which writes 0 for the 0 side and says the port drives
-// nothing low while its own port_value shows a 0 bit.
+// pair however many bits it has -- and the pair has to describe the port.
+//
+// The bits are told apart by the net type rather than by a drive strength,
+// because §10.3.4 gives a continuous assignment's strength specification to
+// scalar nets and to supply0/supply1 alone, and a supply net pins every bit to
+// one value. §28.15 pulls every bit of a tri0 no source drives to 0 at pull,
+// so a part-select driving the low nibble at the default strong leaves a net
+// whose bits resolve on two sides at two levels: the digits are 5 and 6.
+//
+// The case fails on a record whose components come from one bit of the value,
+// which writes 0 for the 0 side and says the port drives nothing low while its
+// own port_value shows four 0 bits.
 TEST_F(ExtendedVcdStrengthFromSource, VectorBitsAtTwoLevelsBothReachTheRecord) {
   auto content = RunPortDump(
-      "  wire [1:0] w;\n"
-      "  assign (weak0, pull1) w = 2'b01;\n");
-  EXPECT_EQ(PortRecord(content, "w"), "01|35") << content;
+      "  tri0 [7:0] w;\n"
+      "  assign w[3:0] = 4'hF;\n");
+  EXPECT_EQ(PortRecord(content, "w"), "00001111|56") << content;
 }
 
 TEST_F(ExtendedVcdStrengthFromSource,
