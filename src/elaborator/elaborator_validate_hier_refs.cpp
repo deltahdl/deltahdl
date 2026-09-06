@@ -348,6 +348,24 @@ static void WalkStmtsForProgramRef(
   });
 }
 
+// §23.9 makes a task and a function scopes of their own, so a formal argument
+// and a declaration at the head of a body shadow a program name the way a
+// block-local declaration does. Both reach the body by a route no statement
+// walk sees, so both are erased here, where the subroutine is read, rather than
+// where its statements are.
+static void WalkSubroutineBodyForProgramRef(
+    const ModuleItem* item, std::unordered_set<std::string_view> program_names,
+    DiagEngine& diag) {
+  for (const auto& arg : item->func_args) program_names.erase(arg.name);
+  for (const auto* s : item->func_body_stmts) {
+    if (s != nullptr && s->kind == StmtKind::kVarDecl)
+      program_names.erase(s->var_name);
+  }
+  for (const auto* s : item->func_body_stmts) {
+    WalkStmtsForProgramRef(s, program_names, diag);
+  }
+}
+
 void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
   if (program_inst_names_.empty()) return;
   if (decl->decl_kind == ModuleDeclKind::kProgram) return;
@@ -373,6 +391,17 @@ void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body)
       WalkStmtsForProgramRef(item->body, program_inst_names_, diag_);
+    // §24.3 says "References to program signals from outside any program block
+    // shall be an error" and names no position the reference may stand in.
+    // §23.9 makes a task and a function scopes within the module rather than
+    // outside it, so a subroutine this module declares is one of the places
+    // outside the program that the sentence reaches. IsProceduralItemKind in
+    // src/parser/ast_module.h accepts the six procedural blocks and nothing
+    // else, so neither item kind arrives above, and their statements are in
+    // func_body_stmts rather than in body.
+    if (item->kind == ModuleItemKind::kTaskDecl ||
+        item->kind == ModuleItemKind::kFunctionDecl)
+      WalkSubroutineBodyForProgramRef(item, program_inst_names_, diag_);
   }
 }
 
@@ -392,24 +421,6 @@ void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
 // This is the other direction from the §24.6 rule below -- a reference out of
 // an anonymous program rather than into one -- which is why each rule has a
 // class arm of its own rather than the two sharing one.
-// §23.9 makes a task and a function scopes of their own, so a formal argument
-// and a declaration at the head of a body shadow a program name the way a
-// block-local declaration does. Both reach the body by a route no statement
-// walk sees, so both are erased here, where the subroutine is read, rather than
-// where its statements are.
-static void WalkSubroutineBodyForProgramRef(
-    const ModuleItem* item, std::unordered_set<std::string_view> program_names,
-    DiagEngine& diag) {
-  for (const auto& arg : item->func_args) program_names.erase(arg.name);
-  for (const auto* s : item->func_body_stmts) {
-    if (s != nullptr && s->kind == StmtKind::kVarDecl)
-      program_names.erase(s->var_name);
-  }
-  for (const auto* s : item->func_body_stmts) {
-    WalkStmtsForProgramRef(s, program_names, diag);
-  }
-}
-
 static void CheckClassMethodsForProgramRef(
     const ClassDecl* cls,
     const std::unordered_set<std::string_view>& program_names,
@@ -646,6 +657,27 @@ static void WalkStmtForProgramCall(
   });
 }
 
+// §23.9 makes a task and a function scopes of their own, so a formal argument
+// and a declaration at the head of a body shadow a program instance name the
+// way a block-local declaration does, and a call on the shadowed name reaches
+// the local's method rather than the program's subroutine. Both reach the body
+// by a route no statement walk sees, so both are erased here, where the
+// subroutine is read, rather than where its statements are. This is
+// WalkSubroutineBodyForProgramRef above with the §24.5 walk in place of the
+// §24.3 one.
+static void WalkSubroutineBodyForProgramCall(
+    const ModuleItem* item, std::unordered_set<std::string_view> program_names,
+    DiagEngine& diag) {
+  for (const auto& arg : item->func_args) program_names.erase(arg.name);
+  for (const auto* s : item->func_body_stmts) {
+    if (s != nullptr && s->kind == StmtKind::kVarDecl)
+      program_names.erase(s->var_name);
+  }
+  for (const auto* s : item->func_body_stmts) {
+    WalkStmtForProgramCall(s, program_names, diag);
+  }
+}
+
 // §24.6 NOTE: "identifiers declared inside an anonymous program cannot be
 // referenced outside any program block". Every position below reports through
 // this one call, so the rule reads the same wherever the reference stood and a
@@ -852,6 +884,15 @@ void Elaborator::ValidateProgramSubroutineCall(const ModuleDecl* decl) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body)
       WalkStmtForProgramCall(item->body, program_inst_names_, diag_);
+    // §24.5 says "Calling program subroutines from within design modules is
+    // illegal and shall result in an error" and names no position the call may
+    // stand in. A task or a function this module declares is within the design
+    // module, so a call written there is one the sentence reaches; it arrives
+    // through neither branch above, IsProceduralItemKind accepting only the six
+    // procedural blocks and the statements living in func_body_stmts.
+    if (item->kind == ModuleItemKind::kTaskDecl ||
+        item->kind == ModuleItemKind::kFunctionDecl)
+      WalkSubroutineBodyForProgramCall(item, program_inst_names_, diag_);
   }
 }
 

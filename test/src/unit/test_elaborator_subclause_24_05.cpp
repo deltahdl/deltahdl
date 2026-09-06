@@ -283,4 +283,101 @@ TEST(ProgramSubroutineCall,
                             9, "24.5"));
 }
 
+// §24.5 says "Calling program subroutines from within design modules is illegal
+// and shall result in an error" and names no position the call may stand in. A
+// task the module declares is within the design module, so a call written there
+// is one the sentence reaches. The rule read a continuous assignment and the
+// body of a procedural block and nothing else, and a task's statements are in
+// neither, so this source elaborated clean.
+TEST(ProgramSubroutineCall, AProgramSubroutineCallInAModuleTaskBodyIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  program p;\n"
+      "    task go; endtask\n"
+      "  endprogram\n"
+      "  task work();\n"
+      "    p.go();\n"
+      "  endtask\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "calling a program subroutine from within a design "
+                            "module is not permitted",
+                            6, "24.5"));
+}
+
+// A function beside the task above. The two item kinds are separate
+// ModuleItemKind values reaching the walk through one branch, so a fix keyed on
+// the task alone would leave the function unreported.
+TEST(ProgramSubroutineCall,
+     AProgramSubroutineCallInAModuleFunctionBodyIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  program p;\n"
+      "    task go; endtask\n"
+      "  endprogram\n"
+      "  function int work();\n"
+      "    p.go();\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "calling a program subroutine from within a design "
+                            "module is not permitted",
+                            6, "24.5"));
+}
+
+// The acceptance beside the two above: §23.9 makes the task a scope of its own,
+// so a declaration at the head of its body is what `p.go()` calls a method of,
+// and the program's task is not reached. The walk added for the subroutine body
+// is WalkSubroutineBodyForProgramCall, which erases such a declaration before
+// reading the body; one that walked the body with the module's set unnarrowed
+// would pass the two cases above and fail this one.
+TEST(ProgramSubroutineCall,
+     ASubroutineLocalOfAProgramInstanceNameIsNotAProgramSubroutineCall) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  class pkt;\n"
+      "    function void go(); endfunction\n"
+      "  endclass\n"
+      "  program p;\n"
+      "    task go; endtask\n"
+      "  endprogram\n"
+      "  task work();\n"
+      "    pkt p;\n"
+      "    p.go();\n"
+      "  endtask\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A formal argument shadows the same way, and reaches the body in func_args
+// rather than in func_body_stmts, so the two acceptances stand for the two
+// erases WalkSubroutineBodyForProgramCall makes.
+TEST(ProgramSubroutineCall,
+     AFormalOfAProgramInstanceNameIsNotAProgramSubroutineCall) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  class pkt;\n"
+      "    function void go(); endfunction\n"
+      "  endclass\n"
+      "  program p;\n"
+      "    task go; endtask\n"
+      "  endprogram\n"
+      "  task work(pkt p);\n"
+      "    p.go();\n"
+      "  endtask\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

@@ -587,4 +587,103 @@ TEST(ProgramConstruct,
                             7, "24.3"));
 }
 
+// §24.3 says "References to program signals from outside any program block
+// shall be an error" and names no position the reference may stand in, and
+// §23.9 makes a task a scope within the module rather than outside it. So a
+// module task body is one of the places outside the program that the sentence
+// reaches. The rule read a continuous assignment and the body of a procedural
+// block and nothing else, and a task's statements are in neither, so this
+// source elaborated clean.
+TEST(ProgramConstruct, AProgramSignalRefInAModuleTaskBodyIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  program p;\n"
+      "    int a;\n"
+      "  endprogram\n"
+      "  int q;\n"
+      "  task work();\n"
+      "    q = p.a;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference to program signal from "
+                            "outside the program is not permitted",
+                            7, "24.3"));
+}
+
+// A function beside the task above. The two item kinds are separate
+// ModuleItemKind values reaching the walk through one branch, so a fix keyed on
+// the task alone would leave the function unreported; the pair is what says the
+// branch reads both.
+TEST(ProgramConstruct, AProgramSignalRefInAModuleFunctionBodyIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  program p;\n"
+      "    int a;\n"
+      "  endprogram\n"
+      "  int q;\n"
+      "  function int work();\n"
+      "    q = p.a;\n"
+      "    return q;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference to program signal from "
+                            "outside the program is not permitted",
+                            7, "24.3"));
+}
+
+// The acceptance beside the task case: §23.9 makes the task a scope of its own,
+// so a declaration at the head of its body is what `p.a` selects from and the
+// nested program is not reached. The walk added for the task body is
+// WalkSubroutineBodyForProgramRef, which erases such a declaration before
+// reading the body; one that walked the body with the module's set unnarrowed
+// would pass the two cases above and fail this one.
+TEST(ProgramConstruct,
+     ASubroutineLocalOfAProgramInstanceNameIsNotAProgramSignalRef) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  program p;\n"
+      "    int a;\n"
+      "  endprogram\n"
+      "  typedef struct { int a; } s_t;\n"
+      "  int q;\n"
+      "  task work();\n"
+      "    s_t p;\n"
+      "    q = p.a;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A formal argument shadows the same way, and reaches the body by a route
+// neither the statement walk nor the body-head loop above sees: it is in
+// func_args rather than in func_body_stmts. The two acceptances therefore stand
+// for the two erases WalkSubroutineBodyForProgramRef makes.
+TEST(ProgramConstruct, AFormalOfAProgramInstanceNameIsNotAProgramSignalRef) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  program p;\n"
+      "    int a;\n"
+      "  endprogram\n"
+      "  typedef struct { int a; } s_t;\n"
+      "  int q;\n"
+      "  function int work(s_t p);\n"
+      "    q = p.a;\n"
+      "    return q;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
