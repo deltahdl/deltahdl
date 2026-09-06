@@ -289,8 +289,27 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   void RecordAssocRef(const AssocRefBinding& binding);
   std::vector<AssocRefBinding> PopAssocRefFrame();
 
-  void SetVcdWriter(VcdWriter* vcd) { vcd_writer_ = vcd; }
-  VcdWriter* GetVcdWriter() { return vcd_writer_; }
+  // §21.7 defines two dump files and no more: the 4-state file of §21.7.1,
+  // written by $dumpfile, $dumpvars and the control tasks §21.7.1.3 through
+  // §21.7.1.6 give them, and the extended file of §21.7.3, written by
+  // $dumpports and the control tasks §21.7.3.2 through §21.7.3.5 give it.
+  // §21.7.3.1 lets one source ask for both -- "The $dumpports task can be used
+  // in source code that also contains the $dumpvars task" -- so the context
+  // holds one dump of each, each with its own writer, file name and default
+  // name, and a task reaches the dump its own clause names.
+  //
+  // A writer installed here stands in for both dumps. Whatever installed it --
+  // the --vcd option, a test driver -- built one writer over one file and
+  // settled its form, so there is no second file for the other form to go to.
+  // The context does not own it.
+  void SetVcdWriter(VcdWriter* vcd);
+  // §21.7.1: the 4-state dump, or null when nothing has opened one.
+  VcdWriter* GetVcdWriter() { return four_state_dump_.writer; }
+  // §21.7.3.1: the extended dump, or null when no $dumpports has opened one.
+  // Separate from GetVcdWriter because the two files are separate: a control
+  // task reaching the wrong one writes its checkpoint into a file of the other
+  // type, or into no file at all.
+  VcdWriter* GetDumpportsWriter() { return extended_dump_.writer; }
 
   // §21.7.1: open the dump file named by GetDumpFileName, write everything
   // that precedes the value changes and install the per-timestep recording;
@@ -309,9 +328,17 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // first two the 4-state file and §21.7.3.1 gives $dumpports the extended
   // one, so the task passes the type it creates.
   VcdWriter* OpenVcdDumpFromTask(VcdFileType type);
-  // §21.7.3.6.1: record the final simulation time and close the dump, which is
-  // what puts the buffered value changes on disk.
+  // §21.7.3.6.1: record the final simulation time and close both dumps, which
+  // is what puts the buffered value changes on disk. A run ends with whatever
+  // dumps its source opened still open, and a source may have opened either or
+  // both. WriteVcdClose writes nothing on a 4-state dump, which §21.7.3.6
+  // gives no such keyword command.
   void CloseVcdDump();
+  // §21.7.3.6.1: close the extended dump alone, which is what $vcdclose
+  // terminates. §21.7.3.6 adds the keyword to the extended format alone, so a
+  // 4-state dump open beside it is neither stamped nor closed and goes on
+  // recording.
+  void CloseDumpportsDump();
 
   // §32.9: the timing data a $sdf_annotate call reads out of an SDF file lands
   // in the design's specify data, so the running model needs a way back to the
@@ -335,8 +362,26 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // a dumpable object.
   bool IsUndumpableVcdName(std::string_view name) const;
 
-  void SetDumpFileName(std::string name) { dump_file_name_ = std::move(name); }
-  const std::string& GetDumpFileName() const { return dump_file_name_; }
+  // §21.7.1.1: the name $dumpfile gives the 4-state file, which "is optional
+  // and defaults to the string literal \"dump.vcd\" if not specified".
+  void SetDumpFileName(std::string name) {
+    four_state_dump_.file_name = std::move(name);
+  }
+  const std::string& GetDumpFileName() const {
+    return four_state_dump_.file_name;
+  }
+
+  // §21.7.3.1: the name $dumpports gives the extended file -- "If no filename
+  // is provided, the file shall be written to the current working directory
+  // with the name dumpports.vcd". Held apart from the 4-state name because the
+  // two files are two files: the defaults differ, and a source calling both
+  // tasks names both.
+  void SetDumpportsFileName(std::string name) {
+    extended_dump_.file_name = std::move(name);
+  }
+  const std::string& GetDumpportsFileName() const {
+    return extended_dump_.file_name;
+  }
 
   // §21.7.2.3: the filename argument of $dumpfile exactly as written in the
   // source -- a string literal keeps its quotes, and a variable or expression
@@ -344,7 +389,9 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // header reproduces this literal inside its $dumpfile(...) entry. Empty when
   // no $dumpfile call supplied a filename.
   void SetDumpFileLiteral(std::string text);
-  const std::string& GetDumpFileLiteral() const { return dump_file_literal_; }
+  const std::string& GetDumpFileLiteral() const {
+    return four_state_dump_.file_literal;
+  }
 
   // §21.7.3.1: scope names supplied to $dumpports must be unique across every
   // call. Records the scope and returns false when it repeats one already used
@@ -772,15 +819,33 @@ class SimContext : public DeclaredNameTables, public RandomStability {
 
   std::vector<std::string_view> func_name_stack_;
   std::vector<Process*> final_processes_;
-  VcdWriter* vcd_writer_ = nullptr;
-  // §21.7.1: the writer OpenVcdDump created. Null when the dump the context
-  // acts through was installed by SetVcdWriter and belongs to its caller.
-  std::unique_ptr<VcdWriter> owned_vcd_writer_;
+  // §21.7: one of the two dump files a source can ask for -- the writer it is
+  // dumped through, the name the file stands under, and the unevaluated source
+  // spelling of the argument that named it (§21.7.2.3). `owned` is null when
+  // the writer was installed by SetVcdWriter and belongs to its caller, in
+  // which case both dumps hold it and neither may destroy it.
+  struct VcdDump {
+    explicit VcdDump(std::string default_name)
+        : file_name(std::move(default_name)) {}
+    std::unique_ptr<VcdWriter> owned;
+    VcdWriter* writer = nullptr;
+    std::string file_name;
+    std::string file_literal;
+  };
+  // The dump a VcdFileType names, so the open path can take the one the task
+  // that called it writes.
+  VcdDump& Dump(VcdFileType type) {
+    return type == VcdFileType::kExtended ? extended_dump_ : four_state_dump_;
+  }
+  // §21.7.3.6.1: stamp one dump with the final simulation time and release its
+  // writer.
+  void CloseOneVcdDump(VcdDump& dump);
+  // §21.7.1.1 defaults the 4-state file to dump.vcd and §21.7.3.1 defaults the
+  // extended file to dumpports.vcd, so each dump starts under its own name.
+  VcdDump four_state_dump_{"dump.vcd"};
+  VcdDump extended_dump_{"dumpports.vcd"};
   SpecifyManager* specify_manager_ = nullptr;
   std::unique_ptr<SpecifyManager> owned_specify_manager_;
-  std::string dump_file_name_ = "dump.vcd";
-  // §21.7.2.3: unevaluated source form of the $dumpfile filename argument.
-  std::string dump_file_literal_;
   // §21.7.3.1 cross-call $dumpports bookkeeping: scope names and explicitly
   // specified file names must each be unique across all $dumpports calls.
   std::unordered_set<std::string> dumpports_scopes_;

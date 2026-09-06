@@ -119,8 +119,12 @@ bool SimContext::RegisterDumpvarsTime(uint64_t time) {
   return time == dumpvars_time_;
 }
 
+// §21.7.2.3: the literal belongs to the 4-state dump, because $dumpfile is the
+// task the $version entry reproduces and §21.7.1.1 gives $dumpfile the 4-state
+// file. An extended dump the same source opened carries no such entry until a
+// $dumpports call spells one.
 void SimContext::SetDumpFileLiteral(std::string text) {
-  dump_file_literal_ = std::move(text);
+  four_state_dump_.file_literal = std::move(text);
 }
 
 bool SimContext::RegisterDumpportsScope(const std::string& scope) {

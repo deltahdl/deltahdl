@@ -69,8 +69,14 @@ class VcdDumpFromSourceTestBase : public ::testing::Test {
     LowerAndRun(design, f_);
     if (close_file) {
       f_.ctx.CloseVcdDump();
-    } else if (f_.ctx.GetVcdWriter() != nullptr) {
-      f_.ctx.GetVcdWriter()->Flush();
+    } else {
+      // §21.7.3.1 lets one source open both dump files, so both are flushed:
+      // a case reading the file $dumpvars wrote sees nothing of it if only the
+      // $dumpports file was emptied, and the other way round.
+      if (f_.ctx.GetVcdWriter() != nullptr) f_.ctx.GetVcdWriter()->Flush();
+      if (f_.ctx.GetDumpportsWriter() != nullptr) {
+        f_.ctx.GetDumpportsWriter()->Flush();
+      }
     }
     ASSERT_FALSE(f_.diag.HasErrors());
   }

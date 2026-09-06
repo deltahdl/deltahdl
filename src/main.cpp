@@ -196,8 +196,9 @@ void SetupVcd(delta::SimContext& ctx, const std::string& top,
   // $version section (§21.7.2.3).
   ctx.SetDumpFileLiteral("\"" + vcd_file + "\"");
   // §21.7.1: the option stands in for the tasks that create the 4-state file,
-  // so that is the type it opens. A source calling $dumpports afterwards finds
-  // this dump already open and does not change its type.
+  // so that is the type it opens. §21.7.3.1 gives $dumpports a file of its own,
+  // so a source calling it afterwards writes its extended dump beside this one
+  // rather than into it.
   ctx.OpenVcdDump(top, /*wait_for_dumpvars=*/false,
                   delta::VcdFileType::kFourState);
 }

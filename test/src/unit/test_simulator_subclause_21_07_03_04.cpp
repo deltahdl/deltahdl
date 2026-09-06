@@ -466,7 +466,7 @@ TEST_F(DumpportslimitSysTask, WithoutDumpFileIsHarmless) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  EXPECT_EQ(f.ctx.GetVcdWriter(), nullptr);
+  EXPECT_EQ(f.ctx.GetDumpportsWriter(), nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 

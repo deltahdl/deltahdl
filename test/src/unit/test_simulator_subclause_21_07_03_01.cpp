@@ -7,8 +7,10 @@
 // included ahead of the fixtures so SimContext's inline constructor (whose
 // unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
+#include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_reported_error.h"
+#include "helpers_text_lines.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -47,7 +49,7 @@ TEST_F(DumpportsSysTask, NoArgumentFormsUseDefaults) {
          "  end\n"
          "endmodule\n");
   EXPECT_FALSE(f1.diag.HasErrors());
-  EXPECT_EQ(f1.ctx.GetDumpFileName(), "dumpports.vcd");
+  EXPECT_EQ(f1.ctx.GetDumpportsFileName(), "dumpports.vcd");
 
   SimFixture f2;
   auto content = RunVcd(f2,
@@ -59,7 +61,7 @@ TEST_F(DumpportsSysTask, NoArgumentFormsUseDefaults) {
                         "  end\n"
                         "endmodule\n");
   EXPECT_FALSE(f2.diag.HasErrors());
-  EXPECT_EQ(f2.ctx.GetDumpFileName(), "dumpports.vcd");
+  EXPECT_EQ(f2.ctx.GetDumpportsFileName(), "dumpports.vcd");
   EXPECT_NE(content.find("1!"), std::string::npos);  // a dumped by default
 }
 
@@ -79,7 +81,7 @@ TEST_F(DumpportsSysTask, NullScopeCommaThenStringLiteralFilename) {
                         "  end\n"
                         "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(f.ctx.GetDumpFileName(), "dump2.dump");
+  EXPECT_EQ(f.ctx.GetDumpportsFileName(), "dump2.dump");
   EXPECT_NE(content.find("1!"), std::string::npos);   // a dumped
   EXPECT_NE(content.find("0\""), std::string::npos);  // b dumped
 }
@@ -97,7 +99,7 @@ TEST_F(DumpportsSysTask, FilenameFromStringTypedVariable) {
          "  end\n"
          "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(f.ctx.GetDumpFileName(), "sv.vcd");
+  EXPECT_EQ(f.ctx.GetDumpportsFileName(), "sv.vcd");
 }
 
 // §21.7.3.1: the filename may also be an integral variable containing a
@@ -113,7 +115,7 @@ TEST_F(DumpportsSysTask, FilenameFromIntegralVariable) {
          "  end\n"
          "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(f.ctx.GetDumpFileName(), "int.vcd");
+  EXPECT_EQ(f.ctx.GetDumpportsFileName(), "int.vcd");
 }
 
 // §21.7.3.1: the filename variable may get its characters from a declaration
@@ -127,7 +129,7 @@ TEST_F(DumpportsSysTask, FilenameFromDeclarationInitializedVariable) {
          "  initial $dumpports(, fn);\n"
          "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(f.ctx.GetDumpFileName(), "ini.vcd");
+  EXPECT_EQ(f.ctx.GetDumpportsFileName(), "ini.vcd");
 }
 
 // §21.7.3.1: the filename argument is an expression, so a parameter constant
@@ -142,7 +144,7 @@ TEST_F(DumpportsSysTask, FilenameFromParameterConstant) {
          "  initial $dumpports(, FN);\n"
          "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(f.ctx.GetDumpFileName(), "p.vc");
+  EXPECT_EQ(f.ctx.GetDumpportsFileName(), "p.vc");
 }
 
 // §21.7.3.1: a localparam constant holding the character string is likewise
@@ -156,7 +158,7 @@ TEST_F(DumpportsSysTask, FilenameFromLocalparamConstant) {
          "  initial $dumpports(, FN);\n"
          "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(f.ctx.GetDumpFileName(), "l.vc");
+  EXPECT_EQ(f.ctx.GetDumpportsFileName(), "l.vc");
 }
 
 // §21.7.3.1: $dumpports names the extended VCD file itself. In source that
@@ -174,7 +176,7 @@ TEST_F(DumpportsSysTask, NamesFileIndependentlyOfDumpfileCall) {
          "  end\n"
          "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(f.ctx.GetDumpFileName(), "dump2.dump");
+  EXPECT_EQ(f.ctx.GetDumpportsFileName(), "dump2.dump");
 }
 
 // §21.7.3.1: the simulator carries out the file-writing checks for the named
@@ -319,7 +321,7 @@ TEST_F(DumpportsSysTask, ScopeWithoutFilenameKeepsDefaultName) {
                         "  initial $dumpports(c1);\n"
                         "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(f.ctx.GetDumpFileName(), "dumpports.vcd");
+  EXPECT_EQ(f.ctx.GetDumpportsFileName(), "dumpports.vcd");
   EXPECT_NE(content.find("b10100101 "), std::string::npos);  // c1.own dumped
 }
 
@@ -701,6 +703,75 @@ TEST_F(DumpportsSysTask, CallsAtDifferentTimesName21_7_3_1) {
          "endmodule\n");
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "at the same simulation time",
                             14, "21.7.3.1"));
+}
+
+// §21.7.3.1: "The $dumpports task can be used in source code that also
+// contains the $dumpvars task." The two tasks write two files -- §21.7.1.1
+// defaults $dumpfile's to dump.vcd and §21.7.3.1 defaults $dumpports' to
+// dumpports.vcd -- and the two are of the two different types §21.7 defines,
+// so neither can stand in for the other: §21.7.4.2 declares an extended file's
+// objects as $var port, which a 4-state reader has no rule for.
+//
+// Every case runs the source's own dump tasks and reads back what the run left
+// in the directory it stood in, because a fixture that installs one writer of
+// its own gives the run one file whatever its tasks ask for.
+class DumpvarsAndDumpportsFromSource : public VcdDumpFromSourceTestBase {
+ protected:
+  // A module that sets one variable, runs `tasks` and then changes it, so each
+  // dump the tasks opened has both definitions and a value change in it.
+  static std::string SourceCalling(const std::string& tasks) {
+    return "module t;\n"
+           "  logic a;\n"
+           "  initial begin\n"
+           "    a = 1'b0;\n" +
+           tasks +
+           "    #1 a = 1'b1;\n"
+           "  end\n"
+           "endmodule\n";
+  }
+};
+
+// §21.7.3.1: a source calling $dumpvars and then $dumpports gets both files.
+// The 4-state file is the one $dumpfile named and declares its objects under
+// the §21.7.5 var_type keywords; the extended file stands under the §21.7.3.1
+// default name and declares them as $var port (§21.7.4.2).
+TEST_F(DumpvarsAndDumpportsFromSource, DumpvarsThenDumpportsWritesBothFiles) {
+  RunSource(
+      SourceCalling("    $dumpfile(\"a.vcd\");\n"
+                    "    $dumpvars;\n"
+                    "    $dumpports;\n"));
+  EXPECT_EQ(NamesWritten(), "a.vcd dumpports.vcd");
+  auto four_state = DumpFile("a.vcd");
+  EXPECT_TRUE(Holds(four_state, "$var ")) << four_state;
+  EXPECT_FALSE(Holds(four_state, "$var port ")) << four_state;
+  EXPECT_TRUE(Holds(DumpFile("dumpports.vcd"), "$var port "))
+      << DumpFile("dumpports.vcd");
+}
+
+// §21.7.3.1: the order the two tasks are called in decides nothing. Each opens
+// the file its own clause gives it, so a $dumpports ahead of the $dumpvars
+// leaves the same two files as the reverse -- where one dump per context makes
+// whichever task ran first settle the file and the type for both.
+TEST_F(DumpvarsAndDumpportsFromSource, DumpportsThenDumpvarsWritesBothFiles) {
+  RunSource(
+      SourceCalling("    $dumpports;\n"
+                    "    $dumpfile(\"a.vcd\");\n"
+                    "    $dumpvars;\n"));
+  EXPECT_EQ(NamesWritten(), "a.vcd dumpports.vcd");
+  auto four_state = DumpFile("a.vcd");
+  EXPECT_TRUE(Holds(four_state, "$var ")) << four_state;
+  EXPECT_FALSE(Holds(four_state, "$var port ")) << four_state;
+  EXPECT_TRUE(Holds(DumpFile("dumpports.vcd"), "$var port "))
+      << DumpFile("dumpports.vcd");
+}
+
+// §21.7.3.1: "If no filename is provided, the file shall be written to the
+// current working directory with the name dumpports.vcd." That default is
+// $dumpports' own; §21.7.1.1's dump.vcd belongs to $dumpfile, and a source
+// calling no 4-state task writes no 4-state file for it to name.
+TEST_F(DumpvarsAndDumpportsFromSource, DumpportsAloneWritesOnlyItsOwnDefault) {
+  RunSource(SourceCalling("    $dumpports;\n"));
+  EXPECT_EQ(NamesWritten(), "dumpports.vcd");
 }
 
 }  // namespace

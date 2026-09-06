@@ -91,7 +91,7 @@ TEST_F(CreatingExtendedVcd, InsertedTaskDefinesDumpFileName) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  EXPECT_EQ(f.ctx.GetDumpFileName(), "dump2.dump");
+  EXPECT_EQ(f.ctx.GetDumpportsFileName(), "dump2.dump");
 }
 
 // The file's three regions appear in creation order: header information

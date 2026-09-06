@@ -162,13 +162,17 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
 // inside a $scope.
 VcdWriter* SimContext::OpenVcdDump(std::string_view top_scope,
                                    bool wait_for_dumpvars, VcdFileType type) {
+  // §21.7.3.1 lets one source call $dumpports and $dumpvars both, and gives
+  // each its own file, so the dump this opens is the one the calling task's
+  // clause names rather than the only dump there is.
+  VcdDump& dump = Dump(type);
   // The writer already installed wins. src/main.cpp's --vcd option opens one
   // before the scheduler runs, so a source's $dumpfile or $dumpvars finds a
   // dump whose header and definitions are already on disk; a second writer
   // over the same context would drop a fresh set of definitions into the
   // middle of that file, and the two would race for the same signal codes.
-  if (vcd_writer_ != nullptr) return vcd_writer_;
-  auto vcd = std::make_unique<VcdWriter>(dump_file_name_);
+  if (dump.writer != nullptr) return dump.writer;
+  auto vcd = std::make_unique<VcdWriter>(dump.file_name);
   if (!vcd->IsOpen()) return nullptr;
   // §21.7 b): an extended file represents "variable changes in all states and
   // strength information", which is a different form for the node information
@@ -198,7 +202,7 @@ VcdWriter* SimContext::OpenVcdDump(std::string_view top_scope,
   // therefore one whole unit, and the time_number is always 1.
   std::string timescale = "1";
   timescale += TimeUnitStr(GlobalPrecision());
-  vcd->WriteHeader(timescale, dump_file_literal_);
+  vcd->WriteHeader(timescale, dump.file_literal);
   // §21.7.1.2: the scope the declarations are written under is the module a
   // $dumpvars scope argument is written down from, and RegisterVcdSignals
   // names each signal by its path below that module. The writer is told which
@@ -220,19 +224,20 @@ VcdWriter* SimContext::OpenVcdDump(std::string_view top_scope,
     vcd->WriteTimestamp(0);
     vcd->DumpAllValues();
   }
-  owned_vcd_writer_ = std::move(vcd);
-  vcd_writer_ = owned_vcd_writer_.get();
+  dump.owned = std::move(vcd);
+  dump.writer = dump.owned.get();
   // §21.7.2.4: each simulation time unit that changed a dumped value
   // contributes its simulation_time command and the value changes under it, so
   // the recording runs once per time step for the rest of the run. The
   // callback reads the writer back out of the context rather than capturing
   // it, so it stops on its own once CloseVcdDump has closed the dump.
-  scheduler_.AddPostTimestepCallback([this]() {
-    if (vcd_writer_ == nullptr) return;
-    vcd_writer_->WriteTimestamp(CurrentTime().ticks);
-    vcd_writer_->DumpChangedValues(0);
+  scheduler_.AddPostTimestepCallback([this, type]() {
+    VcdWriter* writer = Dump(type).writer;
+    if (writer == nullptr) return;
+    writer->WriteTimestamp(CurrentTime().ticks);
+    writer->DumpChangedValues(0);
   });
-  return vcd_writer_;
+  return dump.writer;
 }
 
 // §21.7.1: the dump a source creates for itself. §21.7.1.1 names the file
@@ -245,13 +250,47 @@ VcdWriter* SimContext::OpenVcdDumpFromTask(VcdFileType type) {
   return OpenVcdDump(current_scope_name_, /*wait_for_dumpvars=*/true, type);
 }
 
+// A writer installed from outside belongs to whoever installed it and covers
+// whichever of the two forms that caller decided to write, so both dumps hold
+// it and neither owns it. §21.7 gives a source two files to ask for, but a
+// driver that built one writer over one file has only that one to offer.
+void SimContext::SetVcdWriter(VcdWriter* vcd) {
+  four_state_dump_.writer = vcd;
+  extended_dump_.writer = vcd;
+}
+
 // §21.7.3.6.1: an extended VCD file records the final simulation time as it is
 // closed. Closing here rather than at destruction is what flushes the buffered
 // value changes to disk while the context is still alive to be read back.
-void SimContext::CloseVcdDump() {
-  if (vcd_writer_ == nullptr) return;
-  vcd_writer_->WriteVcdClose(CurrentTime().ticks);
-  owned_vcd_writer_.reset();
-  vcd_writer_ = nullptr;
+// WriteVcdClose writes nothing on a 4-state dump, which §21.7.3.6 gives no
+// such keyword command, so the same step closes either form.
+void SimContext::CloseOneVcdDump(VcdDump& dump) {
+  if (dump.writer == nullptr) return;
+  dump.writer->WriteVcdClose(CurrentTime().ticks);
+  dump.owned.reset();
+  dump.writer = nullptr;
 }
+
+// §21.7.3.6.1: the run is over, so every dump the source opened is stamped and
+// closed. A source may have opened the 4-state file, the extended file or both
+// (§21.7.3.1), and a dump left open holds its value changes in the writer's
+// buffer where nothing can read them.
+void SimContext::CloseVcdDump() {
+  VcdWriter* four_state = four_state_dump_.writer;
+  CloseOneVcdDump(four_state_dump_);
+  if (extended_dump_.writer == four_state) {
+    // SetVcdWriter installs one writer as both dumps. It has been closed once
+    // already, and closing it again would stamp the file with a second
+    // $vcdclose and release a writer this context never owned.
+    extended_dump_.writer = nullptr;
+    extended_dump_.owned.reset();
+    return;
+  }
+  CloseOneVcdDump(extended_dump_);
+}
+
+// §21.7.3.6.1: $vcdclose terminates the extended VCD file. §21.7.3.6 adds the
+// keyword to that format alone, so a 4-state dump the source also opened is
+// left open and goes on recording.
+void SimContext::CloseDumpportsDump() { CloseOneVcdDump(extended_dump_); }
 }  // namespace delta
