@@ -286,9 +286,16 @@ struct EventAwaiter {
   // resolution is not a hierarchical name, and BuildLhsName writes the period
   // that joins one.
   //
-  // `arena` owns the flattened name, the collected names being string_views
+  // A member access is flattened only where the flattened name resolves to a
+  // variable. `q.size()` is a member access too -- a queue method call -- and
+  // `q.size` names nothing, so that one falls through to the descent below and
+  // is watched through `q` as it always was. The test on the name rather than
+  // on the node's shape is what keeps every method call on that path without
+  // this walk having to enumerate them.
+  //
+  // The arena owns the flattened name, the collected names being string_views
   // that outlive this call in the watcher closures.
-  static void CollectExprIdentifiers(const Expr* e, Arena& arena,
+  static void CollectExprIdentifiers(const Expr* e, SimContext& ctx,
                                      std::vector<std::string_view>& out) {
     if (!e) return;
     if (e->kind == ExprKind::kIdentifier) {
@@ -296,24 +303,24 @@ struct EventAwaiter {
       return;
     }
     if (e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution) {
-      auto* flattened = arena.Create<std::string>();
+      auto* flattened = ctx.GetArena().Create<std::string>();
       BuildLhsName(e, *flattened);
-      if (!flattened->empty()) {
+      if (!flattened->empty() && ctx.FindVariable(*flattened) != nullptr) {
         out.push_back(*flattened);
         return;
       }
     }
-    CollectExprIdentifiers(e->lhs, arena, out);
-    CollectExprIdentifiers(e->rhs, arena, out);
-    CollectExprIdentifiers(e->condition, arena, out);
-    CollectExprIdentifiers(e->true_expr, arena, out);
-    CollectExprIdentifiers(e->false_expr, arena, out);
-    CollectExprIdentifiers(e->base, arena, out);
-    CollectExprIdentifiers(e->index, arena, out);
-    CollectExprIdentifiers(e->index_end, arena, out);
-    for (auto* a : e->args) CollectExprIdentifiers(a, arena, out);
+    CollectExprIdentifiers(e->lhs, ctx, out);
+    CollectExprIdentifiers(e->rhs, ctx, out);
+    CollectExprIdentifiers(e->condition, ctx, out);
+    CollectExprIdentifiers(e->true_expr, ctx, out);
+    CollectExprIdentifiers(e->false_expr, ctx, out);
+    CollectExprIdentifiers(e->base, ctx, out);
+    CollectExprIdentifiers(e->index, ctx, out);
+    CollectExprIdentifiers(e->index_end, ctx, out);
+    for (auto* a : e->args) CollectExprIdentifiers(a, ctx, out);
     for (auto* el : e->elements) {
-      CollectExprIdentifiers(el, arena, out);
+      CollectExprIdentifiers(el, ctx, out);
     }
   }
 
@@ -401,7 +408,7 @@ struct EventAwaiter {
                               Process* proc,
                               const std::shared_ptr<bool>& consumed) {
     std::vector<std::string_view> names;
-    CollectExprIdentifiers(ev.signal, ctx.GetArena(), names);
+    CollectExprIdentifiers(ev.signal, ctx, names);
     if (names.empty()) return;
     auto prev =
         std::make_shared<Logic4Vec>(EvalExpr(ev.signal, ctx, ctx.GetArena()));
