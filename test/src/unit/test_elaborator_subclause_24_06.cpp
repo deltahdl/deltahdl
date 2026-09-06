@@ -427,4 +427,73 @@ TEST(AnonymousProgramWideSpace,
   EXPECT_FALSE(f.has_errors);
 }
 
+// §24.6 shares an anonymous program's name space with the surrounding package
+// or compilation-unit scope "and with nothing below it", so a block-local `t`
+// is a different thing from the anonymous program's `t` and a reference to it
+// is not the reference the note bars. The rule matched identifier text with
+// nothing resolving the reference first, so this legal source was refused.
+//
+// The local carries the anonymous program's name deliberately: one named
+// anything else cannot fail.
+TEST(AnonymousProgramWideSpace, ABlockLocalOfTheSameNameIsNotReported) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "program;\n"
+      "  task t(); endtask\n"
+      "endprogram\n"
+      "module top;\n"
+      "  task work();\n"
+      "    int t;\n"
+      "    t = 1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A formal argument shadows the same way and reaches the body by a route no
+// statement walk sees, so it is erased where the subroutine is read rather than
+// where its statements are.
+TEST(AnonymousProgramWideSpace, AFormalArgumentOfTheSameNameIsNotReported) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "program;\n"
+      "  task t(); endtask\n"
+      "endprogram\n"
+      "module top;\n"
+      "  task work(input int t);\n"
+      "    int x;\n"
+      "    x = t;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The true positive beside the two above: the same module task calling the
+// anonymous program's `t`, with nothing of that name declared in between. A fix
+// that silenced the rule everywhere would pass both cases above and fail this
+// one, which is what makes them a set rather than two acceptances.
+TEST(AnonymousProgramWideSpace,
+     ACallWithNoShadowingDeclarationIsStillReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "program;\n"
+      "  task t(); endtask\n"
+      "endprogram\n"
+      "module top;\n"
+      "  task work();\n"
+      "    t();\n"
+      "  endtask\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an identifier declared inside an anonymous "
+                            "program cannot be referenced outside any program "
+                            "block",
+                            6, "24.6"));
+}
+
 }  // namespace

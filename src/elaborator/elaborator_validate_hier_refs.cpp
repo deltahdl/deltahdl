@@ -518,10 +518,28 @@ static void ReportProgramWideSpaceAccess(SourceLoc loc, DiagEngine& diag) {
 // statement holds is one this report reaches, at every depth. ForEachChildExpr
 // and ForEachChildStmt in elaborator_validate_internal.h state those positions
 // once for the whole elaborator.
+// §24.6 shares an anonymous program's name space with the surrounding package
+// or compilation-unit scope "and with nothing below it", so a name a nested
+// scope declares is a different thing of the same name and a reference to it is
+// not the reference the note bars. The rule matches identifier text, nothing
+// resolving the reference first, so a block-local `int t` was reported wherever
+// some anonymous program elsewhere in the compilation unit declared a `task t`.
+//
+// `names` is therefore taken by value and narrowed on the way down, never
+// widened on the way up -- the shape StmtRefsNonStaticMember in
+// elaborator_validate_static_methods.cpp already uses for its locals. A block's
+// declarations are erased before its statements are read, because a declaration
+// and the use that shadows it are siblings under the block rather than one
+// inside the other.
 static void WalkStmtForProgramWideSpaceAccess(
-    const Stmt* s, const std::unordered_set<std::string_view>& names,
+    const Stmt* s, std::unordered_set<std::string_view> names,
     DiagEngine& diag) {
   if (!s) return;
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    if (sub != nullptr && sub->kind == StmtKind::kVarDecl) {
+      names.erase(sub->var_name);
+    }
+  });
   ForEachChildExpr(s, [&](Expr* const& e) {
     if (ExprMentionsAny(e, names))
       ReportProgramWideSpaceAccess(s->range.start, diag);
@@ -556,8 +574,19 @@ static void CheckItemForProgramWideSpaceAccess(
   // item at all -- §26.2 is what ValidatePackageItems reports "process is not
   // allowed in a package" under -- so in a package a subroutine body is the
   // only place a statement stands.
+  //
+  // A subroutine's formals and the declarations at the head of its body shadow
+  // the same way a block's do, and reach the body by a route no statement walk
+  // sees, so they are erased before it is read.
+  std::unordered_set<std::string_view> body_names = names;
+  for (const auto& arg : item->func_args) body_names.erase(arg.name);
+  for (const auto* s : item->func_body_stmts) {
+    if (s != nullptr && s->kind == StmtKind::kVarDecl) {
+      body_names.erase(s->var_name);
+    }
+  }
   for (const auto* s : item->func_body_stmts)
-    WalkStmtForProgramWideSpaceAccess(s, names, diag);
+    WalkStmtForProgramWideSpaceAccess(s, body_names, diag);
 }
 
 void Elaborator::ValidateProgramWideSpaceAccess(const ModuleDecl* decl) {
