@@ -334,19 +334,6 @@ NetStrength CombineAmbigWithUnambig(NetStrength ambig, uint8_t vu, uint8_t su) {
   return r;
 }
 
-static uint8_t DriverBit0Val(const Logic4Vec& drv) {
-  uint64_t mask = 1;
-  bool a = (drv.words[0].aval & mask) != 0;
-  bool b = (drv.words[0].bval & mask) != 0;
-  // Canonical Convention A, matching GetBitVal and the val-code consumers
-  // (WiredAnd/WiredOr/EffectiveStrength): x = (aval=1, bval=1) -> 2, which
-  // carries drive strength; z = (aval=0, bval=1) -> 3, which is high impedance.
-  if (!b && !a) return 0;
-  if (!b && a) return 1;
-  if (b && a) return 2;  // x
-  return 3;              // z
-}
-
 // §28.12.3's "signal of known value and unambiguous strength": one driver's
 // value and the strength level it drives at, in the vocabulary
 // CombineAmbigWithUnambig names them by.
@@ -376,10 +363,11 @@ struct UnambigSignal {
 // only raises the two lower bounds to the level the driver puts there.
 static std::vector<UnambigSignal> FindWeakerUnambig(
     const std::vector<Logic4Vec>& drivers,
-    const std::vector<DriverStrength>& strengths, uint8_t max_str) {
+    const std::vector<DriverStrength>& strengths, uint8_t max_str,
+    uint32_t bit) {
   std::vector<UnambigSignal> weaker;
   for (size_t d = 0; d < drivers.size(); ++d) {
-    uint8_t val = DriverBit0Val(drivers[d]);
+    uint8_t val = GetBitVal(drivers[d], bit).val;
     if (val > 1) continue;
     uint8_t str = EffectiveStrength(val, strengths[d]);
     if (str == 0 || str >= max_str) continue;
@@ -419,10 +407,10 @@ static void FoldDriverIntoMax(uint8_t val, uint8_t str, NetType net_type,
 static void ComputeSingleBitStrength(
     const std::vector<Logic4Vec>& drivers,
     const std::vector<DriverStrength>& strengths, NetStrength& out,
-    NetType net_type) {
+    NetType net_type, uint32_t bit) {
   MaxTracker m;
   for (size_t d = 0; d < drivers.size(); ++d) {
-    uint8_t val = DriverBit0Val(drivers[d]);
+    uint8_t val = GetBitVal(drivers[d], bit).val;
     if (val == 3) continue;
     uint8_t str = EffectiveStrength(val, strengths[d]);
     FoldDriverIntoMax(val, str, net_type, m);
@@ -434,7 +422,7 @@ static void ComputeSingleBitStrength(
     out.s0_hi = s;
     out.s1_hi = s;
     std::vector<UnambigSignal> weaker =
-        FindWeakerUnambig(drivers, strengths, m.str);
+        FindWeakerUnambig(drivers, strengths, m.str, bit);
     for (const UnambigSignal& u : weaker) {
       out = CombineAmbigWithUnambig(out, u.vu, u.su);
     }
@@ -644,6 +632,33 @@ static void AppendTriPullDriver(std::vector<Logic4Vec>& drivers,
   strengths.push_back(DriverStrength{Strength::kPull, Strength::kPull});
 }
 
+// Widen one side of a net's reported strength to take in what one of its bits
+// resolves to there.
+//
+// §28.12.2 has a signal's strength be a range of levels rather than one level
+// where it is ambiguous, and that is what a net whose bits do not resolve alike
+// reports: the range on each side spans every bit that drives that side. A bit
+// leaving the side at highz drives nothing there and widens nothing, so a side
+// no bit drives stays highz, and a net whose bits all resolve alike reports
+// exactly what one of them does -- which is what a scalar net, the only width
+// §21.2.1.4 gives %v, has always reported.
+static void WidenSide(Strength& hi, Strength& lo, Strength bit_hi,
+                      Strength bit_lo) {
+  if (bit_hi == Strength::kHighz) return;
+  if (hi == Strength::kHighz) {
+    hi = bit_hi;
+    lo = bit_lo;
+    return;
+  }
+  if (bit_hi > hi) hi = bit_hi;
+  if (bit_lo < lo) lo = bit_lo;
+}
+
+static void WidenNetStrengthOverBit(NetStrength& net, const NetStrength& bit) {
+  WidenSide(net.s0_hi, net.s0_lo, bit.s0_hi, bit.s0_lo);
+  WidenSide(net.s1_hi, net.s1_lo, bit.s1_hi, bit.s1_lo);
+}
+
 static void ResolveStrengthDriven(Net& net, Arena& arena) {
   std::vector<Logic4Vec> drivers = net.drivers;
   std::vector<DriverStrength> strengths = net.driver_strengths;
@@ -651,12 +666,19 @@ static void ResolveStrengthDriven(Net& net, Arena& arena) {
                       arena);
 
   auto result = MakeLogic4Vec(arena, net.resolved->value.width);
+  net.resolved_strength = NetStrength{};
   for (uint32_t b = 0; b < result.width; ++b) {
     ResolveStrengthBit(drivers, strengths, result, b, net.type);
+    // §28.12 resolves each bit of a net on its own, and the strength of the
+    // signal it resolves to is a property of that bit. A net reports one pair,
+    // so each bit's contribution is folded into it rather than one bit being
+    // taken to speak for the rest.
+    NetStrength bit_strength;
+    ComputeSingleBitStrength(drivers, strengths, bit_strength, net.type, b);
+    WidenNetStrengthOverBit(net.resolved_strength, bit_strength);
   }
   FixupTriPull(result, net.type);
   net.resolved->value = result;
-  ComputeSingleBitStrength(drivers, strengths, net.resolved_strength, net.type);
   net.resolved->NotifyWatchers();
 }
 

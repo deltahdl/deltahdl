@@ -200,4 +200,55 @@ TEST(NetStrengthDisjunction, NetStrengthMutationTogglesIsAmbiguous) {
   EXPECT_FALSE(ns.IsAmbiguous());
 }
 
+// §28.12 resolves each bit of a net on its own -- the strength of a combined
+// signal is a property of the signal on that bit, and a net's bits need not
+// resolve alike. A net reports one pair of strength ranges, so the pair has to
+// take in every bit: §28.12.2 already has an ambiguous signal's strength be a
+// range of levels rather than one level, and that is the shape the pair takes
+// where the bits differ.
+//
+// One driver under (weak0, pull1) holding 2'b01 is what tells the bits apart.
+// Bit 0 is driven 1, which the specification puts at pull; bit 1 is driven 0,
+// which it puts at weak. So the two bits resolve on two sides at two levels
+// from one driver, and a pair read off bit 0 alone says the net drives nothing
+// low.
+TEST(NetStrengthDisjunction, VectorBitsResolvingUnalikeWidenTheReportedPair) {
+  Arena arena;
+  StrengthNet sn = MakeStrengthNet(arena, 2);
+  Net& net = sn.net;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 2, 1));
+  net.driver_strengths.push_back({Strength::kWeak, Strength::kPull});
+  net.Resolve(arena);
+
+  // Bit 0's side, which bit-0-only reporting also reaches.
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kPull);
+  // Bit 1's side, which it does not.
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kWeak);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kWeak);
+}
+
+// §28.12: a net whose bits do resolve alike reports what one of them does. The
+// same driver and the same specification holding 2'b11 drives both bits 1 at
+// pull, so the 0 side is driven by no bit and stays at highz, and the pair does
+// not open into a range. Without this case, a reporting rule that widened
+// unconditionally -- taking every bit's highz bound in -- would satisfy the
+// case above and turn every unambiguous net ambiguous.
+TEST(NetStrengthDisjunction, VectorBitsResolvingAlikeReportWhatOneBitDoes) {
+  Arena arena;
+  StrengthNet sn = MakeStrengthNet(arena, 2);
+  Net& net = sn.net;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 2, 3));
+  net.driver_strengths.push_back({Strength::kWeak, Strength::kPull});
+  net.Resolve(arena);
+
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kHighz);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kHighz);
+  EXPECT_FALSE(net.resolved_strength.IsAmbiguous());
+}
+
 }  // namespace

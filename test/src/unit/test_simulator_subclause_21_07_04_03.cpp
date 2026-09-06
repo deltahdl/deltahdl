@@ -345,6 +345,21 @@ TEST_F(ExtendedVcdStrengthFromSource,
 // resolves to a single level, where the two bounds coincide and the reduction
 // cannot be observed. The case fails on a writer that reports a driven port at
 // strong, which writes ?|66.
+// §21.7.4.3: the record carries one 0_strength_component and one
+// 1_strength_component for the whole port_value, so a vector port reports one
+// pair however many bits it has -- and the pair has to describe the port. A
+// (weak0, pull1) assignment of 2'b01 drives bit 0 to 1 at pull and bit 1 to 0
+// at weak, so both sides of the port are driven and at different levels: the
+// digits are 3 and 5. The case fails on a record whose components come from one
+// bit of the value, which writes 0 for the 0 side and says the port drives
+// nothing low while its own port_value shows a 0 bit.
+TEST_F(ExtendedVcdStrengthFromSource, VectorBitsAtTwoLevelsBothReachTheRecord) {
+  auto content = RunPortDump(
+      "  wire [1:0] w;\n"
+      "  assign (weak0, pull1) w = 2'b01;\n");
+  EXPECT_EQ(PortRecord(content, "w"), "01|35") << content;
+}
+
 TEST_F(ExtendedVcdStrengthFromSource,
        AmbiguousResolvedStrengthReportsTheStrongerBound) {
   auto content = RunPortDump(
