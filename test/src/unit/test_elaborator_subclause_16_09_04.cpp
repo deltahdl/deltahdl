@@ -675,4 +675,49 @@ TEST(GlobalClockingElab,
       "16.9.4"));
 }
 
+// A.6.5: `event_expression ::= [ edge_identifier ] expression [ iff expression
+// ]`, so an event control carries two expressions, and §16.9.4's "may be used
+// only if global clocking is defined (see 14.14)" states no condition on which
+// of them the call is written in.
+//
+// An always procedure keeps its event list in ModuleItem::sensitivity rather
+// than in a Stmt, and the walk over that list read the signal alone. The
+// procedural form of the same source is reported, the statement walk reaching
+// the field through ForEachChildExpr, so the two disagreed for no reason either
+// clause gives.
+TEST(GlobalClockingElab,
+     GclkFunctionInAnAlwaysIffConditionWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  logic [31:0] x;\n"
+      "  always @(posedge clk iff $past_gclk(x)) x = 32'd1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 4,
+      "16.9.4"));
+}
+
+// §16.9.4 also places the future functions -- "$future_gclk, $rising_gclk,
+// $falling_gclk, $steady_gclk and $changing_gclk ... may be used only in a
+// property or sequence expression" -- and ValidateFutureGclkPlacement reads the
+// same walk, so the field has to be read for that report too. A case over
+// $past_gclk alone leaves the placement half unstated.
+TEST(GlobalClockingElab, FutureGclkFunctionInAnAlwaysIffConditionErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  logic [31:0] x;\n"
+      "  always @(posedge clk iff $future_gclk(x)) x = 32'd1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "only in a property or sequence expression", 4,
+                            "16.9.4"));
+}
+
 }  // namespace

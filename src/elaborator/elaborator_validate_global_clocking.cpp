@@ -144,9 +144,19 @@ const Expr* FindGlobalClockRefInItem(const ModuleItem* item) {
     ref = item->prop_body_expr;
   }
   if (!ref) {
+    // A.6.5: `event_expression ::= [ edge_identifier ] expression [ iff
+    // expression ]`, so an event carries two expressions and §14.14 states no
+    // condition on which of them holds the reference. Reading the signal alone
+    // let `always @(posedge clk iff $global_clock)` elaborate clean where the
+    // procedural `initial @(posedge clk iff $global_clock)` is reported, the
+    // statement walk having reached the field through ForEachChildExpr.
     for (const auto& ev : item->sensitivity) {
       if (ExprRefsGlobalClock(ev.signal)) {
         ref = ev.signal;
+        break;
+      }
+      if (ExprRefsGlobalClock(ev.iff_condition)) {
+        ref = ev.iff_condition;
         break;
       }
     }
@@ -271,8 +281,14 @@ const Expr* FindGclkFunctionRefInItem(const ModuleItem* item,
       return hit;
     }
   }
+  // A.6.5 gives an event two expressions, and §16.9.4 puts no condition on
+  // which of them a global clocking sampled value function is written in. See
+  // FindGlobalClockRefInItem above, which reads both for the same reason.
   for (const auto& ev : item->sensitivity) {
     if (const Expr* hit = FindGclkFunctionRef(ev.signal, match)) return hit;
+    if (const Expr* hit = FindGclkFunctionRef(ev.iff_condition, match)) {
+      return hit;
+    }
   }
   return nullptr;
 }

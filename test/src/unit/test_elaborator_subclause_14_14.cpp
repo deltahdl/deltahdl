@@ -425,4 +425,24 @@ TEST(GlobalClockingElab,
                             5, "14.14"));
 }
 
+// A.6.5 gives an event control two expressions -- `[ edge_identifier ]
+// expression [ iff expression ]` -- and §14.14 states no condition on which of
+// them $global_clock is written in. An always procedure keeps its event list in
+// ModuleItem::sensitivity, and the walk over that list read the signal alone,
+// so this source elaborated clean while the procedural form of it was reported.
+TEST(GlobalClockingElab, GlobalClockInAnAlwaysIffConditionErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  logic x;\n"
+      "  always @(posedge clk iff $global_clock) x = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$global_clock has no effective global clocking "
+                            "declaration",
+                            4, "14.14"));
+}
+
 }  // namespace
