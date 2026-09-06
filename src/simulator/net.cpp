@@ -432,9 +432,22 @@ static void ComputeSingleBitStrength(
     out.s0_hi = out.s0_lo = s;
   } else if (m.val == 1) {
     out.s1_hi = out.s1_lo = s;
-  } else if (m.val == 2 &&
-             (net_type == NetType::kWand || net_type == NetType::kTriand ||
-              net_type == NetType::kWor || net_type == NetType::kTrior)) {
+  } else if (m.val == 2) {
+    // §28.12.2 classifies "signals with a value x" as having "strength levels
+    // consisting of subdivisions of both the strength1 and the strength0 parts
+    // of the scale of strengths", so a driver whose value is x puts its own
+    // level on both sides: it is the value that is unknown, not the strength.
+    // Both bounds sit at that level, which is the case §21.2.1.4 renders with a
+    // mnemonic -- "for the unknown value, a mnemonic is used when both the 0
+    // and 1 strength components are at the same strength level".
+    //
+    // This is not the equal-and-opposite conflict above. There §28.12.2 adds
+    // "all the smaller strength levels" to the result, which is why that branch
+    // leaves the lower bounds at high impedance and this one does not. A wired
+    // net reaches here through WiredAnd/WiredOr rather than by a driver
+    // spelling x, and the answer is the same either way, so the net type does
+    // not enter into it -- while it did, a strongly driven x on an ordinary
+    // wire filled neither side and was reported as nothing driving the net.
     out.s0_hi = out.s0_lo = s;
     out.s1_hi = out.s1_lo = s;
   }

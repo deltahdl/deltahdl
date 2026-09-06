@@ -434,6 +434,40 @@ TEST(StrengthFormat, DisplayPercentVOnStrongConflictShowsStX) {
       "StX");
 }
 
+// End-to-end: a driver whose own value is x. §28.12.2 classifies "signals with
+// a value x" as having "strength levels consisting of subdivisions of both the
+// strength1 and the strength0 parts of the scale of strengths", so a strong
+// driver of 1'bx puts strong on both sides -- the value is unknown, the
+// strength is not. §21.2.1.4 renders that with a mnemonic, "when both the 0 and
+// 1 strength components are at the same strength level": StX.
+//
+// This is a different source from the equal-and-opposite conflict above, which
+// arrives at x by combining two known values. A net driven x by one driver
+// reported HiZ, which says nothing is driving it.
+TEST(StrengthFormat, DisplayPercentVOnStrongDrivenUnknownShowsStX) {
+  ExpectPercentVOutput(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign w = 1'bx;\n"
+      "  initial #1 $display(\"%v\", w);\n"
+      "endmodule\n",
+      "StX");
+}
+
+// The level reported is the driver's own, not a constant strong: the same
+// unknown value driven under (pull0, pull1) renders PuX. Without this case, a
+// mapping that filled both sides at strong whatever the driver specified would
+// satisfy the case above.
+TEST(StrengthFormat, DisplayPercentVOnPullDrivenUnknownShowsPuX) {
+  ExpectPercentVOutput(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (pull0, pull1) w = 1'bx;\n"
+      "  initial #1 $display(\"%v\", w);\n"
+      "endmodule\n",
+      "PuX");
+}
+
 // End-to-end: the small-capacitor charge storage strength Sm (Table 21-4, level
 // 1). A small-size trireg (§28.11) driven to 0 then released to high impedance
 // holds that 0 at small charge strength, which %v renders as Sm0 -- completing

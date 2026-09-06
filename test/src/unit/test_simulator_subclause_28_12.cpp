@@ -251,4 +251,47 @@ TEST(NetStrengthDisjunction, VectorBitsResolvingAlikeReportWhatOneBitDoes) {
   EXPECT_FALSE(net.resolved_strength.IsAmbiguous());
 }
 
+// §28.12.2: "signals with a value x ... have strength levels consisting of
+// subdivisions of both the strength1 and the strength0 parts of the scale of
+// strengths". A driver whose value is x therefore puts its own level on both
+// sides, and both bounds sit at that level: the level is known even though the
+// value is not, so the result is not the range the equal-and-opposite conflict
+// produces, which §28.12.2 gives "all the smaller strength levels" as well.
+TEST(NetStrengthDisjunction, DriverOfUnknownValueRecordsItsLevelOnBothSides) {
+  Arena arena;
+  StrengthNet sn = MakeStrengthNet(arena, 1);
+  Net& net = sn.net;
+
+  // x = (aval=1, bval=1) on the single bit, driven at pull on both sides.
+  auto drv = MakeLogic4Vec(arena, 1);
+  drv.words[0].aval = 1;
+  drv.words[0].bval = 1;
+  net.drivers.push_back(drv);
+  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+  net.Resolve(arena);
+
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kPull);
+  // Both bounds at one level is what §21.2.1.4 renders with a mnemonic rather
+  // than with the two digits an ambiguous strength takes.
+  EXPECT_FALSE(net.resolved_strength.IsAmbiguous());
+}
+
+// The negative form: a net no driver reaches keeps every level at high
+// impedance. That is the answer the case above used to give as well, so a fix
+// has to leave this one alone.
+TEST(NetStrengthDisjunction, NetWithNoDriverRecordsNoLevels) {
+  Arena arena;
+  StrengthNet sn = MakeStrengthNet(arena, 1);
+  Net& net = sn.net;
+  net.Resolve(arena);
+
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kHighz);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kHighz);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kHighz);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kHighz);
+}
+
 }  // namespace
