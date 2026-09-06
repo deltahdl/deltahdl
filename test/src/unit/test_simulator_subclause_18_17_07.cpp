@@ -884,36 +884,4 @@ TEST(RandseqValuePassingSim, RandJoinOperandReturnWritesItsOwnValue) {
   EXPECT_EQ(r2, 41u);
 }
 
-// §6.18 and §18.17.7 together: a production declared to return a typedef name
-// returns the type that name stands for, and the value reaches the triggering
-// rule through the implicit variable §18.17.7 declares for it. The production
-// path sizes that value at sites of its own -- separate from the ones a
-// function's return goes through -- so it can be wrong on its own.
-//
-// `nib` is four bits, not the thirty-two an unresolved name fell back to, so
-// the returned 8'hFF reads 15 here and read 255 before.
-//
-// The module declares `p` for the same reason RunRandJoinCapture above does:
-// the implicit variable §18.17.7 gives a rule for each value-returning
-// production it names is written into the enclosing scope, and a code block
-// reading a name the module never declared is reported under §23.9.
-TEST(RandseqValuePassingSim, ProductionReturnTypeWrittenAsATypedefIsResolved) {
-  SimFixture f;
-  uint64_t got = RunModule(f,
-                           "module t;\n"
-                           "  typedef bit [3:0] nib;\n"
-                           "  int p;\n"
-                           "  int got;\n"
-                           "  initial begin\n"
-                           "    got = 0;\n"
-                           "    randsequence(main)\n"
-                           "      void main : p := 1 { got = p; };\n"
-                           "      nib p : { return 8'hFF; };\n"
-                           "    endsequence\n"
-                           "  end\n"
-                           "endmodule\n",
-                           "got");
-  EXPECT_EQ(got, 15u);
-}
-
 }  // namespace

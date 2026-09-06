@@ -773,9 +773,6 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       .arena = arena_,
       .diag = diag_,
       .global_clocking_event = module_global_clocking_event_};
-  // §18.17.7: a randsequence stands in a procedural body, so its productions
-  // are reached here rather than through the module's items.
-  RecordRandsequenceReturnTypes(item->body);
   switch (item->kind) {
     case ModuleItemKind::kInitialBlock:
       AddProcess(RtlirProcessKind::kInitial, item, mod, kNoInferenceEnv);
@@ -816,13 +813,6 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
           declared_names_, diag_);
       ValidateFunctionBody(item);
       ValidateFunctionArgDefaultsScope(item);
-      // §6.18: a return type written as a typedef name is resolved here,
-      // because the table it resolves against is the elaborator's and the
-      // simulator sizes the return variable from the DataType alone.
-      ResolveNamedReturnType(item->return_type, typedefs_);
-      for (auto* s : item->func_body_stmts) {
-        RecordRandsequenceReturnTypes(s);
-      }
       mod->function_decls.push_back(item);
       return true;
     case ModuleItemKind::kElabSystemTask:

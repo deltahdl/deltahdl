@@ -263,33 +263,6 @@ bool ResolveClassScopedDeclType(DataType& dtype, const TypedefMap& typedefs,
   return true;
 }
 
-bool ResolveNamedReturnType(DataType& dtype, const TypedefMap& typedefs) {
-  if (dtype.kind != DataTypeKind::kNamed) return false;
-  // A class scope prefix is ResolveClassScopedDeclType's, not this one's.
-  if (!dtype.scope_name.empty()) return false;
-  // §7.4.4 stacks a use site's own packed dimensions on the typedef's, which
-  // the resolving EvalTypeWidth overload does and a flat copy of the bound type
-  // would silently drop. A use site carrying any is left as it is.
-  if (dtype.packed_dim_left != nullptr || !dtype.extra_packed_dims.empty()) {
-    return false;
-  }
-  auto it = typedefs.find(dtype.type_name);
-  if (it == typedefs.end()) return false;
-  const DataType& bound = it->second;
-  // Only a bound type with a packed width of its own is carried over. A typedef
-  // naming a class, a string or another typedef answers 0 here and is left
-  // alone, so nothing that reads such a return type today reads it differently.
-  uint32_t width = EvalTypeWidth(bound);
-  if (width == 0) return false;
-  // Recorded rather than substituted: the name is what several checks are
-  // about, and §6.6.7's report that a nettype's resolution function "shall have
-  // a return type of 'T'" reads it. DataType::named_width says where this is
-  // read back.
-  dtype.named_width = width;
-  dtype.named_is_signed = IsSignedType(bound, typedefs);
-  return true;
-}
-
 // Whether `cls` declares anything at all under `name`. §8.23 puts a nested
 // class declaration and a typedef in one list -- "the class scope resolution
 // operator applies to all static elements of a class: static class properties,

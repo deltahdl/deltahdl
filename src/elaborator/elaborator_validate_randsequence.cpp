@@ -14,7 +14,6 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
-#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast.h"
 
@@ -108,17 +107,6 @@ void CheckRandsequenceNames(const Stmt* s, DiagEngine& diag) {
 }
 
 }  // namespace
-
-void Elaborator::RecordRandsequenceReturnTypes(Stmt* s) {
-  if (!s) return;
-  if (s->kind == StmtKind::kRandsequence) {
-    for (auto& production : s->rs_productions) {
-      ResolveNamedReturnType(production.return_type, typedefs_);
-    }
-  }
-  ForEachChildStmt(
-      s, [&](Stmt* const& sub) { RecordRandsequenceReturnTypes(sub); });
-}
 
 void Elaborator::ValidateRandsequenceProductionNames(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {

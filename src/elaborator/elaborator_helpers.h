@@ -276,24 +276,6 @@ const DataType* FindClassScopedTypedefType(std::string_view cls_name,
 bool ResolveClassScopedDeclType(DataType& dtype, const TypedefMap& typedefs,
                                 const CompilationUnit* unit);
 
-// §6.18: rewrites `dtype` in place to the type a typedef name stands for, so a
-// return type written as a user-defined name carries the width and signedness
-// that name was declared with. Returns false, leaving `dtype` untouched,
-// wherever the name resolves to nothing this can carry. Defined in
-// elaborator_validate_struct_types.cpp.
-//
-// The simulator has no typedef table: EvalTypeWidth(const DataType&) answers 0
-// for a kNamed type and every caller under src/simulator/ turns a 0 into 32, so
-// a function or a randsequence production declared to return `nib` returned 32
-// bits whatever `nib` was. The table is the elaborator's, so the name is
-// resolved here and the simulator goes on reading a number.
-//
-// It is used for a return type rather than for every named type, because a
-// variable's declared type is already resolved where the width is computed --
-// ElaborateVarDecl calls the resolving EvalTypeWidth overload with the table --
-// and a return type is what nothing did that for.
-bool ResolveNamedReturnType(DataType& dtype, const TypedefMap& typedefs);
-
 // §8.23: "When a type name is used, the name shall resolve to a type after
 // elaboration." Reports a declared type whose class scope prefix names a
 // visible class that declares nothing under that name, which otherwise sizes

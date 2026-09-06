@@ -85,21 +85,6 @@ struct StructMember {
 struct DataType {
   DataTypeKind kind = DataTypeKind::kImplicit;
   bool is_signed = false;
-  // §6.18: what a typedef name this type is written as was declared with, in
-  // the one place the simulator can read it. EvalTypeWidth(const DataType&)
-  // answers 0 for a kNamed type and every caller under src/simulator/ turns a 0
-  // into 32, and the table that would resolve the name is the elaborator's and
-  // never leaves it.
-  //
-  // The elaborator records the answer here rather than rewriting kind and
-  // type_name to the bound type, because the name is what several checks are
-  // about: §6.6.7 requires a nettype's resolution function to "have a return
-  // type of 'T'" and reads the name to say so, and a rewritten type answers
-  // that question with the struct T stands for and reports nothing. A zero
-  // width means nothing was recorded, which is every type but a return type
-  // ResolveNamedReturnType reached.
-  uint32_t named_width = 0;
-  bool named_is_signed = false;
   bool is_packed = false;
   bool is_const = false;
   bool is_net = false;
