@@ -484,6 +484,18 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // statement and ExecRsProduction another for the production, both before a
   // rule is selected. `name` must outlive the context, as for RegisterArray.
   void RegisterLocalArray(std::string_view name, const ArrayInfo& info);
+
+  // The shape of an array, given the lifetime the scope it was declared in
+  // gives it: the enclosing block or call where there is one, and the whole run
+  // otherwise. §23.9 makes a begin-end block a scope and a declaration in it
+  // local to that block, and §13.4 gives a call's formal the lifetime of the
+  // call, so neither shape may answer for a like-named variable afterwards --
+  // which is what a shape registered for the run does, array_infos_ being flat
+  // and cleared by nothing.
+  //
+  // A module-level declaration has no local scope to belong to and keeps the
+  // run-long registration it always had.
+  void RegisterArrayInScope(std::string_view name, const ArrayInfo& info);
   ArrayInfo* FindArrayInfo(std::string_view name);
   const ArrayInfo* FindArrayInfo(std::string_view name) const;
 

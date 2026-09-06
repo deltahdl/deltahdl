@@ -34,7 +34,11 @@ static void CreateBlockArrayElements(const Stmt* stmt, uint32_t elem_width,
   info.size = size;
   info.elem_width = elem_width;
   info.is_descending = (left > right);
-  ctx.RegisterArray(stmt->var_name, info);
+  // §23.9: a declaration inside a begin-end block is local to that block, so
+  // its shape goes away with the block rather than answering for a like-named
+  // variable after it. The element variables below are created the same way a
+  // few lines down in this file.
+  ctx.RegisterArrayInScope(stmt->var_name, info);
   for (uint32_t i = 0; i < size; ++i) {
     uint32_t idx = lo + i;
     auto name = std::string(stmt->var_name) + "[" + std::to_string(idx) + "]";

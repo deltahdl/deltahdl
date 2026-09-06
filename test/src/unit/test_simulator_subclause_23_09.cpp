@@ -316,4 +316,87 @@ TEST(InstanceScopeSimulation, BareParameterNameDoesNotReachTopParameter) {
   EXPECT_EQ(f.ctx.FindVariable("P"), nullptr);
 }
 
+// §23.9 makes a begin-end block a scope and a declaration inside it local to
+// that block, so the shape of an array declared there stands for that array
+// only while the block is running. SimContext::array_infos_ is flat and nothing
+// clears it, so the shape used to answer for a like-named variable afterwards:
+// EvalSelect tries an array element select ahead of the packed bit-select, and
+// element 1 of an array whose element variables went away with their scope
+// reads x rather than bit 1 of the module's own `a`.
+//
+// The read stands after the block, because one taken inside it reads the
+// block's array whether the registration is scoped or not. 8'b1010_1010 has bit
+// 1 set, so the assertion tells a bit-select from an x.
+TEST(InstanceScopeSimulation, BlockLocalArrayShapeDoesNotOutliveItsBlock) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic got;\n"
+      "  initial begin\n"
+      "    a = 8'b1010_1010;\n"
+      "    begin\n"
+      "      int a [1:2];\n"
+      "      a[1] = 5;\n"
+      "    end\n"
+      "    got = a[1];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "got");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// §13.4 gives a formal argument the lifetime of the call, so an array formal's
+// shape goes away when the call returns, as the per-element formal variables
+// bound with it already do. The call is made rather than merely declared: one
+// that never runs binds nothing and cannot fail.
+TEST(InstanceScopeSimulation, ArrayFormalShapeDoesNotOutliveTheCall) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic got;\n"
+      "  int src [1:2];\n"
+      "  function int take(input int a [1:2]);\n"
+      "    return a[1];\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    a = 8'b1010_1010;\n"
+      "    src[1] = 4; src[2] = 5;\n"
+      "    got = take(src);\n"
+      "    got = a[1];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "got");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// Two blocks declaring the same name, the second array smaller than the first.
+// An index past the second one's bound reads x, which the first one's shape
+// would have answered for; two arrays of one size cannot tell the second
+// registration from the first, and neither can a case whose second block
+// declares nothing.
+TEST(InstanceScopeSimulation, ASecondBlockLocalArrayReplacesTheFirstsShape) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int got;\n"
+      "  initial begin\n"
+      "    begin\n"
+      "      int a [1:4];\n"
+      "      a[4] = 9;\n"
+      "    end\n"
+      "    begin\n"
+      "      int a [1:2];\n"
+      "      got = a[4];\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f, "got");
+  ASSERT_NE(var, nullptr);
+  EXPECT_FALSE(var->value.IsKnown());
+}
+
 }  // namespace

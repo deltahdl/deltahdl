@@ -190,7 +190,9 @@ static bool BindQueueToFixedFormal(QueueObject* src_q,
   finfo.size = static_cast<uint32_t>(formal_size);
   finfo.elem_width = src_q->elem_width;
   finfo.is_4state = src_q->is_4state;
-  ctx.RegisterArray(formal.name, finfo);
+  // §13.4: a formal has the lifetime of the call, so its shape goes away when
+  // the call returns, as the per-element formals created just below already do.
+  ctx.RegisterArrayInScope(formal.name, finfo);
   for (uint32_t j = 0; j < finfo.size; ++j) {
     auto dst = std::string(formal.name) + "[" + std::to_string(j) + "]";
     auto* dst_var = ctx.CreateLocalVariable(
@@ -223,7 +225,8 @@ static bool TryBindQueueArg(QueueObject* src_q, const FunctionArg& formal,
 static void BindFixedArrayArg(const Expr* call_arg, const FunctionArg& formal,
                               const ArrayInfo& info, SimContext& ctx,
                               Arena& arena) {
-  ctx.RegisterArray(formal.name, info);
+  // §13.4, as above: the shape lives as long as the call does.
+  ctx.RegisterArrayInScope(formal.name, info);
   for (uint32_t j = 0; j < info.size; ++j) {
     uint32_t idx = info.lo + j;
     auto src = std::string(call_arg->text) + "[" + std::to_string(idx) + "]";

@@ -674,6 +674,15 @@ void SimContext::RegisterLocalArray(std::string_view name,
   scope_stack_.back().arrays[name] = arena_.Create<ArrayInfo>(info);
 }
 
+void SimContext::RegisterArrayInScope(std::string_view name,
+                                      const ArrayInfo& info) {
+  if (HasLocalScope()) {
+    RegisterLocalArray(name, info);
+    return;
+  }
+  RegisterArray(name, info);
+}
+
 ArrayInfo* SimContext::FindArrayInfo(std::string_view name) {
   return const_cast<ArrayInfo*>(std::as_const(*this).FindArrayInfo(name));
 }
