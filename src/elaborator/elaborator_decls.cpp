@@ -511,18 +511,18 @@ static void ApplyTriregDecayTime(const ModuleItem* item, RtlirNet& net,
   if (item->net_delay_decay == nullptr) {
     if (!unit->default_decay_time_infinite) {
       net.decay_ticks = unit->default_decay_time;
+      net.decays = true;
     }
     return;
   }
   auto decay_ticks = ConstEvalInt(item->net_delay_decay, scope);
   if (!decay_ticks) {
     // Report the fold that failed rather than substituting a decay time.
-    // RtlirNet::decay_ticks records a net that does not decay as zero, which is
-    // the opposite of what a declaration writing a third delay asks for, and no
-    // other value is any better a guess. The report is a warning rather than an
-    // error because A.2.2.3 writes delay3 over mintypmax_expression rather than
-    // constant_mintypmax_expression, so a third delay that constant folding
-    // does not reach is not thereby illegal.
+    // RtlirNet::decays is left false, so the net holds its charge, and no
+    // decay time is any better a guess than another. The report is a warning
+    // rather than an error because A.2.2.3 writes delay3 over
+    // mintypmax_expression rather than constant_mintypmax_expression, so a
+    // third delay that constant folding does not reach is not thereby illegal.
     diag.Warning(item->net_delay_decay->range.start,
                  "trireg charge decay time does not fold to a constant, so the "
                  "net is left holding its charge",
@@ -530,6 +530,10 @@ static void ApplyTriregDecayTime(const ModuleItem* item, RtlirNet& net,
     return;
   }
   net.decay_ticks = static_cast<uint64_t>(*decay_ticks);
+  // §28.16.2.2 gives the meaning "never decays" to a declaration with no third
+  // delay, so a declaration that wrote one decays whatever it wrote -- zero
+  // included, which §28.16.2.1 makes the transition to x happening at once.
+  net.decays = true;
 }
 
 // §10.3.1 / §28.16.2: apply the compilation unit's default trireg charge

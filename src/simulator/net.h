@@ -36,6 +36,9 @@ struct Net {
   Strength charge_strength = Strength::kMedium;
   Strength base_charge_strength = Strength::kMedium;
   uint64_t decay_ticks = 0;
+  // §28.16.2.1: whether this net decays, which decay_ticks alone cannot say.
+  // See RtlirNet::decays in src/elaborator/rtlir.h.
+  bool decays = false;
   uint64_t decay_generation = 0;
 
   bool is_user_nettype = false;

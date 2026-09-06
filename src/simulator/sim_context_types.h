@@ -211,6 +211,11 @@ struct TimeFormatSpec {
 struct NetSpec {
   Strength charge_strength = Strength::kMedium;
   uint64_t decay_ticks = 0;
+  // §28.16.2.1: whether the net decays at all, which a count of zero cannot
+  // say -- a charge decay time of zero is the transition to x happening at
+  // once, and it is the *absence* of a third delay that §28.16.2.2 makes a net
+  // hold its charge. See RtlirNet::decays.
+  bool decays = false;
   bool is_user_nettype = false;
   std::string_view resolve_func = {};
   bool is_signed = false;

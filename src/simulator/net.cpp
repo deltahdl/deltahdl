@@ -597,7 +597,13 @@ static void ResolveTriregCharge(Net& net, Scheduler* sched) {
       net.resolved_strength.s1_lo = net.charge_strength;
     }
   }
-  if (net.decay_ticks > 0 && sched != nullptr) {
+  // §28.16.2.1: the decay process ends when "the delay specified by charge
+  // decay time elapses, and the trireg net makes a transition from 1 or 0 to
+  // x", so a charge decay time of zero schedules that transition at the current
+  // time rather than never. Reading the count alone left a `trireg #(0, 0, 0)`
+  // holding its charge for the whole run, which is what §28.16.2.2 gives a
+  // declaration writing no third delay instead.
+  if (net.decays && sched != nullptr) {
     ScheduleDecay(net, sched);
   }
   net.resolved->NotifyWatchers();

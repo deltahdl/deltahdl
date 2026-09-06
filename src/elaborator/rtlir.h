@@ -126,12 +126,23 @@ struct RtlirNet {
 
   // §28.16.2.2: the charge decay time of a trireg net, counted in time units,
   // which the declaration writes as its third delay: "The third delay in a
-  // trireg net declaration shall specify the charge decay time." Zero records a
-  // net that does not decay, which is what §28.16.2 leaves a trireg whose
-  // declaration writes no third delay holding its charge with. Only a trireg
+  // trireg net declaration shall specify the charge decay time." Only a trireg
   // carries one, because §28.16.2 gives the third delay of every other net to
   // "the delay in a transition to the z logic state" instead.
   uint64_t decay_ticks = 0;
+
+  // Whether this net decays at all, which a count of zero cannot say.
+  // §28.16.2.1 makes the decay a process that ends when "the delay specified by
+  // charge decay time elapses, and the trireg net makes a transition from 1 or
+  // 0 to x", so a decay time of zero is that transition happening at once and
+  // not one that never happens; §28.16.2.2 gives the third delay's *absence*
+  // the meaning of never decaying. The two used to share a representation, and
+  // a declaration writing zero got the opposite of what it asked for.
+  //
+  // This is the shape CompilationUnit::default_decay_time_infinite already uses
+  // for the `default_decay_time directive, which records an infinite decay
+  // separately from a count for the same reason.
+  bool decays = false;
 
   // §28.16: the net delay this net was declared with. "Net delays refer to the
   // time it takes from any driver on the net changing value to the time when

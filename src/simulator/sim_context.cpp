@@ -339,6 +339,7 @@ void PopulateNetFields(Net* net, Variable* var, NetType type,
   net->charge_strength = spec.charge_strength;
   net->base_charge_strength = spec.charge_strength;
   net->decay_ticks = spec.decay_ticks;
+  net->decays = spec.decays;
   net->is_user_nettype = spec.is_user_nettype;
   net->resolve_func = spec.resolve_func;
 }

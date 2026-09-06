@@ -255,4 +255,67 @@ TEST(TriregChargeDecayRuntime, ReleasingForceDropsHeldZAndFollowsDriver) {
   EXPECT_EQ(net->resolved->value.words[0].bval & 1u, 0u);
 }
 
+// §28.16.2.1: the charge decay process ends when "the delay specified by charge
+// decay time elapses, and the trireg net makes a transition from 1 or 0 to x".
+// A charge decay time of zero is that transition happening at once, so a trireg
+// written `#(0, 0, 0)` loses its charge the moment its drivers turn off.
+//
+// It held the charge for the whole run instead, RtlirNet::decay_ticks recording
+// a net that does not decay as zero and the scheduler reading the count alone.
+// A trireg with a positive decay time cannot fail this: the decay is scheduled
+// either way and only the moment differs.
+TEST(TriregChargeDecayRuntime, ZeroDecayTimeDecaysWhenDriversTurnOff) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  trireg #(0, 0, 0) cap;\n"
+      "  assign cap = en ? 1'b1 : 1'bz;\n"
+      "  initial begin\n"
+      "    en = 1'b1;\n"
+      "    #1 en = 1'b0;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+
+  auto* net = f.ctx.FindNet("cap");
+  ASSERT_NE(net, nullptr);
+  ASSERT_NE(net->resolved, nullptr);
+  // x is (aval 1, bval 1).
+  EXPECT_EQ(net->resolved->value.words[0].bval & 1u, 1u);
+}
+
+// The other half: §28.16.2.2 gives a declaration with no third delay the
+// meaning of never decaying, so the same source keeps its charge. Without this
+// the case above is satisfied by a trireg that decays whatever it was declared
+// with, which is the opposite defect.
+TEST(TriregChargeDecayRuntime, AbsentThirdDelayHoldsTheChargeAfterTurnOff) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  trireg #50 cap;\n"
+      "  assign cap = en ? 1'b1 : 1'bz;\n"
+      "  initial begin\n"
+      "    en = 1'b1;\n"
+      "    #1 en = 1'b0;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+
+  auto* net = f.ctx.FindNet("cap");
+  ASSERT_NE(net, nullptr);
+  ASSERT_NE(net->resolved, nullptr);
+  EXPECT_EQ(net->resolved->value.words[0].aval & 1u, 1u);
+  EXPECT_EQ(net->resolved->value.words[0].bval & 1u, 0u);
+}
+
 }  // namespace

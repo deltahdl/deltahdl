@@ -52,8 +52,8 @@ void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx, Arena& arena) {
   for (const auto& net : mod->nets) {
     auto* created = ctx.CreateNet(
         net.name, net.net_type, net.width,
-        NetSpec{net.charge_strength, net.decay_ticks, net.is_user_nettype,
-                net.resolve_func, net.is_signed});
+        NetSpec{net.charge_strength, net.decay_ticks, net.decays,
+                net.is_user_nettype, net.resolve_func, net.is_signed});
     RecordPackedRange(net.dtype, created->resolved, ctx, arena);
   }
 }

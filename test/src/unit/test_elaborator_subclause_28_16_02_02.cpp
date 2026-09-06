@@ -176,4 +176,60 @@ TEST(ChargeDecaySpecElaboration,
                               "28.16.2.2"));
 }
 
+// §28.16.2.1 makes the charge decay a process that ends when "the delay
+// specified by charge decay time elapses, and the trireg net makes a transition
+// from 1 or 0 to x", so a decay time of zero is that transition happening at
+// once. §28.16.2.2 gives the *absence* of a third delay the meaning of never
+// decaying. The two states shared one representation -- a decay_ticks of zero
+// -- so a declaration writing zero got the opposite of what it asked for.
+//
+// The elaborated nets are asserted to differ in the field that now tells them
+// apart, which is where the distinction is made; the two run-time cases are in
+// test/src/unit/test_simulator_subclause_28_16_02.cpp.
+TEST(ChargeDecaySpecElaboration, ZeroDecayTimeIsRecordedAsDecaying) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  trireg #(0, 0, 0) cap;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  bool found = false;
+  for (const auto& net : mod->nets) {
+    if (net.name == "cap") {
+      EXPECT_EQ(net.decay_ticks, 0u);
+      EXPECT_TRUE(net.decays);
+      found = true;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+// The other half of the same distinction, which the case above cannot state on
+// its own: a declaration with no third delay records the same zero count and
+// does not decay. SingleDelayDoesNotPopulateDecayTicks asserts the count and is
+// what let the two states share a representation.
+TEST(ChargeDecaySpecElaboration, AbsentThirdDelayIsRecordedAsNotDecaying) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  trireg #50 cap;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  bool found = false;
+  for (const auto& net : mod->nets) {
+    if (net.name == "cap") {
+      EXPECT_EQ(net.decay_ticks, 0u);
+      EXPECT_FALSE(net.decays);
+      found = true;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
 }  // namespace
