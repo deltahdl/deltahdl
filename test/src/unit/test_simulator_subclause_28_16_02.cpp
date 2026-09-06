@@ -293,12 +293,20 @@ TEST(TriregChargeDecayRuntime, ZeroDecayTimeDecaysWhenDriversTurnOff) {
 // meaning of never decaying, so the same source keeps its charge. Without this
 // the case above is satisfied by a trireg that decays whatever it was declared
 // with, which is the opposite defect.
+//
+// The declaration writes `#(0, 0)` rather than a single delay, so that it
+// differs from the case above in the third delay alone. The two zeros also
+// have to be zero: §28.16.2 gives the first two delays of a trireg to the
+// transitions to 1 and to 0, ApplyNetDeclDelaysToDrivers puts them on the
+// driver, and a delay longer than this run leaves the trireg at its initial x
+// with no charge to hold. That reads as a decay while the net was never
+// charged at all, and it is what `trireg #50` asserted here.
 TEST(TriregChargeDecayRuntime, AbsentThirdDelayHoldsTheChargeAfterTurnOff) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
-      "  trireg #50 cap;\n"
+      "  trireg #(0, 0) cap;\n"
       "  assign cap = en ? 1'b1 : 1'bz;\n"
       "  initial begin\n"
       "    en = 1'b1;\n"
