@@ -188,10 +188,17 @@ VcdWriter* SimContext::OpenVcdDump(std::string_view top_scope,
   // $dumpfile named leaves that entry out.
   //
   // The $timescale section states the time unit the value change times are
-  // given in. Both dump paths declare 1ns, the default GlobalPrecision() whose
-  // ticks SimTime counts; a design whose `timescale sets another precision is
-  // dumped under a unit it does not use.
-  vcd->WriteHeader("1ns", dump_file_literal_);
+  // given in, and the times written are SimTime ticks of GlobalPrecision(),
+  // so the unit is read off that rather than fixed. Syntax 21-20 spells the
+  // command as a time_number of 1, 10 or 100 followed by a time_unit;
+  // GlobalPrecision() is a bare TimeUnit, one of the six the same syntax
+  // lists, because ComputeGlobalTimePrecision keeps the smallest precision
+  // any `timescale, timeprecision or compilation-unit declaration asked for
+  // and no magnitude alongside it. Every precision the design can reach is
+  // therefore one whole unit, and the time_number is always 1.
+  std::string timescale = "1";
+  timescale += TimeUnitStr(GlobalPrecision());
+  vcd->WriteHeader(timescale, dump_file_literal_);
   // §21.7.1.2: the scope the declarations are written under is the module a
   // $dumpvars scope argument is written down from, and RegisterVcdSignals
   // names each signal by its path below that module. The writer is told which

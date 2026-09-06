@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace delta {
@@ -128,6 +129,13 @@ uint64_t RealDelayToTicks(double delay, const TimeScale& scale,
                           TimeUnit global_precision);
 
 bool ParseTimeUnitStr(std::string_view str, TimeUnit& out);
+
+// The text a TimeUnit is written as -- "s", "ms", "us", "ns", "ps" or
+// "fs" -- which is what ParseTimeUnitStr reads back. §3.14.2.1 gives that
+// set as the time_literal unit, and Syntax 21-20's time_unit repeats it, so
+// a caller spelling a time unit for either has the same six names to choose
+// from.
+std::string_view TimeUnitStr(TimeUnit unit);
 
 int EffectiveTimeOrder(TimeUnit unit, int magnitude);
 

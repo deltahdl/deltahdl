@@ -1,6 +1,7 @@
 #include "common/types.h"
 
 #include <cmath>
+#include <string_view>
 
 #include "common/arena.h"
 
@@ -277,6 +278,24 @@ int EffectiveTimeOrder(TimeUnit unit, int magnitude) {
   else if (magnitude == 100)
     order += 2;
   return order;
+}
+
+std::string_view TimeUnitStr(TimeUnit unit) {
+  switch (unit) {
+    case TimeUnit::kS:
+      return "s";
+    case TimeUnit::kMs:
+      return "ms";
+    case TimeUnit::kUs:
+      return "us";
+    case TimeUnit::kNs:
+      return "ns";
+    case TimeUnit::kPs:
+      return "ps";
+    case TimeUnit::kFs:
+      break;
+  }
+  return "fs";
 }
 
 bool ParseTimeUnitStr(std::string_view str, TimeUnit& out) {

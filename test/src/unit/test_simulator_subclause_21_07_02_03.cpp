@@ -6,6 +6,7 @@
 // included ahead of the fixtures so SimContext's inline constructor (whose
 // unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
+#include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_text_lines.h"
 #include "simulator/coverage.h"
@@ -482,6 +483,85 @@ TEST_F(VcdKeywordCommandsE2E, DumpvarsSectionCoversOnlySelectedVariables) {
   // Negative form: the unselected variable contributes no record -- its
   // identifier code never appears inside the section.
   EXPECT_EQ(dumpvars.find('"'), std::string::npos) << dumpvars;
+}
+
+// §21.7.2.3: "The $timescale keyword specifies what timescale was used for the
+// simulation", and Syntax 21-20 spells the command as a time_number of 1, 10
+// or 100 followed by a time_unit of s, ms, us, ns, ps or fs. What the section
+// names is the unit the simulation_time commands under it are counted in, so
+// it has to follow the precision the design elaborated to; a fixed unit puts
+// every time in the file out by whatever factor separates the two.
+//
+// These cases run the source's own $dumpfile and $dumpvars, because the unit
+// is read off the design's precision at the moment the dump is opened. A
+// writer a test constructs and hands a timescale to cannot disagree with the
+// string it was handed, which is why the cases above -- and every other §21.7
+// case driven through VcdDumpRunTestBase -- say nothing about this.
+class VcdTimescaleFromSource : public VcdDumpFromSourceTestBase {
+ protected:
+  // The dump file every source below names. Relative, so it lands in the
+  // scratch directory the fixture stands the run in.
+  static constexpr const char* kDumpName = "ts.vcd";
+
+  // The dump left by a module declaring `unit` and `precision` that opens a
+  // dump and moves a dumped variable one of its time units later. The file
+  // carries both the $timescale section and a simulation_time command whose
+  // value came out of the same precision, so a test can ask whether the two
+  // agree rather than only what the section says.
+  std::string DumpAfterOneUnit(const std::string& unit,
+                               const std::string& precision) {
+    RunSource(
+        "module t;\n"
+        "  timeunit " +
+        unit + ";\n  timeprecision " + precision +
+        ";\n"
+        "  logic a;\n"
+        "  initial begin\n"
+        "    a = 0;\n"
+        "    $dumpfile(\"" +
+        std::string(kDumpName) +
+        "\");\n"
+        "    $dumpvars;\n"
+        "    #1 a = 1;\n"
+        "  end\n"
+        "endmodule\n");
+    return DumpFile(kDumpName);
+  }
+};
+
+// §21.7.2.3: the timescale the section states is the one the simulation used.
+// A design whose precision is a picosecond counts its value change times in
+// picoseconds, so the section names ps -- and naming ns beside those times
+// would place every change a thousand times later than it happened.
+TEST_F(VcdTimescaleFromSource, TimescaleNamesTheDesignsOwnPrecision) {
+  auto timescale = Section(DumpAfterOneUnit("1ns", "1ps"), "$timescale");
+  ASSERT_FALSE(timescale.empty());
+  auto toks = Tokens(timescale);
+  EXPECT_EQ(CountToken(toks, "1ps"), 1u) << timescale;
+  // Negative form: the unit the design did not run at appears nowhere in it.
+  EXPECT_EQ(CountToken(toks, "1ns"), 0u) << timescale;
+}
+
+// §21.7.2.3 with §21.7.2.4: each simulation_time command is a count of the
+// units the $timescale section named. A module whose time unit is a
+// nanosecond and whose precision is a picosecond turns its `#1` into a
+// thousand ticks, so the change is stamped #1000 and the section has to say
+// 1ps for that stamp to mean one nanosecond. This case is what shows the two
+// agreeing with each other rather than the section merely being written.
+TEST_F(VcdTimescaleFromSource, ValueChangeTimesAreCountedInTheStatedUnit) {
+  auto content = DumpAfterOneUnit("1ns", "1ps");
+  EXPECT_TRUE(HasLine(AllLines(content), "#1000")) << content;
+  EXPECT_EQ(CountToken(Tokens(Section(content, "$timescale")), "1ps"), 1u)
+      << content;
+}
+
+// §21.7.2.3: a design that does run at nanosecond precision is named as such.
+// Without this case, a unit derived wrongly but consistently -- one step finer
+// than the design's, say -- satisfies both cases above.
+TEST_F(VcdTimescaleFromSource, TimescaleNamesNsWhenThatIsTheDesignsPrecision) {
+  auto timescale = Section(DumpAfterOneUnit("1ns", "1ns"), "$timescale");
+  ASSERT_FALSE(timescale.empty());
+  EXPECT_EQ(CountToken(Tokens(timescale), "1ns"), 1u) << timescale;
 }
 
 }  // namespace
