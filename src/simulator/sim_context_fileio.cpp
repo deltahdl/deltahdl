@@ -106,6 +106,19 @@ bool SimContext::RegisterDumpportsTime(uint64_t time) {
   return time == dumpports_time_;
 }
 
+// §21.7.1.2: $dumpvars "can be invoked as often as desired throughout the model
+// (for example, within various blocks), but the execution of all the $dumpvars
+// tasks shall be at the same simulation time". The first call records its time;
+// a later call passes only when it matches.
+bool SimContext::RegisterDumpvarsTime(uint64_t time) {
+  if (!have_dumpvars_time_) {
+    have_dumpvars_time_ = true;
+    dumpvars_time_ = time;
+    return true;
+  }
+  return time == dumpvars_time_;
+}
+
 void SimContext::SetDumpFileLiteral(std::string text) {
   dump_file_literal_ = std::move(text);
 }

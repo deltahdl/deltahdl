@@ -346,6 +346,16 @@ static std::string DumpvarsScopePath(const Expr* arg) {
 // does not apply to scope arguments that name an individual variable.
 static void ExecDumpvars(const Expr* expr, SimContext& ctx, Arena& arena,
                          VcdWriter* vcd) {
+  // §21.7.1.2: $dumpvars "can be invoked as often as desired throughout the
+  // model (for example, within various blocks), but the execution of all the
+  // $dumpvars tasks shall be at the same simulation time."
+  if (!ctx.RegisterDumpvarsTime(ctx.CurrentTime().ticks)) {
+    ctx.GetDiag().Error(
+        expr->range.start,
+        "all $dumpvars tasks must execute at the same simulation time",
+        Subclause("21.7.1.2"));
+    return;
+  }
   if (!vcd) return;
   std::vector<std::string> scope_storage;
   for (size_t i = 1; i < expr->args.size(); ++i) {

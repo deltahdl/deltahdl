@@ -4,6 +4,7 @@
 #include "fixture_vcd.h"
 #include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
+#include "helpers_reported_error.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
 
@@ -388,6 +389,76 @@ TEST_F(DumpvarsSelectsWhatIsRecorded,
                     "    $dumpvars(0, alpha);\n"));
   EXPECT_NE(content.find("b10100101"), std::string::npos) << content;  // alpha
   EXPECT_NE(content.find("b111100"), std::string::npos) << content;    // beta
+}
+
+// §21.7.1.2: "The $dumpvars task can be invoked as often as desired throughout
+// the model (for example, within various blocks), but the execution of all the
+// $dumpvars tasks shall be at the same simulation time." The rule is over the
+// times the calls run at rather than over the calls, so a case has to hold the
+// fixture to read what the run reported.
+class DumpvarsCallTimes : public VcdDumpRunTestBase {
+ protected:
+  std::string RunVcd(SimFixture& f, const std::string& src) {
+    return RunVcdDump(f, src);
+  }
+};
+
+// Two calls in different time units break the rule, and the second is where it
+// breaks: the first call is what settled the time every later one must match.
+TEST_F(DumpvarsCallTimes, ACallInAnotherTimeUnitIsReported) {
+  SimFixture f;
+  RunVcd(f,
+         "module t;\n"
+         "  logic [7:0] a;\n"
+         "  logic [7:0] b;\n"
+         "  initial begin\n"
+         "    a = 8'hA5;\n"
+         "    $dumpvars(0, a);\n"
+         "    #1 b = 8'h3C;\n"
+         "    $dumpvars(0, b);\n"
+         "  end\n"
+         "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "all $dumpvars tasks must execute at the same simulation time", 8,
+      "21.7.1.2"));
+}
+
+// "As often as desired throughout the model (for example, within various
+// blocks)" is the permission the rule bounds, so two calls from two blocks in
+// one time unit are what the subclause allows rather than what it forbids.
+TEST_F(DumpvarsCallTimes, TwoCallsInOneTimeUnitFromTwoBlocksAreAccepted) {
+  SimFixture f;
+  RunVcd(f,
+         "module t;\n"
+         "  logic [7:0] a;\n"
+         "  logic [7:0] b;\n"
+         "  initial begin\n"
+         "    a = 8'hA5;\n"
+         "    $dumpvars(0, a);\n"
+         "  end\n"
+         "  initial begin\n"
+         "    b = 8'h3C;\n"
+         "    $dumpvars(0, b);\n"
+         "  end\n"
+         "endmodule\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// The rule names one time and does not say which: the first call settles it.
+// A lone call in a later time unit is therefore accepted, where a rule read as
+// "at time zero" would reject it.
+TEST_F(DumpvarsCallTimes, AloneCallAfterADelayIsAccepted) {
+  SimFixture f;
+  RunVcd(f,
+         "module t;\n"
+         "  logic [7:0] a;\n"
+         "  initial begin\n"
+         "    a = 8'hA5;\n"
+         "    #5 $dumpvars(0, a);\n"
+         "  end\n"
+         "endmodule\n");
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace

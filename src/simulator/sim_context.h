@@ -364,6 +364,12 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // $dumpports tasks shall be at the same simulation time. The first call
   // records its time; a later call passes only when it matches.
   bool RegisterDumpportsTime(uint64_t time);
+  // §21.7.1.2: $dumpvars may be invoked as often as desired, but the execution
+  // of all the $dumpvars tasks shall be at the same simulation time. The first
+  // call records its time; a later call passes only when it matches. Separate
+  // from RegisterDumpportsTime because §21.7.1.2 and §21.7.3.1 are two rules
+  // over two sets of calls, and a source may call only one of the two tasks.
+  bool RegisterDumpvarsTime(uint64_t time);
 
   // §35: the one registry the run's DPI calls go through. EvalDpiCall reaches
   // an import through it, so the clause 35 rules DpiRuntime holds -- §35.5.2's
@@ -783,6 +789,10 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // execute, recorded by the first call.
   bool have_dumpports_time_ = false;
   uint64_t dumpports_time_ = 0;
+  // §21.7.1.2: the one simulation time at which every $dumpvars call must
+  // execute, recorded by the first call.
+  bool have_dumpvars_time_ = false;
+  uint64_t dumpvars_time_ = 0;
   DpiRuntime* dpi_runtime_ = nullptr;
   Process* current_process_ = nullptr;
   // The instance being built. See SetLoweringInstancePrefix.
