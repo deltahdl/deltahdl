@@ -13,6 +13,7 @@
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
+#include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
@@ -328,6 +329,11 @@ static void RecomputeRhsInto(Variable* var, const Expr* rhs, SimContext& ctx,
 struct RhsWatcherSpec {
   std::function<bool()> still_valid;
   bool forced;
+  // §10.6.2: the net the force is standing on, when the target is one. Its
+  // reported strength is the force's while the force is in effect, so a
+  // recomputed forced value re-resolves it; null when the target is a variable,
+  // which carries no strength.
+  Net* net = nullptr;
 };
 
 // Installs, on each variable referenced by `rhs` (other than `var`), a watcher
@@ -340,6 +346,7 @@ static void InstallRhsWatchers(Variable* var, const Expr* rhs, SimContext& ctx,
     rhs_var->AddWatcher([var, rhs, ctx_ptr, arena_ptr, spec]() {
       if (!spec.still_valid()) return true;
       RecomputeRhsInto(var, rhs, *ctx_ptr, *arena_ptr, spec.forced);
+      if (spec.net != nullptr) spec.net->Resolve(*arena_ptr);
       return false;
     });
   }
@@ -349,7 +356,7 @@ static void InstallRhsWatchers(Variable* var, const Expr* rhs, SimContext& ctx,
 // expression `rhs`, then installs watchers on each variable appearing in `rhs`
 // so the forced value is re-evaluated whenever those variables change.
 static void InstallForcedValueWatcher(Variable* var, const Expr* rhs,
-                                      SimContext& ctx, Arena& arena) {
+                                      SimContext& ctx, Arena& arena, Net* net) {
   auto rhs_val = EvalExpr(rhs, ctx, arena);
   var->is_forced = true;
   var->forced_value = rhs_val;
@@ -358,10 +365,16 @@ static void InstallForcedValueWatcher(Variable* var, const Expr* rhs,
   var->proc_cont_rhs = rhs;
   var->NotifyWatchers();
 
+  // §10.6.2: the force overrides the net's drivers from here, so the strength
+  // it reports is settled now rather than at the next driver update -- there
+  // may be no further one, and a net forced before anything drove it has no
+  // strength recorded at all.
+  if (net != nullptr) net->Resolve(arena);
+
   InstallRhsWatchers(
       var, rhs, ctx, arena,
       {[var, rhs]() { return var->is_forced && var->proc_cont_rhs == rhs; },
-       /*forced=*/true});
+       /*forced=*/true, net});
 }
 
 // Reestablishes a continuous assignment on `var` from expression `rhs` after
@@ -390,7 +403,14 @@ StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
   if (!var) return StmtResult::kDone;
 
   if (stmt->kind == StmtKind::kAssign) var->assign_cont_rhs = stmt->rhs;
-  InstallForcedValueWatcher(var, stmt->rhs, ctx, arena);
+  // §10.6.2 makes force a statement on a net as well as on a variable, and the
+  // net is what holds the strength the force settles. A select or a
+  // concatenation target names no net here, the same way a continuous
+  // assignment's does not.
+  Net* net = stmt->lhs->kind == ExprKind::kIdentifier
+                 ? ctx.FindNet(stmt->lhs->text)
+                 : nullptr;
+  InstallForcedValueWatcher(var, stmt->rhs, ctx, arena, net);
 
   return StmtResult::kDone;
 }

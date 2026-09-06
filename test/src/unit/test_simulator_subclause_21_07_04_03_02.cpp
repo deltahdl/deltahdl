@@ -186,8 +186,10 @@ TEST_F(ExtendedVcdDriversSim, ContinuousAssignmentDriverDumpsActivePort) {
 // §21.7.4.3.2 Claim 1: a procedural continuous assignment is a driver. This
 // driver kind has two syntactic forms; the force/release form is one. Forcing a
 // net high with a force statement drives it, and the writer dumps it as an
-// active port -- driven value, strong strength -- just like the other two
-// driver kinds.
+// active port -- the value driven, and the strength on the side the value
+// drives, which §10.3.4 defaults to strong. The 0 side is not driven, so its
+// component is the highz digit, exactly as it is for a net a (pull0, pull1)
+// assignment drives to 1.
 TEST_F(ExtendedVcdDriversSim,
        ForceProceduralContinuousAssignmentDumpsActivePort) {
   auto content = RunPortVcd(
@@ -198,7 +200,7 @@ TEST_F(ExtendedVcdDriversSim,
       "    force w = 1'b1;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_EQ(PortRecord(content, "w"), "1|66") << content;
+  EXPECT_EQ(PortRecord(content, "w"), "1|06") << content;
 }
 
 // §21.7.4.3.2 Claim 1: the assign/deassign form is the other syntactic position

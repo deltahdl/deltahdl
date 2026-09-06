@@ -343,4 +343,70 @@ TEST(ForceReleaseSim, ForceOverridesModuleOutputDriver) {
   EXPECT_EQ(w->value.ToUint64(), 10u);
 }
 
+// §10.6.2: "A force procedural statement on a net shall override all drivers of
+// the net -- gate outputs, module outputs, and continuous assignments -- until
+// a release procedural statement is executed on the net." Overridden drivers
+// are not driving, so the strength the net reports is the force's and not
+// theirs. §10.6 gives force no drive_strength syntax, so the strength is the
+// (strong1, strong0) §10.3.4 defaults to, which §21.2.1.4 renders St1.
+//
+// A pull1 continuous assignment is what the force overrides here: driver and
+// force disagree about the level while agreeing about the value, so a net
+// reporting Pu1 is reporting the driver it is not carrying.
+TEST(ForceReleaseSim,
+     ForcedNetReportsTheForcesStrengthNotTheDriversItOverrode) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (pull0, pull1) w = 1'b1;\n"
+      "  initial begin\n"
+      "    #1 force w = 1'b1;\n"
+      "    #1 $display(\"%v\", w);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("St1"), std::string::npos) << out;
+  EXPECT_EQ(out.find("Pu1"), std::string::npos) << out;
+}
+
+// §10.6.2: the force is the net's source from the moment it executes, so a net
+// forced before anything drove it carries a strength too. Reporting the
+// strength only when a driver update happens to re-resolve the net leaves this
+// one at high impedance while it carries a value.
+TEST(ForceReleaseSim, NetForcedWithNoDriverStillReportsAStrength) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module m;\n"
+      "  wire w;\n"
+      "  initial begin\n"
+      "    force w = 1'b0;\n"
+      "    #1 $display(\"%v\", w);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("St0"), std::string::npos) << out;
+  EXPECT_EQ(out.find("HiZ"), std::string::npos) << out;
+}
+
+// §10.6.2: "When released, the net shall immediately be assigned the value
+// determined by the drivers of the net" -- and the strength with it, the
+// drivers being what drives again. Without this case, reporting the force's
+// strength for good satisfies the two above.
+TEST(ForceReleaseSim, ReleasedNetReportsItsDriversStrengthAgain) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (pull0, pull1) w = 1'b1;\n"
+      "  initial begin\n"
+      "    #1 force w = 1'b1;\n"
+      "    #1 release w;\n"
+      "    #1 $display(\"%v\", w);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("Pu1"), std::string::npos) << out;
+}
+
 }  // namespace

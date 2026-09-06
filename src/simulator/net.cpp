@@ -709,10 +709,38 @@ static Logic4Vec CombineAllDrivers(const std::vector<Logic4Vec>& drivers,
   return result;
 }
 
+// §10.6.2: "A force procedural statement on a net shall override all drivers of
+// the net -- gate outputs, module outputs, and continuous assignments -- until
+// a release procedural statement is executed on the net." So while the force
+// stands the net has one source and it is the force, and the strength it
+// reports is that source's rather than the overridden drivers'.
+//
+// Which strength that is: §10.6 gives force no drive_strength syntax to carry
+// one, and §10.3.4 defaults a continuous assignment that specifies none to
+// (strong1, strong0). §21.7.4.3.2 counts a procedural continuous assignment
+// among the drivers a port record reports, so there is something to report and
+// the default is what it is. The forced value is folded through the same
+// per-bit machinery an ordinary driver goes through, so a forced 0 lands on the
+// 0 side, a forced 1 on the 1 side, a forced x on both (§28.12.2) and a forced
+// z on neither.
+static void ResolveForcedStrength(Net& net) {
+  std::vector<Logic4Vec> drivers{net.resolved->value};
+  std::vector<DriverStrength> strengths{{Strength::kStrong, Strength::kStrong}};
+  net.resolved_strength = NetStrength{};
+  for (uint32_t b = 0; b < net.resolved->value.width; ++b) {
+    NetStrength bit_strength;
+    ComputeSingleBitStrength(drivers, strengths, bit_strength, net.type, b);
+    WidenNetStrengthOverBit(net.resolved_strength, bit_strength);
+  }
+}
+
 void Net::Resolve(Arena& arena, Scheduler* sched) {
   if (!resolved) return;
 
-  if (resolved->is_forced) return;
+  if (resolved->is_forced) {
+    ResolveForcedStrength(*this);
+    return;
+  }
 
   // §28.15.3: a supply0/supply1 net models a constant ground/power connection,
   // so it carries value 0/1 at supply strength inherently -- like tri0/tri1, it
