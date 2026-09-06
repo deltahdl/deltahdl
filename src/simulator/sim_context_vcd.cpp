@@ -160,6 +160,10 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
 //
 // An empty top_scope leaves the definitions at the top level rather than
 // inside a $scope.
+VcdDump& SimContext::Dump(VcdFileType type) {
+  return type == VcdFileType::kExtended ? extended_dump_ : four_state_dump_;
+}
+
 VcdWriter* SimContext::OpenVcdDump(std::string_view top_scope,
                                    bool wait_for_dumpvars, VcdFileType type) {
   // §21.7.3.1 lets one source call $dumpports and $dumpvars both, and gives

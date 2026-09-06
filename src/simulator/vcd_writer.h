@@ -3,10 +3,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
+#include <memory>
 #include <ostream>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/types.h"
@@ -472,6 +474,20 @@ class VcdWriter {
   // True once any $dumpports start has been scheduled, so a further call is
   // recognized as adding to the existing selection rather than opening it.
   bool port_start_scheduled_ = false;
+};
+
+// §21.7: one of the two dump files a source can ask for -- the writer it is
+// dumped through, the name the file stands under, and the unevaluated source
+// spelling of the argument that named it (§21.7.2.3). `owned` is null when the
+// writer was installed from outside and belongs to its caller, in which case
+// both dumps hold it and neither may destroy it.
+struct VcdDump {
+  explicit VcdDump(std::string default_name)
+      : file_name(std::move(default_name)) {}
+  std::unique_ptr<VcdWriter> owned;
+  VcdWriter* writer = nullptr;
+  std::string file_name;
+  std::string file_literal;
 };
 
 }  // namespace delta

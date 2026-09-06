@@ -119,6 +119,26 @@ bool SimContext::RegisterDumpvarsTime(uint64_t time) {
   return time == dumpvars_time_;
 }
 
+void SimContext::SetDumpFileName(std::string name) {
+  four_state_dump_.file_name = std::move(name);
+}
+
+const std::string& SimContext::GetDumpFileName() const {
+  return four_state_dump_.file_name;
+}
+
+void SimContext::SetDumpportsFileName(std::string name) {
+  extended_dump_.file_name = std::move(name);
+}
+
+const std::string& SimContext::GetDumpportsFileName() const {
+  return extended_dump_.file_name;
+}
+
+const std::string& SimContext::GetDumpFileLiteral() const {
+  return four_state_dump_.file_literal;
+}
+
 // §21.7.2.3: the literal belongs to the 4-state dump, because $dumpfile is the
 // task the $version entry reproduces and §21.7.1.1 gives $dumpfile the 4-state
 // file. An extended dump the same source opened carries no such entry until a
