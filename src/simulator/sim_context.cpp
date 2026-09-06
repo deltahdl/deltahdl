@@ -683,6 +683,15 @@ void SimContext::RegisterArrayInScope(std::string_view name,
   RegisterArray(name, info);
 }
 
+void SimContext::RegisterStringVariable(std::string_view name) {
+  if (auto* var = FindVariable(name)) var->is_string = true;
+}
+
+bool SimContext::IsStringVariable(std::string_view name) {
+  const auto* var = FindVariable(name);
+  return var != nullptr && var->is_string;
+}
+
 ArrayInfo* SimContext::FindArrayInfo(std::string_view name) {
   return const_cast<ArrayInfo*>(std::as_const(*this).FindArrayInfo(name));
 }

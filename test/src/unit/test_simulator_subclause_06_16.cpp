@@ -604,4 +604,80 @@ TEST(StringDataType, AnElementOfAnArrayOfStringsDisplaysItsCharacters) {
             "planet\n");
 }
 
+// §6.16 makes a variable a string by its declaration, and §6.21 scopes a
+// declaration inside a task to that task, so a `string tag;` in one task says
+// nothing about a `tag` declared elsewhere. The mark used to be a set of
+// unqualified names that nothing erased, so the first declaration made every
+// variable called `tag` a string for the rest of the run: the second task's
+// integer was rendered as characters, 65 printing as A.
+//
+// The string task runs first, so the mark is in place when the second reads.
+// Running it second would leave the case passing whatever keyed the mark.
+TEST(StringSim, AStringInOneTaskDoesNotMakeALikeNamedVariableAStringElsewhere) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  task mark();\n"
+                       "    string tag;\n"
+                       "    tag = \"x\";\n"
+                       "  endtask\n"
+                       "  task show();\n"
+                       "    int tag;\n"
+                       "    tag = 65;\n"
+                       "    $display(tag);\n"
+                       "  endtask\n"
+                       "  initial begin\n"
+                       "    mark();\n"
+                       "    show();\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "65\n");
+}
+
+// The same rule for a block rather than a task, and for a name that no longer
+// has any declaration at all when it is read. §6.21 gives a begin-end block's
+// declaration the block's lifetime, so leaving the block releases the name;
+// this fails even where no two declarations are live at once, which is the half
+// a case with two live declarations cannot state.
+TEST(StringSim, AStringDeclarationDoesNotOutliveTheBlockThatDeclaredIt) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  initial begin\n"
+                       "    begin\n"
+                       "      string s;\n"
+                       "      s = \"x\";\n"
+                       "    end\n"
+                       "    begin\n"
+                       "      int s;\n"
+                       "      s = 66;\n"
+                       "      $display(s);\n"
+                       "    end\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "66\n");
+}
+
+// §18.17 scopes a production identifier to the randsequence statement that
+// declares it, so the implicit variable a string-returning production writes --
+// registered under the production's own name -- says nothing about a variable
+// of that name after the statement. The randsequence is a second writer of the
+// same registry and reaches it by its own path.
+TEST(StringSim, AStringProductionNameDoesNotMarkALaterVariable) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  int op;\n"
+                       "  initial begin\n"
+                       "    randsequence(main)\n"
+                       "      void main : op ;\n"
+                       "      string op : { return \"+\"; };\n"
+                       "    endsequence\n"
+                       "    op = 67;\n"
+                       "    $display(op);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "67\n");
+}
+
 }  // namespace

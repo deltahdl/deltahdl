@@ -16,6 +16,19 @@ struct Variable {
   Logic4Vec value{};
   Logic4Vec prev_value{};
 
+  // §6.16: whether this variable is a string, which decides whether its value
+  // is read as text -- the %s rendering over a task's default radix, the
+  // §6.16.1 through §6.16.15 methods resolving on it, and an assignment going
+  // through StripStringZeros.
+  //
+  // It lives on the variable because it used to live in a set of names.
+  // SimContext::string_vars_ keyed the unqualified text and was erased by
+  // nothing, so one block-local `string s;` made every variable called `s` a
+  // string for the rest of the run, everywhere in the design. What identifies
+  // a variable is the variable, and every reader already holds it or can find
+  // it by the same lookup the mark now hangs off.
+  bool is_string = false;
+
   // §30.5.3: the simulation time this variable's value last changed, in ticks.
   // "Active specify paths are those whose input has transitioned most recently
   // in time", and choosing among the module paths reaching one output is the

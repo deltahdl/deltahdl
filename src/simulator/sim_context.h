@@ -496,6 +496,21 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // A module-level declaration has no local scope to belong to and keeps the
   // run-long registration it always had.
   void RegisterArrayInScope(std::string_view name, const ArrayInfo& info);
+
+  // §6.16: marks the variable `name` finds a string, and answers whether the
+  // one it finds is. The mark is Variable::is_string, so it belongs to the
+  // variable rather than to the text of a name: a set keyed on the unqualified
+  // text and erased by nothing made one block-local `string s;` mark every
+  // variable called `s` for the rest of the run, everywhere in the design.
+  //
+  // Marking a name no variable answers to marks nothing, which is what a
+  // registration made before the variable exists would do; every caller
+  // creates the variable first.
+  //
+  // The query is not const because FindVariable is not, the lookup walking
+  // scope frames it hands out mutable variables from.
+  void RegisterStringVariable(std::string_view name);
+  bool IsStringVariable(std::string_view name);
   ArrayInfo* FindArrayInfo(std::string_view name);
   const ArrayInfo* FindArrayInfo(std::string_view name) const;
 

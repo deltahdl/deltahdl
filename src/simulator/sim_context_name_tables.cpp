@@ -69,14 +69,6 @@ void DeclaredNameTables::RegisterNestedDeclScope(std::string_view prefix) {
   nested_decl_scopes_.insert(std::string(prefix));
 }
 
-void DeclaredNameTables::RegisterStringVariable(std::string_view name) {
-  string_vars_.insert(name);
-}
-
-bool DeclaredNameTables::IsStringVariable(std::string_view name) const {
-  return string_vars_.count(name) != 0;
-}
-
 void DeclaredNameTables::RegisterChandleVariable(std::string_view name) {
   chandle_vars_.insert(name);
 }
