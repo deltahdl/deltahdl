@@ -422,4 +422,36 @@ TEST(ProgramConstruct, ProgramSignalRefInARandsequenceCodeBlockIsError) {
                             8, "24.3"));
 }
 
+// §24.3: "anonymous programs shall not contain hierarchical references to other
+// program scopes", and the clause puts no condition on where in the anonymous
+// program the reference stands. A.1.11 admits a class_declaration as an
+// anonymous_program_item, so a method of such a class is in the anonymous
+// program and the reference it makes is one the clause reaches.
+//
+// The walk read an anonymous program's task and function bodies and never the
+// methods of a class it declares, so this legal placement of an illegal
+// reference went unreported. It is the opposite direction from §24.6's rule --
+// a reference out of an anonymous program rather than into one -- and each rule
+// walks the classes its own side reaches.
+TEST(ProgramConstruct, ProgramSignalRefFromAnAnonymousProgramClassIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "program ps;\n"
+      "  int sampled;\n"
+      "endprogram\n"
+      "program;\n"
+      "  class C;\n"
+      "    function void work();\n"
+      "      ps.sampled = 1;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endprogram\n"
+      "module top; endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference to program signal from "
+                            "outside the program is not permitted",
+                            7, "24.3"));
+}
+
 }  // namespace

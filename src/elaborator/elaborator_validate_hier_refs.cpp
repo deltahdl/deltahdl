@@ -325,6 +325,23 @@ static void CheckScopeItemsForAnonymousProgramHierRefs(
       for (const auto* s : item->func_body_stmts)
         WalkStmtsForProgramRef(s, program_names, diag);
     }
+    // A.1.11 admits a class_declaration as an anonymous_program_item, and
+    // §24.3 says "anonymous programs shall not contain hierarchical references
+    // to other program scopes" without saying where in the anonymous program
+    // the reference may stand. A method of such a class is in it.
+    //
+    // This is the other direction from the §24.6 rule above -- a reference out
+    // of an anonymous program rather than into one -- and the class arm serves
+    // both only because each walks the methods of the classes its own rule
+    // reaches.
+    if (item->class_decl != nullptr) {
+      for (const auto* member : item->class_decl->members) {
+        if (member == nullptr || member->method == nullptr) continue;
+        for (const auto* s : member->method->func_body_stmts) {
+          WalkStmtsForProgramRef(s, program_names, diag);
+        }
+      }
+    }
   }
 }
 
@@ -587,6 +604,22 @@ static void CheckItemForProgramWideSpaceAccess(
   }
   for (const auto* s : item->func_body_stmts)
     WalkStmtForProgramWideSpaceAccess(s, body_names, diag);
+  // A.1.11 admits a class_declaration into an anonymous program and §24.6's
+  // note bars a reference to one of its declarations from "outside any program
+  // block", naming no position such a reference may not stand in. A class
+  // method is outside every program block, so a reference written in one is
+  // reached by the note exactly as one written beside it is -- and a class is
+  // where a verification environment puts its code.
+  //
+  // A method is itself a ModuleItem, so it is read by this same function, which
+  // also carries a class nested in a class.
+  if (item->class_decl != nullptr) {
+    for (const auto* member : item->class_decl->members) {
+      if (member != nullptr && member->method != nullptr) {
+        CheckItemForProgramWideSpaceAccess(member->method, names, diag);
+      }
+    }
+  }
 }
 
 void Elaborator::ValidateProgramWideSpaceAccess(const ModuleDecl* decl) {
@@ -648,6 +681,24 @@ void Elaborator::ValidateProgramWideSpaceAccessInPackageAndCuScopes() {
   for (const auto* pkg : unit_->packages) {
     CheckScopeItemsForProgramWideSpaceAccess(pkg->items,
                                              anonymous_program_names_, diag_);
+  }
+  // A class written at compilation-unit scope stands in
+  // CompilationUnit::classes rather than in cu_items, so it is reached by a
+  // route of its own and is missed by the two lists above.
+  //
+  // Every class here is outside any anonymous program, and so is every method
+  // of one: an anonymous program's body is parsed through ParseModuleItem into
+  // cu_items, where FilterAnonymousProgramItems marks it, and the class arm of
+  // CheckScopeItemsForProgramWideSpaceAccess skips it there. Nothing marked
+  // reaches this list, so nothing here needs the guard that walk carries.
+  for (const auto* cls : unit_->classes) {
+    if (cls == nullptr) continue;
+    for (const auto* member : cls->members) {
+      if (member != nullptr && member->method != nullptr) {
+        CheckItemForProgramWideSpaceAccess(member->method,
+                                           anonymous_program_names_, diag_);
+      }
+    }
   }
 }
 

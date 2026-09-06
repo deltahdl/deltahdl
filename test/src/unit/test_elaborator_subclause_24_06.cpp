@@ -496,4 +496,82 @@ TEST(AnonymousProgramWideSpace,
                             6, "24.6"));
 }
 
+// §24.6's note bars a reference to an anonymous program's declaration from
+// "outside any program block" and names no position such a reference may not
+// stand in. A class method is outside every program block, and the walk read an
+// item's own statements and never the methods of a class it declares -- so
+// putting the call in a class rather than beside it was enough to get past the
+// rule, and a class is where a verification environment puts its code.
+//
+// The same call written in the module's own initial block is reported already,
+// so only the placement can fail this.
+TEST(AnonymousProgramWideSpace, ACallFromAClassMethodInAModuleIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "program;\n"
+      "  task t(); endtask\n"
+      "endprogram\n"
+      "module top;\n"
+      "  class C;\n"
+      "    function void work();\n"
+      "      t();\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an identifier declared inside an anonymous "
+                            "program cannot be referenced outside any program "
+                            "block",
+                            7, "24.6"));
+}
+
+// A class written at compilation-unit scope stands in
+// CompilationUnit::classes rather than in cu_items, so it reaches the walk by a
+// route of its own and is missed on its own: the case above would pass over a
+// fix that read only the classes an item list carries.
+TEST(AnonymousProgramWideSpace,
+     ACallFromACompilationUnitClassMethodIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "program;\n"
+      "  task t(); endtask\n"
+      "endprogram\n"
+      "class C;\n"
+      "  function void work();\n"
+      "    t();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module top; endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an identifier declared inside an anonymous "
+                            "program cannot be referenced outside any program "
+                            "block",
+                            6, "24.6"));
+}
+
+// The class arm selects the reference and not the name: a method declaring `t`
+// of its own is reading its own, and §24.6 shares the anonymous program's name
+// space with nothing below the enclosing scope. Without this the two cases
+// above are satisfied by an arm that reports every mention.
+TEST(AnonymousProgramWideSpace, AClassMethodLocalOfTheSameNameIsNotReported) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "program;\n"
+      "  task t(); endtask\n"
+      "endprogram\n"
+      "module top;\n"
+      "  class C;\n"
+      "    function void work();\n"
+      "      int t;\n"
+      "      t = 1;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
