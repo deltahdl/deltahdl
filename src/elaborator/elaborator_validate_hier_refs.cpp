@@ -49,10 +49,41 @@ static bool ExprRefersToChecker(
   return false;
 }
 
+// §23.6 ends "Hierarchical references into checkers (see Clause 17) shall not
+// be permitted", and §23.7 decides which dotted names are hierarchical at all:
+// "the first component of the name matches a scope name while the first name
+// component of a member select matches a data object or interface port name",
+// settled by resolving that first component, after which "The name resolves to
+// a data object or interface port. The dotted name shall be considered to be a
+// select of that data object or interface port." §23.9 says which declaration
+// the first component reaches -- "If it is declared locally, then the local
+// item shall be used" -- and it lists a begin-end block among the scopes a
+// declaration can be local to. So a name that merely spells a checker
+// instance's identifier is a member select of the local, not a hierarchical
+// reference into the checker, and this rule, which resolves nothing, reported
+// one: a block-local `chk_inst` was refused for `chk_inst.a` wherever the
+// module held a checker instance named `chk_inst`.
+//
+// The set is therefore taken by value and narrowed as the walk enters a scope,
+// never widened on the way out -- the shape WalkStmtsForProgramRef below
+// already uses for §24.3. What is erased is the declared name, because that is
+// the component ExprRefersToChecker matches: HierRefLeftmost reduces
+// `chk_inst.a` to `chk_inst`, so a declaration of `chk_inst` is what shadows it
+// and a declaration of `a` is not. A block's declarations are erased before its
+// statements are read, since a declaration and the use it shadows are siblings
+// under the block rather than one inside the other.
+//
+// ExprRefersToChecker keeps the set by reference: an expression declares
+// nothing, so the narrowing this walk has already done is the whole of what it
+// needs, and it is passed the narrowed set from here.
 static void WalkStmtsForCheckerRef(
-    const Stmt* s, const std::unordered_set<std::string_view>& checker_names,
+    const Stmt* s, std::unordered_set<std::string_view> checker_names,
     DiagEngine& diag) {
   if (!s) return;
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    if (sub != nullptr && sub->kind == StmtKind::kVarDecl)
+      checker_names.erase(sub->var_name);
+  });
   if (s->lhs && ExprRefersToChecker(s->lhs, checker_names))
     diag.Error(s->range.start,
                "hierarchical reference into a checker is not permitted",
@@ -112,10 +143,32 @@ void Elaborator::ValidateHierRefIntoChecker(const ModuleDecl* decl) {
 // §17.7.1 forbids in a randcase item or in a randsequence code block. The walk
 // descends them anyway: what a checker procedure may hold is §17.5's rule to
 // report, not a reason to keep a shorter list here.
+//
+// §23.9 decides which declaration the assignment target reaches -- "If it is
+// declared locally, then the local item shall be used" -- and it lists a
+// begin-end block among the scopes a declaration can be local to. So a
+// block-local named after a free variable is what an assignment to that name
+// updates, the free variable is not written at all, and this rule, which
+// resolves nothing, refused one. The set is therefore taken by value and
+// narrowed as the walk enters a scope, never widened on the way out, and the
+// erase is keyed on the free variable's own name, because that is what
+// HierRefLeftmost reduces the assignment target to.
+//
+// The narrowing runs below the checker body rather than at it.
+// ValidateFreeCheckerVariableAssignments builds the set from the checker's own
+// declarations, so a second declaration of one of those names in the checker
+// body is the collision §23.9 forbids -- "An identifier shall be used to
+// declare only one item within a scope" -- rather than a different variable an
+// assignment could reach. Only a scope below the body can hold that other
+// variable.
 static void WalkStmtsForFreeBlockingAssign(
-    const Stmt* s, const std::unordered_set<std::string_view>& free_vars,
+    const Stmt* s, std::unordered_set<std::string_view> free_vars,
     DiagEngine& diag) {
   if (!s) return;
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    if (sub != nullptr && sub->kind == StmtKind::kVarDecl)
+      free_vars.erase(sub->var_name);
+  });
   if (s->kind == StmtKind::kBlockingAssign && s->lhs) {
     auto target = HierRefLeftmost(s->lhs);
     if (!target.empty() && free_vars.count(target))

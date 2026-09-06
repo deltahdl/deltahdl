@@ -568,4 +568,66 @@ TEST(HierarchicalNameElaboration,
                             9, "23.6"));
 }
 
+// §23.6 bars a hierarchical reference into a checker, and §23.7 decides which
+// dotted names are hierarchical: the first component is resolved, and where it
+// "resolves to a data object or interface port. The dotted name shall be
+// considered to be a select of that data object or interface port." §23.9 says
+// which declaration that first component reaches -- "If it is declared locally,
+// then the local item shall be used" -- and a begin-end block is one of the
+// scopes it lists, so a block-local `chk_inst` is what `chk_inst.a` selects
+// from and the checker instance is not reached at all.
+//
+// The rule resolved nothing: it matched the leftmost component of a member
+// access against the set of checker instance names, so this legal source was
+// refused. The local carries the checker instance's name deliberately; one
+// named anything else cannot fail.
+TEST(HierarchicalNameElaboration,
+     ABlockLocalOfACheckerInstanceNameIsNotAHierRefIntoTheChecker) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "checker my_chk;\n"
+      "  logic captured;\n"
+      "endchecker\n"
+      "module m;\n"
+      "  my_chk chk_inst();\n"
+      "  typedef struct { int a; } s_t;\n"
+      "  int q;\n"
+      "  initial begin\n"
+      "    s_t chk_inst;\n"
+      "    q = chk_inst.a;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The true positive beside the case above: the same block with the shadowing
+// declaration taken out, so the leftmost component reaches the checker instance
+// and §23.6's closing sentence applies. A fix that silenced the rule wherever a
+// member access stood inside a procedure would pass the case above and fail
+// this one, which is what makes the two a pair rather than one acceptance.
+// HierarchicalReferenceIntoCheckerProhibited above covers the same rule over a
+// continuous assignment, which no statement walk reads.
+TEST(HierarchicalNameElaboration,
+     ACheckerRefInABlockWithNoShadowingDeclarationIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker my_chk;\n"
+      "  logic captured;\n"
+      "endchecker\n"
+      "module m;\n"
+      "  my_chk chk_inst();\n"
+      "  int q;\n"
+      "  initial begin\n"
+      "    q = chk_inst.captured;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference into a checker is not "
+                            "permitted",
+                            8, "23.6"));
+}
+
 }  // namespace

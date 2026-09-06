@@ -391,4 +391,57 @@ TEST(CheckerVariableAssignment,
       "17.7.1"));
 }
 
+// §17.7.1 bars a blocking assignment to a free checker variable, and §23.9
+// decides which declaration the assignment target reaches -- "If it is declared
+// locally, then the local item shall be used" -- listing a begin-end block
+// among the scopes a declaration can be local to. So the `x` assigned below is
+// the block's own `bit x`, the free variable is not written at all, and nothing
+// is illegal here.
+//
+// The rule resolved nothing: it matched the leftmost component of the target
+// against the set of free variable names, so this legal source was refused. The
+// local carries the free variable's name deliberately; one named anything else
+// cannot fail. The procedure is always_comb because a blocking assignment in an
+// always_ff is separately illegal under §17.5.
+TEST(CheckerVariableAssignment,
+     ABlockLocalOfAFreeVariableNameIsNotAFreeVariableAssignment) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "checker chk(input logic a, input logic b);\n"
+      "  rand bit x;\n"
+      "  always_comb begin\n"
+      "    bit x;\n"
+      "    x = a & b;\n"
+      "  end\n"
+      "endchecker\n",
+      f, "chk");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The true positive beside the case above: the same procedure with the
+// shadowing declaration taken out, so the target reaches the free variable and
+// §17.7.1's "Continuous assignments and blocking procedural assignments to free
+// checker variables shall be illegal" applies. A fix that silenced the rule
+// wherever the assignment stood inside a block would pass the case above and
+// fail this one. BlockingAssignmentToFreeVariableRejected above covers the same
+// rule over a procedure whose body is the assignment itself, with no block
+// between them.
+TEST(CheckerVariableAssignment,
+     ABlockingAssignmentToAFreeVariableWithNoShadowingDeclarationIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(input logic a, input logic b);\n"
+      "  rand bit x;\n"
+      "  always_comb begin\n"
+      "    x = a & b;\n"
+      "  end\n"
+      "endchecker\n",
+      f, "chk");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a blocking assignment cannot target free checker variable 'x'", 4,
+      "17.7.1"));
+}
+
 }  // namespace
