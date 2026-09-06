@@ -232,11 +232,21 @@ static DriverStrength ComputeEffectiveDriverStrength(
 static void ApplyContAssignToNet(const ContAssignDriver& drv,
                                  const ContAssignDrivenValue& driven,
                                  Scheduler* sched, Arena& arena) {
+  // §10.7: "The size of the left-hand side of an assignment forms the context
+  // for the right-hand expression", and a right-hand side of fewer bits "is
+  // padded to the size of the left-hand side", sign-extended where it is
+  // signed. The width is the net's, so a driver narrower than the net it drives
+  // is extended to it here -- pushed as it stands it would drive the low bits
+  // and leave every bit above them to resolve as undriven. ApplyContAssignToNet
+  // is the net's half of the same step ApplyContAssignToVariable takes for a
+  // variable target.
+  auto value =
+      ResizeToWidth(driven.value, drv.net->resolved->value.width, arena);
   if (drv.first) {
-    drv.net->drivers.push_back(driven.value);
+    drv.net->drivers.push_back(value);
     drv.net->driver_strengths.push_back(driven.strength);
   } else {
-    drv.net->drivers[drv.driver_idx] = driven.value;
+    drv.net->drivers[drv.driver_idx] = value;
     drv.net->driver_strengths[drv.driver_idx] = driven.strength;
   }
   // §28.16.2.1: when this update leaves a trireg net with only high-impedance
