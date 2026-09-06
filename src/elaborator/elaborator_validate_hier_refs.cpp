@@ -549,10 +549,35 @@ static void WalkExprForProgramCall(
     WalkExprForProgramCall(elem, program_names, diag, loc);
 }
 
+// §24.5 bars calling a program subroutine, and a program subroutine is one
+// declared in a program. §23.9 decides which declaration a call reaches -- "If
+// it is declared locally, then the local item shall be used" -- and it lists a
+// begin-end block, a task and a function among the scopes a declaration can be
+// local to. So a name that merely spells a program instance's identifier does
+// not name a program, and this rule, which resolves nothing, reported the
+// method call anyway: a block-local `p` was refused for `p.go()` wherever the
+// module held a program instance named `p`.
+//
+// The set is therefore taken by value and narrowed as the walk enters a scope,
+// never widened on the way out -- the shape WalkStmtsForProgramRef above
+// already uses for §24.3. What is erased is the declared name, because that is
+// the component IsProgramSubroutineCallExpr matches: HierRefLeftmost reduces
+// the callee `p.go` to `p`, so a declaration of `p` is what shadows the call
+// and a declaration of `go` is not. A block's declarations are erased before
+// its expressions and its statements are read, since a declaration and the call
+// it shadows are siblings under the block rather than one inside the other.
+//
+// WalkExprForProgramCall keeps the set by reference: an expression declares
+// nothing, so the narrowing this walk has already done is the whole of what it
+// needs, and it is passed the narrowed set from here.
 static void WalkStmtForProgramCall(
-    const Stmt* s, const std::unordered_set<std::string_view>& program_names,
+    const Stmt* s, std::unordered_set<std::string_view> program_names,
     DiagEngine& diag) {
   if (!s) return;
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    if (sub != nullptr && sub->kind == StmtKind::kVarDecl)
+      program_names.erase(sub->var_name);
+  });
   auto loc = s->range.start;
   WalkExprForProgramCall(s->lhs, program_names, diag, loc);
   WalkExprForProgramCall(s->rhs, program_names, diag, loc);
@@ -758,6 +783,12 @@ void Elaborator::ValidateProgramWideSpaceAccessInPackageAndCuScopes() {
 void Elaborator::ValidateProgramSubroutineCall(const ModuleDecl* decl) {
   if (program_inst_names_.empty()) return;
   if (decl->decl_kind == ModuleDeclKind::kProgram) return;
+  // No name is erased at module level, where the walk below erases the names a
+  // block declares, for the reason ValidateHierRefIntoProgram above states:
+  // program_inst_names_ holds instance and nested-program names of this very
+  // module, so an item of the module declaring one of them again is the
+  // collision §23.9 forbids rather than a different subroutine a call could
+  // reach. Only a scope below the module can hold that other subroutine.
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       WalkExprForProgramCall(item->assign_lhs, program_inst_names_, diag_,

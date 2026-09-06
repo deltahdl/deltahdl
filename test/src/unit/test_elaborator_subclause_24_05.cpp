@@ -197,4 +197,90 @@ TEST(ProgramSubroutineCall, ProgramTaskCallInARandsequenceCodeBlockIsError) {
                             7, "24.5"));
 }
 
+// §24.5 bars "calling program subroutines from within design modules", and a
+// program subroutine is one declared in a program. §23.9 decides which
+// declaration a call reaches -- "If it is declared locally, then the local item
+// shall be used" -- and it lists a begin-end block among the scopes a
+// declaration can be local to, so `p.go()` under a block-local `p` calls that
+// object's method and reaches the nested program not at all.
+//
+// The rule resolved nothing: IsProgramSubroutineCallExpr matched the leftmost
+// component of the callee against the set of program instance names, so this
+// legal source was refused. The local carries the program's name deliberately;
+// one named anything else cannot fail.
+TEST(ProgramSubroutineCall,
+     ABlockLocalOfAProgramInstanceNameIsNotAProgramSubroutineCall) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  class pkt;\n"
+      "    function void go(); endfunction\n"
+      "  endclass\n"
+      "  program p;\n"
+      "    task go; endtask\n"
+      "  endprogram\n"
+      "  initial begin\n"
+      "    pkt p;\n"
+      "    p.go();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The same shadow written one block deeper, so the narrowing has to survive the
+// descent into a nested begin-end rather than holding only in the block the
+// procedural item itself carries. §23.9 makes every begin-end block a scope, so
+// the inner block's `p` is what the call standing beside it reaches.
+TEST(ProgramSubroutineCall,
+     ANestedBlockLocalOfAProgramInstanceNameIsNotAProgramSubroutineCall) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  class pkt;\n"
+      "    function void go(); endfunction\n"
+      "  endclass\n"
+      "  program p;\n"
+      "    task go; endtask\n"
+      "  endprogram\n"
+      "  initial begin\n"
+      "    begin\n"
+      "      pkt p;\n"
+      "      p.go();\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The true positive beside the two acceptances above: the same call with the
+// shadowing declaration taken out, so `p.go` reaches the nested program's task
+// and §24.5 applies. A fix that silenced the rule wherever a method call
+// appeared would pass both cases above and fail this one, which is what makes
+// the three a set rather than two acceptances.
+TEST(ProgramSubroutineCall,
+     AProgramSubroutineCallWithNoShadowingDeclarationIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  class pkt;\n"
+      "    function void go(); endfunction\n"
+      "  endclass\n"
+      "  program p;\n"
+      "    task go; endtask\n"
+      "  endprogram\n"
+      "  initial begin\n"
+      "    p.go();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "calling a program subroutine from within a design "
+                            "module is not permitted",
+                            9, "24.5"));
+}
+
 }  // namespace
