@@ -265,23 +265,56 @@ struct EventAwaiter {
     return true;
   }
 
-  static void CollectExprIdentifiers(const Expr* e,
+  // The names a compound event expression watches. §9.4.2 admits any expression
+  // as an event_expression and puts no condition on the names in it, so a
+  // hierarchical name stands there exactly as a local one does.
+  //
+  // A member access is flattened rather than descended into. Descending
+  // collected `u` and `a` from `u.a` as two bare names, neither of which names
+  // anything in the referencing instance, so `@(u.a & u.b)` armed watchers on
+  // nothing and the process waited forever -- while `@(u.a)` worked, that going
+  // to ResolveSignalToVariable, which flattens. The two paths disagreed about
+  // what one name denotes, which no clause asks for. BuildLhsName is what the
+  // direct path builds the name with, so both now build the same one, and
+  // SimContext::FindVariable resolves a dotted name from inside any instance.
+  //
+  // EvalExpr needed nothing: it answers a kMemberAccess through
+  // EvalMemberAccess, so the recomputation EvalCompoundWatcher makes already
+  // read the variable this now watches.
+  //
+  // The `::` form is left to the descent below. A package or class scope
+  // resolution is not a hierarchical name, and BuildLhsName writes the period
+  // that joins one.
+  //
+  // `arena` owns the flattened name, the collected names being string_views
+  // that outlive this call in the watcher closures.
+  static void CollectExprIdentifiers(const Expr* e, Arena& arena,
                                      std::vector<std::string_view>& out) {
     if (!e) return;
     if (e->kind == ExprKind::kIdentifier) {
       out.push_back(e->text);
       return;
     }
-    CollectExprIdentifiers(e->lhs, out);
-    CollectExprIdentifiers(e->rhs, out);
-    CollectExprIdentifiers(e->condition, out);
-    CollectExprIdentifiers(e->true_expr, out);
-    CollectExprIdentifiers(e->false_expr, out);
-    CollectExprIdentifiers(e->base, out);
-    CollectExprIdentifiers(e->index, out);
-    CollectExprIdentifiers(e->index_end, out);
-    for (auto* a : e->args) CollectExprIdentifiers(a, out);
-    for (auto* el : e->elements) CollectExprIdentifiers(el, out);
+    if (e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution) {
+      auto* flattened = arena.Create<std::string>();
+      BuildLhsName(e, *flattened);
+      if (!flattened->empty()) {
+        out.push_back(*flattened);
+        return;
+      }
+    }
+    CollectExprIdentifiers(e->lhs, arena, out);
+    CollectExprIdentifiers(e->rhs, arena, out);
+    CollectExprIdentifiers(e->condition, arena, out);
+    CollectExprIdentifiers(e->true_expr, arena, out);
+    CollectExprIdentifiers(e->false_expr, arena, out);
+    CollectExprIdentifiers(e->base, arena, out);
+    CollectExprIdentifiers(e->index, arena, out);
+    CollectExprIdentifiers(e->index_end, arena, out);
+    for (auto* a : e->args) CollectExprIdentifiers(a, arena, out);
+    for (auto* el : e->elements) {
+      CollectExprIdentifiers(el, arena, out);
+    }
   }
 
   static bool Logic4VecBitsEqual(const Logic4Vec& a, const Logic4Vec& b) {
@@ -368,7 +401,7 @@ struct EventAwaiter {
                               Process* proc,
                               const std::shared_ptr<bool>& consumed) {
     std::vector<std::string_view> names;
-    CollectExprIdentifiers(ev.signal, names);
+    CollectExprIdentifiers(ev.signal, ctx.GetArena(), names);
     if (names.empty()) return;
     auto prev =
         std::make_shared<Logic4Vec>(EvalExpr(ev.signal, ctx, ctx.GetArena()));

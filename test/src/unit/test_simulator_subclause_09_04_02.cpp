@@ -685,4 +685,93 @@ TEST(EventControlSim, NamedEventTriggerReleasesWaiter) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// §9.4.2 admits any expression as an event_expression and puts no condition on
+// the names in it, so a hierarchical name stands in one exactly as a local name
+// does. A compound event over two of them armed watchers on nothing:
+// CollectExprIdentifiers descended a member access as though it were an
+// operator, collecting `u` and `a` from `u.a` as two bare names, and neither
+// names anything in the instance the event is written in.
+//
+// Both operands are driven, and the process writes `hit` when it resumes, so a
+// process that never resumes leaves the 0 it was initialised with.
+TEST(EventControlSim, CompoundEventOverHierarchicalNamesResumes) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module leaf;\n"
+      "  logic a, b;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  leaf u();\n"
+      "  int hit;\n"
+      "  initial begin\n"
+      "    hit = 0;\n"
+      "    fork\n"
+      "      begin @(u.a & u.b) hit = 1; end\n"
+      "      begin #1 u.a = 1'b1; u.b = 1'b1; end\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f, "hit");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// The pair that isolates the disagreement, over one signal: `@(u.a)` goes to
+// ResolveSignalToVariable, which flattens the name, and `@(u.a & 1'b1)` went to
+// the collector, which shredded it. The first passed before this change and the
+// second did not, and only the pair says the two paths have to agree about what
+// one name denotes. Both counters are asserted, so a fix that broke the direct
+// path to mend the compound one would not pass.
+TEST(EventControlSim, TheDirectAndCompoundPathsAgreeOnAHierarchicalName) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module leaf;\n"
+      "  logic a;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  leaf u();\n"
+      "  int hits;\n"
+      "  initial begin\n"
+      "    hits = 0;\n"
+      "    fork\n"
+      "      begin @(u.a) hits = hits + 1; end\n"
+      "      begin @(u.a & 1'b1) hits = hits + 10; end\n"
+      "      begin #1 u.a = 1'b1; end\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f, "hits");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 11u);
+}
+
+// The referencing scope declares `a` of its own, so a walk that collected the
+// leaf name alone finds a variable and arms a watcher on it -- the wrong one.
+// Only the instance's `a` is driven, and the local one is not, so a process
+// following the local name never resumes. This is what separates flattening the
+// name from happening upon a variable of the same leaf name.
+TEST(EventControlSim, CompoundEventFollowsTheHierarchicalNameNotTheLocalOne) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module leaf;\n"
+      "  logic a;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  leaf u();\n"
+      "  logic a;\n"
+      "  int hit;\n"
+      "  initial begin\n"
+      "    hit = 0;\n"
+      "    a = 1'b0;\n"
+      "    fork\n"
+      "      begin @(u.a & 1'b1) hit = 1; end\n"
+      "      begin #1 u.a = 1'b1; end\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f, "hit");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 }  // namespace
