@@ -270,6 +270,16 @@ class VcdWriter {
   // driven without a $dumpvars call keeps recording as before.
   void ArmDumpvarsStart() { dump_started_ = false; }
 
+  // §21.7.1.2: name the module the run's registered signals are named relative
+  // to, which is the module the declarations were written under the $scope of.
+  // A $dumpvars scope argument is written from the top module down -- "top",
+  // "top.mod1" in the subclause's own examples -- while a signal is registered
+  // by its path below that module, the top module's own variables by their
+  // bare names. Without this the writer cannot tell which of a scope
+  // argument's components is the top module, and a scope naming it selects
+  // nothing at all.
+  void SetTopScope(std::string_view name) { top_scope_ = std::string(name); }
+
   // Read the dump file during simulation (§21.7.1.6): push any buffered output
   // out to the file so an application reading the file mid-simulation sees
   // every value change recorded so far. The dump state is untouched, so dumping
@@ -350,6 +360,9 @@ class VcdWriter {
   // §21.7.1.3: false only after ArmDumpvarsStart() and before the first
   // $dumpvars checkpoint; gates the per-timestep change recording.
   bool dump_started_ = true;
+  // §21.7.1.2: the module a scope argument is written down from, empty when
+  // the caller named none. See SetTopScope.
+  std::string top_scope_;
   uint64_t last_time_ = 0;
   // §21.7.2.4: true once any simulation_time command has been written, so a
   // repeated marker for the same time (a checkpoint stamped its execution time

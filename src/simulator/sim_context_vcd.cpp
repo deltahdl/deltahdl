@@ -192,6 +192,12 @@ VcdWriter* SimContext::OpenVcdDump(std::string_view top_scope,
   // ticks SimTime counts; a design whose `timescale sets another precision is
   // dumped under a unit it does not use.
   vcd->WriteHeader("1ns", dump_file_literal_);
+  // §21.7.1.2: the scope the declarations are written under is the module a
+  // $dumpvars scope argument is written down from, and RegisterVcdSignals
+  // names each signal by its path below that module. The writer is told which
+  // module that is so it can take the name off the front of an argument that
+  // carries it.
+  vcd->SetTopScope(top_scope);
   if (!top_scope.empty()) vcd->BeginScope(top_scope);
   RegisterVcdSignals(*vcd);
   if (!top_scope.empty()) vcd->EndScope();

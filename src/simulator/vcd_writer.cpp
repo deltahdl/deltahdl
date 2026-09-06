@@ -643,35 +643,67 @@ void VcdWriter::DumpSelectedValues(const std::vector<std::string_view>& names) {
   ofs_ << "$end\n";
 }
 
-// §21.7.1.2: decide whether a $dumpvars scope list selects one signal. A scope
-// that exactly names the signal is an individual variable and is always dumped
-// -- the level count does not apply to individual variables. Otherwise the
-// scope names a module instance: a signal lies beneath it when its hierarchical
-// name begins with "scope.". The level count bounds how far below the module to
-// descend -- the module's own variables sit one level down, a sub-instance's
-// variables two, and so on -- with 0 meaning every level below.
-// Whether one scope name selects the signal: the scope names it exactly, or the
-// signal sits at most `level` levels of hierarchy below it (level 0 meaning
-// every level below).
+// How many levels of hierarchy below the top module a registered signal sits:
+// the top module's own variables one, a child instance's two, and so on. The
+// registration names a signal by its path below the top module, so the count
+// is one more than the dots in that path.
+static uint64_t SignalDepth(std::string_view sig_name) {
+  uint64_t depth = 1;
+  for (char c : sig_name) {
+    if (c == '.') ++depth;
+  }
+  return depth;
+}
+
+// §21.7.1.2: a scope argument is written from the top module down -- the
+// subclause's examples are "top", "top.mod1" and "top.mod2.net1" -- while a
+// registered signal is named by its path below the top module, whose own
+// variables are named by their bare names. So the top module's name comes off
+// the front of the argument before anything is matched against a signal:
+// "top" leaves the empty path, which every registered signal lies below, and
+// "top.mod1" leaves "mod1". An argument that does not begin with the top
+// module is left as it stands, which is what a source naming a scope
+// relatively writes.
+static std::string_view StripTopScope(std::string_view scope,
+                                      std::string_view top_scope) {
+  if (top_scope.empty()) return scope;
+  if (scope == top_scope) return {};
+  if (scope.size() > top_scope.size() + 1 &&
+      scope.substr(0, top_scope.size()) == top_scope &&
+      scope[top_scope.size()] == '.')
+    return scope.substr(top_scope.size() + 1);
+  return scope;
+}
+
+// §21.7.1.2: decide whether one scope name, with the top module already taken
+// off the front of it, selects one signal. A scope that exactly names the
+// signal is an individual variable and is always dumped -- the level count
+// does not apply to individual variables. Otherwise the scope names a module
+// instance: a signal lies beneath it when its hierarchical name begins with
+// "scope.". The level count bounds how far below the module to descend -- the
+// module's own variables sit one level down, a sub-instance's variables two,
+// and so on -- with 0 meaning every level below.
 static bool OneScopeSelectsSignal(std::string_view sig_name,
                                   std::string_view scope, uint64_t level) {
+  // The empty scope is the top module itself, which every registered signal
+  // lies below. §21.7.1.2 Example 2: "$dumpvars (0, top)" dumps all variables
+  // in module top and in all module instances below it, and Example 1's
+  // "$dumpvars (1, top)" stops at top's own.
+  if (scope.empty()) return level == 0 || SignalDepth(sig_name) <= level;
   if (sig_name == scope) return true;
   if (sig_name.size() <= scope.size() + 1 ||
       sig_name.substr(0, scope.size()) != scope ||
       sig_name[scope.size()] != '.')
     return false;
-  uint64_t depth = 1;
-  for (char c : sig_name.substr(scope.size() + 1)) {
-    if (c == '.') ++depth;
-  }
-  return level == 0 || depth <= level;
+  return level == 0 || SignalDepth(sig_name.substr(scope.size() + 1)) <= level;
 }
 
 static bool ScopeSelectsSignal(std::string_view sig_name,
                                const std::vector<std::string_view>& scopes,
-                               uint64_t level) {
+                               uint64_t level, std::string_view top_scope) {
   for (std::string_view s : scopes) {
-    if (OneScopeSelectsSignal(sig_name, s, level)) return true;
+    if (OneScopeSelectsSignal(sig_name, StripTopScope(s, top_scope), level))
+      return true;
   }
   return false;
 }
@@ -683,7 +715,8 @@ void VcdWriter::DumpScopeSelectedValues(
   dump_started_ = true;  // §21.7.1.3: the checkpoint starts the dump
   ofs_ << CheckpointKeyword(port_nodes_, "$dumpvars", "$dumpports") << "\n";
   for (auto& sig : signals_) {
-    if (ScopeSelectsSignal(sig.name, names, level)) WriteSignalChange(sig);
+    if (ScopeSelectsSignal(sig.name, names, level, top_scope_))
+      WriteSignalChange(sig);
   }
   ofs_ << "$end\n";
 }
@@ -839,7 +872,8 @@ void VcdWriter::DumpChangedValues(uint64_t) {
     // §21.7.3.1: a $dumpports scope_list keeps objects outside the listed
     // module scopes -- including those of instantiations below a listed
     // scope -- out of the recording.
-    if (port_selection_active_ && !ScopeSelectsSignal(sig.name, selected, 1)) {
+    if (port_selection_active_ &&
+        !ScopeSelectsSignal(sig.name, selected, 1, top_scope_)) {
       continue;
     }
     if (!HasValueChanged(sig)) continue;

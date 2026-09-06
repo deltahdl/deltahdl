@@ -93,6 +93,10 @@ class VcdDumpRunTestBase : public VcdTestBase {
         vcd.SetExtendedPortNodes();
       }
       vcd.WriteHeader("1ns");
+      // §21.7.1.2: the driver tells the writer which module the registered
+      // signals are named relative to, so a $dumpvars scope argument written
+      // from the top module down reaches the same signals here as in a run.
+      vcd.SetTopScope(opts.scope);
       if (!opts.scope.empty()) vcd.BeginScope(opts.scope);
       RegisterSignals(f, vcd, opts.registration);
       if (!opts.scope.empty()) vcd.EndScope();

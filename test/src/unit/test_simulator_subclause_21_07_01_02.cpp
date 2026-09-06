@@ -1,5 +1,8 @@
+#include <string>
+
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "fixture_vcd_dump_from_source.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
 
@@ -231,6 +234,89 @@ TEST_F(DumpvarsSysTask, MayBeInvokedRepeatedly) {
   EXPECT_NE(content.rfind("$dumpvars"), content.find("$dumpvars"));
   EXPECT_NE(content.find("b10100101"), std::string::npos);  // a from first call
   EXPECT_NE(content.find("b111100"), std::string::npos);  // b from second call
+}
+
+// §21.7.1.2's scope arguments as a source writes them, which are written from
+// the top module down: Example 1 and Example 2 pass "top" itself, and Example
+// 3 passes "top.mod1" and "top.mod2.net1". Reaching that form needs the run to
+// have a top module -- the one whose $scope the declarations are written under
+// and whose name the registration measures every signal from -- so these cases
+// let the source open its own dump rather than registering signals against a
+// writer the test built, which is what DumpvarsSysTask above does and why the
+// scope arguments there are all written relative to the top module instead.
+class DumpvarsTopModuleScope : public VcdDumpFromSourceTestBase {
+ protected:
+  // §21.7.2.3: "the general information in the VCD file is presented as a
+  // series of sections surrounded by keywords", so what a $dumpvars call
+  // selected is what stands between its keyword and the $end closing it.
+  // Reading the section rather than the file is what makes an omission
+  // observable: DumpChangedValues records a variable the checkpoint left out
+  // when it next changes, so the value of an unselected variable is in the
+  // file either way.
+  std::string CheckpointSection(const std::string& content) const {
+    auto begin = content.find("$dumpvars\n");
+    if (begin == std::string::npos) return "<no-checkpoint>";
+    begin += std::string("$dumpvars\n").size();
+    auto end = content.find("$end", begin);
+    if (end == std::string::npos) return "<unterminated-checkpoint>";
+    return content.substr(begin, end - begin);
+  }
+
+  // The design both cases below dump: a top module with a variable of its own
+  // and a child instance with another, each set before the dump is specified
+  // so the checkpoint records a value that says which of the two it is.
+  static std::string Design(const std::string& dumpvars_args) {
+    return "module child;\n"
+           "  logic [7:0] val;\n"
+           "endmodule\n"
+           "module t;\n"
+           "  child c1();\n"
+           "  logic [7:0] own;\n"
+           "  initial begin\n"
+           "    own = 8'hA5;\n"
+           "    c1.val = 8'h3C;\n"
+           "    $dumpfile(\"dump.vcd\");\n"
+           "    $dumpvars(" +
+           dumpvars_args +
+           ");\n"
+           "  end\n"
+           "endmodule\n";
+  }
+};
+
+// Example 2: "$dumpvars (0, top);" -- "the $dumpvars task shall dump all
+// variables in the module top and in all module instances below module top in
+// the hierarchy". The top module's own variables are registered under their
+// bare names and a child instance's under a path that does not carry the top
+// module either, so a scope naming the top module matched no signal at all and
+// the checkpoint came out empty.
+TEST_F(DumpvarsTopModuleScope, TopModuleAtLevelZeroDumpsItsOwnAndThoseBelow) {
+  RunSource(Design("0, t"));
+  auto section = CheckpointSection(DumpFile("dump.vcd"));
+  EXPECT_NE(section.find("b10100101"), std::string::npos) << section;  // own
+  EXPECT_NE(section.find("b111100"), std::string::npos) << section;    // c1.val
+}
+
+// Example 1: "$dumpvars (1, top);" -- "this invocation dumps all variables
+// within the module top; it does not dump variables in any of the modules
+// instantiated by module top". The level counts hierarchy below the named
+// scope, so the top module's own variables are the one level it admits.
+TEST_F(DumpvarsTopModuleScope, TopModuleAtLevelOneStopsAtItsOwnVariables) {
+  RunSource(Design("1, t"));
+  auto section = CheckpointSection(DumpFile("dump.vcd"));
+  EXPECT_NE(section.find("b10100101"), std::string::npos) << section;  // own
+  EXPECT_EQ(section.find("b111100"), std::string::npos) << section;    // c1.val
+}
+
+// Example 3's "top.mod1": a scope argument naming an instance beneath the top
+// module carries the top module's name in front of it, while the instance is
+// registered without it. So the name comes off the argument rather than the
+// argument being matched whole, and what is left selects the instance.
+TEST_F(DumpvarsTopModuleScope, AChildNamedThroughTheTopModuleSelectsThatChild) {
+  RunSource(Design("0, t.c1"));
+  auto section = CheckpointSection(DumpFile("dump.vcd"));
+  EXPECT_NE(section.find("b111100"), std::string::npos) << section;    // c1.val
+  EXPECT_EQ(section.find("b10100101"), std::string::npos) << section;  // own
 }
 
 }  // namespace
