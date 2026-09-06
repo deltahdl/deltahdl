@@ -250,10 +250,31 @@ static bool ExprRefersToProgram(
   return false;
 }
 
+// §24.3 bars a reference to a "program signal", which the clause defines as a
+// net or variable "declared within the scope of a program". §23.9 decides which
+// declaration a reference reaches -- "If it is declared locally, then the local
+// item shall be used" -- and it lists a begin-end block, a task and a function
+// among the scopes a declaration can be local to. So a name that merely spells
+// a program instance's identifier is not a program signal, and this rule, which
+// resolves nothing, reported one: a block-local `p` was refused for `p.a`
+// wherever the module held a program instance named `p`.
+//
+// The set is therefore taken by value and narrowed as the walk enters a scope,
+// never widened on the way out -- the shape WalkStmtForProgramWideSpaceAccess
+// below already uses for §24.6. What is erased is the declared name, because
+// that is the component ExprRefersToProgram matches: HierRefLeftmost reduces
+// `p.a` to `p`, so a declaration of `p` is what shadows it and a declaration of
+// `a` is not. A block's declarations are erased before its statements are read,
+// since a declaration and the use it shadows are siblings under the block
+// rather than one inside the other.
 static void WalkStmtsForProgramRef(
-    const Stmt* s, const std::unordered_set<std::string_view>& program_names,
+    const Stmt* s, std::unordered_set<std::string_view> program_names,
     DiagEngine& diag) {
   if (!s) return;
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    if (sub != nullptr && sub->kind == StmtKind::kVarDecl)
+      program_names.erase(sub->var_name);
+  });
   if (s->lhs && ExprRefersToProgram(s->lhs, program_names))
     diag.Error(s->range.start,
                "hierarchical reference to program signal from outside the "
@@ -277,6 +298,12 @@ static void WalkStmtsForProgramRef(
 void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
   if (program_inst_names_.empty()) return;
   if (decl->decl_kind == ModuleDeclKind::kProgram) return;
+  // No name is erased at module level, where the walk below erases the names a
+  // block declares: program_inst_names_ holds instance and nested-program names
+  // of this very module, so an item of the module declaring one of them again
+  // is the collision §23.9 forbids -- "An identifier shall be used to declare
+  // only one item within a scope" -- rather than a different thing a reference
+  // could reach. Only a scope below the module can hold that other thing.
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       if (ExprRefersToProgram(item->assign_lhs, program_inst_names_))
@@ -312,6 +339,24 @@ void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
 // This is the other direction from the §24.6 rule below -- a reference out of
 // an anonymous program rather than into one -- which is why each rule has a
 // class arm of its own rather than the two sharing one.
+// §23.9 makes a task and a function scopes of their own, so a formal argument
+// and a declaration at the head of a body shadow a program name the way a
+// block-local declaration does. Both reach the body by a route no statement
+// walk sees, so both are erased here, where the subroutine is read, rather than
+// where its statements are.
+static void WalkSubroutineBodyForProgramRef(
+    const ModuleItem* item, std::unordered_set<std::string_view> program_names,
+    DiagEngine& diag) {
+  for (const auto& arg : item->func_args) program_names.erase(arg.name);
+  for (const auto* s : item->func_body_stmts) {
+    if (s != nullptr && s->kind == StmtKind::kVarDecl)
+      program_names.erase(s->var_name);
+  }
+  for (const auto* s : item->func_body_stmts) {
+    WalkStmtsForProgramRef(s, program_names, diag);
+  }
+}
+
 static void CheckClassMethodsForProgramRef(
     const ClassDecl* cls,
     const std::unordered_set<std::string_view>& program_names,
@@ -319,9 +364,7 @@ static void CheckClassMethodsForProgramRef(
   if (cls == nullptr) return;
   for (const auto* member : cls->members) {
     if (member == nullptr || member->method == nullptr) continue;
-    for (const auto* s : member->method->func_body_stmts) {
-      WalkStmtsForProgramRef(s, program_names, diag);
-    }
+    WalkSubroutineBodyForProgramRef(member->method, program_names, diag);
   }
 }
 
@@ -344,8 +387,7 @@ static void CheckScopeItemsForAnonymousProgramHierRefs(
     // with a body for this walk to miss.
     if (item->kind == ModuleItemKind::kTaskDecl ||
         item->kind == ModuleItemKind::kFunctionDecl) {
-      for (const auto* s : item->func_body_stmts)
-        WalkStmtsForProgramRef(s, program_names, diag);
+      WalkSubroutineBodyForProgramRef(item, program_names, diag);
     }
     CheckClassMethodsForProgramRef(item->class_decl, program_names, diag);
   }

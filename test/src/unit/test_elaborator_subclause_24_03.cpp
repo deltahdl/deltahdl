@@ -454,4 +454,137 @@ TEST(ProgramConstruct, ProgramSignalRefFromAnAnonymousProgramClassIsError) {
                             7, "24.3"));
 }
 
+// §24.3 bars a reference to a "program signal", which the clause defines as a
+// net or variable "declared within the scope of a program". §23.9 decides which
+// declaration a reference reaches -- "If it is declared locally, then the local
+// item shall be used" -- and a begin-end block is one of the scopes it lists,
+// so a block-local `p` is what `p.a` names and the nested program `p` is not
+// reached at all.
+//
+// The rule resolved nothing: it matched the leftmost component of a member
+// access against the set of program instance names, so this legal source was
+// refused. The local carries the program's name deliberately; one named
+// anything else cannot fail.
+TEST(ProgramConstruct,
+     ABlockLocalOfAProgramInstanceNameIsNotAProgramSignalRef) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  program p;\n"
+      "    int a;\n"
+      "  endprogram\n"
+      "  typedef struct { int a; } s_t;\n"
+      "  int q;\n"
+      "  initial begin\n"
+      "    s_t p;\n"
+      "    q = p.a;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The true positive beside the case above: the same block with the shadowing
+// declaration taken out, so `p.a` reaches the nested program and §24.3's first
+// sentence applies. A fix that silenced the rule wherever a member access
+// appeared would pass the case above and fail this one, which is what makes the
+// two a pair rather than one acceptance.
+TEST(ProgramConstruct, AProgramSignalRefWithNoShadowingDeclarationIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  program p;\n"
+      "    int a;\n"
+      "  endprogram\n"
+      "  int q;\n"
+      "  initial begin\n"
+      "    q = p.a;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference to program signal from "
+                            "outside the program is not permitted",
+                            7, "24.3"));
+}
+
+// §24.3's third sentence -- "anonymous programs shall not contain hierarchical
+// references to other program scopes" -- is read over a different set: the
+// named programs of the compilation unit rather than the program instances of
+// one module. It matched identifier text the same way, and §23.9 shadows it the
+// same way: a function is a scope, so a declaration at the head of its body is
+// what `ps.sampled` names.
+TEST(ProgramConstruct,
+     AnAnonymousProgramSubroutineLocalOfAProgramNameIsNotAHierRef) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class pkt;\n"
+      "  int sampled;\n"
+      "endclass\n"
+      "program ps;\n"
+      "  int sampled;\n"
+      "endprogram\n"
+      "program;\n"
+      "  function void work();\n"
+      "    pkt ps;\n"
+      "    int x;\n"
+      "    x = ps.sampled;\n"
+      "  endfunction\n"
+      "endprogram\n"
+      "module top; endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A formal argument shadows the same way §23.9 makes a body-head declaration
+// shadow, and reaches the body by a route no statement walk sees, so it is
+// erased where the subroutine is read rather than where its statements are.
+TEST(ProgramConstruct,
+     AnAnonymousProgramSubroutineFormalOfAProgramNameIsNotAHierRef) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class pkt;\n"
+      "  int sampled;\n"
+      "endclass\n"
+      "program ps;\n"
+      "  int sampled;\n"
+      "endprogram\n"
+      "program;\n"
+      "  function void work(pkt ps);\n"
+      "    int x;\n"
+      "    x = ps.sampled;\n"
+      "  endfunction\n"
+      "endprogram\n"
+      "module top; endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The true positive beside the two above, in the same subroutine with nothing
+// of the name declared in between, so `ps.sampled` reaches the program `ps` and
+// the anonymous program does contain the reference §24.3's third sentence bars.
+TEST(ProgramConstruct,
+     AnAnonymousProgramHierRefWithNoShadowingDeclarationIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "program ps;\n"
+      "  int sampled;\n"
+      "endprogram\n"
+      "program;\n"
+      "  function void work();\n"
+      "    int x;\n"
+      "    x = ps.sampled;\n"
+      "  endfunction\n"
+      "endprogram\n"
+      "module top; endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference to program signal from "
+                            "outside the program is not permitted",
+                            7, "24.3"));
+}
+
 }  // namespace
