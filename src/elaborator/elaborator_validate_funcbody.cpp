@@ -147,19 +147,27 @@ static void CheckStmtForRefArgs(
 // for_initialization, and only an operator_assignment, an
 // inc_or_dec_expression or a function_subroutine_call in a for_step, none of
 // which is a par_block.
+// `enclosed` says a fork-join_any or fork-join_none already handed this subtree
+// to CheckStmtForRefArgs, which covers the whole of it. §9.3.2 states one rule
+// about a ref argument used "inside a fork-join_any or fork-join_none block",
+// and a use inside two of them is one use of it: without the term the outer
+// fork reported it and the inner fork reported it again, and three nested forks
+// reported it three times.
 static void CheckRefArgsInForkBlocks(
     const Stmt* s, const std::unordered_set<std::string_view>& ref_names,
-    DiagEngine& diag) {
+    bool enclosed, DiagEngine& diag) {
   if (!s) return;
-  if (s->kind == StmtKind::kFork && (s->join_kind == TokenKind::kKwJoinAny ||
-                                     s->join_kind == TokenKind::kKwJoinNone)) {
+  bool is_async_fork =
+      s->kind == StmtKind::kFork && (s->join_kind == TokenKind::kKwJoinAny ||
+                                     s->join_kind == TokenKind::kKwJoinNone);
+  if (is_async_fork && !enclosed) {
     for (auto* fs : s->fork_stmts) {
       bool is_block_item = (fs->kind == StmtKind::kVarDecl);
       CheckStmtForRefArgs(fs, ref_names, is_block_item, diag);
     }
   }
   ForEachChildStmt(s, [&](Stmt* const& sub) {
-    CheckRefArgsInForkBlocks(sub, ref_names, diag);
+    CheckRefArgsInForkBlocks(sub, ref_names, enclosed || is_async_fork, diag);
   });
 }
 
@@ -216,6 +224,10 @@ struct FunctionBodyScope {
   // the return with an expression" -- which is the shape §13.4.1's void-return
   // report fires on. The term is what withholds that report.
   bool in_production_code_block = false;
+  // §9.3.2: whether a fork-join block already encloses the statement being
+  // walked. CheckNoReturnInFork covers a whole subtree from one entry, so
+  // entering it again at a nested fork states one breach twice.
+  bool in_fork = false;
 };
 
 static void CheckFuncBodyStmtSelf(const Stmt* s, const FunctionBodyScope& scope,
@@ -253,7 +265,12 @@ static void CheckFuncBodyStmtSelf(const Stmt* s, const FunctionBodyScope& scope,
                Subclause("10.6.1"));
   }
 
-  if (s->kind == StmtKind::kFork) {
+  // §9.3.2 states one rule about a return "within the context of a fork-join
+  // block", and a return inside two of them breaks it once. CheckNoReturnInFork
+  // descends every child-statement link, Stmt::fork_stmts among them, so the
+  // outermost fork already reaches everything below it and entering again at a
+  // nested one states the same breach a second time.
+  if (s->kind == StmtKind::kFork && !scope.in_fork) {
     for (auto* sub : s->fork_stmts)
       CheckNoReturnInFork(sub, scope.in_production_code_block, diag);
   }
@@ -292,6 +309,10 @@ static void CheckFuncBodyStmt(const Stmt* s, const FunctionBodyScope& scope,
   // A.6.12's rs_rule admits, so §18.17.6's term is set at the randsequence
   // itself.
   if (s->kind == StmtKind::kRandsequence) inner.in_production_code_block = true;
+  // §9.3.2: everything below this fork is already covered by the
+  // CheckNoReturnInFork entry made at it, so a nested fork makes no second
+  // entry.
+  if (s->kind == StmtKind::kFork) inner.in_fork = true;
   ForEachChildStmt(
       s, [&](Stmt* const& sub) { CheckFuncBodyStmt(sub, inner, diag); });
 }
@@ -465,6 +486,10 @@ struct TaskBodyScope {
   // return with an expression" -- which is the shape §13.3's report fires on.
   // The term is what withholds that report.
   bool in_production_code_block = false;
+  // §9.3.2: whether a fork-join block already encloses the statement being
+  // walked. CheckNoReturnInFork covers a whole subtree from one entry, so
+  // entering it again at a nested fork states one breach twice.
+  bool in_fork = false;
 };
 
 static void CheckTaskBodyStmtSelf(const Stmt* s, const TaskBodyScope& scope,
@@ -483,7 +508,12 @@ static void CheckTaskBodyStmtSelf(const Stmt* s, const TaskBodyScope& scope,
   CheckTaskBodyMonitorTrace(s, scope.auto_vars, scope.rule, diag);
   CheckTaskBodyContAssign(s, scope.auto_vars, scope.rule, diag);
 
-  if (s->kind == StmtKind::kFork) {
+  // §9.3.2 states one rule about a return "within the context of a fork-join
+  // block", and a return inside two of them breaks it once. CheckNoReturnInFork
+  // descends every child-statement link, Stmt::fork_stmts among them, so the
+  // outermost fork already reaches everything below it and entering again at a
+  // nested one states the same breach a second time.
+  if (s->kind == StmtKind::kFork && !scope.in_fork) {
     for (auto* sub : s->fork_stmts)
       CheckNoReturnInFork(sub, scope.in_production_code_block, diag);
   }
@@ -511,6 +541,10 @@ static void CheckTaskBodyStmt(const Stmt* s, const TaskBodyScope& scope,
   // A.6.12's rs_rule admits, so §18.17.6's term is set at the randsequence
   // itself.
   if (s->kind == StmtKind::kRandsequence) inner.in_production_code_block = true;
+  // §9.3.2: everything below this fork is already covered by the
+  // CheckNoReturnInFork entry made at it, so a nested fork makes no second
+  // entry.
+  if (s->kind == StmtKind::kFork) inner.in_fork = true;
   ForEachChildStmt(
       s, [&](Stmt* const& sub) { CheckTaskBodyStmt(sub, inner, diag); });
 }
@@ -581,7 +615,7 @@ static void ValidateRefArgsInForkBlocks(const ModuleItem* item,
   }
   if (!ref_names.empty()) {
     for (auto* s : item->func_body_stmts)
-      CheckRefArgsInForkBlocks(s, ref_names, diag);
+      CheckRefArgsInForkBlocks(s, ref_names, /*enclosed=*/false, diag);
   }
 }
 

@@ -1,3 +1,6 @@
+#include <cstddef>
+#include <string_view>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -481,6 +484,71 @@ TEST(ParallelBlockElaboration,
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// How many recorded diagnostics carry `needle` under §9.3.2. The cases below
+// count rather than calling ReportedError, which answers whether a report was
+// made and cannot say it was made once; counting one named report rather than
+// the run's total keeps each case about the rule it names.
+size_t CountReports(const ElabFixture& f, std::string_view needle) {
+  size_t n = 0;
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.subclause == "9.3.2" && d.message.find(needle) != std::string::npos) {
+      ++n;
+    }
+  }
+  return n;
+}
+
+// §9.3.2: "A return statement within the context of a fork-join block is
+// illegal and shall result in a compilation error." One return inside two
+// fork-join blocks is one return in that context, so it is one error.
+//
+// It was two. CheckNoReturnInFork descends every child-statement link,
+// Stmt::fork_stmts among them, so an entry made at the outer fork already
+// reaches the return under the inner one; the enclosing walk then entered again
+// at the inner fork. Three nested forks gave three reports, and a count of
+// errors stood one higher than the number of things wrong with the source.
+TEST(ParallelBlockElaboration, ReturnInNestedForksIsReportedOnce) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task t();\n"
+      "    fork\n"
+      "      fork\n"
+      "        return;\n"
+      "      join\n"
+      "    join\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(CountReports(f,
+                         "return statement is not allowed inside a "
+                         "fork-join block"),
+            1u);
+}
+
+// §9.3.2's other rule, reached by its own walk and duplicated the same way: a
+// ref argument used inside two fork-join_none blocks was reported once per
+// enclosing fork. CheckRefArgsInForkBlocks handed the whole subtree to
+// CheckStmtForRefArgs at each of them.
+TEST(ParallelBlockElaboration, RefArgInNestedForkJoinNoneIsReportedOnce) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task t(ref int v);\n"
+      "    fork\n"
+      "      fork\n"
+      "        v = 1;\n"
+      "      join_none\n"
+      "    join_none\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(CountReports(f,
+                         "ref argument 'v' cannot be used inside a "
+                         "fork-join_any or fork-join_none block"),
+            1u);
 }
 
 }  // namespace
