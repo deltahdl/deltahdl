@@ -366,6 +366,26 @@ static void WalkSubroutineBodyForProgramRef(
   }
 }
 
+// §24.3 names no position a reference to a program signal may stand in, so
+// either side of a continuous assignment is one it reaches. This arm is a
+// function of its own because holding it inside the item walk put that walk
+// past the cognitive complexity threshold once the subroutine bodies joined it.
+static void CheckContAssignForProgramRef(
+    const ModuleItem* item,
+    const std::unordered_set<std::string_view>& program_names,
+    DiagEngine& diag) {
+  if (ExprRefersToProgram(item->assign_lhs, program_names))
+    diag.Error(item->loc,
+               "hierarchical reference to program signal from outside the "
+               "program is not permitted",
+               Subclause("24.3"));
+  if (ExprRefersToProgram(item->assign_rhs, program_names))
+    diag.Error(item->loc,
+               "hierarchical reference to program signal from outside the "
+               "program is not permitted",
+               Subclause("24.3"));
+}
+
 void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
   if (program_inst_names_.empty()) return;
   if (decl->decl_kind == ModuleDeclKind::kProgram) return;
@@ -376,18 +396,8 @@ void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
   // only one item within a scope" -- rather than a different thing a reference
   // could reach. Only a scope below the module can hold that other thing.
   for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kContAssign) {
-      if (ExprRefersToProgram(item->assign_lhs, program_inst_names_))
-        diag_.Error(item->loc,
-                    "hierarchical reference to program signal from outside "
-                    "the program is not permitted",
-                    Subclause("24.3"));
-      if (ExprRefersToProgram(item->assign_rhs, program_inst_names_))
-        diag_.Error(item->loc,
-                    "hierarchical reference to program signal from outside "
-                    "the program is not permitted",
-                    Subclause("24.3"));
-    }
+    if (item->kind == ModuleItemKind::kContAssign)
+      CheckContAssignForProgramRef(item, program_inst_names_, diag_);
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body)
       WalkStmtsForProgramRef(item->body, program_inst_names_, diag_);
