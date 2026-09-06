@@ -386,4 +386,21 @@ TEST(SizeOfDisplayedData, AutoSizedDecimalIntegerFormalIsSigned) {
   EXPECT_EQ(out, ":         -3:\n");
 }
 
+// §21.2.1.2 sizes an expression argument automatically, and the width it picks
+// reads the same signedness flag the arithmetic does: a signed 32-bit value is
+// given eleven columns, one of them the sign. A for-init int loop variable
+// created from its width alone was unsigned, so the same call printed the ten
+// columns of 4294967293 with no padding at all. §6.11.3 makes int signed.
+TEST(SizeOfDisplayedData, AutoSizedDecimalForInitLoopVariableIsSigned) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = -3; i < -2; i = i + 1) $display(\":%d:\", i);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, ":         -3:\n");
+}
+
 }  // namespace

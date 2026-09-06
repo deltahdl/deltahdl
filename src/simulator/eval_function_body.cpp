@@ -380,7 +380,12 @@ static void ExecFuncForInits(const Stmt* stmt, const FuncExecCtx& exec) {
         init->lhs && init->lhs->kind == ExprKind::kIdentifier) {
       uint32_t w = EvalTypeWidth(stmt->for_init_types[i]);
       if (w == 0) w = 32;
-      auto* v = exec.ctx.CreateLocalVariable(init->lhs->text, w);
+      // §6.11.3: byte, shortint, int, integer and longint default to signed,
+      // so the declared type decides the loop variable's signedness as it
+      // decides any other local's. Created from the width alone, an int
+      // counter compared its negative values as huge positive ones.
+      auto* v = exec.ctx.CreateLocalVariable(
+          init->lhs->text, w, IsSignedType(stmt->for_init_types[i], {}));
       if (init->rhs) v->value = EvalExpr(init->rhs, exec.ctx, exec.arena);
     } else if (init) {
       ExecFuncStmt(init, exec);

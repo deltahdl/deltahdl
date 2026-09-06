@@ -240,4 +240,71 @@ TEST(SignedAndUnsigned, DefaultSignedIntegerReturnValueSignExtends) {
   EXPECT_EQ(d->value.ToUint64(), 0xFFFFFFFFFFFFFFFFull);
 }
 
+// §6.11.3: "The data types byte, shortint, int, integer, and longint default
+// to signed." A for-init declaration declares a variable like any other, so an
+// int loop variable is signed and -1 < 3 holds. Created from its width alone it
+// was unsigned, -1 stood as 4294967295, and the body ran no times at all.
+//
+// The loop variable is popped when the loop ends, so what the count reaches is
+// what says it was signed; there is no variable left to read the flag off.
+TEST(SignedAndUnsigned, ForInitIntLoopVariableIsSignedInAProceduralBlock) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  integer count;\n"
+      "  initial begin\n"
+      "    count = 0;\n"
+      "    for (int i = -1; i < 3; i = i + 1) count = count + 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("count")->value.ToUint64(), 4u);
+}
+
+// The same loop inside a subroutine body, which a separate site creates the
+// variable at: a for in a function body is set up by ExecFuncForInits and one
+// in a procedural block by CreateForInitVars, so a fix reaching one leaves the
+// other.
+TEST(SignedAndUnsigned, ForInitIntLoopVariableIsSignedInAFunctionBody) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  integer count;\n"
+      "  function integer steps_from_minus_one;\n"
+      "    integer n;\n"
+      "    n = 0;\n"
+      "    for (int i = -1; i < 3; i = i + 1) n = n + 1;\n"
+      "    return n;\n"
+      "  endfunction\n"
+      "  initial count = steps_from_minus_one();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("count")->value.ToUint64(), 4u);
+}
+
+// §6.11.3 again for the other half of the sentence: "The data types time, bit,
+// reg, and logic default to unsigned, as do arrays of these types." A loop
+// counting down from 8'hFF while it exceeds zero runs 255 times unsigned and no
+// times at all signed, where 8'hFF is -1. Without this a fix that marked every
+// loop variable signed would satisfy the two cases above.
+TEST(SignedAndUnsigned, ForInitLogicVectorLoopVariableStaysUnsigned) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  integer count;\n"
+      "  initial begin\n"
+      "    count = 0;\n"
+      "    for (logic [7:0] i = 8'hFF; i > 0; i = i - 1) count = count + 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("count")->value.ToUint64(), 255u);
+}
+
 }  // namespace
