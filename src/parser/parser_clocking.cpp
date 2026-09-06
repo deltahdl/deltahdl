@@ -282,6 +282,55 @@ void Parser::ParseClockingItem(ModuleItem* item) {
   Expect(TokenKind::kSemicolon, Subclause("14.3"));
 }
 
+// A.9.3: `hierarchical_identifier ::= [ $root . ] { identifier
+// constant_bit_select . } identifier`, so one is a chain of identifiers joined
+// by `.`, each of which may carry a bit select. `a`, `top.a` and `bus[1].a` are
+// hierarchical identifiers; `a + b` and `f(x)` are not.
+//
+// The `::` form is not one. A.9.3 joins the components with `.` alone, and a
+// name reached through a class or package scope is a ps_identifier, which A.6.5
+// does not admit here.
+static bool IsHierarchicalIdentifier(const Expr* e) {
+  while (e != nullptr) {
+    if (e->kind == ExprKind::kIdentifier) return true;
+    if (e->kind == ExprKind::kMemberAccess) {
+      if (e->is_scope_resolution) return false;
+      if (e->rhs == nullptr || e->rhs->kind != ExprKind::kIdentifier) {
+        return false;
+      }
+      e = e->lhs;
+      continue;
+    }
+    if (e->kind == ExprKind::kSelect) {
+      e = e->base;
+      continue;
+    }
+    return false;
+  }
+  return false;
+}
+
+// A.6.5 writes `wait_order ( hierarchical_identifier { ,
+// hierarchical_identifier } ) action_block`, so an operand that is not one is
+// outside the grammar. It is parsed as an expression and then judged, rather
+// than parsed as a name: the identifier still needs the SourceRange a later
+// report stands at, the elaborator already reads Stmt::wait_order_events as
+// expressions, and an operand read with a narrower parse would leave whatever
+// followed it unread.
+//
+// Every rule downstream is what this is for. ForEachChildExpr hands
+// wait_order_events to every walker converted onto it, and the reason no case
+// covers a subroutine call there is that A.6.5 admits none.
+Expr* Parser::ParseWaitOrderOperand() {
+  Expr* e = ParseExpr();
+  if (e != nullptr && !IsHierarchicalIdentifier(e)) {
+    diag_.Error(e->range.start,
+                "wait_order operand shall be a hierarchical identifier",
+                Subclause("15.5.4"));
+  }
+  return e;
+}
+
 Stmt* Parser::ParseWaitOrderStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kWaitOrder;
@@ -289,9 +338,9 @@ Stmt* Parser::ParseWaitOrderStmt() {
   Expect(TokenKind::kKwWaitOrder, Subclause("15.5.4"));
   Expect(TokenKind::kLParen, Subclause("15.5.4"));
 
-  stmt->wait_order_events.push_back(ParseExpr());
+  stmt->wait_order_events.push_back(ParseWaitOrderOperand());
   while (Match(TokenKind::kComma)) {
-    stmt->wait_order_events.push_back(ParseExpr());
+    stmt->wait_order_events.push_back(ParseWaitOrderOperand());
   }
   Expect(TokenKind::kRParen, Subclause("15.5.4"));
 

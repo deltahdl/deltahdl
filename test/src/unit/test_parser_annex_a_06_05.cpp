@@ -817,4 +817,57 @@ TEST(TimingControlSyntaxParsing, EventControlHierarchicalIdentifier) {
   EXPECT_NE(stmt->events[0].signal, nullptr);
 }
 
+// A.6.5 writes `wait_order ( hierarchical_identifier { ,
+// hierarchical_identifier } ) action_block`, so an operand that is an
+// expression rather than a name is outside the grammar. It parsed with no
+// report because ParseWaitOrderStmt read each operand with ParseExpr, which
+// accepts every expression Annex A writes.
+//
+// The other operand is a bare name that is legal, so the source differs from a
+// legal one in the one operand the report has to be about.
+TEST(TimingControlSyntaxParsing, WaitOrderOperandThatIsAnExpressionIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait_order(a + b, c) ;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "wait_order operand shall be a hierarchical identifier", 4,
+      "15.5.4"));
+}
+
+// The same rule reached by the operand the reading behind #3310 turned up. A
+// function_subroutine_call is the one that reaches an elaborator walk over
+// expressions: ForEachChildExpr hands Stmt::wait_order_events to every walker
+// converted onto it, and the reason no case covers a call there is that A.6.5
+// admits none.
+TEST(TimingControlSyntaxParsing, WaitOrderOperandThatIsACallIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait_order(f(x), c) ;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "wait_order operand shall be a hierarchical identifier", 4,
+      "15.5.4"));
+}
+
+// A.6.5's operand is a hierarchical_identifier and not an identifier, and A.9.3
+// writes one as `[ $root . ] { identifier constant_bit_select . } identifier`.
+// A dotted name is therefore legal, and a check demanding a bare name would
+// reject a source nothing reported before. The seven cases above all write bare
+// identifiers, so none of them holds this shut.
+TEST(TimingControlSyntaxParsing, WaitOrderOperandMayBeADottedName) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait_order(top.a, b) ;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

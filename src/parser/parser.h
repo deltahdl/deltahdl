@@ -511,6 +511,7 @@ class Parser {
   void ParseClockingSkew(Edge& edge, Expr*& delay);
   Direction ParseClockingDirection(Edge& in_edge, Expr*& in_delay,
                                    Edge& out_edge, Expr*& out_delay);
+  Expr* ParseWaitOrderOperand();
   Stmt* ParseWaitOrderStmt();
 
   Stmt* ParseImmediateAssert();
