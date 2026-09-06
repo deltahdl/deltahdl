@@ -303,6 +303,28 @@ void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
 // 3.12.1)" and A.1.11 makes anonymous_program a package_item, so a package's
 // items and the compilation unit's items are two lists this one body reads
 // rather than two rules.
+// A.1.11 admits a class_declaration as an anonymous_program_item, and §24.3
+// says "anonymous programs shall not contain hierarchical references to other
+// program scopes" without saying where in the anonymous program the reference
+// may stand. A method of such a class is in it, and the walk over an anonymous
+// program's items read task and function bodies alone.
+//
+// This is the other direction from the §24.6 rule below -- a reference out of
+// an anonymous program rather than into one -- which is why each rule has a
+// class arm of its own rather than the two sharing one.
+static void CheckClassMethodsForProgramRef(
+    const ClassDecl* cls,
+    const std::unordered_set<std::string_view>& program_names,
+    DiagEngine& diag) {
+  if (cls == nullptr) return;
+  for (const auto* member : cls->members) {
+    if (member == nullptr || member->method == nullptr) continue;
+    for (const auto* s : member->method->func_body_stmts) {
+      WalkStmtsForProgramRef(s, program_names, diag);
+    }
+  }
+}
+
 static void CheckScopeItemsForAnonymousProgramHierRefs(
     const std::vector<ModuleItem*>& items,
     const std::unordered_set<std::string_view>& program_names,
@@ -325,23 +347,7 @@ static void CheckScopeItemsForAnonymousProgramHierRefs(
       for (const auto* s : item->func_body_stmts)
         WalkStmtsForProgramRef(s, program_names, diag);
     }
-    // A.1.11 admits a class_declaration as an anonymous_program_item, and
-    // §24.3 says "anonymous programs shall not contain hierarchical references
-    // to other program scopes" without saying where in the anonymous program
-    // the reference may stand. A method of such a class is in it.
-    //
-    // This is the other direction from the §24.6 rule above -- a reference out
-    // of an anonymous program rather than into one -- and the class arm serves
-    // both only because each walks the methods of the classes its own rule
-    // reaches.
-    if (item->class_decl != nullptr) {
-      for (const auto* member : item->class_decl->members) {
-        if (member == nullptr || member->method == nullptr) continue;
-        for (const auto* s : member->method->func_body_stmts) {
-          WalkStmtsForProgramRef(s, program_names, diag);
-        }
-      }
-    }
+    CheckClassMethodsForProgramRef(item->class_decl, program_names, diag);
   }
 }
 
@@ -575,6 +581,31 @@ static void WalkStmtForProgramWideSpaceAccess(
 // of them, rather than each position acquiring a rule of its own.
 static void CheckItemForProgramWideSpaceAccess(
     const ModuleItem* item, const std::unordered_set<std::string_view>& names,
+    DiagEngine& diag);
+
+// A.1.11 admits a class_declaration into an anonymous program, and §24.6's note
+// bars a reference to one of its declarations from "outside any program block",
+// naming no position such a reference may not stand in. A class method is
+// outside every program block, so a reference written in one is reached by the
+// note exactly as one written beside it is -- and a class is where a
+// verification environment puts its code.
+//
+// A method is itself a ModuleItem, so it goes back through the item walk, which
+// carries a class nested in a class with it. That is the mutual recursion the
+// forward declaration above is for.
+static void CheckClassMethodsForProgramWideSpaceAccess(
+    const ClassDecl* cls, const std::unordered_set<std::string_view>& names,
+    DiagEngine& diag) {
+  if (cls == nullptr) return;
+  for (const auto* member : cls->members) {
+    if (member != nullptr && member->method != nullptr) {
+      CheckItemForProgramWideSpaceAccess(member->method, names, diag);
+    }
+  }
+}
+
+static void CheckItemForProgramWideSpaceAccess(
+    const ModuleItem* item, const std::unordered_set<std::string_view>& names,
     DiagEngine& diag) {
   for (bool mentions : {names.count(item->data_type.type_name) != 0,
                         ExprMentionsAny(item->init_expr, names),
@@ -604,22 +635,7 @@ static void CheckItemForProgramWideSpaceAccess(
   }
   for (const auto* s : item->func_body_stmts)
     WalkStmtForProgramWideSpaceAccess(s, body_names, diag);
-  // A.1.11 admits a class_declaration into an anonymous program and §24.6's
-  // note bars a reference to one of its declarations from "outside any program
-  // block", naming no position such a reference may not stand in. A class
-  // method is outside every program block, so a reference written in one is
-  // reached by the note exactly as one written beside it is -- and a class is
-  // where a verification environment puts its code.
-  //
-  // A method is itself a ModuleItem, so it is read by this same function, which
-  // also carries a class nested in a class.
-  if (item->class_decl != nullptr) {
-    for (const auto* member : item->class_decl->members) {
-      if (member != nullptr && member->method != nullptr) {
-        CheckItemForProgramWideSpaceAccess(member->method, names, diag);
-      }
-    }
-  }
+  CheckClassMethodsForProgramWideSpaceAccess(item->class_decl, names, diag);
 }
 
 void Elaborator::ValidateProgramWideSpaceAccess(const ModuleDecl* decl) {
@@ -692,13 +708,8 @@ void Elaborator::ValidateProgramWideSpaceAccessInPackageAndCuScopes() {
   // CheckScopeItemsForProgramWideSpaceAccess skips it there. Nothing marked
   // reaches this list, so nothing here needs the guard that walk carries.
   for (const auto* cls : unit_->classes) {
-    if (cls == nullptr) continue;
-    for (const auto* member : cls->members) {
-      if (member != nullptr && member->method != nullptr) {
-        CheckItemForProgramWideSpaceAccess(member->method,
-                                           anonymous_program_names_, diag_);
-      }
-    }
+    CheckClassMethodsForProgramWideSpaceAccess(cls, anonymous_program_names_,
+                                               diag_);
   }
 }
 
