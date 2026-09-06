@@ -252,6 +252,7 @@ static VcdSignal MakeVcdSignalFields(const VcdSignalSpec& spec) {
   sig.width = spec.width;
   sig.var = spec.var;
   sig.net_type = spec.net_type;
+  sig.direction = spec.direction;
   sig.data_type = spec.data_type;
   sig.msb = spec.msb;
   sig.lsb = spec.lsb;
@@ -420,7 +421,7 @@ static char VcdLeftExtendFill(char digit) {
 // stored words as 0. §21.7.5: a structure member starts at bit_offset within
 // the structure's shared value, so the offset shifts the whole window; an
 // ordinary object leaves it at zero and reads its value directly.
-static char VcdBitChar(const VcdSignal& sig, int32_t i) {
+char VcdBitChar(const VcdSignal& sig, int32_t i) {
   uint32_t abs_bit = static_cast<uint32_t>(i) + sig.bit_offset;
   uint32_t word_idx = abs_bit / 64;
   uint32_t bit_idx = abs_bit % 64;
@@ -479,78 +480,6 @@ void VcdWriter::WriteRealChange(const VcdSignal& sig) {
   char buf[64];
   std::snprintf(buf, sizeof(buf), "%.16g", d);
   ofs_ << "r" << buf << " " << sig.ident << "\n";
-}
-
-// §21.7.4.3: a strength component is one of the eight SystemVerilog strengths,
-// written as the digit 0 highz, 1 small, 2 medium, 3 weak, 4 large, 5 pull, 6
-// strong, 7 supply. Strength (common/types.h) is numbered the same way, so the
-// digit is the enum value.
-static char VcdStrengthDigit(Strength s) {
-  return static_cast<char>('0' + static_cast<uint8_t>(s));
-}
-
-// §21.7.4.3: both strength components of a port whose drive strength the model
-// leaves unresolved. §21.7.4.3.2 counts primitives, continuous assignments and
-// procedural continuous assignments as drivers, so a port_value other than z
-// says a driver is active, and §28.6 gives a driver written without a drive
-// strength specification strong0 and strong1 -- the digit 6. A z port_value
-// says no driver is active, which is highz, the digit 0.
-//
-// Two kinds of object are answered here. An object that is not a net has no
-// drive strength to resolve. So has a net Net::Resolve computed no strength
-// for: one held by force, whose drivers it skips (net.cpp: is_forced returns
-// before resolution), and one driven to x, which §28.12 places on neither the
-// 0 side nor the 1 side.
-static char VcdUnresolvedStrengthDigit(bool driven) {
-  return driven ? '6' : '0';
-}
-
-// §21.7.4.3: write the 0_strength_component and the 1_strength_component of one
-// port value change. They report the strength0 and the strength1 specification
-// for the port, and net resolution settles both: NetStrength keeps the strength
-// of the drive on the 0 side and on the 1 side separately, so its s0 fields
-// answer the first component and its s1 fields the second.
-//
-// Each component is a single digit while §28.12 lets a resolved strength be
-// ambiguous -- a range of levels rather than one level. §21.7.4.3.2 does not
-// say what one digit reports for a range. The one rule it does give that
-// reduces two strengths to one takes "the stronger of the two", so the stronger
-// bound of the range is what is written here.
-static void WritePortStrengthComponents(std::ofstream& ofs,
-                                        const VcdSignal& sig, bool driven) {
-  if (sig.net != nullptr) {
-    const NetStrength& resolved = sig.net->resolved_strength;
-    if (resolved.s0_hi != Strength::kHighz ||
-        resolved.s1_hi != Strength::kHighz) {
-      ofs << VcdStrengthDigit(resolved.s0_hi)
-          << VcdStrengthDigit(resolved.s1_hi);
-      return;
-    }
-  }
-  char digit = VcdUnresolvedStrengthDigit(driven);
-  ofs << digit << digit;
-}
-
-void VcdWriter::WritePortValueChange(const VcdSignal& sig) {
-  if (!sig.var) return;
-  // §21.7.4.3 (Syntax 21-29): value ::= p port_value 0_strength_component
-  // 1_strength_component. The key character p marks a port and is written with
-  // no space before the port_value.
-  ofs_ << 'p';
-  // port_value: the binary state of the port (§21.7.4.1 — port values are given
-  // in binary form as 0, 1, x, or z). The extended format dumps the whole
-  // vector, most significant bit first; a scalar contributes a single state
-  // character.
-  bool driven = false;
-  for (int32_t i = static_cast<int32_t>(sig.width) - 1; i >= 0; --i) {
-    char c = VcdBitChar(sig, i);
-    if (c != 'z') driven = true;
-    ofs_ << c;
-  }
-  WritePortStrengthComponents(ofs_, sig, driven);
-  // identifier_code: the port's integer code preceded by <, exactly as written
-  // in its $var declaration (§21.7.4.2). One space separates the value from it.
-  ofs_ << " <" << sig.port_id << "\n";
 }
 
 // Record what this signal has just put in the file, which is what the

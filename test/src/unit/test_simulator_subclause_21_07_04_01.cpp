@@ -708,11 +708,13 @@ TEST_F(ExtendedVcdSyntaxSim, PortValuesCarryBinaryStateAndStrength) {
   // Each state carries its binary character plus the two strength digits.
   EXPECT_EQ(CountToken(toks, "p066"), 1u);
   EXPECT_EQ(CountToken(toks, "p166"), 1u);
-  EXPECT_EQ(CountToken(toks, "px66"), 1u);
-  EXPECT_EQ(CountToken(toks, "pz00"), 1u);
+  // §21.7.4.3.1 spells unknown ? and three-state F on an object of unknown
+  // direction; x and z belong to no list the port_value is drawn from.
+  EXPECT_EQ(CountToken(toks, "p?66"), 1u);
+  EXPECT_EQ(CountToken(toks, "pF00"), 1u);
   // Every strength component in the file is a strength digit 0-7 (the value
   // tokens above end in their two components).
-  for (const char* v : {"p066", "p166", "px66", "pz00"}) {
+  for (const char* v : {"p066", "p166", "p?66", "pF00"}) {
     std::string t = v;
     EXPECT_TRUE(IsStrengthDigit(t[t.size() - 2]));
     EXPECT_TRUE(IsStrengthDigit(t[t.size() - 1]));

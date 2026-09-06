@@ -221,8 +221,9 @@ TEST_F(ExtendedVcdDriversSim,
 
 // §21.7.4.3.2 Claim 1, negative form: a port with none of the three driver
 // kinds is not an active driver. An undriven net resolves to high impedance, so
-// the writer dumps it with the high-impedance state character z and the highz
-// strength pair 00 -- distinct from the strong 66 an active driver produces.
+// the writer dumps it with the three-state character §21.7.4.3.1 gives an
+// object of unknown direction, F, and the highz strength pair 00 -- distinct
+// from the strong 66 an active driver produces.
 // This is the closest input Claim 1 must reject as "driven".
 TEST_F(ExtendedVcdDriversSim, UndrivenPortIsNotAnActiveDriver) {
   auto content = RunPortVcd(
@@ -230,7 +231,7 @@ TEST_F(ExtendedVcdDriversSim, UndrivenPortIsNotAnActiveDriver) {
       "  wire w;\n"
       "  initial $dumpports;\n"
       "endmodule\n");
-  EXPECT_EQ(PortRecord(content, "w"), "z|00") << content;
+  EXPECT_EQ(PortRecord(content, "w"), "F|00") << content;
 }
 
 }  // namespace

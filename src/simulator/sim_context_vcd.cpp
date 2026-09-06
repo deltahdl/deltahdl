@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "common/types.h"
+#include "parser/ast_type.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
@@ -28,6 +29,20 @@ void SimContext::SetVcdVarKind(std::string_view name, DataTypeKind kind) {
 DataTypeKind SimContext::GetVcdVarKind(std::string_view name) const {
   auto it = vcd_var_kinds_.find(name);
   return it != vcd_var_kinds_.end() ? it->second : DataTypeKind::kImplicit;
+}
+
+// §21.7.4.3.1: a port record's state character comes from the list for the
+// port's direction, and the direction is on the port declaration rather than on
+// the object the name stands for. A name no declaration covers -- a module-body
+// net or variable -- has no direction, and answers the unknown one.
+void SimContext::SetVcdPortDirection(std::string_view name,
+                                     Direction direction) {
+  vcd_port_dirs_[name] = direction;
+}
+
+Direction SimContext::GetVcdPortDirection(std::string_view name) const {
+  auto it = vcd_port_dirs_.find(name);
+  return it != vcd_port_dirs_.end() ? it->second : Direction::kNone;
 }
 
 // §21.7.5: what every member of a dumped structure shares -- the one Variable
@@ -120,6 +135,9 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
     spec.data_type = IsRealVariable(name)
                          ? VcdDataType::kReal
                          : VcdDataTypeForDeclKind(GetVcdVarKind(name));
+    // §21.7.4.3.1: which of the three state-character lists this object's port
+    // records are written from.
+    spec.direction = GetVcdPortDirection(name);
     // §21.7.2.3: the writer picks the $var var_type from the declared net
     // type -- notably a uwire net is recorded as wire -- so a dumped object
     // that is a net carries its net type into the registration.

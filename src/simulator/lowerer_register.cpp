@@ -75,6 +75,12 @@ bool PortDefaultsToZero(const RtlirPort& port) {
 
 void CreatePortVariable(std::string_view name, const RtlirPort& port,
                         SimContext& ctx, Arena& arena) {
+  // §21.7.4.3.1: an extended VCD port record takes its state characters from
+  // the list for the port's direction, and the direction is a property of the
+  // declaration rather than of the storage. Recorded before the question below
+  // of whether storage already exists, because a port whose name a module-body
+  // declaration already created is still a port and still faces one way.
+  ctx.SetVcdPortDirection(name, port.direction);
   if (ctx.FindVariable(name)) return;
   auto* v = ctx.CreateVariable(name, port.width);
   // §23.3.3.2, Table 6-7: port storage starts at the default initial value of

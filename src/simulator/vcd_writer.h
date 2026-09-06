@@ -20,6 +20,9 @@ struct Variable;
 // Declared in parser/ast_type.h; named here only as the argument of the
 // Table 21-11 mapping below, which the header does not otherwise depend on.
 enum class DataTypeKind : uint8_t;
+// Declared in parser/ast_type.h; named here only as the declared direction of a
+// dumped port, which §21.7.4.3.1 makes the choice of state-character list.
+enum class Direction : uint8_t;
 
 // §21.7.5 (Table 21-11): SystemVerilog does not extend the IEEE Std 1364-2005
 // VCD format, so a SystemVerilog data type is dumped by masquerading as a
@@ -132,6 +135,10 @@ struct VcdSignal {
   // Net type of the dumped object, used to pick the $var var_type keyword
   // (§21.7.2.3): a uwire net is recorded as wire.
   NetType net_type = NetType::kWire;
+  // §21.7.4.3.1: the declared direction of the port, which picks the list its
+  // state characters come from. Zero-initialized to kNone, the unknown
+  // direction, for a dumped object no port declaration covers.
+  Direction direction{};
   // §21.7.5 (Table 21-11): the SystemVerilog data type of the dumped object,
   // used to pick the 1364-2005 var_type keyword and the size it masquerades as.
   VcdDataType data_type = VcdDataType::kNet;
@@ -206,7 +213,17 @@ struct VcdSignalSpec {
   // strength components of its port value changes. Null when the object is not
   // a net.
   const Net* net = nullptr;
+  // §21.7.4.3.1: the declared direction of the port, which picks the list its
+  // state characters come from. kNone for a dumped object no port declaration
+  // covers, which reads the unknown-direction list.
+  Direction direction{};
 };
+
+// The §21.7.2.2 value character of one bit of a dumped object: 0, 1, x or z,
+// read out of the 4-state words the object's Variable holds. Shared because the
+// §21.7.4.3 port records in vcd_writer_port.cpp start from the same four values
+// before §21.7.4.3.1 respells them for the port's direction.
+char VcdBitChar(const VcdSignal& sig, int32_t bit);
 
 class VcdWriter {
  public:

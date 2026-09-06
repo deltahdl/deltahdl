@@ -131,8 +131,9 @@ TEST_F(ExtendedVcdValueChangeSim,
   // Registration is in name order: driven -> code 0, floating -> code 1.
   // The driven port: state 1 at strong/strong strength.
   EXPECT_NE(content.find("p166 <0"), std::string::npos) << content;
-  // The undriven net: three-state z at highz/highz strength.
-  EXPECT_NE(content.find("pz00 <1"), std::string::npos) << content;
+  // The undriven net: three-state at highz/highz strength. §21.7.4.3.1 spells
+  // three-state on an object of unknown direction F, not the 4-state z.
+  EXPECT_NE(content.find("pF00 <1"), std::string::npos) << content;
 }
 
 // §21.7.4.3 (value-change form for a real module port, end to end): the
@@ -157,9 +158,11 @@ TEST_F(ExtendedVcdValueChangeSim, DeclaredModulePortsUseValueChangeForm) {
   EXPECT_NE(content.find("$var port 1 <1 o $end"), std::string::npos)
       << content;
   // The bus port dumps its whole port_value (0110, msb first) with strong
-  // strength and its integer code; the scalar output port likewise.
-  EXPECT_NE(content.find("p011066 <0"), std::string::npos) << content;
-  EXPECT_NE(content.find("p166 <1"), std::string::npos) << content;
+  // strength and its integer code; the scalar output port likewise. Both are
+  // declared output, so §21.7.4.3.1 spells their bits from the output list --
+  // L for low and H for high.
+  EXPECT_NE(content.find("pLHHL66 <0"), std::string::npos) << content;
+  EXPECT_NE(content.find("pH66 <1"), std::string::npos) << content;
 }
 
 // §21.7.4.3: the identifier_code of a port value change is the port's integer
@@ -341,14 +344,14 @@ TEST_F(ExtendedVcdStrengthFromSource,
 // 3. Nothing else in this file reaches an ambiguous strength: every other case
 // resolves to a single level, where the two bounds coincide and the reduction
 // cannot be observed. The case fails on a writer that reports a driven port at
-// strong, which writes x|66.
+// strong, which writes ?|66.
 TEST_F(ExtendedVcdStrengthFromSource,
        AmbiguousResolvedStrengthReportsTheStrongerBound) {
   auto content = RunPortDump(
       "  wire w;\n"
       "  assign (weak0, weak1) w = 1'b1;\n"
       "  assign (weak0, weak1) w = 1'b0;\n");
-  EXPECT_EQ(PortRecord(content, "w"), "x|33") << content;
+  EXPECT_EQ(PortRecord(content, "w"), "?|33") << content;
 }
 
 }  // namespace

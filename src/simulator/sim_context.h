@@ -516,6 +516,11 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // recorded kind reports kImplicit, which keeps the §21.7.2.3 net default.
   void SetVcdVarKind(std::string_view name, DataTypeKind kind);
   DataTypeKind GetVcdVarKind(std::string_view name) const;
+  // §21.7.4.3.1: the declared direction of each dumped port, which is what
+  // picks the list its extended VCD state characters come from. A name no port
+  // declaration covers answers kNone, the unknown-direction list.
+  void SetVcdPortDirection(std::string_view name, Direction direction);
+  Direction GetVcdPortDirection(std::string_view name) const;
 
   // Like CreateVariable, keys on the string_view: `name` must outlive the
   // context, so intern a run-time-built name in the arena before calling. The
@@ -904,6 +909,9 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // already resolved) of each dumped variable, consulted when its $var
   // declaration is written to pick the masquerading 1364-2005 var_type.
   std::unordered_map<std::string_view, DataTypeKind> vcd_var_kinds_;
+  // §21.7.4.3.1: declared direction of each dumped port. See
+  // GetVcdPortDirection.
+  std::unordered_map<std::string_view, Direction> vcd_port_dirs_;
 
   std::unordered_map<std::string_view, ArrayInfo> array_infos_;
 
