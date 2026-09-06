@@ -32,10 +32,19 @@ enum class VcdDataType : uint8_t {
   kByte,      // -> reg, size 8
   kEnum,      // -> integer, size 32 (default for an untyped enum)
   kReal,      // -> real (also shortreal)
-  // Not a masquerade, unlike every member above: §21.7.2.1 (Syntax 21-20)
-  // lists event among the var_type keywords, so a named event is declared as
-  // what it is. §6.17 makes it a handle to a synchronization object rather
-  // than a number of bits, so its §21.7.2.3 size is 0.
+  // The members below masquerade as nothing. Each names a type §21.7.2.1
+  // (Syntax 21-20) already lists among the var_type keywords -- "event |
+  // integer | parameter | real | realtime | reg | supply0 | supply1 | time |
+  // tri | triand | trior | trireg | tri0 | tri1 | wand | wire | wor" -- so the
+  // dumped object is declared as what it is rather than as the 1364-2005 type
+  // Table 21-11 would lend it. What §21.7.2.3 gives them is the size, "how
+  // many bits are in the variable", which Table 6-8 fixes for two of the three
+  // below and leaves to the declaration for the third.
+  kReg,      // -> reg, size = declared packed width (Table 6-8: user-defined)
+  kInteger,  // -> integer, size 32 (Table 6-8: 32-bit signed)
+  kTime,     // -> time, size 64 (Table 6-8: 64-bit unsigned)
+  // §6.17 makes an event a handle to a synchronization object rather than a
+  // number of bits, so its §21.7.2.3 size is 0.
   kEvent,  // -> event, size 0
 };
 

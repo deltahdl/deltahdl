@@ -215,6 +215,114 @@ TEST_F(VcdFileSyntaxSim, NamedEventDeclaresEventVarType) {
   EXPECT_EQ(VarDeclFor(content, "clk").size(), 6u) << content;
 }
 
+// Syntax 21-20 (var_type) again, for the three keywords it lists that name a
+// type SystemVerilog kept from IEEE Std 1364-2005 rather than added to it.
+// §21.7.5's Table 21-11 tabulates none of reg, integer and time, and that is
+// the point: the table lends a SystemVerilog type an IEEE Std 1364-2005 type
+// to masquerade as, and these three are 1364-2005 types already, each with a
+// var_type keyword of its own in the list above. §21.7.2.3 gives wire to a net
+// and Table 6-8 makes all three variables, so none of them is a wire.
+//
+// §21.7.2.3 settles the size: "The size specifies how many bits are in the
+// variable". Table 6-8 gives reg a user-defined vector size, so a reg [7:0]
+// declares 8 -- a width chosen to differ from every size the other rows fix,
+// so a keyword answered with the wrong row's size is visible here.
+TEST_F(VcdFileSyntaxSim, RegVariableDeclaresRegVarType) {
+  auto content = RunVcd(
+      "module t;\n"
+      "  reg [7:0] r;\n"
+      "  initial begin\n"
+      "    r = 8'h00;\n"
+      "    $dumpvars;\n"
+      "    #5 r = 8'hA5;\n"
+      "  end\n"
+      "endmodule\n");
+  auto r = VarDeclFor(content, "r");
+  ASSERT_EQ(r.size(), 6u) << content;
+  EXPECT_EQ(r[1], "reg");
+  EXPECT_EQ(r[2], "8");
+}
+
+// Table 6-8: "integer -- 4-state data type, 32-bit signed integer", so the
+// §21.7.2.3 size is 32 whatever the model stores the variable in. §21.7.2.3's
+// own example declares one this way: "$var integer 32 (2 index $end".
+TEST_F(VcdFileSyntaxSim, IntegerVariableDeclaresIntegerVarType) {
+  auto content = RunVcd(
+      "module t;\n"
+      "  integer i;\n"
+      "  initial begin\n"
+      "    i = 0;\n"
+      "    $dumpvars;\n"
+      "    #5 i = 7;\n"
+      "  end\n"
+      "endmodule\n");
+  auto i = VarDeclFor(content, "i");
+  ASSERT_EQ(i.size(), 6u) << content;
+  EXPECT_EQ(i[1], "integer");
+  EXPECT_EQ(i[2], "32");
+}
+
+// Table 6-8: "time -- 4-state data type, 64-bit unsigned integer". time is the
+// one of the three whose keyword nothing else in the writer produces, so a
+// dumped time variable declared as anything at all is declared wrongly.
+TEST_F(VcdFileSyntaxSim, TimeVariableDeclaresTimeVarType) {
+  auto content = RunVcd(
+      "module t;\n"
+      "  time tm;\n"
+      "  initial begin\n"
+      "    tm = 0;\n"
+      "    $dumpvars;\n"
+      "    #5 tm = 64'd9;\n"
+      "  end\n"
+      "endmodule\n");
+  auto tm = VarDeclFor(content, "tm");
+  ASSERT_EQ(tm.size(), 6u) << content;
+  EXPECT_EQ(tm[1], "time");
+  EXPECT_EQ(tm[2], "64");
+}
+
+// The three cases above are each satisfied by declaring every dumped object
+// under the keyword its own declaration names, and that would take wire from
+// the objects §21.7.2.3 gives it to. A net declared beside them holds the
+// keyword still: "In the $var section, a net of net type uwire shall have a
+// var_type of wire", and §21.7.2.3's net mapping is what the wire keyword is
+// for. VcdLogicTypeMapping.ANetKeepsTheWireVarType in
+// test/src/unit/test_simulator_subclause_21_07_05b.cpp makes the same claim
+// against the Table 21-11 rows; this one makes it against the Syntax 21-20
+// keywords, which are the ones a net now stands among.
+TEST_F(VcdFileSyntaxSim, ANetDeclaredBesideThemKeepsTheWireVarType) {
+  auto content = RunVcd(
+      "module t;\n"
+      "  reg r;\n"
+      "  integer i;\n"
+      "  time tm;\n"
+      "  wire w;\n"
+      "  assign w = r;\n"
+      "  initial begin\n"
+      "    r = 1'b0;\n"
+      "    i = 0;\n"
+      "    tm = 0;\n"
+      "    $dumpvars;\n"
+      "    #5 r = 1'b1;\n"
+      "  end\n"
+      "endmodule\n");
+  auto w = VarDeclFor(content, "w");
+  ASSERT_EQ(w.size(), 6u) << content;
+  EXPECT_EQ(w[1], "wire");
+  // Not vacuous: the three variables beside the net are declared under their
+  // own keywords in the same file, so the run did exercise the mapping the net
+  // is being kept out of.
+  auto r = VarDeclFor(content, "r");
+  auto i = VarDeclFor(content, "i");
+  auto tm = VarDeclFor(content, "tm");
+  ASSERT_EQ(r.size(), 6u) << content;
+  ASSERT_EQ(i.size(), 6u) << content;
+  ASSERT_EQ(tm.size(), 6u) << content;
+  EXPECT_EQ(r[1], "reg");
+  EXPECT_EQ(i[1], "integer");
+  EXPECT_EQ(tm[1], "time");
+}
+
 // Top production: {declaration_command} precedes {simulation_command} -- the
 // last declaration keyword in the token stream sits before the first
 // checkpoint section or timestamp, and $enddefinitions appears exactly once,

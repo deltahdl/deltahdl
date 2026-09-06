@@ -35,6 +35,18 @@ VcdDataType VcdDataTypeForDeclKind(DataTypeKind kind) {
       return VcdDataType::kLongint;
     case DataTypeKind::kEnum:
       return VcdDataType::kEnum;
+    // Syntax 21-20 lists reg, integer and time among the var_type keywords, so
+    // each is declared as itself rather than masquerading as anything. Table
+    // 21-11 tabulates none of the three, and that is why: the table maps a
+    // SystemVerilog type onto an IEEE Std 1364-2005 type, and these three are
+    // 1364-2005 types already. Without a case each fell through to kNet and
+    // was declared wire, which §21.7.2.3 gives to a net.
+    case DataTypeKind::kReg:
+      return VcdDataType::kReg;
+    case DataTypeKind::kInteger:
+      return VcdDataType::kInteger;
+    case DataTypeKind::kTime:
+      return VcdDataType::kTime;
     // §21.7.2.1 (Syntax 21-20) lists event among the var_type keywords, so an
     // event is declared as one rather than taking the net default below.
     case DataTypeKind::kEvent:
@@ -132,10 +144,19 @@ static const char* VcdDataTypeKeyword(VcdDataType type) {
     case VcdDataType::kShortint:
     case VcdDataType::kLongint:
     case VcdDataType::kByte:
+    // §6.11.2: "logic and reg denote the same type", so an object declared
+    // with either carries the reg keyword Syntax 21-20 lists -- lent to logic
+    // by Table 21-11, and reg's own.
+    case VcdDataType::kReg:
       return "reg";
     case VcdDataType::kInt:
     case VcdDataType::kEnum:
+    // Syntax 21-20's own keyword rather than the one Table 21-11 lends int.
+    // §21.7.2.3's example declares one: "$var integer 32 (2 index $end".
+    case VcdDataType::kInteger:
       return "integer";
+    case VcdDataType::kTime:
+      return "time";
     case VcdDataType::kReal:
       return "real";
     // §21.7.2.1 (Syntax 21-20) lists event among the var_type keywords, so a
@@ -152,7 +173,14 @@ static uint32_t VcdDataTypeSize(VcdDataType type, uint32_t width) {
   switch (type) {
     case VcdDataType::kInt:
     case VcdDataType::kEnum:
+    // Table 6-8: integer is a 32-bit signed integer.
+    case VcdDataType::kInteger:
       return 32;
+    // Table 6-8: time is a 64-bit unsigned integer. Stated rather than left to
+    // the registered width so it stays 64 whatever storage the model gives a
+    // time variable, as the fixed widths above are.
+    case VcdDataType::kTime:
+      return 64;
     case VcdDataType::kShortint:
       return 16;
     case VcdDataType::kLongint:
@@ -167,6 +195,9 @@ static uint32_t VcdDataTypeSize(VcdDataType type, uint32_t width) {
       return 0;
     case VcdDataType::kBit:
     case VcdDataType::kLogic:
+    // Table 6-8 gives reg a user-defined vector size, so a reg keeps the
+    // width it was declared with, as bit and logic do.
+    case VcdDataType::kReg:
     case VcdDataType::kReal:
     case VcdDataType::kNet:
       break;

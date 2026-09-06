@@ -111,10 +111,12 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
     // §21.7.2.1: value changes for a real variable are real numbers, so its
     // $var declaration carries the real var_type keyword. The declared type
     // decides this -- the Variable's value only turns real once a real
-    // assignment lands, which is after registration. §21.7.5 (Table 21-11): a
-    // non-real variable masquerades as the 1364-2005 type its declared
-    // SystemVerilog type maps to; an unmapped kind yields kNet, leaving the
-    // §21.7.2.3 net var_type default intact.
+    // assignment lands, which is after registration. Every other variable is
+    // declared under VcdDataTypeForDeclKind: the 1364-2005 type §21.7.5
+    // (Table 21-11) lends its declared SystemVerilog type, or, where Syntax
+    // 21-20 already lists that type as a var_type keyword, the keyword itself.
+    // An unmapped kind yields kNet, leaving the §21.7.2.3 net var_type default
+    // intact.
     spec.data_type = IsRealVariable(name)
                          ? VcdDataType::kReal
                          : VcdDataTypeForDeclKind(GetVcdVarKind(name));
