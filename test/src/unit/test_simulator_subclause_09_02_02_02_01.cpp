@@ -1,6 +1,9 @@
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include "fixture_simulator.h"
+#include "simulator/awaiters.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -547,6 +550,71 @@ TEST(AlwaysCombSensitivitySim, InitializerFunctionCallReadRetriggersProcess) {
       f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 41u);
+}
+
+// Runs a design declaring one scalar and one four-bit vector, which between
+// them give a name that designates an object, a name that designates a position
+// within one, and the absence of a name -- the three cases a watch list can
+// carry. Returns false when the source did not elaborate, which a case reads as
+// having covered nothing.
+bool RunTwoSignalDesign(SimFixture& f) {
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic a;\n"
+      "  logic [3:0] b;\n"
+      "  initial begin\n"
+      "    a = 1'b0;\n"
+      "    b = 4'd0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  if (design == nullptr) return false;
+  LowerAndRun(design, f);
+  return true;
+}
+
+// §9.2.2.2.1 puts on the implicit sensitivity list "the expansions of the
+// longest static prefix of each net or variable identifier or select expression
+// that is read", and an expansion is an object of the design. `b[3]` names a
+// position within `b` and no object, SimContext::FindVariable resolving a
+// declared name against one Variable per declaration, so it belongs to no
+// expansion and is not on the list.
+//
+// Watching it is what the list was doing. The awaiters skip a name they cannot
+// resolve when they arm, so the name contributed nothing but its presence, and
+// its presence is what the emptiness test at each watching loop reads.
+TEST(ImplicitSensitivityWatchList, DropsANameThatDesignatesNoObject) {
+  SimFixture f;
+  ASSERT_TRUE(RunTwoSignalDesign(f));
+  std::vector<std::string_view> names{"a", "b[3]", "no_such_signal"};
+  DropUnwatchableNames(f.ctx, names);
+  EXPECT_EQ(names, std::vector<std::string_view>{"a"});
+}
+
+// The control on the case above. A name that does designate an object stays,
+// whatever else the list carried, so the drop cannot be satisfied by a list
+// that empties itself.
+TEST(ImplicitSensitivityWatchList, KeepsEveryNameThatDesignatesAnObject) {
+  SimFixture f;
+  ASSERT_TRUE(RunTwoSignalDesign(f));
+  std::vector<std::string_view> names{"a", "b"};
+  DropUnwatchableNames(f.ctx, names);
+  EXPECT_EQ(names, (std::vector<std::string_view>{"a", "b"}));
+}
+
+// The case the emptiness test at each watching loop exists to answer. A list
+// whose every name designates no object arms no watcher at all, so the process
+// suspending on it can never be resumed: it is never scheduled again and
+// whatever it drives holds its last value for the rest of the run, reported
+// nowhere. The list has to reach that test empty for the loop to evaluate once
+// and finish, which is what §9.2.2.2.1 leaves for a procedure with nothing on
+// its sensitivity list -- it "is automatically triggered once at time zero".
+TEST(ImplicitSensitivityWatchList, EmptiesAListWhoseNamesAllDesignateNoObject) {
+  SimFixture f;
+  ASSERT_TRUE(RunTwoSignalDesign(f));
+  std::vector<std::string_view> names{"b[3]", "no_such_signal"};
+  DropUnwatchableNames(f.ctx, names);
+  EXPECT_TRUE(names.empty());
 }
 
 }  // namespace

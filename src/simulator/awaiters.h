@@ -15,6 +15,7 @@
 // EventAwaiter and RepeatEventAwaiter. AnyChangeAwaiter calls
 // EventAwaiter::ResumeMaybeReactive from there.
 
+#include <algorithm>
 #include <coroutine>
 #include <cstdint>
 #include <memory>
@@ -137,6 +138,34 @@ struct SequenceEventAwaiter {
 
   void await_resume() const noexcept {}
 };
+
+// Drops from `names` every name that designates no object, leaving a process's
+// watch list holding only the names a watcher can be armed on.
+//
+// §9.2.2.2.1 builds an implicit sensitivity list out of "the expansions of the
+// longest static prefix of each net or variable identifier or select expression
+// that is read", and an expansion is an object of the design, so a name that
+// resolves to none of them is not on the list at all. Both awaiters below
+// already read it that way when they arm, by skipping such a name; this is
+// where the list itself comes to agree, which is what lets the `read_vars`
+// emptiness test at each loop that watches one answer the question it asks.
+//
+// A list left holding those names reads as though there were something to
+// watch, so the coroutine suspends on a set of watchers it never armed. Nothing
+// can resume it after that: the process is never scheduled again, and whatever
+// it drives holds the value of its last evaluation for the rest of the run with
+// no report of any kind. #3436 is one instance of that reaching the output.
+// Resuming such a suspension immediately is not the alternative, because each
+// of those loops evaluates and awaits without advancing time, so a suspension
+// that resumes itself spins for ever.
+inline void DropUnwatchableNames(SimContext& ctx,
+                                 std::vector<std::string_view>& names) {
+  auto designates_no_object = [&ctx](std::string_view name) {
+    return ctx.FindVariable(name) == nullptr;
+  };
+  names.erase(std::remove_if(names.begin(), names.end(), designates_no_object),
+              names.end());
+}
 
 struct AnyChangeAwaiter {
   SimContext& ctx;

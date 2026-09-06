@@ -261,6 +261,7 @@ static SimCoroutine MakeUdpInstCoroutine(const RtlirUdpInst* inst,
     CollectExprReads(terminal, read_strs);
   }
   std::vector<std::string_view> read_vars(read_strs.begin(), read_strs.end());
+  DropUnwatchableNames(ctx, read_vars);
 
   // One evaluator for the life of the instance. §29.5 makes the current state
   // of a sequential primitive the current output value, so a UdpEvalState built

@@ -148,6 +148,7 @@ static SimCoroutine MakeAlwaysCombCoroutine(const Stmt* body,
     if (call_outputs.count(std::string(ev.signal->text)) != 0) continue;
     read_vars.push_back(ev.signal->text);
   }
+  DropUnwatchableNames(ctx, read_vars);
   while (!ctx.StopRequested()) {
     co_await ExecStmt(body, ctx, arena);
     if (read_vars.empty()) break;

@@ -497,6 +497,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
   std::unordered_set<std::string> read_strs;
   CollectExprReads(params.rhs, read_strs);
   std::vector<std::string_view> read_vars(read_strs.begin(), read_strs.end());
+  DropUnwatchableNames(ctx, read_vars);
 
   auto* net = lhs_is_name ? ctx.FindNet(params.lhs->text) : nullptr;
   ContAssignDriver drv = MakeContAssignDriver(net);
