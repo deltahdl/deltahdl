@@ -157,12 +157,15 @@ TEST_F(ExtendedVcdValueChangeSim, DeclaredModulePortsUseValueChangeForm) {
       << content;
   EXPECT_NE(content.find("$var port 1 <1 o $end"), std::string::npos)
       << content;
-  // The bus port dumps its whole port_value (0110, msb first) with strong
-  // strength and its integer code; the scalar output port likewise. Both are
-  // declared output, so §21.7.4.3.1 spells their bits from the output list --
-  // L for low and H for high.
+  // The bus port dumps its whole port_value (0110, msb first) and its integer
+  // code; the scalar output port likewise. Both are declared output, so
+  // §21.7.4.3.1 spells their bits from the output list -- L for low and H for
+  // high. §23.2.2.3 makes both ports nets, so the strength digits are the ones
+  // resolution produced rather than the pair the writer falls back on: the bus
+  // has a bit driven strong on each side and reports 66, while the scalar is
+  // driven 1 alone and reports the 0 side undriven, 06.
   EXPECT_NE(content.find("pLHHL66 <0"), std::string::npos) << content;
-  EXPECT_NE(content.find("pH66 <1"), std::string::npos) << content;
+  EXPECT_NE(content.find("pH06 <1"), std::string::npos) << content;
 }
 
 // §21.7.4.3: the identifier_code of a port value change is the port's integer

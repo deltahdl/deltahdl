@@ -87,6 +87,14 @@ struct RtlirPort {
   const DataType* dtype = nullptr;
 
   bool is_var = false;
+  // §23.2.2.3: the net type of a port the clause makes a net -- the net type
+  // keyword the declaration wrote, or the default net type where it wrote
+  // none, since "an implicit data type declaration implies a net unless the
+  // var keyword is used" and an input or inout with no port kind "shall default
+  // to a net of default net type". kNone for a port the clause makes a
+  // variable, which is the same set is_var names; carried separately because
+  // which net type it is is a second question is_var does not answer.
+  NetType net_type = NetType::kNone;
   bool is_interconnect = false;
   bool is_interface_port = false;
   std::string_view interface_type_name;

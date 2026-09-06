@@ -82,13 +82,29 @@ void CreatePortVariable(std::string_view name, const RtlirPort& port,
   // declaration already created is still a port and still faces one way.
   ctx.SetVcdPortDirection(name, port.direction);
   if (ctx.FindVariable(name)) return;
-  auto* v = ctx.CreateVariable(name, port.width);
+  // §23.2.2.3 decides whether a port is a net or a variable, and a port it
+  // makes a net is one: its drivers resolve against each other (§28.12) and it
+  // carries a strength, which is what %v (§21.2.1.4) and an extended VCD port
+  // record (§21.7.4.3) report. Where the port is written -- in the header or,
+  // as a net declaration, in the body -- decides nothing, so the two spellings
+  // reach the same model.
+  Variable* v = nullptr;
+  if (port.net_type != NetType::kNone) {
+    v = ctx.CreateNet(name, port.net_type, port.width,
+                      NetSpec{.is_signed = port.is_signed})
+            ->resolved;
+  } else {
+    v = ctx.CreateVariable(name, port.width);
+    if (port.is_signed) v->is_signed = true;
+  }
   // §23.3.3.2, Table 6-7: port storage starts at the default initial value of
   // the port's data type, so an unconnected input reads as its type's default
-  // rather than as whatever fresh storage happens to hold.
-  if (PortDefaultsToZero(port))
-    v->value = MakeLogic4VecVal(arena, port.width, 0);
-  if (port.is_signed) v->is_signed = true;
+  // rather than as whatever fresh storage happens to hold. That is the port's
+  // own rule and it is written here whichever way the storage was made --
+  // §6.7.1's z belongs to a net no port declaration named, and a net-kind port
+  // reaching CreateNet above has just been given it.
+  v->value = PortDefaultsToZero(port) ? MakeLogic4VecVal(arena, port.width, 0)
+                                      : MakeLogic4Vec(arena, port.width);
   // §11.5.1: "The actual bit that is accessed by an address is, in part,
   // determined by the declaration" -- port.width says how many bits the port
   // has rather than which bit an index names, because `[8:1]` and `[1:8]` are

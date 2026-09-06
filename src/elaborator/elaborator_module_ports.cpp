@@ -308,6 +308,16 @@ static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
   rp.is_signed = port.data_type.is_signed;
   rp.is_var = port_is_var;
   rp.is_interconnect = port.data_type.is_interconnect;
+  // §23.2.2.3: a port the clause makes a net is a net of the type its
+  // declaration names, and of the default net type where it names none --
+  // DataTypeToNetType answers both, an implicit or explicit-data-type kind
+  // falling through to wire. An interconnect port is its own net type
+  // (§6.6.8), as it is for a net declaration.
+  if (!port_is_var) {
+    rp.net_type = port.data_type.is_interconnect
+                      ? NetType::kInterconnect
+                      : DataTypeToNetType(port.data_type.kind);
+  }
   rp.default_value = port.default_value;
   ComputePortUnpackedDims(port, rp, scope, diag);
   return rp;
