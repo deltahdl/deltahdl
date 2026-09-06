@@ -1,5 +1,6 @@
 #include "simulator/lowerer_register.h"
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -73,6 +74,23 @@ bool PortDefaultsToZero(const RtlirPort& port) {
   return !Is4stateType(port.type_kind);
 }
 
+// §6.4: an uninitialized 4-state object is x, and only inside its width -- the
+// bits above it in the top word stay 0 so they cannot leak phantom x into a
+// read or into arithmetic on the value. SimContext::CreateVariable does this
+// for storage it makes itself; a port whose storage came from CreateNet needs
+// it done again, a net's own default being §6.7.1's z.
+static void FillPortStorageWithX(Variable* v, uint32_t width) {
+  for (uint32_t i = 0; i < v->value.nwords; ++i) {
+    v->value.words[i].aval = ~uint64_t{0};
+    v->value.words[i].bval = ~uint64_t{0};
+  }
+  if (uint32_t top_bits = width % 64; top_bits != 0 && v->value.nwords > 0) {
+    uint64_t mask = (uint64_t{1} << top_bits) - 1;
+    v->value.words[v->value.nwords - 1].aval &= mask;
+    v->value.words[v->value.nwords - 1].bval &= mask;
+  }
+}
+
 void CreatePortVariable(std::string_view name, const RtlirPort& port,
                         SimContext& ctx, Arena& arena) {
   // §21.7.4.3.1: an extended VCD port record takes its state characters from
@@ -93,18 +111,22 @@ void CreatePortVariable(std::string_view name, const RtlirPort& port,
     v = ctx.CreateNet(name, port.net_type, port.width,
                       NetSpec{.is_signed = port.is_signed})
             ->resolved;
+    // §23.3.3.2 with Table 6-7 gives a port its data type's default initial
+    // value, and that is the port's own rule: §6.7.1's undriven-net z, which
+    // CreateNet has just installed, belongs to a net no port declaration
+    // named. Putting the port's default back is what keeps a net-kind port
+    // reading what it read before it was one.
+    FillPortStorageWithX(v, port.width);
   } else {
     v = ctx.CreateVariable(name, port.width);
-    if (port.is_signed) v->is_signed = true;
   }
-  // §23.3.3.2, Table 6-7: port storage starts at the default initial value of
-  // the port's data type, so an unconnected input reads as its type's default
-  // rather than as whatever fresh storage happens to hold. That is the port's
-  // own rule and it is written here whichever way the storage was made --
-  // §6.7.1's z belongs to a net no port declaration named, and a net-kind port
-  // reaching CreateNet above has just been given it.
-  v->value = PortDefaultsToZero(port) ? MakeLogic4VecVal(arena, port.width, 0)
-                                      : MakeLogic4Vec(arena, port.width);
+  // §23.3.3.2, Table 6-7: an unconnected input reads as its type's default
+  // rather than as whatever the storage happens to hold. A 4-state type's
+  // default is the x both branches above leave behind; only a 2-state one
+  // needs writing.
+  if (PortDefaultsToZero(port))
+    v->value = MakeLogic4VecVal(arena, port.width, 0);
+  if (port.is_signed) v->is_signed = true;
   // §11.5.1: "The actual bit that is accessed by an address is, in part,
   // determined by the declaration" -- port.width says how many bits the port
   // has rather than which bit an index names, because `[8:1]` and `[1:8]` are
