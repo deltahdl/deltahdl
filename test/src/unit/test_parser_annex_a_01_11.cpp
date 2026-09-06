@@ -439,4 +439,46 @@ TEST(PackageItemsParsing,
       ReportedError(r.diags, kExcludedItemMessage, 4, kExcludedItemSubclause));
 }
 
+// A timeunit declaration is a package_or_generate_item_declaration and no
+// anonymous_program_item. It reaches no filter over the program's items,
+// because its parse path appends no ModuleItem at all, so the refusal stands
+// where the declaration is parsed. The item list is empty either way here,
+// which is why the report is the whole of the claim.
+TEST(PackageItemsParsing, ErrorAnonymousProgramWithTimeunitDecl) {
+  ExpectAnonymousProgramExcludes("timeunit 1ns;");
+}
+
+// A timeprecision declaration is the same form and the same clause, reached by
+// the same parse path. It is written out rather than left to the case above
+// because the two keywords are read by one function and a refusal keyed on the
+// wrong one would pass that case.
+TEST(PackageItemsParsing, ErrorAnonymousProgramWithTimeprecisionDecl) {
+  ExpectAnonymousProgramExcludes("timeprecision 1ps;");
+}
+
+// A.1.11's task_declaration and function_declaration do not reach the extern
+// method-prototype form. A prototype produces the same ModuleItemKind a
+// definition does, so a filter keyed on the kind admitted it; ModuleItem::
+// is_extern is what tells the two apart.
+TEST(PackageItemsParsing, ErrorAnonymousProgramWithExternFunctionPrototype) {
+  ExpectAnonymousProgramExcludes("extern function void f();");
+}
+
+// The control the three above rest on: A.1.11 does admit a
+// function_declaration, so a refusal keyed on the kind alone -- or one that
+// read is_extern the wrong way round -- would reject the form the clause names.
+// The package declares it, an anonymous program having no scope of its own.
+TEST(PackageItemsParsing, AnonymousProgramWithFunctionDeclIsAccepted) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  program;\n"
+      "    function void f(); endfunction\n"
+      "  endprogram\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_EQ(r.cu->packages[0]->items.size(), 1u);
+}
+
 }  // namespace

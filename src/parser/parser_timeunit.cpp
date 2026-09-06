@@ -152,6 +152,20 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu,
   // before this function is entered, so recording the same token is what makes
   // the cross-file report of §3.14.2.2 land where the within-file one does.
   auto kw_tok = Consume();
+  // A.1.11 gives anonymous_program_item a closed set -- task, function, class,
+  // interface class, covergroup and class constructor declarations, and the
+  // null item -- and a timeunit or timeprecision declaration is none of them.
+  // It is refused here rather than in the filter over an anonymous program's
+  // items, because this parse path appends no ModuleItem at all and the filter
+  // never sees one. The message and the citation are the filter's, A.1.11's set
+  // being one rule however a source breaks it.
+  if (in_anonymous_program_) {
+    diag_.Error(kw_tok.loc,
+                "an anonymous program may contain only task, function, class, "
+                "interface class, covergroup, and class constructor "
+                "declarations",
+                Subclause("A.1.11"));
+  }
   auto tok = Consume();
   TimeUnit tu = TimeUnit::kNs;
   int mag = 1;

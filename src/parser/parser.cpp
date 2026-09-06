@@ -50,7 +50,11 @@ void FilterAnonymousProgramItems(DiagEngine& diag,
   size_t kept = before;
   for (size_t i = before; i < items.size(); ++i) {
     ModuleItem* item = items[i];
-    if (!IsAnonymousProgramItemKind(item->kind)) {
+    // A.1.11's task_declaration and function_declaration do not reach the
+    // extern method-prototype form, and a prototype produces the same
+    // ModuleItemKind a definition does, so the kind cannot tell them apart.
+    // ModuleItem::is_extern is what does.
+    if (!IsAnonymousProgramItemKind(item->kind) || item->is_extern) {
       diag.Error(item->loc,
                  "an anonymous program may contain only task, function, class, "
                  "interface class, covergroup, and class constructor "
