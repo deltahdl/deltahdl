@@ -1,7 +1,10 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <fstream>
+#include <ostream>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -346,6 +349,19 @@ class VcdWriter {
   // by a plain writer.
   void SetExtendedPortNodes() { port_nodes_ = true; }
 
+  // §21.7.4.1 (Syntax 21-27): an extended file's version_text is a version
+  // identifier followed by the $dumpports commands that produced the file, and
+  // §21.7.3.1 lets a source issue several of them so long as they all execute
+  // at one simulation time. The last of those runs after the first has already
+  // opened the file, so a writer told to buffer builds the declaration
+  // commands in memory instead of on disk and keeps a place in the version
+  // section for the commands still to come. Call before WriteHeader.
+  void BufferDeclarations();
+  // §21.7.4.1: add one dumpports_command to the version_text. Does nothing on
+  // a writer that is not buffering, whose version section is already on disk
+  // and can take no more.
+  void AddVersionCommand(std::string_view text);
+
   // Emit the $vcdclose keyword command (§21.7.3.6.1): when an extended VCD file
   // is closed, record the final simulation time so a reader knows the end time
   // regardless of whether any signal changed at that time. Syntax 21-26:
@@ -377,7 +393,28 @@ class VcdWriter {
   // limit comment exactly once when the threshold is first crossed.
   bool AtSizeLimit();
 
+  // Where a declaration command goes: the buffer while one is being held, the
+  // file otherwise.
+  std::ostream& Decl() {
+    return buffer_decls_ ? static_cast<std::ostream&>(decl_buf_)
+                         : static_cast<std::ostream&>(ofs_);
+  }
+  // Put the held declaration commands on disk, the version_text's dumpports
+  // commands spliced into the place WriteHeader kept for them, and go back to
+  // writing straight through. Every entry point that writes something
+  // belonging after the declarations calls this first, so the held region
+  // never lands in the middle of the file. Does nothing when nothing is held.
+  void FlushDeclarations();
+
   std::ofstream ofs_;
+  // §21.7.4.1: the declaration commands, held until every dumpports_command
+  // that belongs in the version section is known. See BufferDeclarations.
+  std::ostringstream decl_buf_;
+  bool buffer_decls_ = false;
+  // Offset in decl_buf_ where a dumpports_command belongs: after the version
+  // identifier, before the $version section's $end.
+  size_t version_commands_at_ = 0;
+  std::vector<std::string> version_commands_;
   std::vector<VcdSignal> signals_;
   char next_ident_ = '!';
   bool enabled_ = true;

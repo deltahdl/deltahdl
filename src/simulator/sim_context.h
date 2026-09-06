@@ -407,6 +407,13 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // §21.7.3.7: true once at least one $dumpports call has explicitly named an
   // output file, so a control task's filename can be matched against the set.
   bool HasDumpportsFiles() const { return !dumpports_files_.empty(); }
+  // §21.7.4.1 (Syntax 21-27): an extended file's version_text lists the
+  // $dumpports commands that produced it, so each call's source spelling is
+  // recorded as it executes. A call made before the extended dump was opened
+  // is held until the open replays it into the header; one made after goes
+  // straight to the writer, which is holding its declaration commands for
+  // exactly this.
+  void AddDumpportsCommand(std::string text);
   // §21.7.3.1: $dumpports may be invoked many times, but the execution of all
   // $dumpports tasks shall be at the same simulation time. The first call
   // records its time; a later call passes only when it matches.
@@ -850,6 +857,9 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // specified file names must each be unique across all $dumpports calls.
   std::unordered_set<std::string> dumpports_scopes_;
   std::unordered_set<std::string> dumpports_files_;
+  // §21.7.4.1: the $dumpports commands that executed before the extended dump
+  // was opened, in call order, waiting to be written into its version_text.
+  std::vector<std::string> dumpports_commands_;
   // §21.7.3.1: the one simulation time at which every $dumpports call must
   // execute, recorded by the first call.
   bool have_dumpports_time_ = false;

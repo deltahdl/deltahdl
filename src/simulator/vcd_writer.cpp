@@ -70,23 +70,62 @@ static std::string CurrentDateText() {
 VcdWriter::VcdWriter(const std::string& filename) : ofs_(filename) {}
 
 VcdWriter::~VcdWriter() {
+  FlushDeclarations();
   if (ofs_.is_open()) ofs_.close();
+}
+
+// §21.7.4.1: hold the declaration commands in memory rather than writing them
+// straight out, so a $dumpports command issued after the file was opened still
+// reaches the version section it belongs in.
+void VcdWriter::BufferDeclarations() { buffer_decls_ = true; }
+
+void VcdWriter::AddVersionCommand(std::string_view text) {
+  if (!buffer_decls_) return;
+  version_commands_.emplace_back(text);
+}
+
+void VcdWriter::FlushDeclarations() {
+  if (!buffer_decls_) return;
+  buffer_decls_ = false;
+  if (!ofs_.is_open()) return;
+  std::string text = decl_buf_.str();
+  decl_buf_.str(std::string());
+  std::string commands;
+  for (const auto& command : version_commands_) {
+    commands += "  " + command + "\n";
+  }
+  // §21.7.4.1 (Syntax 21-27): version_text is the version identifier followed
+  // by the dumpports commands, and WriteHeader kept that place. A header that
+  // was never written leaves the offset at zero, where an insertion is still
+  // in bounds and puts the commands ahead of nothing.
+  text.insert(version_commands_at_ <= text.size() ? version_commands_at_ : 0,
+              commands);
+  ofs_ << text;
 }
 
 void VcdWriter::WriteHeader(std::string_view timescale,
                             std::string_view dumpfile_literal) {
   if (!ofs_.is_open()) return;
-  ofs_ << "$date\n  " << CurrentDateText() << "\n$end\n";
+  std::ostream& out = Decl();
+  out << "$date\n  " << CurrentDateText() << "\n$end\n";
   // §21.7.2.3: the $version section names the VCD writer and the $dumpfile call
   // that created the file. When the filename was supplied by a variable or an
   // expression, the unevaluated literal is reproduced here rather than the
   // resolved name.
-  ofs_ << "$version\n  DeltaHDL 0.1.0\n";
+  out << "$version\n  DeltaHDL 0.1.0\n";
   if (!dumpfile_literal.empty()) {
-    ofs_ << "  $dumpfile(" << dumpfile_literal << ")\n";
+    out << "  $dumpfile(" << dumpfile_literal << ")\n";
   }
-  ofs_ << "$end\n";
-  ofs_ << "$timescale\n  " << timescale << "\n$end\n";
+  // §21.7.4.1 (Syntax 21-27): version_text is the version identifier followed
+  // by the dumpports commands, so a command written later belongs here, after
+  // what has just gone out and before the $end below. A buffered header
+  // remembers the offset; a header going straight to disk has nowhere to put a
+  // later command and keeps none.
+  if (buffer_decls_) {
+    version_commands_at_ = static_cast<size_t>(decl_buf_.tellp());
+  }
+  out << "$end\n";
+  out << "$timescale\n  " << timescale << "\n$end\n";
   header_written_ = true;
 }
 
@@ -112,12 +151,12 @@ static const char* VcdScopeKeyword(VcdScopeKind kind) {
 
 void VcdWriter::BeginScope(std::string_view name, VcdScopeKind kind) {
   if (!ofs_.is_open()) return;
-  ofs_ << "$scope " << VcdScopeKeyword(kind) << " " << name << " $end\n";
+  Decl() << "$scope " << VcdScopeKeyword(kind) << " " << name << " $end\n";
 }
 
 void VcdWriter::EndScope() {
   if (!ofs_.is_open()) return;
-  ofs_ << "$upscope $end\n";
+  Decl() << "$upscope $end\n";
 }
 
 // §21.7.2.3: choose the var_type keyword written in a $var declaration. Real
@@ -254,7 +293,7 @@ static VcdSignal MakeVcdSignal(const VcdSignalSpec& spec, char& next_ident,
 // var_type keyword is always port; the size is the declared index range of a
 // bus or 1 for a single-bit port; the identifier code is the integer preceded
 // by <. At least one space separates each syntactical element.
-static void WritePortVarDecl(std::ofstream& ofs, const VcdSignal& sig,
+static void WritePortVarDecl(std::ostream& ofs, const VcdSignal& sig,
                              std::string_view name) {
   ofs << "$var port ";
   if (sig.msb >= 0 && sig.lsb >= 0) {
@@ -268,7 +307,7 @@ static void WritePortVarDecl(std::ofstream& ofs, const VcdSignal& sig,
 // §21.7.5 (Table 21-11): a SystemVerilog data type masquerades as a 1364-2005
 // type. A net keeps the §21.7.2.3 mapping (and a real object dumped through
 // that path is still detected by its value); a data type uses its table entry.
-static void WriteVarDecl(std::ofstream& ofs, const VcdSignal& sig,
+static void WriteVarDecl(std::ostream& ofs, const VcdSignal& sig,
                          std::string_view name, uint32_t width) {
   const char* keyword = sig.data_type == VcdDataType::kNet
                             ? VcdVarTypeKeyword(sig)
@@ -281,7 +320,7 @@ static void WriteVarDecl(std::ofstream& ofs, const VcdSignal& sig,
 // Emit the $var declaration for a freshly registered signal, choosing the
 // extended-VCD port form (§21.7.4.2) when the writer is recording $dumpports
 // nodes and the standard data-type form (§21.7.5) otherwise.
-static void WriteSignalVarDecl(std::ofstream& ofs, const VcdSignal& sig,
+static void WriteSignalVarDecl(std::ostream& ofs, const VcdSignal& sig,
                                std::string_view name, uint32_t width,
                                bool port_nodes) {
   if (port_nodes) {
@@ -303,22 +342,23 @@ void VcdWriter::RegisterSignal(const VcdSignalSpec& spec) {
   VcdSignal sig = MakeVcdSignal(spec, next_ident_, next_port_id_);
   signals_.push_back(sig);
   if (!ofs_.is_open()) return;
-  WriteSignalVarDecl(ofs_, sig, spec.name, spec.width, port_nodes_);
+  WriteSignalVarDecl(Decl(), sig, spec.name, spec.width, port_nodes_);
 }
 
 void VcdWriter::WriteComment(std::string_view text) {
   if (!ofs_.is_open()) return;
   // The comment text -- one line or several -- sits between the $comment
   // keyword and the $end that closes the section.
-  ofs_ << "$comment\n  " << text << "\n$end\n";
+  Decl() << "$comment\n  " << text << "\n$end\n";
 }
 
 void VcdWriter::EndDefinitions() {
   if (!ofs_.is_open()) return;
-  ofs_ << "$enddefinitions $end\n";
+  Decl() << "$enddefinitions $end\n";
 }
 
 bool VcdWriter::AtSizeLimit() {
+  FlushDeclarations();
   if (size_limit_ == 0) return false;  // no limit configured
   if (limit_reached_) return true;     // already stopped
   if (!ofs_.is_open()) return false;
@@ -334,6 +374,7 @@ bool VcdWriter::AtSizeLimit() {
 }
 
 void VcdWriter::WriteTimestamp(uint64_t time) {
+  FlushDeclarations();
   // §21.7.1.3: with the start gate armed, no simulation time is recorded until
   // a $dumpvars checkpoint has started the dump.
   if (!ofs_.is_open() || !enabled_ || !dump_started_) return;
@@ -348,6 +389,7 @@ void VcdWriter::WriteTimestamp(uint64_t time) {
 }
 
 void VcdWriter::EnsureTimestamp(uint64_t time) {
+  FlushDeclarations();
   if (!ofs_.is_open()) return;
   if (have_time_ && time == last_time_) return;
   ofs_ << "#" << time << "\n";
@@ -613,6 +655,7 @@ static bool HasValueChanged(const VcdSignal& sig) {
 }
 
 void VcdWriter::DumpAllValues() {
+  FlushDeclarations();
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
   // §21.7.1.3: the $dumpvars checkpoint starts the value change dumping; from
@@ -630,6 +673,7 @@ void VcdWriter::DumpAllValues() {
 }
 
 void VcdWriter::DumpSelectedValues(const std::vector<std::string_view>& names) {
+  FlushDeclarations();
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
   dump_started_ = true;  // §21.7.1.3: the checkpoint starts the dump
@@ -717,6 +761,7 @@ static bool ScopeSelectsSignal(std::string_view sig_name,
 
 void VcdWriter::DumpScopeSelectedValues(
     const std::vector<std::string_view>& names, uint64_t level) {
+  FlushDeclarations();
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
   dump_started_ = true;  // §21.7.1.3: the checkpoint starts the dump
@@ -770,6 +815,7 @@ void VcdWriter::DumpOn(uint64_t time) {
 }
 
 void VcdWriter::DumpAll() {
+  FlushDeclarations();
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
   // §21.7.1.4: the checkpoint "shows the current value of all selected
@@ -784,6 +830,7 @@ void VcdWriter::DumpAll() {
 }
 
 void VcdWriter::DumpOff() {
+  FlushDeclarations();
   if (!ofs_.is_open()) return;
   // The checkpoint records every selected variable as x, then dumping stops so
   // that no value changes are recorded until $dumpon is executed.
@@ -798,6 +845,7 @@ void VcdWriter::DumpOff() {
 }
 
 void VcdWriter::DumpOn() {
+  FlushDeclarations();
   if (!ofs_.is_open()) return;
   // Recording resumes and a checkpoint of each variable's value at this time is
   // emitted so the dump reflects the current state.
@@ -812,6 +860,7 @@ void VcdWriter::DumpOn() {
 }
 
 void VcdWriter::Flush() {
+  FlushDeclarations();
   if (!ofs_.is_open()) return;
   // Empty the stream's buffer into the file so its current contents are
   // observable to an external reader. No dump command is written and the
@@ -820,6 +869,7 @@ void VcdWriter::Flush() {
 }
 
 void VcdWriter::WriteVcdClose(uint64_t final_time) {
+  FlushDeclarations();
   if (!ofs_.is_open() || !extended_) return;
   // §21.7.3.6.1: the final keyword command of an extended VCD file marks the
   // end simulation time at the moment the file is closed. The time is written
@@ -870,6 +920,7 @@ void VcdWriter::EmitPendingPortStartCheckpoint() {
 }
 
 void VcdWriter::DumpChangedValues(uint64_t) {
+  FlushDeclarations();
   if (port_start_pending_) {
     EmitPendingPortStartCheckpoint();
     // The checkpoint already reported every selected object at this time, so

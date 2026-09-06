@@ -186,6 +186,13 @@ VcdWriter* SimContext::OpenVcdDump(std::string_view top_scope,
   if (type == VcdFileType::kExtended) {
     vcd->SetExtended();
     vcd->SetExtendedPortNodes();
+    // §21.7.4.1 (Syntax 21-27): the version_text of an extended file lists the
+    // $dumpports commands that produced it, and §21.7.3.1 lets a source issue
+    // several -- all at one simulation time, but only the first of them opens
+    // the file. So the declaration commands are held until that time unit has
+    // played out, by which point every command is known and each can go into
+    // the section it belongs in rather than into a header already on disk.
+    vcd->BufferDeclarations();
   }
   // §21.7.2.3: the $version section reproduces the $dumpfile call that named
   // the file, its filename argument spelled as it was written. A dump no
@@ -203,6 +210,17 @@ VcdWriter* SimContext::OpenVcdDump(std::string_view top_scope,
   std::string timescale = "1";
   timescale += TimeUnitStr(GlobalPrecision());
   vcd->WriteHeader(timescale, dump.file_literal);
+  // §21.7.4.1: the $dumpports call that opened this dump executed before the
+  // writer existed, so its command -- and any earlier one whose dump this is --
+  // is replayed into the version section here. A 4-state dump has no version
+  // commands of its own, and §21.7.2.1 gives its version_text none, so the
+  // pending list is left for the extended dump the same source may still open.
+  if (type == VcdFileType::kExtended) {
+    for (const auto& command : dumpports_commands_) {
+      vcd->AddVersionCommand(command);
+    }
+    dumpports_commands_.clear();
+  }
   // §21.7.1.2: the scope the declarations are written under is the module a
   // $dumpvars scope argument is written down from, and RegisterVcdSignals
   // names each signal by its path below that module. The writer is told which

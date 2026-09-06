@@ -127,6 +127,18 @@ void SimContext::SetDumpFileLiteral(std::string text) {
   four_state_dump_.file_literal = std::move(text);
 }
 
+// §21.7.4.1: the version section of the extended file lists the $dumpports
+// commands. The dump the commands belong to is the one $dumpports opens, so a
+// call that finds it open hands its command to the writer and a call that
+// opens it leaves the command here for OpenVcdDump to replay.
+void SimContext::AddDumpportsCommand(std::string text) {
+  if (extended_dump_.writer != nullptr) {
+    extended_dump_.writer->AddVersionCommand(text);
+    return;
+  }
+  dumpports_commands_.push_back(std::move(text));
+}
+
 bool SimContext::RegisterDumpportsScope(const std::string& scope) {
   return dumpports_scopes_.insert(scope).second;
 }

@@ -9,6 +9,7 @@
 // unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_text_lines.h"
 #include "helpers_vcd_logic4vec.h"
@@ -716,6 +717,89 @@ TEST_F(ExtendedVcdSyntaxSim, PortValuesCarryBinaryStateAndStrength) {
     EXPECT_TRUE(IsStrengthDigit(t[t.size() - 2]));
     EXPECT_TRUE(IsStrengthDigit(t[t.size() - 1]));
   }
+}
+
+// The body of the $version section, from the keyword to the $end that closes
+// it (§21.7.4.1: declaration_command ::= declaration_keyword [command_text]
+// $end, with version_section as the command_text). Empty when the file carries
+// no such section.
+std::string VersionSectionOf(const std::string& content) {
+  auto start = content.find("$version");
+  if (start == std::string::npos) return {};
+  auto end = content.find("$end", start);
+  if (end == std::string::npos) return content.substr(start);
+  return content.substr(start, end - start);
+}
+
+// §21.7.4.1 (Syntax 21-27): version_text ::= version_identifier
+// {dumpports_command}, and dumpports_command ::= $dumpports ( scope_identifier
+// , string_literal | variable | expression ). So an extended file's version
+// section names the writer and then lists the $dumpports commands that
+// produced it, which is what lets a reader of the file reconstruct the call.
+//
+// The commands come from the source, so every case here runs the source's own
+// tasks: a writer a test hands a header to has no call to reproduce, which is
+// why the cases above -- which select the extended form at the writer -- say
+// nothing about the version section.
+class ExtendedVcdVersionCommands : public VcdDumpFromSourceTestBase {
+ protected:
+  // A design whose top module runs `tasks`, with two instances below it for a
+  // scope_list to name. Relative file names land in the scratch directory the
+  // fixture stands the run in.
+  static std::string DesignCalling(const std::string& tasks) {
+    return "module n;\n"
+           "  logic [7:0] p;\n"
+           "  initial p = 8'h11;\n"
+           "endmodule\n"
+           "module t;\n"
+           "  n k1();\n"
+           "  n k2();\n"
+           "  logic [7:0] q;\n"
+           "  initial begin\n"
+           "    q = 8'h00;\n" +
+           tasks +
+           "    #1 q = 8'h22;\n"
+           "  end\n"
+           "endmodule\n";
+  }
+};
+
+// §21.7.4.1: the version section lists the call that produced the file, with
+// its arguments as the source wrote them -- the scope_identifier and the
+// string_literal naming the output.
+TEST_F(ExtendedVcdVersionCommands, VersionTextNamesTheDumpportsCall) {
+  RunSource(DesignCalling("    $dumpports(k1, \"ports.vcd\");\n"));
+  auto version = VersionSectionOf(DumpFile("ports.vcd"));
+  ASSERT_FALSE(version.empty()) << DumpFile("ports.vcd");
+  EXPECT_TRUE(Holds(version, "$dumpports(k1,\"ports.vcd\")")) << version;
+}
+
+// §21.7.4.1: {dumpports_command} is a repetition, and §21.7.3.1 lets a source
+// invoke $dumpports several times so long as they all execute at one
+// simulation time. Every one of them produced the file, so every one is
+// listed; a section carrying only the call that opened the file states one
+// command where the source issued two.
+TEST_F(ExtendedVcdVersionCommands, VersionTextListsEveryDumpportsCall) {
+  RunSource(
+      DesignCalling("    $dumpports(k1);\n"
+                    "    $dumpports(k2);\n"));
+  auto version = VersionSectionOf(DumpFile("dumpports.vcd"));
+  ASSERT_FALSE(version.empty()) << DumpFile("dumpports.vcd");
+  EXPECT_TRUE(Holds(version, "$dumpports(k1)")) << version;
+  EXPECT_TRUE(Holds(version, "$dumpports(k2)")) << version;
+}
+
+// §21.7.2.1 gives the 4-state file version_text ::= { ASCII_character } and no
+// dumpports commands, so a source's $dumpvars file carries none. Without this
+// case, writing the commands into both files satisfies the two above.
+TEST_F(ExtendedVcdVersionCommands, FourStateVersionTextCarriesNoDumpportsCall) {
+  RunSource(
+      DesignCalling("    $dumpfile(\"vars.vcd\");\n"
+                    "    $dumpvars;\n"
+                    "    $dumpports(k1);\n"));
+  auto version = VersionSectionOf(DumpFile("vars.vcd"));
+  ASSERT_FALSE(version.empty()) << DumpFile("vars.vcd");
+  EXPECT_FALSE(Holds(version, "$dumpports")) << version;
 }
 
 }  // namespace

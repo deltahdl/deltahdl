@@ -456,6 +456,13 @@ static void ExecDumpports(const Expr* expr, SimContext& ctx, Arena& arena) {
         Subclause("21.7.3.1"));
     return;
   }
+  // §21.7.4.1 (Syntax 21-27): dumpports_command ::= $dumpports (
+  // scope_identifier , string_literal | variable | expression ), so what the
+  // version section records is this call as the source wrote it, arguments
+  // unevaluated. A call that wrote no argument list is recorded as the empty
+  // one §21.7.3.1 makes equivalent to it.
+  ctx.AddDumpportsCommand("$dumpports(" + DumpfileArgListText(expr->args) +
+                          ")");
   bool last_is_file = DumpportsLastArgIsFileName(expr, ctx);
   // §21.7.3.1: the name goes to the extended dump, which is a file of its own.
   // Writing it over the 4-state name would rename the file $dumpfile named and
