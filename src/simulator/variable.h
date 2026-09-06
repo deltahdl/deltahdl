@@ -14,6 +14,19 @@ struct Expr;
 
 struct Variable {
   Logic4Vec value{};
+  // §9.4.2: the baseline an event control's awaiter compares against to decide
+  // whether a change was the edge it waits for. It belongs to those awaiters
+  // alone: they seed it when they arm and resync it to the current value
+  // whenever a watched variable moves without qualifying, so it says what the
+  // last armed awaiter left there and says nothing at all about a variable no
+  // awaiter watches. Nothing in the assignment, NBA or net-resolution paths
+  // maintains it.
+  //
+  // A second reader with a different meaning for it is what produced #3253,
+  // where the VCD writer's change detection lost transitions to those resyncs,
+  // and #3357, where a clocking block's event depended on whether an unrelated
+  // process happened to wait on the same clock. Both now keep records of their
+  // own.
   Logic4Vec prev_value{};
 
   // §6.16: whether this variable is a string, which decides whether its value

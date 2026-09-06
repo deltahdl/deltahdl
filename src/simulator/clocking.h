@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -117,6 +118,18 @@ class ClockingManager {
                                   std::string_view signal_name,
                                   SimContext& ctx) const;
 
+  // §14.13: record what each clocking input holds at the end of the time step
+  // now finishing, which is the value a 1step skew samples at the next clocking
+  // event -- the clause puts it "at the Postponed region of the time step skew
+  // time units prior to the clocking event". Attach installs this as the
+  // end-of-step pass; nothing else writes what it records.
+  void RecordStepValues(SimContext& ctx);
+  // The value `signal_name` held at the end of the previous time step, or
+  // nothing when no step has ended since Attach -- before the first one there
+  // is no preceding step, and §14.4's "last value immediately before the
+  // corresponding clock edge" is the value the signal still holds.
+  std::optional<uint64_t> PrevStepValue(std::string_view signal_name) const;
+
  private:
   using SampleKey = std::pair<std::string, std::string>;
   struct PairHash {
@@ -139,6 +152,12 @@ class ClockingManager {
   std::unordered_map<std::string, std::vector<std::function<void()>>>
       edge_callbacks_;
   std::unordered_map<std::string, SimTime> last_event_time_;
+  // §14.4: what each clocking input held at the end of the last time step to
+  // finish. Written only by RecordStepValues, because Variable::prev_value is
+  // the §9.4.2 event controls' field -- their awaiters seed and resync it for
+  // their own arming, so it answers whatever the design's other event controls
+  // happen to have left there and answers nothing at all where none is armed.
+  std::unordered_map<std::string, uint64_t> prev_step_values_;
 };
 
 }  // namespace delta

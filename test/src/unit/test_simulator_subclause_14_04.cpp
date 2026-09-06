@@ -173,8 +173,7 @@ TEST(ClockingSkewSim, OneStepInputSkewSamplesPreEdgeValue) {
   auto* clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
   auto* data = f.ctx.CreateVariable("step_in", 8);
-  data->prev_value = MakeLogic4VecVal(f.arena, 8, 0x11);
-  data->value = MakeLogic4VecVal(f.arena, 8, 0x22);
+  data->value = MakeLogic4VecVal(f.arena, 8, 0x11);
 
   ClockingManager cmgr;
   ClockingBlock block;
@@ -193,10 +192,28 @@ TEST(ClockingSkewSim, OneStepInputSkewSamplesPreEdgeValue) {
 
   cmgr.Attach(f.ctx, f.scheduler);
 
+  // A time step the signal lives through at 0x11 and which then ends: §14.13
+  // puts the value a 1step skew samples at the Postponed region of the step
+  // before the clocking event, so this is the step that supplies it.
+  auto* settle = f.scheduler.GetEventPool().Acquire();
+  settle->callback = []() {};
+  f.scheduler.ScheduleEvent(SimTime{5}, Region::kActive, settle);
+
+  // The signal moves to 0x22 in the same step as the edge, which is what a
+  // 1step skew must not see -- it takes the value from before the edge.
+  auto* change = f.scheduler.GetEventPool().Acquire();
+  change->callback = [data, &f]() {
+    data->value = MakeLogic4VecVal(f.arena, 8, 0x22);
+    data->NotifyWatchers();
+  };
+  f.scheduler.ScheduleEvent(SimTime{10}, Region::kActive, change);
+
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();
 
   EXPECT_EQ(cmgr.GetSampledValue("cb", "step_in"), 0x11u);
+  // The value at the edge, which the skew steps back from.
+  EXPECT_EQ(data->value.ToUint64(), 0x22u);
 }
 
 TEST(ClockingSkewSim, ExplicitZeroInputSkewSampledAtClockEvent) {

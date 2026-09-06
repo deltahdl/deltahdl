@@ -25,7 +25,11 @@ TEST(ClockingScopeSim, BlockPersistsAcrossClockEdges) {
   EXPECT_EQ(cmgr.GetSampledValue("cb", "data"), 0x10u);
 
   data->value = MakeLogic4VecVal(f.arena, 8, 0x20);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
+  // The clock returns low by changing value, which is how a clock returns low.
+  // Writing clk->value straight down leaves the block's record of it saying
+  // high, so the edge at 20 is no edge at all -- and it read as one only while
+  // the block took its record from a field the test helper wrote.
+  ScheduleNegedge(f, clk, 15);
   SchedulePosedge(f, clk, 20);
   f.scheduler.Run();
   EXPECT_EQ(cmgr.GetSampledValue("cb", "data"), 0x20u);

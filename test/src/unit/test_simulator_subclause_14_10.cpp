@@ -276,4 +276,72 @@ TEST(ClockingBlockEventSim, SharedClockBothBlocksFireEvents) {
   EXPECT_TRUE(ev2_fired);
 }
 
+// Drives `clk` to `value` at `time` the way an ordinary assignment does: the
+// value changes and its watchers are notified, and nothing writes
+// Variable::prev_value.
+//
+// SchedulePosedge in helpers_clocking.h writes that field before every toggle,
+// which stands in for an event control armed on the same clock. §14.10 makes
+// the clocking event the transition of the block's own clocking expression, so
+// it has to be detected whether or not anything else waits on that clock; these
+// cases drive the clock without the write so the block is left to detect the
+// transition on its own.
+void ScheduleClockValue(ClockingSimFixture& f, Variable* clk, uint64_t value,
+                        uint64_t time) {
+  auto* ev = f.scheduler.GetEventPool().Acquire();
+  ev->callback = [clk, value, &f]() {
+    clk->value = MakeLogic4VecVal(f.arena, 1, value);
+    clk->NotifyWatchers();
+  };
+  f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
+}
+
+// §14.10: the block's event fires on each posedge of its clocking expression
+// and on no other notification. The clock is driven low, high, low, high, and
+// nothing else waits on it. Reading the previous value from a field nobody
+// wrote leaves it at 0, which makes every notification look like a posedge, so
+// the count is what tells the two apart.
+TEST(ClockingEventSim, PosedgeBlockFiresOncePerPosedgeOnAnUnwatchedClock) {
+  ClockingSimFixture f;
+  auto* clk = f.ctx.CreateVariable("clk", 1);
+  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
+
+  ClockingManager cmgr;
+  RegisterClockBlock(cmgr, "cb", "clk", Edge::kPosedge);
+  cmgr.Attach(f.ctx, f.scheduler);
+
+  int fired = 0;
+  cmgr.RegisterEdgeCallback("cb", f.ctx, f.scheduler, [&fired]() { ++fired; });
+
+  ScheduleClockValue(f, clk, 1, 10);
+  ScheduleClockValue(f, clk, 0, 20);
+  ScheduleClockValue(f, clk, 1, 30);
+  f.scheduler.Run();
+
+  EXPECT_EQ(fired, 2);
+}
+
+// §14.10, the other edge: a negedge block fires when its clock falls. A
+// previous value read as 0 makes a negedge impossible, so a posedge case alone
+// cannot tell a working record from a missing one -- the two failures are
+// opposite.
+TEST(ClockingEventSim, NegedgeBlockFiresOnTheFallOfAnUnwatchedClock) {
+  ClockingSimFixture f;
+  auto* clk = f.ctx.CreateVariable("clk", 1);
+  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
+
+  ClockingManager cmgr;
+  RegisterClockBlock(cmgr, "cb", "clk", Edge::kNegedge);
+  cmgr.Attach(f.ctx, f.scheduler);
+
+  int fired = 0;
+  cmgr.RegisterEdgeCallback("cb", f.ctx, f.scheduler, [&fired]() { ++fired; });
+
+  ScheduleClockValue(f, clk, 1, 10);
+  ScheduleClockValue(f, clk, 0, 20);
+  f.scheduler.Run();
+
+  EXPECT_EQ(fired, 1);
+}
+
 }  // namespace

@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -74,9 +76,13 @@ SimTime ClockingManager::GetOutputSkew(std::string_view block_name,
   return block->default_output_skew;
 }
 
-static bool CheckClockEdge(Variable* clk_var, Edge edge) {
-  uint64_t cur = clk_var->value.ToUint64() & 1;
-  uint64_t prev = clk_var->prev_value.ToUint64() & 1;
+// §14.10: whether the clock has just made the transition the block's clocking
+// event names. `prev` is what this block last saw the clock at, kept by the
+// watcher below rather than read from Variable::prev_value -- that field
+// belongs to the §9.4.2 event controls, which seed and resync it for their own
+// arming, so a clock no event control watches leaves it at its default and
+// every notification looks like a posedge.
+static bool CheckClockEdge(uint64_t prev, uint64_t cur, Edge edge) {
   if (edge == Edge::kPosedge) return prev == 0 && cur == 1;
   if (edge == Edge::kNegedge) return prev == 1 && cur == 0;
   return prev != cur;
@@ -93,25 +99,44 @@ static void SampleBlockInputs(ClockingManager* mgr, const std::string& name,
     if (!only_zero_skew && sig.is_explicit_zero_skew) continue;
     auto* var = ctx.FindVariable(sig.signal_name);
     if (!var) continue;
-    // §14.4: a 1step input takes the value held just before the clock edge,
-    // i.e. the signal's last value from the preceding time step.
-    uint64_t sampled = sig.is_one_step_skew ? var->prev_value.ToUint64()
-                                            : var->value.ToUint64();
+    // §14.4: an input skew of 1step "indicates that the signal is to be
+    // sampled at the end of the previous time step ... the value sampled is
+    // always the signal's last value immediately before the corresponding clock
+    // edge", which §14.13 places at the Postponed region of that step. That is
+    // what the end-of-step record holds. Before any step has ended there is no
+    // preceding one, and the value the signal still holds is the value it held
+    // immediately before this edge.
+    uint64_t sampled = var->value.ToUint64();
+    if (sig.is_one_step_skew) {
+      sampled = mgr->PrevStepValue(sig.signal_name).value_or(sampled);
+    }
     mgr->SampleInput(name, sig.signal_name, sampled);
   }
 }
 
+// `last_clock` is this block's record of the clock, shared across the watcher's
+// re-registrations and held per block: §14.6 lets several blocks name one
+// clock, and each decides its own event, so one record between them would let
+// the first to run consume the transition for the rest.
 static void RegisterClockWatcher(ClockingManager* mgr, Variable* clk_var,
                                  const ClockingBlock& block, SimContext& ctx,
-                                 Scheduler& sched) {
+                                 Scheduler& sched,
+                                 const std::shared_ptr<uint64_t>& last_clock) {
   auto block_name = std::string(block.name);
   auto signals = block.signals;
   auto edge = block.clock_edge;
   clk_var->AddWatcher(
-      [mgr, clk_var, block_name, signals, edge, &ctx, &sched]() {
-        if (!CheckClockEdge(clk_var, edge)) {
+      [mgr, clk_var, block_name, signals, edge, last_clock, &ctx, &sched]() {
+        uint64_t cur = clk_var->value.ToUint64() & 1;
+        bool fired = CheckClockEdge(*last_clock, cur, edge);
+        // Recorded whether or not the transition was the one this block waits
+        // for, because it is what the clock now stands at either way.
+        *last_clock = cur;
+        if (!fired) {
           auto* blk = mgr->Find(block_name);
-          if (blk) RegisterClockWatcher(mgr, clk_var, *blk, ctx, sched);
+          if (blk) {
+            RegisterClockWatcher(mgr, clk_var, *blk, ctx, sched, last_clock);
+          }
           return true;
         }
 
@@ -128,17 +153,44 @@ static void RegisterClockWatcher(ClockingManager* mgr, Variable* clk_var,
         };
         sched.ScheduleEvent(sched.CurrentTime(), Region::kObserved, ev);
         auto* blk = mgr->Find(block_name);
-        if (blk) RegisterClockWatcher(mgr, clk_var, *blk, ctx, sched);
+        if (blk) {
+          RegisterClockWatcher(mgr, clk_var, *blk, ctx, sched, last_clock);
+        }
         return true;
       });
+}
+
+void ClockingManager::RecordStepValues(SimContext& ctx) {
+  for (const auto& block : blocks_) {
+    for (const auto& sig : block.signals) {
+      if (sig.direction == ClockingDir::kOutput) continue;
+      auto* var = ctx.FindVariable(sig.signal_name);
+      if (var == nullptr) continue;
+      prev_step_values_[std::string(sig.signal_name)] = var->value.ToUint64();
+    }
+  }
+}
+
+std::optional<uint64_t> ClockingManager::PrevStepValue(
+    std::string_view signal_name) const {
+  auto it = prev_step_values_.find(std::string(signal_name));
+  if (it == prev_step_values_.end()) return std::nullopt;
+  return it->second;
 }
 
 void ClockingManager::Attach(SimContext& ctx, Scheduler& sched) {
   for (const auto& block : blocks_) {
     auto* clk_var = ctx.FindVariable(block.clock_signal);
     if (!clk_var) continue;
-    RegisterClockWatcher(this, clk_var, block, ctx, sched);
+    // §14.10: the block's event is the transition of its clocking expression,
+    // so the record starts at what the clock stands at now -- a clock already
+    // high when the block attaches has not made a posedge by being watched.
+    auto last_clock = std::make_shared<uint64_t>(clk_var->value.ToUint64() & 1);
+    RegisterClockWatcher(this, clk_var, block, ctx, sched, last_clock);
   }
+  // §14.13: a 1step input is the value of the signal at the Postponed region
+  // of the step before the clocking event, so it is recorded as each step ends.
+  sched.AddPostTimestepCallback([this, &ctx]() { RecordStepValues(ctx); });
 }
 
 void ClockingManager::SampleInput(std::string_view block_name,
