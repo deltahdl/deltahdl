@@ -8,6 +8,7 @@
 #include "fixture_simulator.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_text_lines.h"
+#include "helpers_vcd_var_decl.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -30,12 +31,14 @@ namespace {
 // was declared in the source, so these rules are exercised by driving real
 // SystemVerilog through the full pipeline (parse, elaborate, lower, register)
 // and reading the $var declarations the writer produced. Two facets are covered
-// at the writer stage directly, and each is documented at its test: a 4-state
-// logic variable's registration is fixed to the net var_type default by
-// §21.7.2.1 (whose e2e dumps pin `logic` -> wire), so only the writer's mapping
-// of a logic-typed object to reg is observable here; and an unpacked structure
-// reaches the writer as one flat object with no per-field sub-objects, so the
-// fork-join scope form is exercised through the writer's scope API.
+// at the writer stage directly, and each is documented at its test: an unpacked
+// structure reaches the writer as one flat object with no per-field
+// sub-objects, so the fork-join scope form is exercised through the writer's
+// scope API.
+//
+// Table 21-11's logic row is covered by the sibling file
+// test_simulator_subclause_21_07_05b.cpp, which this one was split from when it
+// reached the line cap.
 class VcdTypeMappingSim : public VcdDumpRunTestBase {
  protected:
   // Runs a single-module source through the full pipeline with the driver's
@@ -48,23 +51,6 @@ class VcdTypeMappingSim : public VcdDumpRunTestBase {
               .registration = VcdSignalRegistration::kContextFiltered});
   }
 };
-
-// Tokens of the $var declaration whose reference name is `name`
-// ($var var_type size identifier_code reference $end), or empty when absent.
-// Robust to the identifier code, which depends on registration order.
-std::vector<std::string> VarDecl(const std::string& content,
-                                 std::string_view name) {
-  for (const auto& l : AllLines(content)) {
-    auto toks = Tokens(l);
-    if (toks.size() == 6 && toks[0] == "$var" && toks[4] == name) return toks;
-  }
-  return {};
-}
-
-// True when any $var declaration in the dump names `name`.
-bool HasVar(const std::string& content, std::string_view name) {
-  return !VarDecl(content, name).empty();
-}
 
 // The real numbers of the value changes recorded against `ident`, in the order
 // the dump writes them. Syntax 21-20 spells that record
@@ -134,9 +120,8 @@ TEST_F(VcdTypeMappingSim, FixedWidthIntegerTypesMapPerTable) {
 // dimension. This also covers the prose rule that a packed array is dumped as a
 // single reg vector with its multiple packed dimensions collapsed into one: a
 // bit [3:0][7:0] object presents as a single 32-bit reg vector, never as nested
-// ranges. (logic maps to reg as well, but §21.7.2.1 fixes the pipeline
-// registration of a 4-state logic variable to the net default; see
-// LogicVariableMapsToRegAtWriterStage.)
+// ranges. Logic takes the same row of the table, and the sibling file
+// test_simulator_subclause_21_07_05b.cpp covers it.
 TEST_F(VcdTypeMappingSim, BitMasqueradesAsRegAndPackedArrayCollapses) {
   auto content = RunVcd(
       "module t;\n"
@@ -811,36 +796,10 @@ TEST_F(VcdTypeMappingSim, MappedDeclarationsSitInsideModuleScopeSection) {
 }
 
 // ---------------------------------------------------------------------------
-// Writer-stage coverage for the two facets the model cannot supply from source.
+// Writer-stage coverage for the facet the model cannot supply from source: an
+// unpacked structure reaches the writer flat, so its fork-join scope form is
+// driven through the writer's scope API.
 // ---------------------------------------------------------------------------
-
-Variable* MakeVar(Arena& arena, uint32_t width) {
-  auto* v = arena.Create<Variable>();
-  v->value = MakeLogic4VecVal(arena, width, 0);
-  return v;
-}
-
-// Table 21-11: logic masquerades as reg. §21.7.2.1 fixes the pipeline
-// registration of a 4-state logic variable to the net var_type default (its
-// end-to-end tests pin `logic` -> wire), so the mapping of a logic-typed object
-// to reg is observed here at the writer stage, where the data type is supplied
-// directly. This is the writer half of the same rule the integral e2e tests
-// above drive from source for bit.
-TEST_F(VcdTypeMappingSim, LogicVariableMapsToRegAtWriterStage) {
-  {
-    VcdWriter vcd(tmp_path_);
-    vcd.WriteHeader("1ns");
-    vcd.RegisterSignal(VcdSignalSpec{"lv", 8, MakeVar(arena_, 8),
-                                     NetType::kWire, -1, -1,
-                                     VcdDataType::kLogic});
-    vcd.EndDefinitions();
-  }
-  auto content = ReadVcd();
-  auto lv = VarDecl(content, "lv");
-  ASSERT_EQ(lv.size(), 6u) << content;
-  EXPECT_EQ(lv[1], "reg");
-  EXPECT_EQ(lv[2], "8");
-}
 
 // §21.7.5: an unpacked structure appears as a named fork-join block, so it is
 // easy to distinguish from a begin-end block, and its member elements appear as

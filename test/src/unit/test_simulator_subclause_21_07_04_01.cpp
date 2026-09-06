@@ -504,8 +504,8 @@ TEST_F(ExtendedVcdSyntaxSim, DataAreCaseSensitive) {
       "  end\n"
       "endmodule\n");
   // sigA -> '!', siga -> '"' (name order: 'A' < 'a').
-  EXPECT_NE(content.find("$var wire 1 ! sigA $end"), std::string::npos);
-  EXPECT_NE(content.find("$var wire 1 \" siga $end"), std::string::npos);
+  EXPECT_NE(content.find("$var reg 1 ! sigA $end"), std::string::npos);
+  EXPECT_NE(content.find("$var reg 1 \" siga $end"), std::string::npos);
   auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "1!"));
   EXPECT_TRUE(HasLine(lines, "0\""));

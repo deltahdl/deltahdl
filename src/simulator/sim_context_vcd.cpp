@@ -33,19 +33,29 @@ DataTypeKind SimContext::GetVcdVarKind(std::string_view name) const {
 // §21.7.5 (Table 21-11): map a declared SystemVerilog type keyword to the
 // VcdDataType whose $var declaration masquerades as the matching 1364-2005
 // var_type -- int and enum as integer/32, byte/shortint/longint as reg with
-// their fixed sizes, and bit as reg with the total packed width (also covering
-// a packed array or structure collapsed to one reg vector). The 4-state
-// logic/reg/integer types and every unmapped kind fall through to kNet, which
-// keeps the net var_type default established for them by §21.7.2.1/§21.7.2.3;
-// real variables are classified separately by their real flag. The lowerer has
-// already reduced a typed enum to its base kind and a packed struct to kBit, so
-// no enum/struct case appears here. Nor is there a kString case: Table 21-11
-// gives a string no row, and SimContext::RegisterVcdSignals drops one before
-// registration. kEvent is not a Table 21-11 masquerade at all; see its case.
+// their fixed sizes, and bit and logic as reg with the total packed width (also
+// covering a packed array or structure collapsed to one reg vector). Every
+// unmapped kind falls through to kNet, which keeps the net var_type default of
+// §21.7.2.3; real variables are classified separately by their real flag. The
+// lowerer has already reduced a typed enum to its base kind and a packed struct
+// to kBit, so no enum/struct case appears here. Nor is there a kString case:
+// Table 21-11 gives a string no row, and SimContext::RegisterVcdSignals drops
+// one before registration. kEvent is not a Table 21-11 masquerade at all; see
+// its case.
+//
+// The net kinds reach the default and are meant to: DataTypeKind spells wire,
+// tri, uwire and the rest as kinds of their own, so a net never arrives here
+// carrying kLogic, and only an object declared with the logic data type does.
 static VcdDataType VcdDataTypeForDeclKind(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kBit:
       return VcdDataType::kBit;
+    // Table 21-11 gives logic the same row as bit -- reg, sized by the total
+    // packed dimension. It fell through to kNet before, which declared every
+    // dumped logic object as a wire: a var_type the table gives to no
+    // SystemVerilog data type, and one §21.7.2.3 reserves for a net.
+    case DataTypeKind::kLogic:
+      return VcdDataType::kLogic;
     case DataTypeKind::kByte:
       return VcdDataType::kByte;
     case DataTypeKind::kShortint:

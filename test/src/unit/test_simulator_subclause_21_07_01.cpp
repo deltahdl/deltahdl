@@ -99,7 +99,7 @@ TEST_F(CreatingFourStateVcd, HeaderThenDefinitionsThenValueChanges) {
       "    #10 a = 1'b1;\n"
       "  end\n"
       "endmodule\n");
-  ExpectHeaderThenDefinitionsThenValueChanges(content, "$var wire 1 ! a $end",
+  ExpectHeaderThenDefinitionsThenValueChanges(content, "$var reg 1 ! a $end",
                                               "#10");
   auto p_change = content.find("#10");
   EXPECT_NE(content.find("1!", p_change), std::string::npos);
@@ -122,8 +122,8 @@ TEST_F(CreatingFourStateVcd, ValueChangesForAllSpecifiedVariables) {
       "  end\n"
       "endmodule\n");
   // Variable definitions cover each specified variable.
-  EXPECT_NE(content.find("$var wire 1 ! a $end"), std::string::npos);
-  EXPECT_NE(content.find("$var wire 4 \" b $end"), std::string::npos);
+  EXPECT_NE(content.find("$var reg 1 ! a $end"), std::string::npos);
+  EXPECT_NE(content.find("$var reg 4 \" b $end"), std::string::npos);
   // Value changes cover each specified variable.
   auto p_defs_end = content.find("$enddefinitions");
   ASSERT_NE(p_defs_end, std::string::npos);
@@ -174,7 +174,7 @@ TEST_F(CreatingFourStateVcd, TasksInsertedInTaskBodyStillCreateFile) {
       "  end\n"
       "endmodule\n");
   EXPECT_NE(content.find("$timescale"), std::string::npos);
-  EXPECT_NE(content.find("$var wire 1 ! a $end"), std::string::npos);
+  EXPECT_NE(content.find("$var reg 1 ! a $end"), std::string::npos);
   EXPECT_NE(content.find("$enddefinitions"), std::string::npos);
   EXPECT_NE(content.find("1!"), std::string::npos);
 }

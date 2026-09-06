@@ -519,7 +519,7 @@ TEST_F(ExtendedVcdFormatChosenByTheSource,
   // The 4-state declaration and the §21.7.1.3 $dumpvars checkpoint anchor the
   // two absences below, which a run that created no file at all would
   // otherwise satisfy on its own.
-  EXPECT_NE(content.find("$var wire 4 ! bus $end"), std::string::npos);
+  EXPECT_NE(content.find("$var reg 4 ! bus $end"), std::string::npos);
   EXPECT_TRUE(HasLine(Lines(content), "$dumpvars"));
   EXPECT_EQ(content.find("$var port"), std::string::npos);
   EXPECT_EQ(PortValueChanges(content), "");

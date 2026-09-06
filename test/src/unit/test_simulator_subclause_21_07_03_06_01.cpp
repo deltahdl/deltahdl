@@ -420,7 +420,7 @@ TEST_F(VcdcloseFromSource, FourStateDumpIgnoresTheSourceCall) {
   auto content = DumpFile("vardump.vcd");
   // The §21.7.2.1 4-state node information anchors the absence below, which a
   // run that created no file at all would otherwise satisfy on its own.
-  ASSERT_NE(content.find("$var wire"), std::string::npos);
+  ASSERT_NE(content.find("$var reg"), std::string::npos);
   EXPECT_EQ(content.find("$vcdclose"), std::string::npos);
   // Ignored rather than obeyed: the value change of the time unit after the
   // call is recorded, so the dump the call could not close is still running.

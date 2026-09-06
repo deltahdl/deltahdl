@@ -474,7 +474,7 @@ TEST_F(VcdFileSyntaxSim, MemoriesAreNotDumped) {
   auto toks = Tokens(content);
   ASSERT_FALSE(toks.empty());
   EXPECT_EQ(CountToken(toks, "$var"), 1u);
-  EXPECT_NE(content.find("$var wire 8 ! v $end"), std::string::npos);
+  EXPECT_NE(content.find("$var reg 8 ! v $end"), std::string::npos);
   for (const auto& tok : toks) {
     EXPECT_EQ(tok.find("mem"), std::string::npos)
         << "memory reached the dump: " << tok;
@@ -506,7 +506,7 @@ TEST_F(VcdFileSyntaxSim, DynamicAndAssociativeArraysNotDumped) {
   auto toks = Tokens(content);
   ASSERT_FALSE(toks.empty());
   EXPECT_EQ(CountToken(toks, "$var"), 1u);
-  EXPECT_NE(content.find("$var wire 1 ! a $end"), std::string::npos);
+  EXPECT_NE(content.find("$var reg 1 ! a $end"), std::string::npos);
   EXPECT_EQ(CountToken(toks, "d"), 0u);
   EXPECT_EQ(CountToken(toks, "aa"), 0u);
   for (const auto& tok : toks) {
@@ -536,7 +536,7 @@ TEST_F(VcdFileSyntaxSim, MultidimensionalArraysNotDumped) {
   auto toks = Tokens(content);
   ASSERT_FALSE(toks.empty());
   EXPECT_EQ(CountToken(toks, "$var"), 1u);
-  EXPECT_NE(content.find("$var wire 4 ! v $end"), std::string::npos);
+  EXPECT_NE(content.find("$var reg 4 ! v $end"), std::string::npos);
   EXPECT_EQ(CountToken(toks, "m"), 0u);
   for (const auto& tok : toks) {
     EXPECT_FALSE(tok.rfind("m[", 0) == 0)
@@ -701,8 +701,8 @@ TEST_F(VcdFileSyntaxSim, FileDataAreCaseSensitive) {
       "  end\n"
       "endmodule\n");
   // Sorted registration: "AB" precedes "ab", so AB -> '!' and ab -> '"'.
-  EXPECT_NE(content.find("$var wire 1 ! AB $end"), std::string::npos);
-  EXPECT_NE(content.find("$var wire 1 \" ab $end"), std::string::npos);
+  EXPECT_NE(content.find("$var reg 1 ! AB $end"), std::string::npos);
+  EXPECT_NE(content.find("$var reg 1 \" ab $end"), std::string::npos);
   auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "1!"));   // AB's initial 1
   EXPECT_TRUE(HasLine(lines, "0\""));  // ab's initial 0
