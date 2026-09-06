@@ -892,11 +892,17 @@ TEST(RandseqValuePassingSim, RandJoinOperandReturnWritesItsOwnValue) {
 //
 // `nib` is four bits, not the thirty-two an unresolved name fell back to, so
 // the returned 8'hFF reads 15 here and read 255 before.
+//
+// The module declares `p` for the same reason RunRandJoinCapture above does:
+// the implicit variable §18.17.7 gives a rule for each value-returning
+// production it names is written into the enclosing scope, and a code block
+// reading a name the module never declared is reported under §23.9.
 TEST(RandseqValuePassingSim, ProductionReturnTypeWrittenAsATypedefIsResolved) {
   SimFixture f;
   uint64_t got = RunModule(f,
                            "module t;\n"
                            "  typedef bit [3:0] nib;\n"
+                           "  int p;\n"
                            "  int got;\n"
                            "  initial begin\n"
                            "    got = 0;\n"

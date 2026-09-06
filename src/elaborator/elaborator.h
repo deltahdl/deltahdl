@@ -705,6 +705,16 @@ class Elaborator : public ElaboratorClassRules {
   // §18.17 — a production identifier is local to the scope its randsequence
   // statement creates, so every one the statement writes shall name one of
   // that statement's own productions.
+  // §6.18 / §18.17.7: records what a typedef named as a randsequence
+  // production's return type stands for, so the value the production returns is
+  // sized by that type. Every site under src/simulator/ that sizes one reads
+  // the DataType and turns an unresolved zero into thirty-two, the typedef
+  // table being the elaborator's and never leaving it.
+  //
+  // Called from ElaborateBehavioralItem, where the table is populated, rather
+  // than from the validator beside it, which runs with the table already
+  // unwound. It walks statements because a randsequence is one.
+  void RecordRandsequenceReturnTypes(Stmt* s);
   void ValidateRandsequenceProductionNames(const ModuleDecl* decl);
 
   void ValidateConstantFunctionCalls(const ModuleDecl* decl);

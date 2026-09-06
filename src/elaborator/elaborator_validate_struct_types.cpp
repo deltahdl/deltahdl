@@ -279,13 +279,14 @@ bool ResolveNamedReturnType(DataType& dtype, const TypedefMap& typedefs) {
   // Only a bound type with a packed width of its own is carried over. A typedef
   // naming a class, a string or another typedef answers 0 here and is left
   // alone, so nothing that reads such a return type today reads it differently.
-  if (EvalTypeWidth(bound) == 0) return false;
-  dtype.kind = bound.kind;
-  dtype.is_signed = bound.is_signed;
-  dtype.type_name = bound.type_name;
-  dtype.packed_dim_left = bound.packed_dim_left;
-  dtype.packed_dim_right = bound.packed_dim_right;
-  dtype.extra_packed_dims = bound.extra_packed_dims;
+  uint32_t width = EvalTypeWidth(bound);
+  if (width == 0) return false;
+  // Recorded rather than substituted: the name is what several checks are
+  // about, and §6.6.7's report that a nettype's resolution function "shall have
+  // a return type of 'T'" reads it. DataType::named_width says where this is
+  // read back.
+  dtype.named_width = width;
+  dtype.named_is_signed = IsSignedType(bound, typedefs);
   return true;
 }
 

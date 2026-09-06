@@ -189,9 +189,13 @@ uint32_t EvalTypeWidth(const DataType& dtype) {
     case DataTypeKind::kStruct:
     case DataTypeKind::kUnion:
       return EvalStructOrUnionWidth(dtype);
+    case DataTypeKind::kNamed:
+      // §6.18: the width of the type this name was declared with, where the
+      // elaborator recorded it. Zero where it did not, which is what a caller
+      // with no table to resolve the name against read before.
+      return dtype.named_width;
     case DataTypeKind::kString:
     case DataTypeKind::kVoid:
-    case DataTypeKind::kNamed:
     case DataTypeKind::kEvent:
       return 0;
     case DataTypeKind::kChandle:
@@ -429,7 +433,15 @@ bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
 
 bool IsSignedType(const DataType& dtype, const TypedefMap& typedefs) {
   const auto* resolved = ResolveNamed(dtype, typedefs);
-  return resolved ? IsSignedType(*resolved, typedefs) : dtype.is_signed;
+  if (resolved) return IsSignedType(*resolved, typedefs);
+  // §6.18: a caller with no table -- every one under src/simulator/, which
+  // passes an empty map -- reads what the elaborator recorded for the name
+  // instead. named_width is what says something was recorded, a recorded
+  // unsigned type being indistinguishable from nothing recorded otherwise.
+  if (dtype.kind == DataTypeKind::kNamed && dtype.named_width != 0) {
+    return dtype.named_is_signed;
+  }
+  return dtype.is_signed;
 }
 
 bool IsVector(const DataType& dtype) {
