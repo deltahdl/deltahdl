@@ -99,6 +99,26 @@ enum class VcdFileType : uint8_t {
   kExtended,
 };
 
+// §21.7.1.2: which of the registered objects the dump covers. $dumpvars "shall
+// be used to list which variables to dump into the file specified by
+// $dumpfile", and it "can be invoked as often as desired throughout the model",
+// each call adding to what is dumped rather than replacing it -- so a call
+// naming a scope list never takes back what a call with no arguments already
+// selected.
+enum class VcdVarSelection : uint8_t {
+  // No $dumpvars has narrowed the set. A writer driven without the task at all
+  // records every registered object, which is what a dump opened by something
+  // other than a VCD system task wants.
+  kEveryObject,
+  // Only the objects a $dumpvars scope list named. Which those are is marked on
+  // the signals themselves, so a second call adds to them.
+  kListedObjects,
+  // A $dumpvars with no arguments ran, which "dumps all the variables in the
+  // model to the VCD file". A later scope list adds nothing to that, so this
+  // state does not narrow again.
+  kEveryObjectByTask,
+};
+
 struct VcdSignal {
   std::string_view name;
   uint32_t width = 1;
@@ -135,6 +155,10 @@ struct VcdSignal {
   // words the whole variable holds are shared by every sibling and cannot tell
   // which member moved.
   bool is_field = false;
+  // §21.7.1.2: true once a $dumpvars scope list named this object. Read only
+  // while the selection is kListedObjects, and never cleared, because each
+  // $dumpvars call adds to what is dumped.
+  bool dump_selected = false;
   std::string prev_digits;
   bool has_prev_digits = false;
   // §21.7.2.1: "Only the variables that change value during a time increment
@@ -363,6 +387,29 @@ class VcdWriter {
   // §21.7.1.2: the module a scope argument is written down from, empty when
   // the caller named none. See SetTopScope.
   std::string top_scope_;
+  // §21.7.1.2: which objects the dump covers, which every checkpoint and the
+  // per-timestep change pass read through DumpsObject.
+  VcdVarSelection var_selection_ = VcdVarSelection::kEveryObject;
+
+  // Whether one registered object is one of the variables to dump.
+  bool DumpsObject(const VcdSignal& sig) const {
+    return var_selection_ != VcdVarSelection::kListedObjects ||
+           sig.dump_selected;
+  }
+
+  // §21.7.1.2: narrow the dump to what $dumpvars scope lists have named. A
+  // no-argument call has already selected every variable in the model, and a
+  // later call adds to what is dumped, so that state stands.
+  //
+  // An extended file is left alone. §21.7.3.1 gives $dumpports a scope_list of
+  // its own and port_selection_active_/port_scopes_ are what answer it, and
+  // the opening $dumpports checkpoint reaches DumpScopeSelectedValues by way
+  // of EmitPendingPortStartCheckpoint rather than from a $dumpvars call.
+  void NarrowSelectionToListed() {
+    if (port_nodes_) return;
+    if (var_selection_ != VcdVarSelection::kEveryObjectByTask)
+      var_selection_ = VcdVarSelection::kListedObjects;
+  }
   uint64_t last_time_ = 0;
   // §21.7.2.4: true once any simulation_time command has been written, so a
   // repeated marker for the same time (a checkpoint stamped its execution time

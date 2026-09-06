@@ -336,5 +336,32 @@ TEST_F(DumpallSysTask, WithoutDumpFileDumpallIsHarmless) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §21.7.1.4: the checkpoint "shows the current value of all selected
+// variables". Selected is what §21.7.1.2's $dumpvars listed, so a variable
+// outside the scope list has no record here however its value stands -- a
+// checkpoint of everything would report a variable the dump does not cover.
+// Both variables hold a value when the task runs, so the omission is of the
+// unlisted one rather than of an object with nothing to report.
+TEST_F(DumpallSysTask, DumpallRecordsOnlyTheVariablesDumpvarsListed) {
+  auto content = RunVcd(
+      "module t;\n"
+      "  logic [7:0] alpha;\n"
+      "  logic [7:0] beta;\n"
+      "  initial begin\n"
+      "    alpha = 8'hA5;\n"
+      "    beta = 8'h3C;\n"
+      "    $dumpvars(0, alpha);\n"
+      "    #10 $dumpall;\n"
+      "  end\n"
+      "endmodule\n");
+  auto all = content.find("$dumpall");
+  ASSERT_NE(all, std::string::npos) << content;
+  auto end = content.find("$end", all);
+  ASSERT_NE(end, std::string::npos) << content;
+  auto section = content.substr(all, end - all);
+  EXPECT_NE(section.find("b10100101"), std::string::npos) << section;  // alpha
+  EXPECT_EQ(section.find("b111100"), std::string::npos) << section;    // beta
+}
+
 }  // namespace
 }  // namespace delta

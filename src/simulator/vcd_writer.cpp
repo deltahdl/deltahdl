@@ -618,6 +618,10 @@ void VcdWriter::DumpAllValues() {
   // §21.7.1.3: the $dumpvars checkpoint starts the value change dumping; from
   // the end of this time unit onward, per-timestep changes are recorded.
   dump_started_ = true;
+  // §21.7.1.2: "When invoked with no arguments, $dumpvars dumps all the
+  // variables in the model to the VCD file", so the dump covers everything
+  // from here on however it was narrowed before.
+  var_selection_ = VcdVarSelection::kEveryObjectByTask;
   ofs_ << CheckpointKeyword(port_nodes_, "$dumpvars", "$dumpports") << "\n";
   for (auto& sig : signals_) {
     WriteSignalChange(sig);
@@ -629,6 +633,7 @@ void VcdWriter::DumpSelectedValues(const std::vector<std::string_view>& names) {
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
   dump_started_ = true;  // §21.7.1.3: the checkpoint starts the dump
+  NarrowSelectionToListed();
   ofs_ << CheckpointKeyword(port_nodes_, "$dumpvars", "$dumpports") << "\n";
   for (auto& sig : signals_) {
     bool wanted = false;
@@ -638,7 +643,9 @@ void VcdWriter::DumpSelectedValues(const std::vector<std::string_view>& names) {
         break;
       }
     }
-    if (wanted) WriteSignalChange(sig);
+    if (!wanted) continue;
+    sig.dump_selected = true;
+    WriteSignalChange(sig);
   }
   ofs_ << "$end\n";
 }
@@ -713,10 +720,12 @@ void VcdWriter::DumpScopeSelectedValues(
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
   dump_started_ = true;  // §21.7.1.3: the checkpoint starts the dump
+  NarrowSelectionToListed();
   ofs_ << CheckpointKeyword(port_nodes_, "$dumpvars", "$dumpports") << "\n";
   for (auto& sig : signals_) {
-    if (ScopeSelectsSignal(sig.name, names, level, top_scope_))
-      WriteSignalChange(sig);
+    if (!ScopeSelectsSignal(sig.name, names, level, top_scope_)) continue;
+    sig.dump_selected = true;
+    WriteSignalChange(sig);
   }
   ofs_ << "$end\n";
 }
@@ -763,10 +772,12 @@ void VcdWriter::DumpOn(uint64_t time) {
 void VcdWriter::DumpAll() {
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
-  // The checkpoint records the present value of every selected variable,
-  // regardless of whether that value changed during the current time step.
+  // §21.7.1.4: the checkpoint "shows the current value of all selected
+  // variables" -- present value regardless of whether it changed during the
+  // current time step, and no value at all for an object no $dumpvars listed.
   ofs_ << CheckpointKeyword(port_nodes_, "$dumpall", "$dumpportsall") << "\n";
   for (auto& sig : signals_) {
+    if (!DumpsObject(sig)) continue;
     WriteSignalChange(sig);
   }
   ofs_ << "$end\n";
@@ -778,6 +789,8 @@ void VcdWriter::DumpOff() {
   // that no value changes are recorded until $dumpon is executed.
   ofs_ << CheckpointKeyword(port_nodes_, "$dumpoff", "$dumpportsoff") << "\n";
   for (auto& sig : signals_) {
+    // §21.7.1.3: "every selected variable is dumped as an x value".
+    if (!DumpsObject(sig)) continue;
     WriteSignalAllX(sig);
   }
   ofs_ << "$end\n";
@@ -791,6 +804,8 @@ void VcdWriter::DumpOn() {
   enabled_ = true;
   ofs_ << CheckpointKeyword(port_nodes_, "$dumpon", "$dumpportson") << "\n";
   for (auto& sig : signals_) {
+    // §21.7.1.3: the resumed dump covers the variables the dump covers.
+    if (!DumpsObject(sig)) continue;
     WriteSignalChange(sig);
   }
   ofs_ << "$end\n";
@@ -869,6 +884,10 @@ void VcdWriter::DumpChangedValues(uint64_t) {
                                          port_scopes_.end());
   for (auto& sig : signals_) {
     if (!sig.var) continue;
+    // §21.7.1.2: $dumpvars "shall be used to list which variables to dump into
+    // the file specified by $dumpfile", so an object no call listed has no
+    // value change recorded for it either.
+    if (!DumpsObject(sig)) continue;
     // §21.7.3.1: a $dumpports scope_list keeps objects outside the listed
     // module scopes -- including those of instantiations below a listed
     // scope -- out of the recording.

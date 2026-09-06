@@ -3,6 +3,7 @@
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
 #include "fixture_vcd_dump_from_source.h"
+#include "fixture_vcd_dump_run.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
 
@@ -317,6 +318,76 @@ TEST_F(DumpvarsTopModuleScope, AChildNamedThroughTheTopModuleSelectsThatChild) {
   auto section = CheckpointSection(DumpFile("dump.vcd"));
   EXPECT_NE(section.find("b111100"), std::string::npos) << section;    // c1.val
   EXPECT_EQ(section.find("b10100101"), std::string::npos) << section;  // own
+}
+
+// §21.7.1.2: "The $dumpvars task shall be used to list which variables to dump
+// into the file specified by $dumpfile." What a call listed therefore governs
+// the whole recording rather than the one checkpoint the call writes, so these
+// cases run the driver's per-timestep change pass -- which DumpvarsSysTask
+// above installs no callback for -- and read what reaches the file after the
+// checkpoint has been written. Registration is by name order, so the
+// alphabetically first variable carries the identifier code '!'.
+class DumpvarsSelectsWhatIsRecorded : public VcdDumpRunTestBase {
+ protected:
+  std::string RunVcd(const std::string& src) { return RunVcdDump(src); }
+
+  // A design whose two variables take distinct values one time unit after the
+  // dump is specified, so a value in the file names which variable produced it
+  // and the change pass rather than the checkpoint is what put it there.
+  static std::string Design(const std::string& dumpvars_calls) {
+    return "module t;\n"
+           "  logic [7:0] alpha;\n"
+           "  logic [7:0] beta;\n"
+           "  initial begin\n" +
+           dumpvars_calls +
+           "    #1 alpha = 8'hA5;\n"
+           "    beta = 8'h3C;\n"
+           "  end\n"
+           "endmodule\n";
+  }
+};
+
+// A variable outside the scope list is outside the dump: its value change is
+// not recorded when it arrives, any more than its value was recorded in the
+// checkpoint. The listed variable's change is recorded in the same run, so the
+// claim is about which variable rather than about whether anything was dumped.
+TEST_F(DumpvarsSelectsWhatIsRecorded, AnUnlistedVariablesChangeIsNotRecorded) {
+  auto content = RunVcd(Design("    $dumpvars(0, alpha);\n"));
+  EXPECT_NE(content.find("b10100101"), std::string::npos) << content;  // alpha
+  EXPECT_EQ(content.find("b111100"), std::string::npos) << content;    // beta
+}
+
+// §21.7.1.2: "When invoked with no arguments, $dumpvars dumps all the
+// variables in the model to the VCD file", so both changes are recorded.
+TEST_F(DumpvarsSelectsWhatIsRecorded, NoArgumentsRecordsEveryVariablesChange) {
+  auto content = RunVcd(Design("    $dumpvars;\n"));
+  EXPECT_NE(content.find("b10100101"), std::string::npos) << content;  // alpha
+  EXPECT_NE(content.find("b111100"), std::string::npos) << content;    // beta
+}
+
+// §21.7.1.2: the task "can be invoked as often as desired throughout the
+// model", and each invocation lists variables to dump rather than replacing
+// what an earlier one listed, so two calls naming one variable each leave both
+// in the dump.
+TEST_F(DumpvarsSelectsWhatIsRecorded, ASecondCallAddsToWhatIsRecorded) {
+  auto content =
+      RunVcd(Design("    $dumpvars(0, alpha);\n"
+                    "    $dumpvars(0, beta);\n"));
+  EXPECT_NE(content.find("b10100101"), std::string::npos) << content;  // alpha
+  EXPECT_NE(content.find("b111100"), std::string::npos) << content;    // beta
+}
+
+// The same rule read the other way round: a no-argument call has already
+// listed every variable in the model, so a later scope list adds nothing and
+// takes nothing back. Without this the two calls would be read in order and
+// the second would narrow the dump to what it names.
+TEST_F(DumpvarsSelectsWhatIsRecorded,
+       AScopeListAfterNoArgumentsNarrowsNothing) {
+  auto content =
+      RunVcd(Design("    $dumpvars;\n"
+                    "    $dumpvars(0, alpha);\n"));
+  EXPECT_NE(content.find("b10100101"), std::string::npos) << content;  // alpha
+  EXPECT_NE(content.find("b111100"), std::string::npos) << content;    // beta
 }
 
 }  // namespace

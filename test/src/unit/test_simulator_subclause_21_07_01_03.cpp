@@ -450,5 +450,34 @@ TEST_F(DumpOffOnSysTask, WithoutDumpFileTasksAreHarmless) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §21.7.1.3: "When the $dumpoff task is executed, a checkpoint is made in
+// which every selected variable is dumped as an x value." Selected is what
+// §21.7.1.2's $dumpvars listed, so a variable outside the scope list is
+// outside this checkpoint too -- the suspend covers the dump rather than the
+// model. The identifier codes are read out of the $var declarations so each
+// record in the section is attributed to the object that owns it.
+TEST_F(DumpOffOnSysTask, DumpoffRecordsOnlyTheVariablesDumpvarsListed) {
+  auto content = RunVcd(
+      "module t;\n"
+      "  logic [7:0] alpha;\n"
+      "  logic [7:0] beta;\n"
+      "  initial begin\n"
+      "    alpha = 8'hA5;\n"
+      "    beta = 8'h3C;\n"
+      "    $dumpvars(0, alpha);\n"
+      "    #5 $dumpoff;\n"
+      "  end\n"
+      "endmodule\n");
+  auto off = content.find("$dumpoff");
+  ASSERT_NE(off, std::string::npos) << content;
+  auto end = content.find("$end", off);
+  ASSERT_NE(end, std::string::npos) << content;
+  auto section = content.substr(off, end - off);
+  EXPECT_NE(section.find(VarIdentCode(content, "alpha")), std::string::npos)
+      << section;
+  EXPECT_EQ(section.find(VarIdentCode(content, "beta")), std::string::npos)
+      << section;
+}
+
 }  // namespace
 }  // namespace delta
