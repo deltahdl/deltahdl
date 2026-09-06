@@ -26,8 +26,11 @@ using namespace delta;
 enum class VcdSignalRegistration : uint8_t {
   // Registers every variable the context holds, in name order, so identifier
   // codes are deterministic: the alphabetically first variable gets '!', the
-  // next '"', and so on. A test that wants a known, unfiltered signal set to
-  // observe uses this.
+  // next '"', and so on. Each is declared under the §21.7.5 var_type its
+  // declared data type maps to, as the driver declares it; what this varies
+  // from kContextFiltered is which objects are registered and in what order,
+  // not what a registered one is called. A test that wants a known, unfiltered
+  // signal set to observe uses this.
   kAllVariablesSorted,
   // Defers to SimContext::RegisterVcdSignals, the registration the simulation
   // driver itself performs, which applies the §21.7.2.1 exclusions -- memories
@@ -132,7 +135,17 @@ class VcdDumpRunTestBase : public VcdTestBase {
     std::sort(vars.begin(), vars.end(),
               [](const auto& a, const auto& b) { return a.first < b.first; });
     for (const auto& [name, var] : vars) {
-      vcd.RegisterSignal(name, var->value.width, var);
+      // §21.7.5: the var_type a $var claims comes from what the object was
+      // declared as, here as in SimContext::RegisterVcdSignals. Registering
+      // through the plain-net convenience overload instead would declare every
+      // dumped logic object a wire, which is a var_type Table 21-11 gives to no
+      // SystemVerilog data type, and would make this path disagree with the
+      // driver over the one thing §21.7.5 settles.
+      vcd.RegisterSignal(VcdSignalSpec{
+          .name = name,
+          .width = var->value.width,
+          .var = var,
+          .data_type = VcdDataTypeForDeclKind(f.ctx.GetVcdVarKind(name))});
     }
   }
 };

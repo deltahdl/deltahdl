@@ -12,6 +12,9 @@ namespace delta {
 
 struct Net;
 struct Variable;
+// Declared in parser/ast_type.h; named here only as the argument of the
+// Table 21-11 mapping below, which the header does not otherwise depend on.
+enum class DataTypeKind : uint8_t;
 
 // §21.7.5 (Table 21-11): SystemVerilog does not extend the IEEE Std 1364-2005
 // VCD format, so a SystemVerilog data type is dumped by masquerading as a
@@ -35,6 +38,29 @@ enum class VcdDataType : uint8_t {
   // than a number of bits, so its §21.7.2.3 size is 0.
   kEvent,  // -> event, size 0
 };
+
+// §21.7.5 (Table 21-11): map a declared SystemVerilog type keyword to the
+// VcdDataType whose $var declaration masquerades as the matching 1364-2005
+// var_type -- int and enum as integer/32, byte/shortint/longint as reg with
+// their fixed sizes, and bit and logic as reg with the total packed width (also
+// covering a packed array or structure collapsed to one reg vector). Every
+// unmapped kind falls through to kNet, which keeps the net var_type default of
+// §21.7.2.3; real variables are classified separately by their real flag. The
+// lowerer has already reduced a typed enum to its base kind and a packed struct
+// to kBit, so no enum/struct case appears at the definition. Nor is there a
+// kString case: Table 21-11 gives a string no row, and
+// SimContext::RegisterVcdSignals drops one before registration. kEvent is not a
+// Table 21-11 masquerade at all; see its case.
+//
+// The net kinds reach the default and are meant to: DataTypeKind spells wire,
+// tri, uwire and the rest as kinds of their own, so a net never arrives here
+// carrying kLogic, and only an object declared with the logic data type does.
+//
+// Every registration that knows what its object was declared as passes the
+// result of this, so that one table decides the var_type wherever a $var is
+// written -- the simulation driver in SimContext::RegisterVcdSignals and the
+// test fixtures that register a run's variables themselves alike.
+VcdDataType VcdDataTypeForDeclKind(DataTypeKind kind);
 
 // §21.7.2.3: the scope type of a $scope section indicates what kind of scope
 // holds the variables being dumped -- a module (top-level module or module

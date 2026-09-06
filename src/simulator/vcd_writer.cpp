@@ -4,11 +4,45 @@
 #include <ctime>
 #include <iosfwd>
 
+#include "parser/ast_type.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
 
 namespace delta {
+
+// Table 21-11 itself; the header states what the mapping is for. Every
+// unmapped kind falls through to kNet, and the lowerer has already reduced a
+// typed enum to its base kind and a packed struct to kBit, so neither reaches
+// a case of its own here.
+VcdDataType VcdDataTypeForDeclKind(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kBit:
+      return VcdDataType::kBit;
+    // Table 21-11 gives logic the same row as bit -- reg, sized by the total
+    // packed dimension. It fell through to kNet before, which declared every
+    // dumped logic object as a wire: a var_type the table gives to no
+    // SystemVerilog data type, and one §21.7.2.3 reserves for a net.
+    case DataTypeKind::kLogic:
+      return VcdDataType::kLogic;
+    case DataTypeKind::kByte:
+      return VcdDataType::kByte;
+    case DataTypeKind::kShortint:
+      return VcdDataType::kShortint;
+    case DataTypeKind::kInt:
+      return VcdDataType::kInt;
+    case DataTypeKind::kLongint:
+      return VcdDataType::kLongint;
+    case DataTypeKind::kEnum:
+      return VcdDataType::kEnum;
+    // §21.7.2.1 (Syntax 21-20) lists event among the var_type keywords, so an
+    // event is declared as one rather than taking the net default below.
+    case DataTypeKind::kEvent:
+      return VcdDataType::kEvent;
+    default:
+      return VcdDataType::kNet;
+  }
+}
 
 // §21.7.2.3: the $date section indicates the date on which the VCD file was
 // generated, so the header stamps the host clock at header-writing time.
