@@ -134,6 +134,24 @@ bool DeclHasGlobalClocking(const ModuleDecl* decl) {
 }
 
 // First $global_clock reference in a module item's slots, or nullptr.
+// A.6.5: `event_expression ::= [ edge_identifier ] expression [ iff expression
+// ]`, so an event carries two expressions and §14.14 states no condition on
+// which of them holds the reference. Reading the signal alone let `always
+// @(posedge clk iff $global_clock)` elaborate clean where the procedural
+// `initial @(posedge clk iff $global_clock)` is reported, the statement walk
+// having reached the field through ForEachChildExpr.
+//
+// It is a function of its own rather than a loop in the caller because the
+// caller is at the cognitive-complexity threshold etc/clang_tidy/src.yml sets.
+static const Expr* FindGlobalClockRefInSensitivity(
+    const std::vector<EventExpr>& sensitivity) {
+  for (const auto& ev : sensitivity) {
+    if (ExprRefsGlobalClock(ev.signal)) return ev.signal;
+    if (ExprRefsGlobalClock(ev.iff_condition)) return ev.iff_condition;
+  }
+  return nullptr;
+}
+
 const Expr* FindGlobalClockRefInItem(const ModuleItem* item) {
   const Expr* ref = nullptr;
   if (item->body) ref = FindGlobalClockRefInStmt(item->body);
@@ -143,24 +161,7 @@ const Expr* FindGlobalClockRefInItem(const ModuleItem* item) {
   if (!ref && ExprRefsGlobalClock(item->prop_body_expr)) {
     ref = item->prop_body_expr;
   }
-  if (!ref) {
-    // A.6.5: `event_expression ::= [ edge_identifier ] expression [ iff
-    // expression ]`, so an event carries two expressions and §14.14 states no
-    // condition on which of them holds the reference. Reading the signal alone
-    // let `always @(posedge clk iff $global_clock)` elaborate clean where the
-    // procedural `initial @(posedge clk iff $global_clock)` is reported, the
-    // statement walk having reached the field through ForEachChildExpr.
-    for (const auto& ev : item->sensitivity) {
-      if (ExprRefsGlobalClock(ev.signal)) {
-        ref = ev.signal;
-        break;
-      }
-      if (ExprRefsGlobalClock(ev.iff_condition)) {
-        ref = ev.iff_condition;
-        break;
-      }
-    }
-  }
+  if (!ref) ref = FindGlobalClockRefInSensitivity(item->sensitivity);
   return ref;
 }
 
