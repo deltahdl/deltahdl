@@ -103,6 +103,15 @@ static bool IsDataTypeKeyword(TokenKind tk) {
     case TokenKind::kKwRealtime:
     case TokenKind::kKwTime:
     case TokenKind::kKwString:
+    // A.2.2.1 gives data_type the bare alternative `event`, so an event
+    // declaration is a data_declaration and A.2.8's block_item_declaration
+    // carries it wherever A.6.3's seq_block and par_block and A.2.6's and
+    // A.2.7's subroutine bodies put one. Without it the line was read as an
+    // expression statement, the event was never declared, and every later
+    // reference to the name resolved to whatever else it happened to mean --
+    // which is how §15.5's synchronization between two arms of a fork is
+    // written.
+    case TokenKind::kKwEvent:
       return true;
     default:
       return false;
