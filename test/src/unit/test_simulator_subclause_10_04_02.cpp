@@ -280,4 +280,52 @@ TEST(NonblockingAssignSim, ConcatenationTargetWritesOnlyTheBitsASelectNames) {
   LowerRunAndCheck(f, design, {{"a", 0xF9u}, {"b", 0xABu}});
 }
 
+// §9.4.2 makes `@(a)` an implicit event on the expression a -- "The execution
+// of a procedural statement can be synchronized with a value change of an
+// expression, known as an implicit event" -- and settles what such an event
+// answers to: "A non-edge implicit event shall be detected on any change in
+// the value of the expression." The clause draws no distinction by which
+// statement form produced the change, nor by whether the change touched the
+// whole variable or four of its bits. §4.9.4 says where a nonblocking
+// assignment makes that change: it "schedules the update as an NBA update
+// event ... in the current time step", so the write is performed from
+// ScheduleConcatNba's deferred callback rather than where the statement
+// executed. That callback is the third route into UnpackConcatLhs, beside the
+// blocking statement and the subroutine body, and it is the route this case
+// claims. All three inherited one omission: the select-element arm wrote
+// through WriteBitSelect and continued to the next element without notifying
+// the variable's watchers, though the whole-variable arm two lines below it
+// notified, so a took its new value in the update region and nothing waiting
+// on a ever ran.
+//
+// The observation is a count rather than a flag because the count says which
+// of two failures happened. a is written twice, once by an ordinary
+// whole-variable blocking assignment and once by the concatenation, so a run
+// that leaves wakes at 2 detected both changes, one at 1 has a working
+// watcher the concatenation's update did not reach -- the defect -- and one at
+// 0 has no watcher at all and is not evidence about this arm. Neither write of
+// a happens at time 0, so the count does not turn on whether an always block
+// arms before or after an initial block's first statement. a and b are
+// asserted beside it because a case that only counted wakes could be satisfied
+// by an implementation that stopped performing the write: a ends at 0x56, the
+// high nibble §11.4.1 leaves alone still standing, and b at 0xC7.
+TEST(NonblockingAssignSim,
+     ConcatenationTargetSelectElementWakesAnEventControlOnItsVariable) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  int wakes;\n"
+      "  initial begin\n"
+      "    wakes = 0;\n"
+      "    #1 a = 8'h50;\n"
+      "    b = 8'h0F;\n"
+      "    #1 {a[3:0], b} <= 12'h6C7;\n"
+      "  end\n"
+      "  always @(a) wakes = wakes + 1;\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"wakes", 2u}, {"a", 0x56u}, {"b", 0xC7u}});
+}
+
 }  // namespace

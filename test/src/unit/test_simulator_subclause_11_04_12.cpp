@@ -4,6 +4,7 @@
 #include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -207,6 +208,93 @@ TEST(ConcatenationSim, LhsConcatInAFunctionBodyWritesOnlyTheBitsASelectNames) {
       "endmodule\n";
   EXPECT_EQ(RunAndGet(src, "x"), 1u);
   EXPECT_EQ(RunAndGet(src, "v"), 0xFAu);
+}
+
+// §4.9.3 puts the obligation on the writer of a blocking assignment: when the
+// process is returned it "performs the assignment to the left-hand side and
+// enables any events based upon the update of the left-hand side". §9.4.2 says
+// which events those are for an event control written `@(a)`: "A non-edge
+// implicit event shall be detected on any change in the value of the
+// expression." The clause draws no distinction by the statement form that
+// produced the change, nor by whether the change touched the whole variable or
+// four of its bits, so a concatenation target whose element is a select owes
+// the same wake-up as a plain assignment to that select.
+//
+// UnpackConcatLhs wrote a select element through WriteBitSelect and continued
+// straight to the next element. WriteBitSelect notifies nobody -- its three
+// other callers each make the notify themselves -- so this arm performed the
+// assignment and enabled no event: the counter read 1, the wake at time 1 and
+// nothing for the concatenation, where the rule requires 2. This case is the
+// select arm of that loop; the whole-variable arm is the case below it.
+//
+// `a` is loaded with 8'hF0 at time 1 and 12'h9AB puts 4'h9 into a[3:0] at time
+// 2, so `a` goes 8'hF0 -> 8'hF9. That is a genuine change, which is what a
+// non-edge event requires: writing back the value `a` already held would leave
+// nothing for §9.4.2 to detect and the case would claim nothing. Every write to
+// `a` sits behind a `#1`, so the count does not turn on whether the always
+// block arms before or after the initial block's time-zero statements -- the
+// load is the first wake and the concatenation the second either way. Reading
+// `a` back as 8'hF9 beside the counter is what stops the case passing because
+// the write never landed at all.
+TEST(ConcatenationSim, LhsConcatSelectElementWakesAnEventControlOnItsVariable) {
+  SimFixture f;
+  auto* woke = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  logic [7:0] woke;\n"
+      "  initial begin\n"
+      "    b = 8'hFF;\n"
+      "    woke = 8'd0;\n"
+      "    #1 a = 8'hF0;\n"
+      "    #1 {a[3:0], b} = 12'h9AB;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "  always @(a) woke = woke + 1;\n"
+      "endmodule\n",
+      f, "woke");
+  ASSERT_NE(woke, nullptr);
+  EXPECT_EQ(woke->value.ToUint64(), 2u);
+  auto* a = f.ctx.FindVariable("a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->value.ToUint64(), 0xF9u);
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(b->value.ToUint64(), 0xABu);
+}
+
+// The same statement reaching the other arm of the same loop. `{a, b} =
+// 16'hF9AB` names `a` whole, so UnpackConcatLhs writes `var->value` and calls
+// NotifyWatchers two lines below the select arm, and it has always done so:
+// this case passed before the fix and reads the same 2 it read then. It leaves
+// `a` at the very same 8'hF9 by the very same change from 8'hF0, so the only
+// thing separating it from the case above is which arm carried the write.
+//
+// That is why it is here. It is not a second claim about concatenation targets
+// waking event controls -- the case above makes that claim on its own. It is
+// what says the two arms of one loop now agree, so that a fix satisfying the
+// case above by notifying twice on this arm would have something to answer to.
+TEST(ConcatenationSim,
+     LhsConcatWholeVariableElementWakesAnEventControlOnItsVariable) {
+  SimFixture f;
+  auto* woke = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  logic [7:0] woke;\n"
+      "  initial begin\n"
+      "    b = 8'hFF;\n"
+      "    woke = 8'd0;\n"
+      "    #1 a = 8'hF0;\n"
+      "    #1 {a, b} = 16'hF9AB;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "  always @(a) woke = woke + 1;\n"
+      "endmodule\n",
+      f, "woke");
+  ASSERT_NE(woke, nullptr);
+  EXPECT_EQ(woke->value.ToUint64(), 2u);
+  auto* a = f.ctx.FindVariable("a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->value.ToUint64(), 0xF9u);
 }
 
 }  // namespace

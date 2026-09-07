@@ -531,6 +531,17 @@ static void UnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
     // element's width came from.
     if (el->kind == ExprKind::kSelect && el->base != nullptr) {
       WriteBitSelect(var, el, slice, ctx, arena);
+      // §9.4.2 detects a non-edge implicit event "on any change in the value
+      // of the expression", and this element changes one. §4.9.3 states the
+      // obligation for the blocking form -- the process "performs the
+      // assignment to the left-hand side and enables any events based upon the
+      // update of the left-hand side" -- and the deferred form reaches this
+      // same writer through §4.9.4's update event, so both routes owe the
+      // notification. WriteBitSelect notifies nobody, so each of its callers
+      // says so itself; this one did not, and a select element changed its
+      // variable without waking `@(a)` where the whole-variable element below
+      // woke it.
+      var->NotifyWatchers();
       continue;
     }
     // §10.6.2's override reaches an element by its own whole-variable write,
