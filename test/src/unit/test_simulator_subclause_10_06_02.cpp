@@ -310,6 +310,99 @@ TEST(ForceReleaseSim, ForcePreventsACompoundAssignWrittenAsAnExpression) {
   EXPECT_EQ(y->value.ToUint64(), 60u);
 }
 
+// §10.6.2: "A force statement to a variable shall override a procedural
+// assignment, continuous assignment or an assign procedural continuous
+// assignment to the variable until a release procedural statement is executed
+// on the variable." §10.4 puts a blocking assignment written in an initial
+// block among those procedural assignments, and naming a bit-select as the
+// target does not take the statement out of that class -- the clause's own "It
+// shall not be a bit-select or a part-select of a variable" restricts what may
+// be forced, not what a force overrides.
+//
+// This is ForcePreventsBlockingAssign with the target indexed, and it is the
+// case that claims WriteBitSelect. Every whole-variable writer declines --
+// WriteVar, AssignToScalarLhs, PerformBlockingAssign -- but a select target
+// reaches none of them. TryResolveArrayElement asks for an element variable
+// named `x[3]`, and CreateArrayElements makes those only for an unpacked
+// declaration, so a packed `logic [7:0] x` has none; ResolveLhsVariable then
+// walks the select down to its base and TrySelectBlockingAssign hands the whole
+// variable to WriteBitSelect, which consulted the flag nowhere. The forced 50
+// is 8'b0011_0010, so depositing a 1 in bit 3 read 58.
+TEST(ForceReleaseSim, ForcePreventsABitSelectAssign) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    force x = 8'd50;\n"
+      "    x[3] = 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_TRUE(x->is_forced);
+
+  EXPECT_EQ(x->value.ToUint64(), 50u);
+}
+
+// The same rule stated against a part-select. WriteBitSelect holds two deposits
+// and the presence of an index_end is what picks between them: a bit-select
+// clears and sets the one bit in place and returns, while a part-select
+// resolves the window the select names and hands it to WritePartSelect, which
+// the bit-select case above never enters. A decline written into the
+// bit-select arm rather than at the top of the writer would leave this form
+// overriding the force.
+//
+// The forced 50 is 8'b0011_0010, whose low nibble is 4'h2, so writing 4'hF over
+// x[3:0] read 63 where §10.6.2 has the write not land at all.
+TEST(ForceReleaseSim, ForcePreventsAPartSelectAssign) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    force x = 8'd50;\n"
+      "    x[3:0] = 4'hF;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_TRUE(x->is_forced);
+
+  EXPECT_EQ(x->value.ToUint64(), 50u);
+}
+
+// The select form of §11.4.1's compound operator, which is a second route into
+// the same writer rather than a second writer. ApplyCompoundAssignOp's select
+// arm asks TryResolveArrayElement for an element variable first and, a packed
+// vector having none, falls through to the branch that reads the target,
+// computes, and writes the result back through TrySelectBlockingAssign. It
+// never reaches AssignToScalarLhs, which is the arm that would have declined on
+// its own, so this is the route that would silently escape a decline applied at
+// only one of WriteBitSelect's call sites.
+//
+// Traced for `logic [7:0] x`: x[3] of the forced 8'b0011_0010 reads 0, the
+// addition makes 1, and WriteBitSelect deposited that in bit 3 for 58 -- the
+// same answer the plain bit-select assignment above gave, arrived at by a
+// different path, which is what makes the route and not the value the thing
+// this case claims.
+TEST(ForceReleaseSim, ForcePreventsABitSelectCompoundAssign) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    force x = 8'd50;\n"
+      "    x[3] += 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_TRUE(x->is_forced);
+
+  EXPECT_EQ(x->value.ToUint64(), 50u);
+}
+
 TEST(ForceReleaseSim, ForceExpressionRhs) {
   SimFixture f;
   auto* b = RunAndFindVar(
@@ -636,6 +729,41 @@ TEST(ForceReleaseSim, ForcePreventsACompoundAssignInAFunctionBody) {
   EXPECT_EQ(x->value.ToUint64(), 50u);
 }
 
+// The select target written inside a subroutine body, which is the last of the
+// six routes into WriteBitSelect. The subroutine-body executor is its own
+// execution of every statement form, and its select arm ExecFuncSelectAssign
+// calls TrySelectBlockingAssign directly rather than going through the
+// statement executor's arms.
+//
+// A function is what reaches that arm, not a task. SetupTaskCall claims a
+// kTaskDecl and ExecInlineTaskCall then walks the body through the ordinary
+// ExecStmt, so `x[3] = 1'b1;` written in a `task poke;` retraces
+// ForcePreventsABitSelectAssign's route instead of claiming a new one; a void
+// function called with parentheses is declined by SetupTaskCall and reaches
+// ExecFunctionBody, exactly as ForcePreventsAFunctionBodyAssign above records.
+// §10.4 puts procedural assignments "within procedures such as always, initial,
+// task, and function", so this is the same statement wherever it is written,
+// and it read 58 here as well.
+TEST(ForceReleaseSim, ForcePreventsABitSelectAssignInAFunctionBody) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  function void poke();\n"
+      "    x[3] = 1'b1;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    force x = 8'd50;\n"
+      "    poke();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_TRUE(x->is_forced);
+
+  EXPECT_EQ(x->value.ToUint64(), 50u);
+}
+
 // The other half of §10.6.2: the override lasts "until a release procedural
 // statement is executed on the variable", and a released variable "shall
 // maintain its current value until the next procedural assignment to the
@@ -693,6 +821,40 @@ TEST(ForceReleaseSim, ReleaseThenACompoundAssignResumes) {
   EXPECT_FALSE(x->is_forced);
 
   EXPECT_EQ(x->value.ToUint64(), 77u);
+}
+
+// The select form's half of the other rule in §10.6.2: the override lasts
+// "until a release procedural statement is executed on the variable", and a
+// released variable "shall maintain its current value until the next procedural
+// assignment to the variable is executed". Every select case above expects
+// WriteBitSelect to write nothing, so a decline that never lifted would satisfy
+// all four of them; this is what says the decline is the force's and is bounded
+// by the release.
+//
+// The forced 50 is 8'b0011_0010, in which bit 3 and bit 0 are both clear, so
+// the two writes separate three outcomes. 50 is the decline never lifting and
+// neither write landing. 59 is the pre-release `x[3] = 1'b1;` having wrongly
+// landed alongside the post-release one, 50 | 8 | 1. 51 is what §10.6.2 asks
+// for: the write before the release declined and only the write after it
+// landing. (A fourth reading, 58, would be the pre-release write landing and
+// the post-release one not, which is the rule inverted.)
+TEST(ForceReleaseSim, ReleaseThenABitSelectAssignResumes) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    force x = 8'd50;\n"
+      "    x[3] = 1'b1;\n"
+      "    release x;\n"
+      "    x[0] = 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_FALSE(x->is_forced);
+
+  EXPECT_EQ(x->value.ToUint64(), 51u);
 }
 
 }  // namespace
