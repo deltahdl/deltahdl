@@ -577,4 +577,21 @@ TEST(StrengthFormat, ScalarNetOperandToPercentVIsNotReported) {
   EXPECT_TRUE(f.diag.Diagnostics().empty());
 }
 
+// The rule §21.2.1.4 states is on the %v specification and not on the argument
+// on its own. A display task builds every rendering a template might draw on
+// for each argument it takes, %v's among them, so a vector net displayed with
+// %h reaches the strength renderer as well -- and it must pass through
+// unreported, because no %v consumed it.
+TEST(StrengthFormat, VectorNetUnderAnIntegerSpecifierIsNotReported) {
+  SimFixture f;
+  std::string out = CaptureDisplayOutput(
+      "module m;\n"
+      "  wire [3:0] w;\n"
+      "  assign w = 4'ha;\n"
+      "  initial #1 $display(\"[%h]\", w);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty()) << out;
+}
+
 }  // namespace

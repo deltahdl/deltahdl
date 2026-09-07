@@ -18,6 +18,10 @@ struct FormatArgs {
   const std::vector<std::string>& p_fmts;
   const TimeFormatSpec* time_format = nullptr;
   const std::vector<std::string>& v_fmts;
+  // §21.2.1.4: one flag per positional value argument, 1 where the argument
+  // names a net that is not a scalar. Classified by the calling task, which
+  // holds the net reference, and read where a %v consumes the argument.
+  const std::vector<char>& nonscalar_nets;
   SimContext* ctx = nullptr;
   // §21.2.1.1 / §21.2.1.7: per-argument aggregate classification. 0 means the
   // argument is not an unpacked aggregate; 1 means it is one whose elements
@@ -700,7 +704,21 @@ static bool TryPrecomputedArgSpec(char spec, FormatArgs& args,
   // argument; the strength string is precomputed by the calling task, which
   // holds the net reference, and is substituted verbatim here.
   if (spec == 'v') {
-    if (args.vi < args.v_fmts.size() && !args.v_fmts[args.vi].empty()) {
+    // §21.2.1.4: "a corresponding scalar reference shall follow the string
+    // literal in the argument list". The three-character group the clause
+    // defines is "the strength of a scalar net", so it stands for one scalar
+    // and not for however many bits a vector holds; a net that is not scalar
+    // is reported and nothing rendered for it.
+    if (args.vi < args.nonscalar_nets.size() &&
+        args.nonscalar_nets[args.vi] != 0) {
+      if (args.ctx != nullptr) {
+        args.ctx->GetDiag().Error(
+            args.loc,
+            "a %v format specification takes a scalar reference, and the "
+            "argument it consumed is a net declared with a range",
+            Subclause("21.2.1.4"));
+      }
+    } else if (args.vi < args.v_fmts.size() && !args.v_fmts[args.vi].empty()) {
       out += args.v_fmts[args.vi];
     }
     ++args.vi;
@@ -863,12 +881,15 @@ std::string FormatDisplay(const std::string& fmt,
       opts.p_fmts != nullptr ? *opts.p_fmts : kEmpty;
   const std::vector<std::string>& v_fmts =
       opts.v_fmts != nullptr ? *opts.v_fmts : kEmpty;
+  const std::vector<char>& nonscalar_nets =
+      opts.arg_nonscalar_net != nullptr ? *opts.arg_nonscalar_net : kEmptyFlags;
   const std::vector<char>& agg_flags =
       opts.arg_unpacked_agg != nullptr ? *opts.arg_unpacked_agg : kEmptyFlags;
   const std::vector<std::string>& s_fmts =
       opts.arg_byte_strings != nullptr ? *opts.arg_byte_strings : kEmpty;
-  FormatArgs args{vals,     0,         p_fmts, opts.time_format, v_fmts,
-                  opts.ctx, agg_flags, s_fmts, opts.loc};
+  FormatArgs args{
+      vals,           0,        p_fmts,    opts.time_format, v_fmts,
+      nonscalar_nets, opts.ctx, agg_flags, s_fmts,           opts.loc};
   for (size_t i = 0; i < fmt.size(); ++i) {
     if (fmt[i] != '%' || i + 1 >= fmt.size()) {
       AppendLiteralChar(fmt, i, out);

@@ -386,28 +386,29 @@ static bool IsScalarNet(const Variable& var) {
 
 // §21.2.1.4: %v reports the strength of a scalar net, so the operand is looked
 // up as a net and rendered from its resolved strength. An operand that does
-// not name a net carries no strength model and yields an empty string.
-//
-// "For each %v specification that appears in a string literal, a corresponding
-// scalar reference shall follow the string literal in the argument list", so a
-// net that is not scalar is reported rather than rendered: the strength the
-// clause defines is "the strength of a scalar net ... reported in a
-// three-character format", and one such group stands for one scalar, not for
-// however many bits a vector holds.
+// not name a net carries no strength model and yields an empty string, and so
+// does one that names a net §21.2.1.4 does not admit -- which the flag below
+// is what reports.
 static std::string BuildFormatV(const Expr* arg, SimContext& ctx) {
   if (arg->kind != ExprKind::kIdentifier) return "";
   Net* net = ctx.FindNet(arg->text);
   if (net == nullptr || net->resolved == nullptr) return "";
-  if (!IsScalarNet(*net->resolved)) {
-    ctx.GetDiag().Error(arg->range.start,
-                        "a %v format specification takes a scalar reference, "
-                        "and '" +
-                            std::string(arg->text) +
-                            "' is declared with a range",
-                        Subclause("21.2.1.4"));
-    return "";
-  }
+  if (!IsScalarNet(*net->resolved)) return "";
   return FormatStrength(net->resolved_strength);
+}
+
+// §21.2.1.4: "For each %v specification that appears in a string literal, a
+// corresponding scalar reference shall follow the string literal in the
+// argument list". Whether this argument breaks that is settled here, where the
+// net is in reach, and reported by the formatter, where it is known whether a
+// %v is what consumed the argument: the renderings are built for every
+// argument a template takes, so reporting here would report a vector net
+// passed to %h.
+static bool IsNonScalarNetArg(const Expr* arg, SimContext& ctx) {
+  if (arg->kind != ExprKind::kIdentifier) return false;
+  Net* net = ctx.FindNet(arg->text);
+  if (net == nullptr || net->resolved == nullptr) return false;
+  return !IsScalarNet(*net->resolved);
 }
 
 // The eight display and write system tasks named in Syntax 21-1. The b/o/h
@@ -501,6 +502,7 @@ struct DisplayArgRenderings {
   std::vector<Logic4Vec> vals;
   std::vector<std::string> p_fmts;
   std::vector<std::string> v_fmts;
+  std::vector<char> nonscalar_nets;
   std::vector<char> agg_flags;
   std::vector<std::string> byte_strings;
 };
@@ -519,6 +521,8 @@ static DisplayArgRenderings CollectDisplayArgs(const Expr* expr, size_t& i,
     r.vals.push_back(v);
     r.p_fmts.push_back(BuildFormatP(val_arg, v, ctx));
     r.v_fmts.push_back(BuildFormatV(val_arg, ctx));
+    r.nonscalar_nets.push_back(
+        static_cast<char>(IsNonScalarNetArg(val_arg, ctx) ? 1 : 0));
     char agg = ClassifyUnpackedAggregateArg(val_arg, ctx);
     r.agg_flags.push_back(agg);
     // §21.2.1.7: an unpacked array of byte governed by %s prints its element
@@ -572,6 +576,7 @@ static void AppendDisplayArg(const Expr* expr, size_t& i, SimContext& ctx,
     output += FormatDisplay(fmt, r.vals,
                             {.p_fmts = &r.p_fmts,
                              .v_fmts = &r.v_fmts,
+                             .arg_nonscalar_net = &r.nonscalar_nets,
                              .ctx = &ctx,
                              .arg_unpacked_agg = &r.agg_flags,
                              .arg_byte_strings = &r.byte_strings,
