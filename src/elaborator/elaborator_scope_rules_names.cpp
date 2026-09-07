@@ -48,6 +48,40 @@ bool CallArgsNameNoValue(const Expr* e) {
          e->lhs->rhs != nullptr && e->lhs->rhs->text == "randomize";
 }
 
+// §18.17.7: a production yields a readable value only where it declares a
+// non-void return type. A production written with no return type "shall assume
+// a void return type", so it declares no implicit variable at all and a read of
+// its name resolves against nothing.
+bool ProductionDeclaresReturnValue(const RsProduction& production) {
+  return production.has_return_type &&
+         production.return_type.kind != DataTypeKind::kVoid;
+}
+
+// §18.17.7: the names a randsequence statement declares for its own code blocks
+// to read. "Within a rule, a variable is implicitly declared for each
+// production (of the rule) that returns a value", carrying that production's
+// name; and "a production creates a scope, which encompasses all its rules and
+// code blocks", which is what makes a production's formal arguments readable
+// throughout it.
+//
+// Collected flat over the whole statement, as every other name here is. The
+// clause scopes an implicit variable to the rules that name its production --
+// the same name is a scalar in one rule of §18.17.7's Example 2 and a 1..3
+// array in another -- and it scopes a formal to its own production. A name that
+// outlives either boundary can only suppress a report, never raise one, which
+// is the trade the collection above is already written to.
+void CollectRandsequenceDeclaredNames(
+    const Stmt* s, std::unordered_set<std::string_view>& names) {
+  for (const auto& production : s->rs_productions) {
+    if (ProductionDeclaresReturnValue(production)) {
+      names.insert(production.name);
+    }
+    for (const auto& port : production.ports) {
+      if (!port.name.empty()) names.insert(port.name);
+    }
+  }
+}
+
 }  // namespace
 
 // The operands of `e` that a value read could name. Three kinds of node hold an
@@ -181,10 +215,11 @@ void CollectModuleGenerateNames(const std::vector<ModuleItem*>& items,
 }
 
 // Over-approximated set of names that are local to a procedural block: block
-// (begin/end) variable declarations, for-loop control variables, and foreach
-// index variables. Collected flat across the whole block tree without tracking
-// scope boundaries — that can only ever SUPPRESS a diagnostic, never raise one,
-// so a missed boundary is always safe.
+// (begin/end) variable declarations, for-loop control variables, foreach index
+// variables, and the two kinds of name §18.17.7 gives a randsequence statement.
+// Collected flat across the whole block tree without tracking scope
+// boundaries — that can only ever SUPPRESS a diagnostic, never raise one, so a
+// missed boundary is always safe.
 void CollectProcLocalNames(const Stmt* s,
                            std::unordered_set<std::string_view>& names) {
   if (!s) return;
@@ -201,6 +236,7 @@ void CollectProcLocalNames(const Stmt* s,
       names.insert(fi->lhs->text);
     }
   }
+  CollectRandsequenceDeclaredNames(s, names);
   // §6.5 rules that "Data shall be declared before they are used, apart from
   // implicit nets", and puts no condition on the statement the declaration
   // stands in, so every position a statement holds a statement in is a

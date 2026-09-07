@@ -18,6 +18,13 @@ namespace {
 // std::format string at its emission site.
 constexpr std::string_view kItemNamesNoProduction =
     "randsequence production item names";
+// §23.9's report of a read that names no declaration the reference can reach,
+// made by ReportProcUnresolved in src/elaborator/elaborator_scope_rules.cpp. A
+// randsequence code block reads the names §18.17.7 declares, so the cases below
+// turn on whether this report is made rather than on the two above it.
+constexpr std::string_view kUnresolvedIdentifier =
+    "reference to unresolved identifier";
+
 constexpr std::string_view kTopNameNamesNoProduction =
     "as its top-level production, which is not one of the productions it "
     "declares";
@@ -262,6 +269,70 @@ TEST(RandsequenceScope, UndeclaredProductionInAClassInsideAModuleIsReported) {
   ElaborateSrc(src, f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kItemNamesNoProduction,
                             LineHolding(src, "main : missing"), "18.17"));
+}
+
+// The module a §18.17.7 case hands the elaborator. Separate from
+// RandsequenceOver above because these cases read a value out of a production
+// into a variable, which the name-resolution cases have no use for and so do
+// not declare.
+std::string RandsequenceReadingInto(std::string_view rules) {
+  return "module m;\n"
+         "  int r;\n"
+         "  initial begin\n"
+         "    randsequence(main)\n" +
+         std::string(rules) +
+         "    endsequence\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+// §18.17.7: "Within a rule, a variable is implicitly declared for each
+// production (of the rule) that returns a value", and the value "can be read in
+// the code blocks of the production that triggered the generation". So `a` in
+// the code block below is a name the standard declares, and §23.9's report of a
+// reference to an unresolved identifier is for a name nothing declares.
+TEST(RandsequenceProductionNames, ReturnValueReadInACodeBlockResolves) {
+  ElabFixture f;
+  std::string src = RandsequenceReadingInto(
+      "      void main : a { r = a; } ;\n"
+      "      int a : { return 7; } ;\n");
+  ElaborateSrc(src, f);
+  EXPECT_EQ(FindDiag(f, kUnresolvedIdentifier), nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §18.17.7: "A production creates a scope, which encompasses all its rules and
+// code blocks. Thus, arguments passed down to a production are available
+// throughout the production." A formal argument is therefore a declaration its
+// own code blocks may read, reached by a different field of RsProduction from
+// the implicit return variable above and so stated separately.
+TEST(RandsequenceProductionNames, FormalArgumentReadInACodeBlockResolves) {
+  ElabFixture f;
+  std::string src = RandsequenceReadingInto(
+      "      void main : compute(9) ;\n"
+      "      void compute( int v ) : { r = v; } ;\n");
+  ElaborateSrc(src, f);
+  EXPECT_EQ(FindDiag(f, kUnresolvedIdentifier), nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §18.17.7 declares an implicit variable for each production of the rule "that
+// returns a value", and a production with no return type "shall assume a void
+// return type". A void production therefore declares nothing, and a read of its
+// name is a read of an undeclared name.
+//
+// This is what keeps the two cases above from being satisfied by declaring
+// every production name: `a` is written exactly as it is there and differs only
+// in returning nothing, so a collection that ignored the return type would
+// leave this source elaborating clean.
+TEST(RandsequenceProductionNames, VoidProductionNameReadIsUnresolved) {
+  ElabFixture f;
+  std::string src = RandsequenceReadingInto(
+      "      void main : a { r = a; } ;\n"
+      "      void a : { ; } ;\n");
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kUnresolvedIdentifier,
+                            LineHolding(src, "r = a"), "23.9"));
 }
 
 }  // namespace
