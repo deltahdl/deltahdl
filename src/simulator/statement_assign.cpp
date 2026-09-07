@@ -327,12 +327,28 @@ bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
                             lhs->range.start);
 }
 
-static void WritePartSelect(Variable* var, uint32_t lo, uint32_t width,
+// Deposits `rhs_val` in the window of `var` that `bits` names. §11.5.1 has a
+// part-select that is partly out of range "when written, only affect the bits
+// that are in range", and which bits of the value the affected ones receive is
+// bits.src_lo: a select running off the low end of its object has its own low
+// bits land nowhere, so `a[1 -: 4] = 4'b1101` on a `logic [7:0] a` -- which the
+// clause reads as `a[1:-2]` -- gives `a[1:0]` the value's bits [3:2] and must
+// leave `a` at 8'h03. Taking the value's low bits whichever end the select ran
+// off left it at 8'h01. The offset is zero for a select running off the high
+// end, where the bits that land are the value's least significant ones.
+//
+// A source offset of 64 or more names a bit this writer cannot see in any case:
+// Logic4Vec::ToUint64 reads the first word alone, so the value arrived with
+// everything above bit 63 already dropped, and shifting it down that far
+// answers the zero those bits read as here.
+static void WritePartSelect(Variable* var, const PartSelectBits& bits,
                             const Logic4Vec& rhs_val, Arena& arena) {
-  uint64_t mask = (width >= 64) ? ~uint64_t{0} : (uint64_t{1} << width) - 1;
+  uint64_t mask =
+      (bits.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << bits.width) - 1;
+  uint64_t src = (bits.src_lo >= 64) ? 0 : rhs_val.ToUint64() >> bits.src_lo;
   uint64_t old_val = var->value.ToUint64();
-  uint64_t new_bits = (rhs_val.ToUint64() & mask) << lo;
-  uint64_t cleared = old_val & ~(mask << lo);
+  uint64_t new_bits = (src & mask) << bits.lo;
+  uint64_t cleared = old_val & ~(mask << bits.lo);
   var->value = MakeLogic4VecVal(arena, var->value.width, cleared | new_bits);
 }
 
@@ -346,8 +362,11 @@ static bool TryWritePackedElement(Variable* var, int64_t idx,
   if (!range.Contains(idx)) return true;
   uint32_t w = var->packed_elem_width;
   auto off = static_cast<uint64_t>(range.OffsetOf(idx)) * w;
+  // §7.4.1's element is addressed whole or not at all -- the index was found in
+  // the declared range above -- so none of its bits falls below the range and
+  // the source offset is zero.
   if (off < var->value.width)
-    WritePartSelect(var, static_cast<uint32_t>(off), w, rhs_val, arena);
+    WritePartSelect(var, {static_cast<uint32_t>(off), w}, rhs_val, arena);
   return true;
 }
 
@@ -416,7 +435,7 @@ void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
   auto bits =
       PartSelectStorageBits(var->BitSelectRange(), target.first, target.second);
   if (bits.width == 0) return;
-  WritePartSelect(var, bits.lo, bits.width, rhs_val, arena);
+  WritePartSelect(var, bits, rhs_val, arena);
 }
 
 // Single-word resize for known (no x/z) values that fit in 64 bits, applying

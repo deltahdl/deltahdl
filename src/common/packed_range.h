@@ -90,9 +90,22 @@ struct PartSelectIndices {
 // The storage bits a part-select covers: an offset above the least significant
 // end of the vector, and a bit count. A width of zero means the select lies
 // wholly outside the vector, which §11.5.1 makes read as x and write nothing.
+//
+// §11.5.1 has a partially out-of-range part-select "when written, only affect
+// the bits that are in range", which is two answers and not one: `lo` and
+// `width` are the bits of the object that are written, and `src_lo` is where in
+// the value the bits they receive begin. It counts the select's own low bits
+// that fall below the range -- zero for a select running off the high end,
+// whose landing bits are the value's least significant ones, and positive for
+// one running off the low end. Both writers took the value's low bits either
+// way: §11.5.1 reads `a[1 -: 4]` on `logic [7:0] a` as `a[1:-2]`, whose most
+// significant end is index 1, so `a[1]` takes the value's bit 3 and `a[0]` its
+// bit 2 and `a[1 -: 4] = 4'b1101` must leave `a` at 8'h03; taking the value's
+// bits [1:0] left it at 8'h01.
 struct PartSelectBits {
   uint32_t lo = 0;
   uint32_t width = 0;
+  uint32_t src_lo = 0;
 };
 
 // The pair of declared indices a part-select expression addresses. `idx` is its
@@ -117,15 +130,28 @@ inline PartSelectIndices PartSelectTargetIndices(int64_t idx, int64_t end_val,
 // against `range`. Both are brought inside the range first, so a part-select
 // that runs off one end covers "only the bits that are in range"; one that
 // misses the range entirely covers none.
+//
+// The source offset comes from the same clamp. OffsetOf is linear rather than
+// clamped, so the select's own bit k -- k above its least significant end --
+// sits at storage offset `below + k`, where `below` is the unclamped offset of
+// the least significant of the two indices. A select running off the low end
+// has that number negative, and the first of its bits to land is the one that
+// brings the sum to zero, which is `-below` bits above its own low end. A
+// select running off the high end has it at zero or above and every one of the
+// bits that land is at or above the select's own low end, so the offset is zero
+// and `a[9:6] = 4'hF` on a `logic [7:0]` still puts the value's bits [1:0] on
+// `a[7:6]`.
 inline PartSelectBits PartSelectStorageBits(const PackedRange& range,
                                             int64_t first, int64_t second) {
   int64_t lo_idx = std::min(first, second);
   int64_t hi_idx = std::max(first, second);
-  if (hi_idx < range.LowIndex() || lo_idx > range.HighIndex()) return {0, 0};
+  if (hi_idx < range.LowIndex() || lo_idx > range.HighIndex()) return {0, 0, 0};
   auto a = static_cast<uint32_t>(range.OffsetOf(range.Clamp(lo_idx)));
   auto b = static_cast<uint32_t>(range.OffsetOf(range.Clamp(hi_idx)));
   uint32_t lo = std::min(a, b);
-  return {lo, std::max(a, b) - lo + 1};
+  int64_t below = std::min(range.OffsetOf(lo_idx), range.OffsetOf(hi_idx));
+  return {lo, std::max(a, b) - lo + 1,
+          below < 0 ? static_cast<uint32_t>(-below) : 0};
 }
 
 }  // namespace delta

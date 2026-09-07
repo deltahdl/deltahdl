@@ -596,9 +596,12 @@ struct ConcatElemSlot {
 // writes only the bits SelectStorageBits leaves it. They differ for a
 // part-select that is partly out of range, which §11.5.1 has "when written,
 // only affect the bits that are in range" -- `a[9:6]` on `logic [7:0] a` is
-// four bits of the concatenation landing on the two of them that exist. An
-// empty window never reaches here: ApplyToConcatElement declines the element
-// first, so the dst_width of zero below still means the whole variable.
+// four bits of the concatenation landing on the two of them that exist. Which
+// two of the four land is a third answer, and not always the low ones: `a[9:6]`
+// runs off the high end and lands its bits [1:0], while `a[1 -: 4]` runs off
+// the low end and lands its bits [3:2]. An empty window never reaches here:
+// ApplyToConcatElement declines the element first, so the dst_width of zero
+// below still means the whole variable.
 static RhsWatcherSpec SpecForSlot(const ConcatElemSlot& slot, SimContext& ctx,
                                   Arena& arena) {
   PartSelectBits dst{0, slot.width};
@@ -615,7 +618,17 @@ static RhsWatcherSpec SpecForSlot(const ConcatElemSlot& slot, SimContext& ctx,
   RhsWatcherSpec spec;
   spec.net = net;
   spec.rhs_width = slot.rhs_width;
-  spec.src_lo = slot.src_lo;
+  // §11.5.1's "only affect the bits that are in range" is itself two answers:
+  // dst.lo and dst.width are the bits of the object that are written, and
+  // dst.src_lo is where among the element's own bits the ones that land begin.
+  // The element's window of the right-hand value starts at slot.src_lo, so the
+  // bits it deposits start that far in again. WriteOwnedBits gives
+  // DepositBitField the extracted window's low dst_width bits, which for a
+  // select running off the low end of its object are the wrong ones:
+  // `force {w, a[1 -: 4]} = 5'b1_1101;` on a `logic [7:0] a` left `a` at 8'h01
+  // where the clause reads the select as `a[1:-2]` and gives `a[1:0]` the
+  // element's bits [3:2], which is 8'h03.
+  spec.src_lo = slot.src_lo + dst.src_lo;
   spec.src_width = slot.width;
   spec.dst_lo = dst.lo;
   spec.dst_width = dst.width;

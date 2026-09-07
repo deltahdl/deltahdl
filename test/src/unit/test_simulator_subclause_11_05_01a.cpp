@@ -483,6 +483,80 @@ TEST(ExpressionSim, PartSelectPartiallyOutOfBoundsWriteAffectsInRangeOnly) {
   EXPECT_EQ(var->value.ToUint64(), 0xC0u);
 }
 
+// §11.5.1's second indexed form reads `a[1 -: 4]` as the four indices 1, 0, -1
+// and -2: the clause gives `a_vect[15 -: 8]` as `a_vect[15 : 8]` for
+// `logic [31:0] a_vect`, so the base names the select's most significant end
+// and the width descends from it. Only indices 1 and 0 lie inside
+// `logic [7:0] a`, and of a write the clause says "Part-selects that are
+// partially out of range shall, when read, return x for the bits that are out
+// of range and shall, when written, only affect the bits that are in range."
+// Which bits of the right-hand value those two receive follows from the select
+// being a four-bit vector whose bit 3 is index 1 and whose bit 2 is index 0:
+// `a[1]` takes value bit 3 and `a[0]` takes value bit 2, so `4'b1101` puts 1
+// on both and `a` reads 8'h03. Taking the value's own least significant bits
+// instead -- `2'b01` -- read 8'h01, which is what this pins. `4'b1101`
+// discriminates because its high half `2'b11` differs from its low half
+// `2'b01`; an all-ones value such as `4'hF` answers 8'h03 either way. `a`
+// starts at 8'h00 so that every bit set in the outcome is one this write put
+// there.
+TEST(ExpressionSim, PartSelectRunningOffLowEndWritesItsOwnHighBits) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  initial begin a = 8'h00; a[1 -: 4] = 4'b1101; end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x03u);
+}
+
+// The same sentence where the select runs off both ends at once. `a[9 -: 12]`
+// on `logic [7:0] a` addresses the twelve indices 9 down to -2, of which
+// "the bits that are in range" are the whole object, indices 7 through 0. The
+// select is a twelve-bit vector whose bit k is index k-2, so index 7 takes
+// value bit 9 and index 0 takes value bit 2: the eight bits `a` receives are
+// the value's bits 9 through 2, its middle, with two bits spare above and two
+// below. Of `12'hABC` (1010_1011_1100) those are 1010_1111, so `a` reads
+// 8'hAF. Taking the value's least significant eight bits reads 8'hBC. This
+// case pins the distance the value is shifted rather than only its direction:
+// a shift of one would read 8'h5E and a shift of three 8'h57, so only the two
+// indices that fall below zero give 8'hAF.
+TEST(ExpressionSim, PartSelectRunningOffBothEndsWritesItsMiddleBits) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  initial begin a = 8'h00; a[9 -: 12] = 12'hABC; end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xAFu);
+}
+
+// The companion running off the high end, which the same sentence governs and
+// which no fix to the low end may disturb. `a[9:6]` on `logic [7:0] a`
+// addresses indices 9, 8, 7 and 6; the two in range are 7 and 6, and they are
+// the select's own least significant end, so they take value bits 1 and 0.
+// `4'b1101` puts 0 on `a[7]` and 1 on `a[6]`, and `a` reads 8'h40.
+// ExpressionSim.PartSelectPartiallyOutOfBoundsWriteAffectsInRangeOnly above
+// states this direction already but writes `4'hF`, every bit of which is the
+// same bit, so it answers 8'hC0 whichever bits of the value are taken and
+// cannot tell a right answer from a wrong one. `4'b1101` can: a fix that
+// shifted the value by the two indices running off the *high* end would take
+// value bits 3 and 2 and leave 8'hC0 here, and this case is what fails then.
+TEST(ExpressionSim, PartSelectRunningOffHighEndStillTakesItsLowBits) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  initial begin a = 8'h00; a[9:6] = 4'b1101; end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x40u);
+}
+
 // §11.5.1: a packed array is a valid bit-select operand. The array is built
 // from real §7.4.1 packed-array syntax and indexed end-to-end: element pa[1]
 // of the [3:0][7:0] array holding 32'h0000_0100 is 8'h01, so bit pa[1][0] is 1.
@@ -599,6 +673,31 @@ TEST(SelectBoundaryBehavior, PartSelectPartialOOBWriteInRangeOnly) {
   WriteBitSelect(var, sel, MakeLogic4VecVal(f.arena, 4, 0xF), f.ctx, f.arena);
   EXPECT_EQ(var->value.ToUint64() & 0xC0u, 0xC0u);
   EXPECT_EQ(var->value.ToUint64() & 0x3Fu, 0x00u);
+}
+
+// The low-end write at WriteBitSelect itself, the one writer the blocking,
+// compound, increment, expression and subroutine-body forms of an assignment
+// all reach. §11.5.1 makes `plw[1 -: 4]` the indices 1, 0, -1 and -2 and lets
+// the write "only affect the bits that are in range", which here are `plw[1]`
+// and `plw[0]`; being the select's most significant end, they take the value's
+// bits 3 and 2. `4'hD` is 4'b1101, so both take 1 and `plw` reads 8'h03. The
+// value's own low two bits are 2'b01 and read 8'h01. `4'hD` is chosen over the
+// `4'hF` that SelectBoundaryBehavior.PartSelectPartialOOBWriteInRangeOnly
+// writes for exactly that reason: an all-ones value cannot separate the two.
+TEST(SelectBoundaryBehavior, PartSelectPartialOOBLowEndSourceBits) {
+  SimFixture f;
+  auto* var = f.ctx.CreateVariable("plw", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 0x00);
+
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "plw");
+  sel->index = MakeInt(f.arena, 1);
+  sel->index_end = MakeInt(f.arena, 4);
+  sel->is_part_select_minus = true;
+
+  WriteBitSelect(var, sel, MakeLogic4VecVal(f.arena, 4, 0xD), f.ctx, f.arena);
+  EXPECT_EQ(var->value.ToUint64(), 0x03u);
 }
 
 TEST(SelectXZHandling, BitSelectXZIndexWriteNoEffect) {
