@@ -820,4 +820,70 @@ TEST(AssignmentExtensionTruncationSim,
   EXPECT_EQ(x->value.ToUint64(), 0xBFu);
 }
 
+// A class method is the one route from a task into the subroutine-body
+// executor. SetupTaskCall claims a module-level task called with parentheses
+// and runs its body on the ordinary executor, so the task cases above read the
+// rule through that one; EvalClassMethodCall (src/simulator/eval_function.cpp)
+// reaches ExecFunctionBody for a method whether it is declared function or
+// task, and nothing exercised that. The value is carried out through an output
+// formal, a class method's own locals going away with the call.
+
+// §10.7 at a subroutine local, reached through a class method task. The local
+// is four bits, so the eight the literal carries are cut to 15 before the wider
+// formal takes them out; a local that kept the literal's width hands out 255.
+TEST(AssignmentExtensionTruncationSim,
+     ClassMethodTaskTruncatesToTheTargetWidth) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "class C;\n"
+      "  task put(output logic [7:0] o);\n"
+      "    logic [3:0] n;\n"
+      "    n = 8'hFF;\n"
+      "    o = n;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  logic [7:0] v;\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    c = new;\n"
+      "    v = 8'h00;\n"
+      "    c.put(v);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "v");
+  ASSERT_NE(x, nullptr);
+
+  EXPECT_EQ(x->value.ToUint64(), 0x0Fu);
+}
+
+// The select forms by the same route. The formal is loaded before the
+// part-select is written to it, so the three answers separate as they do for a
+// module-level variable: 0xF0 where the select reached nothing, 0xFB where it
+// wrote the bits it named, and 0xAB where the value replaced the formal whole.
+TEST(AssignmentExtensionTruncationSim,
+     ClassMethodTaskPartSelectWriteReachesOnlyTheSelectedBits) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "class C;\n"
+      "  task put(output logic [7:0] o);\n"
+      "    o = 8'hF0;\n"
+      "    o[3:0] = 8'hAB;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  logic [7:0] v;\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    c = new;\n"
+      "    v = 8'h00;\n"
+      "    c.put(v);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "v");
+  ASSERT_NE(x, nullptr);
+
+  EXPECT_EQ(x->value.ToUint64(), 0xFBu);
+}
+
 }  // namespace

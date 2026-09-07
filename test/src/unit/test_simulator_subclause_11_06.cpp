@@ -209,4 +209,32 @@ TEST(AdditionBitLength, FunctionBodySameWidthLhsStillDropsCarry) {
   EXPECT_EQ(var->value.ToUint64(), 0x0000u);
 }
 
+// A class method is the one route from a task into the subroutine-body
+// executor, EvalClassMethodCall reaching ExecFunctionBody for a method whether
+// it is declared function or task. The seventeen-bit target is an output
+// formal, which the method's own scope holds, and §11.6 sizes the sum by it
+// exactly as by a variable of the design.
+TEST(AdditionBitLength, ClassMethodTaskWiderLhsPreservesCarry) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "class C;\n"
+      "  task add(input logic [15:0] a, input logic [15:0] b,\n"
+      "           output logic [16:0] s);\n"
+      "    s = a + b;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module m;\n"
+      "  logic [16:0] sumB;\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    c = new;\n"
+      "    c.add(16'hFFFF, 16'h0001, sumB);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "sumB");
+  ASSERT_NE(var, nullptr);
+
+  EXPECT_EQ(var->value.ToUint64(), 0x10000u);
+}
+
 }  // namespace
