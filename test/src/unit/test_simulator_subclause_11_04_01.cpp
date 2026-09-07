@@ -1,3 +1,5 @@
+#include <string>
+
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "simulator/evaluation.h"
@@ -59,9 +61,29 @@ TEST(LvalueSim, CompoundAssignWithIndexedLhs) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-TEST(LvalueSim, CompoundAssignEvaluatesLvalueIndexOnce) {
+// §11.4.1's once-only left-hand index rule is read the same way each time an
+// lhs form is claimed for it: an automatic function bumps a counter and returns
+// a fixed index, so the value the target ends at is the same however many times
+// the index ran, and the count is what discriminates. This runs one such design
+// and reads both.
+void RunAndCheckIndexOnce(const std::string& src, const char* target,
+                          uint64_t expected) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable(target);
+  auto* calls = f.ctx.FindVariable("idx_calls");
+  ASSERT_NE(var, nullptr);
+  ASSERT_NE(calls, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), expected);
+  EXPECT_EQ(calls->value.ToUint64(), 1u);
+}
+
+TEST(LvalueSim, CompoundAssignEvaluatesLvalueIndexOnce) {
+  RunAndCheckIndexOnce(
       "module t;\n"
       "  int arr [0:3];\n"
       "  int idx_calls;\n"
@@ -75,19 +97,7 @@ TEST(LvalueSim, CompoundAssignEvaluatesLvalueIndexOnce) {
       "    arr[idx_fn()] += 5;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* arr = f.ctx.FindVariable("arr");
-  auto* calls = f.ctx.FindVariable("idx_calls");
-  ASSERT_NE(arr, nullptr);
-  ASSERT_NE(calls, nullptr);
-  auto* arr_elem = f.ctx.FindVariable("arr[2]");
-  ASSERT_NE(arr_elem, nullptr);
-  EXPECT_EQ(arr_elem->value.ToUint64(), 15u);
-  EXPECT_EQ(calls->value.ToUint64(), 1u);
+      "arr[2]", 15u);
 }
 
 // §11.4.1: the once-only left-hand index rule applies to a packed bit-select
@@ -96,8 +106,7 @@ TEST(LvalueSim, CompoundAssignEvaluatesLvalueIndexOnce) {
 // re-derives the bit from the index expression; the side-effecting index must
 // still be evaluated exactly once.
 TEST(LvalueSim, CompoundAssignBitSelectIndexEvaluatedOnce) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
+  RunAndCheckIndexOnce(
       "module t;\n"
       "  logic [7:0] data;\n"
       "  int idx_calls;\n"
@@ -111,17 +120,7 @@ TEST(LvalueSim, CompoundAssignBitSelectIndexEvaluatedOnce) {
       "    data[idx_fn()] += 1'b1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* data = f.ctx.FindVariable("data");
-  auto* calls = f.ctx.FindVariable("idx_calls");
-  ASSERT_NE(data, nullptr);
-  ASSERT_NE(calls, nullptr);
-  EXPECT_EQ(data->value.ToUint64(), 0x08u);
-  EXPECT_EQ(calls->value.ToUint64(), 1u);
+      "data", 0x08u);
 }
 
 // §11.4.1: the once-only rule also governs an indexed part-select lhs
@@ -130,8 +129,7 @@ TEST(LvalueSim, CompoundAssignBitSelectIndexEvaluatedOnce) {
 // index is re-derived by both the read and the write, so a side-effecting base
 // index must be evaluated exactly once here as well.
 TEST(LvalueSim, CompoundAssignPartSelectBaseIndexEvaluatedOnce) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
+  RunAndCheckIndexOnce(
       "module t;\n"
       "  logic [7:0] data;\n"
       "  int idx_calls;\n"
@@ -145,17 +143,54 @@ TEST(LvalueSim, CompoundAssignPartSelectBaseIndexEvaluatedOnce) {
       "    data[idx_fn() +: 2] += 2'b11;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* data = f.ctx.FindVariable("data");
-  auto* calls = f.ctx.FindVariable("idx_calls");
-  ASSERT_NE(data, nullptr);
-  ASSERT_NE(calls, nullptr);
-  EXPECT_EQ(data->value.ToUint64(), 0x0Cu);
-  EXPECT_EQ(calls->value.ToUint64(), 1u);
+      "data", 0x0Cu);
+}
+
+// §11.4.1's once-only rule is a property of the operator, not of where it is
+// written, and the three cases above all write it as a bare statement -- which
+// is intercepted before the expression evaluator and reaches the path that
+// snapshots the indices. §11.3.6 admits the parenthesized form, and any
+// compound assignment used as an operand reaches EvalCompoundAssign instead,
+// where the allocation, the read and the write each re-derived the target from
+// the index and called it again.
+TEST(LvalueSim, CompoundAssignAsAnExpressionEvaluatesLvalueIndexOnce) {
+  RunAndCheckIndexOnce(
+      "module t;\n"
+      "  int arr [0:3];\n"
+      "  int idx_calls;\n"
+      "  int q;\n"
+      "  function automatic int idx_fn();\n"
+      "    idx_calls = idx_calls + 1;\n"
+      "    return 2;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    arr[0] = 0; arr[1] = 0; arr[2] = 10; arr[3] = 0;\n"
+      "    idx_calls = 0;\n"
+      "    q = (arr[idx_fn()] += 5);\n"
+      "  end\n"
+      "endmodule\n",
+      "arr[2]", 15u);
+}
+
+// The packed bit-select written as an expression, which reaches a different
+// writer from the array element above and so is a separate reading.
+TEST(LvalueSim, CompoundAssignAsAnExpressionEvaluatesBitSelectIndexOnce) {
+  RunAndCheckIndexOnce(
+      "module t;\n"
+      "  logic [7:0] data;\n"
+      "  int idx_calls;\n"
+      "  logic q;\n"
+      "  function automatic int idx_fn();\n"
+      "    idx_calls = idx_calls + 1;\n"
+      "    return 3;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    data = 8'b0000_0000;\n"
+      "    idx_calls = 0;\n"
+      "    q = (data[idx_fn()] += 1'b1);\n"
+      "  end\n"
+      "endmodule\n",
+      "data", 0x08u);
 }
 
 // §11.4.1: the blocking-assignment equivalence also holds when the lhs is a
@@ -379,81 +414,6 @@ TEST(LvalueSim, CompoundAssignExpressionYieldsTheTargetsDataType) {
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0u);
-}
-
-// §11.4.1's once-only rule is a property of the operator, not of where it is
-// written, and the three cases above all write it as a bare statement -- which
-// is intercepted before the expression evaluator and reaches the path that
-// snapshots the indices. §11.3.6 admits the parenthesized form, and any
-// compound assignment used as an operand reaches EvalCompoundAssign instead,
-// where the allocation, the read and the write each re-derived the target from
-// the index and called it again.
-
-// The unpacked array element, written as an expression. The counter is what
-// discriminates: the value was already right, each call returning the same
-// index.
-TEST(LvalueSim, CompoundAssignAsAnExpressionEvaluatesLvalueIndexOnce) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int arr [0:3];\n"
-      "  int idx_calls;\n"
-      "  int q;\n"
-      "  function automatic int idx_fn();\n"
-      "    idx_calls = idx_calls + 1;\n"
-      "    return 2;\n"
-      "  endfunction\n"
-      "  initial begin\n"
-      "    arr[0] = 0; arr[1] = 0; arr[2] = 10; arr[3] = 0;\n"
-      "    idx_calls = 0;\n"
-      "    q = (arr[idx_fn()] += 5);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* arr_elem = f.ctx.FindVariable("arr[2]");
-  auto* calls = f.ctx.FindVariable("idx_calls");
-  ASSERT_NE(arr_elem, nullptr);
-  ASSERT_NE(calls, nullptr);
-
-  EXPECT_EQ(arr_elem->value.ToUint64(), 15u);
-  EXPECT_EQ(calls->value.ToUint64(), 1u);
-}
-
-// The packed bit-select, written as an expression. It reaches a different
-// writer from the array element above, so the count is a separate reading.
-TEST(LvalueSim, CompoundAssignAsAnExpressionEvaluatesBitSelectIndexOnce) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] data;\n"
-      "  int idx_calls;\n"
-      "  logic q;\n"
-      "  function automatic int idx_fn();\n"
-      "    idx_calls = idx_calls + 1;\n"
-      "    return 3;\n"
-      "  endfunction\n"
-      "  initial begin\n"
-      "    data = 8'b0000_0000;\n"
-      "    idx_calls = 0;\n"
-      "    q = (data[idx_fn()] += 1'b1);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* data = f.ctx.FindVariable("data");
-  auto* calls = f.ctx.FindVariable("idx_calls");
-  ASSERT_NE(data, nullptr);
-  ASSERT_NE(calls, nullptr);
-
-  EXPECT_EQ(data->value.ToUint64(), 0x08u);
-  EXPECT_EQ(calls->value.ToUint64(), 1u);
 }
 
 }  // namespace

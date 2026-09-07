@@ -38,13 +38,6 @@ Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
 Logic4Vec ConvertRealForKnownLhs(Logic4Vec rhs_val, bool lhs_is_real,
                                  uint32_t target_width, Arena& arena);
 
-// Defined in statement_assign_core.cpp; also used by the subroutine-body
-// statement executor in eval_function_body.cpp. §10.4 lists "Bit-selects,
-// part-selects, and slices of packed arrays" among the left-hand sides a
-// procedural assignment may take, alongside the elements of the arrays of
-// Clause 7, and this decides which of those a select names and writes it
-// accordingly. Always returns true: a select target is this function's to
-// answer for, whether or not it found something to write.
 // Defined in statement_assign_core.cpp; also used by EvalCompoundAssign in
 // eval_expr.cpp. §11.4.1 makes one exception to a compound assignment being an
 // ordinary blocking assignment -- "any left-hand index expression is only
@@ -57,6 +50,13 @@ Logic4Vec ConvertRealForKnownLhs(Logic4Vec rhs_val, bool lhs_is_real,
 void SnapshotSelectIndices(const Expr* lhs, SimContext& ctx, Arena& arena);
 void ClearSelectIndices(const Expr* lhs, SimContext& ctx);
 
+// Defined in statement_assign_core.cpp; also used by the subroutine-body
+// statement executor in eval_function_body.cpp. §10.4 lists "Bit-selects,
+// part-selects, and slices of packed arrays" among the left-hand sides a
+// procedural assignment may take, alongside the elements of the arrays of
+// Clause 7, and this decides which of those a select names and writes it
+// accordingly. Always returns true: a select target is this function's to
+// answer for, whether or not it found something to write.
 bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
                              SimContext& ctx, Arena& arena);
 
