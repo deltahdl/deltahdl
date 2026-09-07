@@ -163,6 +163,18 @@ void ValidateBidirectionalSwitchConnections(
     const std::unordered_map<std::string_view, std::string_view>&
         nettype_canonical);
 
+// §28.16: true when this item carries any delay expression, so the parameter
+// scope a delay is folded against is built for the items that have one and not
+// for every item in the module.
+bool ItemCarriesDelay(const ModuleItem* item);
+
+// §28.16: report each of this item's delays that folds to a negative value. A
+// delay is the time between two events and has no negative form, and a value
+// cast into the unsigned tick counts the model runs on becomes an enormous
+// positive one instead.
+void ValidateItemDelaysNonNegative(const ModuleItem* item,
+                                   const ScopeMap& scope, DiagEngine& diag);
+
 void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
                                            const RtlirModule* mod,
                                            const ScopeMap& scope,

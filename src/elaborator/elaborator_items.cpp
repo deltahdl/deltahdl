@@ -653,6 +653,13 @@ void Elaborator::CheckInstanceTerminalWidths(const ModuleItem* item,
 }
 
 void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
+  // §28.16: every delay a source can write reaches this walk, and each is
+  // checked before the item is built. The nine slots live on the item rather
+  // than on what it becomes, so one place sees the net delays, the continuous
+  // assignment's and the gate or primitive instance's alike.
+  if (ItemCarriesDelay(item)) {
+    ValidateItemDelaysNonNegative(item, BuildParamScope(mod), diag_);
+  }
   if (ElaborateDeclItem(item, mod)) return;
   ElaborateBehavioralItem(item, mod);
 }

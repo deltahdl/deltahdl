@@ -529,6 +529,13 @@ static void ApplyTriregDecayTime(const ModuleItem* item, RtlirNet& net,
                  Subclause("28.16.2.2"));
     return;
   }
+  // §28.16.2: the charge decay time is "the delay between when the drivers of a
+  // trireg net turn off and when its stored charge can no longer be
+  // determined", which has no negative value.
+  // ValidateItemDelaysNonNegative reports one; the store is skipped here so the
+  // cast cannot turn it into the enormous positive tick count an unsigned
+  // reading of it makes (#3378).
+  if (*decay_ticks < 0) return;
   net.decay_ticks = static_cast<uint64_t>(*decay_ticks);
   // §28.16.2.2 gives the meaning "never decays" to a declaration with no third
   // delay, so a declaration that wrote one decays whatever it wrote -- zero
