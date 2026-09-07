@@ -264,7 +264,16 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto func_name = ctx.CurrentFuncName();
   if (TryReuseExistingDeclVar(stmt, func_name, ctx)) return StmtResult::kDone;
 
-  uint32_t width = EvalTypeWidth(stmt->var_decl_type);
+  // §6.18: a variable declared with a user-defined type name is an object of
+  // the type that name stands for, so `nib v` is as wide as `nib` is.
+  // DeclaredTypeWidth is what reaches that width, asking the elaborated typedef
+  // table for a DataTypeKind::kNamed; the one-argument EvalTypeWidth gives such
+  // a type no width at all, and CreateDeclVariable's `width == 0` fallback then
+  // made every typedef'd local 32 bits. A type the table cannot size still
+  // answers 0 and still reaches that fallback, and a string (§6.16) still
+  // reaches the branch above it, because DeclaredTypeWidth answers 0 for a
+  // string typedef as well as for a bare one.
+  uint32_t width = DeclaredTypeWidth(stmt->var_decl_type, ctx);
   bool is_real = (stmt->var_decl_type.kind == DataTypeKind::kReal ||
                   stmt->var_decl_type.kind == DataTypeKind::kShortreal ||
                   stmt->var_decl_type.kind == DataTypeKind::kRealtime);

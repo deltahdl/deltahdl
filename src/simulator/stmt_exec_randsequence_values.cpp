@@ -30,6 +30,7 @@
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
 #include "simulator/stmt_exec_randsequence_internal.h"
 
 namespace delta {
@@ -49,6 +50,14 @@ bool ProductionReturnsString(const RsProduction* p);
 // §18.17.7: passing data to a production uses the same syntax as a task call.
 // Evaluate the actual arguments in the caller's scope, before the production's
 // own scope is entered, sizing each to its formal's declared width.
+//
+// DeclaredTypeWidth rather than the one-argument EvalTypeWidth, because
+// §18.17.7 declares a production's arguments as a task prototype declares them
+// and a formal may therefore be written with a typedef name, which §6.18 makes
+// an object of the type that name stands for. EvalTypeWidth gives a
+// DataTypeKind::kNamed no width at all, so a typedef'd formal contributed
+// nothing to the context its actual is evaluated in. A width of 0 still means
+// self-determined, which is what a formal nothing here can size still gets.
 std::vector<Logic4Vec> EvalProductionActuals(const RsProduction* production,
                                              const RsProductionItem& call,
                                              SimContext& ctx, Arena& arena) {
@@ -56,7 +65,7 @@ std::vector<Logic4Vec> EvalProductionActuals(const RsProduction* production,
   actuals.reserve(call.args.size());
   for (size_t i = 0; i < call.args.size(); ++i) {
     uint32_t w = i < production->ports.size()
-                     ? EvalTypeWidth(production->ports[i].data_type)
+                     ? DeclaredTypeWidth(production->ports[i].data_type, ctx)
                      : 0;
     actuals.push_back(EvalExpr(call.args[i], ctx, arena, w));
   }
@@ -68,12 +77,27 @@ std::vector<Logic4Vec> EvalProductionActuals(const RsProduction* production,
 // the production. Bind each formal by position, falling back to its default
 // value, then to zero, when no actual is supplied. The caller must have entered
 // the production's scope.
+//
+// The formal is an object of its declared type, so it is created at that type's
+// width and the value is assigned into it rather than put in its place. Both
+// halves are needed and neither implies the other. DeclaredTypeWidth is the
+// first: the one-argument EvalTypeWidth gives a typedef name no width, so the
+// `w ? w : 32` below made every typedef'd formal 32 bits. The resize is the
+// second: a sized literal is self-determined, so handing the width to EvalExpr
+// as a context width does not truncate it, and `8'hFF` passed to a four-bit
+// formal arrived eight bits wide and made the formal eight bits wide with it.
+// §10.7 truncates or extends a value assigned to a typed object, which is what
+// ResizeToWidth does here.
+//
+// A width of 0 is a formal nothing here can size -- a string (§6.16) among
+// them, which has no declared width to resize to -- and ResizeToWidth leaves
+// such a value alone, so the 32-bit carrier below still catches it.
 void BindProductionFormals(const RsProduction* production,
                            const std::vector<Logic4Vec>& actuals,
                            SimContext& ctx, Arena& arena) {
   for (size_t i = 0; i < production->ports.size(); ++i) {
     const auto& port = production->ports[i];
-    uint32_t w = EvalTypeWidth(port.data_type);
+    uint32_t w = DeclaredTypeWidth(port.data_type, ctx);
     Logic4Vec val;
     if (i < actuals.size()) {
       val = actuals[i];
@@ -82,6 +106,7 @@ void BindProductionFormals(const RsProduction* production,
     } else {
       val = MakeLogic4VecVal(arena, w ? w : 32, 0);
     }
+    val = ResizeToWidth(val, w, arena);
     uint32_t vw = val.width ? val.width : (w ? w : 32);
     auto* var = ctx.CreateLocalVariable(port.name, vw);
     var->value = val;
