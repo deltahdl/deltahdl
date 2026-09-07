@@ -511,4 +511,91 @@ TEST(DataHidingElaboration,
              "endmodule\n"));
 }
 
+// §6.21 says of a declaration in a block that "These variables are visible to
+// the unnamed block and any nested blocks below it", so the class a handle's
+// name stands for ends where its block does. The table the checks read was a
+// member written straight into and unwound by nothing, so a handle declared in
+// one procedural block rebound its name for the rest of the module.
+//
+// Here the module declares `p` a Packet, whose member is local, and an earlier
+// block declares its own `p` as an Open, whose member is not. The access in the
+// second block is to the module's Packet and earns the report; the block-local
+// binding outliving its block is what hid it.
+TEST(DataHidingElaboration, ABlockLocalHandleDoesNotRebindTheNameAfterIt) {
+  ElabFixture f;
+  ElabOk(
+      "class Packet;\n"
+      "  local int secret;\n"
+      "endclass\n"
+      "class Open;\n"
+      "  int secret;\n"
+      "endclass\n"
+      "module m;\n"
+      "  Packet p;\n"
+      "  initial begin\n"
+      "    Open p;\n"
+      "    p.secret = 1;\n"
+      "  end\n"
+      "  initial p.secret = 2;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot access local member from outside its class",
+                            13, "8.18"));
+}
+
+// The other direction, which is what tells a scoped table from a merely cleared
+// one: the module's handle is the Open and the block's is the Packet, so the
+// access after the block earns no report and a table still holding the block's
+// binding produces one the source does not deserve.
+TEST(DataHidingElaboration, ABlockLocalHandleDoesNotEarnTheNameAReport) {
+  ElabFixture f;
+  ElabOk(
+      "class Packet;\n"
+      "  local int secret;\n"
+      "endclass\n"
+      "class Open;\n"
+      "  int secret;\n"
+      "endclass\n"
+      "module m;\n"
+      "  Open p;\n"
+      "  initial begin\n"
+      "    Packet p;\n"
+      "  end\n"
+      "  initial p.secret = 2;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// Two sibling blocks, each declaring `p` as a different class and each reaching
+// the member. Exactly one of them earns the report, so a fix that unwinds at
+// the wrong grain -- once per module, or never -- is told from one that unwinds
+// at the block.
+TEST(DataHidingElaboration, SiblingBlocksBindTheSameNameSeparately) {
+  ElabFixture f;
+  ElabOk(
+      "class Packet;\n"
+      "  local int secret;\n"
+      "endclass\n"
+      "class Open;\n"
+      "  int secret;\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    Open p;\n"
+      "    p.secret = 1;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    Packet p;\n"
+      "    p.secret = 2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot access local member from outside its class",
+                            14, "8.18"));
+  EXPECT_EQ(f.diag.Diagnostics().size(), 1u);
+}
+
 }  // namespace

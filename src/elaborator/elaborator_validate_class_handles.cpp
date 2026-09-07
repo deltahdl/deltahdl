@@ -1,6 +1,7 @@
 #include <format>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
@@ -740,8 +741,33 @@ void ElaboratorClassRules::WalkStmtsForClassHandleOps(const Stmt* s) {
   // 1;` performed arithmetic on a handle where nothing looked, and a handle
   // declared in one of those seven links never entered class_var_names_ either,
   // which left every later operation on it unchecked as well.
+  // §6.21 says of a declaration in a block that "These variables are visible to
+  // the unnamed block and any nested blocks below it", so the binding a
+  // declaration makes ends where its block does. The two tables are members
+  // written straight into, and nothing unwound them at a block's end: a handle
+  // declared in one procedural block rebound its name for the rest of the
+  // module, and every later check reading the tables read the wrong class.
+  //
+  // The cost ran both ways. A handle shadowed by a narrower class lost the
+  // reports its own class earns -- §8.18's local member reached from outside
+  // went unreported -- and one shadowed by a stricter class gained reports it
+  // does not earn.
+  //
+  // A block and a fork are the scopes §6.21 names, so the tables are put back
+  // as they were when the walk leaves one. Every other statement's children are
+  // in the scope the statement itself stands in, and a declaration among them
+  // is a declaration of that scope.
+  bool opens_scope = s->kind == StmtKind::kBlock || s->kind == StmtKind::kFork;
+  auto outer_names =
+      opens_scope ? class_var_names_ : decltype(class_var_names_)();
+  auto outer_types =
+      opens_scope ? class_var_types_ : decltype(class_var_types_)();
   ForEachChildStmt(
       s, [this](Stmt* const& sub) { WalkStmtsForClassHandleOps(sub); });
+  if (opens_scope) {
+    class_var_names_ = std::move(outer_names);
+    class_var_types_ = std::move(outer_types);
+  }
 }
 
 void ElaboratorClassRules::ValidateClassHandleOps(const ModuleDecl* decl) {
