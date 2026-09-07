@@ -380,8 +380,11 @@ TEST(InstanceScopeSimulation, ArrayFormalShapeDoesNotOutliveTheCall) {
 // of a block's array after the block had ended.
 //
 // The second block's array does not cover index 4, so a read of `a[4]` there
-// reaches an element only the first block declared. It answers x once that
-// element goes away with the block that declared it.
+// reaches an element only the first block declared. §11.5.1 gives a read that
+// addresses no element of a two-state object the value 0, and `int` is
+// two-state, so the element going away with its block reads 0 where the element
+// lingering reads the 9 the first block wrote -- which is why the value written
+// is not 0.
 TEST(InstanceScopeSimulation, ABlockLocalArrayElementDoesNotOutliveItsBlock) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -400,13 +403,14 @@ TEST(InstanceScopeSimulation, ABlockLocalArrayElementDoesNotOutliveItsBlock) {
       "endmodule\n",
       f, "got");
   ASSERT_NE(var, nullptr);
-  EXPECT_FALSE(var->value.IsKnown());
+  EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 // An index the reader does cover, read after the block rather than inside a
 // second one: the case above reaches an index the second array does not have,
 // and this one reaches an index it would have if anything of the first array
-// were left.
+// were left. The 7 written to it is not 0, so the element going away is told
+// from the element standing.
 TEST(InstanceScopeSimulation, ABlockLocalArrayElementIsGoneAfterTheBlock) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -423,7 +427,7 @@ TEST(InstanceScopeSimulation, ABlockLocalArrayElementIsGoneAfterTheBlock) {
       "endmodule\n",
       f, "got");
   ASSERT_NE(var, nullptr);
-  EXPECT_FALSE(var->value.IsKnown());
+  EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 // The control: a module-level array has no local scope to belong to and is
