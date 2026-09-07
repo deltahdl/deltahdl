@@ -127,6 +127,12 @@ static void ExecFuncIdentifierAssign(const Expr* lhs, const Logic4Vec& val,
       return;
     }
     var->value = ConvertRealOnAssign(val, lhs, var->value.width, ctx, arena);
+    // §6.11.2: "When a 4-state value is automatically converted to a 2-state
+    // value, any unknown or high-impedance bits shall be converted to zeros."
+    // AssignToScalarLhs converts on the same test outside a subroutine, and
+    // this executor converted nowhere, so an x assigned to a `bit` or an `int`
+    // in a task or function body survived as an x.
+    if (!var->is_4state) CoerceTo2State(var->value);
     return;
   }
   // §8.10: a static method writes a static property of the enclosing class by
@@ -526,6 +532,18 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // module-scope declaration does (Lowerer sets the same flag there), so an
   // `integer` local is a signed operand rather than an unsigned one.
   auto* v = ctx.CreateLocalVariable(name, w, IsSignedType(type, {}));
+  // §6.11.2 names the 4-state types -- logic, reg, integer and time -- and says
+  // "the other types do not have unknown values". Variable defaults the flag to
+  // 4-state and this path never set it, so a `bit` or `int` body local was
+  // marked as holding unknowns and the conversion above never fired for one.
+  //
+  // A type reached through a name keeps the default. Is4stateType is asked of
+  // the kind alone and a DataTypeKind::kNamed answers false whatever the name
+  // stands for, so marking one 2-state on that answer would convert the
+  // unknowns of a `typedef logic` local. Keeping a bit that §6.11.2 would have
+  // cleared is the smaller error of the two, and carrying a name's resolved
+  // kind into the simulator is #3486.
+  if (type.kind != DataTypeKind::kNamed) v->is_4state = Is4stateType(type.kind);
   if (is_string) v->is_string = true;
   if (is_class) ctx.SetVariableClassType(name, type.type_name);
   RecordVariableEnumType(name, type, ctx);

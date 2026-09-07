@@ -346,4 +346,113 @@ TEST(TwoStateAndFourState, UnsignedByteWideningZeroExtends) {
   EXPECT_EQ(var->value.ToUint64(), 0x000000FFu);
 }
 
+// §6.11.2's conversion applies to an assignment wherever it is written, and a
+// subroutine body runs on the statement executor in eval_function_body.cpp
+// rather than the one FourToTwoStateZeroesOnlyXzBits above exercises. That
+// executor converted nowhere, and it also left every body local at Variable's
+// 4-state default, so both halves are read below: the target's flag, which the
+// lowerer sets for a variable of the design, and the flag a local gets when the
+// subroutine declares it.
+
+// The target is a `bit` of the design, written from a function body. Its flag
+// was already right; what was missing was the conversion at the write.
+TEST(TwoStateAndFourState, FunctionBodyZeroesXzIntoATwoStateTarget) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] src;\n"
+      "  bit [7:0] dst;\n"
+      "  function void copy();\n"
+      "    dst = src;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    src = 8'b1010_x10z;\n"
+      "    copy();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "dst");
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(var->value.IsKnown());
+  EXPECT_EQ(var->value.ToUint64(), 0xA4u);
+}
+
+// The other half: a `bit` local the subroutine declares. Its flag is what the
+// declaration sets, and the value is carried out through a 4-state variable so
+// that what is read is the local's own conversion and not a second one.
+TEST(TwoStateAndFourState, FunctionBodyTwoStateLocalZeroesXz) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] src;\n"
+      "  logic [7:0] dst;\n"
+      "  function void copy();\n"
+      "    bit [7:0] tmp;\n"
+      "    tmp = src;\n"
+      "    dst = tmp;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    src = 8'b1010_x10z;\n"
+      "    copy();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "dst");
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(var->value.IsKnown());
+  EXPECT_EQ(var->value.ToUint64(), 0xA4u);
+}
+
+// §6.11.2 names `logic` among the types that do have unknown values, so a
+// 4-state local keeps what a 2-state one loses. Without this the two cases
+// above would also pass a body that converted every local it declared.
+TEST(TwoStateAndFourState, FunctionBodyFourStateLocalKeepsXz) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] src;\n"
+      "  logic [7:0] dst;\n"
+      "  function void copy();\n"
+      "    logic [7:0] tmp;\n"
+      "    tmp = src;\n"
+      "    dst = tmp;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    src = 8'b1010_x10z;\n"
+      "    copy();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "dst");
+  ASSERT_NE(var, nullptr);
+  EXPECT_FALSE(var->value.IsKnown());
+  EXPECT_EQ(var->value.ToString(), "1010x10z");
+}
+
+// The limit the declaration accepts. Is4stateType is asked of the type's kind
+// alone, and a name answers false whatever it stands for, so a local declared
+// with a typedef of `logic` is left 4-state rather than converted on that
+// answer. This case is that choice: the unknowns survive, which is the smaller
+// error than clearing the unknowns of a type that has them. #3486 is what would
+// carry the name's resolved kind this far.
+TEST(TwoStateAndFourState, FunctionBodyLocalOfATypedefNameKeepsXz) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  typedef logic [7:0] octet;\n"
+      "  logic [7:0] src;\n"
+      "  logic [7:0] dst;\n"
+      "  function void copy();\n"
+      "    octet tmp;\n"
+      "    tmp = src;\n"
+      "    dst = tmp;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    src = 8'b1010_x10z;\n"
+      "    copy();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "dst");
+  ASSERT_NE(var, nullptr);
+  EXPECT_FALSE(var->value.IsKnown());
+  EXPECT_EQ(var->value.ToString(), "1010x10z");
+}
+
 }  // namespace
