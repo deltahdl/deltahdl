@@ -52,9 +52,12 @@ bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
 // One index of a packed multidimensional array addresses an element rather than
 // a bit (§7.4.1), and the window is that element's.
 //
-// Two callers ask it: the concatenation lvalue walk, which needs an element's
-// own width rather than its variable's, and the continuous-assignment lowering,
-// which needs the bits a select-targeted driver drives. They asked it
+// Three callers ask it: the concatenation lvalue walk, which needs an element's
+// own width rather than its variable's; the streaming-concatenation unpack,
+// which needs the same of a target element that is a select, since §11.4.14.1
+// makes a stream_expression's contribution the expression's and not that of the
+// object a sub-expression of it names; and the continuous-assignment lowering,
+// which needs the bits a select-targeted driver drives. The first two asked it
 // separately and of the same clause, which is what the copy-paste gate found.
 PartSelectBits SelectStorageBits(const Variable& var, const Expr* sel,
                                  SimContext& ctx, Arena& arena);

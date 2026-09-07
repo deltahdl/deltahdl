@@ -220,6 +220,92 @@ TEST(StreamingUnpackSim, NullClassHandleTargetIsSkipped) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §11.4.14.3: the unpack splits the stream "into one or more variables", and
+// Syntax 11-4 makes every item of the target list a stream_expression, that is
+// an expression -- so `a[3:0]` is a four-bit element: it claims four bits of
+// the stream and deposits them in the four bits it names, leaving `a[7:4]`
+// standing.
+//
+// The expected values follow from the clause alone. The target list is 4 + 8 =
+// 12 bits and the source holds 16, and "if the source expression contains more
+// bits than are needed, the appropriate number of bits shall be consumed from
+// its left (most significant) end", so the stream is the top twelve bits of
+// 16'h9ABC, namely 12'h9AB, and 4'hC is discarded. §11.4.14.2 has `>>` perform
+// no re-ordering, so the leading 4'h9 goes to `a[3:0]` and the remaining 8'hAB
+// to `b`. `a` therefore reads 8'hF9, its upper nibble surviving, and `b` 8'hAB.
+//
+// CollectStreamElements sized the element at the whole width of `a` and
+// WriteStreamElement stored the slice over the whole of `a`, both resolving the
+// element through ResolveLhsVariable, which walks a select down to its base and
+// discards the index. `a` read 8'h9A and `b` 8'hBC: the mis-sizing moved the
+// boundary between the two elements four bits to the right, so asserting the
+// select alone would miss that every element after it takes the wrong slice.
+// This is the blocking route, ApplyGenericBlockingAssign into
+// UnpackStreamingConcatLhs.
+//
+// 8'hF0 and 8'h0F are sentinels that neither the right answers (8'hF9, 8'hAB)
+// nor the wrong ones (8'h9A, 8'hBC) can produce, so an unpack that wrote
+// nothing cannot pass here as one that wrote the bits the clause asks for.
+TEST(StreamingUnpackSim, SelectElementTakesOnlyTheBitsItNames) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'hF0;\n"
+      "    b = 8'h0F;\n"
+      "    {>> {a[3:0], b}} = 16'h9ABC;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0xF9u);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xABu);
+}
+
+// §11.4.14.3: "if more bits are needed than are provided by the source
+// expression, an error shall be generated" -- and here none are. `{a[3:0], b}`
+// needs 4 + 8 = 12 bits and the source supplies exactly 12, so no bits are
+// consumed from either end: the stream is 12'h9AB whole, `a[3:0]` takes 4'h9
+// over the low nibble of 8'hF0 and `b` takes 8'hAB, the same answers the
+// wider-source case derives, reached without any surplus to drop.
+//
+// Because CollectStreamElements answered 16 for this list,
+// UnpackStreamingConcatLhs compared 12 against 16, reported "too few bits in
+// stream for streaming unpack" under §11.4.14.3 and returned having written
+// nothing. An exact fit is the only shape that reads the mis-sizing as that
+// spurious report; SelectElementTakesOnlyTheBitsItNames above has four bits to
+// spare and so never reaches the check, which is why this case stands apart
+// from it rather than folding into it.
+//
+// The clean run is asserted before the values because the report is this
+// defect's signature: when it fires nothing is written, the targets keep the
+// 8'hF0 and 8'h0F sentinels that no expected value can equal, and the value
+// expectations would only restate what the diagnostic already said.
+TEST(StreamingUnpackSim, SelectElementSizesTheStreamByItsOwnWidth) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'hF0;\n"
+      "    b = 8'h0F;\n"
+      "    {>> {a[3:0], b}} = 12'h9AB;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  EXPECT_EQ(va->value.ToUint64(), 0xF9u);
+  EXPECT_EQ(vb->value.ToUint64(), 0xABu);
+}
+
 // §11.4.14.3: the reverse (unpack) operation applies to a streaming target of a
 // nonblocking assignment as well as a blocking one. Driven through the full
 // pipeline so the deferred NBA-region unpack is exercised; without it the
@@ -231,6 +317,45 @@ TEST(StreamingUnpackSim, NonblockingStreamingUnpackIntegration) {
                             "  logic [7:0] a, b;\n"
                             "  initial {>> {a, b}} <= 16'hABCD;\n"
                             "endmodule\n");
+}
+
+// §11.4.14.3 says what the unpack does and not when it happens, so a select
+// element claims the bits it names on the nonblocking route as well.
+// ScheduleStreamingConcatNba defers the very call ApplyGenericBlockingAssign
+// makes on the spot, UnpackStreamingConcatLhs, so both doors share the element
+// walk that was wrong: `a` read 8'h9A and `b` 8'hBC in the NBA region too,
+// CollectStreamElements and WriteStreamElement having resolved `a[3:0]` through
+// ResolveLhsVariable to the whole of `a`. Writing the same case with `<=` says
+// the fix belongs in the unpacker both callers reach and not in one of them.
+//
+// Driven through the full pipeline the way
+// NonblockingStreamingUnpackIntegration above is -- elaborate, lower, then run
+// the scheduler -- so the update-region unpack really fires; without it the
+// targets would still hold their sentinels. The derivation is that of
+// SelectElementTakesOnlyTheBitsItNames: 4 + 8 = 12 bits of target drawn from
+// the most significant end of 16'h9ABC give the stream 12'h9AB, `a[3:0]` takes
+// 4'h9 into the low nibble of 8'hF0 for 8'hF9, and `b` takes 8'hAB. 8'hF0 and
+// 8'h0F are again values no answer, right or wrong, produces.
+TEST(StreamingUnpackSim, NonblockingSelectElementTakesOnlyTheBitsItNames) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'hF0;\n"
+      "    b = 8'h0F;\n"
+      "    {>> {a[3:0], b}} <= 16'h9ABC;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  EXPECT_EQ(va->value.ToUint64(), 0xF9u);
+  EXPECT_EQ(vb->value.ToUint64(), 0xABu);
 }
 
 // §11.4.14.3: if more bits are needed than the source expression provides, an

@@ -212,6 +212,39 @@ static uint32_t FixedWithRangeElementWidth(const Expr* elem, SimContext& ctx,
   return 0;
 }
 
+// §11.4.14.1: "Each stream_expression within the stream_concatenation ... is
+// converted to a bit-stream and appended", and Syntax 11-4 makes every item of
+// a stream_concatenation an expression, so what a target element contributes is
+// the expression's and not the object some sub-expression of it names. A select
+// is such an element; a select with no base is not, its index standing on
+// nothing to select from and the whole reducing to an ordinary lvalue. This is
+// the test the plain-concatenation walk applies, for the same reason.
+static bool IsStreamSelectElement(const Expr* elem) {
+  return elem->kind == ExprKind::kSelect && elem->base != nullptr;
+}
+
+// §11.5.1: the bits a target element claims of the variable it resolved to --
+// the window a select's indices address, and the whole variable for every other
+// element shape.
+//
+// Reading the resolved variable's width for a select drew the boundary between
+// elements in the wrong place: `{>> {a[3:0], b}} = 16'h9ABC` sized its first
+// element at the whole of `a`, so the element to its right took the wrong bits
+// too, giving `8'h9A` and `8'hBC` where §11.4.14.3 requires `8'hF9` and
+// `8'hAB`; and it made an exactly fitting `12'h9AB` a 12-bit source against a
+// 16-bit target list, rejected as too few bits in the stream.
+//
+// Three sites ask this question -- the collecting pass, the fixed-width sum the
+// single greedy queue is budgeted from, and the forward pass -- and the writers
+// deposit a select through WriteBitSelect, which resolves the same window, so
+// the stream is carved and written on one boundary.
+static uint32_t StreamElementClaimedBits(const Expr* elem, const Variable& var,
+                                         SimContext& ctx, Arena& arena) {
+  if (IsStreamSelectElement(elem))
+    return SelectStorageBits(var, elem, ctx, arena).width;
+  return var.value.width;
+}
+
 // Sum of bit widths of all non-greedy (fixed) targets, used to compute how
 // many bits remain for the single greedy dynamic queue.
 static uint32_t SumFixedElementWidths(const Expr* lhs, SimContext& ctx,
@@ -225,7 +258,10 @@ static uint32_t SumFixedElementWidths(const Expr* lhs, SimContext& ctx,
     if (elem->kind == ExprKind::kIdentifier && ctx.FindQueue(elem->text))
       continue;
     auto* var = ResolveLhsVariable(elem, ctx);
-    if (var) fixed_sum += var->value.width;
+    // The budget the greedy queue is sized from is what the fixed elements
+    // claim, so a select beside a queue contributes the bits it names; the
+    // whole of its variable overstated the budget and left the queue short.
+    if (var) fixed_sum += StreamElementClaimedBits(elem, *var, ctx, arena);
   }
   return fixed_sum;
 }
@@ -380,8 +416,9 @@ static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
     if (IsNullClassHandleTarget(elem, ctx)) continue;
     auto* var = ResolveLhsVariable(elem, ctx);
     if (!var) continue;
-    elems.push_back({elem, var->value.width, {}});
-    total_width += var->value.width;
+    uint32_t width = StreamElementClaimedBits(elem, *var, ctx, arena);
+    elems.push_back({elem, width, {}});
+    total_width += width;
   }
   return total_width;
 }
@@ -548,13 +585,23 @@ static void ForwardUnpackQueueWithRange(const Expr* elem, QueueObject* queue,
 
 // Forward-unpack arm for a plain scalar/lvalue element: write the target from
 // the next `width` stream bits, advancing `cursor`.
-static void ForwardUnpackScalar(const Expr* elem, SimContext& ctx,
+static void ForwardUnpackScalar(const Expr* elem, StreamEnv env,
                                 const StreamTaker& take, uint32_t& cursor) {
-  auto* var = ResolveLhsVariable(elem, ctx);
+  auto* var = ResolveLhsVariable(elem, env.ctx);
   if (!var) return;
-  uint32_t w = var->value.width;
-  var->value = take(w);
-  if (!var->is_4state) CoerceTo2State(var->value);
+  uint32_t w = StreamElementClaimedBits(elem, *var, env.ctx, env.arena);
+  Logic4Vec bits = take(w);
+  // §11.4.14.3 unpacks the stream "into one or more variables", and a select
+  // element names a window of a variable rather than the variable, so the bits
+  // outside it stand. WriteBitSelect resolves the window the width above was
+  // measured over, which is what keeps this pass's consumption and its writes
+  // on one boundary.
+  if (IsStreamSelectElement(elem)) {
+    WriteBitSelect(var, elem, bits, env.ctx, env.arena);
+  } else {
+    var->value = bits;
+    if (!var->is_4state) CoerceTo2State(var->value);
+  }
   var->NotifyWatchers();
   cursor += w;
 }
@@ -578,7 +625,7 @@ static void ForwardUnpackOneElement(const Expr* elem, SimContext& ctx,
       return;
     }
   }
-  ForwardUnpackScalar(elem, ctx, take, cursor);
+  ForwardUnpackScalar(elem, StreamEnv{ctx, arena}, take, cursor);
 }
 
 // Forward unpack for the right-shift form: walk elements in stream order and
@@ -666,8 +713,21 @@ static void WriteStreamElement(const StreamElemInfo& ei, const StreamView& src,
   }
   auto* var = ResolveLhsVariable(ei.expr, env.ctx);
   if (!var) return;
-  StoreStreamValueToVar(var, ExtractStreamBits(src.stream, bit_offset, ei.width,
-                                               src.total_width, env.arena));
+  Logic4Vec bits = ExtractStreamBits(src.stream, bit_offset, ei.width,
+                                     src.total_width, env.arena);
+  // §11.4.14.3 deposits an element's bits in what the element names, and a
+  // select names a window of its variable, so the rest of that variable stands;
+  // storing the value whole gave `{>> {a[3:0], b}}` the whole of `a` and lost
+  // the bits `a[7:4]` had. WriteBitSelect resolves the same window
+  // StreamElementClaimedBits measured, so the stream is carved and deposited on
+  // one boundary. It also declines a variable §10.6.2 has forced, which
+  // StoreStreamValueToVar does not test.
+  if (IsStreamSelectElement(ei.expr)) {
+    WriteBitSelect(var, ei.expr, bits, env.ctx, env.arena);
+    var->NotifyWatchers();
+    return;
+  }
+  StoreStreamValueToVar(var, bits);
 }
 
 // §7.10.5: an unpack grows a queue target to the slots its with-range names or
