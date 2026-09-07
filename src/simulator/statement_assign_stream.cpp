@@ -223,25 +223,37 @@ static bool IsStreamSelectElement(const Expr* elem) {
   return elem->kind == ExprKind::kSelect && elem->base != nullptr;
 }
 
-// §11.5.1: the bits a target element claims of the variable it resolved to --
-// the window a select's indices address, and the whole variable for every other
-// element shape.
+// How many bits of the stream a target element claims: what its expression
+// names, by the clause above -- SelectExprWidth's answer for a select, and the
+// whole of the resolved variable for every other element shape.
 //
-// Reading the resolved variable's width for a select drew the boundary between
-// elements in the wrong place: `{>> {a[3:0], b}} = 16'h9ABC` sized its first
-// element at the whole of `a`, so the element to its right took the wrong bits
-// too, giving `8'h9A` and `8'hBC` where §11.4.14.3 requires `8'hF9` and
-// `8'hAB`; and it made an exactly fitting `12'h9AB` a 12-bit source against a
-// 16-bit target list, rejected as too few bits in the stream.
+// How wide the element is and which bits of its object it may write are two
+// questions, and this answers the first. It gave SelectStorageBits' window to
+// both before, and §11.5.1 leaves that window empty for a select addressing no
+// bit of its object, giving the invalid reference a value rather than an
+// absence -- "x for 4-state and 0 for 2-state values" -- while saying
+// separately that the write "shall have no effect on the data stored". Such an
+// element is still one element of the stream, and it claimed none of it: on
+// `logic [7:0] a, b, c`, `{>> {c, a[9], b}} = 17'h1AAC3` sized the target list
+// at sixteen bits where it names seventeen. §11.4.14.3 consumes a surplus "from
+// its left (most significant) end", so what moves is the elements to the
+// *right* of the mis-sized one -- `b` read 8'h61 where it owns the source's low
+// eight bits and must read 8'hC3. On an exact fit that invented a truncation
+// the clause does not authorize; on a short source it hid the "too few bits in
+// stream" report §11.4.14.3 requires.
 //
-// Three sites ask this question -- the collecting pass, the fixed-width sum the
-// single greedy queue is budgeted from, and the forward pass -- and the writers
-// deposit a select through WriteBitSelect, which resolves the same window, so
-// the stream is carved and written on one boundary.
+// SelectStorageBits still answers the window, reached by the writers through
+// WriteBitSelect, which declines a select addressing nothing on its own. The
+// two part wherever a select runs off the end of its object: §11.5.1 has such a
+// part-select "when written, only affect the bits that are in range", so
+// `a[9:6]` on a `logic [7:0] a` claims four bits of the stream and writes two.
+//
+// Three sites ask this -- the collecting pass, the fixed-width sum the single
+// greedy queue is budgeted from, and the forward pass.
 static uint32_t StreamElementClaimedBits(const Expr* elem, const Variable& var,
                                          SimContext& ctx, Arena& arena) {
   if (IsStreamSelectElement(elem))
-    return SelectStorageBits(var, elem, ctx, arena).width;
+    return SelectExprWidth(var, elem, ctx, arena);
   return var.value.width;
 }
 
@@ -258,9 +270,10 @@ static uint32_t SumFixedElementWidths(const Expr* lhs, SimContext& ctx,
     if (elem->kind == ExprKind::kIdentifier && ctx.FindQueue(elem->text))
       continue;
     auto* var = ResolveLhsVariable(elem, ctx);
-    // The budget the greedy queue is sized from is what the fixed elements
-    // claim, so a select beside a queue contributes the bits it names; the
-    // whole of its variable overstated the budget and left the queue short.
+    // §11.4.14.4 sizes the single greedy queue from what the fixed elements
+    // leave, so a select beside a queue contributes the bits it names: its
+    // write window understated the budget, and `{>> {a[9], q}} = 24'hC3A55A`
+    // on a `byte q[$]` gave `q` three elements where twenty-three bits fit two.
     if (var) fixed_sum += StreamElementClaimedBits(elem, *var, ctx, arena);
   }
   return fixed_sum;
@@ -599,9 +612,10 @@ static void ForwardUnpackScalar(const Expr* elem, StreamEnv env,
   Logic4Vec bits = take(w);
   // §11.4.14.3 unpacks the stream "into one or more variables", and a select
   // element names a window of a variable rather than the variable, so the bits
-  // outside it stand. WriteBitSelect resolves the window the width above was
-  // measured over, which is what keeps this pass's consumption and its writes
-  // on one boundary.
+  // outside it stand. WriteBitSelect resolves that window, which §11.5.1 makes
+  // narrower than the width taken above whenever the select runs off the end of
+  // its object and empty when it addresses no bit -- a case WriteBitSelect
+  // declines itself. The cursor advances by the element's width either way.
   if (IsStreamSelectElement(elem)) {
     WriteBitSelect(var, elem, bits, env.ctx, env.arena);
     var->NotifyWatchers();
@@ -732,9 +746,12 @@ static void WriteStreamElement(const StreamElemInfo& ei, const StreamView& src,
   // §11.4.14.3 deposits an element's bits in what the element names, and a
   // select names a window of its variable, so the rest of that variable stands;
   // storing the value whole gave `{>> {a[3:0], b}}` the whole of `a` and lost
-  // the bits `a[7:4]` had. WriteBitSelect resolves the same window
-  // StreamElementClaimedBits measured, so the stream is carved and deposited on
-  // one boundary. Both writers decline a variable §10.6.2 has forced.
+  // the bits `a[7:4]` had. WriteBitSelect resolves the window §11.5.1 gives the
+  // indices, which is not the width StreamElementClaimedBits carved the stream
+  // by: a select running off the end of its object writes only "the bits that
+  // are in range", and one addressing no bit writes nothing, WriteBitSelect
+  // declining it rather than falling through to the whole variable. Both
+  // writers decline a variable §10.6.2 has forced.
   if (IsStreamSelectElement(ei.expr)) {
     WriteBitSelect(var, ei.expr, bits, env.ctx, env.arena);
     var->NotifyWatchers();

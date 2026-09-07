@@ -306,6 +306,160 @@ TEST(StreamingUnpackSim, SelectElementSizesTheStreamByItsOwnWidth) {
   EXPECT_EQ(vb->value.ToUint64(), 0xABu);
 }
 
+// §11.4.14.1 appends each stream_expression's own bit-stream to the generic
+// stream -- "Each stream_expression within the stream_concatenation ... is
+// converted to a bit-stream and appended to a packed array (stream) of bits" --
+// so how many bits a target element claims is a question about the expression,
+// and §11.5.1 answers it for an invalid address without taking the bits away:
+// "if the bit-select address is invalid (it is out of bounds or has one or more
+// x or z bits), then the value returned by the reference shall be x for 4-state
+// and 0 for 2-state values", while saying separately that such a write "shall
+// have no effect on the data stored". A value, not an absence. So `a[9]` on a
+// `logic [7:0] a` is one bit of the stream that reaches nothing.
+//
+// 17'h1AAC3 laid out is 1_1010101_0_11000011. The list names 8 + 1 + 8 = 17
+// bits and the source holds 17, an exact fit, so §11.4.14.3 consumes nothing
+// from either end: `c` takes bits [16:9] = 8'hD5, `a[9]` takes bit [8] and
+// deposits it nowhere, and `b` takes bits [7:0] = 8'hC3.
+//
+// StreamElementClaimedBits sized the element with SelectStorageBits, whose zero
+// means "the select that addresses no bit of the object", so
+// CollectStreamElements totalled 16 for a list that names 17 and
+// BuildLeftAlignedStream dropped source bit [0] -- a truncation the exact fit
+// does not authorize. A stream is left-aligned, which reverses the direction of
+// the displacement the plain-concatenation lvalue suffers: the first element
+// still lands on the most significant bits and it is what stands *after* the
+// mis-sized element that moves. `c` read 8'hD5 either way and `b` read 8'h61,
+// so `b` is the assertion that discriminates and asserting `c` alone would
+// prove nothing. This is the blocking route, ApplyGenericBlockingAssign into
+// UnpackStreamingConcatLhs.
+//
+// The sentinels are values no answer, right or wrong, produces: 8'h2B is
+// neither 8'hC3 nor 8'h61, and 8'h3C is not 8'hD5. `a` standing at its 8'h1A
+// therefore says the element's bit reached nothing, rather than that it reached
+// the right nothing by accident.
+TEST(StreamingUnpackSim,
+     OutOfBoundsBitSelectElementStillClaimsItsBitOfTheStream) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  initial begin\n"
+      "    a = 8'h1A;\n"
+      "    b = 8'h2B;\n"
+      "    c = 8'h3C;\n"
+      "    {>> {c, a[9], b}} = 17'h1AAC3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0x1Au);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xC3u);
+  EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 0xD5u);
+  // The exact fit leaves nothing to trim and nothing missing, so §11.4.14.3
+  // requires no report in either direction.
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// The same defect reached through a part-select, which is what separates "an
+// invalid select element claims one bit" from "an invalid select element claims
+// the width its indices name". §11.5.1 has a part-select address "several
+// contiguous bits", and of the wholly out-of-range one it says only that it
+// "shall yield the value x when read and shall have no effect on the data
+// stored when written" -- nothing there narrows the bits the indices name -- so
+// `a[11:9]` on a `logic [7:0] a` is three bits of the stream and none of them
+// reaches `a`.
+//
+// 19'h6ABC3 is 11010101_011_11000011: the list names 8 + 3 + 8 = 19 bits
+// against a 19-bit source, so `c` takes bits [18:11] = 8'hD5, `a[11:9]` takes
+// bits [10:8] = 3'b011 and deposits them nowhere, and `b` takes bits [7:0] =
+// 8'hC3.
+//
+// `b` is again the discriminating assertion, and it separates three answers.
+// Claiming nothing for the element -- SelectStorageBits' window, which is empty
+// for a range wholly outside the declared bounds -- totalled 16, trimmed the
+// low three source bits and read 8'h78. Claiming one bit, which a repair that
+// only replaced that zero with a bit-select's width would do, totals 17, trims
+// two and reads 8'hF0. Only the width the indices name reads 8'hC3, which is
+// why this case stands beside the bit-select one above rather than repeating
+// it. It claims SelectExprWidth's answer as StreamElementClaimedBits' answer.
+TEST(StreamingUnpackSim,
+     WhollyOutOfBoundsPartSelectElementClaimsTheWidthItsIndicesName) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  initial begin\n"
+      "    a = 8'h1A;\n"
+      "    b = 8'h2B;\n"
+      "    c = 8'h3C;\n"
+      "    {>> {c, a[11:9], b}} = 19'h6ABC3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 0xD5u);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xC3u);
+  // The three bits addressed nothing, so the 8'h1A sentinel stands.
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0x1Au);
+}
+
+// §11.5.1 gives the partially out-of-range part-select its own rule, and not
+// the one it gives the wholly out-of-range one: such a select "shall, when
+// read, return x for the bits that are out of range and shall, when written,
+// only affect the bits that are in range". Which of its bits land says nothing
+// about how wide the element is, since §11.4.14.1 makes a stream_expression's
+// contribution its expression's bit-stream, so `a[9:6]` is four bits of the
+// stream and two of them reach `a`.
+//
+// This is the shape the wholly out-of-bounds cases above cannot reach, because
+// SelectStorageBits answers two here rather than zero: a repair that only
+// replaced the zero would still size this element at two and still fail. It is
+// what says the two questions were separated rather than the empty window
+// patched.
+//
+// 20'hD5AC3 is 11010101_1010_11000011 and the list names 8 + 4 + 8 = 20 bits,
+// an exact fit: `c` takes bits [19:12] = 8'hD5, `a[9:6]` takes bits [11:8] =
+// 4'b1010, and `b` takes bits [7:0] = 8'hC3. Of those four bits a[9] and a[8]
+// address nothing and a[7:6] takes 2'b10, so `a` goes 8'h1A -> 8'h9A; that
+// write is established outside a streaming concatenation by
+// ExpressionSim.PartSelectPartiallyOutOfBoundsWriteAffectsInRangeOnly in
+// test/src/unit/test_simulator_subclause_11_05_01a.cpp. The slice is chosen so
+// its top half and its bottom half read alike, which keeps the case a claim
+// about the width the element claims of the stream rather than a claim about
+// which two of the four bits the clipped window takes -- no case in test/
+// settles that, since the established one writes 4'hF. `b` read 8'hB0 before,
+// the element having claimed only the two bits it can write.
+TEST(StreamingUnpackSim,
+     PartiallyOutOfBoundsPartSelectElementWritesOnlyItsInRangeBits) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  initial begin\n"
+      "    a = 8'h1A;\n"
+      "    b = 8'h2B;\n"
+      "    c = 8'h3C;\n"
+      "    {>> {c, a[9:6], b}} = 20'hD5AC3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
+  auto* vc = f.ctx.FindVariable("c");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  ASSERT_NE(vc, nullptr);
+  EXPECT_EQ(vc->value.ToUint64(), 0xD5u);
+  EXPECT_EQ(vb->value.ToUint64(), 0xC3u);
+  // Only a[7:6] is in range, so the 8'h1A sentinel keeps its other six bits.
+  EXPECT_EQ(va->value.ToUint64(), 0x9Au);
+}
+
 // §11.4.14.3: the reverse (unpack) operation applies to a streaming target of a
 // nonblocking assignment as well as a blocking one. Driven through the full
 // pipeline so the deferred NBA-region unpack is exercised; without it the
@@ -358,6 +512,45 @@ TEST(StreamingUnpackSim, NonblockingSelectElementTakesOnlyTheBitsItNames) {
   EXPECT_EQ(vb->value.ToUint64(), 0xABu);
 }
 
+// §11.4.14.3 says what the unpack does and not when it happens, so an invalid
+// select element claims its bit on the nonblocking route as well.
+// ScheduleStreamingConcatNba defers the very call ApplyGenericBlockingAssign
+// makes on the spot, UnpackStreamingConcatLhs, so the deferred door reaches the
+// same CollectStreamElements walk and the same StreamElementClaimedBits: `b`
+// read 8'h61 in the update region too. Writing the case with `<=` says the fix
+// belongs in the unpacker both callers reach and not in one of them, which is
+// the claim NonblockingSelectElementTakesOnlyTheBitsItNames above makes for the
+// in-bounds select and this one makes for the invalid one.
+//
+// Driven through the full pipeline -- elaborate, lower, then run the scheduler
+// -- so the update-region unpack really fires; without it the targets would
+// still hold their sentinels, and 8'h1A, 8'h2B and 8'h3C are values no answer
+// produces. The derivation is that of
+// OutOfBoundsBitSelectElementStillClaimsItsBitOfTheStream: 8 + 1 + 8 = 17 bits
+// of target against a 17-bit source is an exact fit, so `c` takes 17'h1AAC3's
+// bits [16:9] = 8'hD5, `a[9]` takes bit [8] and writes nowhere, and `b` takes
+// bits [7:0] = 8'hC3.
+TEST(StreamingUnpackSim,
+     NonblockingOutOfBoundsBitSelectElementStillClaimsItsBit) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  initial begin\n"
+      "    a = 8'h1A;\n"
+      "    b = 8'h2B;\n"
+      "    c = 8'h3C;\n"
+      "    {>> {c, a[9], b}} <= 17'h1AAC3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xC3u);
+  EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 0xD5u);
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0x1Au);
+}
+
 // §11.4.14.3: if more bits are needed than the source expression provides, an
 // error shall be generated. The report the collecting unpack raises names
 // §11.4.14.3.
@@ -391,6 +584,45 @@ TEST(StreamingUnpackSim, ShortStreamForwardResolveNames11_4_14_3) {
   LowerAndRun(design, f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "too few bits in stream", 4,
                             "11.4.14.3"));
+}
+
+// §11.4.14.3: "if more bits are needed than are provided by the source
+// expression, an error shall be generated" -- and the invalid select element is
+// what decides whether more are needed. `{c, a[9], b}` names 8 + 1 + 8 = 17
+// bits and 16'hD5C3 supplies sixteen, one short, so the report is required.
+//
+// Every other case here has the bits it needs, which is what makes this shape
+// the only one that catches the suppressed report. UnpackStreamingConcatLhs
+// compared the source's 16 against CollectStreamElements' 16, found nothing
+// missing, and unpacked: `c` took 8'hD5 and `b` took 8'hC3, values that read as
+// a clean and correct run. So the assertion is the diagnostic, and the two
+// sentinels stand behind it -- the guard returns before writing anything, so
+// `c` must still hold 8'h3C and `b` 8'h2B, values neither the right answers nor
+// the wrong ones take.
+//
+// This is the mirror of the spurious report
+// SelectElementSizesTheStreamByItsOwnWidth covers: the same mis-measurement,
+// there inventing an error and here hiding one.
+TEST(StreamingUnpackSim,
+     ShortStreamWithOutOfBoundsSelectElementNames11_4_14_3) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  initial begin\n"
+      "    a = 8'h1A;\n"
+      "    b = 8'h2B;\n"
+      "    c = 8'h3C;\n"
+      "    {>> {c, a[9], b}} = 16'hD5C3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "too few bits in stream", 7,
+                            "11.4.14.3"));
+  EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 0x3Cu);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0x2Bu);
 }
 
 }  // namespace

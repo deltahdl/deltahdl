@@ -498,8 +498,13 @@ static bool TrySubarrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 // its stated width, §11.5.1 letting that base "vary at run time", and a
 // bit-select whose index carries x or z is one bit like any other, that clause
 // covering the out-of-bounds address and the unknown one in one sentence.
-static uint32_t SelectExprWidth(const Variable& var, const Expr* sel,
-                                SimContext& ctx, Arena& arena) {
+//
+// §11.4.14.1 asks the same question of a streaming-concatenation target
+// element, each stream_expression being "converted to a bit-stream and
+// appended", so this is declared in statement_assign_internal.h and the
+// streaming unpack shares it rather than restating these four shapes.
+uint32_t SelectExprWidth(const Variable& var, const Expr* sel, SimContext& ctx,
+                         Arena& arena) {
   if (sel->index_end == nullptr)
     return var.packed_elem_width > 1 ? var.packed_elem_width : 1;
   bool is_indexed = sel->is_part_select_plus || sel->is_part_select_minus;

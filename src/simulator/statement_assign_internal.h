@@ -92,6 +92,25 @@ bool IsConcatLhs(const Expr* lhs);
 // the pattern a typed pattern wraps, and the expression itself otherwise.
 const Expr* UnwrapTypedPattern(const Expr* expr);
 
+// Defined in statement_assign_core.cpp; also used by the §11.4.14 streaming
+// unpack in statement_assign_stream.cpp, which sizes a target element that is a
+// select with it. §11.5.1: how wide the select `sel` on `var` is as an
+// expression -- one bit for an ordinary bit-select, the element width for the
+// index of a packed multidimensional array (§7.4.1), and the span of the
+// indices for a part-select, indexed or not. An address outside the declared
+// bounds changes none of those: §11.5.1 gives the invalid reference a value
+// rather than an absence, "x for 4-state and 0 for 2-state values", and says
+// separately that such a write "shall have no effect on the data stored". Zero
+// only where the select names no range this can measure, which is a
+// part-select whose bounds or width expression carry x or z.
+//
+// This is the width the select names and not the window of its object it may
+// write; the second question is SelectStorageBits'. The two differ wherever a
+// select runs off the end of its object, and a caller that asked one of them
+// for both drew its element boundaries in the wrong place.
+uint32_t SelectExprWidth(const Variable& var, const Expr* sel, SimContext& ctx,
+                         Arena& arena);
+
 // Defined in statement_assign_core.cpp; also used by the §10.6.1 and §10.6.2
 // procedural continuous assignments in statement_assign_decl.cpp, which cut a
 // forced or assigned value into the same element windows a blocking assignment

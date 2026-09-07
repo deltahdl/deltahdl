@@ -486,4 +486,113 @@ TEST(StreamingDynamicDataSim, OutOfRangeForwardWithRangeNames11_4_14_4) {
                             "11.4.14.4"));
 }
 
+// §11.4.14.4 sizes the one greedy dynamic item from what the rest of the list
+// leaves: "the first dynamically sized item is resized to accept all the
+// available data (excluding subsequent fixed-size items) in the stream". A
+// select element beside the queue is a fixed-size item, and §11.4.14.1 makes
+// its contribution its expression's bit-stream, which §11.5.1 does not shrink
+// for an address outside the object -- an invalid bit-select still "returned"
+// a value, x or 0, and the write alone "shall have no effect on the data
+// stored". So `a[9]` on a `logic [7:0] a` charges one bit to the budget.
+//
+// 24 bits of source less that one bit leaves 23 for `byte q[$]`, and 23 bits
+// hold two whole bytes, so §11.4.14.4 resizes the queue to two elements and
+// the list names 1 + 16 = 17 bits. §11.4.14.3 then consumes those seventeen
+// "from its left (most significant) end", dropping the low seven of
+// 24'hC3A55A = 11000011_10100101_01011010: `a[9]` takes the leading 1 and
+// deposits it nowhere, q[0] takes 8'h87 and q[1] takes 8'h4A.
+//
+// SumFixedElementWidths asked StreamElementClaimedBits for the budget and got
+// SelectStorageBits' empty window, so it budgeted 24 - 0 and
+// CollectGreedyQueueElements gave the queue **three** elements,
+// '{8'hC3, 8'hA5, 8'h5A}. This is the site whose error is visible in the object
+// and not only in the values, which is why the case asserts the size before the
+// contents: a queue of the right length holding the wrong bytes and a queue of
+// the wrong length are different failures. The queue is seeded with three
+// sentinel bytes so that shrinking it to two is told from never having run, and
+// 8'hE7, 8'hE8 and 8'hE9 are values neither answer produces.
+TEST(StreamingDynamicDataSim,
+     OutOfBoundsSelectElementIsChargedToTheGreedyQueueBudget) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  byte q[$];\n"
+      "  initial begin\n"
+      "    a = 8'h1A;\n"
+      "    q.push_back(8'hE7);\n"
+      "    q.push_back(8'hE8);\n"
+      "    q.push_back(8'hE9);\n"
+      "    {>> {a[9], q}} = 24'hC3A55A;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* q = f.ctx.FindQueue("q");
+  ASSERT_NE(q, nullptr);
+  ASSERT_EQ(q->elements.size(), 2u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 0x87u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 0x4Au);
+  // The bit the select claimed reached nothing, so `a` keeps its sentinel.
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0x1Au);
+}
+
+// §11.4.14.4 has a with-range "evaluated immediately before its corresponding
+// array is streamed", so a range naming a field this same operator unpacks to
+// the left of the array must see the just-unpacked value. That is what
+// ShouldForwardResolveUnpack detects and what routes the statement to
+// UnpackStreamingConcatLhsForward, the write-as-you-go pass that consumes the
+// stream element by element instead of collecting the list first. It is the
+// third site that asks StreamElementClaimedBits, and the only one the two
+// §11.4.14.3 cases and the greedy-budget case above do not reach.
+//
+// The pass both sizes and writes in one step -- `cursor += w` after the write
+// -- so an invalid select that claims nothing does not merely mis-measure a
+// total, it leaves the cursor standing where the next element then draws from.
+// 25'h05C35A is 00000010_1_11000011_01011010: `n` takes 8'h02, `a[9]` takes the
+// next bit and deposits it nowhere, and the range [0 +: n] the freshly unpacked
+// 8'h02 resolves gives payload[0] = 8'hC3 and payload[1] = 8'h5A, exhausting
+// the stream exactly. Before, the cursor did not advance past `a[9]`, so
+// payload[0] read 8'hE1 and payload[1] 8'hAD and the pass ended one bit short
+// of the stream without reporting it -- the elements after the mis-sized one
+// again, since a stream is left-aligned and `n` before it landed correctly
+// either way.
+//
+// `n` is seeded with 8'hE0, a width no four-element array can satisfy, so a
+// regression that resolved the range before the unpack instead of during it
+// fails loudly under §11.4.14.4's fixed-array bound rather than quietly. The
+// payload sentinels 8'h71 through 8'h74 are values neither the right answers
+// nor the wrong ones take, and payload[2] and payload[3] keep theirs because
+// the range names two elements.
+TEST(StreamingDynamicDataSim,
+     ForwardResolveOutOfBoundsSelectElementStillClaimsItsBit) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [7:0] n;\n"
+      "  logic [7:0] payload[4];\n"
+      "  initial begin\n"
+      "    a = 8'h1A;\n"
+      "    n = 8'hE0;\n"
+      "    payload[0] = 8'h71;\n"
+      "    payload[1] = 8'h72;\n"
+      "    payload[2] = 8'h73;\n"
+      "    payload[3] = 8'h74;\n"
+      "    {>> {n, a[9], payload with [0 +: n]}} = 25'h05C35A;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(f.ctx.FindVariable("n")->value.ToUint64(), 0x02u);
+  EXPECT_EQ(f.ctx.FindVariable("payload[0]")->value.ToUint64(), 0xC3u);
+  EXPECT_EQ(f.ctx.FindVariable("payload[1]")->value.ToUint64(), 0x5Au);
+  EXPECT_EQ(f.ctx.FindVariable("payload[2]")->value.ToUint64(), 0x73u);
+  EXPECT_EQ(f.ctx.FindVariable("payload[3]")->value.ToUint64(), 0x74u);
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0x1Au);
+}
+
 }  // namespace
