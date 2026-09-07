@@ -128,7 +128,7 @@ struct ClockWatch {
   std::shared_ptr<uint64_t> last_clock;
 };
 
-static void RegisterClockWatcher(ClockingManager* mgr, ClockWatch watch,
+static void RegisterClockWatcher(ClockingManager* mgr, const ClockWatch& watch,
                                  SimContext& ctx, Scheduler& sched);
 
 // Watch the clock for the next notification, reading the block back so a change
@@ -162,7 +162,7 @@ static void FireClockingEvent(ClockingManager* mgr, const ClockWatch& watch,
   sched.ScheduleEvent(sched.CurrentTime(), Region::kObserved, ev);
 }
 
-static void RegisterClockWatcher(ClockingManager* mgr, ClockWatch watch,
+static void RegisterClockWatcher(ClockingManager* mgr, const ClockWatch& watch,
                                  SimContext& ctx, Scheduler& sched) {
   Variable* clk_var = watch.clk_var;
   clk_var->AddWatcher([mgr, watch, &ctx, &sched]() {
