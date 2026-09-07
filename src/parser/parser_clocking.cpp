@@ -75,11 +75,19 @@ ModuleItem* Parser::ParseClockingDecl() {
   item->loc = CurrentLoc();
 
   // §14.7: a clocking block can only be declared inside a module, interface,
-  // checker, or program; it shall not be declared inside a package. An
-  // anonymous program (§24.6) may legally appear in a package, and a clocking
-  // block within that program is itself in a program scope, so the package
-  // restriction does not apply there.
-  if (package_body_depth_ > 0 && !in_anonymous_program_) {
+  // checker, or program; it shall not be declared inside a package.
+  //
+  // An anonymous program in the package is no exception, whatever its keyword
+  // suggests. §24.6 has anonymous programs used inside packages "to declare
+  // items that are part of the program-wide space without declaring a new
+  // scope", and "items declared in an anonymous program share the same name
+  // space as the package or compilation-unit scope in which they are declared"
+  // -- so a clocking block written in one is in the package's scope, which is
+  // what this prohibits. The guard that held the report back read that clause
+  // backwards, and A.1.11 keeps clocking_declaration out of
+  // anonymous_program_item as well, so such a source now draws both reports
+  // rather than only the grammar's.
+  if (package_body_depth_ > 0) {
     diag_.Error(item->loc,
                 "a clocking block shall not be declared inside a package",
                 Subclause("14.7"));
