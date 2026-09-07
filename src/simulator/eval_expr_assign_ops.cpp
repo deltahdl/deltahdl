@@ -99,7 +99,12 @@ static IncDecResult EvalIncDec(const Expr* expr, SimContext& ctx,
       // theirs. Nothing had to do this while the arithmetic above could only
       // produce known bits.
       if (!var->is_4state) CoerceTo2State(new_val);
-      var->value = new_val;
+      // §10.6.2: a force "shall override a procedural assignment ... until a
+      // release procedural statement is executed on the variable", and §11.4.2
+      // states these operators as blocking assignments, so the write is the one
+      // the force overrides. Only the write: the operator still yields the
+      // value it computed, which is what the enclosing expression reads.
+      if (!var->is_forced) var->value = new_val;
     }
   } else if (expr->lhs->kind == ExprKind::kSelect) {
     TrySelectBlockingAssign(expr->lhs, new_val, ctx, arena);
@@ -194,7 +199,10 @@ Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
       result =
           ConvertRealOnAssign(result, expr->lhs, var->value.width, ctx, arena);
       if (!var->is_4state) CoerceTo2State(result);
-      var->value = result;
+      // §10.6.2, as in EvalIncDec above. §11.3.6 has the expression "stack" the
+      // value and return it whether or not the update lands, so the return
+      // below is the value computed rather than what the target still holds.
+      if (!var->is_forced) var->value = result;
     }
   } else if (expr->lhs->kind == ExprKind::kSelect) {
     // TrySelectBlockingAssign is what the statement form reaches, and it

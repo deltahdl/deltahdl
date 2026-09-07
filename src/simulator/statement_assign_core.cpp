@@ -46,6 +46,14 @@ void CoerceTo2State(Logic4Vec& v) {
 }
 
 static void WriteVar(Variable* var, const Logic4Vec& val, Arena& arena) {
+  // §10.6.2: "A force statement to a variable shall override a procedural
+  // assignment ... until a release procedural statement is executed on the
+  // variable." Every other writer a blocking assignment reaches declines here;
+  // this one is reached only by §11.4.1's compound operators, which no case
+  // asked the rule of, so `force x = 8'd50; x += 8'd10;` read 60. A force
+  // establishes its own value by writing the field directly rather than through
+  // this, so nothing a force or a release needs is declined.
+  if (var->is_forced) return;
   var->value = ResizeToWidth(val, var->value.width, arena);
   if (!var->is_4state) CoerceTo2State(var->value);
   var->NotifyWatchers();

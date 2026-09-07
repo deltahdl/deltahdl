@@ -171,6 +171,145 @@ TEST(ForceReleaseSim, ForcePreventsBlockingAssign) {
   EXPECT_EQ(x->value.ToUint64(), 50u);
 }
 
+// §10.6.2: "A force statement to a variable shall override a procedural
+// assignment, continuous assignment or an assign procedural continuous
+// assignment to the variable until a release procedural statement is executed
+// on the variable." §11.4.1 states a compound assignment as one of those
+// assignments -- "an assignment operator is semantically equivalent to a
+// blocking assignment" -- and §10.4 puts a blocking assignment written in an
+// initial block among the procedural assignments, so `x += 8'd10;` is the same
+// statement ForcePreventsBlockingAssign above writes and the force declines it
+// the same way.
+//
+// A compound operator is the one form that reaches WriteVar, and WriteVar was
+// the only writer on the blocking-assignment path that consulted the flag
+// nowhere, so this read 60 -- the forced 50 with the 10 added to it -- where
+// the plain `x = 8'd100;` above already read 50. No other case in this file
+// reaches that writer.
+TEST(ForceReleaseSim, ForcePreventsACompoundAssign) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    force x = 8'd50;\n"
+      "    x += 8'd10;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_TRUE(x->is_forced);
+
+  EXPECT_EQ(x->value.ToUint64(), 50u);
+}
+
+// §11.4.2 states the increment and decrement operators as blocking assignments
+// -- "These increment and decrement assignment operators behave as blocking
+// assignments" -- so §10.6.2 overrides `x++` exactly as it overrides the
+// `x = 8'd100;` of ForcePreventsBlockingAssign and the `x += 8'd10;` of
+// ForcePreventsACompoundAssign above. A bare `x++;` is an expression statement
+// naming no subroutine, so ExecInlineTaskCall declines it and hands it to
+// EvalExpr; the increment therefore happens in the expression evaluator rather
+// than on any statement-assignment path.
+//
+// That is why this case failed while the two above passed. EvalIncDec stores
+// into var->value itself instead of calling WriteVar, so the guard #3506 put
+// in WriteVar sat on a path this one never takes: the increment read the
+// forced 50, added 1 and stored 51.
+//
+// Only the write is declined -- the operator still yields the value it
+// computed -- but a postfix `++` yields what the target held beforehand, which
+// is the forced 50 whether or not the write lands. Nothing here can read that
+// half of the rule; the case below is what does.
+TEST(ForceReleaseSim, ForcePreventsAnIncrement) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    force x = 8'd50;\n"
+      "    x++;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_TRUE(x->is_forced);
+
+  EXPECT_EQ(x->value.ToUint64(), 50u);
+}
+
+// The increment written where its value is read. EvalIncDec is one function
+// for all four spellings, so a decrement and a postfix form cannot fail while
+// ForcePreventsAnIncrement passes; what they cannot say is whether the decline
+// stopped at the write. §11.4.2 states the operator as a blocking assignment,
+// which §10.6.2 overrides, and states nothing about the value it yields, so a
+// prefix increment still reads 51 while the target it declined to write stays
+// at the forced 50. A decline written as an early return from EvalIncDec would
+// hand back the operand unchanged and leave y at 50.
+TEST(ForceReleaseSim, ForcePreventsAnIncrementWithoutChangingWhatItYields) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  logic [7:0] y;\n"
+      "  initial begin\n"
+      "    force x = 8'd50;\n"
+      "    y = (++x);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_TRUE(x->is_forced);
+  EXPECT_EQ(x->value.ToUint64(), 50u);
+
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 51u);
+}
+
+// The compound operator written as an expression rather than as a statement.
+// §11.4.1 makes the two spellings one assignment, so §10.6.2 declines both;
+// but the expression form reaches neither WriteVar nor the read-modify-write
+// the statement form performs. EvalCompoundAssign stores into var->value
+// itself, so x read 60 here -- the forced 50 with the 10 added to it -- after
+// ForcePreventsACompoundAssign above had already been made to read 50.
+//
+// y is what says the decline is confined to the write. §11.3.6 has an
+// assignment expression "evaluates the right-hand side, casts the right-hand
+// side to the left-hand data type, stacks it, updates the left-hand side, and
+// returns the stacked value": the value is stacked before the update, so what
+// comes back is the value the operator computed and not a re-read of the
+// target. The addition produces 60 whichever way the update goes, so y takes
+// 60 while x stays at 50. A decline written as an early return from
+// EvalCompoundAssign, or as returning what the forced target still holds,
+// would leave y at 50 and satisfy the assertions on x alone.
+//
+// LvalueSim.CompoundAssignExpressionYieldsTheTargetsDataType in
+// test_simulator_subclause_11_04_01.cpp reads the rest of the same sentence,
+// that "the data type of the value that is returned is the data type of the
+// left-hand side" -- which is what sizes this 60 at x's eight bits rather than
+// at the literal's.
+TEST(ForceReleaseSim, ForcePreventsACompoundAssignWrittenAsAnExpression) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  logic [7:0] y;\n"
+      "  initial begin\n"
+      "    force x = 8'd50;\n"
+      "    y = (x += 8'd10);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_TRUE(x->is_forced);
+  EXPECT_EQ(x->value.ToUint64(), 50u);
+
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 60u);
+}
+
 TEST(ForceReleaseSim, ForceExpressionRhs) {
   SimFixture f;
   auto* b = RunAndFindVar(
@@ -464,6 +603,39 @@ TEST(ForceReleaseSim, ForcePreventsAFunctionBodyAssign) {
   EXPECT_EQ(x->value.ToUint64(), 50u);
 }
 
+// The same compound assignment written in a function body. This is not a second
+// writer: #3500 routed the subroutine-body executor's `lhs op= rhs` to
+// ApplyCompoundAssignOp, the single read-modify-write the ordinary statement
+// executor performs, so this case and ForcePreventsACompoundAssign above now
+// reach WriteVar by one route rather than two. What it claims is that the rule
+// holds for the subroutine route as well, §10.4 putting procedural assignments
+// "within procedures such as always, initial, task, and function".
+//
+// Before #3500 this case failed for a different reason than the initial-block
+// one: the statement's right-hand side is itself the compound operator, so
+// evaluating it reached EvalCompoundAssign, which wrote x before
+// ExecFuncIdentifierAssign's own is_forced check could decline the write it was
+// handed. Either way the answer was 60 and §10.6.2 says 50.
+TEST(ForceReleaseSim, ForcePreventsACompoundAssignInAFunctionBody) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  function void poke();\n"
+      "    x += 8'd10;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    force x = 8'd50;\n"
+      "    poke();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_TRUE(x->is_forced);
+
+  EXPECT_EQ(x->value.ToUint64(), 50u);
+}
+
 // The other half of §10.6.2: the override lasts "until a release procedural
 // statement is executed on the variable", and a released variable "shall
 // maintain its current value until the next procedural assignment to the
@@ -483,6 +655,37 @@ TEST(ForceReleaseSim, ReleaseThenATaskBodyAssignResumes) {
       "    poke();\n"
       "    release x;\n"
       "    poke();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_FALSE(x->is_forced);
+
+  EXPECT_EQ(x->value.ToUint64(), 77u);
+}
+
+// The compound operator's half of the other rule in §10.6.2: the override lasts
+// "until a release procedural statement is executed on the variable", and a
+// released variable "shall maintain its current value until the next procedural
+// assignment to the variable is executed". Here that next assignment is itself
+// a compound one, so the released 50 becomes 77 rather than staying at 50.
+//
+// ForcePreventsACompoundAssign and ForcePreventsACompoundAssignInAFunctionBody
+// are the only other cases in this file that reach WriteVar, and both expect it
+// to write nothing; a WriteVar that dropped every write would satisfy them.
+// This is what says the new decline is the force's and is bounded by the
+// release -- and the first `x += 8'd10;` here, which leaves x at 50 and not 60,
+// is what makes 77 the answer rather than 87.
+TEST(ForceReleaseSim, ReleaseThenACompoundAssignResumes) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    force x = 8'd50;\n"
+      "    x += 8'd10;\n"
+      "    release x;\n"
+      "    x += 8'd27;\n"
       "  end\n"
       "endmodule\n",
       f, "x");
