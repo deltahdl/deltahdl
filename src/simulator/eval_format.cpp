@@ -694,43 +694,50 @@ static bool TryNoArgScopeSpec(char spec, FormatArgs& args, std::string& out) {
   return false;
 }
 
+// The report §21.2.1.4 makes of an operand that is a reference to a net it does
+// not admit, named by which shape the calling task found it to be. Each is
+// named for itself because what a writer does about one is not what they do
+// about the other: a vector net wants a bit-select of it, and a select that
+// still names more than one bit is already one select too wide.
+static const char* NonScalarPercentVReport(char nonscalar) {
+  if (nonscalar == 2) {
+    return "a %v format specification takes a scalar reference, and the "
+           "argument it consumed is a select naming more than one bit of a net";
+  }
+  return "a %v format specification takes a scalar reference, and the argument "
+         "it consumed is a net declared with a range";
+}
+
+// §21.2.1.4: "a corresponding scalar reference shall follow the string literal
+// in the argument list". The three-character group the clause defines is "the
+// strength of a scalar net", so it stands for one scalar and not for however
+// many bits a vector holds: a reference to a net that is not a scalar is
+// reported and nothing rendered for it. The rendering itself is precomputed by
+// the calling task, which holds the net reference, and is substituted verbatim.
+static void AppendStrengthArg(FormatArgs& args, std::string& out) {
+  char nonscalar =
+      args.vi < args.nonscalar_nets.size() ? args.nonscalar_nets[args.vi] : 0;
+  if (nonscalar != 0) {
+    if (args.ctx != nullptr) {
+      args.ctx->GetDiag().Error(args.loc, NonScalarPercentVReport(nonscalar),
+                                Subclause("21.2.1.4"));
+    }
+  } else if (args.vi < args.v_fmts.size() && !args.v_fmts[args.vi].empty()) {
+    out += args.v_fmts[args.vi];
+  }
+  ++args.vi;
+}
+
 // Specifiers whose substitution is precomputed by the calling task and held in
 // a parallel string vector indexed by the argument cursor: %v (§21.2.1.4 net
 // strength) and %p (assignment-pattern rendering). Returns true when the spec
 // was handled here; in that case the argument cursor has been advanced.
 static bool TryPrecomputedArgSpec(char spec, FormatArgs& args,
                                   std::string& out) {
-  // §21.2.1.4: %v prints the strength of a scalar net. Each %v consumes one
-  // argument; the strength string is precomputed by the calling task, which
-  // holds the net reference, and is substituted verbatim here.
+  // §21.2.1.4: %v prints the strength of a scalar net, and consumes one
+  // argument whether or not it renders anything for it.
   if (spec == 'v') {
-    // §21.2.1.4: "a corresponding scalar reference shall follow the string
-    // literal in the argument list". The three-character group the clause
-    // defines is "the strength of a scalar net", so it stands for one scalar
-    // and not for however many bits a vector holds; a reference to a net that
-    // is not a scalar is reported and nothing rendered for it. Each shape is
-    // named by what it is, the calling task having told them apart, because
-    // what a writer does about one is not what they do about the other: a
-    // vector net wants a bit-select of it and a select naming more than one
-    // bit is already one select too wide.
-    char nonscalar =
-        args.vi < args.nonscalar_nets.size() ? args.nonscalar_nets[args.vi] : 0;
-    if (nonscalar != 0) {
-      if (args.ctx != nullptr) {
-        args.ctx->GetDiag().Error(
-            args.loc,
-            nonscalar == 2
-                ? "a %v format specification takes a scalar reference, and the "
-                  "argument it consumed is a select naming more than one bit "
-                  "of a net"
-                : "a %v format specification takes a scalar reference, and the "
-                  "argument it consumed is a net declared with a range",
-            Subclause("21.2.1.4"));
-      }
-    } else if (args.vi < args.v_fmts.size() && !args.v_fmts[args.vi].empty()) {
-      out += args.v_fmts[args.vi];
-    }
-    ++args.vi;
+    AppendStrengthArg(args, out);
     return true;
   }
   if (spec == 'p' && args.vi < args.p_fmts.size() &&

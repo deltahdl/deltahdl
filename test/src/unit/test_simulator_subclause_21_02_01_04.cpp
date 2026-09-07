@@ -614,35 +614,36 @@ TEST(StrengthFormat, VectorNetUnderAnIntegerSpecifierIsNotReported) {
 // operand index". One bit of a net is the scalar whose strength the clause
 // reports, so a bit-select of a vector net is the operand form that asks about
 // it, and the three characters for the bit named are what it renders. The net
-// as a whole drives both sides here -- bit 0 a 1 and the rest a 0, all at
-// strong -- so a rendering taken from the net rather than the bit would be the
-// unknown value's StX instead.
+// as a whole drives both sides here -- bit 0 a 1 and the rest a 0, at the
+// (strong1, strong0) §10.3.4 defaults a continuous assignment to -- so a
+// rendering taken from the net rather than the bit would be the unknown value's
+// StX instead.
 TEST(StrengthFormat, BitSelectOfVectorNetRendersThatBitsStrength) {
   ExpectPercentVOutput(
       "module m;\n"
       "  wire [3:0] bus;\n"
-      "  assign (strong0, strong1) bus = 4'b0001;\n"
+      "  assign bus = 4'b0001;\n"
       "  initial #1 $display(\"[%v]\", bus[0]);\n"
       "endmodule\n",
       "[St1]");
 }
 
-// The bit is read rather than the net: two drivers each leave the other's bit
-// at z, so bit 0 is driven at strong and bit 1 at weak, and the two bit-selects
-// render different strength levels. The net reports one strength for both bits
-// -- §28.12.2 has an ambiguous signal carry a range of levels, and the 1 side
-// here runs from strong down to weak, which §21.2.1.4 renders with the two
-// decimal digits as 631 -- so a renderer answering with the net's own strength
-// gives one rendering twice and neither of these.
+// The bit is read rather than the net. §6.6.5 makes a tri0 net carry a
+// continuous 0 of pull strength wherever nothing else drives it, so a driver
+// leaving bit 1 at z puts the two bits of this net at different strength levels
+// and different values: bit 0 is the assignment's strong 1 and bit 1 the net's
+// own pull 0. The net reports one strength for both, and §21.2.1.4 renders a 0
+// side and a 1 side at unequal levels as their two decimal digits -- 56X here
+// -- so a renderer answering with the net's own strength gives that one
+// rendering twice and neither of the two below.
 TEST(StrengthFormat, BitSelectReadsTheStrengthOfTheBitItNames) {
   ExpectPercentVOutput(
       "module m;\n"
-      "  wire [1:0] bus;\n"
-      "  assign (strong0, strong1) bus = 2'bz1;\n"
-      "  assign (weak0, weak1) bus = 2'b1z;\n"
+      "  tri0 [1:0] bus;\n"
+      "  assign bus = 2'bz1;\n"
       "  initial #1 $display(\"[%v][%v]\", bus[0], bus[1]);\n"
       "endmodule\n",
-      "[St1][We1]");
+      "[St1][Pu0]");
 }
 
 // §11.5.1: "the actual bit that is accessed by an address is, in part,
@@ -654,7 +655,7 @@ TEST(StrengthFormat, BitSelectResolvesItsIndexAgainstTheDeclaredRange) {
   ExpectPercentVOutput(
       "module m;\n"
       "  wire [1:2] bus;\n"
-      "  assign (strong0, strong1) bus = 2'b01;\n"
+      "  assign bus = 2'b01;\n"
       "  initial #1 $display(\"[%v][%v]\", bus[1], bus[2]);\n"
       "endmodule\n",
       "[St0][St1]");
@@ -669,7 +670,7 @@ TEST(StrengthFormat, OutOfRangeBitSelectOfNetRendersNothing) {
   ExpectPercentVOutput(
       "module m;\n"
       "  wire [3:0] bus;\n"
-      "  assign (strong0, strong1) bus = 4'b0001;\n"
+      "  assign bus = 4'b0001;\n"
       "  initial #1 $display(\"[%v]\", bus[7]);\n"
       "endmodule\n",
       "[]");
@@ -682,7 +683,7 @@ TEST(StrengthFormat, OutOfRangeBitSelectOfNetIsNotReported) {
   ExpectPercentVNotReported(
       "module m;\n"
       "  wire [3:0] bus;\n"
-      "  assign (strong0, strong1) bus = 4'b0001;\n"
+      "  assign bus = 4'b0001;\n"
       "  initial #1 $display(\"[%v]\", bus[7]);\n"
       "endmodule\n");
 }
@@ -694,7 +695,7 @@ TEST(StrengthFormat, BitSelectOfVectorNetOperandIsNotReported) {
   ExpectPercentVNotReported(
       "module m;\n"
       "  wire [3:0] bus;\n"
-      "  assign (strong0, strong1) bus = 4'b0001;\n"
+      "  assign bus = 4'b0001;\n"
       "  initial #1 $display(\"%v\", bus[0]);\n"
       "endmodule\n");
 }
