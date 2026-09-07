@@ -411,10 +411,16 @@ TEST(ForceReleaseSim, ReleasedNetReportsItsDriversStrengthAgain) {
 
 // §10.4 puts procedural assignments "within procedures such as always, initial,
 // task, and function", so the assignment a force overrides is the same
-// statement wherever it is written. A subroutine body runs on the statement
-// executor in eval_function_body.cpp rather than the one
-// ForcePreventsBlockingAssign above exercises, and that executor consulted the
-// flag nowhere, so a task could overwrite a forced variable.
+// statement wherever it is written.
+//
+// A task called with parentheses runs its body on the ordinary statement
+// executor: SetupTaskCall claims a kTaskDecl and ExecInlineTaskCall walks the
+// body through ExecStmt, reaching the same AssignToScalarLhs that
+// ForcePreventsBlockingAssign above exercises. So this case reads the rule
+// through a task call rather than through the subroutine-body executor, and the
+// function case below is what claims that executor -- a void function called
+// with parentheses is declined by SetupTaskCall and reaches ExecFunctionBody
+// instead.
 TEST(ForceReleaseSim, ForcePreventsATaskBodyAssign) {
   SimFixture f;
   auto* x = RunAndFindVar(
@@ -435,8 +441,9 @@ TEST(ForceReleaseSim, ForcePreventsATaskBodyAssign) {
   EXPECT_EQ(x->value.ToUint64(), 50u);
 }
 
-// A function body takes the same executor by its own call path, so neither
-// stands for the other.
+// The subroutine-body executor itself, which consulted the flag nowhere, so an
+// assignment written here overwrote a forced variable where the same statement
+// in an initial block or in a task did not.
 TEST(ForceReleaseSim, ForcePreventsAFunctionBodyAssign) {
   SimFixture f;
   auto* x = RunAndFindVar(

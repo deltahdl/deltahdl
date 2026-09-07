@@ -137,10 +137,15 @@ TEST(ConcatenationSim, LhsConcatInAFunctionBodyDistributesToScalarTargets) {
   EXPECT_EQ(RunAndGet(src, "log3"), 1u);
 }
 
-// A task body takes the same executor by its own call path, so neither case
-// stands for the other. §11.6 sizes the sum by the concatenation's width, which
-// is where the carry-out lands, so this reads the width and the write together:
-// carry is the bit a sixteen-bit sum could not hold.
+// A task called with parentheses runs its body on the ordinary statement
+// executor rather than the subroutine one: SetupTaskCall claims a kTaskDecl
+// and ExecInlineTaskCall walks the body through ExecStmt, where a void
+// function of the same shape is declined there and reaches ExecFunctionBody.
+// So this is the rule read through a task call rather than a second reading of
+// the subroutine executor, and the function case above is what claims that.
+// §11.6 sizes the sum by the concatenation's width, which is where the
+// carry-out lands, so this reads the width and the write together: carry is the
+// bit a sixteen-bit sum could not hold.
 TEST(ConcatenationSim, LhsConcatInATaskBodyTakesTheCarryOut) {
   const char* src =
       "module t;\n"

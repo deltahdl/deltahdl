@@ -561,11 +561,15 @@ TEST(AssignmentExtensionTruncationSim, FunctionBodyTruncatesToTheTargetWidth) {
   EXPECT_EQ(x->value.ToUint64(), 0x3Fu);
 }
 
-// A task body takes the same executor as a function body, so it is the same
-// write, but a task is reached by its own call path and neither case stands for
-// the other. Both assignments here are subject to the rule: the six-bit local
-// discards the literal's high bits, and the output formal then takes the
-// six-bit value into its own thirty-two.
+// A task called with parentheses runs its body on the ordinary statement
+// executor rather than the subroutine one: SetupTaskCall claims a kTaskDecl
+// and ExecInlineTaskCall walks the body through ExecStmt, where a void
+// function of the same shape is declined there and reaches ExecFunctionBody.
+// So this is the rule read through a task call rather than a second reading of
+// the subroutine executor, and the function case above is what claims that.
+// Both assignments here are subject to the rule: the six-bit local discards the
+// literal's high bits, and the output formal then takes the six-bit value into
+// its own thirty-two.
 TEST(AssignmentExtensionTruncationSim, TaskBodyTruncatesToTheTargetWidth) {
   SimFixture f;
   auto* x = RunAndFindVar(
@@ -790,8 +794,12 @@ TEST(AssignmentExtensionTruncationSim,
   EXPECT_EQ(x->value.ToUint64(), 0x20u);
 }
 
-// A task body takes the same executor by its own call path, so neither form
-// stands for the other.
+// A task called with parentheses runs its body on the ordinary statement
+// executor rather than the subroutine one: SetupTaskCall claims a kTaskDecl
+// and ExecInlineTaskCall walks the body through ExecStmt, where a void
+// function of the same shape is declined there and reaches ExecFunctionBody.
+// So this is the rule read through a task call rather than a second reading of
+// the subroutine executor, and the function case above is what claims that.
 TEST(AssignmentExtensionTruncationSim,
      TaskBodyPartSelectWriteReachesOnlyTheSelectedBits) {
   SimFixture f;

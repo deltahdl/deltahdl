@@ -156,8 +156,12 @@ TEST(AdditionBitLength, FunctionBodyWiderLhsPreservesCarry) {
   EXPECT_EQ(var->value.ToUint64(), 0x10000u);
 }
 
-// A task body takes the same executor as a function body but is reached by its
-// own call path, so neither case stands for the other.
+// A task called with parentheses runs its body on the ordinary statement
+// executor rather than the subroutine one: SetupTaskCall claims a kTaskDecl
+// and ExecInlineTaskCall walks the body through ExecStmt, where a void
+// function of the same shape is declined there and reaches ExecFunctionBody.
+// So this is the rule read through a task call rather than a second reading of
+// the subroutine executor, and the function case above is what claims that.
 TEST(AdditionBitLength, TaskBodyWiderLhsPreservesCarry) {
   SimFixture f;
   auto* var = RunAndFindVar(
