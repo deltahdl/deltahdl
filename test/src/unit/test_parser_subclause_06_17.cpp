@@ -98,9 +98,9 @@ TEST(DataTypeParsing, EventDeclaredInAParallelBlock) {
   auto* fork_stmt = FirstInitialStmt(r);
   ASSERT_NE(fork_stmt, nullptr);
   ASSERT_EQ(fork_stmt->kind, StmtKind::kFork);
-  ASSERT_FALSE(fork_stmt->stmts.empty());
-  EXPECT_EQ(fork_stmt->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(fork_stmt->stmts[0]->var_decl_type.kind, DataTypeKind::kEvent);
+  ASSERT_FALSE(fork_stmt->fork_stmts.empty());
+  EXPECT_EQ(fork_stmt->fork_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(fork_stmt->fork_stmts[0]->var_decl_type.kind, DataTypeKind::kEvent);
 }
 
 // A.2.7's tf_item_declaration carries a block_item_declaration into a task
