@@ -123,6 +123,41 @@ static void AddNetDelayToDriverDelay(Arena& arena, RtlirContAssign& ca,
       MakeBinaryExpr(arena, TokenKind::kPlus, driver.decay, net_delay.decay);
 }
 
+// §29.2 makes a primitive instance's output terminal a driver on the net
+// connected to it, and §28.16 gives a net delay to "any driver on the net", so
+// an instance drives its net through the same two segments a gate or a
+// continuous assignment does. A gate reaches the walk above because
+// elaborator_gates.cpp lowers it to an RtlirContAssign; §29.8's instances stand
+// in RtlirModule::udp_insts instead and reached it through nothing, so the same
+// net was delayed for one driver and not for the other.
+//
+// §29.8 gives an instance two delay slots and no third -- "Only two delays may
+// be specified because z is not supported for UDPs" -- so the sum is written
+// into those two and the net's turn-off delay has nowhere to go, which is right
+// for a driver that never goes to z.
+static void ApplyNetDelaysToUdpInstances(
+    Arena& arena, RtlirModule* mod,
+    const std::unordered_map<std::string_view, const RtlirNet*>& delayed) {
+  for (RtlirUdpInst& inst : mod->udp_insts) {
+    const RtlirNet* net = FindDelayedNetDriven(inst.output, delayed);
+    if (net == nullptr) continue;
+    if (inst.delay == nullptr) {
+      inst.delay = net->delay_rise;
+      inst.delay_fall = net->delay_fall;
+      continue;
+    }
+    DelayTriple own =
+        ExpandDelaySpec(arena, inst.delay, inst.delay_fall, nullptr);
+    DelayTriple net_delay = ExpandDelaySpec(
+        arena, net->delay_rise, net->delay_fall, net->delay_turnoff);
+    if (net_delay.rise == nullptr) continue;
+    inst.delay =
+        MakeBinaryExpr(arena, TokenKind::kPlus, own.rise, net_delay.rise);
+    inst.delay_fall =
+        MakeBinaryExpr(arena, TokenKind::kPlus, own.fall, net_delay.fall);
+  }
+}
+
 void ApplyNetDeclDelaysToDrivers(Arena& arena, RtlirModule* mod) {
   std::unordered_map<std::string_view, const RtlirNet*> delayed =
       CollectDelayedNets(mod);
@@ -143,6 +178,7 @@ void ApplyNetDeclDelaysToDrivers(Arena& arena, RtlirModule* mod) {
     ca.delay_fall = net->delay_fall;
     ca.delay_decay = net->delay_turnoff;
   }
+  ApplyNetDelaysToUdpInstances(arena, mod, delayed);
 }
 
 }  // namespace delta

@@ -509,4 +509,47 @@ TEST(GateNetDelays, ProductionNetDelayIsAddedToAGatePrimitivesOwnDelay) {
   EXPECT_EQ(SettleTicksForNetDelayDriver("buf #3 g(w, a);"), 108u);
 }
 
+// §29.2 makes a primitive instance's output terminal a driver on the net
+// connected to it, and §28.16 gives a net delay to "any driver on the net", so
+// the construct driving the net does not change the answer. A gate reaches the
+// pass that gives a driver its net's delay because a gate is lowered to a
+// continuous assignment; §29.8's instances stand in RtlirModule::udp_insts and
+// reached it through nothing, so the same net was delayed for one driver and
+// undelayed for the other.
+//
+// The primitive is declared beside the module because a UDP is a top-level
+// declaration, so these two cases build their own source rather than sharing
+// the helper above.
+static uint64_t SettleTicksForUdpDriver(const std::string& inst) {
+  return SettleTicks(
+      "primitive p (out, in);\n"
+      "  output out;\n"
+      "  input in;\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  reg a;\n"
+      "  wire #5 w;\n"
+      "  " +
+      inst +
+      "\n"
+      "  initial begin a = 1'b0; #100 a = 1'b1; end\n"
+      "endmodule\n");
+}
+
+TEST(GateNetDelays, ProductionNetDelayDelaysAUdpInstanceDriver) {
+  // The instance carries no delay of its own, so the five ticks are the net's
+  // alone and this case rests on no rule about how two delays combine.
+  EXPECT_EQ(SettleTicksForUdpDriver("p u (w, a);"), 105u);
+}
+
+// §29.8 gives an instance a delay of its own, which is the primitive's
+// propagation delay and not the net's, so the two are added as they are for
+// every other driver. The instance's 3 and the net's 5 are neither a multiple
+// of the other and their sum is neither, so a run keeping one alone is told
+// from a run adding them.
+TEST(GateNetDelays, ProductionNetDelayIsAddedToAUdpInstancesOwnDelay) {
+  EXPECT_EQ(SettleTicksForUdpDriver("p #3 u (w, a);"), 108u);
+}
+
 }  // namespace
