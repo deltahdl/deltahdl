@@ -240,6 +240,19 @@ static bool TryReuseExistingDeclVar(const Stmt* stmt,
   return false;
 }
 
+// §6.8's declared variable, as the declaration describes it rather than as the
+// cell happens to have been created: the cell itself, the width the type asked
+// for -- 0 where nothing could size it, which is not the carrier width
+// CreateDeclVariable may have created the cell at -- and whether the type is
+// one of the real family, whose initializer §6.12.1 converts rather than
+// resizes. The three travel together because the initializer needs all of them
+// to be assigned into the declared object rather than put in its place.
+struct DeclaredObject {
+  Variable* var;
+  uint32_t declared_width;
+  bool is_real;
+};
+
 // Applies 4-state coercion and the optional initializer to a freshly created
 // variable, then records it as a static-func var when applicable.
 //
@@ -274,17 +287,17 @@ static bool TryReuseExistingDeclVar(const Stmt* stmt,
 // initializer is assigned to, and `int a[3] = '{1,2,3}` evaluates to the
 // ninety-six bits of a concatenation, which one element's width has nothing to
 // say about.
-static void InitializeDeclVariable(const Stmt* stmt, Variable* var,
-                                   uint32_t declared_width, bool is_real,
+static void InitializeDeclVariable(const Stmt* stmt, const DeclaredObject& obj,
                                    std::string_view func_name, SimContext& ctx,
                                    Arena& arena) {
+  Variable* var = obj.var;
   var->is_4state = Is4stateType(stmt->var_decl_type.kind);
   if (!var->is_4state) CoerceTo2State(var->value);
   if (stmt->var_init) {
     Logic4Vec val = EvalExpr(stmt->var_init, ctx, arena);
     if (stmt->var_unpacked_dims.empty()) {
-      uint32_t target = is_real ? var->value.width : declared_width;
-      val = ConvertRealForKnownLhs(val, is_real, target, arena);
+      uint32_t target = obj.is_real ? var->value.width : obj.declared_width;
+      val = ConvertRealForKnownLhs(val, obj.is_real, target, arena);
     }
     var->value = val;
     if (!var->is_4state) CoerceTo2State(var->value);
@@ -319,7 +332,7 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   RecordVariableEnumType(stmt->var_name, stmt->var_decl_type, ctx);
   auto* var = ctx.FindVariable(stmt->var_name);
   if (var) {
-    InitializeDeclVariable(stmt, var, width, is_real, func_name, ctx, arena);
+    InitializeDeclVariable(stmt, {var, width, is_real}, func_name, ctx, arena);
   }
   return StmtResult::kDone;
 }
