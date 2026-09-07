@@ -51,6 +51,35 @@ struct IncDecResult {
 // names were all incremented by nothing, with nothing reported; a member access
 // had no arm at all. EvalCompoundAssign below is the same read-modify-write
 // over the same targets and asks the same two writers.
+// Writes an increment's or decrement's new value to whichever of §10.4's
+// variable lvalues the operand names. §11.4.2 states these operators as
+// blocking assignments, so the target forms are the ones a blocking assignment
+// admits and the writers are the ones it uses. new_val is taken by reference
+// because §6.11.2's coercion is applied to it here and the operator yields it.
+static void WriteIncDecTarget(const Expr* lhs, Logic4Vec& new_val,
+                              SimContext& ctx, Arena& arena) {
+  if (lhs->kind == ExprKind::kSelect) {
+    TrySelectBlockingAssign(lhs, new_val, ctx, arena);
+    return;
+  }
+  if (lhs->kind == ExprKind::kMemberAccess) {
+    WriteStructField(lhs, new_val, ctx);
+    return;
+  }
+  if (lhs->kind != ExprKind::kIdentifier) return;
+  auto* var = ctx.FindVariable(lhs->text);
+  if (var == nullptr) return;
+  // §6.11.2 gives a 2-state type no x and no z, so an unknown result is coerced
+  // before it is stored, as WriteVar and EvalCompoundAssign coerce theirs.
+  // Nothing had to do this while the arithmetic could only produce known bits.
+  if (!var->is_4state) CoerceTo2State(new_val);
+  // §10.6.2: a force "shall override a procedural assignment ... until a
+  // release procedural statement is executed on the variable". Only the write
+  // is overridden: the operator still yields the value it computed, which is
+  // what the enclosing expression reads.
+  if (!var->is_forced) var->value = new_val;
+}
+
 static IncDecResult EvalIncDec(const Expr* expr, SimContext& ctx,
                                Arena& arena) {
   // §11.4.1's exception, inherited: the allocation, the read and the write each
@@ -91,26 +120,7 @@ static IncDecResult EvalIncDec(const Expr* expr, SimContext& ctx,
                                                         : TokenKind::kMinus,
                      old_val, one, arena);
   }
-  if (expr->lhs->kind == ExprKind::kIdentifier) {
-    auto* var = ctx.FindVariable(expr->lhs->text);
-    if (var) {
-      // §6.11.2 gives a 2-state type no x and no z, so an unknown result is
-      // coerced before it is stored, as WriteVar and EvalCompoundAssign coerce
-      // theirs. Nothing had to do this while the arithmetic above could only
-      // produce known bits.
-      if (!var->is_4state) CoerceTo2State(new_val);
-      // §10.6.2: a force "shall override a procedural assignment ... until a
-      // release procedural statement is executed on the variable", and §11.4.2
-      // states these operators as blocking assignments, so the write is the one
-      // the force overrides. Only the write: the operator still yields the
-      // value it computed, which is what the enclosing expression reads.
-      if (!var->is_forced) var->value = new_val;
-    }
-  } else if (expr->lhs->kind == ExprKind::kSelect) {
-    TrySelectBlockingAssign(expr->lhs, new_val, ctx, arena);
-  } else if (expr->lhs->kind == ExprKind::kMemberAccess) {
-    WriteStructField(expr->lhs, new_val, ctx);
-  }
+  WriteIncDecTarget(expr->lhs, new_val, ctx, arena);
   ClearSelectIndices(expr->lhs, ctx);
   return {old_val, new_val};
 }
