@@ -4,6 +4,7 @@
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 #include "helpers_temp_file.h"
+#include "simulator/evaluation.h"
 
 using namespace delta;
 
@@ -17,6 +18,24 @@ namespace {
 // produced elsewhere -- a §21.3.1 descriptor, a declared destination, a
 // $timeformat configuration -- so each test builds those from real source
 // syntax and drives the full pipeline.
+
+// Runs one $sscanf of a three-character strength sequence into a scalar reg and
+// displays what it returned and what it assigned, so the cases below differ
+// only in the sequence they are given to read.
+std::string ScanStrengthInto(const std::string& seq, SysTaskFixture& f) {
+  return RunCapture(
+      "module t;\n"
+      "  reg r;\n"
+      "  integer n;\n"
+      "  initial begin\n"
+      "    n = $sscanf(\"" +
+          seq +
+          "\", \"%v\", r);\n"
+          "    $display(\"n=%0d r=%b\", n, r);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+}
 
 // C1 + C15: $fscanf reads formatted fields from the file specified by fd and
 // returns the number of successfully matched and assigned items; when the
@@ -827,6 +846,45 @@ TEST(ReadingFormattedData, IntegerCodeOnAggregateNames21_3_4_3) {
   EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
                               "may not read into unpacked aggregate", 6,
                               "21.3.4.3"));
+}
+
+// C11 (Table 21-7, v row): Table 21-3 gives L "for a logic 0 or high-impedance
+// value", so L is one of the logic values a %v field may carry and the reader
+// takes it. What it assigns is the "4-value equivalent" the same row asks for:
+// L names two of the four values without saying which of them holds, and x is
+// the value an integral variable has for that.
+TEST(ReadingFormattedData, StrengthFieldReadsAmbiguousZeroOrHighZ) {
+  SysTaskFixture f;
+  std::string out = ScanStrengthInto("StL", f);
+  EXPECT_NE(out.find("n=1 r=x"), std::string::npos) << out;
+}
+
+// C11 (Table 21-7, v row): H is Table 21-3's "logic 1 or high-impedance value",
+// the other ambiguous logic value, and reaches the reader as a different
+// character from the L above. Its 4-value equivalent is x for the same reason.
+TEST(ReadingFormattedData, StrengthFieldReadsAmbiguousOneOrHighZ) {
+  SysTaskFixture f;
+  std::string out = ScanStrengthInto("PuH", f);
+  EXPECT_NE(out.find("n=1 r=x"), std::string::npos) << out;
+}
+
+// The claim the two halves of the strength format are for: a sequence this tool
+// writes with %v is one it reads back with %v. FormatStrength is what
+// $display's %v renders a scalar net's strength through (§21.2.1.4), so the
+// sequence read here is the writer's own output for a 0 side whose strength
+// range reaches down to high impedance rather than a literal that could drift
+// from it, and the value scanned back is the 4-value equivalent of the logic
+// value that output carries. Neither half's own cases state this: they are in
+// different files and each names the three-character sequence itself.
+TEST(ReadingFormattedData, StrengthFieldReadsBackWhatPercentVWrote) {
+  SysTaskFixture f;
+  NetStrength ns;
+  ns.s0_hi = Strength::kStrong;
+  ns.s0_lo = Strength::kHighz;
+  ns.s1_hi = Strength::kHighz;
+  ns.s1_lo = Strength::kHighz;
+  std::string out = ScanStrengthInto(FormatStrength(ns), f);
+  EXPECT_NE(out.find("n=1 r=x"), std::string::npos) << out;
 }
 
 }  // namespace

@@ -305,6 +305,16 @@ ScanFieldResult ScanFourStateField(ScanCursor cur, Variable* var,
 // value, e.g. "St1" or "HiZ"). The logic value -- the third character -- is
 // converted to its 4-value equivalent and assigned; the strength letters are
 // consumed but carry no storable information for a variable.
+// Table 21-3 logic values whose 4-value equivalent is x. X is the unknown value
+// itself. L is "a logic 0 or high-impedance value" and H "a logic 1 or
+// high-impedance value", so each names two of the four values without saying
+// which of them holds, and x is the value an integral variable has for that.
+// Both cases are taken, as they are for the other letters of the format, though
+// FormatStrength writes these two only in upper case.
+bool IsScanStrengthUnknownValue(char c) {
+  return c == 'x' || c == 'X' || c == 'l' || c == 'L' || c == 'h' || c == 'H';
+}
+
 ScanFieldResult ScanStrengthField(ScanCursor cur, Variable* var, Arena& arena) {
   if (cur.pos + 3 > cur.input.size()) return ScanFieldResult::kStop;
   for (int k = 0; k < 3; ++k) {
@@ -314,7 +324,7 @@ ScanFieldResult ScanStrengthField(ScanCursor cur, Variable* var, Arena& arena) {
   bool a = false, b = false;
   if (vc == '1') {
     a = true;
-  } else if (vc == 'x' || vc == 'X') {
+  } else if (IsScanStrengthUnknownValue(vc)) {
     a = b = true;
   } else if (vc == 'z' || vc == 'Z') {
     b = true;
