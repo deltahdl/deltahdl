@@ -15,9 +15,10 @@ class SimContext;
 class Arena;
 enum class DataTypeKind : uint8_t;
 
-// Internal helpers shared between statement_assign_core.cpp,
-// statement_assign_stream.cpp, and statement_assign_decl.cpp. Each symbol is
-// defined in exactly one of those translation units.
+// Internal helpers shared across the statement_assign_*.cpp family and the
+// handful of other translation units that reach into it. Each symbol is
+// defined in exactly one translation unit, which that symbol's own comment
+// names.
 
 // Defined in statement_assign_core.cpp.
 void CoerceTo2State(Logic4Vec& v);
@@ -97,7 +98,7 @@ uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx);
 Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena);
 
-// Defined in statement_assign_core.cpp; also used by the §11.4.2 nonblocking
+// Defined in statement_assign_stream.cpp; also used by the §11.4.2 nonblocking
 // path in statement_assign_nonblocking.cpp. §11.4.14: left-align a streaming
 // concatenation source in a wider fixed-size target.
 Logic4Vec ApplyStreamPackToTargetWidening(const Stmt* stmt, Logic4Vec rhs_val,
@@ -106,6 +107,19 @@ Logic4Vec ApplyStreamPackToTargetWidening(const Stmt* stmt, Logic4Vec rhs_val,
 // Defined in statement_assign_stream.cpp.
 void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
                               SimContext& ctx, Arena& arena);
+
+// Defined in statement_assign_stream.cpp; also used by the blocking-assignment
+// dispatch in statement_assign_core.cpp, which offers a statement to it before
+// falling through to the generic write. §11.4.14: a streaming concatenation
+// assigned to a dynamically sized target left-aligns in that target, so the
+// queue is resized to the smallest number of elements at least as wide as the
+// stream and the stream is padded with zero bits on the right before being
+// carved into them. Returns false, having written nothing, when the right-hand
+// side is not a streaming concatenation, the left-hand side does not name a
+// queue, or the queue's element width is unknown; the caller then goes on to
+// its other forms.
+bool TryStreamingConcatToQueueTarget(const Stmt* stmt, SimContext& ctx,
+                                     Arena& arena);
 
 // Geometry of an array/queue target addressed by a `with` clause (§11.4.14.3):
 // `size` is the element count and `lo` is the declared low index.
@@ -127,12 +141,14 @@ struct StreamSliceRange {
 bool ResolveWithRange(const Expr* with_expr, SimContext& ctx, Arena& arena,
                       ArrayGeom geom, StreamSliceRange& out_range);
 
-// Assignment-pattern key helpers (defined in statement_assign.cpp; also used by
-// lowerer_var.cpp). IsTypeKeyword recognizes a type-name pattern key;
-// TypeKeyMatchesKind tests whether such a key selects the given element kind.
+// Assignment-pattern key helpers, defined in statement_assign_pattern.cpp;
+// also used by lowerer_var.cpp. IsTypeKeyword recognizes a type-name pattern
+// key; TypeKeyMatchesKind tests whether such a key selects the given element
+// kind.
 bool IsTypeKeyword(std::string_view key);
 bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind);
 
+// Defined in statement_assign_pattern.cpp.
 // §10.9: the index an array pattern key names. Syntax 10-5 writes such a key as
 // a constant expression -- `array_pattern_key ::= constant_expression` -- so
 // the index is what the whole expression evaluates to, not what the text of its

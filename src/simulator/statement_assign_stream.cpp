@@ -717,4 +717,138 @@ void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   EnforceQueueTargetBounds(lhs, ctx);
 }
 
+// §11.4.14: extract a slice of `total_w` bits from `src` starting at bit
+// `start`, returning a `width`-bit Logic4Vec. Helper shared by the
+// pack-to-queue path below.
+static Logic4Vec ExtractWidenedSlice(const Logic4Vec& src, uint32_t start,
+                                     uint32_t width, Arena& arena) {
+  auto out = MakeLogic4Vec(arena, width);
+  for (uint32_t b = 0; b < width; ++b) {
+    uint32_t sbit = start + b;
+    uint32_t sw = sbit / 64, sb = sbit % 64;
+    uint32_t dw = b / 64, db = b % 64;
+    if (sw < src.nwords) {
+      if ((src.words[sw].aval >> sb) & 1ull)
+        out.words[dw].aval |= uint64_t{1} << db;
+      if ((src.words[sw].bval >> sb) & 1ull)
+        out.words[dw].bval |= uint64_t{1} << db;
+    }
+  }
+  return out;
+}
+
+// §11.4.14: handle a streaming_concatenation feeding a dynamically sized
+// target. Resize the target to the smallest number of elements that is at
+// least as wide as the stream; if the resized total exceeds the stream width,
+// pad the stream with zero bits on the right before unpacking.
+// Left-shift `stream` (stream_w bits) into a `total_w`-bit vector, padding the
+// LSB side with zero bits. When no padding is needed the input is returned.
+static Logic4Vec RightPadStreamToWidth(const Logic4Vec& stream,
+                                       uint32_t stream_w, uint32_t total_w,
+                                       Arena& arena) {
+  if (total_w <= stream_w) return stream;
+  auto widened = MakeLogic4Vec(arena, total_w);
+  uint32_t shift = total_w - stream_w;
+  for (uint32_t b = 0; b < stream_w; ++b) {
+    uint32_t sw = b / 64, sb = b % 64;
+    uint32_t dst_bit = shift + b;
+    uint32_t dw = dst_bit / 64, db = dst_bit % 64;
+    if (sw < stream.nwords) {
+      if ((stream.words[sw].aval >> sb) & 1ull)
+        widened.words[dw].aval |= uint64_t{1} << db;
+      if ((stream.words[sw].bval >> sb) & 1ull)
+        widened.words[dw].bval |= uint64_t{1} << db;
+    }
+  }
+  return widened;
+}
+
+// §11.4.14: geometry of a widened bit-stream that is unpacked MSB-first into a
+// queue: the padded stream bits plus the element count, total width, and
+// element width describing how to carve it into successive elements.
+struct WidenedStreamLayout {
+  const Logic4Vec& widened;
+  uint32_t n_elems;
+  uint32_t total_w;
+  uint32_t elem_w;
+};
+
+// Repopulate `queue` from the widened stream described by `layout`, carving out
+// `n_elems` element-width slices (MSB-first into successive elements).
+static void PopulateQueueFromWidenedStream(QueueObject* queue,
+                                           const WidenedStreamLayout& layout,
+                                           Arena& arena) {
+  queue->elements.clear();
+  queue->elements.reserve(layout.n_elems);
+  for (uint32_t i = 0; i < layout.n_elems; ++i) {
+    uint32_t src_start = layout.total_w - (i + 1) * layout.elem_w;
+    queue->elements.push_back(
+        ExtractWidenedSlice(layout.widened, src_start, layout.elem_w, arena));
+  }
+  queue->AssignFreshIds();
+  ++queue->generation;
+}
+
+bool TryStreamingConcatToQueueTarget(const Stmt* stmt, SimContext& ctx,
+                                     Arena& arena) {
+  if (!stmt->rhs || stmt->rhs->kind != ExprKind::kStreamingConcat) return false;
+  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) return false;
+  auto* queue = ctx.FindQueue(stmt->lhs->text);
+  if (!queue) return false;
+
+  auto stream = EvalExpr(stmt->rhs, ctx, arena);
+  uint32_t stream_w = stream.width;
+  uint32_t elem_w = queue->elem_width;
+  if (elem_w == 0) return false;
+
+  if (stream_w == 0) {
+    queue->elements.clear();
+    queue->element_ids.clear();
+    ++queue->generation;
+    return true;
+  }
+
+  uint32_t n_elems = (stream_w + elem_w - 1) / elem_w;
+  uint32_t total_w = n_elems * elem_w;
+
+  Logic4Vec widened = RightPadStreamToWidth(stream, stream_w, total_w, arena);
+  PopulateQueueFromWidenedStream(
+      queue, WidenedStreamLayout{widened, n_elems, total_w, elem_w}, arena);
+  EnforceQueueBound(queue, "streaming assignment", stmt->rhs->range.start, ctx);
+  return true;
+}
+
+// §11.4.14: when a streaming_concatenation is the source of an assignment and
+// the target is a data object of bit-stream type, the stream is left-aligned
+// in the target. A fixed-size target wider than the stream is filled with
+// zero bits on the right (LSB side); a fixed-size target narrower than the
+// stream is an error.
+Logic4Vec ApplyStreamPackToTargetWidening(const Stmt* stmt, Logic4Vec rhs_val,
+                                          SimContext& ctx, Arena& arena) {
+  if (!stmt->rhs || stmt->rhs->kind != ExprKind::kStreamingConcat) {
+    return rhs_val;
+  }
+  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) {
+    return rhs_val;
+  }
+  if (ctx.FindArrayInfo(stmt->lhs->text) || ctx.FindQueue(stmt->lhs->text) ||
+      ctx.FindAssocArray(stmt->lhs->text)) {
+    return rhs_val;
+  }
+  auto* var = ResolveLhsVariable(stmt->lhs, ctx);
+  if (!var || var->value.width == 0) return rhs_val;
+  uint32_t target_width = var->value.width;
+  uint32_t stream_width = rhs_val.width;
+  if (target_width == stream_width) return rhs_val;
+  if (target_width < stream_width) {
+    ctx.GetDiag().Error(
+        stmt->lhs->range.start,
+        "streaming concatenation source is wider than the fixed-size target",
+        Subclause("11.4.14"));
+    return rhs_val;
+  }
+
+  return RightPadStreamToWidth(rhs_val, stream_width, target_width, arena);
+}
+
 }  // namespace delta
