@@ -69,6 +69,12 @@ struct ClassTypeInfo {
     // empty typedef map, so a name answers 2-state whatever it stands for.
     // Defaults to false so an entry that never set it is written unchanged.
     bool width_is_declared = false;
+    // §6.12.1 converts a value crossing the real/integer boundary rather than
+    // reinterpreting its bits, so a write to a real property has to convert
+    // where a write to an integral one resizes. Recorded because the two are
+    // told apart by the declared type and the stored Logic4Vec does not carry
+    // it.
+    bool is_real = false;
   };
   std::vector<PropertyInfo> properties;
 

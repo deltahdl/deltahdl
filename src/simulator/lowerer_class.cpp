@@ -84,6 +84,13 @@ static void InitStaticProperties(ClassTypeInfo* info, SimContext& ctx,
   }
 }
 
+// §6.12: the real family, whose members §6.12.1 converts a value into rather
+// than reinterpreting its bits.
+static bool IsRealKind(DataTypeKind kind) {
+  return kind == DataTypeKind::kReal || kind == DataTypeKind::kShortreal ||
+         kind == DataTypeKind::kRealtime;
+}
+
 static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls) {
   for (auto* member : cls->members) {
     if (member->kind == ClassMemberKind::kProperty) {
@@ -93,7 +100,8 @@ static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls) {
       info->properties.push_back({member->name, w, member->is_static,
                                   member->is_local, member->is_protected,
                                   member->is_const, member->init_expr,
-                                  Is4stateType(member->data_type, {}), sized});
+                                  Is4stateType(member->data_type, {}), sized,
+                                  IsRealKind(member->data_type.kind)});
     } else if (member->kind == ClassMemberKind::kMethod && member->method) {
       std::string name(member->method->name);
       info->methods[name] = member->method;
@@ -172,7 +180,8 @@ static void CollectNestedClassMembers(ClassTypeInfo* nested_info,
       if (w == 0) w = 32;
       nested_info->properties.push_back(
           {m->name, w, m->is_static, m->is_local, m->is_protected, m->is_const,
-           m->init_expr, Is4stateType(m->data_type, {}), sized});
+           m->init_expr, Is4stateType(m->data_type, {}), sized,
+           IsRealKind(m->data_type.kind)});
     } else if (m->kind == ClassMemberKind::kMethod && m->method) {
       nested_info->methods[std::string(m->method->name)] = m->method;
     }

@@ -322,4 +322,31 @@ TEST(ObjectPropertySim, InheritedPropertyTruncatesAValueWrittenFromAMethod) {
             15u);
 }
 
+// §6.12.1 converts a value crossing the real/integer boundary rather than
+// reinterpreting its bits, so a real property assigned an integer holds the
+// double. RealPropertyValueRoundTrips above writes the property from outside
+// the class, which is a different writer; this one writes it from a method,
+// where the §10.7 resize a property write now performs would otherwise store
+// the integer's bit pattern and drop the flag the read needs -- 5 read back as
+// a double that way is 2.5e-323 rather than 5.0.
+TEST(ObjectPropertySim, RealPropertyConvertsAnIntegerWrittenFromAMethod) {
+  EXPECT_DOUBLE_EQ(RunAndGetReal("class C;\n"
+                                 "  real r;\n"
+                                 "  task set();\n"
+                                 "    r = 5;\n"
+                                 "  endtask\n"
+                                 "endclass\n"
+                                 "module t;\n"
+                                 "  real out;\n"
+                                 "  initial begin\n"
+                                 "    C c;\n"
+                                 "    c = new;\n"
+                                 "    c.set();\n"
+                                 "    out = c.r;\n"
+                                 "  end\n"
+                                 "endmodule\n",
+                                 "out"),
+                   5.0);
+}
+
 }  // namespace

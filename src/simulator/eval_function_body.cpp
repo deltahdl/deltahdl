@@ -111,8 +111,13 @@ static void WriteSelfProperty(ClassObject* self, std::string_view name,
   Logic4Vec stored = val;
   const auto* prop = FindPropertyInfo(enclosing, name);
   if (prop != nullptr && prop->width_is_declared) {
-    stored = ResizeToWidth(stored, prop->width, arena);
-    if (!prop->is_4state) CoerceTo2State(stored);
+    // ConvertRealForKnownLhs rather than ResizeToWidth, so that §6.12.1's
+    // conversion happens where the value and the property differ in real-ness:
+    // `real r; ... r = 5;` has to hold the double 5.0, and resizing the
+    // integer's bits to 64 would store its bit pattern and drop the real flag
+    // the read needs. It resizes every value that does not cross the boundary.
+    stored = ConvertRealForKnownLhs(stored, prop->is_real, prop->width, arena);
+    if (!prop->is_4state && !prop->is_real) CoerceTo2State(stored);
   }
   if (enclosing) {
     self->SetPropertyForType(name, enclosing, stored);
