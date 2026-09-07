@@ -1,3 +1,4 @@
+#include <string>
 #include <string_view>
 #include <unordered_map>
 
@@ -35,9 +36,26 @@ static std::unordered_map<std::string_view, const RtlirNet*> CollectDelayedNets(
 // them. A left-hand side naming no single signal reaches no entry, because
 // LhsSignalName answers an empty name for it and no net is declared under one.
 static const RtlirNet* FindDelayedNetDriven(
-    const Expr* lhs,
+    const Expr* lhs, const GenBlockPrefixes& prefixes,
     const std::unordered_map<std::string_view, const RtlirNet*>& delayed) {
-  auto it = delayed.find(LhsSignalName(lhs));
+  std::string_view base = LhsSignalName(lhs);
+  if (base.empty()) return nullptr;
+  // §23.9: "If it is declared locally, then the local item shall be used; if
+  // not, the search shall continue upward until an item by that name is found
+  // or until a module, interface, program, or checker boundary is encountered."
+  // A net declared inside a generate block is named under the block's path by
+  // Elaborator::ScopedName while a driver keeps the bare name the source wrote,
+  // so the two are compared the way SimContext::FindInGenerateBlock compares
+  // them at run time: the driver's own blocks innermost first, then the
+  // enclosing scope. Matching the bare name alone reached a net declared in a
+  // block through nothing, and gave a driver inside a block the delay of a
+  // module-level net of the same name.
+  for (auto it = prefixes.rbegin(); it != prefixes.rend(); ++it) {
+    std::string scoped = std::string(*it) + std::string(base);
+    auto found = delayed.find(scoped);
+    if (found != delayed.end()) return found->second;
+  }
+  auto it = delayed.find(base);
   if (it == delayed.end()) return nullptr;
   return it->second;
 }
@@ -139,7 +157,8 @@ static void ApplyNetDelaysToUdpInstances(
     Arena& arena, RtlirModule* mod,
     const std::unordered_map<std::string_view, const RtlirNet*>& delayed) {
   for (RtlirUdpInst& inst : mod->udp_insts) {
-    const RtlirNet* net = FindDelayedNetDriven(inst.output, delayed);
+    const RtlirNet* net =
+        FindDelayedNetDriven(inst.output, inst.gen_block_prefixes, delayed);
     if (net == nullptr) continue;
     if (inst.delay == nullptr) {
       inst.delay = net->delay_rise;
@@ -162,7 +181,8 @@ void ApplyNetDeclDelaysToDrivers(Arena& arena, RtlirModule* mod) {
   std::unordered_map<std::string_view, const RtlirNet*> delayed =
       CollectDelayedNets(mod);
   for (RtlirContAssign& ca : mod->assigns) {
-    const RtlirNet* net = FindDelayedNetDriven(ca.lhs, delayed);
+    const RtlirNet* net =
+        FindDelayedNetDriven(ca.lhs, ca.gen_block_prefixes, delayed);
     if (net == nullptr) continue;
     // A driver that wrote a delay of its own has the net's added to it, which
     // is what §10.3.3 states of a net delay. A driver that wrote none takes the

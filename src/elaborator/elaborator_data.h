@@ -168,6 +168,10 @@ class ElaboratorData {
   std::unordered_set<std::string_view> const_var_names_;
 
   std::unordered_map<std::string_view, DataTypeKind> forward_typedef_kinds_;
+  // §28.16: the modules ApplyNetDelaysInModuleTree has already given their net
+  // delays to, keyed on the module rather than on its name so that two
+  // RtlirModule objects sharing a name each get the pass once.
+  std::unordered_set<RtlirModule*> net_delay_modules_;
   std::unordered_set<std::string_view> class_names_;
   std::unordered_set<std::string_view> parameterized_class_names_;
   std::unordered_set<std::string_view> class_var_names_;

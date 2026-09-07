@@ -726,6 +726,11 @@ class Elaborator : public ElaboratorClassRules {
   // the methods of each class declared outside every design element.
   void ValidatePerDeclarationRulesInUnitScopes();
 
+  // §28.16: give every module of the tree rooted here the net delays its
+  // declarations carry, after the generate blocks have been elaborated into
+  // their enclosing modules and the item lists are complete.
+  void ApplyNetDelaysInModuleTree(RtlirModule* mod);
+
   void ValidateConstantFunctionCalls(const ModuleDecl* decl);
 
   // §7.7: a dynamic array or queue may not be passed to a DPI import formal

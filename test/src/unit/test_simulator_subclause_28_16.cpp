@@ -552,4 +552,72 @@ TEST(GateNetDelays, ProductionNetDelayIsAddedToAUdpInstancesOwnDelay) {
   EXPECT_EQ(SettleTicksForUdpDriver("p #3 u (w, a);"), 108u);
 }
 
+// §27.5 puts the items of a selected generate block into the enclosing module,
+// so a driver written in one is a driver on the net exactly as a driver written
+// beside it is, and §28.16 makes no distinction between them. The pass that
+// gives a driver its net's delay ran while a module's own items were being
+// elaborated, and ProcessPendingGenerate appends a block's items after that, so
+// a driver in a block reached it through nothing.
+TEST(GateNetDelays, ProductionNetDelayReachesADriverInAGenerateBlock) {
+  EXPECT_EQ(SettleTicks("module m;\n"
+                        "  reg a;\n"
+                        "  wire #5 w;\n"
+                        "  if (1) begin : b\n"
+                        "    assign w = a;\n"
+                        "  end\n"
+                        "  initial begin a = 1'b0; #100 a = 1'b1; end\n"
+                        "endmodule\n"),
+            105u);
+}
+
+// The net declared in the block as well as the driver. Elaborator::ScopedName
+// names such a net under the block's path while the driver keeps the bare name
+// the source wrote, so matching the two by the bare name reached this net
+// through nothing whatever order the passes ran in.
+TEST(GateNetDelays, ProductionNetDelayReachesADriverInTheBlockThatDeclaredIt) {
+  EXPECT_EQ(SettleTicks("module m;\n"
+                        "  reg a;\n"
+                        "  if (1) begin : b\n"
+                        "    wire #5 w;\n"
+                        "    assign w = a;\n"
+                        "  end\n"
+                        "  initial begin a = 1'b0; #100 a = 1'b1; end\n"
+                        "endmodule\n"),
+            105u);
+}
+
+// §23.9 takes the innermost declaration of a name, so a driver inside the block
+// takes the block's net and its delay of 7 rather than the module-level net's
+// 5. Two nets of one name, and the delays differ, so a match that crossed the
+// scope is told from one that does not.
+TEST(GateNetDelays, ProductionNetDelayTakesTheInnermostDeclarationOfTheName) {
+  EXPECT_EQ(SettleTicks("module m;\n"
+                        "  reg a;\n"
+                        "  wire #5 w;\n"
+                        "  if (1) begin : b\n"
+                        "    wire #7 w;\n"
+                        "    assign w = a;\n"
+                        "  end\n"
+                        "  initial begin a = 1'b0; #100 a = 1'b1; end\n"
+                        "endmodule\n"),
+            107u);
+}
+
+// §27.5 leaves an unselected generate block unelaborated, so nothing of it
+// reaches the module and the module-level net keeps the delay it was declared
+// with. Without this, a pass that walked a block whatever its condition would
+// give the driver the unselected block's net.
+TEST(GateNetDelays, ProductionNetDelayIgnoresAnUnselectedGenerateBlock) {
+  EXPECT_EQ(SettleTicks("module m;\n"
+                        "  reg a;\n"
+                        "  wire #5 w;\n"
+                        "  if (0) begin : b\n"
+                        "    wire #7 w;\n"
+                        "  end\n"
+                        "  assign w = a;\n"
+                        "  initial begin a = 1'b0; #100 a = 1'b1; end\n"
+                        "endmodule\n"),
+            105u);
+}
+
 }  // namespace
