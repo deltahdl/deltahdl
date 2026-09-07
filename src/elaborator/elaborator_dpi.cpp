@@ -209,6 +209,29 @@ TypedefMap DpiScopeTypedefs(const std::vector<ModuleItem*>& items,
   return typedefs;
 }
 
+// §35.5.4, footnote 27 of Syntax 35-1: "Formals of dpi_function_proto and
+// dpi_task_proto cannot use pass by reference mode and class types cannot be
+// passed at all." A class name is in neither the built-in type keywords nor the
+// typedef table, so a formal declared with one resolves to nothing and the
+// permitted-type checks below pass over it along with every other name they
+// cannot see -- which is right for a name the elaborator does not know and
+// wrong for this one. The class names are collected so the prohibition can be
+// told from that silence.
+using DpiClassNames = std::unordered_set<std::string_view>;
+
+DpiClassNames CollectDpiClassNames(
+    const std::vector<const std::vector<ModuleItem*>*>& scopes) {
+  DpiClassNames names;
+  for (const auto* items : scopes) {
+    for (const auto* item : *items) {
+      if (item != nullptr && item->kind == ModuleItemKind::kClassDecl) {
+        names.insert(item->name);
+      }
+    }
+  }
+  return names;
+}
+
 // Follow a type name to the type it stands for, so that the permitted set
 // §35.5.5 gives a function result and the one §35.5.6 gives a formal argument
 // are applied to that type rather than to the name. A built-in keyword wins
@@ -232,6 +255,19 @@ DataType ResolveDpiTypeName(const DataType& type, const TypedefMap& typedefs) {
   return dt;
 }
 
+// Whether `type`, followed through the scope's typedefs, names a class.
+// Footnote 27 admits no indirection through which a class may be passed, so a
+// `typedef C my_c_t;` used as a formal is the same prohibition as C written
+// directly. ResolveDpiTypeName leaves an unresolved chain at the last name it
+// reached, which is the name to ask about.
+bool NamesAClass(const DataType& type, const TypedefMap& typedefs,
+                 const DpiClassNames& classes) {
+  if (type.kind != DataTypeKind::kNamed) return false;
+  DataType resolved = ResolveDpiTypeName(type, typedefs);
+  if (resolved.kind != DataTypeKind::kNamed) return false;
+  return classes.count(resolved.type_name) != 0;
+}
+
 // §35.5.6: an imported subroutine's formal argument written as a typedef name
 // is permitted only where the type behind the name is. The parser holds every
 // such formal as a kNamed type and has no typedef table to look it up in, so
@@ -248,9 +284,21 @@ DataType ResolveDpiTypeName(const DataType& type, const TypedefMap& typedefs) {
 // wrote, which is what a reader has in front of them.
 void CheckImportResultTypedefType(const ModuleItem* item,
                                   const TypedefMap& typedefs,
+                                  const DpiClassNames& classes,
                                   DiagEngine& diag) {
   if (item->dpi_is_task) return;
   if (item->return_type.kind != DataTypeKind::kNamed) return;
+  // §35.5.4's footnote 27 forbids passing a class at all, and §35.5.5 restricts
+  // a result to small values, of which a class handle is not one. The same
+  // unresolved name hid both.
+  if (NamesAClass(item->return_type, typedefs, classes)) {
+    diag.Error(item->loc,
+               std::format("imported function '{}' has a class type as its "
+                           "result, which cannot be passed through the DPI",
+                           item->name),
+               Subclause("35.5.5"));
+    return;
+  }
   DataType resolved = ResolveDpiTypeName(item->return_type, typedefs);
   if (resolved.kind == DataTypeKind::kNamed) return;
   if (IsPermittedDpiResultType(resolved)) return;
@@ -265,9 +313,18 @@ void CheckImportResultTypedefType(const ModuleItem* item,
 
 void CheckImportFormalTypedefTypes(const ModuleItem* item,
                                    const TypedefMap& typedefs,
+                                   const DpiClassNames& classes,
                                    DiagEngine& diag) {
   for (const auto& arg : item->func_args) {
     if (arg.data_type.kind != DataTypeKind::kNamed) continue;
+    if (NamesAClass(arg.data_type, typedefs, classes)) {
+      diag.Error(item->loc,
+                 std::format("formal argument '{}' has a class type, which "
+                             "cannot be passed through the DPI",
+                             arg.name),
+                 Subclause("35.5.4"));
+      continue;
+    }
     DataType resolved = ResolveDpiTypeName(arg.data_type, typedefs);
     if (resolved.kind == DataTypeKind::kNamed) continue;
     DpiFormalTypeVerdict verdict = ClassifyDpiFormalType(resolved);
@@ -300,8 +357,18 @@ void CheckImportFormalTypedefTypes(const ModuleItem* item,
 // where that type is permitted. The dynamic array formal is a separate rule of
 // the same clause, checked by CheckExportDynamicArrayArguments.
 void CheckExportFormalTypes(const ModuleItem* callable, const ModuleItem* item,
-                            const TypedefMap& typedefs, DiagEngine& diag) {
+                            const TypedefMap& typedefs,
+                            const DpiClassNames& classes, DiagEngine& diag) {
   for (const auto& arg : callable->func_args) {
+    if (NamesAClass(arg.data_type, typedefs, classes)) {
+      diag.Error(
+          item->loc,
+          std::format("SystemVerilog {} '{}' has a formal argument '{}' of a "
+                      "class type, which cannot be passed through the DPI",
+                      ExportedSubroutineKind(callable), item->name, arg.name),
+          Subclause("35.5.4"));
+      continue;
+    }
     DpiFormalTypeVerdict verdict =
         ClassifyDpiFormalType(ResolveDpiTypeName(arg.data_type, typedefs));
     if (verdict == DpiFormalTypeVerdict::kPermitted) continue;
@@ -416,6 +483,9 @@ struct ExportScopeContext {
   std::unordered_set<std::string_view>& export_link_in_scope;
   std::unordered_set<std::string_view>& exported_sv_func_in_scope;
   const TypedefMap& typedefs;
+  // §35.5.4 footnote 27: the class names the checks tell from a name they
+  // cannot resolve.
+  const DpiClassNames& classes;
 };
 
 // §35.4/§35.7: run the full battery of export-declaration checks for one export
@@ -479,7 +549,7 @@ void ValidateExportDeclaration(
   }
   CheckExportRefArguments(callable, item, diag);
   CheckExportDynamicArrayArguments(callable, item, diag);
-  CheckExportFormalTypes(callable, item, scope.typedefs, diag);
+  CheckExportFormalTypes(callable, item, scope.typedefs, scope.classes, diag);
   CheckExportResultType(callable, item, scope.typedefs, diag);
   CheckExportSignatureEquivalence(callable, link_name, item, export_signatures,
                                   diag);
@@ -580,8 +650,8 @@ void ProcessDpiGlobalNameItem(const ModuleItem* item, ExportScopeContext& scope,
   }
 
   if (item->kind == ModuleItemKind::kDpiImport) {
-    CheckImportFormalTypedefTypes(item, scope.typedefs, diag);
-    CheckImportResultTypedefType(item, scope.typedefs, diag);
+    CheckImportFormalTypedefTypes(item, scope.typedefs, scope.classes, diag);
+    CheckImportResultTypedefType(item, scope.typedefs, scope.classes, diag);
   }
 
   CheckDpiVersionStringAgreement(item, link_name, global.link_version, diag);
@@ -617,6 +687,7 @@ void CheckDpiScopeImportDeclarations(
 void ValidateDpiScopeGlobalNames(const std::vector<ModuleItem*>& items,
                                  const CompilationUnit* unit,
                                  const TypedefMap& outer_typedefs,
+                                 const DpiClassNames& classes,
                                  DpiGlobalNameSpace& global, DiagEngine& diag) {
   // Index this scope's SystemVerilog function and task declarations by name so
   // each export can look up the routine it names and obtain its signature for
@@ -642,7 +713,7 @@ void ValidateDpiScopeGlobalNames(const std::vector<ModuleItem*>& items,
   std::unordered_set<std::string_view> exported_sv_func_in_scope;
 
   ExportScopeContext scope{sv_callables, export_link_in_scope,
-                           exported_sv_func_in_scope, dpi_typedefs};
+                           exported_sv_func_in_scope, dpi_typedefs, classes};
 
   for (const auto* item : items) {
     if (item == nullptr) continue;
@@ -709,8 +780,17 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
 
   DpiGlobalNameSpace global{link_version, export_signatures};
 
-  for (const auto* items : DpiDeclarationScopes(unit_)) {
-    ValidateDpiScopeGlobalNames(*items, unit_, typedefs_, global, diag_);
+  // §35.5.4 footnote 27 is about the type a name stands for, and a class may be
+  // declared in a scope other than the one the declaration naming it is in --
+  // at compilation-unit scope, beside the module holding the import. So the
+  // names are collected across every scope a DPI declaration can be written in
+  // before any of them is checked.
+  auto scopes = DpiDeclarationScopes(unit_);
+  DpiClassNames classes = CollectDpiClassNames(scopes);
+
+  for (const auto* items : scopes) {
+    ValidateDpiScopeGlobalNames(*items, unit_, typedefs_, classes, global,
+                                diag_);
   }
 }
 

@@ -346,4 +346,92 @@ TEST(DpiDeclElab, DuplicateImportNameInOnePackageIsError) {
                             4, "35.5.4"));
 }
 
+// §35.5.4, footnote 27 of Syntax 35-1: "Formals of dpi_function_proto and
+// dpi_task_proto cannot use pass by reference mode and class types cannot be
+// passed at all." A class handle has no representation in the DPI's C layer, so
+// the prohibition is absolute rather than a type the permitted list happens to
+// omit, and the report names it as such.
+//
+// The class stands at compilation-unit scope and the import inside a module,
+// which is where a source would write them: the check has to see a name
+// declared in a scope other than the declaration's own.
+TEST(DpiDeclElab, AClassTypedImportFormalIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    class C;
+      int x;
+    endclass
+    module m;
+      import "DPI-C" function void take(input C handle);
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "formal argument 'handle' has a class type, which cannot be passed "
+      "through the DPI",
+      6, "35.5.4"));
+}
+
+// The same class as the result. §35.5.5 restricts an imported function's result
+// to small values and a class handle is not one, so the resolution that hid the
+// formal hid a second rule beside it.
+TEST(DpiDeclElab, AClassTypedImportResultIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    class C;
+      int x;
+    endclass
+    module m;
+      import "DPI-C" function C make();
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "imported function 'make' has a class type as its result, which cannot "
+      "be passed through the DPI",
+      6, "35.5.5"));
+}
+
+// The export side reaches the same prohibition: §35.7 exports a SystemVerilog
+// subroutine through the DPI, and what cannot be passed cannot be passed in
+// that direction either.
+TEST(DpiDeclElab, AClassTypedExportFormalIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    class C;
+      int x;
+    endclass
+    module m;
+      export "DPI-C" function give;
+      function void give(input C handle);
+      endfunction
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "has a formal argument 'handle' of a class type, which cannot be passed "
+      "through the DPI",
+      6, "35.5.4"));
+}
+
+// The case the check must not catch. A name that resolves to a permitted type
+// stays permitted, and a name that resolves to nothing at all is left alone --
+// which is what keeps a forward-declared or imported type from being reported
+// as a bad one. Without this, a check rejecting every unresolved name would
+// satisfy the three cases above.
+TEST(DpiDeclElab, ATypedefOfAPermittedTypeStaysPermitted) {
+  ElabFixture f;
+  Elaborate(R"(
+    typedef int my_int_t;
+    module m;
+      import "DPI-C" function void take(input my_int_t v);
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
