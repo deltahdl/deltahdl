@@ -11,6 +11,7 @@ namespace delta {
 struct Expr;
 struct Stmt;
 struct Variable;
+struct ClassTypeInfo;
 class SimContext;
 class Arena;
 
@@ -61,6 +62,22 @@ PartSelectBits SelectStorageBits(const Variable& var, const Expr* sel,
 void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
                     SimContext& ctx, Arena& arena);
 Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width, Arena& arena);
+
+// §8.5 puts no restriction on a class property's data type, so a property is an
+// object of the type its declaration gave it, and §10.4 makes every write to one
+// a procedural assignment. Answers what the property `name` declared on `type`
+// -- or on one of its bases, which is where the walk goes -- can hold of `val`:
+// §10.7 truncates or extends into its width, §6.12.1 converts a value crossing
+// the real boundary, and §6.11.2 clears the unknowns a 2-state one has no room
+// for.
+//
+// The value is answered unchanged where the declaration gave no width this can
+// trust. CollectClassMembers substitutes a 32-bit carrier for a type it could
+// not size -- a name, a string, a class handle -- and truncating to a carrier
+// would cut a handle in half and a string down to four characters, so
+// PropertyInfo::width_is_declared is what gates all three.
+Logic4Vec CoerceToPropertyType(const ClassTypeInfo* type, std::string_view name,
+                               Logic4Vec val, Arena& arena);
 bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
                           SimContext& ctx, Arena& arena);

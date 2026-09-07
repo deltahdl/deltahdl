@@ -139,12 +139,42 @@ static bool WriteStructFieldBits(Variable* base_var, const StructTypeInfo* info,
 // Writes `field` onto class object `obj`, honoring declared-type scoping
 // (§8.15) when the type is known so a base field is written rather than a
 // shadowing derived one.
+// The declaring type is found by the walk SetPropertyForType makes for the same
+// name, because a property declared on a base class is not in a derived type's
+// own list.
+static const ClassTypeInfo::PropertyInfo* FindPropertyInfo(
+    const ClassTypeInfo* type, std::string_view name) {
+  for (const auto* t = type; t != nullptr; t = t->parent) {
+    for (const auto& prop : t->properties) {
+      if (prop.name == name) return &prop;
+    }
+  }
+  return nullptr;
+}
+
+Logic4Vec CoerceToPropertyType(const ClassTypeInfo* type, std::string_view name,
+                               Logic4Vec val, Arena& arena) {
+  const auto* prop = FindPropertyInfo(type, name);
+  if (prop == nullptr || !prop->width_is_declared) return val;
+  // ConvertRealForKnownLhs rather than ResizeToWidth: §6.12.1 converts a value
+  // crossing the real boundary rather than reinterpreting its bits, and it
+  // resizes everything that does not cross it.
+  val = ConvertRealForKnownLhs(val, prop->is_real, prop->width, arena);
+  if (!prop->is_4state && !prop->is_real) CoerceTo2State(val);
+  return val;
+}
+
 static void SetClassField(ClassObject* obj, const ClassTypeInfo* declared_type,
-                          std::string_view field, const Logic4Vec& rhs_val) {
+                          std::string_view field, const Logic4Vec& rhs_val,
+                          Arena& arena) {
+  // A chained path that fell back to a flattened key names no property, so
+  // FindPropertyInfo answers for none and the value is stored as it arrived.
+  const ClassTypeInfo* start = declared_type ? declared_type : obj->type;
+  Logic4Vec stored = CoerceToPropertyType(start, field, rhs_val, arena);
   if (declared_type)
-    obj->SetPropertyForType(field, declared_type, rhs_val);
+    obj->SetPropertyForType(field, declared_type, stored);
   else
-    obj->SetProperty(std::string(field), rhs_val);
+    obj->SetProperty(std::string(field), stored);
 }
 
 // Writes a (possibly chained) field path into class object `obj`. A chained
@@ -161,7 +191,7 @@ static void WriteClassFieldChain(ClassObject* obj,
                                  const Logic4Vec& rhs_val, SimContext& ctx) {
   auto dot = field_path.find('.');
   if (dot == std::string_view::npos) {
-    SetClassField(obj, declared_type, field_path, rhs_val);
+    SetClassField(obj, declared_type, field_path, rhs_val, ctx.GetArena());
     return;
   }
   auto& arena = ctx.GetArena();
@@ -172,7 +202,7 @@ static void WriteClassFieldChain(ClassObject* obj,
                     : obj->GetProperty(first, arena);
   auto* next_obj = ctx.GetClassObject(handle_val.ToUint64());
   if (!next_obj) {
-    SetClassField(obj, declared_type, field_path, rhs_val);
+    SetClassField(obj, declared_type, field_path, rhs_val, arena);
     return;
   }
   WriteClassFieldChain(next_obj, nullptr, rest, rhs_val, ctx);
@@ -207,7 +237,9 @@ static bool WriteThisField(std::string_view base_name,
   *handled = true;
   auto* self = ctx.CurrentThis();
   if (!self) return false;
-  self->SetProperty(std::string(field_name), rhs_val);
+  self->SetProperty(
+      std::string(field_name),
+      CoerceToPropertyType(self->type, field_name, rhs_val, ctx.GetArena()));
   return true;
 }
 
@@ -223,7 +255,8 @@ static bool WriteSuperField(std::string_view base_name,
   auto* self = ctx.CurrentThis();
   if (!(self && self->type && self->type->parent)) return false;
   self->SetPropertyForType(std::string(field_name), self->type->parent,
-                           rhs_val);
+                           CoerceToPropertyType(self->type->parent, field_name,
+                                                rhs_val, ctx.GetArena()));
   return true;
 }
 
@@ -239,7 +272,8 @@ static bool WriteStaticClassField(std::string_view base_name,
   *handled = true;
   auto sit = cls_type->static_properties.find(std::string(field_name));
   if (sit == cls_type->static_properties.end()) return false;
-  sit->second = rhs_val;
+  sit->second =
+      CoerceToPropertyType(cls_type, field_name, rhs_val, ctx.GetArena());
   return true;
 }
 

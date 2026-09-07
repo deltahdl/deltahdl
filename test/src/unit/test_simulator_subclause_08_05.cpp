@@ -349,4 +349,88 @@ TEST(ObjectPropertySim, RealPropertyConvertsAnIntegerWrittenFromAMethod) {
                    5.0);
 }
 
+// §10.4 names the same left-hand sides for a procedural assignment wherever it
+// is written, so which spelling reaches a property cannot decide what the
+// property holds. The method-side write truncates; these are its siblings.
+
+// Through a handle, which is the writer most designs use.
+TEST(ObjectPropertySim, NarrowPropertyTruncatesAValueWrittenThroughAHandle) {
+  EXPECT_EQ(RunAndGet("class Packet;\n"
+                      "  bit [3:0] command;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Packet p;\n"
+                      "    p = new;\n"
+                      "    p.command = 8'hFF;\n"
+                      "    result = p.command;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            15u);
+}
+
+// §8.15's `super.x` names the parent slice, so the width is the one the parent
+// declared. This write reaches the storage by its own arm rather than through
+// the one the unqualified name takes.
+TEST(ObjectPropertySim, NarrowPropertyTruncatesAValueWrittenThroughSuper) {
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  bit [3:0] command;\n"
+                      "endclass\n"
+                      "class Derived extends Base;\n"
+                      "  task put();\n"
+                      "    super.command = 8'hFF;\n"
+                      "  endtask\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Derived d;\n"
+                      "    d = new;\n"
+                      "    d.put();\n"
+                      "    result = d.command;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            15u);
+}
+
+// §8.9's static property, written by its class name. Its width is recorded the
+// same way and was consulted no more than the others'.
+TEST(ObjectPropertySim, NarrowStaticPropertyTruncatesAValueWrittenByClassName) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  static bit [3:0] command;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C::command = 8'hFF;\n"
+                      "    result = C::command;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            15u);
+}
+
+// §6.8 executes a declaration's initializer as an assignment to the declared
+// object, so a property's default is coerced into it as a later write is. The
+// no-initializer arm beside it already sized from the declared width, which is
+// what made this one's silence visible.
+TEST(ObjectPropertySim, NarrowPropertyTruncatesItsDeclarationInitializer) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  bit [3:0] command = 8'hFF;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    result = c.command;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            15u);
+}
+
 }  // namespace

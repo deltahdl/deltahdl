@@ -14,6 +14,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
 
 namespace delta {
 
@@ -32,7 +33,12 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
     // a 2-state one — rather than being forced to zero.
     Logic4Vec val;
     if (prop.init_expr) {
-      val = EvalExpr(prop.init_expr, ctx, arena);
+      // §6.8 executes a declaration's initializer as an assignment to the
+      // declared object, so it is coerced into the property exactly as a later
+      // write to it is. The two arms below already size from prop.width, which
+      // is what made this one's silence visible.
+      val = CoerceToPropertyType(info, prop.name,
+                                 EvalExpr(prop.init_expr, ctx, arena), arena);
     } else if (prop.is_4state) {
       val = MakeAllX(arena, prop.width);
     } else {

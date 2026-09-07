@@ -70,20 +70,6 @@ static bool IsMemberAccessOn(const Expr* lhs, std::string_view base_name) {
 // runs as part of a chain populates the inherited slot, not just the unscoped
 // alias. With no enclosing-class context active, the plain unscoped write is
 // preserved, leaving non-method writes unchanged.
-// §8.5 puts no restriction on a class property's data type, so a property is an
-// object of the type its declaration gave it. The declaring type is found by
-// the walk SetPropertyForType makes for the same name, because a property
-// declared on a base class is not in a derived type's own list.
-static const ClassTypeInfo::PropertyInfo* FindPropertyInfo(
-    const ClassTypeInfo* type, std::string_view name) {
-  for (const auto* t = type; t != nullptr; t = t->parent) {
-    for (const auto& prop : t->properties) {
-      if (prop.name == name) return &prop;
-    }
-  }
-  return nullptr;
-}
-
 // §10.4 puts procedural assignments "within procedures such as always, initial,
 // task, and function", so an assignment to a property from a method is one, and
 // §10.7 truncates or extends it into the property while §6.11.2 converts the
@@ -108,17 +94,7 @@ static void WriteSelfProperty(ClassObject* self, std::string_view name,
   // the next read returns the stale scoped value.
   const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
   if (!enclosing) enclosing = self->type;
-  Logic4Vec stored = val;
-  const auto* prop = FindPropertyInfo(enclosing, name);
-  if (prop != nullptr && prop->width_is_declared) {
-    // ConvertRealForKnownLhs rather than ResizeToWidth, so that §6.12.1's
-    // conversion happens where the value and the property differ in real-ness:
-    // `real r; ... r = 5;` has to hold the double 5.0, and resizing the
-    // integer's bits to 64 would store its bit pattern and drop the real flag
-    // the read needs. It resizes every value that does not cross the boundary.
-    stored = ConvertRealForKnownLhs(stored, prop->is_real, prop->width, arena);
-    if (!prop->is_4state && !prop->is_real) CoerceTo2State(stored);
-  }
+  Logic4Vec stored = CoerceToPropertyType(enclosing, name, val, arena);
   if (enclosing) {
     self->SetPropertyForType(name, enclosing, stored);
   } else {
@@ -281,8 +257,12 @@ static void ExecFuncWriteValue(const Expr* lhs, const Logic4Vec& val,
   if (IsMemberAccessOn(lhs, "super")) {
     auto* self = ctx.CurrentThis();
     if (self && self->type && self->type->parent) {
-      self->SetPropertyForType(std::string(lhs->rhs->text), self->type->parent,
-                               val);
+      // §8.15's `super.x` names the parent slice, so the width is the one the
+      // parent declared. This arm writes the storage directly rather than
+      // through WriteSelfProperty, so it asks for the coercion itself.
+      self->SetPropertyForType(
+          std::string(lhs->rhs->text), self->type->parent,
+          CoerceToPropertyType(self->type->parent, lhs->rhs->text, val, arena));
     }
     return;
   }
