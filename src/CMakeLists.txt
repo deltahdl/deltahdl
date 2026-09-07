@@ -196,6 +196,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/sequence_monitor.cpp
     simulator/eval_systask.cpp
     simulator/eval_expr.cpp
+    simulator/eval_expr_assign_ops.cpp
     simulator/eval_expr_cast.cpp
     simulator/eval_enum.cpp
     simulator/eval_array.cpp
