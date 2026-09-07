@@ -125,4 +125,75 @@ TEST(ChargeDecayElaboration, DecayTimeIsTheThirdTripleWhenEveryDelayIsATriple) {
   EXPECT_EQ(cap->decay_ticks, 8u);
 }
 
+// §28.16 gives every net's three delays one meaning -- "The first delay refers
+// to the transition to the 1 value (rise delay). The second delay refers to the
+// transition to the 0 value (fall delay). The third delay refers to the
+// transition to the high-impedance value" -- and §28.16.2 replaces the third
+// for one net type alone: "Like all nets, the delay specification in a trireg
+// net declaration can contain up to three delays ... The third delay shall
+// specify the charge decay time instead of the delay in a transition to the z
+// logic state."
+//
+// So a wire's third delay is a turn-off delay and no charge decay time, and the
+// three values are distinct from each other and from zero so that no
+// coincidence satisfies the assertion.
+TEST(ChargeDecayElaboration, ThirdDelayOfANonTriregIsNoChargeDecayTime) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire #(1, 2, 3) w;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* w = FindNet(design, "t", "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->decay_ticks, 0u);
+  EXPECT_FALSE(w->decays);
+  // §28.16: the delay the wire does have. Without this the case above would
+  // hold of a net whose third delay was dropped altogether.
+  ASSERT_NE(w->delay_turnoff, nullptr);
+  EXPECT_EQ(w->delay_turnoff->int_val, 3u);
+}
+
+// The same declaration on the net type §28.16.2 wrote the replacement for, so
+// the case above is a claim about the net type rather than about three-delay
+// declarations. A fix that stopped reading the third delay at all would satisfy
+// it and fail this.
+TEST(ChargeDecayElaboration, ThirdDelayOfATriregIsTheChargeDecayTime) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  trireg #(1, 2, 3) cap;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* cap = FindNet(design, "t", "cap");
+  ASSERT_NE(cap, nullptr);
+  EXPECT_EQ(cap->decay_ticks, 3u);
+  EXPECT_TRUE(cap->decays);
+}
+
+// The other way a decay time reaches a net: §28.16.2.2's compilation-unit
+// default, which fills in where a trireg's declaration writes no third delay.
+// It is a trireg default too, so a wire in a unit carrying the directive takes
+// none of it -- and a three-delay wire is the case where a check on the delay
+// rather than on the net type would let the directive's value through as well.
+TEST(ChargeDecayElaboration, DefaultDecayTimeDoesNotReachANonTrireg) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "`default_decay_time 100\n"
+      "module t;\n"
+      "  wire #(1, 2, 3) w;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* w = FindNet(design, "t", "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->decay_ticks, 0u);
+  EXPECT_FALSE(w->decays);
+}
+
 }  // namespace
