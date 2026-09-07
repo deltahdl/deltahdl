@@ -463,36 +463,26 @@ static void ResolveStrengthBit(const std::vector<Logic4Vec>& drivers,
                                const std::vector<DriverStrength>& strengths,
                                Logic4Vec& result, uint32_t bit,
                                NetType net_type) {
-  uint8_t max_str = 0;
-  uint8_t max_val = 3;
-  bool conflict = false;
+  MaxTracker m;
   for (size_t d = 0; d < drivers.size(); ++d) {
-    auto bv = GetBitVal(drivers[d], bit);
-    if (bv.val == 3) continue;
-    uint8_t str = EffectiveStrength(bv.val, strengths[d]);
+    uint8_t val = GetBitVal(drivers[d], bit).val;
+    if (val == 3) continue;
+    uint8_t str = EffectiveStrength(val, strengths[d]);
     // §21.2.1.4: "The high-impedance strength cannot have a known logic value;
     // the only logic value allowed for this level is z." A driver at that level
     // therefore drives nothing whatever value it carries, and is passed over
     // the same way a driver already spelling z is. Folding it in instead made
-    // it conflict with the nothing that had been seen so far -- max_val starts
-    // at 3, and a lone such driver matched the equal-strength test against it
-    // -- so a net one driver was holding at high impedance resolved to x.
+    // it conflict with the nothing that had been seen so far -- MaxTracker::val
+    // starts at 3, and a lone such driver matched the equal-strength test
+    // against it, so a net one driver was holding at high impedance resolved to
+    // x.
     if (str == 0) continue;
-    if (str > max_str) {
-      max_str = str;
-      max_val = bv.val;
-      conflict = false;
-    } else if (str == max_str && bv.val != max_val) {
-      if (net_type == NetType::kWand || net_type == NetType::kTriand) {
-        max_val = WiredAnd(max_val, bv.val);
-      } else if (net_type == NetType::kWor || net_type == NetType::kTrior) {
-        max_val = WiredOr(max_val, bv.val);
-      } else {
-        conflict = true;
-      }
-    }
+    FoldDriverIntoMax(val, str, net_type, m);
   }
-  SetBit(result, bit, conflict ? 2 : max_val);
+  // §28.12.2: the value of a net two equally strong drivers disagree over is
+  // unknown. A tracker that saw no driver keeps the unset value, which is the
+  // z a net nothing drives holds.
+  SetBit(result, bit, m.conflict ? 2 : m.val);
 }
 
 static bool AllDriversZ(const std::vector<Logic4Vec>& drivers) {

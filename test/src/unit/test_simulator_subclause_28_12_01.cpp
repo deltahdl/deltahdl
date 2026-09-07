@@ -70,6 +70,15 @@ TEST(StrengthResolution, HighzDriverIgnored) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// §21.2.1.4: "The high-impedance strength cannot have a known logic value; the
+// only logic value allowed for this level is z." Every driver of this net sits
+// at that level, so the net is held at high impedance and nothing decides a
+// value for it.
+//
+// The assertion used to read aval=1 and bval=1, which is x rather than the z
+// the name claims -- the two drivers were being folded into a conflict against
+// each other, which §21.2.1.4 leaves no room for at a level that admits no
+// known value. z is aval=0 with bval=1.
 TEST(StrengthResolution, AllHighzProducesZ) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -87,8 +96,7 @@ TEST(StrengthResolution, AllHighzProducesZ) {
   net.driver_strengths.push_back({Strength::kHighz, Strength::kHighz});
   net.Resolve(arena);
 
-  EXPECT_EQ(var->value.words[0].aval & 1u, 1u);
-  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+  EXPECT_EQ(var->value.ToString(), "z");
 }
 
 // --- Full-pipeline observation of the §28.12.1 rules ------------------------
