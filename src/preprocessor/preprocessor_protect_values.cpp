@@ -482,7 +482,23 @@ bool Preprocessor::TakeDataBlockValue(std::string_view line, SourceLoc loc,
   // data rather than left standing over whatever the text goes on to hold. The
   // digest still to be checked holds the key it needs already.
   digest_decrypt_key_.clear();
-  output.append(ProcessSource(cleartext, loc.file_id, depth));
+  // §22.12 has a compiler maintain "the current line number and file name of
+  // the file being compiled", and the recovered design is in no file the user
+  // holds: its lines are numbered from the top of the block while the envelope
+  // stands wherever it stands in the enclosing file. Reading it under the
+  // enclosing file's id paired those halves, so an envelope at line 400 of
+  // top.sv holding a design whose third line was rejected reported top.sv:3 and
+  // quoted line 3 of top.sv, which is some other line entirely.
+  //
+  // The cleartext is registered as a source of its own instead, named for where
+  // its envelope stands. A report about it then names a position that exists --
+  // a line of the recovered design, quoted from the recovered design -- and
+  // says which envelope to open to find it.
+  std::string block_name = "<protected envelope at " +
+                           std::string(src_mgr_.FilePath(loc.file_id)) + ":" +
+                           std::to_string(loc.line) + ">";
+  uint32_t block_id = src_mgr_.AddFile(std::move(block_name), cleartext);
+  output.append(ProcessSource(cleartext, block_id, depth));
   digest_target_ = std::move(target);
   return true;
 }

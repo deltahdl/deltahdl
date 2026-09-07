@@ -23,11 +23,14 @@
 #include <string>
 #include <string_view>
 
+#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
 #include "fixture_program.h"
 #include "helpers_reported_error.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
@@ -176,6 +179,106 @@ TEST(ProtectDataBlockSyntax, TheBlockBeneathTheKeywordAloneIsRecovered) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(read.find(kOpenedDesign), std::string::npos) << read;
   EXPECT_EQ(read.find("data_block"), std::string::npos) << read;
+}
+
+// §22.12 has a compiler maintain "the current line number and file name of the
+// file being compiled", and a design recovered from a data block was compiled
+// under neither. Its lines were numbered from the top of the block while the
+// file named was the one the envelope stands in, so an envelope well down a
+// file holding a design whose third line is rejected reported that file at line
+// 3 -- a line of the envelope's own surroundings, quoted as though it were the
+// text at fault.
+//
+// The recovered cleartext is a source of its own, named for where its envelope
+// stands, so a report about it names a position that exists.
+
+// The key these cases seal and open their regions under.
+constexpr std::string_view kOriginRegionKey = "one-key-for-the-origin-cases";
+
+// Preprocesses `src` under the name design.sv, registers the output with the
+// origins the preprocessor recorded and parses it -- the sequence
+// PreprocessSources and ParseSource in src/main.cpp run -- and returns where
+// the first error was reported, as DiagEngine::Emit prints it. The parse is
+// what rejects a line of the recovered design; the preprocessor takes no view
+// of what the text it recovers means.
+std::string FirstErrorLocationOf(const std::string& src, PreprocFixture& f,
+                                 Arena& arena) {
+  auto fid = f.mgr.AddFile("design.sv", src);
+  PreprocConfig config;
+  config.protect_key = std::string(kOriginRegionKey);
+  Preprocessor pp(f.mgr, f.diag, std::move(config));
+  std::string out = pp.Preprocess(fid);
+  auto out_fid =
+      f.mgr.AddPreprocessedFile("<preprocessed>", out, pp.LineOrigins());
+  Lexer lexer(f.mgr.FileContent(out_fid), out_fid, f.diag,
+              TextOrigin::kPreprocessorOutput);
+  Parser parser(lexer, arena, f.diag);
+  parser.Parse();
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.severity == DiagSeverity::kError) return f.mgr.FormatLoc(d.loc);
+  }
+  return "<no error was reported>";
+}
+
+// An envelope holding `region`, standing after two lines of ordinary source so
+// that the block's own numbering and the enclosing file's cannot coincide.
+std::string SourceWithEnvelope(std::string_view region) {
+  std::string src = "// one\n// two\n";
+  src.append("`pragma protect begin_protected\n");
+  src.append("`pragma protect data_block\n");
+  src.append(EncryptProtectedRegion(region, kOriginRegionKey));
+  src.append("\n`pragma protect end_protected\n");
+  return src;
+}
+
+TEST(ProtectDataBlockOrigin, ARecoveredLineNamesItsEnvelopeAndItsOwnLine) {
+  PreprocFixture f;
+  Arena arena;
+  // The third line of the region opens no top-level declaration, so the parse
+  // rejects it. The envelope's begin_protected stands on line 3 of design.sv.
+  std::string where = FirstErrorLocationOf(
+      SourceWithEnvelope("module m;\nendmodule\n%\n"), f, arena);
+  EXPECT_NE(where.find("<protected envelope at design.sv:"), std::string::npos)
+      << where;
+  EXPECT_NE(where.find(">:3:"), std::string::npos) << where;
+}
+
+// The same line one further into the block. Without this a fix attributing
+// every recovered line to one fixed position would satisfy the case above.
+TEST(ProtectDataBlockOrigin, ARecoveredLineMovesWithItsPositionInTheBlock) {
+  PreprocFixture f;
+  Arena arena;
+  std::string where = FirstErrorLocationOf(
+      SourceWithEnvelope("module m;\nendmodule\n\n%\n"), f, arena);
+  EXPECT_NE(where.find(">:4:"), std::string::npos) << where;
+}
+
+// The control: a line written outside every envelope still names the file it
+// was written in, at the line it was written on. So the cases above are about
+// the recovered text rather than about origins generally.
+TEST(ProtectDataBlockOrigin, ALineOutsideAnEnvelopeNamesItsOwnFile) {
+  PreprocFixture f;
+  Arena arena;
+  std::string where =
+      FirstErrorLocationOf("module m;\nendmodule\n%\n", f, arena);
+  EXPECT_NE(where.find("design.sv:3:"), std::string::npos) << where;
+  EXPECT_EQ(where.find("protected envelope"), std::string::npos) << where;
+}
+
+// An envelope inside an envelope. The inner block is recovered while the outer
+// block's text is read, so the position its lines are named by is a position in
+// the outer recovered text -- which is itself no file the user holds, and says
+// so. Nothing here collapses to the enclosing file.
+TEST(ProtectDataBlockOrigin, AnEnvelopeInsideAnEnvelopeNamesTheInnerBlock) {
+  PreprocFixture f;
+  Arena arena;
+  std::string inner = SourceWithEnvelope("module m;\nendmodule\n%\n");
+  std::string where = FirstErrorLocationOf(SourceWithEnvelope(inner), f, arena);
+  EXPECT_NE(where.find("<protected envelope at <protected envelope at "
+                       "design.sv:"),
+            std::string::npos)
+      << where;
+  EXPECT_NE(where.find(">:3:"), std::string::npos) << where;
 }
 
 }  // namespace
