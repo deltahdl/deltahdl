@@ -297,4 +297,137 @@ TEST(ConcatenationSim,
   EXPECT_EQ(a->value.ToUint64(), 0xF9u);
 }
 
+// §11.5.1 gives an out-of-bounds bit-select a value rather than an absence. It
+// makes a bit-select the extraction of "a particular bit from a vector", and
+// where "the bit-select address is invalid (it is out of bounds or has one or
+// more x or z bits), then the value returned by the reference shall be x for
+// 4-state and 0 for 2-state values". The same clause says separately of the
+// write that it "shall have no effect on the data stored when written". So
+// `a[9]` on a [7:0] `a` is one bit of the concatenation whichever bit of `a` it
+// fails to address -- §11.6.1's Table 11-21 sizes `{i,...,j}` at L(i)+...+L(j),
+// and L(a[9]) is one -- and it is a bit that reaches nothing.
+//
+// 17'h1AAC3 laid out is 1_1010101_0_11000011, so `c` owns bits [16:9] = 8'hD5,
+// `a[9]` is bit [8], and `b` owns bits [7:0] = 8'hC3. UnpackConcatLhs sized the
+// element with SelectStorageBits, whose zero means "the select that addresses
+// no bit of the object", and read that zero as "this element is not there": the
+// `continue` ran before `bit_offset += w`, so `c` took bits [15:8] and read
+// 8'hAA. The three sentinels are values no expected value takes, so `a`
+// standing at 8'h1A says the write reached nothing rather than that it reached
+// the right nothing by accident.
+TEST(ConcatenationSim,
+     LhsConcatElementWithOutOfBoundsBitSelectStillReservesItsBit) {
+  const char* src =
+      "module t;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  initial begin\n"
+      "    a = 8'h1A;\n"
+      "    b = 8'h2B;\n"
+      "    c = 8'h3C;\n"
+      "    {c, a[9], b} = 17'h1AAC3;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "a"), 0x1Au);
+  EXPECT_EQ(RunAndGet(src, "b"), 0xC3u);
+  EXPECT_EQ(RunAndGet(src, "c"), 0xD5u);
+}
+
+// The same defect reached through a part-select, which is what separates "a
+// select element reserves one bit" from "a select element reserves the width
+// its indices name". §11.5.1 has a part-select address "several contiguous
+// bits", and of the wholly out-of-range one it says only that it "shall yield
+// the value x when read and shall have no effect on the data stored when
+// written" -- nothing there narrows the bits the indices name -- so `a[11:9]`
+// is three bits of the nineteen and none of them reaches `a`.
+//
+// 19'h6ABC3 is 11010101_011_11000011: `c` owns bits [18:11] = 8'hD5, `a[11:9]`
+// bits [10:8], and `b` bits [7:0] = 8'hC3. Reserving nothing for the element
+// read 8'hAB into `c`. Reserving one bit -- which a fix that answered the
+// bit-select width for every select would do -- reads 8'h55. Only the width the
+// indices name reads 8'hD5, which is why this case stands beside the one above
+// rather than repeating it.
+TEST(ConcatenationSim,
+     LhsConcatWhollyOutOfBoundsPartSelectReservesTheWidthItsIndicesName) {
+  const char* src =
+      "module t;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  initial begin\n"
+      "    a = 8'h1A;\n"
+      "    b = 8'h2B;\n"
+      "    c = 8'h3C;\n"
+      "    {c, a[11:9], b} = 19'h6ABC3;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "a"), 0x1Au);
+  EXPECT_EQ(RunAndGet(src, "b"), 0xC3u);
+  EXPECT_EQ(RunAndGet(src, "c"), 0xD5u);
+}
+
+// §11.5.1 gives the partially out-of-range part-select its own rule, and not
+// the one it gives the wholly out-of-range one: such a select "shall, when
+// read, return x for the bits that are out of range and shall, when written,
+// only affect the bits that are in range". Which of its bits land says nothing
+// about how wide the element is, since §11.6.1 sizes an element from the
+// expression, so `a[9:6]` is four bits of the twenty and two of them reach `a`.
+//
+// 20'hD5AC3 is 11010101_1010_11000011: `c` owns bits [19:12] = 8'hD5, `a[9:6]`
+// takes bits [11:8] = 4'b1010, and `b` bits [7:0] = 8'hC3. Of those four bits
+// a[9] and a[8] address nothing and a[7:6] takes 2'b10, so `a` goes 8'h1A ->
+// 8'h9A; that write is established outside a concatenation by
+// ExpressionSim.PartSelectPartiallyOutOfBoundsWriteAffectsInRangeOnly. The
+// slice is chosen so its top half and its bottom half read alike, which keeps
+// the case a claim about the width the element reserves rather than a claim
+// about which bits of the slice the clipped window takes -- no case in test/
+// settles that, since the established one writes 4'hF. `c` read 8'h5A before,
+// and reads 8'h56 under a fix that reserved the two bits that land instead of
+// the four the indices name.
+TEST(ConcatenationSim,
+     LhsConcatPartiallyOutOfBoundsPartSelectWritesOnlyItsInRangeBits) {
+  const char* src =
+      "module t;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  initial begin\n"
+      "    a = 8'h1A;\n"
+      "    b = 8'h2B;\n"
+      "    c = 8'h3C;\n"
+      "    {c, a[9:6], b} = 20'hD5AC3;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "a"), 0x9Au);
+  EXPECT_EQ(RunAndGet(src, "b"), 0xC3u);
+  EXPECT_EQ(RunAndGet(src, "c"), 0xD5u);
+}
+
+// The in-bounds companion, and the element the ordinary case stands to lose.
+// §7.4.1 makes one index of a packed multidimensional array address an element
+// rather than a bit, which §11.5.1 states as "the actual bit that is accessed
+// by an address is, in part, determined by the declaration": `pa[1]` on a
+// [3:0][7:0] `pa` is eight bits and not one. A fix that answered §11.5.1's
+// bit-select width -- one -- for every select carrying no second index would
+// draw this concatenation's boundaries seven bits out and read 8'hBF into `c`,
+// and would satisfy the three cases above while doing it. This case passes
+// before the fix and reads the same values after it, so it is what says the
+// fix left the in-bounds select where it was.
+//
+// 24'hD57EC3: `c` owns bits [23:16] = 8'hD5, `pa[1]` bits [15:8] = 8'h7E, and
+// `b` bits [7:0] = 8'hC3. `pa` is read whole rather than through `pa[1]`, so a
+// slice written to the wrong element of the array is told from one written to
+// the right element instead of vanishing into the read.
+TEST(ConcatenationSim, LhsConcatPackedArrayElementReservesItsElementWidth) {
+  const char* src =
+      "module t;\n"
+      "  logic [3:0][7:0] pa;\n"
+      "  logic [7:0] b, c;\n"
+      "  initial begin\n"
+      "    pa = 32'h11223344;\n"
+      "    b = 8'h2B;\n"
+      "    c = 8'h3C;\n"
+      "    {c, pa[1], b} = 24'hD57EC3;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "pa"), 0x11227E44u);
+  EXPECT_EQ(RunAndGet(src, "b"), 0xC3u);
+  EXPECT_EQ(RunAndGet(src, "c"), 0xD5u);
+}
+
 }  // namespace

@@ -11,6 +11,7 @@ namespace delta {
 struct ArrayInfo;
 struct Expr;
 struct Stmt;
+struct Variable;
 class SimContext;
 class Arena;
 enum class DataTypeKind : uint8_t;
@@ -94,12 +95,30 @@ const Expr* UnwrapTypedPattern(const Expr* expr);
 // Defined in statement_assign_core.cpp; also used by the §10.6.1 and §10.6.2
 // procedural continuous assignments in statement_assign_decl.cpp, which cut a
 // forced or assigned value into the same element windows a blocking assignment
-// cuts it into. §11.4.1/§11.5.1: the width of one concatenation lvalue element
+// cuts it into. §11.4.12/§11.5.1: the width of one concatenation lvalue element
 // -- a nested concatenation or assignment pattern sums its own elements, a
-// select claims the bits §11.5.1 gives its indices, and any other form is as
-// wide as the variable it resolves to. Zero for an element this cannot size,
-// which is also the select that addresses no bit of its object.
+// select is as wide as the bits §11.5.1 gives its indices whether or not they
+// are in bounds, and any other form is as wide as the variable it resolves to.
+// Zero for an element this cannot size at all, which a caller passes over
+// without advancing its offset.
+//
+// This is the element's width as an expression and not the window of its object
+// it may write; the second question is ConcatLhsElemHasWritableBits' and
+// SelectStorageBits'. Answering the window to both dropped an element
+// addressing no bit out of the concatenation entirely, and every element to its
+// left then took its bits one element too low.
 uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx, Arena& arena);
+
+// Defined in statement_assign_core.cpp; also used by the §10.6.1 and §10.6.2
+// procedural continuous assignments in statement_assign_decl.cpp, which have
+// the same element to decline. §11.5.1: whether the concatenation lvalue
+// element `e`, having resolved to `var`, addresses any bit of it -- false for
+// the select whose address lies wholly outside the declared bounds or carries x
+// or z, whose write "shall have no effect on the data stored", and true for
+// every other element shape, each of which names its whole variable. An element
+// this answers false for still occupies ConcatLhsElemWidth's bits of the value.
+bool ConcatLhsElemHasWritableBits(const Expr* e, const Variable& var,
+                                  SimContext& ctx, Arena& arena);
 
 // Defined in statement_assign_core.cpp; also used by the subroutine-body
 // statement executor in eval_function_body.cpp. §10.4 puts procedural

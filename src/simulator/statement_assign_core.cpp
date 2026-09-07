@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -476,15 +477,61 @@ static bool TrySubarrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   return true;
 }
 
-// §11.4.1/§11.5.1: width of a concatenation lvalue element -- a nested
-// concatenation/assignment pattern sums its own elements, a select claims the
-// bits §11.5.1 gives its indices, and any other form reduces to the width of
-// the resolved target variable (0 when unresolved).
+// §11.5.1: how wide a select is as an expression. A bit-select extracts "a
+// particular bit from a vector, packed array, packed structure, parameter, or
+// concatenation", so it is one bit -- or, where one index of a packed
+// multidimensional array addresses an element rather than a bit (§7.4.1), that
+// element. A part-select addresses "several contiguous bits": "the number of
+// bits selected is equal to the width expression" for an indexed one and the
+// span of its two constant indices for a non-indexed one, which is the same
+// number read off the pair PartSelectTargetIndices resolves for all three
+// forms. §11.6.1's Table 11-21 sizes no select, so these widths are §11.5.1's.
 //
-// A select's own width is what §11.4.1 gives its element, and reading the
-// resolved variable's instead drew the boundary between elements in the wrong
-// place: `{a[3:0], b}` sized its first element at the whole of `a`, so every
-// element to the right of it took the wrong bits as well.
+// An address outside the declared bounds changes none of it: §11.5.1 gives the
+// invalid reference a value rather than an absence -- "the value returned by
+// the reference shall be x for 4-state and 0 for 2-state values" -- and says
+// separately that such a write "shall have no effect on the data stored".
+//
+// Zero is answered only where the select names no range this can measure: a
+// non-indexed part-select whose bounds carry x or z, and an indexed one whose
+// width expression does. An unknown base index leaves an indexed part-select
+// its stated width, §11.5.1 letting that base "vary at run time", and a
+// bit-select whose index carries x or z is one bit like any other, that clause
+// covering the out-of-bounds address and the unknown one in one sentence.
+static uint32_t SelectExprWidth(const Variable& var, const Expr* sel,
+                                SimContext& ctx, Arena& arena) {
+  if (sel->index_end == nullptr)
+    return var.packed_elem_width > 1 ? var.packed_elem_width : 1;
+  bool is_indexed = sel->is_part_select_plus || sel->is_part_select_minus;
+  auto idx_val = EvalExpr(sel->index, ctx, arena);
+  auto end_val = EvalExpr(sel->index_end, ctx, arena);
+  if (HasUnknownBits(end_val)) return 0;
+  if (!is_indexed && HasUnknownBits(idx_val)) return 0;
+  auto target = PartSelectTargetIndices(
+      static_cast<int64_t>(idx_val.ToUint64()),
+      static_cast<int64_t>(end_val.ToUint64()), sel->is_part_select_plus,
+      sel->is_part_select_minus);
+  return static_cast<uint32_t>(std::max(target.first, target.second) -
+                               std::min(target.first, target.second) + 1);
+}
+
+// §11.4.12/§11.5.1: width of a concatenation lvalue element -- a nested
+// concatenation/assignment pattern sums its own elements, a select is as wide
+// as SelectExprWidth makes it, and any other form reduces to the width of the
+// resolved target variable. Zero is the element this cannot size at all, which
+// a caller passes over without advancing its offset, having no width to
+// advance by.
+//
+// How wide the element is and which bits of its object it may write are two
+// questions, and this answers the first. Answering the second to both --
+// SelectStorageBits' window, which is zero for a select addressing no bit --
+// dropped such an element out of the concatenation entirely: on
+// `logic [7:0] a, b, c`, `{c, a[9], b} = 17'h1AAC3` gave `a[9]` none of the
+// seventeen bits, so `c` read 8'hAA where it owns bits [16:9] and must read
+// 8'hD5. Reading the resolved variable's width for a select is the other way to
+// draw the boundary wrong: `{a[3:0], b}` sized its first element at the whole
+// of `a`. The writers ask SelectStorageBits for the window themselves, and
+// ConcatLhsElemHasWritableBits below decides whether they write at all.
 uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx, Arena& arena) {
   if (e->kind == ExprKind::kConcatenation ||
       e->kind == ExprKind::kAssignmentPattern) {
@@ -496,9 +543,26 @@ uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx, Arena& arena) {
   auto* var = ResolveLhsVariable(e, ctx);
   if (var == nullptr) return 0;
   if (e->kind == ExprKind::kSelect && e->base != nullptr) {
-    return SelectStorageBits(*var, e, ctx, arena).width;
+    return SelectExprWidth(*var, e, ctx, arena);
   }
   return var->value.width;
+}
+
+// §11.5.1: whether the concatenation lvalue element `e`, having resolved to
+// `var`, addresses any bit of it. A select whose address lies wholly outside
+// the declared bounds or carries x or z addresses none, that write having "no
+// effect on the data stored"; every other element shape names the whole of the
+// variable it resolved to.
+//
+// This is the second of the two questions ConcatLhsElemWidth used to answer as
+// well as the first, and it is asked on its own because an element that writes
+// nothing has to leave everything else about its target alone too: the blocking
+// path would otherwise wake the target's watchers for a change §9.4.2 never
+// saw, and the §10.6 path would mark the whole variable forced.
+bool ConcatLhsElemHasWritableBits(const Expr* e, const Variable& var,
+                                  SimContext& ctx, Arena& arena) {
+  if (e->kind != ExprKind::kSelect || e->base == nullptr) return true;
+  return SelectStorageBits(var, e, ctx, arena).width > 0;
 }
 
 static void UnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
@@ -526,9 +590,16 @@ static void UnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
     if (!var) continue;
     // A select element takes the bits it named and leaves the rest of its
     // variable standing; writing the variable whole gave `{a[3:0], b}` all of
-    // `a`. WriteBitSelect is the writer that resolves the same window this
-    // element's width came from.
+    // `a`. WriteBitSelect resolves the window §11.5.1 gives the indices, which
+    // is a narrower thing than the width the element took above whenever the
+    // select runs off the end of its object.
     if (el->kind == ExprKind::kSelect && el->base != nullptr) {
+      // §11.5.1: a select addressing no bit of its object "shall have no effect
+      // on the data stored when written", so this element writes nothing and
+      // wakes nobody, having already taken its own width of the value above.
+      // WriteBitSelect declines the write on its own but not the notification
+      // below, and §9.4.2 detects a change rather than an attempt at one.
+      if (!ConcatLhsElemHasWritableBits(el, *var, ctx, arena)) continue;
       WriteBitSelect(var, el, slice, ctx, arena);
       // §9.4.2 detects a non-edge implicit event "on any change in the value
       // of the expression", and this element changes one. §4.9.3 states the

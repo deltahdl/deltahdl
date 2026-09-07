@@ -589,8 +589,16 @@ struct ConcatElemSlot {
 // The window of the right-hand value `slot` owns and the window of its own
 // storage that receives it. A whole-variable element takes its bits into the
 // whole of itself; a select element takes them into the bits §11.5.1 says its
-// indices address, "determined by the declaration", which is the window
-// ConcatLhsElemWidth sized the element with, so the two agree by construction.
+// indices address, "determined by the declaration".
+//
+// The two windows are two answers and not one: the element is as wide as
+// ConcatLhsElemWidth makes it whether or not its address is in bounds, and it
+// writes only the bits SelectStorageBits leaves it. They differ for a
+// part-select that is partly out of range, which §11.5.1 has "when written,
+// only affect the bits that are in range" -- `a[9:6]` on `logic [7:0] a` is
+// four bits of the concatenation landing on the two of them that exist. An
+// empty window never reaches here: ApplyToConcatElement declines the element
+// first, so the dst_width of zero below still means the whole variable.
 static RhsWatcherSpec SpecForSlot(const ConcatElemSlot& slot, SimContext& ctx,
                                   Arena& arena) {
   PartSelectBits dst{0, slot.width};
@@ -668,8 +676,18 @@ static void ReleaseOneElement(const ConcatElemSlot& slot, const Stmt* stmt,
 
 // Routes one element to the statement that named it: the two statements that
 // install a procedural continuous assignment, and the two that end one.
+//
+// An element addressing no bit of its target is routed nowhere. §11.5.1 gives
+// such a write "no effect on the data stored", and for these four statements
+// that has to mean the target is left exactly as it was found: is_forced is one
+// flag on the whole Variable, so setting it for an element owning none of its
+// bits would suppress every driver of every bit of it, and the watchers
+// installed with it would go on recomputing a value into it. The element has
+// already taken its own width of the right-hand value, which is what the caller
+// advances past.
 static void ApplyToConcatElement(const ConcatElemSlot& slot, const Stmt* stmt,
                                  SimContext& ctx, Arena& arena) {
+  if (!ConcatLhsElemHasWritableBits(slot.el, *slot.var, ctx, arena)) return;
   if (stmt->kind == StmtKind::kRelease || stmt->kind == StmtKind::kDeassign) {
     ReleaseOneElement(slot, stmt, ctx, arena);
     return;
@@ -691,10 +709,11 @@ static void ApplyToConcatElement(const ConcatElemSlot& slot, const Stmt* stmt,
 // the offset, which is what UnpackConcatLhs does with the same element on the
 // blocking path. Nothing here knows its width to be anything else, so no other
 // advance is available, and a force and an assignment to such a target misalign
-// the elements to its left together rather than disagreeing. That the width is
-// also zero for a select addressing no bit of its object, which is one bit of
-// the concatenation and not none, is #3525 and is answered in that width rather
-// than here.
+// the elements to its left together rather than disagreeing.
+//
+// A select addressing no bit of its object is not that element: §11.5.1 gives
+// it the width its indices name and no bits of its target to write, so the
+// offset advances past it and ApplyToConcatElement declines it.
 static uint32_t WalkConcatLhsElements(const Expr* lhs, const Stmt* stmt,
                                       uint32_t bit_offset, SimContext& ctx,
                                       Arena& arena) {
