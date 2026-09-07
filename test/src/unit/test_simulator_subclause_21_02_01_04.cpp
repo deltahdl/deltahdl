@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
@@ -46,6 +47,20 @@ void ExpectPercentVOutput(const std::string& src, const std::string& expected) {
   SimFixture f;
   std::string out = CaptureDisplayOutput(src, f);
   EXPECT_NE(out.find(expected), std::string::npos);
+}
+
+// Runs a source declaring one net as `decl` and passing it to %v, and asserts
+// the run reported §21.2.1.4's "shall" against that operand at the line of the
+// call, so the vector and one-bit-vector cases differ only in the declaration
+// they name.
+void ExpectPercentVOperandReported(const std::string& decl) {
+  SimFixture f;
+  const std::string kSrc =
+      "module m;\n  " + decl + "\n  initial $display(\"%v\", w);\nendmodule\n";
+  CaptureDisplayOutput(kSrc, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "%v format specification takes a scalar reference",
+                            LineHolding(kSrc, "$display"), "21.2.1.4"));
 }
 
 // Table 21-5: a strong drive of a logic 1 renders with the St mnemonic and the
@@ -529,6 +544,37 @@ TEST(StrengthFormat, NonNetOperandToPercentVRendersEmpty) {
       "endmodule\n",
       f);
   EXPECT_NE(out.find("[]"), std::string::npos);
+}
+
+// §21.2.1.4 admits a scalar reference alone: "a corresponding scalar reference
+// shall follow the string literal in the argument list". A four-bit net is a
+// vector (§6.9), and one three-character group cannot stand for its four bits,
+// so the operand is reported rather than rendered.
+TEST(StrengthFormat, VectorNetOperandToPercentVIsReported) {
+  ExpectPercentVOperandReported("wire [3:0] w;");
+}
+
+// The one-bit vector, settled explicitly rather than by accident: §6.9 makes an
+// object a scalar by its being "declared ... without a range specification", so
+// `wire [0:0] w` is a vector however wide it is, and %v does not admit it. A
+// check written on the width alone would accept this.
+TEST(StrengthFormat, SingleBitVectorNetOperandToPercentVIsReported) {
+  ExpectPercentVOperandReported("wire [0:0] w;");
+}
+
+// The check does not reject what the clause admits: a net declared with no
+// range is the scalar reference §21.2.1.4 asks for, and a run passing one to %v
+// reports nothing at all.
+TEST(StrengthFormat, ScalarNetOperandToPercentVIsNotReported) {
+  SimFixture f;
+  CaptureDisplayOutput(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign w = 1'b1;\n"
+      "  initial #1 $display(\"%v\", w);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
 }
 
 }  // namespace

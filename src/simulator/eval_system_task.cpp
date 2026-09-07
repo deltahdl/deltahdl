@@ -13,9 +13,11 @@
 #include "parser/ast.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/net.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
+#include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
 
 namespace delta {
@@ -370,13 +372,41 @@ static std::string BuildFormatP(const Expr* arg, const Logic4Vec& val,
   return FormatSingularForP(val, DataTypeKind::kImplicit);
 }
 
+// §6.9: a data object "declared ... without a range specification shall be
+// considered 1-bit wide and is known as a scalar", and one declared with a
+// range is a vector. The declaration is what that definition keys on, not the
+// width, so `wire [0:0] w` is a vector here: it is one bit wide and yet carries
+// the range the sentence turns on. Reading the width as well as the range
+// covers the net whose declared bounds this scope could not fold, which
+// RecordPackedRange leaves unrecorded while the storage it sized still says the
+// net is multibit.
+static bool IsScalarNet(const Variable& var) {
+  return !var.has_packed_range && var.value.width == 1;
+}
+
 // §21.2.1.4: %v reports the strength of a scalar net, so the operand is looked
 // up as a net and rendered from its resolved strength. An operand that does
 // not name a net carries no strength model and yields an empty string.
+//
+// "For each %v specification that appears in a string literal, a corresponding
+// scalar reference shall follow the string literal in the argument list", so a
+// net that is not scalar is reported rather than rendered: the strength the
+// clause defines is "the strength of a scalar net ... reported in a
+// three-character format", and one such group stands for one scalar, not for
+// however many bits a vector holds.
 static std::string BuildFormatV(const Expr* arg, SimContext& ctx) {
   if (arg->kind != ExprKind::kIdentifier) return "";
   Net* net = ctx.FindNet(arg->text);
-  if (net == nullptr) return "";
+  if (net == nullptr || net->resolved == nullptr) return "";
+  if (!IsScalarNet(*net->resolved)) {
+    ctx.GetDiag().Error(arg->range.start,
+                        "a %v format specification takes a scalar reference, "
+                        "and '" +
+                            std::string(arg->text) +
+                            "' is declared with a range",
+                        Subclause("21.2.1.4"));
+    return "";
+  }
   return FormatStrength(net->resolved_strength);
 }
 
