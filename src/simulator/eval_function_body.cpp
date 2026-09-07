@@ -112,6 +112,16 @@ static void ExecFuncIdentifierAssign(const Expr* lhs, const Logic4Vec& val,
                                      SimContext& ctx, Arena& arena) {
   auto* var = ctx.FindVariable(lhs->text);
   if (var) {
+    // §10.6.2: "A force statement to a variable shall override a procedural
+    // assignment, continuous assignment or an assign procedural continuous
+    // assignment to the variable until a release procedural statement is
+    // executed on the variable." §10.4 puts procedural assignments "within
+    // procedures such as always, initial, task, and function", so an assignment
+    // written in a subroutine body is one of the assignments a force overrides,
+    // and this executor consulted the flag nowhere. AssignToScalarLhs declines
+    // on the same test outside a subroutine. A release clears the flag and
+    // leaves the value standing, so the next assignment through here lands.
+    if (var->is_forced) return;
     if (var->is_string) {
       var->value = val;
       return;

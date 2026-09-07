@@ -409,4 +409,80 @@ TEST(ForceReleaseSim, ReleasedNetReportsItsDriversStrengthAgain) {
   EXPECT_NE(out.find("Pu1"), std::string::npos) << out;
 }
 
+// §10.4 puts procedural assignments "within procedures such as always, initial,
+// task, and function", so the assignment a force overrides is the same
+// statement wherever it is written. A subroutine body runs on the statement
+// executor in eval_function_body.cpp rather than the one
+// ForcePreventsBlockingAssign above exercises, and that executor consulted the
+// flag nowhere, so a task could overwrite a forced variable.
+TEST(ForceReleaseSim, ForcePreventsATaskBodyAssign) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  task poke();\n"
+      "    x = 8'd100;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    force x = 8'd50;\n"
+      "    poke();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_TRUE(x->is_forced);
+
+  EXPECT_EQ(x->value.ToUint64(), 50u);
+}
+
+// A function body takes the same executor by its own call path, so neither
+// stands for the other.
+TEST(ForceReleaseSim, ForcePreventsAFunctionBodyAssign) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  function void poke();\n"
+      "    x = 8'd100;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    force x = 8'd50;\n"
+      "    poke();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_TRUE(x->is_forced);
+
+  EXPECT_EQ(x->value.ToUint64(), 50u);
+}
+
+// The other half of §10.6.2: the override lasts "until a release procedural
+// statement is executed on the variable", and a released variable "shall
+// maintain its current value until the next procedural assignment to the
+// variable is executed". That next assignment is the one inside the task here,
+// so this is what says the decline above is bounded by the release rather than
+// standing for the rest of the run.
+TEST(ForceReleaseSim, ReleaseThenATaskBodyAssignResumes) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  task poke();\n"
+      "    x = 8'd77;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    force x = 8'd50;\n"
+      "    poke();\n"
+      "    release x;\n"
+      "    poke();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_FALSE(x->is_forced);
+
+  EXPECT_EQ(x->value.ToUint64(), 77u);
+}
+
 }  // namespace
