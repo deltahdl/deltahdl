@@ -723,22 +723,15 @@ TEST(FunctionDeclParsing, DpiImportWithTwoPropertiesReversedRejected) {
 // One property is what the production admits, so neither case above may be
 // satisfied by a parser that turns the context property away outright.
 TEST(FunctionDeclParsing, DpiImportWithOnePropertyAccepted) {
-  SourceManager mgr;
-  Arena arena;
-  auto fid = mgr.AddFile("<test>",
-                         "module m;\n"
-                         "  import \"DPI-C\" context function int f();\n"
-                         "endmodule\n");
-  DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  auto r = parser.Parse();
-  EXPECT_FALSE(diag.HasErrors());
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" context function int f();\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.cu->modules.empty());
-  ASSERT_FALSE(r.cu->modules[0]->items.empty());
-  EXPECT_TRUE(r.cu->modules[0]->items[0]->dpi_is_context);
-  EXPECT_FALSE(r.cu->modules[0]->items[0]->dpi_is_pure);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_TRUE(item->dpi_is_context);
+  EXPECT_FALSE(item->dpi_is_pure);
 }
 
 }  // namespace
