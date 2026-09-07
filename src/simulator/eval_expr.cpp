@@ -957,10 +957,29 @@ Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
       var->value = result;
     }
   } else if (expr->lhs->kind == ExprKind::kSelect) {
-    // An associative element's width is the array's rather than a variable's,
-    // and TryAssocIndexedWrite is what knows it; a select of a packed variable
-    // reaches no writer here at all. Both are #3490's remaining half.
-    TryAssocIndexedWrite(expr->lhs, result, ctx, arena);
+    // §11.3.6 gives the expression the left-hand side's data type, and a
+    // select's type is the window it names rather than the variable it names it
+    // in -- SelectStorageBits is what measures that window, where
+    // LhsContextWidth would answer with the whole variable's width. A select
+    // that resolves to no variable of the design is an associative or queue
+    // element, whose width comes from its container and whose writer applies
+    // it.
+    if (auto* var = ResolveLhsVariable(expr->lhs, ctx)) {
+      uint32_t sel_width = SelectStorageBits(*var, expr->lhs, ctx, arena).width;
+      if (sel_width != 0) result = ResizeToWidth(result, sel_width, arena);
+    }
+    // TrySelectBlockingAssign is what the statement form reaches, and it
+    // answers for every select §10.4 admits: an unpacked array element, a queue
+    // or associative element, the bits of an associative element, a compound
+    // a[i][j], the byte a string's index names, and otherwise the window a
+    // bit-select or part-select opens. Asking only TryAssocIndexedWrite left
+    // every one of the others writing nothing and reporting nothing.
+    TrySelectBlockingAssign(expr->lhs, result, ctx, arena);
+  } else if (expr->lhs->kind == ExprKind::kMemberAccess) {
+    // §10.4 admits a member access as a left-hand side too, and the statement
+    // form reaches WriteStructField for it. This arm did not exist, so
+    // `q = (s.lo += 3)` wrote nothing.
+    WriteStructField(expr->lhs, result, ctx);
   }
   return result;
 }

@@ -189,4 +189,79 @@ TEST(AssignmentWithinExpression, ConcatTargetResultWidthIsSumOfOperandWidths) {
       {{"hi", 0xAu}, {"lo", 0xBCu}, {"q", 0x00000ABCu}});
 }
 
+// C2 holds for every left-hand side §10.4 admits, not only a plain identifier.
+// A compound assignment written as an expression reached one writer -- the one
+// that answers for an associative element -- so every other target was updated
+// by nothing at all and only the returned value showed the operation had
+// happened. Each case below reads the target as well as the value, since the
+// value alone was already right.
+
+// An unpacked array element. `arr[2]` keeps 10 where the write was dropped.
+TEST(AssignmentWithinExpression, CompoundAssignToAnArrayElementUpdatesIt) {
+  RunAndCheck(
+      "module t;\n"
+      "  int arr [0:3];\n"
+      "  int q;\n"
+      "  initial begin\n"
+      "    arr[2] = 10;\n"
+      "    q = (arr[2] += 5);\n"
+      "  end\n"
+      "endmodule\n",
+      {{"arr[2]", 15u}, {"q", 15u}});
+}
+
+// A bit-select of a packed variable, which names a one-bit window rather than
+// the variable it is cut from. The other seven bits standing is what says the
+// window was written rather than the whole of `d`.
+TEST(AssignmentWithinExpression, CompoundAssignToABitSelectWritesOnlyThatBit) {
+  RunAndCheck(
+      "module t;\n"
+      "  logic [7:0] d;\n"
+      "  logic q;\n"
+      "  initial begin\n"
+      "    d = 8'h00;\n"
+      "    q = (d[3] += 1'b1);\n"
+      "  end\n"
+      "endmodule\n",
+      {{"d", 0x08u}, {"q", 1u}});
+}
+
+// A part-select, loaded beforehand so three answers separate: 0xF0 where the
+// write was dropped, 0xF3 where the named bits took it, and 0x03 where the
+// value replaced the variable whole.
+TEST(AssignmentWithinExpression,
+     CompoundAssignToAPartSelectWritesOnlyThoseBits) {
+  RunAndCheck(
+      "module t;\n"
+      "  logic [7:0] d;\n"
+      "  logic [3:0] q;\n"
+      "  initial begin\n"
+      "    d = 8'hF0;\n"
+      "    q = (d[3:0] += 4'd3);\n"
+      "  end\n"
+      "endmodule\n",
+      {{"d", 0xF3u}, {"q", 3u}});
+}
+
+// A packed struct member, which the expression form named no writer for at all.
+// The neighbouring member is read too, since a write that took the whole
+// variable would reach it.
+TEST(AssignmentWithinExpression, CompoundAssignToAStructMemberUpdatesIt) {
+  RunAndCheck(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    logic [3:0] hi;\n"
+      "    logic [3:0] lo;\n"
+      "  } pair_t;\n"
+      "  pair_t s;\n"
+      "  int q;\n"
+      "  initial begin\n"
+      "    s.hi = 4'd2;\n"
+      "    s.lo = 4'd5;\n"
+      "    q = (s.lo += 4'd3);\n"
+      "  end\n"
+      "endmodule\n",
+      {{"s", 0x28u}, {"q", 8u}});
+}
+
 }  // namespace
