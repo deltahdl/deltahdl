@@ -122,6 +122,22 @@ Logic4Vec MakeAllX(Arena& arena, uint32_t width) {
   return vec;
 }
 
+// §28.12: a value every bit of which is high impedance, which is what a source
+// driving none of a net contributes to resolution -- a driver at z drives
+// nothing, so the bits a partial driver leaves at z are resolved by the net's
+// other sources alone. Only the bits the width names are set, the rest of the
+// last word staying clear so that nothing above the value reads as driven.
+Logic4Vec MakeAllHighZ(Arena& arena, uint32_t width) {
+  auto vec = MakeLogic4Vec(arena, width);
+  for (uint32_t i = 0; i < vec.nwords; ++i) {
+    uint32_t bits_here = width - i * 64;
+    uint64_t mask =
+        bits_here >= 64 ? ~uint64_t{0} : (uint64_t{1} << bits_here) - 1;
+    vec.words[i] = {0, mask};
+  }
+  return vec;
+}
+
 // Writes the low `w` bits of {aval,bval} into `result` starting at bit_pos,
 // spanning the 64-bit word boundary when the chunk straddles two words.
 static void WriteConcatChunk(Logic4Vec& result, uint32_t bit_pos, uint32_t w,

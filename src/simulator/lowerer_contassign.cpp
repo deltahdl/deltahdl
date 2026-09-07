@@ -24,6 +24,8 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/packed_range.h"
+#include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
 #include "parser/ast.h"
@@ -37,6 +39,7 @@
 #include "simulator/specify.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -145,6 +148,17 @@ struct ContAssignDriver {
   Net* net = nullptr;
   size_t driver_idx = 0;
   bool first = true;
+  // §10.3.2: which bits of `net` this assignment drives. A bare identifier
+  // drives the whole net; a select drives the bits §11.5.1 gives its indices
+  // and high impedance everywhere else, so that §28.12 combines it with the
+  // net's other sources the way it combines any two. `lo` counts from the least
+  // significant end of the net's storage, and a width of zero with `partial`
+  // set is the select that addresses no bit of the net at all -- an index out
+  // of range, or one carrying x or z -- which §11.5.1 gives no effect and which
+  // therefore drives nothing.
+  bool partial = false;
+  uint32_t lo = 0;
+  uint32_t width = 0;
 };
 
 // The value a continuous-assignment driver contributes to net resolution: the
@@ -229,19 +243,39 @@ static DriverStrength ComputeEffectiveDriverStrength(
   return effective_ds;
 }
 
+// The value this assignment contributes to its net's resolution, over the
+// net's full width.
+//
+// §10.7: "The size of the left-hand side of an assignment forms the context for
+// the right-hand expression", and a right-hand side of fewer bits "is padded to
+// the size of the left-hand side", sign-extended where it is signed. For a bare
+// identifier the left-hand side is the net, so the value is extended to it --
+// pushed as it stands it would drive the low bits and leave every bit above
+// them to resolve as undriven.
+//
+// For a select the left-hand side is the selected bits, so the padding context
+// is their width, and the driver is that value in place with high impedance
+// around it. §28.12 then resolves each bit against the net's other sources, and
+// the bits this assignment does not name are decided without it -- which is
+// what a source driving part of a net is.
+static Logic4Vec ContAssignDriverValue(const ContAssignDriver& drv,
+                                       const Logic4Vec& value, Arena& arena) {
+  uint32_t net_width = drv.net->resolved->value.width;
+  if (!drv.partial) return ResizeToWidth(value, net_width, arena);
+  Logic4Vec out = MakeAllHighZ(arena, net_width);
+  if (drv.width > 0) {
+    Logic4Vec sized = ResizeToWidth(value, drv.width, arena);
+    DepositBitField(out, drv.lo, sized, drv.width);
+  }
+  return out;
+}
+
 static void ApplyContAssignToNet(const ContAssignDriver& drv,
                                  const ContAssignDrivenValue& driven,
                                  Scheduler* sched, Arena& arena) {
-  // §10.7: "The size of the left-hand side of an assignment forms the context
-  // for the right-hand expression", and a right-hand side of fewer bits "is
-  // padded to the size of the left-hand side", sign-extended where it is
-  // signed. The width is the net's, so a driver narrower than the net it drives
-  // is extended to it here -- pushed as it stands it would drive the low bits
-  // and leave every bit above them to resolve as undriven. ApplyContAssignToNet
-  // is the net's half of the same step ApplyContAssignToVariable takes for a
-  // variable target.
-  auto value =
-      ResizeToWidth(driven.value, drv.net->resolved->value.width, arena);
+  // ApplyContAssignToNet is the net's half of the same step
+  // ApplyContAssignToVariable takes for a variable target.
+  auto value = ContAssignDriverValue(drv, driven.value, arena);
   if (drv.first) {
     drv.net->drivers.push_back(value);
     drv.net->driver_strengths.push_back(driven.strength);
@@ -296,17 +330,24 @@ static void ApplyContAssignResult(const ContAssignParams& params,
   }
 }
 
+// The value the target holds now, which §10.3.3's rules read to choose among an
+// assignment's rise, fall and turn-off delays. For a select the target is the
+// selected bits, so the comparison is against those bits and not against the
+// whole net around them.
 static Logic4Vec CurrentContAssignOldValue(const ContAssignParams& params,
-                                           const Net* net, SimContext& ctx,
-                                           Arena& arena) {
+                                           const ContAssignDriver& drv,
+                                           SimContext& ctx, Arena& arena) {
   Logic4Vec old_val = MakeLogic4VecVal(arena, 1, 0);
   auto* var = params.lhs->kind == ExprKind::kIdentifier
                   ? ctx.FindVariable(params.lhs->text)
                   : nullptr;
-  if (var)
+  if (var) {
     old_val = var->value;
-  else if (net && net->resolved)
-    old_val = net->resolved->value;
+  } else if (drv.net && drv.net->resolved) {
+    old_val = drv.partial ? ExtractBitField(arena, drv.net->resolved->value,
+                                            drv.lo, drv.width)
+                          : drv.net->resolved->value;
+  }
   return old_val;
 }
 
@@ -364,12 +405,79 @@ static void CommitContAssignValue(const ContAssignParams& params,
       params, drv, ContAssignDrivenValue{driven_val, effective_ds}, ctx, arena);
 }
 
-static ContAssignDriver MakeContAssignDriver(Net* net) {
+// §11.5.1: the storage bits of `var` that `sel` addresses, resolved against the
+// declaration, since "the actual bit that is accessed by an address is, in
+// part, determined by the declaration". A width of zero is the select that
+// addresses no bit of the object: an index carrying x or z, which §11.5.1 has
+// "return x" when read and have "no effect on the data stored when written",
+// and an index or a range wholly outside the declared bounds, which the same
+// sentence covers.
+static PartSelectBits ContAssignSelectBits(const Variable& var, const Expr* sel,
+                                           SimContext& ctx, Arena& arena) {
+  auto idx_val = EvalExpr(sel->index, ctx, arena);
+  if (HasUnknownBits(idx_val)) return {0, 0};
+  auto idx = static_cast<int64_t>(idx_val.ToUint64());
+  if (sel->index_end == nullptr) {
+    // §7.4.1: one index of a packed multidimensional array addresses an element
+    // rather than a bit, and the element is as many bits wide as the array's
+    // innermost dimension.
+    if (var.packed_elem_width > 1) {
+      PackedRange elems = var.DeclaredRange();
+      if (!elems.Contains(idx)) return {0, 0};
+      auto base = static_cast<uint32_t>(elems.OffsetOf(idx));
+      return {base * var.packed_elem_width, var.packed_elem_width};
+    }
+    PackedRange range = var.BitSelectRange();
+    if (!range.Contains(idx)) return {0, 0};
+    return {static_cast<uint32_t>(range.OffsetOf(idx)), 1};
+  }
+  auto end_val = EvalExpr(sel->index_end, ctx, arena);
+  if (HasUnknownBits(end_val)) return {0, 0};
+  auto target = PartSelectTargetIndices(
+      idx, static_cast<int64_t>(end_val.ToUint64()), sel->is_part_select_plus,
+      sel->is_part_select_minus);
+  return PartSelectStorageBits(var.BitSelectRange(), target.first,
+                               target.second);
+}
+
+// §10.3.2: the net this assignment drives, or a driver with no net where the
+// target is a variable or an lvalue this does not decompose. Which bits of the
+// net a select names is left to RefreshContAssignDriverBits below, which reads
+// it again before each evaluation drives them. A concatenation, a streaming
+// concatenation and a member access each reach something other than one run of
+// one net's bits -- Example 2 of §10.3.2 writes `assign {carry_out, sum_out} =
+// ...`, which is two nets -- so they keep the direct write
+// ApplyContAssignToVariable does and are not drivers yet.
+static ContAssignDriver MakeContAssignDriver(const Expr* lhs, SimContext& ctx) {
   ContAssignDriver drv;
-  drv.net = net;
-  drv.driver_idx = net ? net->drivers.size() : 0;
+  if (lhs->kind == ExprKind::kIdentifier) {
+    drv.net = ctx.FindNet(lhs->text);
+  } else if (lhs->kind == ExprKind::kSelect && lhs->base != nullptr &&
+             lhs->base->kind == ExprKind::kIdentifier) {
+    Net* net = ctx.FindNet(lhs->base->text);
+    if (net != nullptr && net->resolved != nullptr) {
+      drv.net = net;
+      drv.partial = true;
+    }
+  }
+  drv.driver_idx = drv.net ? drv.net->drivers.size() : 0;
   drv.first = true;
   return drv;
+}
+
+// Re-reads which bits of the net a select target names, before each evaluation
+// drives them. §10.3.2 makes a continuous assignment continuous and automatic,
+// so an index that is itself an operand moves the driven bits when it changes,
+// the way it moves the bits a procedural write reaches. The driver slot does
+// not move with them: it is the same assignment driving the same net,
+// contributing high impedance wherever its index is not currently pointing.
+static void RefreshContAssignDriverBits(ContAssignDriver& drv, const Expr* lhs,
+                                        SimContext& ctx, Arena& arena) {
+  if (!drv.partial || drv.net == nullptr) return;
+  PartSelectBits bits =
+      ContAssignSelectBits(*drv.net->resolved, lhs, ctx, arena);
+  drv.lo = bits.lo;
+  drv.width = bits.width;
 }
 
 // The loop-invariant context threaded through the inertial-delay re-evaluation
@@ -461,13 +569,14 @@ struct ContAssignWait {
 // §30.7's pulse filtering places two values on the output -- x and then the
 // value the pulse returned to, or the pulse's own two edges. Every other wait
 // leaves the single commit to the caller.
-static ExecTask RunContAssignWait(const ContAssignWait& w, const Net* net,
-                                  Logic4Vec& val, bool* committed) {
+static ExecTask RunContAssignWait(const ContAssignWait& w,
+                                  const ContAssignDriver& drv, Logic4Vec& val,
+                                  bool* committed) {
   ContAssignDelays d;
   if (w.params.delays.rise) {
     d = BuildContAssignDelays(w.params.delays, w.ctx, w.arena);
   }
-  Logic4Vec old_val = CurrentContAssignOldValue(w.params, net, w.ctx, w.arena);
+  Logic4Vec old_val = CurrentContAssignOldValue(w.params, drv, w.ctx, w.arena);
   uint64_t ticks = w.params.delays.rise
                        ? SelectContAssignDelay(old_val, val, d, w.params.width)
                        : 0;
@@ -509,8 +618,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
   std::vector<std::string_view> read_vars(read_strs.begin(), read_strs.end());
   DropUnwatchableNames(ctx, read_vars);
 
-  auto* net = lhs_is_name ? ctx.FindNet(params.lhs->text) : nullptr;
-  ContAssignDriver drv = MakeContAssignDriver(net);
+  ContAssignDriver drv = MakeContAssignDriver(params.lhs, ctx);
 
   // The name a module path declared in this instance gives this assignment's
   // target: the bare identifier under the instance prefix, which is what
@@ -546,12 +654,13 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
   while (!evaluated_once || !ctx.StopRequested()) {
     evaluated_once = true;
     auto val = EvalExpr(params.rhs, ctx, arena, params.width);
+    RefreshContAssignDriverBits(drv, params.lhs, ctx, arena);
 
     bool committed = false;
     if (params.delays.rise || path_mgr != nullptr) {
       ContAssignWait wait{params,   ctx,         arena, read_vars,
                           path_mgr, path_output, commit};
-      co_await RunContAssignWait(wait, net, val, &committed);
+      co_await RunContAssignWait(wait, drv, val, &committed);
     }
 
     if (!committed) commit(val);

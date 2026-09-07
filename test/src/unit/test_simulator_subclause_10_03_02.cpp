@@ -1,6 +1,8 @@
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
+#include "simulator/net.h"
+#include "simulator/sim_context.h"
 #include "simulator/variable.h"
 
 using namespace delta;
@@ -125,6 +127,73 @@ TEST(ContAssignStatementSim, ContAssignDrivesImplicitlyDeclaredNet) {
       f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// §10.3.2: "Nets can be driven by multiple continuous assignments or by a
+// mixture of primitive outputs, module outputs, and continuous assignments." A
+// continuous assignment into a select of a net is one of those drivers, so the
+// net has a driver to resolve rather than a value written into it behind
+// resolution's back. A whole-identifier target cannot fail this.
+TEST(ContAssignStatementSim, SelectTargetRegistersADriverOnTheNet) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire [1:0] w;\n"
+      "  assign w[0] = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* w = f.ctx.FindNet("w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->drivers.size(), 1u);
+}
+
+// The driver drives only the bits the select names, and high impedance
+// everywhere else, so §28.12 decides the rest of the net from its other
+// sources. §6.6.5 gives a tri0 net "a continuous 0 of pull strength" wherever
+// nothing overrides it, and that is what the undriven nibble resolves to: the
+// low nibble is the assignment's strong 1 and the high nibble the net's own
+// pull 0. Written into storage rather than resolved, the net would report the
+// undriven answer for all eight bits.
+TEST(ContAssignStatementSim, SelectTargetDrivesOnlyTheBitsItNames) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  tri0 [7:0] w;\n"
+      "  assign w[3:0] = 4'hF;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* w = f.ctx.FindNet("w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->BitStrength(0).s1_hi, Strength::kStrong);
+  EXPECT_EQ(w->BitStrength(0).s0_hi, Strength::kHighz);
+  EXPECT_EQ(w->BitStrength(4).s0_hi, Strength::kPull);
+  EXPECT_EQ(w->BitStrength(4).s1_hi, Strength::kHighz);
+}
+
+// Two assignments into overlapping selects of one net are two drivers, and
+// §28.12 combines them where they overlap: bits 1 and 2 are driven 1 by one and
+// 0 by the other at the same strength, which resolves to x, while the bits only
+// one of them names keep that one's value. A direct write into storage would
+// leave whichever assignment ran last standing over the whole overlap.
+TEST(ContAssignStatementSim, OverlappingSelectTargetsResolveAgainstEachOther) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire [3:0] w;\n"
+      "  assign w[2:0] = 3'b111;\n"
+      "  assign w[3:1] = 3'b000;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* w = f.ctx.FindNet("w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->drivers.size(), 2u);
+  EXPECT_EQ(w->resolved->value.ToString(), "0xx1");
 }
 
 }  // namespace

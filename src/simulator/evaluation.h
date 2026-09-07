@@ -32,6 +32,10 @@ uint32_t LiteralWidth(std::string_view text, uint64_t val);
 
 bool HasUnknownBits(const Logic4Vec& v);
 Logic4Vec MakeAllX(Arena& arena, uint32_t width);
+
+// §28.12: a value every bit of which is high impedance, for a source that
+// drives none of the bits it is built over.
+Logic4Vec MakeAllHighZ(Arena& arena, uint32_t width);
 int64_t SignExtend(uint64_t val, uint32_t width);
 
 // §7.10.1 — the value a read of a queue element that is not there yields. An
