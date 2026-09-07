@@ -45,6 +45,18 @@ Logic4Vec ConvertRealForKnownLhs(Logic4Vec rhs_val, bool lhs_is_real,
 // Clause 7, and this decides which of those a select names and writes it
 // accordingly. Always returns true: a select target is this function's to
 // answer for, whether or not it found something to write.
+// Defined in statement_assign_core.cpp; also used by EvalCompoundAssign in
+// eval_expr.cpp. §11.4.1 makes one exception to a compound assignment being an
+// ordinary blocking assignment -- "any left-hand index expression is only
+// evaluated once" -- and the helpers that resolve, read and write a select
+// target each re-derive it from lhs->index, which would call a side-effecting
+// index several times. Snapshot evaluates each index node once and stashes the
+// result for those later reads to find; Clear undoes it, and has to run on
+// every exit or the snapshot leaks into a later statement reusing the same
+// node.
+void SnapshotSelectIndices(const Expr* lhs, SimContext& ctx, Arena& arena);
+void ClearSelectIndices(const Expr* lhs, SimContext& ctx);
+
 bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
                              SimContext& ctx, Arena& arena);
 

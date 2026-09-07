@@ -381,4 +381,79 @@ TEST(LvalueSim, CompoundAssignExpressionYieldsTheTargetsDataType) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
+// §11.4.1's once-only rule is a property of the operator, not of where it is
+// written, and the three cases above all write it as a bare statement -- which
+// is intercepted before the expression evaluator and reaches the path that
+// snapshots the indices. §11.3.6 admits the parenthesized form, and any
+// compound assignment used as an operand reaches EvalCompoundAssign instead,
+// where the allocation, the read and the write each re-derived the target from
+// the index and called it again.
+
+// The unpacked array element, written as an expression. The counter is what
+// discriminates: the value was already right, each call returning the same
+// index.
+TEST(LvalueSim, CompoundAssignAsAnExpressionEvaluatesLvalueIndexOnce) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int arr [0:3];\n"
+      "  int idx_calls;\n"
+      "  int q;\n"
+      "  function automatic int idx_fn();\n"
+      "    idx_calls = idx_calls + 1;\n"
+      "    return 2;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    arr[0] = 0; arr[1] = 0; arr[2] = 10; arr[3] = 0;\n"
+      "    idx_calls = 0;\n"
+      "    q = (arr[idx_fn()] += 5);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* arr_elem = f.ctx.FindVariable("arr[2]");
+  auto* calls = f.ctx.FindVariable("idx_calls");
+  ASSERT_NE(arr_elem, nullptr);
+  ASSERT_NE(calls, nullptr);
+
+  EXPECT_EQ(arr_elem->value.ToUint64(), 15u);
+  EXPECT_EQ(calls->value.ToUint64(), 1u);
+}
+
+// The packed bit-select, written as an expression. It reaches a different
+// writer from the array element above, so the count is a separate reading.
+TEST(LvalueSim, CompoundAssignAsAnExpressionEvaluatesBitSelectIndexOnce) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] data;\n"
+      "  int idx_calls;\n"
+      "  logic q;\n"
+      "  function automatic int idx_fn();\n"
+      "    idx_calls = idx_calls + 1;\n"
+      "    return 3;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    data = 8'b0000_0000;\n"
+      "    idx_calls = 0;\n"
+      "    q = (data[idx_fn()] += 1'b1);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* data = f.ctx.FindVariable("data");
+  auto* calls = f.ctx.FindVariable("idx_calls");
+  ASSERT_NE(data, nullptr);
+  ASSERT_NE(calls, nullptr);
+
+  EXPECT_EQ(data->value.ToUint64(), 0x08u);
+  EXPECT_EQ(calls->value.ToUint64(), 1u);
+}
+
 }  // namespace

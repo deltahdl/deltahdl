@@ -940,6 +940,13 @@ bool IsCompoundAssignOp(TokenKind op) {
 // is the data type of the left-hand side" -- so the coerced value is what is
 // returned, which is what `b = (a += 1)`, the clause's own example, reads.
 Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
+  // §11.4.1's one exception to this being an ordinary blocking assignment:
+  // "any left-hand index expression is only evaluated once". The allocation,
+  // the read and the write below each re-derive the target from expr->lhs and
+  // would call a side-effecting index once apiece, so the indices are evaluated
+  // here and stashed for those to find. This runs before the allocation, which
+  // is itself one of the readers.
+  SnapshotSelectIndices(expr->lhs, ctx, arena);
   // §7.8.7: as in EvalIncDec, the element this reads and writes is allocated
   // before the read.
   AllocateAssocEntryForModify(expr->lhs, ctx, arena);
@@ -980,6 +987,7 @@ Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
     // `q = (s.lo += 3)` wrote nothing.
     WriteStructField(expr->lhs, result, ctx);
   }
+  ClearSelectIndices(expr->lhs, ctx);
   return result;
 }
 

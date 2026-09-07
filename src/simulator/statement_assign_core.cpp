@@ -814,8 +814,7 @@ static bool TryEventVarAssign(const Stmt* stmt, SimContext& ctx) {
 // each index expression a single time up front and stash the result as a
 // per-expression snapshot; EvalExpr returns a stored snapshot ahead of any real
 // evaluation, so every later read of the same index node reuses this value.
-static void SnapshotSelectIndices(const Expr* lhs, SimContext& ctx,
-                                  Arena& arena) {
+void SnapshotSelectIndices(const Expr* lhs, SimContext& ctx, Arena& arena) {
   if (lhs == nullptr || lhs->kind != ExprKind::kSelect) return;
   SnapshotSelectIndices(lhs->base, ctx, arena);
   if (lhs->index != nullptr)
@@ -827,7 +826,7 @@ static void SnapshotSelectIndices(const Expr* lhs, SimContext& ctx,
 
 // Undoes SnapshotSelectIndices once the compound assignment has finished so the
 // snapshots do not leak into later statements that reuse the same index nodes.
-static void ClearSelectIndices(const Expr* lhs, SimContext& ctx) {
+void ClearSelectIndices(const Expr* lhs, SimContext& ctx) {
   if (lhs == nullptr || lhs->kind != ExprKind::kSelect) return;
   ClearSelectIndices(lhs->base, ctx);
   if (lhs->index != nullptr) ctx.ClearDeferredArgSnapshot(lhs->index);
