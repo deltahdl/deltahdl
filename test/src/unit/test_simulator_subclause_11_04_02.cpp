@@ -316,4 +316,106 @@ TEST(ExpressionSim, IncrementEvaluatesItsIndexOnce) {
   LowerRunAndCheck(f, design, {{"arr[2]", 11u}, {"idx_calls", 1u}});
 }
 
+// §11.4.2 states that the increment and decrement operators "behave as blocking
+// assignments", and §11.4.1 states that an assignment operator "is semantically
+// equivalent to a blocking assignment", so `i++` and `i += 1` are one
+// assignment of one arithmetic result and §11.4.3 governs both alike: "for the
+// arithmetic operators, if any operand bit value is the unknown value x or the
+// high-impedance value z, then the entire result value shall be x". The
+// increment computed its new value as a uint64_t round-trip through
+// Logic4Vec::ToUint64, which projects `aval & ~bval` and so reads an x or a z
+// as a 0 and hands back a value every bit of which is known. The readings below
+// are of what that projection lost, and each takes its result from the words
+// rather than from ToUint64, which can express neither an unknown nor a bit
+// above 63.
+
+// Elaborates and runs a module whose module items are `decls` and whose
+// `initial` block body is `body`, then returns the variable `name` the run left
+// behind. The unknown-propagation readings differ only in those three.
+static Variable* RunIncDecBody(SimFixture& f, const std::string& decls,
+                               const std::string& body, const char* name) {
+  return RunAndFindVar("module t;\n  " + decls + "\n  initial begin " + body +
+                           " end\nendmodule\n",
+                       f, name);
+}
+
+// An `integer` is 4-state, so an all-x operand reaches the increment intact and
+// §11.4.3 makes the whole of the result x. Reading the x bits as 0 and adding 1
+// to them left i at a known 1.
+TEST(ExpressionSim, IncrementOfAnUnknownYieldsAnUnknown) {
+  SimFixture f;
+  auto* var = RunIncDecBody(f, "integer i;", "i = 'x; i++;", "i");
+  ASSERT_NE(var, nullptr);
+  EXPECT_FALSE(var->value.IsKnown());
+  EXPECT_EQ(var->value.words[0].aval & 0xFFFFFFFFu, 0xFFFFFFFFu);
+  EXPECT_EQ(var->value.words[0].bval & 0xFFFFFFFFu, 0xFFFFFFFFu);
+}
+
+// The decrement is the same operand and the same rule, and it is a separate
+// reading because it reaches EvalBinaryOp with a different token. Subtracting 1
+// from the projected 0 wrapped, so i read 32'hFFFFFFFF with every bit known.
+TEST(ExpressionSim, DecrementOfAnUnknownYieldsAnUnknown) {
+  SimFixture f;
+  auto* var = RunIncDecBody(f, "integer i;", "i = 'x; i--;", "i");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), std::string(32, 'x'));
+}
+
+// §11.4.3 makes the ENTIRE result x, not the one bit that was x. The operand
+// holds a single unknown in bit 0 and seven known bits above it; the projection
+// read that operand as 8'h04 and produced 8'h05, a result seven bits of which
+// stood and the eighth of which had lost its x.
+TEST(ExpressionSim,
+     IncrementOfAPartlyUnknownOperandYieldsAnEntirelyUnknownResult) {
+  SimFixture f;
+  auto* var = RunIncDecBody(f, "logic [7:0] p;", "p = 8'b0000_010x; p++;", "p");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.words[0].aval & 0xFFu, 0xFFu);
+  EXPECT_EQ(var->value.words[0].bval & 0xFFu, 0xFFu);
+}
+
+// The §11.4.2 and §11.4.1 equality itself: the two spellings of adding one are
+// one assignment of one arithmetic result, so they cannot answer differently
+// about the same operand. `j += 1` already went through EvalBinaryOp and
+// yielded an unknown while `i++` went through the projection and yielded a
+// known 1, so the two disagreed on identical inputs.
+TEST(ExpressionSim, IncrementAndCompoundAddAgreeOnAnUnknown) {
+  SimFixture f;
+  auto* vi =
+      RunIncDecBody(f, "integer i, j;", "i = 'x; j = 'x; i++; j += 1;", "i");
+  ASSERT_NE(vi, nullptr);
+  auto* vj = f.ctx.FindVariable("j");
+  ASSERT_NE(vj, nullptr);
+  EXPECT_FALSE(vi->value.IsKnown());
+  EXPECT_EQ(vi->value.ToString(), vj->value.ToString());
+}
+
+// HasUnknownBits scans every word and MakeAllX fills every word, so the unknown
+// operand is recognized and the unknown result is written above bit 63 as well
+// as below it. ToUint64 reads words[0] alone, so the projection produced a
+// 128-bit value whose high word was zero and every bit of which was known.
+TEST(ExpressionSim, IncrementOfAWideUnknownIsUnknownAboveTheFirstWord) {
+  SimFixture f;
+  auto* var = RunIncDecBody(f, "logic [127:0] w;", "w = 'x; w++;", "w");
+  ASSERT_NE(var, nullptr);
+  ASSERT_GE(var->value.nwords, 2u);
+  EXPECT_NE(var->value.words[1].bval, 0u);
+  EXPECT_NE(var->value.words[0].bval, 0u);
+}
+
+// The postfix form returns the operand's value from before the increment, which
+// was read straight off the variable and so was already unknown; what the
+// projection changed is the variable the same statement writes. `y = x++` left
+// y unknown and x at a known 1, an increment and its own return value
+// disagreeing about whether the operand was ever unknown.
+TEST(ExpressionSim, PostfixIncrementOfAnUnknownReturnsTheUnknownOldValue) {
+  SimFixture f;
+  auto* vy = RunIncDecBody(f, "integer x, y;", "x = 'x; y = x++;", "y");
+  ASSERT_NE(vy, nullptr);
+  auto* vx = f.ctx.FindVariable("x");
+  ASSERT_NE(vx, nullptr);
+  EXPECT_FALSE(vy->value.IsKnown());
+  EXPECT_FALSE(vx->value.IsKnown());
+}
+
 }  // namespace

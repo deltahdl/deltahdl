@@ -67,13 +67,40 @@ static IncDecResult EvalIncDec(const Expr* expr, SimContext& ctx,
     new_val = ApplyRealUnaryOp(
         old_val, (expr->op == TokenKind::kPlusPlus) ? 1.0 : -1.0, arena);
   } else {
-    uint64_t v = old_val.ToUint64();
-    uint64_t nv = (expr->op == TokenKind::kPlusPlus) ? v + 1 : v - 1;
-    new_val = MakeLogic4VecVal(arena, old_val.width, nv);
+    // §11.4.2 states these operators as blocking assignments, and §11.4.1
+    // states `i += 1` as one too, so the two spellings are one assignment of
+    // one arithmetic result and are computed by one arithmetic. That is
+    // EvalBinaryOp, which EvalCompoundAssign below already reaches, rather than
+    // a uint64_t. ToUint64 projects `aval & ~bval`, which reads an x or a z as
+    // a 0 and hands back a value every bit of which is known, so §11.4.3's
+    // "if any operand bit value is the unknown value x or the high-impedance
+    // value z, then the entire result value shall be x" was not applied to an
+    // increment at all: `integer i = 'x; i++;` left i at 1.
+    //
+    // The 1 is built at the operand's own width because EvalBinaryArith sizes
+    // its result at the wider operand: a 32-bit literal would widen a
+    // bit-select's or a part-select's result past the window being written.
+    auto one = MakeLogic4VecVal(arena, old_val.width, 1);
+    // §11.4.3.1 fixes an operand's interpretation by its declaration, and
+    // EvalBinaryArith reads signed arithmetic from both operands rather than
+    // either, so the 1 carries what the target carries. It is what leaves the
+    // result signed, an unknown result included.
+    one.is_signed = old_val.is_signed;
+    new_val =
+        EvalBinaryOp((expr->op == TokenKind::kPlusPlus) ? TokenKind::kPlus
+                                                        : TokenKind::kMinus,
+                     old_val, one, arena);
   }
   if (expr->lhs->kind == ExprKind::kIdentifier) {
     auto* var = ctx.FindVariable(expr->lhs->text);
-    if (var) var->value = new_val;
+    if (var) {
+      // §6.11.2 gives a 2-state type no x and no z, so an unknown result is
+      // coerced before it is stored, as WriteVar and EvalCompoundAssign coerce
+      // theirs. Nothing had to do this while the arithmetic above could only
+      // produce known bits.
+      if (!var->is_4state) CoerceTo2State(new_val);
+      var->value = new_val;
+    }
   } else if (expr->lhs->kind == ExprKind::kSelect) {
     TrySelectBlockingAssign(expr->lhs, new_val, ctx, arena);
   } else if (expr->lhs->kind == ExprKind::kMemberAccess) {
