@@ -767,16 +767,16 @@ TEST(JumpStatementElaboration,
 // shares it, and a case per check is what says the walk rather than the check
 // was the fix.
 TEST(JumpStatementElaboration, BreakOutsideALoopInAClassMethodIsReported) {
-  delta::ElabFixture f;
-  delta::ElaborateSrc(
+  ElabFixture f;
+  ElaborateSrc(
       "class C;\n"
       "  task go;\n"
       "    break;\n"
       "  endtask\n"
       "endclass\n",
       f);
-  EXPECT_TRUE(delta::ReportedError(
-      f.diag.Diagnostics(), "break statement is not inside a loop", 3, "12.8"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "break statement is not inside a loop", 3, "12.8"));
 }
 
 // §8.7 gives a class constructor no return type, so a bare return in one is the
@@ -785,8 +785,8 @@ TEST(JumpStatementElaboration, BreakOutsideALoopInAClassMethodIsReported) {
 // so without a guard the walk newly reaching class methods would report a
 // constructor for lacking an expression it may not have.
 TEST(JumpStatementElaboration, BareReturnInAConstructorIsAccepted) {
-  delta::ElabFixture f;
-  delta::ElaborateSrc(
+  ElabFixture f;
+  ElaborateSrc(
       "class C;\n"
       "  function new();\n"
       "    return;\n"

@@ -233,6 +233,12 @@ void CheckValueReturningFuncReturn(const Stmt* s, std::string_view func_name,
                  Subclause("12.8"));
       return;
     }
+    // A return type written as a name stands for whatever the name means, and
+    // this check has no table to look one up in: `function C::T f(); return 1;`
+    // returns an int through a class-scoped typedef of int, and comparing the
+    // literal against the unresolved name reports a source that is right. An
+    // unresolved name is left alone here as it is everywhere else.
+    if (return_type.kind == DataTypeKind::kNamed) return;
     DataTypeKind expr_kind = ObviousLiteralKind(s->expr);
     if (expr_kind != DataTypeKind::kImplicit) {
       DataType expr_type;
