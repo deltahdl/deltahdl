@@ -121,6 +121,20 @@ TEST(AssignmentPatternSimulation, LhsPositionalUnpackingTwoElements) {
 // bare pattern it wraps would. The type prefix only names the aggregate; it
 // does not alter the slicing. Here 16'hABCD splits into a=0xAB (high byte),
 // b=0xCD.
+//
+// The EXPECT_FALSE(f.has_errors) is what makes this case about the typed
+// spelling at all, and it is the only assertion here that can be. §10.9 obliges
+// each member expression to have "the same number of bits as the corresponding
+// element in the data type of the assignment pattern expression", so the bare
+// `'{a, b}` slices 16'hABCD into exactly the bytes `pair_t'{a, b}` does, and
+// LhsPositionalUnpackingTwoElements above already runs that spelling on the
+// same two values. When the type prefix was mistaken for the data type of a
+// §6.8 declaration, the two reports left the position on the `'{` and the
+// block's loop reparsed the bare pattern, which answered a=0xAB and b=0xCD as
+// before; ElaborateSrc returns the design whatever the diagnostics say, so
+// ASSERT_NE(design, nullptr) survived that too. Reading the values back is
+// therefore what this case has in common with the bare-pattern one, and reading
+// the diagnostics is what distinguishes them.
 TEST(AssignmentPatternSimulation, TypedLhsPatternUnpacks) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -133,6 +147,7 @@ TEST(AssignmentPatternSimulation, TypedLhsPatternUnpacks) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors) << "source reported an elaboration error";
   LowerAndRun(design, f);
   auto* va = f.ctx.FindVariable("a");
   auto* vb = f.ctx.FindVariable("b");

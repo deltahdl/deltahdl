@@ -228,6 +228,33 @@ TEST(NonblockingAssignSim, AssignmentPatternTargetDistributesToItsElements) {
   LowerRunAndCheck(f, design, {{"a", 0x56u}, {"b", 0x78u}});
 }
 
+// §10.9's pattern carries a data type here, and §10.4.2 does not care which of
+// the two spellings names the target, so `pair_t'{a, b} <= 16'hBEEF` has to
+// distribute as the bare pattern above does. The typed form arrives as a cast
+// whose operand is the pattern, which is the third route into the new arm:
+// IsConcatLhs looks through the cast, where ResolveLhsVariable answers null for
+// it, so without that unwrapping the statement would again schedule no write
+// and raise no diagnostic. The wrong answer this case rules out is the one that
+// distinguishes the spellings -- a fix reading only kConcatenation and
+// kAssignmentPattern would leave every typed pattern silently dropped.
+TEST(NonblockingAssignSim,
+     TypedAssignmentPatternTargetDistributesToItsElements) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } pair_t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'h11;\n"
+      "    b = 8'h22;\n"
+      "    pair_t'{a, b} <= 16'hBEEF;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors) << "source reported an elaboration error";
+  LowerRunAndCheck(f, design, {{"a", 0xBEu}, {"b", 0xEFu}});
+}
+
 // §11.4.1 gives a select element of a concatenation target the bits its own
 // indices name and no others, so `{a[3:0], b} <= 12'h9AB` writes the low nibble
 // of a and leaves the high nibble standing: a ends at 0xF9, not 0x09. This is

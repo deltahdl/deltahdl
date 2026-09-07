@@ -360,13 +360,21 @@ bool Parser::IsScopedCallOrAssignStmt() {
     }
   }
   // A known type name reached here either bare or after a `::` scope path. If
-  // it is immediately followed by a call `(` or an assignment operator, it is a
-  // statement rather than a declaration. The bare-assignment case covers an
-  // embedded covergroup (§19.4): `covergroup cg ... endgroup` implicitly
-  // declares both the type `cg` and a variable `cg`, so `cg = new;` is an
-  // assignment to that variable, not the start of a `cg <name>` declaration.
+  // it is immediately followed by a call `(`, an assignment operator, or the
+  // `'{` that opens a §10.9 assignment pattern, it is a statement rather than a
+  // declaration. The bare-assignment case covers an embedded covergroup
+  // (§19.4): `covergroup cg ... endgroup` implicitly declares both the type
+  // `cg` and a variable `cg`, so `cg = new;` is an assignment to that variable,
+  // not the start of a `cg <name>` declaration. The `'{` case covers §10.9's
+  // assignment_pattern_expression, whose type is written as a prefix before the
+  // pattern -- `pair_t'{a, b} = 16'hABCD;` -- so the operator this list is
+  // otherwise looking for stands behind the pattern rather than behind the
+  // name. It cannot be a declaration: §6.8 continues a data_declaration with a
+  // list_of_variable_decl_assignments, which A.2.3 begins with a
+  // variable_identifier, so no declaration puts a `'{` after its type.
   bool is_stmt = Check(TokenKind::kLParen) || Check(TokenKind::kEq) ||
                  Check(TokenKind::kLtEq) ||
+                 Check(TokenKind::kApostropheLBrace) ||
                  IsCompoundAssignOp(CurrentToken().kind);
   lexer_.RestorePos(saved);
   return is_stmt;

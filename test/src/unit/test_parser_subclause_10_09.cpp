@@ -312,6 +312,118 @@ TEST(AssignmentPatternParsing, PsTypeIdentifierAsExpressionType) {
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kAssignmentPattern);
 }
 
+// §10.9 gives the form its own production, `assignment_pattern_expression ::=
+// [ assignment_pattern_expression_type ] assignment_pattern`, whose type is one
+// of `ps_type_identifier`, `ps_parameter_identifier`, `integer_atom_type` or
+// `type_reference`, and the clause puts the whole of it on the left: "When an
+// assignment pattern expression is used in a left-hand expression, the
+// positional notation shall be required". So `pair_t'{a, b} = 16'hABCD;` is an
+// assignment whose target carries a type-name prefix, and the clause's own
+// example writes exactly that as a procedural statement.
+//
+// Between `begin` and `end` it was read instead as a §6.8 `data_declaration`
+// opening with the data type `pair_t`, and rejected at the apostrophe with
+// "expected identifier, got '{" and "expected ';', got '{", both citing §6.8.
+// The wrong answer is not visible in the values. Neither rejection consumes the
+// token it names, so the body loop goes on to read the bare `'{a, b} =
+// 16'hABCD;` that the abandoned declaration left standing, and §10.9 requires
+// each member expression to have "the same number of bits as the corresponding
+// element in the data type of the assignment pattern expression", which makes
+// the bare pattern slice the right-hand value exactly as the typed one does.
+// Reading `a` and `b` back therefore passes either way.
+//
+// The shape is what discriminates. A block that parsed this source holds one
+// statement; a block that misparsed it holds two, the fabricated declaration
+// and the recovered assignment behind it, and that recovered assignment has
+// lost the prefix, so its target is a bare pattern where §10.9 asks for a cast
+// over one.
+TEST(AssignmentPatternParsing,
+     TypedLhsPatternInsideSequentialBlockIsNotADeclaration) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    pair_t'{a, b} = 16'hABCD;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->kind, StmtKind::kBlock);
+  ASSERT_EQ(body->stmts.size(), 1u);
+  auto* stmt = body->stmts[0];
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kCast);
+  ASSERT_NE(stmt->lhs->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->lhs->kind, ExprKind::kAssignmentPattern);
+}
+
+// §10.4.2 gives the nonblocking assignment the same target the blocking one
+// takes: "variable_lvalue is a data type that is valid for a procedural
+// assignment statement", the words §10.4.1 uses at Syntax 10-2. §10.9's typed
+// assignment pattern expression is such a target, so both spellings of the
+// operator accept it and both were rejected at the apostrophe with the two §6.8
+// reports.
+//
+// This is written out rather than folded into the case above because the
+// question is settled by a list that names the two operators separately, so an
+// answer can be given for `=` and withheld from `<=`. Neither operator is what
+// the decision actually turns on: the pattern stands between the type name and
+// whichever operator follows it, so the token that has to be admitted is the
+// `'{`, and admitting it answers for both at once. The same recovery hides the
+// same misparse from the values here, so the assertions are again the statement
+// count and the shape of the target.
+TEST(AssignmentPatternParsing,
+     TypedLhsPatternInsideSequentialBlockTakesTheNonblockingOperator) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    pair_t'{a, b} <= 16'hABCD;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->kind, StmtKind::kBlock);
+  ASSERT_EQ(body->stmts.size(), 1u);
+  auto* stmt = body->stmts[0];
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kCast);
+  ASSERT_NE(stmt->lhs->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->lhs->kind, ExprKind::kAssignmentPattern);
+}
+
+// §10.9 says nothing about which body an assignment pattern expression may be a
+// target in, and a function body is a body like any other, so `pair_t'{a, b} =
+// 16'hABCD;` written straight into one is the same assignment as inside a
+// `begin`-`end` block. The `begin` is deliberately absent: a function body
+// reads its statements from its own loop, and that loop asks the same question
+// about a leading known type name that the sequential block's loop asks. With
+// no block in the source there is no other loop this statement can be reached
+// through, so a source accepted here is one where the question was answered
+// where it is asked rather than in the sequential block alone -- which is what
+// carries the answer to the parallel block, the task body and the randsequence
+// code block, none of which is written out separately.
+TEST(AssignmentPatternParsing, TypedLhsPatternInsideFunctionBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "  logic [7:0] a, b;\n"
+      "  function void f();\n"
+      "    pair_t'{a, b} = 16'hABCD;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 TEST(AssignmentPatternParsing, ConstantAssignmentPatternExpressionInParameter) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
