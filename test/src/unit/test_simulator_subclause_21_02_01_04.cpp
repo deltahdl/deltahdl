@@ -49,18 +49,36 @@ void ExpectPercentVOutput(const std::string& src, const std::string& expected) {
   EXPECT_NE(out.find(expected), std::string::npos);
 }
 
-// Runs a source declaring one net as `decl` and passing it to %v, and asserts
-// the run reported §21.2.1.4's "shall" against that operand at the line of the
-// call, so the vector and one-bit-vector cases differ only in the declaration
-// they name.
-void ExpectPercentVOperandReported(const std::string& decl) {
+// Runs a source declaring one net as `decl` and passing `operand` to %v, and
+// asserts the run reported §21.2.1.4's "shall" against it at the line of the
+// call, naming the operand shape as `shape`, so the cases differ only in the
+// declaration and the operand they name.
+void ExpectPercentVReported(const std::string& decl, const std::string& operand,
+                            const std::string& shape) {
   SimFixture f;
-  const std::string kSrc =
-      "module m;\n  " + decl + "\n  initial $display(\"%v\", w);\nendmodule\n";
+  const std::string kSrc = "module m;\n  " + decl +
+                           "\n  initial $display(\"%v\", " + operand +
+                           ");\nendmodule\n";
   CaptureDisplayOutput(kSrc, f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "%v format specification takes a scalar reference",
-                            LineHolding(kSrc, "$display"), "21.2.1.4"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "%v format specification takes a scalar reference, and the argument it "
+      "consumed is " +
+          shape,
+      LineHolding(kSrc, "$display"), "21.2.1.4"));
+}
+
+// The vector and one-bit-vector cases, which name the whole net.
+void ExpectPercentVOperandReported(const std::string& decl) {
+  ExpectPercentVReported(decl, "w", "a net declared with a range");
+}
+
+// Runs a source and asserts it reported nothing at all, for the operand forms
+// §21.2.1.4 admits.
+void ExpectPercentVNotReported(const std::string& src) {
+  SimFixture f;
+  std::string out = CaptureDisplayOutput(src, f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty()) << out;
 }
 
 // Table 21-5: a strong drive of a logic 1 renders with the St mnemonic and the
@@ -566,15 +584,12 @@ TEST(StrengthFormat, SingleBitVectorNetOperandToPercentVIsReported) {
 // range is the scalar reference §21.2.1.4 asks for, and a run passing one to %v
 // reports nothing at all.
 TEST(StrengthFormat, ScalarNetOperandToPercentVIsNotReported) {
-  SimFixture f;
-  CaptureDisplayOutput(
+  ExpectPercentVNotReported(
       "module m;\n"
       "  wire w;\n"
       "  assign w = 1'b1;\n"
       "  initial #1 $display(\"%v\", w);\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.Diagnostics().empty());
+      "endmodule\n");
 }
 
 // The rule §21.2.1.4 states is on the %v specification and not on the argument
@@ -592,6 +607,115 @@ TEST(StrengthFormat, VectorNetUnderAnIntegerSpecifierIsNotReported) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.Diagnostics().empty()) << out;
+}
+
+// §21.2.1.4 asks a %v for "a corresponding scalar reference", and §11.5.1 has a
+// bit-select "specif[y] the single bit of vector acc that is addressed by the
+// operand index". One bit of a net is the scalar whose strength the clause
+// reports, so a bit-select of a vector net is the operand form that asks about
+// it, and the three characters for the bit named are what it renders. The net
+// as a whole drives both sides here -- bit 0 a 1 and the rest a 0, all at
+// strong -- so a rendering taken from the net rather than the bit would be the
+// unknown value's StX instead.
+TEST(StrengthFormat, BitSelectOfVectorNetRendersThatBitsStrength) {
+  ExpectPercentVOutput(
+      "module m;\n"
+      "  wire [3:0] bus;\n"
+      "  assign (strong0, strong1) bus = 4'b0001;\n"
+      "  initial #1 $display(\"[%v]\", bus[0]);\n"
+      "endmodule\n",
+      "[St1]");
+}
+
+// The bit is read rather than the net: two drivers each leave the other's bit
+// at z, so bit 0 is driven at strong and bit 1 at weak, and the two bit-selects
+// render different strength levels. The net reports one strength for both bits
+// -- §28.12.2 has an ambiguous signal carry a range of levels, and the 1 side
+// here runs from strong down to weak, which §21.2.1.4 renders with the two
+// decimal digits as 631 -- so a renderer answering with the net's own strength
+// gives one rendering twice and neither of these.
+TEST(StrengthFormat, BitSelectReadsTheStrengthOfTheBitItNames) {
+  ExpectPercentVOutput(
+      "module m;\n"
+      "  wire [1:0] bus;\n"
+      "  assign (strong0, strong1) bus = 2'bz1;\n"
+      "  assign (weak0, weak1) bus = 2'b1z;\n"
+      "  initial #1 $display(\"[%v][%v]\", bus[0], bus[1]);\n"
+      "endmodule\n",
+      "[St1][We1]");
+}
+
+// §11.5.1: "the actual bit that is accessed by an address is, in part,
+// determined by the declaration". The declaration here ascends, so index 1 is
+// the most significant bit of the two and index 2 the least; the value 2'b01
+// therefore drives a 0 at index 1. An index read as a storage offset instead
+// would answer with the other bit.
+TEST(StrengthFormat, BitSelectResolvesItsIndexAgainstTheDeclaredRange) {
+  ExpectPercentVOutput(
+      "module m;\n"
+      "  wire [1:2] bus;\n"
+      "  assign (strong0, strong1) bus = 2'b01;\n"
+      "  initial #1 $display(\"[%v][%v]\", bus[1], bus[2]);\n"
+      "endmodule\n",
+      "[St0][St1]");
+}
+
+// §11.5.1 gives an out-of-bounds bit-select the value x: "if the value of addr
+// is out of bounds, then vect[addr] returns x". Such an operand names no bit of
+// the net, so there is no scalar whose strength could be reported and nothing
+// is rendered for it -- the same empty rendering an operand naming no net at
+// all gets.
+TEST(StrengthFormat, OutOfRangeBitSelectOfNetRendersNothing) {
+  ExpectPercentVOutput(
+      "module m;\n"
+      "  wire [3:0] bus;\n"
+      "  assign (strong0, strong1) bus = 4'b0001;\n"
+      "  initial #1 $display(\"[%v]\", bus[7]);\n"
+      "endmodule\n",
+      "[]");
+}
+
+// An out-of-range index is still the scalar reference §21.2.1.4 asks for -- a
+// bit-select is one whether or not the bit it addresses exists -- so the run
+// reports nothing, which is what separates this from the vector operand above.
+TEST(StrengthFormat, OutOfRangeBitSelectOfNetIsNotReported) {
+  ExpectPercentVNotReported(
+      "module m;\n"
+      "  wire [3:0] bus;\n"
+      "  assign (strong0, strong1) bus = 4'b0001;\n"
+      "  initial #1 $display(\"[%v]\", bus[7]);\n"
+      "endmodule\n");
+}
+
+// The admitted form reports nothing: a bit-select of a vector net is the scalar
+// reference the clause asks for, so the check that rejects the vector itself
+// must let a select of one bit of it through.
+TEST(StrengthFormat, BitSelectOfVectorNetOperandIsNotReported) {
+  ExpectPercentVNotReported(
+      "module m;\n"
+      "  wire [3:0] bus;\n"
+      "  assign (strong0, strong1) bus = 4'b0001;\n"
+      "  initial #1 $display(\"%v\", bus[0]);\n"
+      "endmodule\n");
+}
+
+// A part-select is no more a scalar reference than the vector it selects from:
+// §11.5.1 has it address a range of bits, and one three-character group stands
+// for one scalar. It is reported as the shape it is rather than as the vector,
+// since a writer given a whole net is told to select a bit and a writer given a
+// part-select has already selected one too many.
+TEST(StrengthFormat, PartSelectOfNetOperandToPercentVIsReported) {
+  ExpectPercentVReported("wire [3:0] w;", "w[1:0]",
+                         "a select naming more than one bit of a net");
+}
+
+// §7.4.1: a single index of a packed multidimensional array addresses one
+// element rather than one bit, so `w[0]` of a `[1:0][7:0]` net names eight bits
+// and is reported for the same reason a part-select is. A check written on the
+// select's syntax alone would take this for the bit-select it looks like.
+TEST(StrengthFormat, PackedElementSelectOfNetOperandToPercentVIsReported) {
+  ExpectPercentVReported("wire [1:0][7:0] w;", "w[0]",
+                         "a select naming more than one bit of a net");
 }
 
 }  // namespace

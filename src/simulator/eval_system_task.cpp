@@ -1,6 +1,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -10,6 +11,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/packed_range.h"
 #include "parser/ast.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -384,17 +386,120 @@ static bool IsScalarNet(const Variable& var) {
   return !var.has_packed_range && var.value.width == 1;
 }
 
-// §21.2.1.4: %v reports the strength of a scalar net, so the operand is looked
-// up as a net and rendered from its resolved strength. An operand that does
-// not name a net carries no strength model and yields an empty string, and so
-// does one that names a net §21.2.1.4 does not admit -- which the flag below
-// is what reports.
-static std::string BuildFormatV(const Expr* arg, SimContext& ctx) {
-  if (arg->kind != ExprKind::kIdentifier) return "";
-  Net* net = ctx.FindNet(arg->text);
-  if (net == nullptr || net->resolved == nullptr) return "";
-  if (!IsScalarNet(*net->resolved)) return "";
-  return FormatStrength(net->resolved_strength);
+// What §21.2.1.4 makes of one argument a display task rendered a %v for.
+//
+// The clause asks a %v for "a corresponding scalar reference" and reports "the
+// strength of a scalar net", so an argument is one of three things: a reference
+// to a scalar of a net, whose strength there is to render; a reference to a net
+// that is not a scalar, which the clause admits no rendering for and which is
+// reported; or neither, which carries no strength model and so has nothing to
+// render and nothing to report against. The second of those is two kinds rather
+// than one so that a report can name which shape it was.
+enum class PercentVArgKind : uint8_t {
+  kNoStrength,
+  kNetBit,
+  kVectorNet,
+  kNetMultibitSelect,
+};
+
+// One %v argument classified, with the net bit it names where it names one.
+// `bit` counts from the least significant end of the net's storage, which is
+// where Net::BitStrength indexes from.
+struct PercentVArg {
+  PercentVArgKind kind = PercentVArgKind::kNoStrength;
+  const Net* net = nullptr;
+  uint32_t bit = 0;
+};
+
+// Whether evaluating `e` again yields what evaluating it once did, and changes
+// nothing on the way.
+//
+// The display task evaluates every argument it takes, a bit-select's index
+// along with the rest of it, before the strength renderings are built; reading
+// the index here to find which bit was named evaluates that index a second
+// time. So the forms below are the ones a bit-select's index may take and still
+// be a %v operand: a literal is a literal, reading a name changes nothing, and
+// an operator is as repeatable as its operands. Everything else -- a call, a
+// system call, an increment -- is refused, and the operand then names no bit of
+// a net rather than naming one twice.
+static bool IsRepeatableIndex(const Expr* e) {
+  if (e == nullptr) return true;
+  switch (e->kind) {
+    case ExprKind::kIntegerLiteral:
+    case ExprKind::kIdentifier:
+      return true;
+    case ExprKind::kUnary:
+      if (e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus)
+        return false;
+      return IsRepeatableIndex(e->lhs);
+    case ExprKind::kBinary:
+      return IsRepeatableIndex(e->lhs) && IsRepeatableIndex(e->rhs);
+    case ExprKind::kTernary:
+      return IsRepeatableIndex(e->condition) &&
+             IsRepeatableIndex(e->true_expr) &&
+             IsRepeatableIndex(e->false_expr);
+    case ExprKind::kSelect:
+      return IsRepeatableIndex(e->base) && IsRepeatableIndex(e->index) &&
+             IsRepeatableIndex(e->index_end);
+    default:
+      return false;
+  }
+}
+
+// §11.5.1: the bit of `net` that a bit-select's index names, resolved against
+// the declaration, since "the actual bit that is accessed by an address is, in
+// part, determined by the declaration". An index carrying x or z names no bit
+// -- §11.5.1 has `vect[expression that returns x]` return x -- and neither does
+// one outside the declared bounds, which reads as x for the same reason. Both
+// are still the scalar reference §21.2.1.4 asks for, so neither is reported;
+// there is simply no bit of a net whose strength could be named.
+static PercentVArg ClassifyNetBitSelect(const Expr* arg, const Net* net,
+                                        SimContext& ctx, Arena& arena) {
+  // §7.4.1: one index of a packed multidimensional array addresses an element
+  // rather than a bit, and an element of more than one bit is no more a scalar
+  // than a part-select is.
+  if (net->resolved->packed_elem_width > 1)
+    return {PercentVArgKind::kNetMultibitSelect};
+  if (!IsRepeatableIndex(arg->index)) return {};
+  auto idx = EvalExpr(arg->index, ctx, arena);
+  if (!idx.IsKnown()) return {};
+  PackedRange range = net->resolved->BitSelectRange();
+  auto declared = static_cast<int64_t>(idx.ToUint64());
+  if (!range.Contains(declared)) return {};
+  return {PercentVArgKind::kNetBit, net,
+          static_cast<uint32_t>(range.OffsetOf(declared))};
+}
+
+// §21.2.1.4's operand, classified. A net declared without a range is a scalar
+// (§6.9) and names its only bit. A bit-select of a vector net is a scalar
+// reference too: §11.5.1 has it address one bit of the vector, and one bit of a
+// net is the scalar whose strength the clause reports. A select that still
+// names more than one bit is not, being no more a single bit than the vector it
+// selects from.
+static PercentVArg ClassifyPercentVArg(const Expr* arg, SimContext& ctx,
+                                       Arena& arena) {
+  if (arg->kind == ExprKind::kIdentifier) {
+    const Net* net = ctx.FindNet(arg->text);
+    if (net == nullptr || net->resolved == nullptr) return {};
+    if (!IsScalarNet(*net->resolved)) return {PercentVArgKind::kVectorNet};
+    return {PercentVArgKind::kNetBit, net, 0};
+  }
+  if (arg->kind != ExprKind::kSelect || arg->base == nullptr ||
+      arg->base->kind != ExprKind::kIdentifier)
+    return {};
+  const Net* net = ctx.FindNet(arg->base->text);
+  if (net == nullptr || net->resolved == nullptr) return {};
+  if (arg->index_end != nullptr) return {PercentVArgKind::kNetMultibitSelect};
+  return ClassifyNetBitSelect(arg, net, ctx, arena);
+}
+
+// §21.2.1.4: the three-character group reporting the strength of the scalar the
+// argument names. An argument that names no scalar of a net renders nothing,
+// whether because it names no net at all or because it names one the clause
+// does not admit -- the flag threaded beside this is what reports the latter.
+static std::string BuildFormatV(const PercentVArg& v) {
+  if (v.kind != PercentVArgKind::kNetBit) return "";
+  return FormatStrength(v.net->BitStrength(v.bit));
 }
 
 // §21.2.1.4: "For each %v specification that appears in a string literal, a
@@ -403,12 +508,14 @@ static std::string BuildFormatV(const Expr* arg, SimContext& ctx) {
 // net is in reach, and reported by the formatter, where it is known whether a
 // %v is what consumed the argument: the renderings are built for every
 // argument a template takes, so reporting here would report a vector net
-// passed to %h.
-static bool IsNonScalarNetArg(const Expr* arg, SimContext& ctx) {
-  if (arg->kind != ExprKind::kIdentifier) return false;
-  Net* net = ctx.FindNet(arg->text);
-  if (net == nullptr || net->resolved == nullptr) return false;
-  return !IsScalarNet(*net->resolved);
+// passed to %h. The two shapes that break it are told apart so that each is
+// named by what it is: a net reference naming the whole net, or a select of it
+// that still names more than one bit. Zero is every argument that does not
+// break it.
+static char NonScalarNetArgFlag(const PercentVArg& v) {
+  if (v.kind == PercentVArgKind::kVectorNet) return 1;
+  if (v.kind == PercentVArgKind::kNetMultibitSelect) return 2;
+  return 0;
 }
 
 // The eight display and write system tasks named in Syntax 21-1. The b/o/h
@@ -520,9 +627,9 @@ static DisplayArgRenderings CollectDisplayArgs(const Expr* expr, size_t& i,
     auto v = EvalExpr(val_arg, ctx, arena);
     r.vals.push_back(v);
     r.p_fmts.push_back(BuildFormatP(val_arg, v, ctx));
-    r.v_fmts.push_back(BuildFormatV(val_arg, ctx));
-    r.nonscalar_nets.push_back(
-        static_cast<char>(IsNonScalarNetArg(val_arg, ctx) ? 1 : 0));
+    PercentVArg pv = ClassifyPercentVArg(val_arg, ctx, arena);
+    r.v_fmts.push_back(BuildFormatV(pv));
+    r.nonscalar_nets.push_back(NonScalarNetArgFlag(pv));
     char agg = ClassifyUnpackedAggregateArg(val_arg, ctx);
     r.agg_flags.push_back(agg);
     // §21.2.1.7: an unpacked array of byte governed by %s prints its element

@@ -33,6 +33,22 @@ struct Net {
   std::vector<DriverStrength> driver_strengths;
   NetStrength resolved_strength;
 
+  // §21.2.1.4: the strength of each bit of this net, indexed from the least
+  // significant end of its storage. A net reports one strength, which is what
+  // resolved_strength holds: the driven and forced resolutions compute a
+  // strength per bit and widen the bits into that one pair. A bit-select of a
+  // vector net names one of those bits, and the scalar whose strength
+  // §21.2.1.4 reports is the bit rather than the net, so the per-bit answers
+  // are kept as well as folded.
+  //
+  // Empty wherever no resolution filled it: a supply net, a trireg holding
+  // charge and a tri0/tri1 default each give every bit of the net one strength
+  // by construction, and the remaining paths compute no strength at all.
+  // BitStrength answers from resolved_strength there, which is that bit's own
+  // answer in the first three cases and the same thing the net reports in the
+  // rest.
+  std::vector<NetStrength> bit_strengths;
+
   Strength charge_strength = Strength::kMedium;
   Strength base_charge_strength = Strength::kMedium;
   uint64_t decay_ticks = 0;
@@ -45,6 +61,12 @@ struct Net {
   std::string_view resolve_func;
 
   void Resolve(Arena& arena, Scheduler* sched = nullptr);
+
+  // §21.2.1.4: the strength of the bit sitting `bit` places above the least
+  // significant end of this net, which is the scalar a bit-select of a vector
+  // net names. Falls back to the strength the net as a whole reports where no
+  // resolution recorded the bits separately.
+  NetStrength BitStrength(uint32_t bit) const;
 
   bool InCapacitiveState() const;
 };

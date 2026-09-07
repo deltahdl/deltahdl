@@ -46,6 +46,12 @@ bool IsNonresistiveBidir(BidirSwitchKind kind) {
 // the user-defined-net case bypasses both the §28.13 and §28.14 reductions.
 void PassStrengthAcross(Net& dest, const Net& src, BidirSwitchKind kind,
                         bool user_defined_nets) {
+  // What the switch passes across is the strength the source net reports, which
+  // is one strength for the whole of the destination however the destination's
+  // own bits last resolved. Anything Net::Resolve recorded per bit there is
+  // therefore no longer the answer, and dropping it leaves Net::BitStrength
+  // reading the strength written here.
+  dest.bit_strengths.clear();
   if (user_defined_nets) {
     dest.resolved_strength = src.resolved_strength;
     return;

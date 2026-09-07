@@ -707,15 +707,24 @@ static bool TryPrecomputedArgSpec(char spec, FormatArgs& args,
     // §21.2.1.4: "a corresponding scalar reference shall follow the string
     // literal in the argument list". The three-character group the clause
     // defines is "the strength of a scalar net", so it stands for one scalar
-    // and not for however many bits a vector holds; a net that is not scalar
-    // is reported and nothing rendered for it.
-    if (args.vi < args.nonscalar_nets.size() &&
-        args.nonscalar_nets[args.vi] != 0) {
+    // and not for however many bits a vector holds; a reference to a net that
+    // is not a scalar is reported and nothing rendered for it. Each shape is
+    // named by what it is, the calling task having told them apart, because
+    // what a writer does about one is not what they do about the other: a
+    // vector net wants a bit-select of it and a select naming more than one
+    // bit is already one select too wide.
+    char nonscalar =
+        args.vi < args.nonscalar_nets.size() ? args.nonscalar_nets[args.vi] : 0;
+    if (nonscalar != 0) {
       if (args.ctx != nullptr) {
         args.ctx->GetDiag().Error(
             args.loc,
-            "a %v format specification takes a scalar reference, and the "
-            "argument it consumed is a net declared with a range",
+            nonscalar == 2
+                ? "a %v format specification takes a scalar reference, and the "
+                  "argument it consumed is a select naming more than one bit "
+                  "of a net"
+                : "a %v format specification takes a scalar reference, and the "
+                  "argument it consumed is a net declared with a range",
             Subclause("21.2.1.4"));
       }
     } else if (args.vi < args.v_fmts.size() && !args.v_fmts[args.vi].empty()) {

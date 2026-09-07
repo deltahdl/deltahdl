@@ -688,6 +688,7 @@ static void ResolveStrengthDriven(Net& net, Arena& arena) {
     // taken to speak for the rest.
     NetStrength bit_strength;
     ComputeSingleBitStrength(drivers, strengths, bit_strength, net.type, b);
+    net.bit_strengths.push_back(bit_strength);
     WidenNetStrengthOverBit(net.resolved_strength, bit_strength);
   }
   FixupTriPull(result, net.type);
@@ -730,12 +731,23 @@ static void ResolveForcedStrength(Net& net) {
   for (uint32_t b = 0; b < net.resolved->value.width; ++b) {
     NetStrength bit_strength;
     ComputeSingleBitStrength(drivers, strengths, bit_strength, net.type, b);
+    net.bit_strengths.push_back(bit_strength);
     WidenNetStrengthOverBit(net.resolved_strength, bit_strength);
   }
 }
 
+NetStrength Net::BitStrength(uint32_t bit) const {
+  if (bit < bit_strengths.size()) return bit_strengths[bit];
+  return resolved_strength;
+}
+
 void Net::Resolve(Arena& arena, Scheduler* sched) {
   if (!resolved) return;
+
+  // Every resolution below either records one strength per bit or gives the
+  // whole net one, so what a previous resolution recorded says nothing about
+  // this one and is dropped before it runs.
+  bit_strengths.clear();
 
   if (resolved->is_forced) {
     ResolveForcedStrength(*this);
