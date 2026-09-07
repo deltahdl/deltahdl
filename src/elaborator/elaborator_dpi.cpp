@@ -224,8 +224,11 @@ DpiClassNames CollectDpiClassNames(
   DpiClassNames names;
   for (const auto* items : scopes) {
     for (const auto* item : *items) {
-      if (item != nullptr && item->kind == ModuleItemKind::kClassDecl) {
-        names.insert(item->name);
+      // The declaration's name is on the ClassDecl rather than on the item,
+      // which is where RecordClassDecl reads it too.
+      if (item != nullptr && item->kind == ModuleItemKind::kClassDecl &&
+          item->class_decl != nullptr) {
+        names.insert(item->class_decl->name);
       }
     }
   }
@@ -680,6 +683,22 @@ void CheckDpiScopeImportDeclarations(
   }
 }
 
+// §35.4: the DPI declarations of one scope, each run through the global-name
+// checks. Items that are neither an import nor an export are what the scope
+// otherwise holds and are passed over.
+void ProcessDpiScopeItems(const std::vector<ModuleItem*>& items,
+                          ExportScopeContext& scope, DpiGlobalNameSpace& global,
+                          DiagEngine& diag) {
+  for (const auto* item : items) {
+    if (item == nullptr) continue;
+    if (item->kind != ModuleItemKind::kDpiImport &&
+        item->kind != ModuleItemKind::kDpiExport) {
+      continue;
+    }
+    ProcessDpiGlobalNameItem(item, scope, global, diag);
+  }
+}
+
 // §35.4: run the global-name checks over one scope's DPI declarations. `global`
 // carries the rules the clause states across scopes and is the same object for
 // every scope; the sets built here carry the rules it states within one, and
@@ -715,14 +734,7 @@ void ValidateDpiScopeGlobalNames(const std::vector<ModuleItem*>& items,
   ExportScopeContext scope{sv_callables, export_link_in_scope,
                            exported_sv_func_in_scope, dpi_typedefs, classes};
 
-  for (const auto* item : items) {
-    if (item == nullptr) continue;
-    if (item->kind != ModuleItemKind::kDpiImport &&
-        item->kind != ModuleItemKind::kDpiExport) {
-      continue;
-    }
-    ProcessDpiGlobalNameItem(item, scope, global, diag);
-  }
+  ProcessDpiScopeItems(items, scope, global, diag);
 }
 
 // §35.4 and §35.7 state their rules over the scope a DPI declaration is written
