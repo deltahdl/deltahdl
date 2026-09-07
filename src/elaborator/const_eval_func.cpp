@@ -625,7 +625,7 @@ static std::optional<ConstVal> ConstEvalCastFull(const Expr* expr,
 // Parser::ParseMinTypMaxExpr in src/parser/expr_parser_patterns.cpp and
 // Parser::ParseParenExpr in src/parser/expr_parser_aux.cpp both record as
 // Expr::lhs, Expr::condition and Expr::rhs in that order.
-static const Expr* SelectMinTypMaxMember(const Expr* expr) {
+const Expr* SelectMinTypMaxMember(const Expr* expr) {
   switch (ActiveDelayMode()) {
     case DelayMode::kMin:
       return expr->lhs;

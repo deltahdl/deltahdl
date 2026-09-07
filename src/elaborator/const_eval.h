@@ -140,6 +140,16 @@ class DelayModeGuard {
 // when none is live.
 DelayMode ActiveDelayMode();
 
+// §11.11: the one of a min:typ:max expression's three members that stands for
+// it in this run. "Values expressed in min:typ:max format can be used in
+// expressions. The min:typ:max format can be used wherever expressions can
+// appear", and Example 1 reads `(a:b:c) + (d:e:f)` member by member -- "The
+// minimum value is the sum of a+d; the typical value is b+e; the maximum value
+// is c+f" -- so the form is the member the run selects rather than a value
+// composed of the three. What it folds to and how wide it is are the same
+// question asked twice, and both are answered from here.
+const Expr* SelectMinTypMaxMember(const Expr* expr);
+
 std::optional<int64_t> ConstEvalInt(const Expr* expr);
 
 std::optional<int64_t> ConstEvalInt(const Expr* expr, const ScopeMap& scope);

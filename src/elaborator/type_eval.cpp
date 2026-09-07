@@ -858,9 +858,20 @@ uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
     case ExprKind::kAssignmentPattern:
     case ExprKind::kPostfixUnary:
     case ExprKind::kInside:
-    case ExprKind::kMinTypMax:
     case ExprKind::kTagged:
       return 0;
+    // §11.11: "The min:typ:max format can be used wherever expressions can
+    // appear", so the form stands as an operand and an operand is sized. What
+    // it is worth is the member the run selects -- Example 1 reads
+    // `(a:b:c) + (d:e:f)` member by member, "the minimum value is the sum of
+    // a+d; the typical value is b+e; the maximum value is c+f" -- so what it is
+    // worth and how wide it is are the same member's, and the width follows the
+    // fold rather than composing the three. §11.11 requires no relation between
+    // them, so they may differ in width and the selected one decides; a width
+    // of 0 sized the form as nothing wherever a context read it, and a
+    // concatenation holding one contributed no bits for it.
+    case ExprKind::kMinTypMax:
+      return InferExprWidth(SelectMinTypMaxMember(expr), typedefs);
   }
   return 0;
 }

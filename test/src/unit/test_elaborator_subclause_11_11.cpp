@@ -18,10 +18,14 @@
 // a case that asked for the minimum.
 
 #include <cstdint>
+#include <string>
+#include <string_view>
 
 #include "common/types.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "fixture_evaluator.h"
 #include "helpers_rtlir_lookup.h"
 
 using namespace delta;
@@ -90,6 +94,53 @@ TEST(MinTypMaxElaboration, AGuardRestoresTheModeItFoundRatherThanTheDefault) {
   EXPECT_EQ(ActiveDelayMode(), DelayMode::kMax);
   ElabFixture after_inner;
   EXPECT_EQ(FoldedTripleParam(after_inner), 33);
+}
+
+// §11.11 says the form is an expression and not a delay alone -- "Values
+// expressed in min:typ:max format can be used in expressions. The min:typ:max
+// format can be used wherever expressions can appear" -- so it stands as an
+// operand, and an operand is sized. InferExprWidth answered 0 for it, which
+// sizes it as nothing wherever a context reads a width: a concatenation holding
+// one contributes no bits for it and is wrong about how many it moved.
+//
+// Which member's width it takes is what Example 1 settles. `(a:b:c) + (d:e:f)`
+// is read member by member -- "The minimum value is the sum of a+d; the typical
+// value is b+e; the maximum value is c+f" -- so the form stands for the one
+// member the run selects, and its width is that member's rather than anything
+// composed of the three. The members below are sized 4, 8 and 16 bits, all
+// different from each other and from the 0 the case is against, so no
+// coincidence answers for the rule.
+constexpr std::string_view kSizedTriple = "(4'd1:8'd2:16'd3)";
+
+TEST(MinTypMaxElaboration, WidthIsTheTypicalMembersByDefault) {
+  EvalFixture f;
+  auto* e = ParseExprFrom(std::string(kSizedTriple), f);
+  ASSERT_NE(e, nullptr);
+  ASSERT_EQ(e->kind, ExprKind::kMinTypMax);
+  EXPECT_EQ(InferExprWidth(e, {}), 8u);
+}
+
+// The minimum member under the mode that selects it, so the width follows the
+// same member the fold does rather than one the code happened to pick. Without
+// this a width that always answered the typical member would satisfy the case
+// above.
+TEST(MinTypMaxElaboration, WidthFollowsTheSelectedMember) {
+  EvalFixture f;
+  auto* e = ParseExprFrom(std::string(kSizedTriple), f);
+  ASSERT_NE(e, nullptr);
+  DelayModeGuard guard(DelayMode::kMin);
+  EXPECT_EQ(InferExprWidth(e, {}), 4u);
+}
+
+// And the maximum, whose member is a third width again: the three differ, which
+// §11.11 permits by requiring no relation between them, so a rule that took the
+// widest or the narrowest is told from one that takes the selected member.
+TEST(MinTypMaxElaboration, WidthTakesNeitherTheWidestNorTheNarrowest) {
+  EvalFixture f;
+  auto* e = ParseExprFrom(std::string(kSizedTriple), f);
+  ASSERT_NE(e, nullptr);
+  DelayModeGuard guard(DelayMode::kMax);
+  EXPECT_EQ(InferExprWidth(e, {}), 16u);
 }
 
 }  // namespace
