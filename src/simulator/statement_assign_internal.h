@@ -38,6 +38,15 @@ Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
 Logic4Vec ConvertRealForKnownLhs(Logic4Vec rhs_val, bool lhs_is_real,
                                  uint32_t target_width, Arena& arena);
 
+// Defined in statement_assign_core.cpp; also used by the subroutine-body
+// statement executor in eval_function_body.cpp. §10.7: "The size of the
+// left-hand side of an assignment forms the context for the right-hand
+// expression", and §11.6.1 makes that context part of what sizes the
+// expression. The width of the object the lhs names, or the sum of a
+// concatenation's element widths; 0 where the lhs names nothing this can
+// resolve, which EvalExpr reads as self-determined.
+uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx);
+
 // Defined in statement_assign_core.cpp; also used by the §11.4.2 nonblocking
 // path in statement_assign_nonblocking.cpp. Evaluate the rhs with the lhs as
 // the assignment context (width and, for named patterns, struct type).

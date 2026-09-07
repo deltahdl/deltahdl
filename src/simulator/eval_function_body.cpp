@@ -224,11 +224,34 @@ static void ExecFuncWriteValue(const Expr* lhs, const Logic4Vec& val,
   }
 }
 
+// §10.7 opens by making the left-hand side the context for the right-hand
+// expression, and §11.6.1 makes a context-determined expression one whose bit
+// length "is determined by the bit length of the expression and by the fact
+// that it is part of another expression". §11.6 states the consequence for
+// addition -- "the bit length of the largest operand, including the left-hand
+// side of an assignment, shall be used" -- and gives `logic [16:0] sumB;
+// sumB = a + b;` with sixteen-bit operands as the case that keeps the carry.
+// Evaluating the right-hand side with no context at all lost that carry inside
+// a subroutine while keeping it outside one, because ExecBlockingAssignImpl
+// passes the same width and this executor did not.
+//
+// This is the other half of §10.7 from the resize below it: the resize discards
+// bits the expression produced, and the context is what makes the expression
+// produce them. Neither implies the other, and a seventeen-bit target now keeps
+// seventeen bits of a sixteen-bit sum rather than being handed a truncated one
+// to extend.
+//
+// LhsContextWidth alone, rather than the EvalRhsWithStructContext that wraps it
+// outside a subroutine: that function also packs a §10.9.2 assignment pattern
+// and a §11.9 tagged expression against the target's layout, which are claims
+// of their own about clauses this is not.
 static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   if (!stmt->lhs) return;
   if (TryFuncSpecialBlockingAssign(stmt, ctx, arena)) return;
-  ExecFuncWriteValue(stmt->lhs, EvalExpr(stmt->rhs, ctx, arena), ctx, arena);
+  uint32_t ctx_width = LhsContextWidth(stmt->lhs, ctx);
+  ExecFuncWriteValue(stmt->lhs, EvalExpr(stmt->rhs, ctx, arena, ctx_width), ctx,
+                     arena);
 }
 
 // The environment in which a subroutine body executes (§13.4): the return

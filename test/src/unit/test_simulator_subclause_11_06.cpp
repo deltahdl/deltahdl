@@ -129,4 +129,80 @@ TEST(AdditionBitLength, DeclarationInitializerWiderLhsPreservesCarry) {
   EXPECT_EQ(var->value.ToUint64(), 0x10000u);
 }
 
+// The positions above are all outside a subroutine. A subroutine body runs on
+// the statement executor in eval_function_body.cpp rather than the one in
+// statement_assign_core.cpp, and that executor evaluated its right-hand side
+// with no assignment context at all, so the same sum written inside a function
+// added at the operands' sixteen bits and handed 0 to a seventeen-bit target.
+// §11.6's example is the one the cases above use, so it is the one used here.
+TEST(AdditionBitLength, FunctionBodyWiderLhsPreservesCarry) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module m;\n"
+      "  logic [15:0] a, b;\n"
+      "  logic [16:0] sumB;\n"
+      "  function void add();\n"
+      "    sumB = a + b;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    a = 16'hFFFF;\n"
+      "    b = 16'h0001;\n"
+      "    add();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "sumB");
+  ASSERT_NE(var, nullptr);
+
+  EXPECT_EQ(var->value.ToUint64(), 0x10000u);
+}
+
+// A task body takes the same executor as a function body but is reached by its
+// own call path, so neither case stands for the other.
+TEST(AdditionBitLength, TaskBodyWiderLhsPreservesCarry) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module m;\n"
+      "  logic [15:0] a, b;\n"
+      "  logic [16:0] sumB;\n"
+      "  task add();\n"
+      "    sumB = a + b;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    a = 16'hFFFF;\n"
+      "    b = 16'h0001;\n"
+      "    add();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "sumB");
+  ASSERT_NE(var, nullptr);
+
+  EXPECT_EQ(var->value.ToUint64(), 0x10000u);
+}
+
+// §11.6 sizes the addition by "the bit length of the largest operand, including
+// the left-hand side", so a left-hand side no wider than the operands adds no
+// bit and the carry is still dropped. This is the half that says the context is
+// the target's own width rather than some width large enough to hold anything:
+// a body that widened every sum to a word would report 0x10000 here too.
+TEST(AdditionBitLength, FunctionBodySameWidthLhsStillDropsCarry) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module m;\n"
+      "  logic [15:0] a, b;\n"
+      "  logic [15:0] sumA;\n"
+      "  function void add();\n"
+      "    sumA = a + b;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    a = 16'hFFFF;\n"
+      "    b = 16'h0001;\n"
+      "    add();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "sumA");
+  ASSERT_NE(var, nullptr);
+
+  EXPECT_EQ(var->value.ToUint64(), 0x0000u);
+}
+
 }  // namespace

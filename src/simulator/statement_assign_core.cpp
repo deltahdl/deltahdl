@@ -289,7 +289,7 @@ static const Expr* UnwrapTypedPattern(const Expr* expr) {
   return expr;
 }
 
-static uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx) {
+uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx) {
   if (!lhs) return 0;
   // 11.3.6 / 11.6.1: a concatenation target's width is the sum of its operand
   // widths, and that width is the assignment context the right-hand side is
