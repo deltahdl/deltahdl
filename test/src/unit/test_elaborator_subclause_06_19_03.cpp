@@ -422,12 +422,12 @@ TEST(Elaboration, EnumDeclaredAndAssignedInAForkArmIsReported) {
 // for header assigns to any variable in scope, an enum variable among them.
 //
 // The other form A.6.8 admits there, `for_variable_declaration ::= [ var ]
-// data_type variable_identifier = expression { , ... }`, takes no case of its
-// own: Parser::ParseForLocalDeclInits in src/parser/parser_stmt.cpp records the
-// declared type in Stmt::for_init_types and pushes the initialization into
+// data_type variable_identifier = expression { , ... }`, has cases of its own
+// below: Parser::ParseForLocalDeclInits in src/parser/parser_stmt.cpp records
+// the declared type in Stmt::for_init_types and pushes the initialization into
 // Stmt::for_inits as a plain assignment statement, so no statement in the link
-// satisfies StmtDeclaresEnumVar and the collecting half of the walk has nothing
-// there to reach whatever it descends.
+// satisfies StmtDeclaresEnumVar and the name has to be collected from the type
+// beside it.
 TEST(Elaboration, EnumIntAssignInAForInitializationIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -621,6 +621,62 @@ TEST(Elaboration, EnumDeclaredAndAssignedInARandsequenceCodeBlockIsReported) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "integer assigned to enum variable without cast", 5,
                             "6.19.3"));
+}
+
+// §12.7.1 makes a variable declared in a for header local to the loop, so every
+// use of it stands inside the region §6.19.3 has to hold over -- and a
+// declaration written there is not a StmtKind::kVarDecl, which is the only
+// shape the collecting half of the walk knew. The name went unregistered, so
+// the initializer was judged against nothing.
+TEST(Elaboration, EnumDeclaredInAForHeaderWithAnIntegerIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {a, b, c, d} e;\n"
+      "  initial\n"
+      "    for (e val = 1; val != b; val = val + 1)\n"
+      "      ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 4,
+                            "6.19.3"));
+}
+
+// The half that compounds: because the declaration was not judged the variable
+// was not registered, so nothing assigned to it anywhere in the loop was judged
+// either. The step assigns the integer result of an addition, and the header
+// declares its variable with a cast so that the report this asserts is the
+// step's rather than the declaration's.
+TEST(Elaboration, AssignmentToAForHeaderEnumVariableIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {a, b, c, d} e;\n"
+      "  initial\n"
+      "    for (e val = e'(1); val != b; val = val + 1)\n"
+      "      ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 4,
+                            "6.19.3"));
+}
+
+// §6.19.3 admits a cast, so a header that writes one is accepted and the loop
+// body's assignment of an enum member with it. Without this, a fix reporting
+// every for-header declaration of an enum type would satisfy both cases above.
+TEST(Elaboration, EnumDeclaredInAForHeaderWithACastIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {a, b, c, d} e;\n"
+      "  initial\n"
+      "    for (e val = e'(1); val != b; val = c)\n"
+      "      ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace

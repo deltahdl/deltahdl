@@ -774,10 +774,35 @@ void CheckEnumIncDecStmt(const Stmt* s,
   }
 }
 
+// §12.7.1 makes a variable declared in a for header local to the loop, so every
+// use of it is inside the region §6.19.3 has to hold over. The parser records
+// such a declaration as an assignment in Stmt::for_inits with its type in the
+// matching Stmt::for_init_types entry, and not as a StmtKind::kVarDecl -- which
+// is what StmtDeclaresEnumVar above looks for, so the name was never registered
+// and nothing assigned to it anywhere in the loop was judged either.
+//
+// Only the names are taken here. The assignment the header holds is judged
+// where every other assignment is, when the walk descends into for_inits, so an
+// initializer draws the one report §6.19.3 asks for rather than two.
+void RegisterForHeaderEnumVars(
+    const Stmt* s, const TypedefMap& typedefs,
+    std::unordered_set<std::string_view>& enum_vars) {
+  for (size_t k = 0; k < s->for_inits.size() && k < s->for_init_types.size();
+       ++k) {
+    if (!DataTypeIsEnum(s->for_init_types[k], typedefs)) continue;
+    const Stmt* init = s->for_inits[k];
+    if (init != nullptr && init->lhs != nullptr &&
+        init->lhs->kind == ExprKind::kIdentifier) {
+      enum_vars.insert(init->lhs->text);
+    }
+  }
+}
+
 }  // namespace
 
 void Elaborator::WalkStmtsForEnumAssign(const Stmt* s) {
   if (!s) return;
+  RegisterForHeaderEnumVars(s, typedefs_, enum_var_names_);
   WalkExprForEnumCalls(s->rhs);
   WalkExprForEnumCalls(s->expr);
   WalkExprForEnumCalls(s->condition);
