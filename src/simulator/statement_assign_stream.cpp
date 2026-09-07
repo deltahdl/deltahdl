@@ -583,6 +583,12 @@ static void ForwardUnpackQueueWithRange(const Expr* elem, QueueObject* queue,
   }
 }
 
+// Defined below, beside the default pass that is its other caller: deposit a
+// whole element's bits in its variable, subject to §6.11.2's coercion and
+// §10.6.2's override. Declared here because the forward-unpack pass writes its
+// scalar elements through the same function rather than restating it.
+static void StoreStreamValueToVar(Variable* var, Logic4Vec value);
+
 // Forward-unpack arm for a plain scalar/lvalue element: write the target from
 // the next `width` stream bits, advancing `cursor`.
 static void ForwardUnpackScalar(const Expr* elem, StreamEnv env,
@@ -598,11 +604,10 @@ static void ForwardUnpackScalar(const Expr* elem, StreamEnv env,
   // on one boundary.
   if (IsStreamSelectElement(elem)) {
     WriteBitSelect(var, elem, bits, env.ctx, env.arena);
+    var->NotifyWatchers();
   } else {
-    var->value = bits;
-    if (!var->is_4state) CoerceTo2State(var->value);
+    StoreStreamValueToVar(var, bits);
   }
-  var->NotifyWatchers();
   cursor += w;
 }
 
@@ -666,6 +671,15 @@ static Logic4Vec BuildLeftAlignedStream(const Logic4Vec& rhs_val,
 
 // Write `value` into `var`, coercing to 2-state if needed and notifying.
 static void StoreStreamValueToVar(Variable* var, Logic4Vec value) {
+  // §10.6.2: a force "shall override a procedural assignment ... until a
+  // release procedural statement is executed on the variable". The check is
+  // inside the write rather than at the unpack's entry because §11.4.14.3
+  // unpacks the stream "into one or more variables": a force on one of them
+  // declines that one while the rest take their slices, and declining at the
+  // entry would drop the whole statement. It has to be inside for the deferred
+  // route as well, where the unpack runs from an update-region callback and the
+  // flag that governs the write is the one standing then.
+  if (var->is_forced) return;
   var->value = value;
   if (!var->is_4state) CoerceTo2State(var->value);
   var->NotifyWatchers();
@@ -720,8 +734,7 @@ static void WriteStreamElement(const StreamElemInfo& ei, const StreamView& src,
   // storing the value whole gave `{>> {a[3:0], b}}` the whole of `a` and lost
   // the bits `a[7:4]` had. WriteBitSelect resolves the same window
   // StreamElementClaimedBits measured, so the stream is carved and deposited on
-  // one boundary. It also declines a variable §10.6.2 has forced, which
-  // StoreStreamValueToVar does not test.
+  // one boundary. Both writers decline a variable §10.6.2 has forced.
   if (IsStreamSelectElement(ei.expr)) {
     WriteBitSelect(var, ei.expr, bits, env.ctx, env.arena);
     var->NotifyWatchers();

@@ -620,4 +620,137 @@ TEST(ForceReleaseSim, ReleaseThenABitSelectAssignResumes) {
   EXPECT_EQ(x->value.ToUint64(), 51u);
 }
 
+// §10.6.2: "A force statement to a variable shall override a procedural
+// assignment, continuous assignment or an assign procedural continuous
+// assignment to the variable until a release procedural statement is executed
+// on the variable." §11.4.14.3 makes each name in a streaming target the
+// recipient of an assignment -- "When a streaming_concatenation appears as the
+// target of an assignment, the streaming operators perform the reverse
+// operation; i.e., to unpack a stream of bits into one or more variables" --
+// and §10.4 puts a blocking assignment written in an initial block among the
+// procedural assignments occurring "within procedures such as always, initial,
+// task, and function". Writing the target as a streaming concatenation does not
+// take the statement out of the class the force overrides, so a keeps 50 and
+// the slice it would have taken is dropped.
+//
+// UnpackStreamingConcatLhs is the writer every streaming target reaches, and
+// this statement takes its default pass: ShouldForwardResolveUnpack claims only
+// the shape in which a with-range names a target unpacked to its left, so the
+// element walk lands in WriteStreamElement's resolved-lvalue arm and deposits
+// through StoreStreamValueToVar, which consulted the flag nowhere. The route
+// reaches none of the writers that do decline -- PerformBlockingAssign hands a
+// streaming target to UnpackStreamingConcatLhs and returns before its own
+// is_forced test, and WriteBitSelect, which #3519 gave the check, is reached
+// for a select element and not for a plain name. So a took the high byte of
+// 16'hABCD and read 171 where §10.6.2 leaves it at the forced 50.
+//
+// b is what says only the forced element was declined rather than the whole
+// statement dropped. §11.4.14.3 consumes the stream "from its left (most
+// significant) end" and §11.4.14.2 has `>>` perform "no re-ordering", so the
+// sixteen bits reach the two eight-bit targets in the order they are written:
+// a's 8'hAB and b's 8'hCD. b is seeded with 8'h0F first, a value neither slice
+// carries, so a b left alone reads 15 and not the 205 it has to take.
+TEST(ForceReleaseSim, ForcePreventsAStreamingConcatTargetWrite) {
+  SimFixture f;
+  auto* a = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    b = 8'h0F;\n"
+      "    force a = 8'd50;\n"
+      "    {>> {a, b}} = 16'hABCD;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_TRUE(a->is_forced);
+  EXPECT_EQ(a->value.ToUint64(), 50u);
+
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(b->value.ToUint64(), 0xCDu);
+}
+
+// The deferred route into the same unpacker, with the force executed after the
+// assignment statement and before the region that carries it out.
+// ScheduleStreamingConcatNba samples the right-hand side and queues an update
+// event whose callback calls UnpackStreamingConcatLhs, so the writes happen in
+// the NBA region of time 0, after the `force a = 8'd50;` written below the
+// assignment has run in the active region. §10.4 names the nonblocking form
+// among the procedural assignments whatever its left-hand side is, and §10.6.2
+// asks what stands when the assignment is carried out: the force "shall
+// override a procedural assignment ... until a release procedural statement is
+// executed on the variable", and none has been, so the write finds a forced and
+// declines it.
+//
+// The force is written after the assignment rather than before it because that
+// is the order which separates a check inside the write from one asked at
+// scheduling time. A decline asked when the event was queued reads is_forced
+// false, the force not having executed yet, and the update region then deposits
+// 8'h5A over the forced 50 -- the timing point
+// ForcePreventsANonblockingBitSelectAssign makes for the select callbacks, made
+// here for the unpacker's callback. Both orders read 90 before the fix, since
+// the callback consulted the flag at no moment at all.
+//
+// b, seeded with 8'hF0, is again what says the statement was not dropped: the
+// stream 16'h5A3C splits into a's 8'h5A and b's 8'h3C, so b reads 60. The `#1;`
+// is what gives the deferred write its region before the run ends.
+TEST(ForceReleaseSim, ForcePreventsANonblockingStreamingConcatTargetWrite) {
+  SimFixture f;
+  auto* a = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    b = 8'hF0;\n"
+      "    {>> {a, b}} <= 16'h5A3C;\n"
+      "    force a = 8'd50;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_TRUE(a->is_forced);
+  EXPECT_EQ(a->value.ToUint64(), 50u);
+
+  auto* vb = f.ctx.FindVariable("b");
+  ASSERT_NE(vb, nullptr);
+  EXPECT_EQ(vb->value.ToUint64(), 0x3Cu);
+}
+
+// The streaming form's half of the other rule in §10.6.2: the override lasts
+// "until a release procedural statement is executed on the variable", after
+// which the variable "shall not immediately change value and shall maintain its
+// current value until the next procedural assignment to the variable is
+// executed". That next assignment is the streaming one, so a leaves the forced
+// 50 for the 8'hAB its slice carries and reads 171.
+//
+// The two cases above expect StoreStreamValueToVar to write nothing to a, and a
+// decline that never lifted -- one keyed on a condition the release does not
+// clear -- would satisfy both of them. b cannot say otherwise there, since b is
+// never forced and takes its slice under either reading. So this is what says
+// the decline is the force's and is bounded by the release, as
+// ReleaseThenABitSelectAssignResumes says it for the select writer, and it is
+// what keeps the fix from becoming a streaming write that never lands.
+TEST(ForceReleaseSim, ReleaseThenAStreamingConcatTargetWriteResumes) {
+  SimFixture f;
+  auto* a = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    b = 8'h11;\n"
+      "    force a = 8'd50;\n"
+      "    release a;\n"
+      "    {>> {a, b}} = 16'hABCD;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_FALSE(a->is_forced);
+  EXPECT_EQ(a->value.ToUint64(), 0xABu);
+
+  auto* vb = f.ctx.FindVariable("b");
+  ASSERT_NE(vb, nullptr);
+  EXPECT_EQ(vb->value.ToUint64(), 0xCDu);
+}
+
 }  // namespace
