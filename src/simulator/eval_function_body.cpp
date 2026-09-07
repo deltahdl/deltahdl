@@ -70,8 +70,36 @@ static bool IsMemberAccessOn(const Expr* lhs, std::string_view base_name) {
 // runs as part of a chain populates the inherited slot, not just the unscoped
 // alias. With no enclosing-class context active, the plain unscoped write is
 // preserved, leaving non-method writes unchanged.
+// §8.5 puts no restriction on a class property's data type, so a property is an
+// object of the type its declaration gave it. The declaring type is found by
+// the walk SetPropertyForType makes for the same name, because a property
+// declared on a base class is not in a derived type's own list.
+static const ClassTypeInfo::PropertyInfo* FindPropertyInfo(
+    const ClassTypeInfo* type, std::string_view name) {
+  for (const auto* t = type; t != nullptr; t = t->parent) {
+    for (const auto& prop : t->properties) {
+      if (prop.name == name) return &prop;
+    }
+  }
+  return nullptr;
+}
+
+// §10.4 puts procedural assignments "within procedures such as always, initial,
+// task, and function", so an assignment to a property from a method is one, and
+// §10.7 truncates or extends it into the property while §6.11.2 converts the
+// unknowns reaching a 2-state one. A Logic4Vec carries its own width, so
+// writing the value straight in put the expression's width in the declaration's
+// place: §8.2's own `bit [3:0] command;` held eight bits of whatever was
+// assigned to it, and its `initiator_id = 5'bx;` held the x.
+//
+// Only a width the declaration gave is truncated to. CollectClassMembers
+// substitutes a 32-bit carrier for a type it could not size, and truncating to
+// a carrier would cut a class handle in half and a string down to four
+// characters; width_is_declared is what tells the two apart, and it gates the
+// state-ness for the same reason.
 static void WriteSelfProperty(ClassObject* self, std::string_view name,
-                              const Logic4Vec& val, SimContext& ctx) {
+                              const Logic4Vec& val, SimContext& ctx,
+                              Arena& arena) {
   // §8.11: a `this.x` write updates the invoking instance. Properties are kept
   // under both an unscoped key and a `Type::name` scoped key, and reads consult
   // the scoped key first. In a plain instance method (no enclosing-class
@@ -80,10 +108,16 @@ static void WriteSelfProperty(ClassObject* self, std::string_view name,
   // the next read returns the stale scoped value.
   const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
   if (!enclosing) enclosing = self->type;
+  Logic4Vec stored = val;
+  const auto* prop = FindPropertyInfo(enclosing, name);
+  if (prop != nullptr && prop->width_is_declared) {
+    stored = ResizeToWidth(stored, prop->width, arena);
+    if (!prop->is_4state) CoerceTo2State(stored);
+  }
   if (enclosing) {
-    self->SetPropertyForType(name, enclosing, val);
+    self->SetPropertyForType(name, enclosing, stored);
   } else {
-    self->SetProperty(std::string(name), val);
+    self->SetProperty(std::string(name), stored);
   }
 }
 
@@ -147,7 +181,7 @@ static void ExecFuncIdentifierAssign(const Expr* lhs, const Logic4Vec& val,
     }
   }
   auto* self = ctx.CurrentThis();
-  if (self) WriteSelfProperty(self, lhs->text, val, ctx);
+  if (self) WriteSelfProperty(self, lhs->text, val, ctx, arena);
 }
 
 // §8.7: `new` has no type of its own -- "the left-hand side of the assignment
@@ -176,7 +210,7 @@ static bool TrySelfClassNewAssign(const Stmt* stmt, std::string_view field_name,
   WriteSelfProperty(
       self, field_name,
       EvalClassNew(field_type, stmt->rhs, ctx, arena, stmt->rhs->range.start),
-      ctx);
+      ctx, arena);
   return true;
 }
 
@@ -236,7 +270,7 @@ static void ExecFuncWriteValue(const Expr* lhs, const Logic4Vec& val,
   }
   if (IsMemberAccessOn(lhs, "this")) {
     auto* self = ctx.CurrentThis();
-    if (self) WriteSelfProperty(self, lhs->rhs->text, val, ctx);
+    if (self) WriteSelfProperty(self, lhs->rhs->text, val, ctx, arena);
     return;
   }
   if (IsMemberAccessOn(lhs, "super")) {

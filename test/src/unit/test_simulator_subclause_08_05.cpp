@@ -237,4 +237,89 @@ TEST(ObjectPropertySim, LocalParameterAccessedViaInstance) {
             42u);
 }
 
+// §10.4 puts procedural assignments "within procedures such as always, initial,
+// task, and function", so an assignment to a property from a method is one and
+// §10.7 truncates or extends it into the object the declaration made. §8.2's
+// own Packet is the case: it declares `bit [3:0] command;` beside a `clean`
+// task that assigns to it, and to `initiator_id` the `5'bx` §6.11.2 gives a
+// `bit` no room for. The property took the value's width instead, so both
+// survived.
+
+// The width. Eight bits of 8'hFF into the four `command` declares reads 15;
+// the property carrying the literal's own width reads 255.
+TEST(ObjectPropertySim, NarrowPropertyTruncatesAValueWrittenFromAMethod) {
+  EXPECT_EQ(RunAndGet("class Packet;\n"
+                      "  bit [3:0] command;\n"
+                      "  task clean();\n"
+                      "    command = 8'hFF;\n"
+                      "  endtask\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Packet p;\n"
+                      "    p = new;\n"
+                      "    p.clean();\n"
+                      "    result = p.command;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            15u);
+}
+
+// The state-ness, written as §8.2 writes it. The value is carried out into a
+// 4-state variable and read through IsKnown, because an x reads as zero through
+// ToUint64 either way -- what separates the two answers is whether the bits are
+// known, not what they add up to.
+TEST(ObjectPropertySim, TwoStatePropertyZeroesXzWrittenFromAMethod) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "class Packet;\n"
+      "  bit [4:0] initiator_id;\n"
+      "  task clean();\n"
+      "    initiator_id = 5'bx;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  logic [4:0] result;\n"
+      "  initial begin\n"
+      "    Packet p;\n"
+      "    p = new;\n"
+      "    p.clean();\n"
+      "    result = p.initiator_id;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(var->value.IsKnown());
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// A property declared on a base class is not in the derived type's own list, so
+// the width has to be looked for along the chain SetPropertyForType walks to
+// find the storage. A method of the derived class writing the base's property
+// is what asks for that: a lookup that stopped at the method's own class would
+// find nothing and write the value whole.
+TEST(ObjectPropertySim, InheritedPropertyTruncatesAValueWrittenFromAMethod) {
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  bit [3:0] command;\n"
+                      "endclass\n"
+                      "class Derived extends Base;\n"
+                      "  task clean();\n"
+                      "    command = 8'hFF;\n"
+                      "  endtask\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Derived d;\n"
+                      "    d = new;\n"
+                      "    d.clean();\n"
+                      "    result = d.command;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            15u);
+}
+
 }  // namespace

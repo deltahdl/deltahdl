@@ -59,6 +59,16 @@ struct ClassTypeInfo {
     // right fill. Defaults to 2-state so entries that never set it (e.g. class
     // parameters) keep their prior zero-fill behavior.
     bool is_4state = false;
+    // Whether `width` is the width the declaration gave the property, rather
+    // than the 32-bit carrier substituted for a type the collector could not
+    // size — a name, a string, a class handle. §8.7's fill needs a width for
+    // either, which is why the carrier is stored; a write needs to know which
+    // it has, because §10.7 truncating to a carrier would cut a handle in half
+    // and a string down to four characters. `is_4state` is trustworthy on the
+    // same condition and for the same reason: Is4stateType is asked with an
+    // empty typedef map, so a name answers 2-state whatever it stands for.
+    // Defaults to false so an entry that never set it is written unchanged.
+    bool width_is_declared = false;
   };
   std::vector<PropertyInfo> properties;
 
