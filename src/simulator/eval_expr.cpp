@@ -957,23 +957,22 @@ Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
       var->value = result;
     }
   } else if (expr->lhs->kind == ExprKind::kSelect) {
-    // §11.3.6 gives the expression the left-hand side's data type, and a
-    // select's type is the window it names rather than the variable it names it
-    // in -- SelectStorageBits is what measures that window, where
-    // LhsContextWidth would answer with the whole variable's width. A select
-    // that resolves to no variable of the design is an associative or queue
-    // element, whose width comes from its container and whose writer applies
-    // it.
-    if (auto* var = ResolveLhsVariable(expr->lhs, ctx)) {
-      uint32_t sel_width = SelectStorageBits(*var, expr->lhs, ctx, arena).width;
-      if (sel_width != 0) result = ResizeToWidth(result, sel_width, arena);
-    }
     // TrySelectBlockingAssign is what the statement form reaches, and it
     // answers for every select §10.4 admits: an unpacked array element, a queue
     // or associative element, the bits of an associative element, a compound
     // a[i][j], the byte a string's index names, and otherwise the window a
     // bit-select or part-select opens. Asking only TryAssocIndexedWrite left
     // every one of the others writing nothing and reporting nothing.
+    //
+    // The value is handed over as the operation produced it, each of those
+    // writers sizing it by what it is writing into -- an element's own width,
+    // or the bits a select names. Sizing it here instead cannot be done from
+    // the left-hand side alone: ResolveLhsVariable answers with the base
+    // variable, which exists for an array, a queue, an associative array and a
+    // string alike, and SelectStorageBits then measures a bit of it rather than
+    // an element of it. §11.3.6 would have the value the expression yields
+    // carry the select's own type, which is what the writer knows and this does
+    // not; that is #3502.
     TrySelectBlockingAssign(expr->lhs, result, ctx, arena);
   } else if (expr->lhs->kind == ExprKind::kMemberAccess) {
     // §10.4 admits a member access as a left-hand side too, and the statement
