@@ -156,6 +156,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_defparam.cpp
     elaborator/elaborator_gates.cpp
     elaborator/elaborator_validate_delays.cpp
+    elaborator/elaborator_net_delay.cpp
     elaborator/elaborator_validate.cpp
     elaborator/elaborator_validate_classes.cpp
     elaborator/elaborator_validate_operations.cpp

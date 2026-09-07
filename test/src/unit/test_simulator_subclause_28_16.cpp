@@ -484,4 +484,29 @@ TEST(GateNetDelays, ProductionUndrivenDelayedNetAcquiresNoDriver) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
 
+// §10.3.3 states the addition as the rule a net delay is held to. Ruling on the
+// declaration that carries its own continuous assignment it says "the delay is
+// part of the continuous assignment and is not a net delay. Thus, it shall not
+// be added to the delay of other drivers on the net" -- a "thus" that follows
+// only where a delay that is a net delay is added to them. §28.16 gives the two
+// consecutive segments of one path, the driver's from its inputs to its output
+// and the net's from that output changing to the net updating, so the time from
+// the one to the other is their sum.
+//
+// The driver's delay was kept and the net's discarded, so this settled at 102
+// rather than 107. The two delays are 2 and 5 -- neither a multiple of the
+// other, and their sum is neither -- so a run keeping one of them alone is told
+// from a run adding them.
+TEST(GateNetDelays, ProductionNetDelayIsAddedToAContinuousAssignmentsOwnDelay) {
+  EXPECT_EQ(SettleTicksForNetDelayDriver("assign #2 w = a;"), 107u);
+}
+
+// §28.16 makes the answer the same whichever construct drives the net, so a
+// gate primitive carrying its own delay adds the net's exactly as the
+// assignment above does. The gate's 3 is distinct from the assignment's 2, so
+// this case is not the one above under another name.
+TEST(GateNetDelays, ProductionNetDelayIsAddedToAGatePrimitivesOwnDelay) {
+  EXPECT_EQ(SettleTicksForNetDelayDriver("buf #3 g(w, a);"), 108u);
+}
+
 }  // namespace

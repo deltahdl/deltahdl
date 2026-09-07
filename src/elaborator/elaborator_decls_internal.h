@@ -75,6 +75,6 @@ void CheckDeclRedeclaration(const ModuleItem* item,
 // further" and so belongs to the net rather than to any one driver of it. Runs
 // over a module whose items have all been elaborated, because §10.3.2 lets a
 // continuous assignment stand before the declaration of the net it drives.
-void ApplyNetDeclDelaysToDrivers(RtlirModule* mod);
+void ApplyNetDeclDelaysToDrivers(Arena& arena, RtlirModule* mod);
 
 }  // namespace delta

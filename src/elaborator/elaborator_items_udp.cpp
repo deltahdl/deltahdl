@@ -873,7 +873,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   // only once every item is elaborated -- §10.3.2 lets the continuous
   // assignment that drives a net stand before the declaration that gives it its
   // delay, and a gate instance driving it may stand there too.
-  ApplyNetDeclDelaysToDrivers(mod);
+  ApplyNetDeclDelaysToDrivers(arena_, mod);
 
   RunPostItemValidations(decl, mod);
 }

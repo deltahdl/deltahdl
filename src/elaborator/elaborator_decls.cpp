@@ -609,49 +609,6 @@ std::string_view LhsSignalName(const Expr* lhs) {
   return lhs->text;
 }
 
-// §28.16: the nets of `mod` that carry a net delay, keyed by their names, which
-// is what a driver of one names it by.
-static std::unordered_map<std::string_view, const RtlirNet*> CollectDelayedNets(
-    const RtlirModule* mod) {
-  std::unordered_map<std::string_view, const RtlirNet*> delayed;
-  for (const RtlirNet& net : mod->nets) {
-    if (net.delay_rise == nullptr) continue;
-    delayed.emplace(net.name, &net);
-  }
-  return delayed;
-}
-
-// The net of `delayed` that `lhs` drives, or null where `lhs` drives none of
-// them. A left-hand side naming no single signal reaches no entry, because
-// LhsSignalName answers an empty name for it and no net is declared under one.
-static const RtlirNet* FindDelayedNetDriven(
-    const Expr* lhs,
-    const std::unordered_map<std::string_view, const RtlirNet*>& delayed) {
-  auto it = delayed.find(LhsSignalName(lhs));
-  if (it == delayed.end()) return nullptr;
-  return it->second;
-}
-
-void ApplyNetDeclDelaysToDrivers(RtlirModule* mod) {
-  std::unordered_map<std::string_view, const RtlirNet*> delayed =
-      CollectDelayedNets(mod);
-  for (RtlirContAssign& ca : mod->assigns) {
-    // A driver that wrote a delay of its own keeps exactly that delay, and the
-    // net's is not added to it. §10.3.3 requires the addition: it rules that a
-    // declaration assignment's delay "shall not be added to the delay of other
-    // drivers on the net", stating as an exception what a genuine net delay is
-    // held to. Summing the two means first expanding §28.16's one- and
-    // two-delay defaults into expressions, one of which is a minimum of two.
-    // That is a change of its own, and deltahdl/deltahdl#3373 carries it.
-    if (ca.delay != nullptr) continue;
-    const RtlirNet* net = FindDelayedNetDriven(ca.lhs, delayed);
-    if (net == nullptr) continue;
-    ca.delay = net->delay_rise;
-    ca.delay_fall = net->delay_fall;
-    ca.delay_decay = net->delay_turnoff;
-  }
-}
-
 namespace {
 
 // The declared type and width of the signal named `name`. A port contributes
