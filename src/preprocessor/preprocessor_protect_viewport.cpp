@@ -11,15 +11,36 @@ namespace delta {
 void Preprocessor::ApplyViewport(const PragmaKeywordExpression& expr,
                                  SourceLoc loc) {
   // §34.5.32.2 has a viewport describe objects within the current protected
-  // envelope, so the ones an envelope was described by end with it. They are
-  // dropped on the expression that opens an envelope as well as on the one
-  // that closes it, a text that wrote a viewport where no envelope stood
-  // having described nothing the envelope about to open contains.
+  // envelope, so the ones an envelope was described by belong to that envelope
+  // and to no other. §34.2 permits the nesting -- "Decryption envelopes may
+  // contain other envelopes within their enclosed data block" -- so which
+  // envelope is current changes as one opens and closes inside another, and
+  // the outer envelope is current again when the inner one has closed, still
+  // described by what it wrote.
+  //
+  // The viewports were held in one flat list cleared at every boundary, so an
+  // inner envelope's opening wiped the outer's and nothing put them back. They
+  // are a stack now, mirroring the envelope nesting that
+  // ProtectEnvelopeState::Close already keeps: an open puts the current
+  // envelope's aside and starts an empty list for the one opening, and a close
+  // takes the enclosing one back.
   if (OpensEncryptionEnvelope(expr.keyword, expr.has_value) ||
-      ClosesEncryptionEnvelope(expr.keyword, expr.has_value) ||
-      OpensDecryptionEnvelope(expr.keyword, expr.has_value) ||
-      ClosesDecryptionEnvelope(expr.keyword, expr.has_value)) {
+      OpensDecryptionEnvelope(expr.keyword, expr.has_value)) {
+    protect_viewport_stack_.push_back(std::move(protect_viewports_));
     protect_viewports_.clear();
+    return;
+  }
+  if (ClosesEncryptionEnvelope(expr.keyword, expr.has_value) ||
+      ClosesDecryptionEnvelope(expr.keyword, expr.has_value)) {
+    // A close standing where nothing was opened has no enclosing envelope to
+    // give back, and the list it ends is the one written outside every
+    // envelope, which describes nothing.
+    if (protect_viewport_stack_.empty()) {
+      protect_viewports_.clear();
+      return;
+    }
+    protect_viewports_ = std::move(protect_viewport_stack_.back());
+    protect_viewport_stack_.pop_back();
     return;
   }
   if (expr.keyword != kViewportKeyword) return;

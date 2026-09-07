@@ -646,6 +646,11 @@ class Preprocessor {
   // each of them describe an object of that envelope, so they are gathered for
   // as long as it stands and dropped where it ends.
   std::vector<ProtectViewport> protect_viewports_;
+  // §34.2 lets an envelope contain another, and §34.5.32.2 gives a viewport to
+  // "the current protected envelope", so the enclosing envelopes' viewports are
+  // held here while an inner one is open and taken back when it closes.
+  // protect_viewports_ above is the current envelope's alone.
+  std::vector<std::vector<ProtectViewport>> protect_viewport_stack_;
   // The designations the source text has written for the keys of the entities
   // it names. They are unique for the entity they are written under, so they
   // accumulate across the whole compilation input alongside the keyword values

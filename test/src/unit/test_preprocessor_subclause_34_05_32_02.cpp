@@ -316,4 +316,46 @@ TEST(ProtectViewportDescription, AnExpressionInNoEnvelopeIsNotAnsweredTwice) {
       ReportedWarning(reading.diag.Diagnostics(), kNotActedOn, 1, "34.5.32"));
 }
 
+// §34.2 permits the nesting -- "Decryption envelopes may contain other
+// envelopes within their enclosed data block" -- and §34.5.32.2 gives a
+// viewport to "the current protected envelope", so which envelope is current
+// changes as one opens inside another and the outer is current again when the
+// inner has closed. It is still described by what it wrote.
+//
+// The viewports were held in one flat list cleared at every envelope boundary,
+// so the inner envelope's opening wiped the outer's before its closing could,
+// and the outer envelope came back described by nothing. A single envelope
+// cannot fail this: one open and one close leave nothing to lose.
+TEST(ProtectViewportDescription, AnInnerEnvelopeDoesNotWipeTheOuters) {
+  ReadingViewports reading(
+      std::string(kOpensDecryption) + ViewportOf(kObject, kAccess) +
+      std::string(kOpensDecryption) + std::string(kClosesDecryption));
+  ASSERT_EQ(reading.Count(), 1U) << reading.text;
+  EXPECT_EQ(reading.Viewports().front().object, kObject);
+}
+
+// The inner envelope is described by its own and by nothing of the outer's,
+// which is the other half of "the current protected envelope": while the inner
+// stands it is current, and the outer's viewport describes an object of the
+// outer.
+TEST(ProtectViewportDescription, AnInnerEnvelopeIsDescribedByItsOwnAlone) {
+  ReadingViewports reading(
+      std::string(kOpensDecryption) + ViewportOf(kObject, kAccess) +
+      std::string(kOpensDecryption) + ViewportOf(kOtherObject, kAccess));
+  ASSERT_EQ(reading.Count(), 1U) << reading.text;
+  EXPECT_EQ(reading.Viewports().front().object, kOtherObject);
+}
+
+// And the outer's own comes back when the inner closes, beside the one it had
+// before -- so what returns is the outer envelope's list rather than an empty
+// one that the outer then refills.
+TEST(ProtectViewportDescription, TheOutersViewportsReturnWhenTheInnerCloses) {
+  ReadingViewports reading(
+      std::string(kOpensDecryption) + ViewportOf(kObject, kAccess) +
+      std::string(kOpensDecryption) + ViewportOf(kOtherObject, kAccess) +
+      std::string(kClosesDecryption));
+  ASSERT_EQ(reading.Count(), 1U) << reading.text;
+  EXPECT_EQ(reading.Viewports().front().object, kObject);
+}
+
 }  // namespace
