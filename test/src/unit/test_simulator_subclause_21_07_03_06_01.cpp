@@ -429,76 +429,82 @@ TEST_F(VcdcloseFromSource, FourStateDumpIgnoresTheSourceCall) {
 }
 
 // §21.7: a VCD file "contains information about value changes on selected
-// variables in the design", and the change this design makes at time 10 is one
-// of them: it happened while the dump was open, and it is the last thing the
-// design did to `a` before closing its own waveform. The recording runs at the
-// end of a time unit while the close runs inside one, so without the closing
-// unit being recorded first the change reaches no file at all.
+// variables in the design", and the change these designs make to `a` is one of
+// them. Whether it reaches the file turns on which time unit the close falls
+// in, so the cases below differ only in that and in which unit they read.
 //
 // The record is looked for under the identifier code §21.7.4.2's node
-// information gives `a`, rather than under a spelling of the value this test
-// would have to predict, and it is looked for in the text between the closing
-// unit's simulation_time command and the keyword that terminates the file.
-TEST_F(VcdcloseFromSource, ChangeInTheClosingTimeUnitIsRecordedBeforeTheClose) {
-  RunSource(DesignCalling("    $dumpports(, \"portdump.vcd\");\n",
-                          "    $vcdclose;\n"),
-            /*close_file=*/false);
+// information gives `a`, rather than under a spelling of the value these tests
+// would have to predict, and it is looked for in the text between the unit's
+// own simulation_time command and the keyword that terminates the file.
+class VcdcloseClosingUnit : public VcdcloseFromSource {
+ protected:
+  // Runs the shared design with `close_task` and returns what the file lists
+  // for the time unit `time_line` introduces, from that command up to the
+  // terminating keyword. Empty is never the answer for a unit the run reached:
+  // the command itself is always in it.
+  std::string UnitBeforeClose(const std::string& close_task,
+                              const std::string& time_line) {
+    RunSource(
+        DesignCalling("    $dumpports(, \"portdump.vcd\");\n", close_task),
+        /*close_file=*/false);
+    std::string content = DumpFile("portdump.vcd");
+    whole_ = content;
+    code_ = "";
+    found_ = false;
+    auto decl = VarDecl(content, "a");
+    if (decl.size() != 6) return "";
+    code_ = decl[3];
+    size_t close_at = content.find("$vcdclose");
+    if (close_at == std::string::npos) return "";
+    size_t unit_at = content.rfind(time_line, close_at);
+    if (unit_at == std::string::npos) return "";
+    found_ = true;
+    return content.substr(unit_at, close_at - unit_at);
+  }
 
-  std::string content = DumpFile("portdump.vcd");
-  auto decl = VarDecl(content, "a");
-  ASSERT_EQ(decl.size(), 6u) << content;
-  size_t close_at = content.find("$vcdclose");
-  ASSERT_NE(close_at, std::string::npos) << content;
-  size_t unit_at = content.rfind("\n#10\n", close_at);
-  ASSERT_NE(unit_at, std::string::npos) << content;
-  EXPECT_NE(content.substr(unit_at, close_at - unit_at).find(decl[3]),
-            std::string::npos)
-      << content;
+  // Whether the run produced a terminated file carrying `a`'s node information
+  // and the time unit asked for. The absence case below would pass on a file
+  // that had none of them, so every case asserts this first.
+  bool found_ = false;
+  // The identifier code the last UnitBeforeClose call found for `a`, and the
+  // whole file it read, for a failure to report.
+  std::string code_;
+  std::string whole_;
+};
+
+// The change and the close in one time unit. The recording runs at the end of a
+// time unit while the close runs inside one, so without the closing unit being
+// recorded first this change reaches no file at all -- and it is the last thing
+// the design did to `a` before closing its own waveform.
+TEST_F(VcdcloseClosingUnit,
+       ChangeInTheClosingTimeUnitIsRecordedBeforeTheClose) {
+  std::string unit = UnitBeforeClose("    $vcdclose;\n", "\n#10\n");
+  ASSERT_TRUE(found_) << whole_;
+  EXPECT_NE(unit.find(code_), std::string::npos) << whole_;
 }
 
 // The same change one time unit before the close, which the end-of-slot
 // recording reaches on its own. Without this, the case above would hold just as
 // well of a simulator that never recorded the change at any time, and the claim
 // would be about dumping rather than about the closing unit.
-TEST_F(VcdcloseFromSource, ChangeBeforeTheClosingTimeUnitIsStillRecorded) {
-  RunSource(DesignCalling("    $dumpports(, \"portdump.vcd\");\n",
-                          "    #1 $vcdclose;\n"),
-            /*close_file=*/false);
-
-  std::string content = DumpFile("portdump.vcd");
-  auto decl = VarDecl(content, "a");
-  ASSERT_EQ(decl.size(), 6u) << content;
-  size_t close_at = content.find("$vcdclose");
-  ASSERT_NE(close_at, std::string::npos) << content;
-  size_t unit_at = content.rfind("\n#10\n", close_at);
-  ASSERT_NE(unit_at, std::string::npos) << content;
-  EXPECT_NE(content.substr(unit_at, close_at - unit_at).find(decl[3]),
-            std::string::npos)
-      << content;
+TEST_F(VcdcloseClosingUnit, ChangeBeforeTheClosingTimeUnitIsStillRecorded) {
+  std::string unit = UnitBeforeClose("    #1 $vcdclose;\n", "\n#10\n");
+  ASSERT_TRUE(found_) << whole_;
+  EXPECT_NE(unit.find(code_), std::string::npos) << whole_;
 }
 
-// A closing unit the design changed nothing in lists nothing. §21.7.2.1 has a
-// time increment list "the variables that change value" during it, so recording
-// the unit a close falls in must not invent a record for a unit that changed
-// none -- which is what a step that dumped every selected object rather than
-// the changed ones would produce. The simulation_time command itself is not
-// such a record: §21.7.4.1 admits a simulation_time standing on its own, and a
-// dump that stayed open writes one for every time unit the run reaches.
-TEST_F(VcdcloseFromSource, ClosingUnitWithNoChangeListsNoValueChange) {
-  RunSource(DesignCalling("    $dumpports(, \"portdump.vcd\");\n",
-                          "    #1 $vcdclose;\n"),
-            /*close_file=*/false);
-
-  std::string content = DumpFile("portdump.vcd");
-  auto decl = VarDecl(content, "a");
-  ASSERT_EQ(decl.size(), 6u) << content;
-  size_t close_at = content.find("$vcdclose");
-  ASSERT_NE(close_at, std::string::npos) << content;
-  size_t unit_at = content.rfind("\n#11\n", close_at);
-  ASSERT_NE(unit_at, std::string::npos) << content;
-  EXPECT_EQ(content.substr(unit_at, close_at - unit_at).find(decl[3]),
-            std::string::npos)
-      << content;
+// The closing unit of that same run, which the design changed nothing in.
+// §21.7.2.1 has a time increment list "the variables that change value" during
+// it, so recording the unit a close falls in must not invent a record for a
+// unit that changed none -- which is what a step dumping every selected object
+// rather than the changed ones would produce. The simulation_time command
+// itself is not such a record: §21.7.4.1 admits one standing on its own, and a
+// dump that stays open writes one for every time unit the run reaches.
+TEST_F(VcdcloseClosingUnit, ClosingUnitWithNoChangeListsNoValueChange) {
+  std::string unit = UnitBeforeClose("    #1 $vcdclose;\n", "\n#11\n");
+  ASSERT_TRUE(found_) << whole_;
+  EXPECT_EQ(unit.find(code_), std::string::npos) << whole_;
 }
 
 }  // namespace
