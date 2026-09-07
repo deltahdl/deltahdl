@@ -8,6 +8,8 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/packed_range.h"
+#include "common/types.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/assoc_element.h"
@@ -461,40 +463,97 @@ static bool TrySubarrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   return true;
 }
 
+// §11.5.1: the storage bits of `var` that the select `sel` addresses, resolved
+// against the declaration, since "the actual bit that is accessed by an address
+// is, in part, determined by the declaration". A width of zero is the select
+// that addresses no bit of the object -- an index carrying x or z, or one
+// outside the declared bounds, both of which §11.5.1 gives no effect when
+// written.
+static PartSelectBits ConcatSelectBits(const Variable& var, const Expr* sel,
+                                       SimContext& ctx, Arena& arena) {
+  auto idx_val = EvalExpr(sel->index, ctx, arena);
+  if (HasUnknownBits(idx_val)) return {0, 0};
+  auto idx = static_cast<int64_t>(idx_val.ToUint64());
+  if (sel->index_end == nullptr) {
+    // §7.4.1: one index of a packed multidimensional array addresses an element
+    // rather than a bit.
+    if (var.packed_elem_width > 1) {
+      PackedRange elems = var.DeclaredRange();
+      if (!elems.Contains(idx)) return {0, 0};
+      auto base = static_cast<uint32_t>(elems.OffsetOf(idx));
+      return {base * var.packed_elem_width, var.packed_elem_width};
+    }
+    PackedRange range = var.BitSelectRange();
+    if (!range.Contains(idx)) return {0, 0};
+    return {static_cast<uint32_t>(range.OffsetOf(idx)), 1};
+  }
+  auto end_val = EvalExpr(sel->index_end, ctx, arena);
+  if (HasUnknownBits(end_val)) return {0, 0};
+  auto target = PartSelectTargetIndices(
+      idx, static_cast<int64_t>(end_val.ToUint64()), sel->is_part_select_plus,
+      sel->is_part_select_minus);
+  return PartSelectStorageBits(var.BitSelectRange(), target.first,
+                               target.second);
+}
+
 // §11.4.1/§11.5.1: width of a concatenation lvalue element -- a nested
-// concatenation/assignment pattern sums its own elements; any other form
-// reduces to the width of the resolved target variable (0 when unresolved).
-static uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx) {
+// concatenation/assignment pattern sums its own elements, a select claims the
+// bits §11.5.1 gives its indices, and any other form reduces to the width of
+// the resolved target variable (0 when unresolved).
+//
+// A select's own width is what §11.4.1 gives its element, and reading the
+// resolved variable's instead drew the boundary between elements in the wrong
+// place: `{a[3:0], b}` sized its first element at the whole of `a`, so every
+// element to the right of it took the wrong bits as well.
+static uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx,
+                                   Arena& arena) {
   if (e->kind == ExprKind::kConcatenation ||
       e->kind == ExprKind::kAssignmentPattern) {
     uint32_t total = 0;
-    for (const auto* sub : e->elements) total += ConcatLhsElemWidth(sub, ctx);
+    for (const auto* sub : e->elements)
+      total += ConcatLhsElemWidth(sub, ctx, arena);
     return total;
   }
   auto* var = ResolveLhsVariable(e, ctx);
-  return var ? var->value.width : 0;
+  if (var == nullptr) return 0;
+  if (e->kind == ExprKind::kSelect && e->base != nullptr) {
+    return ConcatSelectBits(*var, e, ctx, arena).width;
+  }
+  return var->value.width;
 }
 
 static void UnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
                             SimContext& ctx, Arena& arena) {
-  uint64_t rhs_raw = rhs_val.ToUint64();
   uint32_t bit_offset = 0;
   for (auto it = lhs->elements.rbegin(); it != lhs->elements.rend(); ++it) {
     const Expr* el = *it;
-    uint32_t w = ConcatLhsElemWidth(el, ctx);
+    uint32_t w = ConcatLhsElemWidth(el, ctx, arena);
     if (w == 0) continue;
-    uint64_t mask = (w >= 64) ? ~uint64_t{0} : (uint64_t{1} << w) - 1;
-    uint64_t slice = (rhs_raw >> bit_offset) & mask;
+    // §11.4.1 gives each element the bits its own width claims, and nothing in
+    // the clause bounds a concatenation at one word or drops the x and z bits
+    // of what is assigned. Taking the slice with ExtractBitField rather than
+    // through Logic4Vec::ToUint64 keeps both: that reads words[0] alone and
+    // returns `aval & ~bval`, so a concatenation wider than 64 bits lost
+    // everything above bit 63 and an x or a z arrived as 0.
+    Logic4Vec slice = ExtractBitField(arena, rhs_val, bit_offset, w);
     bit_offset += w;
     // §11.4.1: a nested concatenation lvalue distributes its slice recursively.
     if (el->kind == ExprKind::kConcatenation ||
         el->kind == ExprKind::kAssignmentPattern) {
-      UnpackConcatLhs(el, MakeLogic4VecVal(arena, w, slice), ctx, arena);
+      UnpackConcatLhs(el, slice, ctx, arena);
       continue;
     }
     auto* var = ResolveLhsVariable(el, ctx);
     if (!var) continue;
-    var->value = MakeLogic4VecVal(arena, w, slice);
+    // A select element takes the bits it named and leaves the rest of its
+    // variable standing; writing the variable whole gave `{a[3:0], b}` all of
+    // `a`. WriteBitSelect is the writer that resolves the same window this
+    // element's width came from.
+    if (el->kind == ExprKind::kSelect && el->base != nullptr) {
+      WriteBitSelect(var, el, slice, ctx, arena);
+      continue;
+    }
+    var->value = slice;
     var->NotifyWatchers();
   }
 }

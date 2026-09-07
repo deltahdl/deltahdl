@@ -234,4 +234,79 @@ TEST(LvalueSim, CompoundAssignArithBitwiseShiftThroughPipeline) {
   EXPECT_EQ(f.ctx.FindVariable("shr")->value.ToUint64(), 16u);
 }
 
+// §11.4.1 gives each element of a concatenation lvalue the bits its own width
+// claims, and §11.5.1 gives a select the bits its indices name. The element
+// walk read the width of the resolved variable instead, so a select element was
+// sized at the whole of its variable and written whole: `{a[3:0], b}` took all
+// of `a` and drew the boundary between the two elements in the wrong place, so
+// `b` took the wrong bits as well.
+//
+// `a` is set to 8'hFF first, so a write of the whole variable is told from a
+// write of the low nibble by what the high nibble holds afterwards.
+TEST(LvalueSim, ConcatSelectElementTakesOnlyTheBitsItNames) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [7:0] b;\n"
+      "  initial begin\n"
+      "    a = 8'hFF;\n"
+      "    {a[3:0], b} = 12'h123;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64() & 0xFFu, 0xF1u);
+}
+
+// The element to the right of the select, which a mis-sized first element moves
+// the boundary of. With the select claiming four bits, `b` takes the low eight
+// of 12'h123.
+TEST(LvalueSim, ConcatElementAfterASelectTakesTheBitsBelowIt) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [7:0] b;\n"
+      "  initial begin\n"
+      "    a = 8'hFF;\n"
+      "    {a[3:0], b} = 12'h123;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "b");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64() & 0xFFu, 0x23u);
+}
+
+// Nothing in §11.4.1 drops the x and z bits of what is assigned. The slice was
+// taken through Logic4Vec::ToUint64, which returns `aval & ~bval`, so both
+// arrived as 0.
+TEST(LvalueSim, ConcatLvalueCarriesUnknownBitsToItsElements) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [7:0] b;\n"
+      "  initial {a, b} = 16'bzzzzxxxx10101010;\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "zzzzxxxx");
+}
+
+// And nothing bounds a concatenation at one word. ToUint64 reads words[0]
+// alone, so the element above bit 63 took nothing.
+TEST(LvalueSim, ConcatLvalueReachesElementsAboveTheFirstWord) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [63:0] hi;\n"
+      "  logic [63:0] lo;\n"
+      "  initial {hi, lo} = 128'h1234_0000_0000_0000_0000_0000_0000_0000;\n"
+      "endmodule\n",
+      f, "hi");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x1234000000000000ull);
+}
+
 }  // namespace
