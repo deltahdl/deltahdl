@@ -604,12 +604,14 @@ static RhsWatcherSpec SpecForSlot(const ConcatElemSlot& slot, SimContext& ctx,
   // from the drivers and would undo the one bit this element forced.
   Net* net = slot.el->kind == ExprKind::kIdentifier ? ctx.FindNet(slot.el->text)
                                                     : nullptr;
-  return RhsWatcherSpec{.net = net,
-                        .rhs_width = slot.rhs_width,
-                        .src_lo = slot.src_lo,
-                        .src_width = slot.width,
-                        .dst_lo = dst.lo,
-                        .dst_width = dst.width};
+  RhsWatcherSpec spec;
+  spec.net = net;
+  spec.rhs_width = slot.rhs_width;
+  spec.src_lo = slot.src_lo;
+  spec.src_width = slot.width;
+  spec.dst_lo = dst.lo;
+  spec.dst_width = dst.width;
+  return spec;
 }
 
 // Forces or assigns one element of a concatenation target. §10.6.1's assign and
@@ -743,7 +745,9 @@ StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
   Net* net = stmt->lhs->kind == ExprKind::kIdentifier
                  ? ctx.FindNet(stmt->lhs->text)
                  : nullptr;
-  InstallForcedValueWatcher(var, stmt->rhs, ctx, arena, {.net = net});
+  RhsWatcherSpec spec;
+  spec.net = net;
+  InstallForcedValueWatcher(var, stmt->rhs, ctx, arena, spec);
 
   return StmtResult::kDone;
 }
