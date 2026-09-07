@@ -15,7 +15,7 @@ template <typename Fixture>
 inline void SchedulePosedge(Fixture& f, Variable* clk, uint64_t time) {
   auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
-    clk->prev_value = clk->value;
+    clk->prev_value.Capture(clk->value);
     clk->value = MakeLogic4VecVal(f.arena, 1, 1);
     clk->NotifyWatchers();
   };
@@ -26,7 +26,7 @@ template <typename Fixture>
 inline void ScheduleNegedge(Fixture& f, Variable* clk, uint64_t time) {
   auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
-    clk->prev_value = clk->value;
+    clk->prev_value.Capture(clk->value);
     clk->value = MakeLogic4VecVal(f.arena, 1, 0);
     clk->NotifyWatchers();
   };
