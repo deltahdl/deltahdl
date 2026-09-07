@@ -413,6 +413,12 @@ static void ComputeSingleBitStrength(
     uint8_t val = GetBitVal(drivers[d], bit).val;
     if (val == 3) continue;
     uint8_t str = EffectiveStrength(val, strengths[d]);
+    // §21.2.1.4, as in ResolveStrengthBit above: a driver at the high-impedance
+    // level drives nothing. FoldDriverIntoMax sets the conflict flag for one of
+    // these on its own for the same reason, and the caller is saved from
+    // reporting it only by the early return on an unset value below, which is a
+    // guard on the answer rather than on the fold.
+    if (str == 0) continue;
     FoldDriverIntoMax(val, str, net_type, m);
   }
   out = NetStrength{};
@@ -464,6 +470,14 @@ static void ResolveStrengthBit(const std::vector<Logic4Vec>& drivers,
     auto bv = GetBitVal(drivers[d], bit);
     if (bv.val == 3) continue;
     uint8_t str = EffectiveStrength(bv.val, strengths[d]);
+    // §21.2.1.4: "The high-impedance strength cannot have a known logic value;
+    // the only logic value allowed for this level is z." A driver at that level
+    // therefore drives nothing whatever value it carries, and is passed over
+    // the same way a driver already spelling z is. Folding it in instead made
+    // it conflict with the nothing that had been seen so far -- max_val starts
+    // at 3, and a lone such driver matched the equal-strength test against it
+    // -- so a net one driver was holding at high impedance resolved to x.
+    if (str == 0) continue;
     if (str > max_str) {
       max_str = str;
       max_val = bv.val;

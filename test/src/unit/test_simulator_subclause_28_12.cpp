@@ -294,4 +294,52 @@ TEST(NetStrengthDisjunction, NetWithNoDriverRecordsNoLevels) {
   EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kHighz);
 }
 
+// §21.2.1.4: "The high-impedance strength cannot have a known logic value; the
+// only logic value allowed for this level is z." So a net whose one driver
+// sits at that level is held at high impedance whatever value the driver
+// carries, and the value it carries is not a value the net has. A driver at any
+// stronger level beside it would set the running maximum above high impedance
+// and the driver would never be compared against nothing, which is why this
+// case has one driver and no more.
+TEST(HighZStrengthResolution, LoneZeroDriverAtHighZResolvesToZ) {
+  Arena arena;
+  StrengthNet sn = MakeStrengthNet(arena, 1);
+  AddDriver(arena, sn.net, 1, 0, Strength::kHighz);
+  sn.net.Resolve(arena);
+
+  EXPECT_EQ(sn.var->value.ToString(), "z");
+}
+
+// The same driver carrying a 1. The equal-strength test that produced the
+// conflict compares the driver's value against the running one, so one value
+// could pass it while the other failed.
+TEST(HighZStrengthResolution, LoneOneDriverAtHighZResolvesToZ) {
+  Arena arena;
+  StrengthNet sn = MakeStrengthNet(arena, 1);
+  AddDriver(arena, sn.net, 1, 1, Strength::kHighz);
+  sn.net.Resolve(arena);
+
+  EXPECT_EQ(sn.var->value.ToString(), "z");
+}
+
+// §21.2.1.4 again, from source. §10.3.4 admits highz1 and highz0 on a
+// continuous assignment to a scalar net, and the lowering turns a bit driven at
+// the level into z before the driver reaches the net -- so this case and the
+// two above reach the same answer by different routes, and the resolution is
+// shown to agree with the lowering rather than to be covered by it.
+TEST(HighZStrengthResolution, SourceDrivenHighZNetIsZ) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (highz0, highz1) w = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* w = f.ctx.FindNet("w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->resolved->value.ToString(), "z");
+}
+
 }  // namespace
