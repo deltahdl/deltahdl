@@ -592,10 +592,10 @@ TEST(NetStrengthAmbigUnambig, DominatedUnambigSignalOpensNoGapToFill) {
 // says the weaker drivers were combined is the four bounds asserted beside it,
 // and for every other shape in this file the rendering is the same whether they
 // were combined or dropped, so a case reading it alone would pass on the
-// behavior and on its absence alike -- which the "Tests" section of
-// .claude/CLAUDE.md rules out.
-// The bounds stand beside the rendering for the same reason: they are what
-// §28.12.3 decides, and they say so whatever the renderer does with them.
+// behavior and on its absence alike -- which
+// .claude/memories/discriminating-test-inputs.md rules out. The bounds stand
+// beside the rendering for the same reason: they are what §28.12.3 decides, and
+// they say so whatever the renderer does with them.
 //
 // FormatStrength is the function §21.2.1.4's %v dispatches to
 // (src/simulator/eval_system_task.cpp), so the assertion names the whole

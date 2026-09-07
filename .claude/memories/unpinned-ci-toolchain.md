@@ -17,4 +17,4 @@ One trap is worth remembering. The unversioned apt.llvm.org repository — `deb 
 
 GitHub Actions tags are the exception and stay at their major version (`@v5`, `@v4`). Floating within a major is the safe mechanism; unpinning to a moving ref is a supply-chain risk. This was flagged to the user and deliberately left pinned.
 
-Related: [composite-actions](../conventions/composite-actions.md) for the shape the mechanism is written in.
+Related: [composite-actions](composite-actions.md) for the shape the mechanism is written in.

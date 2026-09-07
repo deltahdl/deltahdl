@@ -1,0 +1,28 @@
+---
+name: locating-a-clause
+description: Resolve an LRM clause to a page from the pypdf bookmarks; the printed page number is the physical page minus one.
+metadata:
+  type: reference
+---
+
+# Locating a clause in the PDF
+
+`~/LRM.pdf` is IEEE 1800-2023, 1354 PDF pages. The printed page number is the physical page minus one: §10.1 General is physical page 248, printed 247.
+
+Resolve a clause to a page from the bookmarks, which reads metadata only and so costs nothing against the content-filter budget:
+
+```python
+import pypdf
+r = pypdf.PdfReader('/Users/jdrowne/LRM.pdf')
+def walk(o):
+    for it in o:
+        if isinstance(it, list):
+            walk(it)
+            continue
+        print(it.title.strip(), '->', r.get_destination_page_number(it) + 1)
+walk(r.outline)
+```
+
+Then Read the resolved physical pages, one per call, per [reading-the-lrm-one-page-per-call](reading-the-lrm-one-page-per-call.md). Do not call `extract_text()` on the pages this finds — see [not-converting-the-lrm-to-text](not-converting-the-lrm-to-text.md).
+
+Worked example: section 10, "Assignment statements", spans physical pages 248 to 269 and ends at §10.11, "Net aliasing"; section 11 starts at physical page 270. There is no §10.12, §10.13 or §10.14.
