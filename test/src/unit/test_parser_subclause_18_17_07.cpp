@@ -279,6 +279,23 @@ TEST(RandseqValuePassingParse, TypedefNameReturnTypeCaptured) {
   EXPECT_EQ(v->return_type.type_name, "word");
 }
 
+// §18.17.7 with A.2.2.1: the type_identifier alternative carries `{
+// packed_dimension }`, so the name a typedef of a vector type declares is a
+// return type like any other. TypedefNameReturnTypeCaptured above uses `int`,
+// whose typedef needs no dimensions, and so leaves open whether a name standing
+// for a *vector* is recognized in return-type position at all -- the parser
+// reads the type only from its record of which identifiers name types, and the
+// simulator sizes the returned value from what lands here. #3473 is a
+// production returning such a name being stored in 32 bits rather than 4, and
+// this case says whether the parse is where that starts.
+TEST(RandseqValuePassingParse, VectorTypedefNameReturnTypeCaptured) {
+  auto r = ParseProductionReturnType("  typedef bit [3:0] nib;\n", "nib");
+  const auto* v = ProductionWithReturnType(r);
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->return_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(v->return_type.type_name, "nib");
+}
+
 // §18.17.7 with A.2.2.1: `data_type ::= ... | enum [ enum_base_type ] {
 // enum_name_declaration { , enum_name_declaration } } { packed_dimension }`,
 // so an enumeration written out in place is a return type Syntax 18-13 admits.
