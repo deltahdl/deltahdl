@@ -114,50 +114,67 @@ static void SampleBlockInputs(ClockingManager* mgr, const std::string& name,
   }
 }
 
-// `last_clock` is this block's record of the clock, shared across the watcher's
-// re-registrations and held per block: §14.6 lets several blocks name one
-// clock, and each decides its own event, so one record between them would let
-// the first to run consume the transition for the rest.
-static void RegisterClockWatcher(ClockingManager* mgr, Variable* clk_var,
-                                 const ClockingBlock& block, SimContext& ctx,
-                                 Scheduler& sched,
-                                 const std::shared_ptr<uint64_t>& last_clock) {
-  auto block_name = std::string(block.name);
-  auto signals = block.signals;
-  auto edge = block.clock_edge;
-  clk_var->AddWatcher(
-      [mgr, clk_var, block_name, signals, edge, last_clock, &ctx, &sched]() {
-        uint64_t cur = clk_var->value.ToUint64() & 1;
-        bool fired = CheckClockEdge(*last_clock, cur, edge);
-        // Recorded whether or not the transition was the one this block waits
-        // for, because it is what the clock now stands at either way.
-        *last_clock = cur;
-        if (!fired) {
-          auto* blk = mgr->Find(block_name);
-          if (blk) {
-            RegisterClockWatcher(mgr, clk_var, *blk, ctx, sched, last_clock);
-          }
-          return true;
-        }
+// §14.10: what one block's clocking event is watched through -- the block whose
+// event it is, the clock variable its clocking expression names, the signals it
+// samples and the edge it waits for, and this block's record of what that clock
+// last stood at. Held together because the watcher hands all of it on when it
+// re-arms, and because §14.6 lets several blocks name one clock: each keeps its
+// own record, so one block's event cannot consume the transition for the rest.
+struct ClockWatch {
+  std::string block_name;
+  Variable* clk_var = nullptr;
+  std::vector<ClockingSignal> signals;
+  Edge edge = Edge::kPosedge;
+  std::shared_ptr<uint64_t> last_clock;
+};
 
-        SampleBlockInputs(mgr, block_name, signals, ctx, false);
+static void RegisterClockWatcher(ClockingManager* mgr, ClockWatch watch,
+                                 SimContext& ctx, Scheduler& sched);
 
-        auto* ev = sched.GetEventPool().Acquire();
-        const auto& bn_copy = block_name;
-        const auto& sigs_copy = signals;
-        ev->callback = [mgr, bn_copy, sigs_copy, &ctx, &sched]() {
-          SampleBlockInputs(mgr, bn_copy, sigs_copy, ctx, true);
-          mgr->MarkBlockEventTime(bn_copy, sched.CurrentTime());
-          mgr->NotifyBlockEvent(bn_copy);
-          mgr->InvokeEdgeCallbacks(bn_copy);
-        };
-        sched.ScheduleEvent(sched.CurrentTime(), Region::kObserved, ev);
-        auto* blk = mgr->Find(block_name);
-        if (blk) {
-          RegisterClockWatcher(mgr, clk_var, *blk, ctx, sched, last_clock);
-        }
-        return true;
-      });
+// Watch the clock for the next notification, reading the block back so a change
+// to what it samples is picked up. A block that is gone is not re-armed.
+static void RearmClockWatcher(ClockingManager* mgr, const ClockWatch& watch,
+                              SimContext& ctx, Scheduler& sched) {
+  const auto* blk = mgr->Find(watch.block_name);
+  if (blk == nullptr) return;
+  RegisterClockWatcher(mgr,
+                       ClockWatch{watch.block_name, watch.clk_var, blk->signals,
+                                  blk->clock_edge, watch.last_clock},
+                       ctx, sched);
+}
+
+// §14.13: "Upon processing its specified clocking event, a clocking block shall
+// update its sampled values before triggering the clocking block event." The
+// inputs carrying a skew are sampled here, and the explicit #0 ones in the
+// Observed region alongside the event itself, which §14.4 is what puts there.
+static void FireClockingEvent(ClockingManager* mgr, const ClockWatch& watch,
+                              SimContext& ctx, Scheduler& sched) {
+  SampleBlockInputs(mgr, watch.block_name, watch.signals, ctx, false);
+  auto* ev = sched.GetEventPool().Acquire();
+  auto name = watch.block_name;
+  auto signals = watch.signals;
+  ev->callback = [mgr, name, signals, &ctx, &sched]() {
+    SampleBlockInputs(mgr, name, signals, ctx, true);
+    mgr->MarkBlockEventTime(name, sched.CurrentTime());
+    mgr->NotifyBlockEvent(name);
+    mgr->InvokeEdgeCallbacks(name);
+  };
+  sched.ScheduleEvent(sched.CurrentTime(), Region::kObserved, ev);
+}
+
+static void RegisterClockWatcher(ClockingManager* mgr, ClockWatch watch,
+                                 SimContext& ctx, Scheduler& sched) {
+  Variable* clk_var = watch.clk_var;
+  clk_var->AddWatcher([mgr, watch, &ctx, &sched]() {
+    uint64_t cur = watch.clk_var->value.ToUint64() & 1;
+    bool fired = CheckClockEdge(*watch.last_clock, cur, watch.edge);
+    // Recorded whether or not the transition was the one this block waits for,
+    // because it is what the clock now stands at either way.
+    *watch.last_clock = cur;
+    if (fired) FireClockingEvent(mgr, watch, ctx, sched);
+    RearmClockWatcher(mgr, watch, ctx, sched);
+    return true;
+  });
 }
 
 void ClockingManager::RecordStepValues(SimContext& ctx) {
@@ -186,7 +203,11 @@ void ClockingManager::Attach(SimContext& ctx, Scheduler& sched) {
     // so the record starts at what the clock stands at now -- a clock already
     // high when the block attaches has not made a posedge by being watched.
     auto last_clock = std::make_shared<uint64_t>(clk_var->value.ToUint64() & 1);
-    RegisterClockWatcher(this, clk_var, block, ctx, sched, last_clock);
+    RegisterClockWatcher(
+        this,
+        ClockWatch{std::string(block.name), clk_var, block.signals,
+                   block.clock_edge, last_clock},
+        ctx, sched);
   }
   // §14.13: a 1step input is the value of the signal at the Postponed region
   // of the step before the clocking event, so it is recorded as each step ends.
