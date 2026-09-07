@@ -426,8 +426,16 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // such as `p.suspend()` dispatch -- module-scope decls do this via
   // TryExecClassVarDecl, but function-body locals take this path instead.
   bool is_class = !type.type_name.empty() && ctx.FindClassType(type.type_name);
-  uint32_t w = is_class ? 64 : EvalTypeWidth(type);
-  if (w == 0) w = 32;
+  // §6.18: a local declared with a user-defined type name is an object of the
+  // type that name stands for, so `nib v` is as wide as `nib` is.
+  // DeclaredTypeWidth is what reaches that width; the one-argument
+  // EvalTypeWidth gives a DataTypeKind::kNamed no width at all, and the
+  // fallback below then made every typedef'd body local 32 bits. This is the
+  // site a subroutine body's declaration takes -- the statement executor's own
+  // ExecVarDeclImpl serves a declaration outside a subroutine -- so the two
+  // have to reach the typedef table separately.
+  uint32_t declared = is_class ? 64 : DeclaredTypeWidth(type, ctx);
+  uint32_t w = declared ? declared : 32;
   // §6.11.3: a body local carries its declared signedness exactly as a
   // module-scope declaration does (Lowerer sets the same flag there), so an
   // `integer` local is a signed operand rather than an unsigned one.
@@ -446,7 +454,20 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
     ApplyClassParamOverrides(name, v->value.ToUint64(), ctx, arena);
     return v;
   }
-  v->value = EvalExpr(init, ctx, arena);
+  // §6.8 states a variable declaration assignment as an assignment to the
+  // declared variable, so §10.7 truncates or extends the initializer into the
+  // width the type declares rather than letting it put its own vector in place:
+  // a Logic4Vec carries its own width, and a sized literal is self-determined,
+  // so `nib v = 8'hFF` left v eight bits holding 255.
+  //
+  // The target is the declared width and not the width the variable was created
+  // at, because the 32 above is a carrier for a type nothing here could size
+  // rather than a width the source asked for. A string local (§6.16) is the
+  // case that turns on the difference: it is created at that carrier width and
+  // has no declared width at all, and its initializer is what gives it one.
+  // ResizeToWidth leaves a value alone at a target of 0, so such a local keeps
+  // the behaviour it had.
+  v->value = ResizeToWidth(EvalExpr(init, ctx, arena), declared, arena);
   return v;
 }
 

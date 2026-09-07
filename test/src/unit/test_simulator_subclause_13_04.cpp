@@ -101,18 +101,24 @@ TEST(FunctionSim, FunctionMultipleStatements) {
 
 // §6.18: a variable declared with a user-defined type name is an object of the
 // type that name stands for, so the `nib v` of a function body is four bits
-// wide and §10.7 truncates 8'hFF to 15 on the way into it. A local the
-// simulator could not size took the 32-bit fallback instead and read 255. The
-// typedef has to be narrower than that fallback for the two answers to differ,
-// which is why it is not the `logic [31:0] tmp` of FunctionWithLocalVars.
+// wide, and §6.8 makes the declaration's initializer an assignment into it, so
+// §10.7 truncates 8'hFF to 15 on the way in. A local the simulator could not
+// size took a 32-bit carrier instead, and an initializer that replaced the
+// vector rather than being assigned into it read 255. The typedef has to be
+// narrower than that carrier for the two answers to differ, which is why it is
+// not the `logic [31:0] tmp` of FunctionWithLocalVars.
+//
+// The value is written as the declaration's initializer rather than by a
+// following `v = 8'hFF;` because a blocking assignment inside a subroutine body
+// replaces the target's vector outright and truncates nothing, which is #3477
+// and not this.
 TEST(FunctionSim, TypedefNameLocalIsSizedByTheTypeItNames) {
   auto val = RunAndGet(
       "module t;\n"
       "  typedef bit [3:0] nib;\n"
       "  logic [31:0] x;\n"
       "  function logic [31:0] f();\n"
-      "    nib v;\n"
-      "    v = 8'hFF;\n"
+      "    nib v = 8'hFF;\n"
       "    return v;\n"
       "  endfunction\n"
       "  initial begin\n"
@@ -123,20 +129,19 @@ TEST(FunctionSim, TypedefNameLocalIsSizedByTheTypeItNames) {
   EXPECT_EQ(val, 15u);
 }
 
-// The case above cannot say a local wider than the fallback keeps its width:
+// The case above cannot say a local wider than the carrier keeps its width:
 // clamping every local to 32 bits would truncate 8'hFF to 15 as well. Forty
-// bits spans two words of the carrier, and the three answers separate --
-// 48'hFFFF00000001 kept whole reads 281470681743361, clamped to 32 bits reads
-// 1, and held in the forty bits `wide` declares reads 1095216660481, whose set
-// bits above the first word are what say the high word survived.
+// bits spans two words, and the three answers separate -- 48'hFFFF00000001 kept
+// whole reads 281470681743361, clamped to 32 bits reads 1, and held in the
+// forty bits `wide` declares reads 1095216660481, whose set bits above the
+// first word are what say the high word survived.
 TEST(FunctionSim, TypedefNameLocalWiderThanOneWordKeepsItsHighBits) {
   auto val = RunAndGet(
       "module t;\n"
       "  typedef bit [39:0] wide;\n"
       "  logic [63:0] x;\n"
       "  function logic [63:0] f();\n"
-      "    wide v;\n"
-      "    v = 48'hFFFF00000001;\n"
+      "    wide v = 48'hFFFF00000001;\n"
       "    return v;\n"
       "  endfunction\n"
       "  initial begin\n"
