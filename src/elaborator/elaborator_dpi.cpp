@@ -220,12 +220,20 @@ TypedefMap DpiScopeTypedefs(const std::vector<ModuleItem*>& items,
 using DpiClassNames = std::unordered_set<std::string_view>;
 
 DpiClassNames CollectDpiClassNames(
+    const CompilationUnit* unit,
     const std::vector<const std::vector<ModuleItem*>*>& scopes) {
   DpiClassNames names;
+  // §3.12.1: a class declared outside every design element belongs to the
+  // compilation-unit scope, and the parser keeps those in their own list rather
+  // than among the unit's items -- which is where a source writes the class an
+  // import in a module names.
+  for (const auto* decl : unit->classes) {
+    if (decl != nullptr) names.insert(decl->name);
+  }
   for (const auto* items : scopes) {
     for (const auto* item : *items) {
-      // The declaration's name is on the ClassDecl rather than on the item,
-      // which is where RecordClassDecl reads it too.
+      // Within a scope the declaration's name is on the ClassDecl rather than
+      // on the item, which is where RecordClassDecl reads it too.
       if (item != nullptr && item->kind == ModuleItemKind::kClassDecl &&
           item->class_decl != nullptr) {
         names.insert(item->class_decl->name);
@@ -683,6 +691,18 @@ void CheckDpiScopeImportDeclarations(
   }
 }
 
+// What a scope resolves a type name against. §35.5.5 and §35.5.6 judge a formal
+// or a result by the type its name stands for, and §35.5.4's footnote 27 by
+// whether that name is a class, so a scope's checks need what the source around
+// it declares: the unit the scope belongs to, the typedefs visible outside it,
+// and the class names collected across every scope a DPI declaration can be
+// written in.
+struct DpiNameContext {
+  const CompilationUnit* unit;
+  const TypedefMap& typedefs;
+  const DpiClassNames& classes;
+};
+
 // §35.4: the DPI declarations of one scope, each run through the global-name
 // checks. Items that are neither an import nor an export are what the scope
 // otherwise holds and are passed over.
@@ -704,9 +724,7 @@ void ProcessDpiScopeItems(const std::vector<ModuleItem*>& items,
 // every scope; the sets built here carry the rules it states within one, and
 // start afresh for each.
 void ValidateDpiScopeGlobalNames(const std::vector<ModuleItem*>& items,
-                                 const CompilationUnit* unit,
-                                 const TypedefMap& outer_typedefs,
-                                 const DpiClassNames& classes,
+                                 const DpiNameContext& names,
                                  DpiGlobalNameSpace& global, DiagEngine& diag) {
   // Index this scope's SystemVerilog function and task declarations by name so
   // each export can look up the routine it names and obtain its signature for
@@ -718,21 +736,22 @@ void ValidateDpiScopeGlobalNames(const std::vector<ModuleItem*>& items,
   // behind the name is permitted, so the checks below need the names this scope
   // resolves. The outer table holds the compilation-unit, package- and
   // class-qualified ones but no scope-local one, which this adds.
-  TypedefMap dpi_typedefs = DpiScopeTypedefs(items, unit, outer_typedefs);
+  TypedefMap dpi_typedefs = DpiScopeTypedefs(items, names.unit, names.typedefs);
 
   // §35.4: multiple export declarations with the same c_identifier in the same
   // scope are forbidden, so this tracks the export linkage names seen here.
-  std::unordered_set<std::string_view> export_link_in_scope;
-
+  //
   // §35.7: "Only one export declaration is permitted per SystemVerilog
   // function." Linkage-name deduplication catches the explicit/implicit
   // c_identifier overlap from §35.4, but two exports of the same SV function
   // with distinct c_identifiers would slip past that check. Tracking SV
   // function names per scope catches that case directly.
+  std::unordered_set<std::string_view> export_link_in_scope;
   std::unordered_set<std::string_view> exported_sv_func_in_scope;
 
   ExportScopeContext scope{sv_callables, export_link_in_scope,
-                           exported_sv_func_in_scope, dpi_typedefs, classes};
+                           exported_sv_func_in_scope, dpi_typedefs,
+                           names.classes};
 
   ProcessDpiScopeItems(items, scope, global, diag);
 }
@@ -798,11 +817,12 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
   // names are collected across every scope a DPI declaration can be written in
   // before any of them is checked.
   auto scopes = DpiDeclarationScopes(unit_);
-  DpiClassNames classes = CollectDpiClassNames(scopes);
+  DpiClassNames classes = CollectDpiClassNames(unit_, scopes);
+
+  DpiNameContext names{unit_, typedefs_, classes};
 
   for (const auto* items : scopes) {
-    ValidateDpiScopeGlobalNames(*items, unit_, typedefs_, classes, global,
-                                diag_);
+    ValidateDpiScopeGlobalNames(*items, names, global, diag_);
   }
 }
 
