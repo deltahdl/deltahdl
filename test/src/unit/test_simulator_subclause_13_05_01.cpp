@@ -246,4 +246,36 @@ TEST(PassByValueSim, TypedefNameFormalWiderThanOneWordKeepsItsHighBits) {
   LowerRunAndCheck(f, design, {{"y", 1095216660481ull}});
 }
 
+// §8.3 makes a class variable a handle to an object rather than an object of a
+// width, so there is nothing here for §10.7 to truncate and the formal takes
+// the handle it was passed. What makes this worth a case of its own is that a
+// class name can reach the elaborated typedef table and answer a width there:
+// §8.27's forward declaration records the name before the class exists, with a
+// data type that is still DataTypeKind::kImplicit, which §6.10 makes a scalar.
+// A formal sized from that answer would hold one bit of the handle and read 0
+// rather than the 42 the object carries -- and only in a design that happens to
+// forward- declare the class, which is why the accompanying `typedef class
+// Packet;` is the whole point of the case and not decoration.
+TEST(PassByValueSim, ForwardDeclaredClassFormalKeepsTheWholeHandle) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "typedef class Packet;\n"
+      "class Packet;\n"
+      "  integer i = 42;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int y;\n"
+      "  function integer read_i(Packet p);\n"
+      "    read_i = p.i;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    Packet q;\n"
+      "    q = new;\n"
+      "    y = read_i(q);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"y", 42u}});
+}
+
 }  // namespace

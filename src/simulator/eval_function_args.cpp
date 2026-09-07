@@ -283,10 +283,24 @@ static bool TryBindRefDirectionArg(const Expr* expr, int arg_index,
 // four-bit formal read 255. §10.8 makes "the passing of a value to a subroutine
 // input, output, or inout argument" an assignment-like context, so §10.7
 // truncates or extends into the formal's declared width.
+//
+// A class-typed formal is excluded, and answers no width at all rather than
+// 64. §8.3 makes a class variable a handle to an object, not an object of a
+// width, so there is nothing here for §10.7 to truncate; and the table would
+// answer for the name whether or not the width it answered meant anything.
+// §8.27's forward declaration `typedef class C;` is the case that shows why:
+// it records the name with no type behind it yet, which is DataTypeKind::
+// kImplicit, and §6.10 makes that a scalar -- so the table holds 1 for the
+// class, and resizing to it would leave one bit of a handle. Whether a class
+// name is in the table at all then turns on whether the design happens to
+// forward-declare it, which is no basis for a width. CreateFuncLocalVar asks
+// ctx.FindClassType the same question for the same reason.
 static uint32_t EvalFormalArgWidth(const DataType& dt, SimContext& ctx,
                                    Arena& arena) {
-  if (!dt.packed_dim_left || !dt.packed_dim_right)
+  if (!dt.packed_dim_left || !dt.packed_dim_right) {
+    if (!dt.type_name.empty() && ctx.FindClassType(dt.type_name)) return 0;
     return DeclaredTypeWidth(dt, ctx);
+  }
   auto span = [&](const Expr* l, const Expr* r) -> uint32_t {
     int64_t lv = static_cast<int64_t>(EvalExpr(l, ctx, arena).ToUint64());
     int64_t rv = static_cast<int64_t>(EvalExpr(r, ctx, arena).ToUint64());
