@@ -417,6 +417,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   RunPreElaborationClassValidations();
 
+  ValidatePerDeclarationRulesInUnitScopes();
+
   ValidateTimescaleConsistency();
 
   ValidateStandaloneTimescaleOrder();

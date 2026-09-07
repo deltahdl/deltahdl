@@ -11,6 +11,9 @@
 // continue and return together with §18.17.6's exemption from two of them.
 
 #include <format>
+#include <string_view>
+#include <unordered_map>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
@@ -109,10 +112,19 @@ void CheckRandsequenceNames(const Stmt* s, DiagEngine& diag) {
 }  // namespace
 
 void Elaborator::ValidateRandsequenceProductionNames(const ModuleDecl* decl) {
-  for (const auto* item : decl->items) {
+  CheckRandsequenceNamesIn(decl->items);
+}
+
+// §18.17 names no enclosing declaration the rule is suspended in, so every body
+// a declaration owns is walked -- ForEachBodyOwningItem in
+// elaborator_validate_internal.h is the one list of those, and a class method
+// arrives as the kFunctionDecl or kTaskDecl item it is.
+void Elaborator::CheckRandsequenceNamesIn(
+    const std::vector<ModuleItem*>& items) {
+  ForEachBodyOwningItem(items, [this](const ModuleItem* item) {
     if (IsProceduralItemKind(item->kind)) {
       CheckRandsequenceNames(item->body, diag_);
-      continue;
+      return;
     }
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
@@ -120,6 +132,50 @@ void Elaborator::ValidateRandsequenceProductionNames(const ModuleDecl* decl) {
         CheckRandsequenceNames(s, diag_);
       }
     }
+  });
+}
+
+// §3.12.1 puts a declaration outside every design element in the
+// compilation-unit scope and Clause 26 puts one in a package. Neither is
+// elaborated through ElaborateItems, so RunPostItemValidations -- where the
+// three per-declaration checks run, once per module -- never sees either, and
+// every rule they enforce was unenforced there.
+//
+// The item lists walked here are the ones no module holds: the compilation
+// unit's own, each package's, and the methods of each class declared outside
+// every design element. A class declared inside a module or a package is
+// reached through that scope's items by ForEachBodyOwningItem rather than here,
+// so no body is walked twice and no report is made twice.
+//
+// The foreach check takes an array map built from the same items, which is what
+// its dimension count is compared against; a name the map does not hold is left
+// alone, exactly as it is for a module.
+void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
+  if (unit_ == nullptr) return;
+
+  auto run_over = [this](const std::vector<ModuleItem*>& items) {
+    std::unordered_map<std::string_view, const ModuleItem*> arrays;
+    for (const auto* item : items) {
+      if (item != nullptr && item->kind == ModuleItemKind::kVarDecl &&
+          !item->name.empty()) {
+        arrays.emplace(item->name, item);
+      }
+    }
+    CheckJumpStatementsIn(items);
+    CheckRandsequenceNamesIn(items);
+    CheckForeachLoopsIn(items, arrays);
+  };
+
+  run_over(unit_->cu_items);
+  for (const auto* pkg : unit_->packages) {
+    if (pkg != nullptr) run_over(pkg->items);
+  }
+  for (const auto* cls : unit_->classes) {
+    std::vector<ModuleItem*> methods;
+    ForEachClassBodyItem(cls, [&](const ModuleItem* m) {
+      methods.push_back(const_cast<ModuleItem*>(m));
+    });
+    run_over(methods);
   }
 }
 

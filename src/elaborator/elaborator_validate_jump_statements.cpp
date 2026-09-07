@@ -274,7 +274,13 @@ void CheckValueReturningFuncReturn(const Stmt* s, std::string_view func_name,
 void CheckSubroutineJumpRules(const ModuleItem* item, DiagEngine& diag) {
   bool is_value_returning = false;
   if (item->kind == ModuleItemKind::kFunctionDecl) {
-    is_value_returning = (item->return_type.kind != DataTypeKind::kVoid);
+    // §8.7: a class constructor "has no return type", so a `return;` in one is
+    // the whole of what a return there can be. It reaches this walk as an
+    // ordinary kFunctionDecl whose return_type was never written, which is not
+    // kVoid either, so without this a constructor's return would be reported
+    // for lacking an expression it may not have.
+    is_value_returning =
+        item->name != "new" && item->return_type.kind != DataTypeKind::kVoid;
   }
   JumpScope scope;
   scope.in_subroutine = true;
@@ -289,16 +295,23 @@ void CheckSubroutineJumpRules(const ModuleItem* item, DiagEngine& diag) {
 }  // namespace
 
 void Elaborator::ValidateJumpStatements(const ModuleDecl* decl) {
-  for (const auto* item : decl->items) {
+  CheckJumpStatementsIn(decl->items);
+}
+
+// §12.8 names no enclosing declaration the rule is suspended in, so every body
+// a declaration owns is walked -- ForEachBodyOwningItem in
+// elaborator_validate_internal.h is the one list of those.
+void Elaborator::CheckJumpStatementsIn(const std::vector<ModuleItem*>& items) {
+  ForEachBodyOwningItem(items, [this](const ModuleItem* item) {
     if (IsProceduralItemKind(item->kind) && item->body) {
       CheckJumpRules(item->body, JumpScope{}, diag_);
-      continue;
+      return;
     }
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
       CheckSubroutineJumpRules(item, diag_);
     }
-  }
+  });
 }
 
 }  // namespace delta

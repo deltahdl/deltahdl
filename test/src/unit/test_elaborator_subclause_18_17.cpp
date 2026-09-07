@@ -205,4 +205,63 @@ TEST(RandsequenceProductionNames, TwoBadNamesAreReportedOnTwoLines) {
                             LineHolding(src, "spare : missing_two"), "18.17"));
 }
 
+// §18.17 names no enclosing declaration the rule is suspended in, and a class
+// method is where a verification environment puts its code -- but the walk that
+// applied the rule reached a module's procedural blocks and its module-level
+// subroutines and no class, so whether a source was checked depended on where
+// it was written. The same randsequence in a module's initial block is reported
+// today, which is why these cases put it where it was not.
+TEST(RandsequenceScope, UndeclaredProductionInAClassMethodIsReported) {
+  ElabFixture f;
+  std::string src =
+      "class C;\n"
+      "  task go;\n"
+      "    randsequence(main)\n"
+      "      main : missing;\n"
+      "    endsequence\n"
+      "  endtask\n"
+      "endclass\n";
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kItemNamesNoProduction,
+                            LineHolding(src, "main : missing"), "18.17"));
+}
+
+// A package is skipped for a different reason from a class: a package is not
+// elaborated through ElaborateItems at all, so the pass the checks run in never
+// sees one. One case cannot stand for both.
+TEST(RandsequenceScope, UndeclaredProductionInAPackageSubroutineIsReported) {
+  ElabFixture f;
+  std::string src =
+      "package p;\n"
+      "  task go;\n"
+      "    randsequence(main)\n"
+      "      main : missing;\n"
+      "    endsequence\n"
+      "  endtask\n"
+      "endpackage\n";
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kItemNamesNoProduction,
+                            LineHolding(src, "main : missing"), "18.17"));
+}
+
+// A class declared inside a module, which reaches the walk by its scope's item
+// list rather than by the compilation unit's, so the two routes to a class are
+// both shown to arrive.
+TEST(RandsequenceScope, UndeclaredProductionInAClassInsideAModuleIsReported) {
+  ElabFixture f;
+  std::string src =
+      "module m;\n"
+      "  class C;\n"
+      "    task go;\n"
+      "      randsequence(main)\n"
+      "        main : missing;\n"
+      "      endsequence\n"
+      "    endtask\n"
+      "  endclass\n"
+      "endmodule\n";
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kItemNamesNoProduction,
+                            LineHolding(src, "main : missing"), "18.17"));
+}
+
 }  // namespace

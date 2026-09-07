@@ -187,7 +187,19 @@ void Elaborator::ValidateForeachLoops(const ModuleDecl* decl) {
     if (item->kind == ModuleItemKind::kVarDecl && !item->name.empty())
       arrays.emplace(item->name, item);
   }
-  for (const auto* item : decl->items) {
+  CheckForeachLoopsIn(decl->items, arrays);
+}
+
+// §12.7.3 names no enclosing declaration the rule is suspended in, so every
+// body a declaration owns is walked -- ForEachBodyOwningItem in
+// elaborator_validate_internal.h is the one list of those. `arrays` is what the
+// dimension count is checked against and holds the declarations of the scope
+// the items are in; a name it does not hold is left alone, which is what a
+// class property is until the map is built from a class's members too.
+void Elaborator::CheckForeachLoopsIn(
+    const std::vector<ModuleItem*>& items,
+    const std::unordered_map<std::string_view, const ModuleItem*>& arrays) {
+  ForEachBodyOwningItem(items, [&](const ModuleItem* item) {
     if (IsProceduralItemKind(item->kind) && item->body) {
       CheckForeachInStmt(item->body, arrays, diag_);
     } else if (item->kind == ModuleItemKind::kFunctionDecl ||
@@ -195,7 +207,7 @@ void Elaborator::ValidateForeachLoops(const ModuleDecl* decl) {
       for (auto* s : item->func_body_stmts)
         CheckForeachInStmt(s, arrays, diag_);
     }
-  }
+  });
 }
 
 // §13.4.3 says a constant function "shall not contain a statement that

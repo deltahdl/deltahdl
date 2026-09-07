@@ -20,6 +20,8 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
+#include "parser/ast_class.h"
+#include "parser/ast_module.h"
 
 namespace delta {
 
@@ -77,6 +79,48 @@ void ForEachRandsequenceStmt(S* s, Visit visit) {
 // `const Stmt*` may not. That is what lets a walker that rewrites the tree
 // share this list with the walkers that only read it, instead of writing a
 // second copy of the list that drifts from this one.
+// Every item of `items` that owns a body a per-declaration check has to reach,
+// and every class method the items declare.
+//
+// A rule stated of a statement names no enclosing declaration it is suspended
+// in, so a check over one has to reach every body a declaration owns. The item
+// loops these checks were written with reached a module's procedural blocks and
+// its module-level subroutines, and no class: a class inside a module is a
+// ModuleItemKind::kClassDecl item whose methods hang off ClassDecl::members and
+// whose own func_body_stmts and body are empty, so it matched neither arm.
+// Every rule those checks enforce was therefore unenforced in a class method,
+// which is where a verification environment puts its code.
+//
+// `visit` receives a ModuleItem*, and a class method is one -- the ClassMember
+// holds a kFunctionDecl or kTaskDecl item with its statements in
+// func_body_stmts -- so a check's existing item-kind switch reaches a method
+// with nothing added to it. Nested classes are descended, since a class member
+// may be a class (§8.24) and its methods are bodies of the same kind.
+template <typename Visit>
+void ForEachClassBodyItem(const ClassDecl* cls, Visit visit) {
+  if (cls == nullptr) return;
+  for (const auto* m : cls->members) {
+    if (m == nullptr) continue;
+    if (m->kind == ClassMemberKind::kMethod && m->method != nullptr) {
+      visit(m->method);
+    } else if (m->kind == ClassMemberKind::kClassDecl) {
+      ForEachClassBodyItem(m->nested_class, visit);
+    }
+  }
+}
+
+template <typename Visit>
+void ForEachBodyOwningItem(const std::vector<ModuleItem*>& items, Visit visit) {
+  for (const auto* item : items) {
+    if (item == nullptr) continue;
+    if (item->kind == ModuleItemKind::kClassDecl) {
+      ForEachClassBodyItem(item->class_decl, visit);
+      continue;
+    }
+    visit(item);
+  }
+}
+
 template <typename S, typename Visit>
 void ForEachChildStmt(S* s, Visit visit) {
   for (auto& sub : s->stmts) visit(sub);

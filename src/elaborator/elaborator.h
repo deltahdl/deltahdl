@@ -707,6 +707,25 @@ class Elaborator : public ElaboratorClassRules {
   // that statement's own productions.
   void ValidateRandsequenceProductionNames(const ModuleDecl* decl);
 
+  // §12.8, §12.7.3 and §18.17 are stated of a statement and name no enclosing
+  // declaration they are suspended in, so each of the three checks above is
+  // written over an item list rather than over a module. The entry points above
+  // pass a module's items; ValidatePerDeclarationRulesInUnitScopes below passes
+  // the item lists a module does not hold.
+  void CheckJumpStatementsIn(const std::vector<ModuleItem*>& items);
+  void CheckForeachLoopsIn(
+      const std::vector<ModuleItem*>& items,
+      const std::unordered_map<std::string_view, const ModuleItem*>& arrays);
+  void CheckRandsequenceNamesIn(const std::vector<ModuleItem*>& items);
+
+  // §3.12.1 puts a declaration outside every design element in the
+  // compilation-unit scope and Clause 26 puts one in a package, and neither is
+  // elaborated through ElaborateItems -- so RunPostItemValidations, where the
+  // three checks above run, never sees either. This runs them over the item
+  // lists that are nobody's module: the compilation unit's, each package's, and
+  // the methods of each class declared outside every design element.
+  void ValidatePerDeclarationRulesInUnitScopes();
+
   void ValidateConstantFunctionCalls(const ModuleDecl* decl);
 
   // §7.7: a dynamic array or queue may not be passed to a DPI import formal

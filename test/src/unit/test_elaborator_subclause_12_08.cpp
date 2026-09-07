@@ -760,4 +760,40 @@ TEST(JumpStatementElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
+// §12.8 names no enclosing declaration the rule is suspended in, but the walk
+// that applied it reached a module's procedural blocks and its module-level
+// subroutines and no class method, so the same break was reported in an initial
+// block and passed in a method. Fixing the walk fixes it for every check that
+// shares it, and a case per check is what says the walk rather than the check
+// was the fix.
+TEST(JumpStatementElaboration, BreakOutsideALoopInAClassMethodIsReported) {
+  delta::ElabFixture f;
+  delta::ElaborateSrc(
+      "class C;\n"
+      "  task go;\n"
+      "    break;\n"
+      "  endtask\n"
+      "endclass\n",
+      f);
+  EXPECT_TRUE(delta::ReportedError(
+      f.diag.Diagnostics(), "break statement is not inside a loop", 3, "12.8"));
+}
+
+// §8.7 gives a class constructor no return type, so a bare return in one is the
+// whole of what a return there can be. It reaches the walk as an ordinary
+// function whose return type was never written -- which is not void either --
+// so without a guard the walk newly reaching class methods would report a
+// constructor for lacking an expression it may not have.
+TEST(JumpStatementElaboration, BareReturnInAConstructorIsAccepted) {
+  delta::ElabFixture f;
+  delta::ElaborateSrc(
+      "class C;\n"
+      "  function new();\n"
+      "    return;\n"
+      "  endfunction\n"
+      "endclass\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
