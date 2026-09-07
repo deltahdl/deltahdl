@@ -286,4 +286,26 @@ TEST(RealConversion, RealToLongintRoundsToNearest) {
   EXPECT_EQ(var->value.ToUint64(), 36u);
 }
 
+// DeclInitIntToReal above is a declaration at module scope, which the lowerer
+// initializes. A declaration written inside a procedural block is initialized
+// by ExecVarDeclImpl in statement_assign_decl.cpp instead, and §6.12.1's
+// conversion has to reach it there too: a plain resize of the initializer to
+// the variable's 64 bits would store the integer 5's bit pattern, which read as
+// a double is 2.47e-323 rather than 5.0. The block-local cannot be found once
+// the block has ended, so the value is carried out through a module-level real.
+TEST(RealConversion, BlockDeclInitIntToReal) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  real out;\n"
+      "  initial begin\n"
+      "    real r = 5;\n"
+      "    out = r;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "out");
+  ASSERT_NE(var, nullptr);
+  EXPECT_NEAR(VecToDouble(var->value), 5.0, 1e-10);
+}
+
 }  // namespace

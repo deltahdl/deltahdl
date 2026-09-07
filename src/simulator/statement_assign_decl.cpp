@@ -242,13 +242,51 @@ static bool TryReuseExistingDeclVar(const Stmt* stmt,
 
 // Applies 4-state coercion and the optional initializer to a freshly created
 // variable, then records it as a static-func var when applicable.
+//
+// §6.8 executes a declaration's initializer "as if the assignment were made
+// from an initial procedure", which §10.8 makes an assignment-like context, so
+// §10.7 truncates or extends it into the width the declaration established. A
+// Logic4Vec carries its own width, so writing the value straight over the
+// variable put the expression's width in the declaration's place instead:
+// `bit [3:0] v = 8'hFF;` in a procedural block left v eight bits reading 255.
+// Lowerer::CoerceVarInitValue applies the same rule to a declaration at module
+// scope and CreateFuncLocalVar to one in a subroutine body; a declaration in a
+// procedural block runs here and had to be told it separately.
+//
+// The target is `declared_width`, the width the type asked for, rather than the
+// width the variable was created at, and the two differ on exactly the cases
+// this must leave alone. A type nothing could size is created at the 32-bit
+// carrier CreateDeclVariable substitutes, and truncating to a carrier would cut
+// a string reached through a typedef name (§6.16) down to the four characters
+// 32 bits hold. A declared width of 0 says there is no width to resize to,
+// which is what a string answers whether it is written bare or behind a name.
+//
+// A real is the one type whose created width is the target instead. §6.12.1
+// converts an initializer that crosses the real/integer boundary rather than
+// reinterpreting its bits, so `real r = 5;` has to hold the double 5.0; and
+// `shortreal` declares 32 bits while being carried in the 64 that conversion
+// needs. ConvertRealForKnownLhs performs the conversion, and resizes every
+// value that does not cross the boundary.
+//
+// A declaration carrying an unpacked dimension is left as it was. Its variable
+// is the element-width carrier that CreateBlockQueue and
+// CreateBlockArrayElements size the real storage from rather than an object the
+// initializer is assigned to, and `int a[3] = '{1,2,3}` evaluates to the
+// ninety-six bits of a concatenation, which one element's width has nothing to
+// say about.
 static void InitializeDeclVariable(const Stmt* stmt, Variable* var,
+                                   uint32_t declared_width, bool is_real,
                                    std::string_view func_name, SimContext& ctx,
                                    Arena& arena) {
   var->is_4state = Is4stateType(stmt->var_decl_type.kind);
   if (!var->is_4state) CoerceTo2State(var->value);
   if (stmt->var_init) {
-    var->value = EvalExpr(stmt->var_init, ctx, arena);
+    Logic4Vec val = EvalExpr(stmt->var_init, ctx, arena);
+    if (stmt->var_unpacked_dims.empty()) {
+      uint32_t target = is_real ? var->value.width : declared_width;
+      val = ConvertRealForKnownLhs(val, is_real, target, arena);
+    }
+    var->value = val;
     if (!var->is_4state) CoerceTo2State(var->value);
   }
 
@@ -281,7 +319,7 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   RecordVariableEnumType(stmt->var_name, stmt->var_decl_type, ctx);
   auto* var = ctx.FindVariable(stmt->var_name);
   if (var) {
-    InitializeDeclVariable(stmt, var, func_name, ctx, arena);
+    InitializeDeclVariable(stmt, var, width, is_real, func_name, ctx, arena);
   }
   return StmtResult::kDone;
 }

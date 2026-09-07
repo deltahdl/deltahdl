@@ -638,4 +638,76 @@ TEST(AssignmentExtensionTruncationSim, StringLocalHasNoWidthToTruncateTo) {
   EXPECT_EQ(x->value.ToUint64(), 11u);
 }
 
+// §6.8 executes a declaration's initializer "as if the assignment were made
+// from an initial procedure", which §10.8 makes an assignment-like context, so
+// §10.7 truncates it into the width the declaration established.
+// DeclarationInitializerTruncates above claims that for a declaration at module
+// scope, which Lowerer::CoerceVarInitValue serves; a declaration written inside
+// a procedural block is created and initialized by ExecVarDeclImpl in
+// statement_assign_decl.cpp instead, which put the initializer's own width in
+// the declaration's place and left `logic [3:0] v = 8'hAB` eight bits reading
+// 171. The block-local cannot be found once the block has ended, so the value
+// is carried out through a module-level variable wide enough not to truncate it
+// a second time.
+TEST(AssignmentExtensionTruncationSim, BlockDeclarationInitializerTruncates) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    logic [3:0] v = 8'hAB;\n"
+      "    x = v;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+
+  EXPECT_EQ(x->value.ToUint64(), 0x0Bu);
+}
+
+// The four-bit case cannot say the initializer is truncated to the declared
+// width rather than to a word: forty bits spans two, and the three answers
+// separate -- 48'hFFFF00000001 kept whole reads 281470681743361, cut to
+// thirty-two reads 1, and held in the forty bits declared reads 1095216660481,
+// whose set bits above the first word are what say the high word survived.
+TEST(AssignmentExtensionTruncationSim,
+     BlockDeclarationInitializerTruncationKeepsTheHighWord) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [63:0] x;\n"
+      "  initial begin\n"
+      "    logic [39:0] w = 48'hFFFF00000001;\n"
+      "    x = w;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+
+  EXPECT_EQ(x->value.ToUint64(), 1095216660481ull);
+}
+
+// §6.16 gives a string no declared width for §10.7 to truncate an initializer
+// to. The width such a declaration is created at is a carrier for a type
+// nothing could size rather than a width the source asked for, and truncating
+// to it would cut "hello world" down to the four characters 32 bits hold and
+// report a length of 4. Eleven is what says the carrier was not mistaken for a
+// declared width.
+TEST(AssignmentExtensionTruncationSim,
+     StringBlockDeclarationInitializerHasNoWidthToTruncateTo) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    string s = \"hello world\";\n"
+      "    x = s.len();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+
+  EXPECT_EQ(x->value.ToUint64(), 11u);
+}
+
 }  // namespace
