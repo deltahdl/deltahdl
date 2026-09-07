@@ -565,6 +565,40 @@ bool ConcatLhsElemHasWritableBits(const Expr* e, const Variable& var,
   return SelectStorageBits(var, e, ctx, arena).width > 0;
 }
 
+// Deposits one non-nested element of a concatenation lvalue its slice. The
+// element has already taken its own width of the right-hand value, which is
+// what it names; what it writes is a narrower thing whenever a select runs off
+// the end of its object.
+static void WriteConcatLhsElement(const Expr* el, const Logic4Vec& slice,
+                                  SimContext& ctx, Arena& arena) {
+  auto* var = ResolveLhsVariable(el, ctx);
+  if (var == nullptr) return;
+  // A select element takes the bits it named and leaves the rest of its
+  // variable standing; writing the variable whole gave `{a[3:0], b}` all of
+  // `a`. WriteBitSelect resolves the window §11.5.1 gives the indices.
+  if (el->kind == ExprKind::kSelect && el->base != nullptr) {
+    // §11.5.1: a select addressing no bit of its object "shall have no effect
+    // on the data stored when written", so this element writes nothing and
+    // wakes nobody. WriteBitSelect declines the write on its own but not the
+    // notification, and §9.4.2 detects a change rather than an attempt at one.
+    if (!ConcatLhsElemHasWritableBits(el, *var, ctx, arena)) return;
+    WriteBitSelect(var, el, slice, ctx, arena);
+    // §9.4.2 detects a non-edge implicit event "on any change in the value of
+    // the expression", and this element changes one. §4.9.3 states the
+    // obligation for the blocking form and the deferred form reaches this same
+    // writer through §4.9.4's update event, so both routes owe it.
+    // WriteBitSelect notifies nobody, so each of its callers says so itself.
+    var->NotifyWatchers();
+    return;
+  }
+  // §10.6.2's override reaches an element by its own whole-variable write, and
+  // this arm runs before any writer carrying the rule is consulted. The select
+  // element above is WriteBitSelect's to decline.
+  if (var->is_forced) return;
+  var->value = slice;
+  var->NotifyWatchers();
+}
+
 static void UnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
                             SimContext& ctx, Arena& arena) {
   uint32_t bit_offset = 0;
@@ -586,40 +620,7 @@ static void UnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
       UnpackConcatLhs(el, slice, ctx, arena);
       continue;
     }
-    auto* var = ResolveLhsVariable(el, ctx);
-    if (!var) continue;
-    // A select element takes the bits it named and leaves the rest of its
-    // variable standing; writing the variable whole gave `{a[3:0], b}` all of
-    // `a`. WriteBitSelect resolves the window §11.5.1 gives the indices, which
-    // is a narrower thing than the width the element took above whenever the
-    // select runs off the end of its object.
-    if (el->kind == ExprKind::kSelect && el->base != nullptr) {
-      // §11.5.1: a select addressing no bit of its object "shall have no effect
-      // on the data stored when written", so this element writes nothing and
-      // wakes nobody, having already taken its own width of the value above.
-      // WriteBitSelect declines the write on its own but not the notification
-      // below, and §9.4.2 detects a change rather than an attempt at one.
-      if (!ConcatLhsElemHasWritableBits(el, *var, ctx, arena)) continue;
-      WriteBitSelect(var, el, slice, ctx, arena);
-      // §9.4.2 detects a non-edge implicit event "on any change in the value
-      // of the expression", and this element changes one. §4.9.3 states the
-      // obligation for the blocking form -- the process "performs the
-      // assignment to the left-hand side and enables any events based upon the
-      // update of the left-hand side" -- and the deferred form reaches this
-      // same writer through §4.9.4's update event, so both routes owe the
-      // notification. WriteBitSelect notifies nobody, so each of its callers
-      // says so itself; this one did not, and a select element changed its
-      // variable without waking `@(a)` where the whole-variable element below
-      // woke it.
-      var->NotifyWatchers();
-      continue;
-    }
-    // §10.6.2's override reaches an element by its own whole-variable write,
-    // and this arm runs before any writer carrying the rule is consulted. The
-    // select element above is WriteBitSelect's to decline.
-    if (var->is_forced) continue;
-    var->value = slice;
-    var->NotifyWatchers();
+    WriteConcatLhsElement(el, slice, ctx, arena);
   }
 }
 
