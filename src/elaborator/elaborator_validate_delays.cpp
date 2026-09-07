@@ -1,3 +1,4 @@
+#include <cmath>
 #include <format>
 #include <optional>
 
@@ -24,6 +25,15 @@ namespace {
 void CheckOneDelay(const Expr* delay, const ScopeMap& scope, DiagEngine& diag) {
   if (delay == nullptr) return;
   std::optional<int64_t> value = ConstEvalInt(delay, scope);
+  if (!value.has_value()) {
+    // A.2.2.3 admits a real_number as a delay_value, which ConstEvalInt does
+    // not fold. §3.14.1 rounds a delay value to the precision before it is
+    // used, so the sign of what a real delay becomes is the sign of the value
+    // written, and a negative one is as much a breach as a negative integer.
+    if (auto real_value = ConstEvalReal(delay, scope)) {
+      value = std::llround(*real_value);
+    }
+  }
   if (!value.has_value() || *value >= 0) return;
   diag.Error(delay->range.start,
              std::format("delay is {}; a delay is the time between two events "

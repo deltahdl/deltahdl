@@ -517,6 +517,28 @@ static void ApplyTriregDecayTime(const ModuleItem* item, RtlirNet& net,
   }
   auto decay_ticks = ConstEvalInt(item->net_delay_decay, scope);
   if (!decay_ticks) {
+    // A.2.2.3 writes delay_value over "unsigned_number | real_number |
+    // ps_identifier | time_literal | 1step", so a decay time with a decimal
+    // point is a form the grammar admits and ConstEvalInt does not fold.
+    // §3.14.1 says what it becomes: "the time precision specifies how delay
+    // values are rounded before being used in simulation", and "if the
+    // precision is the same as the time units, then delay values are rounded
+    // off to whole numbers (integers)". decay_ticks is a raw tick count that
+    // nothing scales later, so the rounding happens here, to the nearest whole
+    // count with ties away from zero -- the same std::llround §6.12.1 already
+    // gives an integer parameter set from a real.
+    //
+    // The fold is reached from here rather than from ConstEvalFull. A
+    // kRealLiteral case there would answer every ConstEvalInt caller in the
+    // elaborator, and several read a failure to fold as their answer: §14.3's
+    // fractional clocking skew is reported only because the integer fold fails
+    // first, and an array bound, a case-item key and a generate-case selector
+    // would each start accepting a real that rounds.
+    if (auto real_ticks = ConstEvalReal(item->net_delay_decay, scope)) {
+      decay_ticks = std::llround(*real_ticks);
+    }
+  }
+  if (!decay_ticks) {
     // Report the fold that failed rather than substituting a decay time.
     // RtlirNet::decays is left false, so the net holds its charge, and no
     // decay time is any better a guess than another. The report is a warning

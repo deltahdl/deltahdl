@@ -208,4 +208,22 @@ TEST(DelaySignElaboration, ZeroDelayIsAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// A real delay in a transition slot, which reaches the sign check by a
+// different route from the decay time: §28.16.2.2's third delay is folded and
+// stored at elaboration, while a rise delay is carried to the run as an
+// expression, so a check that read only what was folded would pass this.
+// A.2.2.3 admits the real_number and §3.14.1 rounds it, which leaves its sign
+// what the source wrote.
+TEST(DelaySignElaboration, NegativeRealNetDelayIsReported) {
+  ExpectDelayReported("wire #(-1.5) w;", "-2");
+}
+
+// The rounding is §3.14.1's and not a truncation, which is what separates -2
+// from the -1 truncating toward zero would give. Stated on a slot whose value
+// no elaborated field carries, so the claim is about the fold rather than about
+// what is stored.
+TEST(DelaySignElaboration, RealNetDelayRoundsRatherThanTruncates) {
+  ExpectDelayReported("wire #(-2.5) w;", "-3");
+}
+
 }  // namespace

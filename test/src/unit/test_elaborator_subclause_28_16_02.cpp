@@ -198,4 +198,49 @@ TEST(ChargeDecayElaboration, DefaultDecayTimeDoesNotReachANonTrireg) {
   EXPECT_FALSE(w->decays);
 }
 
+// A.2.2.3 writes delay_value over "unsigned_number | real_number |
+// ps_identifier | time_literal | 1step", so a decay time with a decimal point
+// is a form the grammar admits. §3.14.1 settles what it becomes: "the time
+// precision specifies how delay values are rounded before being used in
+// simulation", and where the precision is the time unit itself "delay values
+// are rounded off to whole numbers (integers)". RtlirNet::decay_ticks is a raw
+// tick count that nothing scales later, so the rounding is the elaborator's,
+// and 50.5 is a decay time of 51 rather than a net left holding its charge.
+TEST(ChargeDecayElaboration, RealThirdDelayRoundsToADecayTime) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  trireg #(0, 0, 50.5) cap;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* cap = FindNet(design, "t", "cap");
+  ASSERT_NE(cap, nullptr);
+  EXPECT_EQ(cap->decay_ticks, 51u);
+  EXPECT_TRUE(cap->decays);
+}
+
+// The same quantity through the other spelling E.2 gives it, which is the claim
+// the two halves are for: a decay time written on the directive and one written
+// in the declaration are the same decay time. Held apart in two files with no
+// case over both, the two disagreed -- the declaration folded to nothing and
+// the directive truncated -- and a fix to either alone would only have moved
+// the disagreement.
+TEST(ChargeDecayElaboration, RealDirectiveAndRealThirdDelayAgree) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "`default_decay_time 50.5\n"
+      "module t;\n"
+      "  trireg cap;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* cap = FindNet(design, "t", "cap");
+  ASSERT_NE(cap, nullptr);
+  EXPECT_EQ(cap->decay_ticks, 51u);
+  EXPECT_TRUE(cap->decays);
+}
+
 }  // namespace

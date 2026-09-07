@@ -1,4 +1,5 @@
 #include <cctype>
+#include <cmath>
 #include <cstdint>
 #include <fstream>
 
@@ -373,9 +374,15 @@ void Preprocessor::HandleDefaultDecayTime(std::string_view rest,
     return;
   }
   if (has_dot) {
+    // §3.14.1: "the time precision specifies how delay values are rounded
+    // before being used in simulation", and where the precision is the time
+    // unit itself "delay values are rounded off to whole numbers (integers)".
+    // E.2 admits a real_constant here and gives no conversion of its own, so
+    // the rounding is that clause's, not a truncation: 3.5 is a decay time of
+    // 4. The exact value stays in default_decay_time_real_.
     double val = ParseDecayTimeReal(arg);
     default_decay_time_real_ = val;
-    default_decay_time_ = static_cast<uint64_t>(val);
+    default_decay_time_ = static_cast<uint64_t>(std::llround(val));
   } else {
     uint64_t val = ParseDecayTimeInt(arg);
     default_decay_time_ = val;
