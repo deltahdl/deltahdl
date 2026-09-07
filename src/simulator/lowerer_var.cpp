@@ -497,7 +497,7 @@ void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   // §21.7.5 (Table 21-11): remember the declared type keyword so this
   // variable's $var declaration masquerades as the matching 1364-2005 var_type
   // when dumped.
-  ctx_.SetVcdVarKind(name, VcdEffectiveDeclKind(var));
+  ctx_.Vcd().SetVcdVarKind(name, VcdEffectiveDeclKind(var));
   // §21.2.1.6: the %p renderer prints a null chandle as "null", so it needs to
   // know which variables are chandles.
   if (var.is_chandle) ctx_.RegisterChandleVariable(name);

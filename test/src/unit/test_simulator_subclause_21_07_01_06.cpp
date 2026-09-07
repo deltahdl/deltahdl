@@ -275,7 +275,7 @@ TEST_F(DumpflushSysTask, WithoutDumpFileFlushIsHarmless) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  EXPECT_EQ(f.ctx.GetVcdWriter(), nullptr);
+  EXPECT_EQ(f.ctx.Vcd().GetVcdWriter(), nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 

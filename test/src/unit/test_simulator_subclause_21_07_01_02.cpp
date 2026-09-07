@@ -68,7 +68,7 @@ class DumpvarsSysTask : public VcdTestBase {
       }
       vcd.EndDefinitions();
       vcd.WriteTimestamp(0);
-      f.ctx.SetVcdWriter(&vcd);
+      f.ctx.Vcd().SetVcdWriter(&vcd);
       f.scheduler.Run();
     }  // writer destructor flushes the dump to tmp_path_ before ReadVcd
     return ReadVcd();

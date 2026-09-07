@@ -249,7 +249,7 @@ void Lowerer::LowerParams(const RtlirModule* mod) {
       // size states for a value whose length §6.16 lets vary. SimContext
       // decides that by the declared kind, so without this the parameter is
       // dumped with a $var size that follows its character count.
-      ctx_.SetVcdVarKind(*full, DataTypeKind::kString);
+      ctx_.Vcd().SetVcdVarKind(*full, DataTypeKind::kString);
       continue;
     }
     // Use declared width if parameter has explicit type, else 32 (§10.8

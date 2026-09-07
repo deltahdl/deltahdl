@@ -51,10 +51,11 @@ class VcdKeywordCommandsE2E : public VcdDumpRunTestBase {
     Lowerer lowerer(f.ctx, f.arena, f.diag);
     lowerer.Lower(design);
     f.scheduler.Run();
-    if (resolved_name != nullptr) *resolved_name = f.ctx.GetDumpFileName();
+    if (resolved_name != nullptr)
+      *resolved_name = f.ctx.Vcd().GetDumpFileName();
     {
       VcdWriter vcd(tmp_path_);
-      vcd.WriteHeader("1ns", f.ctx.GetDumpFileLiteral());
+      vcd.WriteHeader("1ns", f.ctx.Vcd().GetDumpFileLiteral());
       vcd.EndDefinitions();
     }
     return ReadVcd();

@@ -30,7 +30,7 @@ static void CreateChildModulePorts(const std::string& inst_prefix,
                                    Arena& arena) {
   for (const auto& port : resolved->ports) {
     // The prefixed name is interned in the arena because it is the key both
-    // SimContext::CreateVariable and SimContext::SetVcdVarKind store the port
+    // SimContext::CreateVariable and VcdDumpState::SetVcdVarKind store the port
     // under, and each holds the key rather than a copy of it.
     auto* name =
         arena.Create<std::string>(inst_prefix + std::string(port.name));

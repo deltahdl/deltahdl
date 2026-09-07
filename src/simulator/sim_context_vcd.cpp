@@ -19,32 +19,6 @@
 
 namespace delta {
 
-// §21.7.5: the declared type keyword each dumped name was written with, which
-// is what decides the $var declaration below. A name never declared with one
-// answers kImplicit.
-void SimContext::SetVcdVarKind(std::string_view name, DataTypeKind kind) {
-  vcd_var_kinds_[name] = kind;
-}
-
-DataTypeKind SimContext::GetVcdVarKind(std::string_view name) const {
-  auto it = vcd_var_kinds_.find(name);
-  return it != vcd_var_kinds_.end() ? it->second : DataTypeKind::kImplicit;
-}
-
-// §21.7.4.3.1: a port record's state character comes from the list for the
-// port's direction, and the direction is on the port declaration rather than on
-// the object the name stands for. A name no declaration covers -- a module-body
-// net or variable -- has no direction, and answers the unknown one.
-void SimContext::SetVcdPortDirection(std::string_view name,
-                                     Direction direction) {
-  vcd_port_dirs_[name] = direction;
-}
-
-Direction SimContext::GetVcdPortDirection(std::string_view name) const {
-  auto it = vcd_port_dirs_.find(name);
-  return it != vcd_port_dirs_.end() ? it->second : Direction::kNone;
-}
-
 // §21.7.5: what every member of a dumped structure shares -- the one Variable
 // the model keeps the whole structure in, and the mapping from a declared
 // SystemVerilog type to the 1364-2005 var_type it is dumped as.
@@ -108,7 +82,7 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
     // VcdWriter writes only what was registered. The declared kind decides it
     // because a string port reaches SetVcdVarKind but not
     // RegisterStringVariable.
-    if (GetVcdVarKind(name) == DataTypeKind::kString) continue;
+    if (vcd_.GetVcdVarKind(name) == DataTypeKind::kString) continue;
     // §21.7.5: an unpacked structure is not dumped as one object -- it appears
     // as a named fork-join block whose members are the dumped objects. A packed
     // structure is excluded here because the table collapses it to a single reg
@@ -134,10 +108,10 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
     // intact.
     spec.data_type = IsRealVariable(name)
                          ? VcdDataType::kReal
-                         : VcdDataTypeForDeclKind(GetVcdVarKind(name));
+                         : VcdDataTypeForDeclKind(vcd_.GetVcdVarKind(name));
     // §21.7.4.3.1: which of the three state-character lists this object's port
     // records are written from.
-    spec.direction = GetVcdPortDirection(name);
+    spec.direction = vcd_.GetVcdPortDirection(name);
     // §21.7.2.3: the writer picks the $var var_type from the declared net
     // type -- notably a uwire net is recorded as wire -- so a dumped object
     // that is a net carries its net type into the registration.
@@ -178,16 +152,12 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
 //
 // An empty top_scope leaves the definitions at the top level rather than
 // inside a $scope.
-VcdDump& SimContext::Dump(VcdFileType type) {
-  return type == VcdFileType::kExtended ? extended_dump_ : four_state_dump_;
-}
-
 VcdWriter* SimContext::OpenVcdDump(std::string_view top_scope,
                                    bool wait_for_dumpvars, VcdFileType type) {
   // §21.7.3.1 lets one source call $dumpports and $dumpvars both, and gives
   // each its own file, so the dump this opens is the one the calling task's
   // clause names rather than the only dump there is.
-  VcdDump& dump = Dump(type);
+  VcdDump& dump = vcd_.Dump(type);
   // The writer already installed wins. src/main.cpp's --vcd option opens one
   // before the scheduler runs, so a source's $dumpfile or $dumpvars finds a
   // dump whose header and definitions are already on disk; a second writer
@@ -238,10 +208,10 @@ VcdWriter* SimContext::OpenVcdDump(std::string_view top_scope,
   // commands of its own, and §21.7.2.1 gives its version_text none, so the
   // pending list is left for the extended dump the same source may still open.
   if (type == VcdFileType::kExtended) {
-    for (const auto& command : dumpports_commands_) {
+    for (const auto& command : vcd_.dumpports_commands) {
       vcd->AddVersionCommand(command);
     }
-    dumpports_commands_.clear();
+    vcd_.dumpports_commands.clear();
   }
   // §21.7.1.2: the scope the declarations are written under is the module a
   // $dumpvars scope argument is written down from, and RegisterVcdSignals
@@ -272,7 +242,7 @@ VcdWriter* SimContext::OpenVcdDump(std::string_view top_scope,
   // callback reads the writer back out of the context rather than capturing
   // it, so it stops on its own once CloseVcdDump has closed the dump.
   scheduler_.AddPostTimestepCallback([this, type]() {
-    VcdWriter* writer = Dump(type).writer;
+    VcdWriter* writer = vcd_.Dump(type).writer;
     if (writer == nullptr) return;
     writer->WriteTimestamp(CurrentTime().ticks);
     writer->DumpChangedValues(0);
@@ -288,15 +258,6 @@ VcdWriter* SimContext::OpenVcdDump(std::string_view top_scope,
 // §21.7.2.1 give the node information already written no second spelling.
 VcdWriter* SimContext::OpenVcdDumpFromTask(VcdFileType type) {
   return OpenVcdDump(current_scope_name_, /*wait_for_dumpvars=*/true, type);
-}
-
-// A writer installed from outside belongs to whoever installed it and covers
-// whichever of the two forms that caller decided to write, so both dumps hold
-// it and neither owns it. §21.7 gives a source two files to ask for, but a
-// driver that built one writer over one file has only that one to offer.
-void SimContext::SetVcdWriter(VcdWriter* vcd) {
-  four_state_dump_.writer = vcd;
-  extended_dump_.writer = vcd;
 }
 
 // §21.7.3.6.1: an extended VCD file records the final simulation time as it is
@@ -316,21 +277,21 @@ void SimContext::CloseOneVcdDump(VcdDump& dump) {
 // (§21.7.3.1), and a dump left open holds its value changes in the writer's
 // buffer where nothing can read them.
 void SimContext::CloseVcdDump() {
-  VcdWriter* four_state = four_state_dump_.writer;
-  CloseOneVcdDump(four_state_dump_);
-  if (extended_dump_.writer == four_state) {
+  VcdWriter* four_state = vcd_.four_state.writer;
+  CloseOneVcdDump(vcd_.four_state);
+  if (vcd_.extended.writer == four_state) {
     // SetVcdWriter installs one writer as both dumps. It has been closed once
     // already, and closing it again would stamp the file with a second
     // $vcdclose and release a writer this context never owned.
-    extended_dump_.writer = nullptr;
-    extended_dump_.owned.reset();
+    vcd_.extended.writer = nullptr;
+    vcd_.extended.owned.reset();
     return;
   }
-  CloseOneVcdDump(extended_dump_);
+  CloseOneVcdDump(vcd_.extended);
 }
 
 // §21.7.3.6.1: $vcdclose terminates the extended VCD file. §21.7.3.6 adds the
 // keyword to that format alone, so a 4-state dump the source also opened is
 // left open and goes on recording.
-void SimContext::CloseDumpportsDump() { CloseOneVcdDump(extended_dump_); }
+void SimContext::CloseDumpportsDump() { CloseOneVcdDump(vcd_.extended); }
 }  // namespace delta

@@ -98,7 +98,7 @@ void CreatePortVariable(std::string_view name, const RtlirPort& port,
   // declaration rather than of the storage. Recorded before the question below
   // of whether storage already exists, because a port whose name a module-body
   // declaration already created is still a port and still faces one way.
-  ctx.SetVcdPortDirection(name, port.direction);
+  ctx.Vcd().SetVcdPortDirection(name, port.direction);
   if (ctx.FindVariable(name)) return;
   // §23.2.2.3 decides whether a port is a net or a variable, and a port it
   // makes a net is one: its drivers resolve against each other (§28.12) and it
@@ -138,7 +138,7 @@ void CreatePortVariable(std::string_view name, const RtlirPort& port,
   // declaration that already recorded its kind, so record the declared keyword
   // now. The port carries only that keyword, so an enum port keeps the default
   // enum mapping rather than any specified base type.
-  ctx.SetVcdVarKind(name, port.type_kind);
+  ctx.Vcd().SetVcdVarKind(name, port.type_kind);
 }
 
 void RegisterModulePorts(const RtlirModule* mod, SimContext& ctx,

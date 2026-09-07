@@ -103,7 +103,7 @@ class VcdDumpRunTestBase : public VcdTestBase {
       vcd.EndDefinitions();
       if (!opts.driver_comment.empty()) vcd.WriteComment(opts.driver_comment);
       vcd.ArmDumpvarsStart();
-      f.ctx.SetVcdWriter(&vcd);
+      f.ctx.Vcd().SetVcdWriter(&vcd);
       f.scheduler.AddPostTimestepCallback([&vcd, &f]() {
         vcd.WriteTimestamp(f.ctx.CurrentTime().ticks);
         vcd.DumpChangedValues(0);
@@ -145,11 +145,11 @@ class VcdDumpRunTestBase : public VcdTestBase {
       // dumped logic object a wire, which is a var_type Table 21-11 gives to no
       // SystemVerilog data type, and would make this path disagree with the
       // driver over the one thing §21.7.5 settles.
-      vcd.RegisterSignal(VcdSignalSpec{
-          .name = name,
-          .width = var->value.width,
-          .var = var,
-          .data_type = VcdDataTypeForDeclKind(f.ctx.GetVcdVarKind(name))});
+      vcd.RegisterSignal(VcdSignalSpec{.name = name,
+                                       .width = var->value.width,
+                                       .var = var,
+                                       .data_type = VcdDataTypeForDeclKind(
+                                           f.ctx.Vcd().GetVcdVarKind(name))});
     }
   }
 };

@@ -49,7 +49,7 @@ TEST_F(DumpportsSysTask, NoArgumentFormsUseDefaults) {
          "  end\n"
          "endmodule\n");
   EXPECT_FALSE(f1.diag.HasErrors());
-  EXPECT_EQ(f1.ctx.GetDumpportsFileName(), "dumpports.vcd");
+  EXPECT_EQ(f1.ctx.Vcd().GetDumpportsFileName(), "dumpports.vcd");
 
   SimFixture f2;
   auto content = RunVcd(f2,
@@ -61,7 +61,7 @@ TEST_F(DumpportsSysTask, NoArgumentFormsUseDefaults) {
                         "  end\n"
                         "endmodule\n");
   EXPECT_FALSE(f2.diag.HasErrors());
-  EXPECT_EQ(f2.ctx.GetDumpportsFileName(), "dumpports.vcd");
+  EXPECT_EQ(f2.ctx.Vcd().GetDumpportsFileName(), "dumpports.vcd");
   EXPECT_NE(content.find("1!"), std::string::npos);  // a dumped by default
 }
 
@@ -81,7 +81,7 @@ TEST_F(DumpportsSysTask, NullScopeCommaThenStringLiteralFilename) {
                         "  end\n"
                         "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(f.ctx.GetDumpportsFileName(), "dump2.dump");
+  EXPECT_EQ(f.ctx.Vcd().GetDumpportsFileName(), "dump2.dump");
   EXPECT_NE(content.find("1!"), std::string::npos);   // a dumped
   EXPECT_NE(content.find("0\""), std::string::npos);  // b dumped
 }
@@ -99,7 +99,7 @@ TEST_F(DumpportsSysTask, FilenameFromStringTypedVariable) {
          "  end\n"
          "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(f.ctx.GetDumpportsFileName(), "sv.vcd");
+  EXPECT_EQ(f.ctx.Vcd().GetDumpportsFileName(), "sv.vcd");
 }
 
 // §21.7.3.1: the filename may also be an integral variable containing a
@@ -115,7 +115,7 @@ TEST_F(DumpportsSysTask, FilenameFromIntegralVariable) {
          "  end\n"
          "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(f.ctx.GetDumpportsFileName(), "int.vcd");
+  EXPECT_EQ(f.ctx.Vcd().GetDumpportsFileName(), "int.vcd");
 }
 
 // §21.7.3.1: the filename variable may get its characters from a declaration
@@ -129,7 +129,7 @@ TEST_F(DumpportsSysTask, FilenameFromDeclarationInitializedVariable) {
          "  initial $dumpports(, fn);\n"
          "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(f.ctx.GetDumpportsFileName(), "ini.vcd");
+  EXPECT_EQ(f.ctx.Vcd().GetDumpportsFileName(), "ini.vcd");
 }
 
 // §21.7.3.1: the filename argument is an expression, so a parameter constant
@@ -144,7 +144,7 @@ TEST_F(DumpportsSysTask, FilenameFromParameterConstant) {
          "  initial $dumpports(, FN);\n"
          "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(f.ctx.GetDumpportsFileName(), "p.vc");
+  EXPECT_EQ(f.ctx.Vcd().GetDumpportsFileName(), "p.vc");
 }
 
 // §21.7.3.1: a localparam constant holding the character string is likewise
@@ -158,7 +158,7 @@ TEST_F(DumpportsSysTask, FilenameFromLocalparamConstant) {
          "  initial $dumpports(, FN);\n"
          "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(f.ctx.GetDumpportsFileName(), "l.vc");
+  EXPECT_EQ(f.ctx.Vcd().GetDumpportsFileName(), "l.vc");
 }
 
 // §21.7.3.1: $dumpports names the extended VCD file itself. In source that
@@ -176,7 +176,7 @@ TEST_F(DumpportsSysTask, NamesFileIndependentlyOfDumpfileCall) {
          "  end\n"
          "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(f.ctx.GetDumpportsFileName(), "dump2.dump");
+  EXPECT_EQ(f.ctx.Vcd().GetDumpportsFileName(), "dump2.dump");
 }
 
 // §21.7.3.1: the simulator carries out the file-writing checks for the named
@@ -321,7 +321,7 @@ TEST_F(DumpportsSysTask, ScopeWithoutFilenameKeepsDefaultName) {
                         "  initial $dumpports(c1);\n"
                         "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(f.ctx.GetDumpportsFileName(), "dumpports.vcd");
+  EXPECT_EQ(f.ctx.Vcd().GetDumpportsFileName(), "dumpports.vcd");
   EXPECT_NE(content.find("b10100101 "), std::string::npos);  // c1.own dumped
 }
 

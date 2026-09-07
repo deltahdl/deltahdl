@@ -24,7 +24,7 @@ class DumpfileSysTask : public VcdDumpFromSourceTestBase {
   // records whether or not anything has yet opened a file under it.
   std::string RunAndDumpName(const std::string& src) {
     RunSource(src);
-    return f_.ctx.GetDumpFileName();
+    return f_.ctx.Vcd().GetDumpFileName();
   }
 };
 

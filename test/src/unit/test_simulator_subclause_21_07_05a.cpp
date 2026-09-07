@@ -667,7 +667,7 @@ std::string BodyVarLeafInstantiated() {
 // source's last module as the single top, and a module is not an instance
 // beneath itself, so the same module text is dumped twice instead. The
 // divergence this catches is a child's copy created without
-// SimContext::SetVcdVarKind being called for it, for which GetVcdVarKind
+// VcdDumpState::SetVcdVarKind being called for it, for which GetVcdVarKind
 // answers DataTypeKind::kImplicit, VcdDataTypeForDeclKind answers
 // VcdDataType::kNet, and the writer writes the §21.7.2.3 net keyword wire in
 // place of reg.

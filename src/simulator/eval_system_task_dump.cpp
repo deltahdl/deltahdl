@@ -349,7 +349,7 @@ static void ExecDumpvars(const Expr* expr, SimContext& ctx, Arena& arena,
   // §21.7.1.2: $dumpvars "can be invoked as often as desired throughout the
   // model (for example, within various blocks), but the execution of all the
   // $dumpvars tasks shall be at the same simulation time."
-  if (!ctx.RegisterDumpvarsTime(ctx.CurrentTime().ticks)) {
+  if (!ctx.Vcd().RegisterDumpvarsTime(ctx.CurrentTime().ticks)) {
     ctx.GetDiag().Error(
         expr->range.start,
         "all $dumpvars tasks must execute at the same simulation time",
@@ -425,7 +425,7 @@ static std::vector<std::string> CollectDumpportsScopes(const Expr* expr,
     }
     // §21.7.3.1: scope names must also be unique across separate $dumpports
     // calls, not just within one call.
-    if (!ctx.RegisterDumpportsScope(scope)) {
+    if (!ctx.Vcd().RegisterDumpportsScope(scope)) {
       ctx.GetDiag().Error(expr->args[i]->range.start,
                           "$dumpports scope already named by an earlier call",
                           Subclause("21.7.3.1"));
@@ -449,7 +449,7 @@ static std::vector<std::string> CollectDumpportsScopes(const Expr* expr,
 static void ExecDumpports(const Expr* expr, SimContext& ctx, Arena& arena) {
   // §21.7.3.1: $dumpports can be invoked multiple times, but every execution
   // shall be at the same simulation time.
-  if (!ctx.RegisterDumpportsTime(ctx.CurrentTime().ticks)) {
+  if (!ctx.Vcd().RegisterDumpportsTime(ctx.CurrentTime().ticks)) {
     ctx.GetDiag().Error(
         expr->range.start,
         "all $dumpports tasks must execute at the same simulation time",
@@ -461,22 +461,23 @@ static void ExecDumpports(const Expr* expr, SimContext& ctx, Arena& arena) {
   // version section records is this call as the source wrote it, arguments
   // unevaluated. A call that wrote no argument list is recorded as the empty
   // one §21.7.3.1 makes equivalent to it.
-  ctx.AddDumpportsCommand("$dumpports(" + DumpfileArgListText(expr->args) +
-                          ")");
+  ctx.Vcd().AddDumpportsCommand("$dumpports(" +
+                                DumpfileArgListText(expr->args) + ")");
   bool last_is_file = DumpportsLastArgIsFileName(expr, ctx);
   // §21.7.3.1: the name goes to the extended dump, which is a file of its own.
   // Writing it over the 4-state name would rename the file $dumpfile named and
   // leave a $dumpvars in the same source dumping into the ports file.
-  ctx.SetDumpportsFileName(
+  ctx.Vcd().SetDumpportsFileName(
       ResolveDumpportsFileName(expr, ctx, arena, last_is_file));
   // §21.7.3.1: the simulator checks that the named file is writable and
   // reports an error when it is not.
-  CheckDumpportsFileWritable(ctx.GetDumpportsFileName(), ctx,
+  CheckDumpportsFileWritable(ctx.Vcd().GetDumpportsFileName(), ctx,
                              expr->range.start);
   // §21.7.3.1: a file name spelled out in the call may not be reused by a
   // later $dumpports call. A defaulted name is not "specified", so repeated
   // default calls are allowed.
-  if (last_is_file && !ctx.RegisterDumpportsFile(ctx.GetDumpportsFileName())) {
+  if (last_is_file &&
+      !ctx.Vcd().RegisterDumpportsFile(ctx.Vcd().GetDumpportsFileName())) {
     ctx.GetDiag().Error(
         expr->range.start,
         "$dumpports may not name the same output file more than once",
@@ -513,9 +514,10 @@ static bool DumpportsControlTaskTargetsUnknownFile(const Expr* expr,
                                                    SimContext& ctx,
                                                    Arena& arena,
                                                    std::string_view name) {
-  if (!IsExtendedVcdControlTask(name) || !ctx.HasDumpportsFiles()) return false;
+  if (!IsExtendedVcdControlTask(name) || !ctx.Vcd().HasDumpportsFiles())
+    return false;
   std::string file = DumpportsControlFileArg(expr, ctx, arena, name);
-  return !file.empty() && !ctx.IsDumpportsFile(file);
+  return !file.empty() && !ctx.Vcd().IsDumpportsFile(file);
 }
 
 // §21.7.1.5 / §21.7.3.4: bound the VCD file size in bytes. The single (leading)
@@ -659,7 +661,7 @@ static bool ExecDumpportsControl(const Expr* expr, SimContext& ctx,
 // on recording. That is the same outcome §21.7.3.7 gives a control task naming
 // a file no $dumpports call opened.
 static void ExecVcdClose(SimContext& ctx) {
-  VcdWriter* vcd = ctx.GetDumpportsWriter();
+  VcdWriter* vcd = ctx.Vcd().GetDumpportsWriter();
   if (vcd == nullptr || !vcd->IsExtended()) return;
   ctx.CloseDumpportsDump();
 }
@@ -692,10 +694,10 @@ Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (name == "$dumpfile") {
     // §21.7.2.3: remember the filename argument exactly as written so the
     // $version section can reproduce the $dumpfile call unevaluated.
-    ctx.SetDumpFileLiteral(expr->args.empty()
-                               ? std::string{}
-                               : DumpfileArgSourceText(expr->args[0]));
-    ctx.SetDumpFileName(ResolveDumpFileName(expr, ctx, arena));
+    ctx.Vcd().SetDumpFileLiteral(expr->args.empty()
+                                     ? std::string{}
+                                     : DumpfileArgSourceText(expr->args[0]));
+    ctx.Vcd().SetDumpFileName(ResolveDumpFileName(expr, ctx, arena));
     // §21.7.1: Figure 21-1 has the source's own $dumpfile call produce the VCD
     // file, so the dump is opened here under the name just recorded. §21.7.1
     // is the 4-state file's subclause, so that is the type $dumpfile creates.
@@ -711,18 +713,19 @@ Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
     // §21.7.1.5: the single argument bounds the VCD file size in bytes. A
     // limit on a dump no task has opened bounds nothing, so this opens no
     // file of its own; §21.7.1 gives that job to the three tasks above.
-    ExecDumpLimit(expr, ctx, arena, ctx.GetVcdWriter());
+    ExecDumpLimit(expr, ctx, arena, ctx.Vcd().GetVcdWriter());
   } else if (name == "$dumpports") {
     ExecDumpports(expr, ctx, arena);
   } else if (name == "$vcdclose") {
     ExecVcdClose(ctx);
-  } else if (!ExecBasicVcdControl(name, ctx.GetVcdWriter(), ctx)) {
+  } else if (!ExecBasicVcdControl(name, ctx.Vcd().GetVcdWriter(), ctx)) {
     // §21.7.1.3 through §21.7.1.6 give $dumpoff, $dumpon, $dumpall and
     // $dumpflush the 4-state dump; §21.7.3.2 through §21.7.3.5 give the
     // $dumpports* family the extended one. Each is read here rather than once
     // before the dispatch, so a task that opens a dump above is followed by a
     // control task that finds it, and neither family reaches the other's file.
-    ExecDumpportsControl(expr, ctx, arena, ctx.GetDumpportsWriter(), name);
+    ExecDumpportsControl(expr, ctx, arena, ctx.Vcd().GetDumpportsWriter(),
+                         name);
   }
   return MakeLogic4VecVal(arena, 1, 0);
 }

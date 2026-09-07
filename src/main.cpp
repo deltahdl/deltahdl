@@ -191,10 +191,10 @@ delta::CompilationUnit* ParseSource(
 // the command line is the one written.
 void SetupVcd(delta::SimContext& ctx, const std::string& top,
               const std::string& vcd_file) {
-  ctx.SetDumpFileName(vcd_file);
+  ctx.Vcd().SetDumpFileName(vcd_file);
   // Reproduce the $dumpfile call that would have named this output in the
   // $version section (§21.7.2.3).
-  ctx.SetDumpFileLiteral("\"" + vcd_file + "\"");
+  ctx.Vcd().SetDumpFileLiteral("\"" + vcd_file + "\"");
   // §21.7.1: the option stands in for the tasks that create the 4-state file,
   // so that is the type it opens. §21.7.3.1 gives $dumpports a file of its own,
   // so a source calling it afterwards writes its extended dump beside this one
