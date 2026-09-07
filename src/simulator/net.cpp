@@ -578,25 +578,74 @@ static void ResolveSupplyNet(Net& net, Arena& arena) {
   net.resolved->NotifyWatchers();
 }
 
+// Widen one side of a net's reported strength to take in what one of its bits
+// resolves to there.
+//
+// §28.12.2 has a signal's strength be a range of levels rather than one level
+// where it is ambiguous, and that is what a net whose bits do not resolve alike
+// reports: the range on each side spans every bit that drives that side. A bit
+// leaving the side at highz drives nothing there and widens nothing, so a side
+// no bit drives stays highz, and a net whose bits all resolve alike reports
+// exactly what one of them does -- which is what a scalar net, the only width
+// §21.2.1.4 gives %v, has always reported.
+static void WidenSide(Strength& hi, Strength& lo, Strength bit_hi,
+                      Strength bit_lo) {
+  if (bit_hi == Strength::kHighz) return;
+  if (hi == Strength::kHighz) {
+    hi = bit_hi;
+    lo = bit_lo;
+    return;
+  }
+  if (bit_hi > hi) hi = bit_hi;
+  if (bit_lo < lo) lo = bit_lo;
+}
+
+static void WidenNetStrengthOverBit(NetStrength& net, const NetStrength& bit) {
+  WidenSide(net.s0_hi, net.s0_lo, bit.s0_hi, bit.s0_lo);
+  WidenSide(net.s1_hi, net.s1_lo, bit.s1_hi, bit.s1_lo);
+}
+
+// §28.15.2: the charge one bit of a trireg holds, as the strength of a drive.
+// The trireg's charge strength is declared once for the net -- "one of these
+// three strengths: large, medium, or small" -- while the value it retains in
+// the capacitive state is a value per bit (§6.6.4), so which side of the scale
+// the charge appears on is what the bit decides. A bit holding 0 is charged
+// low, one holding 1 is charged high, and one holding neither is charged on
+// both sides, the same way §28.12.2 puts a signal of value x on "subdivisions
+// of both the strength1 and the strength0 parts of the scale".
+static NetStrength TriregBitCharge(const Logic4Vec& value, uint32_t bit,
+                                   Strength charge) {
+  NetStrength out;
+  BitVal v = GetBitVal(value, bit);
+  if (v.val != 1) {
+    out.s0_hi = charge;
+    out.s0_lo = charge;
+  }
+  if (v.val != 0) {
+    out.s1_hi = charge;
+    out.s1_lo = charge;
+  }
+  return out;
+}
+
 // §28.15.2: once every driver goes to high impedance the trireg enters the
-// charge storage state, retaining its last value. The drive resulting from
-// that retained value carries the trireg's charge strength -- one of large,
-// medium, or small, medium by default. Reflect that charge strength on the
-// resolved drive (on the side matching the held value) so the stored charge
-// competes with other sources at the correct level.
+// charge storage state, retaining its last value. The drive resulting from that
+// retained value carries the trireg's charge strength -- one of large, medium,
+// or small, medium by default. Reflect that charge strength on the resolved
+// drive so the stored charge competes with other sources at the correct level.
+//
+// The value retained is per bit, and §28.12 resolves each bit of a net on its
+// own, so each bit's charge is computed and then folded into the one pair the
+// net reports. Reading bit 0 and letting it stand for the rest said of a
+// `trireg [63:0]` holding 64'd1 that it was charged high and not low, when
+// sixty-three of its bits were charged low (#3465).
 static void ResolveTriregCharge(Net& net, Scheduler* sched) {
   net.resolved_strength = NetStrength{};
-  if (net.resolved->value.nwords > 0) {
-    bool unknown = (net.resolved->value.words[0].bval & 1ull) != 0;
-    bool high = (net.resolved->value.words[0].aval & 1ull) != 0;
-    if (unknown || !high) {
-      net.resolved_strength.s0_hi = net.charge_strength;
-      net.resolved_strength.s0_lo = net.charge_strength;
-    }
-    if (unknown || high) {
-      net.resolved_strength.s1_hi = net.charge_strength;
-      net.resolved_strength.s1_lo = net.charge_strength;
-    }
+  for (uint32_t b = 0; b < net.resolved->value.width; ++b) {
+    NetStrength bit_charge =
+        TriregBitCharge(net.resolved->value, b, net.charge_strength);
+    net.bit_strengths.push_back(bit_charge);
+    WidenNetStrengthOverBit(net.resolved_strength, bit_charge);
   }
   // §28.16.2.1: the decay process ends when "the delay specified by charge
   // decay time elapses, and the trireg net makes a transition from 1 or 0 to
@@ -643,33 +692,6 @@ static void AppendTriPullDriver(std::vector<Logic4Vec>& drivers,
   FillConstBit(pull, type == NetType::kTri1);
   drivers.push_back(pull);
   strengths.push_back(DriverStrength{Strength::kPull, Strength::kPull});
-}
-
-// Widen one side of a net's reported strength to take in what one of its bits
-// resolves to there.
-//
-// §28.12.2 has a signal's strength be a range of levels rather than one level
-// where it is ambiguous, and that is what a net whose bits do not resolve alike
-// reports: the range on each side spans every bit that drives that side. A bit
-// leaving the side at highz drives nothing there and widens nothing, so a side
-// no bit drives stays highz, and a net whose bits all resolve alike reports
-// exactly what one of them does -- which is what a scalar net, the only width
-// §21.2.1.4 gives %v, has always reported.
-static void WidenSide(Strength& hi, Strength& lo, Strength bit_hi,
-                      Strength bit_lo) {
-  if (bit_hi == Strength::kHighz) return;
-  if (hi == Strength::kHighz) {
-    hi = bit_hi;
-    lo = bit_lo;
-    return;
-  }
-  if (bit_hi > hi) hi = bit_hi;
-  if (bit_lo < lo) lo = bit_lo;
-}
-
-static void WidenNetStrengthOverBit(NetStrength& net, const NetStrength& bit) {
-  WidenSide(net.s0_hi, net.s0_lo, bit.s0_hi, bit.s0_lo);
-  WidenSide(net.s1_hi, net.s1_lo, bit.s1_hi, bit.s1_lo);
 }
 
 static void ResolveStrengthDriven(Net& net, Arena& arena) {

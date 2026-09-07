@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/net.h"
@@ -19,39 +21,59 @@ namespace {
 // net from real source and drives it through parse -> elaborate -> lower ->
 // run: an initial block charges the trireg to a value, then releases every
 // driver to z, and the resolved strength installed by production
-// (net.cpp ResolveTriregCharge) is read back from the SimContext. The held
-// value lands its charge strength on the matching side (0 side for a held 0,
-// 1 side for a held 1); the opposite side stays high impedance.
+// (net.cpp ResolveTriregCharge) is read back from the SimContext.
 //
-// A [63:0] vector is used so that the released "z" driver is a full machine
-// word of high impedance, which is exactly the charge storage state the rule
-// speaks of. (Whether a trireg enters that state -- the
+// The charge lands on the side of the scale the held value names -- the 0 side
+// for a held 0, the 1 side for a held 1, both for a held x -- and the value the
+// net retains in the capacitive state is a value per bit (§6.6.4), so a vector
+// whose bits do not agree is charged on both sides. The net reports one
+// strength for the whole of itself, which is the range spanning what its bits
+// hold, so "the opposite side stays high impedance" is a claim about a value
+// every bit of which is alike and not about the width of the declaration.
+//
+// A [63:0] vector is used in most cases so that the released "z" driver is a
+// full machine word of high impedance, which is exactly the charge storage
+// state the rule speaks of; the narrow cases below are the ones about bits that
+// disagree. (Whether a trireg enters that state -- the
 // retain-last-value-when-drivers- turn-off rule -- belongs to §28.16.2; here we
 // only observe the *strength* of the resulting charge-storage drive, which is
 // §28.15.2's rule.)
 
-// A trireg declared with no charge strength retains its charge at the medium
-// default. Charged to 1 then released, its drive is medium on the 1 side.
-TEST(TriregChargeStrength, DefaultStrengthIsMediumOnHeldOne) {
-  SimFixture f;
+// Charges a trireg declared as `decl` to `charged`, then releases its only
+// driver to `released`, and returns the net in the charge storage state, so
+// cases differ only in the declaration and the value they name.
+Net* ChargeThenRelease(const std::string& decl, const std::string& charged,
+                       const std::string& released, SimFixture& f) {
   auto* design = ElaborateSrc(
       "module m;\n"
       "  logic en;\n"
-      "  trireg [63:0] cap;\n"
-      "  assign cap = en ? 64'd1 : 64'bz;\n"
-      "  initial begin\n"
-      "    en = 1'b1;\n"  // charge cap to 1
-      "    #1;\n"
-      "    en = 1'b0;\n"  // release: sole driver goes to z -> charge storage
-      "    #1;\n"
-      "  end\n"
-      "endmodule\n",
+      "  " +
+          decl +
+          "\n"
+          "  assign cap = en ? " +
+          charged + " : " + released +
+          ";\n"
+          "  initial begin\n"
+          "    en = 1'b1;\n"
+          "    #1;\n"
+          "    en = 1'b0;\n"
+          "    #1;\n"
+          "  end\n"
+          "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  ASSERT_FALSE(f.has_errors);
+  if (design == nullptr || f.has_errors) return nullptr;
   LowerAndRun(design, f);
+  return f.ctx.FindNet("cap");
+}
 
-  auto* cap = f.ctx.FindNet("cap");
+// A trireg declared with no charge strength retains its charge at the medium
+// default. Charged to 1 on every bit then released, its drive is medium on the
+// 1 side and nothing at all on the 0 side. The value is spelled as sixty-four
+// ones rather than as 64'd1, which charges bit 0 high and the other sixty-three
+// low and so says nothing about which side a held 1 lands on.
+TEST(TriregChargeStrength, DefaultStrengthIsMediumOnHeldOne) {
+  SimFixture f;
+  Net* cap = ChargeThenRelease("trireg [63:0] cap;", "{64{1'b1}}", "64'bz", f);
   ASSERT_NE(cap, nullptr);
   EXPECT_TRUE(cap->InCapacitiveState());
   EXPECT_EQ(cap->resolved->value.words[0].aval & 1u, 1u);  // held 1
@@ -94,27 +116,12 @@ TEST(TriregChargeStrength, SmallStrengthOnHeldZero) {
 }
 
 // A trireg declared (large) retains its charge at large strength. Charged to 1
-// then released, its drive is large on the 1 side.
+// on every bit then released, its drive is large on the 1 side, and the
+// declared strength is what moved rather than the side.
 TEST(TriregChargeStrength, LargeStrengthOnHeldOne) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic en;\n"
-      "  trireg (large) [63:0] cap;\n"
-      "  assign cap = en ? 64'd1 : 64'bz;\n"
-      "  initial begin\n"
-      "    en = 1'b1;\n"
-      "    #1;\n"
-      "    en = 1'b0;\n"
-      "    #1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  ASSERT_FALSE(f.has_errors);
-  LowerAndRun(design, f);
-
-  auto* cap = f.ctx.FindNet("cap");
+  Net* cap =
+      ChargeThenRelease("trireg (large) [63:0] cap;", "{64{1'b1}}", "64'bz", f);
   ASSERT_NE(cap, nullptr);
   EXPECT_TRUE(cap->InCapacitiveState());
   EXPECT_EQ(cap->resolved_strength.s1_hi, Strength::kLarge);
@@ -178,6 +185,37 @@ TEST(TriregChargeStrength,
   EXPECT_EQ(cap->resolved->value.words[0].aval & 1u, 1u);  // follows driver
   EXPECT_EQ(cap->resolved_strength.s1_hi, Strength::kStrong);
   EXPECT_NE(cap->resolved_strength.s1_hi, Strength::kSmall);
+}
+
+// §6.6.4 has a trireg retain "its last driven value", and that value is one per
+// bit; §28.12 resolves each bit of a net on its own. So a vector whose bits do
+// not hold the same value is charged on both sides of the scale at once, and
+// the pair the net reports spans them. Bit 0 holds 1 and bit 1 holds 0 here,
+// and reading either bit alone would report one side and call the other high
+// impedance.
+TEST(TriregChargeStrength, BitsHoldingDifferentValuesChargeBothSides) {
+  SimFixture f;
+  Net* cap = ChargeThenRelease("trireg [1:0] cap;", "2'b01", "2'bz", f);
+  ASSERT_NE(cap, nullptr);
+  EXPECT_TRUE(cap->InCapacitiveState());
+  EXPECT_EQ(cap->resolved_strength.s0_hi, Strength::kMedium);
+  EXPECT_EQ(cap->resolved_strength.s0_lo, Strength::kMedium);
+  EXPECT_EQ(cap->resolved_strength.s1_hi, Strength::kMedium);
+  EXPECT_EQ(cap->resolved_strength.s1_lo, Strength::kMedium);
+}
+
+// The same net charged so that its bits do agree: every bit holds 1, so the
+// charge is on the 1 side alone and the 0 side stays at high impedance. Without
+// this, a fold that put the charge on both sides whatever the bits held would
+// pass the case above.
+TEST(TriregChargeStrength, BitsHoldingOneAloneLeaveTheZeroSideHighZ) {
+  SimFixture f;
+  Net* cap = ChargeThenRelease("trireg [1:0] cap;", "2'b11", "2'bz", f);
+  ASSERT_NE(cap, nullptr);
+  EXPECT_TRUE(cap->InCapacitiveState());
+  EXPECT_EQ(cap->resolved_strength.s0_hi, Strength::kHighz);
+  EXPECT_EQ(cap->resolved_strength.s1_hi, Strength::kMedium);
+  EXPECT_EQ(cap->resolved_strength.s1_lo, Strength::kMedium);
 }
 
 }  // namespace
