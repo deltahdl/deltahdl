@@ -122,8 +122,21 @@ struct IncDecResult {
   Logic4Vec new_val;
 };
 
+// §11.4.2: "These increment and decrement assignment operators behave as
+// blocking assignments", so §10.4's list of left-hand sides governs them and
+// §11.4.1's once-only left-hand index rule comes with it. This wrote a plain
+// identifier and handed a select to TryAssocIndexedWrite, which answers only
+// for an associative element, so an unpacked array element, a queue element, a
+// bit-select, a part-select, a compound a[i][j] and the byte a string's index
+// names were all incremented by nothing, with nothing reported; a member access
+// had no arm at all. EvalCompoundAssign below is the same read-modify-write
+// over the same targets and asks the same two writers.
 static IncDecResult EvalIncDec(const Expr* expr, SimContext& ctx,
                                Arena& arena) {
+  // §11.4.1's exception, inherited: the allocation, the read and the write each
+  // re-derive the target from expr->lhs, so a side-effecting index would run
+  // once apiece. This is taken before the allocation, which is one of them.
+  SnapshotSelectIndices(expr->lhs, ctx, arena);
   // §7.8.7: an increment reads and writes in one statement, so a nonexistent
   // associative array element is allocated with its initial value before the
   // read below rather than by the write after it.
@@ -142,8 +155,11 @@ static IncDecResult EvalIncDec(const Expr* expr, SimContext& ctx,
     auto* var = ctx.FindVariable(expr->lhs->text);
     if (var) var->value = new_val;
   } else if (expr->lhs->kind == ExprKind::kSelect) {
-    TryAssocIndexedWrite(expr->lhs, new_val, ctx, arena);
+    TrySelectBlockingAssign(expr->lhs, new_val, ctx, arena);
+  } else if (expr->lhs->kind == ExprKind::kMemberAccess) {
+    WriteStructField(expr->lhs, new_val, ctx);
   }
+  ClearSelectIndices(expr->lhs, ctx);
   return {old_val, new_val};
 }
 

@@ -1,5 +1,6 @@
 #include "fixture_real.h"
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -228,6 +229,91 @@ TEST(RealIncDecSim, PostfixDecrementBy1Point0) {
   RunRealBody(f, "rv = 4.0; res = rv--;", &rv, &res);
   EXPECT_DOUBLE_EQ(rv, 3.0);
   EXPECT_DOUBLE_EQ(res, 4.0);
+}
+
+// §11.4.2 makes these operators blocking assignments, so §10.4's list of
+// left-hand sides governs them. Every case above increments a plain identifier,
+// which is one of two forms the evaluator wrote; the rest were incremented by
+// nothing at all and reported nothing.
+
+// An unpacked array element.
+TEST(ExpressionSim, IncrementWritesAnUnpackedArrayElement) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int arr [0:3];\n"
+      "  initial begin arr[2] = 10; arr[2]++; end\n"
+      "endmodule\n",
+      f, "arr[2]");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 11u);
+}
+
+// A bit-select of a packed variable, whose other bits stand.
+TEST(ExpressionSim, IncrementWritesABitSelect) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] d;\n"
+      "  initial begin d = 8'h00; d[3]++; end\n"
+      "endmodule\n",
+      f, "d");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x08u);
+}
+
+// A part-select, loaded first so the high nibble standing is part of the
+// reading.
+TEST(ExpressionSim, IncrementWritesAPartSelect) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] d;\n"
+      "  initial begin d = 8'hF0; d[3:0]++; end\n"
+      "endmodule\n",
+      f, "d");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xF1u);
+}
+
+// A packed struct member, which had no arm at all. The neighbouring member is
+// in the same reading, a write that took the whole variable reaching it.
+TEST(ExpressionSim, DecrementWritesAStructMember) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  typedef struct packed { logic [3:0] hi; logic [3:0] lo; } pair_t;\n"
+      "  pair_t s;\n"
+      "  initial begin s.hi = 4'd2; s.lo = 4'd5; s.lo--; end\n"
+      "endmodule\n",
+      f, "s");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x24u);
+}
+
+// §11.4.1's once-only left-hand index rule, which §11.4.2 inherits by making
+// these blocking assignments. The writers added above each re-derive the target
+// from the index, so without a snapshot the count rises with them; the value is
+// the same however many times a function returning a constant runs, which is
+// why the count is what discriminates.
+TEST(ExpressionSim, IncrementEvaluatesItsIndexOnce) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int arr [0:3];\n"
+      "  int idx_calls;\n"
+      "  function automatic int idx_fn();\n"
+      "    idx_calls = idx_calls + 1;\n"
+      "    return 2;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    arr[2] = 10;\n"
+      "    idx_calls = 0;\n"
+      "    arr[idx_fn()]++;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"arr[2]", 11u}, {"idx_calls", 1u}});
 }
 
 }  // namespace
