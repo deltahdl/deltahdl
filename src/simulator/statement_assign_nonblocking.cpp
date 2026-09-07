@@ -243,6 +243,14 @@ static void SetupBitSelectNbaCallback(const NbaWrite& write, uint32_t idx) {
   Logic4Vec rhs_val = write.rhs_val;
   Arena& arena = write.arena;
   write.event->callback = [var, idx, rhs_val, &arena]() {
+    // §10.6.2: a force "shall override a procedural assignment ... until a
+    // release procedural statement is executed on the variable", and §10.4
+    // names a nonblocking assignment as one of the three kinds of procedural
+    // assignment whatever its left-hand side is. The check sits inside the
+    // callback rather than where the event was scheduled, as it does in
+    // SetupWholeVarNbaCallback, because the flag that governs the write is the
+    // one standing when the update region runs and not when it was queued.
+    if (var->is_forced) return;
     if (idx >= var->value.width) return;
     uint64_t old_val = var->value.ToUint64();
     uint64_t bit = rhs_val.ToUint64() & 1;
@@ -261,6 +269,10 @@ static void SetupPartSelectNbaCallback(const NbaWrite& write, uint32_t lo,
   Logic4Vec rhs_val = write.rhs_val;
   Arena& arena = write.arena;
   write.event->callback = [var, lo, w, rhs_val, &arena]() {
+    // §10.6.2, as in SetupBitSelectNbaCallback above. A part-select reaches
+    // this callback rather than that one whatever the declaration, because
+    // TryResolveArrayElement declines every lhs carrying an index_end.
+    if (var->is_forced) return;
     uint64_t mask = (w >= 64) ? ~uint64_t{0} : (uint64_t{1} << w) - 1;
     uint64_t old_val = var->value.ToUint64();
     uint64_t new_bits = (rhs_val.ToUint64() & mask) << lo;

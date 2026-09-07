@@ -69,6 +69,75 @@ TEST(ForceReleaseSim, ForcePreventsNonblockingAssign) {
   EXPECT_EQ(x->value.ToUint64(), 50u);
 }
 
+// §10.6.2: "A force statement to a variable shall override a procedural
+// assignment, continuous assignment or an assign procedural continuous
+// assignment to the variable until a release procedural statement is executed
+// on the variable." §10.4 lists "Nonblocking procedural assignment statements
+// (see 10.4.2)" as one of the three kinds of procedural assignment statement,
+// and lists "Bit-selects, part-selects, and slices of packed arrays" among the
+// forms "The left-hand side of a procedural assignment can take", so indexing
+// the target of a `<=` leaves it inside the class a force overrides. The
+// clause's own "It shall not be a bit-select or a part-select of a variable"
+// restricts what may be forced, not what a force overrides.
+//
+// This is ForcePreventsNonblockingAssign above with the target indexed, and it
+// is the case that claims SetupBitSelectNbaCallback. ScheduleNonblockingAssign
+// asks TryResolveArrayElement for an element variable named `x[3]` first, and
+// CreateArrayElements makes those only for an unpacked declaration, so a packed
+// `logic [7:0] x` has none and the select branch installs the deferred write.
+// SetupWholeVarNbaCallback beside it has always tested is_forced inside its own
+// lambda; this callback tested it nowhere, so the update region deposited the
+// bit after the force. The forced 50 is 8'b0011_0010, so setting bit 3 read 58.
+// The `#1;` is what ForcePreventsNonblockingAssign uses to give the deferred
+// write its region before the run ends.
+TEST(ForceReleaseSim, ForcePreventsANonblockingBitSelectAssign) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    force x = 8'd50;\n"
+      "    x[3] <= 1'b1;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_TRUE(x->is_forced);
+
+  EXPECT_EQ(x->value.ToUint64(), 50u);
+}
+
+// The same rule stated against a nonblocking part-select, which is a second
+// callback rather than a second route into the first one:
+// SetupSelectNbaCallback picks between SetupBitSelectNbaCallback and
+// SetupPartSelectNbaCallback on whether the select carries an index_end, so the
+// bit-select case above never enters this one. TryResolveArrayElement declines
+// any lhs carrying an index_end outright, which puts even an unpacked array
+// here, and SetupPartSelectNbaCallback had no simulator case of any kind before
+// this one -- a decline written into only the bit-select callback would leave
+// this form overriding the force.
+//
+// The forced 50 is 8'b0011_0010, whose low nibble is 4'h2, so the deferred
+// write of 4'hF over x[3:0] read 63 where §10.6.2 has it not land at all.
+TEST(ForceReleaseSim, ForcePreventsANonblockingPartSelectAssign) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    force x = 8'd50;\n"
+      "    x[3:0] <= 4'hF;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_TRUE(x->is_forced);
+
+  EXPECT_EQ(x->value.ToUint64(), 50u);
+}
+
 TEST(ForceReleaseSim, ReforceUpdatesValue) {
   SimFixture f;
   auto* x = RunAndFindVar(
