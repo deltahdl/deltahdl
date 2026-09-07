@@ -20,6 +20,12 @@
 
 namespace delta {
 
+// The two ways a declaration reaches storage, chosen by whether a scope is open
+// to take it away again. Defined below, beside the scalar declarations that are
+// its other caller.
+static Variable* CreateVarInScope(std::string_view name, uint32_t width,
+                                  SimContext& ctx);
+
 static void CreateBlockArrayElements(const Stmt* stmt, uint32_t elem_width,
                                      SimContext& ctx, Arena& arena) {
   if (stmt->var_unpacked_dims.empty()) return;
@@ -43,7 +49,15 @@ static void CreateBlockArrayElements(const Stmt* stmt, uint32_t elem_width,
   for (uint32_t i = 0; i < size; ++i) {
     uint32_t idx = lo + i;
     auto name = std::string(stmt->var_name) + "[" + std::to_string(idx) + "]";
-    ctx.CreateVariable(*arena.Create<std::string>(std::move(name)), elem_width);
+    // §23.9 makes a declaration in a begin-end block local to that block, and
+    // an array's elements are as much of the declaration as its shape is. They
+    // were created run-long whatever scope declared them, so `a[4]` went on
+    // naming the element of a block's array after the block had ended and a
+    // later block reading `a[4]` read what the earlier one left there. The
+    // shape above already chooses by scope, and CreateVarInScope is what the
+    // scalar declarations below choose with.
+    CreateVarInScope(*arena.Create<std::string>(std::move(name)), elem_width,
+                     ctx);
   }
 }
 

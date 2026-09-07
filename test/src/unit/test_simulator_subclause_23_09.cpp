@@ -373,4 +373,81 @@ TEST(InstanceScopeSimulation, ArrayFormalShapeDoesNotOutliveTheCall) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// §23.9 makes a declaration in a begin-end block local to that block, and an
+// array's elements are as much of the declaration as its shape is. The shape
+// went away with the block already; the per-element variables were created
+// run-long whatever scope declared them, so `a[4]` went on naming the element
+// of a block's array after the block had ended.
+//
+// The second block's array does not cover index 4, so a read of `a[4]` there
+// reaches an element only the first block declared. It answers x once that
+// element goes away with the block that declared it.
+TEST(InstanceScopeSimulation, ABlockLocalArrayElementDoesNotOutliveItsBlock) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int got;\n"
+      "  initial begin\n"
+      "    begin\n"
+      "      int a [1:4];\n"
+      "      a[4] = 9;\n"
+      "    end\n"
+      "    begin\n"
+      "      int a [1:2];\n"
+      "      got = a[4];\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f, "got");
+  ASSERT_NE(var, nullptr);
+  EXPECT_FALSE(var->value.IsKnown());
+}
+
+// An index the reader does cover, read after the block rather than inside a
+// second one: the case above reaches an index the second array does not have,
+// and this one reaches an index it would have if anything of the first array
+// were left.
+TEST(InstanceScopeSimulation, ABlockLocalArrayElementIsGoneAfterTheBlock) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int got;\n"
+      "  initial begin\n"
+      "    begin\n"
+      "      int a [1:2];\n"
+      "      a[1] = 7;\n"
+      "      a[2] = 8;\n"
+      "    end\n"
+      "    got = a[1];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "got");
+  ASSERT_NE(var, nullptr);
+  EXPECT_FALSE(var->value.IsKnown());
+}
+
+// The control: a module-level array has no local scope to belong to and is
+// run-long by right, so it still reads what was written to it after an
+// unrelated block has ended. A fix that scoped every array element would break
+// this.
+TEST(InstanceScopeSimulation, AModuleLevelArrayElementOutlivesABlock) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int a [1:2];\n"
+      "  int got;\n"
+      "  initial begin\n"
+      "    a[1] = 6;\n"
+      "    begin\n"
+      "      int b [1:2];\n"
+      "      b[1] = 3;\n"
+      "    end\n"
+      "    got = a[1];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "got");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 6u);
+}
+
 }  // namespace
