@@ -198,8 +198,36 @@ static bool TrySelfClassNewAssign(const Stmt* stmt, std::string_view field_name,
 // Run the blocking-assignment handlers that do not need the generic
 // right-hand-side value: the three `new` forms and a queue target. Returns
 // true when one of them fully handled the assignment.
+// §11.4.1 states a compound assignment as one blocking assignment: "an
+// assignment operator is semantically equivalent to a blocking assignment, with
+// the exception that any left-hand index expression is only evaluated once".
+//
+// The parser gives `x += 1;` a kBlockingAssign whose lhs is x and whose rhs is
+// the compound operator over that same lhs node, so evaluating that rhs reaches
+// EvalCompoundAssign, which writes x itself. Handing the value it returned to
+// ExecFuncWriteValue then wrote x a second time, and the index the exception
+// covers ran again for that write -- a compound assignment written in a
+// subroutine body was two assignments, whatever the second one landed on.
+// ApplyCompoundAssignOp is the single read-modify-write the ordinary statement
+// executor performs, and this reaches it rather than restating it.
+//
+// A parenthesized rhs is a different statement and is left alone: §11.4.1 lists
+// `( operator_assignment )` as a primary, so `x = (y += 2)` assigns x from an
+// expression that assigns y, and its target is the rhs's own lhs rather than
+// the statement's. TryDispatchSpecialBlockingAssign draws the same line.
+static bool TryFuncCompoundAssign(const Stmt* stmt, SimContext& ctx,
+                                  Arena& arena) {
+  if (stmt->rhs == nullptr || stmt->rhs->kind != ExprKind::kBinary ||
+      !IsCompoundAssignOp(stmt->rhs->op) || stmt->rhs->is_parenthesized) {
+    return false;
+  }
+  ApplyCompoundAssignOp(stmt, ctx, arena);
+  return true;
+}
+
 static bool TryFuncSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                          Arena& arena) {
+  if (TryFuncCompoundAssign(stmt, ctx, arena)) return true;
   // §8.4: resolve `new` against the property named on the left before the
   // right-hand side is evaluated without it.
   // A local of the same name shadows the property, so the unqualified form

@@ -38,6 +38,19 @@ Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
 Logic4Vec ConvertRealForKnownLhs(Logic4Vec rhs_val, bool lhs_is_real,
                                  uint32_t target_width, Arena& arena);
 
+// Defined in statement_assign_core.cpp; also used by the subroutine-body
+// statement executor in eval_function_body.cpp. §11.4.1 states a compound
+// assignment as one blocking assignment -- "an assignment operator is
+// semantically equivalent to a blocking assignment, with the exception that any
+// left-hand index expression is only evaluated once" -- and this performs that
+// one read-modify-write for whichever of the identifier, select, member-access
+// and scalar-fallback forms the target takes. A caller that reaches it has had
+// its statement written for it and must not go on to write the target again
+// from the value of stmt->rhs, which is the compound operator over the same lhs
+// node and would assign it a second time.
+
+void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx, Arena& arena);
+
 // Defined in statement_assign_core.cpp; also used by EvalCompoundAssign in
 // eval_expr.cpp. §11.4.1 makes one exception to a compound assignment being an
 // ordinary blocking assignment -- "any left-hand index expression is only

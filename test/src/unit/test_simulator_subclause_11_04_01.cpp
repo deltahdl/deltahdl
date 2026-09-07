@@ -193,6 +193,125 @@ TEST(LvalueSim, CompoundAssignAsAnExpressionEvaluatesBitSelectIndexOnce) {
       "data", 0x08u);
 }
 
+// §11.4.1 makes `a op= b` "semantically equivalent to a blocking assignment",
+// and a blocking assignment writes its target once. A subroutine body runs on
+// the statement executor in eval_function_body.cpp rather than the one in
+// statement_assign_core.cpp, and that executor evaluated the statement's
+// right-hand side -- which the parser builds as the compound operator over the
+// statement's own left-hand side, so evaluating it had already written the
+// target -- and then wrote the value it handed back to that same left-hand side
+// a second time. A fixed index hides the second write, because it lands the
+// same value on the same element; an index function that returns a fresh index
+// on every call does not. The first write puts 5 in arr[1] and there is no
+// second write, so arr[2] stays 0 and idx_fn has run once. Before the fix
+// arr[1] and arr[2] both held 5 and idx_fn had run twice.
+TEST(LvalueSim, CompoundAssignInAFunctionBodyWritesTheTargetOnce) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int arr [0:3];\n"
+      "  int idx_calls;\n"
+      "  function automatic int idx_fn();\n"
+      "    idx_calls = idx_calls + 1;\n"
+      "    return idx_calls;\n"
+      "  endfunction\n"
+      "  function void bump();\n"
+      "    arr[idx_fn()] += 5;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    arr[0] = 0; arr[1] = 0; arr[2] = 0; arr[3] = 0;\n"
+      "    idx_calls = 0;\n"
+      "    bump();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* written = f.ctx.FindVariable("arr[1]");
+  auto* untouched = f.ctx.FindVariable("arr[2]");
+  auto* calls = f.ctx.FindVariable("idx_calls");
+  ASSERT_NE(written, nullptr);
+  ASSERT_NE(untouched, nullptr);
+  ASSERT_NE(calls, nullptr);
+  EXPECT_EQ(written->value.ToUint64(), 5u);
+  EXPECT_EQ(untouched->value.ToUint64(), 0u);
+  EXPECT_EQ(calls->value.ToUint64(), 1u);
+}
+
+// §11.4.1's once-only left-hand index rule read through the subroutine
+// executor. The index is fixed here, so the target ends at 15 however many
+// times the statement wrote it and the call count is the whole reading. Before
+// the fix the second write re-derived the element from the index expression and
+// idx_fn ran twice.
+TEST(LvalueSim, CompoundAssignInAFunctionBodyEvaluatesLvalueIndexOnce) {
+  RunAndCheckIndexOnce(
+      "module t;\n"
+      "  int arr [0:3];\n"
+      "  int idx_calls;\n"
+      "  function automatic int idx_fn();\n"
+      "    idx_calls = idx_calls + 1;\n"
+      "    return 2;\n"
+      "  endfunction\n"
+      "  function void bump();\n"
+      "    arr[idx_fn()] += 5;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    arr[0] = 0; arr[1] = 0; arr[2] = 10; arr[3] = 0;\n"
+      "    idx_calls = 0;\n"
+      "    bump();\n"
+      "  end\n"
+      "endmodule\n",
+      "arr[2]", 15u);
+}
+
+// A task called with parentheses runs its body on the ordinary statement
+// executor rather than the subroutine one: SetupTaskCall claims a kTaskDecl and
+// ExecInlineTaskCall walks the body through ExecStmt, where a void function of
+// the same shape is declined there and reaches ExecFunctionBody. So a task body
+// never carried the second write and this reading passed before the fix. It is
+// §11.4.1's rule read through a task call rather than a second reading of the
+// subroutine executor, and the function case above is what claims that.
+TEST(LvalueSim, CompoundAssignInATaskBodyEvaluatesLvalueIndexOnce) {
+  RunAndCheckIndexOnce(
+      "module t;\n"
+      "  int arr [0:3];\n"
+      "  int idx_calls;\n"
+      "  function automatic int idx_fn();\n"
+      "    idx_calls = idx_calls + 1;\n"
+      "    return 2;\n"
+      "  endfunction\n"
+      "  task bump();\n"
+      "    arr[idx_fn()] += 5;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    arr[0] = 0; arr[1] = 0; arr[2] = 10; arr[3] = 0;\n"
+      "    idx_calls = 0;\n"
+      "    bump();\n"
+      "  end\n"
+      "endmodule\n",
+      "arr[2]", 15u);
+}
+
+// The plain variable form of the same statement, which nothing read inside a
+// subroutine body before. It does not discriminate on its own: both writes
+// carried the same sum to the same variable, so `x` read 15 before the fix as
+// well. This is coverage of the form in that position rather than a second
+// claim about the doubled write.
+TEST(LvalueSim, VarLvalueCompoundAddInAFunctionBody) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int x;\n"
+      "  function void bump();\n"
+      "    x += 5;\n"
+      "  endfunction\n"
+      "  initial begin x = 10; bump(); end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 15u);
+}
+
 // §11.4.1: the blocking-assignment equivalence also holds when the lhs is a
 // struct member (`s.field op= rhs`). That lhs kind takes its own production
 // branch (member-access read + struct-field write) distinct from a plain
@@ -391,6 +510,55 @@ TEST(LvalueSim, CompoundAssignZeroesXzIntoATwoStateTarget) {
   ASSERT_NE(var, nullptr);
   EXPECT_TRUE(var->value.IsKnown());
   EXPECT_EQ(var->value.ToUint64(), 0xA4u);
+}
+
+// §11.4.1 makes `i += 1.75` the blocking assignment `i = i + 1.75`, so
+// §11.8.1 evaluates the sum in real arithmetic and §6.12.1 then converts the
+// real to the integer target "by rounding to the nearest integer" with ties
+// away from zero. 2.75 is away from the tie, so the answer is 3 and the two
+// wrong answers it excludes are distinct from it and from each other:
+// truncation reads 2, and a raw resize of the 64-bit IEEE-754 double into a
+// 32-bit target reads 0, since the low word of 2.75's bit pattern
+// (0x4006000000000000) is zero.
+TEST(LvalueSim, CompoundAssignOfARealToAnIntegerTarget) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int i;\n"
+      "  initial begin\n"
+      "    i = 1;\n"
+      "    i += 1.75;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "i");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 3u);
+}
+
+// The same conversion in a subroutine body, which reaches it by a different
+// route. The subroutine executor used to write the target twice, and the second
+// write was the one that applied §6.12.1; routing the statement to the single
+// read-modify-write the ordinary executor uses would have dropped the
+// conversion, because the plain variable write does not apply it. So this is
+// the reading that holds §6.12.1 in place across the change rather than one
+// about the doubled write, and the wrong answer it excludes is 0 -- the low 32
+// bits of 2.75 as a double.
+TEST(LvalueSim, CompoundAssignOfARealToAnIntegerTargetInAFunctionBody) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int i;\n"
+      "  function void bump();\n"
+      "    i += 1.75;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    i = 1;\n"
+      "    bump();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "i");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
 // §11.3.6: an assignment expression "casts the right-hand side to the left-hand

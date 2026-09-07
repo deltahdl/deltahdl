@@ -833,10 +833,7 @@ void ClearSelectIndices(const Expr* lhs, SimContext& ctx) {
   if (lhs->index_end != nullptr) ctx.ClearDeferredArgSnapshot(lhs->index_end);
 }
 
-// §11.4.1 compound assignment operators (`+=`, `<<=`, etc.): read-modify-write
-// the lhs through the appropriate target kind.
-static void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx,
-                                  Arena& arena) {
+void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto base_op = CompoundAssignBaseOp(stmt->rhs->op);
   auto actual_rhs = EvalExpr(stmt->rhs->rhs, ctx, arena);
 
@@ -844,6 +841,10 @@ static void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx,
     auto* var = ResolveLhsVariable(stmt->lhs, ctx);
     if (var) {
       auto result = EvalBinaryOp(base_op, var->value, actual_rhs, arena);
+      // §6.12.1's conversion, which WriteVar does not apply: `int i; i += 1.5;`
+      // computes a real and stores an integer.
+      result =
+          ConvertRealOnAssign(result, stmt->lhs, var->value.width, ctx, arena);
       WriteVar(var, result, arena);
     }
   } else if (stmt->lhs->kind == ExprKind::kSelect) {
