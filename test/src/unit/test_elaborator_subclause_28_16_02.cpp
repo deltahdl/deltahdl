@@ -182,7 +182,9 @@ TEST(ChargeDecayElaboration, ThirdDelayOfATriregIsTheChargeDecayTime) {
 // rather than on the net type would let the directive's value through as well.
 TEST(ChargeDecayElaboration, DefaultDecayTimeDoesNotReachANonTrireg) {
   ElabFixture f;
-  auto* design = ElaborateSrc(
+  // The directive is a preprocessor one, so the source goes through the
+  // preprocessor rather than straight to the parser.
+  auto* design = ElaborateWithPreprocessor(
       "`default_decay_time 100\n"
       "module t;\n"
       "  wire #(1, 2, 3) w;\n"
