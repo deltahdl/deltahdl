@@ -11,6 +11,7 @@
 #include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_text_lines.h"
+#include "helpers_vcd_var_decl.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -425,6 +426,79 @@ TEST_F(VcdcloseFromSource, FourStateDumpIgnoresTheSourceCall) {
   // Ignored rather than obeyed: the value change of the time unit after the
   // call is recorded, so the dump the call could not close is still running.
   EXPECT_TRUE(HasLine(Lines(content), "#15"));
+}
+
+// §21.7: a VCD file "contains information about value changes on selected
+// variables in the design", and the change this design makes at time 10 is one
+// of them: it happened while the dump was open, and it is the last thing the
+// design did to `a` before closing its own waveform. The recording runs at the
+// end of a time unit while the close runs inside one, so without the closing
+// unit being recorded first the change reaches no file at all.
+//
+// The record is looked for under the identifier code §21.7.4.2's node
+// information gives `a`, rather than under a spelling of the value this test
+// would have to predict, and it is looked for in the text between the closing
+// unit's simulation_time command and the keyword that terminates the file.
+TEST_F(VcdcloseFromSource, ChangeInTheClosingTimeUnitIsRecordedBeforeTheClose) {
+  RunSource(DesignCalling("    $dumpports(, \"portdump.vcd\");\n",
+                          "    $vcdclose;\n"),
+            /*close_file=*/false);
+
+  std::string content = DumpFile("portdump.vcd");
+  auto decl = VarDecl(content, "a");
+  ASSERT_EQ(decl.size(), 6u) << content;
+  size_t close_at = content.find("$vcdclose");
+  ASSERT_NE(close_at, std::string::npos) << content;
+  size_t unit_at = content.rfind("\n#10\n", close_at);
+  ASSERT_NE(unit_at, std::string::npos) << content;
+  EXPECT_NE(content.substr(unit_at, close_at - unit_at).find(decl[3]),
+            std::string::npos)
+      << content;
+}
+
+// The same change one time unit before the close, which the end-of-slot
+// recording reaches on its own. Without this, the case above would hold just as
+// well of a simulator that never recorded the change at any time, and the claim
+// would be about dumping rather than about the closing unit.
+TEST_F(VcdcloseFromSource, ChangeBeforeTheClosingTimeUnitIsStillRecorded) {
+  RunSource(DesignCalling("    $dumpports(, \"portdump.vcd\");\n",
+                          "    #1 $vcdclose;\n"),
+            /*close_file=*/false);
+
+  std::string content = DumpFile("portdump.vcd");
+  auto decl = VarDecl(content, "a");
+  ASSERT_EQ(decl.size(), 6u) << content;
+  size_t close_at = content.find("$vcdclose");
+  ASSERT_NE(close_at, std::string::npos) << content;
+  size_t unit_at = content.rfind("\n#10\n", close_at);
+  ASSERT_NE(unit_at, std::string::npos) << content;
+  EXPECT_NE(content.substr(unit_at, close_at - unit_at).find(decl[3]),
+            std::string::npos)
+      << content;
+}
+
+// A closing unit the design changed nothing in lists nothing. §21.7.2.1 has a
+// time increment list "the variables that change value" during it, so recording
+// the unit a close falls in must not invent a record for a unit that changed
+// none -- which is what a step that dumped every selected object rather than
+// the changed ones would produce. The simulation_time command itself is not
+// such a record: §21.7.4.1 admits a simulation_time standing on its own, and a
+// dump that stayed open writes one for every time unit the run reaches.
+TEST_F(VcdcloseFromSource, ClosingUnitWithNoChangeListsNoValueChange) {
+  RunSource(DesignCalling("    $dumpports(, \"portdump.vcd\");\n",
+                          "    #1 $vcdclose;\n"),
+            /*close_file=*/false);
+
+  std::string content = DumpFile("portdump.vcd");
+  auto decl = VarDecl(content, "a");
+  ASSERT_EQ(decl.size(), 6u) << content;
+  size_t close_at = content.find("$vcdclose");
+  ASSERT_NE(close_at, std::string::npos) << content;
+  size_t unit_at = content.rfind("\n#11\n", close_at);
+  ASSERT_NE(unit_at, std::string::npos) << content;
+  EXPECT_EQ(content.substr(unit_at, close_at - unit_at).find(decl[3]),
+            std::string::npos)
+      << content;
 }
 
 }  // namespace

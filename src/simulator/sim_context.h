@@ -740,8 +740,12 @@ class SimContext : public DeclaredNameTables, public RandomStability {
 
   std::vector<std::string_view> func_name_stack_;
   std::vector<Process*> final_processes_;
-  // §21.7.3.6.1: stamp one dump with the final simulation time and release its
-  // writer.
+  // §21.7.2.1: record one time unit's simulation_time command and the value
+  // changes under it, which is what the end of a time slot does and what a
+  // close does for the unit it closes in.
+  void RecordVcdTimestep(VcdWriter* writer);
+  // §21.7.3.6.1: record the closing time unit, stamp one dump with the final
+  // simulation time and release its writer.
   void CloseOneVcdDump(VcdDump& dump);
   // §21.7: the two dump files and their bookkeeping. See VcdDumpState.
   VcdDumpState vcd_;

@@ -241,12 +241,8 @@ VcdWriter* SimContext::OpenVcdDump(std::string_view top_scope,
   // the recording runs once per time step for the rest of the run. The
   // callback reads the writer back out of the context rather than capturing
   // it, so it stops on its own once CloseVcdDump has closed the dump.
-  scheduler_.AddPostTimestepCallback([this, type]() {
-    VcdWriter* writer = vcd_.Dump(type).writer;
-    if (writer == nullptr) return;
-    writer->WriteTimestamp(CurrentTime().ticks);
-    writer->DumpChangedValues(0);
-  });
+  scheduler_.AddPostTimestepCallback(
+      [this, type]() { RecordVcdTimestep(vcd_.Dump(type).writer); });
   return dump.writer;
 }
 
@@ -260,6 +256,17 @@ VcdWriter* SimContext::OpenVcdDumpFromTask(VcdFileType type) {
   return OpenVcdDump(current_scope_name_, /*wait_for_dumpvars=*/true, type);
 }
 
+// §21.7.2.1: record what one time unit did -- the simulation_time command
+// introducing it and the value changes listed under it. This is the step the
+// end of a time slot runs, and the step a close runs for the unit it is closing
+// in. WriteTimestamp writes no second marker for a time already stamped, so a
+// close in a unit the recording already covered adds nothing.
+void SimContext::RecordVcdTimestep(VcdWriter* writer) {
+  if (writer == nullptr) return;
+  writer->WriteTimestamp(CurrentTime().ticks);
+  writer->DumpChangedValues(0);
+}
+
 // §21.7.3.6.1: an extended VCD file records the final simulation time as it is
 // closed. Closing here rather than at destruction is what flushes the buffered
 // value changes to disk while the context is still alive to be read back.
@@ -267,6 +274,20 @@ VcdWriter* SimContext::OpenVcdDumpFromTask(VcdFileType type) {
 // such keyword command, so the same step closes either form.
 void SimContext::CloseOneVcdDump(VcdDump& dump) {
   if (dump.writer == nullptr) return;
+  // §21.7: a VCD file "contains information about value changes on selected
+  // variables in the design", and a change the design made while the dump was
+  // open is that information. The recording runs at the end of a time unit
+  // while a close runs at the moment it is asked for, which is inside one, so
+  // the unit in hand is recorded before the file is terminated -- without this
+  // the last thing a design does before closing its own waveform is the thing
+  // the waveform does not show (#3361).
+  //
+  // §21.7.3.6.1 does not say otherwise. It has the keyword record "the final
+  // simulation time at the time the extended VCD file is closed ... regardless
+  // of the state of signal changes", which insulates the time stamp from
+  // whether anything changed at it; it does not make the changes themselves
+  // something the file leaves out.
+  RecordVcdTimestep(dump.writer);
   dump.writer->WriteVcdClose(CurrentTime().ticks);
   dump.owned.reset();
   dump.writer = nullptr;
