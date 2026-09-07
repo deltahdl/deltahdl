@@ -796,11 +796,26 @@ static ExecTask DispatchBlockingAssign(const Stmt* stmt, SimContext& ctx,
 // Executes a kReturn statement: when inside a randsequence production with a
 // return value (§18.17.7) it evaluates the expression into the production's
 // return slot, then unwinds with kReturn.
+//
+// §18.17.7 gives the production's implicit variable "the return type of the
+// production", so a return is an assignment to an object of that type and not
+// a replacement of it, exactly as §13.4.1 makes a function's return one. §10.7
+// then truncates or extends the expression to the object's width. Handing the
+// width to EvalExpr as a context width does not do this on its own: a sized
+// literal is self-determined, so `return 8'hFF` from a production returning a
+// four-bit typedef name came back eight bits wide and replaced the slot the
+// declared width had sized, and the implicit variable read 255 where the type
+// says 15. ExecFuncReturn resizes for the same reason.
+//
+// A slot of zero width is a string production's (§6.16), which has no declared
+// width for the value to be resized to; ResizeToWidth leaves that value alone.
 static StmtResult DispatchReturn(const Stmt* stmt, SimContext& ctx,
                                  Arena& arena) {
   if (stmt->expr && ctx.RsReturnSlot() != nullptr) {
-    *ctx.RsReturnSlot() =
-        EvalExpr(stmt->expr, ctx, arena, ctx.RsReturnSlot()->width);
+    Logic4Vec* slot = ctx.RsReturnSlot();
+    uint32_t width = slot->width;
+    *slot =
+        ResizeToWidth(EvalExpr(stmt->expr, ctx, arena, width), width, arena);
   }
   return StmtResult::kReturn;
 }

@@ -647,12 +647,11 @@ TEST(RandseqValuePassingSim, RecursiveActivationLeavesTheOuterArrayShape) {
 // generated with no return slot at all, its `return 41` reaches nothing, and
 // `r` keeps the 0 the initial block assigned it.
 //
-// The width the value is stored at is not claimed here, because the run does
-// not yet honour it: 41 fits both the 8 bits `octet` declares and the 32-bit
-// carrier a return type nothing could size falls back to, so this case reads
-// the same either way. #3473 is the width, and it is open -- the sizing the
-// four production sites now ask DeclaredTypeWidth for does not reach a typedef
-// name here, though the same helper does reach one for a function.
+// The width the value is stored at is not claimed here: 41 fits both the 8 bits
+// `octet` declares and the 32-bit carrier a return type nothing could size
+// falls back to, so this case reads the same either way and says only that the
+// value reached the rule. test_simulator_subclause_18_17_07b.cpp claims the
+// width, on values the two answers disagree about.
 TEST(RandseqValuePassingSim, TypedefNameReturnTypeValueReachesTheRule) {
   SimFixture f;
   uint64_t r = RunModule(f,
