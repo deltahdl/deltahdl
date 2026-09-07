@@ -408,4 +408,187 @@ TEST(ForceReleaseSim, ReleasedNetReportsItsDriversStrengthAgain) {
   EXPECT_NE(out.find("Pu1"), std::string::npos) << out;
 }
 
+// §10.6.2: "The left-hand side of the assignment can be a reference to a
+// singular variable, a net, a constant bit-select of a vector net, a constant
+// part-select of a vector net, or a concatenation of these." A concatenation of
+// two whole variables is one of the forms that sentence names, so the force
+// takes effect on both of its elements; §11.4.12 -- "The concatenation is
+// treated as a packed vector of bits" -- is what says how one right-hand value
+// reaches two targets, each element taking the bits its own width claims with
+// the leftmost taking the most significant ones. With `logic [7:0] a, b;` and
+// 16'h1234 that is 8'h12 for a and 8'h34 for b.
+//
+// The wrong answer was that nothing happened at all, and silently: the force
+// executor resolved its one target through ResolveLhsVariable, which answers
+// null for a concatenation, and returned kDone having marked nothing, written
+// nothing and reported nothing. Both elements start at sentinels no expected
+// value can be, so a force that writes nothing cannot pass for one that wrote
+// the right answer.
+TEST(ForceReleaseSim, ForceOfAConcatenationGivesEachElementItsSlice) {
+  SimFixture f;
+  auto* a = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'hA1;\n"
+      "    b = 8'hB2;\n"
+      "    force {a, b} = 16'h1234;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(a, nullptr);
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_TRUE(a->is_forced);
+  EXPECT_TRUE(b->is_forced);
+  EXPECT_EQ(a->value.ToUint64(), 0x12u);
+  EXPECT_EQ(b->value.ToUint64(), 0x34u);
+}
+
+// §10.6.2: "A force statement to a variable shall override a procedural
+// assignment ... to the variable until a release procedural statement is
+// executed on the variable." That override is what makes the statement above a
+// force rather than a one-off write of a slice, and it is carried by the
+// is_forced flag the existing writers consult, so this case says the flag the
+// concatenation arm sets is the one they already read. Without it, an arm that
+// deposited each slice and marked nothing would satisfy the case above.
+//
+// The wrong answer was silence in both halves: the force marked neither element
+// and the later `a = 8'd7;` therefore landed, leaving a at 7 rather than at the
+// slice the force gave it.
+TEST(ForceReleaseSim, ForceOfAConcatenationOverridesALaterElementAssign) {
+  SimFixture f;
+  auto* a = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'hA1;\n"
+      "    b = 8'hB2;\n"
+      "    force {a, b} = 16'h1234;\n"
+      "    a = 8'd7;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(a, nullptr);
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_TRUE(a->is_forced);
+  EXPECT_EQ(a->value.ToUint64(), 0x12u);
+  EXPECT_EQ(b->value.ToUint64(), 0x34u);
+}
+
+// §10.6.2 bounds the override by the release -- once released, a variable
+// "shall maintain its current value until the next procedural assignment to the
+// variable is executed" -- and the release names the same concatenation the
+// force did, so it has to reach every element the force marked. This is the
+// companion the file writes for every other form (ReleaseVariableHoldsValue,
+// ReleaseThenProceduralAssignResumes), and it is what keeps the concatenation
+// arm from installing a force no release can lift.
+//
+// The wrong answer was that neither statement did anything: release resolved
+// its target through the same ResolveLhsVariable and returned having cleared
+// nothing. The assignments after the release are what read the flag back --
+// each element takes its ordinary procedural assignment again, which a still
+// forced element would decline.
+TEST(ForceReleaseSim, ReleaseOfAConcatenationLiftsTheForceOnEachElement) {
+  SimFixture f;
+  auto* a = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'hA1;\n"
+      "    b = 8'hB2;\n"
+      "    force {a, b} = 16'h1234;\n"
+      "    release {a, b};\n"
+      "    a = 8'd7;\n"
+      "    b = 8'd9;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(a, nullptr);
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_FALSE(a->is_forced);
+  EXPECT_FALSE(b->is_forced);
+  EXPECT_EQ(a->value.ToUint64(), 7u);
+  EXPECT_EQ(b->value.ToUint64(), 9u);
+}
+
+// §10.6.2 admits "a constant bit-select of a vector net" among the elements a
+// force's concatenation may mix, and the elaborator case
+// ForceConcatWithNetBitSelectElaborates accepts exactly `force {w, bus[3]} =
+// 2'b11;` on `wire w; wire [7:0] bus;`, so the simulator owes that spelling an
+// answer. The element's window is the point: bus[3] claims one bit of the
+// right-hand value and one bit of bus, and the seven bits of bus its select
+// does not name keep the value its driver gave them, the way §11.4.1's
+// distribution leaves the rest of a select element's variable standing. Driving
+// bus with 8'h55 makes bit 3 the only zero among a distinctive pattern, so
+// 8'h5D is reachable only by writing that one bit.
+//
+// The wrong answer was that nothing happened: neither element was written, w
+// stayed at the 0 its driver gave it and bus stayed at 8'h55. A whole-target
+// write is the other wrong answer this case names -- it would put the 2-bit
+// right-hand value over all of bus.
+//
+// bus is left marked forced in its entirety, which is #3512 and not this case's
+// claim; nothing here reads bus's flag or writes its other bits.
+TEST(ForceReleaseSim, ForceOfAConcatenationWritesOnlyTheNetBitItsSelectNames) {
+  SimFixture f;
+  auto* w = RunAndFindVar(
+      "module t;\n"
+      "  wire w;\n"
+      "  wire [7:0] bus;\n"
+      "  assign w = 1'b0;\n"
+      "  assign bus = 8'h55;\n"
+      "  initial begin\n"
+      "    #1;\n"
+      "    force {w, bus[3]} = 2'b11;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "w");
+  ASSERT_NE(w, nullptr);
+  auto* bus = f.ctx.FindVariable("bus");
+  ASSERT_NE(bus, nullptr);
+  EXPECT_TRUE(w->is_forced);
+  EXPECT_EQ(w->value.ToUint64(), 1u);
+  EXPECT_EQ(bus->value.ToUint64(), 0x5Du);
+}
+
+// §10.6.2: "Releasing a variable that is driven by a continuous assignment or
+// currently has an active assign procedural continuous assignment shall
+// reestablish that assignment and schedule a reevaluation in the continuous
+// assignment's scheduling region." That is ReleaseReestablishesAssign reached
+// through a concatenation, and it is the case the reestablishment path can fail
+// on its own: the release writes the assign's right-hand value again, long
+// after the force looked correct, so an element carrying no window of its own
+// quietly takes the whole 16-bit value there. The value the reestablished
+// assign leaves is the same distribution the assign itself made -- 8'h12 for a
+// and 8'h34 for b -- and an a reading 8'h34 is the whole value truncated into
+// it rather than its slice.
+//
+// The wrong answer today is that all three statements are no-ops and a and b
+// stand at their sentinels. What the flag reads after a reestablished assign is
+// ReleaseReestablishesAssign's subject, not this one's, so nothing here asserts
+// on it.
+TEST(ForceReleaseSim, ReleaseOfAConcatenationReestablishesTheAssignPerElement) {
+  SimFixture f;
+  auto* a = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'hA1;\n"
+      "    b = 8'hB2;\n"
+      "    assign {a, b} = 16'h1234;\n"
+      "    force {a, b} = 16'h5678;\n"
+      "    release {a, b};\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(a, nullptr);
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(a->value.ToUint64(), 0x12u);
+  EXPECT_EQ(b->value.ToUint64(), 0x34u);
+}
+
 }  // namespace

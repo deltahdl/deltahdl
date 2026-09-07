@@ -428,29 +428,83 @@ static std::vector<Variable*> CollectDistinctRhsVars(const Expr* rhs,
   return rhs_vars;
 }
 
-// Recomputes `rhs` into `var`, also refreshing var->forced_value when `forced`.
-static void RecomputeRhsInto(Variable* var, const Expr* rhs, SimContext& ctx,
-                             Arena& arena, bool forced) {
-  auto new_val = EvalExpr(rhs, ctx, arena);
-  if (forced) var->forced_value = new_val;
-  var->value = new_val;
-  if (!var->is_4state) CoerceTo2State(var->value);
-  var->NotifyWatchers();
-}
-
-// Behavior of the watchers InstallRhsWatchers installs: `still_valid` gates the
-// watcher (returning true to detach once its backing force/assign is no longer
-// in effect); `forced` selects whether the recomputed value also refreshes
+// Behavior of the watchers InstallRhsWatchers installs, and of the write each
+// installer makes before installing them: `still_valid` gates the watcher
+// (returning true to detach once its backing force/assign is no longer in
+// effect); `forced` selects whether the value written also refreshes
 // var->forced_value.
 struct RhsWatcherSpec {
   std::function<bool()> still_valid;
-  bool forced;
+  bool forced = false;
   // §10.6.2: the net the force is standing on, when the target is one. Its
   // reported strength is the force's while the force is in effect, so a
   // recomputed forced value re-resolves it; null when the target is a variable,
   // which carries no strength.
   Net* net = nullptr;
+  // §10.7: "The size of the left-hand side of an assignment forms the context
+  // for the right-hand expression", so a right-hand side that is evaluated
+  // again later has to be evaluated in the same context or the two evaluations
+  // answer differently. Zero leaves the expression self-determined, which is
+  // what every singular target asks for and what the force path has always
+  // done.
+  uint32_t rhs_width = 0;
+  // §11.4.12 treats a concatenation as "a packed vector of bits", so an element
+  // of one owns a window of the right-hand value and a window of its own
+  // storage, and the two are unrelated numbers: `bus[3]` in `{w, bus[3]}` takes
+  // bit 0 of the value and lands on bit 3 of `bus`. A width of zero is the
+  // whole of it, which is the singular target: it owns every bit of the value
+  // and every bit of itself.
+  uint32_t src_lo = 0;
+  uint32_t src_width = 0;
+  uint32_t dst_lo = 0;
+  uint32_t dst_width = 0;
 };
+
+// Writes into `var` the part of `val` this installation owns. A singular target
+// owns the whole value and takes it whole, width and all. An element of a
+// concatenation owns the two windows above instead, and the bits outside its
+// destination window belong to the other elements or to nothing at all and have
+// to be left standing, which is what DepositBitField does and what writing the
+// variable whole did not: `force {w, bus[3]} = 2'b11;` gave `bus` the whole
+// two-bit value.
+//
+// The deposit is made into a fresh copy of the target's current value rather
+// than through the words it is holding. Copying a Logic4Vec copies its `words`
+// pointer rather than the words (common/types.h), so a variable last written
+// whole from another object shares that object's storage, and depositing
+// through the pointer would write these bits into whatever else is holding it.
+//
+// WriteBitSelect resolves the same window for a select and is deliberately not
+// the writer here: it declines every write to a forced variable, and the force
+// whose bits these are has just set that flag, so the deposit would be dropped
+// and the element would keep the value it had.
+static void WriteOwnedBits(Variable* var, const Logic4Vec& val,
+                           const RhsWatcherSpec& spec, Arena& arena) {
+  if (spec.dst_width == 0) {
+    if (spec.forced) var->forced_value = val;
+    var->value = val;
+  } else {
+    Logic4Vec updated = ExtractBitField(arena, var->value, 0, var->value.width);
+    DepositBitField(
+        updated, spec.dst_lo,
+        spec.src_width == 0
+            ? val
+            : ExtractBitField(arena, val, spec.src_lo, spec.src_width),
+        spec.dst_width);
+    var->value = updated;
+    if (spec.forced) var->forced_value = var->value;
+  }
+  if (!var->is_4state) CoerceTo2State(var->value);
+}
+
+// Recomputes `rhs` into the part of `var` the spec's windows name, also
+// refreshing var->forced_value when the spec is a forced one.
+static void RecomputeRhsInto(Variable* var, const Expr* rhs, SimContext& ctx,
+                             Arena& arena, const RhsWatcherSpec& spec) {
+  auto new_val = EvalExpr(rhs, ctx, arena, spec.rhs_width);
+  WriteOwnedBits(var, new_val, spec, arena);
+  var->NotifyWatchers();
+}
 
 // Installs, on each variable referenced by `rhs` (other than `var`), a watcher
 // that re-evaluates `rhs` into `var` whenever a source changes.
@@ -461,7 +515,7 @@ static void InstallRhsWatchers(Variable* var, const Expr* rhs, SimContext& ctx,
   for (auto* rhs_var : CollectDistinctRhsVars(rhs, ctx, var)) {
     rhs_var->AddWatcher([var, rhs, ctx_ptr, arena_ptr, spec]() {
       if (!spec.still_valid()) return true;
-      RecomputeRhsInto(var, rhs, *ctx_ptr, *arena_ptr, spec.forced);
+      RecomputeRhsInto(var, rhs, *ctx_ptr, *arena_ptr, spec);
       if (spec.net != nullptr) spec.net->Resolve(*arena_ptr);
       return false;
     });
@@ -470,14 +524,16 @@ static void InstallRhsWatchers(Variable* var, const Expr* rhs, SimContext& ctx,
 
 // Applies a procedural continuous-assignment forced value to `var` from the
 // expression `rhs`, then installs watchers on each variable appearing in `rhs`
-// so the forced value is re-evaluated whenever those variables change.
+// so the forced value is re-evaluated whenever those variables change. The spec
+// carries the net the target stands on and, for an element of a concatenation
+// target, the windows that element owns; this fills in the rest of it.
 static void InstallForcedValueWatcher(Variable* var, const Expr* rhs,
-                                      SimContext& ctx, Arena& arena, Net* net) {
-  auto rhs_val = EvalExpr(rhs, ctx, arena);
+                                      SimContext& ctx, Arena& arena,
+                                      RhsWatcherSpec spec) {
+  spec.forced = true;
+  auto rhs_val = EvalExpr(rhs, ctx, arena, spec.rhs_width);
   var->is_forced = true;
-  var->forced_value = rhs_val;
-  var->value = rhs_val;
-  if (!var->is_4state) CoerceTo2State(var->value);
+  WriteOwnedBits(var, rhs_val, spec, arena);
   var->proc_cont_rhs = rhs;
   var->NotifyWatchers();
 
@@ -485,12 +541,12 @@ static void InstallForcedValueWatcher(Variable* var, const Expr* rhs,
   // it reports is settled now rather than at the next driver update -- there
   // may be no further one, and a net forced before anything drove it has no
   // strength recorded at all.
-  if (net != nullptr) net->Resolve(arena);
+  if (spec.net != nullptr) spec.net->Resolve(arena);
 
-  InstallRhsWatchers(
-      var, rhs, ctx, arena,
-      {[var, rhs]() { return var->is_forced && var->proc_cont_rhs == rhs; },
-       /*forced=*/true, net});
+  spec.still_valid = [var, rhs]() {
+    return var->is_forced && var->proc_cont_rhs == rhs;
+  };
+  InstallRhsWatchers(var, rhs, ctx, arena, spec);
 }
 
 // Reestablishes a continuous assignment on `var` from expression `rhs` after
@@ -498,23 +554,184 @@ static void InstallForcedValueWatcher(Variable* var, const Expr* rhs,
 // assignments: does not set is_forced, and watchers check assign_cont_rhs
 // instead of is_forced to remain valid after release.
 static void ReestablishContinuousAssignment(Variable* var, const Expr* rhs,
-                                            SimContext& ctx, Arena& arena) {
-  auto rhs_val = EvalExpr(rhs, ctx, arena);
-  var->value = rhs_val;
-  if (!var->is_4state) CoerceTo2State(var->value);
+                                            SimContext& ctx, Arena& arena,
+                                            RhsWatcherSpec spec) {
+  // §10.6.1 gives the assign statement "a singular variable reference or a
+  // concatenation of variables", so nothing it reestablishes stands on a net
+  // and the force's net does not carry over into the assignment that outlives
+  // it.
+  spec.net = nullptr;
+  spec.forced = false;
+  auto rhs_val = EvalExpr(rhs, ctx, arena, spec.rhs_width);
+  WriteOwnedBits(var, rhs_val, spec, arena);
   var->NotifyWatchers();
 
-  InstallRhsWatchers(var, rhs, ctx, arena,
-                     {[var, rhs]() {
-                        return var->assign_cont_rhs &&
-                               var->assign_cont_rhs == rhs;
-                      },
-                      /*forced=*/false});
+  spec.still_valid = [var, rhs]() {
+    return var->assign_cont_rhs && var->assign_cont_rhs == rhs;
+  };
+  InstallRhsWatchers(var, rhs, ctx, arena, spec);
+}
+
+// One element of a concatenation left-hand side, the window of the right-hand
+// value it owns and the width that value is evaluated at. §11.4.12 makes the
+// concatenation "a packed vector of bits", so the rightmost element takes the
+// least significant bits and each element to its left begins where the previous
+// one ended: `src_lo` is where this one begins and `width` is what
+// ConcatLhsElemWidth gave it.
+struct ConcatElemSlot {
+  const Expr* el = nullptr;
+  Variable* var = nullptr;
+  uint32_t src_lo = 0;
+  uint32_t width = 0;
+  uint32_t rhs_width = 0;
+};
+
+// The window of the right-hand value `slot` owns and the window of its own
+// storage that receives it. A whole-variable element takes its bits into the
+// whole of itself; a select element takes them into the bits §11.5.1 says its
+// indices address, "determined by the declaration", which is the window
+// ConcatLhsElemWidth sized the element with, so the two agree by construction.
+static RhsWatcherSpec SpecForSlot(const ConcatElemSlot& slot, SimContext& ctx,
+                                  Arena& arena) {
+  PartSelectBits dst{0, slot.width};
+  if (slot.el->kind == ExprKind::kSelect && slot.el->base != nullptr)
+    dst = SelectStorageBits(*slot.var, slot.el, ctx, arena);
+  // §10.6.2 makes force a statement on a net as well as on a variable, and the
+  // net is what holds the strength the force settles, so only an element naming
+  // a whole net is looked up. A select element is left standing on no net, as
+  // the standalone `force bus[3] = 1'b1;` is: ctx.FindNet on the select's base
+  // would hand Net::Resolve the whole of `bus`, which settles every bit of it
+  // from the drivers and would undo the one bit this element forced.
+  Net* net = slot.el->kind == ExprKind::kIdentifier ? ctx.FindNet(slot.el->text)
+                                                    : nullptr;
+  return RhsWatcherSpec{.net = net,
+                        .rhs_width = slot.rhs_width,
+                        .src_lo = slot.src_lo,
+                        .src_width = slot.width,
+                        .dst_lo = dst.lo,
+                        .dst_width = dst.width};
+}
+
+// Forces or assigns one element of a concatenation target. §10.6.1's assign and
+// §10.6.2's force share this executor and differ here only in that the assign
+// records its right-hand side, which a later deassign or release looks for.
+//
+// One residual this does not fix: is_forced is a single flag on the whole
+// Variable, so `force {w, bus[3]} = 2'b11;` puts the right bits in the right
+// place and still marks the whole of `bus` forced, suppressing every driver of
+// every bit of it rather than of bit 3 alone. That is #3512, and it is a change
+// to what Variable records rather than to this walk.
+static void ForceOneElement(const ConcatElemSlot& slot, const Stmt* stmt,
+                            SimContext& ctx, Arena& arena) {
+  if (stmt->kind == StmtKind::kAssign) slot.var->assign_cont_rhs = stmt->rhs;
+  InstallForcedValueWatcher(slot.var, stmt->rhs, ctx, arena,
+                            SpecForSlot(slot, ctx, arena));
+}
+
+// Releases or deassigns one element of a concatenation target. §10.6.1: "The
+// deassign procedural statement shall end an assign procedural continuous
+// assignment to a variable", and §10.6.2 ends a force on a release; each
+// element was marked on its own and so is cleared on its own.
+static void ReleaseOneElement(const ConcatElemSlot& slot, const Stmt* stmt,
+                              SimContext& ctx, Arena& arena) {
+  Variable* var = slot.var;
+  var->is_forced = false;
+  var->proc_cont_rhs = nullptr;
+  if (stmt->kind == StmtKind::kDeassign) {
+    var->assign_cont_rhs = nullptr;
+    return;
+  }
+
+  RhsWatcherSpec spec = SpecForSlot(slot, ctx, arena);
+  // §10.6.2: "When released, the net shall immediately be assigned the value
+  // determined by the drivers of the net."
+  if (spec.net != nullptr) spec.net->Resolve(arena);
+
+  // §10.6.1: "Releasing a variable that is driven by a continuous assignment or
+  // currently has an active assign procedural continuous assignment shall
+  // reestablish that assignment", and the element gets back the window of that
+  // assignment's value it held, not the whole of it: without the window,
+  // `assign {a, b} = 16'h1234; force {a, b} = ...; release {a, b};` handed `a`
+  // the entire sixteen-bit value.
+  //
+  // The window is this release statement's own, since the variable records the
+  // assignment's right-hand side and not the window it was installed with, so a
+  // release naming a target written differently from the assign's reestablishes
+  // through its own windows. That is #3526, and answering it is a change to
+  // what Variable records rather than to this walk.
+  if (var->assign_cont_rhs)
+    ReestablishContinuousAssignment(var, var->assign_cont_rhs, ctx, arena,
+                                    spec);
+}
+
+// Routes one element to the statement that named it: the two statements that
+// install a procedural continuous assignment, and the two that end one.
+static void ApplyToConcatElement(const ConcatElemSlot& slot, const Stmt* stmt,
+                                 SimContext& ctx, Arena& arena) {
+  if (stmt->kind == StmtKind::kRelease || stmt->kind == StmtKind::kDeassign) {
+    ReleaseOneElement(slot, stmt, ctx, arena);
+    return;
+  }
+  ForceOneElement(slot, stmt, ctx, arena);
+}
+
+// Distributes a force, an assign, a release or a deassign over the elements of
+// a concatenation target. §10.6.2 admits "a concatenation of these" and §10.6.1
+// "a concatenation of variables", so each element is a target of the statement
+// in its own right and the elements divide the right-hand value the way
+// §11.4.12 divides it for a blocking assignment: the walk runs in reverse so
+// that the rightmost element takes the least significant bits. Returns the
+// offset one past the elements it walked, which is where a nesting caller
+// resumes. All four statements walk here, so a release draws the element
+// boundaries exactly where the force drew them.
+//
+// An element ConcatLhsElemWidth cannot size is passed over without advancing
+// the offset, which is what UnpackConcatLhs does with the same element on the
+// blocking path. Nothing here knows its width to be anything else, so no other
+// advance is available, and a force and an assignment to such a target misalign
+// the elements to its left together rather than disagreeing. That the width is
+// also zero for a select addressing no bit of its object, which is one bit of
+// the concatenation and not none, is #3525 and is answered in that width rather
+// than here.
+static uint32_t WalkConcatLhsElements(const Expr* lhs, const Stmt* stmt,
+                                      uint32_t bit_offset, SimContext& ctx,
+                                      Arena& arena) {
+  uint32_t rhs_width = LhsContextWidth(stmt->lhs, ctx);
+  for (auto it = lhs->elements.rbegin(); it != lhs->elements.rend(); ++it) {
+    const Expr* el = *it;
+    uint32_t w = ConcatLhsElemWidth(el, ctx, arena);
+    if (w == 0) continue;
+    // §11.4.12: a nested concatenation lvalue divides the slice it was given
+    // among its own elements, so the walk continues into it at the offset it
+    // has reached.
+    if (IsConcatLhs(el)) {
+      bit_offset = WalkConcatLhsElements(UnwrapTypedPattern(el), stmt,
+                                         bit_offset, ctx, arena);
+      continue;
+    }
+    if (auto* var = ResolveLhsVariable(el, ctx))
+      ApplyToConcatElement({el, var, bit_offset, w, rhs_width}, stmt, ctx,
+                           arena);
+    bit_offset += w;
+  }
+  return bit_offset;
 }
 
 StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
                                  Arena& arena) {
   if (!stmt->lhs) return StmtResult::kDone;
+  // §10.6.2: "The left-hand side of the assignment can be a reference to a
+  // singular variable, a net, a constant bit-select of a vector net, a constant
+  // part-select of a vector net, or a concatenation of these", and §10.6.1
+  // gives the assign statement "a singular variable reference or a
+  // concatenation of variables". A concatenation names no one object, so
+  // ResolveLhsVariable answers null for it and the statement returned below
+  // having marked nothing and written nothing: `force {a, b} = 16'h1234;` left
+  // `a` and `b` at their initial values with is_forced clear on both.
+  if (IsConcatLhs(stmt->lhs)) {
+    WalkConcatLhsElements(UnwrapTypedPattern(stmt->lhs), stmt, 0, ctx, arena);
+    return StmtResult::kDone;
+  }
   auto* var = ResolveLhsVariable(stmt->lhs, ctx);
   if (!var) return StmtResult::kDone;
 
@@ -526,7 +743,7 @@ StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
   Net* net = stmt->lhs->kind == ExprKind::kIdentifier
                  ? ctx.FindNet(stmt->lhs->text)
                  : nullptr;
-  InstallForcedValueWatcher(var, stmt->rhs, ctx, arena, net);
+  InstallForcedValueWatcher(var, stmt->rhs, ctx, arena, {.net = net});
 
   return StmtResult::kDone;
 }
@@ -534,6 +751,15 @@ StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
 StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena) {
   if (!stmt->lhs) return StmtResult::kDone;
+  // §10.6.1 and §10.6.2 give release and deassign the same targets their
+  // installing statements take, so a concatenation is ended element by element.
+  // Resolving it as one object answered null, which left `release {a, b};` and
+  // `deassign {a, b};` as no-ops and would have made the force above one no
+  // release could lift.
+  if (IsConcatLhs(stmt->lhs)) {
+    WalkConcatLhsElements(UnwrapTypedPattern(stmt->lhs), stmt, 0, ctx, arena);
+    return StmtResult::kDone;
+  }
   auto* var = ResolveLhsVariable(stmt->lhs, ctx);
   if (!var) return StmtResult::kDone;
 
@@ -549,7 +775,7 @@ StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
   }
 
   if (var->assign_cont_rhs && stmt->kind != StmtKind::kDeassign) {
-    ReestablishContinuousAssignment(var, var->assign_cont_rhs, ctx, arena);
+    ReestablishContinuousAssignment(var, var->assign_cont_rhs, ctx, arena, {});
   }
 
   return StmtResult::kDone;

@@ -288,7 +288,7 @@ static bool TryMemberClassNewAssign(const Stmt* stmt, SimContext& ctx,
   return true;
 }
 
-static const Expr* UnwrapTypedPattern(const Expr* expr) {
+const Expr* UnwrapTypedPattern(const Expr* expr) {
   if (expr->kind == ExprKind::kCast && expr->lhs &&
       expr->lhs->kind == ExprKind::kAssignmentPattern)
     return expr->lhs;
@@ -485,8 +485,7 @@ static bool TrySubarrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 // resolved variable's instead drew the boundary between elements in the wrong
 // place: `{a[3:0], b}` sized its first element at the whole of `a`, so every
 // element to the right of it took the wrong bits as well.
-static uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx,
-                                   Arena& arena) {
+uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx, Arena& arena) {
   if (e->kind == ExprKind::kConcatenation ||
       e->kind == ExprKind::kAssignmentPattern) {
     uint32_t total = 0;

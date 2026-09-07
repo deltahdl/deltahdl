@@ -82,6 +82,25 @@ bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
 // the left-hand side is one of them, a typed pattern's cast looked through.
 bool IsConcatLhs(const Expr* lhs);
 
+// Defined in statement_assign_core.cpp; also used by the §10.6.1 and §10.6.2
+// procedural continuous assignments in statement_assign_decl.cpp, whose
+// concatenation targets walk the same elements. §10.9 lets an assignment
+// pattern carry a type prefix -- `type_reference '{...}` -- and that prefix is
+// a cast around the pattern rather than a target of its own, so a caller that
+// means to walk the pattern's elements has to look through it first. Answers
+// the pattern a typed pattern wraps, and the expression itself otherwise.
+const Expr* UnwrapTypedPattern(const Expr* expr);
+
+// Defined in statement_assign_core.cpp; also used by the §10.6.1 and §10.6.2
+// procedural continuous assignments in statement_assign_decl.cpp, which cut a
+// forced or assigned value into the same element windows a blocking assignment
+// cuts it into. §11.4.1/§11.5.1: the width of one concatenation lvalue element
+// -- a nested concatenation or assignment pattern sums its own elements, a
+// select claims the bits §11.5.1 gives its indices, and any other form is as
+// wide as the variable it resolves to. Zero for an element this cannot size,
+// which is also the select that addresses no bit of its object.
+uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx, Arena& arena);
+
 // Defined in statement_assign_core.cpp; also used by the subroutine-body
 // statement executor in eval_function_body.cpp. §10.4 puts procedural
 // assignments "within procedures such as always, initial, task, and function",

@@ -88,4 +88,47 @@ TEST(ProceduralContinuousAssignSim, ForceReevaluatesForEachRhsVariableChange) {
   EXPECT_EQ(a->value.ToUint64(), 30u);
 }
 
+// §10.6.2 makes the force's right-hand side a continuous assignment -- "if b or
+// c changes, a will be forced to the new value of the expression b + f(c)" is
+// the clause's own example -- so a concatenation target is re-evaluated on a
+// source change the same way ForceRhsReevaluatesOnVariableChange above says a
+// singular one is. What is new here is that the recomputed value is one value
+// for two targets: each element owns only the window §11.4.12 gives it, so a
+// takes the top 12 bits and b the bottom 4 of every recomputation, not just of
+// the first. x + y is 16'h1234 when the force executes, giving a 12'h123 and b
+// 4'h4; after x changes it is 16'h4678, giving a 12'h467 and b 4'h8. The widths
+// are deliberately unequal, so an element handed an even share of the value
+// would read 12'h046 rather than 12'h467, and one handed the whole recomputed
+// value would read 12'h678.
+//
+// The wrong answer was that the force did nothing at all: it resolved its one
+// target through ResolveLhsVariable, which answers null for a concatenation, so
+// no value was deposited and no watcher was installed on x or y, leaving a and
+// b at the sentinels they were initialised to.
+TEST(ProceduralContinuousAssignSim,
+     ForceOfAConcatenationReevaluatesEachElementsSlice) {
+  SimFixture f;
+  auto* a = RunAndFindVar(
+      "module t;\n"
+      "  logic [15:0] x, y;\n"
+      "  logic [11:0] a;\n"
+      "  logic [3:0] b;\n"
+      "  initial begin\n"
+      "    a = 12'hAAA;\n"
+      "    b = 4'hF;\n"
+      "    x = 16'h1000;\n"
+      "    y = 16'h0234;\n"
+      "    force {a, b} = x + y;\n"
+      "    #1;\n"
+      "    x = 16'h4444;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(a, nullptr);
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(a->value.ToUint64(), 0x467u);
+  EXPECT_EQ(b->value.ToUint64(), 0x8u);
+}
+
 }  // namespace
