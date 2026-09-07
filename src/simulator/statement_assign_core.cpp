@@ -463,39 +463,6 @@ static bool TrySubarrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   return true;
 }
 
-// §11.5.1: the storage bits of `var` that the select `sel` addresses, resolved
-// against the declaration, since "the actual bit that is accessed by an address
-// is, in part, determined by the declaration". A width of zero is the select
-// that addresses no bit of the object -- an index carrying x or z, or one
-// outside the declared bounds, both of which §11.5.1 gives no effect when
-// written.
-static PartSelectBits ConcatSelectBits(const Variable& var, const Expr* sel,
-                                       SimContext& ctx, Arena& arena) {
-  auto idx_val = EvalExpr(sel->index, ctx, arena);
-  if (HasUnknownBits(idx_val)) return {0, 0};
-  auto idx = static_cast<int64_t>(idx_val.ToUint64());
-  if (sel->index_end == nullptr) {
-    // §7.4.1: one index of a packed multidimensional array addresses an element
-    // rather than a bit.
-    if (var.packed_elem_width > 1) {
-      PackedRange elems = var.DeclaredRange();
-      if (!elems.Contains(idx)) return {0, 0};
-      auto base = static_cast<uint32_t>(elems.OffsetOf(idx));
-      return {base * var.packed_elem_width, var.packed_elem_width};
-    }
-    PackedRange range = var.BitSelectRange();
-    if (!range.Contains(idx)) return {0, 0};
-    return {static_cast<uint32_t>(range.OffsetOf(idx)), 1};
-  }
-  auto end_val = EvalExpr(sel->index_end, ctx, arena);
-  if (HasUnknownBits(end_val)) return {0, 0};
-  auto target = PartSelectTargetIndices(
-      idx, static_cast<int64_t>(end_val.ToUint64()), sel->is_part_select_plus,
-      sel->is_part_select_minus);
-  return PartSelectStorageBits(var.BitSelectRange(), target.first,
-                               target.second);
-}
-
 // §11.4.1/§11.5.1: width of a concatenation lvalue element -- a nested
 // concatenation/assignment pattern sums its own elements, a select claims the
 // bits §11.5.1 gives its indices, and any other form reduces to the width of
@@ -517,7 +484,7 @@ static uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx,
   auto* var = ResolveLhsVariable(e, ctx);
   if (var == nullptr) return 0;
   if (e->kind == ExprKind::kSelect && e->base != nullptr) {
-    return ConcatSelectBits(*var, e, ctx, arena).width;
+    return SelectStorageBits(*var, e, ctx, arena).width;
   }
   return var->value.width;
 }

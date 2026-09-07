@@ -405,41 +405,6 @@ static void CommitContAssignValue(const ContAssignParams& params,
       params, drv, ContAssignDrivenValue{driven_val, effective_ds}, ctx, arena);
 }
 
-// §11.5.1: the storage bits of `var` that `sel` addresses, resolved against the
-// declaration, since "the actual bit that is accessed by an address is, in
-// part, determined by the declaration". A width of zero is the select that
-// addresses no bit of the object: an index carrying x or z, which §11.5.1 has
-// "return x" when read and have "no effect on the data stored when written",
-// and an index or a range wholly outside the declared bounds, which the same
-// sentence covers.
-static PartSelectBits ContAssignSelectBits(const Variable& var, const Expr* sel,
-                                           SimContext& ctx, Arena& arena) {
-  auto idx_val = EvalExpr(sel->index, ctx, arena);
-  if (HasUnknownBits(idx_val)) return {0, 0};
-  auto idx = static_cast<int64_t>(idx_val.ToUint64());
-  if (sel->index_end == nullptr) {
-    // §7.4.1: one index of a packed multidimensional array addresses an element
-    // rather than a bit, and the element is as many bits wide as the array's
-    // innermost dimension.
-    if (var.packed_elem_width > 1) {
-      PackedRange elems = var.DeclaredRange();
-      if (!elems.Contains(idx)) return {0, 0};
-      auto base = static_cast<uint32_t>(elems.OffsetOf(idx));
-      return {base * var.packed_elem_width, var.packed_elem_width};
-    }
-    PackedRange range = var.BitSelectRange();
-    if (!range.Contains(idx)) return {0, 0};
-    return {static_cast<uint32_t>(range.OffsetOf(idx)), 1};
-  }
-  auto end_val = EvalExpr(sel->index_end, ctx, arena);
-  if (HasUnknownBits(end_val)) return {0, 0};
-  auto target = PartSelectTargetIndices(
-      idx, static_cast<int64_t>(end_val.ToUint64()), sel->is_part_select_plus,
-      sel->is_part_select_minus);
-  return PartSelectStorageBits(var.BitSelectRange(), target.first,
-                               target.second);
-}
-
 // §10.3.2: the net this assignment drives, or a driver with no net where the
 // target is a variable or an lvalue this does not decompose. Which bits of the
 // net a select names is left to RefreshContAssignDriverBits below, which reads
@@ -474,8 +439,7 @@ static ContAssignDriver MakeContAssignDriver(const Expr* lhs, SimContext& ctx) {
 static void RefreshContAssignDriverBits(ContAssignDriver& drv, const Expr* lhs,
                                         SimContext& ctx, Arena& arena) {
   if (!drv.partial || drv.net == nullptr) return;
-  PartSelectBits bits =
-      ContAssignSelectBits(*drv.net->resolved, lhs, ctx, arena);
+  PartSelectBits bits = SelectStorageBits(*drv.net->resolved, lhs, ctx, arena);
   drv.lo = bits.lo;
   drv.width = bits.width;
 }

@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "common/packed_range.h"
 #include "common/types.h"
 #include "simulator/stmt_result.h"
 
@@ -39,6 +40,24 @@ Variable* TryResolveCompoundElement(const Expr* lhs, SimContext& ctx,
 Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx);
 bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
                       SimContext& ctx);
+// §11.5.1: the storage bits of `var` that the select `sel` addresses, resolved
+// against the declaration, since "the actual bit that is accessed by an address
+// is, in part, determined by the declaration". A width of zero is the select
+// that addresses no bit of the object -- an index carrying x or z, which
+// §11.5.1 has "return x" when read and have "no effect on the data stored when
+// written", and an index or a range wholly outside the declared bounds, which
+// the same sentence covers.
+//
+// One index of a packed multidimensional array addresses an element rather than
+// a bit (§7.4.1), and the window is that element's.
+//
+// Two callers ask it: the concatenation lvalue walk, which needs an element's
+// own width rather than its variable's, and the continuous-assignment lowering,
+// which needs the bits a select-targeted driver drives. They asked it
+// separately and of the same clause, which is what the copy-paste gate found.
+PartSelectBits SelectStorageBits(const Variable& var, const Expr* sel,
+                                 SimContext& ctx, Arena& arena);
+
 void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
                     SimContext& ctx, Arena& arena);
 Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width, Arena& arena);
