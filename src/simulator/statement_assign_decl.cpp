@@ -20,14 +20,70 @@
 
 namespace delta {
 
+// §7.8 writes an associative array's dimension as the type its index has, and
+// §7.8.1 writes the wildcard index as `*`. The parser records both as an
+// identifier naming the type, which is the shape §7.4.2's size form also has
+// when the size is a parameter, so the two are told apart by what the name
+// means rather than by how the dimension is written: an index type is a
+// keyword, the wildcard, a class, or a name the elaborated typedef table
+// answers for, and a size is anything else.
+//
+// A name the table answers 0 for is read as a size. That is the string typedef
+// of #3486, which the table cannot distinguish from a type it never saw; an
+// associative array keyed by one builds nothing either way, since evaluating a
+// type name as an expression yields no size, so the reading costs nothing that
+// was working.
+static bool IsAssocIndexDim(const Expr* dim, SimContext& ctx) {
+  if (!dim || dim->kind != ExprKind::kIdentifier) return false;
+  if (dim->text == "*") return true;
+  if (TypeNameToDataType(dim->text).kind != DataTypeKind::kNamed) return true;
+  if (ctx.FindClassType(dim->text) != nullptr) return true;
+  return ctx.FindTypeWidth(dim->text) != 0;
+}
+
+// §7.4.2: "A fixed-size unpacked dimension may also be specified by a single
+// positive constant integer expression to specify the number of elements in the
+// unpacked dimension, as in C. In this case, [size] shall mean the same as
+// [0:size-1]." The clause's own example gives `int Array[8][32]` and
+// `int Array[0:7][0:31]` as the same declaration, so the size form is the
+// ascending range counting from zero and is returned here as that range's upper
+// bound.
+//
+// Only a lone dimension is read this way. The range form below takes the first
+// of several and builds one dimension from it, which #3488 is; giving the size
+// form the same treatment would spread that reading rather than answer it.
+//
+// A queue dimension does not reach here: CreateBlockQueue is asked first and
+// answers for every `[$]` and `[$:N]`.
+static std::optional<int64_t> BlockArraySizeFormUpperBound(const Stmt* stmt,
+                                                           const Expr* dim,
+                                                           SimContext& ctx,
+                                                           Arena& arena) {
+  if (stmt->var_unpacked_dims.size() != 1) return std::nullopt;
+  if (IsAssocIndexDim(dim, ctx)) return std::nullopt;
+  auto size = static_cast<int64_t>(EvalExpr(dim, ctx, arena).ToUint64());
+  // §7.4.2 asks for a positive size. A declaration that gives anything else is
+  // reported by the elaborator's ApplyConstSizedUnpackedDim, so nothing is
+  // built here and the same rule is not named twice.
+  if (size <= 0) return std::nullopt;
+  return size - 1;
+}
+
 static void CreateBlockArrayElements(const Stmt* stmt, uint32_t elem_width,
                                      SimContext& ctx, Arena& arena) {
   if (stmt->var_unpacked_dims.empty()) return;
   auto* dim = stmt->var_unpacked_dims[0];
-  if (!dim || dim->kind != ExprKind::kBinary || dim->op != TokenKind::kColon)
+  if (!dim) return;
+  int64_t left = 0;
+  int64_t right = 0;
+  if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
+    left = static_cast<int64_t>(EvalExpr(dim->lhs, ctx, arena).ToUint64());
+    right = static_cast<int64_t>(EvalExpr(dim->rhs, ctx, arena).ToUint64());
+  } else if (auto hi = BlockArraySizeFormUpperBound(stmt, dim, ctx, arena)) {
+    right = *hi;
+  } else {
     return;
-  auto left = static_cast<int64_t>(EvalExpr(dim->lhs, ctx, arena).ToUint64());
-  auto right = static_cast<int64_t>(EvalExpr(dim->rhs, ctx, arena).ToUint64());
+  }
   auto lo = static_cast<uint32_t>(std::min(left, right));
   auto size = static_cast<uint32_t>(std::abs(left - right) + 1);
   ArrayInfo info;
