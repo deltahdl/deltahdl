@@ -272,11 +272,21 @@ static bool TryBindRefDirectionArg(const Expr* expr, int arg_index,
 // Computes a value parameter's declared width using the live simulation scope,
 // so a width that references in-scope (class/specialization) parameters -- e.g.
 // `logic [W-1:0]` -- resolves to the bound parameter value instead of
-// collapsing to 1 bit. Types without packed dimensions use the static
-// evaluator.
+// collapsing to 1 bit.
+//
+// A type carrying no packed dimension of its own is sized by DeclaredTypeWidth
+// rather than the one-argument EvalTypeWidth, so that §6.18's user-defined type
+// name contributes the width of the type it stands for. EvalTypeWidth gives a
+// DataTypeKind::kNamed no width at all, and BindValueArg resizes only a
+// non-zero width, so a formal written `nib p` was never resized and held
+// whatever width the caller's expression happened to have: `8'hFF` passed to a
+// four-bit formal read 255. §10.8 makes "the passing of a value to a subroutine
+// input, output, or inout argument" an assignment-like context, so §10.7
+// truncates or extends into the formal's declared width.
 static uint32_t EvalFormalArgWidth(const DataType& dt, SimContext& ctx,
                                    Arena& arena) {
-  if (!dt.packed_dim_left || !dt.packed_dim_right) return EvalTypeWidth(dt);
+  if (!dt.packed_dim_left || !dt.packed_dim_right)
+    return DeclaredTypeWidth(dt, ctx);
   auto span = [&](const Expr* l, const Expr* r) -> uint32_t {
     int64_t lv = static_cast<int64_t>(EvalExpr(l, ctx, arena).ToUint64());
     int64_t rv = static_cast<int64_t>(EvalExpr(r, ctx, arena).ToUint64());

@@ -171,4 +171,79 @@ TEST(PassByValueSim, UnpackedArrayArgumentCopiedElementwise) {
                    {{"packet[0]", 3u}, {"packet[1]", 4u}, {"total", 7u}});
 }
 
+// §13.5.1 copies each argument into the subroutine area, and §10.8 lists "the
+// passing of a value to a subroutine input, output, or inout argument" among
+// the assignment-like contexts, so §10.7 truncates or extends the actual into
+// the width the formal's type declares. §6.18 makes a formal written with a
+// user-defined type name an object of the type that name stands for, which is
+// the width in question here.
+//
+// Each case passes a value the formal's type is too narrow to hold, because
+// that is what the two answers disagree about: a formal the simulator could not
+// size was left at whatever width the caller's expression had, so `8'hFF` read
+// 255 where four bits read 15. A formal of exactly 32 bits, or a value that
+// fits the type, reads the same either way.
+TEST(PassByValueSim, TypedefNameInputFormalIsSizedByTheTypeItNames) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef bit [3:0] nib;\n"
+      "  int y;\n"
+      "  function int take(input nib p);\n"
+      "    return p;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    y = take(8'hFF);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"y", 15u}});
+}
+
+// A task's formals are bound by the same code as a function's, but a task is
+// reached by its own call path and neither case stands for the other. The
+// output formal here is how the value is read back and is a 32-bit `int`, so
+// what it reports is the input formal's width and not its own.
+TEST(PassByValueSim, TypedefNameTaskInputFormalIsSizedByTheTypeItNames) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef bit [3:0] nib;\n"
+      "  int y;\n"
+      "  task take(input nib p, output int o);\n"
+      "    o = p;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    y = 0;\n"
+      "    take(8'hFF, y);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"y", 15u}});
+}
+
+// The four-bit cases cannot say a formal wider than the 32 bits an unsized
+// formal used to fall back to keeps its own width: a clamp to 32 would truncate
+// 8'hFF to 15 as well. Forty bits spans two words, and the three answers
+// separate -- 48'hFFFF00000001 passed whole reads 281470681743361, clamped to
+// thirty-two reads 1, and truncated to the forty bits `wide` declares reads
+// 1095216660481, whose set bits above the first word are what say the high word
+// survived.
+TEST(PassByValueSim, TypedefNameFormalWiderThanOneWordKeepsItsHighBits) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef bit [39:0] wide;\n"
+      "  logic [63:0] y;\n"
+      "  function logic [63:0] take(input wide p);\n"
+      "    return p;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    y = take(48'hFFFF00000001);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"y", 1095216660481ull}});
+}
+
 }  // namespace
