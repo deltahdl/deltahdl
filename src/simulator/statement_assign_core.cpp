@@ -528,6 +528,10 @@ static void UnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
       WriteBitSelect(var, el, slice, ctx, arena);
       continue;
     }
+    // §10.6.2's override reaches an element by its own whole-variable write,
+    // and this arm runs before any writer carrying the rule is consulted. The
+    // select element above is WriteBitSelect's to decline.
+    if (var->is_forced) continue;
     var->value = slice;
     var->NotifyWatchers();
   }

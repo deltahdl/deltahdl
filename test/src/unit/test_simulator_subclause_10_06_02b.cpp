@@ -1,73 +1,24 @@
-#include "builders_ast.h"
+// §10.6.2's override read against the writers that carry an assignment to a
+// forced variable, continuing test_simulator_subclause_10_06_02a.cpp.
+//
+// The rule itself and the net side of it -- what a force on a net overrides,
+// what a release hands back, and the strength the net reports while each holds
+// -- are in test_simulator_subclause_10_06_02a.cpp. What varies here is the
+// form the assignment takes rather than the rule: a compound operator, an
+// increment, an assignment written as an expression rather than as a statement,
+// a bit-select and a part-select target, the nonblocking forms of those
+// selects, an element of a concatenation left-hand side, and each of the ones
+// the subroutine-body executor has its own execution of, written in a task or
+// a function body. The release companions among them are what say the decline
+// is bounded by the release rather than standing for the rest of the run.
+
 #include "fixture_simulator.h"
-#include "helpers_stmt_exec.h"
-#include "helpers_switch_network.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(ForceReleaseSim, VarLvalueForce) {
-  SimFixture f;
-  auto* var = RunAndFindVar(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin x = 8'h00; force x = 8'hFF; end\n"
-      "endmodule\n",
-      f, "x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xFFu);
-}
-
-TEST(ForceReleaseExec, ForceNullLhsNoOp) {
-  StmtFixture f;
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kForce;
-  stmt->lhs = nullptr;
-  stmt->rhs = MakeInt(f.arena, 5);
-
-  auto result = RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(result, StmtResult::kDone);
-}
-
-TEST(ForceReleaseExec, ReleaseUnknownVarNoOp) {
-  StmtFixture f;
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kRelease;
-  stmt->lhs = MakeId(f.arena, "nonexistent");
-
-  auto result = RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(result, StmtResult::kDone);
-}
-
-TEST(ForceReleaseExec, ReleaseNullLhsNoOp) {
-  StmtFixture f;
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kRelease;
-  stmt->lhs = nullptr;
-
-  auto result = RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(result, StmtResult::kDone);
-}
-
-TEST(ForceReleaseSim, ForcePreventsNonblockingAssign) {
-  SimFixture f;
-  auto* x = RunAndFindVar(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    force x = 8'd50;\n"
-      "    x <= 8'd100;\n"
-      "    #1;\n"
-      "  end\n"
-      "endmodule\n",
-      f, "x");
-  ASSERT_NE(x, nullptr);
-  EXPECT_TRUE(x->is_forced);
-  EXPECT_EQ(x->value.ToUint64(), 50u);
-}
 
 // §10.6.2: "A force statement to a variable shall override a procedural
 // assignment, continuous assignment or an assign procedural continuous
@@ -80,11 +31,12 @@ TEST(ForceReleaseSim, ForcePreventsNonblockingAssign) {
 // clause's own "It shall not be a bit-select or a part-select of a variable"
 // restricts what may be forced, not what a force overrides.
 //
-// This is ForcePreventsNonblockingAssign above with the target indexed, and it
-// is the case that claims SetupBitSelectNbaCallback. ScheduleNonblockingAssign
-// asks TryResolveArrayElement for an element variable named `x[3]` first, and
-// CreateArrayElements makes those only for an unpacked declaration, so a packed
-// `logic [7:0] x` has none and the select branch installs the deferred write.
+// This is ForcePreventsNonblockingAssign, in the sibling file, with the target
+// indexed, and it is the case that claims SetupBitSelectNbaCallback.
+// ScheduleNonblockingAssign asks TryResolveArrayElement for an element variable
+// named `x[3]` first, and CreateArrayElements makes those only for an unpacked
+// declaration, so a packed `logic [7:0] x` has none and the select branch
+// installs the deferred write.
 // SetupWholeVarNbaCallback beside it has always tested is_forced inside its own
 // lambda; this callback tested it nowhere, so the update region deposited the
 // bit after the force. The forced 50 is 8'b0011_0010, so setting bit 3 read 58.
@@ -138,108 +90,6 @@ TEST(ForceReleaseSim, ForcePreventsANonblockingPartSelectAssign) {
   EXPECT_EQ(x->value.ToUint64(), 50u);
 }
 
-TEST(ForceReleaseSim, ReforceUpdatesValue) {
-  SimFixture f;
-  auto* x = RunAndFindVar(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    force x = 8'd50;\n"
-      "    force x = 8'd99;\n"
-      "  end\n"
-      "endmodule\n",
-      f, "x");
-  ASSERT_NE(x, nullptr);
-  EXPECT_TRUE(x->is_forced);
-  EXPECT_EQ(x->value.ToUint64(), 99u);
-}
-
-TEST(ForceReleaseSim, ForceOverridesBlockingAssign) {
-  SimFixture f;
-  auto* x = RunAndFindVar(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd10;\n"
-      "    force x = 8'd99;\n"
-      "  end\n"
-      "endmodule\n",
-      f, "x");
-  ASSERT_NE(x, nullptr);
-  EXPECT_EQ(x->value.ToUint64(), 99u);
-  EXPECT_TRUE(x->is_forced);
-}
-
-TEST(ForceReleaseSim, ReleaseVariableHoldsValue) {
-  SimFixture f;
-  auto* x = RunAndFindVar(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    force x = 8'd50;\n"
-      "    release x;\n"
-      "  end\n"
-      "endmodule\n",
-      f, "x");
-  ASSERT_NE(x, nullptr);
-  EXPECT_FALSE(x->is_forced);
-
-  EXPECT_EQ(x->value.ToUint64(), 50u);
-}
-
-// §10.6.2: once a variable with no continuous assignment or active assign
-// procedural continuous assignment is released, it keeps the forced value only
-// until the next procedural assignment, which then takes effect normally. The
-// released variable therefore resumes accepting ordinary blocking assignments.
-TEST(ForceReleaseSim, ReleaseThenProceduralAssignResumes) {
-  SimFixture f;
-  auto* x = RunAndFindVar(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    force x = 8'd50;\n"
-      "    release x;\n"
-      "    x = 8'd77;\n"
-      "  end\n"
-      "endmodule\n",
-      f, "x");
-  ASSERT_NE(x, nullptr);
-  EXPECT_FALSE(x->is_forced);
-  EXPECT_EQ(x->value.ToUint64(), 77u);
-}
-
-TEST(ForceReleaseSim, ForceOverridesAssign) {
-  SimFixture f;
-  auto* x = RunAndFindVar(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    assign x = 8'd10;\n"
-      "    force x = 8'd99;\n"
-      "  end\n"
-      "endmodule\n",
-      f, "x");
-  ASSERT_NE(x, nullptr);
-  EXPECT_EQ(x->value.ToUint64(), 99u);
-}
-
-TEST(ForceReleaseSim, ForcePreventsBlockingAssign) {
-  SimFixture f;
-  auto* x = RunAndFindVar(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    force x = 8'd50;\n"
-      "    x = 8'd100;\n"
-      "  end\n"
-      "endmodule\n",
-      f, "x");
-  ASSERT_NE(x, nullptr);
-  EXPECT_TRUE(x->is_forced);
-
-  EXPECT_EQ(x->value.ToUint64(), 50u);
-}
-
 // §10.6.2: "A force statement to a variable shall override a procedural
 // assignment, continuous assignment or an assign procedural continuous
 // assignment to the variable until a release procedural statement is executed
@@ -247,14 +97,14 @@ TEST(ForceReleaseSim, ForcePreventsBlockingAssign) {
 // assignments -- "an assignment operator is semantically equivalent to a
 // blocking assignment" -- and §10.4 puts a blocking assignment written in an
 // initial block among the procedural assignments, so `x += 8'd10;` is the same
-// statement ForcePreventsBlockingAssign above writes and the force declines it
-// the same way.
+// statement ForcePreventsBlockingAssign writes in the sibling file, and the
+// force declines it the same way.
 //
 // A compound operator is the one form that reaches WriteVar, and WriteVar was
 // the only writer on the blocking-assignment path that consulted the flag
 // nowhere, so this read 60 -- the forced 50 with the 10 added to it -- where
-// the plain `x = 8'd100;` above already read 50. No other case in this file
-// reaches that writer.
+// the plain `x = 8'd100;` of that file already read 50. No other case in this
+// file reaches that writer.
 TEST(ForceReleaseSim, ForcePreventsACompoundAssign) {
   SimFixture f;
   auto* x = RunAndFindVar(
@@ -472,242 +322,48 @@ TEST(ForceReleaseSim, ForcePreventsABitSelectCompoundAssign) {
   EXPECT_EQ(x->value.ToUint64(), 50u);
 }
 
-TEST(ForceReleaseSim, ForceExpressionRhs) {
+// §10.6.2: "A force statement to a variable shall override a procedural
+// assignment, continuous assignment or an assign procedural continuous
+// assignment to the variable until a release procedural statement is executed
+// on the variable." §11.4.12 makes a concatenation a left-hand side -- "The
+// concatenation is treated as a packed vector of bits. It can be used on the
+// left-hand side of an assignment or in an expression" -- and §10.4.1 lists
+// `{carry, acc} = rega + regb;   // a concatenation` among its examples of a
+// blocking procedural assignment, which §10.4 puts among the assignments
+// occurring "within procedures such as always, initial, task, and function".
+// An element of a concatenation left-hand side therefore receives a procedural
+// assignment, and a force on that element overrides it.
+//
+// UnpackConcatLhs is the writer every concatenation target reaches, and its
+// whole-variable element deposit consulted the flag nowhere, so a took the high
+// slice of 16'h1234 and read 18. The route reaches none of the writers that do
+// decline: PerformBlockingAssign hands a concatenation to UnpackConcatLhs and
+// returns before its own is_forced test, which is the shape the select arm
+// beside it already had.
+//
+// b is what says only the forced element was declined. The concatenation is a
+// packed vector of sixteen bits over two eight-bit variables, so a takes 8'h12
+// and b takes 8'h34; §10.6.2 stops the first at the forced 50 and says nothing
+// about the second, which takes 52. Asserting on a alone would be satisfied by
+// a decline that dropped the whole statement.
+TEST(ForceReleaseSim, ForcePreventsAConcatenationElementAssign) {
   SimFixture f;
-  auto* b = RunAndFindVar(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  initial begin\n"
-      "    a = 8'hF0;\n"
-      "    force b = a | 8'h0F;\n"
+      "    force a = 8'd50;\n"
+      "    {a, b} = 16'h1234;\n"
       "  end\n"
       "endmodule\n",
-      f, "b");
+      f, "a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_TRUE(a->is_forced);
+  EXPECT_EQ(a->value.ToUint64(), 50u);
+
+  auto* b = f.ctx.FindVariable("b");
   ASSERT_NE(b, nullptr);
-  EXPECT_EQ(b->value.ToUint64(), 0xFFu);
-}
-
-TEST(ForceReleaseSim, ReleaseReestablishesAssign) {
-  SimFixture f;
-  auto* x = RunAndFindVar(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    assign x = 8'd10;\n"
-      "    force x = 8'd99;\n"
-      "    release x;\n"
-      "  end\n"
-      "endmodule\n",
-      f, "x");
-  ASSERT_NE(x, nullptr);
-  EXPECT_FALSE(x->is_forced);
-  EXPECT_EQ(x->value.ToUint64(), 10u);
-}
-
-TEST(ForceReleaseSim, ReleaseReestablishesContinuousAssignment) {
-  SimFixture f;
-  auto* x = RunAndFindVar(
-      "module t;\n"
-      "  logic [7:0] src;\n"
-      "  logic [7:0] x;\n"
-      "  assign x = src;\n"
-      "  initial begin\n"
-      "    src = 8'd10;\n"
-      "    #1;\n"
-      "    force x = 8'd99;\n"
-      "    #1;\n"
-      "    release x;\n"
-      "    src = 8'd42;\n"
-      "    #1;\n"
-      "  end\n"
-      "endmodule\n",
-      f, "x");
-  ASSERT_NE(x, nullptr);
-  EXPECT_FALSE(x->is_forced);
-  EXPECT_EQ(x->value.ToUint64(), 42u);
-}
-
-TEST(ForceReleaseSim, ForceOnNetOverridesContinuousDriver) {
-  SimFixture f;
-  auto* w = RunAndFindVar(
-      "module t;\n"
-      "  wire [7:0] w;\n"
-      "  assign w = 8'd10;\n"
-      "  initial begin\n"
-      "    #1;\n"
-      "    force w = 8'd99;\n"
-      "  end\n"
-      "endmodule\n",
-      f, "w");
-  ASSERT_NE(w, nullptr);
-  EXPECT_TRUE(w->is_forced);
-  EXPECT_EQ(w->value.ToUint64(), 99u);
-}
-
-TEST(ForceReleaseSim, ReleaseOnNetUsesDriverValue) {
-  SimFixture f;
-  auto* w = RunAndFindVar(
-      "module t;\n"
-      "  logic [7:0] src;\n"
-      "  wire [7:0] w;\n"
-      "  assign w = src;\n"
-      "  initial begin\n"
-      "    src = 8'd10;\n"
-      "    #1;\n"
-      "    force w = 8'd99;\n"
-      "    #1;\n"
-      "    release w;\n"
-      "    src = 8'd55;\n"
-      "    #1;\n"
-      "  end\n"
-      "endmodule\n",
-      f, "w");
-  ASSERT_NE(w, nullptr);
-  EXPECT_FALSE(w->is_forced);
-  EXPECT_EQ(w->value.ToUint64(), 55u);
-}
-
-// A force on a net overrides every kind of driver until the net is released,
-// not just continuous assignments. Here a primitive AND gate drives w to 1,
-// yet the force holds w at 0 while it is in effect.
-TEST(ForceReleaseSim, ForceOverridesGateOutputDriver) {
-  SimFixture f;
-  auto* w = RunAndFindVar(
-      "module t;\n"
-      "  logic a, b;\n"
-      "  wire w;\n"
-      "  and g(w, a, b);\n"
-      "  initial begin\n"
-      "    a = 1'b1;\n"
-      "    b = 1'b1;\n"
-      "    #1;\n"
-      "    force w = 1'b0;\n"
-      "    #1;\n"
-      "  end\n"
-      "endmodule\n",
-      f, "w");
-  ASSERT_NE(w, nullptr);
-  EXPECT_TRUE(w->is_forced);
-  EXPECT_EQ(w->value.ToUint64(), 0u);
-}
-
-// Releasing a net makes it take the value its drivers determine right away.
-// After release the AND gate (1 & 1) drives w back to 1, displacing the
-// forced 0.
-TEST(ForceReleaseSim, ReleaseNetReturnsToGateOutputValue) {
-  SimFixture f;
-  auto* w = RunAndFindVar(
-      "module t;\n"
-      "  logic a, b;\n"
-      "  wire w;\n"
-      "  and g(w, a, b);\n"
-      "  initial begin\n"
-      "    a = 1'b1;\n"
-      "    b = 1'b1;\n"
-      "    #1;\n"
-      "    force w = 1'b0;\n"
-      "    #1;\n"
-      "    release w;\n"
-      "    #1;\n"
-      "  end\n"
-      "endmodule\n",
-      f, "w");
-  ASSERT_NE(w, nullptr);
-  EXPECT_FALSE(w->is_forced);
-  EXPECT_EQ(w->value.ToUint64(), 1u);
-}
-
-// §10.6.2 names module outputs among the drivers a force overrides, alongside
-// gate outputs and continuous assignments. Here child instance u drives w to 10
-// through its output port; the force pins w to 99 while in effect, and after
-// the release w immediately returns to the value its port driver determines.
-TEST(ForceReleaseSim, ForceOverridesModuleOutputDriver) {
-  SimFixture f;
-  auto* w = RunAndFindVar(
-      "module drv(output logic [7:0] o);\n"
-      "  assign o = 8'd10;\n"
-      "endmodule\n"
-      "module t;\n"
-      "  wire [7:0] w;\n"
-      "  drv u(w);\n"
-      "  initial begin\n"
-      "    #1;\n"
-      "    force w = 8'd99;\n"
-      "    #1;\n"
-      "    release w;\n"
-      "    #1;\n"
-      "  end\n"
-      "endmodule\n",
-      f, "w");
-  ASSERT_NE(w, nullptr);
-  EXPECT_FALSE(w->is_forced);
-  EXPECT_EQ(w->value.ToUint64(), 10u);
-}
-
-// §10.6.2: "A force procedural statement on a net shall override all drivers of
-// the net -- gate outputs, module outputs, and continuous assignments -- until
-// a release procedural statement is executed on the net." Overridden drivers
-// are not driving, so the strength the net reports is the force's and not
-// theirs. §10.6 gives force no drive_strength syntax, so the strength is the
-// (strong1, strong0) §10.3.4 defaults to, which §21.2.1.4 renders St1.
-//
-// A pull1 continuous assignment is what the force overrides here: driver and
-// force disagree about the level while agreeing about the value, so a net
-// reporting Pu1 is reporting the driver it is not carrying.
-TEST(ForceReleaseSim,
-     ForcedNetReportsTheForcesStrengthNotTheDriversItOverrode) {
-  SimFixture f;
-  std::string out = RunCapture(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (pull0, pull1) w = 1'b1;\n"
-      "  initial begin\n"
-      "    #1 force w = 1'b1;\n"
-      "    #1 $display(\"%v\", w);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  EXPECT_NE(out.find("St1"), std::string::npos) << out;
-  EXPECT_EQ(out.find("Pu1"), std::string::npos) << out;
-}
-
-// §10.6.2: the force is the net's source from the moment it executes, so a net
-// forced before anything drove it carries a strength too. Reporting the
-// strength only when a driver update happens to re-resolve the net leaves this
-// one at high impedance while it carries a value.
-TEST(ForceReleaseSim, NetForcedWithNoDriverStillReportsAStrength) {
-  SimFixture f;
-  std::string out = RunCapture(
-      "module m;\n"
-      "  wire w;\n"
-      "  initial begin\n"
-      "    force w = 1'b0;\n"
-      "    #1 $display(\"%v\", w);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  EXPECT_NE(out.find("St0"), std::string::npos) << out;
-  EXPECT_EQ(out.find("HiZ"), std::string::npos) << out;
-}
-
-// §10.6.2: "When released, the net shall immediately be assigned the value
-// determined by the drivers of the net" -- and the strength with it, the
-// drivers being what drives again. Without this case, reporting the force's
-// strength for good satisfies the two above.
-TEST(ForceReleaseSim, ReleasedNetReportsItsDriversStrengthAgain) {
-  SimFixture f;
-  std::string out = RunCapture(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (pull0, pull1) w = 1'b1;\n"
-      "  initial begin\n"
-      "    #1 force w = 1'b1;\n"
-      "    #1 release w;\n"
-      "    #1 $display(\"%v\", w);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  EXPECT_NE(out.find("Pu1"), std::string::npos) << out;
+  EXPECT_EQ(b->value.ToUint64(), 0x34u);
 }
 
 // §10.4 puts procedural assignments "within procedures such as always, initial,
@@ -717,11 +373,11 @@ TEST(ForceReleaseSim, ReleasedNetReportsItsDriversStrengthAgain) {
 // A task called with parentheses runs its body on the ordinary statement
 // executor: SetupTaskCall claims a kTaskDecl and ExecInlineTaskCall walks the
 // body through ExecStmt, reaching the same AssignToScalarLhs that
-// ForcePreventsBlockingAssign above exercises. So this case reads the rule
-// through a task call rather than through the subroutine-body executor, and the
-// function case below is what claims that executor -- a void function called
-// with parentheses is declined by SetupTaskCall and reaches ExecFunctionBody
-// instead.
+// ForcePreventsBlockingAssign exercises in the sibling file. So this case reads
+// the rule through a task call rather than through the subroutine-body
+// executor, and the function case below is what claims that executor -- a void
+// function called with parentheses is declined by SetupTaskCall and reaches
+// ExecFunctionBody instead.
 TEST(ForceReleaseSim, ForcePreventsATaskBodyAssign) {
   SimFixture f;
   auto* x = RunAndFindVar(
@@ -831,6 +487,44 @@ TEST(ForceReleaseSim, ForcePreventsABitSelectAssignInAFunctionBody) {
   EXPECT_TRUE(x->is_forced);
 
   EXPECT_EQ(x->value.ToUint64(), 50u);
+}
+
+// The concatenation left-hand side written inside a subroutine body, which is
+// a second route into UnpackConcatLhs rather than a second writer.
+// ExecFuncWriteValue asks TryUnpackConcatLhs before anything else, so the
+// subroutine-body executor reaches the same element deposit without ever
+// passing ExecFuncIdentifierAssign, the arm that carries the is_forced check --
+// a decline written into that arm rather than into UnpackConcatLhs would leave
+// this form overriding the force. §10.4 puts procedural assignments "within
+// procedures such as always, initial, task, and function", so this is the same
+// statement wherever it is written, and a read 18 here as well.
+//
+// A void function is what claims that executor and not a task: SetupTaskCall
+// claims a kTaskDecl and ExecInlineTaskCall then walks the body through the
+// ordinary ExecStmt, as the comment on ForcePreventsATaskBodyAssign above
+// records, so the same statement written in a task retraces the initial-block
+// route instead of claiming this one.
+TEST(ForceReleaseSim, ForcePreventsAConcatenationElementAssignInAFunctionBody) {
+  SimFixture f;
+  auto* a = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  function void poke();\n"
+      "    {a, b} = 16'h1234;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    force a = 8'd50;\n"
+      "    poke();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_TRUE(a->is_forced);
+  EXPECT_EQ(a->value.ToUint64(), 50u);
+
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(b->value.ToUint64(), 0x34u);
 }
 
 // The other half of §10.6.2: the override lasts "until a release procedural
