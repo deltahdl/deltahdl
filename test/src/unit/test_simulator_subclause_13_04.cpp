@@ -109,9 +109,11 @@ TEST(FunctionSim, FunctionMultipleStatements) {
 // not the `logic [31:0] tmp` of FunctionWithLocalVars.
 //
 // The value is written as the declaration's initializer rather than by a
-// following `v = 8'hFF;` because a blocking assignment inside a subroutine body
-// replaces the target's vector outright and truncates nothing, which is #3477
-// and not this.
+// following `v = 8'hFF;` so that what is claimed is the declaration, which
+// establishes the width, and not the assignment, which truncates to a width
+// already established. test_simulator_subclause_10_07.cpp claims the
+// assignment, on a target whose width no declaration of a typedef name is
+// involved in.
 TEST(FunctionSim, TypedefNameLocalIsSizedByTheTypeItNames) {
   auto val = RunAndGet(
       "module t;\n"

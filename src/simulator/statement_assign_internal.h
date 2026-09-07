@@ -23,8 +23,10 @@ enum class DataTypeKind : uint8_t;
 void CoerceTo2State(Logic4Vec& v);
 
 // Defined in statement_assign_core.cpp; also used by the §11.4.2 nonblocking
-// path in statement_assign_nonblocking.cpp. Convert the rhs value when the lhs
-// and rhs differ in real-ness or real width before a write.
+// path in statement_assign_nonblocking.cpp and by the subroutine-body statement
+// executor in eval_function_body.cpp, which applies §10.7 to its own writes.
+// Convert the rhs value when the lhs and rhs differ in real-ness or real width
+// before a write.
 Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
                               uint32_t target_width, SimContext& ctx,
                               Arena& arena);

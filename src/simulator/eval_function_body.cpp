@@ -10,6 +10,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
+#include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_exec.h"
 
 namespace delta {
@@ -78,11 +79,34 @@ static void WriteSelfProperty(ClassObject* self, std::string_view name,
 
 // Assigns to a plain identifier lhs: writes the local variable when present,
 // otherwise falls back to a property on the current `this` object.
+//
+// §10.7: "the MSBs of the right-hand expression shall be discarded to match the
+// size of the left-hand side", and a right-hand side narrower than the target
+// is padded to it. A Logic4Vec carries its own width, so writing the value over
+// the variable put the expression's width in the variable's place instead and
+// truncated nothing: the `a = 8'hff` of §10.7's Example 1 left a six-bit `a`
+// eight bits wide reading 255 rather than 6'h3f. The same statement outside a
+// subroutine has always been resized, by AssignToScalarLhs in
+// statement_assign_core.cpp; a subroutine body runs on its own statement
+// executor and so has to be told the same rule separately.
+//
+// ConvertRealOnAssign is the resize, and carries §6.12.1's real conversion with
+// it, which a target registered as real needs before its bits mean anything.
+//
+// §6.16 gives a string no declared width for a value to be resized to -- it is
+// as long as what it holds -- so a string target keeps the value it was handed.
+// A string local is marked as one where it is created, without which this would
+// read its width from whatever it was last assigned and truncate every later
+// assignment to the length of the first.
 static void ExecFuncIdentifierAssign(const Expr* lhs, const Logic4Vec& val,
-                                     SimContext& ctx) {
+                                     SimContext& ctx, Arena& arena) {
   auto* var = ctx.FindVariable(lhs->text);
   if (var) {
-    var->value = val;
+    if (var->is_string) {
+      var->value = val;
+      return;
+    }
+    var->value = ConvertRealOnAssign(val, lhs, var->value.width, ctx, arena);
     return;
   }
   // §8.10: a static method writes a static property of the enclosing class by
@@ -168,7 +192,7 @@ static bool TryFuncSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
 static void ExecFuncWriteValue(const Expr* lhs, const Logic4Vec& val,
                                SimContext& ctx, Arena& arena) {
   if (lhs->kind == ExprKind::kIdentifier) {
-    ExecFuncIdentifierAssign(lhs, val, ctx);
+    ExecFuncIdentifierAssign(lhs, val, ctx, arena);
     return;
   }
   if (lhs->kind == ExprKind::kSelect) {
@@ -435,11 +459,22 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // ExecVarDeclImpl serves a declaration outside a subroutine -- so the two
   // have to reach the typedef table separately.
   uint32_t declared = is_class ? 64 : DeclaredTypeWidth(type, ctx);
-  uint32_t w = declared ? declared : 32;
+  // §6.16: a string has no declared width and starts as "", so it is created
+  // with none rather than at the carrier width below, and marked so that what
+  // reads a string reads the flag rather than a width. A declaration outside a
+  // subroutine does both in CreateDeclVariable; without them here,
+  // ExecFuncIdentifierAssign would take the length of whatever the local was
+  // last assigned for a declared width and truncate to it. The flag is set on
+  // the variable this call created rather than through
+  // SimContext::RegisterStringVariable, which resolves a name and would reach a
+  // variable of the design that the local shadows.
+  bool is_string = !is_class && type.kind == DataTypeKind::kString;
+  uint32_t w = declared ? declared : (is_string ? 0 : 32);
   // §6.11.3: a body local carries its declared signedness exactly as a
   // module-scope declaration does (Lowerer sets the same flag there), so an
   // `integer` local is a signed operand rather than an unsigned one.
   auto* v = ctx.CreateLocalVariable(name, w, IsSignedType(type, {}));
+  if (is_string) v->is_string = true;
   if (is_class) ctx.SetVariableClassType(name, type.type_name);
   RecordVariableEnumType(name, type, ctx);
   if (init == nullptr) return v;

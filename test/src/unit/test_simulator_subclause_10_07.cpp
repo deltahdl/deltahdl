@@ -530,4 +530,112 @@ TEST(AssignmentExtensionTruncationSim, SizeMismatchAcceptedNotRejected) {
   EXPECT_EQ(narrow->value.ToUint64(), 0xDu);
 }
 
+// §10.7 applies to a procedural assignment wherever it is written, and a
+// subroutine body is where it was not applied: eval_function_body.cpp runs a
+// function or task body on a statement executor of its own, and that executor
+// wrote the right-hand side over the target rather than into it, so the
+// target's width became the expression's and nothing was discarded. The cases
+// below are that rule inside a subroutine; every case above is the same rule
+// outside one.
+
+// §10.7's Example 1, moved into a function body: `logic [5:0] a; a = 8'hff;`
+// leaves a reading 6'h3f. 255 is the whole literal, which is what a target that
+// took the expression's eight bits reported.
+TEST(AssignmentExtensionTruncationSim, FunctionBodyTruncatesToTheTargetWidth) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  function logic [31:0] f();\n"
+      "    logic [5:0] a;\n"
+      "    a = 8'hff;\n"
+      "    return a;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = f();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+
+  EXPECT_EQ(x->value.ToUint64(), 0x3Fu);
+}
+
+// A task body takes the same executor as a function body, so it is the same
+// write, but a task is reached by its own call path and neither case stands for
+// the other. Both assignments here are subject to the rule: the six-bit local
+// discards the literal's high bits, and the output formal then takes the
+// six-bit value into its own thirty-two.
+TEST(AssignmentExtensionTruncationSim, TaskBodyTruncatesToTheTargetWidth) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  task automatic narrow(output logic [31:0] o);\n"
+      "    logic [5:0] a;\n"
+      "    a = 8'hff;\n"
+      "    o = a;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    narrow(x);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+
+  EXPECT_EQ(x->value.ToUint64(), 0x3Fu);
+}
+
+// The six-bit cases cannot say a target wider than one word is truncated to its
+// own width rather than to a word: 48'hFFFF00000001 into a forty-bit target
+// reads 1095216660481, where the untruncated value reads 281470681743361 and a
+// truncation to thirty-two would read 1. The expected value has bits set above
+// the first word, so the high word survives rather than being masked away.
+TEST(AssignmentExtensionTruncationSim,
+     FunctionBodyTruncationKeepsTheHighWordOfAWideTarget) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [63:0] x;\n"
+      "  function logic [63:0] f();\n"
+      "    logic [39:0] w;\n"
+      "    w = 48'hFFFF00000001;\n"
+      "    return w;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = f();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+
+  EXPECT_EQ(x->value.ToUint64(), 1095216660481ull);
+}
+
+// §6.16 gives a string no declared width -- it is as long as what it holds --
+// so there is nothing for §10.7 to truncate a later assignment to. The second
+// assignment is what says so: a rule that read the target's width from the
+// value already in it would cut "hello world" down to the two characters of
+// "hi" and report a length of 2.
+TEST(AssignmentExtensionTruncationSim, StringLocalHasNoWidthToTruncateTo) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  int x;\n"
+      "  function int f();\n"
+      "    string s;\n"
+      "    s = \"hi\";\n"
+      "    s = \"hello world\";\n"
+      "    return s.len();\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = f();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+
+  EXPECT_EQ(x->value.ToUint64(), 11u);
+}
+
 }  // namespace
