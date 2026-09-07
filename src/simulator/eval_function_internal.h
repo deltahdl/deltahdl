@@ -8,10 +8,26 @@
 
 namespace delta {
 
+struct DataType;
 struct Expr;
 struct ModuleItem;
 class SimContext;
 class Arena;
+
+// §6.11.2 names the 4-state types -- logic, reg, integer and time -- and says
+// "the other types do not have unknown values", which decides whether an
+// unknown assigned to an object declared with this type is converted to zeros.
+// Defined in eval_function_body.cpp and asked by every site that creates one of
+// a subroutine's variables: its declared locals, its formal arguments and the
+// implicit variable holding its return value.
+//
+// A type reached through a name answers 4-state. Is4stateType is asked of the
+// kind alone and a DataTypeKind::kNamed answers false whatever the name stands
+// for, so answering from it would convert the unknowns of a `typedef logic`
+// object. Keeping a bit §6.11.2 would have cleared is the smaller error than
+// clearing one it would have kept, and #3486 is what would carry a name's
+// resolved kind this far.
+bool DeclaredTypeIs4State(const DataType& type);
 
 // Shared between eval_system_task.cpp and eval_system_func.cpp. The system-task
 // helpers are defined once in eval_system_task.cpp; the system-function

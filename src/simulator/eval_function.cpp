@@ -425,6 +425,9 @@ void ExecClassMethod(ClassMethodTarget target, const Expr* expr,
     ret_var = ctx.CreateLocalVariable(
         method->name, ComputeMethodReturnWidth(method, ctx, target.param_cls),
         IsSignedType(method->return_type, {}));
+    // §13.4.1 gives the implicit variable the method's return type, so §6.11.2
+    // decides whether it holds unknowns as it does for any other object.
+    ret_var->is_4state = DeclaredTypeIs4State(method->return_type);
   }
   ExecFunctionBody(method, ret_var, ctx, arena);
   out = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
@@ -635,6 +638,10 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     ret_var = existing
                   ? existing
                   : ctx.CreateLocalVariable(func->name, ret_width, ret_signed);
+    // §13.4.1 with §6.11.2, as above. Set on the retained cell of a static
+    // function as well as on a fresh one, so the second call answers as the
+    // first did.
+    ret_var->is_4state = DeclaredTypeIs4State(func->return_type);
   }
 
   // §20.17.2: a function body is a calling context on the $stacktrace chain,

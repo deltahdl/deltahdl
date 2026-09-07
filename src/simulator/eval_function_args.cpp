@@ -12,6 +12,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
+#include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_exec.h"
 
 namespace delta {
@@ -394,7 +395,12 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
     auto* existing = ctx.FindStaticFuncVar(func->name, param.name);
     if (existing) {
       ctx.AliasLocalVariable(param.name, existing);
-      if (param.direction != Direction::kOutput) existing->value = val;
+      if (param.direction != Direction::kOutput) {
+        existing->value = val;
+        // §6.11.2: the retained cell was marked when the first call created
+        // it, so a later call converts into the same answer.
+        if (!existing->is_4state) CoerceTo2State(existing->value);
+      }
       RegisterValueArgStructType(param, expr, arg_index, ctx);
       RegisterValueArgClassType(param, ctx);
       return;
@@ -408,8 +414,16 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
   // actual's flag, so re-impose the declaration's on the cell too.
   auto* var = ctx.CreateLocalVariable(param.name, val.width,
                                       IsSignedType(param.data_type, {}));
+  // §6.11.2: a formal is an object declared with a type, and §10.8 makes "the
+  // passing of a value to a subroutine input, output, or inout argument" an
+  // assignment-like context, so an unknown copied into a 2-state formal becomes
+  // zero. The flag also decides whether an assignment to the formal inside the
+  // body converts, which it could not while every formal was left at Variable's
+  // 4-state default.
+  var->is_4state = DeclaredTypeIs4State(param.data_type);
   var->value = val;
   var->value.is_signed = var->is_signed;
+  if (!var->is_4state) CoerceTo2State(var->value);
   if (is_static_sub) ctx.SaveStaticFuncVar(func->name, param.name, var);
   // A named-type struct formal (input s_t arg) has kind kNamed, not kStruct, so
   // resolve from the actual argument unconditionally; the resolver is a no-op

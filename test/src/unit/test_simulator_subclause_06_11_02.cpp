@@ -455,4 +455,105 @@ TEST(TwoStateAndFourState, FunctionBodyLocalOfATypedefNameKeepsXz) {
   EXPECT_EQ(var->value.ToString(), "1010x10z");
 }
 
+// A subroutine creates two more objects the clause governs and neither carried
+// its state-ness: the formal a value is copied into, and the implicit variable
+// §13.4.1 gives the function's return type. Both were left at Variable's
+// 4-state default, so an unknown passed to a `bit` formal or returned from a
+// `bit` function was kept where the same value assigned to a `bit` of the
+// design was cleared.
+
+// §10.8 makes "the passing of a value to a subroutine input, output, or inout
+// argument" an assignment-like context, so the conversion belongs at the copy
+// in. The formal is read back out through a 4-state variable, so what is read
+// is the formal's own conversion and not a second one at the target.
+TEST(TwoStateAndFourState, TwoStateFormalZeroesXzAtTheCall) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] src;\n"
+      "  logic [7:0] dst;\n"
+      "  function void take(input bit [7:0] p);\n"
+      "    dst = p;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    src = 8'b1010_x10z;\n"
+      "    take(src);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "dst");
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(var->value.IsKnown());
+  EXPECT_EQ(var->value.ToUint64(), 0xA4u);
+}
+
+// The same call with a 4-state formal, which keeps what the 2-state one loses.
+// Without this a copy that converted every formal would pass the case above.
+TEST(TwoStateAndFourState, FourStateFormalKeepsXzAtTheCall) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] src;\n"
+      "  logic [7:0] dst;\n"
+      "  function void take(input logic [7:0] p);\n"
+      "    dst = p;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    src = 8'b1010_x10z;\n"
+      "    take(src);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "dst");
+  ASSERT_NE(var, nullptr);
+  EXPECT_FALSE(var->value.IsKnown());
+  EXPECT_EQ(var->value.ToString(), "1010x10z");
+}
+
+// §13.4.1's implicit variable, written by a return statement. ExecFuncReturn
+// resizes to the declared return width and wrote the result straight into the
+// variable, so this is the one write in a subroutine body that the identifier
+// assignment's conversion does not stand for.
+TEST(TwoStateAndFourState, TwoStateFunctionReturnZeroesXz) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] src;\n"
+      "  logic [7:0] dst;\n"
+      "  function bit [7:0] pass();\n"
+      "    return src;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    src = 8'b1010_x10z;\n"
+      "    dst = pass();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "dst");
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(var->value.IsKnown());
+  EXPECT_EQ(var->value.ToUint64(), 0xA4u);
+}
+
+// The same variable written by name rather than by a return statement, which
+// §13.4.1 gives as the other way to set it. That write reaches
+// ExecFuncIdentifierAssign, so it converts on the flag rather than on a
+// conversion of its own, and it is the flag that both forms needed.
+TEST(TwoStateAndFourState, TwoStateFunctionNameAssignZeroesXz) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] src;\n"
+      "  logic [7:0] dst;\n"
+      "  function bit [7:0] pass();\n"
+      "    pass = src;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    src = 8'b1010_x10z;\n"
+      "    dst = pass();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "dst");
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(var->value.IsKnown());
+  EXPECT_EQ(var->value.ToUint64(), 0xA4u);
+}
+
 }  // namespace

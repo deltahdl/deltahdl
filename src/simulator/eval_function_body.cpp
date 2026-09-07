@@ -500,6 +500,11 @@ static bool ExecFuncFor(const Stmt* stmt, const FuncExecCtx& exec) {
   return returned;
 }
 
+bool DeclaredTypeIs4State(const DataType& type) {
+  if (type.kind == DataTypeKind::kNamed) return true;
+  return Is4stateType(type.kind);
+}
+
 static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
                                     const Expr* init, SimContext& ctx,
                                     Arena& arena) {
@@ -532,18 +537,7 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // module-scope declaration does (Lowerer sets the same flag there), so an
   // `integer` local is a signed operand rather than an unsigned one.
   auto* v = ctx.CreateLocalVariable(name, w, IsSignedType(type, {}));
-  // §6.11.2 names the 4-state types -- logic, reg, integer and time -- and says
-  // "the other types do not have unknown values". Variable defaults the flag to
-  // 4-state and this path never set it, so a `bit` or `int` body local was
-  // marked as holding unknowns and the conversion above never fired for one.
-  //
-  // A type reached through a name keeps the default. Is4stateType is asked of
-  // the kind alone and a DataTypeKind::kNamed answers false whatever the name
-  // stands for, so marking one 2-state on that answer would convert the
-  // unknowns of a `typedef logic` local. Keeping a bit that §6.11.2 would have
-  // cleared is the smaller error of the two, and carrying a name's resolved
-  // kind into the simulator is #3486.
-  if (type.kind != DataTypeKind::kNamed) v->is_4state = Is4stateType(type.kind);
+  v->is_4state = DeclaredTypeIs4State(type);
   if (is_string) v->is_string = true;
   if (is_class) ctx.SetVariableClassType(name, type.type_name);
   RecordVariableEnumType(name, type, ctx);
@@ -730,6 +724,11 @@ static void ExecFuncReturn(const Stmt* stmt, const FuncExecCtx& exec) {
     val.is_signed = exec.ret_var->is_signed;
   }
   exec.ret_var->value = val;
+  // §6.11.2: §13.4.1 gives the implicit variable the function's return type, so
+  // a `return` into a 2-state one converts its unknowns to zeros. The
+  // assignment form `f = expr;` is converted by ExecFuncIdentifierAssign, which
+  // this statement does not go through.
+  if (!exec.ret_var->is_4state) CoerceTo2State(exec.ret_var->value);
 }
 
 static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
