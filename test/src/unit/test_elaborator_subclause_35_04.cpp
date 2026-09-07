@@ -231,4 +231,54 @@ TEST(DpiGlobalNameElab,
                             2, "35.4"));
 }
 
+// §27.6 makes a generate block a scope, so §35.4's "same scope" is the generate
+// block for a declaration written in one. The parser holds a generate block's
+// items in ModuleItem::gen_body on the item enclosing them, which was in none
+// of the lists the DPI walk collected, so a declaration written there was held
+// to none of §35.4's, §35.5.4's or §35.7's rules. The same pair written
+// directly in the module body is reported today, which is why this case puts it
+// in the block.
+TEST(DpiGlobalNameElab, DuplicateExportLinkageInAGenerateBlockIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      if (1) begin : g
+        function int sv_a(input int x);
+        endfunction
+        function int sv_b(input int x);
+        endfunction
+        export "DPI-C" link = function sv_a;
+        export "DPI-C" link = function sv_b;
+      end
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export linkage name 'link' already "
+                            "declared in this scope",
+                            9, "35.4"));
+}
+
+// A generate block is a scope of its own, so the same linkage name in the
+// module body and in a block inside it is two scopes and no collision. Without
+// this, a fix that folded a generate block's items into the enclosing scope
+// would satisfy the case above and report a source §35.4 admits.
+TEST(DpiGlobalNameElab, ExportLinkageInAGenerateBlockIsItsOwnScope) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      function int sv_a(input int x);
+      endfunction
+      export "DPI-C" link = function sv_a;
+      if (1) begin : g
+        function int sv_b(input int x);
+        endfunction
+        export "DPI-C" link = function sv_b;
+      end
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

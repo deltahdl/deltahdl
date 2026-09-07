@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <format>
 #include <string_view>
 #include <unordered_map>
@@ -648,6 +649,25 @@ void ValidateDpiScopeGlobalNames(const std::vector<ModuleItem*>& items,
 // §3.12.1's compilation-unit scope holds "all declarations that lie outside any
 // other scope" and comes last, since a declaration reaches it only by being in
 // none of the others.
+// §27.6 makes a generate block a scope, so the items of one are a scope of
+// their own for every rule §35.4, §35.5.4 and §35.7 state over declarations "in
+// the same scope", and they belong in the tables those clauses state across
+// scopes -- the version-string agreement, the export signature equivalence and
+// the import signature agreement. The parser holds them in ModuleItem::gen_body
+// on the kGenerateIf, kGenerateFor or kGenerateBlock item enclosing them, which
+// is in none of the lists the walk below collects, so a declaration written
+// there was held to none of those rules and contributed to none of those
+// tables. A generate block inside a generate block is a scope again, so the
+// descent is recursive.
+void AddGenerateScopes(const std::vector<ModuleItem*>& items,
+                       std::vector<const std::vector<ModuleItem*>*>& scopes) {
+  for (const auto* item : items) {
+    if (item == nullptr || item->gen_body.empty()) continue;
+    scopes.push_back(&item->gen_body);
+    AddGenerateScopes(item->gen_body, scopes);
+  }
+}
+
 std::vector<const std::vector<ModuleItem*>*> DpiDeclarationScopes(
     const CompilationUnit* unit) {
   std::vector<const std::vector<ModuleItem*>*> scopes;
@@ -661,6 +681,14 @@ std::vector<const std::vector<ModuleItem*>*> DpiDeclarationScopes(
     if (pkg != nullptr) scopes.push_back(&pkg->items);
   }
   scopes.push_back(&unit->cu_items);
+  // The generate blocks of every scope collected above, each its own scope. The
+  // list is walked by index rather than by iterator because the descent appends
+  // to it, and a generate block of a generate block is reached by the recursion
+  // rather than by a second pass over the grown list.
+  size_t direct_scopes = scopes.size();
+  for (size_t k = 0; k < direct_scopes; ++k) {
+    AddGenerateScopes(*scopes[k], scopes);
+  }
   return scopes;
 }
 
