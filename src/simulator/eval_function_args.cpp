@@ -362,6 +362,33 @@ struct ActualArgRef {
   int index;
 };
 
+// §13.3.2: the arguments of a static task/function are static storage that
+// retains its value between invocations. On a later call the formal already
+// exists in the static-frame store, so reuse that cell instead of a fresh
+// default-initialized one: an input/inout formal is refreshed with the value
+// just passed, while an output formal keeps whatever it retained from the last
+// call (a read-before-write sees the retained value, not the default). An
+// automatic task takes the fresh-each-entry path in BindValueArg, per §13.3.2 /
+// Claim E. Answers whether the formal was bound to such a cell.
+static bool TryReuseStaticFormal(const FunctionArg& param,
+                                 const ActualArgRef& actual,
+                                 const Logic4Vec& val, const ModuleItem* func,
+                                 SimContext& ctx) {
+  if (!func || !func->is_static || func->is_automatic) return false;
+  auto* existing = ctx.FindStaticFuncVar(func->name, param.name);
+  if (existing == nullptr) return false;
+  ctx.AliasLocalVariable(param.name, existing);
+  if (param.direction != Direction::kOutput) {
+    existing->value = val;
+    // §6.11.2: the retained cell was marked when the first call created it, so
+    // a later call converts into the same answer.
+    if (!existing->is_4state) CoerceTo2State(existing->value);
+  }
+  RegisterValueArgStructType(param, actual.expr, actual.index, ctx);
+  RegisterValueArgClassType(param, ctx);
+  return true;
+}
+
 static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
                          const ModuleItem* func, SimContext& ctx,
                          Arena& arena) {
@@ -382,30 +409,8 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
   if (param.direction == Direction::kOutput)
     val = MakeLogic4VecVal(arena, val.width, 0);
 
-  // §13.3.2: the arguments of a static task/function are static storage that
-  // retains its value between invocations. On a later call the formal already
-  // exists in the static-frame store, so reuse that cell instead of a fresh
-  // default-initialized one: an input/inout formal is refreshed with the value
-  // just passed, while an output formal keeps whatever it retained from the
-  // last call (a read-before-write sees the retained value, not the default).
-  // An automatic task takes the fresh-each-entry path below, per §13.3.2 /
-  // Claim E.
   bool is_static_sub = func && func->is_static && !func->is_automatic;
-  if (is_static_sub) {
-    auto* existing = ctx.FindStaticFuncVar(func->name, param.name);
-    if (existing) {
-      ctx.AliasLocalVariable(param.name, existing);
-      if (param.direction != Direction::kOutput) {
-        existing->value = val;
-        // §6.11.2: the retained cell was marked when the first call created
-        // it, so a later call converts into the same answer.
-        if (!existing->is_4state) CoerceTo2State(existing->value);
-      }
-      RegisterValueArgStructType(param, expr, arg_index, ctx);
-      RegisterValueArgClassType(param, ctx);
-      return;
-    }
-  }
+  if (TryReuseStaticFormal(param, actual, val, func, ctx)) return;
 
   // §6.11.3: a formal is an object declared with a type, so `integer a` is a
   // signed object however the actual arrived. Taking the signedness from the
