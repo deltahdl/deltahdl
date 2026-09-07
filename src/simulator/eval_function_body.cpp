@@ -22,25 +22,35 @@ namespace delta {
 // eval_function_args.cpp holds the argument binding and write-back that
 // surround a call.
 
+// §10.4 lists "Bit-selects, part-selects, and slices of packed arrays" among
+// the left-hand sides a procedural assignment may take, and puts such
+// assignments "within procedures such as always, initial, task, and function",
+// so a select target inside a subroutine body names the same things it names
+// outside one. This looked for an element variable named `a[i]` and nothing
+// else, so of the forms §11.5.1 defines only an unpacked array element was
+// reached: a bit-select of a packed variable built the name `v[2]`, which no
+// variable answers to, and wrote nothing, and a part-select built its name from
+// the msb expression alone and wrote nothing either. Neither was reported.
+//
+// What it did write, it wrote whole. A Logic4Vec carries its own width, so
+// `elem->value = val` put the value's width in the element's place rather than
+// truncating into it, which is the §10.7 defect 820f37a1e fixed at the
+// identifier arm and left here because a select's width is its own question.
+//
+// TrySelectBlockingAssign is what the assignment outside a subroutine asks, and
+// it asks it of every form at once: an unpacked array element resized to the
+// element's width, a queue or associative element by its own writer, the bits
+// an associative element's select names, a compound `a[i][j]`, the byte a
+// string's index names (§6.16), and otherwise WriteBitSelect, which deposits
+// the value into the window the select opened and leaves the rest of the
+// variable standing. The associative-array key rules §7.8.1, §7.8.4 and §7.8.6
+// decide still reach it, TryAssocIndexedWrite being one of the writers it
+// dispatches to, so `aa[-1] = v` still reaches the entry the same statement
+// reaches among a module's items rather than a second entry of its own.
 static void ExecFuncSelectAssign(const Expr* lhs, const Logic4Vec& val,
                                  SimContext& ctx, Arena& arena) {
-  // §7.8.1 and §7.8.4 decide what key an index yields: a wildcard index is
-  // self-determined and unsigned, and a typed integral index is cast to the
-  // declared index width, sign-extended when the index type is signed and
-  // zero-extended when it is not. §7.8.6 rules that a write through an index
-  // holding an x or z bit performs no operation and issues a warning.
-  // TryAssocIndexedWrite applies all three, so calling it here leaves one
-  // function deciding the key an associative array write uses: `aa[-1] = v`
-  // reaches the entry in a subroutine body that the same statement reaches
-  // among a module's items, rather than a second entry of its own. It declines
-  // (returning false) when the base is not an identifier naming an associative
-  // array, leaving the fixed-size array element write below.
-  if (TryAssocIndexedWrite(lhs, val, ctx, arena)) return;
-  if (!lhs->base || lhs->base->kind != ExprKind::kIdentifier) return;
-  auto idx = EvalExpr(lhs->index, ctx, arena).ToUint64();
-  auto name = std::string(lhs->base->text) + "[" + std::to_string(idx) + "]";
-  auto* elem = ctx.FindVariable(name);
-  if (elem) elem->value = val;
+  Logic4Vec rhs_val = val;
+  TrySelectBlockingAssign(lhs, rhs_val, ctx, arena);
 }
 
 // True when lhs is a `<base>.<member>` member access whose base identifier name

@@ -51,8 +51,8 @@ static void WriteVar(Variable* var, const Logic4Vec& val, Arena& arena) {
   var->NotifyWatchers();
 }
 
-static bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
-                                    SimContext& ctx, Arena& arena) {
+bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
+                             SimContext& ctx, Arena& arena) {
   if (auto* elem = TryResolveArrayElement(lhs, ctx)) {
     WriteVar(elem, rhs_val, arena);
     return true;

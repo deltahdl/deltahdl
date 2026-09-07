@@ -39,6 +39,16 @@ Logic4Vec ConvertRealForKnownLhs(Logic4Vec rhs_val, bool lhs_is_real,
                                  uint32_t target_width, Arena& arena);
 
 // Defined in statement_assign_core.cpp; also used by the subroutine-body
+// statement executor in eval_function_body.cpp. §10.4 lists "Bit-selects,
+// part-selects, and slices of packed arrays" among the left-hand sides a
+// procedural assignment may take, alongside the elements of the arrays of
+// Clause 7, and this decides which of those a select names and writes it
+// accordingly. Always returns true: a select target is this function's to
+// answer for, whether or not it found something to write.
+bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
+                             SimContext& ctx, Arena& arena);
+
+// Defined in statement_assign_core.cpp; also used by the subroutine-body
 // statement executor in eval_function_body.cpp. §10.4 puts procedural
 // assignments "within procedures such as always, initial, task, and function",
 // so a concatenation or assignment-pattern target is written the same way in a

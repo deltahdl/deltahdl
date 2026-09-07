@@ -710,4 +710,106 @@ TEST(AssignmentExtensionTruncationSim,
   EXPECT_EQ(x->value.ToUint64(), 11u);
 }
 
+// §10.4 lists "Bit-selects, part-selects, and slices of packed arrays" among
+// the left-hand sides a procedural assignment may take, alongside the elements
+// of Clause 7's arrays, and puts such assignments "within procedures such as
+// always, initial, task, and function". The subroutine body's executor looked
+// for an element variable named `a[i]` and nothing else, so of those forms only
+// an unpacked array element was reached, and what it reached it wrote whole.
+
+// The §10.7 rule at the element: the element is an object of the array's
+// element type, so a value too wide for it is truncated into it rather than
+// taking its place. Four bits read 15 where the value's own eight read 255.
+TEST(AssignmentExtensionTruncationSim,
+     TaskBodyArrayElementWriteTruncatesToTheElementWidth) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [3:0] a [0:3];\n"
+      "  task put();\n"
+      "    a[1] = 8'hFF;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    a[1] = 4'h0;\n"
+      "    put();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a[1]");
+  ASSERT_NE(x, nullptr);
+
+  EXPECT_EQ(x->value.ToUint64(), 0xFu);
+}
+
+// §11.5.1's part-select of a packed variable, which the body's executor reached
+// not at all: it built a name from the msb expression, found no variable
+// answering to it, and wrote nothing. `v` is loaded with 8'hF0 beforehand, so
+// the reading separates three answers -- 0xF0 where nothing was written, 0xFB
+// where the selected bits took the value's low nibble and the rest of the
+// variable stood, and 0xAB where the value replaced the variable whole.
+TEST(AssignmentExtensionTruncationSim,
+     FunctionBodyPartSelectWriteReachesOnlyTheSelectedBits) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] v;\n"
+      "  function void put();\n"
+      "    v[3:0] = 8'hAB;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    v = 8'hF0;\n"
+      "    put();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "v");
+  ASSERT_NE(x, nullptr);
+
+  EXPECT_EQ(x->value.ToUint64(), 0xFBu);
+}
+
+// A bit-select is the other form §11.5.1 defines and was dropped by the same
+// silence, the name `v[5]` answering to no variable of a packed vector. Bit 5
+// alone is set, so a write that landed anywhere else reads a different number
+// rather than a shifted one.
+TEST(AssignmentExtensionTruncationSim,
+     FunctionBodyBitSelectWriteReachesTheSelectedBit) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] v;\n"
+      "  function void put();\n"
+      "    v[5] = 1'b1;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    v = 8'h00;\n"
+      "    put();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "v");
+  ASSERT_NE(x, nullptr);
+
+  EXPECT_EQ(x->value.ToUint64(), 0x20u);
+}
+
+// A task body takes the same executor by its own call path, so neither form
+// stands for the other.
+TEST(AssignmentExtensionTruncationSim,
+     TaskBodyPartSelectWriteReachesOnlyTheSelectedBits) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] v;\n"
+      "  task put();\n"
+      "    v[7:4] = 8'hAB;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    v = 8'h0F;\n"
+      "    put();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "v");
+  ASSERT_NE(x, nullptr);
+
+  EXPECT_EQ(x->value.ToUint64(), 0xBFu);
+}
+
 }  // namespace
