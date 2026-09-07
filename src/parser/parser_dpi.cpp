@@ -121,11 +121,27 @@ ModuleItem* Parser::ParseDpiImport() {
   item->loc = CurrentLoc();
   ParserDpiHelpers::ParseDpiSpecString(*this, item);
 
+  // §35.5.4, Syntax 35-1: `dpi_function_import_property ::= context | pure`,
+  // one alternative of two, and §35.5.1.3 says the same in prose -- "Special
+  // properties can be specified for an imported subroutine as pure or as
+  // context." So the property is read once, whichever of the two comes first.
   if (Match(TokenKind::kKwPure)) {
     item->dpi_is_pure = true;
-  }
-  if (Match(TokenKind::kKwContext)) {
+  } else if (Match(TokenKind::kKwContext)) {
     item->dpi_is_context = true;
+  }
+  // A second property where the c_identifier or the `function` keyword is due.
+  // Reading the two independently accepted `pure context` outright and turned
+  // `context pure` away by accident, the leftover keyword standing where a name
+  // was expected and drawing a report about a missing `function`. The keyword
+  // is consumed so the rest of the declaration parses from the token it should,
+  // and this is the only report the source raises.
+  if (Check(TokenKind::kKwPure) || Check(TokenKind::kKwContext)) {
+    diag_.Error(CurrentLoc(),
+                "an import declaration can specify one property, pure or "
+                "context",
+                Subclause("35.5.4"));
+    Consume();
   }
 
   ParserDpiHelpers::TryParseDpiCName(*this, item);

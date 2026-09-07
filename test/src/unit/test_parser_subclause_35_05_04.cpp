@@ -1,3 +1,5 @@
+#include <string>
+
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_config.h"
@@ -678,6 +680,65 @@ TEST(FunctionDeclParsing, DpiImportUnnamedFormalKeepsBothGroupsPacked) {
   EXPECT_NE(arg.data_type.packed_dim_left, nullptr);
   ASSERT_EQ(arg.data_type.extra_packed_dims.size(), 1u);
   EXPECT_TRUE(arg.unpacked_dims.empty());
+}
+
+// §35.5.4, Syntax 35-1: `dpi_function_import_property ::= context | pure`, one
+// alternative of two, and §35.5.1.3 says the same in prose -- "Special
+// properties can be specified for an imported subroutine as pure or as
+// context." A declaration writing both is one no legal source can produce, and
+// §35.5.1.3 gives it no meaning, so the second property is reported where it
+// stands.
+//
+// Runs one import declaration and asserts the report at its line, so the two
+// orders differ only in how they spell the pair.
+void ExpectTwoDpiPropertiesReported(const std::string& properties) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid =
+      mgr.AddFile("<test>", "module m;\n  import \"DPI-C\" " + properties +
+                                " function int f();\n"
+                                "endmodule\n");
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  EXPECT_TRUE(ReportedError(
+      diag.Diagnostics(),
+      "an import declaration can specify one property, pure or context", 2,
+      "35.5.4"));
+}
+
+TEST(FunctionDeclParsing, DpiImportWithTwoPropertiesRejected) {
+  ExpectTwoDpiPropertiesReported("pure context");
+}
+
+// The other order, which was turned away already but by accident: the leftover
+// keyword stood where the c_identifier or the `function` keyword was due and
+// drew a report about a missing `function`. The rule rather than the token
+// order is what turns the source away, so the report is the same one.
+TEST(FunctionDeclParsing, DpiImportWithTwoPropertiesReversedRejected) {
+  ExpectTwoDpiPropertiesReported("context pure");
+}
+
+// One property is what the production admits, so neither case above may be
+// satisfied by a parser that turns the context property away outright.
+TEST(FunctionDeclParsing, DpiImportWithOnePropertyAccepted) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid = mgr.AddFile("<test>",
+                         "module m;\n"
+                         "  import \"DPI-C\" context function int f();\n"
+                         "endmodule\n");
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  auto r = parser.Parse();
+  EXPECT_FALSE(diag.HasErrors());
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.cu->modules.empty());
+  ASSERT_FALSE(r.cu->modules[0]->items.empty());
+  EXPECT_TRUE(r.cu->modules[0]->items[0]->dpi_is_context);
+  EXPECT_FALSE(r.cu->modules[0]->items[0]->dpi_is_pure);
 }
 
 }  // namespace
