@@ -161,6 +161,12 @@ Logic4Vec CoerceToPropertyType(const ClassTypeInfo* type, std::string_view name,
   // resizes everything that does not cross it.
   val = ConvertRealForKnownLhs(val, prop->is_real, prop->width, arena);
   if (!prop->is_4state && !prop->is_real) CoerceTo2State(val);
+  // §6.11.3: the declaration's signedness belongs to the value stored in the
+  // property. A variable keeps it on the Variable and a read consults it there;
+  // a property is only its Logic4Vec, so a value that arrived signed would stay
+  // signed in an unsigned property -- the signed literal 240 truncated into a
+  // `bit [7:0]` reading -16 rather than 240.
+  if (!prop->is_real) val.is_signed = prop->is_signed;
   return val;
 }
 

@@ -64,8 +64,9 @@ void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
 Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width, Arena& arena);
 
 // §8.5 puts no restriction on a class property's data type, so a property is an
-// object of the type its declaration gave it, and §10.4 makes every write to one
-// a procedural assignment. Answers what the property `name` declared on `type`
+// object of the type its declaration gave it, and §10.4 makes every write to
+// one a procedural assignment. Answers what the property `name` declared on
+// `type`
 // -- or on one of its bases, which is where the walk goes -- can hold of `val`:
 // §10.7 truncates or extends into its width, §6.12.1 converts a value crossing
 // the real boundary, and §6.11.2 clears the unknowns a 2-state one has no room

@@ -75,6 +75,13 @@ struct ClassTypeInfo {
     // told apart by the declared type and the stored Logic4Vec does not carry
     // it.
     bool is_real = false;
+    // §6.11.3: the signedness the declaration gives the property, which the
+    // value stored in it carries. A variable keeps this on the Variable and a
+    // read consults it there; a property is only its Logic4Vec, so the flag has
+    // to be imposed on the value as it is written or a signed literal truncated
+    // into an unsigned property reads back negative -- 240 into `bit [7:0]`
+    // reading -16.
+    bool is_signed = false;
   };
   std::vector<PropertyInfo> properties;
 

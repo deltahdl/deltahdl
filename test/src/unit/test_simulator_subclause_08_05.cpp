@@ -433,4 +433,27 @@ TEST(ObjectPropertySim, NarrowPropertyTruncatesItsDeclarationInitializer) {
             15u);
 }
 
+// §6.11.3 gives `bit` no sign, so a value that arrived signed does not stay
+// signed once it is in the property. A property is only its Logic4Vec -- unlike
+// a variable, which keeps the flag beside the value and is read through it --
+// so the declaration's signedness has to be imposed as the value is written.
+// The unsized decimal 240 is a signed literal, and truncated into eight bits
+// while still marked signed it reads back as -16.
+TEST(ObjectPropertySim, UnsignedPropertyDoesNotKeepASignedLiteralsSign) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  bit [7:0] v;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    c.v = 240;\n"
+                      "    result = c.v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            240u);
+}
+
 }  // namespace

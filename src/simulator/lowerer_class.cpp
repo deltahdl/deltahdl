@@ -101,7 +101,8 @@ static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls) {
                                   member->is_local, member->is_protected,
                                   member->is_const, member->init_expr,
                                   Is4stateType(member->data_type, {}), sized,
-                                  IsRealKind(member->data_type.kind)});
+                                  IsRealKind(member->data_type.kind),
+                                  IsSignedType(member->data_type, {})});
     } else if (member->kind == ClassMemberKind::kMethod && member->method) {
       std::string name(member->method->name);
       info->methods[name] = member->method;
@@ -181,7 +182,7 @@ static void CollectNestedClassMembers(ClassTypeInfo* nested_info,
       nested_info->properties.push_back(
           {m->name, w, m->is_static, m->is_local, m->is_protected, m->is_const,
            m->init_expr, Is4stateType(m->data_type, {}), sized,
-           IsRealKind(m->data_type.kind)});
+           IsRealKind(m->data_type.kind), IsSignedType(m->data_type, {})});
     } else if (m->kind == ClassMemberKind::kMethod && m->method) {
       nested_info->methods[std::string(m->method->name)] = m->method;
     }
