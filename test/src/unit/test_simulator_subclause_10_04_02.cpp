@@ -144,4 +144,140 @@ TEST(NonblockingAssignSim, DelayedNbasToSameVarDoNotCancelEachOther) {
   EXPECT_EQ(f.ctx.FindVariable("s3")->value.ToUint64(), 1u);  // t=35, update@30
 }
 
+// §10.4.2 gives the nonblocking form the same target the blocking form takes:
+// "In this syntax, variable_lvalue is a data type that is valid for a
+// procedural assignment statement", and §11.4.12 makes a concatenation one of
+// those -- "The concatenation is treated as a packed vector of bits. It can be
+// used on the left-hand side of an assignment". So `{a, b} <= 16'h1234` has to
+// distribute across a and b exactly as `{a, b} = 16'h1234` does, a taking the
+// high byte and b the low one. It did not: ScheduleNonblockingAssign carried an
+// arm for a streaming concatenation and none for a plain one, and
+// ResolveLhsVariable answers null for a concatenation, so the statement fell
+// out of the bottom of the function having scheduled no write and reported no
+// diagnostic. This is the IsConcatLhs gate and the ScheduleConcatNba arm behind
+// it. Both variables are pre-loaded with sentinels that neither expected value
+// can be, because a target left holding its old value is what the defect
+// produced; starting them at zero would let "scheduled nothing at all" pass as
+// "assigned zero".
+TEST(NonblockingAssignSim, ConcatenationTargetDistributesToItsElements) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'hA5;\n"
+      "    b = 8'h5A;\n"
+      "    {a, b} <= 16'h1234;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 0x12u}, {"b", 0x34u}});
+}
+
+// §10.4.2: a nonblocking assignment "evaluates the right-hand side expression,
+// schedules the assignment ... to occur at the end of the current time step",
+// so the statement after it still reads what the target held before. A
+// concatenation target is under the same rule, since the clause distinguishes
+// its left-hand sides only by what a procedural assignment accepts. Reading a
+// into sample on the very next statement therefore has to answer the old byte
+// while a ends the time step holding the new one. This is what the deferral in
+// ScheduleConcatNba claims: the unpacker runs from inside an update-region
+// callback, not where the statement executed. Doing the distribution eagerly at
+// schedule time would leave sample holding 0x12.
+TEST(NonblockingAssignSim, ConcatenationTargetIsWrittenInTheNbaRegion) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  logic [7:0] sample;\n"
+      "  initial begin\n"
+      "    a = 8'd5;\n"
+      "    b = 8'd6;\n"
+      "    {a, b} <= 16'h1234;\n"
+      "    sample = a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"sample", 5u}, {"a", 0x12u}, {"b", 0x34u}});
+}
+
+// §10.9 gives a positional assignment pattern the same standing on the left of
+// an assignment that §11.4.12 gives a concatenation, and §10.4.2 asks only that
+// the target be one a procedural assignment accepts, so `'{a, b} <= 16'h5678`
+// distributes where `'{a, b} = 16'h5678` does. The bare-pattern spelling
+// reaches the new arm through IsConcatLhs's kAssignmentPattern case rather than
+// its kConcatenation one, and before the fix it too scheduled nothing and
+// reported nothing. The elaboration is required to be clean as well as
+// non-null: §10.9 rules on a left-hand pattern's notation and bit count, and a
+// case that only read the values back could not tell a source the elaborator
+// accepted from one it rejected. Sentinels again, for the reason
+// ConcatenationTargetDistributesToItsElements gives.
+TEST(NonblockingAssignSim, AssignmentPatternTargetDistributesToItsElements) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'hC3;\n"
+      "    b = 8'h3C;\n"
+      "    '{a, b} <= 16'h5678;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors) << "source reported an elaboration error";
+  LowerRunAndCheck(f, design, {{"a", 0x56u}, {"b", 0x78u}});
+}
+
+// §10.9's pattern carries a data type here, and §10.4.2 does not care which of
+// the two spellings names the target, so `pair_t'{a, b} <= 16'hBEEF` has to
+// distribute as the bare pattern above does. The typed form arrives as a cast
+// whose operand is the pattern, which is the third route into the new arm:
+// IsConcatLhs looks through the cast, where ResolveLhsVariable answers null for
+// it, so without that unwrapping the statement would again schedule no write
+// and raise no diagnostic. The wrong answer this case rules out is the one that
+// distinguishes the spellings -- a fix reading only kConcatenation and
+// kAssignmentPattern would leave every typed pattern silently dropped.
+TEST(NonblockingAssignSim,
+     TypedAssignmentPatternTargetDistributesToItsElements) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } pair_t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'h11;\n"
+      "    b = 8'h22;\n"
+      "    pair_t'{a, b} <= 16'hBEEF;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors) << "source reported an elaboration error";
+  LowerRunAndCheck(f, design, {{"a", 0xBEu}, {"b", 0xEFu}});
+}
+
+// §11.4.1 gives a select element of a concatenation target the bits its own
+// indices name and no others, so `{a[3:0], b} <= 12'h9AB` writes the low nibble
+// of a and leaves the high nibble standing: a ends at 0xF9, not 0x09. This is
+// the case that pins the design of the new arm rather than merely its
+// existence. Resolving the elements where the statement executes and scheduling
+// a whole-variable write for each would answer 0x09, because ResolveLhsVariable
+// on a select hands back the whole of the variable selected from -- the
+// boundary error ConcatLhsElemWidth records having already been made once on
+// the blocking side. Deferring the blocking unpacker instead keeps
+// WriteBitSelect as the writer, so the window is the one the element named.
+TEST(NonblockingAssignSim, ConcatenationTargetWritesOnlyTheBitsASelectNames) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'hF0;\n"
+      "    b = 8'hFF;\n"
+      "    {a[3:0], b} <= 12'h9AB;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 0xF9u}, {"b", 0xABu}});
+}
+
 }  // namespace

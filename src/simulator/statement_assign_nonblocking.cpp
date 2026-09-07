@@ -222,6 +222,36 @@ static void SetupWholeVarNbaCallback(Event* event, Variable* var,
 // assignment too, performing the same reverse (unpack) operation. The source
 // is sampled now; defer the per-target writes to the NBA region so the
 // streaming semantics match the blocking form.
+// §11.4.12: "The concatenation is treated as a packed vector of bits. It can be
+// used on the left-hand side of an assignment", and §10.9 gives an assignment
+// pattern the same use. §10.4.2 gives the nonblocking form the same
+// variable_lvalue the blocking form takes -- "variable_lvalue is a data type
+// that is valid for a procedural assignment statement" -- so a concatenation is
+// a nonblocking target exactly as it is a blocking one, and `{a, b} <= x` has
+// to distribute where `{a, b} = x` does.
+//
+// The distribution is the blocking one, deferred rather than restated: one
+// event carries the sampled right-hand value and runs TryUnpackConcatLhs in the
+// update region, as the streaming arm below carries its own unpacker. Resolving
+// the elements here instead and scheduling a whole-variable write for each
+// cannot answer for the forms that unpacker handles -- a nested concatenation
+// names no variable to write, and a select element resolves to the whole of the
+// variable it selects from, which is the boundary error ConcatLhsElemWidth
+// records having already been made once on the blocking side.
+static void ScheduleConcatNba(const Stmt* stmt, const Logic4Vec& rhs_val,
+                              uint64_t delay_ticks, SimContext& ctx,
+                              Arena& arena) {
+  auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+  event->kind = EventKind::kUpdate;
+  const Expr* lhs = stmt->lhs;
+  event->callback = [lhs, rhs_val, &ctx, &arena]() {
+    TryUnpackConcatLhs(lhs, rhs_val, ctx, arena);
+  };
+  auto region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime() + SimTime{delay_ticks},
+                                   region, event);
+}
+
 static void ScheduleStreamingConcatNba(const Stmt* stmt,
                                        const Logic4Vec& rhs_val,
                                        uint64_t delay_ticks, SimContext& ctx,
@@ -340,6 +370,13 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
 
   if (stmt->lhs->kind == ExprKind::kStreamingConcat) {
     ScheduleStreamingConcatNba(stmt, rhs_val, delay_ticks, ctx, arena);
+    return;
+  }
+  // The gate is asked before an event is taken from the pool, rather than by
+  // letting the unpacker decline inside the callback, which would spend one on
+  // every left-hand side that is not a concatenation.
+  if (IsConcatLhs(stmt->lhs)) {
+    ScheduleConcatNba(stmt, rhs_val, delay_ticks, ctx, arena);
     return;
   }
 

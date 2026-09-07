@@ -74,6 +74,14 @@ void ClearSelectIndices(const Expr* lhs, SimContext& ctx);
 bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
                              SimContext& ctx, Arena& arena);
 
+// Defined in statement_assign_core.cpp; also used by the nonblocking scheduler
+// in statement_assign_nonblocking.cpp, which needs the answer before it takes
+// an event from the pool rather than after. §11.4.12 gives a concatenation the
+// left-hand side of an assignment and §10.9 gives an assignment pattern, bare
+// or typed, the same use, so the three are one kind of target. Answers whether
+// the left-hand side is one of them, a typed pattern's cast looked through.
+bool IsConcatLhs(const Expr* lhs);
+
 // Defined in statement_assign_core.cpp; also used by the subroutine-body
 // statement executor in eval_function_body.cpp. §10.4 puts procedural
 // assignments "within procedures such as always, initial, task, and function",

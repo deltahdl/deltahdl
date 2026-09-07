@@ -295,6 +295,13 @@ static const Expr* UnwrapTypedPattern(const Expr* expr) {
   return expr;
 }
 
+bool IsConcatLhs(const Expr* lhs) {
+  if (!lhs) return false;
+  const Expr* pat = UnwrapTypedPattern(lhs);
+  return pat->kind == ExprKind::kConcatenation ||
+         pat->kind == ExprKind::kAssignmentPattern;
+}
+
 uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx) {
   if (!lhs) return 0;
   // 11.3.6 / 11.6.1: a concatenation target's width is the sum of its operand
@@ -543,11 +550,8 @@ static void UnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
 // executor asks the question once rather than restating which shapes count.
 bool TryUnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
                         SimContext& ctx, Arena& arena) {
-  const Expr* lhs_pat = UnwrapTypedPattern(lhs);
-  if (lhs_pat->kind != ExprKind::kConcatenation &&
-      lhs_pat->kind != ExprKind::kAssignmentPattern)
-    return false;
-  UnpackConcatLhs(lhs_pat, rhs_val, ctx, arena);
+  if (!IsConcatLhs(lhs)) return false;
+  UnpackConcatLhs(UnwrapTypedPattern(lhs), rhs_val, ctx, arena);
   return true;
 }
 
@@ -817,10 +821,8 @@ void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
   if (!lhs) return;
   // §10.9: a typed assignment pattern expression on the left unpacks like the
   // bare pattern it wraps.
-  const Expr* lhs_pat = UnwrapTypedPattern(lhs);
-  if (lhs_pat->kind == ExprKind::kConcatenation ||
-      lhs_pat->kind == ExprKind::kAssignmentPattern) {
-    UnpackConcatLhs(lhs_pat, rhs_val, ctx, arena);
+  if (IsConcatLhs(lhs)) {
+    UnpackConcatLhs(UnwrapTypedPattern(lhs), rhs_val, ctx, arena);
     return;
   }
 
