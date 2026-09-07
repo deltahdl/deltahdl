@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -144,21 +145,41 @@ struct ContAssignParams {
 // `driver_idx` is that driver's slot within the net, and `first` is true on the
 // initial commit, when the driver slot must be appended rather than
 // overwritten.
-struct ContAssignDriver {
+struct ContAssignDriverPiece {
   Net* net = nullptr;
   size_t driver_idx = 0;
-  bool first = true;
-  // §10.3.2: which bits of `net` this assignment drives. A bare identifier
-  // drives the whole net; a select drives the bits §11.5.1 gives its indices
-  // and high impedance everywhere else, so that §28.12 combines it with the
-  // net's other sources the way it combines any two. `lo` counts from the least
-  // significant end of the net's storage, and a width of zero with `partial`
-  // set is the select that addresses no bit of the net at all -- an index out
-  // of range, or one carrying x or z -- which §11.5.1 gives no effect and which
-  // therefore drives nothing.
+  // §10.3.2: which bits of `net` this piece drives. A bare identifier drives
+  // the whole net; a select drives the bits §11.5.1 gives its indices and high
+  // impedance everywhere else, so that §28.12 combines it with the net's other
+  // sources the way it combines any two. `lo` counts from the least significant
+  // end of the net's storage, and a width of zero with `partial` set is the
+  // select that addresses no bit of the net at all -- an index out of range, or
+  // one carrying x or z -- which §11.5.1 gives no effect and which therefore
+  // drives nothing.
   bool partial = false;
   uint32_t lo = 0;
   uint32_t width = 0;
+  // §11.4.1: the bits of the assigned value this piece takes. A concatenation
+  // gives its leftmost element the most significant bits, so the pieces are
+  // built from the rightmost element up and each takes the run starting where
+  // the last one ended.
+  uint32_t value_lo = 0;
+  uint32_t value_width = 0;
+};
+
+// What a continuous assignment drives. §10.3.2's Example 2 writes
+// `assign {carry_out, sum_out} = ina + inb + carry_in;`, so one assignment may
+// drive several nets, each taking its own run of the assigned value -- hence a
+// list rather than one net. `first` is true on the initial commit, when each
+// piece's driver slot must be appended rather than overwritten.
+//
+// Empty where the target is a variable, or an lvalue this does not decompose,
+// and ApplyContAssignToVariable writes it instead.
+struct ContAssignDriver {
+  std::vector<ContAssignDriverPiece> pieces;
+  bool first = true;
+
+  bool DrivesNets() const { return !pieces.empty(); }
 };
 
 // The value a continuous-assignment driver contributes to net resolution: the
@@ -258,14 +279,16 @@ static DriverStrength ComputeEffectiveDriverStrength(
 // around it. §28.12 then resolves each bit against the net's other sources, and
 // the bits this assignment does not name are decided without it -- which is
 // what a source driving part of a net is.
-static Logic4Vec ContAssignDriverValue(const ContAssignDriver& drv,
-                                       const Logic4Vec& value, Arena& arena) {
-  uint32_t net_width = drv.net->resolved->value.width;
-  if (!drv.partial) return ResizeToWidth(value, net_width, arena);
+static Logic4Vec ContAssignPieceValue(const ContAssignDriverPiece& piece,
+                                      const Logic4Vec& value, Arena& arena) {
+  uint32_t net_width = piece.net->resolved->value.width;
+  Logic4Vec taken =
+      ExtractBitField(arena, value, piece.value_lo, piece.value_width);
+  if (!piece.partial) return ResizeToWidth(taken, net_width, arena);
   Logic4Vec out = MakeAllHighZ(arena, net_width);
-  if (drv.width > 0) {
-    Logic4Vec sized = ResizeToWidth(value, drv.width, arena);
-    DepositBitField(out, drv.lo, sized, drv.width);
+  if (piece.width > 0) {
+    Logic4Vec sized = ResizeToWidth(taken, piece.width, arena);
+    DepositBitField(out, piece.lo, sized, piece.width);
   }
   return out;
 }
@@ -274,21 +297,27 @@ static void ApplyContAssignToNet(const ContAssignDriver& drv,
                                  const ContAssignDrivenValue& driven,
                                  Scheduler* sched, Arena& arena) {
   // ApplyContAssignToNet is the net's half of the same step
-  // ApplyContAssignToVariable takes for a variable target.
-  auto value = ContAssignDriverValue(drv, driven.value, arena);
-  if (drv.first) {
-    drv.net->drivers.push_back(value);
-    drv.net->driver_strengths.push_back(driven.strength);
-  } else {
-    drv.net->drivers[drv.driver_idx] = value;
-    drv.net->driver_strengths[drv.driver_idx] = driven.strength;
+  // ApplyContAssignToVariable takes for a variable target. Each piece drives
+  // its own net through its own slot, so two pieces naming one net -- which
+  // `{w[1], w[0]}` is -- are two drivers on it and §28.12 resolves them as it
+  // resolves any two.
+  for (const ContAssignDriverPiece& piece : drv.pieces) {
+    auto value = ContAssignPieceValue(piece, driven.value, arena);
+    if (drv.first) {
+      piece.net->drivers.push_back(value);
+      piece.net->driver_strengths.push_back(driven.strength);
+    } else {
+      piece.net->drivers[piece.driver_idx] = value;
+      piece.net->driver_strengths[piece.driver_idx] = driven.strength;
+    }
+    // §28.16.2.1: when this update leaves a trireg net with only
+    // high-impedance drivers it enters the charge storage state, and Resolve
+    // arms the charge decay process by scheduling the transition to x on the
+    // scheduler. Pass the scheduler through so a driver turning off actually
+    // starts that process at run time (a null scheduler would silently drop
+    // it).
+    piece.net->Resolve(arena, sched);
   }
-  // §28.16.2.1: when this update leaves a trireg net with only high-impedance
-  // drivers it enters the charge storage state, and Resolve arms the charge
-  // decay process by scheduling the transition to x on the scheduler. Pass the
-  // scheduler through so a driver turning off actually starts that process at
-  // run time (a null scheduler would silently drop it).
-  drv.net->Resolve(arena, sched);
 }
 
 // True for the left-hand-side forms a continuous assignment can drive beyond a
@@ -323,7 +352,7 @@ static void ApplyContAssignResult(const ContAssignParams& params,
                                   const ContAssignDriver& drv,
                                   const ContAssignDrivenValue& driven,
                                   SimContext& ctx, Arena& arena) {
-  if (drv.net) {
+  if (drv.DrivesNets()) {
     ApplyContAssignToNet(drv, driven, &ctx.GetScheduler(), arena);
   } else {
     ApplyContAssignToVariable(params, driven.value, ctx, arena);
@@ -334,6 +363,32 @@ static void ApplyContAssignResult(const ContAssignParams& params,
 // assignment's rise, fall and turn-off delays. For a select the target is the
 // selected bits, so the comparison is against those bits and not against the
 // whole net around them.
+// The value the target holds now, assembled from the pieces in the order
+// §11.4.1 gives them. This is the target's own value: each piece contributes
+// the bits of its net that it drives, at the position in the value it takes
+// them from, so a concatenation target answers with what the concatenation
+// reads. §10.3.3's rules choose among an assignment's delays by comparing this
+// against what is about to be driven, and a comparison against one piece of the
+// target would be a comparison against something the source did not write.
+static Logic4Vec ContAssignTargetValue(const ContAssignDriver& drv,
+                                       Arena& arena) {
+  uint32_t total = 0;
+  for (const ContAssignDriverPiece& piece : drv.pieces) {
+    total = std::max(total, piece.value_lo + piece.value_width);
+  }
+  if (total == 0) return MakeLogic4VecVal(arena, 1, 0);
+  Logic4Vec out = MakeLogic4Vec(arena, total);
+  for (const ContAssignDriverPiece& piece : drv.pieces) {
+    if (piece.value_width == 0 || piece.net->resolved == nullptr) continue;
+    Logic4Vec bits = piece.partial
+                         ? ExtractBitField(arena, piece.net->resolved->value,
+                                           piece.lo, piece.width)
+                         : piece.net->resolved->value;
+    DepositBitField(out, piece.value_lo, bits, piece.value_width);
+  }
+  return out;
+}
+
 static Logic4Vec CurrentContAssignOldValue(const ContAssignParams& params,
                                            const ContAssignDriver& drv,
                                            SimContext& ctx, Arena& arena) {
@@ -343,10 +398,8 @@ static Logic4Vec CurrentContAssignOldValue(const ContAssignParams& params,
                   : nullptr;
   if (var) {
     old_val = var->value;
-  } else if (drv.net && drv.net->resolved) {
-    old_val = drv.partial ? ExtractBitField(arena, drv.net->resolved->value,
-                                            drv.lo, drv.width)
-                          : drv.net->resolved->value;
+  } else if (drv.DrivesNets()) {
+    old_val = ContAssignTargetValue(drv, arena);
   }
   return old_val;
 }
@@ -413,19 +466,95 @@ static void CommitContAssignValue(const ContAssignParams& params,
 // one net's bits -- Example 2 of §10.3.2 writes `assign {carry_out, sum_out} =
 // ...`, which is two nets -- so they keep the direct write
 // ApplyContAssignToVariable does and are not drivers yet.
-static ContAssignDriver MakeContAssignDriver(const Expr* lhs, SimContext& ctx) {
-  ContAssignDriver drv;
-  if (lhs->kind == ExprKind::kIdentifier) {
-    drv.net = ctx.FindNet(lhs->text);
-  } else if (lhs->kind == ExprKind::kSelect && lhs->base != nullptr &&
-             lhs->base->kind == ExprKind::kIdentifier) {
-    Net* net = ctx.FindNet(lhs->base->text);
-    if (net != nullptr && net->resolved != nullptr) {
-      drv.net = net;
-      drv.partial = true;
-    }
+// The net one element of a target names, and which of its bits, or a piece with
+// no net where the element names something else. The width is the element's own
+// -- §11.5.1 gives a select the bits its indices name -- so that the run of the
+// assigned value each element takes is the run §11.4.1 gives it.
+static ContAssignDriverPiece ContAssignPieceFor(const Expr* el, SimContext& ctx,
+                                                Arena& arena) {
+  ContAssignDriverPiece piece;
+  if (el == nullptr) return piece;
+  if (el->kind == ExprKind::kIdentifier) {
+    Net* net = ctx.FindNet(el->text);
+    if (net == nullptr || net->resolved == nullptr) return piece;
+    piece.net = net;
+    piece.value_width = net->resolved->value.width;
+    return piece;
   }
-  drv.driver_idx = drv.net ? drv.net->drivers.size() : 0;
+  if (el->kind != ExprKind::kSelect || el->base == nullptr ||
+      el->base->kind != ExprKind::kIdentifier) {
+    return piece;
+  }
+  Net* net = ctx.FindNet(el->base->text);
+  if (net == nullptr || net->resolved == nullptr) return piece;
+  piece.net = net;
+  piece.partial = true;
+  piece.width = SelectStorageBits(*net->resolved, el, ctx, arena).width;
+  piece.value_width = piece.width;
+  return piece;
+}
+
+// §11.4.1 orders a concatenation's elements from the most significant, so the
+// pieces are gathered from the rightmost element up and each takes the run of
+// the assigned value starting where the last one ended. A nested concatenation
+// contributes its own elements in the same order.
+//
+// All or nothing: an element that names no net makes the whole target one this
+// does not decompose, and ApplyContAssignToVariable writes it as before.
+// §10.3.2 governs a net element and a variable element differently -- "Nets can
+// be driven by multiple continuous assignments ... Variables can only be driven
+// by one continuous assignment" -- so a mixed target wants each half held to
+// its own rule, which is a scope of its own rather than half of this one.
+static bool GatherConcatPieces(const Expr* lhs, SimContext& ctx, Arena& arena,
+                               std::vector<ContAssignDriverPiece>& out,
+                               uint32_t& value_lo) {
+  for (auto it = lhs->elements.rbegin(); it != lhs->elements.rend(); ++it) {
+    const Expr* el = *it;
+    if (el != nullptr && (el->kind == ExprKind::kConcatenation ||
+                          el->kind == ExprKind::kAssignmentPattern)) {
+      if (!GatherConcatPieces(el, ctx, arena, out, value_lo)) return false;
+      continue;
+    }
+    ContAssignDriverPiece piece = ContAssignPieceFor(el, ctx, arena);
+    if (piece.net == nullptr) return false;
+    piece.value_lo = value_lo;
+    value_lo += piece.value_width;
+    out.push_back(piece);
+  }
+  return true;
+}
+
+// §10.3.2: the nets this assignment drives, or an empty list where the target
+// is a variable or an lvalue this does not decompose. A streaming concatenation
+// and a member access are two of those: the first reorders the bits it
+// distributes (§11.4.14) and the second names a member of a structure rather
+// than a run of a net's bits, and neither is a run of §11.4.1's ordering.
+//
+// Which bits of a net a select names is left to RefreshContAssignDriverBits
+// below, which reads it again before each evaluation drives them.
+static ContAssignDriver MakeContAssignDriver(const Expr* lhs, SimContext& ctx,
+                                             Arena& arena) {
+  ContAssignDriver drv;
+  if (lhs->kind == ExprKind::kConcatenation ||
+      lhs->kind == ExprKind::kAssignmentPattern) {
+    uint32_t value_lo = 0;
+    std::vector<ContAssignDriverPiece> pieces;
+    if (GatherConcatPieces(lhs, ctx, arena, pieces, value_lo)) {
+      drv.pieces = std::move(pieces);
+    }
+  } else {
+    ContAssignDriverPiece piece = ContAssignPieceFor(lhs, ctx, arena);
+    if (piece.net != nullptr) drv.pieces.push_back(piece);
+  }
+  // Two pieces naming one net take two slots -- `{w[1], w[0]}` is such a
+  // target -- so the slots are counted out in the order the first commit fills
+  // them rather than each piece reading the net's current driver count.
+  std::unordered_map<const Net*, size_t> next_slot;
+  for (ContAssignDriverPiece& piece : drv.pieces) {
+    auto [it, inserted] =
+        next_slot.try_emplace(piece.net, piece.net->drivers.size());
+    piece.driver_idx = it->second++;
+  }
   drv.first = true;
   return drv;
 }
@@ -438,10 +567,12 @@ static ContAssignDriver MakeContAssignDriver(const Expr* lhs, SimContext& ctx) {
 // contributing high impedance wherever its index is not currently pointing.
 static void RefreshContAssignDriverBits(ContAssignDriver& drv, const Expr* lhs,
                                         SimContext& ctx, Arena& arena) {
-  if (!drv.partial || drv.net == nullptr) return;
-  PartSelectBits bits = SelectStorageBits(*drv.net->resolved, lhs, ctx, arena);
-  drv.lo = bits.lo;
-  drv.width = bits.width;
+  if (drv.pieces.size() != 1 || !drv.pieces[0].partial) return;
+  PartSelectBits bits =
+      SelectStorageBits(*drv.pieces[0].net->resolved, lhs, ctx, arena);
+  drv.pieces[0].lo = bits.lo;
+  drv.pieces[0].width = bits.width;
+  drv.pieces[0].value_width = bits.width;
 }
 
 // The loop-invariant context threaded through the inertial-delay re-evaluation
@@ -582,7 +713,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
   std::vector<std::string_view> read_vars(read_strs.begin(), read_strs.end());
   DropUnwatchableNames(ctx, read_vars);
 
-  ContAssignDriver drv = MakeContAssignDriver(params.lhs, ctx);
+  ContAssignDriver drv = MakeContAssignDriver(params.lhs, ctx, arena);
 
   // The name a module path declared in this instance gives this assignment's
   // target: the bare identifier under the instance prefix, which is what
