@@ -343,9 +343,15 @@ TEST(PassByRef, SwapViaRef) {
   };
   // §13.4: a variable used in a function body must be declared; there is no
   // implicit creation for procedural locals. Declare the temporary explicitly.
+  // The declaration carries a type because §10.7 truncates what is assigned to
+  // the width the type declares, and a DataType left as it is built is
+  // DataTypeKind::kImplicit, which §6.10 makes a scalar: the swap would carry
+  // one bit of each value through the temporary and hand back 0 for 10. `int`
+  // is the width the two variables above are created at.
   auto* tmp_decl = f.arena.Create<Stmt>();
   tmp_decl->kind = StmtKind::kVarDecl;
   tmp_decl->var_name = "tmp";
+  tmp_decl->var_decl_type.kind = DataTypeKind::kInt;
   func->func_body_stmts = {
       tmp_decl,
       MakeAssign(f.arena, "tmp", MakeId(f.arena, "x")),
