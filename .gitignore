@@ -4,6 +4,7 @@
 *.swp
 .cache/
 .claude/scheduled_tasks.lock
+.claude/settings.local.json
 .coverage
 .deps/
 .DS_Store
