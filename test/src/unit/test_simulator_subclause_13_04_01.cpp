@@ -321,4 +321,50 @@ TEST(FunctionReturnSim, ReturnOfUnsignedBitZeroExtendsIntoSignedReturnType) {
   EXPECT_EQ(r, 1u);
 }
 
+// §13.4.1: the function definition implicitly declares a variable with the same
+// type as the function return value, and Syntax 6-4 makes a type_identifier a
+// data_type like any other, so a function declared to return `nib` returns the
+// four bits `nib` names. Returning 8'hFF through it gives 15; a return type the
+// simulator cannot size falls back to 32 bits and would give 255. A typedef of
+// exactly 32 bits would make the two answers coincide and prove nothing.
+TEST(FunctionReturnSim, TypedefReturnTypeSizesTheImplicitVariable) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  typedef bit [3:0] nib;\n"
+      "  logic [7:0] x;\n"
+      "  function nib get_nib();\n"
+      "    return 8'hFF;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = get_nib();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 15u);
+}
+
+// §13.4.1 again, on a typedef wider than the 32-bit fallback rather than
+// narrower: the fallback is not merely imprecise but too small, and every bit
+// above the first word is lost. 40'hAA_AAAA_AAAA truncated to 32 bits reads
+// 0xAAAAAAAA, so the high byte is what the case turns on.
+TEST(FunctionReturnSim, TypedefReturnTypeWiderThanTheFallbackKeepsItsHighBits) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  typedef bit [39:0] wide;\n"
+      "  logic [39:0] x;\n"
+      "  function wide get_wide();\n"
+      "    return 40'hAA_AAAA_AAAA;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = get_wide();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xAAAAAAAAAAull);
+}
+
 }  // namespace

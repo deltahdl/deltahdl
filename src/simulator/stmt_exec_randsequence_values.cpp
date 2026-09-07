@@ -139,7 +139,7 @@ static void RegisterRuleValueArrays(const Stmt* stmt,
     ArrayInfo info;
     info.lo = 1;
     info.size = static_cast<uint32_t>(n);
-    uint32_t w = EvalTypeWidth(child->return_type);
+    uint32_t w = DeclaredTypeWidth(child->return_type, ctx);
     // §18.17.7: "the type is an array where the element type is the return
     // type of the production", so record the return type's kind for a read of
     // an element to consult. §6.16 then makes the element of a string array
@@ -247,7 +247,7 @@ void StoreRuleProductionValue(const RuleProductionSlot& slot,
                               const RsProduction* child,
                               const Logic4Vec& ret_value, SimContext& ctx,
                               Arena& arena) {
-  uint32_t w = EvalTypeWidth(child->return_type);
+  uint32_t w = DeclaredTypeWidth(child->return_type, ctx);
   if (w == 0) w = ret_value.width;
   // §6.16: a string is as wide as the characters it holds, so a string
   // production that returned nothing leaves the empty string and not 32 bits

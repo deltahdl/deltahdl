@@ -667,11 +667,13 @@ static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
 
 void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
                       SimContext& ctx, Arena& arena) {
-  // A return type EvalTypeWidth cannot size -- void, a string, a class handle,
-  // a parameterized method's type -- leaves the return statement to take the
-  // expression's own vector, which is what it has always done.
+  // A return type nothing can size -- void, a string, a class handle, a
+  // parameterized method's type -- leaves the return statement to take the
+  // expression's own vector, which is what it has always done. A typedef name
+  // is sized, through the type_widths table, so §13.4.1's implicit variable
+  // holds the width the name declares rather than the returned expression's.
   uint32_t ret_width =
-      EvalTypeWidth(func->return_type) == 0 ? 0 : ret_var->value.width;
+      DeclaredTypeWidth(func->return_type, ctx) == 0 ? 0 : ret_var->value.width;
   FuncExecCtx exec{ret_var, func->name, ctx, arena, ret_width};
   for (auto* s : func->func_body_stmts) {
     if (ExecFuncStmt(s, exec)) return;

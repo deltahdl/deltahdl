@@ -539,7 +539,7 @@ static ExecTask BuildOneRandJoinSeq(const RandseqEngine& eng,
     // §6.16: a string has no declared width and starts as "", so leave its
     // storage empty; every other return type EvalTypeWidth gives no width to
     // keeps the 32-bit carrier, as ExecRsProduction sizes it.
-    uint32_t w = EvalTypeWidth(production->return_type);
+    uint32_t w = DeclaredTypeWidth(production->return_type, eng.ctx);
     if (w == 0 && !ProductionReturnsString(production)) w = 32;
     seq.ret_value = MakeLogic4VecVal(eng.arena, w, 0);
   }
@@ -822,7 +822,7 @@ static ExecTask ExecRsProduction(const Stmt* stmt, const RsProductionItem& call,
   Logic4Vec ret_value;
   bool returns_value = ProductionReturnsValue(production);
   if (returns_value) {
-    uint32_t w = EvalTypeWidth(production->return_type);
+    uint32_t w = DeclaredTypeWidth(production->return_type, ctx);
     // §6.16: a string has no declared width and starts as "", the empty
     // string, of zero length. DispatchReturn hands this slot's width to
     // EvalExpr as the context width. A string literal ignores it, so

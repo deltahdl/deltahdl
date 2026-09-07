@@ -399,9 +399,15 @@ static uint32_t ComputeMethodReturnWidth(ModuleItem* method, SimContext& ctx,
       if (var) scope[pname] = static_cast<int64_t>(var->value.ToUint64());
     }
     uint32_t width = EvalTypeWidth(method->return_type, {}, scope);
+    // Not DeclaredTypeWidth here: that asks the one-argument EvalTypeWidth,
+    // which would drop the bound parameters `scope` carries and so mis-size a
+    // return type whose dimensions name one. Resolve a typedef name against the
+    // same table DeclaredTypeWidth uses, but only once the scope-aware overload
+    // has had its say.
+    if (width == 0) width = ctx.FindTypeWidth(method->return_type.type_name);
     return width == 0 ? 32 : width;
   }
-  uint32_t width = EvalTypeWidth(method->return_type);
+  uint32_t width = DeclaredTypeWidth(method->return_type, ctx);
   return width == 0 ? 32 : width;
 }
 
@@ -617,7 +623,7 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   Variable* ret_var = &dummy_ret;
   if (!is_void) {
     auto* existing = is_static ? ctx.FindLocalVariable(func->name) : nullptr;
-    uint32_t ret_width = EvalTypeWidth(func->return_type);
+    uint32_t ret_width = DeclaredTypeWidth(func->return_type, ctx);
     if (ret_width == 0) ret_width = 32;
     // §6.11.3: `byte`, `shortint`, `int`, `integer` and `longint` default to
     // signed, and an explicit `signed`/`unsigned` settles the rest, so the

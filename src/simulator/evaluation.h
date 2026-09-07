@@ -30,6 +30,22 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
 // is at least 32 bits, 64 when its value exceeds 32 bits).
 uint32_t LiteralWidth(std::string_view text, uint64_t val);
 
+// §6.18 -- the width a declared type stands for, where EvalTypeWidth alone
+// cannot say. A type_identifier is a data_type like any other (Syntax 6-4), but
+// the typedef table that resolves one belongs to the elaborator, so
+// EvalTypeWidth gives DataTypeKind::kNamed no width at all. The elaborated
+// width of every named type reaches the simulator as the type_widths table
+// RegisterDesignTypeWidths fills, so this asks that table rather than carrying
+// a second copy of the typedefs down here. Returns 0 for a type nothing here
+// can size -- void, a string, a class handle, a name the design never declared
+// -- which leaves each caller's own fallback in charge of the answer.
+//
+// A packed dimension written where the name is used is not stacked onto the
+// width the name carries, though §7.4.4 says it should be; EvalTypeWidth
+// answers such a type from that dimension alone and this helper does not reach
+// it. See #3471.
+uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx);
+
 bool HasUnknownBits(const Logic4Vec& v);
 Logic4Vec MakeAllX(Arena& arena, uint32_t width);
 

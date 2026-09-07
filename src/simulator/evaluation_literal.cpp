@@ -15,6 +15,13 @@ namespace delta {
 static bool IsXChar(char c) { return c == 'x' || c == 'X'; }
 static bool IsZChar(char c) { return c == 'z' || c == 'Z' || c == '?'; }
 
+uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx) {
+  uint32_t width = EvalTypeWidth(type);
+  if (width != 0) return width;
+  if (type.kind != DataTypeKind::kNamed) return 0;
+  return ctx.FindTypeWidth(type.type_name);
+}
+
 uint32_t LiteralWidth(std::string_view text, uint64_t val) {
   auto tick = text.find('\'');
   if (tick != std::string_view::npos && tick > 0) {
