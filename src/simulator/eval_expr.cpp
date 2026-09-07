@@ -17,6 +17,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
+#include "simulator/statement_assign_internal.h"
 
 namespace delta {
 
@@ -924,18 +925,41 @@ bool IsCompoundAssignOp(TokenKind op) {
   return CompoundAssignBaseOp(op) != TokenKind::kEof;
 }
 
+// §11.4.1: "An assignment operator is semantically equivalent to a blocking
+// assignment, with the exception that any left-hand index expression is only
+// evaluated once", and writes `a[i]+=2;` as the same statement as
+// `a[i] = a[i] +2;`. So §11.6.1 sizes the operation by the target and §10.7
+// truncates the result into it, neither of which happened: the operation was
+// evaluated with no context and the result written over the target, so
+// `logic [3:0] v; v += 8'hFF;` left v eight bits wide.
+//
+// §11.3.6 settles the value the expression yields as well as the one it stores.
+// An assignment expression "evaluates the right-hand side, casts the right-hand
+// side to the left-hand data type, stacks it, updates the left-hand side, and
+// returns the stacked value", and "the data type of the value that is returned
+// is the data type of the left-hand side" -- so the coerced value is what is
+// returned, which is what `b = (a += 1)`, the clause's own example, reads.
 Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
   // §7.8.7: as in EvalIncDec, the element this reads and writes is allocated
   // before the read.
   AllocateAssocEntryForModify(expr->lhs, ctx, arena);
+  uint32_t target_width = LhsContextWidth(expr->lhs, ctx);
   auto lhs_val = EvalExpr(expr->lhs, ctx, arena);
   auto rhs_val = EvalExpr(expr->rhs, ctx, arena);
   auto base_op = CompoundAssignBaseOp(expr->op);
-  auto result = EvalBinaryOp(base_op, lhs_val, rhs_val, arena);
+  auto result = EvalBinaryOp(base_op, lhs_val, rhs_val, arena, target_width);
   if (expr->lhs->kind == ExprKind::kIdentifier) {
     auto* var = ctx.FindVariable(expr->lhs->text);
-    if (var) var->value = result;
+    if (var) {
+      result =
+          ConvertRealOnAssign(result, expr->lhs, var->value.width, ctx, arena);
+      if (!var->is_4state) CoerceTo2State(result);
+      var->value = result;
+    }
   } else if (expr->lhs->kind == ExprKind::kSelect) {
+    // An associative element's width is the array's rather than a variable's,
+    // and TryAssocIndexedWrite is what knows it; a select of a packed variable
+    // reaches no writer here at all. Both are #3490's remaining half.
     TryAssocIndexedWrite(expr->lhs, result, ctx, arena);
   }
   return result;

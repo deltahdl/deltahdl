@@ -309,4 +309,76 @@ TEST(LvalueSim, ConcatLvalueReachesElementsAboveTheFirstWord) {
   EXPECT_EQ(var->value.ToUint64(), 0x1234000000000000ull);
 }
 
+// §11.4.1 makes `a op= b` "semantically equivalent to a blocking assignment",
+// writing `a[i]+=2;` as the same statement as `a[i] = a[i] +2;`. So §10.7
+// truncates the result into the target as it would any other assignment, and
+// §6.11.2 converts the unknowns a 2-state target has no room for. The result
+// was written over the target instead, so the target took the operation's
+// width.
+
+// The eight bits the addition is evaluated at do not fit the four the target
+// declares. 17 is what the target read when it took the operation's width; 1 is
+// what four bits hold of it. The width is read as well as the value, because a
+// target that grew is the defect itself rather than a consequence of it.
+TEST(LvalueSim, CompoundAssignTruncatesToTheTargetWidth) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [3:0] v;\n"
+      "  initial begin\n"
+      "    v = 4'h2;\n"
+      "    v += 8'h0F;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "v");
+  ASSERT_NE(var, nullptr);
+
+  EXPECT_EQ(var->value.width, 4u);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// §6.11.2 gives a `bit` no unknown to hold, and the blocking assignment §11.4.1
+// makes this equivalent to converts them. The value is read through IsKnown as
+// well as by number, since an x reads as zero either way.
+TEST(LvalueSim, CompoundAssignZeroesXzIntoATwoStateTarget) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] u;\n"
+      "  bit [7:0] b;\n"
+      "  initial begin\n"
+      "    u = 8'b1010_x10z;\n"
+      "    b = 8'h00;\n"
+      "    b |= u;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "b");
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(var->value.IsKnown());
+  EXPECT_EQ(var->value.ToUint64(), 0xA4u);
+}
+
+// §11.3.6: an assignment expression "casts the right-hand side to the left-hand
+// data type, stacks it, updates the left-hand side, and returns the stacked
+// value", and "the data type of the value that is returned is the data type of
+// the left-hand side". So what `b = (a += 1)` reads is what `a` holds, not what
+// the addition produced: `b = (a+=1)` is the clause's own example. Sixteen is
+// the untruncated sum, and zero is the four bits `a` keeps of it.
+TEST(LvalueSim, CompoundAssignExpressionYieldsTheTargetsDataType) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [3:0] a;\n"
+      "  int b;\n"
+      "  initial begin\n"
+      "    a = 4'hF;\n"
+      "    b = (a += 1);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "b");
+  ASSERT_NE(var, nullptr);
+
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
 }  // namespace
