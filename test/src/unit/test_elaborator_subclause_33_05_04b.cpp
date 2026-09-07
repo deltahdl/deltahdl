@@ -46,6 +46,9 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <iostream>
+#include <sstream>
+#include <streambuf>
 #include <string>
 #include <vector>
 
@@ -316,6 +319,75 @@ TEST(SeparateCompilationCommandLine,
   CliOptions opts;
   EXPECT_FALSE(ParseCommandLine({"adder.sv", "-f"}, opts));
   EXPECT_TRUE(opts.rejected_argument);
+}
+
+// -f is what puts an option somewhere the reader cannot see. The command line
+// names the file, the file names the option, and a report naming only the
+// option sends the reader to the command line, where `-f args.f design.sv` has
+// nothing wrong with it. So a report about a word read out of an options file
+// opens with the file and the line the word stood on, in the "<file>:<line>: "
+// form the rest of the tool uses for a position.
+//
+// Runs one command line with std::cerr captured and returns what was printed.
+std::string ParseCapturingStderr(const std::vector<std::string>& args,
+                                 CliOptions& opts) {
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cerr.rdbuf(captured.rdbuf());
+  ParseCommandLine(args, opts);
+  std::cerr.rdbuf(old_buf);
+  return captured.str();
+}
+
+TEST(SeparateCompilationCommandLine, OptionsFileNamesItselfInAMissingValue) {
+  ScratchDir tmp;
+  const std::string kOptionsFile =
+      tmp.Write("args.f", "--top adder\n--top\n").string();
+
+  CliOptions opts;
+  std::string out = ParseCapturingStderr({"-f", kOptionsFile}, opts);
+  EXPECT_NE(out.find(kOptionsFile + ":2: --top expects a value"),
+            std::string::npos)
+      << out;
+}
+
+// The other report site, which is a separate line of code: a fix to the one
+// above leaves this one saying nothing about where the option was written.
+TEST(SeparateCompilationCommandLine, OptionsFileNamesItselfInAnUnknownOption) {
+  ScratchDir tmp;
+  const std::string kOptionsFile =
+      tmp.Write("args.f", "--top adder\n--tpo x\n").string();
+
+  CliOptions opts;
+  std::string out = ParseCapturingStderr({"-f", kOptionsFile}, opts);
+  EXPECT_NE(out.find(kOptionsFile + ":2: unknown option: --tpo"),
+            std::string::npos)
+      << out;
+}
+
+// An options file may name another, so the file a word came from is not the
+// file -f was given. A fix carrying the path of the file on the command line
+// would satisfy the two cases above and name the wrong file here.
+TEST(SeparateCompilationCommandLine, NestedOptionsFileNamesTheInnerFile) {
+  ScratchDir tmp;
+  const std::string kInner = tmp.Write("inner.f", "--tpo x\n").string();
+  const std::string kOuter =
+      tmp.Write("outer.f", "--top adder\n-f " + kInner + "\n").string();
+
+  CliOptions opts;
+  std::string out = ParseCapturingStderr({"-f", kOuter}, opts);
+  EXPECT_NE(out.find(kInner + ":1: unknown option: --tpo"), std::string::npos)
+      << out;
+  EXPECT_EQ(out.find(kOuter + ":"), std::string::npos) << out;
+}
+
+// The command line itself names no file, and must go on saying what it always
+// said: the reader has it in front of them. Without this a fix that always
+// printed a position would satisfy every case above.
+TEST(SeparateCompilationCommandLine, CommandLineOptionNamesNoFile) {
+  CliOptions opts;
+  std::string out = ParseCapturingStderr({"--tpo"}, opts);
+  EXPECT_NE(out.find("unknown option: --tpo"), std::string::npos) << out;
+  EXPECT_EQ(out.find(":1: "), std::string::npos) << out;
 }
 
 }  // namespace

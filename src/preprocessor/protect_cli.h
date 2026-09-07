@@ -3,6 +3,7 @@
 #include <string>
 #include <string_view>
 
+#include "common/arg_origin.h"
 #include "preprocessor/protect_keywords.h"
 
 namespace delta {
@@ -22,6 +23,10 @@ namespace delta {
 // entities. They mirror PreprocConfig::protect_key and
 // PreprocConfig::protect_keys, which are the same two for the decrypting mode.
 struct ProtectCliOptions {
+  // Where the words being parsed came from, when they came from an options
+  // file, so a report about one of these options names it. The caller sets it
+  // from its own; null is the command line. See common/arg_origin.h.
+  const ArgOrigins* arg_origins = nullptr;
   bool encrypt = false;
   std::string exchange_key;
   ProtectKeyList keys;

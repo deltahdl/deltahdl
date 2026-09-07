@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/arg_origin.h"
 #include "common/types.h"
 #include "elaborator/elaborator_data.h"
 #include "preprocessor/protect_cli.h"
@@ -78,6 +79,13 @@ struct CliOptions {
   // from the unrecognized option ParseArgs reports, because an option that
   // names its own complaint has already printed the one a reader needs.
   bool rejected_argument = false;
+  // Where the words the parse is reading came from, while they came from an
+  // options file. Null while the command line itself is read, which is the case
+  // a report says nothing about: -f is what puts a word somewhere a reader
+  // cannot see, and the command line is in front of them. Set and restored
+  // around each file the parse descends into, so a nested file names itself
+  // rather than the one that named it.
+  const ArgOrigins* arg_origins = nullptr;
   // §34.3.1's encrypting mode, and the keys it needs.
   delta::ProtectCliOptions protect;
 };

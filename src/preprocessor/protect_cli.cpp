@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 
+#include "common/arg_origin.h"
 #include "preprocessor/protect_keywords.h"
 
 namespace delta {
@@ -30,8 +31,9 @@ bool AddNamedKey(std::string_view value, ProtectKeyList& keys) {
 
 // Reports an option that was recognized and whose value the command line ended
 // before, and records the refusal so the caller's parse fails.
-void ReportMissingValue(std::string_view name, ProtectCliOptions& opts) {
-  std::cerr << name << " expects a value\n";
+void ReportMissingValue(std::string_view name, int i, ProtectCliOptions& opts) {
+  std::cerr << ArgOriginPrefix(opts.arg_origins, i) << name
+            << " expects a value\n";
   opts.rejected_argument = true;
 }
 
@@ -45,7 +47,7 @@ bool TryParseProtectArg(std::string_view arg, int& i, int argc,
   }
   if (arg == "--protect-key") {
     if (i + 1 >= argc) {
-      ReportMissingValue("--protect-key", opts);
+      ReportMissingValue("--protect-key", i, opts);
       return true;
     }
     std::string_view key = argv[++i];
@@ -62,7 +64,7 @@ bool TryParseProtectArg(std::string_view arg, int& i, int argc,
   }
   if (arg != "--protect-named-key") return false;
   if (i + 1 >= argc) {
-    ReportMissingValue("--protect-named-key", opts);
+    ReportMissingValue("--protect-named-key", i, opts);
     return true;
   }
   std::string_view value = argv[++i];

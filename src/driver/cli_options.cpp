@@ -3,11 +3,14 @@
 #include <charconv>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
+
+#include "common/arg_origin.h"
 
 namespace delta {
 
@@ -43,8 +46,9 @@ struct ArgCursor {
 // option written last with its value left off would reach that branch if the
 // parsers answered only "this is not my option"; the user would then be told
 // the option does not exist. Issue #3426 is that they were.
-void ReportMissingValue(std::string_view name, CliOptions& opts) {
-  std::cerr << name << " expects a value\n";
+void ReportMissingValue(std::string_view name, int i, CliOptions& opts) {
+  std::cerr << ArgOriginPrefix(opts.arg_origins, i) << name
+            << " expects a value\n";
   opts.rejected_argument = true;
 }
 
@@ -56,7 +60,7 @@ bool TakeValue(std::string_view arg, std::string_view name, ArgCursor cur,
                std::string& out) {
   if (arg != name) return false;
   if (cur.i + 1 >= cur.argc) {
-    ReportMissingValue(name, cur.opts);
+    ReportMissingValue(name, cur.i, cur.opts);
     return true;
   }
   out = cur.argv[++cur.i];
@@ -69,7 +73,7 @@ bool TakeValue(std::string_view arg, std::string_view name, ArgCursor cur,
                std::vector<std::string>& out) {
   if (arg != name) return false;
   if (cur.i + 1 >= cur.argc) {
-    ReportMissingValue(name, cur.opts);
+    ReportMissingValue(name, cur.i, cur.opts);
     return true;
   }
   out.emplace_back(cur.argv[++cur.i]);
@@ -88,7 +92,7 @@ bool TakeNumber(std::string_view arg, std::string_view name, ArgCursor cur,
                 T& out) {
   if (arg != name) return false;
   if (cur.i + 1 >= cur.argc) {
-    ReportMissingValue(name, cur.opts);
+    ReportMissingValue(name, cur.i, cur.opts);
     return true;
   }
   std::string_view text = cur.argv[++cur.i];
@@ -142,7 +146,7 @@ bool TryParseMinTypMaxArg(std::string_view arg, int& i, int argc,
                           const char* const argv[], CliOptions& opts) {
   if (arg != "--mintypmax") return false;
   if (i + 1 >= argc) {
-    ReportMissingValue("--mintypmax", opts);
+    ReportMissingValue("--mintypmax", i, opts);
     return true;
   }
   std::string_view value = argv[i + 1];
@@ -263,7 +267,7 @@ bool TryParseDefineArg(std::string_view arg, int& i, int argc,
   }
   if (arg != "-D") return false;
   if (i + 1 >= argc) {
-    ReportMissingValue("-D", opts);
+    ReportMissingValue("-D", i, opts);
     return true;
   }
   ParseDefine(argv[++i], opts);
@@ -311,15 +315,27 @@ bool ReadOptionsFile(const std::string& path, CliOptions& opts, int depth) {
     std::cerr << "error: cannot open options file '" << path << "'\n";
     return false;
   }
+  // Read by line rather than by word so each word keeps the line it stood on,
+  // which is what a report about it names alongside the file. A word beginning
+  // with # comments out the rest of its line, as it did when the whole file was
+  // read a word at a time.
   std::vector<std::string> words;
-  std::string word;
-  while (ifs >> word) {
-    if (!word.empty() && word[0] == '#') {
-      std::string rest;
-      std::getline(ifs, rest);
-      continue;
+  ArgOrigins origins;
+  origins.path = path;
+  // argv[0] is the program name below and stands on no line of the file, so the
+  // line list is offset by one from the start and indexes as argv does.
+  origins.lines.push_back(0);
+  std::string line;
+  int line_no = 0;
+  while (std::getline(ifs, line)) {
+    ++line_no;
+    std::istringstream words_of_line(line);
+    std::string word;
+    while (words_of_line >> word) {
+      if (!word.empty() && word[0] == '#') break;
+      words.push_back(std::move(word));
+      origins.lines.push_back(line_no);
     }
-    words.push_back(std::move(word));
   }
   // ParseArgs reads from argv[1], so argv[0] is filled with the program name it
   // skips. The name is held in a buffer of its own rather than pointed at a
@@ -330,8 +346,20 @@ bool ReadOptionsFile(const std::string& path, CliOptions& opts, int depth) {
   for (auto& w : words) {
     ptrs.push_back(w.data());
   }
-  return ParseArgsAtDepth(static_cast<int>(ptrs.size()), ptrs.data(), opts,
-                          depth + 1);
+  // The words this file carries are what the parse reads while it reads them,
+  // so a report names this file. The outer origin is put back on the way out:
+  // an options file may name another, and the words after that one's are the
+  // outer file's again -- while a report about a word of the inner file names
+  // the inner file, which is the whole point of carrying the path rather than
+  // the one -f was given.
+  const ArgOrigins* outer = opts.arg_origins;
+  opts.arg_origins = &origins;
+  opts.protect.arg_origins = &origins;
+  bool ok = ParseArgsAtDepth(static_cast<int>(ptrs.size()), ptrs.data(), opts,
+                             depth + 1);
+  opts.arg_origins = outer;
+  opts.protect.arg_origins = outer;
+  return ok;
 }
 
 bool TryParsePlusArg(std::string_view arg, CliOptions& opts) {
@@ -353,7 +381,7 @@ bool TryParsePlusArg(std::string_view arg, CliOptions& opts) {
 bool TakeOptionsFile(int& i, int argc, char* argv[], CliOptions& opts,
                      int depth) {
   if (i + 1 >= argc) {
-    ReportMissingValue("-f", opts);
+    ReportMissingValue("-f", i, opts);
     return true;
   }
   return ReadOptionsFile(argv[++i], opts, depth);
@@ -369,7 +397,8 @@ bool ParseArgsAtDepth(int argc, char* argv[], CliOptions& opts, int depth) {
       continue;
     }
     if (arg.starts_with("-") || arg.starts_with("+")) {
-      std::cerr << "unknown option: " << arg << "\n";
+      std::cerr << ArgOriginPrefix(opts.arg_origins, i)
+                << "unknown option: " << arg << "\n";
       return false;
     }
     opts.source_files.emplace_back(arg);
