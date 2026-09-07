@@ -191,6 +191,15 @@ static bool TryFuncSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
 // Write an already-evaluated value to the target the left-hand side names.
 static void ExecFuncWriteValue(const Expr* lhs, const Logic4Vec& val,
                                SimContext& ctx, Arena& arena) {
+  // §11.4.12: "The concatenation is treated as a packed vector of bits. It can
+  // be used on the left-hand side of an assignment", the clause's own example
+  // being `{log1, log2, log3} = 3'b111;`. §10.4 puts procedural assignments
+  // "within procedures such as always, initial, task, and function", so that is
+  // as true in a subroutine body as outside one -- and this function named no
+  // concatenation form at all, so such an assignment wrote nothing and reported
+  // nothing. TryUnpackConcatLhs is what the assignment outside a subroutine
+  // asks, and it answers for §10.9's assignment-pattern target as well.
+  if (TryUnpackConcatLhs(lhs, val, ctx, arena)) return;
   if (lhs->kind == ExprKind::kIdentifier) {
     ExecFuncIdentifierAssign(lhs, val, ctx, arena);
     return;

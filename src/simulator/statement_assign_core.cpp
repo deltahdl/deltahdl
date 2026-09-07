@@ -525,6 +525,22 @@ static void UnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   }
 }
 
+// §11.4.12: "The concatenation is treated as a packed vector of bits. It can be
+// used on the left-hand side of an assignment", and §10.9 gives a typed or bare
+// assignment pattern the same use, so both distribute the value across their
+// elements rather than naming one object to receive it. Answers whether the
+// left-hand side was one of those, so that a caller with its own statement
+// executor asks the question once rather than restating which shapes count.
+bool TryUnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
+                        SimContext& ctx, Arena& arena) {
+  const Expr* lhs_pat = UnwrapTypedPattern(lhs);
+  if (lhs_pat->kind != ExprKind::kConcatenation &&
+      lhs_pat->kind != ExprKind::kAssignmentPattern)
+    return false;
+  UnpackConcatLhs(lhs_pat, rhs_val, ctx, arena);
+  return true;
+}
+
 static Logic4Vec ConvertToRealIfNeeded(double d, uint32_t target_width,
                                        Arena& arena) {
   if (target_width == 32) {
@@ -894,14 +910,9 @@ static bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
 static void ApplyGenericBlockingAssign(const Stmt* stmt, Logic4Vec rhs_val,
                                        SimContext& ctx, Arena& arena) {
   // §10.9: a typed assignment pattern expression (type'{...}) is also a valid
-  // left-hand target. Strip the type prefix so its members unpack the RHS
-  // exactly as a bare positional pattern does.
-  const Expr* lhs_pat = UnwrapTypedPattern(stmt->lhs);
-  if (lhs_pat->kind == ExprKind::kConcatenation ||
-      lhs_pat->kind == ExprKind::kAssignmentPattern) {
-    UnpackConcatLhs(lhs_pat, rhs_val, ctx, arena);
-    return;
-  }
+  // left-hand target, and TryUnpackConcatLhs strips the type prefix so its
+  // members unpack the RHS exactly as a bare positional pattern does.
+  if (TryUnpackConcatLhs(stmt->lhs, rhs_val, ctx, arena)) return;
   if (stmt->lhs->kind == ExprKind::kStreamingConcat) {
     UnpackStreamingConcatLhs(stmt->lhs, rhs_val, ctx, arena);
     return;

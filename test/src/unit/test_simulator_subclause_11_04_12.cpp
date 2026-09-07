@@ -108,4 +108,100 @@ TEST(EvalOp, ConcatWidthIsSumOfElements) {
   EXPECT_EQ(result.ToUint64(), 0xABCu);
 }
 
+// §10.4 puts procedural assignments "within procedures such as always, initial,
+// task, and function", so §11.4.12's left-hand concatenation is the same
+// statement inside a subroutine body as in the initial block above. The
+// subroutine body runs on the statement executor in eval_function_body.cpp,
+// which named no concatenation form at all, so the assignment wrote nothing and
+// reported nothing and every target kept the value it already had. The cases
+// below write from a subroutine and read from outside it.
+
+// The LRM's own example, moved into a function body. Each target is read
+// separately, since a distribution that put the whole value in one of them
+// would still leave the others at 0 and so would be told apart by reading all
+// three rather than their concatenation.
+TEST(ConcatenationSim, LhsConcatInAFunctionBodyDistributesToScalarTargets) {
+  const char* src =
+      "module t;\n"
+      "  logic log1, log2, log3;\n"
+      "  function void put();\n"
+      "    {log1, log2, log3} = 3'b101;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    log1 = 0; log2 = 0; log3 = 0;\n"
+      "    put();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "log1"), 1u);
+  EXPECT_EQ(RunAndGet(src, "log2"), 0u);
+  EXPECT_EQ(RunAndGet(src, "log3"), 1u);
+}
+
+// A task body takes the same executor by its own call path, so neither case
+// stands for the other. §11.6 sizes the sum by the concatenation's width, which
+// is where the carry-out lands, so this reads the width and the write together:
+// carry is the bit a sixteen-bit sum could not hold.
+TEST(ConcatenationSim, LhsConcatInATaskBodyTakesTheCarryOut) {
+  const char* src =
+      "module t;\n"
+      "  logic [15:0] a, b;\n"
+      "  logic carry;\n"
+      "  logic [15:0] acc;\n"
+      "  task add();\n"
+      "    {carry, acc} = a + b;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    a = 16'hFFFF;\n"
+      "    b = 16'h0001;\n"
+      "    carry = 0; acc = 16'hFFFF;\n"
+      "    add();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "carry"), 1u);
+  EXPECT_EQ(RunAndGet(src, "acc"), 0u);
+}
+
+// §11.4.12's concatenation may contain a concatenation, and the inner one takes
+// its slice and distributes it again. A writer that walked the elements flatly
+// would hand the inner brace's whole slice to one target or drop it, so b and c
+// are what separate the readings.
+TEST(ConcatenationSim, LhsConcatInAFunctionBodyReachesANestedConcatenation) {
+  const char* src =
+      "module t;\n"
+      "  logic p, q, r;\n"
+      "  function void put();\n"
+      "    {p, {q, r}} = 3'b101;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    p = 0; q = 0; r = 0;\n"
+      "    put();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "p"), 1u);
+  EXPECT_EQ(RunAndGet(src, "q"), 0u);
+  EXPECT_EQ(RunAndGet(src, "r"), 1u);
+}
+
+// An element that is a select takes the bits it named and leaves the rest of
+// its variable standing. `v` is loaded with 8'hF0 first, so a writer that gave
+// the element's slice to the whole variable would read 0x0A where the part
+// written alone reads 0xFA.
+TEST(ConcatenationSim, LhsConcatInAFunctionBodyWritesOnlyTheBitsASelectNames) {
+  const char* src =
+      "module t;\n"
+      "  logic x;\n"
+      "  logic [7:0] v;\n"
+      "  function void put();\n"
+      "    {x, v[3:0]} = 5'b1_1010;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = 0;\n"
+      "    v = 8'hF0;\n"
+      "    put();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "x"), 1u);
+  EXPECT_EQ(RunAndGet(src, "v"), 0xFAu);
+}
+
 }  // namespace

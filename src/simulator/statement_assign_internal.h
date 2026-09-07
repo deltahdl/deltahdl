@@ -39,6 +39,15 @@ Logic4Vec ConvertRealForKnownLhs(Logic4Vec rhs_val, bool lhs_is_real,
                                  uint32_t target_width, Arena& arena);
 
 // Defined in statement_assign_core.cpp; also used by the subroutine-body
+// statement executor in eval_function_body.cpp. §10.4 puts procedural
+// assignments "within procedures such as always, initial, task, and function",
+// so a concatenation or assignment-pattern target is written the same way in a
+// subroutine body as outside one. Returns false when the lhs is neither, so the
+// caller goes on to its other forms.
+bool TryUnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
+                        SimContext& ctx, Arena& arena);
+
+// Defined in statement_assign_core.cpp; also used by the subroutine-body
 // statement executor in eval_function_body.cpp. §10.7: "The size of the
 // left-hand side of an assignment forms the context for the right-hand
 // expression", and §11.6.1 makes that context part of what sizes the
