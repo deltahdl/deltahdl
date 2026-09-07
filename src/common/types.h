@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace delta {
@@ -41,6 +42,44 @@ struct Logic4Vec {
   // wider than 64 bits.
   uint64_t ToUint64() const;
   std::string ToString() const;
+};
+
+// A copy of a Logic4Vec that owns the words it holds.
+//
+// Copying a Logic4Vec copies its `words` pointer rather than the words, so a
+// plain copy kept as a baseline and compared against the original later is the
+// original, and the comparison can only ever report no change. That is a
+// distinction because a write does not always replace the words it writes:
+// DepositBitField writes through them, which is how a packed struct or union
+// member assignment lands, and several sites assign into `value.words[i]`
+// directly. A baseline meant to survive such a write has to own its words, and
+// this is what owns them.
+//
+// The captured view points into this object's own storage, so the copy and
+// move operations are written out: the implicit ones would leave the copy's
+// view pointing at the source's words, which is the aliasing this type exists
+// to remove.
+class Logic4Snapshot {
+ public:
+  Logic4Snapshot() = default;
+  Logic4Snapshot(const Logic4Snapshot& other) { *this = other; }
+  Logic4Snapshot& operator=(const Logic4Snapshot& other);
+  Logic4Snapshot(Logic4Snapshot&& other) noexcept { *this = std::move(other); }
+  Logic4Snapshot& operator=(Logic4Snapshot&& other) noexcept;
+  ~Logic4Snapshot() = default;
+
+  // Copies src's words into storage this owns. The storage already held is
+  // reused, so recapturing the same variable over and over -- which every
+  // event control does, on each notification that does not qualify --
+  // allocates at most once.
+  void Capture(const Logic4Vec& src);
+
+  // The captured value, as a Logic4Vec over the words this owns.
+  const Logic4Vec& Get() const { return view_; }
+
+ private:
+  std::vector<Logic4Word> words_;
+  Logic4Vec view_{};
 };
 
 Logic4Vec MakeLogic4Vec(class Arena& arena, uint32_t width);

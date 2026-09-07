@@ -774,4 +774,99 @@ TEST(EventControlSim, CompoundEventFollowsTheHierarchicalNameNotTheLocalOne) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// §9.4.2: an event control on a packed structure resumes on a write to one of
+// its members, because a member write changes the value the event control
+// names. The write has to be a member write: an assignment to the whole
+// variable, and equally a bit-select or part-select of it, rebuilds the
+// variable's value, so a watcher holding a stale reference to the old
+// representation would still see the two apart. A packed-struct member write
+// deposits into the words the variable already holds, so only a watcher that
+// kept a value of its own can tell the before from the after.
+TEST(EventControlSim, PackedStructMemberWriteFiresAnyChangeEvent) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  typedef struct packed { logic [3:0] a; logic [3:0] b; } ab_t;\n"
+      "  ab_t s;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    s = 8'h00;\n"
+      "    x = 8'd7;\n"
+      "    #5 s.b = 4'h1;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    @(s) x = 8'd33;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 33u);
+}
+
+// §9.4.2: a posedge event control on a packed structure resumes when a member
+// write drives bit 0 of the structure from 0 to 1. A packed structure lays its
+// last member out in the low bits (§7.2.1), so `b` covers bits [3:0] and
+// `s.b = 4'h1` is the write that moves bit 0. As above, a whole-variable
+// assignment or a select assignment replaces the variable's value and so could
+// not fail this; the member write edits the value in place, and the edge is
+// visible only to a watcher holding its own copy of the previous value.
+TEST(EventControlSim, PackedStructMemberWriteFiresPosedge) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  typedef struct packed { logic [3:0] a; logic [3:0] b; } ab_t;\n"
+      "  ab_t s;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    s = 8'h00;\n"
+      "    x = 8'd7;\n"
+      "    #5 s.b = 4'h1;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    @(posedge s) x = 8'd44;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 44u);
+}
+
+// §9.4.2: successive event controls on a packed structure each resume on the
+// next member write. The waiter here is offered three member writes: one that
+// deposits the value the member already holds, which is no change and leaves
+// the first event control still waiting, then two that do change it. So the
+// first event control's watcher has to carry its baseline across a
+// notification it did not resume on, and the second event control has to arm a
+// baseline of its own afterwards. Every one of the three writes edits the
+// structure's value in place, which is why a whole-variable or select
+// assignment could not stand in for any of them.
+TEST(EventControlSim, SuccessivePackedStructMemberWritesResumeTwoWaits) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { logic [3:0] a; logic [3:0] b; } ab_t;\n"
+      "  ab_t s;\n"
+      "  logic [7:0] first_hit, second_hit;\n"
+      "  initial begin\n"
+      "    s = 8'h00;\n"
+      "    first_hit = 8'd1;\n"
+      "    second_hit = 8'd2;\n"
+      "    #5 s.b = 4'h0;\n"
+      "    #5 s.b = 4'h1;\n"
+      "    #5 s.a = 4'h2;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    @(s) first_hit = 8'd55;\n"
+      "    @(s) second_hit = 8'd66;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("first_hit")->value.ToUint64(), 55u);
+  EXPECT_EQ(f.ctx.FindVariable("second_hit")->value.ToUint64(), 66u);
+}
+
 }  // namespace

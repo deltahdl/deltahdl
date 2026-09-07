@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <string_view>
+#include <utility>
 
 #include "common/arena.h"
 
@@ -88,6 +89,28 @@ std::string Logic4Vec::ToString() const {
     }
   }
   return result;
+}
+
+Logic4Snapshot& Logic4Snapshot::operator=(const Logic4Snapshot& other) {
+  if (this == &other) return *this;
+  words_ = other.words_;
+  view_ = other.view_;
+  view_.words = words_.data();
+  return *this;
+}
+
+Logic4Snapshot& Logic4Snapshot::operator=(Logic4Snapshot&& other) noexcept {
+  if (this == &other) return *this;
+  words_ = std::move(other.words_);
+  view_ = other.view_;
+  view_.words = words_.data();
+  return *this;
+}
+
+void Logic4Snapshot::Capture(const Logic4Vec& src) {
+  words_.assign(src.words, src.words + src.nwords);
+  view_ = src;
+  view_.words = words_.data();
 }
 
 Logic4Vec MakeLogic4Vec(Arena& arena, uint32_t width) {

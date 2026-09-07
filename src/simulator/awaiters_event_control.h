@@ -64,7 +64,7 @@ struct ResumeTarget {
 // guard shared across sibling operand watchers, and the signal expression to
 // re-evaluate. One object describes a single compound operand being watched.
 struct CompoundOperand {
-  const std::shared_ptr<Logic4Vec>& prev;
+  const std::shared_ptr<Logic4Snapshot>& prev;
   const std::shared_ptr<bool>& consumed;
   const Expr* signal;
 };
@@ -173,7 +173,14 @@ struct EventAwaiter {
     // two `always @(posedge clk)` blocks would ever fire). Each watcher keeps
     // its own baseline and restores it before delegating to the shared edge
     // logic, so the detections stay independent.
-    Logic4Vec prev = var->value;
+    //
+    // It is a Logic4Snapshot, which owns the words it captured, rather than a
+    // Logic4Vec, which would share the ones var->value holds. A member
+    // assignment writes through those words instead of replacing them, so a
+    // sharing baseline moves with the value it is there to be compared
+    // against and the change is never seen (#3358).
+    Logic4Snapshot prev;
+    prev.Capture(var->value);
     var->AddWatcher([h, var, prev, edge = ev.edge, iff_cond = ev.iff_condition,
                      ctx_ptr, proc, consumed]() mutable {
       if (proc && !proc->active) return true;
@@ -184,7 +191,7 @@ struct EventAwaiter {
       var->prev_value = prev;
       bool fired = HandleEdgeEvent(h, var, EdgeSpec{edge, iff_cond},
                                    ResumeTarget{*ctx_ptr, proc});
-      prev = var->value;
+      prev.Capture(var->value);
       if (fired) *consumed = true;
       return fired;
     });
@@ -219,7 +226,7 @@ struct EventAwaiter {
 
   static bool CheckEdge(const Variable* var, Edge edge) {
     if (edge == Edge::kNone) {
-      const auto& prev = var->prev_value;
+      const auto& prev = var->prev_value.Get();
       const auto& cur = var->value;
       if (prev.nwords != cur.nwords) return true;
       for (uint32_t i = 0; i < prev.nwords; ++i) {
@@ -230,7 +237,7 @@ struct EventAwaiter {
       return false;
     }
 
-    return CheckEdgeOnValues(var->prev_value, var->value, edge);
+    return CheckEdgeOnValues(var->prev_value.Get(), var->value, edge);
   }
 
   // Evaluates the edge gate for an edge-sensitive variable watcher. On a
@@ -238,7 +245,7 @@ struct EventAwaiter {
   // false so the watcher stays armed without resuming.
   static bool EdgeGatePasses(Variable* var, Edge edge) {
     if (CheckEdge(var, edge)) return true;
-    var->prev_value = var->value;
+    var->prev_value.Capture(var->value);
     return false;
   }
 
@@ -253,7 +260,7 @@ struct EventAwaiter {
                             SimContext& ctx) {
     if (!iff_cond) return true;
     if (EvalExpr(iff_cond, ctx, ctx.GetArena()).IsTruthy()) return true;
-    var->prev_value = var->value;
+    var->prev_value.Capture(var->value);
     return false;
   }
 
@@ -380,13 +387,13 @@ struct EventAwaiter {
     if (*op.consumed) return {true, false};
     if (target.proc && !target.proc->active) return {true, false};
     auto cur = EvalExpr(op.signal, target.ctx, target.ctx.GetArena());
-    if (Logic4VecBitsEqual(cur, *op.prev)) return {false, false};
+    if (Logic4VecBitsEqual(cur, op.prev->Get())) return {false, false};
     if (spec.edge != Edge::kNone &&
-        !CheckEdgeOnValues(*op.prev, cur, spec.edge)) {
-      *op.prev = cur;
+        !CheckEdgeOnValues(op.prev->Get(), cur, spec.edge)) {
+      op.prev->Capture(cur);
       return {false, false};
     }
-    *op.prev = cur;
+    op.prev->Capture(cur);
     // §9.4.2.3 with §12.4: the guard is true when any bit of it is 1.
     if (spec.iff_cond &&
         !EvalExpr(spec.iff_cond, target.ctx, target.ctx.GetArena()).IsTruthy())
@@ -410,8 +417,8 @@ struct EventAwaiter {
     std::vector<std::string_view> names;
     CollectExprIdentifiers(ev.signal, ctx, names);
     if (names.empty()) return;
-    auto prev =
-        std::make_shared<Logic4Vec>(EvalExpr(ev.signal, ctx, ctx.GetArena()));
+    auto prev = std::make_shared<Logic4Snapshot>();
+    prev->Capture(EvalExpr(ev.signal, ctx, ctx.GetArena()));
     auto* ctx_ptr = &ctx;
     const Expr* signal = ev.signal;
     const Expr* iff_cond = ev.iff_condition;
@@ -552,17 +559,17 @@ struct RepeatEventAwaiter {
     if (target.proc && !target.proc->active) return {false, true};
     if (target.proc && target.proc->is_suspended) return {false, false};
     if (!EventAwaiter::CheckEdge(var, spec.edge)) {
-      var->prev_value = var->value;
+      var->prev_value.Capture(var->value);
       return {false, false};
     }
     // §9.4.2.3 with §12.4: the guard is true when any bit of it is 1.
     if (spec.iff_cond &&
         !EvalExpr(spec.iff_cond, target.ctx, target.ctx.GetArena())
              .IsTruthy()) {
-      var->prev_value = var->value;
+      var->prev_value.Capture(var->value);
       return {false, false};
     }
-    var->prev_value = var->value;
+    var->prev_value.Capture(var->value);
     return {true, false};
   }
 
@@ -570,7 +577,7 @@ struct RepeatEventAwaiter {
   static void ArmEdgeOperand(Variable* var, const EventExpr& ev,
                              const std::shared_ptr<bool>& done,
                              ResumeTarget target, const TallyFn& tally) {
-    var->prev_value = var->value;
+    var->prev_value.Capture(var->value);
     Edge edge = ev.edge;
     const Expr* iff_cond = ev.iff_condition;
     auto* ctx_ptr = &target.ctx;

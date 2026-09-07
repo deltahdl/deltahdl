@@ -27,7 +27,13 @@ struct Variable {
   // and #3357, where a clocking block's event depended on whether an unrelated
   // process happened to wait on the same clock. Both now keep records of their
   // own.
-  Logic4Vec prev_value{};
+  //
+  // It is a Logic4Snapshot rather than a Logic4Vec because a baseline has to
+  // hold what the value was after the value has moved on, and a Logic4Vec
+  // copied from `value` shares `value`'s words: a member assignment writes
+  // through those words rather than replacing them, so the two sides of the
+  // comparison would be one value and no change would ever be seen (#3358).
+  Logic4Snapshot prev_value{};
 
   // §6.16: whether this variable is a string, which decides whether its value
   // is read as text -- the %s rendering over a task's default radix, the

@@ -197,7 +197,7 @@ struct AnyChangeAwaiter {
                            Process* proc, const std::shared_ptr<bool>& fin,
                            const std::shared_ptr<bool>& consumed) {
     auto* ctx_ptr = &ctx;
-    var->prev_value = var->value;
+    var->prev_value.Capture(var->value);
     var->AddWatcher([h, proc, ctx_ptr, fin, consumed]() mutable {
       // A wait/@* re-suspension arms a fresh watcher on every awaited signal,
       // but watchers are cleared only from the signal that actually fired.
@@ -287,7 +287,7 @@ struct InertialDelayAwaiter {
     for (auto name : var_names) {
       auto* var = ctx.FindVariable(name);
       if (!var) continue;
-      var->prev_value = var->value;
+      var->prev_value.Capture(var->value);
       auto f2 = fired;
       var->AddWatcher([h, proc, f2]() mutable {
         if (*f2) return true;
