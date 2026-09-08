@@ -556,7 +556,11 @@ uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx, Arena& arena) {
   }
   auto* var = ResolveLhsVariable(e, ctx);
   if (var == nullptr) return 0;
-  if (e->kind == ExprKind::kSelect && e->base != nullptr) {
+  // Two questions, not one. SelectExprWidth answers how many bits a select
+  // names within a packed object; an unpacked array index names a whole element
+  // (§7.4.2), whose width is the base variable's, itself one element wide.
+  if (e->kind == ExprKind::kSelect && e->base != nullptr &&
+      ctx.FindArrayInfo(LhsIdentName(e->base)) == nullptr) {
     return SelectExprWidth(*var, e, ctx, arena);
   }
   return var->value.width;
