@@ -266,4 +266,47 @@ TEST(UnpackedArrayConcatSim, NonblockingSizeMismatchNames10_10) {
                             "10.10"));
 }
 
+// §10.10: an item naming an unpacked array "shall represent as many elements
+// as exist in that item", so `b = {a}` hands the two elements of `a` to the
+// two elements of `b`. §6.8 (printed p.105) then says what each of those four
+// names is: "A variable is an abstraction of a data storage element. A
+// variable shall store a value from one assignment to the next." `a[0]` and
+// `b[0]` are two such storage elements, so the concatenation has to leave the
+// destination holding its own words rather than the pointer to the source's
+// that a plain Logic4Vec assignment copies (types.h: the struct holds a
+// Logic4Word* words, and assigning it copies the pointer). The widths match
+// here, which is the case that hides the bug: the collector pushes the source
+// variable's own vector and the resize on the store returns it untouched, so
+// nothing on the path allocates and the two elements end up sharing a buffer.
+//
+// The claim is made on the storage identity, as it is for the whole-array copy
+// of §7.6, because no source-level reader can currently tell the two apart:
+// every writer that reaches an unpacked-array element replaces the element's
+// vector instead of depositing into it. The value assertions alongside it say
+// the copy carried the bits and the x/z plane, and that `b[0]` really did
+// receive `a[0]`'s literal rather than the concatenation quietly doing
+// nothing.
+TEST(UnpackedArrayConcatSim, ArrayItemGivesDestinationItsOwnElementWords) {
+  SimFixture f;
+  auto* a0 = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a [0:1];\n"
+      "  logic [7:0] b [0:1];\n"
+      "  initial begin\n"
+      "    a[0] = 8'hA5; a[1] = 8'h5A;\n"
+      "    b = {a};\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a[0]");
+  ASSERT_NE(a0, nullptr);
+  auto* b0 = f.ctx.FindVariable("b[0]");
+  ASSERT_NE(b0, nullptr);
+  ASSERT_NE(a0->value.words, nullptr);
+  ASSERT_NE(b0->value.words, nullptr);
+  EXPECT_NE(a0->value.words, b0->value.words);
+  EXPECT_EQ(a0->value.words[0].aval, b0->value.words[0].aval);
+  EXPECT_EQ(a0->value.words[0].bval, b0->value.words[0].bval);
+  EXPECT_EQ(b0->value.words[0].aval, 0xA5u);
+}
+
 }  // namespace

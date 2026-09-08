@@ -301,6 +301,30 @@ static const Expr* AsArrayConcatPattern(const Expr* item) {
   return nullptr;
 }
 
+// Replace each collected element with a copy that owns its words, the blocking
+// mirror of SampleConcatElements (statement_assign_nonblocking.cpp). Every
+// collector below pushes a variable's own vec or a queue's own elements, so
+// every entry arrives aliasing live storage, and neither blocking store copies
+// it: DistributeConcatToArray stores through ResizeToWidth, which returns its
+// argument untouched when the widths already match, and TryQueueBlockingAssign
+// moves the run straight into q->elements.
+//
+// §6.8 makes each destination "an abstraction of a data storage element" that
+// "shall store a value from one assignment to the next", so `b = {a}` on
+// same-width arrays must not leave b[0] and a[0] as one buffer. The queue has
+// the stronger rule: §7.10.3 says that "when the target of an assignment is an
+// entire queue, references to any element of the original queue shall become
+// outdated", and §7.10.4 says the same of these very assignments. Splicing
+// q->elements in by pointer is what makes an outdated reference behave as a
+// live one -- after `q = {q, 6}` a write through the old element would reach
+// the new queue.
+//
+// Copying here rather than inside each collector reaches both entry points at
+// the one place the run is produced, and asks no collector for an arena.
+static void OwnConcatElements(std::vector<Logic4Vec>& elems, Arena& arena) {
+  for (auto& elem : elems) elem = OwnRhsWords(elem, arena);
+}
+
 static std::vector<Logic4Vec> CollectConcatElements(const Expr* rhs,
                                                     SimContext& ctx,
                                                     Arena& arena) {
@@ -333,6 +357,7 @@ static void DistributeConcatToArray(std::string_view arr_name,
                                     const ArrayInfo& info, const Expr* rhs,
                                     SimContext& ctx, Arena& arena) {
   auto elems = CollectConcatElements(rhs, ctx, arena);
+  OwnConcatElements(elems, arena);
   if (elems.size() != info.size) {
     ctx.GetDiag().Error(
         rhs->range.start,
@@ -717,6 +742,7 @@ bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   }
   std::vector<Logic4Vec> elems;
   CollectQueueElements(stmt->rhs, ctx, arena, elems);
+  OwnConcatElements(elems, arena);
   q->elements = std::move(elems);
   EnforceQueueBound(q, "assignment", stmt->rhs->range.start, ctx);
   q->AssignFreshIds();
