@@ -1,6 +1,7 @@
 #include <string>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -89,6 +90,56 @@ TEST(NetsAndVariables, BlockLocalReadInARandsequenceWeightCodeBlockIsAccepted) {
       "        alt : { r = 1; };\n"
       "      endsequence\n"
       "    end"));
+}
+
+// §23.7 calls `v.f` a dotted name and rules that "the first name component of a
+// member select matches a data object", which is what LhsBaseName answers for
+// each of the six checks that reduce an lvalue to its base. Its member arm
+// followed `base`, a field only a select carries, so it walked off the end of
+// every dotted name and answered nothing, and each caller reads nothing as
+// "no base to check". §6.5's rule against "a mixture of procedural and
+// continuous assignments writing to any term in the expansion of the longest
+// static prefix of a variable" is the one that makes that observable: the
+// continuous assignment names `v` and the procedural one names a member of it,
+// which is a term in the same expansion.
+TEST(NetsAndVariables,
+     MemberQualifiedProceduralTargetIsAWriteToItsBaseVariable) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef struct packed { logic f; } s_t;\n"
+      "  s_t v;\n"
+      "  logic a, b;\n"
+      "  assign v = a;\n"
+      "  initial v.f = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'v' has both continuous and procedural "
+                            "assignments",
+                            5, "6.5"));
+}
+
+// §23.7.1: "A name with a package or class scope resolution prefix (::) shall
+// always resolve in a downwards manner", so the name before `::` is a package
+// or a class rather than a data object, and the walk ends there rather than
+// returning it. A net and a package can carry one name, which is what lets this
+// case put the two together: descending through the prefix would record `p::x =
+// 1` as a procedural write to the net `p` and draw §6.5's net-as-target report
+// over a statement that writes no net at all.
+TEST(NetsAndVariables, PackageScopedAssignmentIsNotAWriteToThePrefixName) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("package p;\n"
+             "  int x;\n"
+             "endpackage\n"
+             "module m;\n"
+             "  wire p;\n"
+             "  logic a;\n"
+             "  assign p = a;\n"
+             "  initial p::x = 1;\n"
+             "endmodule\n",
+             f));
 }
 
 }  // namespace

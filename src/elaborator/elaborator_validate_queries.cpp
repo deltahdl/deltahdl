@@ -223,6 +223,22 @@ bool IsBitVectorFunction(std::string_view callee) {
 // leading argument names such a variable, reject it. The control_bit arguments
 // to $countbits (args[1..]) are 1-bit logic values, not the expression operand,
 // so only the first argument carries this restriction.
+// Whether the name selects a member of whatever it stands on, rather than
+// naming that object. §20.9's reject list is a property of the argument's own
+// type, and the declared kind LhsBaseName's answer carries is the argument's
+// only when no member intervenes: `$isunknown(vif.sig)` names a signal of the
+// interface a `virtual interface` handle is bound to, and that signal is of a
+// bit-stream type where the handle is not. Nothing here types a member select,
+// so one is left alone rather than judged by its base.
+static bool NamesAMember(const Expr* e) {
+  while (e) {
+    if (e->kind == ExprKind::kMemberAccess) return true;
+    if (e->kind != ExprKind::kSelect) return false;
+    e = e->base;
+  }
+  return false;
+}
+
 void CheckBitVectorFunctionArg(const Expr* call, const TypeMap& types,
                                DiagEngine& diag) {
   // §20.9, Syntax 20-10: list_of_control_bits is non-empty, so $countbits shall
@@ -235,6 +251,7 @@ void CheckBitVectorFunctionArg(const Expr* call, const TypeMap& types,
     return;
   }
   if (call->args.empty() || call->args[0] == nullptr) return;
+  if (NamesAMember(call->args[0])) return;
   auto base = LhsBaseName(call->args[0]);
   if (base.empty()) return;
   auto it = types.find(base);

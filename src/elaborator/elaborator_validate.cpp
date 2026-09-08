@@ -235,28 +235,34 @@ std::string_view ExprIdent(const Expr* e) {
   return {};
 }
 
+// The data object a left-hand side or an operand ultimately names: §23.7 calls
+// `a.b[2].c` a dotted name and rules that "the first name component of a member
+// select matches a data object or interface port name", and this returns that
+// first component. Each node kind is descended by the field the parser actually
+// fills: a select hangs its prefix off `base`, and a member access off `lhs` --
+// Parser::MakeMemberAccess and Parser::ParseForeachArrayId both set `lhs` and
+// leave `base` null, so following `base` throughout walked off the end of every
+// dotted name and answered the empty one, which each caller reads as "nothing
+// to check".
+//
+// Two spellings end the walk rather than being descended:
+//
+//   A scope resolution wears ExprKind::kMemberAccess too, and §23.7.1 has "a
+//   name with a package or class scope resolution prefix (::)" resolve
+//   downwards through that prefix, which names a package or a class rather than
+//   a data object. Returning `C` for `C::x = 1` would offer every caller a name
+//   from the wrong namespace to match its variables against.
+//
+//   `this` and `super` parse as an identifier of that text under a member
+//   access, and neither is a declared variable, so no caller's set can hold
+//   one. The walk stops with the empty name, which is what the callers did with
+//   these before and what keeps a write through `this` from being recorded
+//   against a variable that happens to be spelled that way.
 std::string_view LhsBaseName(const Expr* e) {
   while (e) {
-    if (e->kind == ExprKind::kIdentifier) return e->text;
-    if (e->kind == ExprKind::kSelect || e->kind == ExprKind::kMemberAccess) {
-      e = e->base;
-      continue;
-    }
-    break;
-  }
-  return {};
-}
-
-// The variable a member-qualified lvalue such as `b[2].x` ultimately writes
-// into. A member access needs its own descent because Parser::MakeMemberAccess
-// and Parser::ParseForeachArrayId both hang the prefix off `lhs` and leave
-// `base` null -- only a select fills `base` -- so LhsBaseName, which follows
-// `base` throughout, walks off the end of any dotted name and returns nothing.
-// A scope resolution wears the same node kind but its left operand names a
-// package or class rather than a variable, so it ends the walk instead.
-static std::string_view MemberLvalueBaseName(const Expr* e) {
-  while (e) {
-    if (e->kind == ExprKind::kIdentifier) return e->text;
+    if (e->kind == ExprKind::kIdentifier)
+      return (e->text == "this" || e->text == "super") ? std::string_view{}
+                                                       : e->text;
     if (e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution) {
       e = e->lhs;
       continue;
@@ -297,12 +303,14 @@ static void ReportDynamicLvalueAssign(
     const std::unordered_set<std::string_view>& dynsized_names,
     DiagEngine& diag) {
   if (!s->lhs) return;
-  std::string_view name;
-  if (s->lhs->kind == ExprKind::kSelect) {
-    name = LhsBaseName(s->lhs);
-  } else if (s->lhs->kind == ExprKind::kMemberAccess) {
-    name = MemberLvalueBaseName(s->lhs);
-  }
+  // The kind gate rather than the walk is what confines this to a part of a
+  // dynamically sized variable: a bare identifier lvalue is a write to the
+  // whole object, which the clause permits, and LhsBaseName answers the same
+  // name for it as for a select of it.
+  if (s->lhs->kind != ExprKind::kSelect &&
+      s->lhs->kind != ExprKind::kMemberAccess)
+    return;
+  std::string_view name = LhsBaseName(s->lhs);
   if (name.empty()) return;
   if (s->kind == StmtKind::kNonblockingAssign) {
     if (dynsized_names.count(name) != 0) {

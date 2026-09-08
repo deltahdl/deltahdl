@@ -349,4 +349,30 @@ TEST(ForceReleaseElaboration,
                             "10.6.2"));
 }
 
+// §10.6.2: "A force or release statement shall not be applied to a variable
+// that is being assigned by a mixture of continuous and procedural
+// assignments." The mixture and the force are both written as member-qualified
+// names here, so the case rests on the reduction of a dotted lvalue to the data
+// object it writes -- §23.7's first name component -- which the walk behind
+// CollectProcTargets and CollectForceReleaseTargets answered as nothing for
+// every dotted name until it followed the field the parser fills.
+TEST(ForceReleaseElaboration, ForceOverAMemberQualifiedMixedTargetIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef struct packed { logic f; } s_t;\n"
+      "  s_t v;\n"
+      "  logic a, b;\n"
+      "  assign v = a;\n"
+      "  initial v.f = b;\n"
+      "  initial force v.f = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "force or release applied to variable 'v', which "
+                            "is assigned by a mixture of continuous and "
+                            "procedural assignments",
+                            7, "10.6.2"));
+}
+
 }  // namespace
