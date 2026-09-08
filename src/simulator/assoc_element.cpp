@@ -10,6 +10,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
+#include "simulator/statement_assign_internal.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -29,7 +30,19 @@ Logic4Vec AssocAllocValue(const AssocArrayObject* aa, Arena& arena) {
   // narrower than the element is widened before it becomes the element. A real
   // carries its pattern in a width that says which pattern it is (§6.12), so
   // it is the one value left as it stands.
-  if (init->is_real || init->width >= aa->elem_width) return *init;
+  //
+  // §7.8.7 allocates the entry "with its default or user-specified initial
+  // value": the value is what the entry takes, and §6.8 then makes the entry
+  // "an abstraction of a data storage element" that "shall store a value from
+  // one assignment to the next". So the entry owes its own words. Returning
+  // *init handed back the array's own default_value or elem_init buffer, and
+  // TryWriteAssocMemberField writes through the words with DepositBitField
+  // rather than replacing them, so a member write to one defaulted key landed
+  // in every other defaulted key and in the stored default besides. The other
+  // branch already allocates, ResizeToWidth building its result at a width
+  // this one does not reach.
+  if (init->is_real || init->width >= aa->elem_width)
+    return OwnRhsWords(*init, arena);
   return ResizeToWidth(*init, aa->elem_width, arena);
 }
 

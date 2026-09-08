@@ -496,7 +496,14 @@ void Lowerer::InitAssocDefault(const Expr* init, AssocArrayObject* aa) {
   for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
     if (i >= init->elements.size()) break;
     const auto* key = init->pattern_keys[i];
-    auto val = EvalExpr(init->elements[i], ctx_, arena_);
+    // §7.9.11's literal gives the array a default and its named entries their
+    // values, and each of those is storage of its own under §6.8. A bare item
+    // name of the element width is answered with that variable's own
+    // Logic4Vec, so without the copy `int aa[int] = '{default: seed}` would
+    // leave the array's default sharing seed's words: a later in-place deposit
+    // into seed -- a bit-select write, say -- would rewrite the default, and
+    // through it every entry allocated from the default.
+    auto val = OwnRhsWords(EvalExpr(init->elements[i], ctx_, arena_), arena_);
     if (key->text == "default") {
       aa->has_default = true;
       aa->default_value = val;
@@ -540,7 +547,8 @@ static void ApplyStructMemberDefaults(std::string_view name,
 // under this name, which models one element of the array, so the pattern is
 // read back from there rather than evaluated a second time.
 static void RecordAssocElemInit(std::string_view name, const RtlirVariable& var,
-                                AssocArrayObject* aa, SimContext& ctx) {
+                                AssocArrayObject* aa, SimContext& ctx,
+                                Arena& arena) {
   if (!var.dtype || var.dtype->struct_members.empty()) return;
   if (var.dtype->kind == DataTypeKind::kUnion) return;
   bool any_init = false;
@@ -551,7 +559,12 @@ static void RecordAssocElemInit(std::string_view name, const RtlirVariable& var,
   auto* elem = ctx.FindVariable(name);
   if (!elem) return;
   aa->has_elem_init = true;
-  aa->elem_init = elem->value;
+  // The element model is a live Variable, so the initial value the array keeps
+  // takes its own words rather than the variable's: an entry allocated from
+  // elem_init is §6.8 storage of its own (see AssocAllocValue), and a stored
+  // initial value that shares with a variable would be one more name for the
+  // same buffer behind them all.
+  aa->elem_init = OwnRhsWords(elem->value, arena);
 }
 
 void Lowerer::LowerVarAggregate(std::string_view name,
@@ -580,7 +593,7 @@ void Lowerer::LowerVarAggregate(std::string_view name,
         AssocArraySpec{var.assoc_index_width, var.is_wildcard_index,
                        var.is_4state, var.is_index_signed});
     InitAssocDefault(var.init_expr, aa);
-    RecordAssocElemInit(name, var, aa, ctx_);
+    RecordAssocElemInit(name, var, aa, ctx_, arena_);
   } else {
     CreateArrayElements(name, var, ctx_, arena_);
   }
