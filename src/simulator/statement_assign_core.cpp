@@ -128,6 +128,20 @@ Variable* TryResolveCompoundElementBase(const Expr* lhs, SimContext& ctx,
       ctx.FindVariable(compound) != nullptr) {
     return nullptr;
   }
+  // §7.4.4 also has dimensions "defined in stages with typedef", and only the
+  // range the declaration itself wrote is recorded: `typedef bsix mem_type
+  // [0:3]; mem_type ba [0:7];` leaves one dimension known, so `ba[0]` is a leaf
+  // of that dimension and `ba[0][0]` is the second dimension the record does
+  // not have rather than a bit of a packed object. The two names have the same
+  // shape, and what tells them apart is whether the element type stands for an
+  // array, which the elaborated tables do not yet say -- #3598. Until they do,
+  // an element type written as a name is left to the element the writer below
+  // materializes, and an element type that is an integral type of its own is a
+  // packed object whose bits this addresses.
+  const ArrayInfo* info = ctx.FindArrayInfo(CompoundRootName(lhs));
+  if (info == nullptr || info->elem_type_kind == DataTypeKind::kNamed) {
+    return nullptr;
+  }
   std::string parent;
   if (!BuildCompoundLhsName(lhs->base, ctx, arena, parent)) return nullptr;
   return ctx.FindVariable(parent);
@@ -140,6 +154,15 @@ Variable* TryResolveCompoundElementBase(const Expr* lhs, SimContext& ctx,
 // it, which would take the name down to the array's base carrier.
 static bool TryCompoundElementWrite(const Expr* lhs, const Logic4Vec& rhs_val,
                                     SimContext& ctx, Arena& arena) {
+  // §11.5.1: `mem[0][3] = 1'b1` on a `logic [7:0] mem [0:3]` selects a bit of
+  // the element mem[0], which is a packed object of its own. Read as a second
+  // array dimension it named an element that does not exist, and the fallback
+  // below the caller walks such a name down to the array's base carrier, so the
+  // bit reached neither.
+  if (auto* elem = TryResolveCompoundElementBase(lhs, ctx, arena)) {
+    WriteBitSelect(elem, lhs, rhs_val, ctx, arena);
+    return true;
+  }
   bool absent_element = false;
   if (auto* compound =
           TryResolveCompoundElement(lhs, ctx, arena, &absent_element)) {
@@ -166,15 +189,6 @@ bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
   // the object's property map rather than in a variable, so no writer below
   // can reach it and ResolveLhsVariable answers null for the name it rebuilds.
   if (TryWriteClassPropertyBits(lhs, rhs_val, ctx, arena)) return true;
-  // §11.5.1: `mem[0][3] = 1'b1` on a `logic [7:0] mem [0:3]` selects a bit of
-  // the element mem[0], which is a packed object of its own. The writer below
-  // reads such a name as a second array dimension and answers for an element
-  // that does not exist, and the fallback beneath it walks the name down to the
-  // array's base carrier, so the bit reached neither.
-  if (auto* elem = TryResolveCompoundElementBase(lhs, ctx, arena)) {
-    WriteBitSelect(elem, lhs, rhs_val, ctx, arena);
-    return true;
-  }
   if (TryCompoundElementWrite(lhs, rhs_val, ctx, arena)) return true;
   auto* var = ResolveLhsVariable(lhs, ctx);
 

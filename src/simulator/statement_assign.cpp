@@ -74,7 +74,7 @@ bool BuildCompoundLhsName(const Expr* expr, SimContext& ctx, Arena& arena,
 
 // The name of the identifier a compound indexed name stands on, `a` for
 // `a[i][j]`, or empty where the chain does not stand on one.
-static std::string_view CompoundRootName(const Expr* e) {
+std::string_view CompoundRootName(const Expr* e) {
   while (e != nullptr && e->kind == ExprKind::kSelect) e = e->base;
   return (e != nullptr && e->kind == ExprKind::kIdentifier)
              ? e->text

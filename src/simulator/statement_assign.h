@@ -38,12 +38,10 @@ void BuildLhsName(const Expr* expr, std::string& out);
 Variable* TryResolveArrayElement(const Expr* lhs, SimContext& ctx);
 bool BuildCompoundLhsName(const Expr* expr, SimContext& ctx, Arena& arena,
                           std::string& name);
-// The leaf variable a multidimensional indexed name such as `a[i][j]` stands
-// for, or null. `absent_element`, when given, is set true where the name is one
-// of this shape and no such leaf exists, which §7.4.5 makes a write that
-// performs no operation: a caller reads it as "stop", since the fallback
-// resolution walks such a name down to the array's base carrier and would write
-// a bit of that instead.
+// The name of the identifier a compound indexed name stands on, `a` for
+// `a[i][j]`, or empty where the chain does not stand on one.
+std::string_view CompoundRootName(const Expr* e);
+
 // The element a packed sub-select of an unpacked array element selects within
 // -- `mem[0]` for `mem[0][3]` on a `logic [7:0] mem [0:3]` -- or null where the
 // name is not of that shape. §11.5.1 makes the trailing index a bit of that
@@ -52,6 +50,12 @@ bool BuildCompoundLhsName(const Expr* expr, SimContext& ctx, Arena& arena,
 Variable* TryResolveCompoundElementBase(const Expr* lhs, SimContext& ctx,
                                         Arena& arena);
 
+// The leaf variable a multidimensional indexed name such as `a[i][j]` stands
+// for, or null. `absent_element`, when given, is set true where the name is one
+// of this shape and no such leaf exists, which §7.4.5 makes a write that
+// performs no operation: a caller reads it as "stop", since the fallback
+// resolution walks such a name down to the array's base carrier and would write
+// a bit of that instead.
 Variable* TryResolveCompoundElement(const Expr* lhs, SimContext& ctx,
                                     Arena& arena,
                                     bool* absent_element = nullptr);
