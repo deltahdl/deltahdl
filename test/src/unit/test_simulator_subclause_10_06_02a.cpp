@@ -722,4 +722,135 @@ TEST(ForceReleaseSim, ReleaseOfOneElementLeavesTheOtherElementsAssignIntact) {
   EXPECT_EQ(b->value.ToUint64(), 0xCDu);
 }
 
+// §10.6.2 names "a constant bit-select of a vector net" among the things a
+// force may hold, and the force holds what was named: bit 3 of `bus`, with the
+// rest of the net still driven by `assign bus = 8'h55;`. That is
+// ForceOnNetOverridesContinuousDriver with the target indexed, and it is the
+// arm no case reached.
+//
+// 8'h55 is 0101_0101, whose bit 3 is clear, so the three answers are all
+// different: 8'h5D is the window written and the rest driven, 8'h01 is the
+// one-bit right-hand value copied over the whole net -- a Logic4Vec carries its
+// own width, so the assignment replaced the net's eight bits with one -- and
+// 8'h55 is a force that landed nowhere.
+TEST(ForceReleaseSim, ForceOfANetBitSelectWritesOnlyThatBit) {
+  SimFixture f;
+  auto* bus = RunAndFindVar(
+      "module t;\n"
+      "  wire [7:0] bus;\n"
+      "  assign bus = 8'h55;\n"
+      "  initial begin\n"
+      "    #1;\n"
+      "    force bus[3] = 1'b1;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "bus");
+  ASSERT_NE(bus, nullptr);
+  EXPECT_TRUE(bus->is_forced);
+  EXPECT_EQ(bus->value.ToUint64(), 0x5Du);
+}
+
+// "a constant part-select of a vector net" is the other form the same sentence
+// names, and it is a second window resolution rather than the same one: the
+// bit-select arm of §11.5.1's resolution answers a width of one and returns
+// before the part-select arm is reached, so a fix that handed the force a bit
+// index alone passes the case above and fails this one.
+TEST(ForceReleaseSim, ForceOfANetPartSelectWritesOnlyThoseBits) {
+  SimFixture f;
+  auto* bus = RunAndFindVar(
+      "module t;\n"
+      "  wire [7:0] bus;\n"
+      "  assign bus = 8'h55;\n"
+      "  initial begin\n"
+      "    #1;\n"
+      "    force bus[7:4] = 4'hF;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "bus");
+  ASSERT_NE(bus, nullptr);
+  EXPECT_EQ(bus->value.ToUint64(), 0xF5u);
+}
+
+// The driver half of the same sentence: §10.6.2 overrides "all drivers of the
+// net" that was named, so the drivers of every other bit go on reaching it. The
+// value at force time could be right while every later driver update is dropped
+// -- the flag is one flag on the whole variable and the net resolver returned
+// on it before looking at a driver -- so the source changes after the force and
+// the net must follow it everywhere but bit 3.
+TEST(ForceReleaseSim, ForceOfANetBitSelectLeavesTheOtherBitsDriven) {
+  SimFixture f;
+  auto* bus = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] src;\n"
+      "  wire [7:0] bus;\n"
+      "  assign bus = src;\n"
+      "  initial begin\n"
+      "    src = 8'h55;\n"
+      "    #1;\n"
+      "    force bus[3] = 1'b1;\n"
+      "    src = 8'hA5;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "bus");
+  ASSERT_NE(bus, nullptr);
+  EXPECT_EQ(bus->value.ToUint64(), 0xADu);
+}
+
+// §10.6.2: "When released, the net shall immediately be assigned the value
+// determined by the drivers of the net", which is ReleaseOnNetUsesDriverValue
+// with the target indexed. The release resolved its net only for a bare
+// identifier, so the flag cleared and the net kept the forced bit until some
+// driver happened to notify.
+TEST(ForceReleaseSim, ReleaseOfANetBitSelectRestoresThatBitsDriver) {
+  SimFixture f;
+  auto* bus = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] src;\n"
+      "  wire [7:0] bus;\n"
+      "  assign bus = src;\n"
+      "  initial begin\n"
+      "    src = 8'hA5;\n"
+      "    #1;\n"
+      "    force bus[3] = 1'b1;\n"
+      "    #1;\n"
+      "    release bus[3];\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "bus");
+  ASSERT_NE(bus, nullptr);
+  EXPECT_FALSE(bus->is_forced);
+  EXPECT_EQ(bus->value.ToUint64(), 0xA5u);
+}
+
+// Table D.1's net_is_forced is per bit, $countdrivers taking a bit-select of a
+// vector net as its argument, and it is the one place the flag is visible from
+// source. A fix that lands the value in the right bits while still marking the
+// whole net reads 1 here for bit 7.
+TEST(ForceReleaseSim, CountDriversReportsANetBitSelectForceOnlyOnThatBit) {
+  SimFixture f;
+  auto* f3 = RunAndFindVar(
+      "module t;\n"
+      "  wire [7:0] bus;\n"
+      "  integer f3, f7;\n"
+      "  assign bus = 8'h55;\n"
+      "  initial begin\n"
+      "    #1;\n"
+      "    force bus[3] = 1'b1;\n"
+      "    #1;\n"
+      "    $countdrivers(bus[3], f3);\n"
+      "    $countdrivers(bus[7], f7);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "f3");
+  ASSERT_NE(f3, nullptr);
+  auto* f7 = f.ctx.FindVariable("f7");
+  ASSERT_NE(f7, nullptr);
+  EXPECT_EQ(f3->value.ToUint64(), 1u);
+  EXPECT_EQ(f7->value.ToUint64(), 0u);
+}
+
 }  // namespace

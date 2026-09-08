@@ -371,6 +371,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/sim_context_random_stability.cpp
     simulator/sim_context_systask_state.cpp
     simulator/statement_assign_decl.cpp
+    simulator/statement_assign_force.cpp
     simulator/statement_assign_stream.cpp
     simulator/stmt_exec_control.cpp
     simulator/timing_check_driver.cpp

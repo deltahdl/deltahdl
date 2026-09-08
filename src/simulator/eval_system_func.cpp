@@ -438,8 +438,12 @@ static Logic4Vec EvalCountDrivers(const Expr* expr, SimContext& ctx,
   const uint64_t kN01x = n0 + n1 + nx;
 
   // Write back any supplied output arguments per Table D.1, in declared order.
-  const bool kForced =
-      net != nullptr && net->resolved != nullptr && net->resolved->is_forced;
+  // Table D.1's net_is_forced is asked of the bit the net argument names, and
+  // §10.6.2 lets a force name "a constant bit-select of a vector net": a force
+  // on bus[3] holds bit 3 and no other, so bus[7] reports 0 for it. Reading the
+  // flag alone answered 1 for every bit of the net.
+  const bool kForced = net != nullptr && net->resolved != nullptr &&
+                       net->resolved->BitIsForced(bit);
   const uint64_t kOuts[5] = {kForced ? 1u : 0u, kN01x, n0, n1, nx};
   for (size_t i = 1; i < expr->args.size() && i <= 5u; ++i) {
     if (expr->args[i] != nullptr) {

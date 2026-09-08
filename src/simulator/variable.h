@@ -80,6 +80,16 @@ struct Variable {
 
   bool is_forced = false;
   Logic4Vec forced_value{};
+  // §10.6.2 names "a constant bit-select of a vector net, a constant
+  // part-select of a vector net" among the things a force may hold, and holds
+  // exactly what was named: the drivers it overrides are the drivers of those
+  // bits, and the rest of the net goes on being driven. This is the window of
+  // this variable those bits are, empty for a force on the whole of it -- which
+  // is every force on a variable, §10.6.2 having "It shall not be a bit-select
+  // or a part-select of a variable". The value is deposited through the same
+  // window, so forced_value carries the whole object with the forced bits in
+  // place.
+  ProcContAssignWindow forced_window{};
   Logic4Vec pending_nba{};
   bool has_pending_nba = false;
   bool is_event = false;
@@ -114,6 +124,30 @@ struct Variable {
   PackedRange BitSelectRange() const {
     if (packed_elem_width > 1) return PackedRange::Implicit(value.width);
     return DeclaredRange();
+  }
+
+  // §10.6.2: whether a force holds bit `bit` of this variable. A force naming
+  // the whole object holds every bit of it, which is what the empty window
+  // says; a force naming a select of a vector net holds the bits it named, and
+  // a driver of any other bit is overridden by nothing.
+  bool BitIsForced(uint32_t bit) const {
+    if (!is_forced) return false;
+    if (forced_window.dst_width == 0) return true;
+    return bit >= forced_window.dst_lo &&
+           bit < forced_window.dst_lo + forced_window.dst_width;
+  }
+
+  // Whether a force holds every bit of this variable, which is the force that
+  // needs no resolution of the drivers underneath it. A window covering the
+  // whole object is that force written the long way: an element of a
+  // concatenation naming a whole net records its own width rather than the
+  // empty window, and §10.6.2 says the same thing about it as about the bare
+  // name.
+  bool WholeIsForced() const {
+    if (!is_forced) return false;
+    return forced_window.dst_width == 0 ||
+           (forced_window.dst_lo == 0 &&
+            forced_window.dst_width == value.width);
   }
 
   const Expr* proc_cont_rhs = nullptr;

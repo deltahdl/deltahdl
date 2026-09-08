@@ -531,10 +531,47 @@ static void ResolveForcedStrength(Net& net) {
   }
 }
 
+// §10.6.2: a force on "a constant bit-select of a vector net, a constant
+// part-select of a vector net" overrides the drivers of those bits and no
+// others, so the resolution below runs as it always does and the forced bits
+// are laid back over its answer. forced_value carries the whole object with
+// those bits in place, which is where they are read from and where they go.
+static void ApplyPartialForcedValue(Net& net, Arena& arena) {
+  const auto& window = net.resolved->forced_window;
+  DepositBitField(net.resolved->value, window.dst_lo,
+                  ExtractBitField(arena, net.resolved->forced_value,
+                                  window.dst_lo, window.dst_width),
+                  window.dst_width);
+}
+
+// The strength of the bits a partial force holds, which §10.6.2 makes the
+// force's rather than any driver's. The bits it does not hold keep the strength
+// the driver resolution just gave them, and the net's own strength is widened
+// back over the two kinds together. A resolution that recorded no per-bit
+// strength at all is left alone: it answers every bit from resolved_strength,
+// and there is no entry to correct.
+static void ApplyPartialForcedStrength(Net& net) {
+  if (net.bit_strengths.empty()) return;
+  std::vector<Logic4Vec> drivers{net.resolved->value};
+  std::vector<DriverStrength> strengths{{Strength::kStrong, Strength::kStrong}};
+  net.resolved_strength = NetStrength{};
+  for (uint32_t b = 0; b < net.bit_strengths.size(); ++b) {
+    if (net.resolved->BitIsForced(b)) {
+      NetStrength bit_strength;
+      ComputeSingleBitStrength(drivers, strengths, bit_strength, net.type, b);
+      net.bit_strengths[b] = bit_strength;
+    }
+    WidenNetStrengthOverBit(net.resolved_strength, net.bit_strengths[b]);
+  }
+}
+
 NetStrength Net::BitStrength(uint32_t bit) const {
   if (bit < bit_strengths.size()) return bit_strengths[bit];
   return resolved_strength;
 }
+
+// Resolves the net from its drivers, which is every rule but §10.6.2's force.
+static void ResolveFromDrivers(Net& net, Arena& arena, Scheduler* sched);
 
 void Net::Resolve(Arena& arena, Scheduler* sched) {
   if (!resolved) return;
@@ -544,41 +581,59 @@ void Net::Resolve(Arena& arena, Scheduler* sched) {
   // this one and is dropped before it runs.
   bit_strengths.clear();
 
-  if (resolved->is_forced) {
+  // §10.6.2: "A force procedural statement on a net shall override all drivers
+  // of the net", and a force naming the whole net leaves no bit for a driver to
+  // reach, so the drivers are not resolved at all. A force naming a select of
+  // the net overrides the drivers of those bits alone: the rest of the net goes
+  // on being driven, which is a resolution followed by the forced bits being
+  // laid back over it. Reading the flag alone here dropped every driver of
+  // every bit, so `assign bus = 8'h55;` stopped reaching bits 7:4 and 2:0 the
+  // moment `force bus[3] = 1'b1;` ran.
+  if (resolved->WholeIsForced()) {
     ResolveForcedStrength(*this);
     return;
   }
 
+  ResolveFromDrivers(*this, arena, sched);
+  if (resolved->is_forced) {
+    ApplyPartialForcedValue(*this, arena);
+    ApplyPartialForcedStrength(*this);
+    resolved->NotifyWatchers();
+  }
+}
+
+static void ResolveFromDrivers(Net& net, Arena& arena, Scheduler* sched) {
   // §28.15.3: a supply0/supply1 net models a constant ground/power connection,
   // so it carries value 0/1 at supply strength inherently -- like tri0/tri1, it
   // must resolve even with no driver connected rather than staying z.
   bool needs_resolution_when_undriven =
-      is_user_nettype || type == NetType::kTri0 || type == NetType::kTri1 ||
-      type == NetType::kSupply0 || type == NetType::kSupply1;
-  if (drivers.empty() && !needs_resolution_when_undriven) return;
+      net.is_user_nettype || net.type == NetType::kTri0 ||
+      net.type == NetType::kTri1 || net.type == NetType::kSupply0 ||
+      net.type == NetType::kSupply1;
+  if (net.drivers.empty() && !needs_resolution_when_undriven) return;
 
-  if (type == NetType::kTrireg && !AllDriversZ(drivers)) {
-    ++decay_generation;
+  if (net.type == NetType::kTrireg && !AllDriversZ(net.drivers)) {
+    ++net.decay_generation;
   }
 
-  if (ResolveSpecialNet(*this, arena, sched)) return;
+  if (ResolveSpecialNet(net, arena, sched)) return;
 
-  if (!is_user_nettype && !driver_strengths.empty()) {
-    ResolveStrengthDriven(*this, arena);
+  if (!net.is_user_nettype && !net.driver_strengths.empty()) {
+    ResolveStrengthDriven(net, arena);
     return;
   }
 
-  if (drivers.size() == 1) {
-    resolved->value = drivers[0];
-    FixupTriPull(resolved->value, type);
-    resolved->NotifyWatchers();
+  if (net.drivers.size() == 1) {
+    net.resolved->value = net.drivers[0];
+    FixupTriPull(net.resolved->value, net.type);
+    net.resolved->NotifyWatchers();
     return;
   }
 
-  Logic4Vec result = CombineAllDrivers(drivers, arena, type);
-  FixupTriPull(result, type);
-  resolved->value = result;
-  resolved->NotifyWatchers();
+  Logic4Vec result = CombineAllDrivers(net.drivers, arena, net.type);
+  FixupTriPull(result, net.type);
+  net.resolved->value = result;
+  net.resolved->NotifyWatchers();
 }
 
 static bool ValuesEqual(const Logic4Vec& a, const Logic4Vec& b) {
