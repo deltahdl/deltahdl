@@ -128,6 +128,18 @@ Logic4Vec MakeLogic4VecVal(Arena& arena, uint32_t width, uint64_t val) {
   return vec;
 }
 
+uint64_t WordMaskWithinWidth(uint32_t width, uint32_t word_index) {
+  uint32_t bits_here = width - word_index * 64;
+  return bits_here >= 64 ? ~uint64_t{0} : (uint64_t{1} << bits_here) - 1;
+}
+
+void FillWithX(Logic4Vec& vec) {
+  for (uint32_t i = 0; i < vec.nwords; ++i) {
+    uint64_t mask = WordMaskWithinWidth(vec.width, i);
+    vec.words[i] = {mask, mask};
+  }
+}
+
 Logic4Vec ExtractBitField(Arena& arena, const Logic4Vec& src,
                           uint32_t start_bit, uint32_t width) {
   Logic4Vec out = MakeLogic4Vec(arena, width);

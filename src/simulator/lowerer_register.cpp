@@ -74,24 +74,6 @@ bool PortDefaultsToZero(const RtlirPort& port) {
   return !Is4stateType(port.type_kind);
 }
 
-// §6.8, Table 6-7: an uninitialized 4-state integral object is 'x, and only
-// inside its width -- the bits above it in the top word stay 0 so they cannot
-// leak phantom x into a read or into arithmetic on the value.
-// SimContext::CreateVariable does this for storage it makes itself; a port
-// whose storage came from CreateNet needs it done again, a net's own default
-// being §6.7.1's z.
-static void FillPortStorageWithX(Variable* v, uint32_t width) {
-  for (uint32_t i = 0; i < v->value.nwords; ++i) {
-    v->value.words[i].aval = ~uint64_t{0};
-    v->value.words[i].bval = ~uint64_t{0};
-  }
-  if (uint32_t top_bits = width % 64; top_bits != 0 && v->value.nwords > 0) {
-    uint64_t mask = (uint64_t{1} << top_bits) - 1;
-    v->value.words[v->value.nwords - 1].aval &= mask;
-    v->value.words[v->value.nwords - 1].bval &= mask;
-  }
-}
-
 void CreatePortVariable(std::string_view name, const RtlirPort& port,
                         SimContext& ctx, Arena& arena) {
   // §21.7.4.3.1: an extended VCD port record takes its state characters from
@@ -117,7 +99,11 @@ void CreatePortVariable(std::string_view name, const RtlirPort& port,
     // CreateNet has just installed, belongs to a net no port declaration
     // named. Putting the port's default back is what keeps a net-kind port
     // reading what it read before it was one.
-    FillPortStorageWithX(v, port.width);
+    // §6.8, Table 6-7: an uninitialized 4-state integral object is 'x, which
+    // SimContext::CreateVariable installed and CreateNet then replaced with
+    // §6.7.1's undriven-net z. The storage is the width CreateNet was given,
+    // so FillWithX writes the same bits back that CreateVariable wrote.
+    FillWithX(v->value);
   } else {
     v = ctx.CreateVariable(name, port.width);
   }

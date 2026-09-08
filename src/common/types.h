@@ -85,6 +85,25 @@ class Logic4Snapshot {
 Logic4Vec MakeLogic4Vec(class Arena& arena, uint32_t width);
 Logic4Vec MakeLogic4VecVal(class Arena& arena, uint32_t width, uint64_t val);
 
+// The bits word `word_index` of a `width`-bit vector holds: every bit of a
+// word wholly inside the width, and the low `width % 64` of the word the width
+// ends in. MakeLogic4Vec rounds the allocation up to whole words, so a
+// producer that writes a word at a time has bits above the width to decide
+// about, and the answer is always that they stay clear: they are not part of
+// the value. ToString and ToUint64 stop at the width and so cannot show them,
+// while the word-wise readers -- EvalCaseEquality, which §11.4.5 has compare x
+// and z bits for equality, among them -- compare them like any other bit. A
+// producer that set them therefore prints the same as one that did not and
+// compares differently, which is the disagreement this exists to prevent.
+uint64_t WordMaskWithinWidth(uint32_t width, uint32_t word_index);
+
+// Sets every bit inside `vec.width` to x -- Convention A's (aval=1, bval=1) --
+// and leaves the bits above it clear. §6.8's Table 6-7 gives an uninitialized
+// 4-state integral object this value, and it is produced in four places: the
+// two that allocate storage for a variable, the one behind MakeAllX, and the
+// one that puts a port's default back over a net's z.
+void FillWithX(Logic4Vec& vec);
+
 // Extract `width` bits starting at `start_bit` from `src` into a fresh vector
 // of that width, preserving 4-state encoding. Bits at or beyond src.width read
 // as 0. Multi-word safe (unlike a ToUint64()-based slice, which loses bits >=

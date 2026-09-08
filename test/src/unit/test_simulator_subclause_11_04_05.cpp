@@ -1,3 +1,5 @@
+#include <string_view>
+
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
@@ -9,6 +11,16 @@
 using namespace delta;
 
 namespace {
+
+// §11.4.5 makes === answer 1'b1 or 1'b0 and never x, so a case-equality result
+// asserted here is read as a known 1: the value, and the bit that would say it
+// was unknown.
+void ExpectKnownTrue(SimFixture& f, std::string_view name) {
+  auto* r = f.ctx.FindVariable(name);
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 1u);
+  EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
+}
 
 // §11.4.5: for the logical equality (==) and inequality (!=) operators, if an
 // unknown (x) or high-impedance (z) bit makes the relation ambiguous, the
@@ -109,6 +121,55 @@ TEST(EqualityOperatorSim, CaseInequalityXZMismatchIsKnownTrue) {
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 1u);
   EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
+}
+
+// §11.4.5: "Bits that are x or z shall be included in the comparison and shall
+// match for the result to be considered equal", and "The result of these
+// operators shall always be a known value". Table 6-7 gives a `logic [7:0]`
+// scalar and an element of a `logic [7:0]` array the same 'x default, so the
+// two compare equal to each other and to the literal spelling the same value,
+// whichever producer built them -- the element's came from MakeAllX and the
+// scalar's from SimContext::CreateVariable. `arr[0] === s` is the
+// discriminating half: two values of one declared type and one default, with
+// no literal to be right about. The width is 8 rather than 64 because a width
+// that fills its last word leaves no bits above itself to disagree over.
+TEST(EqualityOperatorSim, CaseEqualityMatchesTable67DefaultOfArrayElement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] s;\n"
+      "  logic [7:0] arr [0:2];\n"
+      "  logic r1, r2;\n"
+      "  initial begin\n"
+      "    r1 = (arr[0] === 8'hxx);\n"
+      "    r2 = (arr[0] === s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  ASSERT_NO_FATAL_FAILURE(ExpectKnownTrue(f, "r1"));
+  ASSERT_NO_FATAL_FAILURE(ExpectKnownTrue(f, "r2"));
+}
+
+// The same rule with no array involved: EvalUnaryMinus answers an operand
+// carrying an unknown bit with an all-x value of the operand's width, so a fix
+// applied to what declares an array element would leave this one failing.
+TEST(EqualityOperatorSim, CaseEqualityMatchesAllXProducedByUnaryMinus) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] a;\n"
+      "  logic r1;\n"
+      "  initial begin\n"
+      "    a = 4'b1x0z;\n"
+      "    r1 = ((-a) === 4'bxxxx);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  ASSERT_NO_FATAL_FAILURE(ExpectKnownTrue(f, "r1"));
 }
 
 TEST(ExpressionSim, EqualityFalse) {

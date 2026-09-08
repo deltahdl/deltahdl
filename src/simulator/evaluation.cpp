@@ -114,11 +114,18 @@ bool HasUnknownBits(const Logic4Vec& v) {
   }
   return false;
 }
+// §6.8, Table 6-7's 'x, and the value §11.4.x gives an operation whose operand
+// carries an unknown bit. Only the bits the width names are x: MakeLogic4Vec
+// rounds up to whole words, and every bit above the width in the top word
+// stays clear, because §11.4.5 has === compare the x and z bits of its
+// operands and EvalCaseEquality compares them a word at a time. Filling those
+// bits left an all-x value built here comparing unequal to an all-x value of
+// the same declared type built by SimContext::CreateVariable, which masks --
+// `logic [7:0] arr [0:2]` against a `logic [7:0]` scalar of the same Table 6-7
+// default, and `(-a) === 4'bxxxx` with no array in sight.
 Logic4Vec MakeAllX(Arena& arena, uint32_t width) {
   auto vec = MakeLogic4Vec(arena, width);
-  for (uint32_t i = 0; i < vec.nwords; ++i) {
-    vec.words[i] = {~uint64_t{0}, ~uint64_t{0}};
-  }
+  FillWithX(vec);
   return vec;
 }
 
@@ -130,10 +137,7 @@ Logic4Vec MakeAllX(Arena& arena, uint32_t width) {
 Logic4Vec MakeAllHighZ(Arena& arena, uint32_t width) {
   auto vec = MakeLogic4Vec(arena, width);
   for (uint32_t i = 0; i < vec.nwords; ++i) {
-    uint32_t bits_here = width - i * 64;
-    uint64_t mask =
-        bits_here >= 64 ? ~uint64_t{0} : (uint64_t{1} << bits_here) - 1;
-    vec.words[i] = {0, mask};
+    vec.words[i] = {0, WordMaskWithinWidth(width, i)};
   }
   return vec;
 }

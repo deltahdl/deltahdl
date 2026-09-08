@@ -82,6 +82,38 @@ TEST(VariableDeclaration, Logic4StateArrayElementDefaultInit) {
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
+// Table 6-7 gives a scalar and an element of an array of the same type one
+// default, so the two are the same value and the words holding them are equal
+// word for word. The assertion deliberately carries no `& 0xFF`: the mask the
+// two cases above use is the width of the declaration written into the
+// assertion, and masking is what hid the two producers disagreeing about the
+// bits above it -- the element's 'x came from MakeAllX, which filled every bit
+// of the top word, and the scalar's from SimContext::CreateVariable, which
+// masked. §11.4.5 is where the disagreement showed, `arr[0] === data` reading
+// 0 for two values of the same declared type and the same default.
+TEST(VariableDeclaration, ArrayElementDefaultXMatchesScalarDefaultX) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] data;\n"
+      "  logic [7:0] arr [0:2];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+
+  auto* scalar = f.ctx.FindVariable("data");
+  auto* element = f.ctx.FindVariable("arr[1]");
+  ASSERT_NE(scalar, nullptr);
+  ASSERT_NE(element, nullptr);
+
+  ASSERT_EQ(element->value.nwords, scalar->value.nwords);
+  EXPECT_EQ(element->value.words[0].aval, scalar->value.words[0].aval);
+  EXPECT_EQ(element->value.words[0].bval, scalar->value.words[0].bval);
+}
+
 // The 2-state half of the same rule, which is what keeps the fix from being a
 // blanket switch to 'x: Table 6-7 gives a 2-state integral '0, so an element of
 // a bit array left without a value stays zero.
