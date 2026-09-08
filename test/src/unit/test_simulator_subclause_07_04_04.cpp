@@ -211,4 +211,75 @@ TEST(MultidimensionalArraySimulation, SubarrayCopyElementsGetTheirOwnWords) {
   EXPECT_EQ(carried->value.words[0].aval & 0xFFu, 0x3Cu);
 }
 
+// §7.4.4: "A multidimensional array is an array of arrays", so `int
+// a[0:1][0:2]` is two arrays of three, six elements in all. A declaration
+// inside a begin-end block was built from its first dimension alone, so the
+// array had two elements and a write to `a[1][2]` reached a leaf nothing had
+// created. The read is what says so: the write was silent either way.
+TEST(MultidimensionalArraySimulation, BlockLocalArrayBuildsEveryDimension) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    int a[0:1][0:2];\n"
+      "    a[1][2] = 7;\n"
+      "    result = a[1][2];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 7u);
+}
+
+// §7.4.2's size form of the same declaration -- the clause gives
+// `int Array[8][32]` and `int Array[0:7][0:31]` as the same array -- which the
+// block builder read only for a lone dimension while the range form beside it
+// took the first of several.
+TEST(MultidimensionalArraySimulation, BlockLocalArrayBuildsEverySizeFormDim) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    int a[2][3];\n"
+      "    a[1][2] = 7;\n"
+      "    result = a[1][2];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 7u);
+}
+
+// The per-dimension extents rather than the leaves: a foreach reads dim_sizes,
+// which the block path left empty, so it iterated the outermost dimension alone
+// and this counted 2 where §7.4.4 gives 6.
+TEST(MultidimensionalArraySimulation,
+     BlockLocalArrayRecordsEveryDimensionSize) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    int a[0:1][0:2];\n"
+      "    result = 0;\n"
+      "    foreach (a[i, j]) result = result + 1;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 6u);
+}
+
+// The same declaration among a module's items, which says the two builders
+// agree rather than that one of them works.
+TEST(MultidimensionalArraySimulation, ModuleScopeArrayAgreesWithTheBlockLocal) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int a[0:1][0:2];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    a[1][2] = 7;\n"
+      "    result = a[1][2];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 7u);
+}
+
 }  // namespace
