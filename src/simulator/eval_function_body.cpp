@@ -349,8 +349,27 @@ static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
   if (!stmt->lhs) return;
   if (TryFuncSpecialBlockingAssign(stmt, ctx, arena)) return;
   uint32_t ctx_width = LhsContextWidth(stmt->lhs, ctx, arena);
-  ExecFuncWriteValue(stmt->lhs, EvalExpr(stmt->rhs, ctx, arena, ctx_width), ctx,
-                     arena);
+  // §6.8: "A variable is an abstraction of a data storage element. A variable
+  // shall store a value from one assignment to the next." Two variables are two
+  // storage elements. No clause has to forbid them sharing one buffer -- the
+  // object model the clause describes already makes them separate -- but
+  // EvalExpr answers a bare identifier with the source variable's own
+  // Logic4Vec, an element select with the element's own, and a Logic4Vec copies
+  // its `words` pointer rather than the words. So the store kept the source's
+  // buffer, and the `if (!var->is_4state) CoerceTo2State(...)` beside it, an
+  // in-place writer, reached back through it: `bit [7:0] y; y = x;` in a task
+  // or function body cleared x's own x and z bits in the statement that only
+  // read x. The same write outside a subroutine is copied by
+  // ExecBlockingAssignImpl; this executor evaluates its own right-hand side and
+  // reaches neither of that path's production points.
+  //
+  // Every store below takes its value from here -- the identifier arm, the
+  // string arm beside it, the select writers behind TrySelectBlockingAssign,
+  // the class property and the struct field -- so one copy where the value is
+  // produced covers all of them, and no store has to know.
+  Logic4Vec val =
+      OwnRhsWords(EvalExpr(stmt->rhs, ctx, arena, ctx_width), arena);
+  ExecFuncWriteValue(stmt->lhs, val, ctx, arena);
 }
 
 // The environment in which a subroutine body executes (§13.4): the return

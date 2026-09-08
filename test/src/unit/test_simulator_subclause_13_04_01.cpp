@@ -367,4 +367,143 @@ TEST(FunctionReturnSim, TypedefReturnTypeWiderThanTheFallbackKeepsItsHighBits) {
   EXPECT_EQ(var->value.ToUint64(), 0xAAAAAAAAAAull);
 }
 
+// §13.4.1's implicitly declared variable is one storage element, and §6.8 makes
+// every other declaration one of its own: "A variable is an abstraction of a
+// data storage element. A variable shall store a value from one assignment to
+// the next." A statement in a function body that only reads `x` therefore
+// cannot change what `x` stores, whatever it does to its own target.
+//
+// A subroutine body runs on its own statement executor -- a void function
+// called with parentheses is declined by SetupTaskCall and reaches
+// ExecFunctionBody, so `take()` lands in ExecFuncIdentifierAssign rather than
+// in the executor an initial block uses. That executor stored the evaluated
+// right-hand value straight into the target, and a Logic4Vec copies its `words`
+// pointer rather than the words: with the resize declining to build anything at
+// equal widths, `y` was left naming `x`'s storage. The line after the store
+// coerces a 2-state target in place -- §6.11.2: "any unknown or high-impedance
+// bits shall be converted to zeros" -- and the coercion travelled back through
+// that alias to clear the unknowns of `x`, in the statement that only read it.
+//
+// The eight bits on each side are load-bearing. Unequal widths make the
+// assignment resize, which builds the value in a fresh store and hides the
+// sharing; matching widths are what let the read value reach the target
+// unresized.
+//
+// The assertions read words[0] because ToUint64 projects aval & ~bval: an x bit
+// already reads 0 there, so `x` answers 0xC1 through it whether its unknowns
+// survived or not. 8'b1100xx01 is stored as aval 0xCD with bval 0x0C, an x bit
+// being aval 1 with bval 1; clearing those unknowns gives aval 0xC1 with bval
+// 0x00, which is what `y` alone is entitled to hold.
+TEST(FunctionReturnSim, TwoStateLocalCopyLeavesTheSourceUnknownsIntact) {
+  SimFixture f;
+  auto* read_var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  bit [7:0] y;\n"
+      "  function void take();\n"
+      "    y = x;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = 8'b1100xx01;\n"
+      "    take();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(read_var, nullptr);
+  auto* written_var = f.ctx.FindVariable("y");
+  ASSERT_NE(written_var, nullptr);
+  EXPECT_EQ(read_var->value.words[0].aval & 0xFFu, 0xCDu);
+  EXPECT_EQ(read_var->value.words[0].bval & 0xFFu, 0x0Cu);
+  EXPECT_EQ(written_var->value.words[0].aval & 0xFFu, 0xC1u);
+  EXPECT_EQ(written_var->value.words[0].bval & 0xFFu, 0x00u);
+}
+
+// The contrast, and the reason the case above is written as a function. §13.4
+// and §13.3 give a task and a function the same procedural body, but the two
+// calls are routed apart: a task called with parentheses is claimed by
+// SetupTaskCall, and ExecInlineTaskCall then walks its body through ExecStmt,
+// so `q = p` written in a task is executed by the ordinary blocking-assignment
+// path -- the one that takes its own copy of the right-hand words before any
+// store can see them. Only the void function above is declined by SetupTaskCall
+// and reaches the subroutine-body executor.
+//
+// So this case states the boundary of the claim rather than one more way to
+// break it: it holds on either side of the fix the function case asks for, and
+// what it discriminates against is a task body rerouted onto the
+// subroutine-body executor, which would carry that executor's in-place coercion
+// back into `p`.
+//
+// 8'b0110x1x0 is stored as aval 0x6E with bval 0x0A, and the 2-state copy of it
+// is aval 0x64 with bval 0x00 -- a different pattern from the function case, so
+// the two state their claim on different bits.
+TEST(FunctionReturnSim, TaskBodyCopyRunsOnTheOrdinaryStatementExecutor) {
+  SimFixture f;
+  auto* source = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] p;\n"
+      "  bit [7:0] q;\n"
+      "  task grab();\n"
+      "    q = p;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    p = 8'b0110x1x0;\n"
+      "    grab();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "p");
+  ASSERT_NE(source, nullptr);
+  auto* target = f.ctx.FindVariable("q");
+  ASSERT_NE(target, nullptr);
+  EXPECT_EQ(source->value.words[0].aval & 0xFFu, 0x6Eu);
+  EXPECT_EQ(source->value.words[0].bval & 0xFFu, 0x0Au);
+  EXPECT_EQ(target->value.words[0].aval & 0xFFu, 0x64u);
+  EXPECT_EQ(target->value.words[0].bval & 0xFFu, 0x00u);
+}
+
+// The same §6.8 independence of storage elements, reached through a write that
+// lands after the copy rather than inside it, and with no 2-state coercion
+// anywhere in it. §7.2.1 makes a packed struct "a single vector", so assigning
+// one of its members deposits into a window of the whole struct's storage,
+// writing through the words the struct already holds. A target left naming its
+// source's storage therefore takes every later member write to the target back
+// to the source, which records an assignment it never received.
+//
+// Both statements sit in the function body, so the copy and the deposit are
+// both executed by the subroutine-body executor. A packed struct lays its first
+// member at the high bits, so `a.hi = 8'h5A; a.lo = 8'hC3;` stores 16'h5AC3,
+// `hi` occupying bits [15:8] and `lo` bits [7:0]. `b = a` must give `b` its own
+// 16'h5AC3, and depositing 8'h00 over `b.lo` then clears bits [7:0] of `b`
+// alone: `b` reads 16'h5A00 and `a` is still 16'h5AC3. Shared storage answers
+// 16'h5A00 for both, `a` having lost the 8'hC3 it was assigned and never
+// overwrote.
+//
+// Every bit involved is known, so ToUint64 reports the stored value exactly and
+// its projection hides nothing here. The two structs are sixteen bits each,
+// which is again what keeps the copy from resizing into a fresh store and so
+// from hiding the sharing.
+TEST(FunctionReturnSim, MemberDepositAfterABodyCopyLeavesTheSourceIntact) {
+  SimFixture f;
+  auto* origin = RunAndFindVar(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } pair_t;\n"
+      "  pair_t a;\n"
+      "  pair_t b;\n"
+      "  function void split();\n"
+      "    b = a;\n"
+      "    b.lo = 8'h00;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    a.hi = 8'h5A;\n"
+      "    a.lo = 8'hC3;\n"
+      "    split();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(origin, nullptr);
+  auto* duplicate = f.ctx.FindVariable("b");
+  ASSERT_NE(duplicate, nullptr);
+  EXPECT_EQ(origin->value.ToUint64(), 0x5AC3u);
+  EXPECT_EQ(duplicate->value.ToUint64(), 0x5A00u);
+}
+
 }  // namespace

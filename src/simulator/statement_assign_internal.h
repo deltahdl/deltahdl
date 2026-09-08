@@ -25,6 +25,14 @@ enum class DataTypeKind : uint8_t;
 // Defined in statement_assign_core.cpp.
 void CoerceTo2State(Logic4Vec& v);
 
+// Defined in statement_assign_core.cpp; also used by the subroutine-body
+// statement executor in eval_function_body.cpp, which evaluates its own
+// right-hand side and so reaches none of the copies this file's own path takes.
+// Answers a value that owns its words, for a store to keep; the definition's
+// comment gives the reason and the fields it carries across. Call it once where
+// the value is produced, not at each store.
+Logic4Vec OwnRhsWords(const Logic4Vec& val, Arena& arena);
+
 // Defined in statement_assign_core.cpp; also used by the §11.4.2 nonblocking
 // path in statement_assign_nonblocking.cpp and by the subroutine-body statement
 // executor in eval_function_body.cpp, which applies §10.7 to its own writes.

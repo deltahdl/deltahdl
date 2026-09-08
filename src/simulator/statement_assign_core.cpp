@@ -79,7 +79,7 @@ void CoerceTo2State(Logic4Vec& v) {
 // This is the blocking mirror of SampleNbaRhs
 // (statement_assign_nonblocking.cpp), which §10.4.2's sampling needed for the
 // same reason.
-static Logic4Vec OwnRhsWords(const Logic4Vec& val, Arena& arena) {
+Logic4Vec OwnRhsWords(const Logic4Vec& val, Arena& arena) {
   Logic4Vec copy = ExtractBitField(arena, val, 0, val.width);
   copy.is_real = val.is_real;
   copy.is_signed = val.is_signed;
