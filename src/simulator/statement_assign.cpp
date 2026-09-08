@@ -414,30 +414,15 @@ void WritePartSelect(Variable* var, const PartSelectBits& bits,
   if (!var->is_4state) CoerceTo2State(var->value);
 }
 
-// §7.4.1: writes a single-index target on a packed multidimensional array as an
-// outermost element (the inner-dimension width), not a single bit. Returns true
-// when `var` is such an array and the write was handled.
-static bool TryWritePackedElement(Variable* var, int64_t idx,
-                                  const Logic4Vec& rhs_val, Arena& arena) {
-  if (var->packed_elem_width <= 1) return false;
-  auto range = var->DeclaredRange();
-  if (!range.Contains(idx)) return true;
-  uint32_t w = var->packed_elem_width;
-  auto off = static_cast<uint64_t>(range.OffsetOf(idx)) * w;
-  // §7.4.1's element is addressed whole or not at all -- the index was found in
-  // the declared range above -- so none of its bits falls below the range and
-  // the source offset is zero.
-  if (off < var->value.width)
-    WritePartSelect(var, {static_cast<uint32_t>(off), w}, rhs_val, arena);
-  return true;
-}
-
 PartSelectBits SelectStorageBits(const Variable& var, const Expr* sel,
                                  SimContext& ctx, Arena& arena) {
   auto idx_val = EvalExpr(sel->index, ctx, arena);
   if (HasUnknownBits(idx_val)) return {0, 0};
   auto idx = SelectBoundValue(idx_val);
   if (sel->index_end == nullptr) {
+    // §7.4.1: a single index on a packed multidimensional array addresses an
+    // outermost element -- the inner dimensions' width -- rather than one bit,
+    // and addresses it whole or not at all, so the source offset stays zero.
     if (var.packed_elem_width > 1) {
       PackedRange elems = var.DeclaredRange();
       if (!elems.Contains(idx)) return {0, 0};
@@ -459,10 +444,9 @@ PartSelectBits SelectStorageBits(const Variable& var, const Expr* sel,
   // The pair PartSelectTargetIndices answers cannot say so on its own: it is
   // the two ends of a width the select does not have, and for `a[3 +: 0]` it is
   // the indices 3 and 2, which any declaration holding them resolves to the
-  // two-bit window a[3:2]. WriteBitSelect, which resolves a statement's own
-  // indices rather than asking here, reports that width as an error instead of
-  // writing it; every other caller reads the zero this returns as the absence
-  // it is.
+  // two-bit window a[3:2]. The write path reports that width as an error ahead
+  // of this call, in ReportZeroWidthPartSelect below; every caller reads the
+  // zero this returns as the absence it is.
   if (target.declared_width == 0) return {0, 0};
   return PartSelectStorageBits(var.BitSelectRange(), target.first,
                                target.second);
@@ -484,46 +468,60 @@ static bool StoredBitsDiffer(const Logic4Vec& a, const Logic4Vec& b) {
   return false;
 }
 
-// The write itself: resolve what `lhs` names of `var` and deposit `rhs_val`
-// there. Six of its paths return having written nothing -- an unknown index, an
-// out-of-range bit, an out-of-range element, a zero declared width, a window
-// that lands on no bit of the object, and a packed element whose offset is past
-// the value -- and none of them has to say anything about the notification,
-// because WriteBitSelect decides that from the stored value once this returns.
+// §11.5.1's report for a select written with a width of zero, which is the one
+// answer the resolution below cannot give: SelectStorageBits returns an empty
+// window for it, and returns the same empty window for an unknown index, an
+// out-of-range index and a select landing on no bit of the object, all of which
+// the clause leaves silent. The width belongs to the select as written rather
+// than to the object it addresses -- §11.5.1 requires it to "be a positive
+// constant" -- so it is read on its own, from a base of zero, which is the
+// declared width PartSelectTargetIndices gives either indexed form whatever the
+// base is. Only those two forms carry a width, so `a[7:0]` reads nothing twice.
+static void ReportZeroWidthPartSelect(const Expr* sel, SimContext& ctx,
+                                      Arena& arena) {
+  if (!sel->index_end) return;
+  if (!sel->is_part_select_plus && !sel->is_part_select_minus) return;
+  auto width = SelectBoundValue(EvalExpr(sel->index_end, ctx, arena));
+  auto target = PartSelectTargetIndices(0, width, sel->is_part_select_plus,
+                                        sel->is_part_select_minus);
+  if (target.declared_width != 0) return;
+  ctx.GetDiag().Error(sel->range.start, "zero-width part-select is not allowed",
+                      Subclause("11.5.1"));
+}
+
+// The write itself, which §11.5.1 states as two questions this file now answers
+// once each. "The actual bit that is accessed by an address is, in part,
+// determined by the declaration" is the resolution, and SelectStorageBits
+// answers it; a part-select partly out of range "shall, when written, only
+// affect the bits that are in range" is the deposit, and WritePartSelect
+// answers that. This function walked the same four arms a second time with the
+// write attached -- the shape a correction lands on one of and not the other,
+// as #3532 records on the nonblocking path, and one copy-paste-test cannot see,
+// the two walks being an early-returning writer against a value-returning
+// resolver rather than duplicated text. The bit-select goes with them, being
+// the one-bit case of that window rather than a write of its own: computed in a
+// machine word instead, `uint64_t{1} << off` was undefined for a bit at 64 or
+// above, and `enable[64] = 1'b1;` on a `logic [64:0] enable` set enable[0].
+//
+// The packed arm's write carried one test the resolver has no counterpart for,
+// `off < var->value.width`, and it is dropped rather than moved into
+// SelectStorageBits. RecordPackedRange (lowerer_register.cpp) records a
+// declared range only once its span times the element width equals value.width,
+// so an index that range contains has its element wholly inside the value, and
+// where the two disagree there is no declared range at all, only the implicit
+// [width-1:0] one. DepositBitField answers both, breaking at the first bit at
+// or past dst.width -- that same "only affect the bits that are in range" -- so
+// an element past the value deposits none of itself. Only a read needs the test
+// (TryPackedElementSelect, eval_select.cpp), owing a value where a write that
+// lands nowhere owes nothing.
+//
+// Nothing here says anything about the notification, which WriteBitSelect
+// decides from the stored value once this returns.
 static void WriteBitSelectBits(Variable* var, const Expr* lhs,
                                const Logic4Vec& rhs_val, SimContext& ctx,
                                Arena& arena) {
-  auto idx_val = EvalExpr(lhs->index, ctx, arena);
-  if (HasUnknownBits(idx_val)) return;
-  auto idx = SelectBoundValue(idx_val);
-  if (!lhs->index_end) {
-    if (TryWritePackedElement(var, idx, rhs_val, arena)) return;
-    auto range = var->BitSelectRange();
-    if (!range.Contains(idx)) return;
-    // §11.5.1's bit-select "extract[s] a particular bit from a vector", which
-    // is the one-bit case of the window WritePartSelect deposits and not a
-    // different write, so it is written once. Computed in a machine word here
-    // as well, it moved the same three sets of bits the comment above that
-    // function names, and `uint64_t{1} << off` was undefined for a bit at 64 or
-    // above: `enable[64] = 1'b1;` on a `logic [64:0] enable` set enable[0].
-    // The source offset is zero because the bit takes the value's own least
-    // significant bit, which is what `rhs_val.ToUint64() & 1` took.
-    auto off = static_cast<uint32_t>(range.OffsetOf(idx));
-    WritePartSelect(var, {off, 1U}, rhs_val, arena);
-    return;
-  }
-
-  auto end_val = SelectBoundValue(EvalExpr(lhs->index_end, ctx, arena));
-  auto target = PartSelectTargetIndices(idx, end_val, lhs->is_part_select_plus,
-                                        lhs->is_part_select_minus);
-  if (target.declared_width == 0) {
-    ctx.GetDiag().Error(lhs->range.start,
-                        "zero-width part-select is not allowed",
-                        Subclause("11.5.1"));
-    return;
-  }
-  auto bits =
-      PartSelectStorageBits(var->BitSelectRange(), target.first, target.second);
+  ReportZeroWidthPartSelect(lhs, ctx, arena);
+  PartSelectBits bits = SelectStorageBits(*var, lhs, ctx, arena);
   if (bits.width == 0) return;
   WritePartSelect(var, bits, rhs_val, arena);
 }
@@ -557,13 +555,12 @@ static void WriteBitSelectBits(Variable* var, const Expr* lhs,
 // already 1 takes a writing path all the way to the deposit and changes
 // nothing, which §9.4.2's last sentence is precisely about.
 //
-// The comparison has to sit at the end rather than beside each deposit, because
-// the deposits are not in one place: WritePartSelect and TryWritePackedElement
-// both write through `var`, and TryWritePackedElement returning true for an
-// element index outside the declared range -- handled, nothing written -- is
-// itself one of the silent no-write paths, so a check beside each deposit would
-// have to be taught them one at a time. Reading the stored value once, after
-// the write, is blind to which path ran.
+// The comparison sits at the end rather than beside the deposit, because the
+// deposit is not where the paths end: the window WriteBitSelectBits resolves is
+// empty for an unknown index, an out-of-range index, a zero declared width and
+// a select landing on no bit of the object, and it returns having written
+// nothing down every one of them. Reading the stored value once, after the
+// write, is blind to which path ran.
 void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
                     SimContext& ctx, Arena& arena) {
   // §10.6.2: a force "shall override a procedural assignment ... until a

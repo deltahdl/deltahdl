@@ -10,7 +10,13 @@
 //
 // Every case here declares a target wider than one 64-bit word, or one holding
 // x, or both, and asserts on Logic4Vec::ToString or on the words directly.
-// That is the whole of the division between this file and its siblings.
+// That is the whole of the division between this file and its siblings, and
+// the last two cases are the exception #3537 asks for. They are narrow and
+// known, and they assert on Logic4Vec::ToUint64, because what they hold is not
+// a bit outside a word or an unknown one but where a write lands at all: they
+// pin the writer's answer to §11.5.1 across the fold of its own walk of the
+// clause onto SelectStorageBits, and they belong beside the writer's other
+// cases rather than with the reads in the siblings.
 // test/src/unit/test_simulator_subclause_11_05_01a.cpp holds the rest of the
 // subclause's simulator cases -- the out-of-range and x/z-indexed selects, the
 // indexed +: and -: forms, the selects of a concatenation, a packed structure
@@ -20,9 +26,11 @@
 // unknown bit. test/src/unit/test_simulator_subclause_11_05_01b.cpp is the
 // other half of the clause, "The actual bit that is accessed by an address
 // is, in part, determined by the declaration of acc", and declares ranges that
-// do not end at zero or that ascend; every target here is [N:0], where an
-// index and the bit offset it reaches are the same number, so nothing here
-// depends on that rule.
+// do not end at zero or that ascend; every other target here is [N:0], where
+// an index and the bit offset it reaches are the same number, so nothing else
+// here depends on that rule. BitSelectWriteTakesAnAscendingDeclarationsBits is
+// the one case here that does, and it is here rather than there because what
+// it holds to the declaration is the writer.
 //
 // A case takes one of two routes, the two the siblings take. It runs a module
 // source through RunAndFindVar in lib/cpp/test_fixtures/fixture_simulator.h
@@ -313,6 +321,136 @@ TEST(ExpressionSim, PartSelectWriteAboveTheFirstWordCarriesUnknownBits) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToString(),
             std::string(28, '1') + "10x1" + std::string(68, '1'));
+}
+
+// §7.4.1 makes one index of a packed multidimensional array an element of the
+// inner dimension rather than a bit, so `p[2]` of a `logic [3:0][7:0] p` is
+// eight bits, and §11.5.1 leaves it to the declaration which eight: the
+// declared outer range is [3:0], its right-hand bound 0 is its least
+// significant element, and index 2 therefore sits two elements above that end,
+// at bit offset 2 * 8 == 16. `p[2] = 8'hA5` on a zeroed target must leave the
+// whole 32 bits reading 32'h00A5_0000 -- A5 in the third byte up and zeros
+// everywhere else.
+//
+// The assertion is on the whole variable rather than on a read back of `p[2]`,
+// because a read taken through the same wrong window would agree with a wrong
+// write and the pair would still be green; the 32 bits fit one word and hold
+// no x, so ToUint64 says everything ToString would about where the byte went.
+//
+// The window the write took is then read off SelectStorageBits for that same
+// select, built here over the variable the run left behind. src/simulator/
+// statement_assign.cpp resolves §11.5.1 twice -- once in SelectStorageBits,
+// which returns the window, and once in WriteBitSelectBits, which walks the
+// same four arms and deposits as it goes -- and the packed-element arm is the
+// one place the two are known to differ, TryWritePackedElement carrying an
+// `off < var->value.width` guard the resolver's arm has not got. Both are
+// right about this select today, so this case is green before the fold and
+// after it; what it is for is the fold itself. It goes red if the folded
+// writer resolves the element against BitSelectRange instead of DeclaredRange
+// -- the flattened view would make index 2 bit offset 2 and leave 32'h000000A5
+// once the width collapsed to one -- or if dropping that guard moves the
+// deposit off the element, either of which parts the stored value from the
+// window the resolver still names.
+TEST(SelectBoundaryBehavior, PackedElementWriteAgreesWithItsStorageBits) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [3:0][7:0] p;\n"
+      "  initial begin\n"
+      "    p = 32'h0;\n"
+      "    p[2] = 8'hA5;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "p");
+  ASSERT_NE(var, nullptr);
+
+  auto* elem = f.arena.Create<Expr>();
+  elem->kind = ExprKind::kSelect;
+  elem->base = MakeId(f.arena, "p");
+  elem->index = MakeInt(f.arena, 2);
+  auto bits = SelectStorageBits(*var, elem, f.ctx, f.arena);
+  EXPECT_EQ(bits.lo, 16u);
+  EXPECT_EQ(bits.width, 8u);
+
+  auto stored = var->value.ToUint64();
+  EXPECT_EQ(stored, uint64_t{0x00A50000});
+  // The same 32 bits split at the window the resolver named: A5 inside it and
+  // nothing at all outside it.
+  auto window = ((uint64_t{1} << bits.width) - 1) << bits.lo;
+  EXPECT_EQ(stored & window, uint64_t{0xA5} << bits.lo);
+  EXPECT_EQ(stored & ~window, uint64_t{0});
+}
+
+// §11.5.1: "the actual bit that is accessed by an address is, in part,
+// determined by the declaration of acc". `logic [0:7] asc` ascends, so its
+// right-hand bound 7 names its least significant bit -- the reading §11.5.1
+// fixes for its own `logic [0:31] b_vect`, whose `b_vect[0 +: 8]` it gives as
+// `b_vect[0:7]`, counting up the declaration from the significant end. Index 6
+// therefore sits one place above the least significant bit, and `asc[6] =
+// 1'b1` on a zeroed target must leave asc reading 8'h02.
+//
+// An ascending declaration is where a resolution that ignored the declaration
+// would part from one that honours it: taken as [7:0], index 6 would be bit
+// offset 6 and the answer 8'h40. Every other target in this file is [N:0],
+// where the two readings agree on every index and a writer resolving against
+// the flattened [width-1:0] view would pass regardless, so this is the only
+// case here that can tell them apart. The target is zeroed so the single 1 in
+// the answer is the only bit this write was entitled to produce, and eight
+// known bits in one word make ToUint64 the whole of the answer.
+//
+// Both walks of the clause honour the declaration today -- the writer through
+// Variable::BitSelectRange, the resolver through the same call -- so this is
+// green before the fold as well as after; it is red if the fold leaves the
+// single-index arm resolving an index as an offset.
+TEST(SelectBoundaryBehavior, BitSelectWriteTakesAnAscendingDeclarationsBits) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [0:7] asc;\n"
+      "  initial begin\n"
+      "    asc = 8'h00;\n"
+      "    asc[6] = 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "asc");
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(var->value.IsKnown());
+  EXPECT_EQ(var->value.ToUint64(), uint64_t{0x02});
+}
+
+// §11.5.1 gives an invalid address one answer on the write side: a select whose
+// address carries x or z "shall have no effect on the data stored when
+// written". An indexed part-select has two expressions and the clause does not
+// privilege one of them, so an unknown width invalidates the address exactly as
+// an unknown base does.
+//
+// Only one of the two was tested for. The blocking writer resolved §11.5.1 by
+// its own walk and checked the base alone, running its width through
+// SelectBoundValue and depositing at whatever that read; SelectStorageBits,
+// which every other writer resolves through, checks both. So the same statement
+// stored bits through a blocking assignment and stored none through a
+// nonblocking one, a continuous assignment or a declaration initializer. That
+// is the divergence folding the writer onto the resolver removes, and this is
+// the case that says which of the two answers survived: the clause's.
+//
+// The target is given a known value first, so leaving it at 8'hC3 is the write
+// having had no effect rather than the variable never having been written at
+// all, and w is 4-state so that an x reaches the width at all.
+TEST(SelectBoundaryBehavior, PartSelectWithAnUnknownWidthBoundWritesNothing) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] tgt;\n"
+      "  logic [3:0] w;\n"
+      "  initial begin\n"
+      "    tgt = 8'hC3;\n"
+      "    w = 4'bxxxx;\n"
+      "    tgt[0 +: w] = 8'hFF;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "tgt");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), uint64_t{0xC3});
 }
 
 }  // namespace
