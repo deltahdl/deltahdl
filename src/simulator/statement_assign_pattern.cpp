@@ -169,7 +169,13 @@ static void WriteLeaf(const PatternDist& pd, const std::string& name,
   if (!elem) return;
   Logic4Vec val = sub ? EvalExpr(sub, pd.ctx, pd.arena)
                       : MakeLogic4VecVal(pd.arena, pd.info.elem_width, 0);
-  elem->value = ResizeToWidth(val, pd.info.elem_width, pd.arena);
+  // The leaf takes its own words for the reason DistributePatternToArray's
+  // single-dimension store gives (§6.8/§10.9.1), and the same resize is what
+  // it leans on: a leaf whose pattern item is a bare name of the leaf's own
+  // width is handed that variable's Logic4Vec, and ResizeToWidth hands it
+  // straight back.
+  elem->value =
+      OwnRhsWords(ResizeToWidth(val, pd.info.elem_width, pd.arena), pd.arena);
   elem->NotifyWatchers();
 }
 
@@ -230,20 +236,33 @@ static void DistributePatternToArray(std::string_view arr_name,
     auto name = std::string(arr_name) + "[" + std::to_string(idx) + "]";
     auto* elem = ctx.FindVariable(name);
     if (!elem) continue;
+    Logic4Vec val;
     if (named) {
       PatternArrayElem slot{idx, info.elem_width, info.elem_type_kind};
-      elem->value = ResizeToWidth(FindArrayKeyedValue(rhs, slot, ctx, arena),
-                                  info.elem_width, arena);
+      val = FindArrayKeyedValue(rhs, slot, ctx, arena);
     } else if (replicate && inner_count > 0) {
-      auto val =
-          EvalExpr(rhs->elements[0]->elements[i % inner_count], ctx, arena);
-      elem->value = ResizeToWidth(val, info.elem_width, arena);
+      val = EvalExpr(rhs->elements[0]->elements[i % inner_count], ctx, arena);
     } else if (i < rhs->elements.size()) {
-      auto val = EvalExpr(rhs->elements[i], ctx, arena);
-      elem->value = ResizeToWidth(val, info.elem_width, arena);
+      val = EvalExpr(rhs->elements[i], ctx, arena);
     } else {
-      elem->value = MakeLogic4VecVal(arena, info.elem_width, 0);
+      val = MakeLogic4VecVal(arena, info.elem_width, 0);
     }
+    // §10.9.1 gives the element the value of its pattern item, and §6.8 makes
+    // the element "an abstraction of a data storage element" that "shall store
+    // a value from one assignment to the next" -- its own value, not a handle
+    // on the item's storage. EvalExpr answers a bare item name with that
+    // variable's own Logic4Vec and a Logic4Vec copies its `words` pointer, so
+    // the whole of what separates the two here is the resize allocating -- and
+    // ResizeToWidth returns its argument untouched when the widths already
+    // match, which is precisely the item as wide as the element it fills. That
+    // is why the copy goes outside the resize rather than inside it: inside, it
+    // would miss the only case that aliases. `arr = '{p, 8'h00}` left arr[0]
+    // and the 8-bit `p` one storage element, and the next writer that deposits
+    // in place -- a packed-member assignment such as `p.hi = 4'h0` -- wrote
+    // through both. Redundant on the arms where the resize or the maker
+    // allocated anyway.
+    elem->value =
+        OwnRhsWords(ResizeToWidth(val, info.elem_width, arena), arena);
     elem->NotifyWatchers();
   }
 }

@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-// The four element pointers of a 2x2 integer array named `arr`.
+// The four element pointers of a 2x2 unpacked array named `arr`.
 struct Array2x2 {
   Variable* e00 = nullptr;
   Variable* e01 = nullptr;
@@ -16,8 +16,8 @@ struct Array2x2 {
 };
 
 // Elaborates and runs `src`, then returns the four element pointers of a 2x2
-// integer array named `arr`. Callers ASSERT on the pointers and their values to
-// keep each test's distinct expectations local.
+// unpacked array named `arr`. Callers ASSERT on the pointers and their values
+// to keep each test's distinct expectations local.
 Array2x2 RunAndFetch2x2(const std::string& src, SimFixture& f) {
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
@@ -486,6 +486,107 @@ TEST(ArrayLiteralSim, KeyedVarInitCoercesToElementWidth) {
   EXPECT_EQ(e0->value.ToUint64(), 0xBBu);
   EXPECT_EQ(e1->value.ToUint64(), 0xCCu);
   EXPECT_EQ(e2->value.ToUint64(), 0xCCu);
+}
+
+// §10.9.1: a pattern item is assigned to its element, so the element ends up
+// holding the item's value rather than continuing to name the item's storage.
+// A bare variable name of the element's own width is the item that tells one
+// reading from the other, because nothing about it needs resizing on the way
+// in. `p` holds 8'hA5 when the pattern runs, so arr[0] has to keep 8'hA5 while
+// a later deposit into a member of `p` -- which rewrites the bits of `p` where
+// they stand instead of replacing them, the one write that could reach a
+// shared buffer -- carries `p` on to 8'h35. An arr[0] that reads 8'h35 is the
+// element and the variable turning out to be one storage. Every bit here is
+// known, so ToUint64, which projects aval & ~bval, reads the whole element.
+TEST(ArrayLiteralSim, PositionalItemVariableIsCopiedNotAliased) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef struct packed { logic [3:0] hi; logic [3:0] lo; } p_t;\n"
+      "  p_t p;\n"
+      "  p_t arr [0:1];\n"
+      "  initial begin\n"
+      "    p = 8'hA5;\n"
+      "    arr = '{p, 8'h5A};\n"
+      "    p.hi = 4'h3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* vp = f.ctx.FindVariable("p");
+  auto* e0 = f.ctx.FindVariable("arr[0]");
+  auto* e1 = f.ctx.FindVariable("arr[1]");
+  ASSERT_NE(vp, nullptr);
+  ASSERT_NE(e0, nullptr);
+  ASSERT_NE(e1, nullptr);
+  EXPECT_EQ(vp->value.ToUint64(), 0x35u);
+  EXPECT_EQ(e0->value.ToUint64(), 0xA5u);
+  EXPECT_EQ(e1->value.ToUint64(), 0x5Au);
+}
+
+// §10.9.1 through a nested pattern: the leaves of a multidimensional array are
+// reached by their own recursive walk over the dimensions, so a leaf that takes
+// a bare variable name is a second place the value has to be copied and needs a
+// case of its own. `p` holds 8'hC3 when the pattern runs, so arr[0][0] has to
+// keep 8'hC3 while `p` goes on to 8'hC7. The deposit is into `lo` here, the low
+// nibble rather than the high one, so a leaf reading 8'hC7 has followed the
+// storage of `p` and not a value taken from it. Its neighbours in the same
+// pattern are read too: only the leaf named by a variable is in question.
+TEST(ArrayLiteralSim, MultidimensionalLeafVariableIsCopiedNotAliased) {
+  SimFixture f;
+  Array2x2 arr = RunAndFetch2x2(
+      "module m;\n"
+      "  typedef struct packed { logic [3:0] hi; logic [3:0] lo; } p_t;\n"
+      "  p_t p;\n"
+      "  p_t arr [0:1][0:1];\n"
+      "  initial begin\n"
+      "    p = 8'hC3;\n"
+      "    arr = '{'{p, 8'h11}, '{8'h22, 8'h33}};\n"
+      "    p.lo = 4'h7;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  auto* vp = f.ctx.FindVariable("p");
+  ASSERT_NE(vp, nullptr);
+  ASSERT_NE(arr.e00, nullptr);
+  ASSERT_NE(arr.e01, nullptr);
+  ASSERT_NE(arr.e11, nullptr);
+  EXPECT_EQ(vp->value.ToUint64(), 0xC7u);
+  EXPECT_EQ(arr.e00->value.ToUint64(), 0xC3u);
+  EXPECT_EQ(arr.e01->value.ToUint64(), 0x11u);
+  EXPECT_EQ(arr.e11->value.ToUint64(), 0x33u);
+}
+
+// §10.9.1 through a key: an index-keyed value is resolved for each element in
+// turn, a third route by which a pattern item arrives at an element, so the
+// keyed form is asked the same question the positional one is. The key 0 pairs
+// `p` with arr[0] and the default fills arr[1], so arr[0] has to hold the 8'h96
+// standing in `p` at that moment; `p` afterwards reads 8'h46, and an arr[0]
+// reading 8'h46 has been carried along by the deposit into `p.hi` rather than
+// holding a value of its own.
+TEST(ArrayLiteralSim, IndexKeyedVariableIsCopiedNotAliased) {
+  SimFixture f;
+  auto* e0 = RunAndFindVar(
+      "module m;\n"
+      "  typedef struct packed { logic [3:0] hi; logic [3:0] lo; } p_t;\n"
+      "  p_t p;\n"
+      "  p_t arr [0:1];\n"
+      "  initial begin\n"
+      "    p = 8'h96;\n"
+      "    arr = '{0: p, default: 8'h0F};\n"
+      "    p.hi = 4'h4;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "arr[0]");
+  ASSERT_NE(e0, nullptr);
+  EXPECT_EQ(e0->value.ToUint64(), 0x96u);
+  auto* vp = f.ctx.FindVariable("p");
+  ASSERT_NE(vp, nullptr);
+  EXPECT_EQ(vp->value.ToUint64(), 0x46u);
+  auto* e1 = f.ctx.FindVariable("arr[1]");
+  ASSERT_NE(e1, nullptr);
+  EXPECT_EQ(e1->value.ToUint64(), 0x0Fu);
 }
 
 }  // namespace
