@@ -247,32 +247,90 @@ std::string_view LhsBaseName(const Expr* e) {
   return {};
 }
 
-// §10.4.2 forbids a nonblocking assignment to an element of a dynamically sized
-// array variable -- dynamic arrays, queues, and associative arrays all qualify
-// because an element's storage can move as the collection is resized between
-// the schedule and update steps. `dynsized_names` therefore carries all three
-// kinds and gates the nonblocking branch, while `dyn_names` (dynamic arrays
-// only) preserves the existing procedural-continuous-assignment diagnostic.
+// The variable a member-qualified lvalue such as `b[2].x` ultimately writes
+// into. A member access needs its own descent because Parser::MakeMemberAccess
+// and Parser::ParseForeachArrayId both hang the prefix off `lhs` and leave
+// `base` null -- only a select fills `base` -- so LhsBaseName, which follows
+// `base` throughout, walks off the end of any dotted name and returns nothing.
+// A scope resolution wears the same node kind but its left operand names a
+// package or class rather than a variable, so it ends the walk instead.
+static std::string_view MemberLvalueBaseName(const Expr* e) {
+  while (e) {
+    if (e->kind == ExprKind::kIdentifier) return e->text;
+    if (e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution) {
+      e = e->lhs;
+      continue;
+    }
+    if (e->kind == ExprKind::kSelect) {
+      e = e->base;
+      continue;
+    }
+    break;
+  }
+  return {};
+}
+
+// §6.21 (printed page 134), first sentence: "Automatic variables and elements
+// of dynamically sized array variables shall not be written with nonblocking,
+// continuous, or procedural continuous assignments." §10.4.2 (printed page 253)
+// states the nonblocking half in its own words: "It shall be illegal to make
+// nonblocking assignments to automatic variables or to elements of dynamically
+// sized array variables." Both say elements, not members. `b[2].x` nonetheless
+// falls under them, because the name is a member while the object the write
+// lands in is the element `b[2]`, and writing part of an element is writing it.
+// That gap between what the target names and what it writes is why this check
+// missed the spelling: it read the outermost node, saw a member access, and
+// never reached the element underneath. The rationale is the one the
+// unqualified case already carries -- an element's storage can move as the
+// collection is resized between the schedule and the update, and a member of
+// that element moves with it. One sentence governs all three assignment kinds,
+// so both arms below take the same lvalue reduction.
+//
+// The reach stops at `dynsized_names`, which is what keeps a member of anything
+// else legal. §6.21's second sentence bars a continuous or procedural
+// continuous write to a non-static class property and pointedly omits
+// nonblocking from that list where the first sentence includes it, so `r.val <=
+// v` is legal by the clause's own omission; a packed struct member is not an
+// element of a dynamically sized variable at all.
+static void ReportDynamicLvalueAssign(
+    const Stmt* s, const std::unordered_set<std::string_view>& dyn_names,
+    const std::unordered_set<std::string_view>& dynsized_names,
+    DiagEngine& diag) {
+  if (!s->lhs) return;
+  std::string_view name;
+  if (s->lhs->kind == ExprKind::kSelect) {
+    name = LhsBaseName(s->lhs);
+  } else if (s->lhs->kind == ExprKind::kMemberAccess) {
+    name = MemberLvalueBaseName(s->lhs);
+  }
+  if (name.empty()) return;
+  if (s->kind == StmtKind::kNonblockingAssign) {
+    if (dynsized_names.count(name) != 0) {
+      diag.Error(s->range.start,
+                 "nonblocking assignment to element of dynamically sized array",
+                 Subclause("6.21"));
+    }
+    return;
+  }
+  if ((s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign) &&
+      dyn_names.count(name) != 0) {
+    diag.Error(s->range.start,
+               "procedural continuous assignment to element of "
+               "dynamic array",
+               Subclause("6.21"));
+  }
+}
+
+// Dynamic arrays, queues, and associative arrays are all dynamically sized, so
+// `dynsized_names` carries the three kinds and gates the nonblocking branch,
+// while `dyn_names` (dynamic arrays only) preserves the existing
+// procedural-continuous-assignment diagnostic.
 void CheckNbaDynamicArrayTarget(
     const Stmt* s, const std::unordered_set<std::string_view>& dyn_names,
     const std::unordered_set<std::string_view>& dynsized_names,
     DiagEngine& diag) {
   if (!s) return;
-  if (s->lhs && s->lhs->kind == ExprKind::kSelect) {
-    auto name = LhsBaseName(s->lhs);
-    if (!name.empty() && s->kind == StmtKind::kNonblockingAssign &&
-        dynsized_names.count(name) != 0) {
-      diag.Error(s->range.start,
-                 "nonblocking assignment to element of dynamically sized array",
-                 Subclause("6.21"));
-    } else if (!name.empty() && dyn_names.count(name) != 0 &&
-               (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign)) {
-      diag.Error(s->range.start,
-                 "procedural continuous assignment to element of "
-                 "dynamic array",
-                 Subclause("6.21"));
-    }
-  }
+  ReportDynamicLvalueAssign(s, dyn_names, dynsized_names, diag);
   ForEachChildStmt(s, [&](const Stmt* sub) {
     CheckNbaDynamicArrayTarget(sub, dyn_names, dynsized_names, diag);
   });
