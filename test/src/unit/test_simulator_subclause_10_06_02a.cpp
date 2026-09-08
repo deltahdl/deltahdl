@@ -853,4 +853,63 @@ TEST(ForceReleaseSim, CountDriversReportsANetBitSelectForceOnlyOnThatBit) {
   EXPECT_EQ(f7->value.ToUint64(), 0u);
 }
 
+// §10.6.2 admits "a concatenation of these" as a force target and §11.4.12
+// divides such a target among its elements, so an element that is `out[1]` on a
+// `logic [7:0] out [0:3]` takes the high eight bits of 16'hABCD. §7.4.2 makes
+// that name a whole element of the array rather than bits of a packed object,
+// and the element has storage of its own -- the variable every read of `out[1]`
+// resolves to.
+//
+// The walk resolved it by following the select down to `out`, which is the
+// one-element-wide carrier the lowerer registers under the array's own name and
+// which no read consults, and then windowed the index against that carrier: the
+// force settled bit 1 of a variable nothing reads and `out[1]` kept 8'h11. The
+// other element is asserted with it because the two share one right-hand value
+// and a repair that gave the array element the whole 16 bits would still leave
+// `b` correct.
+TEST(ForceReleaseSim, ForceOverAConcatenationWritesAnUnpackedArrayElement) {
+  SimFixture f;
+  auto* b = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] out [0:3];\n"
+      "  logic [7:0] b;\n"
+      "  initial begin\n"
+      "    out[1] = 8'h11;\n"
+      "    b = 8'h22;\n"
+      "    force {out[1], b} = 16'hABCD;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "b");
+  ASSERT_NE(b, nullptr);
+  auto* elem = f.ctx.FindVariable("out[1]");
+  ASSERT_NE(elem, nullptr);
+  EXPECT_TRUE(elem->is_forced);
+  EXPECT_EQ(elem->value.ToUint64(), 0xABu);
+  EXPECT_EQ(b->value.ToUint64(), 0xCDu);
+}
+
+// §10.6.2 ends the force on the element it was placed on, which is the element
+// variable rather than the array's carrier: `release {out[1], b};` clears the
+// flag there, and §10.6.2 leaves a released variable holding what it held, no
+// driver and no assign standing to give it anything else.
+TEST(ForceReleaseSim, ReleaseOverAConcatenationEndsAnArrayElementsForce) {
+  SimFixture f;
+  auto* b = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] out [0:3];\n"
+      "  logic [7:0] b;\n"
+      "  initial begin\n"
+      "    out[1] = 8'h11;\n"
+      "    force {out[1], b} = 16'hABCD;\n"
+      "    release {out[1], b};\n"
+      "  end\n"
+      "endmodule\n",
+      f, "b");
+  ASSERT_NE(b, nullptr);
+  auto* elem = f.ctx.FindVariable("out[1]");
+  ASSERT_NE(elem, nullptr);
+  EXPECT_FALSE(elem->is_forced);
+  EXPECT_EQ(elem->value.ToUint64(), 0xABu);
+}
+
 }  // namespace

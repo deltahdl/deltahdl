@@ -201,6 +201,13 @@ struct ConcatElemSlot {
   uint32_t src_lo = 0;
   uint32_t width = 0;
   uint32_t rhs_width = 0;
+  // §7.4.2: whether the element's index names a whole element of an unpacked
+  // array rather than bits of a packed object. Both are written `x[i]`, and the
+  // variable resolved for them is a different one -- the element's own storage
+  // against the object the index selects within -- so the window has to follow
+  // the resolution: an element owns all of itself, where a select owns the bits
+  // §11.5.1 gives its indices.
+  bool names_whole_element = false;
 };
 
 // The window of the right-hand value `slot` owns and the window of its own
@@ -222,8 +229,10 @@ struct ConcatElemSlot {
 static RhsWatcherSpec SpecForSlot(const ConcatElemSlot& slot, SimContext& ctx,
                                   Arena& arena) {
   PartSelectBits dst{0, slot.width};
-  if (slot.el->kind == ExprKind::kSelect && slot.el->base != nullptr)
+  if (!slot.names_whole_element && slot.el->kind == ExprKind::kSelect &&
+      slot.el->base != nullptr) {
     dst = SelectStorageBits(*slot.var, slot.el, ctx, arena);
+  }
   // §10.6.2 makes force a statement on a net as well as on a variable, and the
   // net is what holds the strength the force settles, so only an element naming
   // a whole net is looked up. A select element is left standing on no net, as
@@ -256,11 +265,10 @@ static RhsWatcherSpec SpecForSlot(const ConcatElemSlot& slot, SimContext& ctx,
 // §10.6.2's force share this executor and differ here only in that the assign
 // records its right-hand side, which a later deassign or release looks for.
 //
-// One residual this does not fix: is_forced is a single flag on the whole
-// Variable, so `force {w, bus[3]} = 2'b11;` puts the right bits in the right
-// place and still marks the whole of `bus` forced, suppressing every driver of
-// every bit of it rather than of bit 3 alone. That is #3512, and it is a change
-// to what Variable records rather than to this walk.
+// The window travels onto the variable with the force, so an element naming
+// bits of a net holds those bits alone: §10.6.2's override of "all drivers of
+// the net" reaches the drivers of what was named, which for `force {w, bus[3]}`
+// is bit 3 rather than every bit of `bus`.
 static void ForceOneElement(const ConcatElemSlot& slot, const Stmt* stmt,
                             SimContext& ctx, Arena& arena) {
   RhsWatcherSpec spec = SpecForSlot(slot, ctx, arena);
@@ -282,6 +290,7 @@ static void ReleaseOneElement(const ConcatElemSlot& slot, const Stmt* stmt,
                               SimContext& ctx, Arena& arena) {
   Variable* var = slot.var;
   var->is_forced = false;
+  var->forced_window = {};
   var->proc_cont_rhs = nullptr;
   if (stmt->kind == StmtKind::kDeassign) {
     var->assign_cont_rhs = nullptr;
@@ -380,9 +389,22 @@ static uint32_t WalkConcatLhsElements(const Expr* lhs, const Stmt* stmt,
                                          bit_offset, ctx, arena);
       continue;
     }
-    if (auto* var = ResolveLhsVariable(el, ctx))
-      ApplyToConcatElement({el, var, bit_offset, w, rhs_width}, stmt, ctx,
-                           arena);
+    // §7.4.2 makes `out[i]` on a `logic [7:0] out [0:3]` a whole element, and
+    // §10.6.1 and §10.6.2 both admit a concatenation of the targets they name,
+    // so an element of an unpacked array is one of them. ResolveLhsVariable
+    // walks the select down to `out`, which is the one-element-wide carrier the
+    // lowerer registers under the array's own name and which no read of the
+    // array consults, and the window was then resolved against that: the force
+    // settled one bit of a variable nothing reads. TryResolveArrayElement is
+    // the resolution a lone target already takes, and what it answers owns all
+    // of itself.
+    Variable* var = TryResolveArrayElement(el, ctx);
+    bool whole_element = var != nullptr;
+    if (var == nullptr) var = ResolveLhsVariable(el, ctx);
+    if (var != nullptr) {
+      ApplyToConcatElement({el, var, bit_offset, w, rhs_width, whole_element},
+                           stmt, ctx, arena);
+    }
     bit_offset += w;
   }
   return bit_offset;
