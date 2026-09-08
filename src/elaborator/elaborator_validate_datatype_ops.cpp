@@ -7,6 +7,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
@@ -259,8 +260,52 @@ void Elaborator::ValidateVirtualInterfaceContAssign(const ModuleItem* item) {
   }
 }
 
+// The three procedure kinds whose sensitivity list the elaborator infers rather
+// than reads out of the source: §9.2.2.2 gives an always_comb "an inferred
+// sensitivity list that includes the expressions defined in 9.2.2.2.1",
+// §9.2.2.3 gives always_latch the same one, and §9.2.2.2.2 has `always @*`
+// wait "until a change occurs on a signal in the inferred sensitivity list".
+// item->sensitivity is empty for all three -- an always_comb or always_latch
+// carrying an explicit event control is rejected outright, and `always @*`
+// records is_star_sensitivity with no operands -- so the loop over it above
+// answers for none of them.
+static bool InfersItsSensitivityList(const ModuleItem* item) {
+  if (item->kind == ModuleItemKind::kAlwaysCombBlock) return true;
+  if (item->kind == ModuleItemKind::kAlwaysLatchBlock) return true;
+  return item->kind == ModuleItemKind::kAlwaysBlock &&
+         item->is_star_sensitivity;
+}
+
+// §25.9: a component of the interface a virtual interface is bound to "can only
+// be used in procedural statements; they cannot be used in continuous
+// assignments or sensitivity lists", and an inferred list is a sensitivity
+// list -- the clause draws no distinction between one the source wrote and one
+// the tool derived from what the block reads.
+//
+// Reported once for the procedure, at the procedure's own line, because the
+// list is the procedure's: naming every read would name one fault several
+// times. The read positions are the ones ForEachStmtReadExpr walks, which is
+// the walk CollectStmtReads builds the list from, so the check cannot reject a
+// component the list would not have carried -- §9.2.2.2.1's exception for a
+// timing control expression and its exclusion of an assertion action block are
+// honoured by asking that walk rather than by restating them.
+void Elaborator::ReportVirtualInterfaceInInferredSensitivity(
+    const ModuleItem* item) {
+  if (!InfersItsSensitivityList(item)) return;
+  bool reported = false;
+  ForEachStmtReadExpr(item->body, [&](const Expr* e) {
+    if (reported || !ExprUsesVirtualInterface(e, var_types_)) return;
+    diag_.Error(item->loc,
+                "virtual interface cannot appear in an inferred sensitivity "
+                "list",
+                Subclause("25.9"));
+    reported = true;
+  });
+}
+
 void Elaborator::ValidateVirtualInterfaceSensitivity(const ModuleItem* item) {
   if (!IsProceduralItemKind(item->kind)) return;
+  ReportVirtualInterfaceInInferredSensitivity(item);
   for (const auto& ev : item->sensitivity) {
     // §25.9 bars a component from a sensitivity list, and §9.4.2.3 puts the
     // iff operand inside the event expression it qualifies: "The event

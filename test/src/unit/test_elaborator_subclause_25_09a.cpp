@@ -832,4 +832,86 @@ TEST(VirtualInterfaceElaboration, PortTypeNames25_9) {
                             "virtual interface cannot be used", 2, "25.9"));
 }
 
+// §25.9 bars a component from a sensitivity list, and §9.2.2.2 gives an
+// always_comb "an inferred sensitivity list that includes the expressions
+// defined in 9.2.2.2.1" -- a list the tool derives is a sensitivity list, and
+// the clause draws no distinction. Naming the line of the always_comb is what
+// makes this discriminating: a report against the module or the declaration
+// would satisfy a bare HasErrors() and fail here.
+TEST(VirtualInterfaceElaboration,
+     ComponentInInferredAlwaysCombSensitivity_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface simple_bus; logic a; endinterface\n"
+      "module top;\n"
+      "  virtual simple_bus vif;\n"
+      "  logic x;\n"
+      "  always_comb x = vif.a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "virtual interface cannot appear in an inferred sensitivity list", 5,
+      "25.9"));
+}
+
+// §9.2.2.3 gives always_latch the same inferred list. Separate from the case
+// above because the two kinds are one condition in the process builder and a
+// check written against always_comb alone would pass that case and fail this.
+TEST(VirtualInterfaceElaboration,
+     ComponentInInferredAlwaysLatchSensitivity_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface simple_bus; logic a; endinterface\n"
+      "module top;\n"
+      "  virtual simple_bus vif;\n"
+      "  logic x, en;\n"
+      "  always_latch if (en) x <= vif.a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "virtual interface cannot appear in an inferred sensitivity list", 5,
+      "25.9"));
+}
+
+// §9.2.2.2.2: "always @* waits until a change occurs on a signal in the
+// inferred sensitivity list". A third inferring kind, reached by
+// is_star_sensitivity rather than by the procedure kind, so a check keyed on
+// the two kinds above leaves it open.
+TEST(VirtualInterfaceElaboration, ComponentInStarSensitivityList_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface simple_bus; logic a; endinterface\n"
+      "module top;\n"
+      "  virtual simple_bus vif;\n"
+      "  logic x;\n"
+      "  always @* x = vif.a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "virtual interface cannot appear in an inferred sensitivity list", 5,
+      "25.9"));
+}
+
+// The other half of §25.9's sentence, over a procedure whose list is inferred:
+// the component is written rather than read, so it is in no sensitivity list
+// and the procedural use the clause allows stands. This is what keeps the
+// check off the permitted half, which ComponentInProceduralStatement_Ok above
+// guards for an initial block.
+TEST(VirtualInterfaceElaboration, ComponentWrittenInInferredProcedure_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface simple_bus; logic a; endinterface\n"
+      "module top;\n"
+      "  virtual simple_bus vif;\n"
+      "  logic x;\n"
+      "  always_comb vif.a = x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

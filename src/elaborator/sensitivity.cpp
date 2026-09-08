@@ -1,5 +1,6 @@
 #include "elaborator/sensitivity.h"
 
+#include <functional>
 #include <unordered_set>
 
 #include "common/arena.h"
@@ -80,12 +81,13 @@ void CollectExprReads(const Expr* expr, std::unordered_set<std::string>& out) {
   for (auto* elem : expr->elements) CollectExprReads(elem, out);
 }
 
-static void CollectLhsIndexReads(const Expr* lhs,
-                                 std::unordered_set<std::string>& out) {
-  const Expr* cur = lhs;
-  while (cur && cur->kind == ExprKind::kSelect) {
-    if (cur->index) CollectExprReads(cur->index, out);
-    cur = cur->base;
+// The index expressions of an assignment's left-hand side, which are read where
+// the object they address is written.
+static void ForEachLhsIndexRead(const Expr* lhs,
+                                const std::function<void(const Expr*)>& fn) {
+  for (const Expr* cur = lhs; cur != nullptr && cur->kind == ExprKind::kSelect;
+       cur = cur->base) {
+    if (cur->index) fn(cur->index);
   }
 }
 
@@ -130,25 +132,26 @@ bool IsAssertionActionBlock(const Stmt* owner, const Stmt* sub) {
 // Stmt::condition, Stmt::rhs, Stmt::expr, Stmt::for_cond, Stmt::assert_expr,
 // Stmt::var_init, the weight of each Stmt::randcase_items entry and the
 // patterns of each Stmt::case_items entry.
-void CollectStmtReads(const Stmt* stmt, std::unordered_set<std::string>& out) {
+void ForEachStmtReadExpr(const Stmt* stmt,
+                         const std::function<void(const Expr*)>& fn) {
   if (!stmt) return;
   if (stmt->kind == StmtKind::kBlockingAssign ||
       stmt->kind == StmtKind::kNonblockingAssign) {
-    CollectLhsIndexReads(stmt->lhs, out);
+    ForEachLhsIndexRead(stmt->lhs, fn);
   }
   if (stmt->kind != StmtKind::kWait) {
-    CollectExprReads(stmt->condition, out);
+    fn(stmt->condition);
   }
-  CollectExprReads(stmt->rhs, out);
-  CollectExprReads(stmt->expr, out);
-  CollectExprReads(stmt->for_cond, out);
-  CollectExprReads(stmt->assert_expr, out);
+  fn(stmt->rhs);
+  fn(stmt->expr);
+  fn(stmt->for_cond);
+  fn(stmt->assert_expr);
   // A.2.4 gives a variable_decl_assignment an initializer, which the parser
   // keeps in Stmt::var_init. It is an ordinary expression and not a timing
   // control, so exception (c) leaves what it reads in the list, and exception
   // (a) removes the name being declared rather than the names its initializer
   // reads.
-  CollectExprReads(stmt->var_init, out);
+  fn(stmt->var_init);
   // §18.16 makes a randcase weight an expression the statement evaluates:
   // "The randcase weights can be arbitrary expressions, not just constants",
   // and its example weighs branches by `a + b` over two byte variables, each
@@ -156,16 +159,21 @@ void CollectStmtReads(const Stmt* stmt, std::unordered_set<std::string>& out) {
   // named there is therefore read within the block, and no exception of
   // §9.2.2.2.1 removes it. That is the same answer WalkStmtCaseIdents in
   // elaborator_scope_rules.cpp gives the position for §26.3.
-  for (const auto& rc : stmt->randcase_items) CollectExprReads(rc.first, out);
+  for (const auto& rc : stmt->randcase_items) fn(rc.first);
   // The case-item bodies are statements the descent below reaches; the patterns
   // are expressions it does not, so they are read here.
   for (const auto& ci : stmt->case_items) {
-    for (const auto* pat : ci.patterns) CollectExprReads(pat, out);
+    for (const auto* pat : ci.patterns) fn(pat);
   }
-  ForEachChildStmt(stmt, [stmt, &out](Stmt* const& sub) {
+  ForEachChildStmt(stmt, [stmt, &fn](Stmt* const& sub) {
     if (IsAssertionActionBlock(stmt, sub)) return;
-    CollectStmtReads(sub, out);
+    ForEachStmtReadExpr(sub, fn);
   });
+}
+
+void CollectStmtReads(const Stmt* stmt, std::unordered_set<std::string>& out) {
+  ForEachStmtReadExpr(stmt,
+                      [&out](const Expr* e) { CollectExprReads(e, out); });
 }
 
 static void CollectAssignLhsName(const Expr* lhs,

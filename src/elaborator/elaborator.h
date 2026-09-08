@@ -533,6 +533,7 @@ class Elaborator : public ElaboratorClassRules {
   void ValidateVirtualInterfaceContAssign(const ModuleItem* item);
 
   void ValidateVirtualInterfaceSensitivity(const ModuleItem* item);
+  void ReportVirtualInterfaceInInferredSensitivity(const ModuleItem* item);
 
   void ValidateVirtualInterfaceOps(const ModuleDecl* decl);
 
