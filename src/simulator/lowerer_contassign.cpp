@@ -159,6 +159,19 @@ struct ContAssignDriver {
   bool partial = false;
   uint32_t lo = 0;
   uint32_t width = 0;
+  // §11.5.1's second answer for a select that is only partly in range: a
+  // partially out-of-range part-select "shall, when written, only affect the
+  // bits that are in range", which names both the bits of the net that are
+  // written -- `lo` and `width` -- and the bits of the value those bits take.
+  // `src_lo` is where in the value they begin: it counts the select's own low
+  // bits that fall below the net, so it is zero for a select wholly inside the
+  // net and for one running off the high end, whose landing bits are the
+  // value's least significant ones, and positive for one running off the low
+  // end. §11.5.1 reads `a[1 -: 4]` on a `tri0 [7:0] a` as `a[1:-2]`, whose most
+  // significant end is index 1, so `a[1]` takes the value's bit 3 and `a[0]`
+  // its bit 2 and `assign a[1 -: 4] = 4'b1101` must leave `a` at 8'h03; driving
+  // the value's low two bits left it at 8'h01.
+  uint32_t src_lo = 0;
 };
 
 // The value a continuous-assignment driver contributes to net resolution: the
@@ -258,14 +271,22 @@ static DriverStrength ComputeEffectiveDriverStrength(
 // around it. §28.12 then resolves each bit against the net's other sources, and
 // the bits this assignment does not name are decided without it -- which is
 // what a source driving part of a net is.
+//
+// A select running off the low end of the net does not land the value's low
+// bits: §11.5.1 gives the bits that are in range the value's bits at and above
+// `src_lo`. The padding context is then `src_lo + drv.width`, the number of the
+// select's own bits at and below the ones that land, and the deposit takes its
+// source from `src_lo`. The select's bits above those are discarded either way.
 static Logic4Vec ContAssignDriverValue(const ContAssignDriver& drv,
                                        const Logic4Vec& value, Arena& arena) {
   uint32_t net_width = drv.net->resolved->value.width;
   if (!drv.partial) return ResizeToWidth(value, net_width, arena);
   Logic4Vec out = MakeAllHighZ(arena, net_width);
   if (drv.width > 0) {
-    Logic4Vec sized = ResizeToWidth(value, drv.width, arena);
-    DepositBitField(out, drv.lo, sized, drv.width);
+    Logic4Vec sized = ResizeToWidth(value, drv.src_lo + drv.width, arena);
+    DepositBitField(out, drv.lo,
+                    ExtractBitField(arena, sized, drv.src_lo, drv.width),
+                    drv.width);
   }
   return out;
 }
@@ -442,6 +463,7 @@ static void RefreshContAssignDriverBits(ContAssignDriver& drv, const Expr* lhs,
   PartSelectBits bits = SelectStorageBits(*drv.net->resolved, lhs, ctx, arena);
   drv.lo = bits.lo;
   drv.width = bits.width;
+  drv.src_lo = bits.src_lo;
 }
 
 // The loop-invariant context threaded through the inertial-delay re-evaluation

@@ -196,4 +196,120 @@ TEST(ContAssignStatementSim, OverlappingSelectTargetsResolveAgainstEachOther) {
   EXPECT_EQ(w->resolved->value.ToString(), "0xx1");
 }
 
+// §11.5.1: "Part-selects that are partially out of range shall, when read,
+// return x for the bits that are out of range and shall, when written, only
+// affect the bits that are in range." The indexed form `a[1 -: 4]` descends
+// from its base, so on `[7:0] a` it names indices 1, 0, -1 and -2, and the two
+// of those inside the net are the select's own most significant end. They take
+// the value's most significant end with them: a[1] takes 4'b1101's bit 3 and
+// a[0] its bit 2, both 1. §6.6.5 gives a tri0 a continuous pull 0 wherever no
+// driver reaches, which is the other six bits, so `a` reads 8'h03.
+//
+// `4'b1101` is what lets this case fail. A driver that kept the value's least
+// significant bits and simply narrowed the window it drove them into would put
+// bit 1's 0 on a[1] and bit 0's 1 on a[0], reading 8'h01. The select-target
+// cases above cannot separate the two: 4'hF and 3'b111 are one bit repeated,
+// so every way of choosing which bits of the value to take gives them the same
+// answer, and every select in them lies wholly inside its net besides.
+TEST(ContAssignStatementSim, SelectTargetRunningOffLowEndDrivesItsOwnHighBits) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  tri0 [7:0] a;\n"
+      "  assign a[1 -: 4] = 4'b1101;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* a = f.ctx.FindNet("a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->resolved->value.ToUint64() & 0xFFu, 0x03u);
+}
+
+// The same select on a plain wire, which is the other half of §11.5.1's
+// sentence: the bits out of range are not this driver's, and on a net with no
+// other source they stay z. The two bits in range hold the value's bits 3 and
+// 2, so the resolution reads zzzzzz11.
+//
+// The tri0 case above cannot say this. Its pull answers 0 for a bit no driver
+// reaches, ToUint64 reads x and z alike as 0, and so a driver that also drove
+// the six other bits to 0, or that drove any of them to x by conflicting with
+// itself over a clamped index, reads 8'h03 there just the same. Here each of
+// those shows as its own character in the string, and the assertion is on
+// which bits this one driver claims rather than only on what two of them hold.
+TEST(ContAssignStatementSim,
+     SelectTargetRunningOffLowEndLeavesTheOtherBitsUndriven) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire [7:0] a;\n"
+      "  assign a[1 -: 4] = 4'b1101;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* a = f.ctx.FindNet("a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->resolved->value.ToString(), "zzzzzz11");
+}
+
+// The companion overhanging the top, which the same sentence governs and which
+// no fix to the low end may disturb. `a[9:6]` on `[7:0] a` names indices 9, 8,
+// 7 and 6; the two in range are 7 and 6, and they are the select's own least
+// significant end, so they take the value's bits 1 and 0. `4'b1101` puts 0 on
+// a[7] and 1 on a[6], and with §6.6.5's pull 0 under the rest `a` reads 8'h40.
+//
+// This passes today, and it is here to catch the correction made in the wrong
+// direction. A driver that shifted the value by the count of indices running
+// off the *high* end rather than the low would take bits 3 and 2 here and read
+// 8'hC0. ExpressionSim.PartSelectRunningOffHighEndStillTakesItsLowBits in
+// test_simulator_subclause_11_05_01a.cpp holds this same line for the
+// procedural writer; a continuous assignment reaches the net through a driver
+// and a resolution instead, and that path needs its own case.
+TEST(ContAssignStatementSim,
+     SelectTargetRunningOffHighEndStillTakesItsLowBits) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  tri0 [7:0] a;\n"
+      "  assign a[9:6] = 4'b1101;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* a = f.ctx.FindNet("a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->resolved->value.ToUint64() & 0xFFu, 0x40u);
+}
+
+// A select may hang off both ends at once, and then both of §11.5.1's answers
+// are in play together. `a[9 -: 12]` on `[7:0] a` is `a[9:-2]`, twelve indices
+// of which the eight in the net are in range: the window is clamped at the top
+// as well as at the bottom, so its width is the net's eight rather than the
+// select's declared twelve, while its source offset is still the two indices
+// below the net. The bits that land are the value's [9:2]. `12'hABC` is
+// 1010_1011_1100, whose bits 9 through 2 are 1010_1111, so `a` reads 8'hAF.
+//
+// A driver that carried the source offset but sized the deposit from the
+// select's declared width would answer here and nowhere else in this file: the
+// three cases above are each clamped at one end only, where the declared width
+// and the driven width agree once the offset is applied.
+// ExpressionSim.PartSelectRunningOffBothEndsWritesItsMiddleBits in
+// test_simulator_subclause_11_05_01a.cpp holds the same line for the
+// procedural writer.
+TEST(ContAssignStatementSim, SelectTargetRunningOffBothEndsLandsItsMiddleBits) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  tri0 [7:0] a;\n"
+      "  assign a[9 -: 12] = 12'hABC;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* a = f.ctx.FindNet("a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->resolved->value.ToUint64() & 0xFFu, 0xAFu);
+}
+
 }  // namespace
