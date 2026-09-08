@@ -649,7 +649,16 @@ static void SpawnNbaEventProcess(SimCoroutine coro, SimContext& ctx,
 
 static StmtResult ExecNbaWithEvent(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
-  auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
+  // §4.9.4: this value is held across an event control, the widest gap between
+  // sampling and update in the simulator, so it is copied into the arena rather
+  // than left aliasing the variable EvalExpr read it from. See SampleNbaRhs
+  // (statement_assign_nonblocking.cpp) for why, and for why the three flags
+  // ExtractBitField does not carry are restored.
+  auto sampled = EvalExpr(stmt->rhs, ctx, arena);
+  auto rhs_val = ExtractBitField(arena, sampled, 0, sampled.width);
+  rhs_val.is_real = sampled.is_real;
+  rhs_val.is_signed = sampled.is_signed;
+  rhs_val.is_string = sampled.is_string;
   if (stmt->repeat_event_count) {
     uint64_t count = EvalRepeatCount(stmt->repeat_event_count, ctx, arena);
     if (count == 0) {

@@ -441,3 +441,114 @@ TEST(NonblockingAssignSchedulingSim,
     EXPECT_EQ(element->value.ToUint64(), wanted) << "Variable: " << name;
   }
 }
+
+// Runs `src` and reads back both variables the §4.9.4 cases below turn on: the
+// nonblocking target `d`, and the packed struct `s` the assignment sampled and
+// a later member write reached into.
+//
+// Both readings are load-bearing, and neither would do on its own. `d` alone
+// cannot separate a run that honoured the clause from one that scheduled
+// nothing at all, which is why the source gives `d` a blocking value first.
+// And `s` alone is what says the member write landed: a build where `s.b = ...`
+// quietly did nothing would leave `d` holding 16'hAABB for a reason that has
+// nothing to do with the values in effect at scheduling, and the case would
+// pass while testing nothing. The two cases differ only in when the update is
+// placed, so the values and both readings are stated once here.
+static void ExpectSampledStructSurvivesMemberDeposit(const std::string& src) {
+  SimFixture f;
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(f.has_errors) << "source reported an elaboration error";
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* target = f.ctx.FindVariable("d");
+  ASSERT_NE(target, nullptr);
+  // The whole value in effect when the update was placed. 16'h00BB would be
+  // that value re-read after the member write; 16'h1234 would be no update.
+  EXPECT_EQ(target->value.ToUint64(), 0xAABBu);
+  auto* sampled = f.ctx.FindVariable("s");
+  ASSERT_NE(sampled, nullptr);
+  // The member write did land, so 16'hAABB above cannot be a write that never
+  // happened.
+  EXPECT_EQ(sampled->value.ToUint64(), 0x00BBu);
+}
+
+// §4.9.4 claim 3, the right-hand-value half that the concatenation cases above
+// state for the left-hand target: "the values in effect when the update is
+// placed in the event region are used to compute both the right-hand value and
+// the left-hand target". So a nonblocking assignment carries the value its
+// right-hand side had where the statement ran, whatever happens to the objects
+// it was read from before the NBA region.
+//
+// The writer has to be one that can reach a value already sampled, and most
+// cannot. Assigning the source variable as a whole -- `d <= s; s = 16'h00BB;`
+// -- gives `s` a fresh value and leaves anything reading the old one alone, so
+// it would pass without the clause being honoured at all. A packed struct
+// member deposit is different in kind: §7.2.1 packs the members into one
+// variable's bits, so `s.b` names a window inside `s` rather than storage of
+// its own, and clearing it writes through the bits that are already there.
+// Whatever else is looking at those bits sees the new value, and the sampled
+// right-hand side of a pending nonblocking assignment is looking at them.
+//
+// `s` holds 16'hAABB where the `<=` runs, so the update owes `d` 16'hAABB.
+// Reading `s`'s bits again in the NBA region -- after `s.b` was cleared --
+// gives 16'h00BB, and an update that was never placed leaves the 16'h1234 the
+// blocking write put in `d`. The three are distinct values, so none of the
+// three verdicts can be mistaken for another.
+TEST(NonblockingAssignSchedulingSim, SampledRhsSurvivesMemberDeposit) {
+  ExpectSampledStructSurvivesMemberDeposit(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] b; logic [7:0] l; } pair_t;\n"
+      "  pair_t s;\n"
+      "  logic [15:0] d;\n"
+      "  initial begin\n"
+      "    d = 16'h1234;\n"
+      "    s = 16'hAABB;\n"
+      "    d <= s;\n"
+      "    s.b = 8'h00;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n");
+}
+
+// The same rule over the widest interval the language puts between reading a
+// right-hand side and placing the update it feeds: §9.4.5's intra-assignment
+// event control, where the value is taken when the statement runs and the
+// update waits for an edge that may be many time steps away. §4.9.4 names the
+// placing of the update as the moment whose values count, and §10.4.2 has the
+// right-hand expression of a nonblocking assignment evaluated where the
+// statement executes; between those two the wait is simply time the sampled
+// value has to survive, not a second chance to read the source.
+//
+// Splitting this from the case above is worth it because the two sample in
+// different places -- one schedules the update where the statement runs, the
+// other hands the value to a process that will schedule it later -- so a
+// sampled value made safe in one need not be safe in the other.
+//
+// The second process opens the interval as wide as the case needs: it clears
+// `s.b` at time 2 and drives the posedge at time 5, so the deposit falls
+// strictly between the sampling and the placing, with a time step on either
+// side of it. The three outcomes are the three of the case above, reached over
+// five ticks instead of none.
+TEST(NonblockingAssignSchedulingSim, EventControlRhsSurvivesMemberDeposit) {
+  ExpectSampledStructSurvivesMemberDeposit(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] b; logic [7:0] l; } pair_t;\n"
+      "  pair_t s;\n"
+      "  logic [15:0] d;\n"
+      "  logic clk;\n"
+      "  initial begin\n"
+      "    clk = 1'b0;\n"
+      "    d = 16'h1234;\n"
+      "    s = 16'hAABB;\n"
+      "    d <= @(posedge clk) s;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #2;\n"
+      "    s.b = 8'h00;\n"
+      "    #3;\n"
+      "    clk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n");
+}

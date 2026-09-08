@@ -59,6 +59,42 @@ static void ScheduleNbaEvent(Event* event, uint64_t delay_ticks,
                                    region, event);
 }
 
+// §4.9.4: "The values in effect when the update is placed in the event
+// region are used to compute both the right-hand value and the left-hand
+// target." EvalExpr on a bare identifier hands back the variable's own vec
+// (evaluation.cpp), and copying a Logic4Vec copies its `words` pointer rather
+// than the words (common/types.h), so a sampled right-hand value aliases the
+// storage it was read from. A whole-variable write replaces that storage and
+// cannot be seen through the alias, but an in-place writer reaches through it
+// and changes what a pending update will store: the packed struct member
+// deposit WriteResolvedField makes (statement_assign.cpp) left
+// `s = 16'hAABB; d <= s; s.b = 8'h00;` storing 16'h00BB, and the CoerceTo2State
+// in SetupWholeVarNbaCallback below writes through the alias in the other
+// direction, clearing the source variable's x and z bits when the target is
+// 2-state.
+//
+// The copy is taken once, where the value is sampled, so every capture
+// downstream already owns its words. A Logic4Snapshot is the wrong tool for it
+// even though it is the right one for the lvalue index snapshots below: a
+// snapshot's storage is a member of the snapshot object, so a callback doing
+// `var->value = snap.Get()` would leave the variable pointing at words that
+// die with the lambda. Those index snapshots are read and discarded inside the
+// callback body; this value has to outlive the callback, which is what the
+// arena gives it.
+//
+// ExtractBitField copies the bits -- multi-word safe and 4-state preserving --
+// but builds its result with MakeLogic4Vec, which leaves is_real, is_signed
+// and is_string at their defaults. Those are read downstream, where
+// ConvertRealForKnownLhs converts across the §6.12.1 real boundary on is_real
+// and ResizeToWidth sign-extends on is_signed, so they are carried over here.
+static Logic4Vec SampleNbaRhs(const Logic4Vec& val, Arena& arena) {
+  Logic4Vec copy = ExtractBitField(arena, val, 0, val.width);
+  copy.is_real = val.is_real;
+  copy.is_signed = val.is_signed;
+  copy.is_string = val.is_string;
+  return copy;
+}
+
 // Append the elements of array `info` named `base` (in declared order) to
 // `elems`. Missing element variables are skipped, matching a sparse store.
 static void AppendArrayElements(std::string_view base, const ArrayInfo* info,
@@ -100,6 +136,15 @@ static void CollectArrayConcatElements(const Expr* rhs, SimContext& ctx,
     if (TryAppendConcatIdentifier(item, ctx, elems)) continue;
     elems.push_back(EvalExpr(item, ctx, arena));
   }
+}
+
+// Replace each collected element with a copy that owns its words. Every
+// collector pushes a variable's own vec or a queue's own elements, so every
+// entry arrives aliasing live storage. Copying here rather than inside each
+// collector reaches the queue splice and CollectQueueElements
+// (statement_assign_pattern.cpp) as well, and asks no collector for an arena.
+static void SampleConcatElements(std::vector<Logic4Vec>& elems, Arena& arena) {
+  for (auto& elem : elems) elem = SampleNbaRhs(elem, arena);
 }
 
 // Schedule the per-element NBA writes for an unpacked-array concatenation
@@ -165,6 +210,7 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   } else {
     CollectQueueElements(stmt->rhs, ctx, arena, elems);
   }
+  SampleConcatElements(elems, arena);
 
   uint64_t delay = 0;
   if (stmt->delay) delay = EvalExpr(stmt->delay, ctx, arena).ToUint64();
@@ -200,6 +246,9 @@ StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
 
   auto rhs_val = EvalRhsWithStructContext(stmt, ctx, arena);
   rhs_val = ApplyStreamPackToTargetWidening(stmt, rhs_val, ctx, arena);
+  // Every capture reached through ScheduleNonblockingAssign flows from here, so
+  // one copy at the point of sampling covers all of them.
+  rhs_val = SampleNbaRhs(rhs_val, arena);
 
   uint64_t delay = 0;
   if (stmt->delay) delay = EvalExpr(stmt->delay, ctx, arena).ToUint64();
