@@ -121,21 +121,6 @@ static bool TaggedUnionTagMismatch(std::string_view base_name,
   return true;
 }
 
-// Writes a packed struct/union member into base_var when field_name names one
-// of info's fields. Returns true when the field was found and written.
-static bool WriteStructFieldBits(Variable* base_var, const StructTypeInfo* info,
-                                 std::string_view field_name,
-                                 const Logic4Vec& rhs_val) {
-  uint32_t bit_offset = 0;
-  uint32_t width = 0;
-  if (!ResolveStructFieldPath(info, field_name, &bit_offset, &width)) {
-    return false;
-  }
-  DepositBitField(base_var->value, bit_offset, rhs_val, width);
-  base_var->NotifyWatchers();
-  return true;
-}
-
 // Writes `field` onto class object `obj`, honoring declared-type scoping
 // (§8.15) when the type is known so a base field is written rather than a
 // shadowing derived one.
@@ -183,148 +168,194 @@ static void SetClassField(ClassObject* obj, const ClassTypeInfo* declared_type,
     obj->SetProperty(std::string(field), stored);
 }
 
-// Writes a (possibly chained) field path into class object `obj`. A chained
-// path `first.rest` (e.g. `a.val`) fetches `first` as a class handle and
-// recurses into the referenced object, so `o2.a.val = 88` reaches the same
-// Inner object shared by a shallow copy (§8.12) rather than creating a flat
-// "a.val" key on the outer object. Mirrors ResolveClassFieldChain on the read
-// side; the inner fields carry no declared-type shadowing context. When `first`
-// is not a live handle, the whole dotted path falls back to a flattened key
-// (the legacy nested-handle storage scheme).
-static void WriteClassFieldChain(ClassObject* obj,
-                                 const ClassTypeInfo* declared_type,
-                                 std::string_view field_path,
-                                 const Logic4Vec& rhs_val, SimContext& ctx) {
+// Walks a (possibly chained) field path down to the object that holds its last
+// field. A chained path `first.rest` (e.g. `a.val`) fetches `first` as a class
+// handle and descends into the referenced object, so `o2.a.val = 88` reaches
+// the same Inner object shared by a shallow copy (§8.12) rather than naming a
+// flat "a.val" key on the outer object. Mirrors ResolveClassFieldChain on the
+// read side; the inner fields carry no declared-type shadowing context. When
+// `first` is not a live handle, the whole remaining path stays with the object
+// in hand and is stored under a flattened key (the legacy nested-handle storage
+// scheme).
+static FieldTarget ResolveClassFieldTarget(ClassObject* obj,
+                                           const ClassTypeInfo* declared_type,
+                                           std::string_view field_path,
+                                           SimContext& ctx) {
   auto dot = field_path.find('.');
-  if (dot == std::string_view::npos) {
-    SetClassField(obj, declared_type, field_path, rhs_val, ctx.GetArena());
-    return;
+  if (dot != std::string_view::npos) {
+    auto& arena = ctx.GetArena();
+    auto first = field_path.substr(0, dot);
+    Logic4Vec handle_val =
+        declared_type ? obj->GetPropertyForType(first, declared_type, arena)
+                      : obj->GetProperty(first, arena);
+    if (auto* next_obj = ctx.GetClassObject(handle_val.ToUint64())) {
+      return ResolveClassFieldTarget(next_obj, nullptr,
+                                     field_path.substr(dot + 1), ctx);
+    }
   }
-  auto& arena = ctx.GetArena();
-  auto first = field_path.substr(0, dot);
-  auto rest = field_path.substr(dot + 1);
-  Logic4Vec handle_val =
-      declared_type ? obj->GetPropertyForType(first, declared_type, arena)
-                    : obj->GetProperty(first, arena);
-  auto* next_obj = ctx.GetClassObject(handle_val.ToUint64());
-  if (!next_obj) {
-    SetClassField(obj, declared_type, field_path, rhs_val, arena);
-    return;
-  }
-  WriteClassFieldChain(next_obj, nullptr, rest, rhs_val, ctx);
+  FieldTarget target;
+  target.kind = FieldTarget::Kind::kProperty;
+  target.obj = obj;
+  target.type = declared_type;
+  target.field = std::string(field_path);
+  return target;
 }
 
-// Writes field_name into the class object referenced by base_var. Returns true
-// when base_var refers to a live class object (the write is always performed in
-// that case).
-static bool WriteClassObjectField(Variable* base_var,
-                                  std::string_view base_name,
-                                  std::string_view field_name,
-                                  const Logic4Vec& rhs_val, SimContext& ctx) {
-  auto handle = base_var->value.ToUint64();
-  auto* obj = ctx.GetClassObject(handle);
-  if (!obj) return false;
+// The field of the class object base_var refers to. Answers a kNone target when
+// the handle refers to no live object, which is the base that names no storage.
+static FieldTarget ResolveClassObjectField(Variable* base_var,
+                                           std::string_view base_name,
+                                           std::string_view field_name,
+                                           SimContext& ctx) {
+  auto* obj = ctx.GetClassObject(base_var->value.ToUint64());
+  if (!obj) return {};
   const ClassTypeInfo* declared_type = nullptr;
   auto declared = ctx.GetVariableClassType(base_name);
   if (!declared.empty()) declared_type = ctx.FindClassType(declared);
-  WriteClassFieldChain(obj, declared_type, field_name, rhs_val, ctx);
-  base_var->NotifyWatchers();
-  return true;
+  FieldTarget target =
+      ResolveClassFieldTarget(obj, declared_type, field_name, ctx);
+  target.notify = base_var;
+  return target;
 }
 
-// Writes field_name into the current `this` object. *handled is set true when
-// base_name names `this`; in that case the returned value is the write result.
-static bool WriteThisField(std::string_view base_name,
-                           std::string_view field_name,
-                           const Logic4Vec& rhs_val, SimContext& ctx,
-                           bool* handled) {
+// The field of the current `this` object. *handled is set true when base_name
+// names `this`; the target answered is then the whole answer.
+static FieldTarget ResolveThisField(std::string_view base_name,
+                                    std::string_view field_name,
+                                    SimContext& ctx, bool* handled) {
   *handled = false;
-  if (base_name != "this") return false;
+  if (base_name != "this") return {};
   *handled = true;
   auto* self = ctx.CurrentThis();
-  if (!self) return false;
-  self->SetProperty(
-      std::string(field_name),
-      CoerceToPropertyType(self->type, field_name, rhs_val, ctx.GetArena()));
-  return true;
+  if (!self) return {};
+  FieldTarget target;
+  target.kind = FieldTarget::Kind::kProperty;
+  target.obj = self;
+  target.field = std::string(field_name);
+  return target;
 }
 
-// Writes field_name into the parent slice of the current `this` object via
+// The field of the parent slice of the current `this` object, reached through
 // `super`. *handled is set true when base_name names `super`.
-static bool WriteSuperField(std::string_view base_name,
-                            std::string_view field_name,
-                            const Logic4Vec& rhs_val, SimContext& ctx,
-                            bool* handled) {
+static FieldTarget ResolveSuperField(std::string_view base_name,
+                                     std::string_view field_name,
+                                     SimContext& ctx, bool* handled) {
   *handled = false;
-  if (base_name != "super") return false;
+  if (base_name != "super") return {};
   *handled = true;
   auto* self = ctx.CurrentThis();
-  if (!(self && self->type && self->type->parent)) return false;
-  self->SetPropertyForType(std::string(field_name), self->type->parent,
-                           CoerceToPropertyType(self->type->parent, field_name,
-                                                rhs_val, ctx.GetArena()));
-  return true;
+  if (!(self && self->type && self->type->parent)) return {};
+  FieldTarget target;
+  target.kind = FieldTarget::Kind::kProperty;
+  target.obj = self;
+  target.type = self->type->parent;
+  target.field = std::string(field_name);
+  return target;
 }
 
-// Writes field_name as a static property of the class named base_name.
-// *handled is set true when base_name names a known class type.
-static bool WriteStaticClassField(std::string_view base_name,
-                                  std::string_view field_name,
-                                  const Logic4Vec& rhs_val, SimContext& ctx,
-                                  bool* handled) {
+// The static property field_name of the class named base_name. *handled is set
+// true when base_name names a known class type.
+static FieldTarget ResolveStaticClassField(std::string_view base_name,
+                                           std::string_view field_name,
+                                           SimContext& ctx, bool* handled) {
   *handled = false;
   auto* cls_type = ctx.FindClassType(base_name);
-  if (!cls_type) return false;
+  if (!cls_type) return {};
   *handled = true;
   auto sit = cls_type->static_properties.find(std::string(field_name));
-  if (sit == cls_type->static_properties.end()) return false;
-  sit->second =
-      CoerceToPropertyType(cls_type, field_name, rhs_val, ctx.GetArena());
-  return true;
+  if (sit == cls_type->static_properties.end()) return {};
+  FieldTarget target;
+  target.kind = FieldTarget::Kind::kStatic;
+  target.type = cls_type;
+  target.slot = &sit->second;
+  target.field = std::string(field_name);
+  return target;
 }
 
-// Writes field_name into the variable named base_name, which may be a packed
+// The field field_name of the variable named base_name, which may be a packed
 // struct/union or a class-object handle. The caller has confirmed base_name is
-// neither this/super nor a class type.
-static bool WriteVariableField(std::string_view base_name,
-                               std::string_view field_name,
-                               const Logic4Vec& rhs_val, SimContext& ctx,
-                               SourceLoc loc) {
+// neither this/super nor a class type. `loc` is the position a tagged-union tag
+// mismatch is reported at.
+static FieldTarget ResolveVariableField(std::string_view base_name,
+                                        std::string_view field_name,
+                                        SimContext& ctx, SourceLoc loc) {
   auto* base_var = ctx.FindVariable(base_name);
-  if (!base_var) return false;
-  auto* info = ctx.GetVariableStructType(base_name);
+  if (!base_var) return {};
+  const auto* info = ctx.GetVariableStructType(base_name);
   if (info) {
+    FieldTarget target;
     if (info->is_union &&
         TaggedUnionTagMismatch(base_name, field_name, ctx, loc)) {
-      return true;
+      target.kind = FieldTarget::Kind::kNoOp;
+      return target;
     }
-    if (WriteStructFieldBits(base_var, info, field_name, rhs_val)) return true;
+    if (ResolveStructFieldPath(info, field_name, &target.bit_offset,
+                               &target.width)) {
+      target.kind = FieldTarget::Kind::kBits;
+      target.var = base_var;
+      return target;
+    }
   }
-  return WriteClassObjectField(base_var, base_name, field_name, rhs_val, ctx);
+  return ResolveClassObjectField(base_var, base_name, field_name, ctx);
+}
+
+FieldTarget ResolveFieldTarget(const Expr* lhs, SimContext& ctx) {
+  std::string name;
+  BuildLhsName(lhs, name);
+  auto dot = name.find('.');
+  if (dot == std::string::npos) return {};
+  auto base_name = std::string_view(name).substr(0, dot);
+  auto field_name = std::string_view(name).substr(dot + 1);
+
+  bool handled = false;
+  FieldTarget target = ResolveThisField(base_name, field_name, ctx, &handled);
+  if (handled) return target;
+  target = ResolveSuperField(base_name, field_name, ctx, &handled);
+  if (handled) return target;
+  target = ResolveStaticClassField(base_name, field_name, ctx, &handled);
+  if (handled) return target;
+  return ResolveVariableField(base_name, field_name, ctx, lhs->range.start);
+}
+
+void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
+                        Arena& arena) {
+  switch (target.kind) {
+    case FieldTarget::Kind::kBits:
+      DepositBitField(target.var->value, target.bit_offset, rhs_val,
+                      target.width);
+      target.var->NotifyWatchers();
+      return;
+    case FieldTarget::Kind::kProperty:
+      SetClassField(target.obj, target.type, target.field, rhs_val, arena);
+      // Only a path read out of a variable notifies, which is where the
+      // blocking form notifies; `this` and `super` are read off the process.
+      if (target.notify) target.notify->NotifyWatchers();
+      return;
+    case FieldTarget::Kind::kStatic:
+      *target.slot =
+          CoerceToPropertyType(target.type, target.field, rhs_val, arena);
+      return;
+    case FieldTarget::Kind::kNone:
+    case FieldTarget::Kind::kNoOp:
+      return;
+  }
 }
 
 bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
                       SimContext& ctx) {
   // §7.8.7: `b[2].x = 5` names a member of an associative array element, which
-  // the name built below cannot reach because the select contributes nothing
-  // to it. Allocate the element and write the member through the array.
+  // the name ResolveFieldTarget builds cannot reach because the select
+  // contributes nothing to it. Allocate the element and write the member
+  // through the array.
   if (TryWriteAssocMemberField(lhs, rhs_val, ctx, ctx.GetArena())) return true;
-  std::string name;
-  BuildLhsName(lhs, name);
-  auto dot = name.find('.');
-  if (dot == std::string::npos) return false;
-  auto base_name = std::string_view(name).substr(0, dot);
-  auto field_name = std::string_view(name).substr(dot + 1);
-
-  bool handled = false;
-  bool result = WriteThisField(base_name, field_name, rhs_val, ctx, &handled);
-  if (handled) return result;
-  result = WriteSuperField(base_name, field_name, rhs_val, ctx, &handled);
-  if (handled) return result;
-  result = WriteStaticClassField(base_name, field_name, rhs_val, ctx, &handled);
-  if (handled) return result;
-  return WriteVariableField(base_name, field_name, rhs_val, ctx,
-                            lhs->range.start);
+  // §10.4.2 has a blocking assignment resolve its target and deposit the value
+  // at the one moment, so the two halves are asked back to back here. A
+  // nonblocking assignment asks ResolveFieldTarget alone and defers
+  // WriteResolvedField to the update region.
+  FieldTarget target = ResolveFieldTarget(lhs, ctx);
+  if (target.kind == FieldTarget::Kind::kNone) return false;
+  WriteResolvedField(target, rhs_val, ctx.GetArena());
+  return true;
 }
 
 // Deposits `rhs_val` in the window of `var` that `bits` names. §11.5.1 has a

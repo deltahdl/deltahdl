@@ -261,11 +261,13 @@ struct AnyChangeAwaiter {
   // elsewhere -- CollectSelectReads (src/elaborator/sensitivity.cpp:48-50) puts
   // the select's base identifier `q` into the read set.
   //
-  // A class handle's `value` is the handle, not the object:
-  // WriteClassObjectField (src/simulator/statement_assign.cpp:222-232) writes
-  // the field into the ClassObject and then notifies the handle variable, whose
-  // bits never moved. `wait (obj.f == 1)` arms on `obj`, CollectExprReads
-  // recursing through a member access into both sides of it.
+  // A class handle's `value` is the handle, not the object: the kProperty arm
+  // of WriteResolvedField (src/simulator/statement_assign.cpp) writes the field
+  // into the ClassObject and then notifies the handle variable, whose bits
+  // never moved. `wait (obj.f == 1)` arms on `obj`, CollectExprReads recursing
+  // through a member access into both sides of it. Only a path read out of a
+  // variable carries a handle to notify; `this` and `super` are read off the
+  // running process and notify nothing, which is #3543.
   //
   // FindArrayInfo is deliberately not consulted. It registers a shape (extents
   // and element width), not a store, and the two shapes it can name are already

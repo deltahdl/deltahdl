@@ -536,4 +536,90 @@ TEST(NonblockingAssignSim, MultidimElementTargetLeavesTheArrayBaseAlone) {
   LowerRunAndCheck(f, design, {{"A", 0u}, {"A[1][2]", 43u}, {"A[0][1]", 5u}});
 }
 
+// §10.4.2 gives the nonblocking form the target the blocking form takes --
+// "variable_lvalue is a data type that is valid for a procedural assignment
+// statement" -- and A.8.5 makes a dotted path onto a class property the first
+// production of variable_lvalue. §8.3 keeps that property in the object the
+// handle designates rather than in any variable of the module, which is the
+// whole of what went wrong here: ResolveLhsVariable rebuilt the name "h.f" and
+// asked ctx.FindVariable, the variable table holds no such key because the
+// property is a member of ClassObject, and ScheduleNonblockingAssign returned
+// on the null before acquiring an update event -- no write, no event and no
+// diagnostic. The blocking form reaches the property through AssignToScalarLhs,
+// which falls back to the struct-field writer for a member access, so the two
+// forms disagreed about whether the statement happened at all.
+//
+// The blocking `h.f = 8'h11` standing in front of the nonblocking write is what
+// lets the case name the failure rather than merely notice one. A property
+// never written would read 0 both when the scheduled write was dropped and when
+// no write reached the object at all; starting it at 8'h11 separates those, an
+// answer of 8'h11 saying the object is there and holding what the blocking form
+// put in it. The #1 lets the update region run before `r` samples the property.
+TEST(NonblockingAssignSim, ClassPropertyTargetReceivesTheScheduledWrite) {
+  SimFixture f;
+  auto* sampled = RunAndFindVar(
+      "class C;\n"
+      "  logic [7:0] f;\n"
+      "endclass\n"
+      "module t;\n"
+      "  C h;\n"
+      "  logic [7:0] r;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    h.f = 8'h11;\n"
+      "    h.f <= 8'hA5;\n"
+      "    #1 r = h.f;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(sampled, nullptr);
+  EXPECT_EQ(sampled->value.ToUint64(), 0xA5u);
+}
+
+// The same sentence of §10.4.2 settles when the handle in that path is read: a
+// "class handle" in the left-hand side "shall be evaluated at the same time as
+// the expression on the right-hand side", which is where the statement
+// executes and not where the update region runs. So `h.f <= 8'hA5` followed by
+// `h = other` in the same time step writes the object h designated when the
+// statement ran, and leaves the object it was pointed at afterwards alone.
+//
+// This is the case that pins the design of the member-access arm rather than
+// its existence. Resolving the property from inside the update callback -- the
+// obvious shape, that being where the write is performed -- would follow the
+// reassigned handle, put 8'hA5 on `other` and leave the original object at the
+// 8'h11 the blocking assignment gave it. Each object is read back through a
+// handle that still designates it, `keep` for the original and `other` for the
+// second, so the pair of expectations tells those two outcomes apart instead of
+// reporting one number that either could produce. The two starting values 8'h11
+// and 8'h22 differ for the same reason: equal ones would leave each read unable
+// to say which object it found.
+TEST(NonblockingAssignSim, ClassHandleInTheTargetIsResolvedAtScheduleTime) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  logic [7:0] f;\n"
+      "endclass\n"
+      "module t;\n"
+      "  C h;\n"
+      "  C other;\n"
+      "  C keep;\n"
+      "  logic [7:0] r;\n"
+      "  logic [7:0] seen;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    other = new;\n"
+      "    keep = h;\n"
+      "    h.f = 8'h11;\n"
+      "    other.f = 8'h22;\n"
+      "    h.f <= 8'hA5;\n"
+      "    h = other;\n"
+      "    #1 r = keep.f;\n"
+      "    seen = other.f;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors) << "source reported an elaboration error";
+  LowerRunAndCheck(f, design, {{"r", 0xA5u}, {"seen", 0x22u}});
+}
+
 }  // namespace

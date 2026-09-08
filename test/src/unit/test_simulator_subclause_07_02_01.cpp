@@ -233,4 +233,45 @@ TEST(PackedStructSimulation, MemberWriteUpdatesWholeVector) {
   EXPECT_EQ(v, 0xAB00u);
 }
 
+// §7.2.1 makes a member of a packed structure a named window on the bits of one
+// variable -- the members "are packed together in memory without gaps" -- and
+// §10.4.2 asks of a nonblocking target only that "variable_lvalue is a data
+// type that is valid for a procedural assignment statement", which A.8.5 opens
+// with the dotted member path. So `s.b <= 8'hA5` has to reach the same eight
+// bits that WriteTwoStateValueToBitMember_OverwritesPriorX above reaches with
+// `=`, the two forms differing only in when the write lands.
+//
+// They differed in whether it landed at all. ScheduleNonblockingAssign resolved
+// a member-access target through ResolveLhsVariable, which rebuilds the dotted
+// name and asks ctx.FindVariable; a packed member is a bit field inside `s` and
+// no variable is registered under "s.b", so the lookup answered null and the
+// function returned having acquired no update event, performed no write and
+// reported no diagnostic. `r` read 8'h00.
+//
+// The whole structure is asserted beside `r` because `r` alone cannot say which
+// bits the write reached: a write that landed on the low half would leave `s`
+// at 16'h00A5 while `r`, reading the member back through the same wrong window,
+// could still answer 8'hA5. `s` at 16'hA500 is the member in its declared
+// place, the high byte, with the four-state half below it untouched. The #1 is
+// required rather than decorative -- a nonblocking assignment takes effect in
+// the update region, so a read at time 0 answers the old value however the
+// scheduling behaves.
+TEST(PackedStructSimulation, NonblockingWriteToBitMemberReachesThatMember) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { bit [7:0] b; logic [7:0] l; } mixed_t;\n"
+      "  mixed_t s;\n"
+      "  logic [7:0] r;\n"
+      "  initial begin\n"
+      "    s = 16'h0000;\n"
+      "    s.b <= 8'hA5;\n"
+      "    #1 r = s.b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors) << "source reported an elaboration error";
+  LowerRunAndCheck(f, design, {{"r", 0xA5u}, {"s", 0xA500u}});
+}
+
 }  // namespace

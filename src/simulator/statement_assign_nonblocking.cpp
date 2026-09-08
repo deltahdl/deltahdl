@@ -47,6 +47,18 @@ struct NbaScheduleSlot {
 static void SetupWholeVarNbaCallback(Event* event, Variable* var,
                                      const Logic4Vec& rhs_val);
 
+// Hands `event` to the scheduler as a nonblocking update: the NBA region, or
+// the reactive one when the statement runs in a reactive context, at the time
+// an intra-assignment delay of `delay_ticks` puts it. The schedulers below
+// differ in the callback they install and not in where the event goes, so
+// where it goes is stated once.
+static void ScheduleNbaEvent(Event* event, uint64_t delay_ticks,
+                             SimContext& ctx) {
+  auto region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime() + SimTime{delay_ticks},
+                                   region, event);
+}
+
 // Append the elements of array `info` named `base` (in declared order) to
 // `elems`. Missing element variables are skipped, matching a sparse store.
 static void AppendArrayElements(std::string_view base, const ArrayInfo* info,
@@ -365,9 +377,7 @@ static void ScheduleConcatNba(const Stmt* stmt, const Logic4Vec& rhs_val,
     TryUnpackConcatLhs(lhs, rhs_val, ctx, arena);
     ClearLhsIndexSnapshots(snaps, ctx);
   };
-  auto region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
-  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime() + SimTime{delay_ticks},
-                                   region, event);
+  ScheduleNbaEvent(event, delay_ticks, ctx);
 }
 
 static void ScheduleStreamingConcatNba(const Stmt* stmt,
@@ -383,9 +393,7 @@ static void ScheduleStreamingConcatNba(const Stmt* stmt,
     UnpackStreamingConcatLhs(lhs, rhs_val, ctx, arena);
     ClearLhsIndexSnapshots(snaps, ctx);
   };
-  auto stream_region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
-  auto stream_time = ctx.CurrentTime() + SimTime{delay_ticks};
-  ctx.GetScheduler().ScheduleEvent(stream_time, stream_region, stream_event);
+  ScheduleNbaEvent(stream_event, delay_ticks, ctx);
 }
 
 // §11.5.1: install the deferred update that deposits the sampled right-hand
@@ -488,6 +496,48 @@ static Variable* ResolveNbaSelectElement(const Expr* lhs, SimContext& ctx,
   return TryResolveCompoundElement(lhs, ctx, arena);
 }
 
+// §10.4.2 gives the nonblocking form the same `variable_lvalue` the blocking
+// form takes, and A.8.5 makes a dotted member path the first production of
+// variable_lvalue, so a member of a packed struct and a property of a class
+// object are nonblocking targets exactly as they are blocking ones. Neither is
+// a key in the variable table -- a packed member is a window of bits inside one
+// variable and a property lives on the ClassObject -- so ResolveLhsVariable
+// answers nothing for either and the assignment was dropped in silence: no
+// event, no write, no diagnostic.
+//
+// The target is resolved here, where the statement executes, and only the
+// deposit is deferred, for the reason SetupSelectNbaCallback resolves a
+// select's window here: §10.4.2 has an lvalue that "requires an evaluation,
+// such as an index expression, class handle, or virtual interface reference"
+// evaluated "at the same time as the expression on the right-hand side".
+// Calling WriteStructField from the callback would satisfy the clause for
+// neither, since it re-resolves the base itself -- `this` is a property of the
+// running process, which in the update region is no longer the process that
+// executed the statement, and the base handle is read from a variable that may
+// have been assigned since.
+//
+// Nothing is taken from the event pool until the target resolves, so a path
+// naming no storage -- a null handle, a `this` outside a method -- costs no
+// event. §10.4.2 leaves nothing to write there, which is the answer the
+// blocking form gives it too.
+static void ScheduleFieldNba(const Expr* lhs, const Logic4Vec& rhs_val,
+                             uint64_t delay_ticks, SimContext& ctx,
+                             Arena& arena) {
+  // A member access is the production this answers for, and it is the one the
+  // blocking form gates the same fallback on (AssignToScalarLhs and
+  // PerformBlockingAssign both ask WriteStructField on that kind alone), so the
+  // two forms reach it on the same left-hand sides and no others.
+  if (lhs->kind != ExprKind::kMemberAccess) return;
+  FieldTarget target = ResolveFieldTarget(lhs, ctx);
+  if (!target.HasDeposit()) return;
+  auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+  event->kind = EventKind::kUpdate;
+  event->callback = [target, rhs_val, &arena]() {
+    WriteResolvedField(target, rhs_val, arena);
+  };
+  ScheduleNbaEvent(event, delay_ticks, ctx);
+}
+
 void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
                                uint64_t delay_ticks, SimContext& ctx,
                                Arena& arena) {
@@ -508,7 +558,10 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
   bool is_select = (stmt->lhs->kind == ExprKind::kSelect);
   auto* elem = ResolveNbaSelectElement(stmt->lhs, ctx, arena);
   auto* var = elem ? elem : ResolveLhsVariable(stmt->lhs, ctx);
-  if (!var) return;
+  if (!var) {
+    ScheduleFieldNba(stmt->lhs, rhs_val, delay_ticks, ctx, arena);
+    return;
+  }
 
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
 
@@ -538,9 +591,7 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
         ConvertRealOnAssign(rhs_val, stmt->lhs, var->value.width, ctx, arena);
     SetupWholeVarNbaCallback(event, var, converted);
   }
-  auto nba_region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
-  auto schedule_time = ctx.CurrentTime() + SimTime{delay_ticks};
-  ctx.GetScheduler().ScheduleEvent(schedule_time, nba_region, event);
+  ScheduleNbaEvent(event, delay_ticks, ctx);
 }
 
 }  // namespace delta

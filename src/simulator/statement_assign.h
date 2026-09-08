@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 #include "common/packed_range.h"
@@ -11,6 +12,7 @@ namespace delta {
 struct Expr;
 struct Stmt;
 struct Variable;
+struct ClassObject;
 struct ClassTypeInfo;
 class SimContext;
 class Arena;
@@ -39,8 +41,78 @@ bool BuildCompoundLhsName(const Expr* expr, SimContext& ctx, Arena& arena,
 Variable* TryResolveCompoundElement(const Expr* lhs, SimContext& ctx,
                                     Arena& arena);
 Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx);
+
+// The storage a dotted member path names, resolved away from the expression
+// that named it.
+//
+// §10.4.2 gives a nonblocking assignment the same `variable_lvalue` a blocking
+// one takes, and A.8.5 makes a member path -- `s.field`, `h.prop`, `this.prop`
+// -- the first production of variable_lvalue, so the same paths are targets of
+// both forms. Where such a path "requires an evaluation, such as an index
+// expression, class handle, or virtual interface reference", §10.4.2 has it
+// "evaluated at the same time as the expression on the right-hand side": the
+// path is resolved when the statement executes, and a nonblocking assignment
+// defers only the deposit. That is why the resolution is an entity of its own
+// rather than a step inside the write.
+struct FieldTarget {
+  enum class Kind : uint8_t {
+    kNone,      // the path names no storage; the caller declines
+    kNoOp,      // storage that takes no value -- a write to a member of a
+                // tagged union carrying another tag (§11.9), already reported
+    kBits,      // a window of bits inside a packed struct or union variable
+    kProperty,  // a property of one class object (§8.5)
+    kStatic,    // a static property of one class type (§8.9)
+  };
+  Kind kind = Kind::kNone;
+
+  // kBits: the variable holding the packed object, and the window of it the
+  // member occupies.
+  Variable* var = nullptr;
+  uint32_t bit_offset = 0;
+  uint32_t width = 0;
+
+  // kProperty: the object holding the field. A class object is arena-allocated
+  // and the class garbage collector only unregisters it, so the pointer stays
+  // good for the run; holding it is what lets a deferred write reach the object
+  // resolved when the statement executed rather than re-reading `this` or the
+  // base handle in the update region, where the running process is another one.
+  ClassObject* obj = nullptr;
+  // kProperty: the declared type that scopes the write (§8.15), null when the
+  // object's own type governs. kStatic: the class type whose declaration the
+  // value is coerced to.
+  const ClassTypeInfo* type = nullptr;
+  // kProperty: the variable the handle was read from, notified after the write;
+  // null where the path went through `this` or `super`, neither of which is
+  // read from a variable.
+  Variable* notify = nullptr;
+
+  // kStatic: the entry in the class type's shared static-property map.
+  Logic4Vec* slot = nullptr;
+
+  // kProperty and kStatic: the property's name, or the part of a dotted path
+  // that is stored under one key.
+  std::string field;
+
+  // Whether a value is to be deposited: kNone found no storage and kNoOp
+  // resolved storage that takes none.
+  bool HasDeposit() const { return kind != Kind::kNone && kind != Kind::kNoOp; }
+};
+
+// Resolves the member path `lhs` to the storage it names, evaluating the base
+// -- `this`, `super`, a class type, or a variable holding a packed object or a
+// handle -- as §10.4.2 requires of the moment the statement executes.
+FieldTarget ResolveFieldTarget(const Expr* lhs, SimContext& ctx);
+
+// Deposits `rhs_val` in already-resolved storage. Nothing is re-resolved here,
+// so this is what a nonblocking assignment runs in the update region.
+void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
+                        Arena& arena);
+
+// Resolve-then-write for a blocking assignment, which does both when the
+// statement executes. Returns false when the path names no storage.
 bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
                       SimContext& ctx);
+
 // §11.5.1: the storage bits of `var` that the select `sel` addresses, resolved
 // against the declaration, since "the actual bit that is accessed by an address
 // is, in part, determined by the declaration". A width of zero is the select
