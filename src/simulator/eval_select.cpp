@@ -306,14 +306,24 @@ static bool TryArraySliceSelect(const Expr* expr, SimContext& ctx, Arena& arena,
 // the result's least significant bit was read from; it is negative when the
 // select runs off the low end of the value, and `lo_off + width` exceeds the
 // value's width when it runs off the high end.
+//
+// This marking and the copy in EvalPartSelect below divide the result between
+// them: the copy owns the positions the value holds, this owns every other
+// one, which is why the `continue` is here and why neither writes where the
+// other does. See that function's comment for the copy's half of the bargain.
+// Both now resolve the word a result position lives in, so a select wider than
+// one word is marked above position 63 as well; the loop used to stop at 64
+// and leave the overhang of a partially out of range select at a known 0
+// there. An out-of-range bit reads x, not z, and Logic4Word spells x with aval
+// and bval both set, so the bit goes into both planes.
 static void MarkOutOfRangeBitsX(Logic4Vec* result, uint32_t base_width,
                                 int64_t lo_off, uint32_t width) {
   if (result->nwords == 0) return;
-  for (uint32_t b = 0; b < width && b < 64; ++b) {
+  for (uint32_t b = 0; b < width; ++b) {
     int64_t off = lo_off + b;
     if (off >= 0 && off < static_cast<int64_t>(base_width)) continue;
-    result->words[0].aval |= uint64_t{1} << b;
-    result->words[0].bval |= uint64_t{1} << b;
+    result->words[b / 64].aval |= uint64_t{1} << (b % 64);
+    result->words[b / 64].bval |= uint64_t{1} << (b % 64);
   }
 }
 

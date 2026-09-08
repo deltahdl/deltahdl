@@ -602,4 +602,110 @@ TEST(SelectBoundaryBehavior, BitSelectAboveTheFirstWordReadsThatWordsBit) {
   EXPECT_EQ(lo->value.ToString(), "0");
 }
 
+// §11.5.1: "Part-selects that are partially out of range shall, when read,
+// return x for the bits that are out of range." `a[70:0]` on a `logic [7:0] a`
+// names seventy-one indices, of which only a[7:0] are in range; result
+// positions 8 through 70 are not, and all sixty-three of them must read x --
+// including the seven that sit at position 64 and above, in the result's
+// second word.
+//
+// The second word is where the answer is still wrong. EvalSelect's two read
+// paths in src/simulator/eval_select.cpp now copy the window with
+// ExtractBitField, which carries the bval plane and indexes the word each bit
+// lands in, and which fills positions at or beyond the value's width with 0;
+// the marking that runs after it, MarkOutOfRangeBitsX, bounds its loop at
+// `b < width && b < 64` and ORs into `result->words[0]` alone. So positions 8
+// through 63 are marked and positions 64 through 70 are left exactly as the
+// copy left them, at a known 0. A known 0 is the one thing an out-of-range bit
+// must not read: it is indistinguishable from the vector holding a 0 there.
+//
+// The value is 8'hA5 rather than 8'hFF or 8'h00 so that the in-range byte is
+// one neither an erasure nor the marking could have produced. 1010_0101 is
+// neither all ones nor all zeros, so a first word reading 0xA5 in its low byte
+// says the copy ran and ran on the right eight bits, which is the premise the
+// second word's assertion rests on; against an all-ones vector the byte would
+// be indistinguishable from the x above it in the aval plane.
+//
+// The first word is right today -- 0xA5 in the low byte and x from position 8
+// up, which is aval 0xFFFF_FFFF_FFFF_FFA5 and bval 0xFFFF_FFFF_FFFF_FF00 --
+// and asserting it says the premise holds before the case accuses the second.
+// Positions 64 through 70 are seven bits, so the second word must read aval
+// 0x7F and bval 0x7F; today it reads 0x00 and 0x00, and that is the whole of
+// the wrong answer.
+//
+// The assertion cannot go through Logic4Vec::ToUint64. src/common/types.h
+// calls it a "numeric/boolean projection", it returns `aval & ~bval` so every
+// x reads 0, and it returns words[0] alone, so the seven bits in question are
+// not in what it answers at all.
+TEST(SelectBoundaryBehavior, PartSelectHighOverhangAboveTheFirstWordReadsX) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [70:0] r;\n"
+      "  initial begin\n"
+      "    a = 8'hA5;\n"
+      "    r = a[70:0];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  ASSERT_GE(var->value.nwords, 2u);
+  // x is (aval=1, bval=1), so an out-of-range position sets both planes; a
+  // word left at 0 in either plane is not seven x but seven known zeros.
+  EXPECT_EQ(var->value.words[1].aval, uint64_t{0x7F});
+  EXPECT_EQ(var->value.words[1].bval, uint64_t{0x7F});
+  // The first word is the part of the overhang the marking already reaches,
+  // and it is what says the copy put 8'hA5 where the clause asks.
+  EXPECT_EQ(var->value.words[0].aval, uint64_t{0xFFFFFFFFFFFFFFA5});
+  EXPECT_EQ(var->value.words[0].bval, uint64_t{0xFFFFFFFFFFFFFF00});
+}
+
+// The same sentence read from the other end of the vector, where the in-range
+// bits and the overhang exchange words. §11.5.1's second indexed form reads
+// `a[7 -: 80]` as the eighty indices 7 down to -72 -- the clause gives
+// `a_vect[15 -: 8]` as `a_vect[15 : 8]`, counting the width downwards from the
+// named index -- and only a[7:0] of those are in range. Index 7 is the
+// select's most significant end, so those eight bits are the result's most
+// significant eight, at positions 79 through 72, and the seventy-two positions
+// below them are out of range and must read x.
+//
+// That is what this spelling can ask and the high-end one cannot: here the
+// second word holds the copy's 8'hA5 at positions 72 through 79 and eight of
+// the x at positions 64 through 71, so the marking has to OR into a word
+// ExtractBitField has already written rather than fill an empty one. A
+// widening that cleared each word before filling it would pass the high-end
+// case, whose second word holds nothing but overhang, and lose the byte here.
+//
+// MarkOutOfRangeBitsX stops at position 63, so today positions 64 through 71
+// come back a known 0 and the second word reads aval 0xA500 and bval 0x0000
+// where §11.5.1 asks for aval 0xA5FF and bval 0x00FF. The first word is
+// sixty-four out-of-range positions and is all x in both planes today, since
+// every one of them is below the bound.
+//
+// The assertion is on Logic4Vec::ToString, which names all eighty positions in
+// one string and so pins the in-range byte, the overhang inside the second
+// word and the sixty-four x below it at once, rather than the two halves of
+// one word separately. The wrong answer differs from it in exactly the eight
+// characters for positions 71 through 64. ToUint64 could say none of it: it is
+// the projection that reads every x as 0 and it returns words[0] alone.
+TEST(SelectBoundaryBehavior, PartSelectLowOverhangAboveTheFirstWordReadsX) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [79:0] r;\n"
+      "  initial begin\n"
+      "    a = 8'hA5;\n"
+      "    r = a[7 -: 80];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  // 8'hA5 at the top, then seventy-two x. Today the eight characters just
+  // below the byte read "00000000" instead, and the rest of the string is
+  // already what the clause asks.
+  EXPECT_EQ(var->value.ToString(), "10100101" + std::string(72, 'x'));
+}
+
 }  // namespace
