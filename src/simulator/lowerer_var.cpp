@@ -430,14 +430,34 @@ static bool LowerDynArrayNewInit(const Expr* init_expr, QueueObject* q,
                         Subclause("7.5.1"));
     return true;
   }
-  q->elements.assign(static_cast<size_t>(sz),
-                     MakeLogic4VecVal(arena, q->elem_width, 0));
+  // §7.5.1: with no initialization expression "the elements are initialized to
+  // the default value for their type" -- elements, each one initialized, and
+  // §6.8 makes each "an abstraction of a data storage element" that "shall
+  // store a value from one assignment to the next", so each owes its own
+  // words. vector::assign(n, value) copy-constructs every slot it makes from
+  // the single value it is handed, and a Logic4Vec copy carries the `words`
+  // pointer rather than the words, so filling that way gave `int d[] =
+  // new[4];` one buffer read four times. Building the elements one at a time
+  // gives each its own allocation.
+  q->elements.clear();
+  q->elements.reserve(static_cast<size_t>(sz));
+  for (int64_t i = 0; i < sz; ++i)
+    q->elements.push_back(MakeLogic4VecVal(arena, q->elem_width, 0));
   if (init_expr->args.size() >= 2) {
     auto* src_expr = init_expr->args[1];
     if (src_expr && src_expr->kind == ExprKind::kIdentifier) {
       if (auto* src = ctx.FindQueue(src_expr->text)) {
+        // §7.5.1: "The optional initialization expression is used to
+        // initialize the dynamic array." Each entry it initializes is a store
+        // of its own, so each takes a copy of the source entry's words rather
+        // than the pointer a plain Logic4Vec assignment would leave the two
+        // sharing. The clause says what the sharing breaks: reinitializing
+        // with new "is destructive ... and all preexisting references to array
+        // elements become outdated", and an entry still naming the source's
+        // words is exactly such a reference left live.
         size_t copy_len = std::min(q->elements.size(), src->elements.size());
-        for (size_t i = 0; i < copy_len; ++i) q->elements[i] = src->elements[i];
+        for (size_t i = 0; i < copy_len; ++i)
+          q->elements[i] = OwnRhsWords(src->elements[i], arena);
       }
     }
   }
