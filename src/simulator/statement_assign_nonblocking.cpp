@@ -218,6 +218,121 @@ static void SetupWholeVarNbaCallback(Event* event, Variable* var,
   };
 }
 
+// §10.4.2: "If the variable_lvalue requires an evaluation, such as an index
+// expression, class handle, or virtual interface reference, it shall be
+// evaluated at the same time as the expression on the right-hand side", and
+// §4.9.4 has the values in effect when the update is placed in the event
+// region compute "both the right-hand value and the left-hand target". The two
+// brace arms below defer the write itself, which is where the write belongs --
+// resolving the elements at schedule time cannot answer for the forms their
+// unpackers handle -- but their unpackers evaluate the lvalue's index
+// expressions where they run, which is the update region. So `{a[idx], b} <= x`
+// read whatever `idx` held when the update fired rather than what it held when
+// the statement executed. These pair each index node under a left-hand side
+// with the value it has now, for the callback to install as the
+// deferred-argument snapshots EvalExpr consults before evaluating anything.
+// The value is held in a Logic4Snapshot rather than a Logic4Vec because a
+// Logic4Vec copy keeps pointing at the words it was copied from, and a write
+// does not always replace the words it writes -- the trap variable.h records
+// for #3358, where both sides of a comparison became one value. A snapshot
+// owns its words, so an in-place write to the object an index expression read
+// cannot reach back into what was sampled for the event still pending.
+using LhsIndexSnapshots = std::vector<std::pair<const Expr*, Logic4Snapshot>>;
+
+// Pair `node` with its value now, when there is a node to pair. A constant
+// index is paired like any other: it re-evaluates to the same value, so the
+// snapshot costs one entry and asks the walk no question about the expression.
+static void CollectIndexSnapshot(const Expr* node, SimContext& ctx,
+                                 Arena& arena, LhsIndexSnapshots& out) {
+  if (!node) return;
+  out.emplace_back();
+  out.back().first = node;
+  out.back().second.Capture(EvalExpr(node, ctx, arena));
+}
+
+static void CollectLhsIndexSnapshotsInto(const Expr* lhs, SimContext& ctx,
+                                         Arena& arena, LhsIndexSnapshots& out);
+
+// The indices of a select: its own, and then those of its base, since §7.4.5's
+// indexed name can name a select of a select.
+static void CollectSelectIndices(const Expr* sel, SimContext& ctx, Arena& arena,
+                                 LhsIndexSnapshots& out) {
+  CollectIndexSnapshot(sel->index, ctx, arena, out);
+  CollectIndexSnapshot(sel->index_end, ctx, arena, out);
+  CollectLhsIndexSnapshotsInto(sel->base, ctx, arena, out);
+}
+
+// The indices under each element of a concatenation, an assignment pattern or a
+// streaming concatenation. §11.4.14.3's `with` range is an index expression of
+// the element it qualifies -- ResolveWithRange evaluates it -- so it is taken
+// here alongside the element's own.
+static void CollectElementIndices(const Expr* expr, SimContext& ctx,
+                                  Arena& arena, LhsIndexSnapshots& out) {
+  for (const auto* elem : expr->elements) {
+    if (!elem) continue;
+    if (elem->with_expr) {
+      CollectIndexSnapshot(elem->with_expr->index, ctx, arena, out);
+      CollectIndexSnapshot(elem->with_expr->index_end, ctx, arena, out);
+    }
+    CollectLhsIndexSnapshotsInto(elem, ctx, arena, out);
+  }
+}
+
+static void CollectLhsIndexSnapshotsInto(const Expr* lhs, SimContext& ctx,
+                                         Arena& arena, LhsIndexSnapshots& out) {
+  if (!lhs) return;
+  // §10.9's type prefix is a cast around the pattern, and a nested
+  // concatenation is one of the forms UnpackConcatLhs walks, so the walk looks
+  // through the prefix at every level rather than only at the top.
+  const Expr* target = UnwrapTypedPattern(lhs);
+  if (!target) return;
+  switch (target->kind) {
+    case ExprKind::kSelect:
+      CollectSelectIndices(target, ctx, arena, out);
+      break;
+    case ExprKind::kConcatenation:
+    case ExprKind::kAssignmentPattern:
+    case ExprKind::kStreamingConcat:
+      CollectElementIndices(target, ctx, arena, out);
+      break;
+    default:
+      break;
+  }
+}
+
+static LhsIndexSnapshots CollectLhsIndexSnapshots(const Expr* lhs,
+                                                  SimContext& ctx,
+                                                  Arena& arena) {
+  LhsIndexSnapshots out;
+  CollectLhsIndexSnapshotsInto(lhs, ctx, arena, out);
+  return out;
+}
+
+// The snapshots are installed for the length of one callback body and dropped
+// again at its end. The store is one map per SimContext keyed by expression
+// node -- not one per event and not one per process -- so holding them live
+// from the statement through to the update region would let a second execution
+// of the same statement (a loop body scheduling it twice in one time step, two
+// processes or two instances running it, an intra-assignment delay whose
+// statement re-executes before its update fires) overwrite the key an event
+// still pending reads, and the first clear would empty the store for every
+// event after it. Update-region callbacks run one at a time, so each installing
+// its own values over the same keys is enough. The words the stash points at
+// are the ones the captured vector owns, and the callback it is captured on is
+// released only after it returns (Scheduler::DrainQueue), so every entry is
+// cleared while the storage behind it is still standing.
+static void InstallLhsIndexSnapshots(const LhsIndexSnapshots& snaps,
+                                     SimContext& ctx) {
+  for (const auto& snap : snaps) {
+    ctx.SetDeferredArgSnapshot(snap.first, snap.second.Get());
+  }
+}
+
+static void ClearLhsIndexSnapshots(const LhsIndexSnapshots& snaps,
+                                   SimContext& ctx) {
+  for (const auto& snap : snaps) ctx.ClearDeferredArgSnapshot(snap.first);
+}
+
 // §11.4.14.3: a streaming_concatenation can be the target of a nonblocking
 // assignment too, performing the same reverse (unpack) operation. The source
 // is sampled now; defer the per-target writes to the NBA region so the
@@ -244,8 +359,11 @@ static void ScheduleConcatNba(const Stmt* stmt, const Logic4Vec& rhs_val,
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
   event->kind = EventKind::kUpdate;
   const Expr* lhs = stmt->lhs;
-  event->callback = [lhs, rhs_val, &ctx, &arena]() {
+  auto snaps = CollectLhsIndexSnapshots(lhs, ctx, arena);
+  event->callback = [lhs, rhs_val, snaps, &ctx, &arena]() {
+    InstallLhsIndexSnapshots(snaps, ctx);
     TryUnpackConcatLhs(lhs, rhs_val, ctx, arena);
+    ClearLhsIndexSnapshots(snaps, ctx);
   };
   auto region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime() + SimTime{delay_ticks},
@@ -259,8 +377,11 @@ static void ScheduleStreamingConcatNba(const Stmt* stmt,
   auto* stream_event = ctx.GetScheduler().GetEventPool().Acquire();
   stream_event->kind = EventKind::kUpdate;
   const Expr* lhs = stmt->lhs;
-  stream_event->callback = [lhs, rhs_val, &ctx, &arena]() {
+  auto snaps = CollectLhsIndexSnapshots(lhs, ctx, arena);
+  stream_event->callback = [lhs, rhs_val, snaps, &ctx, &arena]() {
+    InstallLhsIndexSnapshots(snaps, ctx);
     UnpackStreamingConcatLhs(lhs, rhs_val, ctx, arena);
+    ClearLhsIndexSnapshots(snaps, ctx);
   };
   auto stream_region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
   auto stream_time = ctx.CurrentTime() + SimTime{delay_ticks};
