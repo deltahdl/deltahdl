@@ -366,7 +366,11 @@ void SetVariableKindFlags(const ModuleItem* item, RtlirVariable& var,
   var.is_4state = Is4stateType(item->data_type, typedefs);
   var.is_event = (item->data_type.kind == DataTypeKind::kEvent);
   var.is_chandle = (item->data_type.kind == DataTypeKind::kChandle);
-  var.is_string = (item->data_type.kind == DataTypeKind::kString);
+  // §6.18: "the type of the object is the type the name stands for", so a
+  // `typedef string s_t` declares a string. The kind alone answers kNamed for
+  // such a name, and the declaration then took the 32-bit carrier and was never
+  // marked a string, so §6.16's methods and formats did not reach it.
+  var.is_string = IsStringType(item->data_type, typedefs);
   var.is_real = (item->data_type.kind == DataTypeKind::kReal ||
                  item->data_type.kind == DataTypeKind::kShortreal ||
                  item->data_type.kind == DataTypeKind::kRealtime);

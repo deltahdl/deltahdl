@@ -595,6 +595,15 @@ struct RtlirDesign {
   std::unordered_map<std::string_view, RtlirModule*> all_modules;
 
   std::unordered_map<std::string_view, uint32_t> type_widths;
+  // §6.18: "the type of the object is the type the name stands for", and the
+  // width beside this cannot say what that is: EvalTypeWidth answers 0 for a
+  // string, an event, a class handle and a type it could not size alike, so a
+  // simulator asking the width alone cannot tell `typedef string s_t` from a
+  // name it never saw. The resolved kind is recorded here for every name the
+  // typedef table holds, chased through a chain of names to the kind at its
+  // end, so the three declaration paths can ask what a name stands for rather
+  // than reading DataType::kind and finding kNamed.
+  std::unordered_map<std::string_view, DataTypeKind> type_kinds;
 
   std::vector<ModuleItem*> cu_function_decls;
 

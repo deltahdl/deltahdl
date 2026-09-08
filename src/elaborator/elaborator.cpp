@@ -202,11 +202,29 @@ void ClassifyCuItems(const std::vector<ModuleItem*>& cu_items,
 }
 
 // Computes the elaborated bit width of each named typedef into widths.
+// §6.18's "type the name stands for", following a chain of typedefs to the kind
+// at its end. The walk is bounded by the table's own size so a table that names
+// itself -- which the elaborator reports elsewhere rather than resolving --
+// cannot spin here.
+static DataTypeKind ResolvedTypeKind(const DataType& dtype,
+                                     const TypedefMap& typedefs) {
+  const DataType* cur = &dtype;
+  for (size_t steps = 0; steps <= typedefs.size(); ++steps) {
+    if (cur->kind != DataTypeKind::kNamed) return cur->kind;
+    auto it = typedefs.find(cur->type_name);
+    if (it == typedefs.end()) return DataTypeKind::kNamed;
+    cur = &it->second;
+  }
+  return DataTypeKind::kNamed;
+}
+
 void PopulateTypeWidths(
     const TypedefMap& typedefs,
-    std::unordered_map<std::string_view, uint32_t>& widths) {
+    std::unordered_map<std::string_view, uint32_t>& widths,
+    std::unordered_map<std::string_view, DataTypeKind>& kinds) {
   for (const auto& [name, dtype] : typedefs) {
     widths[name] = EvalTypeWidth(dtype, typedefs);
+    kinds[name] = ResolvedTypeKind(dtype, typedefs);
   }
 }
 
@@ -346,7 +364,7 @@ void CopyDesignMetadata(RtlirDesign* design, const CompilationUnit* unit,
 void FinalizeDesignTail(RtlirDesign* design, const CompilationUnit* unit,
                         const TypedefMap& typedefs,
                         const DesignMetadata& meta) {
-  PopulateTypeWidths(typedefs, design->type_widths);
+  PopulateTypeWidths(typedefs, design->type_widths, design->type_kinds);
   CopyDesignMetadata(design, unit, meta);
 }
 

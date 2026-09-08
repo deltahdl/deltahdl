@@ -321,7 +321,7 @@ static Variable* CreateVarInScope(std::string_view name, uint32_t width,
 
 static void CreateDeclVariable(const Stmt* stmt, uint32_t width, bool is_real,
                                SimContext& ctx, Arena& arena) {
-  if (width == 0 && stmt->var_decl_type.kind == DataTypeKind::kString) {
+  if (width == 0 && DeclaredTypeIsString(stmt->var_decl_type, ctx)) {
     CreateVarInScope(stmt->var_name, 0, ctx);
     ctx.RegisterStringVariable(stmt->var_name);
   } else {

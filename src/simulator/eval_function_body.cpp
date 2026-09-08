@@ -290,7 +290,7 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // the variable this call created rather than through
   // SimContext::RegisterStringVariable, which resolves a name and would reach a
   // variable of the design that the local shadows.
-  bool is_string = !is_class && type.kind == DataTypeKind::kString;
+  bool is_string = !is_class && DeclaredTypeIsString(type, ctx);
   uint32_t w = declared ? declared : (is_string ? 0 : 32);
   // §6.11.3: a body local carries its declared signedness exactly as a
   // module-scope declaration does (Lowerer sets the same flag there), so an

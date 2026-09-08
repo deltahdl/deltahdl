@@ -171,6 +171,16 @@ uint32_t DeclaredNameTables::FindTypeWidth(std::string_view name) const {
   return (it != type_widths_.end()) ? it->second : 0;
 }
 
+void DeclaredNameTables::RegisterTypeKind(std::string_view name,
+                                          DataTypeKind kind) {
+  type_kinds_[name] = kind;
+}
+
+DataTypeKind DeclaredNameTables::FindTypeKind(std::string_view name) const {
+  auto it = type_kinds_.find(name);
+  return (it != type_kinds_.end()) ? it->second : DataTypeKind::kNamed;
+}
+
 void DeclaredNameTables::RegisterInstanceType(std::string_view prefix,
                                               std::string_view type) {
   instance_types_[std::string(prefix)] = std::string(type);

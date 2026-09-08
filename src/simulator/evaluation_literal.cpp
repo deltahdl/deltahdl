@@ -22,6 +22,20 @@ uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx) {
   return ctx.FindTypeWidth(type.type_name);
 }
 
+// §6.18: "the type of the object is the type the name stands for", so a
+// variable declared with a typedef of `string` is a string, and §6.16 gives one
+// no declared width and the initial value "". Every declaration path recognised
+// a string by DataType::kind alone, which is kNamed for such a name, so the
+// declaration fell to the 32-bit carrier substituted for a type nothing could
+// size and was never registered as a string: %s, the string methods and a
+// string comparison all read it as a bit vector. The resolved kind the
+// elaborator records beside the width is what answers it.
+bool DeclaredTypeIsString(const DataType& type, const SimContext& ctx) {
+  if (type.kind == DataTypeKind::kString) return true;
+  return type.kind == DataTypeKind::kNamed &&
+         ctx.FindTypeKind(type.type_name) == DataTypeKind::kString;
+}
+
 uint32_t LiteralWidth(std::string_view text, uint64_t val) {
   auto tick = text.find('\'');
   if (tick != std::string_view::npos && tick > 0) {

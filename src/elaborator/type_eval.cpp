@@ -452,6 +452,12 @@ static bool Is4statePackedAggregate(const DataType& dtype) {
   return false;
 }
 
+bool IsStringType(const DataType& dtype, const TypedefMap& typedefs) {
+  const auto* resolved = ResolveNamed(dtype, typedefs);
+  if (resolved) return IsStringType(*resolved, typedefs);
+  return dtype.kind == DataTypeKind::kString;
+}
+
 bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
   const auto* resolved = ResolveNamed(dtype, typedefs);
   if (resolved) return Is4stateType(*resolved, typedefs);

@@ -74,6 +74,14 @@ class DeclaredNameTables {
   void RegisterTypeWidth(std::string_view name, uint32_t width);
   uint32_t FindTypeWidth(std::string_view name) const;
 
+  // §6.18: the kind the type a name stands for resolves to, which the width
+  // cannot say -- EvalTypeWidth answers 0 for a string, an event, a class
+  // handle and a type it could not size alike. DataTypeKind::kNamed is the
+  // answer for a name the elaborated table does not hold, which is what a name
+  // standing for nothing this run knows about answers too.
+  void RegisterTypeKind(std::string_view name, DataTypeKind kind);
+  DataTypeKind FindTypeKind(std::string_view name) const;
+
   void RegisterInstanceType(std::string_view prefix, std::string_view type);
   std::string_view FindInstanceType(std::string_view prefix) const;
 
@@ -112,6 +120,7 @@ class DeclaredNameTables {
   std::unordered_map<std::string_view, std::string_view> var_struct_types_;
 
   std::unordered_map<std::string_view, uint32_t> type_widths_;
+  std::unordered_map<std::string_view, DataTypeKind> type_kinds_;
 
   std::unordered_map<std::string, std::string> instance_types_;
 

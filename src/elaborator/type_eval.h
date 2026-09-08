@@ -36,6 +36,11 @@ uint32_t EvalTypeWidth(const DataType& dtype);
 // does cover, have to answer the same question the same way; two copies of the
 // keyword list had already drifted apart on the second predicate, the
 // elaborator's copy having only the first.
+// §6.16/§6.18: whether the declared type is a string, whether written as the
+// keyword or reached through a typedef name. Is4stateType beside it resolves a
+// name the same way and for the same reason.
+bool IsStringType(const DataType& type, const TypedefMap& typedefs);
+
 bool IsTypeKeyword(std::string_view key);
 bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind);
 

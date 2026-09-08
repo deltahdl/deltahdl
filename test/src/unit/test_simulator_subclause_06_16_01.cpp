@@ -151,4 +151,55 @@ TEST(StringMethods, LenReturnsIntWidth) {
   EXPECT_EQ(result.width, 32u);
 }
 
+// §6.18: "the type of the object is the type the name stands for", so a
+// variable declared with a typedef of `string` is a string and §6.16 gives it
+// no declared width. Every declaration path recognised a string by the kind
+// written at the declaration, which is kNamed for such a name, so the variable
+// took the 32-bit carrier a type nothing could size falls back to and was never
+// registered as a string: len() then counted the four characters that carrier
+// holds. Eleven against four is the discriminating pair.
+TEST(StringMethods, LenCountsCharactersOfATypedefStringAtModuleScope) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef string s_t;\n"
+      "  s_t s = \"hello world\";\n"
+      "  int n;\n"
+      "  initial n = s.len();\n"
+      "endmodule\n",
+      "n");
+  EXPECT_EQ(v, 11u);
+}
+
+// The same declaration inside a procedural block, which CreateDeclVariable
+// serves by a path of its own.
+TEST(StringMethods, LenCountsCharactersOfATypedefStringInABlock) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef string s_t;\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    s_t s = \"hello world\";\n"
+      "    n = s.len();\n"
+      "  end\n"
+      "endmodule\n",
+      "n");
+  EXPECT_EQ(v, 11u);
+}
+
+// And inside a subroutine body, which CreateFuncLocalVar serves by a third.
+TEST(StringMethods, LenCountsCharactersOfATypedefStringInASubroutine) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef string s_t;\n"
+      "  int n;\n"
+      "  function int measure();\n"
+      "    s_t s = \"hello world\";\n"
+      "    return s.len();\n"
+      "  endfunction\n"
+      "  initial n = measure();\n"
+      "endmodule\n",
+      "n");
+  EXPECT_EQ(v, 11u);
+}
+
 }  // namespace

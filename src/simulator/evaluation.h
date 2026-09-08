@@ -46,6 +46,12 @@ uint32_t LiteralWidth(std::string_view text, uint64_t val);
 // it. See #3471.
 uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx);
 
+// §6.18/§6.16: whether the declared type is a string, whether written as the
+// keyword or reached through a typedef name. Defined in
+// evaluation_literal.cpp beside DeclaredTypeWidth, which answers the other half
+// of the same question about a name.
+bool DeclaredTypeIsString(const DataType& type, const SimContext& ctx);
+
 bool HasUnknownBits(const Logic4Vec& v);
 Logic4Vec MakeAllX(Arena& arena, uint32_t width);
 

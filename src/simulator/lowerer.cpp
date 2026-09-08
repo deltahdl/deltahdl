@@ -490,6 +490,12 @@ static void RegisterDesignTypeWidths(const RtlirDesign* design,
   for (const auto& [name, width] : design->type_widths) {
     ctx.RegisterTypeWidth(name, width);
   }
+  // §6.18: the width says how big the type a name stands for is and the kind
+  // says what it is, and only the second tells `typedef string s_t` from a name
+  // nothing could size.
+  for (const auto& [name, kind] : design->type_kinds) {
+    ctx.RegisterTypeKind(name, kind);
+  }
 }
 
 static void InitPackageDataVariables(const RtlirDesign* design, SimContext& ctx,
