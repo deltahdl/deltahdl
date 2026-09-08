@@ -373,8 +373,8 @@ bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
 // values", so a 2-state target is coerced here explicitly. MakeLogic4VecVal
 // gave that for free by never setting a bval; now that the deposit carries x
 // and z, an x reaching such a target would otherwise survive.
-static void WritePartSelect(Variable* var, const PartSelectBits& bits,
-                            const Logic4Vec& rhs_val, Arena& arena) {
+void WritePartSelect(Variable* var, const PartSelectBits& bits,
+                     const Logic4Vec& rhs_val, Arena& arena) {
   Logic4Vec updated = ExtractBitField(arena, var->value, 0, var->value.width);
   DepositBitField(updated, bits.lo,
                   ExtractBitField(arena, rhs_val, bits.src_lo, bits.width),
@@ -422,6 +422,17 @@ PartSelectBits SelectStorageBits(const Variable& var, const Expr* sel,
   auto target = PartSelectTargetIndices(idx, SelectBoundValue(end_val),
                                         sel->is_part_select_plus,
                                         sel->is_part_select_minus);
+  // §11.5.1 spells an indexed part-select's width out separately and requires
+  // that it "shall be a positive constant", so a width of zero names no bit of
+  // the object -- which is what a zero width from this function already means.
+  // The pair PartSelectTargetIndices answers cannot say so on its own: it is
+  // the two ends of a width the select does not have, and for `a[3 +: 0]` it is
+  // the indices 3 and 2, which any declaration holding them resolves to the
+  // two-bit window a[3:2]. WriteBitSelect, which resolves a statement's own
+  // indices rather than asking here, reports that width as an error instead of
+  // writing it; every other caller reads the zero this returns as the absence
+  // it is.
+  if (target.declared_width == 0) return {0, 0};
   return PartSelectStorageBits(var.BitSelectRange(), target.first,
                                target.second);
 }

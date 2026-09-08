@@ -328,4 +328,150 @@ TEST(NonblockingAssignSim,
   LowerRunAndCheck(f, design, {{"wakes", 2u}, {"a", 0x56u}, {"b", 0xC7u}});
 }
 
+// §11.5.1 rules on a part-select that hangs off the end of the object it
+// selects from: "Part-selects that are partially out of range shall, when
+// read, return x for the bits that are out of range and shall, when written,
+// only affect the bits that are in range." The clause asks of the two bounds
+// of a non-indexed part-select only that they be "constant integer
+// expressions", each "evaluated in a self-determined context", and §5.7.1
+// leaves an unsized decimal signed, so the `-2` in `a[1:-2]` is the negative 2
+// and the select names indices 1, 0, -1 and -2. Only 1 and 0 lie inside
+// `logic [7:0] a`; being the select's most significant end they take the
+// value's bits 3 and 2, so `4'b1101` leaves `a` at 8'h03.
+//
+// §10.4.2 asks of a nonblocking target only that "variable_lvalue is a data
+// type that is valid for a procedural assignment statement", which is the
+// left-hand side §10.4.1 gives the blocking form -- whose own examples include
+// `rega[3:5] = 7; // a part-select`. What §10.4 separates the two statements by
+// is procedural flow, "different procedural flows in sequential blocks", and
+// not which bits a select names. So `b` takes the same write in the blocking
+// form beside `a` and the two are asserted equal: the equality is the thing
+// only this case can say, and pinning 8'h03 on `a` beside it is what stops the
+// pair passing by being wrong together.
+// ExpressionSim.NonIndexedPartSelectBelowLowBoundWritesInRangeBitsOnly in
+// test_simulator_subclause_11_05_01a.cpp holds the blocking side of this line
+// on its own.
+//
+// The nonblocking path computed the window itself rather than asking the shared
+// helper, and read each bound through a uint32_t, so -2 arrived as the
+// unsigned 4294967294. The min/max of the two bounds is then {lo: 1, w:
+// 4294967294}, which clamps to a width of seven and writes the value's low
+// seven bits into a[7:1]: `a` read 8'h1A, with a[0] -- the one bit the clause
+// requires this write to reach -- untouched, and seven bits the clause forbids
+// it to touch changed. `4'b1101` is what discriminates, its high half 2'b11
+// differing from its low half 2'b01; an all-ones value answers 8'h03 whichever
+// two of its bits are taken. Both objects start at 8'h00 so that every bit set
+// at the end is one a write put there.
+TEST(NonblockingAssignSim,
+     SelectTargetWithANegativeBoundWritesInRangeBitsOnly) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [7:0] b;\n"
+      "  initial begin\n"
+      "    a = 8'h00;\n"
+      "    b = 8'h00;\n"
+      "    a[1:-2] <= 4'b1101;\n"
+      "    b[1:-2] = 4'b1101;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 0x03u}, {"b", 0x03u}});
+  auto* a = f.ctx.FindVariable("a");
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(a->value.ToUint64(), b->value.ToUint64());
+}
+
+// The indexed spelling of that same select, which §11.5.1 makes one select with
+// it: the clause's own example reads `a_vect[15 -: 8] // == a_vect[15 : 8]`,
+// the `-:` form selecting "starting at the base and descending the bit range",
+// so at base 1 and width 4 `a[1 -: 4]` is `a[1:-2]`. Indices 1 and 0 are again
+// the ones in range and again the select's most significant end, so `4'b1101`
+// leaves `a` at 8'h03 here too.
+//
+// This is the source-offset half of the defect and the half a repair of the
+// bound's sign alone would leave standing. ResolvePartSelectNbaRange folded a
+// `-:` select running off the bottom to `lo = 0` while keeping the full width
+// of four, which puts the value's bit 0 on a[0] and its bit 1 on a[1] instead
+// of its bits 2 and 3: `a` read 8'h0D. Nothing about that answer involves a
+// negative bound, so the sign fix does not reach it.
+TEST(NonblockingAssignSim, SelectTargetRunningOffLowEndWritesItsOwnHighBits) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  initial begin\n"
+      "    a = 8'h00;\n"
+      "    a[1 -: 4] <= 4'b1101;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 0x03u}});
+}
+
+// §11.5.1: "The actual bit that is accessed by an address is, in part,
+// determined by the declaration of acc", the clause putting `logic [15:0] acc;`
+// and `logic [2:17] acc;` side by side to show one index reaching a different
+// bit under each. On `logic [15:8] a` the indices 9 and 8 are the object's two
+// least significant bits, wholly in range, so `a[9:8] <= 2'b11` leaves `a` at
+// 8'h03.
+//
+// This is the case that separates "the window is computed wrongly" from "the
+// declaration is never consulted at all". The nonblocking path took each index
+// as an offset from bit 0 and tested it against the width alone, never
+// subtracting the declared range's low bound: lo = 8 against a width of 8 reads
+// as entirely out of range, ResolvePartSelectNbaRange answered nullopt, and the
+// assignment was dropped whole with no diagnostic -- `a` read 8'h00. A fix
+// carrying only the bound's sign and the source offset across would still
+// answer 8'h00 here. `a` starts at 8'h00 for the reason the cases above give,
+// which is also why the failing answer and the starting value coincide: what
+// the case observes is that the two bits the clause names were reached.
+TEST(NonblockingAssignSim,
+     SelectTargetResolvesItsIndicesAgainstTheDeclaredRange) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:8] a;\n"
+      "  initial begin\n"
+      "    a = 8'h00;\n"
+      "    a[9:8] <= 2'b11;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 0x03u}});
+}
+
+// The companion overhanging the top, which the same sentence of §11.5.1
+// governs and which no repair of the low end may disturb. `a[9:6]` on
+// `logic [7:0] a` names indices 9, 8, 7 and 6; the two in range are 7 and 6,
+// and they are the select's own least significant end, so they take the value's
+// bits 1 and 0. `4'b1101` puts 0 on a[7] and 1 on a[6], and `a` reads 8'h40.
+//
+// This passes today and is here to catch the correction applied in the wrong
+// direction: a fix that shifted the value by the count of indices running off
+// the *high* end rather than the low would take the value's bits 3 and 2 here
+// and read 8'hC0. `4'hF` cannot say that, every bit of it being the same bit;
+// `4'b1101` can. ExpressionSim.PartSelectRunningOffHighEndStillTakesItsLowBits
+// in test_simulator_subclause_11_05_01a.cpp holds this line for the procedural
+// writer, and ContAssignStatementSim.SelectTargetRunningOffHighEndStillTakes-
+// ItsLowBits holds it for a continuous assignment's driver; the nonblocking
+// form reaches the variable through a deferred update callback of its own and
+// needs a case of its own.
+TEST(NonblockingAssignSim, SelectTargetRunningOffHighEndStillTakesItsLowBits) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  initial begin\n"
+      "    a = 8'h00;\n"
+      "    a[9:6] <= 4'b1101;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 0x40u}});
+}
+
 }  // namespace

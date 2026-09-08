@@ -1,8 +1,6 @@
-#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -10,6 +8,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/packed_range.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
@@ -26,7 +25,8 @@ namespace delta {
 
 // §11.4.14: a deferred nonblocking write being installed onto `event`. Bundles
 // the target variable, the sampled right-hand value, and the arena used by the
-// update callback so the bit/part/whole select setup helpers share one entity.
+// update callback so the select and whole-variable setup helpers share one
+// entity.
 struct NbaWrite {
   Event* event;
   Variable* var;
@@ -267,12 +267,17 @@ static void ScheduleStreamingConcatNba(const Stmt* stmt,
   ctx.GetScheduler().ScheduleEvent(stream_time, stream_region, stream_event);
 }
 
-// Install the deferred update callback for a single-bit NBA write of `idx`.
-static void SetupBitSelectNbaCallback(const NbaWrite& write, uint32_t idx) {
+// §11.5.1: install the deferred update that deposits the sampled right-hand
+// value in the window `bits` names -- the bits of the target the select
+// addresses, and where in the value the bits they receive begin. The window is
+// already resolved when this is called; see SetupSelectNbaCallback below for
+// why it is resolved there and not here.
+static void SetupPartSelectNbaCallback(const NbaWrite& write,
+                                       const PartSelectBits& bits) {
   Variable* var = write.var;
   Logic4Vec rhs_val = write.rhs_val;
   Arena& arena = write.arena;
-  write.event->callback = [var, idx, rhs_val, &arena]() {
+  write.event->callback = [var, bits, rhs_val, &arena]() {
     // §10.6.2: a force "shall override a procedural assignment ... until a
     // release procedural statement is executed on the variable", and §10.4
     // names a nonblocking assignment as one of the three kinds of procedural
@@ -280,86 +285,55 @@ static void SetupBitSelectNbaCallback(const NbaWrite& write, uint32_t idx) {
     // callback rather than where the event was scheduled, as it does in
     // SetupWholeVarNbaCallback, because the flag that governs the write is the
     // one standing when the update region runs and not when it was queued.
+    // WritePartSelect itself does not ask -- its blocking caller WriteBitSelect
+    // asks before it evaluates the indices, which is the wrong moment here --
+    // so this is where a forced target is declined.
     if (var->is_forced) return;
-    if (idx >= var->value.width) return;
-    uint64_t old_val = var->value.ToUint64();
-    uint64_t bit = rhs_val.ToUint64() & 1;
-    uint64_t cleared = old_val & ~(uint64_t{1} << idx);
-    var->value =
-        MakeLogic4VecVal(arena, var->value.width, cleared | (bit << idx));
+    WritePartSelect(var, bits, rhs_val, arena);
     var->NotifyWatchers();
   };
 }
 
-// Install the deferred update callback for a `w`-bit part-select NBA write
-// starting at bit `lo`.
-static void SetupPartSelectNbaCallback(const NbaWrite& write, uint32_t lo,
-                                       uint32_t w) {
-  Variable* var = write.var;
-  Logic4Vec rhs_val = write.rhs_val;
-  Arena& arena = write.arena;
-  write.event->callback = [var, lo, w, rhs_val, &arena]() {
-    // §10.6.2, as in SetupBitSelectNbaCallback above. A part-select reaches
-    // this callback rather than that one whatever the declaration, because
-    // TryResolveArrayElement declines every lhs carrying an index_end.
-    if (var->is_forced) return;
-    uint64_t mask = (w >= 64) ? ~uint64_t{0} : (uint64_t{1} << w) - 1;
-    uint64_t old_val = var->value.ToUint64();
-    uint64_t new_bits = (rhs_val.ToUint64() & mask) << lo;
-    uint64_t cleared = old_val & ~(mask << lo);
-    var->value = MakeLogic4VecVal(arena, var->value.width, cleared | new_bits);
-    var->NotifyWatchers();
-  };
-}
-
-// §11.4.14 / §7.4.6: the resolved low bit and width of a part-select NBA
-// target, clamped to the variable width.
-struct PartSelectRange {
-  uint32_t lo;
-  uint32_t w;
-};
-
-// Resolve the [lo, w) part-select range for `lhs` given base index `idx` and
-// `end_val`, mirroring the plus/minus/ranged select forms. Returns nullopt when
-// the select has zero width or lies entirely outside `var_width`; otherwise
-// clamps the range to the variable width.
-static std::optional<PartSelectRange> ResolvePartSelectNbaRange(
-    const Expr* lhs, uint32_t idx, uint32_t end_val, uint32_t var_width) {
-  uint32_t lo = idx;
-  uint32_t w = end_val;
-  if (lhs->is_part_select_plus) {
-  } else if (lhs->is_part_select_minus) {
-    lo = (idx >= w - 1) ? idx - w + 1 : 0;
-  } else {
-    lo = std::min(idx, end_val);
-    w = std::max(idx, end_val) - lo + 1;
-  }
-  if (w == 0 || lo >= var_width) return std::nullopt;
-  if (lo + w > var_width) w = var_width - lo;
-  return PartSelectRange{lo, w};
-}
-
-// Configure the deferred update callback for an NBA whose target is an
-// unresolved bit-select or part-select of `var`. Returns false (without
-// setting a callback) when the assignment must be dropped: an unknown index,
-// or a part-select that resolves to zero width / falls entirely out of range.
+// Configure the deferred update callback for a nonblocking assignment whose
+// left-hand side is a bit-select or a part-select of `write.var`. Returns
+// false, having installed no callback, when the select addresses no bit of the
+// object and the assignment is therefore dropped: §11.5.1 has a write through
+// an index carrying x or z, and one through an address wholly outside the
+// declared bounds, "have no effect on the data stored", which is a zero width
+// from SelectStorageBits.
+//
+// One installer answers both select forms because SelectStorageBits answers
+// both: an ordinary bit-select is the one-bit window its declared range gives
+// the index (Variable::BitSelectRange), and a single index of a packed
+// multidimensional array addresses that array's element rather than one bit
+// (§7.4.1), whose window is as wide as the element. A separate bit-select
+// installer stood here and tested `idx >= var->value.width`, reading the index
+// as a storage offset, so on a `logic [15:8] a` -- eight bits of storage
+// addressed by the indices 8 through 15 -- every nonblocking bit-select write
+// was dropped.
+//
+// §11.5.1 is stated once, by SelectStorageBits and WritePartSelect, rather than
+// twice. The copy that stood here computed its window in uint32_t against
+// `var->value.width` alone and predated three corrections to that shared
+// arithmetic. It read §5.7.1's signed decimal `-2` as 4294967294, so on a
+// `logic [7:0] a` the write `a[1:-2] <= 4'b1101` left 8'h1A where the clause
+// requires 8'h03. It carried no source offset, so a select running off the low
+// end took the value's least significant bits, and `a[1 -: 4] <= 4'b1101` on
+// the same variable left 8'h0D where that same 8'h03 is required -- §11.5.1
+// reads the indexed form as `a[1:-2]`, whose most significant end is index 1,
+// so `a[1]` takes the value's bit 3 and `a[0]` its bit 2. And it read an index
+// as a storage offset rather than resolving it against the declaration, so on a
+// `logic [15:8] a` the write `a[9:8] <= 2'b11` was dropped whole.
+//
+// The resolution is asked here, where the event is scheduled, and not from
+// inside the callback, because §10.4.2 evaluates the left-hand side's index
+// expressions along with the right-hand side when the statement executes. Only
+// the arithmetic moved into the shared helpers; when it runs is unchanged.
 static bool SetupSelectNbaCallback(const NbaWrite& write, const Expr* lhs,
                                    SimContext& ctx) {
-  auto idx_val = EvalExpr(lhs->index, ctx, write.arena);
-  if (HasUnknownBits(idx_val)) return false;
-  auto idx = static_cast<uint32_t>(idx_val.ToUint64());
-
-  if (!lhs->index_end) {
-    SetupBitSelectNbaCallback(write, idx);
-    return true;
-  }
-
-  uint32_t end_val = static_cast<uint32_t>(
-      EvalExpr(lhs->index_end, ctx, write.arena).ToUint64());
-  auto range =
-      ResolvePartSelectNbaRange(lhs, idx, end_val, write.var->value.width);
-  if (!range) return false;
-  SetupPartSelectNbaCallback(write, range->lo, range->w);
+  PartSelectBits bits = SelectStorageBits(*write.var, lhs, ctx, write.arena);
+  if (bits.width == 0) return false;
+  SetupPartSelectNbaCallback(write, bits);
   return true;
 }
 

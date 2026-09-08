@@ -4,6 +4,7 @@
 #include <string_view>
 #include <vector>
 
+#include "common/packed_range.h"
 #include "common/types.h"
 
 namespace delta {
@@ -237,6 +238,33 @@ uint32_t PatternKeyIndex(const Expr* key, SimContext& ctx, Arena& arena);
 // the same assignment in statement_assign_nonblocking.cpp.
 void CollectQueueElements(const Expr* expr, SimContext& ctx, Arena& arena,
                           std::vector<Logic4Vec>& out);
+
+// Defined in statement_assign.cpp; also used by the §11.4.2 nonblocking path in
+// statement_assign_nonblocking.cpp, whose deferred update deposits the window
+// its own left-hand side named. §11.5.1 has a part-select that is only partly
+// in range "when written, only affect the bits that are in range", and this
+// writes `rhs_val` into exactly the window `bits` names: `bits.lo` and
+// `bits.width` are the bits of `var` that are affected, and `bits.src_lo` is
+// where in the value the bits they receive begin. `bits` is what
+// SelectStorageBits (statement_assign.h) answers, and the two are meant to be
+// asked in that order, so that one statement of the clause resolves a select
+// and one deposits it.
+//
+// The deposit is made bit by bit and not in a machine word: a target wider
+// than 64 bits keeps the bits above the first word, the x and z §6.3.1 lets a
+// 4-state bit hold survive the round trip, and a window beginning at bit 64 or
+// above lands where it was named. The definition's own comment gives the three
+// wrong answers that says.
+//
+// A forced target is the caller's to decline, because the two callers ask at
+// different moments. §10.6.2 has a force override a procedural assignment
+// "until a release procedural statement is executed on the variable"; the
+// blocking caller WriteBitSelect asks before it evaluates the indices, while
+// the nonblocking one has to ask inside its update callback, the flag that
+// governs the write being the one standing when the update region runs rather
+// than when the event was queued.
+void WritePartSelect(Variable* var, const PartSelectBits& bits,
+                     const Logic4Vec& rhs_val, Arena& arena);
 
 // Defined in statement_assign.cpp; also used by the array-copy form of a
 // pattern assignment in statement_assign_pattern.cpp. Copies element by
