@@ -6,6 +6,8 @@
 namespace delta {
 
 struct ArrayInfo;
+struct AssocArrayObject;
+struct QueueObject;
 struct Variable;
 
 // One frame of SimContext's scope stack: everything a scope declares, held for
@@ -27,9 +29,20 @@ struct Variable;
 // definition, keeping the frame available to a translation unit that only
 // parks the stack. SimContext::RegisterLocalArray allocates the pointed-to
 // value in the context's arena, which outlives every scope.
+// §13.5.1 is why a frame carries a queue and an associative array as well:
+// "This argument passing mechanism works by copying each argument into the
+// subroutine area ... If the arguments are changed within the subroutine, the
+// changes are not visible outside the subroutine." Their elements live in a
+// QueueObject and an AssocArrayObject rather than in variables, so the copy a
+// by-value bind makes is registered by name like any other declaration, and a
+// formal named after a queue of the enclosing module answered to the module's
+// until the name could be looked up here first. §23.9 gives the same answer for
+// a declaration inside a begin-end block, which is local to that block.
 struct Scope {
   std::unordered_map<std::string_view, Variable*> vars;
   std::unordered_map<std::string_view, ArrayInfo*> arrays;
+  std::unordered_map<std::string_view, QueueObject*> queues;
+  std::unordered_map<std::string_view, AssocArrayObject*> assoc_arrays;
 };
 
 }  // namespace delta

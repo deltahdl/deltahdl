@@ -492,4 +492,69 @@ TEST(PassByValueSim, FixedArrayFormalElementWriteIsNotVisibleOutside) {
   EXPECT_EQ(v, 0x11u);
 }
 
+// §13.5.1's copy has to answer to the formal's name inside the call, and a
+// queue's elements live in a QueueObject registered by name rather than in
+// variables. Registered for the whole run and looked up without asking the
+// scope stack, a formal named after a module's queue was the module's queue to
+// every writer in the callee. The two names have to match for the two answers
+// to differ, which is the case none of the existing argument cases writes.
+TEST(PassByValueSim, QueueFormalNamedLikeTheModulesIsItsOwnCopy) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int q[$];\n"
+      "  int r;\n"
+      "  task automatic fill(input int q[$]);\n"
+      "    q[0] = 99;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    q.push_back(7);\n"
+      "    fill(q);\n"
+      "    r = q[0];\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 7u);
+}
+
+// The associative array is a separate object, a separate map and a separate
+// lookup, so it needs its own case.
+TEST(PassByValueSim, AssocFormalNamedLikeTheModulesIsItsOwnCopy) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int r;\n"
+      "  task automatic fill(input int aa[int]);\n"
+      "    aa[5] = 99;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    aa[5] = 7;\n"
+      "    fill(aa);\n"
+      "    r = aa[5];\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 7u);
+}
+
+// The other half of the same registration: §23.9 gives the copy the lifetime of
+// the scope that declared it, so once the call has returned the name reads the
+// module's queue again rather than the formal's copy.
+TEST(PassByValueSim, QueueFormalCopyDoesNotOutliveTheCall) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int q[$];\n"
+      "  int r;\n"
+      "  task automatic fill(input int q[$]);\n"
+      "    q.push_back(99);\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    q.push_back(7);\n"
+      "    fill(q);\n"
+      "    r = q.size();\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 1u);
+}
+
 }  // namespace

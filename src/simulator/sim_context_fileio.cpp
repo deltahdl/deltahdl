@@ -28,11 +28,33 @@ QueueObject* SimContext::CreateQueue(std::string_view name, uint32_t elem_width,
   q->elem_width = elem_width;
   q->is_4state = is_4state;
   q->max_size = max_size;
+  // §23.9: "If it is declared locally, then the local item shall be used; if
+  // not, the search shall continue upward", and §13.5.1 makes a by-value formal
+  // a declaration of the subroutine. A queue declared where a scope is on the
+  // stack therefore belongs to that scope and goes away with it, exactly as
+  // RegisterArrayInScope puts an array's shape there: registered for the whole
+  // run instead, a formal named after a module's queue was the module's queue
+  // to every writer in the callee, and still answered to the name after the
+  // call returned.
+  if (HasLocalScope()) {
+    scope_stack_.back().queues[name] = q;
+    return q;
+  }
   queues_[name] = q;
   return q;
 }
 
 QueueObject* SimContext::FindQueue(std::string_view name) {
+  // §23.9 searches the innermost scope first, so a queue a subroutine or a
+  // begin-end block declares answers its own name while it is on the stack.
+  // The instance-prefix arm below is a separate question and keeps its place
+  // under this one: it is what a module-scoped queue reached from inside an
+  // instance is found by, and a formal's copy has to be found before it.
+  for (auto frame = scope_stack_.rbegin(); frame != scope_stack_.rend();
+       ++frame) {
+    auto local = frame->queues.find(name);
+    if (local != frame->queues.end()) return local->second;
+  }
   // §23.9: a queue declared inside a module instance is stored under that
   // instance's prefix, so the prefixed name is what a bare reference from
   // within the instance denotes and is tried first. The unprefixed lookup
@@ -74,11 +96,22 @@ AssocArrayObject* SimContext::CreateAssocArray(std::string_view name,
                                                const AssocArraySpec& spec) {
   auto* aa = arena_.Create<AssocArrayObject>();
   PopulateAssocArrayFields(aa, elem_width, is_string_key, spec);
+  // §23.9 and §13.5.1, as in CreateQueue above.
+  if (HasLocalScope()) {
+    scope_stack_.back().assoc_arrays[name] = aa;
+    return aa;
+  }
   assoc_arrays_[name] = aa;
   return aa;
 }
 
 AssocArrayObject* SimContext::FindAssocArray(std::string_view name) {
+  // §23.9's innermost-first search, as in FindQueue above.
+  for (auto frame = scope_stack_.rbegin(); frame != scope_stack_.rend();
+       ++frame) {
+    auto local = frame->assoc_arrays.find(name);
+    if (local != frame->assoc_arrays.end()) return local->second;
+  }
   auto it = assoc_arrays_.find(name);
   return (it != assoc_arrays_.end()) ? it->second : nullptr;
 }
