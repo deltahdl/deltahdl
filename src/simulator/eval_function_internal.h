@@ -11,6 +11,7 @@ namespace delta {
 struct DataType;
 struct Expr;
 struct ModuleItem;
+struct Stmt;
 class SimContext;
 class Arena;
 
@@ -28,6 +29,14 @@ class Arena;
 // clearing one it would have kept, and #3486 is what would carry a name's
 // resolved kind this far.
 bool DeclaredTypeIs4State(const DataType& type);
+
+// §10.4's blocking assignment as a subroutine body performs it, over every
+// left-hand side that body admits: an identifier, a select, `this.f`,
+// `super.f`, an unqualified property of the enclosing object, and the member of
+// whatever an ordinary handle denotes. Defined in
+// eval_function_body_assign.cpp and called by the statement executor in
+// eval_function_body.cpp, which holds the declaration and control-flow forms.
+void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
 // Shared between eval_system_task.cpp and eval_system_func.cpp. The system-task
 // helpers are defined once in eval_system_task.cpp; the system-function
