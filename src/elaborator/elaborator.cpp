@@ -228,6 +228,20 @@ static DataTypeKind ResolvedTypeKind(const DataType& dtype,
   return DataTypeKind::kNamed;
 }
 
+// The width the table records for one name. §8.27's forward class declaration
+// leaves the type it introduces implicit -- `typedef class C;` records C with
+// nothing behind it until the class itself is declared -- and §6.10's answer
+// for an implicit type is one bit, which is not what a class is: §8.3 makes a
+// class variable a handle to an object. Recording that 1 made a class name's
+// width turn on whether the design happened to forward-declare it, since
+// without the forward declaration the name is in no typedef map at all and the
+// table answers 0. 0 is what it answers for the forward-declared one too.
+static uint32_t TypeNameWidth(const DataType& dtype, const TypedefMap& typedefs,
+                              bool is_aggregate) {
+  if (is_aggregate || dtype.kind == DataTypeKind::kImplicit) return 0;
+  return EvalTypeWidth(dtype, typedefs);
+}
+
 // §6.18: what a name stands for is the whole of the type it was declared with,
 // dimensions included, and the map carries only the element type -- the parser
 // leaves a typedef's unpacked dimensions on the declaration rather than in the
@@ -244,7 +258,7 @@ void PopulateTypeWidths(const TypedefMap& typedefs,
                         TypeNameFacts& out) {
   for (const auto& [name, dtype] : typedefs) {
     out.widths[name] =
-        aggregates.count(name) > 0 ? 0 : EvalTypeWidth(dtype, typedefs);
+        TypeNameWidth(dtype, typedefs, aggregates.count(name) > 0);
     out.kinds[name] = ResolvedTypeKind(dtype, typedefs);
     out.is_signed[name] = IsSignedType(dtype, typedefs);
   }

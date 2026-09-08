@@ -86,4 +86,39 @@ TEST(ClassSim, ForwardTypedefParameterizedClassNamedOverride) {
             9u);
 }
 
+// §8.3 makes a class variable a handle to an object, and §8.27's forward
+// declaration says nothing about its width -- the name is introduced before the
+// type. The elaborated table recorded one bit for it, which is §6.10's answer
+// for the implicit type a forward declaration leaves behind, and every reader
+// of that table that does not ask separately whether the name is a class
+// inherits it: a handle truncated to a bit is a handle to nothing.
+//
+// The handle is carried through a subroutine formal and a body local here
+// because those are the two declarations sized from that table, and both are
+// written on a class the file forward-declares, which is the only way the 1 was
+// ever recorded. Reading a property back through the local is what says the
+// handle survived.
+TEST(ClassSim, ForwardTypedefHandleSurvivesASubroutineFormalAndLocal) {
+  EXPECT_EQ(RunAndGet("typedef class C;\n"
+                      "class C;\n"
+                      "  int x;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  function automatic int read_x(C h);\n"
+                      "    C held;\n"
+                      "    held = h;\n"
+                      "    return held.x;\n"
+                      "  endfunction\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    c.x = 42;\n"
+                      "    result = read_x(c);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            42u);
+}
+
 }  // namespace
