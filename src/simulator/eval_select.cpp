@@ -484,13 +484,56 @@ static PackedRange SelectBaseRange(const Expr* base, uint32_t width,
   return var ? var->BitSelectRange() : PackedRange::Implicit(width);
 }
 
+// §11.5.1: how wide a non-indexed part-select is when one of its two bounds is
+// x or z. "The width of a part-select is always constant", and with one bound
+// unknown the span is not a number the expression states, so what bounds it is
+// the declaration: the pair runs from the more significant index to the less
+// significant one, and the widest such select the object admits runs from the
+// known bound -- brought inside the range, since a bound outside it addresses
+// no bit -- to the end the unknown one lies toward. An unknown first bound
+// therefore spans up to the most significant index and an unknown second bound
+// down to the least significant one, and a known bound sitting at that end
+// leaves the single bit the two offsets then name.
+static uint32_t UnknownBoundPartSelectWidth(const PackedRange& range,
+                                            int64_t known_bound,
+                                            bool unknown_is_more_significant) {
+  int64_t known_off = range.OffsetOf(range.Clamp(known_bound));
+  int64_t far_off =
+      unknown_is_more_significant ? range.OffsetOf(range.left) : 0;
+  return static_cast<uint32_t>(std::max(known_off, far_off) -
+                               std::min(known_off, far_off) + 1);
+}
+
 static Logic4Vec EvalPackedPartSelect(const Expr* expr, const Logic4Vec& base,
                                       int64_t idx, SimContext& ctx,
                                       Arena& arena) {
-  auto end_val = SelectBoundValue(EvalExpr(expr->index_end, ctx, arena));
-  auto target = PartSelectTargetIndices(idx, end_val, expr->is_part_select_plus,
-                                        expr->is_part_select_minus);
+  auto end = EvalExpr(expr->index_end, ctx, arena);
   auto range = SelectBaseRange(expr->base, base.width, ctx, arena);
+  // §11.5.1: "a part-select that is x or z shall yield the value x when read",
+  // and the clause makes both bounds of `vect[msb_expr:lsb_expr]` addresses --
+  // "Both msb_expr and lsb_expr shall be constant integer expressions" -- so an
+  // unknown second bound is as much an unknown address as an unknown first one.
+  // Only the first was asked about, on the way in to this function, and the
+  // second reached SelectBoundValue, whose Logic4Vec::ToUint64 is the
+  // "4-state -> integer projection" its own comment in src/common/types.cpp
+  // calls it: x and z both arrived as the index 0, and the select silently
+  // became a different, well-formed one. On a `logic [7:0] a = 8'hA5`,
+  // `a[3 : 1'bx]` was read as `a[3:0]` and answered 4'b0101. SelectStorageBits
+  // (statement_assign.cpp), which every writer of a select now goes through,
+  // has asked this of both bounds all along, so the read was the one direction
+  // where the two bounds were not alike. The second expression of an indexed
+  // part-select is its width rather than an address, and an unknown one is no
+  // more a width than an unknown bound is an address -- §11.5.1 has it "shall
+  // be a positive constant integer expression" -- so it takes the same route,
+  // as it does at the writers.
+  if (HasUnknownBits(end)) {
+    return MakeAllX(arena, UnknownBoundPartSelectWidth(
+                               range, idx,
+                               /*unknown_is_more_significant=*/false));
+  }
+  auto target = PartSelectTargetIndices(idx, SelectBoundValue(end),
+                                        expr->is_part_select_plus,
+                                        expr->is_part_select_minus);
   return EvalPartSelect(base, range.OffsetOf(target.first),
                         range.OffsetOf(target.second), arena);
 }
@@ -524,9 +567,8 @@ static uint32_t UnknownIndexPartSelectWidth(const Expr* expr, SimContext& ctx,
     return end_val > 0 ? static_cast<uint32_t>(end_val) : 1;
   }
   auto range = SelectBaseRange(expr->base, /*width=*/0, ctx, arena);
-  int64_t span =
-      range.OffsetOf(range.left) - range.OffsetOf(range.Clamp(end_val)) + 1;
-  return span > 0 ? static_cast<uint32_t>(span) : 1;
+  return UnknownBoundPartSelectWidth(range, end_val,
+                                     /*unknown_is_more_significant=*/true);
 }
 
 // Computes the result of a select whose index evaluates to x/z. A single-bit
