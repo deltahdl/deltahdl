@@ -343,4 +343,79 @@ TEST(LoopStatementSim, ForHeaderLocalInitializedFromAVariableGetsItsOwnWords) {
   EXPECT_EQ(seen_in_loop->value.words[0].bval & 0xFFu, 0x00u);
 }
 
+// §10.7 sizes the right-hand side of an assignment to the left-hand side, and
+// a typed for-header init declares its variable exactly as any other
+// declaration does. The width the type gives reached the cell
+// CreateLocalVariable made and was then thrown away by the store -- a Logic4Vec
+// carries its own width -- so `for (int i = seed; ...)` over a `logic [7:0]`
+// left the counter eight bits wide for every later read, step and comparison.
+TEST(LoopStatementSim, ForHeaderLocalInASubroutineTakesItsDeclaredWidth) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] seed;\n"
+      "  int result;\n"
+      "  function void sweep();\n"
+      "    for (int i = seed, int turns = 0; turns < 1; turns = turns + 1)\n"
+      "      result = $bits(i);\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    seed = 8'h01;\n"
+      "    sweep();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 32u);
+}
+
+// §6.11.2: "when a 4-state value is automatically converted to a 2-state value,
+// any unknown or high-impedance bits shall be converted to zeros". `int` is one
+// of the 2-state types, and Variable::is_4state -- which is what every later
+// store consults to make that conversion -- defaults to true and was never set
+// here, so the counter kept the x and the z its initializer read. $isunknown is
+// the instrument: the value's own unknown bits are what a read of it into a
+// 2-state variable would hide.
+TEST(LoopStatementSim,
+     ForHeaderLocalInASubroutineDropsItsInitializersUnknowns) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] seed;\n"
+      "  int result;\n"
+      "  function void sweep();\n"
+      "    for (int i = seed, int turns = 0; turns < 1; turns = turns + 1)\n"
+      "      result = $isunknown(i);\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    seed = 8'b1x0z0000;\n"
+      "    sweep();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// The same rule at the sibling site: a for header in a procedural block creates
+// its variable through CreateForInitVars and then runs the initializer as an
+// ordinary assignment, so §10.7's resize was already applied there by WriteVar
+// -- and WriteVar's §6.11.2 conversion was not, for want of the same flag.
+TEST(LoopStatementSim, ForHeaderLocalInABlockDropsItsInitializersUnknowns) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] seed;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    seed = 8'b1x0z0000;\n"
+      "    for (int i = seed, int turns = 0; turns < 1; turns = turns + 1)\n"
+      "      result = $isunknown(i);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
 }  // namespace

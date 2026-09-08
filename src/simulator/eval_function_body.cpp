@@ -560,14 +560,32 @@ static void ExecFuncForInits(const Stmt* stmt, const FuncExecCtx& exec) {
       // counter compared its negative values as huge positive ones.
       auto* v = exec.ctx.CreateLocalVariable(
           init->lhs->text, w, IsSignedType(stmt->for_init_types[i], {}));
-      // The initializer is copied for the reason CreateFuncLocalVar copies
-      // its own (§6.8): `for (int i = n; ...)` would otherwise leave i and n
-      // one storage element, and the loop's own step is the store that shows
-      // it. There is no resize here to place the copy around; this site,
-      // unlike the declaration one, never resized the initializer at all.
-      if (init->rhs)
+      // §6.11.2: the declared type decides whether the loop variable can hold
+      // an unknown at all -- "when a 4-state value is automatically converted
+      // to a 2-state value, any unknown or high-impedance bits shall be
+      // converted to zeros" -- and the flag defaults to true, so an `int`
+      // counter kept the x and z its initializer read. CreateFuncLocalVar sets
+      // the same flag for an ordinary body local from the same answer.
+      v->is_4state = DeclaredTypeIs4State(stmt->for_init_types[i]);
+      // §10.7 sizes the right-hand side to the left-hand side, and the width
+      // the type declares reached the cell CreateLocalVariable made and was
+      // then thrown away by the store: a Logic4Vec carries its own width, so
+      // `for (int i = seed; ...)` over a `logic [7:0] seed` left i eight bits
+      // wide for every later read, step and comparison. The initializer is
+      // copied for the reason CreateFuncLocalVar copies its own (§6.8): `for
+      // (int i = n; ...)` would otherwise leave i and n one storage element,
+      // and the loop's own step is the store that shows it. The copy goes
+      // outside the resize because ResizeToWidth answers its argument
+      // untouched when the widths already match, which is precisely the
+      // aliased case, and the coercion below writes in place -- through a
+      // shared buffer it would clear the source variable's own unknown bits.
+      if (init->rhs) {
         v->value =
-            OwnRhsWords(EvalExpr(init->rhs, exec.ctx, exec.arena), exec.arena);
+            OwnRhsWords(ResizeToWidth(EvalExpr(init->rhs, exec.ctx, exec.arena),
+                                      w, exec.arena),
+                        exec.arena);
+        if (!v->is_4state) CoerceTo2State(v->value);
+      }
     } else if (init) {
       ExecFuncStmt(init, exec);
     }
