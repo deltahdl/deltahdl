@@ -337,19 +337,50 @@ bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
 // off left it at 8'h01. The offset is zero for a select running off the high
 // end, where the bits that land are the value's least significant ones.
 //
-// A source offset of 64 or more names a bit this writer cannot see in any case:
-// Logic4Vec::ToUint64 reads the first word alone, so the value arrived with
-// everything above bit 63 already dropped, and shifting it down that far
-// answers the zero those bits read as here.
+// The window is deposited rather than computed in a machine word, because
+// "only affect the bits that are in range" is a statement about every bit of
+// the target the select did not name and not only about the ones beside it.
+// Reading the target through Logic4Vec::ToUint64 and rebuilding it with
+// MakeLogic4VecVal moved three sets of them. ToUint64 returns words[0] alone
+// and MakeLogic4VecVal fills a fresh zeroed array, so a target wider than one
+// word lost everything above bit 63: `w = '1; w[3:0] = 4'h0;` on a
+// `logic [99:0] w` must leave 96 ones and left 60, w[99:64] being neither named
+// by the select nor the value's to touch. ToUint64 returns `aval & ~bval` and
+// MakeLogic4VecVal sets no bval, so the x and z that §6.3.1 lets every bit of a
+// 4-state vector hold -- "All bits of 4-state vectors can be independently set
+// to one of the four basic values", and §6.11.2 makes `logic` one of those
+// types, whose values "have additional bits, which encode the x and z states"
+// -- were read as 0 on the way in and stored as 0 on the way out:
+// `a = 8'hxx; a[1:0] = 2'b11;` must read 8'bxxxxxx11 and read 8'b00000011, and
+// `a = 8'h00; a[1:0] = 2'b1x;` must read 8'b0000001x and read 8'b00000010. And
+// `mask << bits.lo` was undefined once the window began at bit 64 or above, the
+// shift count being taken modulo 64 on x86-64, so `w[71:68] = 4'hF` on the same
+// `logic [99:0] w` landed on w[7:4] and left w[71:68] at zero. DepositBitField
+// is documented multi-word safe for a start bit of 64 or more, which answers
+// the shift and the lost high words at once, and ExtractBitField takes the
+// value's landing bits with their 4-state encoding kept, which answers the
+// projection on the source side and makes bits.src_lo simply where the extract
+// begins.
+//
+// The deposit is made into a fresh copy of the target's current value rather
+// than through the words it is holding, for the reason WriteOwnedBits
+// (statement_assign_decl.cpp) gives: copying a Logic4Vec copies its `words`
+// pointer rather than the words (common/types.h), so a variable last written
+// whole from another object shares that object's storage and an in-place
+// deposit would write these bits into whatever else is holding it.
+//
+// §6.11.2 makes `bit` and `int` 2-state types that "do not have unknown
+// values", so a 2-state target is coerced here explicitly. MakeLogic4VecVal
+// gave that for free by never setting a bval; now that the deposit carries x
+// and z, an x reaching such a target would otherwise survive.
 static void WritePartSelect(Variable* var, const PartSelectBits& bits,
                             const Logic4Vec& rhs_val, Arena& arena) {
-  uint64_t mask =
-      (bits.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << bits.width) - 1;
-  uint64_t src = (bits.src_lo >= 64) ? 0 : rhs_val.ToUint64() >> bits.src_lo;
-  uint64_t old_val = var->value.ToUint64();
-  uint64_t new_bits = (src & mask) << bits.lo;
-  uint64_t cleared = old_val & ~(mask << bits.lo);
-  var->value = MakeLogic4VecVal(arena, var->value.width, cleared | new_bits);
+  Logic4Vec updated = ExtractBitField(arena, var->value, 0, var->value.width);
+  DepositBitField(updated, bits.lo,
+                  ExtractBitField(arena, rhs_val, bits.src_lo, bits.width),
+                  bits.width);
+  var->value = updated;
+  if (!var->is_4state) CoerceTo2State(var->value);
 }
 
 // §7.4.1: writes a single-index target on a packed multidimensional array as an
@@ -413,12 +444,16 @@ void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
     if (TryWritePackedElement(var, idx, rhs_val, arena)) return;
     auto range = var->BitSelectRange();
     if (!range.Contains(idx)) return;
+    // §11.5.1's bit-select "extract[s] a particular bit from a vector", which
+    // is the one-bit case of the window WritePartSelect deposits and not a
+    // different write, so it is written once. Computed in a machine word here
+    // as well, it moved the same three sets of bits the comment above that
+    // function names, and `uint64_t{1} << off` was undefined for a bit at 64 or
+    // above: `enable[64] = 1'b1;` on a `logic [64:0] enable` set enable[0].
+    // The source offset is zero because the bit takes the value's own least
+    // significant bit, which is what `rhs_val.ToUint64() & 1` took.
     auto off = static_cast<uint32_t>(range.OffsetOf(idx));
-    uint64_t old_val = var->value.ToUint64();
-    uint64_t bit = rhs_val.ToUint64() & 1;
-    uint64_t cleared = old_val & ~(uint64_t{1} << off);
-    var->value =
-        MakeLogic4VecVal(arena, var->value.width, cleared | (bit << off));
+    WritePartSelect(var, {off, 1U}, rhs_val, arena);
     return;
   }
 
