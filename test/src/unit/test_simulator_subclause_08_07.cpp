@@ -500,4 +500,85 @@ TEST(ClassConstructorSim, TwoStateInitializerLeavesItsSourcesXBits) {
   EXPECT_EQ(taken->value.ToUint64(), 5u);
 }
 
+// §8.7: "each property declared in the class shall be initialized to its
+// explicit default value", and §6.8 then has the property, being storage of
+// its own, "store a value from one assignment to the next". The property and
+// the variable its initializer read are two storage elements, so the value the
+// constructor stores has to be the property's own words.
+//
+// CoerceToPropertyType took its copy below its early return, and the early
+// return is the one this declaration takes: CollectClassMembers sizes a
+// property with EvalTypeWidth against an empty typedef map, so a property
+// declared by a typedef name has width_is_declared false and the function
+// handed the caller's own vector straight back. EvalExpr answers a bare
+// identifier with the variable's own Logic4Vec, so `pair_t snap = s;` made the
+// constructed property s's buffer, and `s.b = 8'h00` -- a packed-member
+// deposit, which writes the words it finds rather than replacing them -- then
+// wrote through the property that was initialized before it ran.
+//
+// The case discriminates three ways. The high byte separates a shared buffer
+// (00000000, the deposit read back through snap) from an owned one (10101010,
+// what s held when the constructor ran). The x nibble fails any copy that
+// drops the bval plane, which ExtractBitField carries and MakeLogic4VecVal
+// would not. And the property is declared by a typedef name, which is what
+// puts the case on the early return rather than on the copy
+// TwoStateInitializerLeavesItsSourcesXBits already guards. ToUint64 could
+// state none of it -- it projects `aval & ~bval` and reads an x as 0 -- so the
+// assertion is on ToString.
+TEST(ClassConstructorSim,
+     InitializerOfAnUnsizedTypeDoesNotShareItsSourcesBuffer) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] b; logic [7:0] l; } pair_t;\n"
+      "  pair_t s;\n"
+      "  class C;\n"
+      "    pair_t snap = s;\n"
+      "  endclass\n"
+      "  logic [15:0] got;\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    s = 16'hAAxB;\n"
+      "    c = new;\n"
+      "    s.b = 8'h00;\n"
+      "    got = c.snap;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "got");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "10101010xxxx1011");
+}
+
+// The same design read through the other key the constructor writes. A
+// property is stored twice, under its own name and under the scoped `C::snap`,
+// and an unqualified read inside a method resolves through GetPropertyForType,
+// which consults the scoped key first. Both entries are written from the one
+// value the initializer produced, so a fix that reached only the key the case
+// above reads would leave this one holding the source's buffer.
+TEST(ClassConstructorSim, InitializerOfAnUnsizedTypeIsOwnedUnderTheScopedKey) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] b; logic [7:0] l; } pair_t;\n"
+      "  pair_t s;\n"
+      "  class C;\n"
+      "    pair_t snap = s;\n"
+      "    function logic [15:0] held();\n"
+      "      return snap;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  logic [15:0] got;\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    s = 16'hAAxB;\n"
+      "    c = new;\n"
+      "    s.b = 8'h00;\n"
+      "    got = c.held();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "got");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "10101010xxxx1011");
+}
+
 }  // namespace

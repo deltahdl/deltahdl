@@ -140,6 +140,35 @@ static const ClassTypeInfo::PropertyInfo* FindPropertyInfo(
 
 Logic4Vec CoerceToPropertyType(const ClassTypeInfo* type, std::string_view name,
                                Logic4Vec val, Arena& arena) {
+  // §6.8 makes a variable "an abstraction of a data storage element" that
+  // "shall store a value from one assignment to the next", and §8.7 makes a
+  // property one: "each property declared in the class shall be initialized to
+  // its explicit default value or its uninitialized value if no default is
+  // provided". A property and the variable an initializer read are two storage
+  // elements; nothing has to forbid their sharing one buffer for a write
+  // through the sharing to be wrong. A by-value `Logic4Vec` parameter reads as
+  // though it already owned its bits and does not -- copying one copies the
+  // words pointer and not the words -- and that is the trap this site sets.
+  //
+  // So the copy is taken on entry, above every exit. It used to wrap the
+  // conversion below, which covered the coercion but not the two early returns
+  // over it, and those are the returns a whole family of declarations takes:
+  // CollectClassMembers sizes a property by EvalTypeWidth against an empty
+  // typedef map, so a property declared by a typedef name, a class handle, a
+  // string, an event or a virtual interface has width_is_declared false, and
+  // `pair_t snap = s;` was handed back the module variable's own vector. A
+  // packed-member deposit into that variable then wrote through the property,
+  // since DepositBitField writes the words it finds rather than replacing
+  // them. The prop == nullptr arm is covered by the same move: SetClassField
+  // reaches it on a flattened chained-path key.
+  //
+  // Nothing can ask a Logic4Vec whether it owns its words, so the copy is
+  // unconditional and is merely redundant where the conversion allocates
+  // anyway. What OwnRhsWords restores beside the words matters more here than
+  // it did below: a string property is one of the types that reaches the early
+  // return, and ExtractBitField builds with MakeLogic4Vec, which leaves
+  // is_string false.
+  val = OwnRhsWords(val, arena);
   const auto* prop = FindPropertyInfo(type, name);
   if (prop == nullptr || !prop->width_is_declared) return val;
   // ConvertRealForKnownLhs rather than ResizeToWidth: §6.12.1 converts a value
@@ -148,21 +177,11 @@ Logic4Vec CoerceToPropertyType(const ClassTypeInfo* type, std::string_view name,
   //
   // §6.11.2 has the coercion below convert "any unknown or high-impedance bits
   // ... to zeros", and it writes in place, so it has to land on the property's
-  // own value rather than on the variable the caller read. §6.8 makes a
-  // variable "an abstraction of a data storage element" that "shall store a
-  // value from one assignment to the next", and the property and that variable
-  // are two of them; nothing has to forbid their sharing one buffer for a write
-  // through the sharing to be wrong. A by-value `Logic4Vec` parameter reads as
-  // though it already owned its bits and does not -- copying one copies the
-  // words pointer and not the words -- and that is the trap this site sets.
-  //
-  // The copy wraps the conversion rather than following the coercion, which
-  // would be a copy of the damage, or sitting inside the conversion, whose tail
-  // is a ResizeToWidth that hands its argument back untouched at a matching
-  // width -- precisely the case the sharing arises in. Outside, it covers every
-  // path and is merely redundant where the conversion allocated anyway.
-  val = OwnRhsWords(
-      ConvertRealForKnownLhs(val, prop->is_real, prop->width, arena), arena);
+  // own value rather than on the variable the caller read. The copy above is
+  // what makes that so, whether or not the conversion allocated: its tail is a
+  // ResizeToWidth that hands its argument back untouched at a matching width,
+  // which is precisely the case the sharing arose in.
+  val = ConvertRealForKnownLhs(val, prop->is_real, prop->width, arena);
   if (!prop->is_4state && !prop->is_real) CoerceTo2State(val);
   // §6.11.3: the declaration's signedness belongs to the value stored in the
   // property. A variable keeps it on the Variable and a read consults it there;
