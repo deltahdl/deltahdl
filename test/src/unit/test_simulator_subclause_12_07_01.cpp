@@ -264,8 +264,9 @@ TEST(LoopStatementSim, ForLabeledLoopRuns) {
 // again. ExecFuncForInits stored what EvalExpr answered, EvalExpr answers a
 // bare identifier with the source variable's own Logic4Vec, and a Logic4Vec
 // copies its `words` pointer rather than the words, so the header left `i` and
-// `seed` one element. This site does not even resize on the way in, so unlike
-// a body declaration it shares the buffer at any width the source has.
+// `seed` one element until OwnRhsWords was put around the initializer. This
+// site does not even resize on the way in, so unlike a body declaration it
+// shared the buffer at any width the source has.
 //
 // The loop is written inside a function body because that is where this
 // header's variables are created: ExecFuncForInits builds them for a for in a
@@ -273,35 +274,46 @@ TEST(LoopStatementSim, ForLabeledLoopRuns) {
 // loop in an initial block reaches a different site and states nothing about
 // this one.
 //
-// What the loop does to `i` afterwards is not what exposes the sharing, and
-// the case is shaped around that. The step `i = i + 1` computes a new vector
-// and ExecFuncIdentifierAssign puts it in the local's place, which leaves
-// `seed`'s buffer unreferenced rather than writing through it. The writer that
-// does reach it is the one that converts a vector it did not build: §13.5.1
-// copies "the values of the actual arguments" into an input formal, and
+// This is a regression guard and it discriminates against nothing today: the
+// header could share its buffer again and `seed` would still read 8'b1x0z0000
+// out, because no writer left in the tree reaches a for-header local's words in
+// place. The writer that did reach them was §13.5.1's argument binding, which
+// copied "the values of the actual arguments" by copying the pointer while
 // §6.11.2 -- "any unknown or high-impedance bits shall be converted to zeros"
-// -- converts that copy in place, so handing the loop variable to a `bit
+// -- converted that copy in place, so handing the loop variable to a `bit
 // [7:0]` formal cleared `seed`'s unknowns in the iteration that only read it.
+// That binder takes its own copy since #3564, and the writers beside it decline
+// for reasons of their own: WritePartSelect deposits into a fresh extract of
+// the target rather than through it, so `i[3] = 1'b1` cannot reach past `i`;
+// this site marks no local 2-state (it never writes is_4state), so no
+// CoerceTo2State ever runs on one; and it registers no struct fields, so no
+// member deposit resolves against a for-header local. A 2-state coercion added
+// here without the copy above it is the regression this stands against, and
+// #3567 is the open reason someone will come to add one.
 //
-// That the conversion reaches the actual's own buffer is a defect of this
-// same family at the binding site (#3564), and it is what makes this case
-// discriminating rather than merely true: with the binding taking its own
-// copy, the conversion would land on that copy whether or not the
-// header above shared its words, and the case would go on holding with
-// nothing left to expose the sharing. No writer in the tree reaches a plain
-// integral local's buffer in place, so this is the exposure the claim has.
+// `turns` rather than `i` is what ends the loop, and it is a second header
+// local for that alone. It cannot hold an unknown bit: it is initialized from
+// the literal 0, and its step `turns = turns + 1` reaches EvalBinaryArith with
+// two known operands, which takes the arithmetic rather than §11.8.4's all-x
+// answer. So ExecFuncForLoop's `EvalExpr(for_cond).IsTruthy()` reads
+// EvalRelational on known operands three times -- 0 < 2, 1 < 2, 2 < 2 -- and
+// the body runs exactly twice.
 //
-// The loop runs exactly once and its termination is the step's alone: `seed`
-// has an even low nibble, so `i[0] == 1'b0` admits the first iteration, and
-// after `i = i + 1` the low bit is 1 -- or the whole of `i` is x, once the
-// unknowns above it survive into the sum -- and either answer ends the loop.
+// A condition written on `i` is what this case must not have, and once did: `i
+// + 1` is all-x by §11.8.4 as soon as the unknown bits survive into it, and
+// EvalSelect answers a single-bit select with `(base_val.ToUint64() >> off) &
+// 1`, which projects `aval & ~bval`, so `i[0]` read a known 0 out of an all-x
+// `i` and `i[0] == 1'b0` stayed true for ever. That hung the case for the whole
+// 60 s CTest allows once the binder above stopped clearing `i`; the bit-select
+// is #3566.
 //
 // ToUint64 projects aval & ~bval, so an unknown bit reads as 0 through it and
 // clearing it changes nothing it reports; the assertions read words[0].
 // 8'b1x0z0000 is stored as aval 0xC0 with bval 0x50, an x digit being aval 1
 // with bval 1 and a z digit aval 0 with bval 1, and the 2-state conversion of
 // it is aval 0x80 with bval 0x00 -- which is what the formal, and `noticed`
-// after it, alone are entitled to hold.
+// after it, alone are entitled to hold. `noticed` is also what says the body
+// ran at all: a loop that never entered it leaves it at 0.
 TEST(LoopStatementSim, ForHeaderLocalInitializedFromAVariableGetsItsOwnWords) {
   SimFixture f;
   auto* source = RunAndFindVar(
@@ -312,7 +324,7 @@ TEST(LoopStatementSim, ForHeaderLocalInitializedFromAVariableGetsItsOwnWords) {
       "    return step_val;\n"
       "  endfunction\n"
       "  function void sweep();\n"
-      "    for (int i = seed; i[0] == 1'b0; i = i + 1)\n"
+      "    for (int i = seed, int turns = 0; turns < 2; turns = turns + 1)\n"
       "      noticed = pass_on(i);\n"
       "  endfunction\n"
       "  initial begin\n"
