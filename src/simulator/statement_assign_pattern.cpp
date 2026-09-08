@@ -366,7 +366,11 @@ static void CopyResizableSourceToArray(std::string_view dst_name,
     auto dn = std::string(dst_name) + "[" + std::to_string(di) + "]";
     auto* dv = ctx.FindVariable(dn);
     if (dv) {
-      dv->value = src_q.elements[i];
+      // The queue entry keeps its own words for the same §6.8 reason the
+      // array-to-array arm of this copy does, in CopyArrayElements: the entry
+      // and the element it is copied into are two storage elements, and the
+      // queue outlives the statement that read it.
+      dv->value = OwnRhsWords(src_q.elements[i], ctx.GetArena());
       dv->NotifyWatchers();
     }
   }

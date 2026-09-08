@@ -261,4 +261,82 @@ TEST(ArrayAssignmentSimulation, FixedSizeMismatchNames7_6) {
       "array size mismatch in assignment to fixed-size array", 4, "7.6"));
 }
 
+// §6.8 (printed p.105): "A variable is an abstraction of a data storage
+// element. A variable shall store a value from one assignment to the next."
+// Each element of an unpacked array is one such storage element, so `a[0]` and
+// `b[0]` are two of them, and the whole-array copy `b = a;` has to leave the
+// destination element holding its own words rather than the pointer to the
+// source's that a plain Logic4Vec assignment copies (types.h: the struct holds
+// Logic4Word* words, and assigning it copies the pointer).
+//
+// The claim is made on the storage identity rather than on a value read back
+// from SystemVerilog because no source-level reader can currently tell the two
+// apart: every writer that reaches an unpacked-array element replaces the
+// element's vector instead of depositing into it. WriteVar installs the fresh
+// value ResizeToWidth builds, WritePartSelect rebuilds the element with
+// ExtractBitField, and the one in-place depositor -- WriteResolvedField's
+// kBits arm -- is not reachable through a select, because BuildLhsName spells
+// a kSelect node as "". Add a writer that deposits into an unpacked-array
+// element in place, or a store on this path that coerces rather than replaces
+// (CoerceTo2State writes through whatever words it is handed), and the sharing
+// becomes visible from source as a write to `b[0]` that changes `a[0]`. Until
+// one of those exists the pointer is the only place this rule can be observed,
+// so the pointer assertion is the test rather than scaffolding around one.
+TEST(ArrayAssignmentSimulation,
+     WholeArrayCopyGivesDestinationItsOwnElementWords) {
+  SimFixture f;
+  auto* a0 = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a [0:1];\n"
+      "  logic [7:0] b [0:1];\n"
+      "  initial begin\n"
+      "    a[0] = 8'hA5; a[1] = 8'h5A;\n"
+      "    b = a;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a[0]");
+  ASSERT_NE(a0, nullptr);
+  auto* b0 = f.ctx.FindVariable("b[0]");
+  ASSERT_NE(b0, nullptr);
+  ASSERT_NE(a0->value.words, nullptr);
+  ASSERT_NE(b0->value.words, nullptr);
+  EXPECT_NE(a0->value.words, b0->value.words);
+  EXPECT_EQ(a0->value.words[0].aval, b0->value.words[0].aval);
+  EXPECT_EQ(a0->value.words[0].bval, b0->value.words[0].bval);
+}
+
+// The same §6.8 storage rule on the other arm of the copy: a queue source runs
+// through CopyResizableSourceToArray rather than CopyArrayElements, and a queue
+// entry outlives the statement that read it, so `a[0]` must not end up pointing
+// at the words `q[0]` still holds. This asserts on the pointer for the reason
+// the array-to-array case above spells out -- WriteVar, WritePartSelect and
+// WriteResolvedField all replace an unpacked-array element rather than deposit
+// into it, so shared words are invisible to any SystemVerilog reader until a
+// writer deposits in place or a store on this path coerces instead of
+// replacing.
+TEST(ArrayAssignmentSimulation,
+     WholeArrayCopyFromQueueGivesDestinationItsOwnElementWords) {
+  SimFixture f;
+  auto* a0 = RunAndFindVar(
+      "module t;\n"
+      "  int q[$];\n"
+      "  int a [0:1];\n"
+      "  initial begin\n"
+      "    q.push_back(32'h1234_5678);\n"
+      "    q.push_back(32'h0BAD_F00D);\n"
+      "    a = q;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a[0]");
+  ASSERT_NE(a0, nullptr);
+  auto* q = f.ctx.FindQueue("q");
+  ASSERT_NE(q, nullptr);
+  ASSERT_EQ(q->elements.size(), 2u);
+  ASSERT_NE(a0->value.words, nullptr);
+  ASSERT_NE(q->elements[0].words, nullptr);
+  EXPECT_NE(a0->value.words, q->elements[0].words);
+  EXPECT_EQ(a0->value.words[0].aval, q->elements[0].words[0].aval);
+  EXPECT_EQ(a0->value.words[0].bval, q->elements[0].words[0].bval);
+}
+
 }  // namespace

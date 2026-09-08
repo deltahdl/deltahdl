@@ -774,7 +774,16 @@ void CopyArrayElements(std::string_view dst_name, const ArrayInfo& dst,
     auto* sv = ctx.FindVariable(sn);
     auto* dv = ctx.FindVariable(dn);
     if (sv && dv) {
-      dv->value = sv->value;
+      // §7.6 does a whole-array copy by "assigning each element of the
+      // source array to the corresponding element of the target array", so
+      // this store is an assignment in its own right, and §6.8 makes what it
+      // assigns to "an abstraction of a data storage element" holding "a value
+      // from one assignment to the next". The destination element therefore
+      // takes a copy of the source's words rather than the pointer to them
+      // that a plain Logic4Vec assignment would leave the two sharing. This is
+      // the whole-array spelling `b = a;` of the copy the slice and subarray
+      // forms already own their words on.
+      dv->value = OwnRhsWords(sv->value, ctx.GetArena());
       dv->NotifyWatchers();
     }
   }
