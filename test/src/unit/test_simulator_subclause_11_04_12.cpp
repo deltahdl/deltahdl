@@ -1,6 +1,7 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
@@ -610,6 +611,116 @@ TEST(ConcatenationSim,
       "endmodule\n";
   EXPECT_EQ(RunAndGet(src, "p"), 0x16u);
   EXPECT_EQ(RunAndGet(src, "q"), 0x52u);
+}
+
+// §11.5.1 requires an indexed part-select's width expression to "be a positive
+// constant", so a zero width is not a narrow select a writer may pass over in
+// silence: it is a select the clause does not admit at all. The bit-select
+// writer says so -- WriteBitSelectBits calls ReportZeroWidthPartSelect ahead of
+// the resolution, and that report is what
+// SelectBoundaryBehavior.ZeroWidthPartSelectWriteNames11_5_1 in
+// test_simulator_subclause_11_05_01a.cpp reads -- and §11.4.14.1's streaming
+// unpack reaches the same reporter through the same writer. UnpackConcatLhs did
+// not: its `if (w == 0) continue;` arm dropped the element and said nothing, so
+// `{top, low[5 -: n]} = 12'h6F7` with `n` holding zero ran clean.
+//
+// LhsConcatZeroWidthPartSelectElementClaimsNoBits above asks where the bits of
+// such a concatenation go and answers it without reading a diagnostic at all.
+// This asks only whether the run reported, and the two are separate readings
+// because the sizing was corrected while the silence stood.
+//
+// The width has to reach the simulator unresolved, which is why `n` is a
+// variable: a literal or a localparam is folded and rejected by
+// CheckIndexedPartSelectWidthNode before any run. That leaves the elaborator
+// reporting the variable width as the non-constant expression it is --
+// "indexed part-select width must be a constant expression", at this same line
+// 8 and under this same §11.5.1 -- so neither the line nor the subclause can
+// tell the two reports apart and only the message can. The run is therefore
+// split out of the elaboration here rather than driven through RunAndFindVar:
+// the number of diagnostics standing before LowerAndRun is where FindDiagFrom
+// starts, so what is asserted is a report the run raised, and the ReportedError
+// beside it names the message, the line and the subclause of that report.
+//
+// The values are the other half of the reading. The zero-width element claims
+// no bits, so the concatenation is eight wide and §10.7 cuts 12'h6F7 down to
+// 8'hF7 for `top`, while `low` stands at the 8'h4D it was loaded with. A report
+// raised by a writer that had gone on to write something would be told from one
+// raised where §11.5.1 leaves the data stored alone.
+TEST(ConcatenationSim, LhsConcatZeroWidthPartSelectElementNames11_5_1) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] top, low;\n"
+      "  logic [3:0] n;\n"
+      "  initial begin\n"
+      "    low = 8'h4D;\n"
+      "    top = 8'h5E;\n"
+      "    n = 4'd0;\n"
+      "    {top, low[5 -: n]} = 12'h6F7;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto before_run = f.diag.Diagnostics().size();
+  LowerAndRun(design, f);
+  EXPECT_NE(FindDiagFrom(f, before_run, "zero-width part-select"), nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "zero-width part-select is not allowed", 8,
+                            "11.5.1"));
+  auto* top = f.ctx.FindVariable("top");
+  ASSERT_NE(top, nullptr);
+  EXPECT_EQ(top->value.ToUint64(), 0xF7u);
+  auto* low = f.ctx.FindVariable("low");
+  ASSERT_NE(low, nullptr);
+  EXPECT_EQ(low->value.ToUint64(), 0x4Du);
+}
+
+// The report belongs to the width the select was written with and to nothing
+// else that leaves an element no bits wide. SelectExprWidth answers zero for
+// three shapes: an element resolving to no variable at all, a non-indexed
+// part-select whose bounds carry x or z, and the indexed part-select whose
+// declared width is zero. §11.5.1 states its positive-constant requirement of
+// the third alone; of the second it says only that an invalid address "shall
+// have no effect on the data stored when written", which settles a value and
+// rejects nothing. A writer reporting wherever the element came out zero bits
+// wide would therefore report on a statement the clause admits.
+//
+// ReportZeroWidthPartSelect gates itself on the two indexed forms for that
+// reason, and this case is what holds that gate shut. `mid[msb:0]` with `msb`
+// carrying x is zero bits wide by the second shape, and the run owes it
+// silence, so a fix that answered the case above by reporting from the `w == 0`
+// arm itself would pass that one and fail this one.
+//
+// The x has to arrive at run time, so the bound is a variable and the
+// elaborator reports it as the non-constant bound it is -- "non-indexed
+// part-select bounds shall be constant expressions", §11.5.1 once more. That
+// report is why the assertion names the simulator's own message: a case reading
+// the subclause off whatever the run recorded, or counting errors, would be
+// satisfied by the elaborator's report and would claim nothing.
+//
+// 16'hD5C3 is divided between the two elements that do claim bits -- `lo` takes
+// bits [7:0] and `hi` bits [15:8] = 8'hD5 -- which is what says the walk
+// reached the elements rather than the statement being dropped whole, and `mid`
+// stands at the 8'h6C sentinel its unwritten select leaves it at.
+TEST(ConcatenationSim, LhsConcatUnknownBoundPartSelectElementReportsNothing) {
+  SimFixture f;
+  auto* mid = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] hi, mid, lo;\n"
+      "  logic [3:0] msb;\n"
+      "  initial begin\n"
+      "    mid = 8'h6C;\n"
+      "    msb = 4'bxxxx;\n"
+      "    {hi, mid[msb:0], lo} = 16'hD5C3;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "mid");
+  ASSERT_NE(mid, nullptr);
+  EXPECT_EQ(FindDiag(f, "zero-width part-select"), nullptr);
+  EXPECT_EQ(mid->value.ToUint64(), 0x6Cu);
+  auto* hi = f.ctx.FindVariable("hi");
+  ASSERT_NE(hi, nullptr);
+  EXPECT_EQ(hi->value.ToUint64(), 0xD5u);
 }
 
 }  // namespace

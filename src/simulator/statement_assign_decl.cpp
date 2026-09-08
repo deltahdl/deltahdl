@@ -734,7 +734,17 @@ static uint32_t WalkConcatLhsElements(const Expr* lhs, const Stmt* stmt,
   for (auto it = lhs->elements.rbegin(); it != lhs->elements.rend(); ++it) {
     const Expr* el = *it;
     uint32_t w = ConcatLhsElemWidth(el, ctx, arena);
-    if (w == 0) continue;
+    if (w == 0) {
+      // §11.5.1 requires an indexed part-select's width to "be a positive
+      // constant", so an element written with a width of zero is illegal
+      // rather than merely empty and is reported before being passed over,
+      // the same way the blocking unpack reports it. The report gates itself
+      // on the select carrying such a width, so the other causes of a zero
+      // here -- an element this cannot size at all, a part-select whose bounds
+      // carry x or z -- stay silent, as they were.
+      ReportZeroWidthPartSelect(el, ctx, arena);
+      continue;
+    }
     // §11.4.12: a nested concatenation lvalue divides the slice it was given
     // among its own elements, so the walk continues into it at the offset it
     // has reached.

@@ -560,8 +560,7 @@ static bool StoredBitsDiffer(const Logic4Vec& a, const Logic4Vec& b) {
 // constant" -- so it is read on its own, from a base of zero, which is the
 // declared width PartSelectTargetIndices gives either indexed form whatever the
 // base is. Only those two forms carry a width, so `a[7:0]` reads nothing twice.
-static void ReportZeroWidthPartSelect(const Expr* sel, SimContext& ctx,
-                                      Arena& arena) {
+void ReportZeroWidthPartSelect(const Expr* sel, SimContext& ctx, Arena& arena) {
   if (!sel->index_end) return;
   if (!sel->is_part_select_plus && !sel->is_part_select_minus) return;
   auto width = SelectBoundValue(EvalExpr(sel->index_end, ctx, arena));

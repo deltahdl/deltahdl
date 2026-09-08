@@ -1,5 +1,6 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_stmt_exec.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -589,6 +590,63 @@ TEST(ForceReleaseSim, ReleaseOfAConcatenationReestablishesTheAssignPerElement) {
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 0x12u);
   EXPECT_EQ(b->value.ToUint64(), 0x34u);
+}
+
+// §11.5.1's report for a select written with a zero width is owed by every
+// writer that reaches such a select, and §10.6.1 and §10.6.2 send `assign`,
+// `force`, `release` and `deassign` over a concatenation target through a walk
+// of their own: WalkConcatLhsElements in statement_assign_decl.cpp, which
+// carried the same `if (w == 0) continue;` arm the blocking unpacker carried
+// and the same silence with it. The blocking assignment's reading of the rule
+// is ConcatenationSim.LhsConcatZeroWidthPartSelectElementNames11_5_1 in
+// test_simulator_subclause_11_04_12.cpp; this is the force's, and the two are
+// separate functions in separate files, so either can be corrected while the
+// other stays silent.
+//
+// The select is on a net because §10.6.2 admits "a constant bit-select of a
+// vector net, a constant part-select of a vector net, or a concatenation of
+// these" and nothing wider: CheckForceLhsOperand rejects a select of a variable
+// in a force lvalue outright, which is why `bus` is a wire here as it is in
+// ForceOfAConcatenationWritesOnlyTheNetBitItsSelectNames above.
+//
+// The width is a variable because a folded constant zero never reaches the
+// simulator at all -- CheckIndexedPartSelectWidthNode rejects it during
+// elaboration -- and that leaves the elaborator reporting the variable width as
+// the non-constant expression it is, "indexed part-select width must be a
+// constant expression", at this same line 10 and under this same §11.5.1. The
+// line and the subclause therefore separate nothing, and the message is what
+// names the report this case is about.
+//
+// The values say the force landed rather than the statement being dropped
+// whole. The zero-width element claims none of the right-hand value, so `w` is
+// the whole of a one-bit concatenation and takes the 1 of 2'b01 against the 0
+// its own continuous assignment drives, and `bus`, which the walk passes over,
+// keeps the 8'h55 its driver gave it.
+TEST(ForceReleaseSim, ForceOfAConcatenationZeroWidthPartSelectNames11_5_1) {
+  SimFixture f;
+  auto* w = RunAndFindVar(
+      "module t;\n"
+      "  wire w;\n"
+      "  wire [7:0] bus;\n"
+      "  logic [3:0] wid;\n"
+      "  assign w = 1'b0;\n"
+      "  assign bus = 8'h55;\n"
+      "  initial begin\n"
+      "    wid = 4'd0;\n"
+      "    #1;\n"
+      "    force {w, bus[3 +: wid]} = 2'b01;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "zero-width part-select is not allowed", 10,
+                            "11.5.1"));
+  EXPECT_TRUE(w->is_forced);
+  EXPECT_EQ(w->value.ToUint64(), 1u);
+  auto* bus = f.ctx.FindVariable("bus");
+  ASSERT_NE(bus, nullptr);
+  EXPECT_EQ(bus->value.ToUint64(), 0x55u);
 }
 
 }  // namespace

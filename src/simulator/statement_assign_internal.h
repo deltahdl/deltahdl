@@ -141,6 +141,22 @@ uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx, Arena& arena);
 bool ConcatLhsElemHasWritableBits(const Expr* e, const Variable& var,
                                   SimContext& ctx, Arena& arena);
 
+// Defined in statement_assign.cpp, whose bit-select writer raises it before it
+// resolves a window; also used by the §11.4.12 concatenation unpack in
+// statement_assign_core.cpp and by the §10.6.1 and §10.6.2 procedural
+// continuous assignments in statement_assign_decl.cpp, each of which sizes a
+// concatenation element itself and so never reaches that writer with one this
+// concerns. §11.5.1 requires an indexed part-select's width to "be a positive
+// constant", which makes a zero-width one illegal rather than merely empty,
+// and this raises that error for the select `sel`. It asks the question of the
+// select as written: it returns silently unless `sel` has an index_end, is a
+// plus or minus indexed part-select, and reads a declared width of zero, so a
+// caller may offer it every element it passed over and the ones whose width is
+// zero for another reason -- an element nothing here can size, bounds carrying
+// x or z -- stay as silent as they were. Reporting is all it does; the caller
+// still passes the element over without advancing its offset.
+void ReportZeroWidthPartSelect(const Expr* sel, SimContext& ctx, Arena& arena);
+
 // Defined in statement_assign_core.cpp; also used by the subroutine-body
 // statement executor in eval_function_body.cpp. §10.4 puts procedural
 // assignments "within procedures such as always, initial, task, and function",
@@ -169,6 +185,39 @@ uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx, Arena& arena);
 // the assignment context (width and, for named patterns, struct type).
 Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena);
+
+// The whole-object assignment forms, defined in statement_assign_object.cpp
+// and each used by the blocking-assignment dispatch in
+// statement_assign_core.cpp, which offers a statement to them in turn before
+// evaluating any right-hand value. None of them sizes its right-hand side
+// against the width of its target, because neither an associative array nor a
+// class handle takes a value the way §10.7 sizes one for a vector; each
+// answers the statement whole or declines it, returning false having written
+// nothing, and the caller then goes on to its other forms.
+//
+// §7.9.11 lets a whole associative array be written at once. Copy takes the
+// entries of another associative array named on the right; Map takes those
+// §7.12.5's map() produced, whose set of index values matches its source with
+// each stored value replaced by the value of the with expression; Literal
+// takes them from an '{index:value} assignment pattern, reading each key as an
+// index of the array's declared index type and `default` as the array's
+// default. All three replace the destination's previous contents rather than
+// merging into them.
+bool TryAssocCopyAssign(const Stmt* stmt, SimContext& ctx);
+bool TryAssocMapAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
+bool TryAssocLiteralAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
+
+// §8.3's class `new` in the two forms whose type comes from somewhere other
+// than the target's own declared class. Typed is the class-scope call
+// `obj = C::new`, which names the type on the right and binds §8.25's
+// specialization overrides as locals around the construction when the scope is
+// parameterized; Member is `obj.field = new`, whose bare `new` carries no type
+// at all, so the field's declared class is resolved from the class type of the
+// base and the resulting handle stored through the member chain. The form
+// whose type is the target's, `obj = new`, is TryClassNewAssign, which
+// simulator/statement_assign.h declares.
+bool TryTypedClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
+bool TryMemberClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
 // Defined in statement_assign_stream.cpp; also used by the §11.4.2 nonblocking
 // path in statement_assign_nonblocking.cpp. §11.4.14: left-align a streaming
