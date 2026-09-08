@@ -430,4 +430,71 @@ TEST(ConcatenationSim, LhsConcatPackedArrayElementReservesItsElementWidth) {
   EXPECT_EQ(RunAndGet(src, "c"), 0xD5u);
 }
 
+// §11.5.1 requires an indexed part-select's width expression to "be a positive
+// constant", so a width of zero names no bit of the object: `a[3 +: 0]` is not
+// a narrow select, it is no select at all. §11.6.1's Table 11-21 sizes
+// `{i,...,j}` at L(i)+...+L(j), and an element naming no bit adds nothing to
+// that sum, so the elements above it sit where they would sit if it were not
+// written.
+//
+// Two functions answer that one question and disagreed. SelectStorageBits
+// returns an empty window for the zero declared width, so
+// ConcatLhsElemHasWritableBits says the element writes nothing; SelectExprWidth
+// measured only the pair PartSelectTargetIndices answers -- 3 and 3 + 0 - 1 = 2
+// -- so ConcatLhsElemWidth sized the element at the two bits a[3:2] spans. The
+// element claimed two bits of the right-hand value and wrote none of them, and
+// every bit of the concatenation above it was displaced by two.
+//
+// The width has to be unresolvable before the run for the simulator to be what
+// answers: written as a literal or a localparam, the elaborator folds it and
+// CheckIndexedPartSelectWidthNode rejects it there. A variable `w` holding 0 is
+// reported there too -- as the non-constant width it is, §11.5.1 -- but that
+// report does not stop the elaboration and the design still lowers and runs,
+// which is why the run is read through RunAndFindVar and not RunAndGet, whose
+// EXPECT_FALSE(f.has_errors) requires a clean elaboration. Whether the
+// simulator owes a §11.5.1 report of its own for the zero it now sees is a
+// separate question this case does not ask; it asks only where the bits go.
+//
+// 18'h2D5C3 is 10_11010101_11000011. `c` owns the concatenation's top eight
+// bits and `b` its bottom eight, and the element between them owns none, so a
+// sixteen-bit concatenation receives an eighteen-bit value: §10.7 truncates the
+// two most significant bits away, leaving `c` bits [15:8] = 8'hD5 and `b` bits
+// [7:0] = 8'hC3. Claiming two bits made the concatenation eighteen wide
+// instead, and `c` took bits [17:10] and read 8'hB5.
+//
+// `b` reads 8'hC3 in both readings, and that is why the case is written with a
+// `c` above the zero-width element rather than as `{a[3 +: w], b}`:
+// UnpackConcatLhs counts its offsets up from the least significant bit and
+// §10.7 truncates from the most significant end, so nothing moves an element by
+// what stands to its left, and that shorter concatenation would read the same
+// 8'hAC out of 10'h3AC either way and claim nothing. `a` standing at its 8'h1A
+// sentinel is the other half of the rule -- the element wrote nothing -- and it
+// holds in both readings too, SelectStorageBits having always given this
+// element an empty window; it is here so that a fix moving the boundary by
+// giving the element bits of `a` to write would have something to answer to.
+TEST(ConcatenationSim, LhsConcatZeroWidthPartSelectElementClaimsNoBits) {
+  SimFixture f;
+  auto* a = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  logic [3:0] w;\n"
+      "  initial begin\n"
+      "    a = 8'h1A;\n"
+      "    b = 8'h2B;\n"
+      "    c = 8'h3C;\n"
+      "    w = 4'd0;\n"
+      "    {c, a[3 +: w], b} = 18'h2D5C3;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->value.ToUint64(), 0x1Au);
+  auto* c = f.ctx.FindVariable("c");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(c->value.ToUint64(), 0xD5u);
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(b->value.ToUint64(), 0xC3u);
+}
+
 }  // namespace

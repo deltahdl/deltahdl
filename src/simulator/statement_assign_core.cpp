@@ -491,12 +491,12 @@ static bool TrySubarrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 // the reference shall be x for 4-state and 0 for 2-state values" -- and says
 // separately that such a write "shall have no effect on the data stored".
 //
-// Zero is answered only where the select names no range this can measure: a
-// non-indexed part-select whose bounds carry x or z, and an indexed one whose
-// width expression does. An unknown base index leaves an indexed part-select
-// its stated width, §11.5.1 letting that base "vary at run time", and a
-// bit-select whose index carries x or z is one bit like any other, that clause
-// covering the out-of-bounds address and the unknown one in one sentence.
+// Zero is answered where the select names no bits: a part-select whose bounds
+// or width expression carry x or z, and an indexed one whose width is zero. An
+// unknown base index leaves an indexed part-select its stated width, §11.5.1
+// letting that base "vary at run time", and a bit-select whose index carries x
+// or z is one bit like any other, that clause covering the out-of-bounds
+// address and the unknown one in one sentence.
 //
 // §11.4.14.1 asks the same question of a streaming-concatenation target
 // element, each stream_expression being "converted to a bit-stream and
@@ -520,6 +520,13 @@ uint32_t SelectExprWidth(const Variable& var, const Expr* sel, SimContext& ctx,
   auto target = PartSelectTargetIndices(
       SelectBoundValue(idx_val), SelectBoundValue(end_val),
       sel->is_part_select_plus, sel->is_part_select_minus);
+  // §11.5.1 requires an indexed part-select's width to "be a positive
+  // constant", so a zero one names no bit and the select is no bits wide. This
+  // and SelectStorageBits answer one question off one struct, and only that one
+  // read its third field: the pair below is the two ends of a width the select
+  // does not have -- 3 and 2 for `a[3 +: 0]` -- so `{a[3 +: 0], b}` claimed two
+  // bits of the value and wrote none of them.
+  if (target.declared_width == 0) return 0;
   return static_cast<uint32_t>(std::max(target.first, target.second) -
                                std::min(target.first, target.second) + 1);
 }

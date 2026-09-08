@@ -102,8 +102,9 @@ const Expr* UnwrapTypedPattern(const Expr* expr);
 // bounds changes none of those: §11.5.1 gives the invalid reference a value
 // rather than an absence, "x for 4-state and 0 for 2-state values", and says
 // separately that such a write "shall have no effect on the data stored". Zero
-// only where the select names no range this can measure, which is a
-// part-select whose bounds or width expression carry x or z.
+// only where the select names no bits, which is a part-select whose bounds or
+// width expression carry x or z and an indexed one whose width is zero,
+// §11.5.1 requiring that width to "be a positive constant".
 //
 // This is the width the select names and not the window of its object it may
 // write; the second question is SelectStorageBits'. The two differ wherever a
