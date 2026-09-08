@@ -2,6 +2,7 @@
 #include "fixture_simulator.h"
 #include "helpers_queue.h"
 #include "helpers_queue_ref_method.h"
+#include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/statement_assign.h"
