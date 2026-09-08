@@ -149,7 +149,7 @@ static bool IsQueueOrderingMethod(std::string_view method) {
          method == "shuffle";
 }
 
-static void NotifyOwningVar(SimContext& ctx, std::string_view var_name) {
+void NotifyOwningVar(SimContext& ctx, std::string_view var_name) {
   if (auto* v = ctx.FindVariable(var_name)) v->NotifyWatchers();
 }
 

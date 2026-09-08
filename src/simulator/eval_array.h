@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string_view>
 #include <vector>
 
 #include "common/types.h"
@@ -10,6 +11,19 @@ struct Expr;
 struct AssocArrayObject;
 class SimContext;
 class Arena;
+
+// The notification a write to an aggregate's contents owes §9.4.2, which puts
+// the duty on the writer: "Changing the value of object data members, aggregate
+// elements, or the size of a dynamically sized array referenced by a method or
+// function shall cause the event expression to be reevaluated". A queue, a
+// dynamic array and an associative array all keep their elements outside the
+// Variable registered under the aggregate's name, so a write that changes one
+// leaves that variable's `value` standing still while the watchers armed on the
+// name -- which is what a `wait (q[0] == 3)`, an `always_comb` reading `q[1]`
+// and an `@(q[1])` all arm on -- have nothing else to go on. Every mutating
+// queue method calls this; so does the indexed element write beside them.
+// Defined in eval_array_queue.cpp.
+void NotifyOwningVar(SimContext& ctx, std::string_view var_name);
 
 bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                             Logic4Vec& out);

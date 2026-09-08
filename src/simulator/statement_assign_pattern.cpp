@@ -521,17 +521,33 @@ bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
   }
   auto sz = static_cast<int64_t>(q->elements.size());
 
+  // §9.4.2 has an implicit event detected on any change in the value of the
+  // expression, and names both changes the two stores below make -- an
+  // aggregate element and the size of a dynamically sized array. Neither is
+  // visible in the queue variable's own `value`, so each store tells the
+  // watchers armed on the name, which is what every mutating queue method does
+  // and what §7.10.1 requires of this spelling too: "Queues shall support the
+  // same operations that can be performed on fixed-size unpacked arrays", and
+  // the fixed-array element write notifies through WriteVar. The append
+  // notifies once for the element and the size together, a watcher
+  // re-evaluating its expression rather than reading a delta.
   if (idx == sz) {
     q->elements.push_back(rhs_val);
     q->element_ids.push_back(q->AllocateId());
     ++q->generation;
     EnforceQueueBound(q, "indexed write", lhs->range.start, ctx);
+    NotifyOwningVar(ctx, lhs->base->text);
     return true;
   }
   if (idx >= 0 && idx < sz) {
     q->elements[static_cast<size_t>(idx)] = rhs_val;
+    NotifyOwningVar(ctx, lhs->base->text);
     return true;
   }
+
+  // §7.10.1 has an invalid index "cause a write operation to be ignored", so
+  // the branch below and the x/z one above store nothing and owe no
+  // notification: an event on a write that did not happen is a spurious one.
 
   ctx.GetDiag().Warning(lhs->index->range.start,
                         "queue write index out of bounds", Subclause("7.10.1"));
