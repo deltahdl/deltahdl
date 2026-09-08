@@ -792,4 +792,75 @@ TEST(ArrayIndexingAndSlicing, PackedSliceReadIsXForAMissingElement) {
   EXPECT_EQ(var->value.ToString(), "xxxxxxxx00100010");
 }
 
+// §6.3.1: "All bits of 4-state vectors can be independently set to one of the
+// four basic values", and a slice read as one packed value is a concatenation
+// of such vectors. The assembly took each element through ToUint64, which
+// projects `aval & ~bval`, and wrote the aval plane alone, so no element could
+// carry an x or a z out of it. ToUint64 cannot see the difference either --
+// it reads an all-x element as 0 -- so the assertion is on ToString.
+TEST(ArrayIndexingAndSlicing, ArraySliceAsValueKeepsXAndZ) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a [0:1];\n"
+      "  logic [15:0] w;\n"
+      "  initial begin\n"
+      "    a[0] = 8'h5A;\n"
+      "    a[1] = 8'bxxxx_zzzz;\n"
+      "    w = a[0:1];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "w");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "xxxxzzzz01011010");
+}
+
+// An element width that is not a divisor of 64 puts an element across the word
+// boundary, and the part above it was dropped: the shifted value was ORed into
+// the one word `bit_off / 64` names. Element 1 of a 40-bit array sits at result
+// bit 40, so its top sixteen bits belong in word 1, which was never written.
+TEST(ArrayIndexingAndSlicing, ArraySliceAsValueKeepsBitsAcrossAWordBoundary) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [39:0] a [0:1];\n"
+      "  logic [79:0] w;\n"
+      "  initial begin\n"
+      "    a[0] = 40'hAABBCCDDEE;\n"
+      "    a[1] = 40'h1122334455;\n"
+      "    w = a[0:1];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "w");
+  ASSERT_NE(var, nullptr);
+  ASSERT_EQ(var->value.nwords, 2u);
+  EXPECT_EQ(var->value.words[0].aval, 0x334455AABBCCDDEEull);
+  EXPECT_EQ(var->value.words[1].aval, 0x1122ull);
+}
+
+// A 64-bit element made the mask expression shift a uint64_t by 64, which is
+// undefined behaviour rather than a wide zero. What that produced on x86-64 --
+// a count taken modulo 64, a mask of 0, and every element reading as zero -- is
+// one platform's accident and not a specification; the assertion is written
+// against the value §7.4.5 requires, which the old assembly failed to produce
+// on any platform.
+TEST(ArrayIndexingAndSlicing, ArraySliceAsValueOfSixtyFourBitElements) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [63:0] a [0:1];\n"
+      "  logic [127:0] w;\n"
+      "  initial begin\n"
+      "    a[0] = 64'h1122334455667788;\n"
+      "    a[1] = 64'h99AABBCCDDEEFF00;\n"
+      "    w = a[0:1];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "w");
+  ASSERT_NE(var, nullptr);
+  ASSERT_EQ(var->value.nwords, 2u);
+  EXPECT_EQ(var->value.words[0].aval, 0x1122334455667788ull);
+  EXPECT_EQ(var->value.words[1].aval, 0x99AABBCCDDEEFF00ull);
+}
+
 }  // namespace

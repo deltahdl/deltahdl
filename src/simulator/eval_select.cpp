@@ -316,19 +316,23 @@ static bool TryArraySliceSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   for (uint32_t i = 0; i < run.count; ++i) {
     auto n = run.base + "[" + std::to_string(run.lo + i) + "]";
     auto* v = ctx.FindVariable(n);
-    uint32_t bit_off = i * ew;
-    if (v == nullptr) {
-      // §7.4.5's Table 7-1 again, and the 2-state row needs nothing done: the
-      // result was allocated zeroed. The 4-state row is deposited rather than
-      // shifted in, DepositBitField carrying the bval plane an all-x entry
-      // needs and resolving the word the entry lands in -- what the assembly
-      // below does with an entry that is present is #3575's.
-      if (run.is_4state) DepositBitField(out, bit_off, MakeAllX(arena, ew), ew);
-      continue;
-    }
-    auto val = v->value.ToUint64();
-    out.words[bit_off / 64].aval |= (val & ((1ULL << ew) - 1))
-                                    << (bit_off % 64);
+    // The bit-field primitives rather than 64-bit integer arithmetic, which is
+    // four answers at once. ExtractBitField carries the bval plane, so §6.3.1's
+    // "All bits of 4-state vectors can be independently set to one of the four
+    // basic values" survives the read where ToUint64 projected `aval & ~bval`
+    // and every x and z arrived as 0; it reads every word, where ToUint64
+    // returns words[0] alone. DepositBitField resolves the word each bit
+    // belongs in, where `|=` into `out.words[bit_off / 64]` wrote one word per
+    // element and dropped the part of an element that straddled the boundary.
+    // And no mask is left to shift: `(1ULL << ew) - 1` on a 64-bit element
+    // shifted a uint64_t by 64, which is undefined behaviour rather than a wide
+    // zero -- on x86-64 the count is taken modulo 64, so the mask came out 0
+    // and the whole slice read as zero. This is the instrument 7e036a31f moved
+    // the other two select read paths in this file onto, and it takes §7.4.5's
+    // Table 7-1 default in the same deposit.
+    Logic4Vec elem = v != nullptr ? ExtractBitField(arena, v->value, 0, ew)
+                                  : ElementDefault(run.is_4state, ew, arena);
+    DepositBitField(out, i * ew, elem, ew);
   }
   return true;
 }
