@@ -11,7 +11,7 @@ struct Logic4Vec;
 class SimContext;
 class Arena;
 
-// Defined in stmt_exec_control.cpp. Applies the §9.4.1 delay-control value
+// Defined in stmt_exec_wait.cpp. Applies the §9.4.1 delay-control value
 // rules (unknown/high-impedance delay reads as zero; a negative delay is
 // reinterpreted as a two's-complement unsigned integer the width of a time
 // variable) to a delay expression's evaluated value. Shared so the
@@ -19,7 +19,7 @@ class Arena;
 // delay the same way a standalone delay-control statement does.
 uint64_t DelayTicksFromValue(const Logic4Vec& val);
 
-// Defined in stmt_exec_control.cpp. Turns a delay expression's evaluated value
+// Defined in stmt_exec_wait.cpp. Turns a delay expression's evaluated value
 // into the scheduler tick count that a delay control waits for, applying the
 // §3.14.1 time-value rounding rule: the delay is rounded to the time precision
 // of the design element that issues it (a real delay keeps only the fractional
@@ -39,6 +39,9 @@ ExecTask ExecRandsequence(const Stmt* stmt, SimContext& ctx, Arena& arena);
 // Defined in stmt_exec_wait.cpp.
 ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena);
+ExecTask ExecCycleDelay(const Stmt* stmt, SimContext& ctx, Arena& arena);
+ExecTask ExecDelay(const Stmt* stmt, SimContext& ctx, Arena& arena);
+ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
 // Defined in stmt_exec_control.cpp.
 ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena);
@@ -50,9 +53,6 @@ ExecTask ExecWhile(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecForever(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecRepeat(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecDoWhile(const Stmt* stmt, SimContext& ctx, Arena& arena);
-ExecTask ExecCycleDelay(const Stmt* stmt, SimContext& ctx, Arena& arena);
-ExecTask ExecDelay(const Stmt* stmt, SimContext& ctx, Arena& arena);
-ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
 // §16.3 immediate assertion, including its deferred forms (defined in
 // stmt_exec_deferred.cpp); reached from the statement dispatcher.

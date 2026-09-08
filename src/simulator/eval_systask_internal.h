@@ -61,6 +61,11 @@ uint32_t RunScanf(const ScanRequest& req, SimContext& ctx, Arena& arena);
 
 // String/format-argument helpers (defined in eval_systask.cpp).
 std::string ExtractStrArg(const Expr* arg);
+// Strips the surrounding quotes from a string-literal argument, returning any
+// other argument's text unchanged. Defined in eval_system_func.cpp, where
+// Annex D's $log uses it on the file name it opens; the §20.4.3 $timeformat
+// suffix_string in eval_systask_time.cpp is unquoted the same way.
+std::string ExtractStringArg(const Expr* arg);
 std::string EvalStringArg(const Expr* arg, SimContext& ctx, Arena& arena);
 std::string ResolveFormatArg(const Expr* arg, SimContext& ctx, Arena& arena);
 size_t CountConsumingSpecifiers(const std::string& fmt);
@@ -83,5 +88,21 @@ Logic4Vec EvalSreadmem(const Expr* expr, SimContext& ctx, Arena& arena,
                        bool is_hex);
 Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
                        bool is_hex);
+
+// §20.3 simulation time functions and §20.4 timescale tasks (defined in
+// eval_systask_time.cpp); called by the EvalMiscSysCall dispatcher in
+// eval_system_func.cpp.
+//
+// $time, $stime and $realtime; `name` selects which, and each reports the
+// current time in the invoking module's time unit.
+Logic4Vec EvalTimeSysCall(SimContext& ctx, Arena& arena, std::string_view name);
+// §20.4.1 $timeunit and $timeprecision; `name` selects which.
+Logic4Vec EvalTimescaleQuery(const Expr* expr, SimContext& ctx, Arena& arena,
+                             std::string_view name);
+// §20.4.2 $printtimescale.
+Logic4Vec EvalPrinttimescaleTask(const Expr* expr, SimContext& ctx,
+                                 Arena& arena);
+// §20.4.3 $timeformat.
+Logic4Vec EvalTimeformatTask(const Expr* expr, SimContext& ctx, Arena& arena);
 
 }  // namespace delta

@@ -172,6 +172,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/sensitivity.cpp
     simulator/driver_update.cpp
     simulator/net.cpp
+    simulator/net_strength.cpp
     simulator/switch_network.cpp
     simulator/scheduler.cpp
     simulator/process.cpp
@@ -353,6 +354,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_systask_writemem.cpp
     simulator/eval_systask_verif.cpp
     simulator/eval_system_func.cpp
+    simulator/eval_systask_time.cpp
     simulator/eval_system_task.cpp
     simulator/eval_system_task_dump.cpp
     simulator/evaluation_ops.cpp

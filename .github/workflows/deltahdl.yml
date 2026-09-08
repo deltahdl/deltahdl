@@ -508,20 +508,24 @@ jobs:
           --linters pylint,mypy,yamllint
           --verbose
           ${{ github.workspace }}
-  # This job fails when a .cpp or .h under src, test or lib/cpp holds more than
-  # 1000 lines. It also warns, without failing, at 950, and that second report
-  # is why the step is more than one comparison: a file sitting at exactly 1000
-  # passes, so the check that enforces the limit is silent about every file
-  # that has already reached it. Four files were at 1000 at once when #3048 was
-  # filed, and each arrived there the same way. A change pushes a file to 1001,
-  # its author sees this job go red after writing the change rather than before
-  # starting it, and the cheapest repair is to take a line back out of the same
-  # change. cc443c650 is that move: it returned src/parser/parser_port.cpp to
-  # 1000 by folding a three-line comment into two.
-  # .claude/memories/prose-length-over-column-fitting.md rules that the shorter
-  # word chosen to fit a column is paid for out of the accuracy the prose
-  # exists to carry, so the warning exists to put the split in front of the
-  # author instead, while there are still 50 lines to write it in.
+  # This job fails when a .cpp or .h under src, test or lib/cpp holds 950 lines
+  # or more. It used to fail at 1001 and warn at 950, and the warning is what
+  # this replaces. A warning cannot put the split in front of the author,
+  # because nothing has to answer it: a file could sit in the band across any
+  # number of changes, each of them adding to it in the knowledge that the job
+  # stayed green, until some later change carried it to 1001 and its author
+  # met the split as an obstacle in front of work already written. That is the
+  # failure the warning was added to prevent, and it is the one it produced.
+  # cc443c650 is what it looks like: src/parser/parser_port.cpp returned to
+  # 1000 by folding a three-line comment into two, which
+  # .claude/memories/prose-length-over-column-fitting.md rules against --
+  # the shorter word chosen to fit a column is paid for out of the accuracy
+  # the prose exists to carry.
+  #
+  # One comparison replaces two, so the limit the number describes is the limit
+  # the job enforces and a file reaching it is red rather than noted. The 50
+  # lines the band used to hold are still there to write a split in; what has
+  # changed is that they are spent before the limit rather than after it.
   assert-no-oversized-source-files:
     runs-on: ubuntu-latest
     steps:
@@ -532,11 +536,9 @@ jobs:
           for f in $(find src test lib/cpp -name '*.cpp' -o -name '*.h')
           do
             lines=$(wc -l < "$f")
-            if [ "$lines" -gt 1000 ]; then
-              echo "::error file=$f,line=1001::$f has $lines lines (max 1000)"
+            if [ "$lines" -ge 950 ]; then
+              echo "::error file=$f,line=$lines::$f has $lines lines (max 949); split it before adding to it"
               fail=1
-            elif [ "$lines" -ge 950 ]; then
-              echo "::warning file=$f,line=$lines::$f has $lines lines, within 50 of the 1000-line maximum; split it before adding to it"
             fi
           done
           exit $fail
