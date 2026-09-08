@@ -91,7 +91,6 @@ bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
   }
   if (var) {
     WriteBitSelect(var, lhs, rhs_val, ctx, arena);
-    var->NotifyWatchers();
   }
   return true;
 }
@@ -589,16 +588,13 @@ static void WriteConcatLhsElement(const Expr* el, const Logic4Vec& slice,
   if (el->kind == ExprKind::kSelect && el->base != nullptr) {
     // §11.5.1: a select addressing no bit of its object "shall have no effect
     // on the data stored when written", so this element writes nothing and
-    // wakes nobody. WriteBitSelect declines the write on its own but not the
-    // notification, and §9.4.2 detects a change rather than an attempt at one.
+    // wakes nobody -- WriteBitSelect declines the write and, since #3522, the
+    // notification with it, §9.4.2 detecting a change rather than an attempt at
+    // one. The check stays ahead of the writer all the same: a concatenation
+    // element that names no bit is passed over silently, where WriteBitSelect
+    // reports the zero-width part-select form of it as an error.
     if (!ConcatLhsElemHasWritableBits(el, *var, ctx, arena)) return;
     WriteBitSelect(var, el, slice, ctx, arena);
-    // §9.4.2 detects a non-edge implicit event "on any change in the value of
-    // the expression", and this element changes one. §4.9.3 states the
-    // obligation for the blocking form and the deferred form reaches this same
-    // writer through §4.9.4's update event, so both routes owe it.
-    // WriteBitSelect notifies nobody, so each of its callers says so itself.
-    var->NotifyWatchers();
     return;
   }
   // §10.6.2's override reaches an element by its own whole-variable write, and

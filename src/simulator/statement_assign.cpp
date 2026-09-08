@@ -437,17 +437,31 @@ PartSelectBits SelectStorageBits(const Variable& var, const Expr* sel,
                                target.second);
 }
 
-void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
-                    SimContext& ctx, Arena& arena) {
-  // §10.6.2: a force "shall override a procedural assignment ... until a
-  // release procedural statement is executed on the variable". Naming a
-  // bit-select or a part-select as the target does not take the statement out
-  // of that class -- the clause's own "shall not be a bit-select or a
-  // part-select of a variable" restricts what may be forced, not what a force
-  // overrides -- so this declines as every whole-variable writer does. It is
-  // the one place the statement form, the compound form, the increment, the
-  // expression forms and the subroutine-body form all pass through.
-  if (var->is_forced) return;
+// Whether two stored values differ, which is what the notification in
+// WriteBitSelect turns on. It is the comparison EventAwaiter::CheckEdge makes
+// for a non-edge event (awaiters_event_control.h) and the one the VCD writer
+// makes to decide a transition (eval_system_task_dump.cpp), written out again
+// here rather than shared with either, so that this file's own answer to
+// §9.4.2's "change in the result of the expression" needs nothing from theirs.
+static bool StoredBitsDiffer(const Logic4Vec& a, const Logic4Vec& b) {
+  if (a.nwords != b.nwords) return true;
+  for (uint32_t i = 0; i < a.nwords; ++i) {
+    if (a.words[i].aval != b.words[i].aval ||
+        a.words[i].bval != b.words[i].bval)
+      return true;
+  }
+  return false;
+}
+
+// The write itself: resolve what `lhs` names of `var` and deposit `rhs_val`
+// there. Six of its paths return having written nothing -- an unknown index, an
+// out-of-range bit, an out-of-range element, a zero declared width, a window
+// that lands on no bit of the object, and a packed element whose offset is past
+// the value -- and none of them has to say anything about the notification,
+// because WriteBitSelect decides that from the stored value once this returns.
+static void WriteBitSelectBits(Variable* var, const Expr* lhs,
+                               const Logic4Vec& rhs_val, SimContext& ctx,
+                               Arena& arena) {
   auto idx_val = EvalExpr(lhs->index, ctx, arena);
   if (HasUnknownBits(idx_val)) return;
   auto idx = SelectBoundValue(idx_val);
@@ -481,6 +495,62 @@ void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
       PartSelectStorageBits(var->BitSelectRange(), target.first, target.second);
   if (bits.width == 0) return;
   WritePartSelect(var, bits, rhs_val, arena);
+}
+
+// Writes the window of `var` that `lhs` names, and wakes `var`'s watchers when
+// that write moved the value.
+//
+// The notification is made here rather than by the callers because each of the
+// five call sites had to remember the rule for itself, and they did not agree:
+// #3521 is the record of one forgetting the notification entirely, and #3522
+// the record of the four that remembered it remembering it in a form too
+// coarse -- an unconditional NotifyWatchers() after a call that returns having
+// written nothing down six separate paths. §9.4.2 closes with "A change of
+// value in any operand of the expression without a change in the result of the
+// expression shall not be detected as an event", so a statement that stored no
+// bit owes no event at all: §11.5.1 gives an out-of-range write "no effect on
+// the data stored when written", yet `a[9] = 1'b1;` on a `logic [7:0] a` ran an
+// `always_comb` block reading `a` a third time.
+//
+// This function is the only one holding both the value before the write and the
+// value after it, and "a change in the result" can only be measured between
+// those two. The baseline is a Logic4Snapshot rather than a Logic4Vec copy
+// because a Logic4Vec copied from `value` shares `value`'s words -- the copy
+// takes the `words` pointer (common/types.h) -- so the deposit below would
+// write through the baseline as well, the two sides of the comparison would be
+// one value, and no change would ever be seen. That is #3358, and it is why
+// Variable::prev_value is a snapshot too.
+//
+// A bool returned by the writer would not have been enough. It says "I wrote",
+// not "the value changed", and those part company: `a[3] = 1'b1;` on a bit
+// already 1 takes a writing path all the way to the deposit and changes
+// nothing, which §9.4.2's last sentence is precisely about.
+//
+// The comparison has to sit at the end rather than beside each deposit, because
+// the deposits are not in one place: WritePartSelect and TryWritePackedElement
+// both write through `var`, and TryWritePackedElement returning true for an
+// element index outside the declared range -- handled, nothing written -- is
+// itself one of the silent no-write paths, so a check beside each deposit would
+// have to be taught them one at a time. Reading the stored value once, after
+// the write, is blind to which path ran.
+void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
+                    SimContext& ctx, Arena& arena) {
+  // §10.6.2: a force "shall override a procedural assignment ... until a
+  // release procedural statement is executed on the variable". Naming a
+  // bit-select or a part-select as the target does not take the statement out
+  // of that class -- the clause's own "shall not be a bit-select or a
+  // part-select of a variable" restricts what may be forced, not what a force
+  // overrides -- so this declines as every whole-variable writer does. It is
+  // the one place the statement form, the compound form, the increment, the
+  // expression forms and the subroutine-body form all pass through. It declines
+  // ahead of the snapshot, as WriteVar (statement_assign_core.cpp) declines
+  // ahead of its own notification: nothing is written, so there is nothing to
+  // compare and nobody to wake.
+  if (var->is_forced) return;
+  Logic4Snapshot before;
+  before.Capture(var->value);
+  WriteBitSelectBits(var, lhs, rhs_val, ctx, arena);
+  if (StoredBitsDiffer(before.Get(), var->value)) var->NotifyWatchers();
 }
 
 // Single-word resize for known (no x/z) values that fit in 64 bits, applying

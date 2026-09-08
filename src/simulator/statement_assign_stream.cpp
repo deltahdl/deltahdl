@@ -618,7 +618,6 @@ static void ForwardUnpackScalar(const Expr* elem, StreamEnv env,
   // declines itself. The cursor advances by the element's width either way.
   if (IsStreamSelectElement(elem)) {
     WriteBitSelect(var, elem, bits, env.ctx, env.arena);
-    var->NotifyWatchers();
   } else {
     StoreStreamValueToVar(var, bits);
   }
@@ -754,7 +753,6 @@ static void WriteStreamElement(const StreamElemInfo& ei, const StreamView& src,
   // writers decline a variable §10.6.2 has forced.
   if (IsStreamSelectElement(ei.expr)) {
     WriteBitSelect(var, ei.expr, bits, env.ctx, env.arena);
-    var->NotifyWatchers();
     return;
   }
   StoreStreamValueToVar(var, bits);

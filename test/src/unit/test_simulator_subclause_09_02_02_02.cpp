@@ -106,6 +106,94 @@ TEST(AlwaysCombSim, AlwaysCombRetriggersOnChange) {
   EXPECT_EQ(b->value.ToUint64(), 11u);
 }
 
+// Elaborates, lowers and runs `src` -- a design whose one always_comb copies
+// `a` into `b` and increments `runs` -- then asserts the procedure evaluated
+// exactly `expected_runs` times. The count is the whole observation: what
+// separates a select write that stored a bit from one that stored nothing is
+// whether the inferred sensitivity list saw an event, and `b` alone cannot
+// tell those apart, because a write that stores nothing leaves `b` holding the
+// value the previous evaluation already gave it.
+void ExpectAlwaysCombRunCount(const char* src, uint64_t expected_runs) {
+  SimFixture f;
+  auto* runs = RunAndFindVar(src, f, "runs");
+  ASSERT_NE(runs, nullptr);
+  EXPECT_EQ(runs->value.ToUint64(), expected_runs);
+}
+
+TEST(AlwaysCombSim,
+     AlwaysCombDoesNotRetriggerWhenAnOutOfBoundsBitSelectWriteChangesNothing) {
+  // §11.5.1 (printed page 296) says a bit-select address outside the vector's
+  // range "shall have no effect on the data stored when written", and §9.4.2
+  // (printed page 232) says "a change of value in any operand of the expression
+  // without a change in the result of the expression shall not be detected as
+  // an event". §9.2.2.2 (printed page 222) gives an always_comb "an inferred
+  // sensitivity list", which is the list §9.4.2 governs. So the write of a[9]
+  // to an 8-bit `a` stores no bit and owes the procedure no event.
+  //
+  // Why the count is 2 rather than 3 or 1. The inferred list is {a} alone:
+  // exception (b) of §9.2.2.2.1 leaves out "any expression that is also written
+  // within the block", which here is `b` and `runs`, and InferSensitivity is
+  // called with exclude_written true for an always_comb.
+  // Lowerer::LowerProcesses lowers the non-initial processes ahead of the
+  // initial ones, so at time zero the always_comb evaluates first (`runs` 1)
+  // and arms its watcher while `a` is still 8'hxx; the initial block then
+  // writes 8'd0, a genuine change of the one listed expression, and `runs`
+  // reaches 2. At time 1 the out-of-bounds write stores nothing and the count
+  // must stay at 2.
+  //
+  // Reading 3 is the defect. A select write that returned having written
+  // nothing still notified the variable's watchers, and the AnyChangeAwaiter an
+  // always_comb waits on compares no baseline and resumes on any notify at all.
+  // @(a), always @*, $monitor and a clocking block each hold a baseline of
+  // their own and stay quiet on a notify that moved nothing, which is why
+  // always_comb is the construct that makes this observable.
+  ExpectAlwaysCombRunCount(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  int runs;\n"
+      "  always_comb begin\n"
+      "    b = a;\n"
+      "    runs = runs + 1;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    a = 8'd0;\n"
+      "    #1 a[9] = 1'b1;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      2);
+}
+
+TEST(AlwaysCombSim,
+     AlwaysCombRetriggersWhenAnInBoundsBitSelectWriteChangesTheVector) {
+  // The design above with its one index moved from the out-of-range 9 to the
+  // in-range 3, and the expected count moved with it. This is what stops the
+  // case above from being satisfied by never notifying from a select write at
+  // all: an in-bounds a[3] write does change the vector, §9.4.2 (printed page
+  // 232) therefore makes it an event on the inferred sensitivity list of
+  // §9.2.2.2 (printed page 222), and the always_comb must evaluate a third
+  // time. Suppressing the notify for every select write would leave `runs` at 2
+  // here while passing the other half of the pair -- the regression the
+  // neighbouring arm of this code needed a fix of its own to undo. The two
+  // cases differ only in the index, so the counts have to differ with it or
+  // neither is discriminating.
+  ExpectAlwaysCombRunCount(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  int runs;\n"
+      "  always_comb begin\n"
+      "    b = a;\n"
+      "    runs = runs + 1;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    a = 8'd0;\n"
+      "    #1 a[3] = 1'b1;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      3);
+}
+
 TEST(AlwaysCombSim, AlwaysCombMuxPattern) {
   SimFixture f;
   auto* y = RunAndFindVar(
