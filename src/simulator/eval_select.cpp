@@ -23,6 +23,11 @@ Logic4Vec NonexistentQueueElement(const QueueObject* q, Arena& arena) {
                       : MakeLogic4VecVal(arena, q->elem_width, 0);
 }
 
+int64_t SelectBoundValue(const Logic4Vec& val) {
+  return val.is_signed ? SignExtend(val.ToUint64(), val.width)
+                       : static_cast<int64_t>(val.ToUint64());
+}
+
 static uint64_t ResolveQueueIdx(const Expr* idx_expr, QueueObject* q,
                                 SimContext& ctx, Arena& arena,
                                 bool* has_xz = nullptr) {
@@ -398,8 +403,7 @@ static PackedRange SelectBaseRange(const Expr* base, uint32_t width,
 static Logic4Vec EvalPackedPartSelect(const Expr* expr, const Logic4Vec& base,
                                       int64_t idx, SimContext& ctx,
                                       Arena& arena) {
-  auto end_val =
-      static_cast<int64_t>(EvalExpr(expr->index_end, ctx, arena).ToUint64());
+  auto end_val = SelectBoundValue(EvalExpr(expr->index_end, ctx, arena));
   auto target = PartSelectTargetIndices(idx, end_val, expr->is_part_select_plus,
                                         expr->is_part_select_minus);
   auto range = SelectBaseRange(expr->base, base.width, ctx, arena);
@@ -479,7 +483,7 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
 
   if (base_val.is_string && !expr->index_end)
     return EvalStringByteSelect(base_val, idx, arena);
-  auto declared_idx = static_cast<int64_t>(idx);
+  auto declared_idx = SelectBoundValue(idx_val);
   if (expr->index_end)
     return EvalPackedPartSelect(expr, base_val, declared_idx, ctx, arena);
   if (auto elem =

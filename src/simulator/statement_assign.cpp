@@ -374,7 +374,7 @@ PartSelectBits SelectStorageBits(const Variable& var, const Expr* sel,
                                  SimContext& ctx, Arena& arena) {
   auto idx_val = EvalExpr(sel->index, ctx, arena);
   if (HasUnknownBits(idx_val)) return {0, 0};
-  auto idx = static_cast<int64_t>(idx_val.ToUint64());
+  auto idx = SelectBoundValue(idx_val);
   if (sel->index_end == nullptr) {
     if (var.packed_elem_width > 1) {
       PackedRange elems = var.DeclaredRange();
@@ -388,9 +388,9 @@ PartSelectBits SelectStorageBits(const Variable& var, const Expr* sel,
   }
   auto end_val = EvalExpr(sel->index_end, ctx, arena);
   if (HasUnknownBits(end_val)) return {0, 0};
-  auto target = PartSelectTargetIndices(
-      idx, static_cast<int64_t>(end_val.ToUint64()), sel->is_part_select_plus,
-      sel->is_part_select_minus);
+  auto target = PartSelectTargetIndices(idx, SelectBoundValue(end_val),
+                                        sel->is_part_select_plus,
+                                        sel->is_part_select_minus);
   return PartSelectStorageBits(var.BitSelectRange(), target.first,
                                target.second);
 }
@@ -408,7 +408,7 @@ void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
   if (var->is_forced) return;
   auto idx_val = EvalExpr(lhs->index, ctx, arena);
   if (HasUnknownBits(idx_val)) return;
-  auto idx = static_cast<int64_t>(idx_val.ToUint64());
+  auto idx = SelectBoundValue(idx_val);
   if (!lhs->index_end) {
     if (TryWritePackedElement(var, idx, rhs_val, arena)) return;
     auto range = var->BitSelectRange();
@@ -422,8 +422,7 @@ void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
     return;
   }
 
-  auto end_val =
-      static_cast<int64_t>(EvalExpr(lhs->index_end, ctx, arena).ToUint64());
+  auto end_val = SelectBoundValue(EvalExpr(lhs->index_end, ctx, arena));
   auto target = PartSelectTargetIndices(idx, end_val, lhs->is_part_select_plus,
                                         lhs->is_part_select_minus);
   if (target.declared_width == 0) {

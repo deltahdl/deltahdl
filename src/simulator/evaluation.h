@@ -54,6 +54,30 @@ Logic4Vec MakeAllX(Arena& arena, uint32_t width);
 Logic4Vec MakeAllHighZ(Arena& arena, uint32_t width);
 int64_t SignExtend(uint64_t val, uint32_t width);
 
+// §11.5.1 — the integer a declared bit-select or part-select bound stands for.
+// "Both msb_expr and lsb_expr shall be constant integer expressions", and
+// §5.7.1 has a simple decimal number "treated as signed", so on a
+// `logic [7:0] a` the bound `-2` is a negative index and `a[1:-2]` names the
+// four indices 1, 0, -1 and -2. That is the same select as `a[1 -: 4]`, which
+// §11.5.1 settles with its own `a_vect[15 -: 8] // == a_vect[15 : 8]`: the
+// indexed form is defined by the non-indexed form it equals, so the two
+// spellings shall resolve to one answer.
+//
+// Logic4Vec::ToUint64 is a projection of the stored low word and not a
+// sign-aware read, so the 32 bits §5.7.1 gives an unsized `-2` reached the
+// range as 4294967294. PartSelectStorageBits then clamped `a[1:-2]` to the
+// window a[7:1]: seven bits the clause forbids a write to touch, and not a[0],
+// which the same sentence requires it to reach.
+//
+// Only the signedness the value carries separates a negative bound from a
+// large unsigned one, and that is the separation the language draws: a bound
+// written `32'hFFFFFFFE` is unsigned, is nonsense as an index, and stays
+// 4294967294 rather than becoming -2. A bound 64 bits or wider has already
+// lost everything above bit 63 to ToUint64, and SignExtend hands such a width
+// back as a plain two's-complement cast, which is the answer every bound that
+// names a bit of a real object had before.
+int64_t SelectBoundValue(const Logic4Vec& val);
+
 // §7.10.1 — the value a read of a queue element that is not there yields. An
 // invalid index (a 4-state expression with an x or z bit, or a value outside
 // 0...$) reads as the value Table 7-1 in §7.4.5 gives a nonexistent array entry

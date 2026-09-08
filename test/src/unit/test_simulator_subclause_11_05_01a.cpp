@@ -557,6 +557,87 @@ TEST(ExpressionSim, PartSelectRunningOffHighEndStillTakesItsLowBits) {
   EXPECT_EQ(var->value.ToUint64(), 0x40u);
 }
 
+// §11.5.1's non-indexed form, `vect[msb_expr:lsb_expr]`, reaching the same four
+// indices as the `-:` case above. The clause asks of the two bounds only that
+// they be "constant integer expressions", each "evaluated in a self-determined
+// context", and that "the first expression shall address a more significant bit
+// than the second expression"; on `logic [7:0] a` the more significant end is
+// the numerically larger index, so `a[1:-2]` is well formed and names the run
+// 1, 0, -1, -2. The clause's own `a_vect[15 -: 8] // == a_vect[15 : 8]` read at
+// base 1 and width 4 is `a[1 -: 4] == a[1:-2]`: the two spellings are one
+// select and have to answer alike. Indices 1 and 0 are the ones inside `a`, the
+// write "shall ... only affect the bits that are in range", and being the
+// select's most significant end they take value bits 3 and 2, so `4'b1101`
+// leaves `a` at 8'h03.
+//
+// The second bound is a unary minus over an unsized decimal, which §11.6.1
+// gives 32 bits, and it reached the declared range as the unsigned 4294967294.
+// That clamps to a window of {lo: 1, width: 7} and writes the value's low seven
+// bits into a[7:1], leaving `a` at 8'h1A: a[0], the one bit the clause requires
+// this write to reach, untouched, and seven bits the clause forbids it to touch
+// changed.
+//
+// What this asserts is the pairing rather than a second copy of the number.
+// ExpressionSim.PartSelectRunningOffLowEndWritesItsOwnHighBits above already
+// pins the indexed spelling at 8'h03, so restating 8'h03 for `b` here would say
+// nothing that is not already said. The equality is what only this case can
+// say, and it is the clause's own; pinning 8'h03 on `a` beside it is what stops
+// the pair passing by being wrong together, which an equality alone would
+// allow. `4'b1101` discriminates because its high half 2'b11 differs from its
+// low half 2'b01 -- `4'hF` answers 8'h03 whichever two of its bits are taken --
+// and both objects start at 8'h00 so that every bit set at the end is one a
+// write put there.
+TEST(ExpressionSim, NonIndexedPartSelectBelowLowBoundWritesInRangeBitsOnly) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [7:0] b;\n"
+      "  initial begin\n"
+      "    a = 8'h00; b = 8'h00;\n"
+      "    a[1:-2] = 4'b1101; b[1 -: 4] = 4'b1101;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(var, nullptr);
+  auto* indexed = f.ctx.FindVariable("b");
+  ASSERT_NE(indexed, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x03u);
+  EXPECT_EQ(indexed->value.ToUint64(), var->value.ToUint64());
+}
+
+// The other reading of a bound whose most significant bit is set, which a
+// repair of the negative one must not take. §11.5.1 has each bound of a
+// non-indexed part-select "evaluated in a self-determined context", and §5.7.1
+// leaves a based literal written without an `s` unsigned, so `4'hE` is the
+// four-bit unsigned 14 and `4'hB` is 11: `u[4'hE : 4'hB]` is `u[14:11]`, wholly
+// inside `logic [15:0] u`, with nothing out of range at all. Bit 3 of the
+// select is index 14 and bit 0 is index 11, so `4'b1101` sets u[14], u[13] and
+// u[11] and clears u[12], and `u` reads 16'h6800.
+//
+// Having the top bit set within its own width is the whole of what these two
+// bounds share with a negative one, -2 being the 32-bit 0xFFFFFFFE. A
+// sign-aware read of a bound must therefore turn on the signedness the value
+// carries and not on that bit: a repair that extends from the value's own width
+// whenever the bit is set reads these as -2 and -5, and `u[-2:-5]` is a
+// part-select "completely out of the address bounds of the vector", which the
+// clause says "shall have no effect on the data stored when written" -- `u`
+// would still read 16'h0000. Those two answers are what separate taken as
+// written from sign-extended. `4'b1101` rather than `4'hF` again: an all-ones
+// value reads 16'h7800 and cannot tell u[12] from its neighbours, and 16'h0000
+// as the starting value makes every set bit one this write is answerable for.
+TEST(ExpressionSim, UnsignedPartSelectBoundKeepsItsTopBitAsMagnitude) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [15:0] u;\n"
+      "  initial begin u = 16'h0000; u[4'hE : 4'hB] = 4'b1101; end\n"
+      "endmodule\n",
+      f, "u");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x6800u);
+}
+
 // §11.5.1: a packed array is a valid bit-select operand. The array is built
 // from real §7.4.1 packed-array syntax and indexed end-to-end: element pa[1]
 // of the [3:0][7:0] array holding 32'h0000_0100 is 8'h01, so bit pa[1][0] is 1.
@@ -695,6 +776,68 @@ TEST(SelectBoundaryBehavior, PartSelectPartialOOBLowEndSourceBits) {
   sel->index = MakeInt(f.arena, 1);
   sel->index_end = MakeInt(f.arena, 4);
   sel->is_part_select_minus = true;
+
+  WriteBitSelect(var, sel, MakeLogic4VecVal(f.arena, 4, 0xD), f.ctx, f.arena);
+  EXPECT_EQ(var->value.ToUint64(), 0x03u);
+}
+
+// The negative bound at WriteBitSelect itself, the one writer the blocking,
+// compound, increment, expression and subroutine-body forms of an assignment
+// all reach, and reached here with neither the elaborator nor the lowerer in
+// between. The bound is built as a unary minus over the literal 2 rather than
+// as a ready-made negative number, because the shape of that value is what the
+// defect turns on: §11.6.1 gives an unsized decimal 32 bits and the negation is
+// masked to that width, so what arrives at the range is a signed 32-bit
+// 0xFFFFFFFE. Projected instead of read with its sign that is 4294967294, and
+// PartSelectStorageBits clamps {1, 4294967294} against the [7:0] range to a
+// window of {lo: 1, width: 7}: `nlw` read 8'h1A. With its sign it is -2, which
+// the range clamps to its low end at index 0, and §11.5.1 leaves the write to
+// "only affect the bits that are in range" -- nlw[1] and nlw[0]. They are the
+// select's most significant end and so take value bits 3 and 2; `4'hD` is
+// 4'b1101, so both take 1 and `nlw` reads 8'h03. `4'hD` rather than the `4'hF`
+// of SelectBoundaryBehavior.PartSelectPartialOOBWriteInRangeOnly for the reason
+// given above PartSelectPartialOOBLowEndSourceBits: an all-ones value cannot
+// separate the value's own low bits from the bits the in-range indices name.
+// The read side of the same select. §11.5.1: a part-select "partially out of
+// range shall, when read, return x for the bits that are out of range", and the
+// bits that are out of range are the select's own least significant ones --
+// index 1 is the more significant end, so indices -1 and -2 are result bits 1
+// and 0. Reading the bound through ToUint64 gave the second bound 4294967294,
+// which is not merely a wrong window: the width is computed from the pair, so
+// the read asked for a vector of 4294967294 bits.
+//
+// 8'hA5 is 1010_0101, so a[1] is 0 and a[0] is 1 and the two bits that are in
+// range read 01. A value whose two low bits were alike could not tell them
+// apart from each other.
+TEST(SelectBoundaryBehavior,
+     NegativeNonIndexedBoundReadsXForItsOutOfRangeBits) {
+  SimFixture f;
+
+  MakeVar(f, "nrv", 8, 0xA5);
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "nrv");
+  sel->index = MakeInt(f.arena, 1);
+  sel->index_end = MakeUnary(f.arena, TokenKind::kMinus, MakeInt(f.arena, 2));
+  auto result = EvalExpr(sel, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 4u);
+
+  EXPECT_EQ(result.words[0].bval & 0x3u, 0x3u);
+
+  EXPECT_EQ(result.words[0].bval & 0xCu, 0u);
+  EXPECT_EQ(result.words[0].aval & 0xCu, 0x4u);
+}
+
+TEST(SelectBoundaryBehavior, NegativeNonIndexedBoundClampsToTheLowEnd) {
+  SimFixture f;
+  auto* var = f.ctx.CreateVariable("nlw", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 0x00);
+
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "nlw");
+  sel->index = MakeInt(f.arena, 1);
+  sel->index_end = MakeUnary(f.arena, TokenKind::kMinus, MakeInt(f.arena, 2));
 
   WriteBitSelect(var, sel, MakeLogic4VecVal(f.arena, 4, 0xD), f.ctx, f.arena);
   EXPECT_EQ(var->value.ToUint64(), 0x03u);
