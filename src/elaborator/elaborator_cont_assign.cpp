@@ -1,3 +1,4 @@
+#include <cmath>
 #include <cstdint>
 #include <format>
 
@@ -130,13 +131,41 @@ RtlirContAssign BuildContAssign(ModuleItem* item, RtlirModule* mod,
                             LookupLhsWidth(item->assign_lhs, mod), diag);
 }
 
+// §11.5.1: the width of a select written as an element of a concatenation
+// left-hand side, which the clause makes "always constant": the span its two
+// indices name for `[msb:lsb]`, the width expression for the two indexed forms,
+// and one bit for a bit-select. Zero where a bound does not fold, which is the
+// answer for an element this cannot size at all.
+uint32_t SelectLhsWidth(const Expr* e, const ScopeMap& scope) {
+  if (e->index == nullptr) return 0;
+  if (e->index_end == nullptr) return 1;
+  if (e->is_part_select_plus || e->is_part_select_minus) {
+    auto w = ConstEvalInt(e->index_end, scope);
+    return (w && *w > 0) ? static_cast<uint32_t>(*w) : 0;
+  }
+  auto msb = ConstEvalInt(e->index, scope);
+  auto lsb = ConstEvalInt(e->index_end, scope);
+  if (!msb || !lsb) return 0;
+  return static_cast<uint32_t>(std::abs(*msb - *lsb) + 1);
+}
+
 // §11.4.1/§10.10: total bit width of a continuous-assignment concatenation
 // left-hand side (a nested concatenation sums its elements; identifiers reduce
 // to their declared width).
-uint32_t ConcatLhsWidth(const Expr* e, const RtlirModule* mod) {
+//
+// A select element is sized by its own indices rather than by the signal it
+// selects from. LookupLhsWidth answers 0 for anything that is not a bare
+// identifier, and the emission below passes over an element of width 0, so
+// `assign {b, a[1:0]} = 3'b111;` emitted no assignment for `a` at all: the bits
+// reached neither a driver nor the net's storage, and `b` took its slice from
+// the wrong end of the value besides, the running offset never having advanced
+// past the element that was skipped.
+uint32_t ConcatLhsWidth(const Expr* e, const RtlirModule* mod,
+                        const ScopeMap& scope) {
+  if (e->kind == ExprKind::kSelect) return SelectLhsWidth(e, scope);
   if (e->kind != ExprKind::kConcatenation) return LookupLhsWidth(e, mod);
   uint32_t total = 0;
-  for (const auto* sub : e->elements) total += ConcatLhsWidth(sub, mod);
+  for (const auto* sub : e->elements) total += ConcatLhsWidth(sub, mod, scope);
   return total;
 }
 
@@ -189,14 +218,14 @@ PackedRange RhsSelectRange(const Expr* rhs, uint32_t width,
 // each whole-identifier target registers its own net driver.
 void EmitConcatContAssigns(const ConcatContAssignCtx& cx, Expr* lhs,
                            Expr* rhs) {
-  uint32_t hi = ConcatLhsWidth(lhs, cx.mod);
+  uint32_t hi = ConcatLhsWidth(lhs, cx.mod, cx.scope);
   // §11.5.1: `hi` counts bits up from the least significant end of the
   // right-hand side, and the select naming a run of them has to name them by
   // their index in the range the right-hand side was declared with -- the most
   // significant bit of `wire [8:1] src` is src[8], not src[7].
   PackedRange range = RhsSelectRange(rhs, hi, cx);
   for (auto* el : lhs->elements) {
-    uint32_t w = ConcatLhsWidth(el, cx.mod);
+    uint32_t w = ConcatLhsWidth(el, cx.mod, cx.scope);
     if (w == 0) continue;
     Expr* elem_rhs = MakeRhsPartSelect(rhs, range.IndexAtOffset(hi - 1),
                                        range.IndexAtOffset(hi - w), cx.arena);

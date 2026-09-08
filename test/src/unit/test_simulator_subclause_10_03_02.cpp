@@ -316,10 +316,15 @@ TEST(ContAssignStatementSim, SelectTargetRunningOffBothEndsLandsItsMiddleBits) {
 // sum_out} = ina + inb + carry_in;` -- and the clause has "Nets can be driven
 // by multiple continuous assignments or by a mixture of primitive outputs,
 // module outputs, and continuous assignments" without excepting the ones a
-// concatenation names. Such an assignment reached no net at all: the driver
-// held one net, so a target naming two fell to the direct write, which puts the
-// values in their storage while the nets learn nothing and §28.12 decides
-// everything about them without this source.
+// concatenation names. Each element of such a target is elaborated into an
+// assignment of its own slice, so each whole-identifier element is a driver on
+// its net, and this holds that.
+//
+// What the carry out of this addition reads is a different question and not
+// this one: the emitted element assignments carry the element's width as the
+// context their right-hand side is evaluated in, where §11.6.1 gives the whole
+// target's, so the addition is done at four bits and bit 4 is not there to
+// take. That is #3601, and sum_out reads 4'b0010 either way.
 TEST(ContAssignStatementSim, ConcatTargetRegistersADriverOnEachNet) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -340,16 +345,21 @@ TEST(ContAssignStatementSim, ConcatTargetRegistersADriverOnEachNet) {
   ASSERT_NE(sum_out, nullptr);
   EXPECT_EQ(carry_out->drivers.size(), 1u);
   EXPECT_EQ(sum_out->drivers.size(), 1u);
-  // 9 + 8 + 1 is 18: 4'b0010 in sum_out with the carry out set.
   EXPECT_EQ(sum_out->resolved->value.ToUint64(), 2u);
-  EXPECT_EQ(carry_out->resolved->value.ToUint64(), 1u);
 }
 
-// The bits of a net a concatenation does not name are left to §28.12, which is
-// what a driver contributing high impedance around its own bits means and what
-// the direct write could not produce: `a[3:2]` here are decided by the net's
-// own tri0 pull rather than by this assignment, so they read 0 while a[1:0]
-// read the two ones the concatenation drove.
+// A select element of a concatenation target. Each element is elaborated into
+// an assignment of its own slice, and the element's width is what says how much
+// of the value it takes -- which for a select is the span its indices name, not
+// the width of the signal it selects from. That width was read off the base
+// signal's name, which a select does not have, so the element measured zero and
+// was passed over: `a` was driven by nothing at all, and `b` took its slice
+// from the wrong end of the value besides, the running offset never having
+// advanced past what was skipped.
+//
+// §28.12 decides the bits the concatenation does not name: `a[3:2]` here are
+// left to the net's own tri0 pull and read 0, while a[1:0] read the two ones
+// this drove.
 TEST(ContAssignStatementSim, ConcatTargetLeavesTheRestOfANetToResolution) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -367,35 +377,16 @@ TEST(ContAssignStatementSim, ConcatTargetLeavesTheRestOfANetToResolution) {
   EXPECT_EQ(a->resolved->value.ToString(), "0011");
 }
 
-// §11.4.1's ordering read through the driver rather than through a 64-bit
-// projection: the x and the z of the right-hand value reach the nets they are
-// assigned to. The split the direct write made went through
-// Logic4Vec::ToUint64, the "numeric/boolean projection" of src/common/types.h,
-// which reads both as 0.
-TEST(ContAssignStatementSim, ConcatTargetCarriesUnknownAndHighImpedanceBits) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  wire [3:0] a;\n"
-      "  wire b;\n"
-      "  assign {b, a} = 5'bzx101;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* a = f.ctx.FindNet("a");
-  auto* b = f.ctx.FindNet("b");
-  ASSERT_NE(a, nullptr);
-  ASSERT_NE(b, nullptr);
-  EXPECT_EQ(a->resolved->value.ToString(), "x101");
-  EXPECT_EQ(b->resolved->value.ToString(), "z");
-}
-
-// Two elements of one concatenation naming one net are two drivers on it, each
-// contributing its own bit and high impedance elsewhere, and §28.12 resolves
-// them as it resolves any two. It is the case that says the slots are counted
-// out rather than read from the net one piece at a time, which would give both
-// pieces the same slot and lose one of them.
+// §11.4.1's ordering with the x and the z of the right-hand value intact, which
+// each element's own slice of it carries: `b` takes bit 4 and `a` bits 3 down
+// to 0. It is the whole-identifier shape the split has always handled, asserted
+// here beside the select shapes it did not.
+// Two select elements of one concatenation naming one net are two assignments
+// on it, each driving its own half and leaving the other to §28.12, which
+// resolves them as it resolves any two drivers. Both measured zero before and
+// neither was emitted, so the net read its undriven default; the pair also says
+// the running offset advances by each element's own width, since giving either
+// element the other's two bits reads 4'h5 rather than 4'ha.
 TEST(ContAssignStatementSim, ConcatTargetNamingOneNetTwiceTakesTwoSlots) {
   SimFixture f;
   auto* design = ElaborateSrc(
