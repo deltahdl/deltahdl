@@ -556,4 +556,79 @@ TEST(TwoStateAndFourState, TwoStateFunctionNameAssignZeroesXz) {
   EXPECT_EQ(var->value.ToUint64(), 0xA4u);
 }
 
+// §6.11.2, printed p.110: "any unknown or high-impedance bits shall be
+// converted to zeros." The rule is stated of the 2-state type of the object
+// written, and an element of an unpacked array is an object of the array's
+// element type, so how many dimensions the declaration wrote cannot change the
+// answer. It did. The two-dimensional leaf carried the declaration's 2-state
+// flag and coerced; the one-dimensional leaf was created without it and
+// defaulted to 4-state, so the coercion never fired and the same 8'hxx stayed
+// unknown in c[0] while it read zero in d[0][0]. Both spellings are written in
+// the one run, and both asserted, so the case states the disagreement rather
+// than one half of it.
+//
+// ToUint64 is no use here: it projects aval & ~bval, so an x reads as zero
+// whether or not it was converted, and every one of these cases would have
+// passed unconverted. ToString reads the bval plane, which is the plane the
+// conversion clears.
+TEST(TwoStateAndFourState, TwoStateUnpackedElementZeroesXzAtEitherRank) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  bit [7:0] c [0:1];\n"
+      "  bit [7:0] d [0:1][0:1];\n"
+      "  initial begin\n"
+      "    c[0] = 8'hxx;\n"
+      "    d[0][0] = 8'hxx;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* vc = f.ctx.FindVariable("c[0]");
+  auto* vd = f.ctx.FindVariable("d[0][0]");
+  ASSERT_NE(vc, nullptr);
+  ASSERT_NE(vd, nullptr);
+  EXPECT_EQ(vc->value.ToString(), "00000000");
+  EXPECT_EQ(vd->value.ToString(), vc->value.ToString());
+}
+
+// The clause names "unknown or high-impedance" bits together and converts both,
+// and only the bval plane tells the two apart: x is (aval=1, bval=1) and z is
+// (aval=0, bval=1). A value that is all z therefore sets a bit pattern the x
+// case above never reaches -- every aval bit clear -- and pins that the rule's
+// second word is covered too, rather than leaving z to the coercion's
+// arithmetic by inference.
+TEST(TwoStateAndFourState, TwoStateUnpackedElementZeroesHighImpedance) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  bit [7:0] c [0:1];\n"
+      "  initial c[1] = 8'hzz;\n"
+      "endmodule\n",
+      f, "c[1]");
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(var->value.IsKnown());
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0u);
+  EXPECT_EQ(var->value.words[0].bval & 0xFF, 0u);
+}
+
+// The guard on the two above: §6.11.2 converts what a 2-state type stores, and
+// says nothing about a 4-state one, whose whole point is to hold these bits. An
+// element of a logic array is a 4-state object, so it keeps a mixed x/z pattern
+// unchanged. A fix that gave every array leaf the conversion rather than giving
+// each leaf its declaration's own state count would read 10100100 here.
+TEST(TwoStateAndFourState, FourStateUnpackedElementKeepsXz) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] e [0:1];\n"
+      "  initial e[0] = 8'b1010_x10z;\n"
+      "endmodule\n",
+      f, "e[0]");
+  ASSERT_NE(var, nullptr);
+  EXPECT_FALSE(var->value.IsKnown());
+  EXPECT_EQ(var->value.ToString(), "1010x10z");
+}
+
 }  // namespace

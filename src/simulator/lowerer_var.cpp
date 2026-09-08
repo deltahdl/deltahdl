@@ -265,6 +265,20 @@ static void CreateArrayElements(std::string_view name, const RtlirVariable& var,
     auto* stored = arena.Create<std::string>(std::move(elem_name));
     auto* elem = ctx.CreateVariable(*stored, var.width);
     RecordPackedRange(var.dtype, elem, ctx, arena);
+    // §6.11.2: in a 2-state type "any unknown or high-impedance bits shall be
+    // converted to zeros", and the flag is what decides whether that
+    // conversion runs at all -- WriteVar coerces only when it is clear, so an
+    // element left at Variable's 4-state default keeps an x a runtime write
+    // put there. The two makers of array leaves disagreed about this:
+    // CreateMultiDimLeaves carried the declaration's state-ness and
+    // signedness onto every leaf and this one carried neither, so
+    // `bit [7:0] c [0:1]` and `bit [7:0] d [0:1][0:1]` answered `= 8'hxx`
+    // differently on one write path. The sibling was right; an element is a
+    // variable of the array's element type, so it is 2-state exactly when the
+    // declaration is. §6.11.3 likewise fixes signedness by the declaration
+    // rather than by whatever value flowed in.
+    elem->is_4state = var.is_4state;
+    elem->is_signed = var.is_signed;
     uint32_t pat_idx = var.is_descending ? (var.unpacked_size - 1 - i) : i;
     if (named) {
       InitArrayFromNamed(var, idx, elem, ctx, arena);
