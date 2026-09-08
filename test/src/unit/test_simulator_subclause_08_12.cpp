@@ -67,6 +67,50 @@ TEST(ClassAssignRenameSim, ShallowCopyPreservesDerivedType) {
   EXPECT_EQ(copy->GetProperty("x", f.arena).ToUint64(), 9u);
 }
 
+// §8.12 copies the class properties into the new object and §6.8 makes each of
+// them a data storage element, so the copy's properties are the copy's own
+// words. A map assignment carries the Logic4Vec words pointer rather than the
+// words, which leaves the two objects sharing one buffer per property.
+TEST(ClassAssignRenameSim, ShallowCopyGivesEachPropertyItsOwnWords) {
+  SimFixture f;
+  auto* type = MakeClassType(f, "P", {"lo", "hi"});
+  auto [h, obj] = MakeObj(f, type);
+  obj->SetProperty("lo", MakeLogic4VecVal(f.arena, 32, 0xDEADBEEFu));
+  // A property wider than one word, carrying a distinct pattern in each word
+  // and x bits in the high one: a copy that carried only word 0, or only the
+  // aval plane, answers differently from one that carries the whole value.
+  Logic4Vec hi = MakeLogic4Vec(f.arena, 96);
+  hi.words[0].aval = 0x0123456789ABCDEFull;
+  hi.words[1].aval = 0x00000000FEEDFACEull;
+  hi.words[1].bval = 0x00000000F0000000ull;
+  obj->SetProperty("hi", hi);
+
+  auto* copy = obj->ShallowCopy(f.arena);
+  ASSERT_EQ(copy->properties.size(), obj->properties.size());
+  for (const auto& [name, val] : obj->properties) {
+    SCOPED_TRACE(name);
+    auto it = copy->properties.find(name);
+    ASSERT_NE(it, copy->properties.end());
+    ASSERT_NO_FATAL_FAILURE(ExpectOwnWordsCopy(val, it->second));
+  }
+}
+
+// The consequence of that sharing: DepositBitField writes through the words it
+// finds rather than replacing them, which is the write a packed-member
+// assignment to a property makes, so one buffer under two objects turns a
+// deposit into the copy into a deposit into the source as well.
+TEST(ClassAssignRenameSim, ShallowCopyPropertyDepositLeavesTheSourceIntact) {
+  SimFixture f;
+  auto* type = MakeClassType(f, "P", {"x"});
+  auto [h, obj] = MakeObj(f, type);
+  obj->SetProperty("x", MakeLogic4VecVal(f.arena, 32, 0xDEADBEEFu));
+
+  auto* copy = obj->ShallowCopy(f.arena);
+  DepositBitField(copy->properties["x"], 0, MakeLogic4VecVal(f.arena, 8, 0), 8);
+  EXPECT_EQ(copy->properties["x"].ToUint64(), 0xDEADBE00u);
+  EXPECT_EQ(obj->properties["x"].ToUint64(), 0xDEADBEEFu);
+}
+
 TEST(ClassAssignRenameSim, E2eHandleAssignmentAliasesObject) {
   SimFixture f;
   auto* design = ElaborateSrc(

@@ -6,6 +6,7 @@
 
 #include "common/arena.h"
 #include "parser/ast.h"
+#include "simulator/statement_assign_internal.h"
 
 namespace delta {
 
@@ -112,7 +113,23 @@ void ClassObject::SetPropertyForType(std::string_view name,
 ClassObject* ClassObject::ShallowCopy(Arena& arena) const {
   auto* copy = arena.Create<ClassObject>();
   copy->type = type;
-  copy->properties = properties;
+  // §8.12 (shallow copy, step 2): "All class properties ... are copied to
+  // the new object." A class property is a variable, and §6.8 has a variable
+  // "store a value from one assignment to the next", so the copy's properties
+  // are storage of their own: the two objects hold two values that happen to
+  // start out equal. A map assignment copy-constructs each Logic4Vec, and a
+  // Logic4Vec copy carries the words pointer rather than the words
+  // (src/common/types.h), so it would leave every property of the copy naming
+  // the source property's buffer -- one storage element under two objects,
+  // which the in-place writers then expose: DepositBitField writes through the
+  // words it finds rather than replacing them, so a packed-member deposit into
+  // either object's property would be a deposit into both. Copy the words per
+  // entry instead. What §8.12 does leave shared is the object a handle
+  // property refers to, and that survives this: the handle is the property's
+  // value, so copying the value copies the handle and both objects still name
+  // the one object it refers to.
+  for (const auto& [name, val] : properties)
+    copy->properties[name] = OwnRhsWords(val, arena);
   // §8.12: a shallow copy carries over the source object's internal
   // randomization state. The per-instance RNG (its seed and live generator
   // state) is duplicated into the new object so it resumes from where the
