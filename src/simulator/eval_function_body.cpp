@@ -800,8 +800,17 @@ static bool ExecFuncForeach(const Stmt* stmt, const FuncExecCtx& exec) {
 // the caller a `logic [7:0]` function's result 32 bits wide, and let a 1-bit
 // comparison's signedness stand in for an `int`'s.
 static void ExecFuncReturn(const Stmt* stmt, const FuncExecCtx& exec) {
-  Logic4Vec val =
-      EvalExpr(stmt->expr, exec.ctx, exec.arena, exec.ret_var->value.width);
+  // §6.8, printed page 105: a variable "shall store a value from one assignment
+  // to the next", so the implicit return variable and the returned one are two
+  // storage elements and neither may hold the other's words. EvalExpr answers a
+  // bare identifier's, an unpacked element's or a class property's own vector,
+  // and ResizeToWidth passes a value already at the declared width straight
+  // through, so the CoerceTo2State below would write into whatever was
+  // returned -- and a returned `ref` or `output` formal carries that back out
+  // to the caller's argument.
+  Logic4Vec val = OwnRhsWords(
+      EvalExpr(stmt->expr, exec.ctx, exec.arena, exec.ret_var->value.width),
+      exec.arena);
   if (exec.ret_width != 0) {
     val = ResizeToWidth(val, exec.ret_width, exec.arena);
     val.is_signed = exec.ret_var->is_signed;

@@ -506,4 +506,152 @@ TEST(FunctionReturnSim, MemberDepositAfterABodyCopyLeavesTheSourceIntact) {
   EXPECT_EQ(duplicate->value.ToUint64(), 0x5A00u);
 }
 
+// §13.4.1 makes the value a `return` hands back an assignment to the function's
+// implicitly declared internal variable, and §6.8 makes that variable a storage
+// element of its own: "A variable is an abstraction of a data storage element.
+// A variable shall store a value from one assignment to the next." A statement
+// spelled `return pattern;` therefore only reads `pattern`, and nothing the
+// declared return type does to the result may reach back into what was read.
+//
+// The two forms §13.4.1 offers are executed apart, which is why the claim has
+// to be made twice. The assignment form `f = expr;` is an ordinary blocking
+// assignment in the body and reaches ExecFuncBlockingAssign, which takes its
+// own copy of the right-hand words. The `return expr;` form is ExecFuncReturn,
+// which stored what EvalExpr answered: a bare identifier is answered with the
+// source variable's own Logic4Vec, a Logic4Vec copies its `words` pointer
+// rather than the words, and ResizeToWidth hands a value already at the
+// declared width straight back. So a `bit [7:0]` function's implicit variable
+// was left naming `pattern`'s storage, and §6.11.2's conversion of the result
+// -- "any unknown or high-impedance bits shall be converted to zeros" -- is an
+// in-place write that travelled through the alias and cleared the unknowns of
+// `pattern`, in the statement that only read it.
+//
+// The eight bits on each side are load-bearing. A return type wider or narrower
+// than the returned variable makes ResizeToWidth build the result in a fresh
+// store, which hides the sharing completely; matching widths are what let the
+// read value reach the implicit variable unresized.
+//
+// ToUint64 cannot see this. It projects aval & ~bval, so a bit that is already
+// unknown reads as 0 through it and clearing that bit changes nothing it
+// reports; the assertions read words[0] directly. 8'b1x01101x is stored as aval
+// 0xDB with bval 0x41, an x digit being aval 1 with bval 1, and the correctly
+// coerced result is aval 0x9A with bval 0x00 -- which is what `result` alone is
+// entitled to hold.
+TEST(FunctionReturnSim, ReturnIntoATwoStateResultKeepsTheReadVariableUnknown) {
+  SimFixture f;
+  auto* source = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] pattern;\n"
+      "  logic [7:0] result;\n"
+      "  function bit [7:0] fetch();\n"
+      "    return pattern;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    pattern = 8'b1x01101x;\n"
+      "    result = fetch();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "pattern");
+  ASSERT_NE(source, nullptr);
+  auto* returned = f.ctx.FindVariable("result");
+  ASSERT_NE(returned, nullptr);
+  EXPECT_EQ(source->value.words[0].aval & 0xFFu, 0xDBu);
+  EXPECT_EQ(source->value.words[0].bval & 0xFFu, 0x41u);
+  EXPECT_EQ(returned->value.words[0].aval & 0xFFu, 0x9Au);
+  EXPECT_EQ(returned->value.words[0].bval & 0xFFu, 0x00u);
+}
+
+// The same §13.4.1 return, made worse by where the returned object lives. The
+// §13.4 argument-direction table gives an inout formal a copy in at the start
+// of the call and a copy out at the end, so the formal is not private to the
+// body the way a local is: whatever it holds when the body finishes is what
+// WritebackOutputArgs assigns to the caller's actual. A `return io;` that left
+// the implicit variable naming `io`'s storage therefore carried §6.11.2's
+// conversion into the formal, and the copy-out then carried the cleared value
+// out to `held` -- a variable the caller never assigned after `8'bx11001x1`,
+// and one the function only ever read.
+//
+// That is what separates this from a body-local corruption: §13.4.1's
+// conversion of a function result reaches out of the subroutine entirely. The
+// inout direction is what makes it observable, because the copy-out is the
+// route by which the formal's damaged value becomes the caller's; a plain input
+// formal is discarded when the call returns and takes the damage with it.
+//
+// Widths match at eight bits throughout -- actual, formal and return type --
+// for the reason the case above gives: any mismatch resizes and hides it.
+//
+// 8'bx11001x1 is stored as aval 0xE7 with bval 0x82, and the 2-state result of
+// it is aval 0x65 with bval 0x00. `held` must still read 0xE7/0x82 after the
+// call: it is passed in, read, and passed back unchanged. A different bit
+// pattern from the case above, so the two state their claim on different bits.
+TEST(FunctionReturnSim, ReturnOfAnInoutFormalLeavesTheCallersActualIntact) {
+  SimFixture f;
+  auto* actual = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] held;\n"
+      "  logic [7:0] copy;\n"
+      "  function bit [7:0] relay(inout logic [7:0] io);\n"
+      "    return io;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    held = 8'bx11001x1;\n"
+      "    copy = relay(held);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "held");
+  ASSERT_NE(actual, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* taken_out = f.ctx.FindVariable("copy");
+  ASSERT_NE(taken_out, nullptr);
+  EXPECT_EQ(actual->value.words[0].aval & 0xFFu, 0xE7u);
+  EXPECT_EQ(actual->value.words[0].bval & 0xFFu, 0x82u);
+  EXPECT_EQ(taken_out->value.words[0].aval & 0xFFu, 0x65u);
+  EXPECT_EQ(taken_out->value.words[0].bval & 0xFFu, 0x00u);
+}
+
+// The other form §13.4.1 names, stated as the boundary of the two cases above
+// rather than as a third way to break them: "the value returned by the function
+// is the value of that internal variable", and the subclause reaches that
+// variable either by a `return` or by an assignment to the function's own name.
+// The name-assign form is a blocking assignment in the body, so it is
+// ExecFuncBlockingAssign that executes it, and that executor already copies the
+// right-hand words before any store can keep them. This case therefore holds on
+// both sides of the fix the two above ask for; it is not discriminating for the
+// aliased `return`, and what it does discriminate against is the name-assign
+// form being rerouted onto a path that stores the read variable's own words.
+//
+// It is worth writing because the target here is §13.4.1's implicit variable
+// itself, whose 2-state-ness comes from the declared return type rather than
+// from a declaration in the body, and §6.11.2 has to convert it: a `bit [11:0]`
+// function must hand back a value with no unknowns in it while `stored` keeps
+// every unknown it was assigned.
+//
+// Twelve bits this time, matched across the variable and the return type, so
+// the copy has no resize to hide behind. 12'b1010x0111x01 is stored as aval
+// 0xABD with bval 0x084, and the converted result is aval 0xA39 with bval
+// 0x000.
+TEST(FunctionReturnSim, FunctionNameAssignOfAVariableCoercesOnlyTheResult) {
+  SimFixture f;
+  auto* kept = RunAndFindVar(
+      "module t;\n"
+      "  logic [11:0] stored;\n"
+      "  logic [11:0] taken;\n"
+      "  function bit [11:0] grab_bits();\n"
+      "    grab_bits = stored;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    stored = 12'b1010x0111x01;\n"
+      "    taken = grab_bits();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "stored");
+  ASSERT_NE(kept, nullptr);
+  auto* handed_back = f.ctx.FindVariable("taken");
+  ASSERT_NE(handed_back, nullptr);
+  EXPECT_EQ(kept->value.words[0].aval & 0xFFFu, 0xABDu);
+  EXPECT_EQ(kept->value.words[0].bval & 0xFFFu, 0x084u);
+  EXPECT_EQ(handed_back->value.words[0].aval & 0xFFFu, 0xA39u);
+  EXPECT_EQ(handed_back->value.words[0].bval & 0xFFFu, 0x000u);
+}
+
 }  // namespace
