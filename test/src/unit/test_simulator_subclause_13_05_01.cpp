@@ -424,4 +424,72 @@ TEST(PassByValueSim, NarrowerFormalTruncatesWithoutTouchingTheActual) {
   EXPECT_EQ(read_back->value.words[0].bval & 0xFFu, 0x0u);
 }
 
+// §13.5.1: "This argument passing mechanism works by copying each argument into
+// the subroutine area ... If the arguments are changed within the subroutine,
+// the changes are not visible outside the subroutine." The four aggregate binds
+// copied the container and every entry's Logic4Vec, which carries the words
+// pointer rather than the words, so the formal's entries were the actual's.
+// §7.8.7's write to bits of an element is the writer that shows it:
+// DepositBitField writes through the words it finds, so the callee's write
+// landed in the caller's array as well.
+TEST(PassByValueSim, AssocFormalElementBitsAreNotTheActualsWords) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] aa[int];\n"
+      "  logic [7:0] r;\n"
+      "  task automatic poke(logic [7:0] a[int]);\n"
+      "    a[5][3:0] = 4'hF;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    aa[5] = 8'h00;\n"
+      "    poke(aa);\n"
+      "    r = aa[5];\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 0x00u);
+}
+
+// The queue bind, whose elements live in a QueueObject rather than in
+// variables. A whole-element write replaces the entry's vector rather than
+// writing through it, so this passed before the copy and is the guard on it:
+// the fix must not have made the formal share the actual's container.
+TEST(PassByValueSim, QueueFormalElementWriteIsNotVisibleOutside) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] qu[$];\n"
+      "  logic [7:0] r;\n"
+      "  task automatic poke(logic [7:0] a[$]);\n"
+      "    a[0] = 8'hFF;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    qu.push_back(8'h11);\n"
+      "    poke(qu);\n"
+      "    r = qu[0];\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 0x11u);
+}
+
+// The fixed-size array bind, whose elements are per-element variables of the
+// caller, and the same guard over it.
+TEST(PassByValueSim, FixedArrayFormalElementWriteIsNotVisibleOutside) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] arr[0:1];\n"
+      "  logic [7:0] r;\n"
+      "  task automatic poke(logic [7:0] a[0:1]);\n"
+      "    a[1] = 8'hFF;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    arr[1] = 8'h11;\n"
+      "    poke(arr);\n"
+      "    r = arr[1];\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 0x11u);
+}
+
 }  // namespace
