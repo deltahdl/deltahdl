@@ -703,4 +703,76 @@ TEST(TwoStateAndFourState, TwoStateBodyLocalKeepsTheKnownBitsOfItsInitializer) {
   EXPECT_EQ(var->value.ToUint64(), 0xA4u);
 }
 
+// §10.5 makes a variable declaration assignment "a special case of procedural
+// assignment", so §6.11.2's conversion reaches an array's initializer element
+// by element -- §10.9.1 evaluating each pattern item in the assignment context
+// of its element. The three helpers that fill a one-dimensional array's leaves
+// stored the item resized and not converted, so the one spelling that is both a
+// declaration initializer and an array element kept the x that the same value
+// loses in a scalar declaration and in a runtime write to the same element.
+TEST(TwoStateAndFourState, TwoStateArrayPositionalInitDropsUnknownBits) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  bit [7:0] c [0:1] = '{8'hxx, 8'h00};\n"
+      "endmodule\n",
+      f, "c[0]");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "00000000");
+}
+
+// §10.9.1's replication form, whose item is stored by a second helper.
+TEST(TwoStateAndFourState, TwoStateArrayReplicatedInitDropsUnknownBits) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  bit [7:0] c [0:1] = '{2{8'hxx}};\n"
+      "endmodule\n",
+      f, "c[0]");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "00000000");
+}
+
+// §10.9.1's default key, whose item is stored by a third helper again.
+TEST(TwoStateAndFourState, TwoStateArrayDefaultKeyedInitDropsUnknownBits) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  bit [7:0] c [0:1] = '{default: 8'hxx};\n"
+      "endmodule\n",
+      f, "c[0]");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "00000000");
+}
+
+// The guard: §6.11.2 converts on the way into a 2-state type and only there, so
+// a 4-state element keeps every bit its initializer gave it. Without this the
+// three above would pass on a helper that zeroed unconditionally.
+TEST(TwoStateAndFourState, FourStateArrayPositionalInitKeepsUnknownBits) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] d [0:1] = '{8'hxx, 8'h00};\n"
+      "endmodule\n",
+      f, "d[0]");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "xxxxxxxx");
+}
+
+// The initializer item is a bare name here, which EvalExpr answers with that
+// variable's own Logic4Vec, and the conversion writes in place: through a
+// shared buffer it would clear the source's own unknown bits, which §6.8 keeps
+// as the source's to hold.
+TEST(TwoStateAndFourState, TwoStateArrayInitLeavesItsSourceVariableAlone) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] s = 8'hxx;\n"
+      "  bit [7:0] c [0:1] = '{s, 8'h00};\n"
+      "endmodule\n",
+      f, "s");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "xxxxxxxx");
+}
+
 }  // namespace

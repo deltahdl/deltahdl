@@ -84,6 +84,32 @@ static Logic4Vec Table67ElementDefault(const RtlirVariable& var, Arena& arena) {
                        : MakeLogic4VecVal(arena, var.width, 0);
 }
 
+// §10.5 makes a variable declaration assignment "a special case of procedural
+// assignment", and §10.9.1 evaluates each pattern item in the assignment
+// context of its element, so an item stored on a leaf takes the two steps a
+// runtime write to that element takes: §10.7's resize to the element width, and
+// §6.11.2's conversion of every unknown or high-impedance bit to zero on the
+// way into a 2-state type. The resize is not the second of those: ResizeToWidth
+// answers its argument untouched when the widths already match, and copies the
+// bval plane word for word when they differ, so an x reached a `bit` element
+// either way -- where the same value written to the same element by a statement
+// (WriteVar), or to a scalar of the same type by a declaration
+// (CoerceVarInitValue), reads 0. The three helpers below each stored their item
+// without it.
+//
+// The copy is taken before the coercion because the coercion writes in place
+// and an item that is a bare name is answered with that variable's own
+// Logic4Vec (§6.8): coercing through it would clear the source's own unknown
+// bits, which is the defect #3563 removed elsewhere. It is worth taking on the
+// 4-state path too, a leaf sharing one buffer with the variable its initializer
+// read being the same family again.
+static Logic4Vec CoerceArrayInitItem(const RtlirVariable& var, Logic4Vec val,
+                                     Arena& arena) {
+  val = OwnRhsWords(ResizeToWidth(val, var.width, arena), arena);
+  if (!var.is_4state && !var.is_string && !var.is_real) CoerceTo2State(val);
+  return val;
+}
+
 static void InitArrayElement(const RtlirVariable& var, uint32_t elem_idx,
                              Variable* elem, SimContext& ctx, Arena& arena) {
   if (!var.init_expr) {
@@ -99,11 +125,8 @@ static void InitArrayElement(const RtlirVariable& var, uint32_t elem_idx,
   }
   auto& elements = var.init_expr->elements;
   if (elem_idx < elements.size()) {
-    // §10.9.1: each pattern item is evaluated in the assignment context of its
-    // element, so a value whose self-width differs is coerced to the element
-    // width (no-op when they already match).
-    elem->value = ResizeToWidth(EvalExpr(elements[elem_idx], ctx, arena),
-                                var.width, arena);
+    elem->value = CoerceArrayInitItem(
+        var, EvalExpr(elements[elem_idx], ctx, arena), arena);
     return;
   }
   // Past the end of the pattern's items no value was supplied for this element
@@ -120,11 +143,8 @@ static void InitArrayFromReplicate(const RtlirVariable& var, uint32_t elem_idx,
     elem->value = MakeLogic4VecVal(arena, var.width, 0);
     return;
   }
-  // §10.9.1: a replicated item is likewise evaluated in its element's
-  // assignment context.
-  elem->value =
-      ResizeToWidth(EvalExpr(rep->elements[elem_idx % inner_count], ctx, arena),
-                    var.width, arena);
+  elem->value = CoerceArrayInitItem(
+      var, EvalExpr(rep->elements[elem_idx % inner_count], ctx, arena), arena);
 }
 
 // §10.9.1: "An index:value specifies an explicit value for a keyed element
@@ -182,13 +202,12 @@ static const Expr* FindKeyedItem(const Expr* pat, uint32_t idx,
 static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
                                Variable* elem, SimContext& ctx, Arena& arena) {
   // §10.9.1: a key resolves a value that is then evaluated in the assignment
-  // context of the element, so coerce the chosen value to the element width
-  // (no-op when it already matches). An element covered by none of the keys
-  // keeps the zero default at the element width.
+  // context of the element. An element covered by none of the keys keeps the
+  // zero default at the element width.
   const Expr* item =
       FindKeyedItem(var.init_expr, idx, var.elem_type_kind, ctx, arena);
   elem->value =
-      item ? ResizeToWidth(EvalExpr(item, ctx, arena), var.width, arena)
+      item ? CoerceArrayInitItem(var, EvalExpr(item, ctx, arena), arena)
            : MakeLogic4VecVal(arena, var.width, 0);
 }
 
