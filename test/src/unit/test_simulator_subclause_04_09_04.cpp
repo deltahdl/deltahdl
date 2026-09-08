@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <string>
 #include <vector>
 
 #include "fixture_simulator.h"
@@ -206,6 +207,39 @@ TEST(NonblockingAssignSchedulingSim,
   EXPECT_EQ(f.ctx.FindVariable("q")->value.ToUint64(), 0xABu);
 }
 
+// Runs `src` and checks that the select assignment in it wrote no bit of `x`
+// and cost the scheduler no event.
+//
+// The free count alone cannot say the second thing. EventPool hands out events
+// the Arena makes on demand, so a count read at the end of a run reports
+// whatever the arena happened to build and not how much of it came back; the
+// stock is primed to a known size first, and what the check then reads is
+// whether the run returned everything it borrowed.
+//
+// The two cases below differ only in the source, so the priming, the run and
+// both expectations are stated once here. Both name their variable `x`, since
+// what the caller varies is which of §11.5.1's two routes into a select that
+// addresses no bit the source takes, not what the target is called.
+static void ExpectSelectNbaWritesNothingAndKeepsItsEvent(const std::string& src,
+                                                         SimFixture& f) {
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  auto& pool = f.scheduler.GetEventPool();
+  constexpr size_t kPrimedEvents = 32;
+  std::vector<Event*> primed;
+  primed.reserve(kPrimedEvents);
+  for (size_t n = 0; n < kPrimedEvents; ++n) primed.push_back(pool.Acquire());
+  for (auto* e : primed) pool.Release(e);
+  ASSERT_EQ(pool.FreeCount(), kPrimedEvents);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  // §11.5.1's "no effect on the data stored when written": no bit of x moved.
+  EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 0x00u);
+  // Every event the run took from the primed stock came back to it.
+  EXPECT_EQ(pool.FreeCount(), kPrimedEvents);
+}
+
 // §4.9.4 has a nonblocking assignment compute "the left-hand target" from "the
 // values in effect when the update is placed in the event region", so the index
 // of a select target is resolved where the update is scheduled. §11.5.1 leaves
@@ -224,14 +258,12 @@ TEST(NonblockingAssignSchedulingSim,
 // it knows whether the select addresses any bit, and only an event that reaches
 // a queue is ever released (Scheduler::DrainQueue), so the one taken here left
 // the pool for good -- the Arena has no per-object free to reclaim it, and a
-// long-running design drops one event per such assignment. A free count read at
-// the end of a run cannot show that by itself, since it counts whatever the
-// arena happened to make; the free list is primed with a known stock first and
-// the run has to hand every one of them back. It handed back 31 of 32.
+// long-running design drops one event per such assignment. It handed back 31 of
+// the 32 the helper primes.
 TEST(NonblockingAssignSchedulingSim,
      DroppedUnknownIndexSelectNbaReturnsItsEvent) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  ExpectSelectNbaWritesNothingAndKeepsItsEvent(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  logic [2:0] i;\n"
@@ -242,21 +274,6 @@ TEST(NonblockingAssignSchedulingSim,
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  auto& pool = f.scheduler.GetEventPool();
-  constexpr size_t kPrimedEvents = 32;
-  std::vector<Event*> primed;
-  primed.reserve(kPrimedEvents);
-  for (size_t n = 0; n < kPrimedEvents; ++n) primed.push_back(pool.Acquire());
-  for (auto* e : primed) pool.Release(e);
-  ASSERT_EQ(pool.FreeCount(), kPrimedEvents);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  // §11.5.1's "no effect on the data stored when written": no bit of x moved.
-  EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 0x00u);
-  // Every event the run took from the primed stock came back to it.
-  EXPECT_EQ(pool.FreeCount(), kPrimedEvents);
 }
 
 // The same abandonment reached by the other of §11.5.1's two routes into a
@@ -269,12 +286,12 @@ TEST(NonblockingAssignSchedulingSim,
 // they reach the drop through different arithmetic: the first stops at the
 // unknown-bits test on the evaluated index, this one at the range test in
 // PartSelectStorageBits, and only the shared zero width they both answer with
-// tells the scheduling path there is nothing to place. A run that primes 32
-// free events returned 31.
+// tells the scheduling path there is nothing to place. This one also returned
+// 31 of 32.
 TEST(NonblockingAssignSchedulingSim,
      DroppedOutOfRangePartSelectNbaReturnsItsEvent) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  ExpectSelectNbaWritesNothingAndKeepsItsEvent(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -284,19 +301,4 @@ TEST(NonblockingAssignSchedulingSim,
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  auto& pool = f.scheduler.GetEventPool();
-  constexpr size_t kPrimedEvents = 32;
-  std::vector<Event*> primed;
-  primed.reserve(kPrimedEvents);
-  for (size_t n = 0; n < kPrimedEvents; ++n) primed.push_back(pool.Acquire());
-  for (auto* e : primed) pool.Release(e);
-  ASSERT_EQ(pool.FreeCount(), kPrimedEvents);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  // The part-select named bits 9 and 8 of an eight-bit vector; none was
-  // written.
-  EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 0x00u);
-  EXPECT_EQ(pool.FreeCount(), kPrimedEvents);
 }
