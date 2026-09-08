@@ -62,8 +62,17 @@ static bool TryBindQueueElementRef(const Expr* expr, int arg_index,
   auto idx = EvalExpr(call_arg->index, ctx, arena).ToUint64();
   if (idx >= q->elements.size()) return false;
 
+  // §13.5.2 forms the reference on "equivalent data types", and §6.18 makes a
+  // name standing for the element type equivalent to it. The one-argument
+  // EvalTypeWidth gives a DataTypeKind::kNamed no width at all, so a formal
+  // written with a typedef answered 0, 0 matched no element width, and the bind
+  // was declined -- the argument then fell to the by-value bind and the write
+  // reached a copy, which is the opposite of what the clause asks. This is an
+  // equivalence gate rather than §10.8's resize, which is why the width is
+  // compared rather than applied; what it needed was the width the name stands
+  // for.
   if (param.data_type.kind != DataTypeKind::kImplicit) {
-    uint32_t param_width = EvalTypeWidth(param.data_type);
+    uint32_t param_width = DeclaredTypeWidth(param.data_type, ctx);
     if (param_width != q->elem_width) return false;
   }
 

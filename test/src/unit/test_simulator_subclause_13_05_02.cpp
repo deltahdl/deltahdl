@@ -587,4 +587,74 @@ TEST(PassByRef, RefWholeVariableWriteWakesAnAlwaysCombReadingIt) {
   EXPECT_EQ(v, 99u);
 }
 
+// §13.5.2: "arguments passed by reference are not copied into the subroutine
+// area, rather, a reference to the original argument is passed", matched on
+// equivalent data types, and §6.18 makes a name standing for the element type
+// equivalent to it. The gate that decides whether the reference is formed asked
+// a width that a typedef name answers 0 for, so the bind was declined and the
+// argument fell to the by-value bind: the write reached a copy and the element
+// stood still, which is the discriminating reading.
+TEST(QueueRef, TypedefRefFormalBindsToTheQueueElement) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef bit [3:0] nib;\n"
+      "  nib q[$];\n"
+      "  int r;\n"
+      "  task automatic bump(ref nib e);\n"
+      "    e = e + 1;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    q.push_back(4'd5);\n"
+      "    bump(q[0]);\n"
+      "    r = q[0];\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 6u);
+}
+
+// The associative element, bound by a function of its own beside it.
+TEST(PassByRef, TypedefRefFormalBindsToTheAssocElement) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef bit [3:0] nib;\n"
+      "  nib aa[int];\n"
+      "  int r;\n"
+      "  task automatic bump(ref nib e);\n"
+      "    e = e + 1;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    aa[3] = 4'd5;\n"
+      "    bump(aa[3]);\n"
+      "    r = aa[3];\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 6u);
+}
+
+// The guard on the gate still being one: a name standing for a type that is not
+// the element's is not equivalent to it, so no reference is formed and the
+// element stands. Without this the repair could read as "bind whatever was
+// asked for".
+TEST(QueueRef, RefFormalOfANonEquivalentTypedefDoesNotBind) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef bit [3:0] nib;\n"
+      "  typedef bit [7:0] octet;\n"
+      "  nib q[$];\n"
+      "  int r;\n"
+      "  task automatic bump(ref octet e);\n"
+      "    e = e + 1;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    q.push_back(4'd5);\n"
+      "    bump(q[0]);\n"
+      "    r = q[0];\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 5u);
+}
+
 }  // namespace
