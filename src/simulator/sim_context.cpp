@@ -397,7 +397,11 @@ std::string_view SimContext::StaticFrameKey(std::string_view name) {
 }
 
 void SimContext::PushStaticScope(std::string_view func_name) {
-  scope_stack_.push_back(Scope{static_frames_[StaticFrameKey(func_name)], {}});
+  // §13.4.2's static frame carries the variables the function declared static;
+  // the three maps beside them start empty, a queue or associative array of the
+  // call being the call's own and a shape with it.
+  scope_stack_.push_back(
+      Scope{static_frames_[StaticFrameKey(func_name)], {}, {}, {}});
 }
 
 void SimContext::PopStaticScope(std::string_view func_name) {
