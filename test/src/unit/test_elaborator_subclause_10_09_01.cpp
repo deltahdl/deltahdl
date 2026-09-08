@@ -286,4 +286,44 @@ TEST(ArrayLiteralElaboration, ArrayItemInPatternInAForLoopStepNames10_9_1) {
                             "10.9.1"));
 }
 
+// §10.9.1's type key covers "each field ... whose type matches the type", so a
+// key naming a type the elements are not declared with covers nothing: this
+// pattern names no element by index, carries no default and matches none by
+// type, which "Every element shall be covered by one of these rules" forbids.
+// The coverage check counted any type keyword as covering the whole array and
+// let it through, and the simulator then invented a value for all three.
+TEST(ArrayLiteralElaboration, TypeKeyThatCannotMatchDoesNotCoverTheArray) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] arr[0:2] = '{int: 8'h05};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "keyed array pattern does not cover all elements",
+                            2, "10.9.1"));
+}
+
+// The guard on the other direction, beside TypeKeyArrayOk above: a key that
+// does match the element type covers every element, and this must stay
+// accepted -- it is what keeps the repair from reading every type key as
+// covering nothing.
+TEST(ArrayLiteralElaboration, TypeKeyMatchingTheElementTypeCoversTheArray) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  logic [7:0] arr[0:2] = '{logic: 8'h05};\n"
+             "endmodule\n"));
+}
+
+// §10.9.1 recurses "into each subarray of the array using the rules in this
+// subclause and the type and default keys", so a key matching the leaf element
+// type covers a multidimensional array at every level. The check must ask the
+// element type rather than a subarray's, or this legal source starts failing.
+TEST(ArrayLiteralElaboration, TypeKeyCoversEveryDimensionOfAMultidimArray) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  logic [7:0] d[0:1][0:1] = '{logic: 8'h05};\n"
+             "endmodule\n"));
+}
+
 }  // namespace

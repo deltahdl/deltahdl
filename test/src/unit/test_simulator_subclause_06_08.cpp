@@ -391,4 +391,43 @@ TEST(VariableDeclaration, VariableStoresValueBetweenAssignmentAndRead) {
   EXPECT_EQ(val, 99u);
 }
 
+// §10.9.1 forbids an element no rule covers, so this declaration is reported at
+// elaboration -- and the value the element ends up with still has to be one
+// answer rather than two. The one-dimensional keyed maker gave a known 0 where
+// the positional maker beside it and the multidimensional one both give §6.8's
+// Table 6-7 default, so one spelling of an illegal pattern read 00 and the
+// other read 'x.
+TEST(VariableDeclaration, KeyedPatternUncoveredElementTakesTable67Default) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a [0:2] = '{int: 8'h05};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+
+  auto* var = f.ctx.FindVariable("a[0]");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "xxxxxxxx");
+}
+
+// The run-time keyed writer answers the same question, and no elaboration rule
+// reaches a pattern written as a statement, so this branch is reachable with no
+// report at all -- which is why the two had to agree rather than one of them
+// being unreachable.
+TEST(VariableDeclaration, KeyedPatternStatementUncoveredElementTakesTable67) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a [0:2];\n"
+      "  initial a = '{int: 8'h05};\n"
+      "endmodule\n",
+      f, "a[0]");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "xxxxxxxx");
+}
+
 }  // namespace

@@ -270,13 +270,6 @@ struct StreamSliceRange {
 bool ResolveWithRange(const Expr* with_expr, SimContext& ctx, Arena& arena,
                       ArrayGeom geom, StreamSliceRange& out_range);
 
-// Assignment-pattern key helpers, defined in statement_assign_pattern.cpp;
-// also used by lowerer_var.cpp. IsTypeKeyword recognizes a type-name pattern
-// key; TypeKeyMatchesKind tests whether such a key selects the given element
-// kind.
-bool IsTypeKeyword(std::string_view key);
-bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind);
-
 // Defined in statement_assign_pattern.cpp.
 // §10.9: the index an array pattern key names. Syntax 10-5 writes such a key as
 // a constant expression -- `array_pattern_key ::= constant_expression` -- so

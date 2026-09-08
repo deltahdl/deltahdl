@@ -30,46 +30,6 @@ uint32_t PatternKeyIndex(const Expr* key, SimContext& ctx, Arena& arena) {
   return static_cast<uint32_t>(EvalExpr(key, ctx, arena).ToUint64());
 }
 
-bool IsTypeKeyword(std::string_view key) {
-  return key == "int" || key == "integer" || key == "logic" || key == "reg" ||
-         key == "byte" || key == "shortint" || key == "longint" ||
-         key == "bit" || key == "real" || key == "shortreal" || key == "time" ||
-         key == "realtime" || key == "string";
-}
-
-bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind) {
-  switch (kind) {
-    case DataTypeKind::kInt:
-      return key == "int";
-    case DataTypeKind::kInteger:
-      return key == "integer";
-    case DataTypeKind::kLogic:
-      return key == "logic";
-    case DataTypeKind::kReg:
-      return key == "reg";
-    case DataTypeKind::kByte:
-      return key == "byte";
-    case DataTypeKind::kShortint:
-      return key == "shortint";
-    case DataTypeKind::kLongint:
-      return key == "longint";
-    case DataTypeKind::kBit:
-      return key == "bit";
-    case DataTypeKind::kReal:
-      return key == "real";
-    case DataTypeKind::kShortreal:
-      return key == "shortreal";
-    case DataTypeKind::kTime:
-      return key == "time";
-    case DataTypeKind::kRealtime:
-      return key == "realtime";
-    case DataTypeKind::kString:
-      return key == "string";
-    default:
-      return false;
-  }
-}
-
 // Finds the pattern element whose explicit integer key equals idx. Returns the
 // matching element index, or rhs->elements.size() when none matches.
 static size_t FindIndexKeyedElement(const Expr* rhs, uint32_t idx,
@@ -113,6 +73,9 @@ struct PatternArrayElem {
   uint32_t idx;
   uint32_t width;
   DataTypeKind elem_type_kind;
+  // §6.8's Table 6-7 row this element's type takes, for the branch below where
+  // no §10.9.1 rule covers it.
+  bool is_4state;
 };
 }  // namespace
 
@@ -125,7 +88,14 @@ static Logic4Vec FindArrayKeyedValue(const Expr* rhs,
   if (match >= rhs->elements.size()) match = FindDefaultKeyedElement(rhs);
   if (match < rhs->elements.size())
     return EvalExpr(rhs->elements[match], ctx, arena);
-  return MakeLogic4VecVal(arena, slot.width, 0);
+  // §10.9.1 forbids an element no rule covers -- "Every element shall be
+  // covered by one of these rules" -- so this is a pattern the elaborator
+  // reports, and what the branch answers is §6.8's Table 6-7 default for the
+  // element's own type, as the positional and multidimensional makers answer
+  // it. The known zero it gave had one spelling of an illegal pattern reading
+  // 00 where another read 'x.
+  return slot.is_4state ? MakeAllX(arena, slot.width)
+                        : MakeLogic4VecVal(arena, slot.width, 0);
 }
 
 namespace {
@@ -256,7 +226,8 @@ static void DistributePatternToArray(std::string_view arr_name,
     if (!elem) continue;
     Logic4Vec val;
     if (named) {
-      PatternArrayElem slot{idx, info.elem_width, info.elem_type_kind};
+      PatternArrayElem slot{idx, info.elem_width, info.elem_type_kind,
+                            info.is_4state};
       val = FindArrayKeyedValue(rhs, slot, ctx, arena);
     } else if (replicate && inner_count > 0) {
       val = EvalExpr(rhs->elements[0]->elements[i % inner_count], ctx, arena);

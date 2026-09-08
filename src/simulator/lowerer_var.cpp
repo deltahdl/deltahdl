@@ -202,13 +202,18 @@ static const Expr* FindKeyedItem(const Expr* pat, uint32_t idx,
 static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
                                Variable* elem, SimContext& ctx, Arena& arena) {
   // §10.9.1: a key resolves a value that is then evaluated in the assignment
-  // context of the element. An element covered by none of the keys keeps the
-  // zero default at the element width.
+  // context of the element. An element covered by none of the keys is a pattern
+  // the clause forbids -- "Every element shall be covered by one of these
+  // rules" -- and is reported at elaboration; the branch stays reachable for a
+  // caller that does not stop on that report, and answers Table 6-7 as the
+  // positional maker above and the multidimensional one below do rather than
+  // the known zero it gave, which had one spelling of an illegal pattern
+  // reading 00 where the other read 'x.
   const Expr* item =
       FindKeyedItem(var.init_expr, idx, var.elem_type_kind, ctx, arena);
   elem->value =
       item ? CoerceArrayInitItem(var, EvalExpr(item, ctx, arena), arena)
-           : MakeLogic4VecVal(arena, var.width, 0);
+           : Table67ElementDefault(var, arena);
 }
 
 namespace {

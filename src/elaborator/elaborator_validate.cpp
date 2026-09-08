@@ -15,13 +15,6 @@
 
 namespace delta {
 
-static bool IsTypeKeyword(std::string_view key) {
-  return key == "int" || key == "integer" || key == "logic" || key == "reg" ||
-         key == "byte" || key == "shortint" || key == "longint" ||
-         key == "bit" || key == "real" || key == "shortreal" || key == "time" ||
-         key == "realtime" || key == "string";
-}
-
 static bool IsArrayPatternSpecial(const Expr* init) {
   if (init->repeat_count) return true;
   if (init->elements.size() == 1 &&
@@ -105,7 +98,19 @@ static void CheckArrayPatternCoverage(const ModuleItem* item, SourceLoc loc,
     if (key->text == "default") {
       has_default = true;
     } else if (IsTypeKeyword(key->text)) {
-      has_type_key = true;
+      // §10.9.1's type key covers "each field ... whose type matches the type",
+      // so a key naming a type the element is not declared with covers nothing
+      // and cannot exempt the pattern from the count below: `logic [7:0] arr
+      // [0:2] = '{int: 8'h05};` names no element by index, carries no default
+      // and matches no element by type, which the clause's "Every element shall
+      // be covered by one of these rules" forbids and this accepted. The
+      // element type is asked rather than a subarray's, because the clause
+      // recurses "into each subarray of the array using the rules in this
+      // subclause and the type and default keys" -- a key matching the leaf
+      // type covers a multidimensional array at every level, which is what
+      // CreateMultiDimLeaf already does.
+      has_type_key =
+          has_type_key || TypeKeyMatchesKind(key->text, item->data_type.kind);
     } else if (auto identity = ArrayPatternKeyIdentity(key)) {
       index_keys.insert(*identity);
     } else {
