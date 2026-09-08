@@ -535,14 +535,18 @@ static bool SetupSelectNbaCallback(const NbaWrite& write, const Expr* lhs,
 //
 // Both decline an lhs carrying an index_end, so a slice such as `A[1][1:2] <=
 // x` still reaches the part-select callback. A packed sub-select of an unpacked
-// element -- `logic [7:0] mem [0:3]; mem[0][3] <= 1'b1;` -- takes the compound
-// arm and is handed to #3493, where the blocking form already leaves it; making
-// the two forms agree is the point.
+// element -- `logic [7:0] mem [0:3]; mem[0][3] <= 1'b1;` -- is not an element
+// at all and is answered by neither: §11.5.1 makes it a bit of the element
+// mem[0], so it is resolved by the caller through TryResolveCompoundElementBase
+// and takes the select-window callback the same bit-select of a plain variable
+// takes. Asking it there rather than here is what keeps that route open: an
+// element answered from this function is written whole.
 static Variable* ResolveNbaSelectElement(const Expr* lhs, SimContext& ctx,
                                          Arena& arena, bool* absent_element) {
   *absent_element = false;
   if (lhs->kind != ExprKind::kSelect) return nullptr;
   if (auto* elem = TryResolveArrayElement(lhs, ctx)) return elem;
+  if (TryResolveCompoundElementBase(lhs, ctx, arena) != nullptr) return nullptr;
   return TryResolveCompoundElement(lhs, ctx, arena, absent_element);
 }
 
@@ -612,7 +616,15 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
   // performs no operation, and the fallback below would otherwise take the
   // name down to the array's base carrier.
   if (absent_element) return;
-  auto* var = elem ? elem : ResolveLhsVariable(stmt->lhs, ctx);
+  // §11.5.1's bit of an unpacked element: the object the trailing index selects
+  // within, which is not an element and so must not be written whole. It stands
+  // in for ResolveLhsVariable, which would answer the array's base carrier and
+  // let the window below be resolved against that.
+  auto* sub_elem =
+      elem ? nullptr : TryResolveCompoundElementBase(stmt->lhs, ctx, arena);
+  auto* var = elem                  ? elem
+              : sub_elem != nullptr ? sub_elem
+                                    : ResolveLhsVariable(stmt->lhs, ctx);
   if (!var) {
     ScheduleFieldNba(stmt->lhs, rhs_val, delay_ticks, ctx, arena);
     return;

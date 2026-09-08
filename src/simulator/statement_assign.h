@@ -44,6 +44,14 @@ bool BuildCompoundLhsName(const Expr* expr, SimContext& ctx, Arena& arena,
 // performs no operation: a caller reads it as "stop", since the fallback
 // resolution walks such a name down to the array's base carrier and would write
 // a bit of that instead.
+// The element a packed sub-select of an unpacked array element selects within
+// -- `mem[0]` for `mem[0][3]` on a `logic [7:0] mem [0:3]` -- or null where the
+// name is not of that shape. §11.5.1 makes the trailing index a bit of that
+// element, so both assignment forms resolve it here before they ask
+// TryResolveCompoundElement, which would answer for a second array dimension.
+Variable* TryResolveCompoundElementBase(const Expr* lhs, SimContext& ctx,
+                                        Arena& arena);
+
 Variable* TryResolveCompoundElement(const Expr* lhs, SimContext& ctx,
                                     Arena& arena,
                                     bool* absent_element = nullptr);

@@ -234,4 +234,91 @@ TEST(ArrayAddressing, VariableBitSelectAfterArrayElement) {
   EXPECT_EQ(v, 1u);
 }
 
+// §11.5.2 addresses the word and §11.5.1 then addresses a bit of it, and the
+// write direction has to read the name the same way the read direction does:
+// `arr[0][3]` is bit 3 of the eight-bit element `arr[0]`, since `arr` has one
+// dimension and the element is a packed object of its own.
+//
+// The writer read it as a second array dimension instead. The flat name
+// `arr[0][3]` is no element -- there is none, `arr[0]` being the leaf -- so a
+// cell was fabricated under that name and the write went into it, leaving
+// `arr[0]` at the 8'h00 it was loaded with. Loading zeros first is what makes
+// the answer say where the bit went: 8'h08 is the bit deposited in the element
+// and 8'h00 is the write landing somewhere else entirely.
+TEST(ArrayAddressing, BitSelectWriteAfterArrayElement) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] arr [0:3];\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    arr[0] = 8'h00;\n"
+      "    arr[0][3] = 1'b1;\n"
+      "    result = arr[0];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0x08u);
+}
+
+// The part-select spelling of the same name, which is a second window
+// resolution rather than the same one: the compound writer declines a name
+// carrying an index_end outright, so this fell past it to the fallback that
+// walks the name down to `arr` -- the element-width carrier no element is
+// stored in -- and wrote four bits of that.
+TEST(ArrayAddressing, PartSelectWriteAfterArrayElement) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] arr [0:3];\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    arr[1] = 8'h00;\n"
+      "    arr[1][7:4] = 4'hF;\n"
+      "    result = arr[1];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0xF0u);
+}
+
+// §10.4.2 gives the nonblocking form the same variable_lvalue the blocking form
+// takes, so the two must reach the same bit of the same element. They agreed
+// before this by both writing nowhere, which is the agreement §7.4.5 owes an
+// index that is invalid and not one that names a bit of an object that exists.
+TEST(ArrayAddressing, NonblockingBitSelectWriteAfterArrayElement) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] arr [0:3];\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    arr[2] = 8'h00;\n"
+      "    arr[2][3] <= 1'b1;\n"
+      "    #1;\n"
+      "    result = arr[2];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0x08u);
+}
+
+// The same rule where the element's own name is compound: `twod[1][2]` is the
+// element of a two-dimensional array and `twod[1][2][3]` a bit of it, so the
+// name that resolves is the prefix rather than the whole. It is the case that
+// separates "the prefix is an element" from "the base is an identifier": a
+// repair that looked only one level down finds `twod[1]`, which names nothing,
+// and answers §7.4.5's no operation for a bit that exists.
+TEST(ArrayAddressing, BitSelectWriteAfterMultidimensionalArrayElement) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] twod [0:3][0:3];\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    twod[1][2] = 8'h00;\n"
+      "    twod[1][2][3] = 1'b1;\n"
+      "    result = twod[1][2];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0x08u);
+}
+
 }  // namespace

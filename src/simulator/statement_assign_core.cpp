@@ -101,6 +101,38 @@ static void WriteVar(Variable* var, const Logic4Vec& val, Arena& arena) {
   var->NotifyWatchers();
 }
 
+// §11.5.1: the object a packed sub-select of an unpacked array element stands
+// on. `logic [7:0] mem [0:3]` stores each element under its own indexed name,
+// so `mem[0][3]` is a bit-select of the eight-bit element `mem[0]` and not a
+// second array dimension: the clause makes an index of a packed object address
+// a bit of it, and only the flat name of a genuinely multidimensional array is
+// an element in its own right. Answers the element the trailing index selects
+// within, or null where the name is not of that shape.
+//
+// The two are told apart by the flat name: `A[1][2]` on an `int A[2][3]` is a
+// variable, made when the array's leaves were created, and this declines it, so
+// the writers below go on treating a real element as one. Where the flat name
+// names nothing and the prefix does, the trailing index has an object to be a
+// bit of, and where neither does the index addresses nothing at all -- §7.4.5's
+// no operation, which TryResolveCompoundElement answers.
+//
+// The read side already draws the line here: TryCompoundArraySelect
+// (eval_select.cpp) declines the same shape so EvalSelect reads the trailing
+// index as a bit-select of the element it evaluates.
+Variable* TryResolveCompoundElementBase(const Expr* lhs, SimContext& ctx,
+                                        Arena& arena) {
+  if (lhs->kind != ExprKind::kSelect || lhs->base == nullptr) return nullptr;
+  if (lhs->base->kind != ExprKind::kSelect) return nullptr;
+  std::string compound;
+  if (BuildCompoundLhsName(lhs, ctx, arena, compound) &&
+      ctx.FindVariable(compound) != nullptr) {
+    return nullptr;
+  }
+  std::string parent;
+  if (!BuildCompoundLhsName(lhs->base, ctx, arena, parent)) return nullptr;
+  return ctx.FindVariable(parent);
+}
+
 // §7.4.4: writes `rhs_val` to the element a multidimensional indexed name such
 // as `a[i][j]` stands for. Answers true when the name is one of that shape --
 // whether it wrote the element or performed §7.4.5's no operation for an index
@@ -134,6 +166,15 @@ bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
   // the object's property map rather than in a variable, so no writer below
   // can reach it and ResolveLhsVariable answers null for the name it rebuilds.
   if (TryWriteClassPropertyBits(lhs, rhs_val, ctx, arena)) return true;
+  // §11.5.1: `mem[0][3] = 1'b1` on a `logic [7:0] mem [0:3]` selects a bit of
+  // the element mem[0], which is a packed object of its own. The writer below
+  // reads such a name as a second array dimension and answers for an element
+  // that does not exist, and the fallback beneath it walks the name down to the
+  // array's base carrier, so the bit reached neither.
+  if (auto* elem = TryResolveCompoundElementBase(lhs, ctx, arena)) {
+    WriteBitSelect(elem, lhs, rhs_val, ctx, arena);
+    return true;
+  }
   if (TryCompoundElementWrite(lhs, rhs_val, ctx, arena)) return true;
   auto* var = ResolveLhsVariable(lhs, ctx);
 
