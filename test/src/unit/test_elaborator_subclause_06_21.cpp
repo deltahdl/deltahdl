@@ -857,25 +857,41 @@ TEST(ScopeAndLifetimeElaboration, TaskScopedDynamicArrayElementNbaIsError) {
       "6.21"));
 }
 
-// The guard rather than a reproduction: a declaration inside a generate block
-// is a module item and takes the route that already worked, so it is reported
-// today and must stay reported -- a change to where declarations are tracked
-// cannot pay for the three above by dropping the scope that was never broken.
-TEST(ScopeAndLifetimeElaboration,
-     GenerateScopedQueueElementNonblockingIsError) {
+// The guards on the other direction: §6.21 names the arrays whose size the
+// declaration does not fix, and a fixed-size unpacked array is not one of them,
+// so a nonblocking write to an element of one stands. This is what the new
+// classification could break, reading a first dimension it cannot place as a
+// dynamically sized one rather than as the fixed-size dimension it is.
+TEST(ScopeAndLifetimeElaboration, BlockScopedFixedArrayElementNbaIsAccepted) {
   ElabFixture f;
-  ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
-      "  if (1) begin : g\n"
-      "    int q[$];\n"
-      "    initial q[0] <= 1;\n"
+      "  initial begin\n"
+      "    int a[0:3];\n"
+      "    a[0] <= 1;\n"
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "nonblocking assignment to element of dynamically sized array", 4,
-      "6.21"));
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §7.4.2's size form, given by a parameter, is the dimension that looks like
+// §7.8's index type and is not one: a bare name. Reading it as an associative
+// array would reject a fixed-size array's element.
+TEST(ScopeAndLifetimeElaboration, BlockScopedParamSizedArrayElementNbaIsOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter int N = 4;\n"
+      "  initial begin\n"
+      "    int a[N];\n"
+      "    a[0] <= 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace
