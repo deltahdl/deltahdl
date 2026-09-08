@@ -348,7 +348,7 @@ static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   if (!stmt->lhs) return;
   if (TryFuncSpecialBlockingAssign(stmt, ctx, arena)) return;
-  uint32_t ctx_width = LhsContextWidth(stmt->lhs, ctx);
+  uint32_t ctx_width = LhsContextWidth(stmt->lhs, ctx, arena);
   ExecFuncWriteValue(stmt->lhs, EvalExpr(stmt->rhs, ctx, arena, ctx_width), ctx,
                      arena);
 }

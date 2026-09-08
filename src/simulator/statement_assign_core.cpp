@@ -302,19 +302,17 @@ bool IsConcatLhs(const Expr* lhs) {
          pat->kind == ExprKind::kAssignmentPattern;
 }
 
-uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx) {
+// §11.6.1 sizes an assignment's context from its left-hand side and §10.7 makes
+// that size the right-hand expression's context, which is the rule
+// ConcatLhsElemWidth states one element at a time. The element rule and the
+// context rule are one rule, written twice: this copy lacked the select clause
+// and answered the whole of `a` for `a[3:0]`, so `{a[3:0], b} = a*b/c` divided
+// in a sixteen-bit context where §11.6.1 gives the concatenation twelve. Said
+// once, the context width and the width UnpackConcatLhs cuts the value into
+// cannot drift apart.
+uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx, Arena& arena) {
   if (!lhs) return 0;
-  // 11.3.6 / 11.6.1: a concatenation target's width is the sum of its operand
-  // widths, and that width is the assignment context the right-hand side is
-  // evaluated in (so `{carry, acc} = rega + regb` adds at the full LHS width
-  // and keeps the carry-out bit).
-  if (lhs->kind == ExprKind::kConcatenation) {
-    uint32_t total = 0;
-    for (auto* elem : lhs->elements) total += LhsContextWidth(elem, ctx);
-    return total;
-  }
-  auto* var = ResolveLhsVariable(lhs, ctx);
-  return var ? var->value.width : 0;
+  return ConcatLhsElemWidth(lhs, ctx, arena);
 }
 
 // §11.9: the struct layout of the union member a tagged expression names, or
@@ -329,7 +327,7 @@ static const StructTypeInfo* TaggedMemberLayout(const StructTypeInfo& sinfo,
 
 Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
-  uint32_t ctx_width = LhsContextWidth(stmt->lhs, ctx);
+  uint32_t ctx_width = LhsContextWidth(stmt->lhs, ctx, arena);
   if (!stmt->rhs || stmt->lhs->kind != ExprKind::kIdentifier) {
     return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
   }

@@ -730,7 +730,7 @@ static void ApplyToConcatElement(const ConcatElemSlot& slot, const Stmt* stmt,
 static uint32_t WalkConcatLhsElements(const Expr* lhs, const Stmt* stmt,
                                       uint32_t bit_offset, SimContext& ctx,
                                       Arena& arena) {
-  uint32_t rhs_width = LhsContextWidth(stmt->lhs, ctx);
+  uint32_t rhs_width = LhsContextWidth(stmt->lhs, ctx, arena);
   for (auto it = lhs->elements.rbegin(); it != lhs->elements.rend(); ++it) {
     const Expr* el = *it;
     uint32_t w = ConcatLhsElemWidth(el, ctx, arena);

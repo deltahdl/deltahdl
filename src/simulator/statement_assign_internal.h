@@ -151,13 +151,18 @@ bool TryUnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
                         SimContext& ctx, Arena& arena);
 
 // Defined in statement_assign_core.cpp; also used by the subroutine-body
-// statement executor in eval_function_body.cpp. §10.7: "The size of the
-// left-hand side of an assignment forms the context for the right-hand
-// expression", and §11.6.1 makes that context part of what sizes the
-// expression. The width of the object the lhs names, or the sum of a
-// concatenation's element widths; 0 where the lhs names nothing this can
-// resolve, which EvalExpr reads as self-determined.
-uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx);
+// statement executor in eval_function_body.cpp, the §11.4.1 compound
+// assignment in eval_expr_assign_ops.cpp and the §10.6 procedural continuous
+// assignments in statement_assign_decl.cpp. §10.7: "The size of the left-hand
+// side of an assignment forms the context for the right-hand expression", and
+// §11.6.1 makes that context part of what sizes the expression. The width of
+// the object the lhs names, the bits §11.5.1 gives a select's indices, or the
+// sum of a concatenation's or assignment pattern's element widths -- the same
+// question ConcatLhsElemWidth answers of one element, asked of the whole lhs,
+// and answered by it. 0 where the lhs names no bits at all, either because
+// nothing here can resolve it or because it is a zero-width part-select, which
+// EvalExpr reads as self-determined.
+uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx, Arena& arena);
 
 // Defined in statement_assign_core.cpp; also used by the §11.4.2 nonblocking
 // path in statement_assign_nonblocking.cpp. Evaluate the rhs with the lhs as

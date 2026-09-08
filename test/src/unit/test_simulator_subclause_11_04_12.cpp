@@ -497,4 +497,119 @@ TEST(ConcatenationSim, LhsConcatZeroWidthPartSelectElementClaimsNoBits) {
   EXPECT_EQ(b->value.ToUint64(), 0xC3u);
 }
 
+// §11.6.1 sizes an expression by the context it stands in, and §10.7 makes an
+// assignment's context "the size of the left-hand side of the assignment", so
+// the concatenation target is what the right-hand expression is evaluated at.
+// Table 11-21 sizes {i,...,j} at L(i)+...+L(j) and §11.5.1 gives a part-select
+// the width its indices name, so `{x[3:0], y}` on two [7:0] variables is a
+// twelve-bit context and not a sixteen-bit one. The width the concatenation
+// hands the expression and the width it cuts the result into are one width, and
+// LhsContextWidth read the resolved variable whole for every element that was
+// not itself a concatenation: eight for `x[3:0]`, where UnpackConcatLhs asks
+// ConcatLhsElemWidth and is told four.
+//
+// Most operators cannot tell the two contexts apart, so most of them prove
+// nothing here. An addition, a multiplication, a bitwise operator or a left
+// shift agrees with itself in its low bits at every width it is computed at, so
+// widening the context leaves the bits the concatenation keeps exactly where
+// they were. Division is where the width reaches the answer: truncating the
+// dividend moves the quotient everywhere and not only above the cut.
+//
+// 200 * 200 = 40000. At twelve bits the product is truncated to 40000 - 9*4096
+// = 3136, and 3136 / 7 = 448 = 12'h1C0. At sixteen 40000 stands, and 40000 / 7
+// = 5714 = 16'h1652. Either value is cut the same way -- `y` takes bits [7:0]
+// and `x[3:0]` bits [11:8] -- so `y` reads 8'hC0 where it read 8'h52, and `x`,
+// preloaded 8'hE0 and keeping the top nibble the select does not name, reads
+// 8'hE1 where it read 8'hE6. The sentinel in `y` is neither answer, so a
+// statement that wrote nothing at all is told from both.
+TEST(ConcatenationSim, LhsConcatSelectElementSizesTheRhsContextByItsOwnWidth) {
+  const char* src =
+      "module t;\n"
+      "  logic [7:0] m, n, d;\n"
+      "  logic [7:0] x, y;\n"
+      "  initial begin\n"
+      "    m = 8'd200;\n"
+      "    n = 8'd200;\n"
+      "    d = 8'd7;\n"
+      "    x = 8'hE0;\n"
+      "    y = 8'h3C;\n"
+      "    {x[3:0], y} = m * n / d;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "x"), 0xE1u);
+  EXPECT_EQ(RunAndGet(src, "y"), 0xC0u);
+}
+
+// How wide the context is and which bits the select writes are two questions,
+// and this is the second one asked while the first one moves. §11.5.1 gives
+// `lo[5:2]` four contiguous bits of `lo` to write and says nothing of the rest
+// of the object, and the indices are the whole of what settles that window, so
+// no width the right-hand side was evaluated at may reach it.
+//
+// The select is the least significant element here rather than the most, which
+// is what lets one case ask both. UnpackConcatLhs counts its offsets up from
+// bit zero, so `lo[5:2]` takes bits [3:0] of the value whatever the value's
+// width turns out to be and `hi` takes bits [11:4] above it. A right shift is
+// §11.6.1's left-width operator -- the result is as wide as its
+// context-determined left operand -- so the truncation of the product is the
+// only thing the context decides and the case stays a claim about bits.
+//
+// `s * u >> 4` is 40000 >> 4 = 2500 = 16'h9C4 in the sixteen bits `hi` plus the
+// whole of `lo` claimed, and (40000 - 9*4096) >> 4 = 3136 >> 4 = 196 = 12'h0C4
+// in the twelve §11.6.1 gives it. Bits [3:0] are 4'h4 in both readings, so
+// `lo`, preloaded 8'hCB = 1100_1011, reads 8'hD3 = 1101_0011 either way: bits
+// [7:6] and [1:0] stand where they stood and the window took 4'b0100. A writer
+// that gave the element the whole variable would read 8'h04 and one that wrote
+// `lo[3:0]` would read 8'hC4, so the value is what says the window did not
+// move. Bits [11:4] are what did move, and `hi` reads 8'h0C where it read
+// 8'h9C.
+TEST(ConcatenationSim,
+     LhsConcatSelectElementWritesItsWindowWhereverTheBoundaryFalls) {
+  const char* src =
+      "module t;\n"
+      "  logic [7:0] s, u;\n"
+      "  logic [7:0] hi, lo;\n"
+      "  initial begin\n"
+      "    s = 8'd200;\n"
+      "    u = 8'd200;\n"
+      "    hi = 8'h3C;\n"
+      "    lo = 8'hCB;\n"
+      "    {hi, lo[5:2]} = s * u >> 4;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "lo"), 0xD3u);
+  EXPECT_EQ(RunAndGet(src, "hi"), 0x0Cu);
+}
+
+// The same expression through a concatenation carrying no select, where the two
+// readings agree and must go on agreeing. `{p, q}` on two [7:0] variables is
+// sixteen bits by Table 11-21 and sixteen bits by the whole-variable widths
+// LhsContextWidth read, so this case passed before the boundary was drawn from
+// the elements' own widths and reads the same values after: it is what says the
+// change reached selects and nothing else.
+//
+// It is the same 40000 / 7 = 5714 = 16'h1652, and `p` takes bits [15:8] while
+// `q` takes bits [7:0], so `p` reads 8'h16 and `q` reads 8'h52. That 8'h52 is
+// the value the case above this pair read out of `y` while the defect stood,
+// which is the defect said twice: a concatenation naming four bits of `x` was
+// dividing in the context this one is entitled to.
+TEST(ConcatenationSim,
+     LhsConcatOfWholeVariablesSizesTheRhsContextTheSameEitherWay) {
+  const char* src =
+      "module t;\n"
+      "  logic [7:0] m, n, d;\n"
+      "  logic [7:0] p, q;\n"
+      "  initial begin\n"
+      "    m = 8'd200;\n"
+      "    n = 8'd200;\n"
+      "    d = 8'd7;\n"
+      "    p = 8'hAA;\n"
+      "    q = 8'h55;\n"
+      "    {p, q} = m * n / d;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "p"), 0x16u);
+  EXPECT_EQ(RunAndGet(src, "q"), 0x52u);
+}
+
 }  // namespace

@@ -212,7 +212,7 @@ Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
   // §7.8.7: as in EvalIncDec, the element this reads and writes is allocated
   // before the read.
   AllocateAssocEntryForModify(expr->lhs, ctx, arena);
-  uint32_t target_width = LhsContextWidth(expr->lhs, ctx);
+  uint32_t target_width = LhsContextWidth(expr->lhs, ctx, arena);
   auto lhs_val = EvalExpr(expr->lhs, ctx, arena);
   auto rhs_val = EvalExpr(expr->rhs, ctx, arena);
   auto base_op = CompoundAssignBaseOp(expr->op);
