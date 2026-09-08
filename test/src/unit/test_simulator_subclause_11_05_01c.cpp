@@ -55,7 +55,9 @@
 
 #include "builders_ast.h"
 #include "fixture_simulator.h"
+#include "helpers_eval_op.h"
 #include "parser/ast.h"
+#include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 
@@ -784,6 +786,115 @@ TEST(ExpressionSim, PartSelectWriteToAClassPropertyLeavesItsUnknownBits) {
       f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToString(), "10101010xxxx1111");
+}
+
+// §11.5.1 spells the two part-select forms separately -- `vect[msb_expr :
+// lsb_expr]` against `down_vect[lsb_base_expr +: width_expr]` -- and the second
+// expression means a different thing in each: an index in the first, a width in
+// the second, where "width_expr shall be a positive constant integer
+// expression". The reader for a select whose first index is x asked neither
+// which form it held and took that expression as the width for both, so the
+// span `a[1'bx : 4]` names was read off the number 4.
+//
+// The clause bounds the span by the declaration rather than by that number:
+// the first index of the non-indexed form is the more significant end of the
+// pair, so on a `logic [7:0]` a select written `[1'bx : 4]` reaches at most
+// bits 7 through 4, four of them, and `[1'bx : 6]` at most bits 7 and 6, two.
+// Both are asserted in one case because either alone is satisfied by the
+// defect: 4 is the answer the old reading gives `[1'bx : 4]` for the wrong
+// reason, and only the second bound, where the two readings part -- span 2
+// against width 6 -- separates them.
+TEST(SelectXZHandling,
+     NonIndexedPartSelectWithAnUnknownFirstBoundSpansIndices) {
+  SimFixture f;
+  auto* v = f.ctx.CreateVariable("nipsv", 8);
+  v->value = MakeLogic4VecVal(f.arena, 8, 0xA5);
+  MakeVar4(f, "nipsi", 4, 0, 1);
+
+  auto* wide = f.arena.Create<Expr>();
+  wide->kind = ExprKind::kSelect;
+  wide->base = MakeId(f.arena, "nipsv");
+  wide->index = MakeId(f.arena, "nipsi");
+  wide->index_end = MakeInt(f.arena, 4);
+  auto wide_result = EvalExpr(wide, f.ctx, f.arena);
+  EXPECT_EQ(wide_result.width, 4u);
+  EXPECT_EQ(wide_result.ToString(), "xxxx");
+
+  auto* narrow = f.arena.Create<Expr>();
+  narrow->kind = ExprKind::kSelect;
+  narrow->base = MakeId(f.arena, "nipsv");
+  narrow->index = MakeId(f.arena, "nipsi");
+  narrow->index_end = MakeInt(f.arena, 6);
+  auto narrow_result = EvalExpr(narrow, f.ctx, f.arena);
+  EXPECT_EQ(narrow_result.width, 2u);
+  EXPECT_EQ(narrow_result.ToString(), "xx");
+}
+
+// §11.5.1: "a part-select that is x or z shall yield the value x when read".
+// The first bound here is x, so that is the whole of the answer, and `r` must
+// read 4'bxxxx.
+//
+// It read 4'b0000, which is the one answer the sentence forbids -- 0 is what a
+// 2-state out-of-range select yields and `r` is `logic`. The route there was
+// the width: `-2` is a unary minus over an unsized decimal, so §11.6.1 gives it
+// 32 bits, the bound came back as 4294967294 through a uint32_t cast, and
+// MakeLogic4Vec's `(width + 63) / 64` wrapped that to a word count of 0. The
+// vector returned claimed 4294967294 bits and held no words, so the resize into
+// `r` copied nothing and left it at its zeroed default. The second bound is out
+// of the object's range, which §11.5.1 covers with the same sentence, and the
+// width the fix answers is the eight bits the declaration has.
+//
+// The assertion is on Logic4Vec::ToString because ToUint64 is the projection
+// src/common/types.h calls "numeric/boolean" and reads 4'bxxxx and 4'b0000
+// alike as 0.
+TEST(SelectXZHandling, NonIndexedPartSelectWithAnUnknownFirstBoundReadsAllX) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [3:0] r;\n"
+      "  initial begin\n"
+      "    a = 8'hA5;\n"
+      "    r = a[1'bx : -2];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "xxxx");
+}
+
+// §11.5.1 makes the base of an indexed part-select the expression that "can
+// vary at run time", so an x base is the ordinary case for these two forms
+// rather than the odd one, and the width stays the number the syntax states.
+// Both forms are here because they are what a fix that stopped reading the
+// second expression as a width outright would break: for `+:` and `-:` it is
+// the width, and 4 is what §11.5.1's "width_expr shall be a positive constant
+// integer expression" makes it whichever way the select runs from its base.
+TEST(SelectXZHandling, IndexedPartSelectWithAnUnknownBaseKeepsItsWidth) {
+  SimFixture f;
+  auto* v = f.ctx.CreateVariable("ipsv", 8);
+  v->value = MakeLogic4VecVal(f.arena, 8, 0xA5);
+  MakeVar4(f, "ipsi", 4, 0, 1);
+
+  auto* up = f.arena.Create<Expr>();
+  up->kind = ExprKind::kSelect;
+  up->base = MakeId(f.arena, "ipsv");
+  up->index = MakeId(f.arena, "ipsi");
+  up->index_end = MakeInt(f.arena, 4);
+  up->is_part_select_plus = true;
+  auto up_result = EvalExpr(up, f.ctx, f.arena);
+  EXPECT_EQ(up_result.width, 4u);
+  EXPECT_EQ(up_result.ToString(), "xxxx");
+
+  auto* down = f.arena.Create<Expr>();
+  down->kind = ExprKind::kSelect;
+  down->base = MakeId(f.arena, "ipsv");
+  down->index = MakeId(f.arena, "ipsi");
+  down->index_end = MakeInt(f.arena, 4);
+  down->is_part_select_minus = true;
+  auto down_result = EvalExpr(down, f.ctx, f.arena);
+  EXPECT_EQ(down_result.width, 4u);
+  EXPECT_EQ(down_result.ToString(), "xxxx");
 }
 
 }  // namespace

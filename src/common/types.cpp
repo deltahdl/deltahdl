@@ -114,7 +114,14 @@ void Logic4Snapshot::Capture(const Logic4Vec& src) {
 }
 
 Logic4Vec MakeLogic4Vec(Arena& arena, uint32_t width) {
-  uint32_t nwords = (width + 63) / 64;
+  // The rounding is done in 64 bits because it overflows in 32: a width above
+  // 0xFFFFFFC0 wrapped `width + 63` back to a small number and answered a word
+  // count far below the one the width needs -- 0 for the widths just under the
+  // maximum -- leaving a vector whose width and nwords disagree and which
+  // Logic4Vec::ToString then reads out of its own allocation. Every width a
+  // declaration can state rounds identically either way.
+  uint32_t nwords =
+      static_cast<uint32_t>((static_cast<uint64_t>(width) + 63) / 64);
   auto* words = arena.AllocArray<Logic4Word>(nwords);
   return {width, nwords, words};
 }

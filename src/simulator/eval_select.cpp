@@ -495,6 +495,40 @@ static Logic4Vec EvalPackedPartSelect(const Expr* expr, const Logic4Vec& base,
                         range.OffsetOf(target.second), arena);
 }
 
+// §11.5.1: how wide a part-select is whose first index is x or z. The clause
+// gives the second expression two meanings and the part-select flags are the
+// whole of what says which one this select carries: for `[base +: width]` and
+// `[base -: width]` it is the width, which "shall be a positive constant
+// integer expression", and for `[msb_expr:lsb_expr]` it is the second index,
+// with the width being the span the two indices name. Reading it as a width for
+// both is what let `a[1'bx : -2]` ask for a vector of 4294967294 bits, since
+// SelectBoundValue's -2 was a width of 4294967294 to a uint32_t cast.
+//
+// The first index is x, so the span is not a number the expression states, and
+// §11.5.1 nonetheless makes it constant: "The width of a part-select is always
+// constant." What bounds it is the declaration. The clause's first index is the
+// more significant end of the pair, so the widest such select the object admits
+// runs from the known second index -- brought inside the range, since a bound
+// outside it addresses no bit of the object -- up to the most significant index
+// there is. A second index at or past that end leaves the one bit the minimum
+// below keeps, which is the same answer §11.5.1 gives a select "completely out
+// of the address bounds": the value x.
+//
+// A base with no declaration of its own is left at the implicit empty range
+// rather than evaluated for its width, since this arm runs before the base is
+// read and evaluating it here would run its side effects a second time.
+static uint32_t UnknownIndexPartSelectWidth(const Expr* expr, SimContext& ctx,
+                                            Arena& arena) {
+  int64_t end_val = SelectBoundValue(EvalExpr(expr->index_end, ctx, arena));
+  if (expr->is_part_select_plus || expr->is_part_select_minus) {
+    return end_val > 0 ? static_cast<uint32_t>(end_val) : 1;
+  }
+  auto range = SelectBaseRange(expr->base, /*width=*/0, ctx, arena);
+  int64_t span =
+      range.OffsetOf(range.left) - range.OffsetOf(range.Clamp(end_val)) + 1;
+  return span > 0 ? static_cast<uint32_t>(span) : 1;
+}
+
 // Computes the result of a select whose index evaluates to x/z. A single-bit
 // select over a known array yields that array's default element; a part-select
 // yields all-x of the part width; a bit-select otherwise yields x or 0
@@ -509,9 +543,7 @@ static Logic4Vec EvalUnknownIndexSelect(const Expr* expr, SimContext& ctx,
   }
 
   if (expr->index_end) {
-    auto w =
-        static_cast<uint32_t>(EvalExpr(expr->index_end, ctx, arena).ToUint64());
-    return MakeAllX(arena, w > 0 ? w : 1);
+    return MakeAllX(arena, UnknownIndexPartSelectWidth(expr, ctx, arena));
   }
   return SelectBaseIs4State(expr, ctx) ? MakeAllX(arena, 1)
                                        : MakeLogic4VecVal(arena, 1, 0);
