@@ -794,4 +794,88 @@ TEST(ScopeAndLifetimeElaboration,
                             "6.21"));
 }
 
+// §6.21 bars a nonblocking write to an element of a dynamically sized array,
+// and says nothing about where the array was declared. A declaration inside a
+// begin-end block is a statement rather than a module item, so it never reached
+// the one site that fills var_array_info_ and the rule went unenforced for
+// every one of them: this module and the one that declares the same queue among
+// its items got two answers to one question.
+TEST(ScopeAndLifetimeElaboration, BlockScopedQueueElementNonblockingIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    int q[$];\n"
+      "    q.push_back(0);\n"
+      "    q[0] <= 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "nonblocking assignment to element of dynamically sized array", 5,
+      "6.21"));
+}
+
+// §7.8's associative array is a second of the three §6.21 names, told by a
+// different first dimension and carried in a different flag, so a fix reaching
+// the queue need not reach it.
+TEST(ScopeAndLifetimeElaboration, BlockScopedAssocElementNonblockingIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    int aa[int];\n"
+      "    aa[5] = 0;\n"
+      "    aa[5] <= 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "nonblocking assignment to element of dynamically sized array", 5,
+      "6.21"));
+}
+
+// The third kind, declared in a subroutine body rather than a begin-end block:
+// a different list of statements, walked by the func_body_stmts arm of the
+// check rather than the body arm.
+TEST(ScopeAndLifetimeElaboration, TaskScopedDynamicArrayElementNbaIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task t1();\n"
+      "    int d[];\n"
+      "    d = new[2];\n"
+      "    d[0] <= 1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "nonblocking assignment to element of dynamically sized array", 5,
+      "6.21"));
+}
+
+// The guard rather than a reproduction: a declaration inside a generate block
+// is a module item and takes the route that already worked, so it is reported
+// today and must stay reported -- a change to where declarations are tracked
+// cannot pay for the three above by dropping the scope that was never broken.
+TEST(ScopeAndLifetimeElaboration,
+     GenerateScopedQueueElementNonblockingIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  if (1) begin : g\n"
+      "    int q[$];\n"
+      "    initial q[0] <= 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "nonblocking assignment to element of dynamically sized array", 4,
+      "6.21"));
+}
+
 }  // namespace

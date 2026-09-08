@@ -587,6 +587,68 @@ void Elaborator::ValidateProceduralNetAssign() {
   }
 }
 
+// §7.8.1 lists the index types an associative array may be keyed by, and the
+// wildcard `*` of §7.8.1. A dimension written as a bare name is one of these or
+// it is §7.4.2's size form given by a parameter, and only the names listed here
+// are read as an index type: an unrecognised one is left as a size, so a
+// declaration this cannot classify goes unreported rather than reported
+// wrongly. A class-keyed or typedef-keyed associative array is therefore among
+// the ones left, which is where the module-item path -- which has the
+// elaborated variable rather than the dimension text -- still answers and this
+// does not.
+static bool IsAssocIndexTypeName(std::string_view name) {
+  return name == "*" || name == "string" || name == "int" ||
+         name == "integer" || name == "byte" || name == "shortint" ||
+         name == "longint";
+}
+
+// §6.21's "dynamically sized array variables" are the three §7.4 admits whose
+// size the declaration does not fix, and the first unpacked dimension is what
+// says which: `[]` reaches the parser as no dimension expression at all, `[$]`
+// and `[$:N]` are §7.10's queue, and an index type is §7.8's associative array.
+// `*dynamic` is set for the dynamic array alone, which is the narrower of the
+// two sets the caller keeps.
+static bool DeclaresDynamicallySizedArray(const Stmt* s, bool* dynamic) {
+  *dynamic = false;
+  if (s->var_unpacked_dims.empty()) return false;
+  const Expr* dim = s->var_unpacked_dims[0];
+  if (dim == nullptr) {
+    *dynamic = true;
+    return true;
+  }
+  if (IsQueueDim(dim)) return true;
+  return dim->kind == ExprKind::kIdentifier && IsAssocIndexTypeName(dim->text);
+}
+
+// The dynamically sized arrays a procedure declares in its own scope. A
+// declaration inside a begin-end block, a loop or fork body, or a subroutine
+// body is a Stmt rather than a ModuleItem, so it never reaches
+// Elaborator::ElaborateVarDecl and never enters var_array_info_, and §6.21's
+// rule went unenforced for every one of them: `initial begin int q[$]; q[0] <=
+// 1; end` elaborated clean where the same queue declared among the module's
+// items is rejected.
+//
+// A bare name set is all this rule needs -- it asks whether any `q` in scope is
+// dynamically sized, and every candidate is forbidden as a nonblocking element
+// target -- so the collision that would come of keying var_array_info_ itself
+// by an unqualified block-scope name, and of handing the wrong `q` to the rules
+// that decide a diagnostic from the shape they find, does not arise here.
+static void CollectProceduralDynamicNames(
+    const Stmt* s, std::unordered_set<std::string_view>& dyn_names,
+    std::unordered_set<std::string_view>& dynsized_names) {
+  if (!s) return;
+  if (s->kind == StmtKind::kVarDecl || s->kind == StmtKind::kBlockItemDecl) {
+    bool dynamic = false;
+    if (DeclaresDynamicallySizedArray(s, &dynamic)) {
+      dynsized_names.insert(s->var_name);
+      if (dynamic) dyn_names.insert(s->var_name);
+    }
+  }
+  ForEachChildStmt(s, [&dyn_names, &dynsized_names](Stmt* const& sub) {
+    CollectProceduralDynamicNames(sub, dyn_names, dynsized_names);
+  });
+}
+
 void Elaborator::ValidateDynamicArrayNba(const ModuleDecl* decl) {
   std::unordered_set<std::string_view> dyn_names;
   std::unordered_set<std::string_view> dynsized_names;
@@ -596,6 +658,14 @@ void Elaborator::ValidateDynamicArrayNba(const ModuleDecl* decl) {
     // dynamically sized and are illegal nonblocking-assignment element targets.
     if (info.is_dynamic || info.is_queue || info.is_assoc)
       dynsized_names.insert(name);
+  }
+  // The two lists below are the ones the check itself walks, so the names a
+  // procedure declares are collected from the same trees the offending
+  // statement is found in, and one pass over each serves both.
+  for (const auto* item : decl->items) {
+    CollectProceduralDynamicNames(item->body, dyn_names, dynsized_names);
+    for (auto* s : item->func_body_stmts)
+      CollectProceduralDynamicNames(s, dyn_names, dynsized_names);
   }
   if (dynsized_names.empty()) return;
   for (const auto* item : decl->items) {
