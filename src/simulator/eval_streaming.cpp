@@ -502,11 +502,27 @@ Logic4Vec EvalAssignmentPattern(const Expr* expr, SimContext& ctx,
   return AssembleConcatParts(parts, total_width, arena);
 }
 
+// §10.9.2 places a member's value at the bits the member occupies in the packed
+// result. DepositBitField resolves the word each bit falls in and carries the
+// bval plane, which is what the two halves of this need: a member of a struct
+// wider than one word sits at a bit offset of 64 or more, where the shift this
+// once made was undefined behaviour rather than a placement, and §6.3.1 lets
+// every bit of a 4-state member be x or z, which a uint64_t value could not
+// express and an OR into aval could not have cleared. ExtractBitField is the
+// coercion the mask here used to be -- §10.9.2 evaluates each member expression
+// "in the context of an assignment to the type of the corresponding member" --
+// zero-filling a narrower value and truncating a wider one across every word
+// rather than the first.
+//
+// The deposit assigns each bit where the placements used to OR into a zeroed
+// result. That is what makes an x depositable at all, and nothing accumulates
+// across placements: §10.9.2's "Every member shall be covered by one of these
+// rules" is exactly what PatternState::assigned enforces, so no two of the
+// three rules write one member's bits.
 static void PlaceFieldValue(Logic4Vec& result, const StructFieldInfo& f,
-                            uint64_t val) {
-  uint64_t mask = (f.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << f.width) - 1;
-  uint64_t bits = (val & mask) << f.bit_offset;
-  result.words[0].aval |= bits;
+                            const Logic4Vec& val, Arena& arena) {
+  DepositBitField(result, f.bit_offset, ExtractBitField(arena, val, 0, f.width),
+                  f.width);
 }
 
 // §10.9.2: when the default: key falls on an unmatched member that is itself a
@@ -515,14 +531,15 @@ static void PlaceFieldValue(Logic4Vec& result, const StructFieldInfo& f,
 // `base` accumulates the enclosing fields' offsets so a leaf member lands at
 // its absolute bit position within the packed result.
 static void PlaceDefaultValue(Logic4Vec& result, const StructFieldInfo& f,
-                              uint32_t base, uint64_t val) {
+                              uint32_t base, const Logic4Vec& val,
+                              Arena& arena) {
   if (f.nested) {
     for (const auto& sub : f.nested->fields)
-      PlaceDefaultValue(result, sub, base + f.bit_offset, val);
+      PlaceDefaultValue(result, sub, base + f.bit_offset, val, arena);
     return;
   }
-  uint64_t mask = (f.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << f.width) - 1;
-  result.words[0].aval |= (val & mask) << (base + f.bit_offset);
+  DepositBitField(result, base + f.bit_offset,
+                  ExtractBitField(arena, val, 0, f.width), f.width);
 }
 
 static DataTypeKind TypeKeyToKind(std::string_view key) {
@@ -565,7 +582,7 @@ static void ApplyMemberKeys(const Expr* expr, const StructTypeInfo* info,
     auto val = EvalExpr(expr->elements[i], s.ctx, s.arena);
     for (size_t fi = 0; fi < info->fields.size(); ++fi) {
       if (info->fields[fi].name != key) continue;
-      PlaceFieldValue(s.result, info->fields[fi], val.ToUint64());
+      PlaceFieldValue(s.result, info->fields[fi], val, s.arena);
       s.assigned[fi] = true;
       break;
     }
@@ -586,7 +603,7 @@ static void ApplyTypeKeys(const Expr* expr, const StructTypeInfo* info,
     auto val = EvalExpr(expr->elements[i], s.ctx, s.arena);
     for (size_t fi = 0; fi < info->fields.size(); ++fi) {
       if (s.assigned[fi] || info->fields[fi].type_kind != kind) continue;
-      PlaceFieldValue(s.result, info->fields[fi], val.ToUint64());
+      PlaceFieldValue(s.result, info->fields[fi], val, s.arena);
       s.assigned[fi] = true;
     }
   }
@@ -600,7 +617,7 @@ static void ApplyDefaultKey(const Expr* expr, const StructTypeInfo* info,
     auto val = EvalExpr(expr->elements[i], s.ctx, s.arena);
     for (size_t fi = 0; fi < info->fields.size(); ++fi) {
       if (s.assigned[fi]) continue;
-      PlaceDefaultValue(s.result, info->fields[fi], 0, val.ToUint64());
+      PlaceDefaultValue(s.result, info->fields[fi], 0, val, s.arena);
     }
     return;
   }
@@ -638,7 +655,7 @@ Logic4Vec EvalStructPatternValue(const Expr* expr, const StructTypeInfo* info,
     auto result = MakeLogic4Vec(arena, info->total_width);
     for (size_t i = 0; i < info->fields.size(); ++i) {
       auto val = EvalExpr(expr->elements[i], ctx, arena);
-      PlaceFieldValue(result, info->fields[i], val.ToUint64());
+      PlaceFieldValue(result, info->fields[i], val, arena);
     }
     return result;
   }

@@ -1,3 +1,7 @@
+#include <cstdint>
+#include <string>
+#include <string_view>
+
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
@@ -8,6 +12,105 @@
 using namespace delta;
 
 namespace {
+
+// The struct the wide cases are written over. BuildStructTypeInfo lays a packed
+// struct out from the top down, so the first-declared member sits at the
+// highest bit offset: `a` is at bit 64, above the first word, which is where a
+// placement confined to words[0] had nowhere to put it. `w1` takes the keyed
+// spelling and `w2` the positional one.
+std::string WideStructSource(std::string_view body) {
+  return std::string(
+             "module t;\n"
+             "  typedef struct packed {\n"
+             "    logic [7:0] a;\n"
+             "    logic [63:0] b;\n"
+             "  } wide_t;\n"
+             "  wide_t w1, w2;\n"
+             "  initial begin\n") +
+         std::string(body) +
+         "  end\n"
+         "endmodule\n";
+}
+
+// §10.9.2: "A member:value specifies an explicit value for a named member of
+// the structure", and the member is the bits the member occupies. 8'hA5 and
+// 64'h42 are chosen so that the answer a placement into words[0] alone gave --
+// the two ORed together, 0xE7 -- is neither of them, and so that a case using
+// all-ones values could not pass on the OR by accident.
+TEST(StructPatternSimulation,
+     WideStructNamedPatternPlacesAMemberAboveTheFirstWord) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      WideStructSource("    w1 = '{a: 8'hA5, b: 64'h42};\n"), f, "w1");
+  ASSERT_NE(var, nullptr);
+  ASSERT_EQ(var->value.nwords, 2u);
+  EXPECT_EQ(var->value.words[1].aval, 0xA5u);
+  EXPECT_EQ(var->value.words[0].aval, 0x42u);
+  // No unknown was invented on the way.
+  EXPECT_EQ(var->value.words[1].bval, 0u);
+  EXPECT_EQ(var->value.words[0].bval, 0u);
+}
+
+// §6.3.1: "All bits of 4-state vectors can be independently set to one of the
+// four basic values", and §10.9.2 evaluates a member expression in the context
+// of an assignment to the member, which for a logic member carries x and z.
+// `b`'s known 0x42 is what makes this discriminating: a result that came out
+// all-x or all-0 fails, and only the per-member answer passes.
+TEST(StructPatternSimulation, NamedStructPatternCarriesAnUnknownMemberValue) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "  pair_t p;\n"
+      "  initial begin\n"
+      "    p = '{a: 8'bxxxxxxxx, b: 8'h42};\n"
+      "  end\n"
+      "endmodule\n",
+      f, "p");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "xxxxxxxx01000010");
+}
+
+// The two spellings of one §10.9.2 pattern over one value. The positional form
+// falls through to EvalAssignmentPattern, which copies every word and both
+// planes, so it is the one that was already right: the assertion states the
+// disagreement rather than an expected value, and a fix reaching only the
+// keyed arm leaves it standing.
+TEST(StructPatternSimulation,
+     WideStructNamedPatternAgreesWithThePositionalSpelling) {
+  SimFixture f;
+  auto* design =
+      ElaborateSrc(WideStructSource("    w1 = '{a: 8'bxxxxxxxx, b: 64'h42};\n"
+                                    "    w2 = '{8'bxxxxxxxx, 64'h42};\n"),
+                   f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* keyed = f.ctx.FindVariable("w1");
+  auto* positional = f.ctx.FindVariable("w2");
+  ASSERT_NE(keyed, nullptr);
+  ASSERT_NE(positional, nullptr);
+  ASSERT_EQ(keyed->value.nwords, positional->value.nwords);
+  for (uint32_t i = 0; i < keyed->value.nwords; ++i) {
+    SCOPED_TRACE(testing::Message() << "word " << i);
+    EXPECT_EQ(keyed->value.words[i].aval, positional->value.words[i].aval);
+    EXPECT_EQ(keyed->value.words[i].bval, positional->value.words[i].bval);
+  }
+}
+
+// §10.9.2's default: key reaches its own placement function, with its own
+// offset accumulation for a nested substructure, so the member above the first
+// word has to be asked of that one separately. 8'hA5 widens to the 64-bit
+// member as an assignment to it would.
+TEST(StructPatternSimulation,
+     WideStructDefaultKeyPlacesEveryMemberAboveTheFirstWord) {
+  SimFixture f;
+  auto* var =
+      RunAndFindVar(WideStructSource("    w1 = '{default: 8'hA5};\n"), f, "w1");
+  ASSERT_NE(var, nullptr);
+  ASSERT_EQ(var->value.nwords, 2u);
+  EXPECT_EQ(var->value.words[1].aval, 0xA5u);
+  EXPECT_EQ(var->value.words[0].aval, 0xA5u);
+}
 
 TEST(StructPatternSimulation, NamedStructPatternWithDefault) {
   SimFixture f;
