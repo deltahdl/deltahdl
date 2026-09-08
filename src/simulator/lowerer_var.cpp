@@ -71,16 +71,23 @@ static uint8_t StringLiteralByteAt(const Logic4Vec& packed, uint32_t i) {
   return static_cast<uint8_t>((packed.words[word].aval >> bit) & 0xFF);
 }
 
+// §6.8, Table 6-7: the value an element left without one takes -- the default
+// initial value of its own type, 'x for a 4-state integral and '0 for a 2-state
+// one. An element is a variable of the array's element type, so the rule
+// reaches it exactly as it reaches a scalar declared alongside; only the
+// 2-state case is zero. Both of this function's callers write the same rule,
+// and the two makers of array leaves have already drifted once over a
+// per-element property of exactly this kind (the is_4state/is_signed flags), so
+// it is written once.
+static Logic4Vec Table67ElementDefault(const RtlirVariable& var, Arena& arena) {
+  return var.is_4state ? MakeAllX(arena, var.width)
+                       : MakeLogic4VecVal(arena, var.width, 0);
+}
+
 static void InitArrayElement(const RtlirVariable& var, uint32_t elem_idx,
                              Variable* elem, SimContext& ctx, Arena& arena) {
-  // Table 6-7: an element left without a value takes the default initial value
-  // of its own type -- 'x for a 4-state integral, '0 for a 2-state one. An
-  // element is a variable of the array's element type, so the rule reaches it
-  // exactly as it reaches a scalar declared alongside; only the 2-state case
-  // is zero.
   if (!var.init_expr) {
-    elem->value = var.is_4state ? MakeAllX(arena, var.width)
-                                : MakeLogic4VecVal(arena, var.width, 0);
+    elem->value = Table67ElementDefault(var, arena);
     return;
   }
 
@@ -101,8 +108,7 @@ static void InitArrayElement(const RtlirVariable& var, uint32_t elem_idx,
   }
   // Past the end of the pattern's items no value was supplied for this element
   // either, so Table 6-7 governs it the same way.
-  elem->value = var.is_4state ? MakeAllX(arena, var.width)
-                              : MakeLogic4VecVal(arena, var.width, 0);
+  elem->value = Table67ElementDefault(var, arena);
 }
 
 static void InitArrayFromReplicate(const RtlirVariable& var, uint32_t elem_idx,
@@ -121,62 +127,69 @@ static void InitArrayFromReplicate(const RtlirVariable& var, uint32_t elem_idx,
                     var.width, arena);
 }
 
-static bool InitArrayFromIndexKey(const Expr* init, uint32_t idx,
-                                  Variable* elem, SimContext& ctx,
-                                  Arena& arena) {
-  for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
-    if (i >= init->elements.size()) break;
-    const auto* key = init->pattern_keys[i];
+// §10.9.1: "An index:value specifies an explicit value for a keyed element
+// index." The clause makes it "an error to specify the same index more than
+// once in a single array pattern expression", so the first key that names this
+// element is the only one that can. Null when no index key names it.
+static const Expr* FindIndexKeyedItem(const Expr* pat, uint32_t idx,
+                                      SimContext& ctx, Arena& arena) {
+  for (size_t i = 0; i < pat->pattern_keys.size(); ++i) {
+    if (i >= pat->elements.size()) break;
+    const auto* key = pat->pattern_keys[i];
     if (key->text == "default" || IsTypeKeyword(key->text)) continue;
-    if (PatternKeyIndex(key, ctx, arena) == idx) {
-      elem->value = EvalExpr(init->elements[i], ctx, arena);
-      return true;
-    }
+    if (PatternKeyIndex(key, ctx, arena) == idx) return pat->elements[i];
   }
-  return false;
+  return nullptr;
 }
 
-static bool InitArrayFromTypeKey(const Expr* init, DataTypeKind elem_type_kind,
-                                 Variable* elem, SimContext& ctx,
+// §10.9.1: "For type:value, if the element or subarray type of the array
+// matches this type, then each element or subarray that has not already been
+// set by an index key above shall be set to the value." Null when no type key
+// matches this kind.
+static const Expr* FindTypeKeyedItem(const Expr* pat, DataTypeKind kind) {
+  for (size_t i = 0; i < pat->pattern_keys.size(); ++i) {
+    if (i >= pat->elements.size()) break;
+    auto key = pat->pattern_keys[i]->text;
+    if (IsTypeKeyword(key) && TypeKeyMatchesKind(key, kind))
+      return pat->elements[i];
+  }
+  return nullptr;
+}
+
+// §10.9.1: "The default:value applies to elements or subarrays that are not
+// matched by either index or type key." Null when the pattern writes no
+// default key.
+static const Expr* FindDefaultKeyedItem(const Expr* pat) {
+  for (size_t i = 0; i < pat->pattern_keys.size(); ++i) {
+    if (i >= pat->elements.size()) break;
+    if (pat->pattern_keys[i]->text == "default") return pat->elements[i];
+  }
+  return nullptr;
+}
+
+// §10.9.1's three matching rules, asked in the order the clause writes them:
+// index key, then type key, then default. Null when none of them covers this
+// element -- which the clause forbids ("Every element shall be covered by one
+// of these rules"), so it is a malformed pattern rather than a defined value.
+static const Expr* FindKeyedItem(const Expr* pat, uint32_t idx,
+                                 DataTypeKind kind, SimContext& ctx,
                                  Arena& arena) {
-  for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
-    if (i >= init->elements.size()) break;
-    auto key = init->pattern_keys[i]->text;
-    if (IsTypeKeyword(key) && TypeKeyMatchesKind(key, elem_type_kind)) {
-      elem->value = EvalExpr(init->elements[i], ctx, arena);
-      return true;
-    }
-  }
-  return false;
-}
-
-static bool InitArrayFromDefaultKey(const Expr* init, Variable* elem,
-                                    SimContext& ctx, Arena& arena) {
-  for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
-    if (i >= init->elements.size()) break;
-    if (init->pattern_keys[i]->text == "default") {
-      elem->value = EvalExpr(init->elements[i], ctx, arena);
-      return true;
-    }
-  }
-  return false;
+  if (const Expr* item = FindIndexKeyedItem(pat, idx, ctx, arena)) return item;
+  if (const Expr* item = FindTypeKeyedItem(pat, kind)) return item;
+  return FindDefaultKeyedItem(pat);
 }
 
 static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
                                Variable* elem, SimContext& ctx, Arena& arena) {
-  auto* init = var.init_expr;
-
-  // §10.9.1: index, type, and default keys resolve a value that is then
-  // evaluated in the assignment context of the element, so coerce the chosen
-  // value to the element width (no-op when it already matches). An element
-  // covered by none of the keys keeps the zero default at the element width.
-  if (InitArrayFromIndexKey(init, idx, elem, ctx, arena) ||
-      InitArrayFromTypeKey(init, var.elem_type_kind, elem, ctx, arena) ||
-      InitArrayFromDefaultKey(init, elem, ctx, arena)) {
-    elem->value = ResizeToWidth(elem->value, var.width, arena);
-    return;
-  }
-  elem->value = MakeLogic4VecVal(arena, var.width, 0);
+  // §10.9.1: a key resolves a value that is then evaluated in the assignment
+  // context of the element, so coerce the chosen value to the element width
+  // (no-op when it already matches). An element covered by none of the keys
+  // keeps the zero default at the element width.
+  const Expr* item =
+      FindKeyedItem(var.init_expr, idx, var.elem_type_kind, ctx, arena);
+  elem->value =
+      item ? ResizeToWidth(EvalExpr(item, ctx, arena), var.width, arena)
+           : MakeLogic4VecVal(arena, var.width, 0);
 }
 
 namespace {
@@ -189,29 +202,126 @@ struct MultiDimArray {
 };
 }  // namespace
 
-// §7.4.2: recursively create one leaf variable per element of a fixed
-// multidimensional unpacked array, named arr[i0][i1]... in row-major order so a
-// compound select (eval_select.cpp) and a nested assignment pattern resolve to
-// it. §6.8's Table 6-7 gives an untouched 2-state integral leaf '0 and a
-// 4-state one 'x, which is the x CreateVariable seeds.
-static void CreateMultiDimLeaves(const MultiDimArray& m,
-                                 const std::string& prefix, size_t d) {
-  const auto& sizes = m.var.unpacked_dim_sizes;
-  if (d == sizes.size()) {
-    auto* stored = m.arena.Create<std::string>(prefix);
-    auto* elem = m.ctx.CreateVariable(*stored, m.var.width);
-    RecordPackedRange(m.var.dtype, elem, m.ctx, m.arena);
-    elem->is_4state = m.var.is_4state;
-    elem->is_signed = m.var.is_signed;
+// §10.9.1: "A syntax resembling replications ... can be used in array
+// assignment patterns as well. Each replication shall represent an entire
+// single dimension." A replicated item is therefore not one element's value but
+// the body of the dimension it stands for, cycled across that dimension's
+// positions -- which is what makes the clause's own `'{2{'{3{y}}}}` the same as
+// `'{'{y,y,y},'{y,y,y}}`. Null when this pattern is not the replicated form.
+static const std::vector<Expr*>* ReplicateBody(const Expr* pat) {
+  if (!pat->pattern_keys.empty()) return nullptr;
+  if (pat->elements.size() != 1) return nullptr;
+  if (pat->elements[0]->kind != ExprKind::kReplicate) return nullptr;
+  const auto& body = pat->elements[0]->elements;
+  return body.empty() ? nullptr : &body;
+}
+
+// §10.9.1: "the braces shall match the array dimensions", so an item that is
+// itself a brace pattern is the sub-pattern of the next dimension in. Anything
+// else is a value, which is what a type or default key resolves to for a whole
+// subarray -- the clause applies those "recursively ... to each of its elements
+// or subarrays", so such a value reaches every leaf beneath it.
+static bool IsDimPattern(const Expr* item) {
+  return item->kind == ExprKind::kAssignmentPattern ||
+         item->kind == ExprKind::kConcatenation;
+}
+
+// §10.9: only a brace pattern matches the array's dimensions, so only one is
+// distributed into the leaves; a typed assignment pattern expression
+// (`T'{...}`) parses as a cast wrapping one, so unwrap that first. Null for a
+// declaration with no initializer, or one whose initializer is not a pattern at
+// all.
+static const Expr* ArrayInitPattern(const Expr* init) {
+  if (!init) return nullptr;
+  if (init->kind == ExprKind::kCast && init->lhs && IsDimPattern(init->lhs))
+    return init->lhs;
+  return IsDimPattern(init) ? init : nullptr;
+}
+
+// §10.9.1: the item of `pat` that fills one dimension's element at address
+// `idx`, position `pos` within that dimension. All three item forms the clause
+// admits are read here -- keyed, replicated, and positional -- so the descent
+// below meets the same three the single-dimension maker does. Null when the
+// pattern supplies nothing for this element.
+static const Expr* SelectDimItem(const Expr* pat, uint32_t idx, uint32_t pos,
+                                 const MultiDimArray& m) {
+  if (!pat->pattern_keys.empty())
+    return FindKeyedItem(pat, idx, m.var.elem_type_kind, m.ctx, m.arena);
+  if (const auto* body = ReplicateBody(pat)) return (*body)[pos % body->size()];
+  return pos < pat->elements.size() ? pat->elements[pos] : nullptr;
+}
+
+// Materializes one leaf variable of the array and gives it the value of the
+// pattern item that reached it, or §6.8 Table 6-7's default when none did.
+static void CreateMultiDimLeaf(const MultiDimArray& m, const std::string& name,
+                               const Expr* item) {
+  auto* stored = m.arena.Create<std::string>(name);
+  auto* elem = m.ctx.CreateVariable(*stored, m.var.width);
+  RecordPackedRange(m.var.dtype, elem, m.ctx, m.arena);
+  elem->is_4state = m.var.is_4state;
+  elem->is_signed = m.var.is_signed;
+  if (!item) {
+    // §6.8, Table 6-7: nothing covered this leaf, so it keeps the default
+    // initial value of its type -- the 'x CreateVariable seeded for a 4-state
+    // element (masked to the width there, which MakeAllX does not do), and '0
+    // for a 2-state one. Exactly what an uncovered leaf held before this walk
+    // carried an initializer at all.
     if (!m.var.is_4state)
       elem->value = MakeLogic4VecVal(m.arena, m.var.width, 0);
     return;
   }
+  // §10.9.1: "Each expression item shall be evaluated in the context of an
+  // assignment to the type of the corresponding element in the array", so the
+  // item is coerced to the element width (a no-op when they already match).
+  // §6.8 then makes the leaf "an abstraction of a data storage element" that
+  // stores a value of its own, so it takes its own words: a bare item name of
+  // the leaf's width is answered with that variable's Logic4Vec, ResizeToWidth
+  // hands it straight back, and without the copy every leaf of
+  // `'{2{'{3{y}}}}` would share y's storage.
+  elem->value = OwnRhsWords(
+      ResizeToWidth(EvalExpr(item, m.ctx, m.arena), m.var.width, m.arena),
+      m.arena);
+}
+
+// §7.4.2: recursively create one leaf variable per element of a fixed
+// multidimensional unpacked array, named arr[i0][i1]... in row-major order so a
+// compound select (eval_select.cpp) and a nested assignment pattern resolve to
+// it. `item` is the part of the declaration initializer that reached this
+// subtree: §10.9.1 has "the braces shall match the array dimensions", so the
+// initializer is a tree of the array's own shape and the walk carries the
+// sub-pattern for the current dimension down beside the prefix it already
+// carried. This is the step the two makers of array leaves differed by -- the
+// single-dimension one applied the initializer and this one never read it, so
+// the clause's own `int n[1:2][1:3] = '{2{'{3{y}}}};` read 0 at all six leaves.
+// A leaf no item reaches keeps §6.8 Table 6-7's default, unchanged.
+static void CreateMultiDimLeaves(const MultiDimArray& m,
+                                 const std::string& prefix, size_t d,
+                                 const Expr* item) {
+  const auto& sizes = m.var.unpacked_dim_sizes;
+  if (d == sizes.size()) {
+    CreateMultiDimLeaf(m, prefix, item);
+    return;
+  }
+  const auto& dim = m.var.unpacked_dims[d];
   // §11.5.2 counts an address from the smaller of the two bounds the
-  // declaration wrote, whichever way round it wrote them.
-  int64_t lo = m.var.unpacked_dims[d].Low();
+  // declaration wrote, whichever way round it wrote them, while §10.9.1 counts
+  // a pattern's positional items from the dimension's left bound. A descending
+  // dimension therefore takes them the other way round, exactly as the
+  // single-dimension maker's pat_idx does; is_descending on the variable
+  // describes only the first dimension, so each dimension is asked its own
+  // bounds instead.
+  bool descending = dim.left > dim.right;
+  const Expr* pat = (item != nullptr && IsDimPattern(item)) ? item : nullptr;
   for (uint32_t i = 0; i < sizes[d]; ++i) {
-    CreateMultiDimLeaves(m, prefix + "[" + std::to_string(lo + i) + "]", d + 1);
+    int64_t idx = dim.Low() + i;
+    // A value standing where this dimension's braces were expected is a whole
+    // subarray's value, so it passes down unchanged to every leaf beneath.
+    const Expr* sub =
+        pat ? SelectDimItem(pat, static_cast<uint32_t>(idx),
+                            descending ? (sizes[d] - 1 - i) : i, m)
+            : item;
+    CreateMultiDimLeaves(m, prefix + "[" + std::to_string(idx) + "]", d + 1,
+                         sub);
   }
 }
 
@@ -239,7 +349,8 @@ static bool TryCreateMultiDimArray(std::string_view name,
   }
   info.dim_sizes = var.unpacked_dim_sizes;
   ctx.RegisterArray(name, info);
-  CreateMultiDimLeaves(MultiDimArray{var, ctx, arena}, std::string(name), 0);
+  CreateMultiDimLeaves(MultiDimArray{var, ctx, arena}, std::string(name), 0,
+                       ArrayInitPattern(var.init_expr));
   return true;
 }
 

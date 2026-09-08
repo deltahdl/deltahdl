@@ -589,4 +589,129 @@ TEST(ArrayLiteralSim, IndexKeyedVariableIsCopiedNotAliased) {
   EXPECT_EQ(e1->value.ToUint64(), 0x0Fu);
 }
 
+// The six leaf pointers of a [1:2][1:3] unpacked array, the shape §10.9.1's own
+// replication example declares. The bounds the declaration wrote are what name
+// a leaf, so the leaves run arr[1][1] to arr[2][3] and there is no arr[0][0];
+// e[i][j] here is the leaf at the declared indices i+1 and j+1.
+struct Array2x3 {
+  Variable* e[2][3] = {};
+};
+
+// Elaborates and runs `src`, then returns the six leaves of the [1:2][1:3]
+// array `name`. A leaf the run never declared comes back null, so a caller
+// asserts on the pointer before reading a value, and each test keeps its own
+// per-leaf expectations local.
+Array2x3 RunAndFetch2x3(const std::string& src, SimFixture& f,
+                        std::string_view name) {
+  auto* design = ElaborateSrc(src, f);
+  EXPECT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  Array2x3 out;
+  for (int i = 0; i < 2; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      auto leaf = std::string(name) + "[" + std::to_string(i + 1) + "][" +
+                  std::to_string(j + 1) + "]";
+      out.e[i][j] = f.ctx.FindVariable(leaf);
+      EXPECT_NE(out.e[i][j], nullptr) << leaf;
+    }
+  }
+  return out;
+}
+
+// §10.9.1 writes its replication example as a declaration initializer:
+// `int n[1:2][1:3] = '{2{'{3{y}}}};  // same as '{'{y,y,y},'{y,y,y}}`. The
+// clause's `y` is a parameter here, a static variable's declaration initializer
+// being evaluated once before time zero and so needing a constant expression.
+// The leaves of a multidimensional array are made by a walk of their own,
+// separate from the one that applies a single-dimension declaration
+// initializer, and this is the case that asks whether that walk reads the
+// initializer at all: a walk that does not read it leaves every leaf at §6.8
+// Table 6-7's no-initializer default, which for the 2-state int is '0. That is
+// why y is 7 and not 0 -- a leaf holding a written 0 and a leaf the initializer
+// never reached read alike. Every bit of an int leaf is known, so ToUint64,
+// which projects aval & ~bval, reads the whole of one.
+TEST(ArrayLiteralSim, NestedReplicationVarInitFillsEveryLeaf) {
+  SimFixture f;
+  Array2x3 n = RunAndFetch2x3(
+      "module m;\n"
+      "  parameter int y = 7;\n"
+      "  int n [1:2][1:3] = '{2{'{3{y}}}};\n"
+      "endmodule\n",
+      f, "n");
+  for (int i = 0; i < 2; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      ASSERT_NE(n.e[i][j], nullptr) << i << " " << j;
+      EXPECT_EQ(n.e[i][j]->value.ToUint64(), 7u) << i << " " << j;
+    }
+  }
+}
+
+// §10.9.1: "The expressions shall match element for element, and the braces
+// shall match the array dimensions." A nested positional pattern in a
+// declaration initializer therefore has an order to get right as well as a set
+// of values: the outer pattern's first item is the subarray at the first index
+// of the outer dimension, and within it the items run across the inner
+// dimension. The declared bounds start at 1, so the first leaf is g[1][1] and
+// the sixth g[2][3]; six distinct nonzero bytes tell a leaf that took the right
+// item from one that took a neighbour's, and tell either from the 2-state '0 of
+// §6.8's Table 6-7 that a leaf keeps when the initializer never reaches it.
+// Every bit of a bit [7:0] leaf is known, so ToUint64 reads all eight.
+TEST(ArrayLiteralSim, PositionalNestedVarInitIsRowMajor) {
+  SimFixture f;
+  Array2x3 g = RunAndFetch2x3(
+      "module m;\n"
+      "  bit [7:0] g [1:2][1:3] = '{'{8'h11, 8'h22, 8'h33},\n"
+      "                             '{8'h44, 8'h55, 8'h66}};\n"
+      "endmodule\n",
+      f, "g");
+  ASSERT_NE(g.e[0][0], nullptr);
+  ASSERT_NE(g.e[0][1], nullptr);
+  ASSERT_NE(g.e[0][2], nullptr);
+  ASSERT_NE(g.e[1][0], nullptr);
+  ASSERT_NE(g.e[1][1], nullptr);
+  ASSERT_NE(g.e[1][2], nullptr);
+  EXPECT_EQ(g.e[0][0]->value.ToUint64(), 0x11u);
+  EXPECT_EQ(g.e[0][1]->value.ToUint64(), 0x22u);
+  EXPECT_EQ(g.e[0][2]->value.ToUint64(), 0x33u);
+  EXPECT_EQ(g.e[1][0]->value.ToUint64(), 0x44u);
+  EXPECT_EQ(g.e[1][1]->value.ToUint64(), 0x55u);
+  EXPECT_EQ(g.e[1][2]->value.ToUint64(), 0x66u);
+}
+
+// §10.9.1 describes one array pattern, and nothing in the clause distinguishes
+// the pattern that initializes an array in its declaration from the pattern a
+// procedural assignment gives the same array: both "match element for element",
+// so both arrays here have to end the run holding the same six values. Writing
+// the two in one module is what makes the reading exact. Should the leaves of
+// `d` differ from the leaves of `p`, the difference is between a declaration
+// and a statement and not between one array shape and another, the two arrays
+// being declared alike; and should both hold the values, no route to a leaf has
+// been left out. The values run 10 to 60 so that a leaf reading 0 is a leaf
+// nothing wrote rather than a leaf written from the pattern. Both arrays are
+// int, every bit known, so ToUint64 reads each leaf whole.
+TEST(ArrayLiteralSim, VarInitLeafMatchesProceduralAssignLeaf) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int d [1:2][1:3] = '{'{10, 20, 30}, '{40, 50, 60}};\n"
+      "  int p [1:2][1:3];\n"
+      "  initial p = '{'{10, 20, 30}, '{40, 50, 60}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  for (int i = 1; i <= 2; ++i) {
+    for (int j = 1; j <= 3; ++j) {
+      auto suffix = "[" + std::to_string(i) + "][" + std::to_string(j) + "]";
+      auto* declared = f.ctx.FindVariable("d" + suffix);
+      auto* assigned = f.ctx.FindVariable("p" + suffix);
+      ASSERT_NE(declared, nullptr) << suffix;
+      ASSERT_NE(assigned, nullptr) << suffix;
+      uint64_t want = static_cast<uint64_t>(((i - 1) * 3 + j) * 10);
+      EXPECT_EQ(assigned->value.ToUint64(), want) << suffix;
+      EXPECT_EQ(declared->value.ToUint64(), want) << suffix;
+    }
+  }
+}
+
 }  // namespace
