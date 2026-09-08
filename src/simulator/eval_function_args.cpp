@@ -394,7 +394,24 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
                          Arena& arena) {
   const Expr* expr = actual.expr;
   int arg_index = actual.index;
-  auto val = ResolveArgValue(param, expr, arg_index, ctx, arena);
+  // §6.8: a variable is "an abstraction of a data storage element" that
+  // "shall store a value from one assignment to the next", and the formal is a
+  // second one. EvalExpr answers a bare identifier, an unpacked-array element
+  // select and a class property with the source's own Logic4Vec, and a
+  // Logic4Vec copies its words pointer, so a formal took the actual's storage.
+  // The coercion below is what shows it: §6.11.2 converts "any unknown or
+  // high-impedance bits ... to zeros", and it must convert the formal's copy --
+  // `note(x)` with a `bit [7:0]` formal cleared the caller's x inside a call
+  // that only read it.
+  //
+  // The copy is taken here, where the value is produced, rather than around the
+  // resize below. That resize runs only on a width mismatch and returns its
+  // argument untouched when the widths already match, which is precisely the
+  // aliased case, so a copy placed within it would leave the defect. Here it
+  // also covers the static formal's own store and coercion, which
+  // TryReuseStaticFormal reaches before the resize's result gets that far.
+  auto val =
+      OwnRhsWords(ResolveArgValue(param, expr, arg_index, ctx, arena), arena);
   const auto& dt = param.data_type;
   if (dt.kind != DataTypeKind::kImplicit) {
     uint32_t formal_width = EvalFormalArgWidth(dt, ctx, arena);
