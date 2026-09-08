@@ -60,13 +60,16 @@ struct FieldTarget {
     kNoOp,      // storage that takes no value -- a write to a member of a
                 // tagged union carrying another tag (§11.9), already reported
     kBits,      // a window of bits inside a packed struct or union variable
+    kVariable,  // a whole variable of its own: a component of the interface
+                // instance a virtual interface is bound to (§25.9)
     kProperty,  // a property of one class object (§8.5)
     kStatic,    // a static property of one class type (§8.9)
   };
   Kind kind = Kind::kNone;
 
   // kBits: the variable holding the packed object, and the window of it the
-  // member occupies.
+  // member occupies. kVariable: the whole variable the path named, which owns
+  // every bit of its own storage, so the window fields say nothing about it.
   Variable* var = nullptr;
   uint32_t bit_offset = 0;
   uint32_t width = 0;

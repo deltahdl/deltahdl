@@ -16,6 +16,7 @@
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_expr_internal.h"
+#include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -272,6 +273,55 @@ static FieldTarget ResolveStaticClassField(std::string_view base_name,
   return target;
 }
 
+// The component field_name of the interface instance the virtual interface
+// variable base_name is bound to. §25.9: "Once a virtual interface has been
+// initialized, all the components of the underlying interface instance are
+// directly available to the virtual interface via the dot notation. These
+// components can only be used in procedural statements", and an assignment is
+// such a statement -- the clause's own example writes `bus.req <= 1'b1`. The
+// component belongs to the instance, so the path names that instance's own
+// variable and the write lands there.
+//
+// One arm serves both assignment forms, because both reach here: the blocking
+// one through WriteStructField, which resolves and deposits at the one moment,
+// and the nonblocking one through ScheduleFieldNba, which asks this alone when
+// the statement executes and defers only the deposit. That is also where
+// §10.4.2 wants a "virtual interface reference" in an lvalue evaluated, "at the
+// same time as the expression on the right-hand side", so the binding read
+// here is the one in force when the statement ran, not the one in the update
+// region.
+//
+// *handled is set true when base_name names a virtual interface variable,
+// bound or not. An unbound one is the null reference §25.9 makes a runtime
+// error -- the same one a read through it raises -- reported here and resolved
+// to storage that takes no value, so the caller sees a handled path rather
+// than an unwritten one it would report again or drop in silence.
+static FieldTarget ResolveVirtualInterfaceField(std::string_view base_name,
+                                                std::string_view field_name,
+                                                SimContext& ctx, SourceLoc loc,
+                                                bool* handled) {
+  *handled = false;
+  auto* base_var = ctx.FindVariable(base_name);
+  if (!ctx.IsVirtualInterfaceVar(base_var)) return {};
+  *handled = true;
+  if (!ctx.VirtualInterfaceIsBound(base_var)) {
+    ctx.GetDiag().Error(loc, "reference through a null virtual interface",
+                        Subclause("25.9"));
+    FieldTarget target;
+    target.kind = FieldTarget::Kind::kNoOp;
+    return target;
+  }
+  std::string name(ctx.VirtualInterfaceBinding(base_var));
+  name += ".";
+  name += field_name;
+  auto* component = ctx.FindVariable(name);
+  if (!component) return {};
+  FieldTarget target;
+  target.kind = FieldTarget::Kind::kVariable;
+  target.var = component;
+  return target;
+}
+
 // The field field_name of the variable named base_name, which may be a packed
 // struct/union or a class-object handle. The caller has confirmed base_name is
 // neither this/super nor a class type. `loc` is the position a tagged-union tag
@@ -314,7 +364,37 @@ FieldTarget ResolveFieldTarget(const Expr* lhs, SimContext& ctx) {
   if (handled) return target;
   target = ResolveStaticClassField(base_name, field_name, ctx, &handled);
   if (handled) return target;
+  // A virtual interface base is a plain variable name, so it is asked after
+  // the bases that are not -- `this`, `super`, a class type name -- which it
+  // would otherwise shadow, and before ResolveVariableField, which would take
+  // the virtual interface variable for a packed object or a class handle, find
+  // neither, and answer that the path names no storage.
+  target = ResolveVirtualInterfaceField(base_name, field_name, ctx,
+                                        lhs->range.start, &handled);
+  if (handled) return target;
   return ResolveVariableField(base_name, field_name, ctx, lhs->range.start);
+}
+
+// Deposits a value in a whole variable, which is the write a component of an
+// interface instance takes: it owns all of its storage, so the value is
+// resized to the declaration rather than deposited into a window of it. Same
+// steps, in the same order, as a direct assignment to that component makes
+// (WriteVar and AssignToScalarLhs, statement_assign_core.cpp): §10.6.2 leaves
+// a forced variable to its force, a string takes its text, §10.7 resizes the
+// value to the declared width, a 2-state declaration drops x and z, and the
+// watchers are notified exactly as the direct write notifies them -- a write
+// through a virtual interface is the same write, reached by another name.
+static void WriteWholeVariable(Variable* var, const Logic4Vec& val,
+                               Arena& arena) {
+  if (var->is_forced) return;
+  if (var->is_string) {
+    var->value = StripStringZeros(val, arena);
+    var->NotifyWatchers();
+    return;
+  }
+  var->value = ResizeToWidth(val, var->value.width, arena);
+  if (!var->is_4state) CoerceTo2State(var->value);
+  var->NotifyWatchers();
 }
 
 void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
@@ -324,6 +404,9 @@ void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
       DepositBitField(target.var->value, target.bit_offset, rhs_val,
                       target.width);
       target.var->NotifyWatchers();
+      return;
+    case FieldTarget::Kind::kVariable:
+      WriteWholeVariable(target.var, rhs_val, arena);
       return;
     case FieldTarget::Kind::kProperty:
       SetClassField(target.obj, target.type, target.field, rhs_val, arena);
