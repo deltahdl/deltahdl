@@ -1,6 +1,9 @@
 #pragma once
 
+#include <gtest/gtest.h>
+
 #include <cstddef>
+#include <cstdint>
 #include <iostream>
 #include <sstream>
 #include <streambuf>
@@ -78,6 +81,40 @@ inline void LowerAndRun(const RtlirDesign* design, SimFixture& f) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
+}
+
+// Asserts that a value and the copy taken from it are two storage elements
+// holding one value, rather than one storage element read twice.
+//
+// §6.8 makes a variable "an abstraction of a data storage element" that "shall
+// store a value from one assignment to the next", so a store that copies
+// between two of them has to leave each holding its own words. Logic4Vec copies
+// its `words` pointer rather than the words, so a store that skips the copy
+// leaves the pair sharing one buffer, and a later writer that deposits in place
+// -- a packed-member assignment, say -- then writes through both.
+//
+// Equal bits alone cannot tell the two cases apart, because a shared buffer
+// reads equal by construction; the pointer comparison is what carries the
+// claim. Both planes of every word are compared alongside it, so the copy is
+// shown to have carried x and z as well as the value, and to have carried the
+// whole width rather than the low word of it.
+//
+// The null checks are fatal assertions, and a fatal assertion in a helper
+// returns from the helper rather than from the test that called it. A caller
+// that goes on to read the words itself -- as one pinning the value against
+// the literal its source was given does -- has to wrap the call in
+// ASSERT_NO_FATAL_FAILURE, or a run where the words came back null would
+// dereference the null pointer here and take the binary down instead of
+// reporting the failure.
+inline void ExpectOwnWordsCopy(const Logic4Vec& src, const Logic4Vec& dst) {
+  ASSERT_NE(src.words, nullptr);
+  ASSERT_NE(dst.words, nullptr);
+  EXPECT_NE(src.words, dst.words);
+  ASSERT_EQ(src.nwords, dst.nwords);
+  for (uint32_t i = 0; i < src.nwords; ++i) {
+    EXPECT_EQ(src.words[i].aval, dst.words[i].aval) << "aval word " << i;
+    EXPECT_EQ(src.words[i].bval, dst.words[i].bval) << "bval word " << i;
+  }
 }
 
 // Elaborates, lowers and runs `src`, then returns the context variable `name`

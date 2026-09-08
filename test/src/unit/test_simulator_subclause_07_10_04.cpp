@@ -605,15 +605,17 @@ TEST(QueueAssign,
   EXPECT_EQ(q->elements[1].ToUint64(), 1u);
 }
 
-// §10.10 makes an item of an unpacked array concatenation contribute the
-// elements of the array it names, so `q = {a}` leaves the queue holding what
-// `a[0]` and `a[1]` hold. §6.8 calls a variable "an abstraction of a data
-// storage element" that "shall store a value from one assignment to the next",
-// and the queue entry and the array element are two such elements: a later
-// assignment to `a[0]` must not reach the queue. A collector that pushes the
-// element variable's own words rather than a copy of them leaves both storage
-// elements pointing at one buffer, which the pointer comparison below is what
-// catches -- the bits alone match either way.
+// §10.10 makes an item of an unpacked array concatenation that names an array
+// "represent as many elements as exist in that item, arranged in the same
+// left-to-right order as they would appear in the array item itself", so
+// `q = {a}` leaves the queue holding what `a[0]` and `a[1]` hold. Holding, not
+// naming: §7.10.3 says that when "the target of an assignment is an entire
+// queue, references to any element of the original queue shall become
+// outdated", and a queue entry left sharing a buffer with the live array
+// element it was collected from is exactly such an outdated reference, one the
+// next assignment to `a[0]` would still write through. ExpectOwnWordsCopy makes
+// the storage-identity claim; the read of 0xA5 after it keeps the test from
+// passing on a queue of two entries the run never filled.
 TEST(QueueAssign, SourceConcatItemNamingArrayGivesQueueItsOwnElementWords) {
   SimFixture f;
   auto* a0 = RunAndFindVar(
@@ -630,11 +632,7 @@ TEST(QueueAssign, SourceConcatItemNamingArrayGivesQueueItsOwnElementWords) {
   auto* q = f.ctx.FindQueue("q");
   ASSERT_NE(q, nullptr);
   ASSERT_EQ(q->elements.size(), 2u);
-  ASSERT_NE(a0->value.words, nullptr);
-  ASSERT_NE(q->elements[0].words, nullptr);
-  EXPECT_NE(a0->value.words, q->elements[0].words);
-  EXPECT_EQ(a0->value.words[0].aval, q->elements[0].words[0].aval);
-  EXPECT_EQ(a0->value.words[0].bval, q->elements[0].words[0].bval);
+  ASSERT_NO_FATAL_FAILURE(ExpectOwnWordsCopy(a0->value, q->elements[0]));
   EXPECT_EQ(q->elements[0].words[0].aval, 0xA5u);
 }
 

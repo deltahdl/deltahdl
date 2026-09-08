@@ -298,11 +298,7 @@ TEST(ArrayAssignmentSimulation,
   ASSERT_NE(a0, nullptr);
   auto* b0 = f.ctx.FindVariable("b[0]");
   ASSERT_NE(b0, nullptr);
-  ASSERT_NE(a0->value.words, nullptr);
-  ASSERT_NE(b0->value.words, nullptr);
-  EXPECT_NE(a0->value.words, b0->value.words);
-  EXPECT_EQ(a0->value.words[0].aval, b0->value.words[0].aval);
-  EXPECT_EQ(a0->value.words[0].bval, b0->value.words[0].bval);
+  ASSERT_NO_FATAL_FAILURE(ExpectOwnWordsCopy(a0->value, b0->value));
 }
 
 // The same §6.8 storage rule on the other arm of the copy: a queue source runs
@@ -332,11 +328,7 @@ TEST(ArrayAssignmentSimulation,
   auto* q = f.ctx.FindQueue("q");
   ASSERT_NE(q, nullptr);
   ASSERT_EQ(q->elements.size(), 2u);
-  ASSERT_NE(a0->value.words, nullptr);
-  ASSERT_NE(q->elements[0].words, nullptr);
-  EXPECT_NE(a0->value.words, q->elements[0].words);
-  EXPECT_EQ(a0->value.words[0].aval, q->elements[0].words[0].aval);
-  EXPECT_EQ(a0->value.words[0].bval, q->elements[0].words[0].bval);
+  ASSERT_NO_FATAL_FAILURE(ExpectOwnWordsCopy(a0->value, q->elements[0]));
 }
 
 }  // namespace

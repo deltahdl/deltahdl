@@ -267,25 +267,22 @@ TEST(UnpackedArrayConcatSim, NonblockingSizeMismatchNames10_10) {
 }
 
 // §10.10: an item naming an unpacked array "shall represent as many elements
-// as exist in that item", so `b = {a}` hands the two elements of `a` to the
-// two elements of `b`. §6.8 (printed p.105) then says what each of those four
-// names is: "A variable is an abstraction of a data storage element. A
-// variable shall store a value from one assignment to the next." `a[0]` and
-// `b[0]` are two such storage elements, so the concatenation has to leave the
-// destination holding its own words rather than the pointer to the source's
-// that a plain Logic4Vec assignment copies (types.h: the struct holds a
-// Logic4Word* words, and assigning it copies the pointer). The widths match
-// here, which is the case that hides the bug: the collector pushes the source
-// variable's own vector and the resize on the store returns it untouched, so
-// nothing on the path allocates and the two elements end up sharing a buffer.
+// as exist in that item, arranged in the same left-to-right order as they
+// would appear in the array item itself", so `b = {a}` hands the two elements
+// of `a` to the two elements of `b`, in that order. Each of those four names
+// is a variable in its own right, so the concatenation has to leave `b[0]`
+// holding its own words; ExpectOwnWordsCopy is where that claim and the
+// reasoning behind the pointer comparison live.
 //
-// The claim is made on the storage identity, as it is for the whole-array copy
-// of §7.6, because no source-level reader can currently tell the two apart:
-// every writer that reaches an unpacked-array element replaces the element's
-// vector instead of depositing into it. The value assertions alongside it say
-// the copy carried the bits and the x/z plane, and that `b[0]` really did
-// receive `a[0]`'s literal rather than the concatenation quietly doing
-// nothing.
+// The widths match here, which is the case that hides the bug: the collector
+// pushes the source variable's own vector and the resize on the store returns
+// it untouched, so nothing on the path allocates and the two elements end up
+// sharing a buffer. The claim is made on the storage identity, as it is for
+// the whole-array copy of §7.6, because no source-level reader can currently
+// tell the two apart: every writer that reaches an unpacked-array element
+// replaces the element's vector instead of depositing into it. The literal
+// read back from `b[0]` alongside it says the concatenation really did deliver
+// `a[0]`'s value rather than quietly doing nothing.
 TEST(UnpackedArrayConcatSim, ArrayItemGivesDestinationItsOwnElementWords) {
   SimFixture f;
   auto* a0 = RunAndFindVar(
@@ -301,11 +298,7 @@ TEST(UnpackedArrayConcatSim, ArrayItemGivesDestinationItsOwnElementWords) {
   ASSERT_NE(a0, nullptr);
   auto* b0 = f.ctx.FindVariable("b[0]");
   ASSERT_NE(b0, nullptr);
-  ASSERT_NE(a0->value.words, nullptr);
-  ASSERT_NE(b0->value.words, nullptr);
-  EXPECT_NE(a0->value.words, b0->value.words);
-  EXPECT_EQ(a0->value.words[0].aval, b0->value.words[0].aval);
-  EXPECT_EQ(a0->value.words[0].bval, b0->value.words[0].bval);
+  ASSERT_NO_FATAL_FAILURE(ExpectOwnWordsCopy(a0->value, b0->value));
   EXPECT_EQ(b0->value.words[0].aval, 0xA5u);
 }
 
