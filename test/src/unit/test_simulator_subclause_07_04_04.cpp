@@ -282,4 +282,71 @@ TEST(MultidimensionalArraySimulation, ModuleScopeArrayAgreesWithTheBlockLocal) {
   EXPECT_EQ(v, 7u);
 }
 
+// §7.4.5: "Writing to an array with an invalid index shall perform no
+// operation, with the exceptions of writing to element [$+1] of a queue ... and
+// creating a new element of an associative array". A fixed unpacked array is
+// neither exception, and the write invented a variable for the name it built
+// instead -- 32 bits wide whatever the element type declared, in the
+// design-wide table under a name FindVariable will not read back from inside an
+// instance, and made again on every execution. Nothing existing under the name
+// afterwards is what says the operation was not performed.
+TEST(MultidimensionalArraySimulation,
+     WriteToAnAbsentCompoundElementIsNoOperation) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a [0:1][0:2];\n"
+      "  int i;\n"
+      "  initial begin\n"
+      "    i = 5;\n"
+      "    a[i][0] = 7;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("a[5][0]"), nullptr);
+}
+
+// The same write executed twice: the fabrication made one cell per execution,
+// so a loop writing an out-of-range element grew the table for as long as it
+// ran.
+TEST(MultidimensionalArraySimulation, RepeatedAbsentCompoundWriteMakesNoCells) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a [0:1][0:2];\n"
+      "  int i;\n"
+      "  initial begin\n"
+      "    for (i = 5; i < 7; i = i + 1)\n"
+      "      a[i][0] = 7;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("a[5][0]"), nullptr);
+  EXPECT_EQ(f.ctx.FindVariable("a[6][0]"), nullptr);
+}
+
+// The guard: an index that is in range names an element that exists, and the
+// write reaches it at the element's own declared width rather than the 32 the
+// fabricated cell had.
+TEST(MultidimensionalArraySimulation, WriteToAPresentCompoundElementReachesIt) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  byte a [0:1][0:2];\n"
+      "  int i;\n"
+      "  initial begin\n"
+      "    i = 1;\n"
+      "    a[i][2] = 8'd7;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a[1][2]");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.width, 8u);
+  EXPECT_EQ(var->value.ToUint64(), 7u);
+}
+
 }  // namespace

@@ -73,16 +73,27 @@ bool BuildCompoundLhsName(const Expr* expr, SimContext& ctx, Arena& arena,
 }
 
 Variable* TryResolveCompoundElement(const Expr* lhs, SimContext& ctx,
-                                    Arena& arena) {
+                                    Arena& arena, bool* absent_element) {
+  if (absent_element != nullptr) *absent_element = false;
   if (lhs->kind != ExprKind::kSelect || !lhs->base) return nullptr;
   if (lhs->base->kind != ExprKind::kSelect) return nullptr;
   if (lhs->index_end) return nullptr;
   std::string compound;
   if (!BuildCompoundLhsName(lhs, ctx, arena, compound)) return nullptr;
-  auto* var = ctx.FindVariable(compound);
-  if (var) return var;
-  return ctx.CreateVariable(*arena.Create<std::string>(std::move(compound)),
-                            32);
+  if (auto* var = ctx.FindVariable(compound)) return var;
+  // §7.4.5: "Writing to an array with an invalid index shall perform no
+  // operation, with the exceptions of writing to element [$+1] of a queue
+  // (described in 7.10.1) and creating a new element of an associative array
+  // (described in 7.8.6)" -- and neither exception is an indexed name of this
+  // shape, both being reached by their own writers before this one. A cell was
+  // fabricated for the name instead, 32 bits wide whatever the element type
+  // declared, in the design-wide table under an unprefixed name that
+  // FindVariable will not read back from inside an instance: written, never
+  // read, and made again on every execution of the statement. The caller is
+  // told so it can perform the no operation the clause asks for rather than
+  // falling through to the base carrier the name stands on.
+  if (absent_element != nullptr) *absent_element = true;
+  return nullptr;
 }
 
 Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx) {

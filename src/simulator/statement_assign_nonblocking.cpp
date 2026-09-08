@@ -539,10 +539,11 @@ static bool SetupSelectNbaCallback(const NbaWrite& write, const Expr* lhs,
 // arm and is handed to #3493, where the blocking form already leaves it; making
 // the two forms agree is the point.
 static Variable* ResolveNbaSelectElement(const Expr* lhs, SimContext& ctx,
-                                         Arena& arena) {
+                                         Arena& arena, bool* absent_element) {
+  *absent_element = false;
   if (lhs->kind != ExprKind::kSelect) return nullptr;
   if (auto* elem = TryResolveArrayElement(lhs, ctx)) return elem;
-  return TryResolveCompoundElement(lhs, ctx, arena);
+  return TryResolveCompoundElement(lhs, ctx, arena, absent_element);
 }
 
 // §10.4.2 gives the nonblocking form the same `variable_lvalue` the blocking
@@ -605,7 +606,12 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
   }
 
   bool is_select = (stmt->lhs->kind == ExprKind::kSelect);
-  auto* elem = ResolveNbaSelectElement(stmt->lhs, ctx, arena);
+  bool absent_element = false;
+  auto* elem = ResolveNbaSelectElement(stmt->lhs, ctx, arena, &absent_element);
+  // §7.4.5, as on the blocking path: a write to an array with an invalid index
+  // performs no operation, and the fallback below would otherwise take the
+  // name down to the array's base carrier.
+  if (absent_element) return;
   auto* var = elem ? elem : ResolveLhsVariable(stmt->lhs, ctx);
   if (!var) {
     ScheduleFieldNba(stmt->lhs, rhs_val, delay_ticks, ctx, arena);

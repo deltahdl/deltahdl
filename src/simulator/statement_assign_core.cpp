@@ -118,10 +118,18 @@ bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
   // the object's property map rather than in a variable, so no writer below
   // can reach it and ResolveLhsVariable answers null for the name it rebuilds.
   if (TryWriteClassPropertyBits(lhs, rhs_val, ctx, arena)) return true;
-  if (auto* compound = TryResolveCompoundElement(lhs, ctx, arena)) {
+  bool absent_element = false;
+  if (auto* compound =
+          TryResolveCompoundElement(lhs, ctx, arena, &absent_element)) {
     WriteVar(compound, rhs_val, arena);
     return true;
   }
+  // §7.4.5: a write to an array with an invalid index performs no operation.
+  // Handled here rather than left to fall through, because ResolveLhsVariable
+  // below walks `a[i][j]` down to the variable named `a` -- the element-width
+  // carrier no element is stored in -- and WriteBitSelect would then read the
+  // last index as a bit position of it.
+  if (absent_element) return true;
   auto* var = ResolveLhsVariable(lhs, ctx);
 
   if (var && lhs->kind == ExprKind::kSelect && lhs->base && !lhs->index_end) {

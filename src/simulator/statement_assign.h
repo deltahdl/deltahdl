@@ -38,8 +38,15 @@ void BuildLhsName(const Expr* expr, std::string& out);
 Variable* TryResolveArrayElement(const Expr* lhs, SimContext& ctx);
 bool BuildCompoundLhsName(const Expr* expr, SimContext& ctx, Arena& arena,
                           std::string& name);
+// The leaf variable a multidimensional indexed name such as `a[i][j]` stands
+// for, or null. `absent_element`, when given, is set true where the name is one
+// of this shape and no such leaf exists, which §7.4.5 makes a write that
+// performs no operation: a caller reads it as "stop", since the fallback
+// resolution walks such a name down to the array's base carrier and would write
+// a bit of that instead.
 Variable* TryResolveCompoundElement(const Expr* lhs, SimContext& ctx,
-                                    Arena& arena);
+                                    Arena& arena,
+                                    bool* absent_element = nullptr);
 Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx);
 
 // The storage a dotted member path names, resolved away from the expression
