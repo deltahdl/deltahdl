@@ -697,6 +697,19 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // merely redundant on the path where the resize itself allocated.
   v->value = OwnRhsWords(
       ResizeToWidth(EvalExpr(init, ctx, arena), declared, arena), arena);
+  // §6.11.2: "when a 4-state value is automatically converted to a 2-state
+  // value, any unknown or high-impedance bits shall be converted to zeros", and
+  // §6.8 makes a variable declaration assignment an assignment to the declared
+  // variable, so a 2-state local declared from a 4-state initializer holds
+  // zeros where that initializer held x or z. The flag was recorded above and
+  // applied by nothing on this path: every later store consults it in
+  // ExecFuncIdentifierAssign, so `int v; v = seed;` converted where `int v =
+  // seed;` did not -- two spellings of one declaration with two answers. The
+  // coercion writes in place and so goes after the copy, never through the
+  // value the initializer produced: an initializer that reads another variable
+  // is answered with that variable's own Logic4Vec, and coercing through it
+  // would clear the source's own unknown bits (#3563).
+  if (!v->is_4state) CoerceTo2State(v->value);
   return v;
 }
 

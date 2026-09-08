@@ -631,4 +631,76 @@ TEST(TwoStateAndFourState, FourStateUnpackedElementKeepsXz) {
   EXPECT_EQ(var->value.ToString(), "1010x10z");
 }
 
+// §6.8 makes a variable declaration assignment an assignment to the declared
+// variable, so §6.11.2's conversion is owed by a declaration exactly as it is
+// owed by the statement below it. A subroutine-body local recorded the flag the
+// conversion is made through and stored its initializer without applying it,
+// which is what makes the two spellings of one declaration disagree: the second
+// case here is the same two facts as two statements and answered 0 all along.
+TEST(TwoStateAndFourState, TwoStateBodyLocalDropsItsInitializersUnknownBits) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] seed;\n"
+      "  int result;\n"
+      "  function void probe();\n"
+      "    int v = seed;\n"
+      "    result = $isunknown(v);\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    seed = 8'b1x0z0000;\n"
+      "    probe();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// The spelling that already converted, which is what the case above has to
+// agree with rather than merely answer correctly on its own.
+TEST(TwoStateAndFourState, TwoStateBodyLocalAssignedAfterDeclarationDropsThem) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] seed;\n"
+      "  int result;\n"
+      "  function void probe();\n"
+      "    int v;\n"
+      "    v = seed;\n"
+      "    result = $isunknown(v);\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    seed = 8'b1x0z0000;\n"
+      "    probe();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// The bits the conversion keeps: §6.11.2 zeroes the unknown ones and leaves the
+// known ones alone, so a case asserting only that nothing is unknown would pass
+// on a local that came out all zeros.
+TEST(TwoStateAndFourState, TwoStateBodyLocalKeepsTheKnownBitsOfItsInitializer) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] seed;\n"
+      "  int result;\n"
+      "  function void probe();\n"
+      "    int v = seed;\n"
+      "    result = v;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    seed = 8'b1010_x10z;\n"
+      "    probe();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xA4u);
+}
+
 }  // namespace
