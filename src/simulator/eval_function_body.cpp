@@ -139,15 +139,32 @@ static void ExecFuncIdentifierAssign(const Expr* lhs, const Logic4Vec& val,
     if (var->is_forced) return;
     if (var->is_string) {
       var->value = val;
-      return;
+    } else {
+      var->value = ConvertRealOnAssign(val, lhs, var->value.width, ctx, arena);
+      // §6.11.2: "When a 4-state value is automatically converted to a 2-state
+      // value, any unknown or high-impedance bits shall be converted to zeros."
+      // AssignToScalarLhs converts on the same test outside a subroutine, and
+      // this executor converted nowhere, so an x assigned to a `bit` or an
+      // `int` in a task or function body survived as an x.
+      if (!var->is_4state) CoerceTo2State(var->value);
     }
-    var->value = ConvertRealOnAssign(val, lhs, var->value.width, ctx, arena);
-    // §6.11.2: "When a 4-state value is automatically converted to a 2-state
-    // value, any unknown or high-impedance bits shall be converted to zeros."
-    // AssignToScalarLhs converts on the same test outside a subroutine, and
-    // this executor converted nowhere, so an x assigned to a `bit` or an `int`
-    // in a task or function body survived as an x.
-    if (!var->is_4state) CoerceTo2State(var->value);
+    // §9.4.2: "A non-edge implicit event shall be detected on any change in the
+    // value of the expression", and the subclause names a subroutine as the
+    // writer where it requires that "Changing the value of object data members,
+    // aggregate elements, or the size of a dynamically sized array referenced
+    // by a method or function shall cause the event expression to be
+    // reevaluated". A watcher is the only route by which a process parked on
+    // @(x), wait(x) or an always_comb's inferred sensitivity list is resumed,
+    // and this executor notified none: a module-scope variable, or a caller's
+    // variable reached through a `ref` formal, written from a function body
+    // left every process waiting on it parked for the rest of the run. The
+    // notification is unconditional, whether a given change counts being the
+    // awaiter's own test -- AnyChangeAwaiter::ChangeGatePasses and
+    // EventAwaiter::CheckEdge each decline a wake on a value that did not
+    // change. It sits behind the is_forced return because a variable that
+    // declines the store declines the notification with it, as WriteVar and
+    // WriteBitSelect both do.
+    var->NotifyWatchers();
     return;
   }
   // §8.10: a static method writes a static property of the enclosing class by

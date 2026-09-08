@@ -291,4 +291,50 @@ TEST(LevelSensitiveEventSimulation, WaitOnABitSelectResumesWhenThatBitChanges) {
   EXPECT_EQ(val, 42u);
 }
 
+// §9.4.3 states level-sensitive event control as an obligation about the truth
+// of a condition rather than as a reaction to a change: "The wait statement
+// shall evaluate a condition; and, if it is not true (as defined in 12.4), the
+// procedural statements following the wait statement shall remain blocked
+// until that condition becomes true before continuing." The clause draws the
+// contrast itself -- the wait is "level-sensitive, as opposed to basic event
+// control (specified by the @ character), which is edge-sensitive" -- so a
+// §9.4.2 case does not stand in for this one: any route that observes the
+// condition becoming true would satisfy §9.4.3. In this implementation,
+// though, a wait parks on the same AnyChangeAwaiter that @ parks on and is
+// released only by the written variable's watcher notification, so the two
+// mechanisms fail together, which is what earns this clause its own case.
+//
+// The writer has to be a void function called with parentheses, because that
+// is the only call form whose body runs through ExecFunctionBody and its
+// identifier-assignment path. A task call is inlined onto the ordinary
+// statement executor, which notifies already, so a task written here would
+// pass whether or not the function path notifies and would prove nothing.
+//
+// `done` holds 8'd3 when the process parks and the wait's body writes 8'd91,
+// neither of them a value a `logic [7:0]` reaches on its own, so a process
+// left parked for the rest of the run reads back as 3 rather than 91.
+TEST(LevelSensitiveEventSimulation, WaitResumesOnVoidFunctionWrite) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic gate;\n"
+      "  logic [7:0] done;\n"
+      "  function void open_gate;\n"
+      "    gate = 1'b1;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    gate = 1'b0;\n"
+      "    #5;\n"
+      "    open_gate();\n"
+      "  end\n"
+      "  initial begin\n"
+      "    done = 8'd3;\n"
+      "    wait (gate) done = 8'd91;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "done");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 91u);
+}
+
 }  // namespace
