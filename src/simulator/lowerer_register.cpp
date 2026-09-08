@@ -74,11 +74,12 @@ bool PortDefaultsToZero(const RtlirPort& port) {
   return !Is4stateType(port.type_kind);
 }
 
-// §6.4: an uninitialized 4-state object is x, and only inside its width -- the
-// bits above it in the top word stay 0 so they cannot leak phantom x into a
-// read or into arithmetic on the value. SimContext::CreateVariable does this
-// for storage it makes itself; a port whose storage came from CreateNet needs
-// it done again, a net's own default being §6.7.1's z.
+// §6.8, Table 6-7: an uninitialized 4-state integral object is 'x, and only
+// inside its width -- the bits above it in the top word stay 0 so they cannot
+// leak phantom x into a read or into arithmetic on the value.
+// SimContext::CreateVariable does this for storage it makes itself; a port
+// whose storage came from CreateNet needs it done again, a net's own default
+// being §6.7.1's z.
 static void FillPortStorageWithX(Variable* v, uint32_t width) {
   for (uint32_t i = 0; i < v->value.nwords; ++i) {
     v->value.words[i].aval = ~uint64_t{0};

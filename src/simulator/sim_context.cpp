@@ -245,11 +245,11 @@ Variable* SimContext::CreateVariable(std::string_view name, uint32_t width) {
   auto* var = arena_.Create<Variable>();
   var->value = MakeLogic4Vec(arena_, width);
 
-  // §6.4: an uninitialized 4-state variable defaults to x. Canonical
-  // Convention A encodes x as (aval=1, bval=1) per bit. Only the bits inside
-  // `width` are x; bits past `width` in the top word stay 0 so they cannot
-  // leak phantom x into reads or arithmetic of the value (a field write that
-  // covers only part of a word would otherwise leave that garbage behind).
+  // §6.8, Table 6-7: an uninitialized 4-state integral variable defaults to 'x.
+  // Canonical Convention A encodes x as (aval=1, bval=1) per bit. Only the bits
+  // inside `width` are x; bits past `width` in the top word stay 0 so they
+  // cannot leak phantom x into reads or arithmetic of the value (a field write
+  // that covers only part of a word would otherwise leave that garbage behind).
   for (uint32_t i = 0; i < var->value.nwords; ++i) {
     var->value.words[i].aval = ~uint64_t{0};
     var->value.words[i].bval = ~uint64_t{0};

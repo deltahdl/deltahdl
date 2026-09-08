@@ -192,8 +192,8 @@ struct MultiDimArray {
 // §7.4.2: recursively create one leaf variable per element of a fixed
 // multidimensional unpacked array, named arr[i0][i1]... in row-major order so a
 // compound select (eval_select.cpp) and a nested assignment pattern resolve to
-// it. An untouched 2-state leaf defaults to 0; a 4-state leaf keeps the x that
-// CreateVariable seeds (§6.4).
+// it. §6.8's Table 6-7 gives an untouched 2-state integral leaf '0 and a
+// 4-state one 'x, which is the x CreateVariable seeds.
 static void CreateMultiDimLeaves(const MultiDimArray& m,
                                  const std::string& prefix, size_t d) {
   const auto& sizes = m.var.unpacked_dim_sizes;
