@@ -509,8 +509,36 @@ bool TryWriteClassPropertyBits(const Expr* lhs, const Logic4Vec& rhs_val,
   return true;
 }
 
+// The declared width of the storage a resolved field target names, which
+// §11.3.6 makes the data type of the value an assignment expression returns:
+// "The data type of the value that is returned is the data type of the
+// left-hand side." Zero where the target names storage of no declared width --
+// a property the collector could not size, a string, an array the path fell
+// back to a flattened key on -- which a caller reads as "no answer" and leaves
+// the value it has.
+static uint32_t FieldTargetWidth(const FieldTarget& target) {
+  switch (target.kind) {
+    case FieldTarget::Kind::kBits:
+      return target.width;
+    case FieldTarget::Kind::kVariable:
+      return target.var != nullptr ? target.var->value.width : 0;
+    case FieldTarget::Kind::kProperty: {
+      const ClassTypeInfo* start =
+          target.type ? target.type : (target.obj ? target.obj->type : nullptr);
+      const auto* prop = FindPropertyInfo(start, target.field);
+      return (prop != nullptr && prop->width_is_declared) ? prop->width : 0;
+    }
+    case FieldTarget::Kind::kStatic:
+      return target.slot != nullptr ? target.slot->width : 0;
+    case FieldTarget::Kind::kNone:
+    case FieldTarget::Kind::kNoOp:
+      return 0;
+  }
+  return 0;
+}
+
 bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
-                      SimContext& ctx) {
+                      SimContext& ctx, uint32_t* written_width) {
   // §7.8.7: `b[2].x = 5` names a member of an associative array element, which
   // the name ResolveFieldTarget builds cannot reach because the select
   // contributes nothing to it. Allocate the element and write the member
@@ -522,6 +550,11 @@ bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
   // WriteResolvedField to the update region.
   FieldTarget target = ResolveFieldTarget(lhs, ctx);
   if (target.kind == FieldTarget::Kind::kNone) return false;
+  // The width is reported from the resolved target rather than measured from
+  // the left-hand side by the caller: a member access resolves to a window of a
+  // packed variable, a whole component of an interface instance or a class
+  // property, and only the resolution tells which.
+  if (written_width != nullptr) *written_width = FieldTargetWidth(target);
   WriteResolvedField(target, rhs_val, ctx, ctx.GetArena());
   return true;
 }

@@ -213,6 +213,10 @@ Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
   // before the read.
   AllocateAssocEntryForModify(expr->lhs, ctx, arena);
   uint32_t target_width = LhsContextWidth(expr->lhs, ctx, arena);
+  // §11.6.1 sizes the operation from the left-hand side and §11.3.6 sizes the
+  // value the expression yields from it too, so the two start from one answer;
+  // the member arm below replaces it with the one its writer resolved.
+  uint32_t yield_width = target_width;
   auto lhs_val = EvalExpr(expr->lhs, ctx, arena);
   auto rhs_val = EvalExpr(expr->rhs, ctx, arena);
   auto base_op = CompoundAssignBaseOp(expr->op);
@@ -245,21 +249,33 @@ Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
     //
     // The value is handed over as the operation produced it, each of those
     // writers sizing it by what it is writing into -- an element's own width,
-    // or the bits a select names. Sizing it here instead cannot be done from
-    // the left-hand side alone: ResolveLhsVariable answers with the base
-    // variable, which exists for an array, a queue, an associative array and a
-    // string alike, and SelectStorageBits then measures a bit of it rather than
-    // an element of it. §11.3.6 would have the value the expression yields
-    // carry the select's own type, which is what the writer knows and this does
-    // not; that is #3502.
+    // or the bits a select names. What the expression yields is sized below,
+    // from LhsContextWidth, which answers the two shapes apart: the bits a
+    // select names within a packed object, and the whole element an unpacked
+    // array, queue or associative index names.
     TrySelectBlockingAssign(expr->lhs, result, ctx, arena);
   } else if (expr->lhs->kind == ExprKind::kMemberAccess) {
     // §10.4 admits a member access as a left-hand side too, and the statement
     // form reaches WriteStructField for it. This arm did not exist, so
-    // `q = (s.lo += 3)` wrote nothing.
-    WriteStructField(expr->lhs, result, ctx);
+    // `q = (s.lo += 3)` wrote nothing. The width comes back from the writer:
+    // a member access resolves to a window of a packed variable, an interface
+    // component or a class property, and LhsContextWidth answers for none of
+    // them -- ResolveLhsVariable looks the flattened name `s.lo` up and finds
+    // no variable.
+    WriteStructField(expr->lhs, result, ctx, &yield_width);
   }
   ClearSelectIndices(expr->lhs, ctx);
+  // §11.3.6: an assignment expression "evaluates the right-hand side, casts the
+  // right-hand side to the left-hand data type, stacks it, updates the
+  // left-hand side, and returns the stacked value. The data type of the value
+  // that is returned is the data type of the left-hand side." The write itself
+  // was already right -- each writer sizes the value by what it is writing into
+  // -- and it is the value the surrounding expression reads that carried the
+  // operation's width instead of the target's. Zero means no width was found
+  // for the left-hand side, and the value is left as it is rather than resized
+  // to nothing.
+  if (yield_width != 0 && yield_width != result.width)
+    return ResizeToWidth(result, yield_width, arena);
   return result;
 }
 

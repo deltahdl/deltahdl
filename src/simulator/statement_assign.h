@@ -121,8 +121,12 @@ bool TryWriteClassPropertyBits(const Expr* lhs, const Logic4Vec& rhs_val,
 
 // Resolve-then-write for a blocking assignment, which does both when the
 // statement executes. Returns false when the path names no storage.
+// Writes `rhs_val` through the member access `lhs` names. `written_width`, when
+// given, receives the declared width of the storage the target named, which
+// §11.3.6 makes the data type of the value an assignment expression returns; it
+// is left alone where the target has no declared width to report.
 bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
-                      SimContext& ctx);
+                      SimContext& ctx, uint32_t* written_width = nullptr);
 
 // §11.5.1: the storage bits of `var` that the select `sel` addresses, resolved
 // against the declaration, since "the actual bit that is accessed by an address

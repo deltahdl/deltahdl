@@ -264,4 +264,79 @@ TEST(AssignmentWithinExpression, CompoundAssignToAStructMemberUpdatesIt) {
       {{"s", 0x28u}, {"q", 8u}});
 }
 
+// §11.3.6 gives the returned value "the data type of the left-hand side", and a
+// select is a left-hand side of its own type: `d[3:0]` names four bits however
+// wide the operation that produced the value was. The write was already right,
+// each writer sizing what it stores by what it is storing into; it is the value
+// the surrounding expression reads that carried the operation's width.
+TEST(AssignmentWithinExpression,
+     CompoundAssignToPartSelectYieldsTheSelectWidth) {
+  RunAndCheck(
+      "module t;\n"
+      "  logic [7:0] d;\n"
+      "  logic [7:0] q;\n"
+      "  initial begin\n"
+      "    d = 8'h00;\n"
+      "    q = (d[3:0] += 8'hFF);\n"
+      "  end\n"
+      "endmodule\n",
+      {{"d", 0x0Fu}, {"q", 0x0Fu}});
+}
+
+// An unpacked array index names a whole element (§7.4.2), so the left-hand type
+// is the element's and not the one bit a select of a packed object would name.
+// This is the shape 2f14f4b6f withdrew over: measuring the select against the
+// base variable truncated the value to one bit and sign-extended it back. The
+// added operand is wider than the element, so the operation is sixteen bits and
+// 310 truncates to the element's 54.
+TEST(AssignmentWithinExpression,
+     CompoundAssignToArrayElementYieldsElementWidth) {
+  RunAndCheck(
+      "module t;\n"
+      "  byte arr [0:3];\n"
+      "  logic [15:0] q;\n"
+      "  initial begin\n"
+      "    arr[2] = 8'd10;\n"
+      "    q = (arr[2] += 16'd300);\n"
+      "  end\n"
+      "endmodule\n",
+      {{"q", 54u}});
+}
+
+// A queue element's width comes from its container rather than from any
+// variable the left-hand side names, and the same answer has to reach the
+// yielded value.
+TEST(AssignmentWithinExpression,
+     CompoundAssignToQueueElementYieldsElementWidth) {
+  RunAndCheck(
+      "module t;\n"
+      "  byte qu [$];\n"
+      "  logic [15:0] q;\n"
+      "  initial begin\n"
+      "    qu.push_back(8'd10);\n"
+      "    q = (qu[0] += 16'd300);\n"
+      "  end\n"
+      "endmodule\n",
+      {{"q", 54u}});
+}
+
+// §11.3.6 over a packed struct member, whose width is the member's. The width
+// comes back from the writer here: a member access resolves to a window of the
+// variable rather than to a variable of its own, so measuring it from the
+// left-hand side finds nothing.
+TEST(AssignmentWithinExpression,
+     CompoundAssignToStructMemberYieldsMemberWidth) {
+  RunAndCheck(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } pair_t;\n"
+      "  pair_t s;\n"
+      "  logic [15:0] q;\n"
+      "  initial begin\n"
+      "    s = 16'h000A;\n"
+      "    q = (s.lo += 16'd300);\n"
+      "  end\n"
+      "endmodule\n",
+      {{"q", 54u}});
+}
+
 }  // namespace
