@@ -227,7 +227,13 @@ void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
   const auto& params = obj->type->decl->params;
   for (size_t i = 0; i < params.size() && i < param_exprs.size(); ++i) {
     if (param_exprs[i]) {
-      auto val = EvalExpr(param_exprs[i], ctx, arena);
+      // §6.8, as in the default arm of InitClassPropertyDefaults above: the
+      // object's stored parameter and whatever the override expression read
+      // are two data storage elements, and a Logic4Vec copy carries the words
+      // pointer rather than the words, so `C #(.W(n)) c;` stored as it arrived
+      // left the object and the variable n as one buffer. One copy serves both
+      // keys, which are two names for the one parameter.
+      auto val = OwnRhsWords(EvalExpr(param_exprs[i], ctx, arena), arena);
       obj->properties[std::string(params[i].first)] = val;
       std::string scoped =
           std::string(obj->type->name) + "::" + std::string(params[i].first);

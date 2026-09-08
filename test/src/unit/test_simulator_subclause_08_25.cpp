@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <vector>
 
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
@@ -12,60 +13,113 @@ using namespace delta;
 
 namespace {
 
-// Builds a class `P` whose one #() parameter defaults to the bare identifier
-// `n`, over a 32-bit context variable of that name holding `val`, constructs an
-// object of it and answers both. §8.25 gives a parameterized class's value
-// parameter a default expression, and the two tests below are about where the
-// value that expression produced ends up: the object's stored parameter and the
-// variable named are §6.8's two data storage elements.
-struct ParamDefaultCase {
+// The value both a class parameter's default and an override of it are written
+// as here: a bare identifier naming a variable. §6.8 makes that variable and
+// the object's stored parameter two data storage elements, each storing "a
+// value from one assignment to the next", so a store of the value the
+// identifier produced has to take the words rather than the pointer to them --
+// EvalExpr answers a bare identifier with the variable's own vector.
+constexpr uint64_t kSeed = 0xDEADBEEFu;
+constexpr uint64_t kSeedLowByteCleared = 0xDEADBE00u;
+
+struct NamedVariable {
   Variable* var;
-  ClassObject* obj;
+  Expr* expr;
 };
 
-ParamDefaultCase ConstructWithParamDefaultNamingAVariable(SimFixture& f,
-                                                          uint64_t val) {
+NamedVariable MakeVariableAndItsName(SimFixture& f) {
   auto* var = f.ctx.CreateVariable("n", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, val);
+  var->value = MakeLogic4VecVal(f.arena, 32, kSeed);
+  auto* expr = f.arena.Create<Expr>();
+  expr->kind = ExprKind::kIdentifier;
+  expr->text = "n";
+  return {var, expr};
+}
 
-  auto* name_expr = f.arena.Create<Expr>();
-  name_expr->kind = ExprKind::kIdentifier;
-  name_expr->text = "n";
-
+// A class `P` with one #() value parameter `W`, whose default is `def` (null
+// for a parameter declared without one, which is what an override supplies).
+ClassTypeInfo* RegisterOneParamClass(SimFixture& f, Expr* def) {
   auto* decl = f.arena.Create<ClassDecl>();
   decl->name = "P";
-  decl->params.push_back({"W", name_expr});
-
+  decl->params.push_back({"W", def});
   auto* type = f.arena.Create<ClassTypeInfo>();
   type->name = "P";
   type->decl = decl;
   f.ctx.RegisterClassType("P", type);
-
-  auto handle = EvalClassNew("P", nullptr, f.ctx, f.arena, {});
-  return {var, f.ctx.GetClassObject(handle.ToUint64())};
+  return type;
 }
 
-TEST(ClassSim, ClassParameterDefaultIsStoredOwningItsWords) {
-  SimFixture f;
-  auto [var, obj] = ConstructWithParamDefaultNamingAVariable(f, 0xDEADBEEFu);
+// Both keys the parameter is stored under: the bare name a use inside the
+// class writes, and the "P::W" one a scoped access writes.
+void ExpectStoredParameterOwnsItsWords(const Variable* var,
+                                       const ClassObject* obj) {
   ASSERT_NE(obj, nullptr);
-  // Both keys the parameter is stored under: the bare name a use inside the
-  // class writes, and the "P::W" one a scoped access writes.
-  ASSERT_NO_FATAL_FAILURE(ExpectOwnWordsCopy(var->value, obj->properties["W"]));
   ASSERT_NO_FATAL_FAILURE(
-      ExpectOwnWordsCopy(var->value, obj->properties["P::W"]));
+      ExpectOwnWordsCopy(var->value, obj->properties.at("W")));
+  ASSERT_NO_FATAL_FAILURE(
+      ExpectOwnWordsCopy(var->value, obj->properties.at("P::W")));
 }
 
 // The consequence of the sharing: DepositBitField writes through the words it
 // finds rather than replacing them, so one buffer under the object and the
-// variable would carry a write to the stored parameter back to `n`.
-TEST(ClassSim, DepositIntoAStoredClassParameterLeavesTheVariableIntact) {
-  SimFixture f;
-  auto [var, obj] = ConstructWithParamDefaultNamingAVariable(f, 0xDEADBEEFu);
+// variable carries a write to the stored parameter back to `n`.
+void ExpectDepositLeavesTheNamedVariableIntact(SimFixture& f,
+                                               const Variable* var,
+                                               ClassObject* obj) {
   ASSERT_NE(obj, nullptr);
   DepositBitField(obj->properties["W"], 0, MakeLogic4VecVal(f.arena, 8, 0), 8);
-  EXPECT_EQ(obj->properties["W"].ToUint64(), 0xDEADBE00u);
-  EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
+  EXPECT_EQ(obj->properties["W"].ToUint64(), kSeedLowByteCleared);
+  EXPECT_EQ(var->value.ToUint64(), kSeed);
+}
+
+// §8.25 gives a parameterized class's value parameter a default expression,
+// which InitClassPropertyDefaults evaluates and stores when an object is
+// constructed.
+ClassObject* ConstructWithParamDefault(SimFixture& f, Expr* def) {
+  RegisterOneParamClass(f, def);
+  auto handle = EvalClassNew("P", nullptr, f.ctx, f.arena, {});
+  return f.ctx.GetClassObject(handle.ToUint64());
+}
+
+// §8.25 overrides a parameter where the handle is declared -- `P #(.W(n)) c;`
+// -- which the simulator records against the variable name and applies to the
+// object the declaration constructed.
+ClassObject* ConstructWithParamOverride(SimFixture& f, Expr* override_expr) {
+  auto* type = RegisterOneParamClass(f, nullptr);
+  auto* obj = f.arena.Create<ClassObject>();
+  obj->type = type;
+  auto handle = f.ctx.AllocateClassObject(obj);
+  f.ctx.SetVariableClassParamExprs("c", {override_expr});
+  ApplyClassParamOverrides("c", handle, f.ctx, f.arena);
+  return obj;
+}
+
+TEST(ClassSim, ClassParameterDefaultIsStoredOwningItsWords) {
+  SimFixture f;
+  auto [var, expr] = MakeVariableAndItsName(f);
+  ASSERT_NO_FATAL_FAILURE(ExpectStoredParameterOwnsItsWords(
+      var, ConstructWithParamDefault(f, expr)));
+}
+
+TEST(ClassSim, DepositIntoAParameterDefaultLeavesTheVariableIntact) {
+  SimFixture f;
+  auto [var, expr] = MakeVariableAndItsName(f);
+  ASSERT_NO_FATAL_FAILURE(ExpectDepositLeavesTheNamedVariableIntact(
+      f, var, ConstructWithParamDefault(f, expr)));
+}
+
+TEST(ClassSim, ClassParameterOverrideIsStoredOwningItsWords) {
+  SimFixture f;
+  auto [var, expr] = MakeVariableAndItsName(f);
+  ASSERT_NO_FATAL_FAILURE(ExpectStoredParameterOwnsItsWords(
+      var, ConstructWithParamOverride(f, expr)));
+}
+
+TEST(ClassSim, DepositIntoAParameterOverrideLeavesTheVariableIntact) {
+  SimFixture f;
+  auto [var, expr] = MakeVariableAndItsName(f);
+  ASSERT_NO_FATAL_FAILURE(ExpectDepositLeavesTheNamedVariableIntact(
+      f, var, ConstructWithParamOverride(f, expr)));
 }
 
 TEST(ClassSim, ParameterizedClassInstantiation) {
