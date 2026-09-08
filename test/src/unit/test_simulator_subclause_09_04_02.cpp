@@ -151,6 +151,55 @@ TEST(EventControlSim, NoEventOnSameValueWrite) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// §9.4.2 (printed page 232) closes with the rule this case holds the simulator
+// to: "A change of value in any operand of the expression without a change in
+// the result of the expression shall not be detected as an event." A write that
+// deposits the value the variable already holds changes no operand's value, so
+// `@(sig)` shall not resume on it.
+//
+// This is the discriminating replacement for NoEventOnSameValueWrite above,
+// which offers the same three writes but reads a variable the waiting process
+// sets to one constant. That variable reads 1 whether the event control fired
+// on the same-value write or waited for the real change that follows it, so the
+// assertion holds of a simulator that obeys the rule and of one that ignores
+// it. Counting the resumptions is what tells the two apart: an event control
+// that resumes on every notification of a write reaches 3, and one that
+// compares the value it was given against the value it holds reaches 2.
+//
+// The count is 2 rather than 1 because the always procedure arms before the
+// first write reaches it. Lowerer::LowerProcesses lowers every non-initial
+// process ahead of the initial ones, and an Active region queue is first-in
+// first-out, so `always @(sig)` has captured its baseline x before the initial
+// block runs. The x-to-5 write at time 0 is the first resumption and the 5-to-7
+// write at time 2 is the second; the 5-to-5 write at time 1 is the one the rule
+// excludes. `woke` counts from zero without being assigned one, because it is
+// 2-state and Table 6-7 gives such a variable a default of '0.
+//
+// It also blocks a regression that the always_comb cases for #3523 cannot see.
+// That issue is that AnyChangeAwaiter re-runs an always_comb on a same-value
+// write, and dropping the NotifyWatchers calls from WriteVar and
+// AssignToScalarLhs would bring the always_comb counts out right while `@(sig)`
+// stopped firing at all. This case counts what an event control does with those
+// same notifications, so that cure fails it.
+TEST(EventControlSim, SameValueWriteWakesNoEventControlCountedByEvaluations) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] sig;\n"
+      "  int woke;\n"
+      "  always @(sig) woke = woke + 1;\n"
+      "  initial begin\n"
+      "    sig = 8'd5;\n"
+      "    #1 sig = 8'd5;\n"
+      "    #1 sig = 8'd7;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "woke");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
 TEST(EventControlSim, PosedgeFiresOnZeroToZ) {
   SimFixture f;
   auto* var = RunAndFindVar(

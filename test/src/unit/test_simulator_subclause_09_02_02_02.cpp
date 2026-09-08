@@ -194,6 +194,83 @@ TEST(AlwaysCombSim,
       3);
 }
 
+TEST(AlwaysCombSim,
+     AlwaysCombDoesNotRetriggerWhenAWriteDepositsTheValueTheVariableHolds) {
+  // §9.4.2 (printed page 232, last line of the clause) says "a change of value
+  // in any operand of the expression without a change in the result of the
+  // expression shall not be detected as an event", and §9.2.2.2 (printed page
+  // 222) gives an always_comb "an inferred sensitivity list that includes the
+  // expressions defined in 9.2.2.2.1" -- the list §9.4.2 governs. A store that
+  // deposits the bits the variable already holds changes no result, so it owes
+  // the procedure no event, however genuinely the store itself happened.
+  //
+  // Why the count is 2 rather than 3 or 1. The inferred list is {a} alone:
+  // exception (b) of §9.2.2.2.1 leaves out "any expression that is also written
+  // within the block", which here is `b` and `runs`, and InferSensitivity is
+  // called with exclude_written true for an always_comb.
+  // Lowerer::LowerProcesses lowers the non-initial processes ahead of the
+  // initial ones, so at time zero the always_comb evaluates first (`runs` 1)
+  // and arms its watcher while `a` is still 8'hxx; the initial block then
+  // writes 8'd5, a genuine change of the one listed expression, and `runs`
+  // reaches 2. At time 1 the second write of 8'd5 changes nothing and the count
+  // must stay at 2.
+  //
+  // Reading 3 is the defect. The write takes ApplyGenericBlockingAssign's
+  // fall-through into AssignToScalarLhs, which stores the identical bits and
+  // notifies the variable's watchers regardless, and the AnyChangeAwaiter an
+  // always_comb waits on captures a baseline it never reads back -- every guard
+  // in its body is about frame or process liveness, or a sibling having
+  // consumed the suspension -- so any notify at all resumes the process.
+  //
+  // The same design written `always @(a) runs = runs + 1;` ends at 2 today,
+  // because that path is EventAwaiter::CheckEdge, which compares its baseline
+  // word by word. One clause, one write, two answers from two awaiters: that
+  // divergence is what this case pins.
+  ExpectAlwaysCombRunCount(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  int runs;\n"
+      "  always_comb begin\n"
+      "    b = a;\n"
+      "    runs = runs + 1;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    a = 8'd5;\n"
+      "    #1 a = 8'd5;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      2);
+}
+
+TEST(AlwaysCombSim, AlwaysCombRetriggersWhenAWriteChangesTheVariable) {
+  // The design above with the value written at time 1 moved from 8'd5 to 8'd7,
+  // and the expected count moved with it. This is what stops the case above
+  // from being satisfied by dropping the notify from the writers altogether:
+  // 8'd7 does change `a`, §9.4.2 (printed page 232) therefore makes it an event
+  // on the inferred sensitivity list of §9.2.2.2 (printed page 222), and the
+  // always_comb must evaluate a third time. A writer that stopped notifying
+  // would leave `runs` at 2 here while passing the other half of the pair --
+  // exactly the regression a neighbouring arm of this code needed a fix of its
+  // own to undo. The two programs differ only in the value written, so the
+  // counts have to differ with them or neither case is discriminating.
+  ExpectAlwaysCombRunCount(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  int runs;\n"
+      "  always_comb begin\n"
+      "    b = a;\n"
+      "    runs = runs + 1;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    a = 8'd5;\n"
+      "    #1 a = 8'd7;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      3);
+}
+
 TEST(AlwaysCombSim, AlwaysCombMuxPattern) {
   SimFixture f;
   auto* y = RunAndFindVar(

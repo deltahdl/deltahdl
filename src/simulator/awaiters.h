@@ -183,6 +183,87 @@ struct AnyChangeAwaiter {
 
   bool await_ready() const noexcept { return false; }
 
+  // The object one watcher is armed on: the variable the awaited name resolved
+  // to, and whether that variable's `value` is where the object's state lives.
+  // It is one parameter rather than two because AttachChangeWatcher below is at
+  // the five-parameter limit readability-function-size in
+  // etc/clang_tidy/src.yml sets, and because the two answer one question
+  // together: they are what the arming site learned about the name, and the
+  // watcher body has no way to ask again (it holds no name, and a lookup per
+  // notification would be the wrong place for one anyway).
+  struct WatchedObject {
+    Variable* var;
+    bool value_backed;
+  };
+
+  // Whether the state of the object `name` designates lives in the `value` of
+  // the variable it resolves to. §9.4.2 reserves the event for "any change in
+  // the value of the expression", and for a queue, a dynamic array or an
+  // associative array that value is the contents of the object, which
+  // Variable::value does not hold: the elements live in a QueueObject or an
+  // AssocArrayObject that SimContext keys by the same name (CreateQueue is what
+  // lowerer_var.cpp calls for both `is_queue` and `is_dynamic`, and
+  // CreateAssocArray for `is_assoc`). A comparison of `value` cannot answer the
+  // clause's question for those, and would answer "no change" to every
+  // notification about them, so they keep the unconditional resume the watcher
+  // has always given and the process re-evaluates what it reads.
+  //
+  // NotifyOwningVar (src/simulator/eval_array_queue.cpp:152-153) is the
+  // notifier this preserves: a queue's mutating methods notify the watchers of
+  // the variable owning the queue while that variable's `value` stands still.
+  // The case that reaches this awaiter is `wait (q[0] == 3)` woken by a
+  // `q.push_back(...)` elsewhere -- CollectSelectReads
+  // (src/elaborator/sensitivity.cpp:48-50) puts the select's base identifier
+  // `q` into the read set, so a watcher is armed on the queue's own variable.
+  //
+  // FindArrayInfo is deliberately not consulted. It registers a shape (extents
+  // and element width), not a store, and the two shapes it can name are already
+  // decided: a dynamic array's store is the QueueObject FindQueue returns, and
+  // a fixed unpacked array's elements are ordinary variables named `a[0]`,
+  // `a[1]` and so on (CollectVecElements in
+  // src/simulator/eval_array.cpp:132-140), each written and then notified
+  // through its own `value` by every writer that touches it. Exempting a name
+  // FindArrayInfo answers for would take the comparison away from value-backed
+  // variables, which is the opposite of what this is for.
+  static bool StateLivesInValue(SimContext& ctx, std::string_view name) {
+    return ctx.FindQueue(name) == nullptr &&
+           ctx.FindAssocArray(name) == nullptr;
+  }
+
+  // Decides whether a notification on a watched variable is the change §9.4.2
+  // reserves the event for, and resyncs the per-watcher baseline either way.
+  // Named and shaped after EventAwaiter::EdgeGatePasses, which is the same gate
+  // for an edge: a notification that does not qualify leaves the watcher armed
+  // and the process suspended, and the baseline moves to the current value so
+  // the next notification is measured from where this one left the variable.
+  //
+  // A watcher armed on an object whose state is not in `value` passes
+  // unconditionally, for the reason StateLivesInValue records above. Every
+  // other kind of variable goes through the comparison, and that is nearly all
+  // of them: a string keeps its bytes in `value`, a real its bit pattern, a net
+  // the value its drivers resolved to, and a forced variable writes both
+  // `forced_value` and `value` (WriteOwnedBits in
+  // src/simulator/statement_assign_decl.cpp:481-497), so all four are compared.
+  //
+  // The comparison itself is EventAwaiter::Logic4VecBitsEqual, the predicate
+  // EventAwaiter::CheckEdge's Edge::kNone arm and EvalCompoundTrigger already
+  // decide a change with -- differing nwords, or any differing aval/bval --
+  // rather than a third copy of it. CheckEdge itself reads var->prev_value,
+  // the shared field this awaiter must not consult, so calling it here would
+  // mean writing that field first the way AttachEdgeVarWatcher has to;
+  // Logic4VecBitsEqual takes both values as arguments and needs no such
+  // detour. awaiters_event_control.h is already included by this header and
+  // this awaiter already calls EventAwaiter::ResumeMaybeReactive, so no new
+  // dependency comes with it.
+  static bool ChangeGatePasses(const WatchedObject& watched,
+                               Logic4Snapshot& prev) {
+    if (!watched.value_backed) return true;
+    bool changed =
+        !EventAwaiter::Logic4VecBitsEqual(prev.Get(), watched.var->value);
+    prev.Capture(watched.var->value);
+    return changed;
+  }
+
   // Arms the change watcher one named variable carries for one suspension.
   // Factored out of await_suspend for the reason
   // EventAwaiter::AttachEventVarWatcher is factored out of its own: the watcher
@@ -192,13 +273,65 @@ struct AnyChangeAwaiter {
   //
   // `fin` and `consumed` answer different questions and both are needed. `fin`
   // and h.done() ask whether the frame is still there; `consumed` asks whether
-  // this suspension is still the one the frame is waiting at.
-  void AttachChangeWatcher(Variable* var, std::coroutine_handle<> h,
+  // this suspension is still the one the frame is waiting at. Neither asks what
+  // the value did, and until ChangeGatePasses was added below, nothing on the
+  // path from a writer to an always_comb did: a store depositing what the
+  // variable already held notified the watchers, and the watchers resumed the
+  // process. §9.4.2 (printed page 232, last line of the clause) says what that
+  // notification is worth: "A non-edge implicit event shall be detected on any
+  // change in the value of the expression. However, an edge event shall be
+  // detected only on the LSB of the expression. A change of value in any
+  // operand of the expression without a change in the result of the expression
+  // shall not be detected as an event." §9.2.2.2 (printed page 222) makes it
+  // observable, an always_comb having "an inferred sensitivity list that
+  // includes the expressions defined in 9.2.2.2.1" and §9.4.2 governing what
+  // such a list detects: `always_comb begin b = a; runs = runs + 1; end` ran a
+  // third time for `a = 8'd5;` on a variable already holding 8'd5. The same
+  // design written `always @(a)` ran twice, because that path consults
+  // EventAwaiter::CheckEdge. One clause was getting two answers from two
+  // awaiters in one simulator; the gate below is the answer CheckEdge gives, so
+  // now they agree.
+  //
+  // The comparison belongs here rather than at the writers. NotifyWatchers() is
+  // called from twelve places in statement_assign_core.cpp alone and from more
+  // than forty across the assignment, nonblocking, streaming, net-resolution
+  // and continuous-assign paths, and a writer-side test would have to be
+  // remembered, and got right, at every one of them -- and at every one added
+  // later. That is the state #3522 recorded for WriteBitSelect's five callers.
+  // There is one place that knows what the awaiter was armed to detect, and it
+  // is the awaiter.
+  //
+  // `watched` carries what the arming site learned about the name: the variable
+  // it resolved to, and StateLivesInValue's answer for it. The watcher body
+  // holds no name and could not ask again.
+  void AttachChangeWatcher(WatchedObject watched, std::coroutine_handle<> h,
                            Process* proc, const std::shared_ptr<bool>& fin,
                            const std::shared_ptr<bool>& consumed) {
     auto* ctx_ptr = &ctx;
+    Variable* var = watched.var;
+    // Left in place: nothing below reads it, the baseline this watcher compares
+    // against being its own. It is the seed this path has always written into
+    // the shared field, and other readers of it -- RepeatEventAwaiter's edge
+    // operands keep their baseline there between notifications -- would be
+    // reading a different field's worth of history if it went away. Removing it
+    // is a change to them, not to this fix.
     var->prev_value.Capture(var->value);
-    var->AddWatcher([h, proc, ctx_ptr, fin, consumed]() mutable {
+    // The baseline is per watcher and per suspension, not var->prev_value.
+    // variable.h documents that field as saying only what the last armed
+    // awaiter left there: every watcher on the variable that declines resyncs
+    // it, and no writer maintains it. Two always_comb procedures watching one
+    // signal would therefore starve each other through it, which is what two
+    // `always @(posedge clk)` blocks did before AttachEdgeVarWatcher took a
+    // copy of its own; this follows that function.
+    //
+    // It is a Logic4Snapshot, which owns the words it captured, and not a
+    // Logic4Vec copied from `value`, which would share the words `value` holds:
+    // a member assignment writes through those words rather than replacing
+    // them, so the baseline would move with the value it exists to be compared
+    // against and no change would ever be seen (#3358).
+    Logic4Snapshot prev;
+    prev.Capture(var->value);
+    var->AddWatcher([h, watched, prev, proc, ctx_ptr, fin, consumed]() mutable {
       // A wait/@* re-suspension arms a fresh watcher on every awaited signal,
       // but watchers are cleared only from the signal that actually fired.
       // Watchers stranded on the other signals accumulate; once one of them
@@ -220,6 +353,17 @@ struct AnyChangeAwaiter {
       // frame is still alive at this point, so done() above cannot tell the two
       // suspension points apart.
       if (*consumed) return true;
+      // §9.4.2: the notification says the variable was written, not that its
+      // value changed -- and, for an object whose state is not in `value`, not
+      // even that, which is why the gate passes unconditionally for those. It
+      // sits after the two liveness guards, so a watcher on a dead frame or a
+      // stopped process is still dropped whatever the value did, and after the
+      // `consumed` guard, so a sibling that already resumed this suspension
+      // still retires this one. It sits before `*consumed = true`, because a
+      // watcher that declines has not consumed the suspension: it returns
+      // false, stays armed on this variable, and leaves the guard clear for
+      // whichever operand does change.
+      if (!ChangeGatePasses(watched, prev)) return false;
       *consumed = true;
       EventAwaiter::ResumeMaybeReactive(h, proc, *ctx_ptr);
       return true;
@@ -239,7 +383,11 @@ struct AnyChangeAwaiter {
     for (auto name : var_names) {
       auto* var = ctx.FindVariable(name);
       if (!var) continue;
-      AttachChangeWatcher(var, h, proc, fin, consumed);
+      // The name is in hand only here, and the decision it feeds is the same
+      // for every notification the watcher will see, so it is made once per
+      // name per suspension rather than in the watcher body.
+      AttachChangeWatcher({var, StateLivesInValue(ctx, name)}, h, proc, fin,
+                          consumed);
     }
   }
 
