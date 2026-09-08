@@ -23,6 +23,12 @@ using TypedefMap = std::unordered_map<std::string_view, DataType>;
 void ResolveNestedAggregateTypes(DataType& dt, const TypedefMap& typedefs,
                                  Arena& arena);
 
+// §7.4.4: the element count of the packed dimensions a declaration writes --
+// the leading range times each further one -- which is what a use-site
+// dimension multiplies the width of the type it is written on by. Zero where
+// the declaration carries no packed dimension or a bound does not fold.
+uint32_t PackedDimProduct(const DataType& dtype);
+
 uint32_t EvalTypeWidth(const DataType& dtype);
 
 // §10.9.1's `type:value` key. IsTypeKeyword answers whether a key names a type

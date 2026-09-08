@@ -19,7 +19,15 @@ uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx) {
   uint32_t width = EvalTypeWidth(type);
   if (width != 0) return width;
   if (type.kind != DataTypeKind::kNamed) return 0;
-  return ctx.FindTypeWidth(type.type_name);
+  uint32_t base = ctx.FindTypeWidth(type.type_name);
+  if (base == 0) return 0;
+  // §7.4.4: "Multiple packed dimensions can also be defined in stages with
+  // typedef", and a dimension written where the name is used stacks on the ones
+  // the typedef itself carries -- `bsix [1:10] v5` on a `typedef bit [1:5]
+  // bsix` is 50 bits. The table holds what the name stands for; the use-site
+  // range is how many of those the declaration asks for.
+  uint32_t outer = PackedDimProduct(type);
+  return outer > 0 ? base * outer : base;
 }
 
 // §6.18: "the type of the object is the type the name stands for", so a

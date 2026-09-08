@@ -349,4 +349,70 @@ TEST(MultidimensionalArraySimulation, WriteToAPresentCompoundElementReachesIt) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
+// §7.4.4: "Multiple packed dimensions can also be defined in stages with
+// typedef", whose example `typedef bit [1:5] bsix; bsix [1:10] v5;` is 50 bits
+// -- the use-site range multiplies the width the name stands for rather than
+// replacing it. `nib [1:0] x` on a `typedef bit [3:0] nib` is therefore eight
+// bits.
+//
+// It was two: the width came from a reader that tested the packed dimensions
+// before the name and answered from the range alone, so the declaration took
+// the width of the index rather than of what is indexed and the name was
+// discarded. 8'hA5 is the discriminating value -- its low two bits are 2'b01,
+// so the truncated declaration reads 1 -- and nib is four bits against a
+// two-bit use-site range so that no coincidence of the two can pass.
+TEST(MultidimensionalArraySimulation,
+     UseSitePackedDimStacksOnTheTypedefsWidth) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef bit [3:0] nib;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    nib [1:0] x;\n"
+      "    x = 8'hA5;\n"
+      "    result = x;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0xA5u);
+}
+
+// The same declaration in a subroutine body, which is the other of the two
+// paths that size a declaration from the elaborated table.
+TEST(MultidimensionalArraySimulation, UseSitePackedDimStacksInASubroutineBody) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef bit [3:0] nib;\n"
+      "  int result;\n"
+      "  function automatic int widen(input int seed);\n"
+      "    nib [1:0] x;\n"
+      "    x = seed;\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "  initial result = widen(8'hA5);\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0xA5u);
+}
+
+// A use-site dimension on a typedef that carries none of its own: §7.4.4 stacks
+// the range on a width of one, so `flag [3:0] v` is four bits. It is what a
+// repair that multiplied unconditionally would break, by doubling a width that
+// had nothing to stack on.
+TEST(MultidimensionalArraySimulation,
+     UseSitePackedDimOnAScalarTypedefIsItself) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef bit flag;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    flag [3:0] f;\n"
+      "    f = 4'hD;\n"
+      "    result = f;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0xDu);
+}
+
 }  // namespace

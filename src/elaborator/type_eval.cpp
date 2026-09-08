@@ -196,6 +196,17 @@ static uint32_t EvalRangeWidth(const Expr* left_expr, const Expr* right_expr,
 }
 
 uint32_t EvalTypeWidth(const DataType& dtype) {
+  // §7.4.4: "Multiple packed dimensions can also be defined in stages with
+  // typedef", and its example `typedef bit [1:5] bsix; bsix [1:10] v5;` is 50
+  // bits: a packed dimension written where a typedef name is used is a
+  // dimension *of* that name and multiplies the width the name stands for.
+  // This overload has no typedef map to resolve the name with, so it cannot
+  // answer, and answering from the range alone discarded the name entirely --
+  // `nib [1:0] x` on a `typedef bit [3:0] nib` came out 2 bits, the width of
+  // the index rather than of what is indexed. 0 is what a name already answers
+  // here without a dimension, what every caller's fallback is written to
+  // handle, and what lets a typedef-aware caller take over.
+  if (dtype.kind == DataTypeKind::kNamed) return 0;
   if (dtype.packed_dim_left && dtype.packed_dim_right) {
     uint32_t w = EvalRangeWidth(dtype.packed_dim_left, dtype.packed_dim_right);
 
@@ -367,7 +378,7 @@ void ResolveNestedAggregateTypes(DataType& dt, const TypedefMap& typedefs,
 // §7.4.1: the total element count of a data type's packed dimensions -- the
 // leading range times each further one. Zero when the type declares no packed
 // dimension, or when a bound does not fold.
-static uint32_t PackedDimProduct(const DataType& dtype) {
+uint32_t PackedDimProduct(const DataType& dtype) {
   if (!dtype.packed_dim_left || !dtype.packed_dim_right) return 0;
   uint32_t w = EvalRangeWidth(dtype.packed_dim_left, dtype.packed_dim_right);
   for (const auto& [left, right] : dtype.extra_packed_dims) {
