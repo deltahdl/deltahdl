@@ -4,6 +4,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "elaborator/queue_dim.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/assoc_element.h"
@@ -247,7 +248,14 @@ static bool BindQueueToFixedFormal(QueueObject* src_q,
 static bool TryBindQueueArg(QueueObject* src_q, const FunctionArg& formal,
                             SimContext& ctx, Arena& arena, SourceLoc loc) {
   if (formal.unpacked_dims.empty()) return false;
-  if (formal.unpacked_dims[0] != nullptr) {
+  // §7.10 writes a queue formal's dimension as `[$]` or `[$:N]`, which the
+  // parser records as an expression rather than as the null a dynamic array's
+  // `[]` leaves. Reading any non-null dimension as §7.4.2's fixed size sent a
+  // queue formal to the fixed-size bind, which evaluated the `$` as a size,
+  // reported a mismatch and bound nothing -- so the callee's `q[0]` found no
+  // formal at all and reached the actual it was called with.
+  const Expr* dim = formal.unpacked_dims[0];
+  if (dim != nullptr && !IsQueueDim(dim)) {
     return BindQueueToFixedFormal(src_q, formal, ctx, arena, loc);
   }
   // An unsized formal keeps the dynamic-array/queue representation, so the
