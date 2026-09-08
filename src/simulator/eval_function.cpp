@@ -15,6 +15,7 @@
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
+#include "simulator/statement_assign_internal.h"
 
 namespace delta {
 
@@ -53,7 +54,17 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
   if (info->decl) {
     for (const auto& [pname, pexpr] : info->decl->params) {
       if (pexpr) {
-        auto val = EvalExpr(pexpr, ctx, arena);
+        // §6.8 makes the object's stored parameter and whatever the default
+        // expression read two data storage elements, each storing "a value
+        // from one assignment to the next". EvalExpr on a bare identifier
+        // answers with the variable's own vector (evaluation.cpp), and a
+        // Logic4Vec copy carries the words pointer rather than the words
+        // (src/common/types.h), so storing it as it arrived left the two as
+        // one buffer. The property arm above reaches the same copy through
+        // CoerceToPropertyType; this arm coerces nothing, so it takes it here.
+        // The bare and the scoped key are two names for the one parameter and
+        // every writer sets both, so they share the one copy as they do above.
+        auto val = OwnRhsWords(EvalExpr(pexpr, ctx, arena), arena);
         obj->properties[std::string(pname)] = val;
         std::string scoped =
             std::string(info->name) + "::" + std::string(pname);

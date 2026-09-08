@@ -1,3 +1,5 @@
+#include <cstdint>
+
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
 #include "helpers_scheduler.h"
@@ -9,6 +11,62 @@
 using namespace delta;
 
 namespace {
+
+// Builds a class `P` whose one #() parameter defaults to the bare identifier
+// `n`, over a 32-bit context variable of that name holding `val`, constructs an
+// object of it and answers both. §8.25 gives a parameterized class's value
+// parameter a default expression, and the two tests below are about where the
+// value that expression produced ends up: the object's stored parameter and the
+// variable named are §6.8's two data storage elements.
+struct ParamDefaultCase {
+  Variable* var;
+  ClassObject* obj;
+};
+
+ParamDefaultCase ConstructWithParamDefaultNamingAVariable(SimFixture& f,
+                                                          uint64_t val) {
+  auto* var = f.ctx.CreateVariable("n", 32);
+  var->value = MakeLogic4VecVal(f.arena, 32, val);
+
+  auto* name_expr = f.arena.Create<Expr>();
+  name_expr->kind = ExprKind::kIdentifier;
+  name_expr->text = "n";
+
+  auto* decl = f.arena.Create<ClassDecl>();
+  decl->name = "P";
+  decl->params.push_back({"W", name_expr});
+
+  auto* type = f.arena.Create<ClassTypeInfo>();
+  type->name = "P";
+  type->decl = decl;
+  f.ctx.RegisterClassType("P", type);
+
+  auto handle = EvalClassNew("P", nullptr, f.ctx, f.arena, {});
+  return {var, f.ctx.GetClassObject(handle.ToUint64())};
+}
+
+TEST(ClassSim, ClassParameterDefaultIsStoredOwningItsWords) {
+  SimFixture f;
+  auto [var, obj] = ConstructWithParamDefaultNamingAVariable(f, 0xDEADBEEFu);
+  ASSERT_NE(obj, nullptr);
+  // Both keys the parameter is stored under: the bare name a use inside the
+  // class writes, and the "P::W" one a scoped access writes.
+  ASSERT_NO_FATAL_FAILURE(ExpectOwnWordsCopy(var->value, obj->properties["W"]));
+  ASSERT_NO_FATAL_FAILURE(
+      ExpectOwnWordsCopy(var->value, obj->properties["P::W"]));
+}
+
+// The consequence of the sharing: DepositBitField writes through the words it
+// finds rather than replacing them, so one buffer under the object and the
+// variable would carry a write to the stored parameter back to `n`.
+TEST(ClassSim, DepositIntoAStoredClassParameterLeavesTheVariableIntact) {
+  SimFixture f;
+  auto [var, obj] = ConstructWithParamDefaultNamingAVariable(f, 0xDEADBEEFu);
+  ASSERT_NE(obj, nullptr);
+  DepositBitField(obj->properties["W"], 0, MakeLogic4VecVal(f.arena, 8, 0), 8);
+  EXPECT_EQ(obj->properties["W"].ToUint64(), 0xDEADBE00u);
+  EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
+}
 
 TEST(ClassSim, ParameterizedClassInstantiation) {
   SimFixture f;
