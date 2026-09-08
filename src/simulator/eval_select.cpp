@@ -203,7 +203,24 @@ struct UnpackedSliceRun {
   // numerically lowest index either way, so this is what says which end of the
   // run the slice's first element sits at.
   bool is_descending;
+  // §7.4.5's Table 7-1 answers a read of a nonexistent entry by the element
+  // type: 'x for a 4-state one and '0 for a 2-state one. The two readers below
+  // reach that table for an element the slice names and the array does not
+  // hold, and this is what tells them which row -- ArrayInfo carries it and
+  // neither could ask, so both answered the 2-state row for every array.
+  bool is_4state;
 };
+
+// §7.4.5's Table 7-1, "Value read from a nonexistent array entry": 'x for a
+// 4-state integral element type and '0 for a 2-state one. Said once here for
+// the two slice readers below, which answer the same table
+// TryArrayElementSelect and TryCompoundDefaultElem above answer for a single
+// element of the same array.
+static Logic4Vec ElementDefault(bool is_4state, uint32_t elem_width,
+                                Arena& arena) {
+  return is_4state ? MakeAllX(arena, elem_width)
+                   : MakeLogic4VecVal(arena, elem_width, 0);
+}
 
 // Names the run `expr` addresses, or declines when `expr` is not a slice of an
 // unpacked array. A compound base that is itself a stored packed element is not
@@ -232,10 +249,11 @@ static bool ResolveUnpackedSliceRun(const Expr* expr, SimContext& ctx,
   out.count = count;
   out.elem_width = info->elem_width;
   out.is_descending = info->is_descending;
+  out.is_4state = info->is_4state;
   // A compound name only reaches an array through the leaves it was built to
   // reach, so an absent leaf means this is not that array; a direct name has
   // already been matched against the array itself, and an absent element there
-  // is an out-of-range read that the loop below reports as zero.
+  // is an out-of-range read the loops below answer from Table 7-1.
   return !compound ||
          ctx.FindVariable(out.base + "[" + std::to_string(lo) + "]") != nullptr;
 }
@@ -274,8 +292,13 @@ bool CollectUnpackedSliceElements(const Expr* expr, SimContext& ctx,
         run.is_descending ? (run.lo + run.count - 1 - i) : (run.lo + i);
     auto n = run.base + "[" + std::to_string(idx) + "]";
     auto* v = ctx.FindVariable(n);
+    // §7.4.5: "Reading from an unpacked array of any kind with an invalid index
+    // shall return the value specified in Table 7-1", which gives a 4-state
+    // element 'x and only a 2-state one '0. This is the same answer
+    // TryArrayElementSelect and TryCompoundDefaultElem give for the element
+    // spelling of the same read.
     out.push_back(v ? OwnRhsWords(v->value, arena)
-                    : MakeLogic4VecVal(arena, run.elem_width, 0));
+                    : ElementDefault(run.is_4state, run.elem_width, arena));
   }
   return true;
 }
@@ -293,8 +316,17 @@ static bool TryArraySliceSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   for (uint32_t i = 0; i < run.count; ++i) {
     auto n = run.base + "[" + std::to_string(run.lo + i) + "]";
     auto* v = ctx.FindVariable(n);
-    auto val = v ? v->value.ToUint64() : 0;
     uint32_t bit_off = i * ew;
+    if (v == nullptr) {
+      // §7.4.5's Table 7-1 again, and the 2-state row needs nothing done: the
+      // result was allocated zeroed. The 4-state row is deposited rather than
+      // shifted in, DepositBitField carrying the bval plane an all-x entry
+      // needs and resolving the word the entry lands in -- what the assembly
+      // below does with an entry that is present is #3575's.
+      if (run.is_4state) DepositBitField(out, bit_off, MakeAllX(arena, ew), ew);
+      continue;
+    }
+    auto val = v->value.ToUint64();
     out.words[bit_off / 64].aval |= (val & ((1ULL << ew) - 1))
                                     << (bit_off % 64);
   }

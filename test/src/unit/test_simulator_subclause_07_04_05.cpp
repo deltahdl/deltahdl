@@ -722,4 +722,74 @@ TEST(ArrayIndexingAndSlicing, ArrayFilledFromASliceGetsItsOwnWords) {
   EXPECT_EQ(taken->value.words[0].bval & 0xFFFFu, 0x0000u);
 }
 
+// §7.4.5: "Reading from an unpacked array of any kind with an invalid index
+// shall return the value specified in Table 7-1", and the table gives a
+// 4-state integral element 'x. §7.4.5 has the slice's size constant and its
+// position variable, so `a[i +: 2]` running one past the end is the form the
+// clause itself names rather than a corner. The element spelling of this read
+// answers the table correctly, and the slice spelling answered '0 for every
+// array whatever its element type.
+TEST(ArrayIndexingAndSlicing, SliceOfA4StateArrayReadsXForAMissingElement) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a [0:1];\n"
+      "  logic [7:0] b [0:1];\n"
+      "  int i;\n"
+      "  initial begin\n"
+      "    a[0] = 8'h11;\n"
+      "    a[1] = 8'h22;\n"
+      "    i = 1;\n"
+      "    b = a[i +: 2];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "b[1]");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "xxxxxxxx");
+}
+
+// The other row of the same table, which is the pair the fix has to keep
+// apart: a 2-state element type reads '0, and did before.
+TEST(ArrayIndexingAndSlicing, SliceOfA2StateArrayReadsZeroForAMissingElement) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  bit [7:0] a [0:1];\n"
+      "  bit [7:0] b [0:1];\n"
+      "  int i;\n"
+      "  initial begin\n"
+      "    a[0] = 8'h11;\n"
+      "    a[1] = 8'h22;\n"
+      "    i = 1;\n"
+      "    b = a[i +: 2];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "b[1]");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "00000000");
+}
+
+// The other reader of the same run: a context expecting a single value takes
+// the slice as one packed value, and the missing element is the high half of
+// it. The element that is present pins the low half, so a result that came out
+// all-x could not pass.
+TEST(ArrayIndexingAndSlicing, PackedSliceReadIsXForAMissingElement) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a [0:1];\n"
+      "  logic [15:0] p;\n"
+      "  int i;\n"
+      "  initial begin\n"
+      "    a[0] = 8'h11;\n"
+      "    a[1] = 8'h22;\n"
+      "    i = 1;\n"
+      "    p = a[i +: 2];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "p");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "xxxxxxxx00100010");
+}
+
 }  // namespace
