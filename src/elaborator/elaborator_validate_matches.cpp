@@ -1,4 +1,5 @@
 #include <format>
+#include <functional>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -608,16 +609,21 @@ static bool IsAssocIndexTypeName(std::string_view name) {
 // and `[$:N]` are §7.10's queue, and an index type is §7.8's associative array.
 // `*dynamic` is set for the dynamic array alone, which is the narrower of the
 // two sets the caller keeps.
-static bool DeclaresDynamicallySizedArray(const Stmt* s, bool* dynamic) {
+static bool DimsAreDynamicallySized(const std::vector<Expr*>& dims,
+                                    bool* dynamic) {
   *dynamic = false;
-  if (s->var_unpacked_dims.empty()) return false;
-  const Expr* dim = s->var_unpacked_dims[0];
+  if (dims.empty()) return false;
+  const Expr* dim = dims[0];
   if (dim == nullptr) {
     *dynamic = true;
     return true;
   }
   if (IsQueueDim(dim)) return true;
   return dim->kind == ExprKind::kIdentifier && IsAssocIndexTypeName(dim->text);
+}
+
+static bool DeclaresDynamicallySizedArray(const Stmt* s, bool* dynamic) {
+  return DimsAreDynamicallySized(s->var_unpacked_dims, dynamic);
 }
 
 // The dynamically sized arrays a procedure declares in its own scope. A
@@ -649,6 +655,47 @@ static void CollectProceduralDynamicNames(
   });
 }
 
+// §27.6 makes a generate block's declarations declarations of the module, and
+// §27.4 and §27.5 put the construct's contents in its own nested lists rather
+// than beside the module's other items: a kGenerateFor, kGenerateIf or
+// kGenerateCase item carries them in gen_body, gen_else and the case items'
+// bodies, and its own `body` is null and its func_body_stmts empty. A walk of
+// decl->items alone therefore never reaches a statement written inside one, and
+// §6.21's rule went unenforced there: `if (1) begin : g int q[$]; initial q[0]
+// <= 1; end` elaborated clean where the same two lines at module scope are
+// rejected. Visits the item and every item a generate construct holds under it.
+static void ForEachItemAndGenerateDescendant(
+    const ModuleItem* item, const std::function<void(const ModuleItem*)>& fn) {
+  if (item == nullptr) return;
+  fn(item);
+  for (const auto* child : item->gen_body) {
+    ForEachItemAndGenerateDescendant(child, fn);
+  }
+  ForEachItemAndGenerateDescendant(item->gen_else, fn);
+  for (const auto& case_item : item->gen_case_items) {
+    for (const auto* child : case_item.body) {
+      ForEachItemAndGenerateDescendant(child, fn);
+    }
+  }
+}
+
+// The dynamically sized arrays one item declares. A declaration among the
+// module's own items has already entered var_array_info_ by way of
+// Elaborator::ElaborateVarDecl; one inside a generate construct has not, since
+// §27 expands the construct after this rule runs, so its dimensions are read
+// from the declaration itself. §6.21 asks only whether a name in scope is
+// dynamically sized, which the declaration says on its own.
+static void CollectItemDynamicNames(
+    const ModuleItem* item, std::unordered_set<std::string_view>& dyn_names,
+    std::unordered_set<std::string_view>& dynsized_names) {
+  bool dynamic = false;
+  if (item->kind == ModuleItemKind::kVarDecl &&
+      DimsAreDynamicallySized(item->unpacked_dims, &dynamic)) {
+    dynsized_names.insert(item->name);
+    if (dynamic) dyn_names.insert(item->name);
+  }
+}
+
 void Elaborator::ValidateDynamicArrayNba(const ModuleDecl* decl) {
   std::unordered_set<std::string_view> dyn_names;
   std::unordered_set<std::string_view> dynsized_names;
@@ -662,17 +709,24 @@ void Elaborator::ValidateDynamicArrayNba(const ModuleDecl* decl) {
   // The two lists below are the ones the check itself walks, so the names a
   // procedure declares are collected from the same trees the offending
   // statement is found in, and one pass over each serves both.
-  for (const auto* item : decl->items) {
+  auto collect = [&dyn_names, &dynsized_names](const ModuleItem* item) {
+    CollectItemDynamicNames(item, dyn_names, dynsized_names);
     CollectProceduralDynamicNames(item->body, dyn_names, dynsized_names);
     for (auto* s : item->func_body_stmts)
       CollectProceduralDynamicNames(s, dyn_names, dynsized_names);
+  };
+  for (const auto* item : decl->items) {
+    ForEachItemAndGenerateDescendant(item, collect);
   }
   if (dynsized_names.empty()) return;
-  for (const auto* item : decl->items) {
+  auto check = [&dyn_names, &dynsized_names, this](const ModuleItem* item) {
     if (item->body)
       CheckNbaDynamicArrayTarget(item->body, dyn_names, dynsized_names, diag_);
     for (auto* s : item->func_body_stmts)
       CheckNbaDynamicArrayTarget(s, dyn_names, dynsized_names, diag_);
+  };
+  for (const auto* item : decl->items) {
+    ForEachItemAndGenerateDescendant(item, check);
   }
 }
 

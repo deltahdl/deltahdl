@@ -894,4 +894,52 @@ TEST(ScopeAndLifetimeElaboration, BlockScopedParamSizedArrayElementNbaIsOk) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §27.6 makes a generate block's declarations declarations of the module, so
+// §6.21's "elements of dynamically sized array variables shall not be written
+// with nonblocking ... assignments" is the same rule inside one. The construct
+// holds its contents in its own nested lists rather than beside the module's
+// other items, and the walk read only the latter, so no statement written in a
+// generate block was ever handed to the check.
+//
+// The three lists are here in one module because they are three fields rather
+// than three rules: the block of an if, the block its else records on an item
+// of its own, and the bodies of a case's items. P selects the else and the
+// default, so both assertions stand on branches the construct instantiates.
+TEST(ScopeAndLifetimeElaboration,
+     GenerateScopedQueueElementNonblockingIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  parameter P = 3;\n"
+      "  generate\n"
+      "    if (P == 1) begin : t1\n"
+      "      int qa[$];\n"
+      "      initial qa[0] <= 1;\n"
+      "    end else begin : t2\n"
+      "      int qb[$];\n"
+      "      initial qb[0] <= 1;\n"
+      "    end\n"
+      "    case (P)\n"
+      "      1: begin : c1\n"
+      "        int qc[$];\n"
+      "        initial qc[0] <= 1;\n"
+      "      end\n"
+      "      default: begin : c2\n"
+      "        int qd[$];\n"
+      "        initial qd[0] <= 1;\n"
+      "      end\n"
+      "    endcase\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "nonblocking assignment to element of dynamically sized array", 9,
+      "6.21"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "nonblocking assignment to element of dynamically sized array", 18,
+      "6.21"));
+}
+
 }  // namespace
