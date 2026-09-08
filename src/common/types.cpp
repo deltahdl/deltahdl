@@ -120,8 +120,7 @@ Logic4Vec MakeLogic4Vec(Arena& arena, uint32_t width) {
   // maximum -- leaving a vector whose width and nwords disagree and which
   // Logic4Vec::ToString then reads out of its own allocation. Every width a
   // declaration can state rounds identically either way.
-  uint32_t nwords =
-      static_cast<uint32_t>((static_cast<uint64_t>(width) + 63) / 64);
+  auto nwords = static_cast<uint32_t>((static_cast<uint64_t>(width) + 63) / 64);
   auto* words = arena.AllocArray<Logic4Word>(nwords);
   return {width, nwords, words};
 }
