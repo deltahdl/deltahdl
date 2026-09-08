@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <vector>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
+#include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 
 using namespace delta;
@@ -200,4 +204,99 @@ TEST(NonblockingAssignSchedulingSim,
   // snap captured q before the deferred update; q holds the NBA result.
   EXPECT_EQ(f.ctx.FindVariable("snap")->value.ToUint64(), 0x00u);
   EXPECT_EQ(f.ctx.FindVariable("q")->value.ToUint64(), 0xABu);
+}
+
+// §4.9.4 has a nonblocking assignment compute "the left-hand target" from "the
+// values in effect when the update is placed in the event region", so the index
+// of a select target is resolved where the update is scheduled. §11.5.1 leaves
+// that resolution nothing to write when the index carries x -- "a part-select
+// that is x or z shall yield the value x when read and shall have no effect on
+// the data stored when written", and its bullet list has
+// `vect[expression that returns x]` return x -- so the update is dropped and
+// `x` keeps the 8'h00 the blocking write left. `i` is never assigned, so it
+// holds 3'bxxx: §6.11.2 makes `logic` one of the 4-state types, "types that can
+// have unknown and high-impedance values", and §6.8's Table 6-7 -- "the default
+// values for variables if no initializer is specified" -- gives a 4-state
+// integral variable 'x.
+//
+// Dropping the write is what the clause asks for; abandoning the event taken to
+// carry it is not. The scheduling path acquires an Event from the pool before
+// it knows whether the select addresses any bit, and only an event that reaches
+// a queue is ever released (Scheduler::DrainQueue), so the one taken here left
+// the pool for good -- the Arena has no per-object free to reclaim it, and a
+// long-running design drops one event per such assignment. A free count read at
+// the end of a run cannot show that by itself, since it counts whatever the
+// arena happened to make; the free list is primed with a known stock first and
+// the run has to hand every one of them back. It handed back 31 of 32.
+TEST(NonblockingAssignSchedulingSim,
+     DroppedUnknownIndexSelectNbaReturnsItsEvent) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  logic [2:0] i;\n"
+      "  initial begin\n"
+      "    x = 8'h00;\n"
+      "    x[i] <= 1'b1;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto& pool = f.scheduler.GetEventPool();
+  constexpr size_t kPrimedEvents = 32;
+  std::vector<Event*> primed;
+  primed.reserve(kPrimedEvents);
+  for (size_t n = 0; n < kPrimedEvents; ++n) primed.push_back(pool.Acquire());
+  for (auto* e : primed) pool.Release(e);
+  ASSERT_EQ(pool.FreeCount(), kPrimedEvents);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  // §11.5.1's "no effect on the data stored when written": no bit of x moved.
+  EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 0x00u);
+  // Every event the run took from the primed stock came back to it.
+  EXPECT_EQ(pool.FreeCount(), kPrimedEvents);
+}
+
+// The same abandonment reached by the other of §11.5.1's two routes into a
+// select that addresses no bit of its object: not an index carrying x, but "a
+// part-select that addresses a range of bits that are completely out of the
+// address bounds of the vector", which `x[9:8]` on a `logic [7:0] x` is -- both
+// of its indices sit above the declared 7. The clause gives it the same
+// treatment, "no effect on the data stored when written", so `x` keeps 8'h00,
+// and the same event goes with it. The two are worth having separately because
+// they reach the drop through different arithmetic: the first stops at the
+// unknown-bits test on the evaluated index, this one at the range test in
+// PartSelectStorageBits, and only the shared zero width they both answer with
+// tells the scheduling path there is nothing to place. A run that primes 32
+// free events returned 31.
+TEST(NonblockingAssignSchedulingSim,
+     DroppedOutOfRangePartSelectNbaReturnsItsEvent) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'h00;\n"
+      "    x[9:8] <= 2'b11;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto& pool = f.scheduler.GetEventPool();
+  constexpr size_t kPrimedEvents = 32;
+  std::vector<Event*> primed;
+  primed.reserve(kPrimedEvents);
+  for (size_t n = 0; n < kPrimedEvents; ++n) primed.push_back(pool.Acquire());
+  for (auto* e : primed) pool.Release(e);
+  ASSERT_EQ(pool.FreeCount(), kPrimedEvents);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  // The part-select named bits 9 and 8 of an eight-bit vector; none was
+  // written.
+  EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 0x00u);
+  EXPECT_EQ(pool.FreeCount(), kPrimedEvents);
 }

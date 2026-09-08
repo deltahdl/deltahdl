@@ -364,7 +364,24 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
   event->kind = EventKind::kUpdate;
   if (is_select && !elem) {
     NbaWrite write{event, var, rhs_val, arena};
-    if (!SetupSelectNbaCallback(write, stmt->lhs, ctx)) return;
+    // §11.5.1 makes a select that addresses no bit of its object -- one whose
+    // index carries x or z, and one whose address lies wholly outside the
+    // declared bounds -- "have no effect on the data stored when written", so
+    // declining the write is the clause rather than an error, and only the
+    // bookkeeping was wrong. The event is taken from the pool before the window
+    // is resolved because NbaWrite carries the Event* the installer writes its
+    // callback onto, so the one this path does not use is handed back here.
+    // EventPool::Release (scheduler.cpp:22) resets kind, target, callback and
+    // superseded before relinking, so an event returned mid-setup is as clean
+    // as one the scheduler drains from a queue, and SetupSelectNbaCallback
+    // installs no callback on the path that returns false, so there is nothing
+    // else to undo. Returning without it lost the event for the rest of the
+    // run: the arena has no per-object free, and every other route back to the
+    // pool runs on an event that reached a queue.
+    if (!SetupSelectNbaCallback(write, stmt->lhs, ctx)) {
+      ctx.GetScheduler().GetEventPool().Release(event);
+      return;
+    }
   } else {
     auto converted =
         ConvertRealOnAssign(rhs_val, stmt->lhs, var->value.width, ctx, arena);
