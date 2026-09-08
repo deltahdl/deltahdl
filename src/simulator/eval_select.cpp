@@ -301,20 +301,40 @@ static void MarkOutOfRangeBitsX(Logic4Vec* result, uint32_t base_width,
 
 // Reads the bits between two storage offsets of `base_val`, either of which may
 // lie outside it.
+//
+// §11.5.1 gives a select the value the bits it addresses hold, and §6.3.1 sets
+// every bit of a 4-state vector independently to one of the four basic values,
+// so a bit holding x reads x and one holding z reads z. This function and the
+// bit-select ending EvalSelect both used to read through Logic4Vec::ToUint64,
+// the 2-state projection: it masks by ~bval, so an x and a z alike arrived as
+// 0, and MakeLogic4VecVal sets no bval, so neither could leave. `a[0:0]` and
+// `a[0]` name one window of one variable and have to answer alike; both
+// answered a known 0. ToUint64 returns words[0] alone besides, so neither
+// reached a bit at offset 64 or above -- this one clamped its shift to 63 and
+// read the top of the first word, the bit-select shifted a single word by its
+// own width, which C++ leaves undefined. ExtractBitField copies a window bit
+// by bit, carrying the bval plane and indexing the word each bit lives in, and
+// it is what TryPackedElementSelect below already read its own one-element
+// window with. It fills positions at or beyond `base_val.width` with 0 rather
+// than x, so the marking still runs after it; the marking writes only
+// positions outside the value, which the copy leaves clear, so the two agree
+// on every bit rather than contending for any.
 static Logic4Vec EvalPartSelect(const Logic4Vec& base_val, int64_t idx,
                                 int64_t end_idx, Arena& arena) {
   int64_t lo = std::min(idx, end_idx);
   int64_t hi = std::max(idx, end_idx);
   auto width = static_cast<uint32_t>(hi - lo + 1);
-  // Both shifts are held inside a word: a select far enough outside the value
-  // to need more than that reads no bits of it at all, and the out-of-range
-  // marking below covers the whole result.
-  uint64_t val = base_val.ToUint64() >> std::clamp<int64_t>(lo, 0, 63);
-  // Bits read from the value sit that far up in the result when the select
-  // starts below the value's least significant bit.
-  if (lo < 0) val <<= std::clamp<int64_t>(-lo, 0, 63);
-  uint64_t mask = (width >= 64) ? ~uint64_t{0} : (uint64_t{1} << width) - 1;
-  auto result = MakeLogic4VecVal(arena, width, val & mask);
+  auto result = MakeLogic4Vec(arena, width);
+  // The window's own bits start at the first of them the value holds, and land
+  // that far up in the result when the select runs off the value's low end. A
+  // window lying wholly below the value reads none of it at all.
+  int64_t start = std::max<int64_t>(lo, 0);
+  if (start <= hi) {
+    auto n = static_cast<uint32_t>(hi - start + 1);
+    DepositBitField(
+        result, static_cast<uint32_t>(start - lo),
+        ExtractBitField(arena, base_val, static_cast<uint32_t>(start), n), n);
+  }
   MarkOutOfRangeBitsX(&result, base_val.width, lo, width);
   return result;
 }
@@ -496,8 +516,10 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (!range.Contains(declared_idx))
     return SelectBaseIs4State(expr, ctx) ? MakeAllX(arena, 1)
                                          : MakeLogic4VecVal(arena, 1, 0);
+  // One bit is a window of one, read the way EvalPartSelect above reads the
+  // other spelling of it and for the reasons set out there.
   auto off = static_cast<uint32_t>(range.OffsetOf(declared_idx));
-  return MakeLogic4VecVal(arena, 1, (base_val.ToUint64() >> off) & 1);
+  return ExtractBitField(arena, base_val, off, 1);
 }
 
 }  // namespace delta

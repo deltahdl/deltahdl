@@ -1,6 +1,7 @@
 // §11.5.1 Vector bit-select and part-select addressing, for what a select
-// write must leave alone: the target's own bits outside the window, whatever
-// word they live in, and the x and z those bits and the value's bits hold.
+// must not lose: on the write side the target's own bits outside the window,
+// whatever word they live in, and the x and z those bits and the value's bits
+// hold; on the read side the state of the very bit the select names.
 // §11.5.1 says a part-select partly out of range "shall, when written, only
 // affect the bits that are in range", and the bits a select does not name are
 // no more the write's to touch than the ones past the end are; §6.3.1 gives a
@@ -11,8 +12,8 @@
 // Every case here declares a target wider than one 64-bit word, or one holding
 // x, or both, and asserts on Logic4Vec::ToString or on the words directly.
 // That is the whole of the division between this file and its siblings, and
-// the last two cases are the exception #3537 asks for. They are narrow and
-// known, and they assert on Logic4Vec::ToUint64, because what they hold is not
+// the cases asserting on Logic4Vec::ToUint64 are the exception #3537 asks for.
+// They are narrow and known, and can be, because what they hold is not
 // a bit outside a word or an unknown one but where a write lands at all: they
 // pin the writer's answer to §11.5.1 across the fold of its own walk of the
 // clause onto SelectStorageBits, and they belong beside the writer's other
@@ -39,6 +40,16 @@
 // calls WriteBitSelect from src/simulator/statement_assign.h directly, which
 // pins the answer at the one writer the blocking, compound, increment,
 // expression and subroutine-body forms of an assignment all reach.
+//
+// The cases through the middle of the file are all writes. The reads at the
+// end are §6.3.1 and the word boundary asked of the other direction, of
+// EvalSelect in src/simulator/eval_select.cpp rather than of the writer:
+// §11.5.1 gives a bit-select the value of the bit it addresses, so a
+// bit-select of a bit holding x is 1'bx, one of a bit holding z is 1'bz, and
+// one at an offset of 64 or more is still the bit at that offset. They sit
+// here rather than with the other reads in the siblings for the reason every
+// case here does -- each needs a target holding x or z, or one wider than a
+// 64-bit word, which is what those files' targets are defined not to be.
 
 #include <string>
 
@@ -451,6 +462,144 @@ TEST(SelectBoundaryBehavior, PartSelectWithAnUnknownWidthBoundWritesNothing) {
       f, "tgt");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), uint64_t{0xC3});
+}
+
+// §11.5.1 gives a bit-select "the value of the bit" it addresses, and §6.3.1
+// says "all bits of 4-state vectors can be independently set to one of the
+// four basic values", x among them. So a bit-select of a bit holding x is
+// 1'bx. The sharpest way to say that is not to assert on the bit-select alone
+// but against the part-select spelling of the very same window in the very
+// same run: `a[0]` and `a[0:0]` name one bit of one variable, and §11.5.1
+// gives them the same answer or the clause has two readings. Today they
+// disagree.
+//
+// The two spellings reach two bodies of code. `a[0:0]` carries an index_end,
+// so EvalSelect routes it to EvalPackedPartSelect and on to ExtractBitField in
+// src/common/types.cpp, which copies aval and bval a bit at a time and so
+// keeps the x. `a[0]` falls through to the function's last statement, which
+// reads the target through Logic4Vec::ToUint64 -- the "numeric/boolean
+// projection" of src/common/types.h, returning `aval & ~bval` -- and rebuilds
+// the answer with MakeLogic4VecVal, which sets no bval at all. The x is
+// projected to 0 going in and cannot be encoded going out.
+//
+// The wrong answer is bit_sel "0" against part_sel "x". The assertion has to
+// be on Logic4Vec::ToString: ToUint64 is the very projection under test and
+// reads 1'bx and 1'b0 alike as 0, so a case comparing the two spellings
+// through it would be green today. ToString is what the rest of this file
+// uses, and for a one-bit result it is a one-character string that names the
+// state outright.
+TEST(SelectBoundaryBehavior, BitSelectOfAnUnknownBitAgreesWithThePartSelect) {
+  SimFixture f;
+  auto* bit_sel = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic bit_sel;\n"
+      "  logic part_sel;\n"
+      "  initial begin\n"
+      "    a = 8'bxxxxxxxx;\n"
+      "    bit_sel = a[0];\n"
+      "    part_sel = a[0:0];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "bit_sel");
+  ASSERT_NE(bit_sel, nullptr);
+  auto* part_sel = f.ctx.FindVariable("part_sel");
+  ASSERT_NE(part_sel, nullptr);
+  // The part-select spelling is the one that is right today, so pinning it
+  // first says that the case's own premise holds before it accuses the other.
+  EXPECT_EQ(part_sel->value.ToString(), "x");
+  EXPECT_EQ(bit_sel->value.ToString(), "x");
+  EXPECT_EQ(bit_sel->value.ToString(), part_sel->value.ToString());
+}
+
+// z is the fourth of §6.3.1's values and is no more the projection's to lose
+// than x is, so §11.5.1 gives a bit-select of a bit holding z the answer 1'bz.
+// It needs asserting apart from the x because x and z are one encoding apart
+// and a fix could produce the wrong one of them: src/simulator/
+// evaluation_literal.cpp:93-96 stores x as (aval=1, bval=1) and z as (aval=0,
+// bval=1), and Logic4Vec::ToString in src/common/types.cpp reads bval set with
+// aval set as x and bval set with aval clear as z. A rebuild that set bval
+// from the source but took aval from ToUint64's `aval & ~bval` -- which is 0
+// for x and for z alike -- would answer z here and z again for the x above.
+//
+// So this case asserts the two words as well as the string. ToString says
+// which of the four states the bit is in, and the words say it in the one
+// encoding the rest of the simulator reads, so neither can be satisfied by a
+// coincidence of the other.
+//
+// The wrong answer is "0": ToUint64 masks by ~bval, so the z reads 0 going in,
+// and MakeLogic4VecVal leaves bval clear, so the result is a known 0 rather
+// than a bit in any unknown state at all.
+TEST(SelectBoundaryBehavior, BitSelectOfAHighImpedanceBitReturnsZ) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic bit_sel;\n"
+      "  initial begin\n"
+      "    a = 8'bzzzzzzzz;\n"
+      "    bit_sel = a[0];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "bit_sel");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "z");
+  // z is (aval=0, bval=1). An answer of x would set both and an answer of a
+  // known 0 would set neither, so this pair excludes the two ways of being
+  // wrong that ToString's single character already names.
+  EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+}
+
+// The other half of the same statement, which is wrong for a reason that has
+// nothing to do with x or z: Logic4Vec::ToUint64 returns words[0] alone, so
+// the bit-select arm cannot see a bit that lives in any other word. §11.5.1
+// makes index 64 of a `logic [99:0]` bit offset 64, which is bit 0 of the
+// second word, and the arm shifts its one word right by 64 to reach it --
+// a shift by the width of the type, which C++ leaves undefined and which
+// x86-64 takes modulo 64, so the shift is by 0 and the answer is bit 0 of the
+// first word instead.
+//
+// The target is `100'h1_0000_0000_0000_0000`, one bit set at offset 64 and
+// nothing else, and the case reads both w[64] and w[0]. That pairing is what
+// makes the aliasing visible rather than merely a wrong bit: today the two
+// selects return the same thing, and the clause says they must not, because
+// the bits they name hold different values. A target with bit 0 also set, or
+// an all-ones target, would have the two agreeing legitimately and the case
+// would pass while reading the wrong word.
+//
+// The literal is written into the source rather than deposited by
+// `w[64] = 1'b1` so that no writer stands between the declaration and the
+// read; the two assertions on words pin that the value did land at offset 64
+// before anything is claimed about what a select made of it.
+//
+// The wrong answer is hi "0" and lo "0". After the fix hi reads "1" and lo
+// still reads "0".
+TEST(SelectBoundaryBehavior, BitSelectAboveTheFirstWordReadsThatWordsBit) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [99:0] w;\n"
+      "  logic hi;\n"
+      "  logic lo;\n"
+      "  initial begin\n"
+      "    w = 100'h1_0000_0000_0000_0000;\n"
+      "    hi = w[64];\n"
+      "    lo = w[0];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "w");
+  ASSERT_NE(var, nullptr);
+  ASSERT_GE(var->value.nwords, 2u);
+  EXPECT_EQ(var->value.words[1].aval, uint64_t{1});
+  EXPECT_EQ(var->value.words[0].aval, uint64_t{0});
+
+  auto* hi = f.ctx.FindVariable("hi");
+  auto* lo = f.ctx.FindVariable("lo");
+  ASSERT_NE(hi, nullptr);
+  ASSERT_NE(lo, nullptr);
+  EXPECT_EQ(hi->value.ToString(), "1");
+  EXPECT_EQ(lo->value.ToString(), "0");
 }
 
 }  // namespace
