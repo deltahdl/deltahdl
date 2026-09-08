@@ -111,6 +111,14 @@ FieldTarget ResolveFieldTarget(const Expr* lhs, SimContext& ctx);
 void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
                         SimContext& ctx, Arena& arena);
 
+// §11.5.1: writes the window `lhs` names of the class property its base selects
+// from, e.g. `c.p[7:0] = 8'h00`. Answers false for anything that is not a
+// select over a member access naming a property of a declared width, so a
+// caller goes on to the writers that name a context variable. Defined in
+// statement_assign.cpp; the definition's comment gives the reason it exists.
+bool TryWriteClassPropertyBits(const Expr* lhs, const Logic4Vec& rhs_val,
+                               SimContext& ctx, Arena& arena);
+
 // Resolve-then-write for a blocking assignment, which does both when the
 // statement executes. Returns false when the path names no storage.
 bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,

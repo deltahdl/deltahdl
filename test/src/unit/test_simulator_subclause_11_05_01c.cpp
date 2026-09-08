@@ -708,4 +708,82 @@ TEST(SelectBoundaryBehavior, PartSelectLowOverhangAboveTheFirstWordReadsX) {
   EXPECT_EQ(var->value.ToString(), "10100101" + std::string(72, 'x'));
 }
 
+// §11.5.1 makes a part-select of a vector an lvalue and §6.8 has the variable
+// behind it store what is assigned, and §8.3 declares a class property as a
+// data declaration -- so a window of one is a target like any other. It reached
+// none of the writers, each of which names a context variable: the base is a
+// member access rather than an identifier, and the fallback rebuilt the text
+// "c.p" and asked FindVariable for storage that lives in the object's property
+// map, so the write was dropped with nothing reported. 16'hAA00 against
+// 16'hAABB is the discriminating pair -- the untouched half of the value is
+// what names the window that was written.
+TEST(ExpressionSim, PartSelectWriteToAClassPropertyLandsInIt) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class C;\n"
+      "    logic [15:0] p;\n"
+      "  endclass\n"
+      "  logic [15:0] r;\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    c = new;\n"
+      "    c.p = 16'hAABB;\n"
+      "    c.p[7:0] = 8'h00;\n"
+      "    r = c.p;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xAA00u);
+}
+
+// The single-index arm of the same rule, which WriteBitSelect resolves through
+// a different path from the part-select above.
+TEST(ExpressionSim, BitSelectWriteToAClassPropertyLandsInIt) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class C;\n"
+      "    logic [15:0] p;\n"
+      "  endclass\n"
+      "  logic [15:0] r;\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    c = new;\n"
+      "    c.p = 16'h00FF;\n"
+      "    c.p[8] = 1'b1;\n"
+      "    r = c.p;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x01FFu);
+}
+
+// This file's own rule over the same target: §6.3.1 gives a 4-state property
+// four values per bit, and the bits outside the window are the property's own,
+// x and z included. A writer that rebuilt the value from a 2-state projection
+// would answer a known 0 for the nibble it did not write.
+TEST(ExpressionSim, PartSelectWriteToAClassPropertyLeavesItsUnknownBits) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class C;\n"
+      "    logic [15:0] p;\n"
+      "  endclass\n"
+      "  logic [15:0] r;\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    c = new;\n"
+      "    c.p = 16'hAAxB;\n"
+      "    c.p[3:0] = 4'hF;\n"
+      "    r = c.p;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "10101010xxxx1111");
+}
+
 }  // namespace

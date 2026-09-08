@@ -466,6 +466,49 @@ void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
   }
 }
 
+// §11.5.1 makes a bit-select and a part-select of a vector an lvalue in their
+// own right, and §6.8 has the variable behind one store what is assigned to it
+// from one assignment to the next. A class property is such a variable -- §8.3
+// declares class properties as data declarations -- and `c.p[7:0] = 8'h00` is a
+// select whose base is a member access, which every arm of
+// TrySelectBlockingAssign declined: each of them names a context variable, and
+// the fallback ResolveLhsVariable rebuilds the text "c.p" and asks FindVariable
+// for storage that lives in the ClassObject's property map instead, so the
+// write was dropped with `true` returned to the caller and nothing reported.
+//
+// The window is resolved the way §7.8.7's write to bits of an associative
+// element resolves its own: a stack Variable lends WriteBitSelect the width and
+// state-ness the declaration gave the property, since a property is stored as a
+// bare vector carrying neither, and the value it leaves is stored back through
+// the same coercion and the same announcement a whole-property write takes.
+// A property whose width the collector could not size -- a typedef name, a
+// class handle, a string -- is declined rather than addressed through a carrier
+// width the declaration never gave.
+bool TryWriteClassPropertyBits(const Expr* lhs, const Logic4Vec& rhs_val,
+                               SimContext& ctx, Arena& arena) {
+  if (!lhs || lhs->kind != ExprKind::kSelect || !lhs->base) return false;
+  if (lhs->base->kind != ExprKind::kMemberAccess) return false;
+  FieldTarget target = ResolveFieldTarget(lhs->base, ctx);
+  if (target.kind != FieldTarget::Kind::kProperty || target.obj == nullptr)
+    return false;
+  const ClassTypeInfo* start = target.type ? target.type : target.obj->type;
+  const auto* prop = FindPropertyInfo(start, target.field);
+  if (prop == nullptr || !prop->width_is_declared || prop->is_real)
+    return false;
+
+  Variable elem;
+  elem.value = target.type ? target.obj->GetPropertyForType(target.field,
+                                                            target.type, arena)
+                           : target.obj->GetProperty(target.field, arena);
+  elem.is_4state = prop->is_4state;
+  elem.is_signed = prop->is_signed;
+  WriteBitSelect(&elem, lhs, rhs_val, ctx, arena);
+  SetClassField(target.obj, target.type, target.field, elem.value, arena);
+  if (target.notify) target.notify->NotifyWatchers();
+  ctx.NotifyClassHandleWatchers(target.obj->handle);
+  return true;
+}
+
 bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
                       SimContext& ctx) {
   // §7.8.7: `b[2].x = 5` names a member of an associative array element, which
