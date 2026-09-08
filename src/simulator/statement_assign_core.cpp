@@ -465,6 +465,21 @@ bool ConcatLhsElemHasWritableBits(const Expr* e, const Variable& var,
 // the end of its object.
 static void WriteConcatLhsElement(const Expr* el, const Logic4Vec& slice,
                                   SimContext& ctx, Arena& arena) {
+  // §7.4.2 makes `out[i]` on an unpacked array a reference to one whole
+  // element, and §11.4.12 gives a concatenation element the bits its own width
+  // claims -- ConcatLhsElemWidth having already sized this one by the element's
+  // width. These are the three writers TrySelectBlockingAssign asks first for a
+  // lone target, in its order, and asking none of them is what sent an element
+  // to ResolveLhsVariable below: that answers the variable the lowerer creates
+  // under the array's own name, one element wide and read by nothing, so the
+  // slice was deposited one bit at a time into a carrier and lost -- `{out[1],
+  // b} = 16'hABCD` left out[1] holding what it held while `b` took 8'hCD.
+  if (auto* elem = TryResolveArrayElement(el, ctx)) {
+    WriteVar(elem, slice, arena);
+    return;
+  }
+  if (TryQueueIndexedWrite(el, slice, ctx, arena)) return;
+  if (TryAssocIndexedWrite(el, slice, ctx, arena)) return;
   auto* var = ResolveLhsVariable(el, ctx);
   if (var == nullptr) return;
   // A select element takes the bits it named and leaves the rest of its

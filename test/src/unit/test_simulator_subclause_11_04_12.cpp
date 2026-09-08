@@ -723,4 +723,63 @@ TEST(ConcatenationSim, LhsConcatUnknownBoundPartSelectElementReportsNothing) {
   EXPECT_EQ(hi->value.ToUint64(), 0xD5u);
 }
 
+// §11.4.12 makes a concatenation lvalue "a packed vector of bits" whose
+// elements each receive their own bits, and §7.4.2 makes `out[i]` on an
+// unpacked array a reference to one whole element. The lone-target write
+// honours that; the same target written inside a concatenation resolved to the
+// variable the lowerer creates under the array's name -- one element wide and
+// read by nothing -- and deposited one bit of the slice there. `b` taking 8'hCD
+// is what says the division of the value was right all along and only the
+// deposit was not.
+TEST(ConcatenationSim, LhsConcatWritesAnUnpackedArrayElement) {
+  const char* src =
+      "module t;\n"
+      "  logic [7:0] out [0:3];\n"
+      "  logic [7:0] b;\n"
+      "  logic [7:0] r;\n"
+      "  initial begin\n"
+      "    out[1] = 8'h11;\n"
+      "    {out[1], b} = 16'hABCD;\n"
+      "    r = out[1];\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "r"), 0xABu);
+  EXPECT_EQ(RunAndGet(src, "b"), 0xCDu);
+}
+
+// A queue element reached the same way, its store being a QueueObject rather
+// than a variable of its own -- so the fallback wrote a carrier for it too.
+TEST(ConcatenationSim, LhsConcatWritesAQueueElement) {
+  const char* src =
+      "module t;\n"
+      "  logic [7:0] qu [$];\n"
+      "  logic [7:0] b;\n"
+      "  logic [7:0] r;\n"
+      "  initial begin\n"
+      "    qu.push_back(8'h11);\n"
+      "    {qu[0], b} = 16'hABCD;\n"
+      "    r = qu[0];\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "r"), 0xABu);
+  EXPECT_EQ(RunAndGet(src, "b"), 0xCDu);
+}
+
+// The guard on the arm this now runs ahead of: a bit-select of a packed
+// variable is not a whole element, and §11.5.1 has it take the bits it names
+// and leave the rest of the variable standing.
+TEST(ConcatenationSim, LhsConcatStillWritesAPackedSelectInPlace) {
+  const char* src =
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [7:0] b;\n"
+      "  initial begin\n"
+      "    a = 8'hF0;\n"
+      "    {a[3:0], b} = 12'hABC;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "a"), 0xFAu);
+  EXPECT_EQ(RunAndGet(src, "b"), 0xBCu);
+}
+
 }  // namespace
