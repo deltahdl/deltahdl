@@ -98,10 +98,22 @@ struct QueueObject {
   uint64_t next_elem_id_ = 0;
 };
 
+// The name the aggregate was declared under, carried on both ref bindings
+// below. A queue's and an associative array's elements are bare Logic4Vecs
+// rather than Variables, so a ref formal bound to one is copied out at the end
+// of the call rather than aliased -- and §9.4.2 has that write announce itself
+// ("Changing the value of object data members, aggregate elements, or the size
+// of a dynamically sized array referenced by a method or function shall cause
+// the event expression to be reevaluated"), which means telling the watchers
+// armed on the aggregate's own Variable. Nothing else on either binding names
+// it: the QueueObject and the AssocArrayObject are reached by pointer and the
+// local variable carries the formal's name. The view is the call argument's
+// base identifier text, which the AST owns and which outlives the call.
 struct QueueRefBinding {
   QueueObject* queue = nullptr;
   uint64_t element_id = 0;
   Variable* local_var = nullptr;
+  std::string_view var_name;
 };
 
 struct AssocArrayObject;
@@ -112,6 +124,7 @@ struct AssocRefBinding {
   int64_t int_key = 0;
   std::string str_key;
   Variable* local_var = nullptr;
+  std::string_view var_name;
 };
 
 struct AssocArrayObject {

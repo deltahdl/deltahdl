@@ -487,4 +487,103 @@ TEST(QueueRef, QueueRefOutOfBoundsFallsBackToValue) {
   EXPECT_EQ(q->elements[2].ToUint64(), 30u);
 }
 
+// §13.5.2 makes a ref argument the caller's own object rather than a copy, so
+// the copy-out a queue element ref needs -- an element being a bare vector
+// rather than a Variable to alias -- is a write to the caller's queue, and
+// §9.4.2 has it announce itself: "Changing the value of object data members,
+// aggregate elements, or the size of a dynamically sized array referenced by a
+// method or function shall cause the event expression to be reevaluated". The
+// watchers are on the variable the queue was declared under. 99 against 20 is
+// the discriminating pair: 20 is what a run that notified on push_back and not
+// on the writeback leaves standing.
+TEST(QueueRef, RefElementWritebackWakesAnAlwaysCombReadingTheElement) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int q[$];\n"
+      "  int b;\n"
+      "  function automatic void poke(ref int r);\n"
+      "    r = 99;\n"
+      "  endfunction\n"
+      "  always_comb b = q[1];\n"
+      "  initial begin\n"
+      "    q.push_back(10);\n"
+      "    q.push_back(20);\n"
+      "    #1 poke(q[1]);\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      "b");
+  EXPECT_EQ(v, 99u);
+}
+
+// The other awaiter route onto the same notification -- the compound watcher an
+// event control arms rather than the inferred sensitivity list's -- so a fix
+// serving one could leave the other. The second push and the writeback are the
+// two changes to q[1] after the control armed, and a run that notified only on
+// the push counts one of them.
+TEST(QueueRef, RefElementWritebackWakesAnEventControlOnThatElement) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int q[$];\n"
+      "  int woke;\n"
+      "  function automatic void poke(ref int r);\n"
+      "    r = 99;\n"
+      "  endfunction\n"
+      "  always @(q[1]) woke = woke + 1;\n"
+      "  initial begin\n"
+      "    woke = 0;\n"
+      "    #1 q.push_back(10);\n"
+      "    #1 q.push_back(20);\n"
+      "    #1 poke(q[1]);\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      "woke");
+  EXPECT_EQ(v, 2u);
+}
+
+// WritebackAssocRefs rather than WritebackQueueRefs, a separate function whose
+// notification is separate. The ref call is the only write in the design, so no
+// statement-path element writer is involved and the case stands on the
+// writeback alone.
+TEST(PassByRef, AssocRefElementWritebackWakesAnAlwaysCombReadingTheElement) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int b;\n"
+      "  function automatic void poke(ref int r);\n"
+      "    r = 99;\n"
+      "  endfunction\n"
+      "  always_comb b = aa[1];\n"
+      "  initial begin\n"
+      "    #1 poke(aa[1]);\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      "b");
+  EXPECT_EQ(v, 99u);
+}
+
+// The guard rather than a reproduction: a ref bound to a whole variable is
+// aliased rather than copied out, and the body's own write is what notifies.
+// It passes today, and it is what says the notification for the element case
+// was added beside that one rather than moved onto its path.
+TEST(PassByRef, RefWholeVariableWriteWakesAnAlwaysCombReadingIt) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int x;\n"
+      "  int b;\n"
+      "  function automatic void poke(ref int r);\n"
+      "    r = 99;\n"
+      "  endfunction\n"
+      "  always_comb b = x;\n"
+      "  initial begin\n"
+      "    #1 poke(x);\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      "b");
+  EXPECT_EQ(v, 99u);
+}
+
 }  // namespace

@@ -8,6 +8,7 @@
 #include "parser/ast.h"
 #include "simulator/assoc_element.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_array.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -69,7 +70,7 @@ static bool TryBindQueueElementRef(const Expr* expr, int arg_index,
   var->value = q->elements[idx];
 
   if (idx < q->element_ids.size()) {
-    ctx.RecordQueueRef({q, q->element_ids[idx], var});
+    ctx.RecordQueueRef({q, q->element_ids[idx], var, call_arg->base->text});
   }
   return true;
 }
@@ -83,6 +84,15 @@ void WritebackQueueRefs(SimContext& ctx) {
     auto pos = static_cast<size_t>(it - ids.begin());
     if (pos < b.queue->elements.size()) {
       b.queue->elements[pos] = b.local_var->value;
+      // §13.5.2 makes this the caller's own element rather than a copy, so the
+      // copy-out is a write to the caller's queue and §9.4.2 has it announce
+      // itself. Only here, below the `continue` above: an element deleted
+      // during the call is written nowhere and so changes nothing. Several
+      // bindings can name one aggregate -- `swap(q[0], q[1])` -- and each has
+      // changed an element of it, so one notification per binding is the
+      // count, a watcher re-evaluating its expression rather than reading a
+      // delta.
+      NotifyOwningVar(ctx, b.var_name);
     }
   }
 }
@@ -105,6 +115,7 @@ static bool TryBindAssocElementRef(const Expr* expr, int arg_index,
   binding.assoc = aa;
   binding.is_string_key = aa->is_string_key;
   binding.local_var = var;
+  binding.var_name = call_arg->base->text;
   // §7.8.7: an element passed by reference is allocated when it does not
   // exist, holding the initial value the array gives a new element. The key it
   // is allocated under is the one an assignment to that element would use, so
@@ -115,6 +126,11 @@ static bool TryBindAssocElementRef(const Expr* expr, int arg_index,
     if (it == aa->str_data.end()) {
       aa->str_data[binding.str_key] = AssocAllocValue(aa, arena);
       it = aa->str_data.find(binding.str_key);
+      // The allocation is itself a change to the caller's array, so it is
+      // announced where it happens rather than left for the copy-out, which
+      // would make the notification depend on the body having written the
+      // formal.
+      NotifyOwningVar(ctx, binding.var_name);
     }
     var->value = it->second;
   } else {
@@ -125,6 +141,7 @@ static bool TryBindAssocElementRef(const Expr* expr, int arg_index,
     if (it == aa->int_data.end()) {
       aa->int_data[binding.int_key] = AssocAllocValue(aa, arena);
       it = aa->int_data.find(binding.int_key);
+      NotifyOwningVar(ctx, binding.var_name);
     }
     var->value = it->second;
   }
@@ -140,6 +157,10 @@ void WritebackAssocRefs(SimContext& ctx) {
     } else {
       b.assoc->int_data[b.int_key] = b.local_var->value;
     }
+    // §13.5.2 and §9.4.2, as for the queue above: the copy-out writes the
+    // caller's array, and the watchers are on the variable the array was
+    // declared under rather than on the entry.
+    NotifyOwningVar(ctx, b.var_name);
   }
 }
 
