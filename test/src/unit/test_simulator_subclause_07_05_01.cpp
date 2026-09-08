@@ -329,4 +329,97 @@ TEST(DynamicArrayNewSimulation, DeclNegativeSizeNames7_5_1) {
                             "7.5.1"));
 }
 
+// §7.5.1: "The new constructor sets the size of a dynamic array and
+// initializes its elements", and "In either case, if the new constructor call
+// does not specify an initialization expression, the elements are initialized
+// to the default value for their type". Elements, plural: §6.8 makes each one
+// "an abstraction of a data storage element" that "shall store a value from
+// one assignment to the next", so `d = new[3]` owes the array three storage
+// elements rather than one value read three times.
+//
+// The grow arm reaches the size through std::vector::resize(n, value), and
+// resize copy-constructs every element it appends from the single value it
+// was handed. Logic4Vec copies its `words` pointer and not the words, so all
+// three entries come back naming one buffer, the one MakeLogic4VecVal
+// allocated for the fill value: a writer that later deposits into d[0] in
+// place would be read back through d[1] and d[2] as well. The three pointers
+// standing pairwise distinct is the whole of the claim, since equal bits read
+// equal by construction on a shared buffer. The zeroes beside them are what
+// keeps the case from passing on three elements the run never initialized at
+// all, the default value for `int` being the one the clause names.
+TEST(DynamicArrayNewSimulation, NewWithoutInitGivesEachElementItsOwnWords) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int d[];\n"
+      "  initial d = new[3];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* d = f.ctx.FindQueue("d");
+  ASSERT_NE(d, nullptr);
+  ASSERT_EQ(d->elements.size(), 3u);
+  ASSERT_NE(d->elements[0].words, nullptr);
+  ASSERT_NE(d->elements[1].words, nullptr);
+  ASSERT_NE(d->elements[2].words, nullptr);
+  EXPECT_NE(d->elements[0].words, d->elements[1].words);
+  EXPECT_NE(d->elements[1].words, d->elements[2].words);
+  EXPECT_NE(d->elements[0].words, d->elements[2].words);
+  EXPECT_EQ(d->elements[0].ToUint64(), 0u);
+  EXPECT_EQ(d->elements[1].ToUint64(), 0u);
+  EXPECT_EQ(d->elements[2].ToUint64(), 0u);
+}
+
+// §7.5.1 on the other store the constructor has: "The optional initialization
+// expression is used to initialize the dynamic array", and "Resizing or
+// reinitializing a previously initialized dynamic array using new is
+// destructive; no preexisting array data is preserved (unless reinitialized
+// with its old contents -- see preceding), and all preexisting references to
+// array elements become outdated". A destination element left sharing a
+// buffer with a live source element is exactly such a preexisting reference
+// that did not become outdated: `s` goes on naming the storage `d` was just
+// given, and a later write through either name would be read back through the
+// other.
+//
+// CopyNewInit finishes with a plain per-element Logic4Vec assignment, which
+// carries the `words` pointer over, so `new[2](s)` hands each position of `d`
+// the buffer the matching position of `s` still holds. ExpectOwnWordsCopy is
+// what makes the storage-identity claim and compares both planes of every
+// word alongside it; the second position is claimed on the pointer alone
+// because the helper has already established the shape. Reading the literals
+// back afterwards says the copy delivered the source values rather than
+// leaving `d` empty of them, and the two source values differ, so a run that
+// filled both positions from one entry fails here too.
+TEST(DynamicArrayNewSimulation, NewWithInitGivesDestinationItsOwnWords) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int s[];\n"
+      "  int d[];\n"
+      "  initial begin\n"
+      "    s = new[2];\n"
+      "    s[0] = 32'h1234_5678;\n"
+      "    s[1] = 32'h0BAD_F00D;\n"
+      "    d = new[2](s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* s = f.ctx.FindQueue("s");
+  ASSERT_NE(s, nullptr);
+  ASSERT_EQ(s->elements.size(), 2u);
+  auto* d = f.ctx.FindQueue("d");
+  ASSERT_NE(d, nullptr);
+  ASSERT_EQ(d->elements.size(), 2u);
+  ASSERT_NO_FATAL_FAILURE(ExpectOwnWordsCopy(s->elements[0], d->elements[0]));
+  ASSERT_NE(d->elements[1].words, nullptr);
+  EXPECT_NE(d->elements[1].words, s->elements[1].words);
+  EXPECT_EQ(d->elements[0].words[0].aval, 0x12345678u);
+  EXPECT_EQ(d->elements[1].words[0].aval, 0x0BADF00Du);
+}
+
 }  // namespace

@@ -695,8 +695,19 @@ void CollectQueueElements(const Expr* expr, SimContext& ctx, Arena& arena,
   CollectQueueItem(expr, ctx, arena, out);
 }
 
+// §7.5.1: "The optional initialization expression is used to initialize the
+// dynamic array." Each entry it initializes is a store of its own, so each
+// takes a copy of the source entry's words rather than the pointer to them a
+// plain Logic4Vec assignment would leave the two sharing. The clause is
+// explicit about what the sharing would break: reinitializing with new "is
+// destructive ... and all preexisting references to array elements become
+// outdated", and an entry still pointing at the source's words is exactly such
+// a reference left live. `saved` carries the same hazard on the self-
+// initializing form `d = new[n](d)`, since it is a vector copy whose entries
+// are themselves pointer copies of what the array held before the resize.
 static void CopyNewInit(const Expr* rhs, QueueObject* q,
-                        const std::vector<Logic4Vec>& saved, SimContext& ctx) {
+                        const std::vector<Logic4Vec>& saved, SimContext& ctx,
+                        Arena& arena) {
   if (rhs->args.size() < 2) return;
   auto* init_expr = rhs->args[1];
   if (!init_expr || init_expr->kind != ExprKind::kIdentifier) return;
@@ -705,7 +716,8 @@ static void CopyNewInit(const Expr* rhs, QueueObject* q,
 
   const auto& src_elems = (src == q) ? saved : src->elements;
   size_t copy_len = std::min(q->elements.size(), src_elems.size());
-  for (size_t i = 0; i < copy_len; ++i) q->elements[i] = src_elems[i];
+  for (size_t i = 0; i < copy_len; ++i)
+    q->elements[i] = OwnRhsWords(src_elems[i], arena);
 }
 
 bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
@@ -732,9 +744,19 @@ bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     }
 
     auto saved = q->elements;
-    q->elements.resize(static_cast<size_t>(sz),
-                       MakeLogic4VecVal(arena, q->elem_width, 0));
-    CopyNewInit(stmt->rhs, q, saved, ctx);
+    // §7.5.1: with no initialization expression "the elements are initialized
+    // to the default value for their type" -- each element initialized, so
+    // each is a storage element of its own under §6.8 and needs its own words.
+    // resize(n, value) copy-constructs every element it adds from the one
+    // value it is handed, and a Logic4Vec copy copies the `words` pointer, so
+    // filling that way would leave `d = new[4]` holding one buffer read four
+    // times. Growing one element at a time gives each its own allocation;
+    // shrinking is left to resize, which drops entries rather than making any.
+    size_t grown_from = q->elements.size();
+    q->elements.resize(static_cast<size_t>(sz));
+    for (size_t i = grown_from; i < q->elements.size(); ++i)
+      q->elements[i] = MakeLogic4VecVal(arena, q->elem_width, 0);
+    CopyNewInit(stmt->rhs, q, saved, ctx, arena);
     EnforceQueueBound(q, "new[]", stmt->rhs->range.start, ctx);
     q->AssignFreshIds();
     ++q->generation;
