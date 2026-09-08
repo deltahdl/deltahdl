@@ -617,4 +617,50 @@ TEST(ImplicitSensitivityWatchList, EmptiesAListWhoseNamesAllDesignateNoObject) {
   EXPECT_TRUE(names.empty());
 }
 
+// §9.2.2.2.1: "The implicit sensitivity list of an always_comb includes the
+// expansions of the longest static prefix of each net or variable identifier or
+// select expression that is read within the block". An unpacked array's element
+// is a Variable of its own, and every element writer notifies that Variable
+// rather than the one the array's name denotes, so watching the base name alone
+// left this block reading Table 6-7's 'x for the rest of the run. 8'hEF against
+// that x is the discriminating pair: ToUint64 reads an all-x value as 0.
+TEST(AlwaysCombSensitivitySim, ReactsToAWriteOfTheArrayElementItReads) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  reg [7:0] mem [0:3];\n"
+      "  reg [7:0] b;\n"
+      "  always_comb b = mem[2];\n"
+      "  initial begin\n"
+      "    #1 mem[2] = 8'hEF;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "b");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xEFu);
+}
+
+// The packed half of the same rule, which is what keeps the fix from being a
+// blanket switch to watching prefixes: `a[1]` names no simulation object -- a
+// `logic [7:0] a` is one Variable -- so the base name is what a bit-select read
+// is watched through, and a write to any bit of it still re-runs the block.
+TEST(AlwaysCombSensitivitySim, StillReactsToAWriteOfThePackedBitItReads) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  reg [7:0] a;\n"
+      "  reg b;\n"
+      "  always_comb b = a[1];\n"
+      "  initial begin\n"
+      "    a = 8'h00;\n"
+      "    #1 a[1] = 1'b1;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "b");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 }  // namespace

@@ -337,15 +337,26 @@ static void MergeCalledFunctionSignals(const Stmt* body, const FuncMap& funcs,
   }
 }
 
-// §9.2.2.2.1: the inferred sensitivity watches whole signals, so reduce a
-// read's longest static prefix (e.g. "state[0]", "s.f") to the base identifier.
-// The event signal is then a plain identifier that the simulator resolves to
-// the declared net/variable (it keys watchers by the base name via
-// FindVariable); an indexed/membered text would never match and the process
-// would not wake.
+// The base identifier a read's longest static prefix (e.g. "state[0]", "s.f")
+// stands on. It is one of the two names the prefix expands to, and the one that
+// always denotes a simulation object: `logic [7:0] a` is a single Variable
+// named `a`, so a bit-select read of it can only be watched through that name.
 static std::string_view BaseSignalName(std::string_view name) {
   auto pos = name.find_first_of("[.");
   return pos == std::string_view::npos ? name : name.substr(0, pos);
+}
+
+// Records one watchable name, deduped, as a plain identifier event the
+// simulator resolves through FindVariable.
+static void EmitSignalEvent(std::string_view text,
+                            std::unordered_set<std::string_view>& emitted,
+                            std::vector<EventExpr>& events, Arena& arena) {
+  if (text.empty() || !emitted.insert(text).second) return;
+  auto* expr = arena.Create<Expr>();
+  expr->kind = ExprKind::kIdentifier;
+  expr->text = std::string_view(arena.AllocString(text.data(), text.size()),
+                                text.size());
+  events.push_back({Edge::kNone, expr});
 }
 
 static std::vector<EventExpr> BuildSensitivityEvents(
@@ -366,12 +377,23 @@ static std::vector<EventExpr> BuildSensitivityEvents(
     // select index that survived as its own read) is dropped -- a constant
     // never changes, so it cannot be part of a sensitivity list.
     if (const_names && const_names->count(base)) continue;
-    if (base.empty() || !emitted.insert(base).second) continue;
-    auto* expr = arena.Create<Expr>();
-    expr->kind = ExprKind::kIdentifier;
-    expr->text = std::string_view(arena.AllocString(base.data(), base.size()),
-                                  base.size());
-    events.push_back({Edge::kNone, expr});
+    EmitSignalEvent(base, emitted, events, arena);
+    // §9.2.2.2.1 asks for "the expansions of the longest static prefix of each
+    // net or variable identifier or select expression that is read", and the
+    // prefix is the other expansion. The base name alone is enough for a
+    // packed vector, whose bits all live in the one Variable it names, and is
+    // not enough for an unpacked array, whose elements are Variables of their
+    // own: `always_comb b = mem[2];` watched `mem`, whose value models one
+    // element and never moves, while every element writer -- WriteVar through
+    // TryResolveArrayElement, the pattern writers, the §21.4 loaders --
+    // notifies `mem[2]`, so the block never re-ran. Emitting both is what
+    // CollectSelectReads already does for the `wait` route, which is why that
+    // route wakes; a prefix that names no object, `a[1]` of a packed `a` among
+    // them, is dropped by DropUnwatchableNames in the simulator and skipped by
+    // EventAwaiter, so neither path is asked to arm on a name it cannot
+    // resolve.
+    if (std::string_view(name) != base)
+      EmitSignalEvent(name, emitted, events, arena);
   }
   return events;
 }

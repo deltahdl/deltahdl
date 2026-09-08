@@ -760,4 +760,26 @@ TEST(AlwaysCombSensitivityInference, ClassScopeResolvedCallArgInSensitivity) {
   ExpectSensitivityContains(proc, {"a"});
   ExpectSensitivityExcludes(proc, {"C"});
 }
+// §9.2.2.2.1 asks for "the expansions of the longest static prefix", plural,
+// and both of them reach the list: the base identifier, which is the expansion
+// that names an object for a packed vector, and the prefix itself, which is the
+// one that names an object for an unpacked array, whose elements are variables
+// of their own. Watching only the base left an always_comb reading `arr[1]`
+// watching a variable no element write touches.
+TEST(AlwaysCombSensitivityInference, ArrayElementReadListsPrefixAndBase) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] arr [0:3];\n"
+      "  logic [7:0] y;\n"
+      "  always_comb y = arr[1];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  ExpectSensitivityContains(design->top_modules[0]->processes[0],
+                            {"arr[1]", "arr"});
+}
+
 }  // namespace
