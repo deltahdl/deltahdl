@@ -408,6 +408,20 @@ uint32_t SelectExprWidth(const Variable& var, const Expr* sel, SimContext& ctx,
 // draw the boundary wrong: `{a[3:0], b}` sized its first element at the whole
 // of `a`. The writers ask SelectStorageBits for the window themselves, and
 // ConcatLhsElemHasWritableBits below decides whether they write at all.
+// Whether an index of `base` names a whole element rather than bits within a
+// packed object. §7.4.2's fixed unpacked array is registered as an ArrayInfo;
+// §7.10's queue and §7.8's associative array are not registered as one at all,
+// their elements living in a QueueObject and an AssocArrayObject, so asking
+// FindArrayInfo alone answered no for them and a select of one was measured as
+// a bit-select of the variable the lowerer creates under the name -- a variable
+// that models one element, so `qu[0]` came back one bit wide. That width is
+// §11.6.1's context for the operation and, since #3502, §11.3.6's type for the
+// value an assignment expression yields, so both were sized to a bit.
+static bool IndexNamesWholeElement(std::string_view base, SimContext& ctx) {
+  return ctx.FindArrayInfo(base) != nullptr || ctx.FindQueue(base) != nullptr ||
+         ctx.FindAssocArray(base) != nullptr;
+}
+
 uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx, Arena& arena) {
   if (e->kind == ExprKind::kConcatenation ||
       e->kind == ExprKind::kAssignmentPattern) {
@@ -419,10 +433,10 @@ uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx, Arena& arena) {
   auto* var = ResolveLhsVariable(e, ctx);
   if (var == nullptr) return 0;
   // Two questions, not one. SelectExprWidth answers how many bits a select
-  // names within a packed object; an unpacked array index names a whole element
-  // (§7.4.2), whose width is the base variable's, itself one element wide.
+  // names within a packed object; an index of a collection names a whole
+  // element, whose width is the base variable's, itself one element wide.
   if (e->kind == ExprKind::kSelect && e->base != nullptr &&
-      ctx.FindArrayInfo(LhsIdentName(e->base)) == nullptr) {
+      !IndexNamesWholeElement(LhsIdentName(e->base), ctx)) {
     return SelectExprWidth(*var, e, ctx, arena);
   }
   return var->value.width;
