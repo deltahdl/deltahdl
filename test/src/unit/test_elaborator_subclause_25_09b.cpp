@@ -25,6 +25,24 @@
 // that may name a virtual interface, are in
 // test_elaborator_subclause_25_09a.cpp, which the 1000-line cap in
 // .github/workflows/deltahdl.yml separated this file from.
+//
+// The last group leaves the statement positions and covers the expression
+// positions the other sentence of §25.9 reaches: "These components can only be
+// used in procedural statements; they cannot be used in continuous assignments
+// or sensitivity lists" (printed page 802). A component written directly in
+// either place is already rejected, by
+// Elaborator::ValidateVirtualInterfaceContAssign and
+// Elaborator::ValidateVirtualInterfaceSensitivity in
+// src/elaborator/elaborator_validate_datatype_ops.cpp, and
+// ComponentInContinuousAssignLhs_Error, ComponentInContinuousAssignRhs_Error
+// and ComponentInSensitivityList_Error in
+// test_elaborator_subclause_25_09a.cpp pin that. What the sentence also reaches
+// is a component written one expression deeper than those walks descend: an
+// argument of a call standing in the continuous assignment, and the `iff`
+// operand A.6.5 writes inside the event_expression a sensitivity list is made
+// of. Two acceptance cases hold the far edge, because a walk that reached too
+// far would bar a call argument in a procedural statement, which the same
+// sentence permits, and a call carrying no virtual interface at all.
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -350,6 +368,124 @@ TEST(ArrayOfVirtualInterfaceInit,
                             "compatible with virtual interface element type "
                             "'bus_a'",
                             8, "25.9"));
+}
+
+// §25.9 bars a virtual interface component from a continuous assignment
+// without naming a depth, and A.8.2 makes the argument of a
+// subroutine_call an expression of the assignment's own right-hand side, so
+// a component reached through a call stands in the continuous assignment as
+// plainly as one written there. ExprUsesVirtualInterface in
+// src/elaborator/elaborator_validate_datatype_ops.cpp descends lhs, rhs, base,
+// index, condition, true_expr, false_expr and elements but not Expr::args, so
+// the two cases below elaborated clean.
+
+TEST(VirtualInterfaceElaboration, ComponentAsCallArgInContAssign_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface pkt_if; logic v; endinterface\n"
+      "module top;\n"
+      "  virtual pkt_if pif;\n"
+      "  wire q;\n"
+      "  function logic idf(input logic z); return z; endfunction\n"
+      "  assign q = idf(pif.v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "virtual interface cannot be used in continuous assignment", 6, "25.9"));
+}
+
+// A second call around the first: the argument list is reached by the same
+// recursion, so nesting is a distinct position only while args is unwalked.
+
+TEST(VirtualInterfaceElaboration, ComponentInNestedCallArgInContAssign_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ctrl_if; logic e; endinterface\n"
+      "module top;\n"
+      "  virtual ctrl_if cif;\n"
+      "  wire r;\n"
+      "  function logic hold(input logic p); return p; endfunction\n"
+      "  function logic wrap(input logic p); return hold(p); endfunction\n"
+      "  assign r = wrap(hold(cif.e));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "virtual interface cannot be used in continuous assignment", 7, "25.9"));
+}
+
+// A.6.5 gives `event_expression ::= [ edge_identifier ] expression [ iff
+// expression ] | ...`, so the `iff` operand is written inside the
+// event_expression the sensitivity list is made of, and §25.9 bars a component
+// from a sensitivity list without carving any operand of one out. That §9.4.2.3
+// has the `iff` operand read at the event rather than watched says when it is
+// sampled, not where it is written, and the walk already treats a component
+// anywhere under a sensitivity entry's signal as barred rather than only its
+// root. Elaborator::ValidateVirtualInterfaceSensitivity read only
+// EventExpr::signal, never EventExpr::iff_condition, so this elaborated clean.
+
+TEST(VirtualInterfaceElaboration, ComponentInSensitivityIffCondition_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface gate_if; logic g; endinterface\n"
+      "module top;\n"
+      "  virtual gate_if gif;\n"
+      "  logic clk, d, q;\n"
+      "  always @(posedge clk iff gif.g) q <= d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "virtual interface cannot appear in event "
+                            "expression",
+                            5, "25.9"));
+}
+
+// The same sentence of §25.9 that bars the three cases above states the
+// permission they are the exception to, so a walk that took a call argument to
+// be barred everywhere would reject this, which is legal: the call stands in a
+// procedural statement, the position §25.9 names as the one components may be
+// used in. ComponentInProceduralStatement_Ok in
+// test_elaborator_subclause_25_09a.cpp holds the same edge for a component
+// written directly.
+
+TEST(VirtualInterfaceElaboration, ComponentAsCallArgInProceduralStmt_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface log_if; logic s; endinterface\n"
+      "module top;\n"
+      "  log_if u();\n"
+      "  virtual log_if lif;\n"
+      "  logic w;\n"
+      "  function logic thru(input logic t); return t; endfunction\n"
+      "  initial begin\n"
+      "    lif = u;\n"
+      "    w = thru(lif.s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// And the walk that now descends a call's arguments reaches every call in a
+// continuous assignment, including the ones carrying no virtual interface. The
+// module declares one so that the walk runs at all.
+
+TEST(VirtualInterfaceElaboration, CallWithoutComponentInContAssign_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface mem_if; logic m; endinterface\n"
+      "module top;\n"
+      "  virtual mem_if mif;\n"
+      "  logic y;\n"
+      "  wire z;\n"
+      "  function logic same(input logic k); return k; endfunction\n"
+      "  assign z = same(y);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace

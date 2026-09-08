@@ -215,6 +215,18 @@ static std::string_view ReferenceRootName(const Expr* e) {
   return {};
 }
 
+// §25.9: the components of the underlying interface instance "can only be used
+// in procedural statements; they cannot be used in continuous assignments or
+// sensitivity lists". A call does not carry the read out of the assignment
+// that makes it: `assign x = f(vif.a)` evaluates f, and so reads the
+// component, on the continuous assignment's own re-evaluation and not in a
+// procedural statement, so an argument is as much a use in the assignment as
+// an operand is. Every child expression a node holds is therefore descended.
+// pattern_keys is not one: a key is as often a name in another namespace -- a
+// struct member, a type, `default` -- as an expression, and matching one
+// against a variable would report a use that is not there. inline_constraint
+// is a ClassMember rather than an expression, and its relations are solved
+// inside randomize() rather than evaluated as an operand of the assignment.
 static bool ExprUsesVirtualInterface(const Expr* e, const TypeMap& types) {
   if (!e) return false;
   if (IsVirtualInterfaceVar(e, types)) return true;
@@ -222,13 +234,15 @@ static bool ExprUsesVirtualInterface(const Expr* e, const TypeMap& types) {
       IsVirtualInterfaceVar(e->lhs, types)) {
     return true;
   }
-  if (ExprUsesVirtualInterface(e->lhs, types)) return true;
-  if (ExprUsesVirtualInterface(e->rhs, types)) return true;
-  if (ExprUsesVirtualInterface(e->base, types)) return true;
-  if (ExprUsesVirtualInterface(e->index, types)) return true;
-  if (ExprUsesVirtualInterface(e->condition, types)) return true;
-  if (ExprUsesVirtualInterface(e->true_expr, types)) return true;
-  if (ExprUsesVirtualInterface(e->false_expr, types)) return true;
+  const Expr* const kChildren[] = {
+      e->lhs,       e->rhs,       e->base,       e->index,        e->index_end,
+      e->condition, e->true_expr, e->false_expr, e->repeat_count, e->with_expr};
+  for (const auto* child : kChildren) {
+    if (ExprUsesVirtualInterface(child, types)) return true;
+  }
+  for (const auto* arg : e->args) {
+    if (ExprUsesVirtualInterface(arg, types)) return true;
+  }
   for (const auto* elem : e->elements) {
     if (ExprUsesVirtualInterface(elem, types)) return true;
   }
@@ -248,7 +262,13 @@ void Elaborator::ValidateVirtualInterfaceContAssign(const ModuleItem* item) {
 void Elaborator::ValidateVirtualInterfaceSensitivity(const ModuleItem* item) {
   if (!IsProceduralItemKind(item->kind)) return;
   for (const auto& ev : item->sensitivity) {
-    if (ExprUsesVirtualInterface(ev.signal, var_types_)) {
+    // §25.9 bars a component from a sensitivity list, and §9.4.2.3 puts the
+    // iff operand inside the event expression it qualifies: "The event
+    // expression only triggers if the expression after the iff is true". The
+    // event control reads that operand rather than waits on it, which is
+    // still not the use "in procedural statements" the clause allows.
+    if (ExprUsesVirtualInterface(ev.signal, var_types_) ||
+        ExprUsesVirtualInterface(ev.iff_condition, var_types_)) {
       diag_.Error(item->loc,
                   "virtual interface cannot appear in event expression",
                   Subclause("25.9"));
