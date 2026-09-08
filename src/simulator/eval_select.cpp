@@ -14,6 +14,7 @@
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign_internal.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -248,6 +249,22 @@ static bool ResolveUnpackedSliceRun(const Expr* expr, SimContext& ctx,
 // [7:0]`, whose first element is `busA[7]`; that slice contributes `busA[7]`
 // first. Reversing both ends of a copy changes nothing, so this only becomes
 // visible against a destination that runs the other way.
+//
+// Each element is answered as a value, not as a handle on the element it was
+// read from. §6.8 makes that element its own storage -- "A variable is an
+// abstraction of a data storage element. A variable shall store a value from
+// one assignment to the next" -- and an array element is such an element, so a
+// run pushed as `v->value` handed a whole row of them out by pointer. Every
+// caller stores what it collects, into a destination slice's elements, a
+// destination array's, or a queue's, and none reads back through the entries,
+// so the copy is taken once here where the run is produced rather than at each
+// of those stores. The fallback element is built fresh and needs none.
+//
+// This pair is quiet where it is made: no store on these paths coerces, so
+// nothing happens inside the statement that read the source, and the shared
+// buffer only shows on the next write to either side -- a resize that keeps
+// the words at equal widths and coerces through them, or a deposit into a
+// packed member that lands in both.
 bool CollectUnpackedSliceElements(const Expr* expr, SimContext& ctx,
                                   Arena& arena, std::vector<Logic4Vec>& out) {
   UnpackedSliceRun run;
@@ -257,7 +274,8 @@ bool CollectUnpackedSliceElements(const Expr* expr, SimContext& ctx,
         run.is_descending ? (run.lo + run.count - 1 - i) : (run.lo + i);
     auto n = run.base + "[" + std::to_string(idx) + "]";
     auto* v = ctx.FindVariable(n);
-    out.push_back(v ? v->value : MakeLogic4VecVal(arena, run.elem_width, 0));
+    out.push_back(v ? OwnRhsWords(v->value, arena)
+                    : MakeLogic4VecVal(arena, run.elem_width, 0));
   }
   return true;
 }

@@ -606,4 +606,120 @@ TEST(ArrayIndexingAndSlicing, NetSingleIndexSelectsAPackedElement) {
   EXPECT_EQ(var->value.ToUint64(), 0xBEu);
 }
 
+// §7.4.5 makes "a slice name of an unpacked array ... an unpacked array", and
+// §6.8 makes every element it names a storage element of its own: "A variable
+// is an abstraction of a data storage element. A variable shall store a value
+// from one assignment to the next." So `echo[0:1] = wave[0:1]` has to leave
+// these two arrays four variables and not two.
+// CollectUnpackedSliceElements (src/simulator/eval_select.cpp) answered each
+// position of the run with the source element variable's own Logic4Vec, and
+// WriteUnpackedSliceElements (src/simulator/statement_assign_core.cpp) stores
+// what it is handed; a Logic4Vec copies its `words` pointer rather than the
+// words (src/common/types.h), so the window and the source it was filled from
+// ran on one buffer per position.
+//
+// Eight bits on both sides is load-bearing. The writer resizes each element to
+// the destination's width, and ResizeToWidth answers its argument untouched
+// when the widths already agree -- which is precisely the shared case. A
+// destination of another width makes the resize build the value in a fresh
+// store and hides the sharing entirely.
+//
+// The copy is quiet where it is made, so the case writes one element of the
+// window afterwards and reads the source position that element was paired
+// with. It is a regression guard and discriminates against nothing today: the
+// store that would show the sharing is the 2-state coercion inside
+// WriteUnpackedSliceElements, which runs on `var->value` after the collected
+// vector has been put there, and it never runs on an array element at all --
+// CreateArrayElements (src/simulator/lowerer_var.cpp) leaves every leaf of a
+// one-dimensional array at Variable's 4-state default, so a `bit` array
+// element is not coerced even when it is written x directly. The writers
+// beside it decline for reasons of their own: WriteVar puts its own resized
+// value in the element's place before it coerces, WritePartSelect deposits
+// into a fresh extract of the target rather than through it, §13.5.1's
+// argument binding takes its own copy since #3564, and no member deposit
+// resolves against an indexed name, BuildLhsName having no select arm. Give
+// the array leaf its declared state-ness and the coercion above it becomes
+// live, which is the regression this stands against.
+//
+// ToUint64 cannot see the claim: it projects aval & ~bval, so a bit that is
+// already unknown reads as 0 through it and clearing that bit changes nothing
+// it reports. The assertions read words[0] instead. 8'b1z0x0011 is stored as
+// aval 0x93 with bval 0x50, an x digit being aval 1 with bval 1 and a z digit
+// aval 0 with bval 1, and the 2-state conversion of it would be aval 0x83 with
+// bval 0x00. echo[1] is what says the copy ran at all.
+TEST(ArrayIndexingAndSlicing, SliceWindowElementsGetTheirOwnWords) {
+  SimFixture f;
+  auto* source = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] wave [0:1];\n"
+      "  logic [7:0] echo [0:1];\n"
+      "  initial begin\n"
+      "    wave[0] = 8'b1z0x0011;\n"
+      "    wave[1] = 8'h5A;\n"
+      "    echo[0:1] = wave[0:1];\n"
+      "    echo[0] = 8'h00;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "wave[0]");
+  ASSERT_NE(source, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* filled = f.ctx.FindVariable("echo[0]");
+  auto* paired = f.ctx.FindVariable("echo[1]");
+  ASSERT_NE(filled, nullptr);
+  ASSERT_NE(paired, nullptr);
+  EXPECT_EQ(source->value.words[0].aval & 0xFFu, 0x93u);
+  EXPECT_EQ(source->value.words[0].bval & 0xFFu, 0x50u);
+  EXPECT_EQ(filled->value.words[0].aval & 0xFFu, 0x00u);
+  EXPECT_EQ(filled->value.words[0].bval & 0xFFu, 0x00u);
+  EXPECT_EQ(paired->value.words[0].aval & 0xFFu, 0x5Au);
+}
+
+// The clause's other destination for a slice: `busB = busA[7:6]` names a whole
+// array on the left, so §7.4.5's run fills it as elements rather than as the
+// one value their concatenation would make. That path is TryArraySliceCopy
+// (src/simulator/statement_assign_pattern.cpp), and unlike the windowed writer
+// above it holds no copy of its own -- it stores straight into the
+// destination's elements what CollectUnpackedSliceElements handed it. The
+// collector is therefore the only place this shape can be made to own its
+// words, which is what this case stands over: a run answered with the source
+// elements' own Logic4Vecs left `limb[0]` and `trunk[0]` one storage element,
+// against §6.8, which gives each of the four a value it holds "from one
+// assignment to the next".
+//
+// Sixteen bits on both sides for the reason the eight above were: the writer
+// resizes to the destination's element width and a mismatch would allocate,
+// so equal widths are what leave the shared buffer in place to be seen.
+//
+// This is a regression guard on the same terms as the case above, no writer
+// left in the tree reaching an array leaf's words in place, and it is the only
+// one that covers this caller. 16'b1x0z000011110101 is stored as aval 0xC0F5
+// with bval 0x5000; the 2-state conversion of it would be aval 0x80F5 with
+// bval 0x0000, and a deposit into it would leave bval standing while aval
+// changed, so both words are read. limb[1] is what says the copy ran.
+TEST(ArrayIndexingAndSlicing, ArrayFilledFromASliceGetsItsOwnWords) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] trunk [0:1];\n"
+      "  logic [15:0] limb [0:1];\n"
+      "  initial begin\n"
+      "    trunk[0] = 16'b1x0z000011110101;\n"
+      "    trunk[1] = 16'hA53C;\n"
+      "    limb = trunk[0:1];\n"
+      "    limb[0] = 16'd0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* held = f.ctx.FindVariable("trunk[0]");
+  auto* taken = f.ctx.FindVariable("limb[1]");
+  ASSERT_NE(held, nullptr);
+  ASSERT_NE(taken, nullptr);
+  EXPECT_EQ(held->value.words[0].aval & 0xFFFFu, 0xC0F5u);
+  EXPECT_EQ(held->value.words[0].bval & 0xFFFFu, 0x5000u);
+  EXPECT_EQ(taken->value.words[0].aval & 0xFFFFu, 0xA53Cu);
+  EXPECT_EQ(taken->value.words[0].bval & 0xFFFFu, 0x0000u);
+}
+
 }  // namespace

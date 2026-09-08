@@ -282,16 +282,11 @@ static bool TryUnpackedSliceAssign(const Stmt* stmt, SimContext& ctx,
   UnpackedSliceTarget dst{lhs->base->text, dst_lo, dst_count,
                           dst_info->elem_width, dst_info->is_descending};
   std::vector<Logic4Vec> src;
-  if (CollectUnpackedSliceElements(stmt->rhs, ctx, arena, src)) {
-    // The collector pushes each source element variable's own vec, so every
-    // entry arrives aliasing live storage. Copying here rather than in the
-    // writer keeps the copy at the point the run is produced, and leaves the
-    // packed fallback below -- which builds its fields fresh -- paying nothing.
-    for (auto& elem : src) elem = OwnRhsWords(elem, arena);
-  }
-  if (src.empty()) {
+  // The collector answers each element with a copy of its own, so its entries
+  // are the destination's to keep; the packed fallback builds its fields fresh
+  // and owns them likewise.
+  if (!CollectUnpackedSliceElements(stmt->rhs, ctx, arena, src) || src.empty())
     FillSliceSourceFromPacked(stmt, dst, ctx, arena, src);
-  }
   WriteUnpackedSliceElements(dst, src, ctx, arena);
   return true;
 }
@@ -316,10 +311,17 @@ static bool TrySubarrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!BuildCompoundLhsName(stmt->rhs, ctx, arena, src_prefix)) return false;
   std::string match = src_prefix + "[";
   std::vector<std::pair<std::string, Logic4Vec>> elems;
+  // Each element of the source subarray is a storage element of its own under
+  // §6.8, so the run is copied where it is gathered rather than shared with
+  // the destination's elements. This handler runs ahead of the right-hand
+  // value the statement executor makes and gathers its own, so none of that
+  // value's copy reaches here; and the store below neither resizes nor
+  // coerces, so `b = a` was quiet where it paired the elements up and the
+  // shared words only showed on the next write to either array.
   for (const auto& [vname, vptr] : ctx.GetVariables()) {
     if (vname.starts_with(match))
       elems.emplace_back(std::string(vname.substr(src_prefix.size())),
-                         vptr->value);
+                         OwnRhsWords(vptr->value, arena));
   }
   if (elems.empty()) return false;
   for (const auto& [suffix, val] : elems) {

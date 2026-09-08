@@ -149,4 +149,66 @@ TEST(MultidimensionalArraySimulation, NonblockingReachesSameElementAsBlocking) {
   EXPECT_EQ(written_nonblocking->value.ToUint64(), 9u);
 }
 
+// §7.4.4 makes a multidimensional array an array of arrays, so the name of one
+// of its inner arrays is itself an aggregate and `mirror[0][0] = bank[0][0]`
+// copies the two elements that inner array holds. §6.8 gives each of those
+// four names its own storage -- "A variable is an abstraction of a data storage
+// element. A variable shall store a value from one assignment to the next" --
+// which TrySubarrayAssign (src/simulator/statement_assign_core.cpp) has to
+// leave standing. It gathers the source subarray by walking the context for the
+// leaves under that prefix and stores each leaf's Logic4Vec into the matching
+// destination leaf, and a Logic4Vec copies its `words` pointer rather than the
+// words (src/common/types.h), so the two subarrays were one row of storage read
+// under two names.
+//
+// This handler neither resizes nor coerces, so the copy is silent where it is
+// made and the case writes one destination leaf afterwards and reads the source
+// leaf it was paired with. It is a regression guard rather than a
+// discriminator: no writer left in the tree reaches an unpacked-array leaf's
+// words in place. WriteVar puts its own resized value in the leaf before it
+// applies §6.11.2, WritePartSelect deposits into a fresh extract of the target,
+// §13.5.1's argument binding owns its copy since #3564, and a member deposit
+// cannot resolve against an indexed name at all, BuildLhsName
+// (src/simulator/statement_assign.cpp) having no select arm. A 2-state
+// destination is what would make it bite -- the leaves of a multidimensional
+// array do carry their declared state-ness, unlike those of a one-dimensional
+// one -- because this store leaves the source's words in the destination and
+// coercing them there would clear the source.
+//
+// Three dimensions because two do not reach this handler: TrySubarrayAssign
+// asks for a select of a select on both sides, and on `bank[2][2]` the name
+// `bank[0]` is a select of a plain identifier.
+//
+// ToUint64 would report nothing here. It projects aval & ~bval, so an unknown
+// bit already reads as 0 through it; the assertions read words[0] instead.
+// 8'b0x11z000 is stored as aval 0x70 with bval 0x48, an x digit being aval 1
+// with bval 1 and a z digit aval 0 with bval 1, and the 2-state conversion of
+// it would be aval 0x30 with bval 0x00. The second leaf is what says the
+// subarray copy ran at all.
+TEST(MultidimensionalArraySimulation, SubarrayCopyElementsGetTheirOwnWords) {
+  SimFixture f;
+  auto* origin = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] bank [2][2][2];\n"
+      "  logic [7:0] mirror [2][2][2];\n"
+      "  initial begin\n"
+      "    bank[0][0][0] = 8'b0x11z000;\n"
+      "    bank[0][0][1] = 8'h3C;\n"
+      "    mirror[0][0] = bank[0][0];\n"
+      "    mirror[0][0][0] = 8'hFF;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "bank[0][0][0]");
+  ASSERT_NE(origin, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* overwritten = f.ctx.FindVariable("mirror[0][0][0]");
+  auto* carried = f.ctx.FindVariable("mirror[0][0][1]");
+  ASSERT_NE(overwritten, nullptr);
+  ASSERT_NE(carried, nullptr);
+  EXPECT_EQ(origin->value.words[0].aval & 0xFFu, 0x70u);
+  EXPECT_EQ(origin->value.words[0].bval & 0xFFu, 0x48u);
+  EXPECT_EQ(overwritten->value.words[0].aval & 0xFFu, 0xFFu);
+  EXPECT_EQ(carried->value.words[0].aval & 0xFFu, 0x3Cu);
+}
+
 }  // namespace
