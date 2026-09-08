@@ -343,9 +343,14 @@ static bool TryCreateMultiDimArray(std::string_view name,
   info.elem_type_kind = var.elem_type_kind;
   // ArrayInfo::dim_los is uint32_t, so a negative bound does not survive the
   // copy. §7.4.2 admits one; carrying it into the simulator is separate work.
+  // The direction beside it does survive: it is the comparison of the two
+  // int64_t bounds, made here before either is narrowed, so `[-1:-3]` records
+  // as descending however its low bound lands.
   info.dim_los.reserve(var.unpacked_dims.size());
+  info.dim_descending.reserve(var.unpacked_dims.size());
   for (const auto& dim : var.unpacked_dims) {
     info.dim_los.push_back(static_cast<uint32_t>(dim.Low()));
+    info.dim_descending.push_back(dim.left > dim.right);
   }
   info.dim_sizes = var.unpacked_dim_sizes;
   ctx.RegisterArray(name, info);

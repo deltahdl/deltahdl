@@ -714,4 +714,130 @@ TEST(ArrayLiteralSim, VarInitLeafMatchesProceduralAssignLeaf) {
   }
 }
 
+// §10.9.1 counts a pattern's positional items from a dimension's left bound --
+// §10.10.1's `int A3[1:3]; A3 = '{1, 2, 3};` fills A3[1] first because 1 is the
+// bound written on the left -- while §11.5.2 counts an element's address from
+// the smaller of the two bounds, whichever way round the declaration wrote
+// them. The two orders coincide only where a dimension ascends. `[2:1]`
+// descends, so the outer pattern's first item is the row at address 2 and its
+// second the row at address 1; the inner `[1:3]` ascends, so within a row the
+// items run to addresses 1, 2, 3 in order. '{'{1, 2, 3}, '{4, 5, 6}} therefore
+// puts 1, 2, 3 at a[2][1..3] and 4, 5, 6 at a[1][1..3]. A descending dimension
+// names its leaves by address like any other, so the six names are a[1][1] to
+// a[2][3] and only the order they are filled in differs.
+//
+// Nothing in §10.9.1 distinguishes the pattern that initializes an array in its
+// declaration from the pattern a procedural assignment gives the same array, so
+// `a` and `b` -- declared alike and given the same pattern -- have to end the
+// run holding the same six values. Each leaf is read against the value the
+// clause requires and against its counterpart in the other array. Reading the
+// two arrays against each other alone would say only that they disagree;
+// reading both against the clause says which of them is right. Every leaf is an
+// int with all bits known, so ToUint64, which projects aval & ~bval, reads one
+// whole.
+TEST(ArrayLiteralSim, DescendingOuterDimVarInitAndAssignAgree) {
+  SimFixture f;
+  Array2x3 a = RunAndFetch2x3(
+      "module m;\n"
+      "  int a [2:1][1:3] = '{'{1, 2, 3}, '{4, 5, 6}};\n"
+      "  int b [2:1][1:3];\n"
+      "  initial b = '{'{1, 2, 3}, '{4, 5, 6}};\n"
+      "endmodule\n",
+      f, "a");
+  // Indexed by address, lowest first: the row at address 1 took the pattern's
+  // second item and the row at address 2 its first.
+  const uint64_t kRows[2][3] = {{4u, 5u, 6u}, {1u, 2u, 3u}};
+  for (int i = 0; i < 2; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      std::string leaf =
+          "b[" + std::to_string(i + 1) + "][" + std::to_string(j + 1) + "]";
+      auto* proc = f.ctx.FindVariable(leaf);
+      ASSERT_NE(a.e[i][j], nullptr) << leaf;
+      ASSERT_NE(proc, nullptr) << leaf;
+      EXPECT_EQ(a.e[i][j]->value.ToUint64(), kRows[i][j]) << leaf;
+      EXPECT_EQ(proc->value.ToUint64(), kRows[i][j]) << leaf;
+      EXPECT_EQ(proc->value.ToUint64(), a.e[i][j]->value.ToUint64()) << leaf;
+    }
+  }
+}
+
+// §10.9.1's left-bound counting applies to each dimension on its own, and which
+// dimension descends decides what the pattern rearranges. `c[2:1][1:3]`
+// descends outermost, so the outer items go to addresses 2 then 1 while each
+// row's items go to 1, 2, 3: the rows are exchanged and their contents are
+// not. `d[1:2][3:1]` descends innermost, so the rows go to addresses 1 then 2
+// while the items within a row go to addresses 3, 2, 1: the rows stay put and
+// each one is reversed. One pattern, '{'{10, 20, 30}, '{40, 50, 60}}, put into
+// both arrays therefore has to come back two different ways, which is what
+// tells a distributor that reads each dimension's own bounds from one that
+// reads the array's first dimension for all of them or reads none at all. The
+// inner-descending array is the harder half: a single-dimension array cannot
+// pose the question, and ArrayInfo carries lo and size per dimension but one
+// is_descending for the whole array, so an inner dimension's direction is not
+// among the things the run-time distributor is handed. Both arrays are int with
+// every bit known, so ToUint64 reads each leaf whole.
+TEST(ArrayLiteralSim, DescendingInnerDimTakesItemsFromLeftBound) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int c [2:1][1:3];\n"
+      "  int d [1:2][3:1];\n"
+      "  initial begin\n"
+      "    c = '{'{10, 20, 30}, '{40, 50, 60}};\n"
+      "    d = '{'{10, 20, 30}, '{40, 50, 60}};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  // Both tables are indexed by address, lowest first, so a row of one lines up
+  // with the same pair of names in the other.
+  const uint64_t kOuterDesc[2][3] = {{40u, 50u, 60u}, {10u, 20u, 30u}};
+  const uint64_t kInnerDesc[2][3] = {{30u, 20u, 10u}, {60u, 50u, 40u}};
+  for (int i = 0; i < 2; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      std::string addr =
+          "[" + std::to_string(i + 1) + "][" + std::to_string(j + 1) + "]";
+      auto* outer = f.ctx.FindVariable("c" + addr);
+      auto* inner = f.ctx.FindVariable("d" + addr);
+      ASSERT_NE(outer, nullptr) << addr;
+      ASSERT_NE(inner, nullptr) << addr;
+      EXPECT_EQ(outer->value.ToUint64(), kOuterDesc[i][j]) << addr;
+      EXPECT_EQ(inner->value.ToUint64(), kInnerDesc[i][j]) << addr;
+    }
+  }
+}
+
+// The control on the two cases above. Where every dimension ascends, §10.9.1's
+// left bound and §11.5.2's smaller bound are the same bound, so the item at
+// position k belongs at address lo+k however the two rules are combined, and
+// `[1:2][1:3]` must read row-major: 1, 2, 3 across the row at address 1 and 4,
+// 5, 6 across the row at address 2. Both the declaration and the procedural
+// spelling already read that way, and a distributor taught to count from the
+// left bound has to leave both alone -- a fix that reversed something here
+// would have swapped the two rules rather than told them apart. Every leaf is
+// an int with all bits known, so ToUint64 reads one whole.
+TEST(ArrayLiteralSim, AscendingDimsUnchangedByPerDimensionDirection) {
+  SimFixture f;
+  Array2x3 e = RunAndFetch2x3(
+      "module m;\n"
+      "  int e [1:2][1:3] = '{'{1, 2, 3}, '{4, 5, 6}};\n"
+      "  int p [1:2][1:3];\n"
+      "  initial p = '{'{1, 2, 3}, '{4, 5, 6}};\n"
+      "endmodule\n",
+      f, "e");
+  for (uint64_t i = 0; i < 2; ++i) {
+    for (uint64_t j = 0; j < 3; ++j) {
+      uint64_t want = i * 3 + j + 1;
+      std::string cell =
+          "p[" + std::to_string(i + 1) + "][" + std::to_string(j + 1) + "]";
+      auto* assigned = f.ctx.FindVariable(cell);
+      ASSERT_NE(e.e[i][j], nullptr) << cell;
+      ASSERT_NE(assigned, nullptr) << cell;
+      EXPECT_EQ(e.e[i][j]->value.ToUint64(), want) << cell;
+      EXPECT_EQ(assigned->value.ToUint64(), want) << cell;
+    }
+  }
+}
+
 }  // namespace

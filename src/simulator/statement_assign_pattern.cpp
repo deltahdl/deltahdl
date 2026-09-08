@@ -202,10 +202,22 @@ static void DistributeDimPattern(const PatternDist& pd,
                                  const std::string& prefix, size_t d,
                                  const Expr* pat) {
   uint32_t lo = pd.info.dim_los[d];
+  uint32_t size = pd.info.dim_sizes[d];
   bool last = (d + 1 == pd.info.dim_sizes.size());
-  for (uint32_t i = 0; i < pd.info.dim_sizes[d]; ++i) {
+  // §11.5.2 addresses this dimension from its smaller bound and §10.9.1 counts
+  // the pattern's positional items from its left bound, which are the same
+  // bound only when the dimension ascends. `i` is therefore the address offset
+  // alone, and a descending dimension takes its position the other way round --
+  // what the single-dimension arm below already does through its own idx, and
+  // what the declaration path (CreateMultiDimLeaves in lowerer_var.cpp) was
+  // fixed to do first. Until now this walk passed `i` as both, so
+  // `int a[2:1][1:3] = '{...}` and the same pattern assigned to a `b` of that
+  // shape held the rows in opposite orders; that gap closes here.
+  bool descending = pd.info.dim_descending[d];
+  for (uint32_t i = 0; i < size; ++i) {
     std::string child = prefix + "[" + std::to_string(lo + i) + "]";
-    const Expr* sub = SelectDimElement(pat, lo + i, i, pd);
+    const Expr* sub =
+        SelectDimElement(pat, lo + i, descending ? (size - 1 - i) : i, pd);
     bool is_pattern = sub && (sub->kind == ExprKind::kAssignmentPattern ||
                               sub->kind == ExprKind::kConcatenation);
     if (last)

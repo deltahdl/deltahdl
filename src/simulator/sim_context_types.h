@@ -156,6 +156,18 @@ struct ArrayInfo {
   // row-major order and to resolve an @-address against the highest dimension.
   std::vector<uint32_t> dim_los = {};
   std::vector<uint32_t> dim_sizes = {};
+  // §11.5.2 addresses a dimension from "the address bounds given in the
+  // declaration", which is its smaller bound whichever way round the two were
+  // written, while §10.9.1 counts an assignment pattern's positional items from
+  // the dimension's left bound; the two are the same bound only for an
+  // ascending dimension. dim_los/dim_sizes above record the address extent and
+  // so cannot tell `[1:3]` from `[3:1]`, and this says which of the two each
+  // dimension was: outermost first, one entry per entry of those. With it the
+  // declared bounds come back exactly -- a descending dimension was written
+  // [lo+size-1:lo] and an ascending one [lo:lo+size-1]. is_descending above
+  // says the same of the outermost dimension alone, for the paths that read
+  // the lo/size pair rather than these vectors.
+  std::vector<bool> dim_descending = {};
 };
 
 // §20.15.3: a queued entry as the queue manager retains it. $q_add records the
