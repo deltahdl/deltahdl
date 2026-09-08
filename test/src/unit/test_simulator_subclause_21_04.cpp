@@ -799,17 +799,24 @@ TEST(ReadmemFileLoadSim, UnopenableFileStatesNoRuleOfTheStandard) {
 // pass without, the store having happened all along and the value being what
 // they read back.
 // §21.4's load writes the memory's elements, which is what a testbench most
-// often waits on. CollectSelectReads puts the folded prefix `mem[2]` into the
-// read set beside the base name, so the always_comb holds a watcher on the very
-// element the load writes.
-TEST(ReadmemFileLoadSim, LoadedElementWakesAnAlwaysCombReadingIt) {
+// often waits on. The wait is the route that reaches them: CollectSelectReads
+// puts the folded prefix `mem[2]` into the read set beside the base name, so a
+// watcher stands on the very element the load writes. An always_comb reading
+// the same element would not do -- its inferred sensitivity list reduces every
+// read to its base signal name, so it watches `mem` and no element write of any
+// kind reaches it, which is #3592 rather than anything §21.4 decides.
+TEST(ReadmemFileLoadSim, LoadedElementReleasesAWaitOnIt) {
   SimFixture f;
   std::string path = WriteData("event_h", "AB\nCD\nEF\n");
   auto* var = RunAndFindVar(
       "module t;\n"
       "  reg [7:0] mem [0:7];\n"
-      "  reg [7:0] b;\n"
-      "  always_comb b = mem[2];\n"
+      "  integer woke;\n"
+      "  initial begin\n"
+      "    woke = 0;\n"
+      "    wait (mem[2] == 8'hEF);\n"
+      "    woke = 1;\n"
+      "  end\n"
       "  initial begin\n"
       "    #1 $readmemh(\"" +
           path +
@@ -817,9 +824,9 @@ TEST(ReadmemFileLoadSim, LoadedElementWakesAnAlwaysCombReadingIt) {
           "    #1 $finish;\n"
           "  end\n"
           "endmodule\n",
-      f, "b");
+      f, "woke");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xEFu);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
   std::remove(path.c_str());
 }
 
