@@ -1,3 +1,4 @@
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -152,6 +153,130 @@ TEST(FunctionSim, TypedefNameLocalWiderThanOneWordKeepsItsHighBits) {
       "endmodule\n",
       "x");
   EXPECT_EQ(val, 1095216660481ull);
+}
+
+// §6.8: "A variable is an abstraction of a data storage element. A variable
+// shall store a value from one assignment to the next." A declaration in a
+// subroutine body declares a storage element of its own, so `logic [7:0]
+// mirror = held;` reads `held` and must leave `held` holding what it was last
+// assigned. CreateFuncLocalVar stored what EvalExpr answered; EvalExpr answers
+// a bare identifier with the source variable's own Logic4Vec, a Logic4Vec
+// copies its `words` pointer rather than the words, and ResizeToWidth hands
+// back a value already at the declared width -- so the declaration left
+// `mirror` and `held` one element. The eight bits on each side are
+// load-bearing: a declared width other than the source's makes the resize
+// build the value in a fresh store, which hides the sharing entirely.
+//
+// The declaration itself writes nothing in place, so it takes a later writer
+// to show the sharing, and which writer it is decides what this case can be. A
+// store to `mirror` will not do it: ExecFuncBlockingAssign owns its right-hand
+// words, and ExecFuncIdentifierAssign puts that owned vector in the local's
+// place before it coerces, so a later store leaves `held`'s buffer
+// unreferenced rather than writing through it. The writer that does reach it
+// is the one that coerces a vector it did not build: §13.5.1 passes an input
+// argument by copying "the values of the actual arguments" into the formal,
+// and §6.11.2 -- "When a 4-state value is automatically converted to a 2-state
+// value, any unknown or high-impedance bits shall be converted to zeros" --
+// converts that copy in place. Handing `mirror` to a `bit [7:0]` formal of its
+// own width therefore cleared `held`'s unknowns from inside a call that read
+// nothing but a local copy of it.
+//
+// That the conversion reaches the actual's own buffer is a defect of this
+// same family at the binding site (#3564), and it is what makes this case
+// discriminating rather than merely true: with the binding taking its own
+// copy, the conversion would land on that copy whether or not the
+// declaration above shared its words, and the case would go on holding with
+// nothing left to expose the sharing. No writer in the tree reaches a plain
+// integral local's buffer in place, so this is the exposure the claim has.
+//
+// ToUint64 cannot see this. It projects aval & ~bval, so a bit that is already
+// unknown reads as 0 through it and clearing that bit changes nothing it
+// reports; the assertions read words[0] directly. 8'b0x1110x0 is stored as
+// aval 0x7A with bval 0x42, an x digit being aval 1 with bval 1, and the
+// 2-state conversion of it is aval 0x38 with bval 0x00 -- which is what the
+// formal, and `seen` after it, alone are entitled to hold.
+TEST(FunctionSim, DeclaredLocalInitializedFromAVariableGetsItsOwnWords) {
+  SimFixture f;
+  auto* source = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] held;\n"
+      "  bit [7:0] seen;\n"
+      "  function bit [7:0] note(bit [7:0] arg);\n"
+      "    return arg;\n"
+      "  endfunction\n"
+      "  function void relay();\n"
+      "    logic [7:0] mirror = held;\n"
+      "    seen = note(mirror);\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    held = 8'b0x1110x0;\n"
+      "    relay();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "held");
+  ASSERT_NE(source, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* noted = f.ctx.FindVariable("seen");
+  ASSERT_NE(noted, nullptr);
+  EXPECT_EQ(source->value.words[0].aval & 0xFFu, 0x7Au);
+  EXPECT_EQ(source->value.words[0].bval & 0xFFu, 0x42u);
+  EXPECT_EQ(noted->value.words[0].aval & 0xFFu, 0x38u);
+  EXPECT_EQ(noted->value.words[0].bval & 0xFFu, 0x00u);
+}
+
+// The other expression the declaration site can be handed, and the reason the
+// case above does not state the whole claim: §7.4.2 makes each element of an
+// unpacked array an object in its own right, and a select of one is answered
+// with that element variable's own Logic4Vec rather than with a value read out
+// of the array. So `logic [7:0] slot = bank[1];` shares its buffer with an
+// element -- a variable the source names only through an index, and one no
+// later store in the subroutine mentions at all.
+//
+// z as well as x, because §6.11.2 converts "any unknown or high-impedance
+// bits" and the two are stored apart: 8'b1zz01x10 is aval 0x8E with bval 0x64,
+// a z digit being aval 0 with bval 1 where an x digit is aval 1 with bval 1,
+// and the conversion of it is aval 0x8A with bval 0x00. bval is what separates
+// the two states: a conversion that dropped the x bits and kept the z bits
+// would answer the same aval and leave bval at 0x60.
+//
+// That the conversion reaches the actual's own buffer is a defect of this
+// same family at the binding site (#3564), and it is what makes this case
+// discriminating rather than merely true: with the binding taking its own
+// copy, the conversion would land on that copy whether or not the
+// declaration above shared its words, and the case would go on holding with
+// nothing left to expose the sharing. No writer in the tree reaches a plain
+// integral local's buffer in place, so this is the exposure the claim has.
+//
+// Eight bits throughout for the reason the case above gives, and the element
+// is read once and never written after `lift()` returns, so the array must
+// still hold what the initial block put in it.
+TEST(FunctionSim, DeclaredLocalInitializedFromAnElementGetsItsOwnWords) {
+  SimFixture f;
+  auto* element = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] bank [0:1];\n"
+      "  bit [7:0] taken;\n"
+      "  function bit [7:0] echo_bits(bit [7:0] bits_in);\n"
+      "    return bits_in;\n"
+      "  endfunction\n"
+      "  function void lift();\n"
+      "    logic [7:0] slot = bank[1];\n"
+      "    taken = echo_bits(slot);\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    bank[1] = 8'b1zz01x10;\n"
+      "    lift();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "bank[1]");
+  ASSERT_NE(element, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* lifted = f.ctx.FindVariable("taken");
+  ASSERT_NE(lifted, nullptr);
+  EXPECT_EQ(element->value.words[0].aval & 0xFFu, 0x8Eu);
+  EXPECT_EQ(element->value.words[0].bval & 0xFFu, 0x64u);
+  EXPECT_EQ(lifted->value.words[0].aval & 0xFFu, 0x8Au);
+  EXPECT_EQ(lifted->value.words[0].bval & 0xFFu, 0x00u);
 }
 
 }  // namespace

@@ -256,4 +256,79 @@ TEST(LoopStatementSim, ForLabeledLoopRuns) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
+// §12.7.1 has the for statement declare its control variable in the loop's own
+// implicit block -- "the loop variable is local to the loop" -- so `for (int i
+// = seed; ...)` declares a storage element of its own and §6.8's "A variable
+// shall store a value from one assignment to the next" holds for `seed` across
+// the whole loop: the header reads it once and no part of the loop names it
+// again. ExecFuncForInits stored what EvalExpr answered, EvalExpr answers a
+// bare identifier with the source variable's own Logic4Vec, and a Logic4Vec
+// copies its `words` pointer rather than the words, so the header left `i` and
+// `seed` one element. This site does not even resize on the way in, so unlike
+// a body declaration it shares the buffer at any width the source has.
+//
+// The loop is written inside a function body because that is where this
+// header's variables are created: ExecFuncForInits builds them for a for in a
+// subroutine body and CreateForInitVars for one in a procedural block, so a
+// loop in an initial block reaches a different site and states nothing about
+// this one.
+//
+// What the loop does to `i` afterwards is not what exposes the sharing, and
+// the case is shaped around that. The step `i = i + 1` computes a new vector
+// and ExecFuncIdentifierAssign puts it in the local's place, which leaves
+// `seed`'s buffer unreferenced rather than writing through it. The writer that
+// does reach it is the one that converts a vector it did not build: §13.5.1
+// copies "the values of the actual arguments" into an input formal, and
+// §6.11.2 -- "any unknown or high-impedance bits shall be converted to zeros"
+// -- converts that copy in place, so handing the loop variable to a `bit
+// [7:0]` formal cleared `seed`'s unknowns in the iteration that only read it.
+//
+// That the conversion reaches the actual's own buffer is a defect of this
+// same family at the binding site (#3564), and it is what makes this case
+// discriminating rather than merely true: with the binding taking its own
+// copy, the conversion would land on that copy whether or not the
+// header above shared its words, and the case would go on holding with
+// nothing left to expose the sharing. No writer in the tree reaches a plain
+// integral local's buffer in place, so this is the exposure the claim has.
+//
+// The loop runs exactly once and its termination is the step's alone: `seed`
+// has an even low nibble, so `i[0] == 1'b0` admits the first iteration, and
+// after `i = i + 1` the low bit is 1 -- or the whole of `i` is x, once the
+// unknowns above it survive into the sum -- and either answer ends the loop.
+//
+// ToUint64 projects aval & ~bval, so an unknown bit reads as 0 through it and
+// clearing it changes nothing it reports; the assertions read words[0].
+// 8'b1x0z0000 is stored as aval 0xC0 with bval 0x50, an x digit being aval 1
+// with bval 1 and a z digit aval 0 with bval 1, and the 2-state conversion of
+// it is aval 0x80 with bval 0x00 -- which is what the formal, and `noticed`
+// after it, alone are entitled to hold.
+TEST(LoopStatementSim, ForHeaderLocalInitializedFromAVariableGetsItsOwnWords) {
+  SimFixture f;
+  auto* source = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] seed;\n"
+      "  bit [7:0] noticed;\n"
+      "  function bit [7:0] pass_on(bit [7:0] step_val);\n"
+      "    return step_val;\n"
+      "  endfunction\n"
+      "  function void sweep();\n"
+      "    for (int i = seed; i[0] == 1'b0; i = i + 1)\n"
+      "      noticed = pass_on(i);\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    seed = 8'b1x0z0000;\n"
+      "    sweep();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "seed");
+  ASSERT_NE(source, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* seen_in_loop = f.ctx.FindVariable("noticed");
+  ASSERT_NE(seen_in_loop, nullptr);
+  EXPECT_EQ(source->value.words[0].aval & 0xFFu, 0xC0u);
+  EXPECT_EQ(source->value.words[0].bval & 0xFFu, 0x50u);
+  EXPECT_EQ(seen_in_loop->value.words[0].aval & 0xFFu, 0x80u);
+  EXPECT_EQ(seen_in_loop->value.words[0].bval & 0xFFu, 0x00u);
+}
+
 }  // namespace

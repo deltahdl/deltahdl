@@ -551,7 +551,14 @@ static void ExecFuncForInits(const Stmt* stmt, const FuncExecCtx& exec) {
       // counter compared its negative values as huge positive ones.
       auto* v = exec.ctx.CreateLocalVariable(
           init->lhs->text, w, IsSignedType(stmt->for_init_types[i], {}));
-      if (init->rhs) v->value = EvalExpr(init->rhs, exec.ctx, exec.arena);
+      // The initializer is copied for the reason CreateFuncLocalVar copies
+      // its own (§6.8): `for (int i = n; ...)` would otherwise leave i and n
+      // one storage element, and the loop's own step is the store that shows
+      // it. There is no resize here to place the copy around; this site,
+      // unlike the declaration one, never resized the initializer at all.
+      if (init->rhs)
+        v->value =
+            OwnRhsWords(EvalExpr(init->rhs, exec.ctx, exec.arena), exec.arena);
     } else if (init) {
       ExecFuncStmt(init, exec);
     }
@@ -649,7 +656,20 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // has no declared width at all, and its initializer is what gives it one.
   // ResizeToWidth leaves a value alone at a target of 0, so such a local keeps
   // the behaviour it had.
-  v->value = ResizeToWidth(EvalExpr(init, ctx, arena), declared, arena);
+  //
+  // §6.8 also calls a variable "an abstraction of a data storage element"
+  // that "shall store a value from one assignment to the next". An initializer
+  // that reads another variable is answered with that variable's own Logic4Vec,
+  // and a Logic4Vec copies its words pointer, so `bit [7:0] y = x;` left y and
+  // x one element. The declaration is quiet about it -- nothing writes in place
+  // here -- and the next store to y is what shows it: ExecFuncIdentifierAssign
+  // coerces a 2-state target in place and cleared x's x/z bits through the
+  // shared words. The copy goes outside the resize rather than inside because
+  // ResizeToWidth returns its argument untouched when the widths already match,
+  // which is precisely the aliased case; outside, it covers every path, and is
+  // merely redundant on the path where the resize itself allocated.
+  v->value = OwnRhsWords(
+      ResizeToWidth(EvalExpr(init, ctx, arena), declared, arena), arena);
   return v;
 }
 
