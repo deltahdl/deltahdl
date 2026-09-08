@@ -372,6 +372,44 @@ static Logic4Vec CurrentContAssignOldValue(const ContAssignParams& params,
   return old_val;
 }
 
+// The bits of the right-hand value this driver lands, which is what §10.3.3's
+// transition reads against the target's present value.
+// CurrentContAssignOldValue above already answers with the selected bits alone,
+// and until this stood beside it the two sides of that comparison were not the
+// same bits and not even the same width: the whole value as written was
+// compared against the window it lands in.
+//
+// §11.5.1 says which of the value's bits those are. A partially out-of-range
+// part-select "shall, when written, only affect the bits that are in range",
+// and the bits it affects take the value's bits at and above `src_lo` rather
+// than its least significant ones -- the same projection ContAssignDriverValue
+// makes before depositing them. On a `tri0 [7:0] a`, `a[1 -: 4]` is `a[1:-2]`,
+// so `assign #(2,3) a[1 -: 4] = 4'b0011` lands 2'b00 on a[1:0]: a transition to
+// zero, which §10.3.3's "the second delay controls the falling delay" gives the
+// fall delay, where the whole 4'b0011 is nonzero and took the rise.
+//
+// The commit path keeps the value as written. ContAssignDriverValue makes this
+// projection for itself, and ApplyHighzStrengthsToValue before it reads the
+// select's own width.
+static Logic4Vec ContAssignDrivenBits(const ContAssignDriver& drv,
+                                      const Logic4Vec& val, Arena& arena) {
+  if (!drv.partial || drv.width == 0) return val;
+  return ExtractBitField(arena,
+                         ResizeToWidth(val, drv.src_lo + drv.width, arena),
+                         drv.src_lo, drv.width);
+}
+
+// How wide the transition §10.3.3 is choosing a delay for is: the bits driven,
+// which for a select partly out of range are fewer than the select declares.
+// The width decides which of the clause's two tables applies -- one bit takes
+// the scalar transition table -- so a one-bit window inside a wider select took
+// the vector arm and answered the rise delay where the scalar table gives a
+// z-to-0 transition the fall.
+static uint32_t ContAssignTransitionWidth(const ContAssignDriver& drv,
+                                          uint32_t declared_width) {
+  return drv.partial ? drv.width : declared_width;
+}
+
 // Tracks the result of re-evaluating the right-hand side after an inertial
 // delay is interrupted by an operand change. `collapsed` requests that the
 // pending transition be dropped because the new value already equals the
@@ -393,26 +431,47 @@ struct PendingContAssignTransition {
   Logic4Vec& val;
 };
 
+// The loop-invariant context threaded through the inertial-delay re-evaluation
+// of a continuous assignment (IEEE 1800 §28 inertial delays): the assignment
+// parameters, the resolved delay set, and the simulation context/arena used to
+// re-evaluate the right-hand side. Bundled so the per-iteration helper stays
+// within a small parameter count.
+struct InertialLoopCtx {
+  const ContAssignParams& params;
+  const ContAssignDelays& d;
+  // Which bits of the target this assignment drives, since the delay a
+  // re-evaluation chooses is a delay for that transition rather than for the
+  // whole value.
+  const ContAssignDriver& drv;
+  SimContext& ctx;
+  Arena& arena;
+};
+
 static InertialReeval ReevalInertialContAssign(
-    const ContAssignParams& params, const ContAssignDelays& d,
-    const PendingContAssignTransition& xition, SimContext& ctx, Arena& arena) {
+    const InertialLoopCtx& loop, const PendingContAssignTransition& xition) {
   InertialReeval result;
-  auto new_val = EvalExpr(params.rhs, ctx, arena, params.width);
+  auto new_val =
+      EvalExpr(loop.params.rhs, loop.ctx, loop.arena, loop.params.width);
   if (Logic4VecEqual(new_val, xition.val)) return result;
   // The operand changed again before the pending value could propagate, so the
   // previously scheduled event is dropped.
   xition.val = new_val;
-  if (Logic4VecEqual(new_val, xition.old_val)) {
+  // The comparison and the delay are about the bits that land, which is what
+  // `old_val` already holds: a re-evaluation reaches the same §10.3.3 question
+  // the first evaluation did, and has to read the same two operands.
+  auto driven = ContAssignDrivenBits(loop.drv, new_val, loop.arena);
+  if (Logic4VecEqual(driven, xition.old_val)) {
     // The re-evaluated right-hand side now matches the value already present on
     // the left-hand side, so no replacement event is scheduled and the pending
     // transition collapses immediately.
     result.collapsed = true;
     return result;
   }
-  uint64_t ticks =
-      SelectContAssignDelay(xition.old_val, xition.val, d, params.width);
+  uint64_t ticks = SelectContAssignDelay(
+      xition.old_val, driven, loop.d,
+      ContAssignTransitionWidth(loop.drv, loop.params.width));
   result.rescheduled = true;
-  result.target = ctx.CurrentTime() + SimTime{ticks};
+  result.target = loop.ctx.CurrentTime() + SimTime{ticks};
   return result;
 }
 
@@ -466,18 +525,6 @@ static void RefreshContAssignDriverBits(ContAssignDriver& drv, const Expr* lhs,
   drv.src_lo = bits.src_lo;
 }
 
-// The loop-invariant context threaded through the inertial-delay re-evaluation
-// of a continuous assignment (IEEE 1800 §28 inertial delays): the assignment
-// parameters, the resolved delay set, and the simulation context/arena used to
-// re-evaluate the right-hand side. Bundled so the per-iteration helper stays
-// within a small parameter count.
-struct InertialLoopCtx {
-  const ContAssignParams& params;
-  const ContAssignDelays& d;
-  SimContext& ctx;
-  Arena& arena;
-};
-
 static uint64_t RemainingTicks(SimTime target, SimContext& ctx) {
   return (target.ticks > ctx.CurrentTime().ticks)
              ? (target.ticks - ctx.CurrentTime().ticks)
@@ -492,8 +539,7 @@ static uint64_t RemainingTicks(SimTime target, SimContext& ctx) {
 static bool ApplyInertialReeval(const InertialLoopCtx& loop,
                                 const PendingContAssignTransition& xition,
                                 SimTime& target) {
-  InertialReeval re = ReevalInertialContAssign(loop.params, loop.d, xition,
-                                               loop.ctx, loop.arena);
+  InertialReeval re = ReevalInertialContAssign(loop, xition);
   if (re.collapsed) return true;
   if (re.rescheduled) target = re.target;
   return false;
@@ -563,11 +609,14 @@ static ExecTask RunContAssignWait(const ContAssignWait& w,
     d = BuildContAssignDelays(w.params.delays, w.ctx, w.arena);
   }
   Logic4Vec old_val = CurrentContAssignOldValue(w.params, drv, w.ctx, w.arena);
+  Logic4Vec driven = ContAssignDrivenBits(drv, val, w.arena);
   uint64_t ticks = w.params.delays.rise
-                       ? SelectContAssignDelay(old_val, val, d, w.params.width)
+                       ? SelectContAssignDelay(
+                             old_val, driven, d,
+                             ContAssignTransitionWidth(drv, w.params.width))
                        : 0;
 
-  if (w.path_mgr != nullptr && !Logic4VecEqual(val, old_val)) {
+  if (w.path_mgr != nullptr && !Logic4VecEqual(driven, old_val)) {
     ModulePathDrive drive{w.ctx,          w.arena,     *w.path_mgr,
                           w.path_output,  w.read_vars, w.params.rhs,
                           w.params.width, ticks,       w.commit};
@@ -576,7 +625,7 @@ static ExecTask RunContAssignWait(const ContAssignWait& w,
   }
 
   if (ticks > 0 && !w.read_vars.empty()) {
-    InertialLoopCtx loop{w.params, d, w.ctx, w.arena};
+    InertialLoopCtx loop{w.params, d, drv, w.ctx, w.arena};
     co_await RunInertialContAssignDelay(loop, w.read_vars, old_val, val, ticks);
   } else if (ticks > 0) {
     co_await DelayAwaiter{w.ctx, ticks};

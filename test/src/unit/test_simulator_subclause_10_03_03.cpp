@@ -466,4 +466,68 @@ TEST(AssignmentDelaySim, ThreeOperandsChangingInOneStepCommitOnce) {
   EXPECT_EQ(changes_late->value.ToUint64() - changes_mid->value.ToUint64(), 1u);
 }
 
+// §10.3.3 chooses between an assignment's two delays from the transition the
+// assignment makes, and §11.5.1 says which bits that transition is over: a
+// partially out-of-range part-select "shall, when written, only affect the bits
+// that are in range", and those bits take the value's bits at and above the
+// select's own low ones. `a[1 -: 4]` is `a[1:-2]`, so a[1] takes src[3] and
+// a[0] takes src[2]: 4'b0011 lands 2'b00 on a pair already holding 2'b11, which
+// is a transition to zero and takes "the second delay", the fall delay of 3.
+//
+// The comparison was between the whole four-bit value as written and the two
+// in-range bits it lands on -- not the same bits, and not even the same width.
+// 4'b0011 is nonzero, so the zero test failed and the rise delay of 2 was
+// taken. The value is chosen for exactly that: its whole is nonzero while the
+// bits it lands are zero, which is the only shape that separates the two
+// readings.
+//
+// The settle time is the assertion because it is what the delay decides. The
+// first drive at t=0 leaves a[1:0] at 2'b11 and the change at t=20 is the one
+// under test, so the run ends at 23 for the fall and 22 for the rise.
+TEST(AssignmentDelaySim, SelectOffTheLowEndFallsOnTheBitsThatLand) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [3:0] src;\n"
+      "  tri [7:0] a;\n"
+      "  assign #(2, 3) a[1 -: 4] = src;\n"
+      "  initial begin\n"
+      "    src = 4'b1111;\n"
+      "    #20 src = 4'b0011;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "zzzzzz00");
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 23u);
+}
+
+// §10.3.3 has two transition tables and the width of what is driven says which
+// applies: one bit takes the scalar table, where a z-to-0 transition is a fall.
+// `b[0 -: 2]` is `b[0:-1]`, whose one in-range bit is b[0], and it takes the
+// value's bit 1 -- the 0 of 2'b01 -- against an undriven `tri`, which is z. So
+// the drive is a z-to-0 transition of a single bit and the fall delay of 3 is
+// what §10.3.3 gives it.
+//
+// The declared select is two bits wide, and that width was what chose the
+// table, so the vector arm ran instead: it reads a fall only from a value that
+// is entirely zero, and the unprojected 2'b01 is not, so the rise delay of 2
+// was taken. Both halves of the correction are needed here -- the bits compared
+// and the width they are compared at -- which is what makes this case distinct
+// from the one above, where the width is two either way.
+TEST(AssignmentDelaySim, OneBitDrivenWindowTakesTheScalarTransitionTable) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [1:0] s;\n"
+      "  tri [7:0] b;\n"
+      "  assign #(2, 3) b[0 -: 2] = s;\n"
+      "  initial s = 2'b01;\n"
+      "endmodule\n",
+      f, "b");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "zzzzzzz0");
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 3u);
+}
+
 }  // namespace
