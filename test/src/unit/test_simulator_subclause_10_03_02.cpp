@@ -312,4 +312,104 @@ TEST(ContAssignStatementSim, SelectTargetRunningOffBothEndsLandsItsMiddleBits) {
   EXPECT_EQ(a->resolved->value.ToUint64() & 0xFFu, 0xAFu);
 }
 
+// §10.3.2's Example 2 is written exactly this way -- `assign {carry_out,
+// sum_out} = ina + inb + carry_in;` -- and the clause has "Nets can be driven
+// by multiple continuous assignments or by a mixture of primitive outputs,
+// module outputs, and continuous assignments" without excepting the ones a
+// concatenation names. Such an assignment reached no net at all: the driver
+// held one net, so a target naming two fell to the direct write, which puts the
+// values in their storage while the nets learn nothing and §28.12 decides
+// everything about them without this source.
+TEST(ContAssignStatementSim, ConcatTargetRegistersADriverOnEachNet) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire carry_out, carry_in;\n"
+      "  wire [3:0] sum_out, ina, inb;\n"
+      "  assign ina = 4'd9;\n"
+      "  assign inb = 4'd8;\n"
+      "  assign carry_in = 1'b1;\n"
+      "  assign {carry_out, sum_out} = ina + inb + carry_in;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* carry_out = f.ctx.FindNet("carry_out");
+  auto* sum_out = f.ctx.FindNet("sum_out");
+  ASSERT_NE(carry_out, nullptr);
+  ASSERT_NE(sum_out, nullptr);
+  EXPECT_EQ(carry_out->drivers.size(), 1u);
+  EXPECT_EQ(sum_out->drivers.size(), 1u);
+  // 9 + 8 + 1 is 18: 4'b0010 in sum_out with the carry out set.
+  EXPECT_EQ(sum_out->resolved->value.ToUint64(), 2u);
+  EXPECT_EQ(carry_out->resolved->value.ToUint64(), 1u);
+}
+
+// The bits of a net a concatenation does not name are left to §28.12, which is
+// what a driver contributing high impedance around its own bits means and what
+// the direct write could not produce: `a[3:2]` here are decided by the net's
+// own tri0 pull rather than by this assignment, so they read 0 while a[1:0]
+// read the two ones the concatenation drove.
+TEST(ContAssignStatementSim, ConcatTargetLeavesTheRestOfANetToResolution) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  tri0 [3:0] a;\n"
+      "  wire b;\n"
+      "  assign {b, a[1:0]} = 3'b111;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* a = f.ctx.FindNet("a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->drivers.size(), 1u);
+  EXPECT_EQ(a->resolved->value.ToString(), "0011");
+}
+
+// §11.4.1's ordering read through the driver rather than through a 64-bit
+// projection: the x and the z of the right-hand value reach the nets they are
+// assigned to. The split the direct write made went through
+// Logic4Vec::ToUint64, the "numeric/boolean projection" of src/common/types.h,
+// which reads both as 0.
+TEST(ContAssignStatementSim, ConcatTargetCarriesUnknownAndHighImpedanceBits) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire [3:0] a;\n"
+      "  wire b;\n"
+      "  assign {b, a} = 5'bzx101;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* a = f.ctx.FindNet("a");
+  auto* b = f.ctx.FindNet("b");
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(a->resolved->value.ToString(), "x101");
+  EXPECT_EQ(b->resolved->value.ToString(), "z");
+}
+
+// Two elements of one concatenation naming one net are two drivers on it, each
+// contributing its own bit and high impedance elsewhere, and §28.12 resolves
+// them as it resolves any two. It is the case that says the slots are counted
+// out rather than read from the net one piece at a time, which would give both
+// pieces the same slot and lose one of them.
+TEST(ContAssignStatementSim, ConcatTargetNamingOneNetTwiceTakesTwoSlots) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire [3:0] a;\n"
+      "  assign {a[3:2], a[1:0]} = 4'ha;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* a = f.ctx.FindNet("a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->drivers.size(), 2u);
+  EXPECT_EQ(a->resolved->value.ToUint64(), 0xAu);
+}
+
 }  // namespace
