@@ -86,6 +86,12 @@ void StoreRealField(Variable* var, Arena& arena, double d) {
   auto vec = MakeLogic4VecVal(arena, width, bits);
   vec.is_real = true;
   var->value = vec;
+  // §9.4.2: "A non-edge implicit event shall be detected on any change in the
+  // value of the expression", and the clause names no writer whose change is
+  // exempt -- a scanned field is a write to a user variable, and
+  // Variable::NotifyWatchers is the only route by which a process parked on
+  // that variable resumes. Every store below owes the same.
+  var->NotifyWatchers();
 }
 
 // Outcome of handling one §21.3.4.3 conversion specifier. `kStop` ends the
@@ -148,6 +154,7 @@ void StoreScannedChars(const ScanDest& dst, const std::string& s,
       if (elem == nullptr) continue;
       uint8_t byte = i < s.size() ? static_cast<uint8_t>(s[i]) : 0;
       elem->value = MakeLogic4VecVal(arena, ai->elem_width, byte);
+      elem->NotifyWatchers();
     }
     return;
   }
@@ -158,6 +165,7 @@ void StoreScannedChars(const ScanDest& dst, const std::string& s,
   } else {
     dst.var->value = ScanStringToVec(arena, s, dst.var->value.width);
   }
+  dst.var->NotifyWatchers();
 }
 
 // §21.3.4.3: the character conversion does not skip leading white space; it
@@ -172,6 +180,7 @@ ScanFieldResult ScanCharField(ScanCursor cur, int width, const ScanDest& dst,
   if (chars.size() == 1 && dst.var && !dst.is_string) {
     dst.var->value = MakeLogic4VecVal(arena, dst.var->value.width,
                                       static_cast<uint8_t>(chars[0]));
+    dst.var->NotifyWatchers();
   } else {
     StoreScannedChars(dst, chars, ctx, arena);
   }
@@ -266,7 +275,10 @@ ScanFieldResult ScanRawBinaryField(ScanCursor cur, Variable* var,
     if (word < vec.nwords) vec.words[word].aval |= chunk << (off % 64);
   }
   cur.pos += need;
-  if (var) var->value = vec;
+  if (var) {
+    var->value = vec;
+    var->NotifyWatchers();
+  }
   return ScanFieldResult::kMatched;
 }
 
@@ -296,7 +308,10 @@ ScanFieldResult ScanFourStateField(ScanCursor cur, Variable* var,
     }
   }
   cur.pos += need;
-  if (var) var->value = vec;
+  if (var) {
+    var->value = vec;
+    var->NotifyWatchers();
+  }
   return ScanFieldResult::kMatched;
 }
 
@@ -337,6 +352,7 @@ ScanFieldResult ScanStrengthField(ScanCursor cur, Variable* var, Arena& arena) {
     if (a) vec.words[0].aval |= 1;
     if (b) vec.words[0].bval |= 1;
     var->value = vec;
+    var->NotifyWatchers();
   }
   return ScanFieldResult::kMatched;
 }
@@ -396,6 +412,7 @@ void StoreScannedDigits(Variable* var, const std::vector<ScanDigit>& digits,
                           bits_per_digit, vec);
   }
   var->value = vec;
+  var->NotifyWatchers();
 }
 
 // Fills every bit of the destination with x or with z, the reading of a
@@ -409,6 +426,7 @@ void StoreAllXZ(Variable* var, bool is_x, Arena& arena) {
     vec.words[bit / 64].bval |= uint64_t{1} << (bit % 64);
   }
   var->value = vec;
+  var->NotifyWatchers();
 }
 
 // §21.3.4.3, Table 21-7: a decimal field is an optionally signed digit string
@@ -456,6 +474,7 @@ ScanFieldResult ScanDecimalField(ScanCursor cur, int width, Variable* var,
   if (var) {
     uint64_t v = neg ? (0 - mag) : mag;
     var->value = MakeLogic4VecVal(arena, var->value.width, v);
+    var->NotifyWatchers();
   }
   return ScanFieldResult::kMatched;
 }

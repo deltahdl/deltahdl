@@ -299,4 +299,35 @@ TEST(ReadingALineAtATime, ReadsThroughReadUpdateDescriptor) {
   std::remove(tmp.c_str());
 }
 
+// §9.4.2: "A non-edge implicit event shall be detected on any change in the
+// value of the expression", and the clause names no writer whose change is
+// exempt. A system task that writes one of its arguments has written a user
+// variable, so a process parked on it resumes -- which every case above could
+// pass without, the store having happened all along and the value being what
+// they read back.
+TEST(ReadingALineAtATime, FgetsDestinationWakesAnEventControlOnIt) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_213402_event.txt";
+  SeedFile(tmp, "Hi\n");
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  integer fd, c, hits;\n"
+      "  reg [8*16:1] str;\n"
+      "  always @(str) hits = hits + 1;\n"
+      "  initial begin\n"
+      "    hits = 0;\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    #1 c = $fgets(str, fd);\n"
+          "    $fclose(fd);\n"
+          "    #1 $finish;\n"
+          "  end\n"
+          "endmodule\n",
+      f, "hits");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+  std::remove(tmp.c_str());
+}
+
 }  // namespace

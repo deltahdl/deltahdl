@@ -85,6 +85,12 @@ static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
   } else if (var) {
     var->value = ScanStringToVec(arena, line, var->value.width);
   }
+  // §9.4.2: "A non-edge implicit event shall be detected on any change in the
+  // value of the expression", and the clause names no writer whose change is
+  // exempt. A system task that writes one of its arguments has written a user
+  // variable, and Variable::NotifyWatchers is the only route by which a
+  // process parked on it resumes.
+  if (var) var->NotifyWatchers();
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(line.size()));
 }
 
@@ -169,6 +175,7 @@ static Logic4Vec EvalFerror(const Expr* expr, SimContext& ctx, Arena& arena) {
       var->value = ctx.IsStringVariable(expr->args[1]->text)
                        ? StripStringZeros(packed, arena)
                        : ResizeToWidth(packed, var->value.width, arena);
+      var->NotifyWatchers();
     }
   }
   return MakeLogic4VecVal(arena, 32, static_cast<uint32_t>(code));
@@ -441,6 +448,10 @@ static Logic4Vec FreadUnpackedStruct(const StructTypeInfo* sinfo, Variable* var,
     total_bytes += fread_n;
     if (fread_n < fbytes) break;  // file ran out mid-member
   }
+  // One notification for the one variable the members were deposited into,
+  // rather than one per member: a watcher re-evaluates its expression rather
+  // than reading a delta, and the call is one $fread.
+  var->NotifyWatchers();
   return MakeLogic4VecVal(arena, 32, total_bytes);
 }
 
@@ -453,6 +464,7 @@ static Logic4Vec FreadIntegralVar(Variable* var, FILE* fp, Arena& arena) {
   size_t nread = std::fread(buf, 1, nbytes, fp);
   var->value = PackWordBigEndian(arena, buf, nread, nbytes, var->value.width);
   delete[] buf;
+  var->NotifyWatchers();
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(nread));
 }
 
@@ -514,6 +526,7 @@ static uint64_t FreadLoadWords(const FreadMemory& mem, const FreadWindow& win,
     if (auto* v = ctx.FindVariable(elem)) {
       v->value = PackWordBigEndian(arena, buf, nread, mem.bytes_per_word,
                                    v->value.width);
+      v->NotifyWatchers();
     }
     total_bytes += nread;
     ++words_done;

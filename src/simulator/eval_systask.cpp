@@ -364,11 +364,9 @@ static void StorePlusargInteger(const PlusargDest& dest, char conv,
 // §21.6: convert the remainder of a matching plusarg into `var` according to
 // the format string's conversion code. The stored value is automatically zero-
 // padded or truncated to the variable width by MakeLogic4VecVal.
-static void StorePlusargValue(const PlusargDest& dest, char conv,
-                              const std::string& remainder, SimContext& ctx,
-                              Arena& arena) {
-  if (!dest.var) return;
-
+static void StorePlusargConverted(const PlusargDest& dest, char conv,
+                                  const std::string& remainder, SimContext& ctx,
+                                  Arena& arena) {
   // §21.6: %s performs no numeric conversion; the characters are stored as
   // is. A string-typed destination resizes to exactly the stored text (an
   // empty remainder leaves it the empty string); a packed destination is
@@ -386,6 +384,23 @@ static void StorePlusargValue(const PlusargDest& dest, char conv,
   }
 
   StorePlusargInteger(dest, conv, remainder, arena);
+}
+
+// The conversion above reaches eleven stores into the destination across four
+// functions, and every one of them is a write to a user variable. §9.4.2: "A
+// non-edge implicit event shall be detected on any change in the value of the
+// expression", and the clause names no writer whose change is exempt, so the
+// notification is made once here where the destination is known rather than
+// eleven times inside the conversion. Whether a given change counts is the
+// awaiter's own test -- AnyChangeAwaiter::ChangeGatePasses and
+// EventAwaiter::CheckEdge each decline a wake on a value that did not move --
+// so what is owed here is unconditional.
+static void StorePlusargValue(const PlusargDest& dest, char conv,
+                              const std::string& remainder, SimContext& ctx,
+                              Arena& arena) {
+  if (!dest.var) return;
+  StorePlusargConverted(dest, conv, remainder, ctx, arena);
+  dest.var->NotifyWatchers();
 }
 
 static Logic4Vec EvalValuePlusargs(const Expr* expr, SimContext& ctx,
@@ -760,7 +775,11 @@ static Logic4Vec EvalIsunbounded(const Expr* expr, SimContext& ctx,
 static Logic4Vec CastAssignSuccess(std::string_view dest_name, uint64_t src_val,
                                    SimContext& ctx, Arena& arena) {
   auto* var = ctx.FindVariable(dest_name);
-  if (var) var->value = MakeLogic4VecVal(arena, var->value.width, src_val);
+  if (var) {
+    var->value = MakeLogic4VecVal(arena, var->value.width, src_val);
+    // §9.4.2 again: §6.24.1's $cast has written a user variable.
+    var->NotifyWatchers();
+  }
   return MakeLogic4VecVal(arena, 32, 1);
 }
 

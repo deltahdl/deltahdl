@@ -792,4 +792,35 @@ TEST(ReadmemFileLoadSim, UnopenableFileStatesNoRuleOfTheStandard) {
   EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), "cannot open file", 3, ""));
 }
 
+// §9.4.2: "A non-edge implicit event shall be detected on any change in the
+// value of the expression", and the clause names no writer whose change is
+// exempt. A system task that writes one of its arguments has written a user
+// variable, so a process parked on it resumes -- which every case above could
+// pass without, the store having happened all along and the value being what
+// they read back.
+// §21.4's load writes the memory's elements, which is what a testbench most
+// often waits on. CollectSelectReads puts the folded prefix `mem[2]` into the
+// read set beside the base name, so the always_comb holds a watcher on the very
+// element the load writes.
+TEST(ReadmemFileLoadSim, LoadedElementWakesAnAlwaysCombReadingIt) {
+  SimFixture f;
+  std::string path = WriteData("event_h", "AB\nCD\nEF\n");
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  reg [7:0] mem [0:7];\n"
+      "  reg [7:0] b;\n"
+      "  always_comb b = mem[2];\n"
+      "  initial begin\n"
+      "    #1 $readmemh(\"" +
+          path +
+          "\", mem);\n"
+          "    #1 $finish;\n"
+          "  end\n"
+          "endmodule\n",
+      f, "b");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xEFu);
+  std::remove(path.c_str());
+}
+
 }  // namespace

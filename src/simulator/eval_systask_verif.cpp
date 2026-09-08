@@ -57,7 +57,15 @@ static void WriteQueueStatus(const Expr* status_arg, uint64_t status,
                              SimContext& ctx, Arena& arena) {
   if (!status_arg || status_arg->kind != ExprKind::kIdentifier) return;
   auto* var = ctx.FindVariable(status_arg->text);
-  if (var) var->value = MakeLogic4VecVal(arena, var->value.width, status);
+  // §9.4.2: "A non-edge implicit event shall be detected on any change in the
+  // value of the expression", and the clause names no writer whose change is
+  // exempt -- a queue task's output argument is a user variable, and
+  // Variable::NotifyWatchers is the only route by which a process parked on it
+  // resumes.
+  if (var) {
+    var->value = MakeLogic4VecVal(arena, var->value.width, status);
+    var->NotifyWatchers();
+  }
 }
 
 // §20.15.3: write an integer value back through one of $q_remove's output
@@ -66,7 +74,10 @@ static void WriteQueueOutput(const Expr* out_arg, uint64_t value,
                              SimContext& ctx, Arena& arena) {
   if (!out_arg || out_arg->kind != ExprKind::kIdentifier) return;
   auto* var = ctx.FindVariable(out_arg->text);
-  if (var) var->value = MakeLogic4VecVal(arena, var->value.width, value);
+  if (var) {
+    var->value = MakeLogic4VecVal(arena, var->value.width, value);
+    var->NotifyWatchers();
+  }
 }
 
 // §20.15.1 $q_initialize(q_id, q_type, max_length, status): create a queue of

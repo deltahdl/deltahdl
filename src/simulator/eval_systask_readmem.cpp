@@ -451,7 +451,15 @@ static bool HandleMultiDimWord(const ReadmemEnv& env, const MultiDimGeom& g,
     return false;
   }
   std::string elem = MultiDimElementName(g, cursor);
-  if (auto* var = env.ctx.FindVariable(elem)) var->value = word;
+  // §9.4.2: "A non-edge implicit event shall be detected on any change in the
+  // value of the expression", and the clause names no writer whose change is
+  // exempt -- a §21.4 load writes the design's own memory elements, which is
+  // what a testbench most often waits on, and Variable::NotifyWatchers is the
+  // only route by which such a process resumes.
+  if (auto* var = env.ctx.FindVariable(elem)) {
+    var->value = word;
+    var->NotifyWatchers();
+  }
   ++cursor;
   return true;
 }
@@ -610,7 +618,10 @@ static void LoadMemSingleDim(const ReadmemEnv& env, const std::string& content,
                      args.w};
   EvalReadmemIndexed(env, content, req, [&](int64_t addr, const Logic4Vec& v) {
     std::string elem = dest.mem_name + "[" + std::to_string(addr) + "]";
-    if (auto* var = env.ctx.FindVariable(elem)) var->value = v;
+    if (auto* var = env.ctx.FindVariable(elem)) {
+      var->value = v;
+      var->NotifyWatchers();
+    }
   });
 }
 

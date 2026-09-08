@@ -216,4 +216,30 @@ TEST(QAdd, RejectedAddDoesNotPlaceEntry) {
   EXPECT_NE(out[3], "0");  // empty: the rejected add placed nothing
 }
 
+// §9.4.2: "A non-edge implicit event shall be detected on any change in the
+// value of the expression", and the clause names no writer whose change is
+// exempt. A system task that writes one of its arguments has written a user
+// variable, so a process parked on it resumes -- which every case above could
+// pass without, the store having happened all along and the value being what
+// they read back.
+// The add is routed at an undefined queue so the status is the one write in the
+// design, leaving the count unambiguous.
+TEST(QAdd, StatusOutputWakesAnEventControlOnIt) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  integer st;\n"
+      "  integer hits;\n"
+      "  always @(st) hits = hits + 1;\n"
+      "  initial begin\n"
+      "    hits = 0;\n"
+      "    #1 $q_add(99, 1, 0, st);\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "hits");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 }  // namespace

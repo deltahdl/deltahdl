@@ -887,4 +887,30 @@ TEST(ReadingFormattedData, StrengthFieldReadsBackWhatPercentVWrote) {
   EXPECT_NE(out.find("n=1 r=x"), std::string::npos) << out;
 }
 
+// §9.4.2: "A non-edge implicit event shall be detected on any change in the
+// value of the expression", and the clause names no writer whose change is
+// exempt. A system task that writes one of its arguments has written a user
+// variable, so a process parked on it resumes -- which every case above could
+// pass without, the store having happened all along and the value being what
+// they read back.
+// The inferred-sensitivity route rather than the event-control one, and the
+// scanned stores $fscanf shares with $sscanf.
+TEST(ReadingFormattedData, SscanfDestinationWakesAnAlwaysCombReadingIt) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  integer v;\n"
+      "  integer y;\n"
+      "  integer n;\n"
+      "  always_comb y = v + 1;\n"
+      "  initial begin\n"
+      "    #1 n = $sscanf(\"7\", \"%d\", v);\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 8u);
+}
+
 }  // namespace

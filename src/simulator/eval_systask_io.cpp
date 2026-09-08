@@ -87,6 +87,12 @@ static bool TryStoreIntoByteArray(std::string_view name,
     if (elem == nullptr) continue;
     uint8_t byte = i < output.size() ? static_cast<uint8_t>(output[i]) : 0;
     elem->value = MakeLogic4VecVal(arena, ai->elem_width, byte);
+    // §9.4.2: "A non-edge implicit event shall be detected on any change in
+    // the value of the expression", and the clause names no writer whose
+    // change is exempt -- a system task that writes one of its arguments has
+    // changed a user variable, and Variable::NotifyWatchers is the only route
+    // by which a process parked on it resumes.
+    elem->NotifyWatchers();
   }
   return true;
 }
@@ -106,6 +112,7 @@ static void StoreStringResult(Variable* dst, std::string_view name,
   } else {
     dst->value = ResizeToWidth(packed, dst->value.width, arena);
   }
+  dst->NotifyWatchers();
 }
 
 // §21.3.3 N6: $swrite/$swriteb/$swriteh/$swriteo take an output variable as
