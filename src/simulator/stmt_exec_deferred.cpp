@@ -10,10 +10,8 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
-#include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
-#include "simulator/awaiters.h"
 #include "simulator/evaluation.h"
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
