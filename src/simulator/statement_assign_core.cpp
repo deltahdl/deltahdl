@@ -101,6 +101,22 @@ static void WriteVar(Variable* var, const Logic4Vec& val, Arena& arena) {
   var->NotifyWatchers();
 }
 
+// §7.4.4: writes `rhs_val` to the element a multidimensional indexed name such
+// as `a[i][j]` stands for. Answers true when the name is one of that shape --
+// whether it wrote the element or performed §7.4.5's no operation for an index
+// the array does not hold -- so the caller does not go on to the writers below
+// it, which would take the name down to the array's base carrier.
+static bool TryCompoundElementWrite(const Expr* lhs, const Logic4Vec& rhs_val,
+                                    SimContext& ctx, Arena& arena) {
+  bool absent_element = false;
+  if (auto* compound =
+          TryResolveCompoundElement(lhs, ctx, arena, &absent_element)) {
+    WriteVar(compound, rhs_val, arena);
+    return true;
+  }
+  return absent_element;
+}
+
 bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
                              SimContext& ctx, Arena& arena) {
   if (auto* elem = TryResolveArrayElement(lhs, ctx)) {
@@ -118,18 +134,7 @@ bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
   // the object's property map rather than in a variable, so no writer below
   // can reach it and ResolveLhsVariable answers null for the name it rebuilds.
   if (TryWriteClassPropertyBits(lhs, rhs_val, ctx, arena)) return true;
-  bool absent_element = false;
-  if (auto* compound =
-          TryResolveCompoundElement(lhs, ctx, arena, &absent_element)) {
-    WriteVar(compound, rhs_val, arena);
-    return true;
-  }
-  // §7.4.5: a write to an array with an invalid index performs no operation.
-  // Handled here rather than left to fall through, because ResolveLhsVariable
-  // below walks `a[i][j]` down to the variable named `a` -- the element-width
-  // carrier no element is stored in -- and WriteBitSelect would then read the
-  // last index as a bit position of it.
-  if (absent_element) return true;
+  if (TryCompoundElementWrite(lhs, rhs_val, ctx, arena)) return true;
   auto* var = ResolveLhsVariable(lhs, ctx);
 
   if (var && lhs->kind == ExprKind::kSelect && lhs->base && !lhs->index_end) {
