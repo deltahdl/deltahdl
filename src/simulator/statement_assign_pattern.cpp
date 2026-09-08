@@ -157,7 +157,13 @@ static const Expr* SelectDimElement(const Expr* pat, uint32_t idx, uint32_t pos,
     }
     return pos < pat->elements.size() ? pat->elements[pos] : nullptr;
   }
+  // §10.9.1 resolves a keyed pattern by index, then by type, then by default,
+  // and the type key was the one this asked for nowhere: FindTypeKeyedElement
+  // sat unused beside the other two, so `p = '{int: 7}` on an int array filled
+  // no element while the declaration form of the same pattern filled them all.
   size_t m = FindIndexKeyedElement(pat, idx, pd.ctx, pd.arena);
+  if (m >= pat->elements.size())
+    m = FindTypeKeyedElement(pat, pd.info.elem_type_kind);
   if (m >= pat->elements.size()) m = FindDefaultKeyedElement(pat);
   return m < pat->elements.size() ? pat->elements[m] : nullptr;
 }

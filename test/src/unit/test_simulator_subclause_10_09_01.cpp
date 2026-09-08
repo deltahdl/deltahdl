@@ -840,4 +840,85 @@ TEST(ArrayLiteralSim, AscendingDimsUnchangedByPerDimensionDirection) {
   }
 }
 
+// §10.9.1 gives a keyed array pattern three rules -- "For index:value ...",
+// "For type:value, if the element or subarray type of the array matches this
+// type, then each element or subarray that has not already been set by an
+// index key above shall be set to the value", and the default that covers what
+// neither reached -- and writes none of the three for one dimension only. The
+// element type of `p [1:2][1:3]` is int, which matches the `int` key, so the
+// type key has to reach all six leaves just as it reaches all three elements of
+// the one-dimensional `int arr [0:2] = '{int: 42}` above. A multidimensional
+// array's leaves are filled by a walk of their own, and this is the case that
+// asks whether that walk consults the type key at all: a walk that asks only
+// for an index key and then a default finds neither in '{int: 7} and leaves
+// each leaf at §6.8 Table 6-7's no-initializer default, which for a 2-state int
+// is '0. `d` carries the same pattern in its declaration, a route that resolved
+// type keys already, so reading the two arrays together says which spelling of
+// the one pattern is wrong rather than only that a leaf holds the wrong number.
+// 7 is not 0, so a leaf nothing wrote is never mistaken for one the pattern
+// filled. Every bit of an int leaf is known, so ToUint64, which projects
+// aval & ~bval, reads one whole.
+TEST(ArrayLiteralSim, TypeKeyReachesEveryLeafOfMultidimAssign) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int d [1:2][1:3] = '{int: 7};\n"
+      "  int p [1:2][1:3];\n"
+      "  initial p = '{int: 7};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  const std::string kLeaves[6] = {"[1][1]", "[1][2]", "[1][3]",
+                                  "[2][1]", "[2][2]", "[2][3]"};
+  for (const auto& leaf : kLeaves) {
+    auto* declared = f.ctx.FindVariable("d" + leaf);
+    auto* assigned = f.ctx.FindVariable("p" + leaf);
+    ASSERT_NE(declared, nullptr) << leaf;
+    ASSERT_NE(assigned, nullptr) << leaf;
+    EXPECT_EQ(declared->value.ToUint64(), 7u) << leaf;
+    EXPECT_EQ(assigned->value.ToUint64(), 7u) << leaf;
+  }
+}
+
+// §10.9.1 states the three rules in an order and says so: an index key sets its
+// element, "For type:value ... each element or subarray that has not already
+// been set by an index key above shall be set to the value", and
+// "The default:value applies to elements or subarrays that are not matched by
+// either index or type key." One pattern carrying all three settles the order
+// on a multidimensional target, where each of the two rows of `q [1:2][1:3]` is
+// a subarray the outer pattern's keys are matched against. Address 1 is named
+// by the index key, so that row takes 100 although the `int` key matches its
+// type as well; address 2 is named by no index key, so the type key takes it
+// and the row reads 7; and 55 appears nowhere, the default having nothing left
+// to cover. Each row would read differently under any other order -- type
+// before index puts 7 in both rows, default before type puts 55 at address 2 --
+// so the three values separate the clause's order from the alternatives rather
+// than merely showing a key was read. A row is broadcast whole, so all three of
+// its leaves are checked and a partial fill cannot pass for a complete one.
+// Every leaf is an int with all bits known, so ToUint64 reads one whole.
+TEST(ArrayLiteralSim, MultidimKeyOrderIsIndexThenTypeThenDefault) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int q [1:2][1:3];\n"
+      "  initial q = '{1: 100, int: 7, default: 55};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  // Indexed by outer address, lowest first: the row an index key claimed, then
+  // the row the type key had to reach.
+  const uint64_t kRowValue[2] = {100u, 7u};
+  for (uint32_t i = 1; i <= 2; ++i) {
+    for (uint32_t j = 1; j <= 3; ++j) {
+      std::string leaf =
+          "q[" + std::to_string(i) + "][" + std::to_string(j) + "]";
+      auto* e = f.ctx.FindVariable(leaf);
+      ASSERT_NE(e, nullptr) << leaf;
+      EXPECT_EQ(e->value.ToUint64(), kRowValue[i - 1]) << leaf;
+    }
+  }
+}
+
 }  // namespace
