@@ -12,6 +12,24 @@ namespace delta {
 
 struct Expr;
 
+// §10.6.1/§11.4.12: which bits of a procedural continuous assignment's
+// right-hand value a variable owns, and where in the variable they land. A
+// concatenation target makes those two different windows and the two are
+// unrelated numbers: `bus[3]` in `assign {w, bus[3]} = ...` takes bit 0 of the
+// value and lands on bit 3 of `bus`. `rhs_width` is §10.7's context the value
+// is evaluated in -- "The size of the left-hand side of an assignment forms the
+// context for the right-hand expression" -- which is the whole concatenation's
+// width, so a later re-evaluation answers what the first one did. A dst_width
+// of zero is the whole of it, which is the singular target: it owns every bit
+// of the value and every bit of itself.
+struct ProcContAssignWindow {
+  uint32_t rhs_width = 0;
+  uint32_t src_lo = 0;
+  uint32_t src_width = 0;
+  uint32_t dst_lo = 0;
+  uint32_t dst_width = 0;
+};
+
 struct Variable {
   Logic4Vec value{};
   // §9.4.2: the baseline an event control's awaiter compares against to decide
@@ -101,6 +119,18 @@ struct Variable {
   const Expr* proc_cont_rhs = nullptr;
 
   const Expr* assign_cont_rhs = nullptr;
+
+  // §10.6.1: "Releasing a variable that ... currently has an active assign
+  // procedural continuous assignment shall reestablish that assignment", and
+  // what the assignment gives this variable is its window of the right-hand
+  // value rather than the whole of it. The expression alone could not say so,
+  // and the release recomputed a window from its own target instead: after
+  // `assign {a, b} = 16'h1234;`, `release a;` reestablished the entire sixteen
+  // bits on the eight-bit `a` where §11.4.12's packed vector of bits gives it
+  // 8'h12. The window is recorded here as the assignment is installed, so the
+  // two cannot drift apart and a release naming a target written differently
+  // from the assign's reestablishes what the assign actually installed.
+  ProcContAssignWindow assign_cont_window{};
 
   std::vector<std::function<bool()>> watchers;
 

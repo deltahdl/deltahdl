@@ -649,4 +649,77 @@ TEST(ForceReleaseSim, ForceOfAConcatenationZeroWidthPartSelectNames11_5_1) {
   EXPECT_EQ(bus->value.ToUint64(), 0x55u);
 }
 
+// §10.6.1: "Releasing a variable that ... currently has an active assign
+// procedural continuous assignment shall reestablish that assignment", and the
+// assignment being reestablished is `assign {a, b} = 16'h1234`. What that
+// assignment gives `a` is §11.4.12's packed vector of bits' high half, 8'h12,
+// however the release that reestablishes it is written.
+//
+// This release names `a` where the assign named the concatenation, and that is
+// the whole of the case: the variable recorded the right-hand expression and
+// not the window it was installed with, so the release recomputed a window from
+// its own target -- the whole of `a`, which takes the whole of the value -- and
+// reestablished all sixteen bits of 16'h1234 on the eight-bit `a`. The sibling
+// case above releases the same concatenation the assign named, where the
+// recomputed window happens to match and nothing separates the two.
+//
+// `a` reading 16'h1234 is that whole value and `a` reading 8'h34 would be it
+// truncated into eight bits, so the assertion tells the slice from both wrong
+// answers; `b` is asserted with it because the release named neither `b` nor
+// anything of it.
+TEST(ForceReleaseSim, ReleaseOfOneElementReestablishesThatElementsSlice) {
+  SimFixture f;
+  auto* a = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'hA1;\n"
+      "    b = 8'hB2;\n"
+      "    assign {a, b} = 16'h1234;\n"
+      "    force a = 8'h55;\n"
+      "    release a;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(a, nullptr);
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(a->value.ToUint64(), 0x12u);
+  EXPECT_EQ(b->value.ToUint64(), 0x34u);
+}
+
+// §10.6.1 has the reestablished assignment go on being an assignment: it
+// "shall reestablish that assignment and schedule a reevaluation", so a later
+// change of the right-hand side reaches the released element again, through the
+// same window. Each element carries its own, and releasing one says nothing
+// about the other -- `b` was never named by the force or the release and its
+// half of the assign stands untouched throughout.
+//
+// The source is a variable rather than a literal for exactly that: with a
+// constant right-hand side the reestablishment is a single write and nothing
+// after it can tell a window that was recorded from one that was recomputed.
+// After src becomes 16'hABCD the two elements must read 8'hAB and 8'hCD; a
+// reestablishment through the whole value leaves `a` holding all sixteen bits.
+TEST(ForceReleaseSim, ReleaseOfOneElementLeavesTheOtherElementsAssignIntact) {
+  SimFixture f;
+  auto* a = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  logic [15:0] src;\n"
+      "  initial begin\n"
+      "    src = 16'h1234;\n"
+      "    assign {a, b} = src;\n"
+      "    force a = 8'h55;\n"
+      "    release a;\n"
+      "    src = 16'hABCD;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(a, nullptr);
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(a->value.ToUint64(), 0xABu);
+  EXPECT_EQ(b->value.ToUint64(), 0xCDu);
+}
+
 }  // namespace

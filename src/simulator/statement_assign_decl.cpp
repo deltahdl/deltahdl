@@ -520,23 +520,13 @@ struct RhsWatcherSpec {
   // recomputed forced value re-resolves it; null when the target is a variable,
   // which carries no strength.
   Net* net = nullptr;
-  // §10.7: "The size of the left-hand side of an assignment forms the context
-  // for the right-hand expression", so a right-hand side that is evaluated
-  // again later has to be evaluated in the same context or the two evaluations
-  // answer differently. Zero leaves the expression self-determined, which is
-  // what every singular target asks for and what the force path has always
-  // done.
-  uint32_t rhs_width = 0;
   // §11.4.12 treats a concatenation as "a packed vector of bits", so an element
   // of one owns a window of the right-hand value and a window of its own
-  // storage, and the two are unrelated numbers: `bus[3]` in `{w, bus[3]}` takes
-  // bit 0 of the value and lands on bit 3 of `bus`. A width of zero is the
-  // whole of it, which is the singular target: it owns every bit of the value
-  // and every bit of itself.
-  uint32_t src_lo = 0;
-  uint32_t src_width = 0;
-  uint32_t dst_lo = 0;
-  uint32_t dst_width = 0;
+  // storage. Those five numbers are what Variable records beside an assign's
+  // right-hand side, so they are the struct Variable records rather than five
+  // fields of this one: a release has to reestablish through the window the
+  // assign was installed with.
+  ProcContAssignWindow window;
 };
 
 // Writes into `var` the part of `val` this installation owns. A singular target
@@ -559,17 +549,17 @@ struct RhsWatcherSpec {
 // and the element would keep the value it had.
 static void WriteOwnedBits(Variable* var, const Logic4Vec& val,
                            const RhsWatcherSpec& spec, Arena& arena) {
-  if (spec.dst_width == 0) {
+  if (spec.window.dst_width == 0) {
     if (spec.forced) var->forced_value = val;
     var->value = val;
   } else {
     Logic4Vec updated = ExtractBitField(arena, var->value, 0, var->value.width);
-    DepositBitField(
-        updated, spec.dst_lo,
-        spec.src_width == 0
-            ? val
-            : ExtractBitField(arena, val, spec.src_lo, spec.src_width),
-        spec.dst_width);
+    DepositBitField(updated, spec.window.dst_lo,
+                    spec.window.src_width == 0
+                        ? val
+                        : ExtractBitField(arena, val, spec.window.src_lo,
+                                          spec.window.src_width),
+                    spec.window.dst_width);
     var->value = updated;
     if (spec.forced) var->forced_value = var->value;
   }
@@ -580,7 +570,7 @@ static void WriteOwnedBits(Variable* var, const Logic4Vec& val,
 // refreshing var->forced_value when the spec is a forced one.
 static void RecomputeRhsInto(Variable* var, const Expr* rhs, SimContext& ctx,
                              Arena& arena, const RhsWatcherSpec& spec) {
-  auto new_val = EvalExpr(rhs, ctx, arena, spec.rhs_width);
+  auto new_val = EvalExpr(rhs, ctx, arena, spec.window.rhs_width);
   WriteOwnedBits(var, new_val, spec, arena);
   var->NotifyWatchers();
 }
@@ -610,7 +600,7 @@ static void InstallForcedValueWatcher(Variable* var, const Expr* rhs,
                                       SimContext& ctx, Arena& arena,
                                       RhsWatcherSpec spec) {
   spec.forced = true;
-  auto rhs_val = EvalExpr(rhs, ctx, arena, spec.rhs_width);
+  auto rhs_val = EvalExpr(rhs, ctx, arena, spec.window.rhs_width);
   var->is_forced = true;
   WriteOwnedBits(var, rhs_val, spec, arena);
   var->proc_cont_rhs = rhs;
@@ -641,7 +631,7 @@ static void ReestablishContinuousAssignment(Variable* var, const Expr* rhs,
   // it.
   spec.net = nullptr;
   spec.forced = false;
-  auto rhs_val = EvalExpr(rhs, ctx, arena, spec.rhs_width);
+  auto rhs_val = EvalExpr(rhs, ctx, arena, spec.window.rhs_width);
   WriteOwnedBits(var, rhs_val, spec, arena);
   var->NotifyWatchers();
 
@@ -696,7 +686,7 @@ static RhsWatcherSpec SpecForSlot(const ConcatElemSlot& slot, SimContext& ctx,
                                                     : nullptr;
   RhsWatcherSpec spec;
   spec.net = net;
-  spec.rhs_width = slot.rhs_width;
+  spec.window.rhs_width = slot.rhs_width;
   // §11.5.1's "only affect the bits that are in range" is itself two answers:
   // dst.lo and dst.width are the bits of the object that are written, and
   // dst.src_lo is where among the element's own bits the ones that land begin.
@@ -707,10 +697,10 @@ static RhsWatcherSpec SpecForSlot(const ConcatElemSlot& slot, SimContext& ctx,
   // `force {w, a[1 -: 4]} = 5'b1_1101;` on a `logic [7:0] a` left `a` at 8'h01
   // where the clause reads the select as `a[1:-2]` and gives `a[1:0]` the
   // element's bits [3:2], which is 8'h03.
-  spec.src_lo = slot.src_lo + dst.src_lo;
-  spec.src_width = slot.width;
-  spec.dst_lo = dst.lo;
-  spec.dst_width = dst.width;
+  spec.window.src_lo = slot.src_lo + dst.src_lo;
+  spec.window.src_width = slot.width;
+  spec.window.dst_lo = dst.lo;
+  spec.window.dst_width = dst.width;
   return spec;
 }
 
@@ -725,9 +715,15 @@ static RhsWatcherSpec SpecForSlot(const ConcatElemSlot& slot, SimContext& ctx,
 // to what Variable records rather than to this walk.
 static void ForceOneElement(const ConcatElemSlot& slot, const Stmt* stmt,
                             SimContext& ctx, Arena& arena) {
-  if (stmt->kind == StmtKind::kAssign) slot.var->assign_cont_rhs = stmt->rhs;
-  InstallForcedValueWatcher(slot.var, stmt->rhs, ctx, arena,
-                            SpecForSlot(slot, ctx, arena));
+  RhsWatcherSpec spec = SpecForSlot(slot, ctx, arena);
+  if (stmt->kind == StmtKind::kAssign) {
+    slot.var->assign_cont_rhs = stmt->rhs;
+    // §10.6.1's reestablishment is of this assignment, so the window it gave
+    // this element travels with the expression that will be re-evaluated
+    // through it, however the release that reestablishes it is written.
+    slot.var->assign_cont_window = spec.window;
+  }
+  InstallForcedValueWatcher(slot.var, stmt->rhs, ctx, arena, spec);
 }
 
 // Releases or deassigns one element of a concatenation target. §10.6.1: "The
@@ -741,6 +737,7 @@ static void ReleaseOneElement(const ConcatElemSlot& slot, const Stmt* stmt,
   var->proc_cont_rhs = nullptr;
   if (stmt->kind == StmtKind::kDeassign) {
     var->assign_cont_rhs = nullptr;
+    var->assign_cont_window = {};
     return;
   }
 
@@ -756,14 +753,17 @@ static void ReleaseOneElement(const ConcatElemSlot& slot, const Stmt* stmt,
   // `assign {a, b} = 16'h1234; force {a, b} = ...; release {a, b};` handed `a`
   // the entire sixteen-bit value.
   //
-  // The window is this release statement's own, since the variable records the
-  // assignment's right-hand side and not the window it was installed with, so a
-  // release naming a target written differently from the assign's reestablishes
-  // through its own windows. That is #3526, and answering it is a change to
-  // what Variable records rather than to this walk.
-  if (var->assign_cont_rhs)
+  // The window is the assignment's own rather than this statement's. The two
+  // agree only where the release names the target the assign named, and
+  // `assign {a, b} = 16'h1234; force a = 8'h55; release a;` is where they part:
+  // this release's element is the whole of `a`, whose window is the whole of
+  // the value, while the assignment gave `a` the value's high eight bits.
+  if (var->assign_cont_rhs) {
+    RhsWatcherSpec reestablished;
+    reestablished.window = var->assign_cont_window;
     ReestablishContinuousAssignment(var, var->assign_cont_rhs, ctx, arena,
-                                    spec);
+                                    reestablished);
+  }
 }
 
 // Routes one element to the statement that named it: the two statements that
@@ -858,7 +858,15 @@ StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
   auto* var = ResolveLhsVariable(stmt->lhs, ctx);
   if (!var) return StmtResult::kDone;
 
-  if (stmt->kind == StmtKind::kAssign) var->assign_cont_rhs = stmt->rhs;
+  if (stmt->kind == StmtKind::kAssign) {
+    var->assign_cont_rhs = stmt->rhs;
+    // §10.6.1 gives the assign statement "a singular variable reference or a
+    // concatenation of variables", and this is the singular one: it owns every
+    // bit of the value and every bit of itself, which is the empty window. It
+    // is recorded rather than left alone so that an earlier assign through a
+    // concatenation leaves no window behind for this one's release to read.
+    var->assign_cont_window = {};
+  }
   // §10.6.2 makes force a statement on a net as well as on a variable, and the
   // net is what holds the strength the force settles. A select or a
   // concatenation target names no net here, the same way a continuous
@@ -893,6 +901,7 @@ StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
 
   if (stmt->kind == StmtKind::kDeassign) {
     var->assign_cont_rhs = nullptr;
+    var->assign_cont_window = {};
   } else if (stmt->lhs->kind == ExprKind::kIdentifier) {
     if (auto* net = ctx.FindNet(stmt->lhs->text)) {
       net->Resolve(arena);
@@ -900,7 +909,12 @@ StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
   }
 
   if (var->assign_cont_rhs && stmt->kind != StmtKind::kDeassign) {
-    ReestablishContinuousAssignment(var, var->assign_cont_rhs, ctx, arena, {});
+    // The window the assignment was installed with, which for an assign through
+    // a concatenation is this variable's slice of it and not the whole value.
+    RhsWatcherSpec reestablished;
+    reestablished.window = var->assign_cont_window;
+    ReestablishContinuousAssignment(var, var->assign_cont_rhs, ctx, arena,
+                                    reestablished);
   }
 
   return StmtResult::kDone;
