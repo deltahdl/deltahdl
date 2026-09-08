@@ -6,6 +6,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "parser/ast.h"
+#include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -121,8 +122,11 @@ bool TryWriteAssocMemberField(const Expr* lhs, const Logic4Vec& rhs_val,
   uint32_t width = 0;
   if (!ResolveAssocMember(lhs, ctx, &bit_offset, &width)) return false;
   auto* entry = AssocEntryForWrite(lhs->lhs, ctx, arena);
+  // A declined entry is §7.8.6's invalid index, which allocates nothing and
+  // writes nothing, so there is no change for §9.4.2 to announce.
   if (!entry) return true;
   DepositBitField(*entry, bit_offset, rhs_val, width);
+  NotifyOwningVar(ctx, lhs->lhs->base->text);
   return true;
 }
 
@@ -160,6 +164,12 @@ bool TryWriteAssocElementBits(const Expr* lhs, const Logic4Vec& rhs_val,
   }
   WriteBitSelect(&elem, lhs, rhs_val, ctx, arena);
   *entry = elem.value;
+  // §9.4.2 again, and `elem` cannot carry it: it is a stack Variable built to
+  // lend WriteBitSelect the declaration's packed range, so its watcher list is
+  // empty and the entry it is copied back into is a bare vector. The array's
+  // own variable -- the one looked up a few lines above for that range -- is
+  // where the watchers are.
+  NotifyOwningVar(ctx, lhs->base->base->text);
   return true;
 }
 

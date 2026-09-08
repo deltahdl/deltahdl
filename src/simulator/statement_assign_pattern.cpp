@@ -492,6 +492,8 @@ bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
   } else {
     auto key_val = EvalExpr(lhs->index, ctx, arena);
     if (HasUnknownBits(key_val)) {
+      // §7.8.6: an index carrying an x or z bit is invalid and the write is a
+      // no-op, so nothing changed and nothing is announced.
       ctx.GetDiag().Warning(lhs->index->range.start,
                             "associative array index contains x/z",
                             Subclause("7.8.6"));
@@ -501,6 +503,12 @@ bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
                            aa->is_index_signed);
     aa->int_data[key] = rhs_val;
   }
+  // §9.4.2: the element that changed is an aggregate element, which the clause
+  // names among the changes that "shall cause the event expression to be
+  // reevaluated", and it lives outside the variable registered under the
+  // array's name -- the one an `@(aa[3])` and an `always_comb` reading `aa[3]`
+  // both arm on. One statement wrote one entry, so it is announced once.
+  NotifyOwningVar(ctx, lhs->base->text);
   return true;
 }
 

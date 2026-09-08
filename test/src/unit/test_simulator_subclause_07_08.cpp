@@ -114,4 +114,71 @@ TEST(AssocArraySimulation, WholeArrayCopyDuplicatesEntries) {
   EXPECT_EQ(v, 77u);
 }
 
+// §9.4.2 has a non-edge implicit event "detected on any change in the value of
+// the expression" and names an aggregate element as a lawful operand of one:
+// "Object (class instance) members or aggregate elements can be any type as
+// long as the result of the expression is a singular value". The clause puts
+// the duty on the writer -- "Changing the value of object data members,
+// aggregate elements ... shall cause the event expression to be reevaluated" --
+// and an associative array's entries live outside the variable an @(aa[3]) arms
+// its watcher on, so the write has to announce the change itself.
+TEST(AssocArraySimulation, AssocElementWriteWakesAnEventControlOnThatElement) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] aa[int];\n"
+      "  int woke;\n"
+      "  always @(aa[3]) woke = woke + 1;\n"
+      "  initial begin\n"
+      "    woke = 0;\n"
+      "    #1 aa[3] = 8'hF0;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      "woke");
+  EXPECT_EQ(v, 1u);
+}
+
+// The same event on the other writer: `aa[3][3:0]` is §7.8.7's write to bits of
+// an element, which goes through TryWriteAssocElementBits rather than the
+// whole-element store, so a notification placed on one does not reach the
+// other. Two changes after the control armed, so the count discriminates
+// between a fix that reached both writers and one that reached only the first.
+TEST(AssocArraySimulation,
+     AssocElementBitSelectWriteWakesAnEventControlOnThatElement) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] aa[int];\n"
+      "  int woke;\n"
+      "  always @(aa[3]) woke = woke + 1;\n"
+      "  initial begin\n"
+      "    woke = 0;\n"
+      "    #1 aa[3] = 8'hF0;\n"
+      "    #1 aa[3][3:0] = 4'hA;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      "woke");
+  EXPECT_EQ(v, 2u);
+}
+
+// The other awaiter route onto the same notification: an inferred sensitivity
+// list reduces a select read to its base name, so the always_comb arms an
+// AnyChangeAwaiter on `aa` and resumes on the notification alone -- the
+// comparison that awaiter makes is skipped for a name FindAssocArray answers,
+// the array's own variable holding no element value to compare.
+TEST(AssocArraySimulation, AssocElementWriteWakesAnAlwaysCombThatReadsIt) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] aa[int];\n"
+      "  logic [7:0] b;\n"
+      "  always_comb b = aa[3];\n"
+      "  initial begin\n"
+      "    #1 aa[3] = 8'hF0;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      "b");
+  EXPECT_EQ(v, 0xF0u);
+}
+
 }  // namespace
