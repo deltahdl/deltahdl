@@ -44,6 +44,49 @@ void CoerceTo2State(Logic4Vec& v) {
   }
 }
 
+// A right-hand value that owns its words, for a store to keep.
+//
+// §6.8: "A variable is an abstraction of a data storage element. A variable
+// shall store a value from one assignment to the next." Two variables are two
+// storage elements, and no clause has to forbid them sharing one buffer: the
+// object model the clause describes already makes them separate. EvalExpr
+// answers a bare identifier with the variable's own Logic4Vec (EvalIdentifier,
+// evaluation.cpp), an element select with the element variable's own vec
+// (eval_select.cpp), and a Logic4Vec copies its `words` pointer rather than the
+// words it points at. ResizeToWidth returns its argument untouched when the
+// widths already match, so `y = x` at equal widths stored x's buffer in y.
+//
+// That is not a latent hazard waiting for a later write. The very next line of
+// every one of these stores is `if (!var->is_4state) CoerceTo2State(...)`,
+// which writes in place: on `logic [7:0] x; bit [7:0] y; y = x;` the coercion
+// reached back through the alias and cleared x's own x and z bits, inside the
+// statement that only read x.
+//
+// The copy is taken where the value is produced rather than at each store, so
+// every store downstream of a production point is already safe and none of them
+// has to know. A production point pays one copy for a statement; the stores are
+// six, and several of them run per element.
+//
+// ExtractBitField copies the words -- multi-word safe, and it carries the bval
+// plane, so an x or z survives the copy -- but it builds its result with
+// MakeLogic4Vec, which leaves is_real, is_signed and is_string false. All three
+// are read after this point and are restored beside the words:
+// ConvertRealOnAssign branches on is_real to convert rather than reinterpret a
+// real's bits, ResizeToWidth sign-extends on is_signed, and a value stored into
+// a class property keeps its is_string for whatever later reads the property as
+// text.
+//
+// This is the blocking mirror of SampleNbaRhs
+// (statement_assign_nonblocking.cpp), which §10.4.2's sampling needed for the
+// same reason.
+static Logic4Vec OwnRhsWords(const Logic4Vec& val, Arena& arena) {
+  Logic4Vec copy = ExtractBitField(arena, val, 0, val.width);
+  copy.is_real = val.is_real;
+  copy.is_signed = val.is_signed;
+  copy.is_string = val.is_string;
+  return copy;
+}
+
 static void WriteVar(Variable* var, const Logic4Vec& val, Arena& arena) {
   // §10.6.2: "A force statement to a variable shall override a procedural
   // assignment ... until a release procedural statement is executed on the
@@ -239,7 +282,13 @@ static bool TryUnpackedSliceAssign(const Stmt* stmt, SimContext& ctx,
   UnpackedSliceTarget dst{lhs->base->text, dst_lo, dst_count,
                           dst_info->elem_width, dst_info->is_descending};
   std::vector<Logic4Vec> src;
-  CollectUnpackedSliceElements(stmt->rhs, ctx, arena, src);
+  if (CollectUnpackedSliceElements(stmt->rhs, ctx, arena, src)) {
+    // The collector pushes each source element variable's own vec, so every
+    // entry arrives aliasing live storage. Copying here rather than in the
+    // writer keeps the copy at the point the run is produced, and leaves the
+    // packed fallback below -- which builds its fields fresh -- paying nothing.
+    for (auto& elem : src) elem = OwnRhsWords(elem, arena);
+  }
   if (src.empty()) {
     FillSliceSourceFromPacked(stmt, dst, ctx, arena, src);
   }
@@ -725,6 +774,10 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   if (TryDispatchSpecialBlockingAssign(stmt, ctx, arena))
     return StmtResult::kDone;
   auto rhs_val = EvalRhsWithStructContext(stmt, ctx, arena);
+  // Every generic blocking store -- the scalar write, the select writers,
+  // WriteStructField and the class property behind it -- takes the value from
+  // here, so one copy at the point it is produced covers all of them.
+  rhs_val = OwnRhsWords(rhs_val, arena);
   ApplyGenericBlockingAssign(stmt, rhs_val, ctx, arena);
   return StmtResult::kDone;
 }
@@ -732,32 +785,37 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
 void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
                            SimContext& ctx, Arena& arena) {
   if (!lhs) return;
+  // The value arrives already made, from a caller outside this file -- an
+  // embedded assignment expression, a continuous assignment's driven value, an
+  // output argument's writeback, a DPI or system task's result. This entry is
+  // where such a value is produced as far as the store path can see, so it is
+  // copied once here rather than in the arms below.
+  Logic4Vec owned = OwnRhsWords(rhs_val, arena);
   // §10.9: a typed assignment pattern expression on the left unpacks like the
   // bare pattern it wraps.
   if (IsConcatLhs(lhs)) {
-    UnpackConcatLhs(UnwrapTypedPattern(lhs), rhs_val, ctx, arena);
+    UnpackConcatLhs(UnwrapTypedPattern(lhs), owned, ctx, arena);
     return;
   }
 
   if (lhs->kind == ExprKind::kStreamingConcat) {
-    UnpackStreamingConcatLhs(lhs, rhs_val, ctx, arena);
+    UnpackStreamingConcatLhs(lhs, owned, ctx, arena);
     return;
   }
   if (lhs->kind == ExprKind::kSelect) {
-    Logic4Vec mutable_val = rhs_val;
-    TrySelectBlockingAssign(lhs, mutable_val, ctx, arena);
+    TrySelectBlockingAssign(lhs, owned, ctx, arena);
     return;
   }
   auto* var = ResolveLhsVariable(lhs, ctx);
   if (var) {
     if (var->is_forced) return;
     auto converted =
-        ConvertRealOnAssign(rhs_val, lhs, var->value.width, ctx, arena);
+        ConvertRealOnAssign(owned, lhs, var->value.width, ctx, arena);
     var->value = converted;
     if (!var->is_4state) CoerceTo2State(var->value);
     var->NotifyWatchers();
   } else if (lhs->kind == ExprKind::kMemberAccess) {
-    WriteStructField(lhs, rhs_val, ctx);
+    WriteStructField(lhs, owned, ctx);
   }
 }
 
