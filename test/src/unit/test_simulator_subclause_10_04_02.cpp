@@ -474,4 +474,66 @@ TEST(NonblockingAssignSim, SelectTargetRunningOffHighEndStillTakesItsLowBits) {
   LowerRunAndCheck(f, design, {{"a", 0x40u}});
 }
 
+// §10.4.2: the left-hand side of a nonblocking assignment names the variable
+// "to which the value is assigned", and a compound select names one element of
+// a multidimensional unpacked array -- an element §7.4.2 gives storage of its
+// own, which CreateMultiDimLeaves registers under the name "A[1][2]". Reaching
+// that element through two index expressions rather than one changes nothing
+// about which object the update region writes.
+//
+// The nonblocking path resolved its target with a single-level element lookup
+// that declines when the select's base is itself a select, then fell back to
+// the bare name A: the update landed on the array's base variable as a
+// bit-select of index 2, and the element itself stayed 0. The blocking form
+// A[1][2] = 43 already writes the element, which is what left the two-level
+// nonblocking form looking covered by
+// NonblockingAssignSim.LhsRequiringEvaluationBindsAtScheduleTime above -- that
+// case indexes one dimension, the level the declined lookup does handle.
+//
+// The #1 is required rather than decorative: a nonblocking assignment takes
+// effect in the update region, so a run that ends at time 0 reads the element's
+// old value whichever variable the target resolved to.
+TEST(NonblockingAssignSim, MultidimElementTargetWritesTheElement) {
+  SimFixture f;
+  auto* elem = RunAndFindVar(
+      "module t;\n"
+      "  int A[2][3];\n"
+      "  initial begin\n"
+      "    A[1][2] <= 43;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "A[1][2]");
+  ASSERT_NE(elem, nullptr);
+  EXPECT_EQ(elem->value.ToUint64(), 43u);
+}
+
+// The half of the same defect that names it: what the misresolved assignment
+// did instead. Falling back to the bare name turned each element target into a
+// bit-select of the array's 32-bit base variable -- the variable no element is
+// stored in -- so A read 6, bits 2 and 1 set by numbers that were element
+// indices, while both elements stayed 0.
+//
+// Two assignments in one time step, to elements of different rows, hold the
+// outer index as well as the inner: a resolution that honoured only the
+// innermost select would put both values in the same row. 43 and 5 are odd on
+// purpose. The bit-select the defect performs reduces its right-hand side to
+// rhs_val.ToUint64() & 1, so an even value would write a 0 bit and leave the
+// base variable reading 0 -- the expectation on A would then hold today, for a
+// reason that has nothing to do with the element being written.
+TEST(NonblockingAssignSim, MultidimElementTargetLeavesTheArrayBaseAlone) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int A[2][3];\n"
+      "  initial begin\n"
+      "    A[1][2] <= 43;\n"
+      "    A[0][1] <= 5;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"A", 0u}, {"A[1][2]", 43u}, {"A[0][1]", 5u}});
+}
+
 }  // namespace

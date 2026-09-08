@@ -118,4 +118,35 @@ TEST(MultidimensionalArraySimulation,
   EXPECT_EQ(v, 123u);
 }
 
+TEST(MultidimensionalArraySimulation, NonblockingReachesSameElementAsBlocking) {
+  // §10.4.2: the variable_lvalue of a nonblocking assignment is "a data type
+  // that is valid for a procedural assignment statement", and §7.4.5 makes an
+  // indexed name one such lvalue, so `A[1][2] <= 9` must land in the very
+  // element `A[1][2] = 9` would have written. The two elements are read out of
+  // the run by their own names rather than summed, because a sum cannot say
+  // which of them carried the value -- nor that the array's base variable took
+  // it instead. The delay lets the update region run: a nonblocking assignment
+  // read back at time 0 still shows the old value. 9 is odd on purpose; an
+  // even value would leave a wrongly written base variable at 0 as well.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int A[2][3];\n"
+      "  initial begin\n"
+      "    A[0][0] = 7;\n"
+      "    A[1][2] <= 9;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* written_blocking = f.ctx.FindVariable("A[0][0]");
+  auto* written_nonblocking = f.ctx.FindVariable("A[1][2]");
+  ASSERT_NE(written_blocking, nullptr);
+  ASSERT_NE(written_nonblocking, nullptr);
+  EXPECT_EQ(written_blocking->value.ToUint64(), 7u);
+  EXPECT_EQ(written_nonblocking->value.ToUint64(), 9u);
+}
+
 }  // namespace

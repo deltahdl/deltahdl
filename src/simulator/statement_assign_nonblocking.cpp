@@ -337,6 +337,36 @@ static bool SetupSelectNbaCallback(const NbaWrite& write, const Expr* lhs,
   return true;
 }
 
+// §10.4.2 gives the nonblocking form the same target the blocking form takes --
+// `nonblocking_assignment ::= variable_lvalue <= [ delay_or_event_control ]
+// expression`, where variable_lvalue "is a data type that is valid for a
+// procedural assignment statement" -- so a select that names an element must
+// reach the same object here as it does in TrySelectBlockingAssign, which asks
+// these two resolvers in this order. §7.4.5: "A single element of a packed or
+// unpacked array can be selected using an indexed name."
+//
+// TryResolveArrayElement answers only a one-dimensional indexed name, declining
+// outright when the select's base is itself a select, so `A[1][2] <= 43` on an
+// `int A[2][3]` fell through to the base variable `A` -- the element-width cell
+// LowerVar registers under the declared name, which no element is stored in --
+// and the select branch below read the element index 2 as a bit position and
+// wrote one bit of it. TryResolveCompoundElement is entered on exactly that
+// condition: it rebuilds the full indexed name and finds the leaf that
+// CreateMultiDimLeaves made. Every route into ScheduleNonblockingAssign shares
+// this resolution, so the event-controlled forms get it too.
+//
+// Both decline an lhs carrying an index_end, so a slice such as `A[1][1:2] <=
+// x` still reaches the part-select callback. A packed sub-select of an unpacked
+// element -- `logic [7:0] mem [0:3]; mem[0][3] <= 1'b1;` -- takes the compound
+// arm and is handed to #3493, where the blocking form already leaves it; making
+// the two forms agree is the point.
+static Variable* ResolveNbaSelectElement(const Expr* lhs, SimContext& ctx,
+                                         Arena& arena) {
+  if (lhs->kind != ExprKind::kSelect) return nullptr;
+  if (auto* elem = TryResolveArrayElement(lhs, ctx)) return elem;
+  return TryResolveCompoundElement(lhs, ctx, arena);
+}
+
 void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
                                uint64_t delay_ticks, SimContext& ctx,
                                Arena& arena) {
@@ -355,7 +385,7 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
   }
 
   bool is_select = (stmt->lhs->kind == ExprKind::kSelect);
-  auto* elem = is_select ? TryResolveArrayElement(stmt->lhs, ctx) : nullptr;
+  auto* elem = ResolveNbaSelectElement(stmt->lhs, ctx, arena);
   auto* var = elem ? elem : ResolveLhsVariable(stmt->lhs, ctx);
   if (!var) return;
 
