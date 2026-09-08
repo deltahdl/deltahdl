@@ -584,4 +584,51 @@ TEST(LvalueSim, CompoundAssignExpressionYieldsTheTargetsDataType) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
+// §11.4.1's `( operator_assignment )` primary is the one form of a compound
+// assignment that does not arrive as a statement: the parser wraps a bare
+// `x += 2;` as a blocking assign whose rhs carries the operator, and
+// TryDispatchSpecialBlockingAssign hands that to ApplyCompoundAssignOp, which
+// writes through WriteVar. Parenthesized, the same operator is an embedded
+// assignment expression whose target is its own lhs, so the dispatcher declines
+// it and EvalExpr routes it to EvalCompoundAssign -- which stores to the
+// variable directly. §9.4.2 makes that store a change like any other, and an
+// `always @(x)` parked on the target is entitled to see it.
+//
+// The delays keep one write to a time step so the tally is unambiguous, and the
+// third write adds nothing: the awaiter compares against the value it captured
+// when it armed, so a store of the value already held is not a change and does
+// not wake anyone. That fixes three separate wrong answers on `hits` -- 0 when
+// the embedded store notifies nobody, 1 when only the first change is seen, and
+// 4 when every store notifies whether or not it changed anything. §11.3.6 gives
+// the expression a value as well as an effect, so `y` pins what the last one
+// yielded beside `x`, which pins what it stored.
+TEST(LvalueSim, CompoundAssignExpressionWakesAnEventControlOnItsTarget) {
+  SimFixture f;
+  const std::string kSrc =
+      "module t;\n"
+      "  int x;\n"
+      "  int y;\n"
+      "  int hits;\n"
+      "  always @(x) hits = hits + 1;\n"
+      "  initial begin\n"
+      "    #1 y = (x += 3);\n"
+      "    #1 y = (x += 0);\n"
+      "    #1 y = (x += 5);\n"
+      "    #1 y = (x += 4);\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n";
+  auto* hits = RunAndFindVar(kSrc, f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 3u);
+
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 12u);
+
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 12u);
+}
+
 }  // namespace

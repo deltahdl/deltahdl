@@ -77,7 +77,21 @@ static void WriteIncDecTarget(const Expr* lhs, Logic4Vec& new_val,
   // release procedural statement is executed on the variable". Only the write
   // is overridden: the operator still yields the value it computed, which is
   // what the enclosing expression reads.
-  if (!var->is_forced) var->value = new_val;
+  //
+  // §9.4.2: "A non-edge implicit event shall be detected on any change in the
+  // value of the expression", and a value "referenced by a method or function"
+  // that changes "shall cause the event expression to be reevaluated". The
+  // clause exempts no writer, so an increment is a change exactly as an `=` is.
+  // This stored and said nothing, and NotifyWatchers is the only route by which
+  // a parked process is resumed, so the wake-up ended rather than waiting. It
+  // sits inside the gate, where WriteVar and ExecFuncIdentifierAssign put
+  // theirs, because a write that did not land is no change to detect. It is
+  // otherwise unconditional: whether a change counts is the awaiter's own test,
+  // which ChangeGatePasses and CheckEdge already make.
+  if (!var->is_forced) {
+    var->value = new_val;
+    var->NotifyWatchers();
+  }
 }
 
 static IncDecResult EvalIncDec(const Expr* expr, SimContext& ctx,
@@ -212,7 +226,14 @@ Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
       // §10.6.2, as in EvalIncDec above. §11.3.6 has the expression "stack" the
       // value and return it whether or not the update lands, so the return
       // below is the value computed rather than what the target still holds.
-      if (!var->is_forced) var->value = result;
+      //
+      // §9.4.2 again, as in WriteIncDecTarget: the update is a change in the
+      // variable's value and its watchers are told so, inside the same gate,
+      // because the write that does not land is not a change.
+      if (!var->is_forced) {
+        var->value = result;
+        var->NotifyWatchers();
+      }
     }
   } else if (expr->lhs->kind == ExprKind::kSelect) {
     // TrySelectBlockingAssign is what the statement form reaches, and it

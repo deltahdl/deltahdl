@@ -337,4 +337,58 @@ TEST(LevelSensitiveEventSimulation, WaitResumesOnVoidFunctionWrite) {
   EXPECT_EQ(var->value.ToUint64(), 91u);
 }
 
+// §9.4.3 states level-sensitive event control as an obligation about the truth
+// of a condition: "The wait statement shall evaluate a condition; and, if it is
+// not true (as defined in 12.4), the procedural statements following the wait
+// statement shall remain blocked until that condition becomes true before
+// continuing." The clause names its own contrast -- the wait is
+// "level-sensitive, as opposed to basic event control (specified by the @
+// character), which is edge-sensitive" -- so a §9.4.2 case does not stand in
+// for this one: any route that observed the condition becoming true would
+// satisfy §9.4.3, and the clause asks for none in particular. In this
+// implementation, though, ExecWait parks on the same AnyChangeAwaiter that @
+// parks on, released only by the watcher notification of a variable the
+// condition reads, so the level-sensitive and the edge-sensitive constructs
+// fail together on one missing notification. That shared dependence is what
+// earns this clause a case of its own rather than a §9.4.2 one standing in.
+//
+// The writer here is the increment operator in the ordinary body of a process:
+// a bare `i++;` is a kExprStmt, which ExecStmt routes through
+// ExecInlineTaskCall to EvalExpr and on to EvalIncDec, whose store to
+// var->value said nothing to the variable's watchers. §11.4.2 makes these
+// operators blocking assignments, so §9.4.2's "change in the value of the
+// expression" covers an increment exactly as it covers an `=`, and a wait
+// reading the incremented variable must be released by one.
+//
+// Three processes, so that the value the released statement copies is written
+// by neither of the others at the moment it parks: `tag` holds 8'd12 when the
+// waiter suspends and 8'd64 from time 5 onward, while `i` reaches 3 only at
+// time 20. A waiter left parked for the rest of the run leaves `seen` at the
+// 8'd3 it was given at time 0; one released too early would copy 8'd12; only a
+// waiter released by the third increment reads 8'd64. None of the three is a
+// value a `logic [7:0]` reaches on its own, whose default is 8'hxx.
+TEST(LevelSensitiveEventSimulation, WaitResumesOnAnIncrementOperatorWrite) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int i;\n"
+      "  logic [7:0] tag, seen;\n"
+      "  initial begin\n"
+      "    i = 0;\n"
+      "    tag = 8'd12;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #5  tag = 8'd64;\n"
+      "    #5  i++;\n"
+      "    #5  i++;\n"
+      "    #5  i++;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    seen = 8'd3;\n"
+      "    wait (i == 3) seen = tag;\n"
+      "  end\n"
+      "endmodule\n",
+      "seen");
+  EXPECT_EQ(val, 64u);
+}
+
 }  // namespace

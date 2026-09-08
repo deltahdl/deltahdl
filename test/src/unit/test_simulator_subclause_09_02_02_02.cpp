@@ -348,4 +348,47 @@ TEST(AlwaysCombSim, AlwaysCombChainedDependency) {
   EXPECT_EQ(c->value.ToUint64(), 12u);
 }
 
+// §9.2.2.2 (printed page 222) gives an always_comb "an inferred sensitivity
+// list that includes the expressions defined in 9.2.2.2.1", and §9.4.2
+// (printed page 232) makes an event out of "any change in the value of the
+// expression" on such a list. §11.4.2 states the increment and decrement
+// operators as blocking assignments, so a bare `i++;` in a process body is a
+// change of `i` exactly as `i = i + 1;` would be, and the combinational
+// procedure reading `i` owes an evaluation to it.
+//
+// The route is the ordinary process body, not a subroutine's: `i++;` is a
+// kExprStmt that ExecStmt hands to ExecInlineTaskCall, whose non-call
+// fall-through evaluates it as an expression, reaching EvalIncDec and its store
+// to var->value. That store told the variable's watchers nothing, and the
+// watcher is the whole mechanism: DropUnwatchableNames keeps every name
+// ctx.FindVariable resolves, so this always_comb does hold a live watcher on
+// `i` and is waiting on precisely the notification the increment withheld.
+// This is the AnyChangeAwaiter arm of the same omission the wait statement
+// meets through ExecWait.
+//
+// The values separate the two answers the run can give. An always_comb
+// evaluates once at time zero whatever happens, there with `i` at its 2-state
+// default of 0 (§6.8, Table 6-7), so `y` is 8'd1; the initial block's write of
+// 7 is an ordinary assignment and retriggers the procedure, so `y` is 8'd8
+// before the increment ever runs. Only an evaluation caused by the increment
+// itself puts 8'd9 in `y`. A procedure that ran only its earlier times leaves
+// 8'd8, which is why the assertion is not merely "y moved off its default".
+TEST(AlwaysCombSim, AlwaysCombRetriggersOnAnIncrementOperatorWrite) {
+  SimFixture f;
+  auto* y = RunAndFindVar(
+      "module t;\n"
+      "  int i;\n"
+      "  logic [7:0] y;\n"
+      "  always_comb y = i + 8'd1;\n"
+      "  initial begin\n"
+      "    i = 7;\n"
+      "    #1 i++;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 9u);
+}
+
 }  // namespace
