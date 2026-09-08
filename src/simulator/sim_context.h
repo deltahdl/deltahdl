@@ -609,6 +609,26 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // the keyword "a predefined object handle".
   uint64_t CurrentThisHandle() const;
 
+  // §9.4.2: notifies the watchers armed on every variable that designates the
+  // object `handle` names. A write to a class property is a change to "object
+  // data members", which the clause has re-evaluate an event expression, and
+  // the watchers that can see it sit on the variables rather than on the
+  // object: a class handle's own bits never move, so the notification is the
+  // whole of what a process waiting on `obj.f` has to go on (StateLivesInValue
+  // in src/simulator/awaiters.h answers false for a class-typed name for
+  // exactly that reason).
+  //
+  // The object is reached by handle rather than by name because the three
+  // writers inside a method -- an unqualified property name, `this.f` and
+  // `super.f` -- hold a ClassObject and no name at all, and because the answer
+  // is a set rather than one variable: `C q = p;` leaves both designating one
+  // object, and a write through either is a change both are watching.
+  //
+  // Only a variable declared with a class type is considered, which is what
+  // keeps an integer that happens to equal the handle out of it, and the walk
+  // is over those alone rather than over every variable in the design.
+  void NotifyClassHandleWatchers(uint64_t handle);
+
   // §8.15/§8.17: the class whose method body is currently executing (the
   // lexically enclosing class), so `super` resolves relative to that class
   // rather than the dynamic type of `this`. Without this, super.new() in a

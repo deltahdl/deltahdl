@@ -434,7 +434,7 @@ static void WriteWholeVariable(Variable* var, const Logic4Vec& val,
 }
 
 void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
-                        Arena& arena) {
+                        SimContext& ctx, Arena& arena) {
   switch (target.kind) {
     case FieldTarget::Kind::kBits:
       DepositBitField(target.var->value, target.bit_offset, rhs_val,
@@ -446,9 +446,15 @@ void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
       return;
     case FieldTarget::Kind::kProperty:
       SetClassField(target.obj, target.type, target.field, rhs_val, arena);
-      // Only a path read out of a variable notifies, which is where the
-      // blocking form notifies; `this` and `super` are read off the process.
+      // §9.4.2 has a change to "object data members" re-evaluate the event
+      // expression, and it says nothing about which syntax named the object.
+      // The watchers sit on the variables that designate it, so the object is
+      // announced by handle: a path read out of a variable notifies the
+      // variable it was read from, and `this` and `super`, which are read off
+      // the running process and carry no name at all, notify the same way as
+      // every other designator of the same object.
       if (target.notify) target.notify->NotifyWatchers();
+      if (target.obj) ctx.NotifyClassHandleWatchers(target.obj->handle);
       return;
     case FieldTarget::Kind::kStatic:
       *target.slot =
@@ -473,7 +479,7 @@ bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
   // WriteResolvedField to the update region.
   FieldTarget target = ResolveFieldTarget(lhs, ctx);
   if (target.kind == FieldTarget::Kind::kNone) return false;
-  WriteResolvedField(target, rhs_val, ctx.GetArena());
+  WriteResolvedField(target, rhs_val, ctx, ctx.GetArena());
   return true;
 }
 

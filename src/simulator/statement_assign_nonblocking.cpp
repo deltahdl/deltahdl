@@ -581,8 +581,8 @@ static void ScheduleFieldNba(const Expr* lhs, const Logic4Vec& rhs_val,
   if (!target.HasDeposit()) return;
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
   event->kind = EventKind::kUpdate;
-  event->callback = [target, rhs_val, &arena]() {
-    WriteResolvedField(target, rhs_val, arena);
+  event->callback = [target, rhs_val, &ctx, &arena]() {
+    WriteResolvedField(target, rhs_val, ctx, arena);
   };
   ScheduleNbaEvent(event, delay_ticks, ctx);
 }

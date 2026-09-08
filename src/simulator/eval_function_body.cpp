@@ -100,6 +100,12 @@ static void WriteSelfProperty(ClassObject* self, std::string_view name,
   } else {
     self->SetProperty(std::string(name), stored);
   }
+  // §9.4.2: "Changing the value of object data members ... referenced by a
+  // method or function shall cause the event expression to be reevaluated".
+  // This is the write a method makes to its own object, by `this.f` or by the
+  // property's bare name, and it has no variable in hand: the watchers are on
+  // whatever variables designate the object, which the handle finds.
+  ctx.NotifyClassHandleWatchers(self->handle);
 }
 
 // Assigns to a plain identifier lhs: writes the local variable when present,
@@ -308,6 +314,9 @@ static void ExecFuncWriteValue(const Expr* lhs, const Logic4Vec& val,
       self->SetPropertyForType(
           std::string(lhs->rhs->text), self->type->parent,
           CoerceToPropertyType(self->type->parent, lhs->rhs->text, val, arena));
+      // §9.4.2 as above: this arm writes the storage directly rather than
+      // through WriteSelfProperty, so it announces the change itself.
+      ctx.NotifyClassHandleWatchers(self->handle);
     }
     return;
   }

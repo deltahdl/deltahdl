@@ -109,7 +109,7 @@ FieldTarget ResolveFieldTarget(const Expr* lhs, SimContext& ctx);
 // Deposits `rhs_val` in already-resolved storage. Nothing is re-resolved here,
 // so this is what a nonblocking assignment runs in the update region.
 void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
-                        Arena& arena);
+                        SimContext& ctx, Arena& arena);
 
 // Resolve-then-write for a blocking assignment, which does both when the
 // statement executes. Returns false when the path names no storage.

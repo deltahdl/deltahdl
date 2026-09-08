@@ -188,4 +188,126 @@ TEST(ClassSim, ThisMultipleProperties) {
   LowerRunAndCheck(f, design, {{"ra", 3u}, {"rb", 7u}});
 }
 
+// §9.4.2: "Changing the value of object data members, aggregate elements, or
+// the size of a dynamically sized array referenced by a method or function
+// shall cause the event expression to be reevaluated". A class handle's own
+// bits never move, so the announcement is the whole of what a process reading
+// `obj.f` has to go on, and the clause draws no distinction between the
+// spellings the four cases below use. This one writes the property by its bare
+// name inside a method.
+TEST(ClassSim, UnqualifiedPropertyWriteInMethodWakesAnAlwaysCombReadingIt) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class C;\n"
+      "    int f;\n"
+      "    function void bump(); f = 1; endfunction\n"
+      "  endclass\n"
+      "  C obj = new();\n"
+      "  int b;\n"
+      "  always_comb b = obj.f;\n"
+      "  initial begin\n"
+      "    #1 obj.bump();\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "b");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// §8.11's `this.f`, a different write site from the bare name above.
+TEST(ClassSim, ThisPropertyWriteInMethodWakesAnAlwaysCombReadingIt) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class C;\n"
+      "    int f;\n"
+      "    function void bump(); this.f = 1; endfunction\n"
+      "  endclass\n"
+      "  C obj = new();\n"
+      "  int b;\n"
+      "  always_comb b = obj.f;\n"
+      "  initial begin\n"
+      "    #1 obj.bump();\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "b");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// §8.15's `super.f`, which writes the parent slice through a third site again.
+TEST(ClassSim, SuperPropertyWriteInMethodWakesAnAlwaysCombReadingIt) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class B;\n"
+      "    int f;\n"
+      "  endclass\n"
+      "  class D extends B;\n"
+      "    function void bump(); super.f = 1; endfunction\n"
+      "  endclass\n"
+      "  D obj = new();\n"
+      "  int b;\n"
+      "  always_comb b = obj.f;\n"
+      "  initial begin\n"
+      "    #1 obj.bump();\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "b");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// The guard: the write spelled through the handle, which announced itself all
+// along. It pins the arm that worked, so the three above cannot be paid for by
+// moving the notification off it.
+TEST(ClassSim, HandlePropertyWriteWakesAnAlwaysCombReadingIt) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class C;\n"
+      "    int f;\n"
+      "  endclass\n"
+      "  C obj = new();\n"
+      "  int b;\n"
+      "  always_comb b = obj.f;\n"
+      "  initial begin\n"
+      "    #1 obj.f = 1;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "b");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// The set the announcement answers is the variables designating the object, not
+// the one the statement named: §8.12 leaves `q` and `obj` denoting one object,
+// so a write through either is a change the other is watching.
+TEST(ClassSim, PropertyWriteThroughOneHandleWakesAnAliasOfTheSameObject) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class C;\n"
+      "    int f;\n"
+      "  endclass\n"
+      "  C obj = new();\n"
+      "  C q;\n"
+      "  int b;\n"
+      "  always_comb b = q.f;\n"
+      "  initial begin\n"
+      "    q = obj;\n"
+      "    #1 obj.f = 1;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "b");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 }  // namespace

@@ -156,6 +156,23 @@ void SweepDeadObjects(
 
 }  // namespace
 
+void SimContext::NotifyClassHandleWatchers(uint64_t handle) {
+  if (handle == kNullClassHandle) return;
+  auto notify_if_designates = [&](std::string_view name, Variable* var) {
+    if (!var || !var_class_types_.count(name)) return;
+    if (var->value.ToUint64() == handle) var->NotifyWatchers();
+  };
+  // The same three places a handle can be held that CollectRootLiveHandles
+  // scans: the design's variables, every open scope, and every static frame.
+  for (const auto& [name, var] : variables_) notify_if_designates(name, var);
+  for (const auto& scope : scope_stack_) {
+    for (const auto& [name, var] : scope.vars) notify_if_designates(name, var);
+  }
+  for (const auto& [func, frame] : static_frames_) {
+    for (const auto& [name, var] : frame) notify_if_designates(name, var);
+  }
+}
+
 void SimContext::CollectGarbage() {
   if (class_objects_.empty()) return;
 
