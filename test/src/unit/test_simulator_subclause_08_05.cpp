@@ -456,4 +456,85 @@ TEST(ObjectPropertySim, UnsignedPropertyDoesNotKeepASignedLiteralsSign) {
             240u);
 }
 
+// A guard rather than a discriminating case: it holds today and is meant to go
+// on holding. §6.8 makes the property and what was read into it two storage
+// elements, and what keeps them apart is a copy taken where a subroutine body
+// produces its right-hand value (OwnRhsWords in ExecFuncBlockingAssign,
+// eval_function_body.cpp), not anything the property write itself does. Every
+// write a method makes passes that one point, so the 2-state coercion behind
+// `this.p` has a buffer of its own to clear.
+//
+// `mark` is 4-state and `p` is `bit` at the same width: the pair that shares a
+// buffer if the copy is ever dropped, since a 4-state target coerces nothing
+// and an unequal width allocates. 4'bx1z0 carries an x and a z, so either kind
+// of unknown would show; ToUint64 would show neither, projecting both to 0.
+TEST(ObjectPropertySim, ThisWriteLeavesTheXBitsOfWhatItRead) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "class C;\n"
+      "  logic [3:0] mark;\n"
+      "  bit [3:0] p;\n"
+      "  function void grab();\n"
+      "    this.p = mark;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  logic [3:0] kept;\n"
+      "  int taken;\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    c = new;\n"
+      "    c.mark = 4'bx1z0;\n"
+      "    c.grab();\n"
+      "    kept = c.mark;\n"
+      "    taken = c.p;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "kept");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "x1z0");
+  auto* taken = f.ctx.FindVariable("taken");
+  ASSERT_NE(taken, nullptr);
+  EXPECT_EQ(taken->value.ToUint64(), 4u);
+}
+
+// The same guard for §8.15's `super.slot`, which reaches the parent's storage
+// by an arm of its own instead of the one the unqualified name takes, and so
+// asks for the coercion itself. It draws its value from the same production
+// point as the write above, so the copy taken there covers this arm too; the
+// case stands here so a later change to this arm alone cannot quietly stop
+// being covered. 8'hz3 is four z bits over 0011, and `slot` is `bit` at the
+// width the parent declared -- again the pair that would share a buffer.
+TEST(ObjectPropertySim, SuperWriteLeavesTheXBitsOfWhatItRead) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "class Base;\n"
+      "  logic [7:0] mark;\n"
+      "  bit [7:0] slot;\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  task stash();\n"
+      "    super.slot = mark;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  logic [7:0] kept;\n"
+      "  int held;\n"
+      "  initial begin\n"
+      "    Derived d;\n"
+      "    d = new;\n"
+      "    d.mark = 8'hz3;\n"
+      "    d.stash();\n"
+      "    kept = d.mark;\n"
+      "    held = d.slot;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "kept");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "zzzz0011");
+  auto* held = f.ctx.FindVariable("held");
+  ASSERT_NE(held, nullptr);
+  EXPECT_EQ(held->value.ToUint64(), 3u);
+}
+
 }  // namespace

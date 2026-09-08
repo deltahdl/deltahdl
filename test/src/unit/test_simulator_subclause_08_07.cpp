@@ -456,4 +456,48 @@ TEST(ClassConstructorSim, MethodConstructsClassHandleProperty) {
             17u);
 }
 
+// §8.7: "a class property can be declared with an initial value", and §6.8 runs
+// that initializer as an assignment into the property being declared -- so the
+// value it reads is a value it has no licence to write. EvalExpr answers a
+// property read with the object's own stored vector, and a Logic4Vec copies its
+// `words` pointer rather than the words, so §6.11.2's coercion of the unknowns
+// into a 2-state property reached back through the read and cleared `tag`'s own
+// x bits while initializing `snap` from it.
+//
+// Both halves of the shape carry weight. `snap` is `bit`, because a 4-state
+// property runs no coercion at all and there would be nothing to write through;
+// and the two are the same width, because ResizeToWidth answers a value already
+// at the target width with the value itself, while any other width allocates a
+// fresh buffer and the aliasing would not be reachable.
+//
+// ToUint64 cannot state the difference -- it projects `aval & ~bval`, so an x
+// already reads as 0 and clearing it changes nothing. ToString names each bit's
+// state instead: 8'hx5 is four x bits over 0101, so a tag left alone reads
+// "xxxx0101" while a tag written through reads "00000101", which is the value
+// that belongs to snap.
+TEST(ClassConstructorSim, TwoStateInitializerLeavesItsSourcesXBits) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "class C;\n"
+      "  logic [7:0] tag = 8'hx5;\n"
+      "  bit [7:0] snap = tag;\n"
+      "endclass\n"
+      "module t;\n"
+      "  logic [7:0] carried;\n"
+      "  int taken;\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    c = new;\n"
+      "    carried = c.tag;\n"
+      "    taken = c.snap;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "carried");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "xxxx0101");
+  auto* taken = f.ctx.FindVariable("taken");
+  ASSERT_NE(taken, nullptr);
+  EXPECT_EQ(taken->value.ToUint64(), 5u);
+}
+
 }  // namespace

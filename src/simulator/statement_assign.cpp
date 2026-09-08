@@ -145,7 +145,24 @@ Logic4Vec CoerceToPropertyType(const ClassTypeInfo* type, std::string_view name,
   // ConvertRealForKnownLhs rather than ResizeToWidth: §6.12.1 converts a value
   // crossing the real boundary rather than reinterpreting its bits, and it
   // resizes everything that does not cross it.
-  val = ConvertRealForKnownLhs(val, prop->is_real, prop->width, arena);
+  //
+  // §6.11.2 has the coercion below convert "any unknown or high-impedance bits
+  // ... to zeros", and it writes in place, so it has to land on the property's
+  // own value rather than on the variable the caller read. §6.8 makes a
+  // variable "an abstraction of a data storage element" that "shall store a
+  // value from one assignment to the next", and the property and that variable
+  // are two of them; nothing has to forbid their sharing one buffer for a write
+  // through the sharing to be wrong. A by-value `Logic4Vec` parameter reads as
+  // though it already owned its bits and does not -- copying one copies the
+  // words pointer and not the words -- and that is the trap this site sets.
+  //
+  // The copy wraps the conversion rather than following the coercion, which
+  // would be a copy of the damage, or sitting inside the conversion, whose tail
+  // is a ResizeToWidth that hands its argument back untouched at a matching
+  // width -- precisely the case the sharing arises in. Outside, it covers every
+  // path and is merely redundant where the conversion allocated anyway.
+  val = OwnRhsWords(
+      ConvertRealForKnownLhs(val, prop->is_real, prop->width, arena), arena);
   if (!prop->is_4state && !prop->is_real) CoerceTo2State(val);
   // §6.11.3: the declaration's signedness belongs to the value stored in the
   // property. A variable keeps it on the Variable and a read consults it there;
