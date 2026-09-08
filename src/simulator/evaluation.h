@@ -52,6 +52,12 @@ uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx);
 // of the same question about a name.
 bool DeclaredTypeIsString(const DataType& type, const SimContext& ctx);
 
+// §6.11.1/§6.18: whether the declared type is signed, resolving a typedef name
+// through the elaborated table. Defined in evaluation_literal.cpp beside
+// DeclaredTypeWidth and DeclaredTypeIsString, the other two facts a declaration
+// reads off a name.
+bool DeclaredTypeIsSigned(const DataType& type, const SimContext& ctx);
+
 bool HasUnknownBits(const Logic4Vec& v);
 Logic4Vec MakeAllX(Arena& arena, uint32_t width);
 

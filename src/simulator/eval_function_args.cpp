@@ -485,8 +485,8 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
   // declaration rather than leaving the formal unsigned is what makes `a + b`
   // in the body signed arithmetic; the value copied in below carries the
   // actual's flag, so re-impose the declaration's on the cell too.
-  auto* var = ctx.CreateLocalVariable(param.name, val.width,
-                                      IsSignedType(param.data_type, {}));
+  auto* var = ctx.CreateLocalVariable(
+      param.name, val.width, DeclaredTypeIsSigned(param.data_type, ctx));
   // §6.11.2: a formal is an object declared with a type, and §10.8 makes "the
   // passing of a value to a subroutine input, output, or inout argument" an
   // assignment-like context, so an unknown copied into a 2-state formal becomes

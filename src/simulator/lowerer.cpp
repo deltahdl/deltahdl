@@ -496,6 +496,12 @@ static void RegisterDesignTypeWidths(const RtlirDesign* design,
   for (const auto& [name, kind] : design->type_kinds) {
     ctx.RegisterTypeKind(name, kind);
   }
+  // §6.11.1's default signedness and the `signed` keyword are the third fact a
+  // name carries, and the one IsSignedType could not recover with the empty map
+  // the simulator was passing it.
+  for (const auto& [name, is_signed] : design->type_signed) {
+    ctx.RegisterTypeSigned(name, is_signed);
+  }
 }
 
 static void InitPackageDataVariables(const RtlirDesign* design, SimContext& ctx,

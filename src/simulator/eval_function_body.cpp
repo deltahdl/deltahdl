@@ -201,7 +201,8 @@ static void ExecFuncForInits(const Stmt* stmt, const FuncExecCtx& exec) {
       // decides any other local's. Created from the width alone, an int
       // counter compared its negative values as huge positive ones.
       auto* v = exec.ctx.CreateLocalVariable(
-          init->lhs->text, w, IsSignedType(stmt->for_init_types[i], {}));
+          init->lhs->text, w,
+          DeclaredTypeIsSigned(stmt->for_init_types[i], exec.ctx));
       // §6.11.2: the declared type decides whether the loop variable can hold
       // an unknown at all -- "when a 4-state value is automatically converted
       // to a 2-state value, any unknown or high-impedance bits shall be
@@ -295,7 +296,7 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // §6.11.3: a body local carries its declared signedness exactly as a
   // module-scope declaration does (Lowerer sets the same flag there), so an
   // `integer` local is a signed operand rather than an unsigned one.
-  auto* v = ctx.CreateLocalVariable(name, w, IsSignedType(type, {}));
+  auto* v = ctx.CreateLocalVariable(name, w, DeclaredTypeIsSigned(type, ctx));
   v->is_4state = DeclaredTypeIs4State(type);
   if (is_string) v->is_string = true;
   if (is_class) ctx.SetVariableClassType(name, type.type_name);

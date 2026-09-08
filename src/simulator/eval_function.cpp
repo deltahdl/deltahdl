@@ -447,7 +447,7 @@ void ExecClassMethod(ClassMethodTarget target, const Expr* expr,
     // EvalFunctionCall below.
     ret_var = ctx.CreateLocalVariable(
         method->name, ComputeMethodReturnWidth(method, ctx, target.param_cls),
-        IsSignedType(method->return_type, {}));
+        DeclaredTypeIsSigned(method->return_type, ctx));
     // §13.4.1 gives the implicit variable the method's return type, so §6.11.2
     // decides whether it holds unknowns as it does for any other object.
     ret_var->is_4state = DeclaredTypeIs4State(method->return_type);
@@ -657,7 +657,7 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     // signedness. Built from the width alone it would be unsigned whatever the
     // function returns, and §21.2.1.2's automatic %d field would then lose the
     // sign column an `integer` result is entitled to.
-    bool ret_signed = IsSignedType(func->return_type, {});
+    bool ret_signed = DeclaredTypeIsSigned(func->return_type, ctx);
     ret_var = existing
                   ? existing
                   : ctx.CreateLocalVariable(func->name, ret_width, ret_signed);

@@ -82,6 +82,13 @@ class DeclaredNameTables {
   void RegisterTypeKind(std::string_view name, DataTypeKind kind);
   DataTypeKind FindTypeKind(std::string_view name) const;
 
+  // §6.11.1: whether the type a name stands for is signed, which neither the
+  // width nor the kind can say -- `logic signed [7:0]` and `logic [7:0]` are
+  // one kind at one width. False for a name the elaborated table does not hold,
+  // which is what an unsigned type answers too.
+  void RegisterTypeSigned(std::string_view name, bool is_signed);
+  bool FindTypeSigned(std::string_view name) const;
+
   void RegisterInstanceType(std::string_view prefix, std::string_view type);
   std::string_view FindInstanceType(std::string_view prefix) const;
 
@@ -121,6 +128,7 @@ class DeclaredNameTables {
 
   std::unordered_map<std::string_view, uint32_t> type_widths_;
   std::unordered_map<std::string_view, DataTypeKind> type_kinds_;
+  std::unordered_map<std::string_view, bool> type_signed_;
 
   std::unordered_map<std::string, std::string> instance_types_;
 

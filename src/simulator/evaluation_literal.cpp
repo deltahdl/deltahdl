@@ -30,6 +30,20 @@ uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx) {
 // size and was never registered as a string: %s, the string methods and a
 // string comparison all read it as a bit vector. The resolved kind the
 // elaborator records beside the width is what answers it.
+// §6.11.1/§6.18: whether the declared type is signed, whether written with the
+// `signed` keyword, defaulted by one of the signed integer types, or reached
+// through a typedef name. The simulator carries no TypedefMap, so every site
+// asked IsSignedType with an empty one and a formal or local written with a
+// name for a signed type was created unsigned: -1 read back as 255, and every
+// relational and arithmetic operator on it read a magnitude. #3475 had already
+// moved such a declaration's width onto the elaborated table, so the two
+// disagreed about where the type came from until this followed it.
+bool DeclaredTypeIsSigned(const DataType& type, const SimContext& ctx) {
+  if (type.kind == DataTypeKind::kNamed)
+    return ctx.FindTypeSigned(type.type_name);
+  return IsSignedType(type, {});
+}
+
 bool DeclaredTypeIsString(const DataType& type, const SimContext& ctx) {
   if (type.kind == DataTypeKind::kString) return true;
   return type.kind == DataTypeKind::kNamed &&

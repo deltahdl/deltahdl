@@ -604,6 +604,13 @@ struct RtlirDesign {
   // end, so the three declaration paths can ask what a name stands for rather
   // than reading DataType::kind and finding kNamed.
   std::unordered_map<std::string_view, DataTypeKind> type_kinds;
+  // §6.11.1 makes byte, shortint, int, integer and longint signed by default,
+  // and the `signed` keyword makes any of them signed explicitly; neither is
+  // recoverable from the width or from the kind alone -- `logic signed [7:0]`
+  // and `logic [7:0]` are one kind and one width. Recorded here for the same
+  // reason and by the same walk, since a simulator asking IsSignedType of a
+  // name has no typedef map to resolve it through.
+  std::unordered_map<std::string_view, bool> type_signed;
 
   std::vector<ModuleItem*> cu_function_decls;
 

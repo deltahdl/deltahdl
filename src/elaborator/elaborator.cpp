@@ -202,6 +202,16 @@ void ClassifyCuItems(const std::vector<ModuleItem*>& cu_items,
 }
 
 // Computes the elaborated bit width of each named typedef into widths.
+// What the elaborated tables record about each name a typedef declares: how
+// wide the type it stands for is, what kind it is, and whether it is signed.
+// They travel together because one walk of the typedef map fills all three and
+// because a declaration reads them together.
+struct TypeNameFacts {
+  std::unordered_map<std::string_view, uint32_t>& widths;
+  std::unordered_map<std::string_view, DataTypeKind>& kinds;
+  std::unordered_map<std::string_view, bool>& is_signed;
+};
+
 // §6.18's "type the name stands for", following a chain of typedefs to the kind
 // at its end. The walk is bounded by the table's own size so a table that names
 // itself -- which the elaborator reports elsewhere rather than resolving --
@@ -218,13 +228,11 @@ static DataTypeKind ResolvedTypeKind(const DataType& dtype,
   return DataTypeKind::kNamed;
 }
 
-void PopulateTypeWidths(
-    const TypedefMap& typedefs,
-    std::unordered_map<std::string_view, uint32_t>& widths,
-    std::unordered_map<std::string_view, DataTypeKind>& kinds) {
+void PopulateTypeWidths(const TypedefMap& typedefs, TypeNameFacts& out) {
   for (const auto& [name, dtype] : typedefs) {
-    widths[name] = EvalTypeWidth(dtype, typedefs);
-    kinds[name] = ResolvedTypeKind(dtype, typedefs);
+    out.widths[name] = EvalTypeWidth(dtype, typedefs);
+    out.kinds[name] = ResolvedTypeKind(dtype, typedefs);
+    out.is_signed[name] = IsSignedType(dtype, typedefs);
   }
 }
 
@@ -364,7 +372,9 @@ void CopyDesignMetadata(RtlirDesign* design, const CompilationUnit* unit,
 void FinalizeDesignTail(RtlirDesign* design, const CompilationUnit* unit,
                         const TypedefMap& typedefs,
                         const DesignMetadata& meta) {
-  PopulateTypeWidths(typedefs, design->type_widths, design->type_kinds);
+  TypeNameFacts facts{design->type_widths, design->type_kinds,
+                      design->type_signed};
+  PopulateTypeWidths(typedefs, facts);
   CopyDesignMetadata(design, unit, meta);
 }
 

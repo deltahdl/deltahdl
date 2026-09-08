@@ -557,4 +557,75 @@ TEST(PassByValueSim, QueueFormalCopyDoesNotOutliveTheCall) {
   EXPECT_EQ(v, 1u);
 }
 
+// §6.11.1 makes byte, shortint, int, integer and longint signed by default, and
+// §6.18 makes a formal declared with a name for one an object of that type, so
+// §10.7 sign-extends it into a wider target. The formal's cell was created by
+// asking IsSignedType with an empty typedef map, which resolves a name through
+// nothing and answers unsigned, so -1 came back as the magnitude 255. The value
+// has to be negative and the target wider for the two answers to differ.
+TEST(PassByValueSim, TypedefSignedFormalSignExtendsIntoAWiderTarget) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef byte b_t;\n"
+      "  int r;\n"
+      "  function int widen(input b_t p);\n"
+      "    return p;\n"
+      "  endfunction\n"
+      "  initial r = widen(-1);\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 0xFFFFFFFFu);
+}
+
+// §6.11.1's default signedness and an explicit `signed` keyword reach
+// IsSignedType by different arms, so the typedef of an explicitly signed vector
+// is its own case.
+TEST(PassByValueSim, TypedefExplicitlySignedFormalSignExtends) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef logic signed [7:0] s8_t;\n"
+      "  int r;\n"
+      "  function int widen(input s8_t p);\n"
+      "    return p;\n"
+      "  endfunction\n"
+      "  initial r = widen(-1);\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 0xFFFFFFFFu);
+}
+
+// The sign read through an operator rather than through an assignment: §11.4.4
+// compares a signed operand as a signed value, which an unsigned cell makes
+// false for every value it can hold.
+TEST(PassByValueSim, TypedefSignedFormalComparesAsSigned) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef byte b_t;\n"
+      "  int r;\n"
+      "  function int is_negative(input b_t p);\n"
+      "    return (p < 0) ? 1 : 0;\n"
+      "  endfunction\n"
+      "  initial r = is_negative(-1);\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 1u);
+}
+
+// A body local declared with the same name, which CreateFuncLocalVar creates by
+// its own path and asked the same empty map.
+TEST(PassByValueSim, TypedefSignedBodyLocalSignExtends) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef byte b_t;\n"
+      "  int r;\n"
+      "  function int widen();\n"
+      "    b_t p = -1;\n"
+      "    return p;\n"
+      "  endfunction\n"
+      "  initial r = widen();\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 0xFFFFFFFFu);
+}
+
 }  // namespace

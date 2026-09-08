@@ -181,6 +181,16 @@ DataTypeKind DeclaredNameTables::FindTypeKind(std::string_view name) const {
   return (it != type_kinds_.end()) ? it->second : DataTypeKind::kNamed;
 }
 
+void DeclaredNameTables::RegisterTypeSigned(std::string_view name,
+                                            bool is_signed) {
+  type_signed_[name] = is_signed;
+}
+
+bool DeclaredNameTables::FindTypeSigned(std::string_view name) const {
+  auto it = type_signed_.find(name);
+  return it != type_signed_.end() && it->second;
+}
+
 void DeclaredNameTables::RegisterInstanceType(std::string_view prefix,
                                               std::string_view type) {
   instance_types_[std::string(prefix)] = std::string(type);

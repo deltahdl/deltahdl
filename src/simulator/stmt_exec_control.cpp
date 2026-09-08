@@ -431,7 +431,7 @@ static void CreateForInitVars(const Stmt* stmt, SimContext& ctx) {
     // any other local's. Created from the width alone, an int counter compared
     // its negative values as huge positive ones.
     auto* v = ctx.CreateLocalVariable(
-        init->lhs->text, w, IsSignedType(stmt->for_init_types[i], {}));
+        init->lhs->text, w, DeclaredTypeIsSigned(stmt->for_init_types[i], ctx));
     // §6.11.2: "when a 4-state value is automatically converted to a 2-state
     // value, any unknown or high-impedance bits shall be converted to zeros",
     // and it is this flag that WriteVar consults to make the conversion when
