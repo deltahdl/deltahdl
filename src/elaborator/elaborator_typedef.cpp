@@ -298,6 +298,14 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
                 Subclause("6.18"));
   }
   typedefs_[item->name] = item->typedef_type;
+  // §6.18: the dimensions belong to the type the name stands for, so a name
+  // written with any of them stands for an aggregate rather than for one
+  // element. Recording that is what lets the elaborated type-width table
+  // decline to answer for it; the map below keeps only the dimensions of the
+  // forms it was written for, and an associative typedef reaches neither.
+  if (!item->unpacked_dims.empty()) {
+    aggregate_typedef_names_.insert(item->name);
+  }
   bool first_dim_assoc = IsAssocFirstDimTypedef(item, typedefs_, class_names_,
                                                 assoc_typedef_names_);
   if (!item->unpacked_dims.empty() && !first_dim_assoc) {

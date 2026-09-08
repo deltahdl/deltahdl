@@ -507,6 +507,13 @@ class ElaboratorData {
   // back out of typedefs_, and Elaborator::ElaborateTopModules puts the union
   // back once every top module is elaborated.
   TypedefMap all_typedefs_;
+  // §6.18: every name a typedef gives to an unpacked aggregate -- a fixed-size
+  // unpacked array, a dynamic array, a queue or an associative array -- keyed
+  // as typedefs_ keys it, so that the elaborated type-width table can say that
+  // such a name has no single width instead of answering with one element's.
+  // Filled at each site that enters a typedef under its bare name, which is
+  // the spelling every reader of that table looks up.
+  std::unordered_set<std::string_view> aggregate_typedef_names_;
   // §6.24.3: names of typedefs whose unpacked dimensions designate an
   // associative array. A bit-stream cast must reject any such typedef as a
   // destination type.

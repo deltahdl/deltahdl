@@ -228,9 +228,23 @@ static DataTypeKind ResolvedTypeKind(const DataType& dtype,
   return DataTypeKind::kNamed;
 }
 
-void PopulateTypeWidths(const TypedefMap& typedefs, TypeNameFacts& out) {
+// §6.18: what a name stands for is the whole of the type it was declared with,
+// dimensions included, and the map carries only the element type -- the parser
+// leaves a typedef's unpacked dimensions on the declaration rather than in the
+// data type. So a name declared as an unpacked array, dynamic array, queue or
+// associative array would be recorded at one element's width, which nothing
+// downstream can tell from the width of a singular type: `typedef int arr_t[4]`
+// answered 32, exactly as `typedef int i_t` does, and a formal or local written
+// with it was sized to one element. 0 is what the table says instead, since
+// that is what every reader already treats as "no width the type declares" and
+// falls back from. The whole aggregate's bit count is a different claim and not
+// one an unpacked array has at all (§7.4).
+void PopulateTypeWidths(const TypedefMap& typedefs,
+                        const std::unordered_set<std::string_view>& aggregates,
+                        TypeNameFacts& out) {
   for (const auto& [name, dtype] : typedefs) {
-    out.widths[name] = EvalTypeWidth(dtype, typedefs);
+    out.widths[name] =
+        aggregates.count(name) > 0 ? 0 : EvalTypeWidth(dtype, typedefs);
     out.kinds[name] = ResolvedTypeKind(dtype, typedefs);
     out.is_signed[name] = IsSignedType(dtype, typedefs);
   }
@@ -371,10 +385,11 @@ void CopyDesignMetadata(RtlirDesign* design, const CompilationUnit* unit,
 // severity metadata (§20.10.1) onto the finished design.
 void FinalizeDesignTail(RtlirDesign* design, const CompilationUnit* unit,
                         const TypedefMap& typedefs,
+                        const std::unordered_set<std::string_view>& aggregates,
                         const DesignMetadata& meta) {
   TypeNameFacts facts{design->type_widths, design->type_kinds,
                       design->type_signed};
-  PopulateTypeWidths(typedefs, facts);
+  PopulateTypeWidths(typedefs, aggregates, facts);
   CopyDesignMetadata(design, unit, meta);
 }
 
@@ -620,7 +635,7 @@ RtlirDesign* Elaborator::ElaborateTops(
   }
 
   FinalizeDesignTail(
-      design, unit_, typedefs_,
+      design, unit_, typedefs_, aggregate_typedef_names_,
       DesignMetadata{elab_simulation_blocked_, elab_last_severity_,
                      elab_last_severity_msg_, elab_last_severity_scope_,
                      elab_last_severity_loc_});

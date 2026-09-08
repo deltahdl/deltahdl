@@ -1,3 +1,6 @@
+#include <cstdint>
+#include <string_view>
+
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -530,6 +533,84 @@ TEST(UserDefinedTypeElaboration,
                             "declaration of type 'my_type' does not precede "
                             "this reference to it",
                             5, "6.18"));
+}
+
+// §6.18: "the type of the object is the type the name stands for", and the
+// dimensions written on a typedef belong to that type -- what arr_t stands for
+// is four ints, not one. The parser leaves those dimensions beside the data
+// type rather than in it, so the elaborated table used to record the element's
+// width and a reader could not tell it from a singular type's: arr_t answered
+// the same 32 that i_t does. The singular typedef is asserted alongside the
+// four aggregate forms for that reason, and an absent entry is distinguished
+// from a recorded 0 so that "no width" is read as an answer rather than as the
+// name never having reached the table.
+TEST(UserDefinedTypeElaboration, AggregateTypedefIsRecordedWithNoWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef int i_t;\n"
+      "  typedef int arr_t[4];\n"
+      "  typedef int q_t[$];\n"
+      "  typedef byte da_t[];\n"
+      "  typedef int aa_t[string];\n"
+      "  i_t v;\n"
+      "  initial v = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto width_of = [design](std::string_view name) -> int64_t {
+    auto it = design->type_widths.find(name);
+    if (it == design->type_widths.end()) return -1;
+    return it->second;
+  };
+  EXPECT_EQ(width_of("i_t"), 32);
+  EXPECT_EQ(width_of("arr_t"), 0);
+  EXPECT_EQ(width_of("q_t"), 0);
+  EXPECT_EQ(width_of("da_t"), 0);
+  EXPECT_EQ(width_of("aa_t"), 0);
+}
+
+// §3.12.1 puts a typedef written outside any design element in the
+// compilation-unit scope, and such a declaration never runs the module item
+// walk, so its dimensions are recorded where the compilation-unit scope is
+// built rather than where a module's typedef is elaborated. Both spellings of
+// the same §6.18 name stand for the same type and the table has to say so.
+TEST(UserDefinedTypeElaboration, CompilationUnitAggregateTypedefHasNoWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "typedef int cu_i_t;\n"
+      "typedef int cu_arr_t[4];\n"
+      "module t;\n"
+      "  cu_i_t v;\n"
+      "  initial v = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(design->type_widths["cu_i_t"], 32u);
+  EXPECT_EQ(design->type_widths["cu_arr_t"], 0u);
+}
+
+// §26.4: an import is what makes a package's typedef available by its bare
+// name, and that name stands for the type the package declared -- dimensions
+// included. The import registers the element type alone, so the aggregate has
+// to be recorded as the import enters the name, not only where the package
+// wrote it.
+TEST(UserDefinedTypeElaboration, ImportedAggregateTypedefHasNoWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  typedef int p_i_t;\n"
+      "  typedef int p_arr_t[4];\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import p::*;\n"
+      "  p_i_t v;\n"
+      "  initial v = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(design->type_widths["p_i_t"], 32u);
+  EXPECT_EQ(design->type_widths["p_arr_t"], 0u);
 }
 
 }  // namespace

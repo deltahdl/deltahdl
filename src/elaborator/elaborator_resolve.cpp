@@ -338,6 +338,7 @@ void RegisterBuiltinClassNames(
 struct CuScope {
   std::unordered_set<std::string_view>& names;
   TypedefMap& typedefs;
+  std::unordered_set<std::string_view>& aggregate_typedefs;
   std::unordered_set<std::string_view>& class_names;
   std::unordered_set<std::string_view>& parameterized_classes;
   ScopeMap& param_scope;
@@ -351,6 +352,11 @@ void ClassifyCuScopeItem(ModuleItem* item, CuScope& scope) {
   if (!item->name.empty()) scope.names.insert(item->name);
   if (item->kind == ModuleItemKind::kTypedef) {
     scope.typedefs[item->name] = item->typedef_type;
+    // §6.18: a compilation-unit typedef never runs Elaborator::ElaborateTypedef
+    // (see Elaborator::ValidateCuTypedefs), so the dimensions that make its
+    // name stand for an aggregate are recorded here instead.
+    if (!item->unpacked_dims.empty())
+      scope.aggregate_typedefs.insert(item->name);
   } else if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
     scope.class_names.insert(item->class_decl->name);
     if (!item->class_decl->params.empty())
@@ -471,9 +477,13 @@ bool CellUseOverrideApplies(std::string_view src_lib, std::string_view name,
 
 void Elaborator::RegisterCuScopeItems() {
   RegisterBuiltinClassNames(class_names_);
-  CuScope cu_scope{cu_scope_names_, typedefs_,
-                   class_names_,    parameterized_class_names_,
-                   cu_param_scope_, diag_};
+  CuScope cu_scope{cu_scope_names_,
+                   typedefs_,
+                   aggregate_typedef_names_,
+                   class_names_,
+                   parameterized_class_names_,
+                   cu_param_scope_,
+                   diag_};
   for (auto* item : unit_->cu_items) {
     ClassifyCuScopeItem(item, cu_scope);
   }

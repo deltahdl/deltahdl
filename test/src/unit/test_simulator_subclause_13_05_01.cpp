@@ -628,4 +628,28 @@ TEST(PassByValueSim, TypedefSignedBodyLocalSignExtends) {
   EXPECT_EQ(v, 0xFFFFFFFFu);
 }
 
+// §13.5.1 passes an input by value, and §10.7 sizes what arrives to the width
+// the formal declares. What b4_t declares is four bytes, not one -- §7.4.2's
+// unpacked array of four elements, whose bit-stream size §20.6.2 gives as 32 --
+// so a formal written with it must not be sized to a byte. The elaborated type
+// table answered one element's width for the aggregate name, and the actual
+// here is an assignment pattern rather than an identifier, so the bind that
+// intercepts an array argument by name declines and that width was applied:
+// three of the four elements were dropped before the body ran. Reading $bits
+// of the formal is what states the size the argument arrived at.
+TEST(PassByValueSim, FixedUnpackedArrayTypedefFormalIsNotSizedToOneElement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef byte b4_t[4];\n"
+      "  int y;\n"
+      "  function automatic int arrival_bits(input b4_t v);\n"
+      "    return $bits(v);\n"
+      "  endfunction\n"
+      "  initial y = arrival_bits('{8'h11, 8'h22, 8'h33, 8'h44});\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"y", 32u}});
+}
+
 }  // namespace
