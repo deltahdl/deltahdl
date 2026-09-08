@@ -664,6 +664,20 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   ElaborateBehavioralItem(item, mod);
 }
 
+// §8.26: a class declared inside a module. Its name and parameterized status go
+// onto the module, and §6.20.1 makes every param_assignment in its body a
+// localparam whose value is a constant expression -- said of a class declared
+// here as much as of one declared at compilation-unit scope, where
+// RegisterClassParams asks it. The module's own parameter scope is what such a
+// default folds against, since §6.20.1's constant expression is constant in the
+// scope the class stands in.
+void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
+  RecordClassDecl(item, mod, class_names_, parameterized_class_names_);
+  if (item->class_decl == nullptr) return;
+  RegisterModuleClassParams(item->class_decl, BuildParamScope(mod),
+                            cu_param_scope_, arena_, diag_);
+}
+
 // Declarations, types, instances, and structural items (§6, §23, §25, §28).
 bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
   auto make_implicit_net = [&](std::string_view n, SourceLoc l) {  // §6.10
@@ -751,14 +765,7 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       RecordImportDecl(item, mod);
       return true;
     case ModuleItemKind::kClassDecl:
-      RecordClassDecl(item, mod, class_names_, parameterized_class_names_);
-      // §6.20.1 makes every param_assignment in a class body a localparam whose
-      // value is a constant expression, and says it of a class declared here as
-      // much as of one declared at compilation-unit scope.
-      if (item->class_decl != nullptr) {
-        RegisterModuleClassParams(item->class_decl, BuildParamScope(mod),
-                                  cu_param_scope_, arena_, diag_);
-      }
+      ElaborateModuleClassDecl(item, mod);
       return true;
     default:
       return false;

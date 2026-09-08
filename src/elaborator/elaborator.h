@@ -214,6 +214,7 @@ class Elaborator : public ElaboratorClassRules {
   // Two-level dispatch for ElaborateItem: each handles a cohesive subset of
   // module-item kinds and returns true when it consumed `item->kind`.
   bool ElaborateDeclItem(ModuleItem* item, RtlirModule* mod);
+  void ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod);
   bool ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod);
   // Third-level dispatch for the §16 assertion/sequence/property/clocking
   // module items; returns true for those kinds and is a no-op (true) otherwise.
