@@ -700,14 +700,14 @@ TEST(ArrayLiteralSim, VarInitLeafMatchesProceduralAssignLeaf) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  for (int i = 1; i <= 2; ++i) {
-    for (int j = 1; j <= 3; ++j) {
+  for (uint64_t i = 1; i <= 2; ++i) {
+    for (uint64_t j = 1; j <= 3; ++j) {
       auto suffix = "[" + std::to_string(i) + "][" + std::to_string(j) + "]";
       auto* declared = f.ctx.FindVariable("d" + suffix);
       auto* assigned = f.ctx.FindVariable("p" + suffix);
       ASSERT_NE(declared, nullptr) << suffix;
       ASSERT_NE(assigned, nullptr) << suffix;
-      uint64_t want = static_cast<uint64_t>(((i - 1) * 3 + j) * 10);
+      uint64_t want = ((i - 1) * 3 + j) * 10;
       EXPECT_EQ(assigned->value.ToUint64(), want) << suffix;
       EXPECT_EQ(declared->value.ToUint64(), want) << suffix;
     }
