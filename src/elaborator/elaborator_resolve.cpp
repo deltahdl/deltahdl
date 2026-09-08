@@ -264,6 +264,30 @@ static void RegisterOneClassParams(ClassParamRegistration& reg) {
   }
 }
 
+// §8.26: "A class declaration may appear ... within a module", and §6.20.1 says
+// the same thing of every class body wherever it stands: "All param_assignments
+// appearing within a class body shall become localparam declarations regardless
+// of the presence or absence of a parameter_port_list", whose value Syntax 6-6
+// makes a constant_param_expression. The walk below reaches the compilation
+// unit's classes alone, so a class written inside a module had its defaults
+// folded and checked nowhere and `class C #(parameter int W = n);` over a
+// variable n elaborated in silence -- and the default was then evaluated at
+// each construction against the simulation context, a per-object value where
+// §6.20 has one constant.
+//
+// `module_scope` is what the class layers its own names over, so a default
+// naming one of the module's parameters folds against it, and the qualified
+// "Class.name" keys go to the compilation-unit scope the unit's classes write
+// to, which is where every consumer of a class parameter looks.
+void RegisterModuleClassParams(const ClassDecl* cls,
+                               const ScopeMap& module_scope,
+                               ScopeMap& cu_param_scope, Arena& arena,
+                               DiagEngine& diag) {
+  ClassParamRegistration reg{
+      cls, ClassParamNames(cls), module_scope, cu_param_scope, arena, diag};
+  RegisterOneClassParams(reg);
+}
+
 void RegisterClassParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
                          Arena& arena, DiagEngine& diag) {
   for (auto* cls : unit->classes) {

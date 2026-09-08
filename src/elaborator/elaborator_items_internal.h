@@ -6,6 +6,8 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -13,6 +15,17 @@
 namespace delta {
 
 struct RtlirModule;
+struct ClassDecl;
+
+// §6.20.1: folds and checks the parameter defaults of a class declared inside a
+// module, which RegisterClassParams (elaborator_resolve.cpp) does for a class
+// declared at compilation-unit scope. `module_scope` is the enclosing module's
+// parameter scope, which a default may name; the folded values are recorded
+// under their "Class.name" keys in `cu_param_scope`.
+void RegisterModuleClassParams(const ClassDecl* cls,
+                               const ScopeMap& module_scope,
+                               ScopeMap& cu_param_scope, Arena& arena,
+                               DiagEngine& diag);
 
 // State threaded into RegisterImportedEnumLiterals: the compilation unit (to
 // find imported packages), the arena and enum-member name set used to emit

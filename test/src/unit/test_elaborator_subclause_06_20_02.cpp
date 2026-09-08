@@ -813,4 +813,44 @@ TEST(ValueParameters, MethodCallOnANonStringParameterReportsOnly6_20_4) {
   }
 }
 
+// §8.26 lets a class declaration appear "within a module", and §6.20.1 says the
+// same thing of every class body wherever it stands, so the constancy rule the
+// two cases above assert of a compilation-unit class is the rule here too.
+// Registration walked the compilation unit's classes alone, so a class written
+// inside a module had its defaults folded and checked nowhere: this source
+// elaborated in silence, and the default was then evaluated at each
+// construction against whatever `n` held, a per-object value where §6.20 has
+// one constant. The `n` stands on line 3.
+TEST(ValueParameters, NonConstantModuleScopedClassParamDefaultIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int n;\n"
+      "  class C #(parameter int W = n);\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "class parameter 'W' value is not a constant expression", 3, "6.20.2"));
+}
+
+// The other half of the same registration: §6.20.1's constant_param_expression
+// is constant in the scope the class stands in, and a class inside a module
+// stands in the module's, so a default naming one of the module's parameters
+// folds rather than being reported. It is what a repair that folded a
+// module-scope class against the compilation unit alone would break, every such
+// default naming a name that scope has never heard of.
+TEST(ValueParameters, ModuleScopedClassParamDefaultFoldsAgainstAModuleParam) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  localparam int W = 4;\n"
+      "  class C #(parameter int P = W);\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

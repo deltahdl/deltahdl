@@ -752,6 +752,13 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       return true;
     case ModuleItemKind::kClassDecl:
       RecordClassDecl(item, mod, class_names_, parameterized_class_names_);
+      // §6.20.1 makes every param_assignment in a class body a localparam whose
+      // value is a constant expression, and says it of a class declared here as
+      // much as of one declared at compilation-unit scope.
+      if (item->class_decl != nullptr) {
+        RegisterModuleClassParams(item->class_decl, BuildParamScope(mod),
+                                  cu_param_scope_, arena_, diag_);
+      }
       return true;
     default:
       return false;
