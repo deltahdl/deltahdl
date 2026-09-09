@@ -355,6 +355,13 @@ class SynthLower {
   uint32_t LowerVariableSelectBit(const Expr* expr, AigGraph& aig,
                                   uint32_t bit);
 
+  // §11.5.1: lower one bit of a select whose operand is an expression rather
+  // than a name, which carries no declaration to resolve an index against and
+  // no signal to read a bit out of. The bits of such an operand are addressed
+  // [width-1:0], so an index is an offset, and the bit the select names is the
+  // bit SynthLower::LowerExprBit answers at that offset.
+  uint32_t LowerExprSelectBit(const Expr* expr, AigGraph& aig, uint32_t bit);
+
   // The literal that is true exactly where `expr` carries the value `value`.
   uint32_t ExprEqualsValue(const Expr* expr, AigGraph& aig, int64_t value);
 

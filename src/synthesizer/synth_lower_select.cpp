@@ -305,6 +305,25 @@ int64_t SynthLower::VariableSelectIndex(const Expr* expr, int64_t value,
          static_cast<int64_t>(bit);
 }
 
+// The operands a select can be written on that carry no name of their own, and
+// so no declaration to resolve an index against and no signal to read a bit out
+// of. A §12.5.4 value range is written as a select with no operand at all and
+// is none of these.
+static bool IsExpressionSelectOperand(const Expr* base) {
+  if (base == nullptr) return false;
+  switch (base->kind) {
+    case ExprKind::kBinary:
+    case ExprKind::kUnary:
+    case ExprKind::kTernary:
+    case ExprKind::kConcatenation:
+    case ExprKind::kReplicate:
+    case ExprKind::kSelect:
+      return true;
+    default:
+      return false;
+  }
+}
+
 uint32_t SynthLower::LowerVariableSelectBit(const Expr* expr, AigGraph& aig,
                                             uint32_t bit) {
   // §11.5.2 addresses an element of an unpacked array and §11.5.1 a bit of a
@@ -315,9 +334,19 @@ uint32_t SynthLower::LowerVariableSelectBit(const Expr* expr, AigGraph& aig,
         unpacked_arrays_.count(expr->base->text) != 0) {
       return LowerArraySelectBit(expr, aig, bit);
     }
-    // A select written on something that is not a name reaches here, and the
-    // §12.5.4 value range `[2'b01:2'b10]` is one. It answers constant false, as
-    // it did before §11.5.2 was lowered.
+    // A select written on an expression reaches here. §11.5.1 addresses a
+    // select to a net or a variable and §11.4.12 to a concatenation, so what
+    // stands under one is this tool's own lowering: Elaborator::
+    // ElaborateContAssign splits a continuous assignment to a concatenation
+    // into one assignment per element, each driven by a slice of the right-hand
+    // side, and §10.3.2's Example 2 writes that right-hand side as
+    // `ina + inb + carry_in`.
+    if (IsExpressionSelectOperand(expr->base)) {
+      return LowerExprSelectBit(expr, aig, bit);
+    }
+    // The §12.5.4 value range `[2'b01:2'b10]` also reaches here, written as a
+    // select with no operand at all. It answers constant false, as it did
+    // before §11.5.2 was lowered.
     return AigGraph::kConstFalse;
   }
   int64_t width = VariableSelectWidth(expr);
@@ -361,6 +390,32 @@ uint32_t SynthLower::LowerSelectBit(const Expr* expr, AigGraph& aig,
   int64_t offset = storage.lo + bit;
   if (offset < 0) return AigGraph::kConstFalse;
   return GetSignalBit(storage.name, static_cast<uint32_t>(offset));
+}
+
+uint32_t SynthLower::LowerExprSelectBit(const Expr* expr, AigGraph& aig,
+                                        uint32_t bit) {
+  std::optional<int64_t> index = ConstEvalInt(expr->index, scope_);
+  if (!index) return AigGraph::kConstFalse;
+  int64_t first = *index;
+  int64_t second = *index;
+  if (expr->index_end != nullptr) {
+    std::optional<int64_t> end = ConstEvalInt(expr->index_end, scope_);
+    if (!end) return AigGraph::kConstFalse;
+    PartSelectIndices indices = PartSelectTargetIndices(
+        *index, *end, expr->is_part_select_plus, expr->is_part_select_minus);
+    first = indices.first;
+    second = indices.second;
+  }
+  // §11.5.1 addresses "a contiguous sequence of bits", and an expression's bits
+  // run [width-1:0] with no declaration to renumber them, so an index of one is
+  // an offset into it. Bit `bit` of `e[msb:lsb]` is therefore bit `lsb + bit`
+  // of `e`, and a bit the select does not name reads constant false, which is
+  // the answer §11.5.1 gives for an address out of range of a 2-state value.
+  int64_t lo = std::min(first, second);
+  int64_t hi = std::max(first, second);
+  int64_t offset = lo + static_cast<int64_t>(bit);
+  if (offset < 0 || offset > hi) return AigGraph::kConstFalse;
+  return LowerExprBit(expr->base, aig, static_cast<uint32_t>(offset));
 }
 
 void SynthLower::LowerSelectTarget(const Expr* lhs, const Expr* rhs,

@@ -229,4 +229,42 @@ TEST(VectorSelect,
                             "assignment target has no lowering", 4, ""));
 }
 
+// §11.5.1 addresses a select to a net or a variable, so the operand of one is
+// normally a name; what writes a select over an expression is this tool's own
+// lowering. `Elaborator::ElaborateContAssign` splits a continuous assignment to
+// a concatenation into one assignment per element, each driven by a slice of
+// the right-hand side, so §10.3.2's Example 2 reaches the synthesizer as two
+// selects over `ina + inb + carry_in`.
+//
+// A select whose operand is not a name answered constant false for every bit
+// and reported nothing, so the netlist drove `carry_out` and `sum_out` to zero
+// for all 512 inputs while the run reported success. The sweep is over both
+// outputs at once, and the carry is what the clause writes the example for.
+TEST(VectorSelect, SelectOverAnArithmeticExpressionCarriesItsBits) {
+  ExpectInputSweep(
+      "module m(input [3:0] ina, input [3:0] inb, input carry_in,\n"
+      "         output carry_out, output [3:0] sum_out);\n"
+      "  assign {carry_out, sum_out} = ina + inb + carry_in;\n"
+      "endmodule\n",
+      512, [](uint64_t v) {
+        uint64_t sum = (v & 0xFu) + ((v >> 4) & 0xFu) + ((v >> 8) & 0x1u);
+        return ((sum >> 4) & 0x1u) | ((sum & 0xFu) << 1);
+      });
+}
+
+// §11.4.12 admits the other operand a select can be written on that carries no
+// declaration: "a concatenation ... can be used on the left-hand side of an
+// assignment" and is "treated as a packed vector of bits", so `{a, b}[2:1]`
+// names bit 2 and bit 1 of the four-bit vector the concatenation makes. Those
+// are the low bit of `a` and the high bit of `b`, which no single declaration
+// holds, so a lowering that answered through one signal's bits cannot produce
+// them.
+TEST(VectorSelect, SelectOverAConcatenationCrossesItsOperands) {
+  ExpectInputSweep(
+      "module m(input [1:0] a, input [1:0] b, output [1:0] y);\n"
+      "  assign y = {a, b}[2:1];\n"
+      "endmodule\n",
+      16, [](uint64_t v) { return ((v & 0x1u) << 1) | ((v >> 3) & 0x1u); });
+}
+
 }  // namespace
