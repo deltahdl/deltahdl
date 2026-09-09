@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
+#include "simulator/sim_context.h"
 #include "simulator/sva_engine.h"
 
 using namespace delta;
@@ -133,6 +135,50 @@ TEST(ProceduralConcurrentAssertion, ClockInferenceRequiresAllThreeConditions) {
   EXPECT_FALSE(SatisfiesClockInferenceRequirements(true, true, false));
 
   EXPECT_FALSE(SatisfiesClockInferenceRequirements(false, false, false));
+}
+
+// §16.14.6 has a concurrent assertion embedded in procedural code "evaluated as
+// though it were a separate concurrent assertion". The property here carries no
+// clocking event of its own, so it takes the clocking of the procedure that
+// reaches it -- the posedge the always block waits on -- and `a` is false when
+// that edge arrives, so the assertion fails and §16.3's default report says so.
+//
+// The parser discarded the property before reading it, so what the executor
+// evaluated was nothing at all. The pair below is what says the property is
+// read: a case asserting only the failure passes on an evaluation that answers
+// false for every source, which is what a discarded property gives it.
+TEST(ProceduralConcurrentAssertionSim, FalseBooleanPropertyFailsAtTheEdge) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  logic a = 0;\n"
+      "  always @(posedge clk) assert property (a);\n"
+      "  initial #1 clk = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.LastSeverity(), "ERROR");
+  EXPECT_EQ(f.ctx.LastSeverityMsg(), "Assertion failed.");
+}
+
+// The other half of the pair: a property that holds reports nothing. This is
+// the case a discarded property cannot pass, the null it left behind being
+// evaluated as false at every edge.
+TEST(ProceduralConcurrentAssertionSim, TrueBooleanPropertyReportsNothing) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  logic a = 1;\n"
+      "  always @(posedge clk) assert property (a);\n"
+      "  initial #1 clk = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.LastSeverityMsg(), "");
 }
 
 }  // namespace
