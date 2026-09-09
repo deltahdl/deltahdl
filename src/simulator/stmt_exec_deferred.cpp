@@ -146,6 +146,72 @@ static bool TryScheduleDeferredAssertAction(const Stmt* action,
   return true;
 }
 
+// §4.4.2.6: "The code specified by blocking assignments in checkers, program
+// blocks and the code in action blocks of concurrent assertions are scheduled
+// in the Reactive region", which §4.4.2.5 states again from the property's
+// side: "During property evaluation, pass/fail code shall be scheduled in the
+// Reactive region of the current time slot." The action therefore does not run
+// where the property was evaluated, and §4.4's region order is what that buys:
+// the design's Active-region code has settled before a testbench reacts to the
+// assertion, so nothing the action writes can be read by the design in the same
+// time slot.
+//
+// The action runs in a process of its own rather than from a plain callback
+// because it is ordinary procedural code: it may be a begin/end block and it
+// may carry a delay, and §16.14.5 has the assertion that queued it back at its
+// clocking event for the next tick whatever the action does. Running it inline
+// from a Reactive-region callback would put the region right and leave a
+// delayed action stalling the assertion that queued it.
+static SimCoroutine ConcurrentAssertActionCoroutine(const Stmt* action,
+                                                    SimContext& ctx,
+                                                    Arena& arena) {
+  co_await ExecStmt(action, ctx, arena);
+}
+
+// The process an action block runs in. §23.6 resolves the names it writes under
+// the instance and generate prefixes the assertion stands in, so the process
+// carries the ones the process that reached the assertion had; and §4.4.2.6
+// makes its code reactive, so a blocking assignment it makes and a #0 it
+// executes belong to the reactive region set rather than to the active one.
+static Process* CreateConcurrentAssertActionProcess(SimContext& ctx,
+                                                    Arena& arena) {
+  auto* p = arena.Create<Process>();
+  p->kind = ProcessKind::kInitial;
+  p->home_region = ConcurrentAssertActionRegion();
+  p->is_reactive = true;
+  if (auto* asserting = ctx.CurrentProcess()) {
+    p->inst_prefix = asserting->inst_prefix;
+    p->gen_prefixes = asserting->gen_prefixes;
+    p->program_block_id = asserting->program_block_id;
+  }
+  // §18.14.2: a new thread's RNG is seeded with the next value drawn from the
+  // thread that creates it, so an action block that randomizes draws from its
+  // own stream and does so reproducibly.
+  p->rng_seed = ctx.DrawSeedForChild();
+  return p;
+}
+
+// Schedules a concurrent assertion's action block into the region §4.4.2.6
+// gives it and reports whether it did, so a caller that gets false runs the
+// action where it stands. An immediate assertion's action block is that case:
+// §16.3 executes it in the procedure that reached the assert, so only a
+// statement carrying a concurrent assertion's property takes this path.
+static bool TryScheduleConcurrentAssertAction(const Stmt* action,
+                                              const Stmt* stmt, SimContext& ctx,
+                                              Arena& arena) {
+  if (!stmt->is_concurrent_clocked) return false;
+  auto* p = CreateConcurrentAssertActionProcess(ctx, arena);
+  p->coro = ConcurrentAssertActionCoroutine(action, ctx, arena).Release();
+  auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
+  ev->callback = [p, &ctx]() {
+    if (!p->active) return;
+    ctx.SetCurrentProcess(p);
+    p->Resume();
+  };
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), p->home_region, ev);
+  return true;
+}
+
 // Records a cover-immediate sampling: bumps the evaluation count and, when the
 // covered expression held, the success count. No-op for assert/assume forms.
 static void RecordCoverImmediateSample(const Stmt* stmt, bool is_true,
@@ -234,7 +300,8 @@ ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   const Stmt* action =
       is_true ? stmt->assert_pass_stmt : stmt->assert_fail_stmt;
   if (action != nullptr) {
-    if (TryScheduleDeferredAssertAction(action, stmt, ctx, arena)) {
+    if (TryScheduleDeferredAssertAction(action, stmt, ctx, arena) ||
+        TryScheduleConcurrentAssertAction(action, stmt, ctx, arena)) {
       co_return StmtResult::kDone;
     }
     co_return co_await ExecStmt(action, ctx, arena);

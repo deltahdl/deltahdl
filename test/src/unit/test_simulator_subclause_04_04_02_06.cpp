@@ -203,3 +203,111 @@ TEST(ReactiveRegionSim, CheckerBlockingAssignmentHomeIsReactive) {
 TEST(ReactiveRegionSim, ConcurrentAssertionActionBlockHomeIsReactive) {
   EXPECT_EQ(ConcurrentAssertActionRegion(), Region::kReactive);
 }
+
+// §4.4.2.6 D2 end-to-end: "the code in action blocks of concurrent assertions
+// are scheduled in the Reactive region", and §4.4 puts that region after the
+// whole active region set. A design reading in the same time slot therefore
+// sees the value from before the action ran, whichever process the scheduler
+// reached first.
+//
+// The reader waits one #0 so it reads from the Inactive region rather than
+// racing the assertion inside the Active one: Inactive precedes Observed and
+// Reactive both, so the read is ordered against the action by the region order
+// alone. The action ran where the assertion body ran -- the Active region, for
+// a concurrent assertion embedded in procedural code -- so `saw` read 1 here,
+// the design seeing a testbench's reaction before it had settled.
+TEST(ReactiveRegionSim,
+     ConcurrentAssertionActionIsNotSeenFromTheInactiveRegion) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk = 0;\n"
+      "  int flag = 0;\n"
+      "  int saw = 99;\n"
+      "  always @(posedge clk) assert property (1'b1) flag = 1;\n"
+      "  always @(posedge clk) begin\n"
+      "    #0;\n"
+      "    saw = flag;\n"
+      "  end\n"
+      "  initial #5 clk = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* saw = f.ctx.FindVariable("saw");
+  auto* flag = f.ctx.FindVariable("flag");
+  ASSERT_NE(saw, nullptr);
+  ASSERT_NE(flag, nullptr);
+  // Inactive runs before Reactive: the design read the value from before the
+  // action, rather than the 99 that would say it never read at all.
+  EXPECT_EQ(saw->value.ToUint64(), 0u);
+  // The action still ran, in its own region of the same time slot.
+  EXPECT_EQ(flag->value.ToUint64(), 1u);
+}
+
+// The other half of the pair: the action block runs in the reactive region set
+// of the same time slot, not in some later one. A program block's code is
+// scheduled in the Reactive region too (§4.4.2.6), and an explicit #0 there
+// suspends it into the Re-Inactive region (§4.4.2.7), which §4.4 orders after
+// every Reactive event of the slot -- so a read made there sees an action block
+// that has run and would not see one deferred to the Postponed region or to the
+// next time slot.
+TEST(ReactiveRegionSim,
+     ConcurrentAssertionActionIsSeenFromTheReInactiveRegion) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk = 0;\n"
+      "  int flag = 0;\n"
+      "  int seen = 99;\n"
+      "  always @(posedge clk) assert property (1'b1) flag = 1;\n"
+      "  program p;\n"
+      "    initial begin\n"
+      "      @(posedge clk);\n"
+      "      #0;\n"
+      "      seen = flag;\n"
+      "    end\n"
+      "  endprogram\n"
+      "  initial #5 clk = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* seen = f.ctx.FindVariable("seen");
+  ASSERT_NE(seen, nullptr);
+  EXPECT_EQ(seen->value.ToUint64(), 1u);
+}
+
+// An action block is code the region holds rather than code the assertion runs
+// on its way past, so a delay in one delays the action and nothing else. The
+// assertion is back at its clocking event for the next edge while its first
+// action is still waiting, and both actions run.
+//
+// The action was executed inline by the process carrying the assertion, so a
+// `#20` in it parked that process: the second posedge arrived while it was
+// waiting and no attempt started, leaving one increment instead of two.
+TEST(ReactiveRegionSim,
+     ConcurrentAssertionActionDelayDoesNotStallTheAssertion) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk = 0;\n"
+      "  int hits = 0;\n"
+      "  always @(posedge clk) assert property (1'b1) #20 hits = hits + 1;\n"
+      "  initial begin\n"
+      "    #5 clk = 1;\n"
+      "    #5 clk = 0;\n"
+      "    #5 clk = 1;\n"
+      "    #40;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* hits = f.ctx.FindVariable("hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 2u);
+}
