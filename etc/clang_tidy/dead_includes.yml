@@ -1,0 +1,39 @@
+# ============================================================
+# DEAD #include DETECTION - ENFORCED BY CLANG-TIDY
+#
+# This configuration exists because etc/clang_tidy/src.yml cannot
+# ask this question. misc-include-cleaner emits two diagnostics
+# and cannot be told to emit one: an include no symbol in the
+# file uses, and a symbol the file reaches through a header some
+# other header pulled in. IgnoreHeaders silences both for the
+# headers it names, and src.yml names every header ending in .h,
+# because this repository relies on the transitive half -- an
+# umbrella header is included for what it pulls in. The unused
+# half went with it, so a dead include was invisible to every
+# job: nine of them accumulated across five translation units
+# and survived a file split with everything green.
+#
+# So the two halves are asked separately. This configuration
+# runs the check alone, ignores no project header by pattern,
+# and the job filters its output down to the unused-include
+# message; src.yml goes on asking the transitive half of the
+# headers it names.
+#
+# RULES FOR THE AI:
+# 1. NEVER add a header here to make a job pass. Remove the
+#    include instead -- that is the whole point of the job.
+# 2. The only headers named below are the ones whose transitive
+#    use is deliberate: an umbrella header, which declares
+#    nothing of its own, and the standard headers src.yml names
+#    for the same reason it names them.
+# ============================================================
+---
+CheckOptions:
+  # The three umbrella headers under src/ declare nothing of their own --
+  # src/parser/ast.h says so in its own first line, holding the sub-headers "in
+  # dependency order so that #include "parser/ast.h" continues to provide" what
+  # a caller expects -- so no file that includes one uses a symbol from it
+  # directly and every such include would be reported. The six standard headers
+  # are the ones src.yml names, reached transitively across most of the tree.
+  misc-include-cleaner.IgnoreHeaders: 'parser/ast\.h$;simulator/sva_engine\.h$;simulator/vpi\.h$;<utility>$;<cstddef>$;<string_view>$;<cstdint>$;<vector>$;<string>$'
+Checks: '-*,misc-include-cleaner'

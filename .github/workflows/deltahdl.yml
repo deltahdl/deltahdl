@@ -178,6 +178,57 @@ jobs:
   # declaration was skipped -- silently, and for exactly the longest and
   # most specific names, which are the ones a near-duplicate is likeliest
   # to reuse.
+  # This job fails when a translation unit under src/ includes a header no
+  # symbol in it uses. misc-include-cleaner is the check that reports one and it
+  # runs in clang-tidy-src already, where etc/clang_tidy/src.yml has to silence
+  # it for every header ending in .h: the check emits that diagnostic and a
+  # second one about a symbol reached through a header some other header pulled
+  # in, IgnoreHeaders silences both together, and this repository relies on the
+  # second being silent. So the unused half was silent too, and nine dead
+  # includes accumulated across five translation units and survived a file split
+  # with every job green -- four of them behind simulator/awaiters.h, which is
+  # 666 lines and pulls five more headers after it, so four translation units
+  # rebuilt on every edit to any of them for no reason and a reader was told the
+  # file suspends processes on awaiters when it does not.
+  #
+  # etc/clang_tidy/dead_includes.yml asks the same check the other question:
+  # nothing is ignored by pattern, so a project header is a candidate, and the
+  # output is filtered to the unused-include message alone. The transitive-use
+  # diagnostic is printed by the same run and discarded here, which is what lets
+  # one check answer two questions differently in two jobs.
+  assert-no-dead-includes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install LLVM
+        uses: ./.github/actions/install-llvm
+      # BUILD_TESTING off for the reason clang-tidy-src turns it off: nothing
+      # under src/ includes a googletest header, and leaving it on would hold
+      # this job behind a fetch of googletest for translation units the pattern
+      # below discards.
+      - name: Generate compile_commands.json
+        run: |
+          cmake -B build \
+            -DBUILD_TESTING=OFF \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+      # The run itself is expected to print the transitive-use diagnostic for
+      # most of the tree, so its exit status says nothing this job asks about
+      # and the report is read out of the output instead.
+      - name: Check for includes no symbol uses
+        run: |
+          run-clang-tidy -p build \
+            -j "$(nproc)" \
+            -config-file=etc/clang_tidy/dead_includes.yml \
+            -extra-arg=-ferror-limit=0 \
+            -extra-arg=-w \
+            '^(?!.*/test/).*\.cpp$' > tidy.log 2>&1 || true
+          grep -E 'is not used directly' tidy.log | sort -u > dead.log || true
+          if [ -s dead.log ]; then
+            echo "::error ::includes no symbol uses; remove them"
+            cat dead.log
+            exit 1
+          fi
   assert-no-duplicate-test-names:
     runs-on: ubuntu-latest
     steps:
