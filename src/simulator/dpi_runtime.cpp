@@ -636,24 +636,6 @@ void DpiRuntime::SetScope(const DpiScope* scope) { current_scope_ = scope; }
 
 const DpiScope* DpiRuntime::GetScope() const { return current_scope_; }
 
-uint32_t DpiRuntime::SvLow(const SvOpenArrayHandle&) { return 0; }
-
-uint32_t DpiRuntime::SvHigh(const SvOpenArrayHandle& h) {
-  return h.size > 0 ? h.size - 1 : 0;
-}
-
-uint32_t DpiRuntime::SvSize(const SvOpenArrayHandle& h) { return h.size; }
-
-SvOpenArrayHandle DpiRuntime::MakeOpenArrayFromActual(void* actual_data,
-                                                      uint32_t actual_size,
-                                                      uint32_t elem_width) {
-  // §35.6.1.1: the formal's unsized dimension takes the size of the
-  // corresponding actual argument dimension; the element width is the type
-  // information carried over from the import declaration. SvLow/SvHigh then
-  // report the normalized range for the solitary unsized dimension.
-  return SvOpenArrayHandle{actual_data, actual_size, elem_width};
-}
-
 void DpiRuntime::EnterContextImportCall(std::string_view sv_name,
                                         DpiScope decl_scope, bool is_task) {
   // §35.9: the disabled state is a per-thread property of an in-progress

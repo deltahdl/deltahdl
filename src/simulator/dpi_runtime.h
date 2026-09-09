@@ -376,20 +376,36 @@ class DpiRuntime {
   bool DisableProtocolFatalErrorIssued() const;
   const std::string& DisableProtocolFatalError() const;
 
-  static uint32_t SvLow(const SvOpenArrayHandle& h);
-  static uint32_t SvHigh(const SvOpenArrayHandle& h);
+  static int32_t SvLow(const SvOpenArrayHandle& h);
+  static int32_t SvHigh(const SvOpenArrayHandle& h);
   static uint32_t SvSize(const SvOpenArrayHandle& h);
 
   // §35.6.1.1: under the WYSIWYG principle the unsized ranges of an open-array
   // formal (§35.5.6.1) are not fixed by the import declaration; they are
-  // determined at the call site from the corresponding actual argument. This
-  // builds the open-array handle a foreign function receives for such a formal,
-  // taking the unsized dimension's size from the actual passed at this call
-  // while the rest of the type information (the element width) stays as
-  // specified at the import declaration.
-  static SvOpenArrayHandle MakeOpenArrayFromActual(void* actual_data,
-                                                   uint32_t actual_size,
-                                                   uint32_t elem_width);
+  // determined at the call site from the corresponding actual argument. These
+  // two build the open-array handle a foreign function receives for such a
+  // formal, and the clause gives each kind of unsized dimension its own range:
+  // the rest of the type information (the element width) stays as specified at
+  // the import declaration either way.
+
+  // §35.6.1.1: "A solitary, unsized, packed dimension assumes the linearized,
+  // normalized range of the actual's packed dimensions (see H.7.6)."
+  // Linearizing "an arbitrary number of sized dimensions" (§35.5.6.1) leaves a
+  // count of elements rather than any one declared range, so `actual_bits` is
+  // that count and the range the formal takes on is the normalized 0 to
+  // actual_bits-1 whatever ranges the actual's own dimensions ran over.
+  static SvOpenArrayHandle MakeOpenArrayFromPackedActual(void* actual_data,
+                                                         uint32_t actual_bits,
+                                                         uint32_t elem_width);
+
+  // §35.6.1.1: "A formal's unsized, unpacked dimensions take on the ranges of
+  // the corresponding actual dimension." No normalization here: the formal
+  // reports the actual dimension's own bounds, so §35.5.6.1's `MyType a_10x5
+  // [11:20][6:2]` bound to `MyType i [][]` gives the first formal dimension the
+  // range 11 to 20 rather than 0 to 9. The size follows from those bounds,
+  // since an unpacked dimension has as many elements as its range has values.
+  static SvOpenArrayHandle MakeOpenArrayFromUnpackedActual(
+      void* actual_data, SvActualDimension actual, uint32_t elem_width);
 
  private:
   // §35.9 item b): an imported task returning due to a disable shall return 1.

@@ -62,10 +62,28 @@ inline uint32_t DpiCanonicalWordCount(uint32_t width) {
   return (width + 31U) / 32U;
 }
 
+// §35.6.1.1: one dimension of an actual argument, as the actual's own
+// declaration wrote it. §35.5.6.1's `MyType a_10x5 [11:20][6:2]` has two of
+// these, the first running 11 to 20 and the second 2 to 6, and the bounds are
+// signed because the same clause's `a_64x8 [64:1][-1:-8]` declares a dimension
+// over -8 to -1. An unsized formal dimension is what these bounds reach: which
+// of them it takes on is what MakeOpenArrayFromUnpackedActual and
+// MakeOpenArrayFromPackedActual differ over.
+struct SvActualDimension {
+  int32_t low = 0;
+  int32_t high = 0;
+};
+
 struct SvOpenArrayHandle {
   void* data = nullptr;
   uint32_t size = 0;
   uint32_t elem_width = 0;
+  // §35.6.1.1: "The unsized ranges of open arrays are determined at a call
+  // site", so this is the range the formal's unsized dimension took on there
+  // rather than anything the import declaration could have said. SvLow and
+  // SvHigh report it.
+  int32_t low = 0;
+  int32_t high = 0;
 };
 
 // §35.5.6: one formal argument of an imported or exported subroutine, as the
