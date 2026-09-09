@@ -226,7 +226,6 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vcd_writer_port.cpp
     simulator/adv_sim.cpp
     simulator/vpi.cpp
-    simulator/sv_callable.cpp
     simulator/clocking.cpp
     simulator/checker_instance_scheduling.cpp
     simulator/checker_scheduling_semantics.cpp
