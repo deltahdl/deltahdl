@@ -6,6 +6,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "lexer/token.h"
+#include "simulator/evaluation.h"
 
 namespace delta {
 namespace {
@@ -30,32 +31,39 @@ void MaskToWidth(Limbs& v, uint32_t width) {
   v.back() &= TopLimbMask(width);
 }
 
-// §11.6.1: an operand narrower than the result is extended to it, and §11.6.1's
-// signed operands extend by their sign where unsigned ones extend with zeros.
-// The value's own width says where its sign bit is, which is not where the
-// result's is.
-Limbs ToLimbs(const Logic4Vec& v, uint32_t width, bool is_signed) {
+// The known bits of a value as limbs, its own width's worth and no more. A
+// value whose storage was never masked above its declared width cannot leak
+// into the extension below.
+Limbs KnownLimbs(const Logic4Vec& v, uint32_t width) {
   Limbs out(LimbCount(width), 0);
   for (uint32_t i = 0; i < out.size() && i < v.nwords; ++i) {
     out[i] = v.words[i].aval & ~v.words[i].bval;
   }
-  if (v.width < width) {
-    // Clear whatever the source held above its own width before extending, so
-    // a value that was never masked cannot leak into the extension.
-    uint32_t top = (v.width == 0) ? 0 : (v.width - 1) / 64;
-    if (top < out.size()) {
-      out[top] &= TopLimbMask(v.width);
-      for (uint32_t i = top + 1; i < out.size(); ++i) out[i] = 0;
-    }
-    bool negative =
-        is_signed && v.width > 0 &&
-        ((out[(v.width - 1) / 64] >> ((v.width - 1) % 64)) & 1) != 0;
-    if (negative) {
-      uint32_t top_bits = v.width % 64;
-      if (top_bits != 0) out[top] |= ~TopLimbMask(v.width);
-      for (uint32_t i = top + 1; i < out.size(); ++i) out[i] = ~uint64_t{0};
-    }
-  }
+  if (v.width == 0 || v.width >= width) return out;
+  uint32_t top = (v.width - 1) / 64;
+  if (top >= out.size()) return out;
+  out[top] &= TopLimbMask(v.width);
+  for (uint32_t i = top + 1; i < out.size(); ++i) out[i] = 0;
+  return out;
+}
+
+// §11.6.1: a signed operand narrower than the result extends by its sign where
+// an unsigned one extends with zeros. The value's own width is where its sign
+// bit is, which is not where the result's is.
+void SignExtendLimbs(Limbs& v, uint32_t from_width, uint32_t width) {
+  if (from_width == 0 || from_width >= width) return;
+  uint32_t top = (from_width - 1) / 64;
+  if (top >= v.size()) return;
+  if (((v[top] >> ((from_width - 1) % 64)) & 1) == 0) return;
+  if (from_width % 64 != 0) v[top] |= ~TopLimbMask(from_width);
+  for (uint32_t i = top + 1; i < v.size(); ++i) v[i] = ~uint64_t{0};
+}
+
+// An operand as the limbs the result width asks for, extended into the bits it
+// does not have of its own.
+Limbs ToLimbs(const Logic4Vec& v, uint32_t width, bool is_signed) {
+  Limbs out = KnownLimbs(v, width);
+  if (is_signed) SignExtendLimbs(out, v.width, width);
   MaskToWidth(out, width);
   return out;
 }
