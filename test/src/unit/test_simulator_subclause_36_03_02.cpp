@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/variable.h"
 #include "simulator/vpi.h"
 
@@ -267,9 +268,12 @@ TEST_F(OverrideBuiltinSystf, UnregisteredNameIsStillReported) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  size_t before = f.diag.Diagnostics().size();
   LowerAndRun(design, f);
-  EXPECT_NE(FindDiagFrom(f, before, "is not a system task"), nullptr);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$no_such_task is not a system task or system function this tool "
+      "implements",
+      2, Subclause("20.1")));
 }
 
 }  // namespace
