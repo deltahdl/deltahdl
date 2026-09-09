@@ -250,19 +250,28 @@ struct FourStateActual {
   Logic4Word Actual() { return f.ctx.FindVariable("a")->value.words[0]; }
 };
 
-// The same crossing for a formal §35.5.6 admits at a width no single machine
-// word holds. `k` is a 128-bit variable whose two words are `lo` and `hi`, and
-// the formal is declared `bit [127:0]`, so the value travels in Annex
-// H.10.1.2's canonical array of four aval/bval pairs rather than in the one
-// pair DpiArgValue's union carries. `seen` is the array the foreign body was
-// handed, `wrote` is the array it leaves in the formal, and Actual() is the
-// variable once the call has returned.
+// §35.5.6's packed formal as a declaration writes it: the bit or logic type it
+// is composed of, the width, and the direction §35.5.1.2 reads to decide which
+// way the value crosses. Those three are what decide the carrier, so they
+// travel together rather than as loose arguments.
+struct PackedFormal {
+  DataTypeKind kind = DataTypeKind::kBit;
+  uint32_t width = 128;
+  Direction direction = Direction::kInput;
+};
+
+// The same crossing for a formal §35.5.6 admits at a width the union member its
+// kind lands in cannot hold. `k` is a variable of the formal's width whose two
+// words are `lo` and `hi`, so the value travels in Annex H.10.1.2's canonical
+// array of aval/bval pairs rather than in the union. `seen` is the array the
+// foreign body was handed, `wrote` is the array it leaves in the formal, and
+// Actual() is the variable once the call has returned.
 struct WideActual {
   DpiRuntime dpi;
   SimFixture f;
   std::vector<SvLogicVecVal> seen;
 
-  WideActual(Direction direction, Logic4Word lo, Logic4Word hi,
+  WideActual(PackedFormal decl, Logic4Word lo, Logic4Word hi,
              const std::vector<SvLogicVecVal>& wrote) {
     DpiRtFunction func;
     func.c_name = "c_touch_wide";
@@ -270,26 +279,25 @@ struct WideActual {
     func.return_type = DataTypeKind::kInt;
     DpiArg formal;
     formal.name = "k";
-    formal.type = DataTypeKind::kBit;
-    formal.direction = direction;
-    formal.width = 128;
+    formal.type = decl.kind;
+    formal.direction = decl.direction;
+    formal.width = decl.width;
     func.args = {formal};
     auto* seen_slot = &seen;
-    func.arg_impl = [seen_slot,
-                     wrote](std::vector<DpiArgValue>& args) -> DpiArgValue {
+    func.arg_impl = [seen_slot, wrote,
+                     decl](std::vector<DpiArgValue>& args) -> DpiArgValue {
       *seen_slot = args[0].AsLogicVecWords();
       if (!wrote.empty()) {
-        args[0] =
-            DpiArgValue::FromLogicVecWords(wrote, 128, DataTypeKind::kBit);
+        args[0] = DpiArgValue::FromLogicVecWords(wrote, decl.width, decl.kind);
       }
       return DpiArgValue::FromInt(0);
     };
     dpi.RegisterImport(std::move(func));
     f.ctx.SetDpiRuntime(&dpi);
-    auto* var = f.ctx.CreateVariable("k", 128);
-    var->value = MakeLogic4Vec(f.arena, 128);
+    auto* var = f.ctx.CreateVariable("k", decl.width);
+    var->value = MakeLogic4Vec(f.arena, decl.width);
     var->value.words[0] = lo;
-    var->value.words[1] = hi;
+    if (var->value.nwords > 1) var->value.words[1] = hi;
     EvalFunctionCall(ParseExprFrom("touch_wide(k)", f), f.ctx, f.arena);
   }
 
@@ -302,7 +310,7 @@ struct WideActual {
 // quarters differ from one another, so a crossing that keeps the first word
 // alone hands the foreign body the low two and nothing above them.
 TEST(DpiArgumentPassingInADesign, AFormalWiderThanOneWordArrivesWhole) {
-  WideActual run(Direction::kInput, Logic4Word{0x1234567855667788ULL, 0},
+  WideActual run(PackedFormal{}, Logic4Word{0x1234567855667788ULL, 0},
                  Logic4Word{0x99AABBCCDDEEFF00ULL, 0}, {});
 
   ASSERT_EQ(run.seen.size(), 4u);
@@ -319,7 +327,7 @@ TEST(DpiArgumentPassingInADesign, AFormalWiderThanOneWordArrivesWhole) {
 // bit 0 is 1, so a carrier that widened the aval and left the bval one word
 // wide delivers bit 96 as a known one.
 TEST(DpiArgumentPassingInADesign, AnUnknownBitAboveTheFirstWordSurvives) {
-  WideActual run(Direction::kInput, Logic4Word{1, 0},
+  WideActual run(PackedFormal{}, Logic4Word{1, 0},
                  Logic4Word{0x0000000100000000ULL, 0x0000000100000000ULL}, {});
 
   ASSERT_EQ(run.seen.size(), 4u);
@@ -335,7 +343,8 @@ TEST(DpiArgumentPassingInADesign, AnUnknownBitAboveTheFirstWordSurvives) {
 // variable the call site named holds every one of them afterwards.
 TEST(DpiArgumentPassingInADesign, AWideOutputFormalIsWrittenBackWhole) {
   WideActual run(
-      Direction::kOutput, Logic4Word{}, Logic4Word{},
+      PackedFormal{DataTypeKind::kBit, 128, Direction::kOutput}, Logic4Word{},
+      Logic4Word{},
       {SvLogicVecVal{0x0A0B0C0DU, 0}, SvLogicVecVal{0x1A1B1C1DU, 0},
        SvLogicVecVal{0x2A2B2C2DU, 0}, SvLogicVecVal{0x3A3B3C3DU, 0}});
 
@@ -345,6 +354,49 @@ TEST(DpiArgumentPassingInADesign, AWideOutputFormalIsWrittenBackWhole) {
   EXPECT_EQ(got.words[0].aval, 0x1A1B1C1D0A0B0C0DULL);
   // The upper word is what a write-back built from words[0] alone leaves at 0.
   EXPECT_EQ(got.words[1].aval, 0x3A3B3C3D2A2B2C2DULL);
+}
+
+// §35.5.6 puts no lower bound on a packed formal either, and what decides
+// whether the union can hold one is the member its kind lands in rather than
+// the widest member there is: SvBit is a uint8_t holding one bit, so a
+// `bit [7:0]` formal has seven bits with nowhere to go. The actual is 8'hA5,
+// whose bit 0 is 1, so a crossing that keeps that member hands the foreign body
+// a 1 and reads as the whole value having arrived.
+TEST(DpiArgumentPassingInADesign,
+     APackedFormalNarrowerThanOneWordArrivesWhole) {
+  WideActual run(PackedFormal{DataTypeKind::kBit, 8, Direction::kInput},
+                 Logic4Word{0xA5, 0}, Logic4Word{}, {});
+
+  ASSERT_EQ(run.seen.size(), 1u);
+  EXPECT_EQ(run.seen[0].aval, 0xA5U);
+}
+
+// The four-state half of the same: §35.5.6's packed types are "composed of
+// types bit and logic", and a logic holds four values, so an unknown bit of a
+// `logic [7:0]` formal crosses wherever it stands. Bit 4 is x here -- aval and
+// bval both set -- and the SvLogic member the kind would otherwise land in
+// carries one bit of each half.
+TEST(DpiArgumentPassingInADesign, AnUnknownBitOfAPackedLogicFormalSurvives) {
+  WideActual run(PackedFormal{DataTypeKind::kLogic, 8, Direction::kInput},
+                 Logic4Word{0x13, 0x10}, Logic4Word{}, {});
+
+  ASSERT_EQ(run.seen.size(), 1u);
+  EXPECT_EQ(run.seen[0].aval, 0x13U);
+  EXPECT_EQ(run.seen[0].bval, 0x10U);
+}
+
+// §35.6.1's copy-out for the same formal: the foreign body leaves 8'h3C in an
+// `output bit [7:0]`, so the variable the call site named holds all eight bits
+// afterwards rather than bit 0 of them.
+TEST(DpiArgumentPassingInADesign,
+     APackedOutputFormalNarrowerThanOneWordIsWrittenBackWhole) {
+  WideActual run(PackedFormal{DataTypeKind::kBit, 8, Direction::kOutput},
+                 Logic4Word{}, Logic4Word{}, {SvLogicVecVal{0x3C, 0}});
+
+  const Logic4Vec& got = run.Actual();
+  ASSERT_EQ(got.width, 8U);
+  ASSERT_GE(got.nwords, 1U);
+  EXPECT_EQ(got.words[0].aval, 0x3CU);
 }
 
 // §35.6.1: "For input and inout arguments, the temporary variable is

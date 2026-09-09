@@ -32,11 +32,29 @@ struct SvLogicVecVal {
 
 using SvChandle = void*;
 
-// The widest packed value DpiArgValue's union carries. Its four-state member is
-// one SvLogicVecVal pair, and the two-state members it shares storage with are
-// at most 64 bits, so a value of more bits than this has nowhere in the union
-// to be and travels in the canonical array instead.
+// The widest value DpiArgValue's union carries when nothing narrower applies:
+// its int, longint, real and chandle members each hold a machine word.
 inline constexpr uint32_t kDpiInlineValueBits = 64;
+
+// The widest value the union carries for `kind`, which is the width of the
+// member that kind lands in rather than of the widest member there is. §35.2.2
+// gives a bit and a logic one scalar each -- SvBit and SvLogic are a uint8_t
+// holding one bit -- and §35.2.2.1's aval/bval pair carries an `integer`'s 32.
+// A packed formal §35.5.6 admits above this has nowhere in the union to be and
+// travels in the canonical array instead, so measuring against the widest
+// member would send a `bit [7:0]` down the SvBit branch and cross it as bit 0.
+inline uint32_t DpiInlineValueBits(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kBit:
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+      return 1;
+    case DataTypeKind::kInteger:
+      return 32;
+    default:
+      return kDpiInlineValueBits;
+  }
+}
 
 // Annex H.10.1.2: how many aval/bval pairs a value of `width` bits occupies in
 // the canonical representation, which packs 32 bits into each.

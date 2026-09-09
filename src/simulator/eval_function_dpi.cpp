@@ -164,12 +164,12 @@ Logic4Vec VecOfCanonicalWords(Arena& arena,
 // between that and the foreign side.
 DpiArgValue DpiArgValueOfType(DataTypeKind kind, uint32_t declared_width,
                               const Logic4Vec& v) {
-  // §35.5.6's packed formal may be wider than anything DpiArgValue's union
-  // holds, and every branch below reads that union. Such a formal crosses in
-  // the canonical array instead, which is what keeps the bits above the first
-  // word -- and the unknown bits among them -- from being dropped here.
+  // §35.5.6's packed formal may be wider than the union member its kind lands
+  // in, and every branch below reads that member. Such a formal crosses in the
+  // canonical array instead, which is what keeps the bits above the member --
+  // and the unknown bits among them -- from being dropped here.
   if (uint32_t width = DpiValueWidth(kind, declared_width);
-      width > kDpiInlineValueBits) {
+      width > DpiInlineValueBits(kind)) {
     return DpiArgValue::FromLogicVecWords(CanonicalWordsOfVec(v, width), width,
                                           kind);
   }

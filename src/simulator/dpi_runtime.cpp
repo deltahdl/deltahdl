@@ -500,7 +500,7 @@ DpiArgValue DpiRuntime::UndeterminedOutputValue(DataTypeKind type,
   // §35.5.1.2: the initial value of an output argument is undetermined and
   // implementation dependent. We pick a deterministic per-type zero so the
   // callee observes a value that is independent of the caller's actual.
-  if (width > kDpiInlineValueBits) {
+  if (width > DpiInlineValueBits(type)) {
     return DpiArgValue::FromLogicVecWords(
         std::vector<SvLogicVecVal>(DpiCanonicalWordCount(width),
                                    SvLogicVecVal{0, 0}),
