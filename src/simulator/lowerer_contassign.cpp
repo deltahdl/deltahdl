@@ -212,6 +212,31 @@ static uint64_t SelectScalarContAssignDelay(const Logic4Vec& old_val,
   return d.rise;
 }
 
+// §10.3.3 decides which of the three delays governs, and for a vector net it
+// decides it once for the assignment rather than once per bit: "If the
+// left-hand side references a vector net, then up to three delays can be
+// applied. The following rules determine which delay controls the assignment:
+// If the right-hand side makes a transition from nonzero to zero, then the
+// falling delay shall be used. If the right-hand side makes a transition to z,
+// then the turn-off delay shall be used. For all other cases, the rising delay
+// shall be used." Each rule reads the right-hand side whole, so a vector whose
+// bits move in opposite directions is neither a transition to zero nor one to
+// z, and the rising delay carries every bit of it: the whole vector settles at
+// one time, not each bit at its own.
+//
+// The clause's later sentence restricts the same thing again for one of the two
+// forms -- "if the assignment is to a vector net, then the rising and falling
+// delays shall not be applied to the individual bits if the assignment is
+// included in the declaration" -- and grants nothing to the other. A net delay
+// reaches here as the driver's own delay, ApplyNetDeclDelaysToDrivers
+// (src/elaborator/elaborator_net_delay.cpp) having added it to whatever the
+// driver wrote, and it is selected by these same rules. So both forms settle a
+// vector whole, which is what #3372 asked to be decided and recorded.
+//
+// A scalar left-hand side is the other half of the clause: "If the left-hand
+// references a scalar net, then the delay shall be treated in the same way as
+// for gate delays", which is Table 28-9 and is what
+// SelectScalarContAssignDelay above reads.
 static uint64_t SelectContAssignDelay(const Logic4Vec& old_val,
                                       const Logic4Vec& new_val,
                                       const ContAssignDelays& d,

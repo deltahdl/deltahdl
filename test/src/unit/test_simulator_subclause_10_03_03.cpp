@@ -248,6 +248,91 @@ TEST(AssignmentDelaySim, VectorNetDeclMultiDelayUsesFallForNonzeroToZero) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 55u);
 }
 
+// §10.3.3 decides which delay governs a vector net once for the assignment
+// rather than once per bit: each of its three rules -- nonzero to zero picks
+// the falling delay, a transition to z picks the turn-off delay, and every
+// other case picks the rising delay -- reads the right-hand side whole. So a
+// vector whose two bits move in opposite directions is neither a transition to
+// zero nor one to z, and the rising delay carries both: bit 0 falling and bit 1
+// rising settle together at the rising delay rather than each at its own.
+//
+// The delay here is a net delay, §10.3.3's `wire #10 wireA;` form: the
+// declaration assigns nothing and a separate continuous assignment drives it,
+// so ApplyNetDeclDelaysToDrivers (src/elaborator/elaborator_net_delay.cpp) is
+// what puts the net's delays on the driver. The case below it is the other
+// form, and the two agree -- which is what #3372 asked to be settled.
+//
+// The rise delay is 2 and the fall delay 4, and the source changes at 50, so
+// the whole vector settles at 52. A reading that gave each bit its own delay
+// would settle bit 0 at 54, and the run would end there.
+TEST(AssignmentDelaySim, ANetDelaySettlesAVectorWholeWhenItsBitsDisagree) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [1:0] src;\n"
+      "  wire [1:0] #(2, 4) w;\n"
+      "  assign w = src;\n"
+      "  initial begin\n"
+      "    src = 2'b01;\n"
+      "    #50 src = 2'b10;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "w");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 52u);
+}
+
+// The same two bits under the other form, which is the one §10.3.3 restricts by
+// name: "if the assignment is to a vector net, then the rising and falling
+// delays shall not be applied to the individual bits if the assignment is
+// included in the declaration". The delay is part of the continuous assignment
+// here rather than a net delay, and the vector still settles whole at 52.
+//
+// Without this case beside the one above, the clause's contrast is stated on
+// one side only, which is the gap #3372 records.
+TEST(AssignmentDelaySim, ADeclarationAssignmentSettlesTheSameVectorWhole) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [1:0] src;\n"
+      "  wire [1:0] #(2, 4) w = src;\n"
+      "  initial begin\n"
+      "    src = 2'b01;\n"
+      "    #50 src = 2'b10;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "w");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 52u);
+}
+
+// The first of §10.3.3's three rules under a net delay, which is what says the
+// rule read above is the clause's rather than a rising delay applied to
+// everything: both bits fall together, the right-hand side goes from nonzero to
+// zero, and the falling delay of 4 carries it to 54.
+//
+// VectorNetDeclMultiDelayUsesFallForNonzeroToZero above asks the same of the
+// declaration-assignment form.
+TEST(AssignmentDelaySim, ANetDelayUsesTheFallingDelayForNonzeroToZero) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [1:0] src;\n"
+      "  wire [1:0] #(2, 4) w;\n"
+      "  assign w = src;\n"
+      "  initial begin\n"
+      "    src = 2'b11;\n"
+      "    #50 src = 2'b00;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "w");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 54u);
+}
+
 // §10.3.3: a continuous assignment to a net of a user-defined nettype admits
 // only a single delay, and that one delay governs the assignment for any value
 // change (there is no rise/fall/turn-off split, unlike a scalar or vector net).
