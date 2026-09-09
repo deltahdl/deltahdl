@@ -94,4 +94,18 @@ TEST(DpiFunctionResultInADesign, AnIntResultIsThirtyTwoBitsWide) {
   EXPECT_EQ(run.result.words[0].aval, 7U);
 }
 
+// §35.5.5's list of permitted result types -- void, byte, shortint, int,
+// longint, real, shortreal, chandle and string, and scalar bit and logic -- is
+// what it calls "small values", and every one of them is 64 bits or fewer. So a
+// result stays in one word however wide a formal may be: §35.5.6's packed
+// formals travel in Annex H.10.1.2's canonical array, and a carrier that put
+// every value there would give a byte result more words than a byte has.
+TEST(DpiFunctionResultInADesign, ANarrowResultStillOccupiesOneWord) {
+  ImportResultOfType run(DataTypeKind::kByte, DpiArgValue::FromInt(0x5A));
+
+  EXPECT_EQ(run.result.width, 8U);
+  EXPECT_EQ(run.result.nwords, 1U);
+  EXPECT_EQ(run.result.words[0].aval, 0x5AU);
+}
+
 }  // namespace

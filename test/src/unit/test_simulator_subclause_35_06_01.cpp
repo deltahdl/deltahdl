@@ -250,6 +250,103 @@ struct FourStateActual {
   Logic4Word Actual() { return f.ctx.FindVariable("a")->value.words[0]; }
 };
 
+// The same crossing for a formal §35.5.6 admits at a width no single machine
+// word holds. `k` is a 128-bit variable whose two words are `lo` and `hi`, and
+// the formal is declared `bit [127:0]`, so the value travels in Annex
+// H.10.1.2's canonical array of four aval/bval pairs rather than in the one
+// pair DpiArgValue's union carries. `seen` is the array the foreign body was
+// handed, `wrote` is the array it leaves in the formal, and Actual() is the
+// variable once the call has returned.
+struct WideActual {
+  DpiRuntime dpi;
+  SimFixture f;
+  std::vector<SvLogicVecVal> seen;
+
+  WideActual(Direction direction, Logic4Word lo, Logic4Word hi,
+             std::vector<SvLogicVecVal> wrote) {
+    DpiRtFunction func;
+    func.c_name = "c_touch_wide";
+    func.sv_name = "touch_wide";
+    func.return_type = DataTypeKind::kInt;
+    DpiArg formal;
+    formal.name = "k";
+    formal.type = DataTypeKind::kBit;
+    formal.direction = direction;
+    formal.width = 128;
+    func.args = {formal};
+    auto* seen_slot = &seen;
+    func.arg_impl = [seen_slot,
+                     wrote](std::vector<DpiArgValue>& args) -> DpiArgValue {
+      *seen_slot = args[0].AsLogicVecWords();
+      if (!wrote.empty()) {
+        args[0] =
+            DpiArgValue::FromLogicVecWords(wrote, 128, DataTypeKind::kBit);
+      }
+      return DpiArgValue::FromInt(0);
+    };
+    dpi.RegisterImport(std::move(func));
+    f.ctx.SetDpiRuntime(&dpi);
+    auto* var = f.ctx.CreateVariable("k", 128);
+    var->value = MakeLogic4Vec(f.arena, 128);
+    var->value.words[0] = lo;
+    var->value.words[1] = hi;
+    EvalFunctionCall(ParseExprFrom("touch_wide(k)", f), f.ctx, f.arena);
+  }
+
+  const Logic4Vec& Actual() { return f.ctx.FindVariable("k")->value; }
+};
+
+// §35.5.6 lists "Packed arrays, structs, and unions composed of types bit and
+// logic" among a formal's permitted types and puts no width limit on one, so
+// `bit [127:0]` is a formal a declaration may write. The actual's four 32-bit
+// quarters differ from one another, so a crossing that keeps the first word
+// alone hands the foreign body the low two and nothing above them.
+TEST(DpiArgumentPassingInADesign, AFormalWiderThanOneWordArrivesWhole) {
+  WideActual run(Direction::kInput, Logic4Word{0x1234567855667788ULL, 0},
+                 Logic4Word{0x99AABBCCDDEEFF00ULL, 0}, {});
+
+  ASSERT_EQ(run.seen.size(), 4u);
+  EXPECT_EQ(run.seen[0].aval, 0x55667788U);
+  EXPECT_EQ(run.seen[1].aval, 0x12345678U);
+  // These two are the halves a single-word carrier drops entirely.
+  EXPECT_EQ(run.seen[2].aval, 0xDDEEFF00U);
+  EXPECT_EQ(run.seen[3].aval, 0x99AABBCCU);
+}
+
+// §35.2.2.1 has the representation of a four-state value be "irrelevant for
+// SystemVerilog semantics", so an unknown bit crosses wherever it stands in the
+// value. Bit 96 is x here -- aval and bval both set in the top quarter -- and
+// bit 0 is 1, so a carrier that widened the aval and left the bval one word
+// wide delivers bit 96 as a known one.
+TEST(DpiArgumentPassingInADesign, AnUnknownBitAboveTheFirstWordSurvives) {
+  WideActual run(Direction::kInput, Logic4Word{1, 0},
+                 Logic4Word{0x0000000100000000ULL, 0x0000000100000000ULL}, {});
+
+  ASSERT_EQ(run.seen.size(), 4u);
+  EXPECT_EQ(run.seen[0].aval, 1U);
+  EXPECT_EQ(run.seen[0].bval, 0U);
+  EXPECT_EQ(run.seen[3].aval, 1U);
+  EXPECT_EQ(run.seen[3].bval, 1U);
+}
+
+// §35.6.1: "For output or inout arguments, the value of the temporary variable
+// is assigned to the actual argument with the appropriate conversion." The
+// foreign body leaves all four quarters set to different values, so the
+// variable the call site named holds every one of them afterwards.
+TEST(DpiArgumentPassingInADesign, AWideOutputFormalIsWrittenBackWhole) {
+  WideActual run(
+      Direction::kOutput, Logic4Word{}, Logic4Word{},
+      {SvLogicVecVal{0x0A0B0C0DU, 0}, SvLogicVecVal{0x1A1B1C1DU, 0},
+       SvLogicVecVal{0x2A2B2C2DU, 0}, SvLogicVecVal{0x3A3B3C3DU, 0}});
+
+  const Logic4Vec& got = run.Actual();
+  ASSERT_EQ(got.width, 128U);
+  ASSERT_GE(got.nwords, 2U);
+  EXPECT_EQ(got.words[0].aval, 0x1A1B1C1D0A0B0C0DULL);
+  // The upper word is what a write-back built from words[0] alone leaves at 0.
+  EXPECT_EQ(got.words[1].aval, 0x3A3B3C3D2A2B2C2DULL);
+}
+
 // §35.6.1: "For input and inout arguments, the temporary variable is
 // initialized with the value of the actual argument with the appropriate
 // coercion." The actual is 4'b10x1, so the foreign body is handed a 1, a 0 and

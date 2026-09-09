@@ -1,5 +1,6 @@
 #include "simulator/dpi_runtime.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <functional>
@@ -134,6 +135,15 @@ DpiArgValue DpiArgValue::FromLogicVec(SvLogicVecVal v) {
   return a;
 }
 
+DpiArgValue DpiArgValue::FromLogicVecWords(std::vector<SvLogicVecVal> words,
+                                           uint32_t width, DataTypeKind type) {
+  DpiArgValue a;
+  a.type = type;
+  a.vec_words = std::move(words);
+  a.vec_width = width;
+  return a;
+}
+
 int32_t DpiArgValue::AsInt() const { return data.int_val; }
 int64_t DpiArgValue::AsLongint() const { return data.longint_val; }
 double DpiArgValue::AsReal() const { return data.real_val; }
@@ -205,6 +215,18 @@ double NumericToReal(const DpiArgValue& v) {
 // value-change semantics where an assignment of an unchanged value is inert.
 bool SameArgValue(const DpiArgValue& a, const DpiArgValue& b) {
   if (a.type != b.type) return false;
+  // Annex H.10.1.2: a value carried in the canonical array is compared word by
+  // word over the whole of it. Falling through to the union below would read a
+  // member nothing wrote and call two different wide values the same, so an
+  // output formal §35.5.6 admits at 128 bits would raise no §35.6.2 event.
+  if (a.IsWideVec() || b.IsWideVec()) {
+    return a.VecWidth() == b.VecWidth() &&
+           std::equal(a.AsLogicVecWords().begin(), a.AsLogicVecWords().end(),
+                      b.AsLogicVecWords().begin(), b.AsLogicVecWords().end(),
+                      [](SvLogicVecVal x, SvLogicVecVal y) {
+                        return x.aval == y.aval && x.bval == y.bval;
+                      });
+  }
   switch (a.type) {
     // §35.2.2.1: two four-state values are the same value when both halves
     // agree. Comparing the aval alone would call an actual left at x equal to
@@ -241,6 +263,12 @@ bool SameArgValue(const DpiArgValue& a, const DpiArgValue& b) {
 // assignment/coercion rules. When the value already has the target type no
 // conversion is needed and it is returned unchanged.
 DpiArgValue CoerceArgValue(const DpiArgValue& v, DataTypeKind target) {
+  // §35.6.1 has the value cross through a temporary of the formal's own type,
+  // and a value carried in the canonical array was already built at the width
+  // that formal's declaration gave it. There is nothing to convert, and every
+  // conversion below reads the union, so a wide value put through one would
+  // come back as its low word alone.
+  if (v.IsWideVec()) return v;
   if (v.type == target) return v;
   switch (target) {
     case DataTypeKind::kReal:
@@ -467,10 +495,17 @@ DpiArgValue DpiRuntime::CallImportReusingPureResult(
   return result;
 }
 
-DpiArgValue DpiRuntime::UndeterminedOutputValue(DataTypeKind type) {
+DpiArgValue DpiRuntime::UndeterminedOutputValue(DataTypeKind type,
+                                                uint32_t width) {
   // §35.5.1.2: the initial value of an output argument is undetermined and
   // implementation dependent. We pick a deterministic per-type zero so the
   // callee observes a value that is independent of the caller's actual.
+  if (width > kDpiInlineValueBits) {
+    return DpiArgValue::FromLogicVecWords(
+        std::vector<SvLogicVecVal>(DpiCanonicalWordCount(width),
+                                   SvLogicVecVal{0, 0}),
+        width, type);
+  }
   switch (type) {
     case DataTypeKind::kLongint:
     case DataTypeKind::kTime:
@@ -508,7 +543,8 @@ DpiArgValue DpiRuntime::CallImportWithArgs(
   std::vector<DpiArgValue> callee = actuals;
   for (size_t i = 0; i < func->args.size() && i < callee.size(); ++i) {
     if (func->args[i].direction == Direction::kOutput) {
-      callee[i] = UndeterminedOutputValue(func->args[i].type);
+      callee[i] =
+          UndeterminedOutputValue(func->args[i].type, func->args[i].width);
     } else {
       // §35.6.1: input and inout formals are passed copy-in through a temporary
       // initialized with the actual coerced to the formal's type. When the

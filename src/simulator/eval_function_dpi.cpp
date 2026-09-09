@@ -8,6 +8,7 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "parser/ast.h"
+#include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -33,12 +34,14 @@ int ResolveDpiActualIndex(const DpiRtFunction* import, const Expr* expr,
 }
 
 // §35.5.5 lists the types an imported function's result may have and §35.5.6
-// the types its formals may have; this is the width each carries. Built at a
-// fixed width instead, a longint or a chandle result lost its upper half and a
-// byte arrived padded with bits its type does not have. A void result falls to
-// the default with everything else the clauses do not name: §35.5.5 gives such
-// a call no value, so nothing reads what width it came out at.
-uint32_t DpiValueWidth(DataTypeKind kind) {
+// the types its formals may have; this is the width the kind alone gives each.
+// Built at a fixed width instead, a longint or a chandle result lost its upper
+// half and a byte arrived padded with bits its type does not have. A void
+// result falls to the default with everything else the clauses do not name:
+// §35.5.5 gives such a call no value, so nothing reads what width it came out
+// at. A packed formal is the one case the kind cannot answer for, which is what
+// DpiValueWidth below takes the declaration's own width for.
+uint32_t DpiKindWidth(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kBit:
     case DataTypeKind::kLogic:
@@ -58,6 +61,15 @@ uint32_t DpiValueWidth(DataTypeKind kind) {
     default:
       return 32;
   }
+}
+
+// §35.5.6 admits a packed formal of any width, and the kind of `bit [127:0]` is
+// just kBit, so the width the declaration wrote is what a formal crosses at
+// wherever it is wider than the kind alone says. A formal whose type carries
+// its own width records none and keeps the kind's.
+uint32_t DpiValueWidth(DataTypeKind kind, uint32_t declared) {
+  uint32_t kind_width = DpiKindWidth(kind);
+  return declared > kind_width ? declared : kind_width;
 }
 
 bool IsRealKind(DataTypeKind kind) {
@@ -103,12 +115,64 @@ SvChandle ChandleOfWord(Logic4Word w) {
   return handle;
 }
 
+// Annex H.10.1.2: `v` as the canonical array of aval/bval pairs, `width` bits
+// of it. A Logic4Vec keeps 64 bits per word and the canonical array 32, so each
+// word supplies two pairs; a word the vector does not have reads as zero, which
+// is what a value narrower than its declared formal is zero-extended to.
+std::vector<SvLogicVecVal> CanonicalWordsOfVec(const Logic4Vec& v,
+                                               uint32_t width) {
+  std::vector<SvLogicVecVal> words(DpiCanonicalWordCount(width),
+                                   SvLogicVecVal{0, 0});
+  for (size_t i = 0; i < words.size(); ++i) {
+    size_t src = i / 2;
+    if (src >= v.nwords) break;
+    unsigned shift = (i % 2) == 0 ? 0U : 32U;
+    words[i].aval = static_cast<uint32_t>(v.words[src].aval >> shift);
+    words[i].bval = static_cast<uint32_t>(v.words[src].bval >> shift);
+  }
+  // The bits above the declared width belong to no bit of the value, so the
+  // top pair is masked rather than carrying whatever the source word held
+  // there.
+  if (uint32_t rem = width % 32U; rem != 0 && !words.empty()) {
+    uint32_t mask = (1U << rem) - 1U;
+    words.back().aval &= mask;
+    words.back().bval &= mask;
+  }
+  return words;
+}
+
+// The reverse: an arena-allocated Logic4Vec of `width` bits holding what the
+// canonical array carries, unknown bits and all.
+Logic4Vec VecOfCanonicalWords(Arena& arena,
+                              const std::vector<SvLogicVecVal>& words,
+                              uint32_t width) {
+  Logic4Vec v = MakeLogic4Vec(arena, width);
+  for (size_t i = 0; i < words.size(); ++i) {
+    size_t dst = i / 2;
+    if (dst >= v.nwords) break;
+    unsigned shift = (i % 2) == 0 ? 0U : 32U;
+    v.words[dst].aval |= static_cast<uint64_t>(words[i].aval) << shift;
+    v.words[dst].bval |= static_cast<uint64_t>(words[i].bval) << shift;
+  }
+  return v;
+}
+
 // The value a design's expression presents to a formal (or a call's result to
 // the expression it stands in), typed as the declaration types it. §35.6.1 has
 // the crossing go through a temporary of the formal's type, so the type the
 // declaration names is the one the value is built at; DpiRuntime then coerces
 // between that and the foreign side.
-DpiArgValue DpiArgValueOfType(DataTypeKind kind, const Logic4Vec& v) {
+DpiArgValue DpiArgValueOfType(DataTypeKind kind, uint32_t declared_width,
+                              const Logic4Vec& v) {
+  // §35.5.6's packed formal may be wider than anything DpiArgValue's union
+  // holds, and every branch below reads that union. Such a formal crosses in
+  // the canonical array instead, which is what keeps the bits above the first
+  // word -- and the unknown bits among them -- from being dropped here.
+  if (uint32_t width = DpiValueWidth(kind, declared_width);
+      width > kDpiInlineValueBits) {
+    return DpiArgValue::FromLogicVecWords(CanonicalWordsOfVec(v, width), width,
+                                          kind);
+  }
   Logic4Word word = v.nwords == 0 ? Logic4Word{} : v.words[0];
   DpiArgValue out;
   switch (kind) {
@@ -151,8 +215,16 @@ DpiArgValue DpiArgValueOfType(DataTypeKind kind, const Logic4Vec& v) {
 // is_real, which is the shape MakeRealVec in src/simulator/evaluation.cpp
 // builds and what the rest of the evaluator reads a real out of.
 Logic4Vec DpiValueOfType(Arena& arena, DataTypeKind kind,
-                         const DpiArgValue& value) {
-  uint32_t width = DpiValueWidth(kind);
+                         uint32_t declared_width, const DpiArgValue& value) {
+  // A value that crossed in the canonical array carries the width it was built
+  // at, and reading the union below would rebuild it out of a member nothing
+  // wrote. §35.5.6's packed formals are what arrive this way, in both
+  // directions: the write-back of an output formal is this call too.
+  if (value.IsWideVec()) {
+    return VecOfCanonicalWords(arena, value.AsLogicVecWords(),
+                               value.VecWidth());
+  }
+  uint32_t width = DpiValueWidth(kind, declared_width);
   if (IsRealKind(kind)) return MakeRealVec(arena, value.AsReal(), width);
 
   Logic4Word word;
@@ -198,18 +270,20 @@ DpiArgValue EvalDpiActualForFormal(const DpiRtFunction* import, size_t i,
   // DpiRuntime::CallImportWithArgs seeds an output formal with the undetermined
   // value instead -- while §35.6.2 needs the value the actual held before the
   // call to say afterwards whether the call changed it.
+  uint32_t width = import->args[i].width;
   int ai = ResolveDpiActualIndex(import, b.call, i, b.positional_count);
   if (ai >= 0 && b.call->args[static_cast<size_t>(ai)] != nullptr) {
     return DpiArgValueOfType(
-        type, EvalExpr(b.call->args[static_cast<size_t>(ai)], b.ctx, b.arena));
+        type, width,
+        EvalExpr(b.call->args[static_cast<size_t>(ai)], b.ctx, b.arena));
   }
   if (import->args[i].default_value) {
     return DpiArgValueOfType(
-        type, EvalExpr(import->args[i].default_value, b.ctx, b.arena));
+        type, width, EvalExpr(import->args[i].default_value, b.ctx, b.arena));
   }
   // A formal the call bound nothing to and the declaration gave no default has
   // no value to present, so it presents the type's own undetermined value.
-  return DpiRuntime::UndeterminedOutputValue(type);
+  return DpiRuntime::UndeterminedOutputValue(type, width);
 }
 
 std::vector<DpiArgValue> BindDpiActualsFromImport(const DpiRtFunction* import,
@@ -228,8 +302,8 @@ std::vector<DpiArgValue> BindDpiActualsPositional(const ActualBindingCtx& b) {
   for (auto* arg : b.call->args) {
     // With no formal to read a type off, the value crosses as the type DpiArg
     // itself declares when a declaration says nothing.
-    args.push_back(
-        DpiArgValueOfType(DataTypeKind::kInt, EvalExpr(arg, b.ctx, b.arena)));
+    args.push_back(DpiArgValueOfType(DataTypeKind::kInt, 0,
+                                     EvalExpr(arg, b.ctx, b.arena)));
   }
   return args;
 }
@@ -261,10 +335,10 @@ void WritebackDpiChangedArgs(const DpiRtFunction* import,
     // The value arrives at the width the formal declares, unknown bits and
     // all, and the assignment narrows it to whatever the actual holds, as an
     // assignment to that actual would anywhere else.
-    PerformBlockingAssign(
-        b.call->args[static_cast<size_t>(ai)],
-        DpiValueOfType(b.arena, import->args[i].type, actuals[i]), b.ctx,
-        b.arena);
+    PerformBlockingAssign(b.call->args[static_cast<size_t>(ai)],
+                          DpiValueOfType(b.arena, import->args[i].type,
+                                         import->args[i].width, actuals[i]),
+                          b.ctx, b.arena);
   }
 }
 
@@ -328,7 +402,10 @@ Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // §35.6.1: the result crosses back through a temporary of the declared result
   // type, so a body that computed it in another type is coerced to the type
   // §35.5.5 says the call site receives.
-  return DpiValueOfType(arena, import->return_type,
+  // §35.5.5 restricts a function result to the small values it lists, every
+  // one of which the kind's own width states, so no declared width travels
+  // with it the way §35.5.6's packed formals carry one.
+  return DpiValueOfType(arena, import->return_type, 0,
                         CoerceArgValue(result, import->return_type));
 }
 

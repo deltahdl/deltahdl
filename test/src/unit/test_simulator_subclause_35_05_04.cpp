@@ -78,6 +78,33 @@ TEST(DpiImportLowering, AnImportedFunctionCarriesItsFormalsDirections) {
   EXPECT_EQ(import->args[1].type, DataTypeKind::kInt);
 }
 
+// §35.5.6 admits "Packed arrays, structs, and unions composed of types bit and
+// logic" as formal types and names no width limit, and DataTypeKind says only
+// `bit` for `bit [127:0]`. So the width the declaration wrote has to travel
+// with the formal: without it the crossing sizes that formal by its kind and
+// hands the foreign side one bit of the design's 128.
+TEST(DpiImportLowering, AnImportedFunctionCarriesItsPackedFormalsWidth) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  import \"DPI-C\" function void take_key(input bit [127:0] key,\n"
+      "                                         input int n);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* dpi = f.ctx.GetDpiRuntime();
+  ASSERT_NE(dpi, nullptr);
+  const DpiRtFunction* import = dpi->FindImport("take_key");
+  ASSERT_NE(import, nullptr);
+  ASSERT_EQ(import->args.size(), 2u);
+  EXPECT_EQ(import->args[0].width, 128U);
+  // A formal whose type states its own width records none: the kind is the one
+  // answer about how wide an `int` is, and a second one beside it could differ
+  // from it.
+  EXPECT_EQ(import->args[1].width, 0U);
+}
+
 // §35.4 makes the declaration a reference to a global symbol the foreign side
 // defines and §35.5.4 leaves the binding to the tool. Nothing supplies one
 // here, so the call reaches no implementation, and what it must not do is

@@ -32,6 +32,18 @@ struct SvLogicVecVal {
 
 using SvChandle = void*;
 
+// The widest packed value DpiArgValue's union carries. Its four-state member is
+// one SvLogicVecVal pair, and the two-state members it shares storage with are
+// at most 64 bits, so a value of more bits than this has nowhere in the union
+// to be and travels in the canonical array instead.
+inline constexpr uint32_t kDpiInlineValueBits = 64;
+
+// Annex H.10.1.2: how many aval/bval pairs a value of `width` bits occupies in
+// the canonical representation, which packs 32 bits into each.
+inline uint32_t DpiCanonicalWordCount(uint32_t width) {
+  return (width + 31U) / 32U;
+}
+
 struct SvOpenArrayHandle {
   void* data = nullptr;
   uint32_t size = 0;
@@ -49,6 +61,12 @@ struct DpiArg {
   // §35.6: the default value expression the declaration gave this formal,
   // supplied where the call site omits the argument.
   const Expr* default_value = nullptr;
+  // §35.5.6 admits "Packed arrays, structs, and unions composed of types bit
+  // and logic" as formal types and names no width limit, so `bit [127:0]` is a
+  // formal a declaration may write and the kind alone cannot say how wide it
+  // is. This is the width the declaration gave it; 0 leaves the width to the
+  // kind, which is what every formal whose type carries its own width has.
+  uint32_t width = 0;
 };
 
 struct DpiArgValue {
@@ -68,6 +86,16 @@ struct DpiArgValue {
     SvLogicVecVal logic_vec_val;
   } data = {};
   std::string string_val;
+  // Annex H.10.1.2: a packed value wider than the union's single pair, carried
+  // as the canonical representation -- an array of aval/bval pairs, one per 32
+  // bits, which is the layout svGetBitselLogic and svPutBitselLogic already
+  // index into. §35.5.6 puts no width limit on a packed formal while one pair
+  // says nothing above bit 31, so a formal too wide for the union crosses in
+  // here and `data` says nothing about it. Empty for every value that fits.
+  std::vector<SvLogicVecVal> vec_words;
+  // The declared width the words carry, which the word count rounds up to a
+  // multiple of 32 and so cannot state.
+  uint32_t vec_width = 0;
 
   static DpiArgValue FromInt(int32_t v);
   static DpiArgValue FromLongint(int64_t v);
@@ -79,6 +107,11 @@ struct DpiArgValue {
   // §35.2.2.1: a four-state integral value of type `integer`, carried as the
   // canonical aval/bval pair rather than as a plain word.
   static DpiArgValue FromLogicVec(SvLogicVecVal v);
+  // Annex H.10.1.2: a packed value of `width` bits typed as `type`, carried as
+  // the canonical array of aval/bval pairs. `words` holds ceil(width/32) of
+  // them, least significant first.
+  static DpiArgValue FromLogicVecWords(std::vector<SvLogicVecVal> words,
+                                       uint32_t width, DataTypeKind type);
 
   int32_t AsInt() const;
   int64_t AsLongint() const;
@@ -88,6 +121,12 @@ struct DpiArgValue {
   SvBit AsBit() const;
   SvLogic AsLogic() const;
   SvLogicVecVal AsLogicVec() const;
+  // Whether this value crossed in the canonical array rather than in `data`.
+  bool IsWideVec() const { return !vec_words.empty(); }
+  const std::vector<SvLogicVecVal>& AsLogicVecWords() const {
+    return vec_words;
+  }
+  uint32_t VecWidth() const { return vec_width; }
 };
 
 // §35.6.2: a value-change event the SystemVerilog simulator raises for an

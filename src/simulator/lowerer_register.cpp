@@ -173,6 +173,17 @@ void RegisterModuleDpiImports(const RtlirModule* mod, SimContext& ctx) {
       // §35.6: the default the declaration gave a formal, which a call site
       // that omits the argument takes.
       formal.default_value = arg.default_value;
+      // §35.5.6 admits "Packed arrays, structs, and unions composed of types
+      // bit and logic" as formal types and names no width limit, and
+      // DataTypeKind says only kBit or kLogic for one of those. So the width
+      // the declaration wrote travels beside the kind for exactly those types;
+      // every other formal's type states its own width, and recording one for
+      // it would put a second answer beside the kind's.
+      if (DataTypeKind kind = arg.data_type.kind;
+          kind == DataTypeKind::kBit || kind == DataTypeKind::kLogic ||
+          kind == DataTypeKind::kReg) {
+        formal.width = EvalTypeWidth(arg.data_type);
+      }
       func.args.push_back(formal);
     }
     dpi.RegisterImport(std::move(func));

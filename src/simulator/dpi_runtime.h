@@ -200,8 +200,13 @@ class DpiRuntime {
   // argument's initial value — it is undetermined and implementation
   // dependent — the callee never sees the caller's actual on an output
   // formal. This implementation deterministically chooses the formal type's
-  // zero as its undetermined seed.
-  static DpiArgValue UndeterminedOutputValue(DataTypeKind type);
+  // zero as its undetermined seed. `width` is the width the formal's
+  // declaration gave it, which is what §35.5.6's packed formals need: the zero
+  // of a `bit [127:0]` formal is 128 bits of it, and the kind says only `bit`.
+  // Left at 0 the width is the kind's own, which is every formal whose type
+  // carries its width.
+  static DpiArgValue UndeterminedOutputValue(DataTypeKind type,
+                                             uint32_t width = 0);
 
   // §35.5.1.2: call an import applying input/output/inout argument-passing
   // semantics. `actuals` holds the caller's actual argument values and is
