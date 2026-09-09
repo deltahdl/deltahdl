@@ -5,7 +5,7 @@ description: Start or stop the standing reminders that keep an autonomous issue-
 
 # Autopilot
 
-Eight recurring reminders, one per standing rule, that fire back into this session while it works through open issues on its own. Each rule gets its own reminder so that no rule can be quietly dropped from a merged block of text, and the fire times are staggered across the ten-minute period so they arrive one at a time rather than as a wall.
+Seven recurring reminders, one per standing rule, that fire back into this session while it works through open issues on its own. Each rule gets its own reminder so that no rule can be quietly dropped from a merged block of text, and the fire times are staggered across the ten-minute period so they arrive one at a time rather than as a wall.
 
 The argument selects the mode: `start bysubclause`, `start byissuefloor <issue-number>`, or `stop`.
 
@@ -13,7 +13,7 @@ The argument selects the mode: `start bysubclause`, `start byissuefloor <issue-n
 
 Two forms select the work, and they differ in one reminder. `start bysubclause` takes the subclause the dependency order points at. `start byissuefloor <issue-number>` takes the open issues above the number, which are what this work has filed for itself and which the subclause resolver cannot name at all.
 
-Create eight jobs with `CronCreate`, exactly as listed below. Use `recurring: true` (the default). Take `:01` from the form the user asked for, substituting the number they gave for `{X}` where the form carries it, and leave the other seven verbatim. Each `cron` field is a distinct offset within the same ten-minute period, so the eight reminders never land together.
+Create seven jobs with `CronCreate`, exactly as listed below. Use `recurring: true` (the default). Take `:01` from the form the user asked for, substituting the number they gave for `{X}` where the form carries it, and leave the other six verbatim. Each `cron` field is a distinct offset within the same ten-minute period, so the seven reminders never land together.
 
 ### The reminder that selects the work
 
@@ -39,7 +39,7 @@ REMINDER: Run PYTHONPATH=.:scripts python3 -m next_subclause for the subclause i
 REMINDER: Run gh issue list --state open --limit 1000 --json number,title --jq 'map(select(.number > {X}))' for the open issues above #{X}; take one, solve it, and run the same command again when it closes. The issues at or below #{X} are a person's to take rather than this loop's.
 ```
 
-### The seven reminders both forms carry
+### The six reminders both forms carry
 
 | Offset | Cron | Prompt |
 | --- | --- | --- |
@@ -49,7 +49,6 @@ REMINDER: Run gh issue list --state open --limit 1000 --json number,title --jq '
 | :05 | `5,15,25,35,45,55 * * * *` | `REMINDER: After pushing, deltahdl.yml might fail at its integration or e2e tests. You can ignore that.` |
 | :07 | `7,17,27,37,47,57 * * * *` | `REMINDER: Do not do anything but wait while a workflow is running.` |
 | :08 | `8,18,28,38,48,58 * * * *` | `REMINDER: Solve what you find rather than filing it and moving on. A failing integration or e2e test in deltahdl.yml is the exception: leave that one where it is.` |
-| :09 | `9,19,29,39,49,59 * * * *` | `REMINDER: When you come up against a new problem, solve it.` |
 
 ### What to report
 
@@ -59,13 +58,13 @@ For `start bysubclause`, run `PYTHONPATH=.:scripts python3 -m next_subclause` an
 
 For `start byissuefloor <issue-number>`, run the `gh issue list` command from that form's prompt and name the floor it was given, how many open issues stand above it, and which of them the first iteration will take.
 
-Either way, a selector that names nothing is where this stops: say so and do not create the jobs, because every firing would report the same. Otherwise say that eight reminders are running and give the two limits that come with them — the jobs live in this session only and are gone when it ends, and recurring jobs auto-expire after seven days.
+Either way, a selector that names nothing is where this stops: say so and do not create the jobs, because every firing would report the same. Otherwise say that seven reminders are running and give the two limits that come with them — the jobs live in this session only and are gone when it ends, and recurring jobs auto-expire after seven days.
 
-Then start the first iteration in the same turn, without waiting for a reminder to arrive. Take the issue the selector named, or one of the issues it listed, and begin solving it under the eight prompts listed above.
+Then start the first iteration in the same turn, without waiting for a reminder to arrive. Take the issue the selector named, or one of the issues it listed, and begin solving it under the seven prompts listed above.
 
 ## Stop
 
-Call `CronList`, then call `CronDelete` once per job it returns — all of them, not only the eight this skill created. "Delete all your reminders" means the session ends with an empty schedule. Call `CronList` again afterwards to confirm it is empty, and report how many jobs were deleted.
+Call `CronList`, then call `CronDelete` once per job it returns — all of them, not only the seven this skill created. "Delete all your reminders" means the session ends with an empty schedule. Call `CronList` again afterwards to confirm it is empty, and report how many jobs were deleted.
 
 `CronList` returning nothing is not a failure; say the schedule was already empty and stop.
 
@@ -73,7 +72,7 @@ Call `CronList`, then call `CronDelete` once per job it returns — all of them,
 
 Cron jobs fire only while the session is idle, never mid-turn, because a turn cannot be preempted. That limit is the reason this skill does not try to correct drift in the middle of a task: what it can do is restart a loop that has stalled, which is the failure it is there to catch.
 
-Starting the reminders starts the work, in the same turn. It used to end the turn instead and leave the first iteration to the first firing, which spent up to ten minutes on an idle session and needed nothing that was not in context already: this file lists all eight prompts, and invoking the skill is what reads them in. A reminder restarts a loop that has stalled, so until a first iteration has run there is no loop for one to restart.
+Starting the reminders starts the work, in the same turn. It used to end the turn instead and leave the first iteration to the first firing, which spent up to ten minutes on an idle session and needed nothing that was not in context already: this file lists all seven prompts, and invoking the skill is what reads them in. A reminder restarts a loop that has stalled, so until a first iteration has run there is no loop for one to restart.
 
 Each form is named rather than inferred from whether a number was given. The floor came back in the shape it had before `70f1e9899`, where the number alone selected the form, and that commit had already found what is wrong with it: `start 2939` says nothing about what the loop will take, and a caller who means the floor form and forgets the number silently gets the other one. A name says which set is being asked for, and leaves the number to mean only how much of it.
 
@@ -94,3 +93,5 @@ Reminder :05 exists because `.github/workflows/deltahdl.yml` is red on every pus
 Reminder :05 names both job families because reminder :08 draws its exception around both, and drawing it at one job would leave the other unstated the first time it went red. Today the standing failure is `integration-test-coverage` alone: `e2e-test-coverage` runs `run_sim_tests` and passes on the same runs the sv-tests job fails on.
 
 Reminder :08 is why nothing else waits. A defect the loop finds is fixed in the commit in hand rather than written into the tracker for a later iteration to take, which is what `.claude/memories/what-does-not-get-filed.md` already says of a defect the commit in hand fixes: solving a finding is not a rule traded away for this one, it is the case that memory carves out. The exception is the integration and e2e tests, and it is the same exception :05 states about the run: a loop sent at those tests spends every iteration on the 146 it was not started to fix.
+
+A `:09` reminder saying to solve a new problem when the loop came up against one was removed when :08 was written, because it had stopped saying anything :08 does not. A defect the loop finds is a new problem, and :09 set no scope that held any back, so the two prompts asked for the same thing on arrival — with :08 the stronger of them, since it names what deferring would have looked like and carries the one exception. What remains of :09 that :08 does not state is covered by :04, which is the reminder that says not to hand the work back.
