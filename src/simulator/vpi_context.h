@@ -25,6 +25,33 @@ class VpiContext {
 
   VpiHandle RegisterSystf(VpiSystfData* data);
 
+  // §38.37.1: "Callbacks to the application pointed to by the calltf routine
+  // shall occur each time the system task or system function is invoked during
+  // simulation execution." This is that call: it runs the application a
+  // registration associated with `name` and reports whether one did.
+  //
+  // §36.3.2 decides where the evaluator asks. "If a user-provided PLI
+  // application is associated with the same name as a built-in system task or
+  // system function (using the PLI mechanism), the user-provided C application
+  // shall override the built-in system task or system function, replacing its
+  // functionality", and the clause's own example is a PLI application
+  // registered as $random. So the registry is asked ahead of what the tool
+  // implements itself, and a name no registration claims falls through to the
+  // built-ins.
+  //
+  // `result` is what a system function's application wrote back through
+  // vpi_put_value on the handle §37.42 gives it, which it reaches with
+  // vpi_handle(vpiSysTfCall, NULL). It is a 32-bit zero where the application
+  // wrote nothing: §38.37.1 gives a sized function with no sizetf 32 bits, and
+  // a system task's result is a value the caller discards.
+  //
+  // §38.37.1's compiletf and sizetf are not called here. They "shall occur when
+  // the simulation data structure is compiled or built", which is a different
+  // moment from this one and a separate reading of the clause;
+  // VpiSystfCallbackFiresAtBuild (src/simulator/vpi_control.cpp) already models
+  // which of the three that is.
+  bool CallRegisteredSystf(const char* name, Logic4Vec& result, Arena& arena);
+
   // §36.3.2: resolve the effective registration for a system task/function
   // name, honouring the override rule. A user-provided PLI application
   // associated with the same name as a built-in overrides that built-in,

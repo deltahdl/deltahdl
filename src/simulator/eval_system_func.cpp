@@ -19,6 +19,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/vcd_writer.h"
+#include "simulator/vpi_context.h"
 
 namespace delta {
 
@@ -635,6 +636,26 @@ static bool TryEvalCoverageSysCall(const Expr* expr, SimContext& ctx,
 
 Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto name = expr->callee;
+
+  // §36.3.2: "If a user-provided PLI application is associated with the same
+  // name as a built-in system task or system function (using the PLI
+  // mechanism), the user-provided C application shall override the built-in
+  // system task or system function, replacing its functionality", the clause's
+  // own example being an application registered as $random. The registry is
+  // therefore asked ahead of everything below rather than after it, and
+  // §38.37.1 has the application's calltf called "each time the system task or
+  // system function is invoked during simulation execution", which is here.
+  //
+  // A name no registration claims falls through to the built-ins, and past them
+  // to §20.1's report. §36.3.2's one exception needs nothing of this dispatch:
+  // "SystemVerilog timing checks, such as $setup, are not system tasks and
+  // cannot be overridden", and a timing check reaches the specify machinery
+  // rather than this evaluator.
+  Logic4Vec systf_result;
+  if (GetGlobalVpiContext().CallRegisteredSystf(std::string(name).c_str(),
+                                                systf_result, arena)) {
+    return systf_result;
+  }
 
   // §20.16.1: a PLA modeling system task evaluates the array and drives its
   // output terms; it produces no value of its own.

@@ -14,6 +14,7 @@ namespace delta {
 
 class SimContext;
 class Scheduler;
+class Arena;
 struct Net;
 struct Variable;
 

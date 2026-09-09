@@ -8,6 +8,7 @@
 #include <string_view>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/types.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
@@ -93,6 +94,42 @@ const VpiSystfData* VpiContext::ResolveSystf(const char* name) const {
     }
   }
   return nullptr;
+}
+
+bool VpiContext::CallRegisteredSystf(const char* name, Logic4Vec& result,
+                                     Arena& arena) {
+  const VpiSystfData* data = ResolveSystf(name);
+  if (data == nullptr) return false;
+
+  // §37.42: the system task or function call currently invoking a PLI
+  // application, which the application reaches with
+  // vpi_handle(vpiSysTfCall, NULL). It is also where a system function's
+  // return value is put: vpi_put_value writes through the object's own
+  // storage, so the call carries a variable of its own for the application to
+  // write and for the caller below to read back.
+  auto* call = AllocObject();
+  call->type = (data->type == vpiSysFunc) ? vpiSysFuncCall : vpiSysTaskCall;
+  call->name = data->tfname != nullptr ? std::string_view(data->tfname)
+                                       : std::string_view();
+  auto* value_holder = arena.Create<Variable>();
+  // §38.37.1: "If no sizetf is provided, a user-defined system function of type
+  // vpiSizedFunc or vpiSizedSignedFunc shall return 32 bits", which is the
+  // width the call answers with when the application writes nothing.
+  value_holder->value = MakeLogic4VecVal(arena, 32, 0);
+  call->var = value_holder;
+  call->size = 32;
+
+  // A call reached from inside another PLI application is the inner one while
+  // it runs, so the outer call is put back rather than cleared.
+  VpiHandle outer_call = CurrentSystfCall();
+  SetCurrentSystfCall(call);
+  if (data->calltf != nullptr) {
+    data->calltf(static_cast<const char*>(data->user_data));
+  }
+  SetCurrentSystfCall(outer_call);
+
+  result = value_holder->value;
+  return true;
 }
 
 void VpiContext::GetSystfInfo(VpiHandle obj, VpiSystfData* systf_data_p) {
