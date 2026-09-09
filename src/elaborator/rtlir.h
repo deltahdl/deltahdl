@@ -333,6 +333,18 @@ struct RtlirContAssign {
   bool from_resistive_switch = false;
 
   Expr* data_input = nullptr;
+
+  // §28.6: the two terminals of a three-state gate, kept because Table 28-5
+  // answers by them rather than by the value the gate's own expression yields.
+  // With a control of x or z the gate drives L or H -- "a result that has a
+  // value 0 or z" and "a value 1 or z" -- which is one side of the strength
+  // scale rather than a value, so the strength a drive carries depends on the
+  // control and on the value the gate would transmit. `three_state_pass` is
+  // that value, the data terminal as the gate passes it, so a notif's inversion
+  // is already in it. Null for every assignment that is not one of §28.6's four
+  // gates.
+  Expr* three_state_ctrl = nullptr;
+  Expr* three_state_pass = nullptr;
   std::vector<ResolvedAttribute> attrs;
   GenBlockConsts gen_block_consts;
   GenBlockPrefixes gen_block_prefixes;

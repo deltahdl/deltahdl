@@ -47,14 +47,18 @@ uint64_t SettleTime(const std::string& decl, const std::string& stim) {
   return f.scheduler.CurrentTime().ticks;
 }
 
-// --- Table 28-5: unambiguous rows reproduced by production ---
+// --- Table 28-5: the rows reproduced by production ---
 //
 // The rows where the control is a clean 0/1 are fully modelled by the lowered
-// ternary. Only the ambiguous-control rows (the L/H results in the control x/z
-// columns) are the strength-ambiguous behaviour the LRM defers to 28.12.2;
-// production renders those functionally and they are not asserted here. A
-// high-impedance data value on a conducting gate is NOT one of those cases:
-// Table 28-5 gives it a definite x, which is asserted below.
+// ternary. The control x/z columns give L and H, which §28.6 defines as values
+// -- "The symbol L shall represent a result that has a value 0 or z. The symbol
+// H shall represent a result that has a value 1 or z" -- and §28.12.2 draws as
+// a strength: a range on one side of the scale, from the gate's own drive level
+// down to high impedance. The value such a gate settles on is x either way, so
+// the cases at the end of this file read the strength back with %v, which is
+// where L and H are told from an unambiguous x. A high-impedance data value on
+// a conducting gate is not one of those rows: Table 28-5 gives it a definite x,
+// which is asserted below.
 
 TEST(TristateGateSim, Bufif1ConductsWhenControlHigh) {
   // bufif1 conducts when control is 1, passing the data value.
@@ -224,6 +228,84 @@ TEST(TristateGateSim, FallDelayFromLocalparamGovernsTransition) {
       SettleTime("localparam Q = 10;\n  bufif1 #(5, Q, 15) g(y, src, ctrl);",
                  "ctrl = 1'b1; src = 1'b1; #20 src = 1'b0;");
   EXPECT_EQ(t, 30u);
+}
+
+// The strength one three-state gate drives, read back through §21.2.1.4's %v.
+// The gate's own drive strength is what it drives at, so the source names none
+// and takes the strong default of §28.11.
+std::string DriveTristateStrength(const std::string& decl,
+                                  const std::string& stim) {
+  SimFixture f;
+  std::string src = "module t;\n  wire y;\n  " + decl + "\n  initial begin " +
+                    stim + " #1 $display(\"%v\", y); end\nendmodule\n";
+  return RunCapture(src, f);
+}
+
+// §28.6 Table 28-5, bufif1 with a control of x and a data value of 1: the gate
+// drives H, "a result that has a value 1 or z", which §28.12.2's Figure 28-6
+// draws as the output of exactly this gate and Figure 28-7 as a range on the
+// strength1 side running from the driving level down to high impedance.
+// §21.2.1.4 renders that range as the level's mnemonic and the letter H: StH.
+//
+// The gate drove an unambiguous x instead -- the conditional it lowers to
+// combines the data value with high impedance and yields x, and a driver of
+// value x put its own level on both sides of the scale -- so %v printed StX and
+// the two logic values Table 21-3 defines for an ambiguous value were
+// unreachable from any source.
+TEST(TristateGateSim, Bufif1WithUnknownControlDrivesStrongH) {
+  EXPECT_EQ(DriveTristateStrength("logic d, c;\n  bufif1 g(y, d, c);",
+                                  "d = 1'b1; c = 1'bx;"),
+            "StH\n");
+}
+
+// Figure 28-6's other gate: a bufif0 whose data input is driven weak and whose
+// control is x drives StL. The figure draws We0 in and StL out, so the case
+// says the ambiguity is the gate's own and the level is the gate's own -- an
+// output taking its input's strength would print WeL.
+TEST(TristateGateSim, Bufif0WithUnknownControlDrivesStrongLFromAWeakInput) {
+  EXPECT_EQ(DriveTristateStrength(
+                "wire d;\n  logic c;\n"
+                "  assign (weak0, weak1) d = 1'b0;\n  bufif0 g(y, d, c);",
+                "c = 1'bx;"),
+            "StL\n");
+}
+
+// The value beside the strength. Table 28-5 leaves the control x column at L
+// for a data value of 0, and L is 0 or z rather than either of them, so the net
+// reads x: a design cannot take the ambiguity for a driven 0.
+TEST(TristateGateSim, Bufif1WithUnknownControlReadsAsUnknown) {
+  EXPECT_EQ(DriveTristate("bufif1", "1'b0", "1'bx"), "x");
+}
+
+// The notif rows of the same column, where the inversion decides which of the
+// two the gate drives: notif1 with a control of x and a data value of 0 gives
+// H, the row Table 28-5 writes as "0 z 1 H H". A gate reading its data terminal
+// rather than the value it transmits would drive L here.
+TEST(TristateGateSim, Notif1WithUnknownControlDrivesTheInvertedSide) {
+  EXPECT_EQ(DriveTristateStrength("logic d, c;\n  notif1 g(y, d, c);",
+                                  "d = 1'b0; c = 1'bx;"),
+            "StH\n");
+}
+
+// §28.6's control z column answers as the x column does -- Table 28-5 gives the
+// two the same L and H -- so a control left floating drives the same range.
+TEST(TristateGateSim, Bufif1WithHighImpedanceControlDrivesStrongH) {
+  EXPECT_EQ(DriveTristateStrength("logic d;\n  wire c;\n  bufif1 g(y, d, c);",
+                                  "d = 1'b1;"),
+            "StH\n");
+}
+
+// §28.12.3 with the range this gate makes: Figure 28-23 combines an ambiguous
+// signal occupying one side with a weaker unambiguous driver of the other
+// value, and its result runs from the weaker driver's level through high
+// impedance to the ambiguous signal's own. §21.2.1.4 renders two sides whose
+// strongest levels differ with the two-digit form, so a strong H against a pull
+// 0 prints 56X.
+TEST(TristateGateSim, StrongHAgainstAWeakerZeroRendersTheTwoDigitForm) {
+  EXPECT_EQ(DriveTristateStrength("logic d, c;\n  bufif1 g(y, d, c);\n"
+                                  "  assign (pull0, pull1) y = 1'b0;",
+                                  "d = 1'b1; c = 1'bx;"),
+            "56X\n");
 }
 
 }  // namespace

@@ -153,6 +153,11 @@ struct MaxTracker {
   uint8_t str = 0;
   uint8_t val = 3;
   bool conflict = false;
+  // §28.6: the two sides of the strongest driver's own strength. A driver of
+  // value x whose declaration leaves one side at the high-impedance level is
+  // Table 28-5's L or H rather than an unambiguous x, and that is the only
+  // thing that tells them apart once the level alone has been folded.
+  DriverStrength ds;
 };
 
 static void FoldDriverIntoMax(uint8_t val, uint8_t str, NetType net_type,
@@ -188,7 +193,14 @@ static void ComputeSingleBitStrength(
     // reporting it only by the early return on an unset value below, which is a
     // guard on the answer rather than on the fold.
     if (str == 0) continue;
+    // The strongest driver's own strength travels with the level it set,
+    // because §28.6's L and H are told from an unambiguous x by the side of
+    // that strength standing at the high-impedance level and by nothing else.
+    // A driver that only ties the level leaves it: a tie of two values is the
+    // conflict below, and a tie of one value is one signal spelt twice.
+    uint8_t before = m.str;
     FoldDriverIntoMax(val, str, net_type, m);
+    if (m.str != before) m.ds = strengths[d];
   }
   out = NetStrength{};
   if (m.val == 3) return;
@@ -235,6 +247,36 @@ static void ComputeSingleBitStrength(
     // spelling x, and the answer is the same either way, so the net type does
     // not enter into it -- while it did, a strongly driven x on an ordinary
     // wire filled neither side and was reported as nothing driving the net.
+    //
+    // §28.6 Table 28-5 is the exception, and it is spelt in the driver's own
+    // strength. A three-state gate with a control of x or z drives L or H --
+    // "a result that has a value 0 or z" and "a value 1 or z" -- which
+    // §28.12.2's Figure 28-7 and Figure 28-8 draw as a range on one side of the
+    // scale running from the driving level down to high impedance, and nothing
+    // at all on the other. Such a driver spells x with the side it does not
+    // drive at the high-impedance level, so that side contributes no range and
+    // the side it drives contributes one reaching high impedance.
+    auto ds0 = static_cast<uint8_t>(m.ds.s0);
+    auto ds1 = static_cast<uint8_t>(m.ds.s1);
+    if (ds0 == 0 || ds1 == 0) {
+      if (ds0 != 0) {
+        out.s0_hi = static_cast<Strength>(ds0);
+        out.s0_lo = Strength::kHighz;
+      }
+      if (ds1 != 0) {
+        out.s1_hi = static_cast<Strength>(ds1);
+        out.s1_lo = Strength::kHighz;
+      }
+      // §28.12.3 combines an ambiguous signal with each weaker signal of known
+      // value and unambiguous strength, which is what Figure 28-23 draws for
+      // exactly this shape: a one-sided range and a weaker driver of the other
+      // value.
+      for (const UnambigSignal& u :
+           FindWeakerUnambig(drivers, strengths, m.str, bit)) {
+        out = CombineAmbigWithUnambig(out, u.vu, u.su);
+      }
+      return;
+    }
     out.s0_hi = out.s0_lo = s;
     out.s1_hi = out.s1_lo = s;
   }

@@ -136,6 +136,14 @@ struct ContAssignParams {
 
   bool resistive_switch = false;
   const Expr* data_input = nullptr;
+
+  // §28.6: the control and the transmitted value of a three-state gate, null
+  // for every other assignment. Table 28-5 answers by them: a control of x or z
+  // gives the gate an output of L or H, which is a range on one side of the
+  // strength scale rather than a value, and which side it is comes from the
+  // value the gate would transmit.
+  const Expr* three_state_ctrl = nullptr;
+  const Expr* three_state_pass = nullptr;
 };
 
 // Identifies the driver slot that a continuous assignment writes to. Per IEEE
@@ -239,9 +247,55 @@ static ContAssignDelays BuildContAssignDelays(const ContAssignDelayExprs& exprs,
   return d;
 }
 
+// The two bits one scalar value carries, as §28.6's tables name them: 0, 1, x
+// or z of the least significant bit.
+enum class GateBit : uint8_t { kZero, kOne, kUnknown, kHighz };
+
+static GateBit LowGateBit(const Logic4Vec& v) {
+  if (v.nwords == 0) return GateBit::kUnknown;
+  bool aval = (v.words[0].aval & 1) != 0;
+  bool bval = (v.words[0].bval & 1) != 0;
+  if (!bval) return aval ? GateBit::kOne : GateBit::kZero;
+  return aval ? GateBit::kUnknown : GateBit::kHighz;
+}
+
+// §28.6 Table 28-5: a three-state gate whose control is x or z drives L or H --
+// "The symbol L shall represent a result that has a value 0 or z. The symbol H
+// shall represent a result that has a value 1 or z" -- where an unknown control
+// with an unknown or high-impedance data value drives a plain x. §28.12.2 draws
+// L and H as a range on one side of the strength scale, from the gate's own
+// drive level down to high impedance (Figure 28-6 through Figure 28-8), and a
+// driver spells that by putting the other side of its strength at the
+// high-impedance level: the value the gate's own conditional yields is x for
+// all three cases, and the strength is what tells them apart.
+//
+// A control of 0 or 1 leaves the gate driving what Table 28-5's first two
+// columns give at the strength its declaration named, which is the strength
+// passed in.
+static DriverStrength ThreeStateGateStrength(const ContAssignParams& params,
+                                             SimContext& ctx, Arena& arena) {
+  GateBit ctrl = LowGateBit(EvalExpr(params.three_state_ctrl, ctx, arena));
+  if (ctrl == GateBit::kZero || ctrl == GateBit::kOne) return params.ds;
+  GateBit passed = LowGateBit(EvalExpr(params.three_state_pass, ctx, arena));
+  DriverStrength one_sided = params.ds;
+  if (passed == GateBit::kZero) {
+    one_sided.s1 = Strength::kHighz;
+    return one_sided;
+  }
+  if (passed == GateBit::kOne) {
+    one_sided.s0 = Strength::kHighz;
+    return one_sided;
+  }
+  return params.ds;
+}
+
 static DriverStrength ComputeEffectiveDriverStrength(
     const ContAssignParams& params, SimContext& ctx) {
   DriverStrength effective_ds = params.ds;
+  if (params.three_state_ctrl != nullptr &&
+      params.three_state_pass != nullptr) {
+    return ThreeStateGateStrength(params, ctx, ctx.GetArena());
+  }
   if ((params.nonresistive_switch || params.resistive_switch) &&
       params.data_input && params.data_input->kind == ExprKind::kIdentifier) {
     auto* data_net = ctx.FindNet(params.data_input->text);
@@ -743,6 +797,8 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
   cap.nonresistive_switch = ca.from_nonresistive_switch;
   cap.resistive_switch = ca.from_resistive_switch;
   cap.data_input = ca.data_input;
+  cap.three_state_ctrl = ca.three_state_ctrl;
+  cap.three_state_pass = ca.three_state_pass;
   cap.delays = {ca.delay, ca.delay_fall, ca.delay_decay};
   cap.width = ca.width;
   cap.inst_prefix = inst_prefix_;

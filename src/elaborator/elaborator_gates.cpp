@@ -482,6 +482,15 @@ static void ElaborateBufifNotifGate(ModuleItem* item, RtlirModule* mod,
   ca.lhs = terms[0];
   ca.rhs = rhs;
   ca.width = LookupLhsWidth(ca.lhs, mod);
+  // §28.6 Table 28-5: with a control of x or z the gate's output is L or H
+  // rather than x, which §28.12.2 makes a range on one side of the strength
+  // scale. The conditional above yields the x; which side of the scale it
+  // stands on is decided by the control and by the value the gate would
+  // transmit, so both terminals travel with the assignment. `pass` rather than
+  // `data` is what a notif transmits, the inversion being part of what the gate
+  // passes.
+  ca.three_state_ctrl = ctrl;
+  ca.three_state_pass = pass;
   ApplyGateDelays(ca, item);
   mod->assigns.push_back(ca);
 }
