@@ -650,6 +650,9 @@ static std::string_view PastAnalogueOfFutureFunction(std::string_view name) {
 // prior tick is the expression's default sampled value.
 static Logic4Vec EvalFutureGclk(const Expr* expr, SimContext& ctx, Arena& arena,
                                 std::string_view name) {
+  if (expr->args.empty() || expr->args[0] == nullptr) {
+    return MakeLogic4VecVal(arena, name == "$future_gclk" ? 32 : 1, 0);
+  }
   auto next_val = EvalSampledArg(expr->args[0], ctx, arena);
   if (name == "$future_gclk") return next_val;
   const Logic4Vec* at_tick = ctx.AssertionSamples().PastValue(expr, 1);
@@ -660,24 +663,32 @@ static Logic4Vec EvalFutureGclk(const Expr* expr, SimContext& ctx, Arena& arena,
                            cur_val, arena);
 }
 
+// §16.9.3's $sampled and its past-directed functions, which all read the
+// argument's sampled value at this tick: $sampled returns it, and $past and the
+// four value-change functions compare it with what the site saw before. A call
+// written with no argument is answered with a zero of the width the function
+// carries -- one bit for $sampled's Boolean, the default integer width for the
+// value $past returns -- rather than left to read args[0].
+static Logic4Vec EvalSampledOrPast(const Expr* expr, SimContext& ctx,
+                                   Arena& arena, std::string_view name) {
+  bool is_sampled = name == "$sampled";
+  if (expr->args.empty() || expr->args[0] == nullptr) {
+    return MakeLogic4VecVal(arena, is_sampled ? 1 : 32, 0);
+  }
+  auto now_val = EvalSampledArg(expr->args[0], ctx, arena);
+  if (is_sampled) return now_val;
+  return EvalPastOrValueChange(expr, ctx, arena, name, now_val);
+}
+
 static std::optional<Logic4Vec> EvalSampledValueFunc(const Expr* expr,
                                                      SimContext& ctx,
                                                      Arena& arena,
                                                      std::string_view name) {
-  bool is_sampled = name == "$sampled";
-  if (is_sampled || IsPastSampledFunction(name) ||
+  if (name == "$sampled" || IsPastSampledFunction(name) ||
       IsValueChangeFunction(name)) {
-    if (expr->args.empty() || expr->args[0] == nullptr) {
-      return MakeLogic4VecVal(arena, is_sampled ? 1 : 32, 0);
-    }
-    auto now_val = EvalSampledArg(expr->args[0], ctx, arena);
-    if (is_sampled) return now_val;
-    return EvalPastOrValueChange(expr, ctx, arena, name, now_val);
+    return EvalSampledOrPast(expr, ctx, arena, name);
   }
   if (IsFutureSampledFunction(name)) {
-    if (expr->args.empty() || expr->args[0] == nullptr) {
-      return MakeLogic4VecVal(arena, name == "$future_gclk" ? 32 : 1, 0);
-    }
     return EvalFutureGclk(expr, ctx, arena, name);
   }
   return std::nullopt;
