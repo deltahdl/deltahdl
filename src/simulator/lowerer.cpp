@@ -14,6 +14,7 @@
 #include "simulator/module_path_delay.h"
 #include "simulator/timing_check_driver.h"
 // CollectExprReads, the walk over the names an expression reads.
+#include "elaborator/global_clocking_sampled_value.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -368,11 +369,54 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
 // list is built from, so it reaches the base and index of a select, the
 // arguments of a call and the operands of every subexpression -- which is the
 // set of variables a property names.
+// §16.9.3: "The use of these functions is not limited to assertion features;
+// they may be used as expressions in procedural code as well." Each reads the
+// sampled value of its argument, so the variables that argument names have to
+// be enrolled wherever the call is written -- a `$sampled(x)` in a $display
+// reads the store as much as one inside a property does, and a variable the
+// store never heard of answers with its live value.
+static bool IsSampledValueFunction(std::string_view name) {
+  return name == "$sampled" || name == "$past" || name == "$rose" ||
+         name == "$fell" || name == "$stable" || name == "$changed" ||
+         IsGlobalClockingSampledFunction(name);
+}
+
+// The names read by the argument of every sampled value function call anywhere
+// in `e`, which is the set those calls will ask the store for.
+static void CollectSampledFunctionArgs(const Expr* e,
+                                       std::unordered_set<std::string>& out) {
+  if (e == nullptr) return;
+  if (e->kind == ExprKind::kSystemCall && IsSampledValueFunction(e->callee) &&
+      !e->args.empty()) {
+    CollectExprReads(e->args[0], out);
+  }
+  CollectSampledFunctionArgs(e->lhs, out);
+  CollectSampledFunctionArgs(e->rhs, out);
+  CollectSampledFunctionArgs(e->condition, out);
+  CollectSampledFunctionArgs(e->true_expr, out);
+  CollectSampledFunctionArgs(e->false_expr, out);
+  CollectSampledFunctionArgs(e->base, out);
+  CollectSampledFunctionArgs(e->index, out);
+  CollectSampledFunctionArgs(e->index_end, out);
+  CollectSampledFunctionArgs(e->with_expr, out);
+  CollectSampledFunctionArgs(e->repeat_count, out);
+  for (auto* sub : e->elements) CollectSampledFunctionArgs(sub, out);
+  for (auto* sub : e->args) CollectSampledFunctionArgs(sub, out);
+}
+
+static void CollectSampledFunctionArgsInStmt(
+    const Stmt* stmt, std::unordered_set<std::string>& out) {
+  if (stmt == nullptr) return;
+  ForEachStmtReadExpr(
+      stmt, [&out](const Expr* e) { CollectSampledFunctionArgs(e, out); });
+}
+
 static void RegisterAssertionSampledVars(const Stmt* body, SimContext& ctx,
                                          const std::string& inst_prefix) {
-  if (body == nullptr || body->assert_expr == nullptr) return;
+  if (body == nullptr) return;
   std::unordered_set<std::string> names;
-  CollectExprReads(body->assert_expr, names);
+  if (body->assert_expr != nullptr) CollectExprReads(body->assert_expr, names);
+  CollectSampledFunctionArgsInStmt(body, names);
   for (const auto& name : names) {
     // A variable is keyed under the instance prefix joined to its declared
     // name. The prefix is passed in because no process is executing while the

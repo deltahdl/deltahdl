@@ -486,30 +486,143 @@ static void ApplyGlobalAssertionControlTask(const Expr* expr, SimContext& ctx,
   }
 }
 
+// §16.5.1's sampled value of `arg`: the store answers a variable read with the
+// value it had in the Preponed region of this time slot while the mode below is
+// raised, which is what §16.9.3 makes $sampled and every value-change function
+// read. The previous setting is put back rather than cleared, so a sampled
+// value function called from inside a property's own evaluation leaves that
+// evaluation sampled.
+static Logic4Vec EvalSampledArg(const Expr* arg, SimContext& ctx,
+                                Arena& arena) {
+  auto& samples = ctx.AssertionSamples();
+  bool outer = samples.EvaluatingProperty();
+  samples.SetEvaluatingProperty(true);
+  auto value = EvalExpr(arg, ctx, arena);
+  samples.SetEvaluatingProperty(outer);
+  return value;
+}
+
+// §16.9.3's answer for a value-change function called "at or before the
+// simulation time step in which the first clocking event occurs": the
+// comparison is against the expression's default sampled value, which §16.5.1
+// makes the value its declaration assigned or the uninitialized value of its
+// type.
+static Logic4Vec EvalDefaultSampledArg(const Expr* arg, SimContext& ctx,
+                                       Arena& arena) {
+  auto& samples = ctx.AssertionSamples();
+  bool outer = samples.EvaluatingProperty();
+  samples.SetEvaluatingProperty(true);
+  samples.SetReadingDefaults(true);
+  auto value = EvalExpr(arg, ctx, arena);
+  samples.SetReadingDefaults(false);
+  samples.SetEvaluatingProperty(outer);
+  return value;
+}
+
+// Whether the least significant bit is the known value `one`. §16.9.3's $rose
+// and $fell are written on that bit alone -- "the LSB of the expression changed
+// to 1" -- and an x or a z is neither 1 nor 0, so a bit carrying one is
+// answered no by both questions.
+static bool LsbIs(const Logic4Vec& v, bool one) {
+  if (v.nwords == 0) return false;
+  if ((v.words[0].bval & 1) != 0) return false;
+  return ((v.words[0].aval & 1) != 0) == one;
+}
+
+// Whether two sampled values differ, which is the question §16.9.3 asks of
+// $stable and $changed: "the value of the expression did not change". Every bit
+// counts, including the x and z a 4-state value carries, so the comparison is
+// over both planes rather than through a numeric projection.
+static bool SampledValuesDiffer(const Logic4Vec& a, const Logic4Vec& b) {
+  if (a.width != b.width) return true;
+  for (uint32_t i = 0; i < a.nwords && i < b.nwords; ++i) {
+    if (a.words[i].aval != b.words[i].aval) return true;
+    if (a.words[i].bval != b.words[i].bval) return true;
+  }
+  return false;
+}
+
+// §16.9.3's four value-change functions, each answering 1'b1 or 1'b0 from the
+// sampled value now and the one at the prior clock tick.
+static Logic4Vec ValueChangeAnswer(std::string_view name,
+                                   const Logic4Vec& now_val,
+                                   const Logic4Vec& prev_val, Arena& arena) {
+  bool result = false;
+  if (name == "$rose" || name == "$rose_gclk") {
+    result = LsbIs(now_val, true) && !LsbIs(prev_val, true);
+  } else if (name == "$fell" || name == "$fell_gclk") {
+    result = LsbIs(now_val, false) && !LsbIs(prev_val, false);
+  } else if (name == "$stable" || name == "$stable_gclk") {
+    result = !SampledValuesDiffer(now_val, prev_val);
+  } else {
+    result = SampledValuesDiffer(now_val, prev_val);
+  }
+  return MakeLogic4VecVal(arena, 1, result ? 1 : 0);
+}
+
+// §16.9.3: "number_of_ticks" of $past, which defaults to 1 -- "The default of 1
+// is used for the empty number_of_ticks argument" -- and is a constant.
+static uint32_t PastTickCount(const Expr* expr, SimContext& ctx, Arena& arena) {
+  if (expr->args.size() < 2 || expr->args[1] == nullptr) return 1;
+  auto n = EvalExpr(expr->args[1], ctx, arena).ToUint64();
+  return n == 0 ? 1 : static_cast<uint32_t>(n);
+}
+
 // §16.9/§16.13: the sampled-value functions and immediate-assertion-control
 // queries. Returns the result when `name` selects one of these, or nullopt so
 // the caller can fall through to the other system-call families.
-// §16.9.3/§16.9.4: the sampled value system functions. $sampled, $past and the
-// global-clocking $past_gclk / $future_gclk each yield the (sampled) value of
-// their argument -- $past_gclk(v) is defined as $past(v,,,@$global_clock) and
-// $future_gclk(v) is the value of v at the next global clock tick. The
-// value-change functions ($rose, $fell, $stable, $changed and their _gclk
-// counterparts, including the future $rising_gclk / $falling_gclk /
-// $steady_gclk / $changing_gclk) each return a 1-bit Boolean.
+//
+// §16.9.3's functions are keyed by their own call site. Each is evaluated once
+// per tick of the clock it samples on -- the assertion's clock where it is
+// written in one, the procedure's where it is not -- so the value the site saw
+// last is "the sampled value of the expression from the most recent strictly
+// prior time step in which the clocking event occurred", which is what $past
+// returns and what the four value-change functions compare against. Before the
+// site has a history the clause names the comparison itself: the expression's
+// default sampled value.
+//
+// §16.9.4's future functions are what this does not serve. $future_gclk,
+// $rising_gclk, $falling_gclk, $steady_gclk and $changing_gclk read a value
+// sampled at the *next* global clock tick, which no evaluation standing at this
+// one can read, and they answer what they answered before. That is #3607.
+static bool IsFutureSampledFunction(std::string_view name) {
+  return name == "$future_gclk" || name == "$rising_gclk" ||
+         name == "$falling_gclk" || name == "$steady_gclk" ||
+         name == "$changing_gclk";
+}
+
 static std::optional<Logic4Vec> EvalSampledValueFunc(const Expr* expr,
                                                      SimContext& ctx,
                                                      Arena& arena,
                                                      std::string_view name) {
-  if (name == "$sampled" || name == "$past" || name == "$past_gclk" ||
-      name == "$future_gclk") {
-    uint32_t empty_width = name == "$sampled" ? 1 : 32;
-    if (expr->args.empty()) return MakeLogic4VecVal(arena, empty_width, 0);
+  bool is_past = name == "$past" || name == "$past_gclk";
+  bool is_change = name == "$rose" || name == "$fell" || name == "$stable" ||
+                   name == "$changed" || name == "$rose_gclk" ||
+                   name == "$fell_gclk" || name == "$stable_gclk" ||
+                   name == "$changed_gclk";
+  if (name == "$sampled" || is_past || is_change) {
+    if (expr->args.empty() || expr->args[0] == nullptr) {
+      uint32_t empty_width = name == "$sampled" ? 1 : 32;
+      return MakeLogic4VecVal(arena, empty_width, 0);
+    }
+    auto now_val = EvalSampledArg(expr->args[0], ctx, arena);
+    if (name == "$sampled") return now_val;
+
+    auto& samples = ctx.AssertionSamples();
+    uint32_t ticks = is_past ? PastTickCount(expr, ctx, arena) : 1;
+    const Logic4Vec* past = samples.PastValue(expr, ticks);
+    Logic4Vec prev_val = past != nullptr
+                             ? *past
+                             : EvalDefaultSampledArg(expr->args[0], ctx, arena);
+    samples.RecordTick(expr, now_val, ticks, arena);
+    if (is_past) return prev_val;
+    return ValueChangeAnswer(name, now_val, prev_val, arena);
+  }
+  if (name == "$future_gclk") {
+    if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
     return EvalExpr(expr->args[0], ctx, arena);
   }
-  if (name == "$rose" || name == "$fell" || name == "$stable" ||
-      name == "$changed" || IsGlobalClockingSampledFunction(name)) {
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
+  if (IsFutureSampledFunction(name)) return MakeLogic4VecVal(arena, 1, 0);
   return std::nullopt;
 }
 

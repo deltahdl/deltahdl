@@ -138,11 +138,16 @@ TEST(IoStrobeSim, StrobeObservesNonBlockingUpdate) {
   EXPECT_EQ(out, "y=2a\n");
 }
 
-// §21.2.2: a $strobe of a $sampled value prints the value from the preponed
-// region of the current time step. Because the strobe fires in the postponed
-// region of that same time step, the variable's value-as-of-this-step is the
-// value that reaches the output.
-TEST(IoStrobeSim, StrobeOfSampledValueUsesCurrentStep) {
+// §16.9.3 makes $sampled "the sampled value of its argument (see 16.5.1)", and
+// §16.5.1 makes that the value in the Preponed region of the time slot -- what
+// the slot began with, before anything in it wrote. The write to 8'h22 and the
+// strobe stand in the same slot at time 10, so what the strobe prints is the
+// 8'h11 the slot began with, whichever region the strobe itself fires in.
+//
+// This case asserted 34 -- the live value -- and so pinned $sampled as an
+// identity on its argument. That is what it was: the function evaluated its
+// argument and returned it.
+TEST(IoStrobeSim, StrobeOfSampledValueUsesThePreponedValue) {
   SimFixture f;
   std::string out = RunCapture(
       "module t;\n"
@@ -154,7 +159,7 @@ TEST(IoStrobeSim, StrobeOfSampledValueUsesCurrentStep) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_EQ(out, "34\n");
+  EXPECT_EQ(out, "17\n");
 }
 
 }  // namespace

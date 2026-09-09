@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <unordered_map>
+#include <vector>
 
 #include "common/types.h"
 #include "simulator/sva_engine_sequences.h"
@@ -10,6 +11,7 @@
 namespace delta {
 
 class Arena;
+struct Expr;
 struct Variable;
 
 enum class AssertionKind : uint8_t {
@@ -228,7 +230,10 @@ class AssertionSampleStore {
   // rule a variable read asks about, so a reader consults it and keeps the live
   // value whenever it answers nothing.
   const Logic4Vec* ReadWithinProperty(const Variable* var, SimTime t) const {
-    return evaluating_property_ ? Read(var, t) : nullptr;
+    if (!evaluating_property_) return nullptr;
+    if (!reading_defaults_) return Read(var, t);
+    auto it = entries_.find(var);
+    return it == entries_.end() ? nullptr : &it->second.default_value;
   }
 
   // §16.5.1 applies to the expressions of a concurrent assertion and to nothing
@@ -238,6 +243,30 @@ class AssertionSampleStore {
   void SetEvaluatingProperty(bool on) { evaluating_property_ = on; }
   bool EvaluatingProperty() const { return evaluating_property_; }
 
+  // §16.9.3: "When these functions are called at or before the simulation time
+  // step in which the first clocking event occurs, the results are computed by
+  // comparing the sampled value of the expression with its default sampled
+  // value." Raised around one evaluation of a value-change function's argument,
+  // this makes every read answer that default, so the comparison is made on the
+  // expression the source wrote rather than on one variable of it.
+  void SetReadingDefaults(bool on) { reading_defaults_ = on; }
+
+  // §16.9.3: the sampled value a sampled-value-function call site saw at the
+  // clock ticks before this one, `ticks_back` of them ago, or nullptr where the
+  // site has not been evaluated that many times yet. The key is the call site's
+  // own expression node: it is unique to one position in the source and is
+  // evaluated once per tick of the clock the function samples on, so the
+  // sequence of values it has seen is "the sampled value of the expression from
+  // the most recent strictly prior time step in which the clocking event
+  // occurred" and the ticks before that.
+  const Logic4Vec* PastValue(const Expr* site, uint32_t ticks_back) const;
+
+  // Records what the site sampled at this tick, so the next evaluation of it
+  // can read this value back. `depth` is how many ticks of history that site
+  // asks for, which bounds what is kept.
+  void RecordTick(const Expr* site, const Logic4Vec& sampled, uint32_t depth,
+                  Arena& arena);
+
  private:
   struct Entry {
     Logic4Vec default_value;
@@ -245,7 +274,11 @@ class AssertionSampleStore {
   };
 
   std::unordered_map<const Variable*, Entry> entries_;
+  // Most recent first, so entry 0 is the previous tick's value -- $past's
+  // default of one tick back.
+  std::unordered_map<const Expr*, std::vector<Logic4Vec>> tick_history_;
   bool evaluating_property_ = false;
+  bool reading_defaults_ = false;
 };
 
 }  // namespace delta

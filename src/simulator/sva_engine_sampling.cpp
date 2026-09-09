@@ -245,4 +245,27 @@ const Logic4Vec* AssertionSampleStore::Read(const Variable* var,
                                                : &it->second.preponed_value;
 }
 
+const Logic4Vec* AssertionSampleStore::PastValue(const Expr* site,
+                                                 uint32_t ticks_back) const {
+  if (site == nullptr || ticks_back == 0) return nullptr;
+  auto it = tick_history_.find(site);
+  if (it == tick_history_.end() || it->second.size() < ticks_back) {
+    return nullptr;
+  }
+  return &it->second[ticks_back - 1];
+}
+
+void AssertionSampleStore::RecordTick(const Expr* site,
+                                      const Logic4Vec& sampled, uint32_t depth,
+                                      Arena& arena) {
+  if (site == nullptr) return;
+  auto& history = tick_history_[site];
+  Logic4Vec copy;
+  CopySample(sampled, copy, arena);
+  history.insert(history.begin(), copy);
+  // Only as many ticks as the site asks for are kept, so a `$past(x)` written
+  // once costs one value however long the run is.
+  if (history.size() > depth) history.resize(depth);
+}
+
 }  // namespace delta

@@ -5,6 +5,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_simulator.h"
 #include "simulator/assertion.h"
 #include "simulator/sim_context.h"
 
@@ -208,6 +209,107 @@ TEST(Assertion, FirstEvaluationHasNoPriorSample) {
   monitor.AddProperty(prop);
 
   EXPECT_EQ(monitor.Evaluate("p_first", 5), AssertionResult::kVacuousPass);
+}
+
+// §16.9.3: "$sampled returns the sampled value of its argument (see 16.5.1)",
+// and §16.5.1 makes that "the value of this variable in the Preponed region of
+// this time slot" -- the value it held before anything in this slot wrote it.
+// The function returned EvalExpr of its argument, which is the live value, so
+// the two coincided only where nothing had changed and $sampled was an identity
+// everywhere else.
+//
+// The write and the read stand in one time slot here, which is the only shape
+// that tells the two apart: 8'h11 is what the slot began with and 8'h22 is what
+// the live variable holds when the read runs.
+TEST(SampledValueSim, SampledReadsThePreponedValueOfItsArgument) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  reg [7:0] x;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    x = 8'h11;\n"
+      "    #10;\n"
+      "    x = 8'h22;\n"
+      "    result = $sampled(x);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x11u);
+}
+
+// §16.9.3: "$rose returns true (1'b1) if the LSB of the expression changed to
+// 1", compared against "the sampled value of the expression from the most
+// recent strictly prior time step in which the clocking event occurred" -- and
+// where no such step has occurred, against the default sampled value, which
+// §16.5.1 makes the value the declaration assigned. `req` is declared 0 and is
+// 1 at the first edge, so it rose and the property holds.
+//
+// $rose returned a constant zero, so this property was false at every tick and
+// an assertion written on it could not pass.
+TEST(SampledValueSim, RoseHoldsWhenTheLsbRisesBeforeTheEdge) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  logic req = 0;\n"
+      "  always @(posedge clk) assert property ($rose(req));\n"
+      "  initial begin\n"
+      "    #1 req = 1;\n"
+      "    #1 clk = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.LastSeverityMsg(), "");
+}
+
+// The other half of the pair, which is what separates a working $rose from one
+// answering true for everything: `req` never leaves 0, so nothing rose and the
+// property fails.
+TEST(SampledValueSim, RoseFailsWhenTheLsbDoesNotRise) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  logic req = 0;\n"
+      "  always @(posedge clk) assert property ($rose(req));\n"
+      "  initial #1 clk = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.LastSeverityMsg(), "Assertion failed.");
+}
+
+// §16.9.3 gives $past "the value of b sampled at the previous occurrence of
+// (posedge clk)", the default number_of_ticks being 1. It returned the current
+// value, so `x != $past(x)` was never true and a property watching for a change
+// could not fire.
+//
+// The recorded value is read rather than an assertion's verdict, so what the
+// case asserts is the value the clause names: x is 1 at the first edge and 2 at
+// the second, so the second edge's $past is 1.
+TEST(SampledValueSim, PastReturnsTheValueSampledAtThePreviousTick) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  int x = 1;\n"
+      "  int seen = 99;\n"
+      "  always @(posedge clk) seen = $past(x);\n"
+      "  initial begin\n"
+      "    #1 clk = 1;\n"
+      "    #1 clk = 0;\n"
+      "    x = 2;\n"
+      "    #1 clk = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "seen");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 }  // namespace
