@@ -583,7 +583,7 @@ static uint32_t PastTickCount(const Expr* expr, SimContext& ctx, Arena& arena) {
 // §16.9.4's future functions are what this does not serve. $future_gclk,
 // $rising_gclk, $falling_gclk, $steady_gclk and $changing_gclk read a value
 // sampled at the *next* global clock tick, which no evaluation standing at this
-// one can read, and they answer what they answered before. That is #3607.
+// one can read, and they answer what they answered before. That is #3608.
 static bool IsFutureSampledFunction(std::string_view name) {
   return name == "$future_gclk" || name == "$rising_gclk" ||
          name == "$falling_gclk" || name == "$steady_gclk" ||
