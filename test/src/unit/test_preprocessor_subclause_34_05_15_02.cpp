@@ -36,10 +36,12 @@
 #include <string>
 #include <string_view>
 
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
 #include "helpers_protect_block_lines.h"
-#include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
+#include "preprocessor/protect_digest_block.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_processing.h"
 
@@ -115,11 +117,17 @@ std::string BlockBeneathTheKeyword(std::string_view envelope) {
   return std::string(beneath.substr(0, beneath.find('\n')));
 }
 
-// A reading of `src` by a tool holding the key the region was sealed under.
-std::string ReadBack(const std::string& src, PreprocFixture& f) {
+// What a reading is configured with to open the regions sealed above, which is
+// the key and nothing besides.
+PreprocConfig KeyOnly() {
   PreprocConfig config;
   config.protect_key = std::string(kRegionKey);
-  return Preprocess(src, f, config);
+  return config;
+}
+
+// A reading of `src` by a tool holding the key the region was sealed under.
+std::string ReadBack(const std::string& src, PreprocFixture& f) {
+  return Preprocess(src, f, KeyOnly());
 }
 
 // §34.5.15.2, encryption output: the block is encoded as the encoding pragma
@@ -189,12 +197,29 @@ TEST(ProtectDataBlockDescription, ABlockStandingOnSeveralLinesIsReadWhole) {
   EXPECT_NE(read.find(kSealedDesign), std::string::npos) << read;
 }
 
+// A reading of `src` by a tool holding the key, with the preprocessor kept
+// alive so the comparison §34.5.22 had it make can be read off afterwards.
+struct ReadKeepingTheComparison {
+  SourceManager mgr;
+  DiagEngine diag{mgr};
+  Preprocessor pp{mgr, diag, KeyOnly()};
+  std::string text;
+
+  explicit ReadKeepingTheComparison(const std::string& src) {
+    text = pp.Preprocess(mgr.AddFile("<test>", src));
+  }
+};
+
 // The other half of "says nothing about where it ends": what ends it. A block
 // runs to the next `pragma directive, none of §34.5.9.2's schemes spelling one,
 // and that directive still takes effect. §34.5.22 puts the digest_block
-// expression immediately after the block it vouches for, so a reading that
-// swallowed that directive would check no digest -- and a digest altered by
-// hand would then go unreported.
+// expression immediately after the block it vouches for, so what the directive
+// does is announce a digest, and a reading that had swallowed it into the block
+// above would have checked none.
+//
+// The comparison is read off the preprocessor rather than inferred from
+// silence: a digest that was never reached leaves kNotChecked, which is what a
+// swallowed directive leaves and what no report is made about either way.
 TEST(ProtectDataBlockDescription, TheDirectiveEndingABlockStillTakesEffect) {
   // §34.5.22.2 makes a digest_block written between the delimiters a request,
   // so this region is the one whose envelope carries a directive after the data
@@ -202,23 +227,13 @@ TEST(ProtectDataBlockDescription, TheDirectiveEndingABlockStillTakesEffect) {
   std::string broken = WithBlockBrokenIntoLines(
       EnvelopeOfRegion(kNamedScheme, kDigestAnnouncingDirective),
       kAnnouncingDirective, 3);
-  auto at = broken.find(kDigestAnnouncingDirective);
-  ASSERT_NE(at, std::string::npos) << broken;
-  // A character well inside the digest, which §34.5.22.2 puts on the line after
-  // its own keyword. Counting past that directive's newline is what reaches the
-  // digest rather than the expression announcing it.
-  auto target = at + kDigestAnnouncingDirective.size() + 4;
-  ASSERT_LT(target, broken.size());
-  ASSERT_NE(broken[target], '\n') << broken;
-  broken[target] = (broken[target] == 'A') ? 'B' : 'A';
+  ASSERT_NE(broken.find(kDigestAnnouncingDirective), std::string::npos)
+      << broken;
 
-  PreprocFixture f;
-  ReadBack(broken, f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "protect pragma digest block disagrees with the block it follows, so one "
-      "of the two was altered after encryption",
-      LineHolding(broken, kDigestAnnouncingDirective) + 1, "34.5.22"));
+  ReadKeepingTheComparison run(broken);
+  EXPECT_FALSE(run.diag.HasErrors()) << run.text;
+  EXPECT_NE(run.text.find(kSealedDesign), std::string::npos) << run.text;
+  EXPECT_EQ(run.pp.LastDigestBlockCheck(), ProtectDigestCheck::kMatched);
 }
 
 // §34.5.15.2, decryption input: the block is read in the encoded form and that
