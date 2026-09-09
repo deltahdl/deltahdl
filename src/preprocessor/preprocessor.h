@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -69,6 +70,18 @@ struct CondState {
   bool active;
   bool any_taken;
   bool parent_active;
+};
+
+// Which of §34.5's three blocks a run of lines is being gathered for, each
+// announced by a keyword standing on the directive above it: §34.5.27's key
+// block, §34.5.15's data block and §34.5.22's digest block. Only one of the
+// three can be owed a block at a time, an announcement being answered by the
+// lines that follow it.
+enum class ProtectBlockKind : std::uint8_t {
+  kNone,
+  kKey,
+  kData,
+  kDigest,
 };
 
 class Preprocessor {
@@ -328,32 +341,43 @@ class Preprocessor {
   // The default of each is the same thing: nothing announced and no key
   // carried, which is where a reading stands before any text is read.
   void ResetAnnouncementsAndRecoveredKeys();
-  // Takes `line` as the key block announced by a key_block expression on the
-  // line before it, and says whether it did. A line taken this way is key
-  // material of the protected block above it rather than text of the design, so
-  // the caller neither dispatches it as a directive nor emits it.
-  bool TakeKeyBlockValue(std::string_view line, SourceLoc loc, int depth);
+  // Which of the three block keywords is standing over the next line, or kNone
+  // where none is.
+  ProtectBlockKind AnnouncedProtectBlockKind() const;
+  // Begins gathering the block a key_block, data_block or digest_block
+  // expression on the line before announced, `line` being its first line, and
+  // says whether it did. A line taken this way belongs to the block above it
+  // rather than being a directive or text of the design.
+  //
+  // A keyword whose next line opens a `pragma directive announced an empty
+  // block: nothing is gathered and false comes back, so that directive is read
+  // as itself rather than eaten as block characters.
+  bool StartGatheredProtectBlock(std::string_view line, SourceLoc loc);
+  // Adds a further line to the block being gathered.
+  void AppendGatheredProtectBlockLine(std::string_view line);
+  // Reads the block gathered so far as the keyword that announced it, and
+  // leaves nothing gathered. Does nothing where no block is being gathered.
+  void FinishGatheredProtectBlock(int depth, std::string& output);
+  // Reads `block` as the key block a key_block expression announced. The block
+  // is key material of the protected region rather than text of the design.
+  void ReadProtectKeyBlock(std::string_view block, SourceLoc loc, int depth);
   // The same, for the encoded value a data_decrypt_key expression on the line
   // before it announced.
   bool TakeDataDecryptKeyValue(std::string_view line, SourceLoc loc);
   // The same, for the encoded value a digest_decrypt_key expression on the line
   // before it announced (§34.5.20): the key that opens the region's digests.
   bool TakeDigestDecryptKeyValue(std::string_view line, SourceLoc loc);
-  // Takes `line` as the digest block announced by a digest_block expression on
-  // the line before it, and says whether it did. §34.5.22 has that digest
-  // checked against the block it follows, so a line taken this way
+  // Reads `block` as the digest block a digest_block expression announced.
+  // §34.5.22 has that digest checked against the block it follows, so this
   // authenticates what the reading last recovered rather than adding anything
-  // to the design, and the caller neither dispatches it as a directive nor
-  // emits it.
-  bool TakeDigestBlockValue(std::string_view line, SourceLoc loc);
-  // Takes `line` as the data block announced by a data_block expression on the
-  // line before it, and says whether it did. §34.5.15.2 has the block begin on
-  // that line, so what the line carries is the region's design in its encrypted
-  // and encoded form: it is opened here and the design it recovers to is
-  // appended to `output` in its place, the caller neither dispatching the line
-  // as a directive nor emitting it.
-  bool TakeDataBlockValue(std::string_view line, SourceLoc loc, int depth,
-                          std::string& output);
+  // to the design.
+  void ReadProtectDigestBlock(std::string_view block, SourceLoc loc);
+  // Reads `block` as the data block a data_block expression announced. What it
+  // carries is the region's design in its encrypted and encoded form, so it is
+  // opened here and the design it recovers to is appended to `output` in place
+  // of the envelope it arrived in.
+  void ReadProtectDataBlock(std::string_view block, SourceLoc loc, int depth,
+                            std::string& output);
   // Takes `line` as the encoded value announced by a key_public_key expression
   // on the line before it, and says whether it did. A line taken this way is
   // the designation of a key rather than text of the design, so the caller
@@ -430,7 +454,7 @@ class Preprocessor {
   // The table LineOrigins() answers with, filled as the output is written.
   std::vector<OutputLineOrigin> line_origins_;
   // Whether lines being written now reach the output LineOrigins() describes.
-  // False while Preprocessor::TakeKeyBlockValue in
+  // False while Preprocessor::ReadProtectKeyBlock in
   // src/preprocessor/preprocessor_protect_values.cpp runs a recovered protected
   // block for what it defines, because that run appends its text to no output:
   // an entry recorded for it would name a line the output does not have and
@@ -574,8 +598,8 @@ class Preprocessor {
   // cipher this implementation does not provide is passed over rather than
   // reported. §34.5.27.2 makes several key blocks alternative ways into one
   // envelope, so a block written for some other reader is not an error here:
-  // it fails to open, and Preprocessor::TakeKeyBlockValue
-  // (preprocessor/preprocessor_protect_values.cpp) consumes its line and says
+  // it fails to open, and Preprocessor::ReadProtectKeyBlock
+  // (preprocessor/preprocessor_protect_values.cpp) spends its lines and says
   // nothing, which is where a block whose key the reader does not hold is left
   // as well.
   //
@@ -698,6 +722,20 @@ class Preprocessor {
   bool digest_block_value_next_ = false;
   // And for §34.5.15's, which says a data block begins on the line after it.
   bool data_block_value_next_ = false;
+  // Which of those three blocks is being gathered, and what has been gathered
+  // for it. §34.5.15.2 has a data block "begin on the next line in the file"
+  // and says nothing about where it ends, and §34.5.22.2 and §34.5.27.2 word
+  // the digest block and the key block the same way, so a block is the run of
+  // lines after its keyword rather than the one line beneath it. The lines are
+  // joined with the break between them, because §34.5.9.2's uuencode and
+  // quoted-printable carry meaning in where a line ends -- the first writes a
+  // length character at the head of each and the second a soft break at the
+  // tail -- and §34.5.9's byte count is stated once for the whole block, which
+  // is what the joined text is measured against. The location is the first
+  // line's, so a block reported on names where it began.
+  ProtectBlockKind gathering_block_ = ProtectBlockKind::kNone;
+  SourceLoc gathering_block_loc_;
+  std::string gathering_block_text_;
   // The key §34.5.14 has open a protected region's data block, recovered from
   // the key block that carried it.
   //

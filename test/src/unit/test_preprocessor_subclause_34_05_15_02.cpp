@@ -37,6 +37,7 @@
 #include <string_view>
 
 #include "fixture_preprocessor.h"
+#include "helpers_protect_block_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_processing.h"
@@ -145,6 +146,53 @@ TEST(ProtectDataBlockDescription, ReversingTheDeclaredSchemeOpensTheBlock) {
   std::string read = ReadBack(EnvelopeEncodedIn(kNamedScheme), f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(read.find(kSealedDesign), std::string::npos) << read;
+}
+
+// §34.5.15.2, decryption input, on where the block ends: the subclause says the
+// block begins on the next line in the file and says nothing about where it
+// stops, so a block another tool wrote over several lines -- which is what
+// §34.5.9.2's uuencode and quoted-printable produce by construction, and what
+// any scheme produces under a stated line_length -- is a block this one has to
+// read. The envelope here is the tool's own with its block broken across three
+// lines by hand, so it differs from one that reads back in the breaks alone.
+TEST(ProtectDataBlockDescription, ABlockStandingOnSeveralLinesIsReadWhole) {
+  std::string envelope = EnvelopeEncodedIn(kNamedScheme);
+  std::string broken =
+      WithBlockBrokenIntoLines(envelope, kAnnouncingDirective, 3);
+  ASSERT_NE(broken, envelope);
+  // The first line no longer carries the block, which is what says the block
+  // really was broken rather than left where it stood.
+  ASSERT_LT(BlockBeneathTheKeyword(broken).size(),
+            BlockBeneathTheKeyword(envelope).size());
+
+  PreprocFixture f;
+  std::string read = ReadBack(broken, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(read.find(kSealedDesign), std::string::npos) << read;
+}
+
+// The other half of "says nothing about where it ends": what ends it. A block
+// runs to the next `pragma directive, none of §34.5.9.2's schemes spelling one,
+// and that directive still takes effect. The envelope this tool
+// writes puts §34.5.22's digest_block expression immediately after the data
+// block, so a reading that swallowed the directive would check no digest --
+// and a digest altered by hand would then go unreported.
+TEST(ProtectDataBlockDescription, TheDirectiveEndingABlockStillTakesEffect) {
+  std::string broken = WithBlockBrokenIntoLines(EnvelopeEncodedIn(kNamedScheme),
+                                                kAnnouncingDirective, 3);
+  constexpr std::string_view kDigestAnnouncing =
+      "`pragma protect digest_block
+      ";
+      auto at = broken.find(kDigestAnnouncing);
+  ASSERT_NE(at, std::string::npos) << broken;
+  auto target = at + kDigestAnnouncing.size() + 4;
+  ASSERT_LT(target, broken.size());
+  ASSERT_NE(broken[target], '\n') << broken;
+  broken[target] = (broken[target] == 'A') ? 'B' : 'A';
+
+  PreprocFixture f;
+  ReadBack(broken, f);
+  EXPECT_TRUE(f.diag.HasErrors());
 }
 
 // §34.5.15.2, decryption input: the block is read in the encoded form and that

@@ -188,12 +188,11 @@ bool ProtectEncodingIsAvailable(std::string_view enctype) {
   return IsProtectEncodingAlgorithm(enctype) || enctype == kBlockEnctype;
 }
 
-// The identity transformation writes whatever the data hold, and the two
-// line-oriented schemes break their output into lines by construction. What is
-// left are the two that write a long run of characters drawn from an alphabet
-// holding no line break.
-bool ProtectEncodingFitsOneLine(std::string_view enctype) {
-  return enctype == kBase64Enctype || enctype == kBlockEnctype;
+// The identity transformation writes whatever the data hold, printable or not.
+// Every other scheme this implementation provides draws its output from an
+// alphabet of printable characters, however many lines it runs that output to.
+bool ProtectEncodingWritesPrintableText(std::string_view enctype) {
+  return ProtectEncodingIsAvailable(enctype) && enctype != kRawEnctype;
 }
 
 ProtectEncoding DefaultProtectEncoding() {

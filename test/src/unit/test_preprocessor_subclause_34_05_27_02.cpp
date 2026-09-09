@@ -48,6 +48,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_protect_read.h"
+#include "helpers_protect_block_lines.h"
 #include "helpers_protect_keys.h"
 #include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
@@ -263,6 +264,23 @@ TEST(ProtectKeyBlockDescription, AReaderHoldingNeitherKeyOpensNeitherBlock) {
 TEST(ProtectKeyBlockDescription, TheBlockThisReaderCannotOpenCostsItNoReport) {
   ReadSource run(EnvelopeWithTwoBlocks(),
                  ReadSource::KeysConfig(OnlyTheSecondEntitysKey()));
+  EXPECT_TRUE(Holds(run.text, kEncodingSealedDesign)) << run.text;
+  EXPECT_TRUE(run.diag.Diagnostics().empty()) << run.text;
+}
+
+// §34.5.27.2 has the block "read in the encoded form" and §34.5.27.1's keyword
+// begins it on the line beneath, neither saying where it ends. So a key block
+// another tool wrote over several lines -- which §34.5.9.2's line-oriented
+// schemes produce by construction -- is one this reader has to take, and the
+// entity's key still comes out of it. The envelope is this tool's own with the
+// block broken across three lines by hand, so it differs from one that opens in
+// the breaks alone.
+TEST(ProtectKeyBlockDescription, AKeyBlockStandingOnSeveralLinesIsReadWhole) {
+  std::string envelope = EnvelopeWithOneBlock();
+  std::string broken = WithBlockBrokenIntoLines(envelope, kKeyBlockLine, 3);
+  ASSERT_NE(broken, envelope);
+
+  ReadSource run(broken, ReadSource::KeysConfig(OnlyTheFirstEntitysKey()));
   EXPECT_TRUE(Holds(run.text, kEncodingSealedDesign)) << run.text;
   EXPECT_TRUE(run.diag.Diagnostics().empty()) << run.text;
 }

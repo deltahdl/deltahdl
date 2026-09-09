@@ -18,11 +18,13 @@
 
 #include "common/diagnostic.h"
 #include "preprocessor/preprocessor.h"
+#include "preprocessor/preprocessor_internal.h"
 #include "preprocessor/protect_digest_block.h"
 #include "preprocessor/protect_digest_key.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope_output.h"
 #include "preprocessor/protect_keywords.h"
+#include "preprocessor/protect_pragma_line.h"
 #include "preprocessor/protect_processing.h"
 
 namespace delta {
@@ -56,21 +58,19 @@ namespace delta {
 // it is reading a source text found inside another, and bounding that the way
 // an inclusion is bounded is what keeps a block whose content names a further
 // block from being followed without end.
-bool Preprocessor::TakeKeyBlockValue(std::string_view line, SourceLoc loc,
-                                     int depth) {
-  if (!key_block_value_next_) return false;
-  key_block_value_next_ = false;
+void Preprocessor::ReadProtectKeyBlock(std::string_view text, SourceLoc loc,
+                                       int depth) {
   std::string block;
-  // A line that cannot be read out of the scheme in effect carries no block,
-  // and the line is consumed either way: the keyword above it said the line is
-  // key material, so it is not text of the design whether or not a block came
-  // out of it.
-  if (!ReadEncodedProtectValue(Trim(line), loc, &block)) return true;
+  // Text that cannot be read out of the scheme in effect carries no block, and
+  // the lines are spent either way: the keyword above them said they are key
+  // material, so they are not text of the design whether or not a block came
+  // out of them.
+  if (!ReadEncodedProtectValue(text, loc, &block)) return;
   std::string content;
   if (!DecryptProtectedBlock(
           block, ProtectKeyBlockKey(protect_keywords_, config_.protect_keys),
           &content)) {
-    return true;
+    return;
   }
   // The block is run for what it defines and its text is appended nowhere, so
   // its lines are not lines of the output and must not be recorded as such.
@@ -87,7 +87,6 @@ bool Preprocessor::TakeKeyBlockValue(std::string_view line, SourceLoc loc,
   // digest is checked with it, so a reader learns the key by opening the block
   // and then checks that the block it opened is the one that was sealed.
   digest_target_ = {content, std::string(DigestBlockKeyInEffect())};
-  return true;
 }
 
 // §34.5.20: a line a digest_decrypt_key expression announces holds the encoded
@@ -143,13 +142,12 @@ bool Preprocessor::TakeDigestDecryptKeyValue(std::string_view line,
 // The block being checked is spent by the check, so a second digest written
 // after it finds nothing to announce it rather than checking the same block
 // twice.
-bool Preprocessor::TakeDigestBlockValue(std::string_view line, SourceLoc loc) {
-  if (!digest_block_value_next_) return false;
-  digest_block_value_next_ = false;
+void Preprocessor::ReadProtectDigestBlock(std::string_view text,
+                                          SourceLoc loc) {
   ProtectDigestTarget target = std::move(digest_target_);
   digest_target_ = ProtectDigestTarget();
   std::string block;
-  if (!ReadEncodedProtectValue(Trim(line), loc, &block)) return true;
+  if (!ReadEncodedProtectValue(text, loc, &block)) return;
   last_digest_block_check_ =
       CheckProtectDigestBlock(block, target, DigestMethodInEffect());
   if (last_digest_block_check_ == ProtectDigestCheck::kAltered) {
@@ -158,7 +156,6 @@ bool Preprocessor::TakeDigestBlockValue(std::string_view line, SourceLoc loc) {
                 "follows, so one of the two was altered after encryption",
                 Subclause("34.5.22"));
   }
-  return true;
 }
 
 // §34.5.14: the line a data_decrypt_key expression announces holds the encoded
@@ -393,7 +390,7 @@ void Preprocessor::SpendEncodedValueSize() {
 // The line is reached the way §34.5.27's key block and §34.5.22's digest block
 // are reached, all three keywords being spelled standing alone by their own
 // subclauses: ApplyAnnouncedBlockKeywords records that the keyword was written,
-// and Preprocessor::TookAnnouncedValue (preprocessor/preprocessor.cpp) offers
+// and Preprocessor::TookAnnouncedValue below offers
 // it the line beneath. Only an announcement made inside a decryption envelope
 // is recorded, so a data_block expression written anywhere else describes
 // something other than a protected region and the line beneath it is left to
@@ -419,16 +416,14 @@ void Preprocessor::SpendEncodedValueSize() {
 // bytes should come out. Both are spent where every encoded value of an
 // envelope is read, so a block of the wrong size is turned away there -- before
 // any key is offered to it, and so never reported as a key that does not fit.
-bool Preprocessor::TakeDataBlockValue(std::string_view line, SourceLoc loc,
-                                      int depth, std::string& output) {
-  if (!data_block_value_next_) return false;
-  data_block_value_next_ = false;
+void Preprocessor::ReadProtectDataBlock(std::string_view text, SourceLoc loc,
+                                        int depth, std::string& output) {
   std::string block;
-  // A line that cannot be read out of the scheme in effect carries no block,
-  // and the line is consumed either way: the keyword above it said the line is
-  // where the block begins, so it is not text of the design whether or not a
-  // block came out of it.
-  if (!ReadEncodedProtectValue(Trim(line), loc, &block)) return true;
+  // Text that cannot be read out of the scheme in effect carries no block, and
+  // the lines are spent either way: the keyword above them said the block
+  // begins there, so they are not text of the design whether or not a block
+  // came out of them.
+  if (!ReadEncodedProtectValue(text, loc, &block)) return;
   // §34.5.14 has the key a key block carried open the data block that block was
   // written beside, so it is spent here rather than left standing over whatever
   // the text goes on to hold. A key made for one region says nothing about the
@@ -454,7 +449,7 @@ bool Preprocessor::TakeDataBlockValue(std::string_view line, SourceLoc loc,
                 "implementation does not provide: " +
                     method.value,
                 Subclause("34.5.11.2"));
-    return true;
+    return;
   }
   std::string cleartext;
   if (!DecryptProtectedBlock(block, region_key, &cleartext)) {
@@ -462,7 +457,7 @@ bool Preprocessor::TakeDataBlockValue(std::string_view line, SourceLoc loc,
                 "protect pragma data block cannot be decrypted with the key "
                 "supplied",
                 Subclause("34.3.2"));
-    return true;
+    return;
   }
   // §34.5.22 owes this block a digest of its own, written immediately after it,
   // so what the block recovered to is held for the digest that follows,
@@ -500,7 +495,113 @@ bool Preprocessor::TakeDataBlockValue(std::string_view line, SourceLoc loc,
   uint32_t block_id = src_mgr_.AddFile(std::move(block_name), cleartext);
   output.append(ProcessSource(cleartext, block_id, depth));
   digest_target_ = std::move(target);
+}
+
+// Whether `line` carried a value the line before it announced, which is what
+// puts it beyond being a directive or a line of the design: it belongs to the
+// protected block above it. Eight keywords speak for the line after them this
+// way -- the public key a region's keys are under (34.5.26), the block carrying
+// the key its data are under (34.5.27), that key itself (34.5.14), the public
+// key the data are under (34.5.13), the public key its digest is under
+// (34.5.19), the key that opens the region's digests (34.5.20), the digest a
+// block is checked against (34.5.22), and the block holding the design itself
+// (34.5.15) -- and a line answers at most one of them, whichever announcement
+// is outstanding.
+//
+// The last of the eight is the one whose line recovers to text rather than to a
+// key: what a data block holds is the design, so it is appended to `output` in
+// place of the envelope it arrived in.
+bool Preprocessor::TookAnnouncedValue(std::string_view line, SourceLoc loc,
+                                      int depth, std::string& output) {
+  // §34.5.4.2 ends the run of gathered expressions at the word closing the
+  // envelope, so that word is read as the expression it is rather than as the
+  // encoded value one of the seven above it is still waiting for. The word is
+  // looked for the way the encrypting half looks for it, both readings asking
+  // one function of the line's own characters, so neither can take the other's
+  // envelope ending for a designation.
+  bool ends_envelope = protect_envelopes_.InProtectedRegion() &&
+                       NamesBareKeyword(line, kEndDecryptionKeyword);
+  // A block already begun takes every line that can be part of one. §34.5.15.2
+  // says where a block starts and not where it stops, so what ends it is a line
+  // that cannot belong to it: none of §34.5.9.2's schemes spells a `pragma
+  // directive, so the next one of those ends the block, and the word closing
+  // the envelope ends one for the reason above.
+  //
+  // A bare backtick is not that line. §34.5.9.2's uuencode writes the grave
+  // accent for a six-bit zero, so a line of one is the terminator that scheme's
+  // own output ends with.
+  if (gathering_block_ != ProtectBlockKind::kNone && !ends_envelope &&
+      !StartsWithPragmaDirective(line)) {
+    AppendGatheredProtectBlockLine(line);
+    return true;
+  }
+  // The block is read before this line is, so a directive that ended one takes
+  // effect after the block it stood beneath rather than before it.
+  FinishGatheredProtectBlock(depth, output);
+  if (ends_envelope) EndAccumulatedProtectPragmas();
+  if (TakeKeyPublicKeyValue(line, loc)) return true;
+  if (StartGatheredProtectBlock(line, loc)) return true;
+  if (TakeDataDecryptKeyValue(line, loc)) return true;
+  if (TakeDataPublicKeyValue(line, loc)) return true;
+  if (TakeDigestPublicKeyValue(line, loc)) return true;
+  return TakeDigestDecryptKeyValue(line, loc);
+}
+
+ProtectBlockKind Preprocessor::AnnouncedProtectBlockKind() const {
+  if (key_block_value_next_) return ProtectBlockKind::kKey;
+  if (data_block_value_next_) return ProtectBlockKind::kData;
+  if (digest_block_value_next_) return ProtectBlockKind::kDigest;
+  return ProtectBlockKind::kNone;
+}
+
+bool Preprocessor::StartGatheredProtectBlock(std::string_view line,
+                                             SourceLoc loc) {
+  ProtectBlockKind kind = AnnouncedProtectBlockKind();
+  if (kind == ProtectBlockKind::kNone) return false;
+  // The announcement is answered whatever the line turns out to be: the keyword
+  // spoke for the line beneath it once, and a second line cannot answer it
+  // again.
+  key_block_value_next_ = false;
+  data_block_value_next_ = false;
+  digest_block_value_next_ = false;
+  // A keyword whose next line opens a directive announced an empty block. The
+  // directive is left to be read as itself, which is what keeps a `pragma the
+  // block ran up against from being swallowed as characters of it.
+  if (StartsWithPragmaDirective(line)) return false;
+  gathering_block_ = kind;
+  gathering_block_loc_ = loc;
+  gathering_block_text_.assign(Trim(line));
   return true;
+}
+
+void Preprocessor::AppendGatheredProtectBlockLine(std::string_view line) {
+  gathering_block_text_.push_back('\n');
+  gathering_block_text_.append(Trim(line));
+}
+
+void Preprocessor::FinishGatheredProtectBlock(int depth, std::string& output) {
+  ProtectBlockKind kind = gathering_block_;
+  if (kind == ProtectBlockKind::kNone) return;
+  // The gathering is ended before the block is read, because reading a data
+  // block or a key block hands its cleartext back to the source loop and that
+  // text may carry blocks of its own.
+  std::string block = std::move(gathering_block_text_);
+  SourceLoc loc = gathering_block_loc_;
+  gathering_block_ = ProtectBlockKind::kNone;
+  gathering_block_text_.clear();
+  switch (kind) {
+    case ProtectBlockKind::kKey:
+      ReadProtectKeyBlock(block, loc, depth);
+      return;
+    case ProtectBlockKind::kData:
+      ReadProtectDataBlock(block, loc, depth, output);
+      return;
+    case ProtectBlockKind::kDigest:
+      ReadProtectDigestBlock(block, loc);
+      return;
+    default:
+      return;
+  }
 }
 
 }  // namespace delta

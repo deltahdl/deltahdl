@@ -5,7 +5,6 @@
 #include <functional>
 
 #include "preprocessor/preprocessor_internal.h"
-#include "preprocessor/protect_pragma_line.h"
 
 namespace delta {
 
@@ -725,6 +724,12 @@ void Preprocessor::ResetAnnouncementsAndRecoveredKeys() {
 
 void Preprocessor::EndAccumulatedProtectPragmas() {
   ResetAnnouncementsAndRecoveredKeys();
+  // A block half gathered when the run of pragmas ends belongs to an envelope
+  // that is over, so it is discarded rather than carried into whatever the text
+  // goes on to hold. §34.5.9 states a byte count against a whole block, and
+  // half of one would be measured against a count for all of it.
+  gathering_block_ = ProtectBlockKind::kNone;
+  gathering_block_text_.clear();
   // §34.5.22 has the digest of a key block or a data block written in the
   // digest block immediately following that block, so the block a digest can
   // still be owed belongs to the envelope it was recovered from. An envelope
@@ -751,42 +756,6 @@ static void EmitStrippedActiveLine(const std::string& stripped,
   EmitActiveLine(stripped, emit, output);
 }
 
-// Whether `line` carried a value the line before it announced, which is what
-// puts it beyond being a directive or a line of the design: it belongs to the
-// protected block above it. Eight keywords speak for the line after them this
-// way -- the public key a region's keys are under (34.5.26), the block carrying
-// the key its data are under (34.5.27), that key itself (34.5.14), the public
-// key the data are under (34.5.13), the public key its digest is under
-// (34.5.19), the key that opens the region's digests (34.5.20), the digest a
-// block is checked against (34.5.22), and the block holding the design itself
-// (34.5.15) -- and a line answers at most one of them, whichever announcement
-// is outstanding.
-//
-// The last of the eight is the one whose line recovers to text rather than to a
-// key: what a data block holds is the design, so it is appended to `output` in
-// place of the envelope it arrived in.
-bool Preprocessor::TookAnnouncedValue(std::string_view line, SourceLoc loc,
-                                      int depth, std::string& output) {
-  // §34.5.4.2 ends the run of gathered expressions at the word closing the
-  // envelope, so that word is read as the expression it is rather than as the
-  // encoded value one of the seven above it is still waiting for. The word is
-  // looked for the way the encrypting half looks for it, both readings asking
-  // one function of the line's own characters, so neither can take the other's
-  // envelope ending for a designation.
-  if (protect_envelopes_.InProtectedRegion() &&
-      NamesBareKeyword(line, kEndDecryptionKeyword)) {
-    EndAccumulatedProtectPragmas();
-  }
-  if (TakeKeyPublicKeyValue(line, loc)) return true;
-  if (TakeKeyBlockValue(line, loc, depth)) return true;
-  if (TakeDataBlockValue(line, loc, depth, output)) return true;
-  if (TakeDataDecryptKeyValue(line, loc)) return true;
-  if (TakeDataPublicKeyValue(line, loc)) return true;
-  if (TakeDigestPublicKeyValue(line, loc)) return true;
-  if (TakeDigestDecryptKeyValue(line, loc)) return true;
-  return TakeDigestBlockValue(line, loc);
-}
-
 std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
                                         int depth) {
   if (depth > kMaxIncludeDepth) {
@@ -797,7 +766,7 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
 
   // Every path text takes into the Preprocessor arrives here -- Preprocess for
   // a file named on the command line, ProcessIncludeFile for a `include, and
-  // the protected-envelope cleartext Preprocessor::TakeDataBlockValue in
+  // the protected-envelope cleartext Preprocessor::ReadProtectDataBlock in
   // src/preprocessor/preprocessor_protect_values.cpp hands over -- so this is
   // the one place that has to hold for the marker to mean what Lexer takes it
   // to mean.
@@ -865,6 +834,11 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   ops.note_output_line = [&] { NoteOutputLine(file_id, line_num); };
 
   RunPreprocLoop(src, line_num, ops, output);
+  // A block whose lines ran to the end of this text is complete: there is no
+  // further line that could belong to it. Reading it here is also what keeps a
+  // block begun inside a recovered block from being carried out into the text
+  // that carried it, this function being what runs such text.
+  FinishGatheredProtectBlock(depth, output);
   return output;
 }
 

@@ -31,4 +31,9 @@ ActiveLineSplit ClassifyActiveLine(std::string_view stripped);
 
 bool StartsWithDirective(std::string_view line, std::string_view dir);
 
+// Whether `line` opens a `pragma directive. None of §34.5.9.2's coding schemes
+// spells one, so this is what a line of a protected block can never be, and it
+// is how the reader of a block spanning several lines knows the block ended.
+bool StartsWithPragmaDirective(std::string_view line);
+
 }  // namespace delta

@@ -70,20 +70,18 @@ bool IsProtectEncodingAlgorithm(std::string_view enctype);
 // Whether the table marks `enctype` as one every implementation provides.
 bool IsRequiredProtectEncodingAlgorithm(std::string_view enctype);
 
-// Whether a block written under `enctype` stands on one line: the characters
-// that scheme writes hold no line break.
+// Whether a block written under `enctype` is text: the scheme draws its output
+// from an alphabet of printable characters, so what it writes can stand in a
+// source file and be read back out of one.
 //
-// §34.5.9 leaves a tool free to encode a block under whichever scheme a text
-// asks for, and §34.5.15.2 has a block begin on the line beneath the keyword
-// announcing it and says nothing about where it ends. This implementation reads
-// one line -- Preprocessor::TakeDataBlockValue (preprocessor/preprocessor.h)
-// takes the line the keyword announced and nothing after it -- so a scheme
-// spelling a block over several lines is not one a block can be written under
-// here, and writing one would produce an envelope this tool could not read
-// back. The two schemes that stand on one line are accepted by the reading side
-// either way, so nothing is lost by writing under one of them and saying so.
-// #3431 covers reading a block that spans several lines.
-bool ProtectEncodingFitsOneLine(std::string_view enctype);
+// §34.5.9.2 lists one scheme that is no coding at all -- the identity
+// transformation writes whatever the data hold, which is free to include
+// characters that cannot be printed -- and a block of those written into a
+// file is not text a reader can take lines out of. Every other scheme the
+// clause lists is one a block may be written under, however many lines its
+// output runs to: §34.5.15.2's block begins on the line beneath its keyword
+// and the reading takes every line up to the next `pragma directive.
+bool ProtectEncodingWritesPrintableText(std::string_view enctype);
 
 // Whether this implementation can write and read a block under `enctype`.
 // That covers every tabulated identifier, the required ones because they have

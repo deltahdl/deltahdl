@@ -222,17 +222,19 @@ std::string_view RegionDigestKey(const RegionKeyNames& names,
 // enclosed text asked for, where a block of that scheme stands on one line, and
 // this implementation's own otherwise.
 //
-// A line length the text stated is not carried across. It is a maximum on the
-// characters of a line of the block, and a break put in to honor it would put
-// the block on more lines than one. §34.5.15.2 has a block begin on the line
-// beneath its keyword and says nothing about where it ends, and this
-// implementation reads one line: Preprocessor::TakeDataBlockValue
-// (preprocessor/preprocessor.h) takes the line the keyword announced and
-// nothing after it, as Preprocessor::TakeKeyBlockValue and
-// Preprocessor::TakeDigestBlockValue do for the blocks §34.5.27 and §34.5.22
-// announce. Writing a block this tool could not read back is what the two
-// restrictions here prevent, and #3431 covers reading a block that spans
-// several lines.
+// A line length the text stated is carried across, a break put in to honor it
+// putting the block on more lines than one. §34.5.15.2 has a block begin on the
+// line beneath its keyword and says nothing about where it ends, so the reading
+// takes every line after the keyword up to the next `pragma directive:
+// Preprocessor::ReadProtectDataBlock (preprocessor/preprocessor.h) is handed
+// the run of them joined, as Preprocessor::ReadProtectKeyBlock and
+// Preprocessor::ReadProtectDigestBlock are for the blocks §34.5.27 and
+// §34.5.22 announce.
+//
+// The one scheme §34.5.9.2 lists that a block is not written under here is the
+// identity transformation, which is no coding at all: it leaves the data free
+// to hold characters that cannot be printed, and a run of those written into a
+// text file is not text a reader can take lines back out of.
 ProtectEncoding EnvelopeBlockEncoding(const ProtectEncoding& requested);
 
 // The decryption envelope one encryption envelope is transformed into: the

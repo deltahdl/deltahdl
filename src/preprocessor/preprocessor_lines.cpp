@@ -108,7 +108,7 @@ static bool StartsWithCellDirective(std::string_view line,
 // Syntax 22-8 separates the `pragma keyword from the pragma_name that follows
 // it, so `pragma_name is a usage of the macro pragma_name and not this
 // directive carrying the pragma_name "_name".
-static bool StartsWithPragmaDirective(std::string_view line) {
+bool StartsWithPragmaDirective(std::string_view line) {
   return StartsWithDirective(line, "pragma") &&
          DirectiveKeywordIsWholeWord(line, "pragma");
 }

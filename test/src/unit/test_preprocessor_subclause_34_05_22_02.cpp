@@ -67,6 +67,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_protect_encoding.h"
+#include "helpers_protect_block_lines.h"
 #include "helpers_protect_keys.h"
 #include "helpers_reported_error.h"
 #include "helpers_text_lines.h"
@@ -328,6 +329,25 @@ TEST(ProtectDigestBlockDecryptionInput, ADigestOfTheBlockItFollowsAgrees) {
   ReadEnvelope run(
       EnvelopeCarrying(DataBlockHolding(kEncodingSealedDesign) +
                        DigestBlockVouchingFor(kEncodingSealedDesign)));
+  EXPECT_FALSE(run.diag.HasErrors()) << run.text;
+  EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kMatched);
+}
+
+// §34.5.22.2 has the digest "written on the line following the digest_block
+// expression" and says nothing about where it ends, so a digest block another
+// tool wrote over several lines -- which §34.5.9.2's line-oriented schemes
+// produce by construction -- is one this reader has to take, and it still
+// agrees with the block it follows. The envelope is the one above with its
+// digest broken across three lines by hand, so the two differ in the breaks
+// alone.
+TEST(ProtectDigestBlockDecryptionInput, ADigestOnSeveralLinesStillAgrees) {
+  std::string src =
+      EnvelopeCarrying(DataBlockHolding(kEncodingSealedDesign) +
+                       DigestBlockVouchingFor(kEncodingSealedDesign));
+  std::string broken = WithBlockBrokenIntoLines(src, kDigestBlockLine, 3);
+  ASSERT_NE(broken, src);
+
+  ReadEnvelope run(broken);
   EXPECT_FALSE(run.diag.HasErrors()) << run.text;
   EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kMatched);
 }

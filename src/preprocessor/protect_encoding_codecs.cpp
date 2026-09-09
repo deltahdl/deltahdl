@@ -75,6 +75,11 @@ bool DecodeSixBitGroups(std::string_view text, std::string_view alphabet,
   uint32_t group = 0;
   size_t have = 0;
   for (char c : text) {
+    // §34.5.9.1's line_length breaks the written output into lines, and neither
+    // alphabet holds a line break, so the breaks are stepped over rather than
+    // read as characters of the encoding. RFC 2045 says the same of base64's
+    // own output: a decoder ignores the line breaks the encoder put in.
+    if (c == '\n' || c == '\r') continue;
     size_t index = alphabet.find(c);
     if (index == std::string_view::npos) return false;
     group = (group << 6) | static_cast<uint32_t>(index);
@@ -255,7 +260,12 @@ std::string EncodeBase64(std::string_view bytes) {
 // reads a short group reads that from the group's own length, so the padding
 // is taken off before the reading rather than read as data.
 bool DecodeBase64(std::string_view text, std::string* bytes) {
-  while (!text.empty() && text.back() == kBase64Pad) text.remove_suffix(1);
+  // The padding stands at the end of the encoded data rather than at the end of
+  // the last line, so a line break the writing left after it comes off first.
+  while (!text.empty() && (text.back() == kBase64Pad || text.back() == '\n' ||
+                           text.back() == '\r')) {
+    text.remove_suffix(1);
+  }
   return DecodeSixBitGroups(text, kBase64Alphabet, bytes);
 }
 

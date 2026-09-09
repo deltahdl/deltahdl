@@ -279,7 +279,7 @@ bool Preprocessor::ReportDelimiterWrittenWithValue(
 // No text comes back from here. §34.5.15.1 spells the expression carrying a
 // region as the keyword standing alone, and §34.5.15.2 has the block begin on
 // the line beneath it, so the design a region records is recovered by
-// Preprocessor::TakeDataBlockValue when that line arrives rather than by any
+// Preprocessor::ReadProtectDataBlock when those lines arrive rather than by any
 // expression this reads. What an expression here does is record that the
 // keyword was written, which ApplyAnnouncedBlockKeywords does for all eight
 // keywords whose definitions speak for the line after them.
