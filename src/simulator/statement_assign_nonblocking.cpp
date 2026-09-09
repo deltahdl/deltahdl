@@ -644,6 +644,12 @@ static void ScheduleFieldNba(const Expr* lhs, const Logic4Vec& rhs_val,
   // PerformBlockingAssign both ask WriteStructField on that kind alone), so the
   // two forms reach it on the same left-hand sides and no others.
   if (lhs->kind != ExprKind::kMemberAccess) return;
+  // §14.16: a clockvar names a clocking block's output rather than a member of
+  // an object, and it is asked first because ResolveFieldTarget takes `cb` for
+  // a variable, finds none, and drops the statement. Both arrive here for the
+  // same reason -- a dotted left-hand side that is no key in the variable table
+  // -- so this is where the two are told apart.
+  if (TryScheduleClockvarDrive(lhs, rhs_val, ctx)) return;
   FieldTarget target = ResolveFieldTarget(lhs, ctx);
   if (!target.HasDeposit()) return;
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
@@ -688,10 +694,6 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
               : sub_elem != nullptr ? sub_elem
                                     : ResolveLhsVariable(stmt->lhs, ctx);
   if (!var) {
-    // §14.16: a clockvar target is a synchronous drive rather than a member of
-    // an object, and it is asked before the field path because the field path
-    // resolves `cb` as a variable and finds none.
-    if (TryScheduleClockvarDrive(stmt->lhs, rhs_val, ctx)) return;
     ScheduleFieldNba(stmt->lhs, rhs_val, delay_ticks, ctx, arena);
     return;
   }
