@@ -88,7 +88,7 @@ struct ClassTypeInfo {
     // holds the whole structure in one value (§6.8), and the offset of `p.b`
     // within it is a fact about `pair_t` rather than about the property, which
     // SimContext::FindStructType answers by that name.
-    std::string_view type_name;
+    std::string_view type_name = {};
   };
   std::vector<PropertyInfo> properties;
 
