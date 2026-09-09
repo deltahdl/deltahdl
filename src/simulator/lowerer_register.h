@@ -66,6 +66,12 @@ void RegisterDesignTypeLayouts(const RtlirDesign* design, SimContext& ctx,
 void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx, Arena& arena);
 void RegisterModulePorts(const RtlirModule* mod, SimContext& ctx, Arena& arena);
 void RegisterModuleSubroutines(const RtlirModule* mod, SimContext& ctx);
+
+// §35.5.4: put this module's imported subroutine declarations in the run's DPI
+// registry, which is what a call to one reaches its declaration through. The
+// registry is acquired on the first module that declares an import, so a design
+// that declares none never makes one.
+void RegisterModuleDpiImports(const RtlirModule* mod, SimContext& ctx);
 void RegisterModuleSequenceDecls(const RtlirModule* mod, SimContext& ctx);
 void RegisterProcessClassType(SimContext& ctx, Arena& arena);
 

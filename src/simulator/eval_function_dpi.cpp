@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulator/dpi_runtime.h"
@@ -274,6 +275,20 @@ Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   const DpiRtFunction* import =
       dpi == nullptr ? nullptr : dpi->FindImport(expr->callee);
   if (import == nullptr) return MakeLogic4VecVal(arena, 1, 0);
+  // §35.4 makes an imported subroutine's declaration a reference to a global
+  // symbol the foreign side defines, and §35.5.4 leaves the binding of that
+  // symbol to the tool: this one binds nothing, because no route exists for a
+  // foreign object to supply an implementation (#3441). A call reaching no
+  // implementation is reported rather than answered: the zero it would
+  // otherwise yield is a value the design reads as data and cannot tell from a
+  // foreign function that returned zero.
+  if (!import->impl && !import->arg_impl) {
+    ctx.GetDiag().Error(expr->range.start,
+                        "imported subroutine '" + std::string(expr->callee) +
+                            "' is bound to no foreign implementation",
+                        Subclause("35.5.4"));
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
   // §35.6: calling an imported function uses the same usage and syntax as a
   // native function call. When the import's formals are known, resolve the
   // call-site actuals against them so that named-argument binding and omitted
@@ -285,9 +300,10 @@ Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // §35.5.3: "A DPI call chain is a call chain ... that begins when
   // SystemVerilog code calls an imported subroutine." This call site is that
   // beginning, and the frame's context property is the one the import's own
-  // declaration carries (§35.5.1.3). The declaration's instantiated scope is
-  // not carried here: a design's import declarations do not yet reach the
-  // registry at all, which is #3285, and the scope arrives with them.
+  // declaration carries (§35.5.1.3). The instantiated scope the declaration
+  // stands in is not carried here: a design's declarations reach the registry
+  // by name, and which instance of a module declared one is a question
+  // §35.5.3's scope chain asks that this does not yet answer.
   dpi->EnterDeclaredImportCall(expr->callee, DpiScope{});
 
   DpiArgValue result;

@@ -339,6 +339,10 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   for (const auto& var : mod->variables) LowerVar(var.name, var);
   RegisterModulePorts(mod, ctx_, arena_);
   RegisterModuleSubroutines(mod, ctx_);
+  // §35.5.4: an imported subroutine is declared where the source writes it and
+  // called like a native one, so the declarations of the module being lowered
+  // go into the registry EvalDpiCall reaches an import through.
+  RegisterModuleDpiImports(mod, ctx_);
   RegisterModuleSequenceDecls(mod, ctx_);
   LowerSequenceMonitors(mod);
 

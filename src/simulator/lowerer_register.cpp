@@ -12,6 +12,7 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
+#include "simulator/dpi_runtime.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -137,6 +138,44 @@ void RegisterModuleSubroutines(const RtlirModule* mod, SimContext& ctx) {
   }
   for (auto* let_decl : mod->let_decls) {
     ctx.RegisterLetDecl(let_decl->name, let_decl);
+  }
+}
+
+void RegisterModuleDpiImports(const RtlirModule* mod, SimContext& ctx) {
+  if (mod->dpi_import_decls.empty()) return;
+  // §35.5.4 declares an imported subroutine in the scope that writes the
+  // declaration, and §35.6 has a call to one written exactly as a call to a
+  // native subroutine. The registry is what a call reaches the declaration
+  // through, so a design's declarations are put in it as the design is lowered;
+  // a design that declares no import never asks for one.
+  DpiRuntime& dpi = ctx.AcquireDpiRuntime();
+  for (const auto* item : mod->dpi_import_decls) {
+    DpiRtFunction func;
+    func.sv_name = item->name;
+    // §35.4: "If a global name is not explicitly given, it shall be the same as
+    // the SystemVerilog subroutine name", which is the rule
+    // DpiLinkageName states for the elaborator's own reading of the same
+    // declaration.
+    func.c_name = item->dpi_c_name.empty() ? item->name : item->dpi_c_name;
+    func.return_type = item->return_type.kind;
+    // §35.5.1.3: the declaration says whether the subroutine is pure or
+    // context, and §35.5.2 and §35.5.3 are read off those two.
+    func.is_pure = item->dpi_is_pure;
+    func.is_context = item->dpi_is_context;
+    for (const auto& arg : item->func_args) {
+      DpiArg formal;
+      formal.name = arg.name;
+      formal.type = arg.data_type.kind;
+      // §35.5.1.2 reads the direction to decide which way each formal's value
+      // crosses, so it travels with the declaration rather than being inferred
+      // at the call.
+      formal.direction = arg.direction;
+      // §35.6: the default the declaration gave a formal, which a call site
+      // that omits the argument takes.
+      formal.default_value = arg.default_value;
+      func.args.push_back(formal);
+    }
+    dpi.RegisterImport(std::move(func));
   }
 }
 

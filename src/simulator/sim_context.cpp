@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "simulator/coverage.h"
+#include "simulator/dpi_runtime.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
 #include "simulator/specify.h"
@@ -34,6 +35,18 @@ SpecifyManager& SimContext::AcquireSpecifyManager() {
   }
   specify_manager_ = owned_specify_manager_.get();
   return *owned_specify_manager_;
+}
+
+DpiRuntime& SimContext::AcquireDpiRuntime() {
+  // A registry installed from outside is the run's: §35 holds of whichever one
+  // the calls go through, and making a second here would leave a design's
+  // imports in one registry and its calls in the other.
+  if (dpi_runtime_ != nullptr) return *dpi_runtime_;
+  if (owned_dpi_runtime_ == nullptr) {
+    owned_dpi_runtime_ = std::make_unique<DpiRuntime>();
+  }
+  dpi_runtime_ = owned_dpi_runtime_.get();
+  return *owned_dpi_runtime_;
 }
 
 namespace {

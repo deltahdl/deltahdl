@@ -355,6 +355,14 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   void SetDpiRuntime(DpiRuntime* dpi) { dpi_runtime_ = dpi; }
   DpiRuntime* GetDpiRuntime() { return dpi_runtime_; }
 
+  // §35.5.4: the registry a design's own import declarations are put in, made
+  // on first use and owned by the context so it outlives the lowering that
+  // fills it. A run that declares no import never makes one, and a caller that
+  // installed a registry of its own through SetDpiRuntime keeps it: the two
+  // ways of supplying the registry agree on which one the run's calls go
+  // through, which is what §35 holds of.
+  DpiRuntime& AcquireDpiRuntime();
+
   void SetCurrentProcess(Process* proc);
   Process* CurrentProcess() const { return current_process_; }
   bool IsReactiveContext() const;
@@ -771,6 +779,7 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   VcdDumpState vcd_;
   SpecifyManager* specify_manager_ = nullptr;
   std::unique_ptr<SpecifyManager> owned_specify_manager_;
+  std::unique_ptr<DpiRuntime> owned_dpi_runtime_;
   DpiRuntime* dpi_runtime_ = nullptr;
   Process* current_process_ = nullptr;
   // The instance being built. See SetLoweringInstancePrefix.
