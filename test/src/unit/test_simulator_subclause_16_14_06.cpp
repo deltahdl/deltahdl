@@ -181,4 +181,89 @@ TEST(ProceduralConcurrentAssertionSim, TrueBooleanPropertyReportsNothing) {
   EXPECT_EQ(f.ctx.LastSeverityMsg(), "");
 }
 
+// §16.5: "Concurrent assertions ... are evaluated in the Observed region", and
+// §16.14.6 has an embedded one "evaluated as though it were a separate
+// concurrent assertion", so the region is the same wherever the statement is
+// written. §4.4 orders the Observed region after the whole active region set,
+// so a design that writes at the same clock edge has written by the time the
+// property is evaluated.
+//
+// `peek()` is what makes the region visible. §16.5.1's sampling covers the
+// variables a property names, and this one names none: a function call reads
+// `v` from within its body, where no sample stands, so the property reads the
+// live value and answers differently in the two regions. Evaluated where the
+// statement stands -- the Active region, in the middle of the write that
+// assigned the clock -- it read the 0 `v` still held and the assertion failed.
+TEST(ProceduralConcurrentAssertionSim, PropertyIsEvaluatedInTheObservedRegion) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  int v = 0;\n"
+      "  int saw = 99;\n"
+      "  function int peek();\n"
+      "    return v;\n"
+      "  endfunction\n"
+      "  always @(posedge clk) assert property (peek() == 1) saw = 1;\n"
+      "  else saw = 0;\n"
+      "  always @(posedge clk) v = 1;\n"
+      "  initial #5 clk = 1;\n"
+      "endmodule\n",
+      f, "saw");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// The other half: the property is still evaluated, and still fails when what it
+// reads has not arrived. `v` is written a time step after the edge rather than
+// at it, so no region of the tick's own time slot sees the 1 and the assertion
+// takes its fail action. A property that stopped being evaluated at all, or one
+// answered true for everything, passes the case above and fails this.
+TEST(ProceduralConcurrentAssertionSim,
+     PropertyStillFailsOnWhatTheTickCannotSee) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  int v = 0;\n"
+      "  int saw = 99;\n"
+      "  function int peek();\n"
+      "    return v;\n"
+      "  endfunction\n"
+      "  always @(posedge clk) assert property (peek() == 1) saw = 1;\n"
+      "  else saw = 0;\n"
+      "  initial begin\n"
+      "    #5 clk = 1;\n"
+      "    #5 v = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "saw");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// The form that already answered from the Observed region, asserted unchanged:
+// §16.14.5's static concurrent assertion is carried by a process the scheduler
+// resumes there, and it reads the same 1 the embedded form now reads. The pair
+// says the two spellings of one assertion agree.
+TEST(ProceduralConcurrentAssertionSim, StaticFormReadsTheSameValueAtTheEdge) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  int v = 0;\n"
+      "  int saw = 99;\n"
+      "  function int peek();\n"
+      "    return v;\n"
+      "  endfunction\n"
+      "  assert property (@(posedge clk) peek() == 1) saw = 1;\n"
+      "  else saw = 0;\n"
+      "  always @(posedge clk) v = 1;\n"
+      "  initial #5 clk = 1;\n"
+      "endmodule\n",
+      f, "saw");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 }  // namespace

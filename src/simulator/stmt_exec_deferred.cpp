@@ -1,4 +1,5 @@
 #include <cmath>
+#include <coroutine>
 #include <cstdint>
 #include <cstring>
 #include <functional>
@@ -212,6 +213,47 @@ static bool TryScheduleConcurrentAssertAction(const Stmt* action,
   return true;
 }
 
+// §16.5: "Concurrent assertions ... are evaluated in the Observed region", and
+// §16.14.6 has one embedded in procedural code "evaluated as though it were a
+// separate concurrent assertion", so where the statement is written does not
+// change the region its property is evaluated in. A module-item concurrent
+// assertion is carried by a process the scheduler already resumes there
+// (Process::is_concurrent_clocked, see ResumeMaybeReactive in
+// simulator/awaiters_event_control.h); one written inside a procedure is
+// reached in whatever region that procedure is running in, which for an
+// `always @(posedge clk)` is the Active region -- in the middle of the write
+// that assigned the clock.
+//
+// The procedure suspends into the Observed region and resumes there rather than
+// handing the property to a process of its own, because §16.14.6.1 evaluates
+// the assertion against the scope the statement stands in: a variable of that
+// procedure is reachable from this process and from no other. The statements
+// after the assertion resume with it, which is the cost of the choice; §4.4.2.2
+// keeps ordinary procedural code in the Active region, and a procedure with
+// code after a concurrent assertion pays for the assertion's region.
+struct ObservedRegionAwaiter {
+  SimContext& ctx;
+
+  bool await_ready() const noexcept {
+    return ctx.GetScheduler().CurrentRegion() == Region::kObserved;
+  }
+
+  void await_suspend(std::coroutine_handle<> h) const {
+    auto* proc = ctx.CurrentProcess();
+    auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+    auto* ctx_ptr = &ctx;
+    event->callback = [h, proc, ctx_ptr]() mutable {
+      if (proc != nullptr && !proc->active) return;
+      if (proc != nullptr) ctx_ptr->SetCurrentProcess(proc);
+      h.resume();
+    };
+    ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kObserved,
+                                     event);
+  }
+
+  void await_resume() const noexcept {}
+};
+
 // Records a cover-immediate sampling: bumps the evaluation count and, when the
 // covered expression held, the success count. No-op for assert/assume forms.
 static void RecordCoverImmediateSample(const Stmt* stmt, bool is_true,
@@ -269,6 +311,12 @@ static void ReportDefaultAssertionFailure(const Stmt* stmt, uint32_t type_bit,
 }
 
 ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  // §16.5: a concurrent assertion's property is evaluated in the Observed
+  // region, whether the statement stands outside procedural code or inside it.
+  // An immediate assertion (§16.3) is not marked and is evaluated where it
+  // stands.
+  if (stmt->is_concurrent_clocked) co_await ObservedRegionAwaiter{ctx};
+
   // §16.3 / §20.11: the execution of immediate assertions can be controlled by
   // the assertion control system tasks. When $assertcontrol Off/Kill (or
   // $assertoff/$assertkill) has stopped checking for this assertion's type and
