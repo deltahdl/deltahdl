@@ -443,4 +443,80 @@ TEST(DpiArgumentPassingInADesign, AnOutputFormalsUnknownBitReachesTheActual) {
   EXPECT_EQ(run.Actual().bval, 0b0100U);
 }
 
+// The same crossing asked of a formal whose type has no bval to put an unknown
+// bit in. `formal` is the type §35.5.4's declaration gave it and `actual` the
+// bits of the four-bit variable `a` the call site names; `seen` is the value
+// the foreign body was handed, in whichever member of the union that type lands
+// in.
+struct TwoStateFormal {
+  DpiRuntime dpi;
+  SimFixture f;
+  DpiArgValue seen;
+
+  TwoStateFormal(DataTypeKind formal, SvLogicVecVal actual) {
+    DpiRtFunction func;
+    func.c_name = "c_take_two_state";
+    func.sv_name = "take2";
+    func.return_type = DataTypeKind::kInt;
+    func.args = {DpiArg{"a", formal, Direction::kInput}};
+    auto* seen_slot = &seen;
+    func.arg_impl = [seen_slot](std::vector<DpiArgValue>& args) -> DpiArgValue {
+      *seen_slot = args[0];
+      return DpiArgValue::FromInt(0);
+    };
+    dpi.RegisterImport(std::move(func));
+    f.ctx.SetDpiRuntime(&dpi);
+    auto* var = f.ctx.CreateVariable("a", 4);
+    var->value = MakeLogic4Vec(f.arena, 4);
+    var->value.words[0] = Logic4Word{actual.aval, actual.bval};
+    EvalFunctionCall(ParseExprFrom("take2(a)", f), f.ctx, f.arena);
+  }
+};
+
+// §35.6.1 has the temporary a value crosses in "initialized with the value of
+// the actual argument with the appropriate coercion", and "the assignments
+// between a temporary and the actual argument follow general SystemVerilog
+// rules for assignments and automatic coercion". §6.11.2 is what those rules
+// say where the type on the other side holds no unknown bit: the assignment
+// converts "any unknown or high-impedance bits in the value ... to zeros". The
+// actual is 4'b10x1 and the formal is int, so the body is handed 4'b1001.
+TEST(DpiArgumentPassingInADesign, AnUnknownBitOfATwoStateFormalArrivesAsZero) {
+  TwoStateFormal run(DataTypeKind::kInt, SvLogicVecVal{0b1011, 0b0010});
+
+  // 9 is 4'b1001. The raw aval of 4'b10x1 is 4'b1011, which is 11 and is what
+  // a crossing that reads the aval without consulting the bval hands over.
+  EXPECT_EQ(run.seen.AsInt(), 9);
+}
+
+// The same rule for a real formal, whose value is a double and so has nowhere
+// to record an unknown bit either. §6.12.1 converts an integral expression
+// assigned to a real numerically, over the value §6.11.2 leaves; the actual is
+// 4'b1x01, so that value is 4'b1001.
+TEST(DpiArgumentPassingInADesign, AnUnknownBitOfARealFormalArrivesAsZero) {
+  TwoStateFormal run(DataTypeKind::kReal, SvLogicVecVal{0b1101, 0b0100});
+
+  // 9.0 is 4'b1001 converted; 13.0 is what the raw aval 4'b1101 converts to.
+  EXPECT_DOUBLE_EQ(run.seen.AsReal(), 9.0);
+}
+
+// §35.2.2 gives a bit formal one scalar, which is two-state, so the one bit of
+// it obeys §6.11.2 as well. Bit 0 of the actual is x -- aval 1 with bval 1 --
+// and the formal cannot hold an x, so the body is handed a 0.
+TEST(DpiArgumentPassingInADesign, AnUnknownBitOfABitFormalArrivesAsZero) {
+  TwoStateFormal run(DataTypeKind::kBit, SvLogicVecVal{1, 1});
+
+  EXPECT_EQ(run.seen.AsBit(), 0);
+}
+
+// The other half of §6.11.2's projection: it converts the unknown bits and
+// leaves the rest, so a wholly known actual reaches the formal as it stands.
+// The actual is 4'b1101 with no bit unknown, so the body is handed 13 rather
+// than the 0 a projection that kept the unknown bits instead would leave.
+TEST(DpiArgumentPassingInADesign,
+     TheKnownBitsOfAFourStateActualArriveUntouched) {
+  TwoStateFormal run(DataTypeKind::kInt, SvLogicVecVal{0b1101, 0});
+
+  EXPECT_EQ(run.seen.AsInt(), 13);
+}
+
 }  // namespace

@@ -174,19 +174,32 @@ DpiArgValue DpiArgValueOfType(DataTypeKind kind, uint32_t declared_width,
                                           kind);
   }
   Logic4Word word = v.nwords == 0 ? Logic4Word{} : v.words[0];
+  // §35.6.1 has the temporary "initialized with the value of the actual
+  // argument with the appropriate coercion", and has "the assignments between a
+  // temporary and the actual argument follow general SystemVerilog rules for
+  // assignments and automatic coercion". §6.11.2 is what those rules say where
+  // the type on the other side holds no unknown bit: the assignment converts
+  // "any unknown or high-impedance bits in the value ... to zeros". Every
+  // branch below but the four-state ones reads the aval alone and so has no
+  // bval to put an x in, and read raw that aval says an x is a one. This is the
+  // aval those branches read instead, which is the projection
+  // ConvertRealForKnownLhs in statement_assign_core.cpp already applies to an
+  // assignment reaching a real and Logic4Vec::ToUint64 to one reaching a
+  // two-state integral.
+  Logic4Word known{word.aval & ~word.bval, 0};
   DpiArgValue out;
   switch (kind) {
     case DataTypeKind::kReal:
     case DataTypeKind::kShortreal:
     case DataTypeKind::kRealtime:
       out = DpiArgValue::FromReal(v.is_real ? RealVecToDouble(v)
-                                            : static_cast<double>(word.aval));
+                                            : static_cast<double>(known.aval));
       out.type = kind;
       return out;
     case DataTypeKind::kChandle:
-      return DpiArgValue::FromChandle(ChandleOfWord(word));
+      return DpiArgValue::FromChandle(ChandleOfWord(known));
     case DataTypeKind::kBit:
-      return DpiArgValue::FromBit(static_cast<SvBit>(word.aval & 1U));
+      return DpiArgValue::FromBit(static_cast<SvBit>(known.aval & 1U));
     case DataTypeKind::kLogic:
     case DataTypeKind::kReg:
       out = DpiArgValue::FromLogic(SvLogicOfWord(word));
@@ -206,7 +219,7 @@ DpiArgValue DpiArgValueOfType(DataTypeKind kind, uint32_t declared_width,
       // declaration left at DpiArg's own default -- narrows and sign-extends
       // through §35.6.1's coercion rather than through a cast written here.
       return CoerceArgValue(
-          DpiArgValue::FromLongint(static_cast<int64_t>(word.aval)), kind);
+          DpiArgValue::FromLongint(static_cast<int64_t>(known.aval)), kind);
   }
 }
 
