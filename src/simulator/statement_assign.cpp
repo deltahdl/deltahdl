@@ -8,7 +8,6 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
-#include "common/packed_range.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/assoc_element.h"
