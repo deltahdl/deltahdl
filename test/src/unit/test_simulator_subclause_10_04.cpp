@@ -279,17 +279,16 @@ TEST(ClassMethodAssignSim, AConcatenationTargetAssignsFromAClassMethod) {
             0x50Cu);
 }
 
-// §7.8.6's copy of a whole associative array, which rebuilds the destination's
-// entries. A write that wrote the destination's carrier variable instead leaves
-// the entry the read asks for unallocated.
-TEST(ClassMethodAssignSim, AnAssociativeCopyAssignsFromAClassMethod) {
+// §10.4's "slices of unpacked arrays", which writes exactly the sliced
+// elements. The two sliced elements are read back together, so a write that
+// landed on the array's carrier instead of on its elements answers zero.
+TEST(ClassMethodAssignSim, AnUnpackedSliceAssignsFromAClassMethod) {
   EXPECT_EQ(RunAndGet("class C;\n"
-                      "  function int copy();\n"
-                      "    int src [int];\n"
-                      "    int dst [int];\n"
-                      "    src[7] = 42;\n"
-                      "    dst = src;\n"
-                      "    return dst[7];\n"
+                      "  function int slice();\n"
+                      "    logic [3:0] a [0:3];\n"
+                      "    a = '{4'h0, 4'h0, 4'h0, 4'h0};\n"
+                      "    a[1:2] = '{4'h3, 4'h4};\n"
+                      "    return a[1] * 16 + a[2] + a[0] + a[3];\n"
                       "  endfunction\n"
                       "endclass\n"
                       "module t;\n"
@@ -297,11 +296,11 @@ TEST(ClassMethodAssignSim, AnAssociativeCopyAssignsFromAClassMethod) {
                       "  initial begin\n"
                       "    C c;\n"
                       "    c = new;\n"
-                      "    result = c.copy();\n"
+                      "    result = c.slice();\n"
                       "  end\n"
                       "endmodule\n",
                       "result"),
-            42u);
+            0x34u);
 }
 
 }  // namespace
