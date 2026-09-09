@@ -148,7 +148,9 @@ TEST(StrengthCombineAmbigUnambig, RuleATrimsLowEndButKeepsHigh) {
   auto result = CombineAmbiguousWithUnambiguous(unambig, ambig);
   EXPECT_EQ(result.value, Val4::kX);
   EXPECT_EQ(result.strength1_hi, StrengthLevel::kStrong);
-  EXPECT_EQ(result.strength1_lo, StrengthLevel::kStrong);
+  // Rule c: the strong 1 survives the pull 0, and the gap between the two
+  // crosses high impedance, so the side reaches it (Figure 28-23).
+  EXPECT_EQ(result.strength1_lo, StrengthLevel::kHighz);
 }
 
 TEST(StrengthCombineAmbigUnambig, RuleBEliminatesAmbigAtOrBelowSu) {
@@ -190,9 +192,9 @@ TEST(StrengthCombineAmbigUnambig, RuleCFillsGapOnOppositeSide) {
   auto result = CombineAmbiguousWithUnambiguous(unambig, ambig);
   EXPECT_EQ(result.value, Val4::kX);
   EXPECT_EQ(result.strength1_hi, StrengthLevel::kSupply);
-  EXPECT_EQ(result.strength1_lo, StrengthLevel::kStrong);
+  EXPECT_EQ(result.strength1_lo, StrengthLevel::kHighz);
   EXPECT_EQ(result.strength0_hi, StrengthLevel::kPull);
-  EXPECT_EQ(result.strength0_lo, StrengthLevel::kPull);
+  EXPECT_EQ(result.strength0_lo, StrengthLevel::kHighz);
 }
 
 TEST(StrengthCombineAmbigUnambig, RuleCFillsMultiLevelGap) {
@@ -202,7 +204,7 @@ TEST(StrengthCombineAmbigUnambig, RuleCFillsMultiLevelGap) {
   auto result = CombineAmbiguousWithUnambiguous(unambig, ambig);
   EXPECT_EQ(result.value, Val4::kX);
   EXPECT_EQ(result.strength1_hi, StrengthLevel::kSupply);
-  EXPECT_EQ(result.strength1_lo, StrengthLevel::kLarge);
+  EXPECT_EQ(result.strength1_lo, StrengthLevel::kHighz);
 }
 
 TEST(StrengthCombineAmbigUnambig, RuleCDoesNotFillSameSideGap) {
@@ -223,9 +225,9 @@ TEST(StrengthCombineAmbigUnambig, RulesAAndBApplyPerSide) {
   auto result = CombineAmbiguousWithUnambiguous(unambig, ambig);
   EXPECT_EQ(result.value, Val4::kX);
   EXPECT_EQ(result.strength0_hi, StrengthLevel::kStrong);
-  EXPECT_EQ(result.strength0_lo, StrengthLevel::kPull);
+  EXPECT_EQ(result.strength0_lo, StrengthLevel::kHighz);
   EXPECT_EQ(result.strength1_hi, StrengthLevel::kStrong);
-  EXPECT_EQ(result.strength1_lo, StrengthLevel::kStrong);
+  EXPECT_EQ(result.strength1_lo, StrengthLevel::kHighz);
 }
 
 TEST(StrengthCombineAmbigUnambig, SupplyUnambigWipesAllAmbig) {
@@ -245,9 +247,9 @@ TEST(StrengthCombineAmbigUnambig, MirrorWithV1Unambig) {
   auto result = CombineAmbiguousWithUnambiguous(unambig, ambig);
   EXPECT_EQ(result.value, Val4::kX);
   EXPECT_EQ(result.strength1_hi, StrengthLevel::kPull);
-  EXPECT_EQ(result.strength1_lo, StrengthLevel::kPull);
+  EXPECT_EQ(result.strength1_lo, StrengthLevel::kHighz);
   EXPECT_EQ(result.strength0_hi, StrengthLevel::kStrong);
-  EXPECT_EQ(result.strength0_lo, StrengthLevel::kStrong);
+  EXPECT_EQ(result.strength0_lo, StrengthLevel::kHighz);
 }
 
 TEST(StrengthCombineAmbigUnambig, RuleCFillsGapOnOppositeSideMirror) {
@@ -257,9 +259,9 @@ TEST(StrengthCombineAmbigUnambig, RuleCFillsGapOnOppositeSideMirror) {
   auto result = CombineAmbiguousWithUnambiguous(unambig, ambig);
   EXPECT_EQ(result.value, Val4::kX);
   EXPECT_EQ(result.strength0_hi, StrengthLevel::kSupply);
-  EXPECT_EQ(result.strength0_lo, StrengthLevel::kStrong);
+  EXPECT_EQ(result.strength0_lo, StrengthLevel::kHighz);
   EXPECT_EQ(result.strength1_hi, StrengthLevel::kPull);
-  EXPECT_EQ(result.strength1_lo, StrengthLevel::kPull);
+  EXPECT_EQ(result.strength1_lo, StrengthLevel::kHighz);
 }
 
 TEST(StrengthCombineAmbigUnambig, HighZUnambigPreservesEntireAmbig) {
@@ -269,7 +271,7 @@ TEST(StrengthCombineAmbigUnambig, HighZUnambigPreservesEntireAmbig) {
   auto result = CombineAmbiguousWithUnambiguous(unambig, ambig);
   EXPECT_EQ(result.value, Val4::kX);
   EXPECT_EQ(result.strength1_hi, StrengthLevel::kPull);
-  EXPECT_EQ(result.strength1_lo, StrengthLevel::kSmall);
+  EXPECT_EQ(result.strength1_lo, StrengthLevel::kHighz);
 }
 
 TEST(StrengthResolution, RuleAAndBTrimAmbigLoBoundsPerSide) {
@@ -278,8 +280,8 @@ TEST(StrengthResolution, RuleAAndBTrimAmbigLoBoundsPerSide) {
       arena,
       {{0, Strength::kPull}, {1, Strength::kPull}, {0, Strength::kWeak}});
 
-  ExpectResolvedStrengthsAndX(sn, Strength::kPull, Strength::kWeak,
-                              Strength::kPull, Strength::kLarge);
+  ExpectResolvedStrengthsAndX(sn, Strength::kPull, Strength::kHighz,
+                              Strength::kPull, Strength::kHighz);
 }
 
 TEST(StrengthResolution, RuleAAndBTrimAmbigLoBoundsPerSideVuOne) {
@@ -288,8 +290,8 @@ TEST(StrengthResolution, RuleAAndBTrimAmbigLoBoundsPerSideVuOne) {
       arena,
       {{0, Strength::kStrong}, {1, Strength::kStrong}, {1, Strength::kWeak}});
 
-  ExpectResolvedStrengthsAndX(sn, Strength::kStrong, Strength::kLarge,
-                              Strength::kStrong, Strength::kWeak);
+  ExpectResolvedStrengthsAndX(sn, Strength::kStrong, Strength::kHighz,
+                              Strength::kStrong, Strength::kHighz);
   EXPECT_TRUE(sn.net.resolved_strength.IsAmbiguous());
 }
 
@@ -299,8 +301,8 @@ TEST(StrengthResolution, RuleBAtAmbigHiMinusOnePerSide) {
       arena,
       {{0, Strength::kStrong}, {1, Strength::kStrong}, {0, Strength::kPull}});
 
-  ExpectResolvedStrengthsAndX(sn, Strength::kStrong, Strength::kPull,
-                              Strength::kStrong, Strength::kStrong);
+  ExpectResolvedStrengthsAndX(sn, Strength::kStrong, Strength::kHighz,
+                              Strength::kStrong, Strength::kHighz);
   EXPECT_TRUE(sn.net.resolved_strength.IsAmbiguous());
 }
 
@@ -334,12 +336,12 @@ TEST(StrengthResolution, RuleBCompleteEliminationProducesUnambigResult) {
 
 // §28.12.3 makes one combination per signal of known value and unambiguous
 // strength, so the weak 0 here is combined as surely as the pull 0 above it --
-// and it moves no bound. §28.12.1 has the stronger signal dominate the weaker,
-// and after the pull 0 has been combined the result holds no level at or below
-// weak for the weak 0 to be the lower bound of: rule c's gap needs the
-// unambiguous signal's own level to bound it from below, and that level is not
-// in the result. A combination that filled the gap regardless would take the 1
-// side down to large and report the net at levels no driver drives it to.
+// and neither moves a bound. §28.12.2 gives the strong conflict "the strength
+// levels of both signals and all the smaller strength levels", so the range
+// already runs to high impedance on both sides, and rule c returns it whole
+// each time: rule a keeps every level above the weaker driver, rule b takes the
+// rest, and the gap that leaves crosses high impedance and is filled back. A
+// second combination cannot narrow what the first left.
 TEST(StrengthResolution, SecondWeakerDriverBelowTheFirstWidensNothing) {
   Arena arena;
   StrengthNet sn = ResolveWidth1(arena, {{0, Strength::kStrong},
@@ -347,18 +349,17 @@ TEST(StrengthResolution, SecondWeakerDriverBelowTheFirstWidensNothing) {
                                          {0, Strength::kPull},
                                          {0, Strength::kWeak}});
 
-  ExpectResolvedStrengthsAndX(sn, Strength::kStrong, Strength::kPull,
-                              Strength::kStrong, Strength::kStrong);
+  ExpectResolvedStrengthsAndX(sn, Strength::kStrong, Strength::kHighz,
+                              Strength::kStrong, Strength::kHighz);
 }
 
-// The shape a second combination decides. The two weaker drivers are of
-// opposite value at one level, so neither dominates the other and §28.12.3 has
-// a combination to make for each: the pull 0 leaves the 1 side only the levels
-// above pull (rules a and b), and the pull 1 leaves the 0 side only the levels
-// above pull. Combining only the strongest of them leaves the 0 side reaching
-// to pull, a level the drivers do not admit. The result carries a single level
-// on each side, so the net is a strong x of unambiguous strength -- Table
-// 21-5's StX -- rather than a range.
+// The two weaker drivers are of opposite value at one level, so §28.12.3 has a
+// combination to make for each, and neither changes the range: §28.12.1 has the
+// stronger signal "dominate all the weaker drivers and determine the result",
+// and the strong conflict is stronger than both. Rules a and b take the pull
+// levels out of the range and rule c puts them back, the gap between the
+// surviving 0-side and 1-side levels crossing high impedance (Figure 28-23), so
+// the net stands at the conflict range §28.12.2 gave it.
 TEST(StrengthResolution, OppositeValueWeakerDriversAtOneLevelBothCombine) {
   Arena arena;
   StrengthNet sn = ResolveWidth1(arena, {{0, Strength::kStrong},
@@ -366,9 +367,9 @@ TEST(StrengthResolution, OppositeValueWeakerDriversAtOneLevelBothCombine) {
                                          {0, Strength::kPull},
                                          {1, Strength::kPull}});
 
-  ExpectResolvedStrengthsAndX(sn, Strength::kStrong, Strength::kStrong,
-                              Strength::kStrong, Strength::kStrong);
-  EXPECT_FALSE(sn.net.resolved_strength.IsAmbiguous());
+  ExpectResolvedStrengthsAndX(sn, Strength::kStrong, Strength::kHighz,
+                              Strength::kStrong, Strength::kHighz);
+  EXPECT_TRUE(sn.net.resolved_strength.IsAmbiguous());
 }
 
 // The same two weaker drivers at one value. Each is combined, and the second
@@ -384,8 +385,8 @@ TEST(StrengthResolution, SameValueWeakerDriversAtOneLevelCombineIdempotently) {
                                          {0, Strength::kPull},
                                          {0, Strength::kPull}});
 
-  ExpectResolvedStrengthsAndX(sn, Strength::kStrong, Strength::kPull,
-                              Strength::kStrong, Strength::kStrong);
+  ExpectResolvedStrengthsAndX(sn, Strength::kStrong, Strength::kHighz,
+                              Strength::kStrong, Strength::kHighz);
 }
 
 // A weaker driver at the high-impedance level. §21.2.1.4 says that level
@@ -412,25 +413,24 @@ TEST(StrengthResolution, RuleAAndBAtSmallestNonHighzSu) {
       arena,
       {{0, Strength::kPull}, {1, Strength::kPull}, {0, Strength::kSmall}});
 
-  ExpectResolvedStrengthsAndX(sn, Strength::kPull, Strength::kSmall,
-                              Strength::kPull, Strength::kMedium);
+  ExpectResolvedStrengthsAndX(sn, Strength::kPull, Strength::kHighz,
+                              Strength::kPull, Strength::kHighz);
 }
 
 // Rule a) at the top of the strength scale: an opposite-value supply-strength
-// conflict yields an ambiguous range whose high end is supply; a weaker strong
-// unambiguous driver leaves the supply level in place (rule a) while trimming
-// the levels at or below strong (rule b). Exercises preservation of the maximum
-// strength level through net.Resolve.
+// conflict yields an ambiguous range whose high end is supply, and a weaker
+// strong unambiguous driver leaves it there. Rule b takes the levels at or
+// below strong and rule c returns them, the gap crossing high impedance, so
+// what the case pins is that the maximum level survives net.Resolve and that a
+// weaker driver moves neither bound.
 TEST(StrengthResolution, RuleAKeepsSupplyLevelAtTopOfScale) {
   Arena arena;
   StrengthNet sn = ResolveWidth1(
       arena,
       {{0, Strength::kSupply}, {1, Strength::kSupply}, {0, Strength::kStrong}});
 
-  // Unambiguous side (value 0) extends down to the unambiguous strong level;
-  // the opposite side keeps only the supply level above strong.
-  ExpectResolvedStrengthsAndX(sn, Strength::kSupply, Strength::kStrong,
-                              Strength::kSupply, Strength::kSupply);
+  ExpectResolvedStrengthsAndX(sn, Strength::kSupply, Strength::kHighz,
+                              Strength::kSupply, Strength::kHighz);
   EXPECT_TRUE(sn.net.resolved_strength.IsAmbiguous());
 }
 
@@ -454,39 +454,42 @@ TEST(StrengthResolution, RuleBCompleteEliminationYieldsUnambigOne) {
 
 // §28.12.3 through the production combiner rather than through the model beside
 // it. Net::Resolve reaches CombineAmbigWithUnambig only after two equally
-// strong drivers of opposite value have made an ambiguous signal, and such a
-// signal always runs down to highz, so the resolver cannot present an ambiguous
-// range that begins above the unambiguous level -- which is where rules b and c
-// have anything to decide. Calling the combiner directly is what puts those
-// ranges in front of it.
+// strong drivers of opposite value have made an ambiguous signal, and §28.12.2
+// gives such a signal every level below the conflict, so it runs to high
+// impedance on both sides and the combination returns it unchanged. The
+// one-sided range Figure 28-23 draws -- what a three-state gate with an unknown
+// control outputs -- is the shape the combination decides, and calling the
+// combiner directly is what puts it in front of it.
 
 // §28.12.3 rule c: an ambiguous 1-side range of [supply, supply] against an
 // unambiguous 0 at pull leaves a gap between pull and supply, and the signals
-// are of opposite value, so the gap belongs to the result. The range comes back
-// [strong, supply] rather than the [supply, supply] rules a and b alone would
-// leave, and rule c is the only thing that lowers the bound.
+// are of opposite value, so the gap belongs to the result. Figure 28-23 draws
+// that gap crossing high impedance -- its result is one range running Pu0
+// through HiZ to St1 -- so both sides come back reaching high impedance rather
+// than the [supply, supply] and [pull, pull] rules a and b alone would leave.
 TEST(NetStrengthAmbigUnambig, RuleCFillsTheGapOnTheOppositeValueSide) {
   NetStrength ambig;
   ambig.s1_hi = Strength::kSupply;
   ambig.s1_lo = Strength::kSupply;
   NetStrength r = CombineAmbigWithUnambig(ambig, /*vu=*/0, /*su=*/5);
   EXPECT_EQ(r.s1_hi, Strength::kSupply);
-  EXPECT_EQ(r.s1_lo, Strength::kStrong);
+  EXPECT_EQ(r.s1_lo, Strength::kHighz);
   EXPECT_EQ(r.s0_hi, Strength::kPull);
-  EXPECT_EQ(r.s0_lo, Strength::kPull);
+  EXPECT_EQ(r.s0_lo, Strength::kHighz);
 }
 
 // §28.12.3 rule c over more than one level: the same shape with the unambiguous
-// signal at weak leaves four levels between it and the surviving strong, and
-// every one of them is in the result. A gap fill that reached only one level
-// below the survivor would report large here.
+// signal at weak leaves every level between it and the surviving strong in the
+// result, and the run does not stop at weak. A gap fill bounded by the
+// unambiguous level would report large here and one bounded by the survivor
+// alone would report strong.
 TEST(NetStrengthAmbigUnambig, RuleCFillsAGapOfSeveralLevels) {
   NetStrength ambig;
   ambig.s1_hi = Strength::kSupply;
   ambig.s1_lo = Strength::kStrong;
   NetStrength r = CombineAmbigWithUnambig(ambig, /*vu=*/0, /*su=*/3);
   EXPECT_EQ(r.s1_hi, Strength::kSupply);
-  EXPECT_EQ(r.s1_lo, Strength::kLarge);
+  EXPECT_EQ(r.s1_lo, Strength::kHighz);
 }
 
 // §28.12.3 on the side of the unambiguous signal's own value: the two signals
@@ -545,23 +548,24 @@ TEST(NetStrengthAmbigUnambig, RulesFollowTheValueAndNotTheSide) {
   ambig.s0_lo = Strength::kSupply;
   NetStrength r = CombineAmbigWithUnambig(ambig, /*vu=*/1, /*su=*/5);
   EXPECT_EQ(r.s0_hi, Strength::kSupply);
-  EXPECT_EQ(r.s0_lo, Strength::kStrong);
+  EXPECT_EQ(r.s0_lo, Strength::kHighz);
   EXPECT_EQ(r.s1_hi, Strength::kPull);
-  EXPECT_EQ(r.s1_lo, Strength::kPull);
+  EXPECT_EQ(r.s1_lo, Strength::kHighz);
 }
 
-// §28.12.3 rule c against a signal that dominates the unambiguous one. Every
-// level of this ambiguous signal is stronger than the weak the unambiguous
-// signal drives at, so by §28.12.1 the stronger signal dominates the weaker
-// and the weak level is in no part of the result. Rule c's gap is bounded from
-// below by that level, so there is no gap: the levels beneath the surviving
-// ones lie under nothing. The 0-side bound therefore stays where rules a and b
-// left it, at pull, and a gap fill that ran regardless would take it to large.
+// §28.12.3 rule c where the ambiguous signal is stronger than the unambiguous
+// one throughout. §28.12.1 has the stronger signal "dominate all the weaker
+// drivers and determine the result", and the weak level the unambiguous signal
+// drives at is in no part of the result -- but the levels it removed are, since
+// rule c's gap is bounded by the surviving pieces and those sit on opposite
+// sides of the scale. Both sides therefore come back reaching high impedance,
+// and the combination has widened nothing that the ambiguous signal's own range
+// did not already admit.
 //
-// This is the shape a net presents to the second of two combinations, which is
-// why it decides whether combining every weaker driver widens the result or
-// leaves it alone.
-TEST(NetStrengthAmbigUnambig, DominatedUnambigSignalOpensNoGapToFill) {
+// The input is one Net::Resolve cannot present: §28.12.2 gives a conflict every
+// level below its own, so an ambiguous signal it builds runs to high impedance
+// on both sides. The case is about the function.
+TEST(NetStrengthAmbigUnambig, DominatingAmbiguousSignalKeepsItsOwnRange) {
   NetStrength ambig;
   ambig.s0_hi = Strength::kStrong;
   ambig.s0_lo = Strength::kPull;
@@ -569,9 +573,9 @@ TEST(NetStrengthAmbigUnambig, DominatedUnambigSignalOpensNoGapToFill) {
   ambig.s1_lo = Strength::kStrong;
   NetStrength r = CombineAmbigWithUnambig(ambig, /*vu=*/1, /*su=*/3);
   EXPECT_EQ(r.s0_hi, Strength::kStrong);
-  EXPECT_EQ(r.s0_lo, Strength::kPull);
+  EXPECT_EQ(r.s0_lo, Strength::kHighz);
   EXPECT_EQ(r.s1_hi, Strength::kStrong);
-  EXPECT_EQ(r.s1_lo, Strength::kStrong);
+  EXPECT_EQ(r.s1_lo, Strength::kHighz);
 }
 
 // §28.12.3 driven from source. Nothing above reaches Net::Resolve the way a
@@ -607,22 +611,22 @@ TEST(NetStrengthAmbigUnambig, DominatedUnambigSignalOpensNoGapToFill) {
 // and weak.
 
 // Two weaker drivers of opposite value at one level, from source. Both are
-// combined, so each side of the result carries the single level strong, which
-// §21.2.1.4 renders with that level's mnemonic and the unknown logic value:
-// StX. Combining only the strongest of them leaves the 0 side running down to
-// pull, and renders StX as well -- §21.2.1.4 chooses the mnemonic when the two
-// sides' strongest levels are equal, which rule a keeps them either way. The
-// four bounds asserted below are what separates the two, and the rendering is
-// asserted beside them to say that the strength reaches %v as the resolver
-// left it.
+// combined and neither moves a bound: the strong conflict runs to high
+// impedance on both sides (§28.12.2) and rule c returns every level rule b
+// takes, the gap between the surviving sides crossing high impedance. §21.2.1.4
+// renders the result with the mnemonic of the two sides' strongest level and
+// the unknown logic value -- StX -- since it names one level per side and this
+// result's strongest levels are equal. The four bounds are asserted beside the
+// rendering because the rendering reads the strongest levels alone and would
+// say StX whatever the weaker drivers did to the low ends.
 TEST(StrengthResolution, SourceOppositeValuePullDriversRenderAsStX) {
   NetStrength ns = ResolveSrcNetW(
       ConflictPlusWeakerSrc("  assign (pull0, pull1) w = 1'b0;\n"
                             "  assign (pull0, pull1) w = 1'b1;\n"));
   EXPECT_EQ(ns.s0_hi, Strength::kStrong);
-  EXPECT_EQ(ns.s0_lo, Strength::kStrong);
+  EXPECT_EQ(ns.s0_lo, Strength::kHighz);
   EXPECT_EQ(ns.s1_hi, Strength::kStrong);
-  EXPECT_EQ(ns.s1_lo, Strength::kStrong);
+  EXPECT_EQ(ns.s1_lo, Strength::kHighz);
   EXPECT_EQ(FormatStrength(ns), "StX");
 }
 
@@ -637,6 +641,154 @@ TEST(StrengthResolution, SourceHighzStrengthDriverLeavesTheConflictRangeWhole) {
   EXPECT_EQ(ns.s0_lo, Strength::kHighz);
   EXPECT_EQ(ns.s1_hi, Strength::kStrong);
   EXPECT_EQ(ns.s1_lo, Strength::kHighz);
+}
+
+// --- §28.12.3's own figures ---
+//
+// The clause states rules a), b) and c) in words that leave what rule c's gap
+// runs to open, and draws four combinations that answer it. Each case below is
+// one of those drawings, so the reading the two implementations share is
+// anchored to the standard rather than to either of them.
+
+// Figure 28-23: an ambiguous signal occupying the strength1 side from high
+// impedance to strong -- what §28.12.2's Figure 28-6 gives a three-state gate
+// with an unknown control -- combined with an unambiguous Pu0. The figure draws
+// one range running Pu0 through HiZ0 and HiZ1 to St1, and its prose calls it "a
+// range defined by the greatest strength in the range of the ambiguous strength
+// signal and by the strength level of the unambiguous strength signal". Rule
+// c's gap therefore crosses high impedance: a fill bounded by the unambiguous
+// level would leave the 1 side at strong and the 0 side at pull.
+TEST(NetStrengthAmbigUnambig, Figure2823FillsAcrossHighImpedance) {
+  NetStrength ambig;
+  ambig.s1_hi = Strength::kStrong;
+  ambig.s1_lo = Strength::kHighz;
+  NetStrength r = CombineAmbigWithUnambig(ambig, /*vu=*/0, /*su=*/5);
+  EXPECT_EQ(r.s0_hi, Strength::kPull);
+  EXPECT_EQ(r.s0_lo, Strength::kHighz);
+  EXPECT_EQ(r.s1_hi, Strength::kStrong);
+  EXPECT_EQ(r.s1_lo, Strength::kHighz);
+}
+
+// Figure 28-22: the same side for both signals, so no gap of opposite value
+// opens and rules a) and b) alone decide. The ambiguous 1 range runs from high
+// impedance to pull and the unambiguous Me1 stands at medium, and the figure
+// draws the result from Me1 to Pu1 -- the levels below medium disappear rather
+// than being filled back.
+TEST(NetStrengthAmbigUnambig, Figure2822StopsAtTheUnambiguousLevel) {
+  NetStrength ambig;
+  ambig.s1_hi = Strength::kPull;
+  ambig.s1_lo = Strength::kHighz;
+  NetStrength r = CombineAmbigWithUnambig(ambig, /*vu=*/1, /*su=*/2);
+  EXPECT_EQ(r.s1_hi, Strength::kPull);
+  EXPECT_EQ(r.s1_lo, Strength::kMedium);
+  EXPECT_EQ(r.s0_hi, Strength::kHighz);
+  EXPECT_EQ(r.s0_lo, Strength::kHighz);
+}
+
+// Figure 28-20, which the clause names as rule b) on its own: an ambiguous 0
+// range against an unambiguous 0 at pull keeps the levels above pull and takes
+// the rest, leaving the range the figure draws from Pu0 to St0.
+TEST(NetStrengthAmbigUnambig, Figure2820EliminatesTheLevelsAtOrBelowSu) {
+  NetStrength ambig;
+  ambig.s0_hi = Strength::kStrong;
+  ambig.s0_lo = Strength::kHighz;
+  NetStrength r = CombineAmbigWithUnambig(ambig, /*vu=*/0, /*su=*/5);
+  EXPECT_EQ(r.s0_hi, Strength::kStrong);
+  EXPECT_EQ(r.s0_lo, Strength::kPull);
+  EXPECT_EQ(r.s1_hi, Strength::kHighz);
+}
+
+// Figure 28-21: an ambiguous signal crossing the scale, whose opposite-value
+// component lies entirely below the unambiguous Pu1. Nothing of the opposite
+// value survives rule b), so rule c) has no gap to fill and the result is the
+// range the figure draws, from the unambiguous level to the ambiguous signal's
+// greater extreme.
+TEST(NetStrengthAmbigUnambig, Figure2821LeavesTheRangeFromSuToTheExtreme) {
+  NetStrength ambig;
+  ambig.s0_hi = Strength::kWeak;
+  ambig.s0_lo = Strength::kHighz;
+  ambig.s1_hi = Strength::kStrong;
+  ambig.s1_lo = Strength::kHighz;
+  NetStrength r = CombineAmbigWithUnambig(ambig, /*vu=*/1, /*su=*/5);
+  EXPECT_EQ(r.s1_hi, Strength::kStrong);
+  EXPECT_EQ(r.s1_lo, Strength::kPull);
+  EXPECT_EQ(r.s0_hi, Strength::kHighz);
+  EXPECT_EQ(r.s0_lo, Strength::kHighz);
+}
+
+// --- the model and the function it models, on one input ---
+//
+// A model under lib/cpp/test_models/ states what the standard requires
+// independently of the code, so a case can be checked against the clause rather
+// than against the implementation. That is worth only as much as the two
+// agreeing, and nothing ran them on one input: the cases above call one or the
+// other. These two do, over the inputs where a divergence would show.
+
+// The four bounds a combination answers with, in the order §21.2.1.4 reads
+// them: the strength0 side and then the strength1 side, each from its strongest
+// level to its weakest.
+struct ExpectedBounds {
+  StrengthLevel s0_hi;
+  StrengthLevel s0_lo;
+  StrengthLevel s1_hi;
+  StrengthLevel s1_lo;
+};
+
+// Those bounds read off both the model and the production combiner for one
+// ambiguous signal and one unambiguous (value, level) pair, so a case states
+// the clause's answer once and both implementations are held to it.
+void ExpectModelAndCombinerAgree(StrengthSignal ambig, Val4 vu,
+                                 StrengthLevel su, const ExpectedBounds& want) {
+  StrengthSignal modelled =
+      CombineAmbiguousWithUnambiguous(UnambiguousSignal(vu, su), ambig);
+  EXPECT_EQ(modelled.strength0_hi, want.s0_hi);
+  EXPECT_EQ(modelled.strength0_lo, want.s0_lo);
+  EXPECT_EQ(modelled.strength1_hi, want.s1_hi);
+  EXPECT_EQ(modelled.strength1_lo, want.s1_lo);
+
+  NetStrength ns;
+  ns.s0_hi = static_cast<Strength>(ambig.strength0_hi);
+  ns.s0_lo = static_cast<Strength>(ambig.strength0_lo);
+  ns.s1_hi = static_cast<Strength>(ambig.strength1_hi);
+  ns.s1_lo = static_cast<Strength>(ambig.strength1_lo);
+  NetStrength r = CombineAmbigWithUnambig(ns, vu == Val4::kV0 ? 0 : 1,
+                                          static_cast<uint8_t>(su));
+  EXPECT_EQ(r.s0_hi, static_cast<Strength>(want.s0_hi));
+  EXPECT_EQ(r.s0_lo, static_cast<Strength>(want.s0_lo));
+  EXPECT_EQ(r.s1_hi, static_cast<Strength>(want.s1_hi));
+  EXPECT_EQ(r.s1_lo, static_cast<Strength>(want.s1_lo));
+}
+
+// Figure 28-23's own input, which is where the two used to differ: each filled
+// the opposite side down to one level above the unambiguous signal, and both
+// stopped short of the high impedance the figure draws.
+TEST(NetStrengthAmbigUnambig, ModelAndCombinerAgreeOnFigure2823) {
+  ExpectModelAndCombinerAgree(
+      AmbiguousRange(Val4::kV1, StrengthLevel::kHighz, StrengthLevel::kStrong),
+      Val4::kV0, StrengthLevel::kPull,
+      {StrengthLevel::kPull, StrengthLevel::kHighz, StrengthLevel::kStrong,
+       StrengthLevel::kHighz});
+}
+
+// The shape Net::Resolve actually builds: §28.12.2's conflict range, which runs
+// to high impedance on both sides, against a weaker unambiguous driver. The
+// combination returns it unchanged, and the two implementations say so alike.
+TEST(NetStrengthAmbigUnambig, ModelAndCombinerAgreeOnAResolverConflictRange) {
+  ExpectModelAndCombinerAgree(
+      AmbiguousRange(Val4::kX, StrengthLevel::kHighz, StrengthLevel::kStrong),
+      Val4::kV0, StrengthLevel::kPull,
+      {StrengthLevel::kStrong, StrengthLevel::kHighz, StrengthLevel::kStrong,
+       StrengthLevel::kHighz});
+}
+
+// The same-value side, where no gap opens: the two agree there too, so the
+// agreement above is not one the fill alone accounts for.
+TEST(NetStrengthAmbigUnambig, ModelAndCombinerAgreeWithNoOppositeSurvivor) {
+  ExpectModelAndCombinerAgree(
+      AmbiguousRange(Val4::kV0, StrengthLevel::kHighz, StrengthLevel::kStrong),
+      Val4::kV0, StrengthLevel::kPull,
+      {StrengthLevel::kStrong, StrengthLevel::kPull, StrengthLevel::kHighz,
+       StrengthLevel::kHighz});
 }
 
 }  // namespace

@@ -196,6 +196,18 @@ static void ComputeSingleBitStrength(
   if (m.conflict) {
     out.s0_hi = s;
     out.s1_hi = s;
+    // §28.12.3 makes one combination per signal of known value and unambiguous
+    // strength, so every weaker driver is combined in turn. None of them moves
+    // a bound, and the reason is worth stating rather than discovering: the
+    // range above runs from the conflict level down to high impedance on both
+    // sides -- §28.12.2 gives such a conflict "the strength levels of both
+    // signals and all the smaller strength levels" -- and §28.12.3's rule c
+    // returns every level rule b takes out of it, the gap between the surviving
+    // sides crossing high impedance (Figure 28-23). The loop stands because the
+    // clause has the combination made, and because an ambiguous signal
+    // occupying one side alone -- what §28.12.2's Figure 28-6 gives a
+    // three-state gate with an unknown control -- is one this resolver does not
+    // build yet (#3468) and one the combination does decide.
     std::vector<UnambigSignal> weaker =
         FindWeakerUnambig(drivers, strengths, m.str, bit);
     for (const UnambigSignal& u : weaker) {

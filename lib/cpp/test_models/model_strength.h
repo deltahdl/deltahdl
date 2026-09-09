@@ -301,47 +301,48 @@ inline StrengthSignal CombineAmbiguous(StrengthSignal a, StrengthSignal b) {
   return SignalOfSpan(result);
 }
 
-// §28.12.3: rules a/b/c for combining a known-value, single-level unambig
-// signal with one component of an ambiguous-strength signal.
-//   a) ambig levels strictly above Su survive on their original side;
-//   b) ambig levels at or below Su disappear (subject to c);
-//   c) if a) and b) leave a gap on the !Vu side because the signals are of
-//      opposite value, the gap is filled down to Su+1.
-// The unambig signal contributes its single level Su on the Vu side. Per-side
-// surviving ranges are merged with that contribution into [lo, hi] form.
+// §28.12.3 combines a known-value, single-level unambiguous signal with each
+// component of an ambiguous-strength signal:
+//
+//   a) ambiguous levels strictly above Su remain in the result;
+//   b) ambiguous levels at or below Su disappear, subject to c);
+//   c) where a) and b) leave a gap because the signals are of opposite value,
+//      the levels in the gap are in the result.
+//
+// The clause's figures say what the gap runs to, and they are what this model
+// states. Figure 28-23 combines an ambiguous signal on the strength1 side with
+// an unambiguous Pu0 and draws one range from Pu0 through high impedance to
+// St1: the gap is bounded by the surviving pieces, which sit on opposite sides
+// of the scale, so filling it carries both sides down to high impedance.
+// Figure 28-20 and Figure 28-22, where nothing of the opposite value survives,
+// leave the shared side running from Su up to the ambiguous top and nothing on
+// the other side; Figure 28-21 is the same answer reached with an
+// opposite-value component that lies entirely at or below Su.
+//
+// The Vu side takes [max(Su, ambiguous lo), max(Su, ambiguous hi)] where no
+// opposite-value level survives, because two signals of one value resolve to
+// the stronger of the two: a level above Su settles the combination on its own,
+// and a level below it resolves to Su.
 inline StrengthSignal CombineAmbiguousWithUnambiguous(StrengthSignal unambig,
                                                       StrengthSignal ambig) {
   bool vu_is_0 = unambig.value == Val4::kV0;
   StrengthLevel s_u = vu_is_0 ? unambig.strength0_hi : unambig.strength1_hi;
   auto s_u_idx = static_cast<uint8_t>(s_u);
 
-  // Split the ambiguous signal into its component on the unambiguous value side
-  // (Vu) and the opposite value side (!Vu).
-  // The opposite-side lower bound is not needed: rule c always fills the gap
-  // down to Su+1 whenever any opposite-value level survives.
   StrengthLevel amb_vu_lo = vu_is_0 ? ambig.strength0_lo : ambig.strength1_lo;
   StrengthLevel amb_vu_hi = vu_is_0 ? ambig.strength0_hi : ambig.strength1_hi;
   StrengthLevel amb_op_hi = vu_is_0 ? ambig.strength1_hi : ambig.strength0_hi;
 
-  // Vu side (§28.12.3 rules a/b, same value): the unambiguous level Su is
-  // always driven, and two drivers of the same value resolve to the stronger
-  // one, so the result spans [max(Su, ambig_lo), max(Su, ambig_hi)]. Rule c
-  // never fills a same-value gap, which is exactly why the lower bound is
-  // clamped up to Su rather than extended down to it.
-  StrengthLevel vu_lo = static_cast<StrengthLevel>(
-      std::max<uint8_t>(s_u_idx, static_cast<uint8_t>(amb_vu_lo)));
+  bool opposite_survives = static_cast<uint8_t>(amb_op_hi) > s_u_idx;
+
   StrengthLevel vu_hi = static_cast<StrengthLevel>(
       std::max<uint8_t>(s_u_idx, static_cast<uint8_t>(amb_vu_hi)));
-
-  // Opposite side (§28.12.3 rules a/b/c, opposite value): only ambiguous levels
-  // strictly greater than Su survive (rules a/b); when any survive, the signals
-  // are of opposite value so rule c fills the gap down to Su+1.
+  StrengthLevel vu_lo = opposite_survives
+                            ? StrengthLevel::kHighz
+                            : static_cast<StrengthLevel>(std::max<uint8_t>(
+                                  s_u_idx, static_cast<uint8_t>(amb_vu_lo)));
+  StrengthLevel op_hi = opposite_survives ? amb_op_hi : StrengthLevel::kHighz;
   StrengthLevel op_lo = StrengthLevel::kHighz;
-  StrengthLevel op_hi = StrengthLevel::kHighz;
-  if (static_cast<uint8_t>(amb_op_hi) > s_u_idx) {
-    op_hi = amb_op_hi;
-    op_lo = static_cast<StrengthLevel>(s_u_idx + 1);
-  }
 
   StrengthSignal result;
   if (vu_is_0) {
@@ -359,7 +360,7 @@ inline StrengthSignal CombineAmbiguousWithUnambiguous(StrengthSignal unambig,
   // The unambiguous signal always anchors its known value, so the result keeps
   // that value unless opposite-value levels survive, in which case it is
   // ambiguous (x).
-  result.value = (op_hi != StrengthLevel::kHighz) ? Val4::kX : unambig.value;
+  result.value = opposite_survives ? Val4::kX : unambig.value;
   return result;
 }
 

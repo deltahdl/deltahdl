@@ -188,68 +188,73 @@ Logic4Word ResolveWorWord(Logic4Word a, Logic4Word b) {
   return {res_aval, res_bval};
 }
 
-// §28.12.3 rules a and b: the ambiguous levels above `su` remain in the result
-// and those at or below it disappear. A side whose whole range sits at or below
-// `su` disappears entirely, which is what leaving the outputs at their highz
-// default says.
-static void TrimAmbigSide(Strength a_lo, Strength a_hi, uint8_t su,
-                          Strength& r_lo, Strength& r_hi) {
-  if (static_cast<uint8_t>(a_hi) <= su) return;
-  uint8_t lo_idx = std::max<uint8_t>(static_cast<uint8_t>(a_lo),
-                                     static_cast<uint8_t>(su + 1));
-  r_lo = static_cast<Strength>(lo_idx);
-  r_hi = a_hi;
-}
-
-// §28.12.3 rule c: where rules a and b leave a gap in strength levels because
-// the signals are of opposite value, the levels in the gap are part of the
-// result. The gap runs from just above `su`, the strongest level rule b
-// removed, up to the lowest level that survived, so filling it takes the lower
-// bound back down to `su` + 1. A gap needs the unambiguous signal's own level
-// to bound it from below, which `su_in_result` reports: where every level of
-// the ambiguous signal is stronger than `su`, §28.12.1 has the stronger signal
-// dominate, the unambiguous signal is in no part of the result, and the levels
-// below the surviving ones lie under nothing rather than in a gap.
-static void FillRuleCGap(Strength& r_lo, Strength r_hi, uint8_t su,
-                         bool su_in_result) {
-  if (r_hi == Strength::kHighz) return;
-  if (!su_in_result) return;
-  if (static_cast<uint8_t>(r_lo) <= su + 1) return;
-  r_lo = static_cast<Strength>(su + 1);
-}
-
+// §28.12.3 combines a signal of known value and unambiguous strength with each
+// component of a signal of ambiguous strength, under three rules:
+//
+//   a) "The strength levels of the ambiguous strength signal that are greater
+//      than the strength level of the unambiguous signal shall remain in the
+//      result."
+//   b) "The strength levels of the ambiguous strength signal that are smaller
+//      than or equal to the strength level of the unambiguous signal shall
+//      disappear from the result, subject to rule c)."
+//   c) "If the operation of rule a) and rule b) results in a gap in strength
+//      levels because the signals are of opposite value, the signals in the gap
+//      shall be part of the result."
+//
+// What rule c's gap runs to is what the clause's words leave open and its
+// figures settle. Figure 28-23 combines an ambiguous signal occupying the
+// strength1 side with an unambiguous Pu0 and draws the result as one range
+// running Pu0 through high impedance to St1, which its prose states as "a range
+// defined by the greatest strength in the range of the ambiguous strength
+// signal and by the strength level of the unambiguous strength signal". The gap
+// is therefore bounded by the two surviving pieces rather than by the
+// unambiguous level, and since those pieces sit on opposite sides of Figure
+// 28-2's scale, filling it takes both sides down to high impedance.
+//
+// Where no opposite-value level survives there is no such gap, and the result
+// is what rules a and b leave on the side the two signals share: Figure 28-20
+// trims an ambiguous 0 range to [su, its own top], Figure 28-22 does the same
+// on the strength1 side, and Figure 28-21 does it where the ambiguous signal's
+// opposite-value component lies entirely at or below `su`. Two signals of one
+// value resolve to the stronger of the two, which is what puts the lower bound
+// at the greater of `su` and the ambiguous signal's own bound: a level above
+// `su` settles the combination on its own, so `su` cannot appear below a range
+// that begins above it.
+//
+// The consequence for the resolver is worth stating where it is read rather
+// than where it is called: §28.12.2 gives an equal-strength opposite-value
+// conflict "the strength levels of both signals and all the smaller strength
+// levels", so every ambiguous signal Net::Resolve builds runs down to high
+// impedance on both sides, and combining one with any weaker driver returns it
+// unchanged. The function earns its keep on the one-sided ambiguous signal
+// Figure 28-23 draws, which is what a three-state gate with an unknown control
+// outputs (§28.12.2, Figure 28-6) and what this simulator does not build yet
+// (#3468).
 NetStrength CombineAmbigWithUnambig(NetStrength ambig, uint8_t vu, uint8_t su) {
   NetStrength r;
   Strength amb_vu_lo = (vu == 0) ? ambig.s0_lo : ambig.s1_lo;
   Strength amb_vu_hi = (vu == 0) ? ambig.s0_hi : ambig.s1_hi;
-  Strength amb_opp_lo = (vu == 0) ? ambig.s1_lo : ambig.s0_lo;
   Strength amb_opp_hi = (vu == 0) ? ambig.s1_hi : ambig.s0_hi;
 
-  // The unambiguous signal's own level stands in the result exactly where the
-  // ambiguous signal has a level at or below it: such a level resolves against
-  // `su` to `su` itself, while §28.12.1 has an ambiguous signal every one of
-  // whose levels is stronger dominate the unambiguous signal outright. This is
-  // the same test the side of `vu` applies below, where it puts the lower bound
-  // at the greater of `su` and the ambiguous signal's own bound.
-  bool su_in_result = static_cast<uint8_t>(amb_vu_lo) <= su;
-
-  Strength& opp_hi = (vu == 0) ? r.s1_hi : r.s0_hi;
-  Strength& opp_lo = (vu == 0) ? r.s1_lo : r.s0_lo;
-  TrimAmbigSide(amb_opp_lo, amb_opp_hi, su, opp_lo, opp_hi);
-  FillRuleCGap(opp_lo, opp_hi, su, su_in_result);
-
-  // §28.12.3 on the side of the unambiguous signal's own value: the two signals
-  // agree there, so each level the ambiguous signal might have resolves against
-  // `su` to whichever of the two is stronger, and the range of those results is
-  // what the side contributes. A level at or below `su` therefore leaves the
-  // result as rule b says while `su` itself stays, and a level above `su`
-  // settles the combination on its own, which is why `su` cannot appear below
-  // an ambiguous range that begins above it.
-  auto s_su = static_cast<Strength>(su);
-  Strength& vu_hi = (vu == 0) ? r.s0_hi : r.s1_hi;
   Strength& vu_lo = (vu == 0) ? r.s0_lo : r.s1_lo;
-  vu_lo = std::max(s_su, amb_vu_lo);
+  Strength& vu_hi = (vu == 0) ? r.s0_hi : r.s1_hi;
+  Strength& opp_lo = (vu == 0) ? r.s1_lo : r.s0_lo;
+  Strength& opp_hi = (vu == 0) ? r.s1_hi : r.s0_hi;
+
+  auto s_su = static_cast<Strength>(su);
   vu_hi = std::max(s_su, amb_vu_hi);
+  if (static_cast<uint8_t>(amb_opp_hi) > su) {
+    // Rule a keeps the opposite-value levels above `su`, and rule c fills the
+    // gap between them and the unambiguous signal's own level. That gap crosses
+    // high impedance, so both sides reach it.
+    opp_hi = amb_opp_hi;
+    opp_lo = Strength::kHighz;
+    vu_lo = Strength::kHighz;
+    return r;
+  }
+  // Rule b took the whole opposite side, which leaves the two signals agreeing
+  // on one value and no gap for rule c to fill.
+  vu_lo = std::max(s_su, amb_vu_lo);
   return r;
 }
 
