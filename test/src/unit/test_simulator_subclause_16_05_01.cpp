@@ -247,4 +247,93 @@ TEST(ConcurrentAssertionSampling, TimeZeroTickReadsTheDefaultSampledValue) {
   EXPECT_EQ(misses->value.ToUint64(), 1u);
 }
 
+// §16.5.1 puts no condition on where the variable a property reads is declared,
+// and §23.6 makes a hierarchical name an ordinary way to reach one: "The
+// instance name ... is used to unambiguously gain access" to a name inside
+// another instance. So `u.req` is sampled exactly as a name the module declares
+// itself, and the value the property reads at a clock tick is the one `u.req`
+// held in the Preponed region of that time slot.
+//
+// The write and the tick stand in one time step here, which is the only shape
+// that tells a sampled read from a live one: `u.req` is 0 in the Preponed
+// region of time 5 and 1 by the time the property is evaluated, so the
+// assertion does not hold and its pass action does not run.
+TEST(ConcurrentAssertionSampling, ChildInstanceOperandReadsThePreponedValue) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module leaf;\n"
+      "  logic req = 0;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  logic clk = 0;\n"
+      "  int hits = 0;\n"
+      "  leaf u();\n"
+      "  assert property (@(posedge clk) u.req) hits = hits + 1;\n"
+      "  initial begin\n"
+      "    #5 u.req = 1;\n"
+      "    clk = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "hits");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// The other half of the pair. `u.req` is raised a whole time step before the
+// tick, so the Preponed value of the tick's time slot is the 1 it settled to,
+// and the assertion holds. Either case on its own is satisfied by an
+// implementation that answers one thing for every hierarchical operand -- the
+// live value passes this one and fails the case above, and a stuck default
+// passes that one and fails this.
+TEST(ConcurrentAssertionSampling,
+     ChildInstanceOperandSettledBeforeTheTickHolds) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module leaf;\n"
+      "  logic req = 0;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  logic clk = 0;\n"
+      "  int hits = 0;\n"
+      "  leaf u();\n"
+      "  assert property (@(posedge clk) u.req) hits = hits + 1;\n"
+      "  initial begin\n"
+      "    #5 u.req = 1;\n"
+      "    #5 clk = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "hits");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// Two instances of one module declare the same name, and one property reads
+// both. Each is sampled from its own instance: `u1.req` settled a time step
+// before the tick and `u2.req` is written in the tick's own time step, so the
+// property reads 1 and 0 and holds. An enrolment keyed by the declared name
+// rather than by the variable the reference resolves to samples neither, and
+// the live read of `u2.req` then makes the property false.
+TEST(ConcurrentAssertionSampling, LikeNamedOperandsAreSampledPerInstance) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module leaf;\n"
+      "  logic req = 0;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  logic clk = 0;\n"
+      "  int hits = 0;\n"
+      "  leaf u1();\n"
+      "  leaf u2();\n"
+      "  assert property (@(posedge clk) u1.req && !u2.req) hits = hits + 1;\n"
+      "  initial begin\n"
+      "    #5 u1.req = 1;\n"
+      "    #5 u2.req = 1;\n"
+      "    clk = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "hits");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 }  // namespace

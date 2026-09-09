@@ -639,7 +639,18 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
     resolved = resolved.substr(kLocalScopePrefix.size());
   }
   auto* var = ctx.FindVariable(resolved);
-  if (var) return var->value;
+  if (var) {
+    // §16.5.2: "In an assertion, the sampled value is the only valid value of a
+    // variable during a clock tick", and §16.5.1 puts no condition on where the
+    // variable is declared, so a variable a property reaches across an instance
+    // boundary reads the value sampled for this time slot exactly as one the
+    // module declares itself. The store answers nothing outside a clocked
+    // concurrent assertion's property and nothing for a variable no such
+    // property reads, so every other hierarchical read is the live read it was.
+    const Logic4Vec* sampled =
+        ctx.AssertionSamples().ReadWithinProperty(var, ctx.CurrentTime());
+    return sampled != nullptr ? *sampled : var->value;
+  }
 
   auto dot = resolved.find('.');
   if (dot == std::string::npos) return MakeLogic4Vec(arena, 1);

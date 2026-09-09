@@ -360,15 +360,13 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   LowerChildModules(mod);
 }
 
-// §16.5.1: enrols every variable a concurrent assertion's property reads in the
-// sampled-value store, so that the end of each time slot copies its value and
-// the property is evaluated against that copy rather than against whatever
-// stands at the clock tick.
+// §16.5.1: the variables a concurrent assertion's property reads are enrolled
+// in the sampled-value store, so that the end of each time slot copies each
+// one's value and the property is evaluated against that copy rather than
+// against whatever stands at the clock tick. The functions below name what is
+// enrolled; Lowerer::RegisterDesignAssertionSampling is where the enrolment
+// happens.
 //
-// CollectExprReads is the reader-name walk §9.2.2.2.1's implicit sensitivity
-// list is built from, so it reaches the base and index of a select, the
-// arguments of a call and the operands of every subexpression -- which is the
-// set of variables a property names.
 // §16.9.3: "The use of these functions is not limited to assertion features;
 // they may be used as expressions in procedural code as well." Each reads the
 // sampled value of its argument, so the variables that argument names have to
@@ -381,27 +379,75 @@ static bool IsSampledValueFunction(std::string_view name) {
          IsGlobalClockingSampledFunction(name);
 }
 
+// Every node of `e`, itself included. Both walks below ask a question of every
+// subexpression -- one about the calls, one about the names -- so the descent
+// they share is written once here.
+template <typename Fn>
+static void ForEachSubExpr(const Expr* e, const Fn& fn) {
+  if (e == nullptr) return;
+  fn(e);
+  ForEachSubExpr(e->lhs, fn);
+  ForEachSubExpr(e->rhs, fn);
+  ForEachSubExpr(e->condition, fn);
+  ForEachSubExpr(e->true_expr, fn);
+  ForEachSubExpr(e->false_expr, fn);
+  ForEachSubExpr(e->base, fn);
+  ForEachSubExpr(e->index, fn);
+  ForEachSubExpr(e->index_end, fn);
+  ForEachSubExpr(e->with_expr, fn);
+  ForEachSubExpr(e->repeat_count, fn);
+  for (auto* sub : e->elements) ForEachSubExpr(sub, fn);
+  for (auto* sub : e->args) ForEachSubExpr(sub, fn);
+}
+
+// The dotted spelling of a hierarchical reference, appended to `out`, and
+// whether `e` is one. §23.6 writes a name that crosses an instance boundary as
+// `u.req`, and the child instance's variable is keyed under exactly that
+// spelling, so the whole reference is the name to look up rather than the
+// identifiers it is built from. Anything else the walk meets -- a select, a
+// call, a class scope resolution -- names no variable of its own, and is
+// reported false rather than half a name.
+static bool AppendHierarchicalName(const Expr* e, std::string& out) {
+  if (e == nullptr) return false;
+  if (e->kind == ExprKind::kIdentifier) {
+    out += e->text;
+    return true;
+  }
+  if (e->kind != ExprKind::kMemberAccess || e->is_scope_resolution) {
+    return false;
+  }
+  if (!AppendHierarchicalName(e->lhs, out)) return false;
+  out += '.';
+  return AppendHierarchicalName(e->rhs, out);
+}
+
+// The names an expression a sampled value is taken of reads. CollectExprReads
+// is the reader-name walk §9.2.2.2.1's implicit sensitivity list is built from,
+// which reaches the base and index of a select, the arguments of a call and the
+// operands of every subexpression; a hierarchical reference is added to what it
+// answers, because it holds `u.req` as a member access over two identifiers and
+// so contributes `u` and `req`, neither of which is the name the child's
+// variable is keyed under.
+static void CollectSampledOperandNames(const Expr* e,
+                                       std::unordered_set<std::string>& out) {
+  CollectExprReads(e, out);
+  ForEachSubExpr(e, [&out](const Expr* sub) {
+    if (sub->kind != ExprKind::kMemberAccess) return;
+    std::string name;
+    if (AppendHierarchicalName(sub, name)) out.insert(name);
+  });
+}
+
 // The names read by the argument of every sampled value function call anywhere
 // in `e`, which is the set those calls will ask the store for.
 static void CollectSampledFunctionArgs(const Expr* e,
                                        std::unordered_set<std::string>& out) {
-  if (e == nullptr) return;
-  if (e->kind == ExprKind::kSystemCall && IsSampledValueFunction(e->callee) &&
-      !e->args.empty()) {
-    CollectExprReads(e->args[0], out);
-  }
-  CollectSampledFunctionArgs(e->lhs, out);
-  CollectSampledFunctionArgs(e->rhs, out);
-  CollectSampledFunctionArgs(e->condition, out);
-  CollectSampledFunctionArgs(e->true_expr, out);
-  CollectSampledFunctionArgs(e->false_expr, out);
-  CollectSampledFunctionArgs(e->base, out);
-  CollectSampledFunctionArgs(e->index, out);
-  CollectSampledFunctionArgs(e->index_end, out);
-  CollectSampledFunctionArgs(e->with_expr, out);
-  CollectSampledFunctionArgs(e->repeat_count, out);
-  for (auto* sub : e->elements) CollectSampledFunctionArgs(sub, out);
-  for (auto* sub : e->args) CollectSampledFunctionArgs(sub, out);
+  ForEachSubExpr(e, [&out](const Expr* sub) {
+    if (sub->kind == ExprKind::kSystemCall &&
+        IsSampledValueFunction(sub->callee) && !sub->args.empty()) {
+      CollectSampledOperandNames(sub->args[0], out);
+    }
+  });
 }
 
 static void CollectSampledFunctionArgsInStmt(
@@ -411,20 +457,43 @@ static void CollectSampledFunctionArgsInStmt(
       stmt, [&out](const Expr* e) { CollectSampledFunctionArgs(e, out); });
 }
 
-static void RegisterAssertionSampledVars(const Stmt* body, SimContext& ctx,
-                                         const std::string& inst_prefix) {
-  if (body == nullptr) return;
+void Lowerer::RecordAssertionSampleScope(const RtlirProcess& proc) {
+  if (proc.body == nullptr) return;
   std::unordered_set<std::string> names;
-  if (body->assert_expr != nullptr) CollectExprReads(body->assert_expr, names);
-  CollectSampledFunctionArgsInStmt(body, names);
-  for (const auto& name : names) {
-    // A variable is keyed under the instance prefix joined to its declared
-    // name. The prefix is passed in because no process is executing while the
-    // design is lowered for SimContext::FindVariable to take it from.
-    if (auto* var = ctx.FindVariable(inst_prefix + name)) {
-      ctx.AssertionSamples().Register(var, ctx.GetArena());
+  if (proc.body->assert_expr != nullptr) {
+    CollectSampledOperandNames(proc.body->assert_expr, names);
+  }
+  CollectSampledFunctionArgsInStmt(proc.body, names);
+  if (names.empty()) return;
+  AssertionSampleScope scope;
+  scope.inst_prefix = inst_prefix_;
+  scope.names.assign(names.begin(), names.end());
+  assertion_sample_scopes_.push_back(std::move(scope));
+}
+
+void Lowerer::RegisterDesignAssertionSampling() {
+  // §23.6 makes a hierarchical name an ordinary way to reach a variable, and
+  // §16.5.1 puts no condition on where the variable a property reads is
+  // declared, so `u.req` is enrolled exactly as a name the module declares
+  // itself. That is why this runs after every module is lowered rather than
+  // beside the process that named it: Lowerer::LowerChildModules creates an
+  // instance's variables after the enclosing module's processes are lowered, so
+  // a name resolved where it was found reached nothing and the read fell back
+  // to the live value §16.5.1 exists to stop reading.
+  //
+  // Each name is resolved through SimContext::FindVariable under its own
+  // instance prefix, which is the lookup the process body will make: no process
+  // is executing here, so the prefix is the one SetLoweringInstancePrefix last
+  // set, and the enrolled Variable* is therefore the one the read will find.
+  for (const auto& scope : assertion_sample_scopes_) {
+    ctx_.SetLoweringInstancePrefix(scope.inst_prefix);
+    for (const auto& name : scope.names) {
+      if (auto* var = ctx_.FindVariable(name)) {
+        ctx_.AssertionSamples().Register(var, ctx_.GetArena());
+      }
     }
   }
+  ctx_.SetLoweringInstancePrefix("");
 }
 
 void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
@@ -443,10 +512,12 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
   p->is_concurrent_clocked = proc.is_concurrent_clocked;
   // §16.9.3 has the sampled value functions "not limited to assertion
   // features", so the variables they name are enrolled wherever the call is
-  // written and not only where a concurrent assertion's property stands. A
-  // process naming none enrols nothing, which is every process in a design that
-  // uses neither.
-  RegisterAssertionSampledVars(proc.body, ctx_, inst_prefix_);
+  // written and not only where a concurrent assertion's property stands. The
+  // names are recorded here and resolved once the whole design is lowered,
+  // because a property may name a variable of a child instance that does not
+  // exist yet. A process naming none records nothing, which is every process in
+  // a design that uses neither.
+  RecordAssertionSampleScope(proc);
   // §18.14.1: a static process is seeded with the next value from the
   // enclosing initialization RNG. Lowering happens before any thread runs, so
   // the active stream here is the context-wide generator, which embodies the
@@ -723,6 +794,8 @@ void Lowerer::Lower(const RtlirDesign* design) {
   for (auto* mod : design->top_modules) {
     LowerModule(mod);
   }
+
+  RegisterDesignAssertionSampling();
 
   RegisterDesignTiming();
 

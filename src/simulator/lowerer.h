@@ -54,6 +54,19 @@ struct SpecifyScope {
   const RtlirModule* module;
 };
 
+// The names one lowered process's concurrent assertion property and sampled
+// value function calls read, with the instance prefix the process was lowered
+// under. §16.5.1 samples a variable rather than reading it live, and which
+// variable a name reaches is a question about the whole design: §23.6 lets the
+// property name a variable of a child instance, whose storage does not exist
+// until that instance is lowered. The names are therefore recorded where they
+// are found and resolved once every module has been lowered, the way
+// SpecifyScope defers a specify block for the specparams it may name.
+struct AssertionSampleScope {
+  std::string inst_prefix;
+  std::vector<std::string> names;
+};
+
 class Lowerer {
  public:
   Lowerer(SimContext& ctx, Arena& arena, DiagEngine& diag);
@@ -121,6 +134,14 @@ class Lowerer {
   // once every module has been lowered. A module declaring neither is not
   // recorded; either alone is enough.
   void RecordSpecifyScope(const RtlirModule* mod);
+  // Records the variable names one process's property and sampled value
+  // function calls read, under the instance prefix in force, so that Lower can
+  // enrol them for §16.5.1 sampling once every module has been lowered. A
+  // process reading none is not recorded.
+  void RecordAssertionSampleScope(const RtlirProcess& proc);
+  // Enrols into the run's AssertionSampleStore every variable
+  // RecordAssertionSampleScope gathered, once every module has been lowered.
+  void RegisterDesignAssertionSampling();
   // Registers into the run's SpecifyManager everything RecordSpecifyScope
   // gathered, once every module has been lowered.
   void RegisterDesignTiming();
@@ -139,6 +160,7 @@ class Lowerer {
   uint32_t next_program_block_id_ = 1;
   std::string inst_prefix_;
   std::vector<SpecifyScope> specify_scopes_;
+  std::vector<AssertionSampleScope> assertion_sample_scopes_;
 };
 
 }  // namespace delta
