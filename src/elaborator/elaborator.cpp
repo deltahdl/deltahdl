@@ -623,6 +623,11 @@ void Elaborator::ResolveDefparamsAndGenerates(RtlirDesign* design) {
 RtlirDesign* Elaborator::ElaborateTops(
     const std::vector<ModuleDecl*>& top_decls) {
   auto* design = arena_.Create<RtlirDesign>();
+  // §32.4.4: what an SDF interconnect entry names is found by walking the
+  // parsed hierarchy, so the design keeps the way back to it. See
+  // RtlirDesign::compilation_unit.
+  design->compilation_unit = unit_;
+  design->top_decls.assign(top_decls.begin(), top_decls.end());
   pending_generates_.clear();
   applied_defparams_.clear();
   generate_defparams_.clear();

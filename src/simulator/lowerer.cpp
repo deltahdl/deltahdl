@@ -30,6 +30,7 @@
 #include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
+#include "simulator/specify_sdf.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
 
@@ -672,6 +673,24 @@ static void AttachCuMethodsToClasses(const RtlirDesign* design,
 // §30.3, §32.4.1 and §6.20.5: the timing every module instance declared,
 // registered into the manager the run reads. Separate from Lower because it is
 // one step of it that grew its own paragraphs.
+// §32.4.4: hands the manager the design's interconnect connectivity, without
+// which an INTERCONNECT, PORT or NETDELAY entry has no ports, nets or
+// primitives to look its names up in and annotates nothing at all. The
+// connectivity is read off the parsed hierarchy rather than off the lowered
+// design, because an interconnect delay has no SystemVerilog declaration behind
+// it and §32.4.4's names are the design's own hierarchical names.
+//
+// The first top module is what is walked. §32.5's CELL records name an instance
+// by a hierarchical path rooted at a top, and a design with two of them gives
+// one path two readings, which is a question the SDF file cannot answer.
+static void BindInterconnectTopology(const RtlirDesign* design,
+                                     SpecifyManager& mgr) {
+  if (design->compilation_unit == nullptr || design->top_decls.empty()) return;
+  if (design->top_decls.front() == nullptr) return;
+  mgr.BindDesignInterconnect(CollectInterconnectTopology(
+      *design->compilation_unit, *design->top_decls.front()));
+}
+
 void Lowerer::RegisterDesignTiming() {
   // §30.3's specify block declares the design's specify data. The manager is
   // acquired whether or not any module declared a specify block, because
@@ -692,6 +711,7 @@ void Lowerer::RegisterDesignTiming() {
   // that prefix is the one SetLoweringInstancePrefix last set, and a specparam
   // of an instantiated module is reachable only while it names that instance.
   SpecifyManager& mgr = ctx_.AcquireSpecifyManager();
+  BindInterconnectTopology(design_, mgr);
   for (const auto& scope : specify_scopes_) {
     ctx_.SetLoweringInstancePrefix(scope.inst_prefix);
     RegisterSpecifyBlocks(scope.module->specify_blocks, scope.inst_prefix, ctx_,

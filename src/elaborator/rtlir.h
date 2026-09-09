@@ -345,6 +345,17 @@ struct RtlirContAssign {
   // gates.
   Expr* three_state_ctrl = nullptr;
   Expr* three_state_pass = nullptr;
+  // §32.4.4: when this assignment is the §23.3.2 input port connection of a
+  // module instance, the SDF names of the port it drives and of the signal it
+  // drives it from -- the load and the source an interconnect entry annotates
+  // between. Written the way an SDF file writes a hierarchical name, with `/`
+  // between levels, because that is the spelling the annotator matched the
+  // entry against. Both empty for every other continuous assignment, and the
+  // source alone is empty where the connection is not a plain signal name, in
+  // which case a PORT or NETDELAY delay -- which is the delay from all sources
+  // -- still reaches the load.
+  std::string interconnect_load;
+  std::string interconnect_source;
   std::vector<ResolvedAttribute> attrs;
   GenBlockConsts gen_block_consts;
   GenBlockPrefixes gen_block_prefixes;
@@ -655,6 +666,16 @@ struct RtlirDesign {
   // Each entry is an arena-owned copy with its nested aggregate members
   // resolved, so it outlives the elaborator that built it.
   std::unordered_map<std::string_view, const DataType*> type_layouts;
+
+  // §32.4.4: the parsed compilation unit and the top module declarations this
+  // design was elaborated from. An interconnect delay is annotated between
+  // module ports rather than onto a declaration, so what an SDF INTERCONNECT,
+  // PORT or NETDELAY entry names is looked up in the design's own hierarchy of
+  // ports, nets and primitives; CollectInterconnectTopology
+  // (src/simulator/specify_sdf.h) reads that hierarchy off the AST, and a
+  // lowered design has no other route back to it.
+  const CompilationUnit* compilation_unit = nullptr;
+  std::vector<const ModuleDecl*> top_decls;
 
   std::vector<ModuleItem*> cu_function_decls;
 

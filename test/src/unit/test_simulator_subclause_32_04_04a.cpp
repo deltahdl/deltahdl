@@ -1,3 +1,14 @@
+// The matching rules of §32.4.4: which port, net or primitive an INTERCONNECT,
+// PORT or NETDELAY entry reaches, and what the annotator says about one it
+// cannot place. Every case here binds the topology itself and applies the
+// entries directly, which is what keeps a failure about the rule rather than
+// about the route to it.
+//
+// test_simulator_subclause_32_04_04b.cpp is the other half: one design carried
+// through the production path alone, whose $sdf_annotate call places the delay
+// and whose own signals are read to show the load taking its source's value
+// that much later.
+
 #include <gtest/gtest.h>
 
 #include <string>

@@ -132,6 +132,12 @@ struct ContAssignParams {
   // assignment drives.
   std::string inst_prefix;
 
+  // §32.4.4: the SDF names of this assignment's interconnect load and source,
+  // empty for every assignment that is not a §23.3.2 input port connection.
+  // RtlirContAssign::interconnect_load says how they are spelled and why.
+  std::string interconnect_load;
+  std::string interconnect_source;
+
   bool nonresistive_switch = false;
 
   bool resistive_switch = false;
@@ -728,6 +734,61 @@ static ExecTask RunContAssignWait(const ContAssignWait& w,
   co_return StmtResult::kDone;
 }
 
+// Everything the §32.4.4 lookup below reads. Bundled because the question it
+// answers is about one transition of one assignment, and the five things that
+// take are what a §30.4 module path drive already bundles for the same reason.
+struct InterconnectDelayQuery {
+  const ContAssignParams& params;
+  const ContAssignDriver& drv;
+  const Logic4Vec& val;
+  SimContext& ctx;
+  Arena& arena;
+};
+
+// §32.4.4: how long the value this assignment just evaluated takes to reach the
+// port it drives, or zero where nothing was annotated between the two.
+//
+// The delay is read on every evaluation rather than once when the coroutine
+// starts, which is what a module path delay does: §32.9's $sdf_annotate is a
+// system task executed during simulation, so the annotation may not exist yet
+// the first time this assignment runs and may be replaced by a later call.
+//
+// §32.4.4 gives an interconnect delay the twelve transition delays a specify
+// path delay carries, and the two this reads are the rise and the fall, chosen
+// by §10.3.3's own rule for a continuous assignment's delay so that a port
+// connection picks its delay the way every other continuous assignment does.
+static uint64_t InterconnectDelayTicks(const InterconnectDelayQuery& q) {
+  if (q.params.interconnect_load.empty()) return 0;
+  const SpecifyManager* mgr = q.ctx.GetSpecifyManager();
+  if (mgr == nullptr) return 0;
+  const InterconnectDelay* annotated = mgr->FindInterconnectDelay(
+      q.params.interconnect_source, q.params.interconnect_load);
+  if (annotated == nullptr) return 0;
+  ContAssignDelays d;
+  d.rise = annotated->rise;
+  d.fall = annotated->fall;
+  d.has_fall = true;
+  Logic4Vec old_val =
+      CurrentContAssignOldValue(q.params, q.drv, q.ctx, q.arena);
+  Logic4Vec driven = ContAssignDrivenBits(q.drv, q.val, q.arena);
+  return SelectContAssignDelay(
+      old_val, driven, d, ContAssignTransitionWidth(q.drv, q.params.width));
+}
+
+// §32.4.4: "the load takes the delayed value" -- an annotated interconnect
+// delay is the time the source's value takes to arrive at the port, so the
+// value is evaluated when the source changed and driven onto the port that much
+// later. An assignment with nothing annotated between its two names commits at
+// once, which is what every continuous assignment did before.
+static ExecTask CommitAfterInterconnectDelay(
+    const InterconnectDelayQuery& q,
+    const std::function<void(const Logic4Vec&)>& commit) {
+  uint64_t ticks = InterconnectDelayTicks(q);
+  if (ticks > 0) co_await DelayAwaiter{q.ctx, ticks};
+  commit(q.val);
+  co_return StmtResult::kDone;
+}
+
 static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
                                             SimContext& ctx, Arena& arena) {
   if (!params.lhs) co_return;
@@ -794,7 +855,10 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
       co_await RunContAssignWait(wait, drv, val, &committed);
     }
 
-    if (!committed) commit(val);
+    if (!committed) {
+      InterconnectDelayQuery query{params, drv, val, ctx, arena};
+      co_await CommitAfterInterconnectDelay(query, commit);
+    }
 
     if (read_vars.empty()) break;
     co_await AnyChangeAwaiter{ctx, read_vars};
@@ -827,6 +891,8 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
   cap.delays = {ca.delay, ca.delay_fall, ca.delay_decay};
   cap.width = ca.width;
   cap.inst_prefix = inst_prefix_;
+  cap.interconnect_load = ca.interconnect_load;
+  cap.interconnect_source = ca.interconnect_source;
   p->coro = MakeContAssignCoroutine(cap, ctx_, arena_).Release();
 
   ScheduleProcess(p, ctx_);

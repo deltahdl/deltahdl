@@ -87,6 +87,19 @@ bool Lowerer::TryAliasInterfacePort(const RtlirModuleInst& inst,
   return true;
 }
 
+// §32.4.4: a hierarchical name the way an SDF file writes it. The design spells
+// a path with `.` and SDF spells it with `/`, and the annotator matched the
+// entry's names against the second spelling (CollectInterconnectTopology in
+// src/simulator/specify_interconnect.cpp), so a name handed to it has to be in
+// that spelling too.
+static std::string SdfHierName(const std::string& dotted) {
+  std::string out = dotted;
+  for (char& c : out) {
+    if (c == '.') c = '/';
+  }
+  return out;
+}
+
 void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
                                 bool from_program) {
   // §23.3.2: the caller lowers bindings under the PARENT prefix; qualify the
@@ -120,6 +133,18 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
       ca.lhs = local_id;
       ca.rhs = binding.connection;
       ca.width = binding.width;
+      // §32.4.4: this assignment is the path an interconnect delay is annotated
+      // along -- from the signal the parent connected to the port of the
+      // instance -- so it carries the two names the annotator placed the delay
+      // between. A connection that is not a plain signal name leaves the source
+      // unnamed, which still reads a PORT or NETDELAY delay, those being the
+      // delay from every source on the net.
+      ca.interconnect_load =
+          SdfHierName(inst_prefix_ + inst_seg + std::string(binding.port_name));
+      if (binding.connection->kind == ExprKind::kIdentifier) {
+        ca.interconnect_source =
+            SdfHierName(inst_prefix_ + std::string(binding.connection->text));
+      }
       LowerContAssign(ca, from_program);
       continue;
     }
