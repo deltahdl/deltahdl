@@ -878,4 +878,19 @@ class DataReadApi {
   std::unordered_map<std::string, std::vector<ValueChangeCb>> change_cbs_;
 };
 
+// §35.5.3: "the current scope" decides which instance of an exported subroutine
+// a call reaches, so the C layer and the run have to answer that question the
+// same way. The run's registry is installed here -- by
+// SimContext::AcquireDpiRuntime and SimContext::SetDpiRuntime -- and the §H.9.3
+// entry points svGetScope() and svSetScope() read and write its scope through
+// it rather than a second copy of the state.
+//
+// It is a free function beside the disable state above for the reason that one
+// is: §H.9.3 gives a foreign routine no handle to pass, so the run's registry
+// has to be reachable without one. Null where no run has installed one, which
+// is what a translation unit exercising the value utilities on their own
+// leaves it at, and what a run's context restores when it goes away.
+void DpiSetForeignRuntime(DpiRuntime* runtime);
+DpiRuntime* DpiForeignRuntime();
+
 }  // namespace delta

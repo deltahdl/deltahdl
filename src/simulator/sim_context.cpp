@@ -18,7 +18,16 @@ namespace delta {
 
 // Defined here, where CoverageDB is a complete type, so the owning unique_ptr
 // member can be destroyed.
-SimContext::~SimContext() = default;
+SimContext::~SimContext() {
+  // §35.5.3: the C layer reaches this run's registry through a free function
+  // (DpiForeignRuntime), so a run that installed one takes it back out when it
+  // goes away rather than leaving a pointer to storage that no longer exists.
+  // Another run's installation is left alone: the last run to install is the
+  // one the foreign layer is talking to.
+  if (dpi_runtime_ != nullptr && DpiForeignRuntime() == dpi_runtime_) {
+    DpiSetForeignRuntime(nullptr);
+  }
+}
 
 CoverageDB& SimContext::CoverageData() {
   // §19.9: an externally injected database wins; otherwise create the run's own
@@ -54,11 +63,18 @@ DpiRuntime& SimContext::AcquireDpiRuntime() {
   // A registry installed from outside is the run's: §35 holds of whichever one
   // the calls go through, and making a second here would leave a design's
   // imports in one registry and its calls in the other.
-  if (dpi_runtime_ != nullptr) return *dpi_runtime_;
+  if (dpi_runtime_ != nullptr) {
+    DpiSetForeignRuntime(dpi_runtime_);
+    return *dpi_runtime_;
+  }
   if (owned_dpi_runtime_ == nullptr) {
     owned_dpi_runtime_ = std::make_unique<DpiRuntime>();
   }
   dpi_runtime_ = owned_dpi_runtime_.get();
+  // §35.5.3: the C layer has no handle to pass, so the registry a foreign
+  // routine's svGetScope and svSetScope reach is installed here, where the
+  // run's own registry is settled.
+  DpiSetForeignRuntime(dpi_runtime_);
   return *owned_dpi_runtime_;
 }
 

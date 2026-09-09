@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "simulator/dpi_runtime.h"
+#include "simulator/svdpi.h"
 
 using namespace delta;
 
@@ -528,6 +529,57 @@ TEST(DpiContextChain, SvSetScopeDoesNotMakeANoncontextCallContext) {
   DpiArgValue result;
   auto status = rt.CallExportFromImport("sv_export", {}, &result);
   EXPECT_EQ(status, DpiExportCallStatus::kNoncontextChain);
+}
+
+// §35.5.3 makes "the current scope" decide which instance of an exported
+// subroutine a call reaches, and §H.9.3 gives foreign code svGetScope and
+// svSetScope to read and move it. src/simulator/svdpi.cpp kept a scope of its
+// own beside the registry's, so a foreign routine that moved the scope and a
+// run that read it back were giving one question two answers. The three cases
+// below are that the two entry points read and write the run's own registry
+// wherever a run has installed one, and the C layer's own state where none has.
+
+// Installs `rt` as the registry the C layer reaches for the length of a case
+// and takes it back out afterwards, because the installation is process-wide
+// and would otherwise reach the cases that follow.
+struct ForeignRuntimeInstall {
+  explicit ForeignRuntimeInstall(DpiRuntime* rt) { DpiSetForeignRuntime(rt); }
+  ~ForeignRuntimeInstall() { DpiSetForeignRuntime(nullptr); }
+};
+
+TEST(DpiForeignScope, SvSetScopeMovesTheScopeTheRegistryReports) {
+  DpiRuntime rt;
+  ForeignRuntimeInstall installed(&rt);
+  DpiScope decl;
+  decl.name = "top.dut";
+  rt.EnterContextImportCall("ctx_import", decl);
+
+  const DpiScope* alt = DpiRegisterScope("top.other");
+  svSetScope(const_cast<DpiScope*>(alt));
+
+  ASSERT_NE(rt.CurrentScope(), nullptr);
+  EXPECT_EQ(rt.CurrentScope()->name, "top.other");
+}
+
+TEST(DpiForeignScope, SvGetScopeReportsTheScopeTheRegistryHolds) {
+  DpiRuntime rt;
+  ForeignRuntimeInstall installed(&rt);
+  DpiScope decl;
+  decl.name = "top.dut";
+  rt.EnterContextImportCall("ctx_import", decl);
+
+  ASSERT_NE(rt.CurrentScope(), nullptr);
+  EXPECT_EQ(svGetScope(), static_cast<const void*>(rt.CurrentScope()));
+}
+
+// The counterpart that keeps the two entry points usable on their own: with no
+// run installed they answer out of the C layer's own state, which is what every
+// case exercising the §H.10 value utilities depends on.
+TEST(DpiForeignScope, WithNoRegistryInstalledTheScopeIsTheCLayersOwn) {
+  DpiSetForeignRuntime(nullptr);
+  const DpiScope* standalone = DpiRegisterScope("standalone");
+  svSetScope(const_cast<DpiScope*>(standalone));
+  EXPECT_EQ(svGetScope(), static_cast<const void*>(standalone));
 }
 
 }  // namespace

@@ -610,9 +610,24 @@ void svPutBitArrElem(svOpenArrayHandle d, svBit value, int indx1, ...) {
   svPutBitScalarElem(d, value, idx.data(), n);
 }
 
-svScope svGetScope(void) { return g_current_scope; }
+svScope svGetScope(void) {
+  // §35.5.3: the current scope decides which instance of an exported subroutine
+  // a call reaches, so what is reported is the run's own scope wherever a run
+  // has installed its registry. The local below is what a translation unit
+  // exercising these utilities with no run behind them reads, which is every
+  // caller that never installed one.
+  if (auto* runtime = delta::DpiForeignRuntime()) {
+    return const_cast<delta::DpiScope*>(runtime->CurrentScope());
+  }
+  return g_current_scope;
+}
 
 svScope svSetScope(svScope scope) {
+  if (auto* runtime = delta::DpiForeignRuntime()) {
+    auto* prev = const_cast<delta::DpiScope*>(runtime->CurrentScope());
+    runtime->SetScope(static_cast<const delta::DpiScope*>(scope));
+    return prev;
+  }
   svScope prev = g_current_scope;
   g_current_scope = scope;
   return prev;

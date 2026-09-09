@@ -354,7 +354,14 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // an import through it, so the clause 35 rules DpiRuntime holds -- §35.5.2's
   // pure-result reuse, §35.5.3's call chain, §35.6.2's value changes, §35.9's
   // disable protocol -- are the rules a design's calls meet.
-  void SetDpiRuntime(DpiRuntime* dpi) { dpi_runtime_ = dpi; }
+  // §35.5.3: installing a registry also makes it the one the C layer's
+  // svGetScope and svSetScope read and write, because the two answering
+  // differently is two answers to the question of which instance of an exported
+  // subroutine a call reaches.
+  void SetDpiRuntime(DpiRuntime* dpi) {
+    dpi_runtime_ = dpi;
+    DpiSetForeignRuntime(dpi);
+  }
   DpiRuntime* GetDpiRuntime() { return dpi_runtime_; }
 
   // §35.5.4: the registry a design's own import declarations are put in, made

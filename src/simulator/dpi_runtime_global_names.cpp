@@ -6,6 +6,18 @@
 
 namespace delta {
 
+namespace {
+// The run's registry as the C layer reaches it. Not thread-local, unlike the
+// §35.9 disable state in dpi_runtime.cpp: that state is one execution
+// context's and this is one run's, and a foreign routine calling back on any
+// thread is calling back into the same run.
+DpiRuntime* g_foreign_runtime = nullptr;
+}  // namespace
+
+void DpiSetForeignRuntime(DpiRuntime* runtime) { g_foreign_runtime = runtime; }
+
+DpiRuntime* DpiForeignRuntime() { return g_foreign_runtime; }
+
 std::string_view DpiGlobalName(const DpiRtFunction& func) {
   return func.c_name.empty() ? func.sv_name : func.c_name;
 }
