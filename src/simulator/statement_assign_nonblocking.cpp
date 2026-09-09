@@ -12,6 +12,7 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
+#include "simulator/clocking.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
@@ -574,6 +575,67 @@ static Variable* ResolveNbaSelectElement(const Expr* lhs, SimContext& ctx,
 // naming no storage -- a null handle, a `this` outside a method -- costs no
 // event. §10.4.2 leaves nothing to write there, which is the answer the
 // blocking form gives it too.
+// §14.16's clockvar of a synchronous drive: the block a `cb.sig <= value`
+// names and the signal within it, or nothing where the left-hand side is not a
+// clockvar at all. The clause writes the target as `clockvar_expression ::=
+// clockvar select` with `clockvar ::= hierarchical_identifier`, so the base
+// names the block and the member names the signal.
+static const ClockingSignal* FindClockvarSignal(const Expr* lhs,
+                                                SimContext& ctx,
+                                                std::string_view* block_name) {
+  if (lhs->kind != ExprKind::kMemberAccess) return nullptr;
+  if (lhs->lhs == nullptr || lhs->lhs->kind != ExprKind::kIdentifier) {
+    return nullptr;
+  }
+  auto* mgr = ctx.GetClockingManager();
+  if (mgr == nullptr) return nullptr;
+  const ClockingBlock* block = mgr->Find(lhs->lhs->text);
+  if (block == nullptr) return nullptr;
+  std::string_view member = lhs->text;
+  if (lhs->rhs != nullptr && lhs->rhs->kind == ExprKind::kIdentifier) {
+    member = lhs->rhs->text;
+  }
+  if (member.empty()) return nullptr;
+  for (const auto& sig : block->signals) {
+    if (sig.signal_name != member) continue;
+    // §14.3: "clocking block outputs (output or inout) are used to drive
+    // values onto their corresponding signals". An input clockvar names a
+    // sampled value and is not a drive target, so it is left to decline here
+    // rather than driven.
+    if (sig.direction == ClockingDir::kInput) return nullptr;
+    *block_name = lhs->lhs->text;
+    return &sig;
+  }
+  return nullptr;
+}
+
+// §14.16: "Clocking block outputs (output or inout) are used to drive values
+// onto their corresponding signals, but at a specified time. In other words,
+// the corresponding signal changes value at the indicated clocking event as
+// modified by the output skew." A synchronous drive is written with the
+// nonblocking operator and reaches this function as one, so the clockvar target
+// is recognised here and handed to ClockingManager::ScheduleOutputDrive, which
+// places the value in the Re-NBA region the clause names. Returns whether the
+// left-hand side was a clockvar; a false answer leaves the ordinary
+// nonblocking paths to it.
+//
+// The drive carries the whole value the right-hand side produced. §14.16 also
+// admits a bit-select and a slice of a clockvar -- `dom.sig[2]`, `dom.sig[8:2]`
+// -- and those reach here as a select of a member access rather than as a
+// member access, so they are not clockvars to this function and take the
+// ordinary path, which finds no variable for them and drops them. That is the
+// state they were already in.
+static bool TryScheduleClockvarDrive(const Expr* lhs, const Logic4Vec& rhs_val,
+                                     SimContext& ctx) {
+  std::string_view block_name;
+  const ClockingSignal* sig = FindClockvarSignal(lhs, ctx, &block_name);
+  if (sig == nullptr) return false;
+  ctx.GetClockingManager()->ScheduleOutputDrive(block_name, sig->signal_name,
+                                                rhs_val.ToUint64(), ctx,
+                                                ctx.GetScheduler());
+  return true;
+}
+
 static void ScheduleFieldNba(const Expr* lhs, const Logic4Vec& rhs_val,
                              uint64_t delay_ticks, SimContext& ctx,
                              Arena& arena) {
@@ -626,6 +688,10 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
               : sub_elem != nullptr ? sub_elem
                                     : ResolveLhsVariable(stmt->lhs, ctx);
   if (!var) {
+    // §14.16: a clockvar target is a synchronous drive rather than a member of
+    // an object, and it is asked before the field path because the field path
+    // resolves `cb` as a variable and finds none.
+    if (TryScheduleClockvarDrive(stmt->lhs, rhs_val, ctx)) return;
     ScheduleFieldNba(stmt->lhs, rhs_val, delay_ticks, ctx, arena);
     return;
   }

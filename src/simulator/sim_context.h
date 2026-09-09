@@ -42,10 +42,11 @@
 #include "simulator/sim_context_name_tables.h"
 #include "simulator/sim_context_random_stability.h"
 #include "simulator/sim_context_types.h"
-// SpecifyManager and DpiRuntime, each held by value behind an owning unique_ptr
-// below. The constructor of this class is defined inline, which instantiates
-// those pointers' destructors, so a forward declaration is not enough for
-// either.
+// ClockingManager, SpecifyManager and DpiRuntime, each held by value behind an
+// owning unique_ptr below. The constructor of this class is defined inline,
+// which instantiates those pointers' destructors, so a forward declaration is
+// not enough for any of them.
+#include "simulator/clocking.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/instance_prefix_override.h"
 #include "simulator/specify.h"
@@ -693,6 +694,12 @@ class SimContext : public DeclaredNameTables, public RandomStability {
 
   void SetClockingManager(class ClockingManager* mgr) { clocking_mgr_ = mgr; }
   class ClockingManager* GetClockingManager() { return clocking_mgr_; }
+  // §14's clocking blocks for the design, created on the first call and
+  // installed as the manager GetClockingManager answers with. The context owns
+  // it for the reason it owns the specify data: the Lowerer that registers the
+  // blocks is gone before the run starts, and the manager is what the run's
+  // clocking events, synchronous drives and clocking block events go through.
+  ClockingManager& AcquireClockingManager();
 
   void SetCoverageDB(class CoverageDB* db) { coverage_db_ = db; }
   class CoverageDB* GetCoverageDB() { return coverage_db_; }
@@ -902,6 +909,7 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   uint32_t last_severity_line_ = 0;
 
   class ClockingManager* clocking_mgr_ = nullptr;
+  std::unique_ptr<ClockingManager> owned_clocking_manager_;
 
   class CoverageDB* coverage_db_ = nullptr;
   std::unique_ptr<class CoverageDB> owned_coverage_db_;

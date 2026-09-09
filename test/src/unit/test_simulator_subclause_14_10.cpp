@@ -1,3 +1,5 @@
+#include <string>
+
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_clocking.h"
@@ -342,6 +344,91 @@ TEST(ClockingEventSim, NegedgeBlockFiresOnTheFallOfAnUnwatchedClock) {
   f.scheduler.Run();
 
   EXPECT_EQ(fired, 1);
+}
+
+// §14.10: "Upon processing its specified clocking event, a clocking block shall
+// trigger the event associated with the clocking block name. This event shall
+// be triggered in the Observed region and is referred to as a clocking block
+// event." The cases above drive ClockingManager::NotifyBlockEvent through a
+// manager and an event variable the test builds itself, which says nothing
+// about whether a design's `always @(cb)` attaches to anything. This one starts
+// from source, on §14.10's own example shape.
+//
+// The clock rises twice, at t=5 and t=15, so a process attached to the block's
+// event runs twice; one attached to nothing runs not at all and leaves hits at
+// its declared 0.
+TEST(ClockingBlockEventSim, ClockingBlockEventFromSourceTriggersOnTheEdge) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 1'b0;\n"
+      "  logic [7:0] data = 8'h00;\n"
+      "  int hits = 0;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "  always @(cb) hits = hits + 1;\n"
+      "  initial begin\n"
+      "    #5 clk = 1'b1;\n"
+      "    #5 clk = 1'b0;\n"
+      "    #5 clk = 1'b1;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 2u);
+}
+
+// §14.10's event is the block's own, so a clock edge that is not the one the
+// block names triggers nothing. The declaration here is on `negedge clk` while
+// the run drives two rises and one fall, so a process that followed the raw
+// variable rather than the declared edge would reach a different count.
+TEST(ClockingBlockEventSim, ClockingBlockEventFollowsTheDeclaredEdge) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 1'b0;\n"
+      "  logic [7:0] data = 8'h00;\n"
+      "  int hits = 0;\n"
+      "  clocking cb @(negedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "  always @(cb) hits = hits + 1;\n"
+      "  initial begin\n"
+      "    #5 clk = 1'b1;\n"
+      "    #5 clk = 1'b0;\n"
+      "    #5 clk = 1'b1;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+}
+
+// The root-cause guard under both cases above and under
+// SyncDriveSim.SynchronousDriveFromSourceDrivesTheSignal: a design carrying a
+// clocking block leaves the run with a ClockingManager holding it. Without
+// this, a fix that wires one construct and not the other leaves the unwired one
+// failing for a reason the two counts report identically.
+TEST(ClockingBlockEventSim, ClockingManagerIsInstalledForADesignWithABlock) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk = 1'b0;\n"
+      "  logic [7:0] data = 8'h00;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "  initial #5 $finish;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  ASSERT_NE(f.ctx.GetClockingManager(), nullptr);
+  EXPECT_EQ(f.ctx.GetClockingManager()->Count(), 1u);
+  EXPECT_NE(f.ctx.GetClockingManager()->Find("cb"), nullptr);
 }
 
 }  // namespace

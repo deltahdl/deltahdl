@@ -362,6 +362,11 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
     LowerUdpInst(udp_inst, mod->is_program);
   }
 
+  // §14.3: the block's clock and signals are variables of this module, so it is
+  // registered once they exist. AttachDesignClocking arms the watchers when the
+  // whole design has been lowered.
+  LowerClockingBlocks(mod);
+
   LowerChildModules(mod);
 }
 
@@ -785,6 +790,8 @@ void Lowerer::Lower(const RtlirDesign* design) {
   for (auto* mod : design->top_modules) {
     LowerModule(mod);
   }
+
+  AttachDesignClocking();
 
   RegisterDesignAssertionSampling();
 

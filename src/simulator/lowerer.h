@@ -146,6 +146,13 @@ class Lowerer {
   // gathered, once every module has been lowered.
   void RegisterDesignTiming();
   void LowerChildModules(const RtlirModule* mod);
+  // §14.3: registers the module's clocking blocks with the run's
+  // ClockingManager and creates the event variable §14.10 triggers under each
+  // block's name. Defined in src/simulator/lowerer_clocking.cpp.
+  void LowerClockingBlocks(const RtlirModule* mod);
+  // §14.3: arms every registered block's clock watcher, once every module has
+  // been lowered and each block's clock variable exists.
+  void AttachDesignClocking();
   void CreateChildModuleVariables(const std::string& inst_prefix,
                                   const RtlirModule* resolved);
 

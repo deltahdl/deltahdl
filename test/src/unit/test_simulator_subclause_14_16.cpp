@@ -1,3 +1,5 @@
+#include <string>
+
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_clocking.h"
@@ -141,6 +143,60 @@ TEST(SyncDriveSim, ClockvarNetDriverInitIsHighZ) {
   EXPECT_FALSE(v.IsKnown());
   EXPECT_EQ(v.words[0].aval, 0u);
   EXPECT_EQ(v.words[0].bval, 0xFFu);
+}
+
+// §14.16: "Clocking block outputs (output or inout) are used to drive values
+// onto their corresponding signals, but at a specified time." The cases above
+// drive the primitive from C++ on a ClockingManager they build themselves,
+// which says nothing about whether a design's `cb.sig <= 8'hFE;` reaches it.
+// This one starts from source: the block is declared, the drive is written as
+// §14.16 spells it, and the signal is read afterwards.
+//
+// sig is seeded to 8'h00 and driven to 8'hFE, so the value read back can only
+// have come from the drive.
+TEST(SyncDriveSim, SynchronousDriveFromSourceDrivesTheSignal) {
+  SimFixture f;
+  auto* sig = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 1'b0;\n"
+      "  logic [7:0] sig = 8'h00;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    output sig;\n"
+      "  endclocking\n"
+      "  initial begin\n"
+      "    #5 clk = 1'b1;\n"
+      "    cb.sig <= 8'hFE;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "sig");
+  ASSERT_NE(sig, nullptr);
+  EXPECT_EQ(sig->value.ToUint64(), 0xFEu);
+}
+
+// §14.16 makes the drive a property of the block's outputs: a clocking block
+// input "is used to sample" its signal and is not a drive target. A design
+// writing the same statement against an input clockvar must therefore leave the
+// signal alone, which is what separates the recognition above from one that
+// drives whatever member it is handed.
+TEST(SyncDriveSim, DriveToAnInputClockvarLeavesTheSignalAlone) {
+  SimFixture f;
+  auto* sig = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 1'b0;\n"
+      "  logic [7:0] sig = 8'h11;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input sig;\n"
+      "  endclocking\n"
+      "  initial begin\n"
+      "    #5 clk = 1'b1;\n"
+      "    cb.sig <= 8'hFE;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "sig");
+  ASSERT_NE(sig, nullptr);
+  EXPECT_EQ(sig->value.ToUint64(), 0x11u);
 }
 
 }  // namespace

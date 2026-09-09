@@ -225,8 +225,15 @@ bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
       return true;
     case ModuleItemKind::kAssumeProperty:
     case ModuleItemKind::kRestrictProperty:
+      ValidateClockingBlock(item, mod);
+      return true;
     case ModuleItemKind::kClockingBlock:
       ValidateClockingBlock(item, mod);
+      // §14.3: a clocking block is a declaration the run needs, not only one
+      // elaboration checks. Lowerer::LowerClockingBlocks registers it with the
+      // ClockingManager, which is what makes §14.16's synchronous drive and
+      // §14.10's clocking block event reach anything.
+      if (mod != nullptr) mod->clocking_blocks.push_back(item);
       return true;
     default:
       // §23.10.4 kDefparam, kExportDecl, kDefaultDisableIff, kNestedModuleDecl,

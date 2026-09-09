@@ -555,6 +555,12 @@ struct RtlirModule {
   std::vector<RtlirProcess> processes;
   std::vector<RtlirModuleInst> children;
   std::vector<RtlirParamDecl> params;
+  // §14.3's clocking blocks declared in this module, in source order. The item
+  // is carried rather than resolved because §14.3 puts the clock, the skews and
+  // the direction of each signal in it and the simulator's ClockingManager
+  // wants all three; elaboration validates them (Elaborator::
+  // ValidateClockingBlock) and this is what lets the run have them at all.
+  std::vector<ModuleItem*> clocking_blocks;
   std::vector<ModuleItem*> function_decls;
   std::vector<ModuleItem*> let_decls;
   // §35.5.4's imported subroutines, declared in this module. They are held

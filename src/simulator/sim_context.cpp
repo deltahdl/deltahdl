@@ -29,6 +29,19 @@ CoverageDB& SimContext::CoverageData() {
   return *owned_coverage_db_;
 }
 
+ClockingManager& SimContext::AcquireClockingManager() {
+  // A manager installed from outside is the run's, the way an installed DPI
+  // registry is: §14's blocks, their events and their sampled values all have
+  // to be the one set, and making a second here would leave the design's blocks
+  // in one manager and the run's lookups in the other.
+  if (clocking_mgr_ != nullptr) return *clocking_mgr_;
+  if (owned_clocking_manager_ == nullptr) {
+    owned_clocking_manager_ = std::make_unique<ClockingManager>();
+  }
+  clocking_mgr_ = owned_clocking_manager_.get();
+  return *owned_clocking_manager_;
+}
+
 SpecifyManager& SimContext::AcquireSpecifyManager() {
   if (owned_specify_manager_ == nullptr) {
     owned_specify_manager_ = std::make_unique<SpecifyManager>();
