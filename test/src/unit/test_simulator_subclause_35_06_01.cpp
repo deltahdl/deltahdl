@@ -263,7 +263,7 @@ struct WideActual {
   std::vector<SvLogicVecVal> seen;
 
   WideActual(Direction direction, Logic4Word lo, Logic4Word hi,
-             std::vector<SvLogicVecVal> wrote) {
+             const std::vector<SvLogicVecVal>& wrote) {
     DpiRtFunction func;
     func.c_name = "c_touch_wide";
     func.sv_name = "touch_wide";
