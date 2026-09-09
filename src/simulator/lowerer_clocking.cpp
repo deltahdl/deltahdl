@@ -1,4 +1,5 @@
 #include <optional>
+#include <string>
 
 #include "common/arena.h"
 #include "common/types.h"
@@ -118,23 +119,25 @@ std::optional<ClockingBlock> BuildClockingBlock(const ModuleItem* item,
 // skew, §14.16's synchronous drive reads each output's skew, and §14.10's
 // clocking block event reads the variable created under the block's name.
 //
-// The names are taken as the source wrote them. A block declared in a child
-// instance would need the instance prefix on the block name, on its clock and
-// on every signal, while the clockvar spellings that read them back -- the `cb`
-// of `cb.sig <= ...` and of `always @(cb)` -- carry no prefix at all, so the
-// two halves would have to agree on one before an instance's block could
-// resolve. That is why this runs for a top module's blocks alone.
+// §23.9: a block is registered under the instance prefix of the module
+// declaring it, because §14.3 names it within its module and two instances of
+// one module therefore declare two blocks of one name. The clock and the
+// signals stay as the source wrote them, ClockingBlock::inst_prefix joining
+// them to the instance's own variables, and a reference spelling the bare name
+// -- the `cb` of `cb.sig <= ...`, of `@(cb.sig)` and of `always @(cb)` --
+// reaches the running instance's block through ClockingManager::FindInScope.
 void Lowerer::LowerClockingBlocks(const RtlirModule* mod) {
   for (const ModuleItem* item : mod->clocking_blocks) {
-    auto block = BuildClockingBlock(item, ctx_, arena_);
+    ClockingLowerScope scope{inst_prefix_, ctx_, arena_};
+    auto block = BuildClockingBlock(item, scope);
     if (!block.has_value()) continue;
     auto& mgr = ctx_.AcquireClockingManager();
     mgr.Register(*block);
     // §14.12: "the default clocking" and §14.14's global clocking are the two
     // the source can name without naming the block, so which block each is has
     // to be recorded beside the registration.
-    if (item->is_default_clocking) mgr.SetDefaultClocking(item->name);
-    if (item->is_global_clocking) mgr.SetGlobalClocking(item->name);
+    if (item->is_default_clocking) mgr.SetDefaultClocking(block->name);
+    if (item->is_global_clocking) mgr.SetGlobalClocking(block->name);
 
     // §14.10: "Upon processing its specified clocking event, a clocking block
     // shall trigger the event associated with the clocking block name." That
@@ -142,10 +145,13 @@ void Lowerer::LowerClockingBlocks(const RtlirModule* mod) {
     // SimContext::FindVariable and an event variable is what EventAwaiter
     // attaches a notify-driven watcher to. ClockingManager::NotifyBlockEvent
     // notifies it from the Observed region, which is where the clause puts it.
-    auto* event_var = ctx_.CreateVariable(item->name, 1);
+    // The variable carries the instance prefix for the reason the block does,
+    // and SimContext::FindVariable is what joins a bare `cb` written inside the
+    // instance to it.
+    auto* event_var = ctx_.CreateVariable(block->name, 1);
     if (event_var == nullptr) continue;
     event_var->is_event = true;
-    mgr.SetBlockEventVar(item->name, event_var);
+    mgr.SetBlockEventVar(block->name, event_var);
   }
 }
 

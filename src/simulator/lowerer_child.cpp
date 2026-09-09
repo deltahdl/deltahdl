@@ -124,6 +124,11 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     for (const auto& udp_inst : child.resolved->udp_insts) {
       LowerUdpInst(udp_inst, child.resolved->is_program);
     }
+    // §14.3: a clocking block belongs to the instance that declares it, so this
+    // instance's blocks are registered under this instance's prefix, beside its
+    // processes. Lowerer::AttachDesignClocking arms them all once the whole
+    // design is lowered.
+    LowerClockingBlocks(child.resolved);
 
     LowerChildModules(child.resolved);
 

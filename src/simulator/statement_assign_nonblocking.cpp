@@ -589,7 +589,10 @@ static const ClockingSignal* FindClockvarSignal(const Expr* lhs,
   }
   auto* mgr = ctx.GetClockingManager();
   if (mgr == nullptr) return nullptr;
-  const ClockingBlock* block = mgr->Find(lhs->lhs->text);
+  // §23.9: a clockvar spells its block by the bare name the module declared, so
+  // the block it reaches is the one belonging to the instance the assignment is
+  // running in.
+  const ClockingBlock* block = mgr->FindInScope(lhs->lhs->text, ctx);
   if (block == nullptr) return nullptr;
   std::string_view member = lhs->text;
   if (lhs->rhs != nullptr && lhs->rhs->kind == ExprKind::kIdentifier) {
@@ -603,7 +606,7 @@ static const ClockingSignal* FindClockvarSignal(const Expr* lhs,
     // sampled value and is not a drive target, so it is left to decline here
     // rather than driven.
     if (sig.direction == ClockingDir::kInput) return nullptr;
-    *block_name = lhs->lhs->text;
+    *block_name = block->name;
     return &sig;
   }
   return nullptr;

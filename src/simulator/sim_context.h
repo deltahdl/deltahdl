@@ -376,6 +376,14 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // the instance here instead.
   void SetLoweringInstancePrefix(std::string_view prefix);
 
+  // The instance a name written without a hierarchical path resolves within:
+  // the running process's, or the one being built when none is running. Public
+  // because a name that is not a variable resolves the same way and is looked
+  // up somewhere else -- §14.3's clocking block is registered under this prefix
+  // and reached by the bare name its module declared
+  // (ClockingManager::FindInScope).
+  std::string ActiveInstancePrefix() const;
+
   // §32.4.3: the instance an evaluation stands in, where that is not the
   // running process's. simulator/instance_prefix_override.h holds the reason
   // and the guard that sets it; nothing else should write it.
@@ -757,10 +765,6 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // that distinct instances of the same module do not share storage. Returns
   // the bare name unchanged at the top level (empty instance prefix).
   std::string_view StaticFrameKey(std::string_view name);
-  // The instance a name written without a hierarchical path resolves within:
-  // the running process's, or the one being built when none is running.
-  std::string ActiveInstancePrefix() const;
-
   Scheduler& scheduler_;
   Arena& arena_;
   DiagEngine& diag_;

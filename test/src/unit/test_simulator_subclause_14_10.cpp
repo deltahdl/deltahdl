@@ -431,4 +431,40 @@ TEST(ClockingBlockEventSim, ClockingManagerIsInstalledForADesignWithABlock) {
   EXPECT_NE(f.ctx.GetClockingManager()->Find("cb"), nullptr);
 }
 
+// §14.3 declares a clocking block within its module, so a block written in a
+// module that is instantiated belongs to the instance rather than to the
+// module: the clock it names, the signals it samples and the event it triggers
+// are all that instance's. The cases below declare the block one level down and
+// read the result back under the instance's own prefix.
+
+// §14.10's clocking block event, triggered by a block a child instance
+// declares. The clock rises twice, so the child's `always @(cb)` runs twice; a
+// block registered nowhere leaves that process attached to nothing and `hits`
+// at its declared 0.
+TEST(ClockingBlockEventSim, AChildInstancesBlockTriggersItsOwnEvent) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "module leaf(input logic clk);\n"
+      "  logic [7:0] data = 8'h00;\n"
+      "  int hits = 0;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "  always @(cb) hits = hits + 1;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 1'b0;\n"
+      "  leaf u(.clk(clk));\n"
+      "  initial begin\n"
+      "    #5 clk = 1'b1;\n"
+      "    #5 clk = 1'b0;\n"
+      "    #5 clk = 1'b1;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "u.hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 2u);
+}
+
 }  // namespace

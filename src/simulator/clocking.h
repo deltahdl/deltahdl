@@ -59,8 +59,24 @@ struct ClockingSignal {
   bool is_one_step_skew = false;
 };
 
+// §23.9: the design-wide name of one signal a clocking block names. A block
+// declares its clock and its signals by the bare names of the module it stands
+// in, so two instances of one module declare signals spelled identically and
+// the instance prefix is what tells the two variables apart -- the same thing
+// PathDelay::inst_prefix does for a specify block's terminals. A block declared
+// in a module elaborated as a top carries no prefix and the bare name is the
+// whole of it.
+std::string ClockingSignalName(std::string_view inst_prefix,
+                               std::string_view signal_name);
+
 struct ClockingBlock {
+  // The name the block is registered under, which carries the instance prefix
+  // of the module instance declaring it: §14.3 names a block within its module,
+  // so two instances of one module declare two blocks of one name and only the
+  // prefix separates them. The names below stay as the source wrote them, and
+  // inst_prefix is what joins them to the instance's own variables.
   std::string_view name;
+  std::string_view inst_prefix;
   std::string_view clock_signal;
   Edge clock_edge = Edge::kPosedge;
   SimTime default_input_skew{0};
@@ -74,6 +90,13 @@ class ClockingManager {
   void Register(ClockingBlock block);
   void Attach(SimContext& ctx, Scheduler& sched);
   const ClockingBlock* Find(std::string_view name) const;
+  // §23.9: the block `name` reaches from where the reference stands. A clockvar
+  // and an `always @(cb)` spell the block by the bare name its module declared,
+  // so the running instance's own block is looked for first and the bare name
+  // is the answer only where that instance declared none -- which is the whole
+  // of it for a block declared in a module elaborated as a top.
+  const ClockingBlock* FindInScope(std::string_view name,
+                                   const SimContext& ctx) const;
   SimTime GetInputSkew(std::string_view block_name,
                        std::string_view signal_name) const;
   SimTime GetOutputSkew(std::string_view block_name,

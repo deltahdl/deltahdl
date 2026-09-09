@@ -456,9 +456,14 @@ static bool TryClockvarMemberAccess(std::string_view base_name,
                                     Logic4Vec& out) {
   auto* mgr = ctx.GetClockingManager();
   if (!mgr) return false;
+  // §23.9: `cb.data` spells the block by the bare name the module declared, so
+  // the sampled value read back is the one belonging to the instance this
+  // expression is running in, which is what the block was registered under.
+  const ClockingBlock* block = mgr->FindInScope(base_name, ctx);
+  if (block == nullptr) return false;
   auto* sig_var = mgr->ResolveClockingMember(base_name, field_name, ctx);
   if (!sig_var) return false;
-  uint64_t sampled = mgr->GetSampledValue(base_name, field_name);
+  uint64_t sampled = mgr->GetSampledValue(block->name, field_name);
   out = MakeLogic4VecVal(arena, sig_var->value.width, sampled);
   return true;
 }

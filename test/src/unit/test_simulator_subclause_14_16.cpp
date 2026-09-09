@@ -199,4 +199,60 @@ TEST(SyncDriveSim, DriveToAnInputClockvarLeavesTheSignalAlone) {
   EXPECT_EQ(sig->value.ToUint64(), 0x11u);
 }
 
+// §14.16's synchronous drive, written against a block a child instance
+// declares. The clockvar names the block by the bare name the child's module
+// declared, and the signal it drives is the child instance's own.
+TEST(SyncDriveSim, AChildInstancesClockvarDrivesThatInstancesSignal) {
+  SimFixture f;
+  auto* sig = RunAndFindVar(
+      "module leaf(input logic clk);\n"
+      "  logic [7:0] sig = 8'h00;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    output sig;\n"
+      "  endclocking\n"
+      "  initial #5 cb.sig <= 8'hFE;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 1'b0;\n"
+      "  leaf u(.clk(clk));\n"
+      "  initial #10 $finish;\n"
+      "endmodule\n",
+      f, "u.sig");
+  ASSERT_NE(sig, nullptr);
+  EXPECT_EQ(sig->value.ToUint64(), 0xFEu);
+}
+
+// §14.3 names a block within its module, so two instances of one module declare
+// two blocks spelled identically and each drives its own signal. Only `u1`'s
+// clock rises here, so `u1` drives and `u2` keeps the value its declaration
+// gave it; a single registration shared between the instances would put one
+// instance's drive on whichever signal that registration named.
+TEST(SyncDriveSim, TwoInstancesOfOneCellDriveTheirOwnSignals) {
+  const char* const kSrc =
+      "module leaf(input logic clk);\n"
+      "  logic [7:0] sig = 8'h11;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    output sig;\n"
+      "  endclocking\n"
+      "  always @(posedge clk) cb.sig <= 8'hFE;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk1 = 1'b0;\n"
+      "  logic clk2 = 1'b0;\n"
+      "  leaf u1(.clk(clk1));\n"
+      "  leaf u2(.clk(clk2));\n"
+      "  initial begin\n"
+      "    #5 clk1 = 1'b1;\n"
+      "    #10 $finish;\n"
+      "  end\n"
+      "endmodule\n";
+  SimFixture f;
+  auto* driven = RunAndFindVar(kSrc, f, "u1.sig");
+  ASSERT_NE(driven, nullptr);
+  EXPECT_EQ(driven->value.ToUint64(), 0xFEu);
+  auto* untouched = f.ctx.FindVariable("u2.sig");
+  ASSERT_NE(untouched, nullptr);
+  EXPECT_EQ(untouched->value.ToUint64(), 0x11u);
+}
+
 }  // namespace
