@@ -591,32 +591,53 @@ static bool IsFutureSampledFunction(std::string_view name) {
          name == "$changing_gclk";
 }
 
+// §16.9.3's $past and §16.9.4's global-clocking spelling of it, which take the
+// value from a stated number of clock ticks back.
+static bool IsPastSampledFunction(std::string_view name) {
+  return name == "$past" || name == "$past_gclk";
+}
+
+// §16.9.3's four value change functions and the global-clocking spellings that
+// look back rather than forward.
+static bool IsValueChangeFunction(std::string_view name) {
+  return name == "$rose" || name == "$fell" || name == "$stable" ||
+         name == "$changed" || name == "$rose_gclk" || name == "$fell_gclk" ||
+         name == "$stable_gclk" || name == "$changed_gclk";
+}
+
+// §16.9.3's two past-directed shapes: $past's own value from a stated number of
+// ticks back, and the four value-change answers, which take one tick back. Both
+// read the history this call site has and record what it sampled now, and both
+// fall back to the default sampled value the clause names for a site that has
+// not been evaluated that many times yet.
+static Logic4Vec EvalPastOrValueChange(const Expr* expr, SimContext& ctx,
+                                       Arena& arena, std::string_view name,
+                                       const Logic4Vec& now_val) {
+  auto& samples = ctx.AssertionSamples();
+  bool is_past = IsPastSampledFunction(name);
+  uint32_t ticks = is_past ? PastTickCount(expr, ctx, arena) : 1;
+  const Logic4Vec* past = samples.PastValue(expr, ticks);
+  Logic4Vec prev_val = past != nullptr
+                           ? *past
+                           : EvalDefaultSampledArg(expr->args[0], ctx, arena);
+  samples.RecordTick(expr, now_val, ticks, arena);
+  if (is_past) return prev_val;
+  return ValueChangeAnswer(name, now_val, prev_val, arena);
+}
+
 static std::optional<Logic4Vec> EvalSampledValueFunc(const Expr* expr,
                                                      SimContext& ctx,
                                                      Arena& arena,
                                                      std::string_view name) {
-  bool is_past = name == "$past" || name == "$past_gclk";
-  bool is_change = name == "$rose" || name == "$fell" || name == "$stable" ||
-                   name == "$changed" || name == "$rose_gclk" ||
-                   name == "$fell_gclk" || name == "$stable_gclk" ||
-                   name == "$changed_gclk";
-  if (name == "$sampled" || is_past || is_change) {
+  bool is_sampled = name == "$sampled";
+  if (is_sampled || IsPastSampledFunction(name) ||
+      IsValueChangeFunction(name)) {
     if (expr->args.empty() || expr->args[0] == nullptr) {
-      uint32_t empty_width = name == "$sampled" ? 1 : 32;
-      return MakeLogic4VecVal(arena, empty_width, 0);
+      return MakeLogic4VecVal(arena, is_sampled ? 1 : 32, 0);
     }
     auto now_val = EvalSampledArg(expr->args[0], ctx, arena);
-    if (name == "$sampled") return now_val;
-
-    auto& samples = ctx.AssertionSamples();
-    uint32_t ticks = is_past ? PastTickCount(expr, ctx, arena) : 1;
-    const Logic4Vec* past = samples.PastValue(expr, ticks);
-    Logic4Vec prev_val = past != nullptr
-                             ? *past
-                             : EvalDefaultSampledArg(expr->args[0], ctx, arena);
-    samples.RecordTick(expr, now_val, ticks, arena);
-    if (is_past) return prev_val;
-    return ValueChangeAnswer(name, now_val, prev_val, arena);
+    if (is_sampled) return now_val;
+    return EvalPastOrValueChange(expr, ctx, arena, name, now_val);
   }
   if (name == "$future_gclk") {
     if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
