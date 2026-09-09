@@ -220,27 +220,28 @@ TEST(ProtectKeyMethodSyntax, ANameMerelyOpeningWithTheKeywordIsNotIt) {
 }
 
 // The other half of the tool asks the same line the same question, and what it
-// does with the answer is refuse the region. §34.5.24.2 has a region's keys
-// encrypted under the algorithm the identifier names and has the identifier
-// unchanged in the output file, and #3278 settled that a tool with one cipher
-// cannot honour both: it refuses a region naming another cipher rather than
-// writing out an identifier its blocks contradict. So the spelling §34.5.24.1
-// defines is what carries an author's request as far as that refusal.
+// does with the answer is seal the region's keys under the cipher the answer
+// names. §34.5.24.2 has a region's keys encrypted under the algorithm the
+// identifier names and has the identifier unchanged in the output file, and the
+// identifier here is the one Table 34-3 requires of every implementation, so
+// both rules are kept: the blocks are sealed under FIPS 46-3's cipher and the
+// envelope states it. So the spelling §34.5.24.1 defines is what carries an
+// author's request as far as the block it governs.
 //
 // The region here designates a key of an entity whose key the tool does not
 // hold, which is what sends its keys into a key block and makes a cipher for
 // them something the region asked for.
-TEST(ProtectKeyMethodSyntax, TheAlgorithmStatedInThatSpellingIsRefused) {
+TEST(ProtectKeyMethodSyntax, TheAlgorithmStatedInThatSpellingIsHonoured) {
   SourceManager mgr;
   DiagEngine diag{mgr};
   std::string src = SignedRegionStating(StatesMethod(InQuotes(kStated)));
-  EncryptEnvelopes(src, {}, TheBlockProvidersKey(), &diag,
-                   mgr.AddFile("<test>", src));
-  EXPECT_TRUE(ReportedError(
-      diag.Diagnostics(),
-      "protect pragma key_method asks for an encryption algorithm this "
-      "implementation does not provide: des-cbc",
-      LineHolding(src, "key_method"), "34.5.24.2"));
+  std::string envelope = EncryptEnvelopes(src, {}, TheBlockProvidersKey(),
+                                          &diag, mgr.AddFile("<test>", src));
+  EXPECT_FALSE(diag.HasErrors()) << envelope;
+  EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
+  std::string stated = "`pragma protect key_method=\"";
+  stated.append(kStated).append("\"");
+  EXPECT_TRUE(Holds(envelope, stated)) << envelope;
 }
 
 // And the same list read by that half. An expression naming no algorithm asks

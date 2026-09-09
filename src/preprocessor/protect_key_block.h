@@ -169,6 +169,22 @@ class ProtectKeyBlockRequests {
   void DesignatePublicKey(std::string_view keyowner, std::string_view key,
                           const ProtectDataDecryption& data, uint32_t line);
 
+  // §34.5.24: the cipher the region named for its own keys, which is the one
+  // its key blocks are encrypted under. It stands on the collection rather than
+  // on a request because §34.5.24.1 writes the keyword once for the region
+  // while a request is one designation of one entity's key, so every block of
+  // an envelope is under the one cipher the region named.
+  //
+  // Empty where the region named none, and empty as well where it named one
+  // this implementation does not have: only §34.5.11.2's required des-cbc is a
+  // stated cipher the blocks can be written under, everything else taking this
+  // implementation's own. A region asking for a cipher there is none of is
+  // reported where it closes and its blocks written all the same, and stating
+  // the name it asked for would leave an envelope claiming an algorithm nobody
+  // used.
+  void UseKeyMethod(std::string_view method) { key_method_ = method; }
+  std::string_view KeyMethod() const { return key_method_; }
+
   const std::vector<ProtectKeyBlockRequest>& Requests() const {
     return requests_;
   }
@@ -176,6 +192,7 @@ class ProtectKeyBlockRequests {
 
  private:
   std::vector<ProtectKeyBlockRequest> requests_;
+  std::string key_method_;
 };
 
 // What §34.5.27 has an encrypting tool produce for one region.
@@ -270,7 +287,8 @@ std::string ProtectKeyBlockContent(const ProtectDataDecryption& data,
 std::string ProtectKeyBlockDirectives(const ProtectKeyBlockRequest& request,
                                       std::string_view content,
                                       std::string_view key,
-                                      const ProtectEncoding& encoding);
+                                      const ProtectEncoding& encoding,
+                                      std::string_view method);
 
 // The key blocks `requests` asks for, over the region whose cleartext is
 // `cleartext`, using the keys the tool was given.

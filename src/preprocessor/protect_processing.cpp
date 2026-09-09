@@ -201,6 +201,17 @@ std::string_view RegionKey(const RegionKeyNames& names,
 // closed next rather than for this one, so where it asks for a block is where
 // this region ends. Nothing reads the line off a lone request either way:
 // §34.5.27's requirement is one two blocks can break and one cannot.
+// Which cipher a stated identifier selects. §34.5.11.2 admits an
+// implementation-defined identifier beside Table 34-3's, and this
+// implementation encrypts under two: the table's required des-cbc, and its own
+// where nothing else applies. A region asking for one of the other fifteen is
+// reported where it closes and written under this implementation's own all the
+// same, so what it asked for reaches nothing here -- an envelope stating the
+// name it asked for would claim an algorithm nobody used.
+std::string_view ProvidedCipher(std::string_view stated) {
+  return stated == kDesCbcMethod ? stated : std::string_view{};
+}
+
 ProtectKeyBlockRequests DesignatedKeyBlocks(const RegionKeyNames& names,
                                             uint32_t closing_line,
                                             std::string_view data_method) {
@@ -294,7 +305,9 @@ void ReportUnprovidedKeyMethod(const RegionKeyReader& in_effect,
                                uint32_t file_id) {
   if (diag == nullptr || how.key_blocks.directives.empty()) return;
   std::string_view stated = ProtectPragmaValueBody(in_effect.key_method);
-  if (stated.empty() || stated == kDataMethod) return;
+  if (stated.empty() || stated == kDataMethod || stated == kDesCbcMethod) {
+    return;
+  }
   std::string message(
       "protect pragma key_method asks for an encryption algorithm this "
       "implementation does not provide: ");
@@ -426,6 +439,12 @@ RegionEncryption RegionEncryptionFor(const RegionKeyReader& in_effect,
           ? DesignatedKeyBlocks(in_effect.names, closing_line,
                                 ProtectPragmaValueBody(in_effect.data_method))
           : region.written_inside.key_blocks;
+  // §34.5.24 names the cipher the region's own keys are under, and §34.5.24.2
+  // sends the identifier to §34.5.11's table, so des-cbc is required for these
+  // blocks as it is for the data. It is stated once for the region, so it goes
+  // on the collection rather than on a designation.
+  requests.UseKeyMethod(
+      ProvidedCipher(ProtectPragmaValueBody(in_effect.key_method)));
   how.key_blocks = ProtectKeyBlocksFor(
       requests, region.body, keys,
       EnvelopeBlockEncoding(region.written_inside.encoding), how.digest);

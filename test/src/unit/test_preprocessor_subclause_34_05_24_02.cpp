@@ -52,9 +52,9 @@
 // and leaves an additional identifier and the cipher behind it to the
 // implementation. IsRequiredProtectEncryptionAlgorithm in
 // src/preprocessor/protect_key_method.h is what answers the question, and the
-// report names the half of the table the identifier came from. #3430 covers
-// providing the ciphers the table requires of every implementation, and the
-// report is what stands in their place until that lands.
+// report names the half of the table the identifier came from. #3430 provided
+// des-cbc, which is the whole of the required half, so what a region can be
+// refused for is one of the fifteen the table leaves optional.
 
 #include <gtest/gtest.h>
 
@@ -92,10 +92,10 @@ constexpr std::string_view kEntityKey = "meridian-trust-wrapping-key";
 constexpr std::string_view kDataKeyName = "design-2027";
 
 // The identifier Table 34-3 requires of every implementation, which is the one
-// a region names below to ask for a cipher this implementation does not have,
-// and the identifier a region names for the algorithm its digests are computed
-// with. The second is there to be looked for and not found: §34.5.21.2 excuses
-// it from the clear wherever a digital signature is used and §34.5.24.2 excuses
+// a region names below to ask for §34.5.11.2's required cipher, and the
+// identifier a region names for the algorithm its digests are computed with.
+// The second is there to be looked for and not found: §34.5.21.2 excuses it
+// from the clear wherever a digital signature is used and §34.5.24.2 excuses
 // this one from nothing.
 constexpr std::string_view kKeyCipher = "des-cbc";
 constexpr std::string_view kDigestAlgorithm = "md5";
@@ -140,11 +140,11 @@ constexpr std::string_view kNoCipherOfOurs =
     "protect pragma key_method asks for an encryption algorithm this "
     "implementation does not provide: ";
 
-// The two halves of Table 34-3 as that report names them. Which half the
-// identifier came from is the whole of what separates the two reported cases
-// below from each other.
-constexpr std::string_view kTableObligesEveryTool =
-    ", which IEEE 1800-2023 Table 34-3 requires of every implementation";
+// The half of Table 34-3 a report about a key_method can name. §34.5.24.2 sends
+// this keyword to §34.5.11's table, whose one Required row is des-cbc, and this
+// implementation now provides that cipher for these blocks as well as for the
+// data; so every identifier a region can be refused for is one the table leaves
+// optional, and the report says that of each.
 constexpr std::string_view kTableLeavesItOptional =
     ", which IEEE 1800-2023 Table 34-3 does not require of every "
     "implementation";
@@ -433,22 +433,33 @@ TEST(ProtectKeyMethodDescription, AnEnvelopeStatingNoneIsReadBackToo) {
 // §34.5.24.2's ENCRYPTION INPUT has the identifier indicate "the encryption
 // algorithm that shall be used to encrypt the keys used to encrypt the
 // data_block", so a region naming des-cbc has stated what its own key block is
-// to be sealed with. This implementation seals one under the cipher it names
-// kDataMethod and under no other, so the region asked for something it cannot
-// be given and is told so. Table 34-3 marks des-cbc Required and the report
-// says so, §34.5.11.2 calling a required method standard in every
-// implementation and this implementation being the one falling short.
+// to be sealed with. §34.5.24.2 gives this keyword no table of its own and
+// sends the reader to §34.5.11's, which marks des-cbc Required of every
+// implementation, so the block is sealed under FIPS 46-3's cipher and the
+// envelope states that identifier rather than this implementation's own.
 //
-// The identifier stands on the fifth line, the region opening on the first and
-// closing on the seventh, so a report placed at either delimiter fails this.
+// The design is sealed and nothing is reported, and the identifier the envelope
+// states is read as well: a tool that sealed under its own cipher and said so
+// would be one that honoured nothing.
 TEST(ProtectKeyMethodEncryptionInput,
-     ARegionAskingForTheRequiredCipherForItsKeysIsReported) {
+     ARegionAskingForTheRequiredCipherForItsKeysIsSealedUnderIt) {
   AuthorsRun run(SignedRegion(Writes("key_method", kKeyCipher)),
                  TheEntitysKey());
-  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
-                            AskingFor(kKeyCipher, kTableObligesEveryTool), 5,
-                            "34.5.24.2"))
+  EXPECT_FALSE(run.diag.HasErrors()) << run.envelope;
+  EXPECT_EQ(IdentifierStatedFor(run.envelope, "key_method"), kKeyCipher)
       << run.envelope;
+  EXPECT_FALSE(Holds(run.envelope, kSealedDesign)) << run.envelope;
+}
+
+// The same envelope read back by a tool holding the entity's key: the key block
+// it carries is opened under the cipher the envelope states for it, so the key
+// inside reaches the data block and the design comes out. Without this the case
+// above would hold of a tool that wrote an identifier it could not read back.
+TEST(ProtectKeyMethodEncryptionInput,
+     AKeyBlockSealedUnderTheRequiredCipherIsOpenedUnderIt) {
+  AuthorsRun run(SignedRegion(Writes("key_method", kKeyCipher)),
+                 TheEntitysKey());
+  EXPECT_TRUE(Holds(ReadBack(run.envelope), kSealedDesign)) << run.envelope;
 }
 
 // §34.5.24.2 sends this keyword to the identifiers written for data_method, and

@@ -67,10 +67,17 @@ void Preprocessor::ReadProtectKeyBlock(std::string_view text, SourceLoc loc,
   // material, so they are not text of the design whether or not a block came
   // out of them.
   if (!ReadEncodedProtectValue(text, loc, &block)) return;
+  // §34.5.24.2 has the key_method name the algorithm the key block is opened
+  // with, and §34.5.24 sends the identifier to §34.5.11's table, so the two
+  // this implementation encrypts under are the two it reads a key block under.
+  // A block naming any other is one it cannot open, which §34.5.27.2 leaves
+  // unreported: several key blocks are alternative ways into one envelope, so a
+  // block written for some other reader is passed over rather than complained
+  // about.
   std::string content;
   if (!DecryptProtectedBlock(
           block, ProtectKeyBlockKey(protect_keywords_, config_.protect_keys),
-          &content)) {
+          &content, protect_keywords_.ValueOf(kKeyMethodKeyword).value)) {
     return;
   }
   // The block is run for what it defines and its text is appended nowhere, so

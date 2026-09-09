@@ -232,8 +232,10 @@ void AppendClearKeyNames(const EncryptionEnvelope& envelope,
   // so every envelope would carry a line Preprocessor::HandlePragma reports as
   // an illegal token.
   if (signed_envelope) {
+    std::string_view stated = ProtectPragmaValueBody(envelope.key_method);
     text->append("`pragma protect ").append(kKeyMethodKeyword).append("=\"");
-    text->append(kDataMethod).append("\"\n");
+    text->append(stated == kDesCbcMethod ? stated : kDataMethod);
+    text->append("\"\n");
   }
   // §34.5.25 has the name of the key a region's own keys are under written as
   // cleartext as well. It is the name a reader combines with the entity beside

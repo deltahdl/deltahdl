@@ -186,7 +186,8 @@ bool SameProtectDataDecryption(const ProtectDataDecryption& a,
 std::string ProtectKeyBlockDirectives(const ProtectKeyBlockRequest& request,
                                       std::string_view content,
                                       std::string_view key,
-                                      const ProtectEncoding& encoding) {
+                                      const ProtectEncoding& encoding,
+                                      std::string_view method) {
   std::string text;
   // §34.5.23 has the entity unchanged wherever the tool writes it out, and
   // states no exception at all, so it goes into the block's own directive in
@@ -202,10 +203,10 @@ std::string ProtectKeyBlockDirectives(const ProtectKeyBlockRequest& request,
     text.append(ProtectKeyPublicKeyDirective(
         EncodeProtectBlock(request.public_key, encoding)));
   }
-  text.append(ProtectEncodedValueDirective(encoding,
-                                           ProtectedRegionBlockSize(content)));
+  text.append(ProtectEncodedValueDirective(
+      encoding, ProtectedRegionBlockSize(content, method)));
   text.append("`pragma protect ").append(kKeyBlockKeyword).append("\n");
-  text.append(EncryptProtectedRegion(content, key, encoding.enctype));
+  text.append(EncryptProtectedRegion(content, key, encoding.enctype, method));
   text.push_back('\n');
   return text;
 }
@@ -251,8 +252,8 @@ ProtectKeyBlocks ProtectKeyBlocksFor(const ProtectKeyBlockRequests& requests,
       blocks.data_changed_line = request.line;
     }
     std::string content = KeyBlockContentFor(request, blocks, digest, encoding);
-    blocks.directives.append(
-        ProtectKeyBlockDirectives(request, content, key, encoding));
+    blocks.directives.append(ProtectKeyBlockDirectives(
+        request, content, key, encoding, requests.KeyMethod()));
     // §34.5.22 owes a digest block to each key block generated, immediately
     // following the block it refers to. The buffer the block was formed from is
     // what the digest is computed over, because that is what a reader holds
