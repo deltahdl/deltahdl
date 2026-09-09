@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "fixture_sdf_design.h"
-#include "fixture_simulator.h"
 #include "simulator/sdf_parser.h"
 #include "simulator/specify.h"
 
@@ -817,81 +816,6 @@ TEST(SdfInterconnectAnnotation, ReferencesBeforeAndAfterTheLoadDiffer) {
   d.Annotate(SdfDelay("(INTERCONNECT u1/b/a/q u2/m2/d (5))"));
   EXPECT_TRUE(d.mgr.ReadInterconnectReference("u2/m2/m1/d").delayed);
   EXPECT_FALSE(d.mgr.ReadInterconnectReference("u1/b/q").delayed);
-}
-
-// The delay running: the source's transition reaches the load the annotated
-// delay later, and the rise and fall transitions take their own slot's delay.
-TEST(SdfInterconnectAnnotation, SourceTransitionsArriveAtTheLoadDelayed) {
-  Design d;
-  ASSERT_TRUE(d.Build(kPairSrc));
-  d.Annotate(SdfDelay("(INTERCONNECT u1/q u2/d (3) (7))"));
-  d.mgr.StartInterconnectPropagation(d.f.ctx, d.f.scheduler);
-  d.f.scheduler.Run();
-
-  const auto& arrivals = d.mgr.GetInterconnectArrivals();
-  const InterconnectArrival* rise = nullptr;
-  const InterconnectArrival* fall = nullptr;
-  for (const auto& a : arrivals) {
-    if (a.load_port != "u2/d") continue;
-    // The source rises at 5 and falls at 10.
-    if (a.value == 1 && a.time == 8) rise = &a;
-    if (a.value == 0 && a.time == 17) fall = &a;
-  }
-  ASSERT_NE(rise, nullptr) << "no delayed rise arrival at the load";
-  ASSERT_NE(fall, nullptr) << "no delayed fall arrival at the load";
-  EXPECT_EQ(rise->delay, 3u);
-  EXPECT_EQ(fall->delay, 7u);
-  for (const auto& a : arrivals) {
-    // Nothing arrives when the source transitioned: that is the undelayed
-    // value, which only a reference to the source reads.
-    EXPECT_NE(a.time, 5u);
-    EXPECT_NE(a.time, 10u);
-  }
-}
-
-// Any number of transitions may be in flight at once: a second transition of
-// the source does not cancel the first one's pending arrival, even when the two
-// arrive out of the order they were sent in.
-TEST(SdfInterconnectAnnotation, ManyArrivalsMayBeScheduledAtOnce) {
-  Design d;
-  ASSERT_TRUE(d.Build(kPairSrc));
-  // The source rises at 5 and falls at 10; a rise takes 20 to reach the load
-  // and a fall takes 2, so both are pending together and the later transition
-  // arrives first.
-  d.Annotate(SdfDelay("(INTERCONNECT u1/q u2/d (20) (2))"));
-  d.mgr.StartInterconnectPropagation(d.f.ctx, d.f.scheduler);
-  d.f.scheduler.Run();
-
-  bool rise_arrived = false;
-  bool fall_arrived = false;
-  for (const auto& a : d.mgr.GetInterconnectArrivals()) {
-    if (a.load_port != "u2/d") continue;
-    if (a.value == 1 && a.time == 25) rise_arrived = true;
-    if (a.value == 0 && a.time == 12) fall_arrived = true;
-  }
-  EXPECT_TRUE(rise_arrived);
-  EXPECT_TRUE(fall_arrived);
-}
-
-// A delay carrying no source of its own is the delay from every source on the
-// load's net, so at run time the load follows whichever source drives that net.
-TEST(SdfInterconnectAnnotation, PortAnnotatedLoadFollowsTheNetSourceAtRuntime) {
-  Design d;
-  ASSERT_TRUE(d.Build(kPairSrc));
-  d.Annotate(SdfDelay("(PORT u2/d (4) (6))"));
-  d.mgr.StartInterconnectPropagation(d.f.ctx, d.f.scheduler);
-  d.f.scheduler.Run();
-
-  bool rise_arrived = false;
-  bool fall_arrived = false;
-  for (const auto& a : d.mgr.GetInterconnectArrivals()) {
-    if (a.load_port != "u2/d") continue;
-    // The net's source rises at 5 and falls at 10.
-    if (a.value == 1 && a.time == 9) rise_arrived = true;
-    if (a.value == 0 && a.time == 16) fall_arrived = true;
-  }
-  EXPECT_TRUE(rise_arrived);
-  EXPECT_TRUE(fall_arrived);
 }
 
 TEST(SdfInterconnectAnnotation, SingleValueEntryBroadcastsAcrossAllSlots) {

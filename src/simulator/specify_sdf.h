@@ -105,17 +105,6 @@ struct SdfInterconnectOutcome {
   std::vector<std::string> warnings;
 };
 
-// §32.4.4: one source-side transition arriving at an annotated load, the
-// interconnect delay later than the source took the value. This is what makes a
-// reference at or after the load read the delayed signal value while a
-// reference to the source keeps reading the undelayed one.
-struct InterconnectArrival {
-  std::string load_port;
-  uint64_t value = 0;
-  uint64_t time = 0;
-  uint64_t delay = 0;
-};
-
 // §32.4.4: which of the two values a reference to a signal reads. A reference
 // at or hierarchically after an annotated load reads the delayed value and
 // therefore carries that load's delay; every reference before it, the source

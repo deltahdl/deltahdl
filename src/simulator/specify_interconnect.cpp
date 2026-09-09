@@ -1,12 +1,8 @@
 // §32.5: the delay an SDF INTERCONNECT, PORT or NETDELAY entry puts between a
-// driving port and a driven port, and the arrival that delay produces while the
-// simulation runs. SpecifyManager::StartInterconnectPropagation registers the
-// post-timestep callback that SpecifyManager::PollInterconnectSources answers
-// with, reading each annotated source and scheduling the load's new value one
-// Table 30-3 transition delay later.
+// driving port and a driven port.
 //
-// The rest of the file answers §32.4.4, which decides what an entry's names
-// stand for before any delay is stored: CollectInterconnectTopology builds the
+// The file answers §32.4.4, which decides what an entry's names stand for
+// before any delay is stored: CollectInterconnectTopology builds the
 // InterconnectTopology whose nets a port connection merges, the free functions
 // in the anonymous namespace compare and walk the hierarchical names SDF and
 // the design spell differently, and SpecifyManager::AnnotateSdfInterconnect and
@@ -25,11 +21,8 @@
 #include <utility>
 #include <vector>
 
-#include "simulator/scheduler.h"
-#include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/specify_internal.h"
-#include "simulator/variable.h"
 
 namespace delta {
 
@@ -205,66 +198,6 @@ std::vector<const InterconnectTerminal*> ResolveInterconnectLoads(
     return LoadsOnNamedNet(topo, net);
   }
   return LoadsWithinScope(topo, name);
-}
-
-// Which of the twelve transition slots a value change of a one-bit signal took.
-// Only the six two-state transitions are distinguished here; a change into or
-// out of x or z lands on the matching slot of Table 30-3's ordering.
-uint8_t InterconnectTransitionSlot(uint64_t from, uint64_t to) {
-  const bool kFromZero = from == 0;
-  const bool kToZero = to == 0;
-  if (kFromZero && !kToZero) return 0;  // 0 -> 1
-  if (!kFromZero && kToZero) return 1;  // 1 -> 0
-  return 0;
-}
-
-// §32.5: whether some entry naming its own source already carries the delay
-// from `source` to `load` -- which is exactly what an INTERCONNECT annotation
-// written after a PORT annotation to the same load leaves standing beside the
-// PORT's all-sources entry.
-bool InterconnectSourceClaimed(const std::vector<InterconnectDelay>& delays,
-                               std::string_view load, std::string_view source) {
-  for (const auto& delay : delays) {
-    if (delay.covered_sources.empty()) continue;
-    if (!InterconnectNameEq(delay.dst_port, load)) continue;
-    for (const auto& covered : delay.covered_sources) {
-      if (InterconnectNameEq(covered, source)) return true;
-    }
-  }
-  return false;
-}
-
-// §32.4.4: the design-side name whose value an annotated load follows. A delay
-// from one named source follows that source; a delay standing for all sources
-// on the net follows whichever source drives the load's net.
-//
-// §32.5: a source a later INTERCONNECT annotation named is not one of those,
-// though. Only the delay from that source was meant to change, so the source
-// keeps to its own entry and the all-sources entry moves on to a source no
-// entry of its own covers.
-std::string InterconnectSourceStorageName(
-    const InterconnectTopology& topo,
-    const std::vector<InterconnectDelay>& all_delays,
-    const InterconnectDelay& delay) {
-  std::string source;
-  if (!delay.covered_sources.empty()) {
-    source = delay.covered_sources.front();
-  } else if (const auto* load = FindInterconnectTerminal(topo, delay.dst_port);
-             load != nullptr) {
-    for (const auto* candidate : InterconnectSourcesOnNet(topo, load->net)) {
-      if (InterconnectSourceClaimed(all_delays, delay.dst_port,
-                                    candidate->name)) {
-        continue;
-      }
-      source = candidate->name;
-      break;
-    }
-  }
-  if (source.empty()) return {};
-  for (char& c : source) {
-    if (c == '/') c = '.';
-  }
-  return source;
 }
 
 // The module a hierarchical instantiation names, or null when the compilation
@@ -722,65 +655,6 @@ InterconnectReferenceRead SpecifyManager::ReadInterconnectReference(
   // §32.4.4: everything else -- the source itself, and every point on the net
   // before the load -- reads the undelayed value.
   return {};
-}
-
-void SpecifyManager::StartInterconnectPropagation(SimContext& ctx,
-                                                  Scheduler& scheduler) {
-  interconnect_ctx_ = &ctx;
-  interconnect_scheduler_ = &scheduler;
-  interconnect_last_source_value_.clear();
-  interconnect_arrivals_.clear();
-  // Take the values standing now as the starting point, so only transitions
-  // from here on produce an arrival at a load.
-  PollInterconnectSources();
-  scheduler.AddPostTimestepCallback([this]() { PollInterconnectSources(); });
-}
-
-void SpecifyManager::PollInterconnectSources() {
-  if (interconnect_ctx_ == nullptr || interconnect_scheduler_ == nullptr) {
-    return;
-  }
-  for (const auto& delay : interconnect_delays_) {
-    const std::string kStorage =
-        InterconnectSourceStorageName(topology_, interconnect_delays_, delay);
-    if (kStorage.empty()) continue;
-    Variable* var = interconnect_ctx_->FindVariable(kStorage);
-    if (var == nullptr) continue;
-    const uint64_t kValue = var->value.ToUint64();
-    // §32.5: one load can carry two entries at once -- the all-sources delay a
-    // PORT annotation left and the delay from the one source a later
-    // INTERCONNECT annotation named -- so each is watched against the source it
-    // follows rather than against the load they share.
-    const std::string kWatched = kStorage + "->" + delay.dst_port;
-    auto it = interconnect_last_source_value_.find(kWatched);
-    if (it == interconnect_last_source_value_.end()) {
-      interconnect_last_source_value_.emplace(kWatched, kValue);
-      continue;
-    }
-    if (it->second == kValue) continue;
-    const uint8_t kSlot = InterconnectTransitionSlot(it->second, kValue);
-    it->second = kValue;
-    const uint64_t kDelay = delay.delays[kSlot];
-    const uint64_t kNow = interconnect_scheduler_->CurrentTime().ticks;
-    InterconnectArrival arrival;
-    arrival.load_port = delay.dst_port;
-    arrival.value = kValue;
-    arrival.time = kNow + kDelay;
-    arrival.delay = kDelay;
-    if (kDelay == 0) {
-      // The current time slot is already being torn down, so a zero delay
-      // arrives right here rather than through the event queue.
-      interconnect_arrivals_.push_back(std::move(arrival));
-      continue;
-    }
-    Event* event = interconnect_scheduler_->GetEventPool().Acquire();
-    event->kind = EventKind::kEvaluation;
-    event->callback = [this, arrival]() {
-      interconnect_arrivals_.push_back(arrival);
-    };
-    interconnect_scheduler_->ScheduleEvent(SimTime{kNow + kDelay},
-                                           Region::kActive, event);
-  }
 }
 
 }  // namespace delta

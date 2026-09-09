@@ -168,30 +168,6 @@ const char* const kThreeSourceSrc =
     "  ld i15(.in(n));\n"
     "endmodule\n";
 
-// Two sources on one net that transition at different times, so each source's
-// own arrival at the shared load can be told apart at run time.
-const char* const kStaggeredSourceSrc =
-    "module drv_a(out);\n"
-    "  output out;\n"
-    "  reg out;\n"
-    "  initial begin out = 1'b0; #5 out = 1'b1; end\n"
-    "endmodule\n"
-    "module drv_b(out);\n"
-    "  output out;\n"
-    "  reg out;\n"
-    "  initial begin out = 1'b0; #20 out = 1'b1; end\n"
-    "endmodule\n"
-    "module ld(in);\n"
-    "  input in;\n"
-    "  wire in;\n"
-    "endmodule\n"
-    "module top;\n"
-    "  wire n;\n"
-    "  drv_a i13(.out(n));\n"
-    "  drv_b i11(.out(n));\n"
-    "  ld i15(.in(n));\n"
-    "endmodule\n";
-
 // Two loads on one net, so a construct aimed at one load can be shown to leave
 // what was annotated to the other load alone.
 const char* const kTwoLoadSrc =
@@ -660,31 +636,6 @@ TEST(SdfMultipleAnnotations, InterconnectAfterPortChangesOnlyItsOwnSource) {
   EXPECT_EQ(from_other2->delays[0], 6u);
 }
 
-// Running the design: each source's own transition reaches the shared load
-// after the delay that source is annotated with, so the pair of annotations is
-// visible in the arrivals and not only in the recorded values.
-TEST(SdfMultipleAnnotations, EachSourceArrivesWithItsOwnDelayAtRuntime) {
-  Design d;
-  ASSERT_TRUE(d.Build(kStaggeredSourceSrc));
-  d.Annotate(SdfDelay("(PORT i15/in (6)) (INTERCONNECT i13/out i15/in (5))"));
-
-  d.mgr.StartInterconnectPropagation(d.f.ctx, d.f.scheduler);
-  d.f.scheduler.Run();
-
-  // The named source rises at 5 and so arrives at 10 carrying the
-  // INTERCONNECT's delay; the other source rises at 20 and so arrives at 26
-  // still carrying the PORT's delay.
-  bool named_arrived = false;
-  bool other_arrived = false;
-  for (const auto& a : d.mgr.GetInterconnectArrivals()) {
-    if (a.load_port != "i15/in") continue;
-    if (a.time == 10 && a.delay == 5) named_arrived = true;
-    if (a.time == 26 && a.delay == 6) other_arrived = true;
-  }
-  EXPECT_TRUE(named_arrived) << "no arrival carrying the INTERCONNECT delay";
-  EXPECT_TRUE(other_arrived) << "no arrival carrying the PORT delay";
-}
-
 // ---------------------------------------------------------------------------
 // INTERCONNECT followed by PORT: the interconnect annotation is overwritten.
 // ---------------------------------------------------------------------------
@@ -704,28 +655,6 @@ TEST(SdfMultipleAnnotations, PortAfterInterconnectOverwritesItForEverySource) {
     ASSERT_NE(got, nullptr) << source;
     EXPECT_EQ(got->delays[0], 6u) << source;
   }
-}
-
-// Running the design after the overwrite: the source the INTERCONNECT had named
-// no longer has a delay of its own, so its transition reaches the load carrying
-// the PORT's delay like every other source.
-TEST(SdfMultipleAnnotations, OverwrittenSourceArrivesWithThePortDelay) {
-  Design d;
-  ASSERT_TRUE(d.Build(kStaggeredSourceSrc));
-  d.Annotate(SdfDelay("(INTERCONNECT i13/out i15/in (5)) (PORT i15/in (6))"));
-
-  d.mgr.StartInterconnectPropagation(d.f.ctx, d.f.scheduler);
-  d.f.scheduler.Run();
-
-  // The named source rises at 5, so under the INTERCONNECT's overwritten delay
-  // of 5 it would have arrived at 10; under the PORT's delay it arrives at 11.
-  bool arrived_with_port_delay = false;
-  for (const auto& a : d.mgr.GetInterconnectArrivals()) {
-    if (a.load_port != "i15/in") continue;
-    EXPECT_NE(a.delay, 5u) << "a source still carries the overwritten delay";
-    if (a.time == 11 && a.delay == 6) arrived_with_port_delay = true;
-  }
-  EXPECT_TRUE(arrived_with_port_delay);
 }
 
 // The rule is about a PORT construct and an INTERCONNECT construct reaching the

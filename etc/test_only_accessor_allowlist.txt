@@ -29,5 +29,4 @@ ClosedEnvelopes src/preprocessor/protect_envelope.h #3602
 FsmStatePragmas src/lexer/lexer.h #3603
 FsmPartSelectPragmas src/lexer/lexer.h #3603
 FsmConcatPragmas src/lexer/lexer.h #3603
-GetInterconnectArrivals src/simulator/specify.h #3606
 ProtectViewports src/preprocessor/preprocessor.h #3284

@@ -15,10 +15,8 @@
 // BuildTimingCheckUnderOptions that fills in the limits it compares; the other
 // Check*Violation members stand in
 // src/simulator/specify_timing_violation.cpp. §32.4.4's and §32.5's
-// interconnect delays -- the InterconnectTopology, the AnnotateSdf* members
-// that place an InterconnectDelay, and
-// SpecifyManager::StartInterconnectPropagation with
-// SpecifyManager::PollInterconnectSources -- stand in
+// interconnect delays -- the InterconnectTopology and the AnnotateSdf* members
+// that place an InterconnectDelay -- stand in
 // src/simulator/specify_interconnect.cpp, which was split out of this file.
 
 #include <string>

@@ -15,7 +15,6 @@
 namespace delta {
 
 class SimContext;
-class Scheduler;
 
 // §32.4.3: a module path declaration together with the module instance it was
 // registered under. SpecifyManager::RebuildPathDelaysForSpecparam recomputes a
@@ -289,18 +288,6 @@ class SpecifyManager {
   InterconnectReferenceRead ReadInterconnectReference(
       std::string_view name) const;
 
-  // §32.4.4: start the annotated interconnect delays running in `ctx`. Each
-  // annotated load follows its source's storage, and a transition of that
-  // source is scheduled to arrive at the load the annotated delay later, with
-  // the transition's own slot of the twelve choosing the delay. The arrivals
-  // are recorded in order, so what the load saw and when is observable after
-  // the run.
-  void StartInterconnectPropagation(SimContext& ctx, Scheduler& scheduler);
-
-  const std::vector<InterconnectArrival>& GetInterconnectArrivals() const {
-    return interconnect_arrivals_;
-  }
-
   void RegisterSpecparamReevaluation(std::string name,
                                      std::function<void(uint64_t)> reevaluate);
 
@@ -551,11 +538,6 @@ class SpecifyManager {
                               const std::string& load,
                               std::vector<std::string> covered_sources);
 
-  // §32.4.4: sample every annotated source once and schedule the arrivals its
-  // transitions cause. Run after each time step, which is what turns an
-  // annotated delay into a delayed load-side value during a simulation.
-  void PollInterconnectSources();
-
   std::vector<PathDelay> path_delays_;
   std::vector<PrimitiveDriver> primitive_drivers_;
   std::vector<TimingCheckEntry> timing_checks_;
@@ -570,14 +552,9 @@ class SpecifyManager {
   std::unordered_map<std::string, size_t> specparam_index_;
   std::vector<InterconnectDelay> interconnect_delays_;
 
-  // §32.4.4: the design's interconnect connectivity, and the running side of an
-  // annotated delay -- where each annotated source's value was last seen and
-  // every arrival its transitions produced at the loads.
+  // §32.4.4: the design's interconnect connectivity, which is what an entry's
+  // names are matched against before any delay is stored.
   InterconnectTopology topology_;
-  SimContext* interconnect_ctx_ = nullptr;
-  Scheduler* interconnect_scheduler_ = nullptr;
-  std::unordered_map<std::string, uint64_t> interconnect_last_source_value_;
-  std::vector<InterconnectArrival> interconnect_arrivals_;
 
   std::vector<std::pair<std::string, std::function<void(uint64_t)>>>
       specparam_reevaluators_;
