@@ -273,7 +273,7 @@ TEST_F(OverrideBuiltinSystf, UnregisteredNameIsStillReported) {
       f.diag.Diagnostics(),
       "$no_such_task is not a system task or system function this tool "
       "implements",
-      2, Subclause("20.1")));
+      2, "20.1"));
 }
 
 }  // namespace
