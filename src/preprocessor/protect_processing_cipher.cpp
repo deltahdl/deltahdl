@@ -120,8 +120,7 @@ size_t ProtectedRegionBlockSize(std::string_view cleartext) {
 
 std::string EncryptProtectedRegion(std::string_view cleartext,
                                    std::string_view key,
-                                   std::string_view enctype,
-                                   size_t line_length) {
+                                   std::string_view enctype) {
   if (key.empty()) return "";
   std::string blob = FingerprintPrefix(FingerprintOf(cleartext));
   blob.append(cleartext);
@@ -132,10 +131,7 @@ std::string EncryptProtectedRegion(std::string_view cleartext,
   if (combined.size() != blob.size()) return "";
   ProtectEncoding encoding;
   encoding.enctype = std::string(enctype);
-  encoding.line_length = line_length;
-  std::string written = EncodeProtectBlock(combined, encoding);
-  while (!written.empty() && written.back() == '\n') written.pop_back();
-  return written;
+  return EncodeProtectBlock(combined, encoding);
 }
 
 bool DecryptProtectedBlock(std::string_view block, std::string_view key,

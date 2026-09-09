@@ -295,14 +295,9 @@ std::string_view RegionDigestKey(const RegionKeyNames& names,
 
 ProtectEncoding EnvelopeBlockEncoding(const ProtectEncoding& requested) {
   ProtectEncoding encoding = DefaultProtectEncoding();
-  if (ProtectEncodingWritesPrintableText(requested.enctype)) {
+  if (ProtectEncodingFitsOneLine(requested.enctype)) {
     encoding.enctype = requested.enctype;
   }
-  // §34.5.9.1's line_length is a maximum on the characters of a line of the
-  // block, so honoring it is what breaks the block across lines, and the
-  // reading takes every line the keyword announced up to the next `pragma
-  // directive.
-  encoding.line_length = requested.line_length;
   return encoding;
 }
 
@@ -368,9 +363,8 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   // (preprocessor/protect_digest_block.cpp) and ProtectKeyBlockDirective
   // (preprocessor/protect_key_block.cpp) are the same three lines.
   text.append("`pragma protect ").append(kDataBlockKeyword).append("\n");
-  text.append(EncryptProtectedRegion(envelope.body, how.key,
-                                     block_encoding.enctype,
-                                     block_encoding.line_length));
+  text.append(
+      EncryptProtectedRegion(envelope.body, how.key, block_encoding.enctype));
   text.push_back('\n');
   // §34.5.22 owes a digest block to the data block as well as each key block,
   // immediately following the block it refers to. The digest is computed over

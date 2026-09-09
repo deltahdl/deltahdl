@@ -35,8 +35,7 @@ std::string ProtectDigestBlockDirectives(std::string_view cleartext,
   text.append(
       ProtectEncodedValueDirective(encoding, ProtectedRegionBlockSize(digest)));
   text.append("`pragma protect ").append(kDigestBlockKeyword).append("\n");
-  text.append(EncryptProtectedRegion(digest, policy.key, encoding.enctype,
-                                     encoding.line_length));
+  text.append(EncryptProtectedRegion(digest, policy.key, encoding.enctype));
   text.push_back('\n');
   return text;
 }

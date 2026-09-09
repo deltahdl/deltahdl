@@ -59,26 +59,19 @@ inline constexpr std::string_view kDataBlockKeyword = "data_block";
 size_t ProtectedRegionBlockSize(std::string_view cleartext);
 
 // Encrypts one region of cleartext under `key` and returns the text that
-// records it, written in the coding scheme `enctype` names and broken so that
-// no line of it runs past `line_length` characters. An empty key encrypts
-// nothing and returns an empty block, and so does a scheme this implementation
-// does not provide and a key no keyed run can be derived from.
+// records it, written in the coding scheme `enctype` names. An empty key
+// encrypts nothing and returns an empty block, and so does a scheme this
+// implementation does not provide and a key no keyed run can be derived from.
 //
 // The scheme defaults to this implementation's own, which is what a region
-// encrypted by a text that stated no encoding is written in, and a length of
-// zero asks for no break. §34.5.15.2 begins the block on the line beneath its
-// keyword and says nothing about where it ends, so a block whose scheme or
-// whose stated length runs it over several lines is written over several.
-//
-// The text carries no line break at its end. The break that ends the block's
-// last line is the caller's to write, that being the one it writes for a block
-// standing on one line, so a scheme ending its own output with a break -- as
-// §34.5.9.2's uuencode does, its last line being the one saying the data are
-// complete -- would otherwise leave a blank line behind the block.
+// encrypted by a text that stated no encoding is written in. Its alphabet holds
+// letters, digits and two punctuation characters only and no line break, so a
+// block of it stands on the one line §34.5.15.2 begins it on. The reading side
+// takes a block on several lines all the same, that being what an envelope
+// another tool wrote may carry; #3612 covers writing one.
 std::string EncryptProtectedRegion(std::string_view cleartext,
                                    std::string_view key,
-                                   std::string_view enctype = kBlockEnctype,
-                                   size_t line_length = 0);
+                                   std::string_view enctype = kBlockEnctype);
 
 // The inverse, taking the block as the bytes it holds rather than as the text
 // it was written as: recovers into `*cleartext` the region those bytes record.

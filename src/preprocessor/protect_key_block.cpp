@@ -205,8 +205,7 @@ std::string ProtectKeyBlockDirectives(const ProtectKeyBlockRequest& request,
   text.append(ProtectEncodedValueDirective(encoding,
                                            ProtectedRegionBlockSize(content)));
   text.append("`pragma protect ").append(kKeyBlockKeyword).append("\n");
-  text.append(EncryptProtectedRegion(content, key, encoding.enctype,
-                                     encoding.line_length));
+  text.append(EncryptProtectedRegion(content, key, encoding.enctype));
   text.push_back('\n');
   return text;
 }

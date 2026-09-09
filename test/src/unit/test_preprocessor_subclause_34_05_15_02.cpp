@@ -38,6 +38,7 @@
 
 #include "fixture_preprocessor.h"
 #include "helpers_protect_block_lines.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_processing.h"
@@ -60,6 +61,12 @@ constexpr std::string_view kNamedScheme = "base64";
 // line.
 constexpr std::string_view kAnnouncingDirective =
     "`pragma protect data_block\n";
+
+// §34.5.22.1's expression, which the tool writes immediately after the data
+// block. It is the `pragma directive that ends that block, and what it
+// announces is the digest checked against it.
+constexpr std::string_view kDigestAnnouncingDirective =
+    "`pragma protect digest_block\n";
 
 // A region naming `scheme` for its block, with the design between the
 // delimiters of §34.5.1 and §34.5.2.
@@ -180,19 +187,23 @@ TEST(ProtectDataBlockDescription, ABlockStandingOnSeveralLinesIsReadWhole) {
 TEST(ProtectDataBlockDescription, TheDirectiveEndingABlockStillTakesEffect) {
   std::string broken = WithBlockBrokenIntoLines(EnvelopeEncodedIn(kNamedScheme),
                                                 kAnnouncingDirective, 3);
-  constexpr std::string_view kDigestAnnouncing =
-      "`pragma protect digest_block
-      ";
-      auto at = broken.find(kDigestAnnouncing);
+  auto at = broken.find(kDigestAnnouncingDirective);
   ASSERT_NE(at, std::string::npos) << broken;
-  auto target = at + kDigestAnnouncing.size() + 4;
+  // A character well inside the digest, which §34.5.22.2 puts on the line after
+  // its own keyword. Counting past that directive's newline is what reaches the
+  // digest rather than the expression announcing it.
+  auto target = at + kDigestAnnouncingDirective.size() + 4;
   ASSERT_LT(target, broken.size());
   ASSERT_NE(broken[target], '\n') << broken;
   broken[target] = (broken[target] == 'A') ? 'B' : 'A';
 
   PreprocFixture f;
   ReadBack(broken, f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "protect pragma digest block disagrees with the block it follows, so one "
+      "of the two was altered after encryption",
+      LineHolding(broken, kDigestAnnouncingDirective) + 1, "34.5.22"));
 }
 
 // §34.5.15.2, decryption input: the block is read in the encoded form and that

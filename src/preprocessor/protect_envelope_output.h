@@ -222,19 +222,20 @@ std::string_view RegionDigestKey(const RegionKeyNames& names,
 // enclosed text asked for, where a block of that scheme stands on one line, and
 // this implementation's own otherwise.
 //
-// A line length the text stated is carried across, a break put in to honor it
-// putting the block on more lines than one. §34.5.15.2 has a block begin on the
-// line beneath its keyword and says nothing about where it ends, so the reading
-// takes every line after the keyword up to the next `pragma directive:
-// Preprocessor::ReadProtectDataBlock (preprocessor/preprocessor.h) is handed
-// the run of them joined, as Preprocessor::ReadProtectKeyBlock and
-// Preprocessor::ReadProtectDigestBlock are for the blocks §34.5.27 and
-// §34.5.22 announce.
+// A line length the text stated is not carried across, and a scheme that breaks
+// its own output is not written under. §34.5.9 states the encoding once for the
+// whole envelope, so the scheme it names writes every encoded value the
+// envelope carries, and not all of those may run to several lines: §34.5.15.2's
+// block may, its keyword beginning it on the line beneath and nothing saying
+// where it ends, while §34.5.13.2's, §34.5.14.2's, §34.5.19's, §34.5.20's and
+// §34.5.26's key values are "the next line" each.
 //
-// The one scheme §34.5.9.2 lists that a block is not written under here is the
-// identity transformation, which is no coding at all: it leaves the data free
-// to hold characters that cannot be printed, and a run of those written into a
-// text file is not text a reader can take lines back out of.
+// The reading side takes a block on several lines either way -- that is what an
+// envelope another tool wrote may carry, and
+// Preprocessor::ReadProtectDataBlock (preprocessor/preprocessor.h) is handed
+// the run of its lines joined, as Preprocessor::ReadProtectKeyBlock and
+// Preprocessor::ReadProtectDigestBlock are for the blocks §34.5.27 and
+// §34.5.22 announce. #3612 covers writing one.
 ProtectEncoding EnvelopeBlockEncoding(const ProtectEncoding& requested);
 
 // The decryption envelope one encryption envelope is transformed into: the

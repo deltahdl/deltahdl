@@ -70,18 +70,21 @@ bool IsProtectEncodingAlgorithm(std::string_view enctype);
 // Whether the table marks `enctype` as one every implementation provides.
 bool IsRequiredProtectEncodingAlgorithm(std::string_view enctype);
 
-// Whether a block written under `enctype` is text: the scheme draws its output
-// from an alphabet of printable characters, so what it writes can stand in a
-// source file and be read back out of one.
+// Whether a value written under `enctype` stands on one line: the characters
+// that scheme writes hold no line break.
 //
-// §34.5.9.2 lists one scheme that is no coding at all -- the identity
-// transformation writes whatever the data hold, which is free to include
-// characters that cannot be printed -- and a block of those written into a
-// file is not text a reader can take lines out of. Every other scheme the
-// clause lists is one a block may be written under, however many lines its
-// output runs to: §34.5.15.2's block begins on the line beneath its keyword
-// and the reading takes every line up to the next `pragma directive.
-bool ProtectEncodingWritesPrintableText(std::string_view enctype);
+// §34.5.9's encoding is stated once for a whole envelope, so the scheme it
+// names writes every encoded value that envelope carries -- and not all of
+// those may run to several lines. §34.5.15.2 has a data block "begin on the
+// next line in the file" and says nothing about where it ends, so a block may;
+// §34.5.13.2 and §34.5.14.2 say instead that "the next line contains the
+// encoded value" of the key they announce, and §34.5.19, §34.5.20 and §34.5.26
+// word theirs the same way, so those values are one line each. An envelope
+// declaring a scheme that breaks its output would break those too, so the
+// writing keeps to the schemes that do not. The reading side accepts a block on
+// several lines either way, which is what an envelope another tool wrote may
+// carry. #3612 covers writing one.
+bool ProtectEncodingFitsOneLine(std::string_view enctype);
 
 // Whether this implementation can write and read a block under `enctype`.
 // That covers every tabulated identifier, the required ones because they have
