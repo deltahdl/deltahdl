@@ -279,16 +279,21 @@ TEST(ClassMethodAssignSim, AConcatenationTargetAssignsFromAClassMethod) {
             0x50Cu);
 }
 
-// §10.4's "slices of unpacked arrays", which writes exactly the sliced
-// elements. The two sliced elements are read back together, so a write that
-// landed on the array's carrier instead of on its elements answers zero.
+// §10.4's "slices of unpacked arrays", which writes exactly the sliced elements
+// and leaves the neighbours untouched. The two sliced elements are read back as
+// their sum at sixteen times, and the two beside them as themselves, so a write
+// that landed on the array's carrier rather than on its elements answers zero
+// and one that spilled into a neighbour answers more than 0x70. The sum is what
+// is read of the slice because element ordering within one is Clause 7's
+// question rather than §10.4's, which is what UnpackedArraySliceLhs above says
+// of the same statement outside a subroutine.
 TEST(ClassMethodAssignSim, AnUnpackedSliceAssignsFromAClassMethod) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  function int slice();\n"
                       "    logic [3:0] a [0:3];\n"
                       "    a = '{4'h0, 4'h0, 4'h0, 4'h0};\n"
                       "    a[1:2] = '{4'h3, 4'h4};\n"
-                      "    return a[1] * 16 + a[2] + a[0] + a[3];\n"
+                      "    return (a[1] + a[2]) * 16 + a[0] + a[3];\n"
                       "  endfunction\n"
                       "endclass\n"
                       "module t;\n"
@@ -300,7 +305,7 @@ TEST(ClassMethodAssignSim, AnUnpackedSliceAssignsFromAClassMethod) {
                       "  end\n"
                       "endmodule\n",
                       "result"),
-            0x34u);
+            0x70u);
 }
 
 }  // namespace
