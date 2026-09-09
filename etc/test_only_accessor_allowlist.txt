@@ -1,0 +1,35 @@
+# Accessors that hand back a container and have no caller under src/, each with
+# the reading that says why it is here. assert-no-test-only-accessors in
+# .github/workflows/deltahdl.yml reports exactly this shape, and the job fails
+# both on a name that is not listed and on a line here naming a name it no
+# longer reports, so an entry cannot outlive its reason.
+#
+# There are two reasons an entry is legitimate, and they are not the same:
+# a window a test reads the object through, where production reads the member
+# itself and the accessor is spare; and a defect that is filed, where nothing
+# reads the data at all and the issue says what is to become of it. Nothing
+# else belongs here. An entry with no reason is what this file exists to make
+# impossible.
+#
+# Format: <accessor> <header> <reason>
+
+# Production reads the member directly.
+CellsNotPrecompiled src/elaborator/separate_compilation_bind.h separate_compilation_bind.cpp:154 reports each missing cell and :159 answers from the list being empty
+GetDeclaredSpecparamsWithInstance src/simulator/specify.h specify.cpp:923 walks the declarations and specify.h:337 builds the name list from them
+GetInterconnectDelays src/simulator/specify.h specify_interconnect.cpp:670 :707 :717 :743 :745 select a delay from it and specify.cpp:689 :692 increment it
+GetPrimitiveDrivers src/simulator/specify.h specify.cpp:873 updates each driver and specify_pulse.cpp:117 rebuilds one
+GetSpecparamValues src/simulator/specify.h specify_pulse.cpp:220 reads the stored value to increment it
+OpenEnvelopes src/preprocessor/protect_envelope.h protect_envelope.cpp:32 counts them :74 finds the one to close and :103 :106 append a keyword to the innermost
+PendingEnvelopeKeywords src/preprocessor/protect_envelope.h protect_envelope.cpp:61 moves them onto the envelope being opened
+RegisteredCallbacks src/simulator/vpi_context.h vpi_callbacks.cpp:160 :175 :298 :304 :357 and vpi_control.cpp:322 :344 dispatch and cancel through it
+RegisteredSystfs src/simulator/vpi_context.h vpi_systf.cpp:90 looks a systf up by name and :111 copies one out; that no simulator call dispatches to one is #3452
+
+# Nothing under src/ reads the data; each is filed.
+ClosedEnvelopes src/preprocessor/protect_envelope.h #3602
+FsmStatePragmas src/lexer/lexer.h #3603
+FsmPartSelectPragmas src/lexer/lexer.h #3603
+FsmConcatPragmas src/lexer/lexer.h #3603
+Params src/simulator/sv_callable.h #3604
+GetSdfAnnotations src/simulator/specify.h #3605
+GetInterconnectArrivals src/simulator/specify.h #3606
+ProtectViewports src/preprocessor/preprocessor.h #3284

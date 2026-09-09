@@ -624,6 +624,71 @@ jobs:
   # ending it are the {} the first alternative matches, and SourceLoc::None()
   # matches neither alternative, because it holds no {} and the text
   # SourceLoc() is not a substring of it.
+  # This job fails when a public accessor that hands back a container has no
+  # caller under src/, unless etc/test_only_accessor_allowlist.txt names it with
+  # the reading that says why. It also fails when a line in that file names an
+  # accessor the scan no longer reports, so an exemption cannot outlive the
+  # thing it exempted.
+  #
+  # A member that only tests call is a member production does not need, and
+  # coverage cannot say so: a test executed it, so it is covered.
+  # SimContext::AddSensitivity and GetSensitiveProcesses were that shape --
+  # a map written for every always_comb in every design, read by two unit tests
+  # that asserted it held what was put in it, and by nothing that wakes a
+  # process. #3312 removed them after a person found them by hand while tracing
+  # something else, and #3313 asked for the job that would have said so.
+  #
+  # The shape is narrow on purpose. The rule as first proposed -- any public
+  # member function whose references outside its own declaration are all under
+  # test/ -- reports 331 names, nearly all of them an accessor a test reads an
+  # object through while production reads the member itself, and a job
+  # reporting 331 names is one nobody keeps green. Restricting it to the shape
+  # the defect had, an accessor returning a reference to a container, reports
+  # seventeen, and two of those were already-filed defects when the rule was
+  # calibrated.
+  assert-no-test-only-accessors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check no container accessor is called only from tests
+        run: |
+          found=$(mktemp)
+          for f in $(find src -name '*.h')
+          do
+            sed -nE 's#^ *(const )?std::(vector|map|set|unordered_map|unordered_set|deque)<.*>& *([A-Za-z_][A-Za-z0-9_]*)\(\).*#\3#p' "$f" \
+              | sed "s|\$| $f|"
+          done | sort -u > "$found"
+          listed=$(mktemp)
+          grep -vE '^\s*(#|$)' etc/test_only_accessor_allowlist.txt \
+            | awk '{print $1, $2}' | sort -u > "$listed"
+          reported=$(mktemp)
+          while read -r name hdr
+          do
+            hits=$(grep -rn "\b$name\b" src --include='*.cpp' --include='*.h' \
+              | grep -vc "^$hdr:" || true)
+            if [ "$hits" = "0" ]; then echo "$name $hdr" >> "$reported"; fi
+          done < "$found"
+          sort -u -o "$reported" "$reported"
+          fail=0
+          while read -r name hdr
+          do
+            if ! grep -qxF "$name $hdr" "$listed"; then
+              echo "::error file=$hdr::$name is called only from tests; give it"\
+                " a caller under src/, or list it in"\
+                " etc/test_only_accessor_allowlist.txt with the reading that"\
+                " says why"
+              fail=1
+            fi
+          done < "$reported"
+          while read -r name hdr
+          do
+            if ! grep -qxF "$name $hdr" "$reported"; then
+              echo "::error file=etc/test_only_accessor_allowlist.txt::$name in"\
+                " $hdr is no longer reported; remove its line"
+              fail=1
+            fi
+          done < "$listed"
+          exit $fail
   assert-no-unlocated-diagnostics:
     runs-on: ubuntu-latest
     steps:
