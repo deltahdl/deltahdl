@@ -200,8 +200,6 @@ class SpecifyManager {
   bool AnnotateSdfDeviceDelay(const SdfDeviceAnnotation& annotation,
                               std::string_view inst_prefix);
 
-  void AnnotateSdf(SdfAnnotation annotation);
-
   // §32.4.3: apply one LABEL entry's value to the specparam it names. The value
   // the file asked for is recorded whatever the name turns out to be, and the
   // design's own storage is written only when that name is a specparam the
@@ -457,10 +455,6 @@ class SpecifyManager {
     return timing_checks_;
   }
 
-  const std::vector<SdfAnnotation>& GetSdfAnnotations() const {
-    return sdf_annotations_;
-  }
-
   bool HasPathDelay(std::string_view src, std::string_view dst) const;
   bool CheckSetupViolation(std::string_view ref, uint64_t ref_time,
                            std::string_view data, uint64_t data_time) const;
@@ -565,7 +559,6 @@ class SpecifyManager {
   std::vector<PathDelay> path_delays_;
   std::vector<PrimitiveDriver> primitive_drivers_;
   std::vector<TimingCheckEntry> timing_checks_;
-  std::vector<SdfAnnotation> sdf_annotations_;
 
   // §32.4.3: what each LABEL entry asked for, kept whether or not the design
   // declared the name as a specparam. The index is keyed by the entry's name

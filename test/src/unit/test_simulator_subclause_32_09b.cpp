@@ -75,7 +75,7 @@ constexpr uint64_t kNoPath = UINT64_MAX;
 // annotates. False when the source did not lower, which every case asserts on
 // before reading anything back. Nothing is bound to the context here:
 // Lowerer::Lower installs the manager and registers the design's specify blocks
-// into it, and that is the manager DelayIn and AnnotationCount read.
+// into it, and that is the manager DelayIn reads.
 bool BuildAndRun(SdfDesign& d, const std::string& src) {
   if (!d.Lower(src)) return false;
   d.f.scheduler.Run();
@@ -99,14 +99,6 @@ uint64_t DelayIn(SdfDesign& d, std::string_view prefix) {
     }
   }
   return kNoPath;
-}
-
-// How many annotations of the design the run recorded. §32.6 makes each call
-// one annotation, recorded whether or not the file it named turned out to be
-// readable.
-std::size_t AnnotationCount(SdfDesign& d) {
-  SpecifyManager* mgr = d.f.ctx.GetSpecifyManager();
-  return mgr == nullptr ? 0 : mgr->GetSdfAnnotations().size();
 }
 
 // The number of non-empty lines `path` holds, which is how many entries a log
@@ -282,7 +274,6 @@ TEST(SdfAnnotateTask, CallWithNoSdfFileOperandIsReportedAndAnnotatesNothing) {
                             "$sdf_annotate requires an SDF file name",
                             LineHolding(kSrc, "$sdf_annotate"), "32.9"));
   EXPECT_EQ(DelayIn(d, "a."), kDeclaredDelay);
-  EXPECT_EQ(AnnotationCount(d), 0u);
 }
 
 // The same holds when the call reaches past an empty first slot to a later
@@ -295,7 +286,6 @@ TEST(SdfAnnotateTask, CallWithAnEmptySdfFileSlotIsReportedAndAnnotatesNothing) {
                             "$sdf_annotate requires an SDF file name",
                             LineHolding(kSrc, "$sdf_annotate"), "32.9"));
   EXPECT_EQ(DelayIn(d, "a."), kDeclaredDelay);
-  EXPECT_EQ(AnnotationCount(d), 0u);
 }
 
 // A file that cannot be opened carries no timing data, so the design keeps what
@@ -306,9 +296,6 @@ TEST(SdfAnnotateTask, UnreadableSdfFileIsReportedAndLeavesTheDesignAlone) {
       d, OneCellDesign("\"/tmp/delta_c32_09_absent_dir/none.sdf\"")));
   EXPECT_EQ(DelayIn(d, "a."), kDeclaredDelay);
   EXPECT_GT(d.f.diag.WarningCount(), 0u);
-
-  // The call still counts as an annotation of the design having been asked for.
-  EXPECT_EQ(AnnotationCount(d), 1u);
 }
 
 // module_instance names the hierarchy level the annotator works from, so a cell

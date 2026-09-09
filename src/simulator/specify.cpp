@@ -883,10 +883,6 @@ bool SpecifyManager::AnnotateSdfDeviceDelay(const SdfDeviceAnnotation& a,
   return applied;
 }
 
-void SpecifyManager::AnnotateSdf(SdfAnnotation annotation) {
-  sdf_annotations_.push_back(std::move(annotation));
-}
-
 void SpecifyManager::AddPathDelayFromDecl(const SpecifyPathDecl& decl,
                                           SimContext& ctx, Arena& arena,
                                           bool default_pulse_limits,

@@ -355,12 +355,6 @@ SdfAnnotationResult RunSdfAnnotateTask(const SdfAnnotateTaskArgs& args,
                                        SdfMtm tool_default) {
   SdfAnnotationResult result;
 
-  // §32.6: each call is one annotation of the design from one SDF file, so the
-  // call is recorded on the manager whether or not the file turns out to be
-  // readable. That record is what makes a run of several calls, each over its
-  // own file and its own region, visible as such.
-  mgr.AnnotateSdf({args.sdf_file, args.module_instance});
-
   SdfFile file;
   if (!ReadSdfFile(args.sdf_file, file)) {
     result.warnings.push_back("SDF annotator: unable to read SDF file " +

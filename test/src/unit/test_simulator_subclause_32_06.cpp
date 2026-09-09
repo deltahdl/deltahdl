@@ -203,12 +203,6 @@ TEST(SdfMultipleFiles, EachCallAnnotatesTheDesignFromItsOwnFile) {
   const PathDelay* second = d.PathOf("b.", "out_z");
   ASSERT_NE(second, nullptr);
   EXPECT_EQ(second->delays[0], 20u);
-
-  // Each call is one annotation of the design from one file, recorded in the
-  // order the calls ran.
-  ASSERT_EQ(d.run_mgr->GetSdfAnnotations().size(), 2u);
-  EXPECT_EQ(d.run_mgr->GetSdfAnnotations()[0].sdf_file, kF1);
-  EXPECT_EQ(d.run_mgr->GetSdfAnnotations()[1].sdf_file, kF2);
 }
 
 // An ABSOLUTE value in a later file overwrites what an earlier file annotated
@@ -261,7 +255,6 @@ TEST(SdfMultipleFiles, RepeatingOneIncrementFileModifiesTheDesignEachTime) {
   const PathDelay* path = d.PathOf("a.", "out_z");
   ASSERT_NE(path, nullptr);
   EXPECT_EQ(path->delays[0], 11u);
-  EXPECT_EQ(d.run_mgr->GetSdfAnnotations().size(), 3u);
 }
 
 // Different regions of a design can be annotated from different SDF files, by

@@ -14,11 +14,6 @@
 
 namespace delta {
 
-struct SdfAnnotation {
-  std::string sdf_file;
-  std::string scope;
-};
-
 struct SpecparamValue {
   std::string name;
   uint64_t value = 0;
