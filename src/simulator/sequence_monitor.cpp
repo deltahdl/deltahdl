@@ -6,6 +6,7 @@
 
 #include "common/types.h"
 #include "parser/ast.h"
+#include "simulator/awaiters.h"
 #include "simulator/evaluation.h"
 #include "simulator/process.h"
 #include "simulator/scheduler.h"

@@ -35,5 +35,12 @@ CheckOptions:
   # a caller expects -- so no file that includes one uses a symbol from it
   # directly and every such include would be reported. The six standard headers
   # are the ones src.yml names, reached transitively across most of the tree.
-  misc-include-cleaner.IgnoreHeaders: 'parser/ast\.h$;simulator/sva_engine\.h$;simulator/vpi\.h$;<utility>$;<cstddef>$;<string_view>$;<cstdint>$;<vector>$;<string>$'
+  #
+  # simulator/awaiters.h is named for a different reason: the check does not see
+  # the type of a co_await operand as a use, so a coroutine whose only use of
+  # that header is `co_await EventAwaiter{...}` is reported and the build fails
+  # without the include. src/simulator/sequence_monitor.cpp is that file and the
+  # compiler is what says so, which is the evidence this entry stands on rather
+  # than a job going green.
+  misc-include-cleaner.IgnoreHeaders: 'parser/ast\.h$;simulator/awaiters\.h$;simulator/sva_engine\.h$;simulator/vpi\.h$;<utility>$;<cstddef>$;<string_view>$;<cstdint>$;<vector>$;<string>$'
 Checks: '-*,misc-include-cleaner'
