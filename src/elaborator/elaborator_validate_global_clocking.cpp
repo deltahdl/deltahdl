@@ -165,11 +165,9 @@ const Expr* FindGlobalClockRefInItem(const ModuleItem* item) {
   return ref;
 }
 
-// Predicate over the global clocking sampled value function kinds. Callers pass
-// AcceptAnyGclk for the whole family or IsGlobalClockingFutureFunction to look
-// for the future functions alone.
-using GclkKindPredicate = bool (*)(GlobalClockingSampledFunction);
-
+// The GclkKindPredicate (declared in elaborator_validate_internal.h) that
+// accepts the whole family; a caller after the five future functions alone
+// passes IsGlobalClockingFutureFunction instead.
 bool AcceptAnyGclk(GlobalClockingSampledFunction) { return true; }
 
 // §16.9.4: recursively search `e` for the first global clocking sampled value
@@ -198,7 +196,8 @@ const Expr* FindGclkFunctionRef(const Expr* e, GclkKindPredicate match) {
   return nullptr;
 }
 
-const Expr* FindGclkFunctionRefInStmt(const Stmt* s, GclkKindPredicate match);
+const Expr* FindGclkFunctionRefInStmt(const Stmt* s, GclkKindPredicate match,
+                                      bool include_property_slot);
 
 // Recurse into every nested statement of `s`; returns the first descendant
 // call whose kind satisfies `match`, or nullptr. §16.9.4 says the global
@@ -215,11 +214,12 @@ const Expr* FindGclkFunctionRefInStmt(const Stmt* s, GclkKindPredicate match);
 // after the answer is already known, and a hit found beneath a later child
 // would overwrite the one this function is required to return.
 const Expr* FindGclkFunctionRefInSubStmts(const Stmt* s,
-                                          GclkKindPredicate match) {
+                                          GclkKindPredicate match,
+                                          bool include_property_slot) {
   const Expr* found = nullptr;
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     if (found) return;
-    found = FindGclkFunctionRefInStmt(sub, match);
+    found = FindGclkFunctionRefInStmt(sub, match, include_property_slot);
   });
   return found;
 }
@@ -244,21 +244,43 @@ const Expr* FindGclkFunctionRefInSubStmts(const Stmt* s,
 // A.6.5 gives `event_expression ::= [ edge_identifier ] expression [ iff
 // expression ]`, so both are expressions of one production, and §16.9.4 puts no
 // condition on which of them holds the call.
+// The one expression a statement holds that §16.9.4 admits a future sampled
+// value function in, or nullptr where it holds none. The parser gives a
+// concurrent assertion's property_expr the shape of an immediate assert
+// statement and marks it (Stmt::is_concurrent_clocked, see
+// parser_assert.cpp), so `assert property (@clk $rising_gclk(req));` reaches
+// this walk as a statement whose assert_expr is the property. That expression
+// is the property slot; a caller searching the procedural positions alone
+// passes over it and searches everything else the statement holds, which
+// includes the action block, where the clause bars these functions outright:
+// they "shall not be used in assertion action blocks".
+const Expr* PropertySlotOfStmt(const Stmt* s) {
+  return s->is_concurrent_clocked ? s->assert_expr : nullptr;
+}
+
 const Expr* FindGclkFunctionRefInOwnExprs(const Stmt* s,
-                                          GclkKindPredicate match) {
+                                          GclkKindPredicate match,
+                                          bool include_property_slot) {
+  const Expr* skip = include_property_slot ? nullptr : PropertySlotOfStmt(s);
   const Expr* found = nullptr;
   ForEachChildExpr(s, [&](Expr* const& e) {
-    if (found) return;
+    if (found || (skip != nullptr && e == skip)) return;
     found = FindGclkFunctionRef(e, match);
   });
   return found;
 }
 
-const Expr* FindGclkFunctionRefInStmt(const Stmt* s, GclkKindPredicate match) {
+const Expr* FindGclkFunctionRefInStmt(const Stmt* s, GclkKindPredicate match,
+                                      bool include_property_slot) {
   if (!s) return nullptr;
-  if (const Expr* hit = FindGclkFunctionRefInOwnExprs(s, match)) return hit;
-  return FindGclkFunctionRefInSubStmts(s, match);
+  if (const Expr* hit =
+          FindGclkFunctionRefInOwnExprs(s, match, include_property_slot)) {
+    return hit;
+  }
+  return FindGclkFunctionRefInSubStmts(s, match, include_property_slot);
 }
+
+}  // namespace
 
 // First matching global clocking sampled value function reference in a module
 // item's slots, or nullptr. When `include_property_slot` is false the property
@@ -268,7 +290,8 @@ const Expr* FindGclkFunctionRefInItem(const ModuleItem* item,
                                       GclkKindPredicate match,
                                       bool include_property_slot) {
   if (item->body) {
-    if (const Expr* hit = FindGclkFunctionRefInStmt(item->body, match)) {
+    if (const Expr* hit = FindGclkFunctionRefInStmt(item->body, match,
+                                                    include_property_slot)) {
       return hit;
     }
   }
@@ -293,8 +316,6 @@ const Expr* FindGclkFunctionRefInItem(const ModuleItem* item,
   }
   return nullptr;
 }
-
-}  // namespace
 
 bool Elaborator::ModuleDeclaresGlobalClocking(const ModuleDecl* decl) {
   return DeclHasGlobalClocking(decl);
@@ -359,9 +380,11 @@ void Elaborator::ValidateFutureGclkPlacement(const ModuleDecl* decl) {
   // $rising_gclk, $falling_gclk, $steady_gclk, $changing_gclk) may be invoked
   // only in a property or sequence expression, so a use in procedural code, a
   // continuous assignment, an initializer, or an event control is illegal. The
-  // parser does not expose property/sequence specification bodies here, so any
-  // future function reachable in these procedural slots is out of place. The
-  // past functions carry no such restriction and are left alone.
+  // walk below is told to pass over the property slots, which are the property
+  // body expression of a property declaration and the property a concurrent
+  // assertion carries as a marked assert statement, so what it reaches is the
+  // procedural positions alone. The past functions carry no such restriction
+  // and are left alone.
   for (const auto* item : decl->items) {
     const Expr* ref =
         FindGclkFunctionRefInItem(item, IsGlobalClockingFutureFunction,

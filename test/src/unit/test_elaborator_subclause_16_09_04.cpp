@@ -720,4 +720,44 @@ TEST(GlobalClockingElab, FutureGclkFunctionInAnAlwaysIffConditionErrors) {
                             "16.9.4"));
 }
 
+// §16.9.4 admits the future functions in a property_expr -- they "may be
+// invoked only in property_expr or in sequence_expr" -- and the parser gives a
+// concurrent assertion's property the shape of an immediate assert statement,
+// so the placement rule has to tell that statement apart from the procedural
+// code it otherwise resembles. Without the distinction the accepted use below
+// is reported as though it stood in an always block.
+TEST(GlobalClockingElab,
+     FutureFunctionInAConcurrentAssertionPropertyIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  logic [31:0] x;\n"
+      "  global clocking gc @(posedge clk); endclocking\n"
+      "  assert property (@(posedge clk) $rising_gclk(x));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §16.9.4: the same statement's action block is not the property, and the
+// clause bars these functions there outright -- "this implies that they shall
+// not be used in assertion action blocks". The action block is a statement of
+// the assertion rather than its property expression, so it stays inside the
+// placement rule while the property is passed over.
+TEST(GlobalClockingElab, FutureFunctionInAnAssertionActionBlockErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  logic [31:0] x, y;\n"
+      "  global clocking gc @(posedge clk); endclocking\n"
+      "  assert property (@(posedge clk) x) y = $future_gclk(x);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "only in a property or sequence expression", 5,
+                            "16.9.4"));
+}
+
 }  // namespace

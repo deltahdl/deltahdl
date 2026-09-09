@@ -22,6 +22,7 @@
 #include "simulator/class_object.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
+#include "simulator/expr_walk.h"
 #include "simulator/lowerer_child.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/net.h"
@@ -383,27 +384,6 @@ static bool IsSampledValueFunction(std::string_view name) {
          IsGlobalClockingSampledFunction(name);
 }
 
-// Every node of `e`, itself included. Both walks below ask a question of every
-// subexpression -- one about the calls, one about the names -- so the descent
-// they share is written once here.
-template <typename Fn>
-static void ForEachSubExpr(const Expr* e, const Fn& fn) {
-  if (e == nullptr) return;
-  fn(e);
-  ForEachSubExpr(e->lhs, fn);
-  ForEachSubExpr(e->rhs, fn);
-  ForEachSubExpr(e->condition, fn);
-  ForEachSubExpr(e->true_expr, fn);
-  ForEachSubExpr(e->false_expr, fn);
-  ForEachSubExpr(e->base, fn);
-  ForEachSubExpr(e->index, fn);
-  ForEachSubExpr(e->index_end, fn);
-  ForEachSubExpr(e->with_expr, fn);
-  ForEachSubExpr(e->repeat_count, fn);
-  for (auto* sub : e->elements) ForEachSubExpr(sub, fn);
-  for (auto* sub : e->args) ForEachSubExpr(sub, fn);
-}
-
 // The dotted spelling of a hierarchical reference, appended to `out`, and
 // whether `e` is one. §23.6 writes a name that crosses an instance boundary as
 // `u.req`, and the child instance's variable is keyed under exactly that
@@ -514,6 +494,10 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
   // evaluated in the Observed region on the sampled values of the variables the
   // property names.
   p->is_concurrent_clocked = proc.is_concurrent_clocked;
+  // §16.9.4: an attempt of a property naming one of the five future sampled
+  // value functions is completed at the global clocking tick that follows its
+  // own clock's, which is the event carried here.
+  p->gclk_future_event = proc.gclk_future_event;
   // §16.9.3 has the sampled value functions "not limited to assertion
   // features", so the variables they name are enrolled wherever the call is
   // written and not only where a concurrent assertion's property stands. The

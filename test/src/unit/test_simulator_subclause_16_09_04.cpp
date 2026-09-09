@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -14,6 +15,7 @@
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sva_engine.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -160,6 +162,158 @@ TEST(GlobalClockingSampledValue, EvalWithMissingArgumentIsDefined) {
   SysTaskFixture f;
   auto* past = MkSysCall(f.arena, "$past_gclk", {});
   EXPECT_EQ(EvalExpr(past, f.ctx, f.arena).ToUint64(), 0u);
+}
+
+// §16.9.4's five future functions read a value at the *next* global clock tick,
+// which is not the tick the assertion clock is on: "$future_gclk(v) is the
+// sampled value of v at the next global clock tick". The five cases below give
+// the assertion its own clock, `aclk`, and the global clocking declaration a
+// different one, `gclk`, so that the two ticks stand at different times and a
+// value read at the wrong one is a different value. A design clocking both from
+// one signal would answer the same either way, the sequence of values a run
+// visits being the same sequence shifted by a tick.
+//
+// Each run has one posedge of aclk, at t=5, and one posedge of gclk after it,
+// at t=10, so exactly one attempt is started and exactly one is completed.
+//
+// The operand moves between the two, at t=7, which is after the Preponed
+// region of t=5 and before that of t=10: §16.5.1 makes the sampled value at a
+// tick "the value of this variable in the Preponed region of this time slot",
+// so the attempt's own tick samples the value before the move and the global
+// tick that completes it samples the value after.
+
+// §16.9.4: "$rising_gclk(expression) returns true (1'b1) if the sampled value
+// of the LSB of the expression is changing to 1 at the next global clocking
+// tick." req is 0 at the assertion tick and 1 at the global tick that follows,
+// so the property holds and its pass action runs once.
+TEST(GlobalClockingFutureSim,
+     RisingGclkHoldsWhereTheOperandRisesByTheNextTick) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "module t;\n"
+      "  logic aclk = 1'b0;\n"
+      "  logic gclk = 1'b0;\n"
+      "  logic req = 1'b0;\n"
+      "  int hits = 0;\n"
+      "  global clocking gc @(posedge gclk); endclocking\n"
+      "  assert property (@(posedge aclk) $rising_gclk(req)) hits = hits + 1;\n"
+      "  initial begin\n"
+      "    #5 aclk = 1'b1;\n"
+      "    #2 req = 1'b1;\n"
+      "    #3 gclk = 1'b1;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+}
+
+// §16.9.4, the discriminating counterpart of the case above: req holds 0 across
+// the global tick that completes the attempt, so nothing is "changing to 1" and
+// the property fails. Without this case a $rising_gclk that answered true for
+// everything would pass the case above.
+TEST(GlobalClockingFutureSim, RisingGclkFailsWhereTheOperandIsSteady) {
+  SimFixture f;
+  auto* misses = RunAndFindVar(
+      "module t;\n"
+      "  logic aclk = 1'b0;\n"
+      "  logic gclk = 1'b0;\n"
+      "  logic req = 1'b0;\n"
+      "  int hits = 0;\n"
+      "  int misses = 0;\n"
+      "  global clocking gc @(posedge gclk); endclocking\n"
+      "  assert property (@(posedge aclk) $rising_gclk(req)) hits = hits + 1;\n"
+      "  else misses = misses + 1;\n"
+      "  initial begin\n"
+      "    #5 aclk = 1'b1;\n"
+      "    #5 gclk = 1'b1;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "misses");
+  ASSERT_NE(misses, nullptr);
+  EXPECT_EQ(misses->value.ToUint64(), 1u);
+}
+
+// §16.9.4: "$steady_gclk(expression) returns true (1'b1) if the sampled value
+// of the expression does not change at the next global clock tick." This is the
+// one of the five whose right answer here is true where a constant 1'b0 is
+// false, so it separates a fix that answers the rising/falling pair from one
+// that answers all five.
+TEST(GlobalClockingFutureSim, SteadyGclkHoldsOverAnOperandThatDoesNotChange) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "module t;\n"
+      "  logic aclk = 1'b0;\n"
+      "  logic gclk = 1'b0;\n"
+      "  logic [3:0] v = 4'd5;\n"
+      "  int hits = 0;\n"
+      "  global clocking gc @(posedge gclk); endclocking\n"
+      "  assert property (@(posedge aclk) $steady_gclk(v)) hits = hits + 1;\n"
+      "  initial begin\n"
+      "    #5 aclk = 1'b1;\n"
+      "    #5 gclk = 1'b1;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+}
+
+// §16.9.4: "$future_gclk(v) is the sampled value of v at the next global clock
+// tick". v is 8'd0 at the assertion tick and 8'd7 at the global tick that
+// follows, so the comparison against 8'd7 holds; reading v at the assertion's
+// own tick answers 8'd0 and the comparison fails.
+TEST(GlobalClockingFutureSim, FutureGclkReadsTheValueAtTheNextGlobalTick) {
+  SimFixture f;
+  auto* agree = RunAndFindVar(
+      "module t;\n"
+      "  logic aclk = 1'b0;\n"
+      "  logic gclk = 1'b0;\n"
+      "  logic [7:0] v = 8'd0;\n"
+      "  int agree = 0;\n"
+      "  global clocking gc @(posedge gclk); endclocking\n"
+      "  assert property (@(posedge aclk) $future_gclk(v) == 8'd7)\n"
+      "    agree = agree + 1;\n"
+      "  initial begin\n"
+      "    #5 aclk = 1'b1;\n"
+      "    #2 v = 8'd7;\n"
+      "    #3 gclk = 1'b1;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "agree");
+  ASSERT_NE(agree, nullptr);
+  EXPECT_EQ(agree->value.ToUint64(), 1u);
+}
+
+// §16.9.4: "Execution of the action block of an assertion containing global
+// clocking future sampled value functions shall be delayed until the global
+// clocking tick that follows the last tick of the assertion clock for the
+// attempt." The assertion clock ticks at t=5 and the global clocking tick that
+// follows is at t=10, so the pass action reads $time as 10; an action run where
+// the attempt started would read 5.
+TEST(GlobalClockingFutureSim, TheActionBlockRunsAtTheFollowingGlobalTick) {
+  SimFixture f;
+  auto* when = RunAndFindVar(
+      "module t;\n"
+      "  logic aclk = 1'b0;\n"
+      "  logic gclk = 1'b0;\n"
+      "  logic [3:0] v = 4'd5;\n"
+      "  int when = 0;\n"
+      "  global clocking gc @(posedge gclk); endclocking\n"
+      "  assert property (@(posedge aclk) $steady_gclk(v)) when = $time;\n"
+      "  initial begin\n"
+      "    #5 aclk = 1'b1;\n"
+      "    #5 gclk = 1'b1;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "when");
+  ASSERT_NE(when, nullptr);
+  EXPECT_EQ(when->value.ToUint64(), 10u);
 }
 
 }  // namespace

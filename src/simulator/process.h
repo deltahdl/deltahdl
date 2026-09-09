@@ -11,6 +11,7 @@
 
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "parser/ast_stmt.h"
 #include "simulator/scope.h"
 
 namespace delta {
@@ -117,6 +118,11 @@ struct Process {
   // process is never resumed synchronously inside the process that assigned its
   // clock, whatever edge its clocking event names.
   bool is_concurrent_clocked = false;
+
+  // §16.9.4: the global clocking event this process's attempt waits for before
+  // it evaluates, empty for every process whose property names none of the five
+  // future sampled value functions. RtlirProcess::gclk_future_event says why.
+  std::vector<EventExpr> gclk_future_event;
 
   WaitForkState wait_fork_state;
 

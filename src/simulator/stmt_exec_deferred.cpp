@@ -10,9 +10,12 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "elaborator/global_clocking_sampled_value.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
+#include "simulator/awaiters_event_control.h"
 #include "simulator/evaluation.h"
+#include "simulator/expr_walk.h"
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -310,12 +313,63 @@ static void ReportDefaultAssertionFailure(const Stmt* stmt, uint32_t type_bit,
   EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr);
 }
 
+// §16.9.4: the value each of the five future sampled value functions names is
+// "the sampled value of v at the next global clock tick", and the four
+// predicates beside $future_gclk compare it with the value at the tick the
+// function was called in. That second value is this one, so it is sampled here,
+// before the attempt waits for the global clocking tick that answers the first.
+//
+// Each call site records under itself, which is the keying §16.9.3's past
+// functions already use: the store is per call site, so two calls naming one
+// variable keep two histories and neither reads the other's. What the delayed
+// evaluation then asks for is one tick back, which is this.
+static void SampleFutureGclkOperands(const Expr* root, SimContext& ctx,
+                                     Arena& arena) {
+  ForEachSubExpr(root, [&](const Expr* e) {
+    GlobalClockingSampledFunction fn = GlobalClockingSampledFunction::kPastGclk;
+    if (e->kind != ExprKind::kSystemCall) return;
+    if (e->args.empty() || e->args[0] == nullptr) return;
+    if (!ClassifyGlobalClockingSampledFunction(e->callee, fn)) return;
+    if (!IsGlobalClockingFutureFunction(fn)) return;
+    ctx.AssertionSamples().RecordTick(e, EvalSampledArg(e->args[0], ctx, arena),
+                                      1, arena);
+  });
+}
+
 ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   // §16.5: a concurrent assertion's property is evaluated in the Observed
   // region, whether the statement stands outside procedural code or inside it.
   // An immediate assertion (§16.3) is not marked and is evaluated where it
   // stands.
   if (stmt->is_concurrent_clocked) co_await ObservedRegionAwaiter{ctx};
+
+  // §16.9.4: an attempt of a property naming one of the five future sampled
+  // value functions is answered at the global clocking tick that follows the
+  // last tick of its own clock -- "Execution of the action block of an
+  // assertion containing global clocking future sampled value functions shall
+  // be delayed until the global clocking tick that follows the last tick of the
+  // assertion clock for the attempt" -- so the value each of the five names is
+  // sampled at that tick rather than predicted at this one. What the attempt
+  // needs from its own tick is sampled here, before the wait.
+  //
+  // The whole property is then evaluated at that later tick, so an operand of
+  // it that is not an argument of one of the five reads its sampled value there
+  // rather than at the assertion's tick. §16.9.4 puts the attempt's interval at
+  // the assertion clock, "as though the future sampled values were known in
+  // advance", so a property mixing a future function with a plain operand reads
+  // the plain one a tick late. What that costs is one tick of a value the
+  // property also names directly, and what it buys is the five functions
+  // answering at all.
+  //
+  // Lowerer::LowerProcess carries the event onto the process, and it is empty
+  // for every process whose property names none of the five, which is every
+  // assertion in a design that uses none.
+  Process* proc = ctx.CurrentProcess();
+  if (proc != nullptr && !proc->gclk_future_event.empty()) {
+    SampleFutureGclkOperands(stmt->assert_expr, ctx, arena);
+    co_await EventAwaiter{ctx, proc->gclk_future_event, arena};
+    co_await ObservedRegionAwaiter{ctx};
+  }
 
   // §16.3 / §20.11: the execution of immediate assertions can be controlled by
   // the assertion control system tasks. When $assertcontrol Off/Kill (or

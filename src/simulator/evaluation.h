@@ -172,6 +172,11 @@ Logic4Vec EvalFileIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
 Logic4Vec EvalArrayQuerySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 std::string_view name);
 
+// §16.5.1's sampled value of `arg`: a read of a variable answers the value it
+// held in the Preponed region of this time slot while this evaluates, which is
+// what §16.9.3's and §16.9.4's sampled value functions compare and return.
+Logic4Vec EvalSampledArg(const Expr* arg, SimContext& ctx, Arena& arena);
+
 Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            std::string_view name);
 

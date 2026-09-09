@@ -491,8 +491,7 @@ static void ApplyGlobalAssertionControlTask(const Expr* expr, SimContext& ctx,
 // read. The previous setting is put back rather than cleared, so a sampled
 // value function called from inside a property's own evaluation leaves that
 // evaluation sampled.
-static Logic4Vec EvalSampledArg(const Expr* arg, SimContext& ctx,
-                                Arena& arena) {
+Logic4Vec EvalSampledArg(const Expr* arg, SimContext& ctx, Arena& arena) {
   auto& samples = ctx.AssertionSamples();
   bool outer = samples.EvaluatingProperty();
   samples.SetEvaluatingProperty(true);
@@ -580,10 +579,13 @@ static uint32_t PastTickCount(const Expr* expr, SimContext& ctx, Arena& arena) {
 // site has a history the clause names the comparison itself: the expression's
 // default sampled value.
 //
-// §16.9.4's future functions are what this does not serve. $future_gclk,
-// $rising_gclk, $falling_gclk, $steady_gclk and $changing_gclk read a value
-// sampled at the *next* global clock tick, which no evaluation standing at this
-// one can read, and they answer what they answered before. That is #3608.
+// §16.9.4's five future functions read a value sampled at the *next* global
+// clock tick, which no evaluation standing at this one can read. What reaches
+// them here is an evaluation that already stands at that next tick:
+// ExecImmediateAssert samples the values of this tick and then waits for the
+// global clocking event before evaluating the property, so the argument's
+// current sampled value is the future one the clause names and the value at the
+// assertion's own tick is one tick back in the store.
 static bool IsFutureSampledFunction(std::string_view name) {
   return name == "$future_gclk" || name == "$rising_gclk" ||
          name == "$falling_gclk" || name == "$steady_gclk" ||
@@ -624,6 +626,40 @@ static Logic4Vec EvalPastOrValueChange(const Expr* expr, SimContext& ctx,
   return ValueChangeAnswer(name, now_val, prev_val, arena);
 }
 
+// §16.9.4's four future predicates, each defined against §16.9.3's own
+// value-change function of the same shape: $rising_gclk is "the sampled value
+// of the LSB of the expression is changing to 1 at the next global clocking
+// tick", which is $rose over the pair (next tick, this tick), and
+// $falling_gclk, $steady_gclk and $changing_gclk stand in the same relation to
+// $fell, $stable and $changed. Naming the analogue rather than restating the
+// rule keeps the x and z handling of LsbIs and SampledValuesDiffer answering
+// both clauses.
+static std::string_view PastAnalogueOfFutureFunction(std::string_view name) {
+  if (name == "$rising_gclk") return "$rose";
+  if (name == "$falling_gclk") return "$fell";
+  if (name == "$steady_gclk") return "$stable";
+  return "$changed";
+}
+
+// §16.9.4's five future functions, evaluated at the global clock tick that
+// follows the assertion's own. The argument's sampled value here is the one the
+// clause calls the value "at the next global clock tick"; the value at the
+// assertion's tick was recorded against this call site before the wait, so
+// PastValue reads it back. A site with no history is one whose attempt did not
+// go through that wait, and the clause's own fallback for a comparison with no
+// prior tick is the expression's default sampled value.
+static Logic4Vec EvalFutureGclk(const Expr* expr, SimContext& ctx, Arena& arena,
+                                std::string_view name) {
+  auto next_val = EvalSampledArg(expr->args[0], ctx, arena);
+  if (name == "$future_gclk") return next_val;
+  const Logic4Vec* at_tick = ctx.AssertionSamples().PastValue(expr, 1);
+  Logic4Vec cur_val = at_tick != nullptr
+                          ? *at_tick
+                          : EvalDefaultSampledArg(expr->args[0], ctx, arena);
+  return ValueChangeAnswer(PastAnalogueOfFutureFunction(name), next_val,
+                           cur_val, arena);
+}
+
 static std::optional<Logic4Vec> EvalSampledValueFunc(const Expr* expr,
                                                      SimContext& ctx,
                                                      Arena& arena,
@@ -638,11 +674,12 @@ static std::optional<Logic4Vec> EvalSampledValueFunc(const Expr* expr,
     if (is_sampled) return now_val;
     return EvalPastOrValueChange(expr, ctx, arena, name, now_val);
   }
-  if (name == "$future_gclk") {
-    if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
-    return EvalExpr(expr->args[0], ctx, arena);
+  if (IsFutureSampledFunction(name)) {
+    if (expr->args.empty() || expr->args[0] == nullptr) {
+      return MakeLogic4VecVal(arena, name == "$future_gclk" ? 32 : 1, 0);
+    }
+    return EvalFutureGclk(expr, ctx, arena, name);
   }
-  if (IsFutureSampledFunction(name)) return MakeLogic4VecVal(arena, 1, 0);
   return std::nullopt;
 }
 

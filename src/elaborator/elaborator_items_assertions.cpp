@@ -175,6 +175,25 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
     // assertion body is stays in the parser.
     mod->processes.back().is_concurrent_clocked =
         item->body->is_concurrent_clocked;
+    // §16.9.4: the five future sampled value functions read a value "sampled at
+    // the next global clock tick", so an attempt of a property naming one
+    // cannot be answered at the assertion clock's own tick. The clause says
+    // where it is answered instead -- "Execution of the action block of an
+    // assertion containing global clocking future sampled value functions shall
+    // be delayed until the global clocking tick that follows the last tick of
+    // the assertion clock for the attempt" -- so the process carries that event
+    // and waits for it before it evaluates. A property naming none carries
+    // nothing and is evaluated where it always was.
+    //
+    // §16.9.4 also requires a global clocking declaration for any of the ten
+    // functions, and ValidateGclkRequiresGlobalClocking reports a text that
+    // names one without; where that report has been made there is no event to
+    // carry, and the assertion is left alone rather than parked forever.
+    if (module_global_clocking_event_ != nullptr &&
+        FindGclkFunctionRefInItem(item, IsGlobalClockingFutureFunction,
+                                  /*include_property_slot=*/true) != nullptr) {
+      mod->processes.back().gclk_future_event = *module_global_clocking_event_;
+    }
     return;
   }
   ValidateClockingBlock(item, mod);

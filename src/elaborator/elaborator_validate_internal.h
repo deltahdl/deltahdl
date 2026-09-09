@@ -18,6 +18,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/global_clocking_sampled_value.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
 #include "parser/ast_class.h"
@@ -437,6 +438,20 @@ void CheckRealSelectStmt(const Stmt* s, const TypeMap& types,
                          const SelectOperands& operands, DiagEngine& diag);
 void CheckIndexedPartSelectWidthStmt(const Stmt* s, const ScopeMap& scope,
                                      DiagEngine& diag);
+
+// Defined in elaborator_validate_global_clocking.cpp.
+//
+// §16.9.4's ten sampled value functions, sought in one module item's slots.
+// `match` selects which of them count -- IsGlobalClockingFutureFunction picks
+// the five that read the next global clock tick -- and returns the first
+// reference found or nullptr. With `include_property_slot` false the property
+// body expression is skipped, which is how a validation asks for the
+// procedural positions alone; §16.9.4 admits a future function in a
+// property_expr and bars it everywhere else.
+using GclkKindPredicate = bool (*)(GlobalClockingSampledFunction);
+const Expr* FindGclkFunctionRefInItem(const ModuleItem* item,
+                                      GclkKindPredicate match,
+                                      bool include_property_slot);
 
 // Defined in elaborator_validate_matches.cpp.
 bool IsArrayQueryFunc(std::string_view callee);

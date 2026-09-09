@@ -403,6 +403,21 @@ struct RtlirProcess {
   // the procedure itself rather than a statement within it has no other
   // position to name: body is a separate statement carrying its own.
   SourceLoc loc;
+  // §16.9.4: the global clocking event an attempt of this process's property
+  // has to reach before it can be evaluated, empty for every process whose
+  // property names none of the five future sampled value functions. Those five
+  // read a value "sampled at the next global clock tick", which no evaluation
+  // standing at the assertion's own tick can read, and the clause says what to
+  // do about it: "Execution of the action block of an assertion containing
+  // global clocking future sampled value functions shall be delayed until the
+  // global clocking tick that follows the last tick of the assertion clock for
+  // the attempt." So the attempt waits for this event and is evaluated there,
+  // where the values it names have been sampled.
+  //
+  // It is the effective global clocking declaration's event, copied per process
+  // for the reason the sensitivity substitution above is made per process:
+  // §14.14 rule b) can give two instances of one module different events.
+  std::vector<EventExpr> gclk_future_event;
   bool is_star_sensitivity = false;
   Stmt* body = nullptr;
   std::vector<EventExpr> sensitivity;
