@@ -100,6 +100,35 @@ static std::string SdfHierName(const std::string& dotted) {
   return out;
 }
 
+// The two halves of one §23.3.2 input port connection, as §32.4.4 names them:
+// the instance's port, which is the load an interconnect delay is annotated
+// onto, and the signal the parent connected to it, which is the source it is
+// annotated from. Bundled because they are the four things one such name is
+// built out of and the assignment they are written onto is a fifth.
+struct PortConnectionPath {
+  const std::string& inst_prefix;
+  const std::string& inst_seg;
+  std::string_view port_name;
+  const Expr* connection;
+};
+
+// §32.4.4: names the load and the source of one input port connection on the
+// assignment that carries it, so the run can ask what was annotated between
+// them. A connection that is not a plain signal name leaves the source unnamed,
+// which still reads a PORT or NETDELAY delay, those being the delay from every
+// source on the net.
+static void NameInterconnectPath(const PortConnectionPath& path,
+                                 RtlirContAssign& ca) {
+  ca.interconnect_load = SdfHierName(path.inst_prefix + path.inst_seg +
+                                     std::string(path.port_name));
+  if (path.connection == nullptr ||
+      path.connection->kind != ExprKind::kIdentifier) {
+    return;
+  }
+  ca.interconnect_source =
+      SdfHierName(path.inst_prefix + std::string(path.connection->text));
+}
+
 void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
                                 bool from_program) {
   // §23.3.2: the caller lowers bindings under the PARENT prefix; qualify the
@@ -136,15 +165,9 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
       // §32.4.4: this assignment is the path an interconnect delay is annotated
       // along -- from the signal the parent connected to the port of the
       // instance -- so it carries the two names the annotator placed the delay
-      // between. A connection that is not a plain signal name leaves the source
-      // unnamed, which still reads a PORT or NETDELAY delay, those being the
-      // delay from every source on the net.
-      ca.interconnect_load =
-          SdfHierName(inst_prefix_ + inst_seg + std::string(binding.port_name));
-      if (binding.connection->kind == ExprKind::kIdentifier) {
-        ca.interconnect_source =
-            SdfHierName(inst_prefix_ + std::string(binding.connection->text));
-      }
+      // between.
+      NameInterconnectPath(
+          {inst_prefix_, inst_seg, binding.port_name, binding.connection}, ca);
       LowerContAssign(ca, from_program);
       continue;
     }
