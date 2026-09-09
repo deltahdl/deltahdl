@@ -207,6 +207,52 @@ static bool CreateBlockQueue(const Stmt* stmt, uint32_t elem_width,
   return true;
 }
 
+// §7.8 makes an associative array's dimension the type its index has, so a
+// declaration written among a subroutine's statements builds one the way
+// Lowerer::LowerVar (src/simulator/lowerer_var.cpp) builds one for a variable a
+// module declares. Without it SimContext::CreateAssocArray was reached from
+// that lowering and from an assoc-array formal argument and from nowhere else,
+// so a local array existed for no name: ctx.FindAssocArray answered null, and
+// TryAssocIndexedWrite, TryAssocCopyAssign and the read beside them each
+// declined, storing nothing and reporting nothing (#3614).
+//
+// The index's own width and signedness are the index type's, taken from that
+// type rather than from a table restated here -- §7.8's dimension is a
+// data_type, and TypeNameToDataType with EvalTypeWidth and IsSignedType are
+// what read one. A typedef'd index takes the width the elaborated table gives
+// it, and a wildcard index takes neither: §7.8.4 leaves its value unsigned and
+// self-determined, which is the default this spec carries.
+//
+// A packed dimension on the index -- §7.8's `int aa[bit[3:0]]`, whose index is
+// four bits rather than one -- is not read here. That form reaches this path
+// only in a subroutine, and the elaborator answers it for every module-level
+// declaration; the width it would give is the product of the declared
+// dimensions, which the dimension expression carries in its own elements.
+static bool CreateBlockAssocArray(const Stmt* stmt, uint32_t elem_width,
+                                  SimContext& ctx) {
+  if (stmt->var_unpacked_dims.size() != 1) return false;
+  const Expr* dim = stmt->var_unpacked_dims.front();
+  if (!IsAssocIndexDim(dim, ctx)) return false;
+
+  AssocArraySpec spec;
+  spec.is_wildcard = dim->text == "*";
+  spec.is_4state = DeclaredTypeIs4State(stmt->var_decl_type);
+  DataType index_type = TypeNameToDataType(dim->text);
+  if (index_type.kind != DataTypeKind::kNamed) {
+    spec.index_width = EvalTypeWidth(index_type);
+    spec.is_index_signed = IsSignedType(index_type, {});
+  } else if (uint32_t named = ctx.FindTypeWidth(dim->text); named != 0) {
+    spec.index_width = named;
+  }
+  // A.2.2.1 lets an integer type carry its own signing, and §7.8.4 keys an
+  // entry off the index under it: the keys of a `byte unsigned` index order 0
+  // to 255 rather than -128 to 127.
+  if (dim->op == TokenKind::kKwUnsigned) spec.is_index_signed = false;
+  if (dim->op == TokenKind::kKwSigned) spec.is_index_signed = true;
+  ctx.CreateAssocArray(stmt->var_name, elem_width, dim->text == "string", spec);
+  return true;
+}
+
 // §7.10 and §7.4.2: the storage a declaration's unpacked dimensions ask for
 // beside the variable that carries one element's width. A queue dimension is
 // not the range dimension of a fixed-size unpacked array, so a declaration is
@@ -219,6 +265,7 @@ static bool CreateBlockQueue(const Stmt* stmt, uint32_t elem_width,
 // in a task body was a plain vector and q.push_back had no store to reach.
 void CreateDeclAggregate(const Stmt* stmt, uint32_t elem_width, SimContext& ctx,
                          Arena& arena) {
+  if (CreateBlockAssocArray(stmt, elem_width, ctx)) return;
   if (!CreateBlockQueue(stmt, elem_width, ctx, arena)) {
     CreateBlockArrayElements(stmt, elem_width, ctx, arena);
   }

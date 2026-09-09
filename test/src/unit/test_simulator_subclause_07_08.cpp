@@ -181,4 +181,86 @@ TEST(AssocArraySimulation, AssocElementWriteWakesAnAlwaysCombThatReadsIt) {
   EXPECT_EQ(v, 0xF0u);
 }
 
+// §7.8's declaration is a declaration wherever it is written, and §6.21 puts a
+// variable declared inside a subroutine among the ones a subroutine declares.
+// SimContext::CreateAssocArray was reached from the lowering of a module's own
+// variables and from an associative-array formal argument and from nowhere
+// else, so an array declared among a subroutine's statements existed for no
+// name: every index write stored nothing and every read answered the element
+// type's default, with nothing reported (#3614).
+
+// §7.8: "allocate storage for elements only when they are used". The write is
+// what uses the element, and the read is what says the storage it allocated is
+// the storage the key reaches.
+TEST(AssocArraySimulation, ADeclarationInsideAFunctionBuildsTheArray) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int result;\n"
+      "  function int keep();\n"
+      "    int aa [int];\n"
+      "    aa[7] = 42;\n"
+      "    return aa[7];\n"
+      "  endfunction\n"
+      "  initial result = keep();\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 42u);
+}
+
+// §7.8.6's copy of a whole associative array between two of them declared the
+// same way, which is the form #3496 could not write while this was open:
+// TryAssocCopyAssign asks SimContext::FindAssocArray for both names and
+// declined for both.
+TEST(AssocArraySimulation, ACopyBetweenTwoDeclaredInsideAFunction) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int result;\n"
+      "  function int copy();\n"
+      "    int src [int];\n"
+      "    int dst [int];\n"
+      "    src[7] = 42;\n"
+      "    dst = src;\n"
+      "    return dst[7];\n"
+      "  endfunction\n"
+      "  initial result = copy();\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 42u);
+}
+
+// §7.8's index type decides which values are one element, so a `string` index
+// is a different map from an integral one and the array a subroutine declares
+// is keyed by the type its dimension names.
+TEST(AssocArraySimulation, AStringKeyedArrayInsideAFunctionKeysByTheString) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int result;\n"
+      "  function int keyed();\n"
+      "    int aa [string];\n"
+      "    aa[\"seven\"] = 42;\n"
+      "    return aa[\"seven\"];\n"
+      "  endfunction\n"
+      "  initial result = keyed();\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 42u);
+}
+
+// The same declaration among a module's items, which is the path
+// Lowerer::LowerVar serves. Without it a fix that moved the creation rather
+// than adding one would pass the three above and take this away.
+TEST(AssocArraySimulation, TheSameDeclarationAmongAModulesItemsStillBuildsOne) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa [int];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[7] = 42;\n"
+      "    result = aa[7];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 42u);
+}
+
 }  // namespace
