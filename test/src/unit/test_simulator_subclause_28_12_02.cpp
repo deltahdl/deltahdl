@@ -23,6 +23,8 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/arena.h"
 #include "fixture_simulator.h"
 #include "helpers_net_strength.h"
@@ -529,6 +531,48 @@ TEST(AmbiguousStrengthModelCombine,
   // result.
   EXPECT_EQ(r.strength0_hi, StrengthLevel::kHighz);
   EXPECT_EQ(r.strength0_lo, StrengthLevel::kHighz);
+}
+
+// --- Figure 28-9, driven from source ---
+//
+// The strength a design's own net settles at, read back through §21.2.1.4's %v.
+std::string ResolvedStrengthOf(const std::string& body) {
+  SimFixture f;
+  return RunCapture("module t;\n  wire y;\n" + body +
+                        "  initial #1 $display(\"%v\", y);\nendmodule\n",
+                    f);
+}
+
+// §28.12.2's Figure 28-9: two three-state gates with unknown controls, one
+// passing Pu1 and one passing We0, drive one net. Each is an ambiguous signal
+// (§28.6's H and L), and "the combination of two signals of ambiguous strength
+// shall result in a signal of ambiguous strength ... a range of strength levels
+// that includes the strength levels in its component signals" -- which Figure
+// 28-10 draws as one range from We0 across high impedance to Pu1. §21.2.1.4
+// renders it 35X: "The first is the digit 3, which corresponds to the highest
+// strength0 level for the result. The second digit, 5, corresponds to the
+// highest strength1 level for the result."
+//
+// That two-digit form was reachable from no source. The resolution answered
+// with the strongest driver alone, so the weaker gate's side of the scale was
+// not in the result and the two sides' strongest levels were always equal,
+// which §21.2.1.4 renders with a mnemonic instead.
+TEST(StrengthResolution, SourceFigure289CombinesTwoAmbiguousGates) {
+  EXPECT_EQ(ResolvedStrengthOf(
+                "  logic d1, d0, c;\n"
+                "  bufif1 (pull0, pull1) g1 (y, d1, c);\n"
+                "  bufif1 (weak0, weak1) g0 (y, d0, c);\n"
+                "  initial begin d1 = 1'b1; d0 = 1'b0; c = 1'bx; end\n"),
+            "35X\n");
+}
+
+// The narrower claim underneath: one driver of unknown value at a known
+// strength gives the net that strength rather than high impedance. §28.12.2
+// puts such a signal on "both the strength1 and the strength0 parts of the
+// scale", and with one level on each side §21.2.1.4 names it with that level's
+// mnemonic.
+TEST(StrengthResolution, SourceUnknownValueDriverGivesItsOwnStrength) {
+  EXPECT_EQ(ResolvedStrengthOf("  assign (pull0, pull1) y = 1'bx;\n"), "PuX\n");
 }
 
 }  // namespace
