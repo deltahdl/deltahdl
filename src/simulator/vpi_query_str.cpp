@@ -18,7 +18,6 @@
 #include <cstdint>
 #include <string>
 
-#include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi.h"
 #include "simulator/vpi_model_helpers3.h"

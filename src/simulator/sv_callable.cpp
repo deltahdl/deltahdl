@@ -4,7 +4,6 @@
 #include <utility>
 #include <vector>
 
-#include "common/types.h"
 #include "parser/ast.h"
 
 namespace delta {

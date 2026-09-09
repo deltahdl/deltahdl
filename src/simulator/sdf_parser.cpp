@@ -8,8 +8,6 @@
 #include <string>
 #include <vector>
 
-#include "simulator/specify.h"
-
 namespace delta {
 
 enum class SdfTokKind : uint8_t {

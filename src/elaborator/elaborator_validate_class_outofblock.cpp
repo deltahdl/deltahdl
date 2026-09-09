@@ -7,8 +7,6 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
-#include "elaborator/elaborator_validate_classes_internal.h"
-#include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 

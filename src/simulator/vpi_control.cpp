@@ -11,8 +11,6 @@
 #include "common/types.h"
 #include "simulator/dpi.h"
 #include "simulator/net.h"
-#include "simulator/scheduler.h"
-#include "simulator/sim_context.h"
 #include "simulator/vpi.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.

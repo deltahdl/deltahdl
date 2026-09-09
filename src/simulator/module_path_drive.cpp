@@ -24,7 +24,6 @@
 
 #include <cstdint>
 
-#include "common/arena.h"
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulator/awaiters.h"

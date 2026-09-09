@@ -6,7 +6,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"

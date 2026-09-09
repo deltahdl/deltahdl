@@ -60,7 +60,6 @@
 #include "simulator/specify.h"
 #include "simulator/specify_timing_check.h"
 #include "simulator/timing_check_driver_internal.h"
-#include "simulator/variable.h"
 
 namespace delta {
 namespace {

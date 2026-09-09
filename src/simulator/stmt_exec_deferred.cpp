@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "common/arena.h"
-#include "common/diagnostic.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"

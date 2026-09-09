@@ -11,8 +11,6 @@
 #include <utility>
 #include <vector>
 
-#include "simulator/sv_vpi_user.h"
-
 namespace delta {
 
 // §35.9 disable-protocol state for the current execution thread. A foreign

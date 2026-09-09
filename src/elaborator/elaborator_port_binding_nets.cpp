@@ -5,7 +5,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/elaborator.h"

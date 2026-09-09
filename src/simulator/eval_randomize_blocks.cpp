@@ -5,8 +5,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include "common/arena.h"
-#include "common/types.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
@@ -14,7 +12,6 @@
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_randomize_internal.h"
 #include "simulator/evaluation.h"
-#include "simulator/sim_context.h"
 #include "simulator/variable.h"
 
 namespace delta {

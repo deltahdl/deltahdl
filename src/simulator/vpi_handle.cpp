@@ -9,16 +9,10 @@
 #include <unordered_map>
 #include <vector>
 
-#include "common/types.h"
-#include "simulator/dpi.h"
-#include "simulator/net.h"
-#include "simulator/scheduler.h"
-#include "simulator/sim_context.h"
 #include "simulator/vpi.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
-#include "simulator/variable.h"
 #include "simulator/vpi_internal.h"
 
 namespace delta {

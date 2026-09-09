@@ -8,7 +8,6 @@
 #include <utility>
 #include <vector>
 
-#include "common/diagnostic.h"
 #include "simulator/coverage.h"
 #include "simulator/net.h"
 #include "simulator/process.h"

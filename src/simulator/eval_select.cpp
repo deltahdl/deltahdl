@@ -9,7 +9,6 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/packed_range.h"
-#include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"

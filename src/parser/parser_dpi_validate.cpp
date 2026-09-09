@@ -3,7 +3,6 @@
 #include <format>
 
 #include "common/diagnostic.h"
-#include "common/types.h"
 #include "parser/ast.h"
 
 namespace delta {

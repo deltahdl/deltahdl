@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "common/arena.h"
-#include "common/diagnostic.h"
 #include "common/packed_range.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -16,7 +15,6 @@
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
-#include "simulator/process.h"
 #include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"

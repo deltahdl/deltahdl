@@ -4,9 +4,7 @@
 #include <vector>
 
 #include "common/arena.h"
-#include "common/diagnostic.h"
 #include "elaborator/type_eval.h"
-#include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/clocking.h"

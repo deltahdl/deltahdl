@@ -1,7 +1,6 @@
 #include <string>
 
 #include "common/arena.h"
-#include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"

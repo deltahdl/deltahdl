@@ -1,4 +1,3 @@
-#include <fcntl.h>
 
 #include <cmath>
 #include <cstdint>

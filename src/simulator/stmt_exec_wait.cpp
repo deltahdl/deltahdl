@@ -13,7 +13,6 @@
 #include "parser/ast.h"
 #include "simulator/awaiters.h"
 #include "simulator/evaluation.h"
-#include "simulator/process.h"
 #include "simulator/sim_context.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_internal.h"

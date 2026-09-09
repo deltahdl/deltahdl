@@ -3,10 +3,8 @@
 
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/preprocessor_internal.h"
-#include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_keywords.h"
-#include "preprocessor/protect_processing.h"
 #include "preprocessor/standard_pragmas.h"
 
 namespace delta {

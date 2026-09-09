@@ -5,7 +5,6 @@
 #include <utility>
 #include <vector>
 
-#include "elaborator/elaborator_helpers.h"
 #include "synthesizer/synth_lower.h"
 
 namespace delta {

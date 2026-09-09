@@ -11,15 +11,9 @@
 #include <unordered_map>
 #include <vector>
 
-#include "common/types.h"
-#include "simulator/dpi.h"
-#include "simulator/net.h"
-#include "simulator/scheduler.h"
-#include "simulator/sim_context.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
-#include "simulator/variable.h"
 
 vpiHandle vpi_register_systf(s_vpi_systf_data* data) {
   delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error

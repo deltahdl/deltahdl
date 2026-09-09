@@ -8,13 +8,10 @@
 #include <vector>
 
 #include "common/arena.h"
-#include "common/diagnostic.h"
 #include "parser/ast.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/eval_systask_readmem_internal.h"
 #include "simulator/evaluation.h"
-#include "simulator/sim_context.h"
-#include "simulator/variable.h"
 
 namespace delta {
 

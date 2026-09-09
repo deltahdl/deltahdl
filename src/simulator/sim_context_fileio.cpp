@@ -3,10 +3,7 @@
 #include <string>
 #include <utility>
 
-#include "common/diagnostic.h"
-#include "simulator/coverage.h"
 #include "simulator/net.h"
-#include "simulator/process.h"
 #include "simulator/sim_context.h"
 #include "simulator/vcd_writer.h"
 

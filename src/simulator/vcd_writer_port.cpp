@@ -10,7 +10,6 @@
 #include "common/types.h"
 #include "parser/ast_type.h"
 #include "simulator/net.h"
-#include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
 
 namespace delta {

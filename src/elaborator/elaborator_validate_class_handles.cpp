@@ -7,7 +7,6 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
-#include "elaborator/rtlir.h"
 #include "parser/ast.h"
 
 namespace delta {

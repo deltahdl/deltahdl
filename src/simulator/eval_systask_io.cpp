@@ -10,7 +10,6 @@
 #include <vector>
 
 #include "common/arena.h"
-#include "common/diagnostic.h"
 #include "parser/ast.h"
 #include "simulator/eval_string.h"
 #include "simulator/eval_systask_internal.h"
