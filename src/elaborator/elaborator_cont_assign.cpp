@@ -169,9 +169,8 @@ uint32_t ConcatLhsWidth(const Expr* e, const RtlirModule* mod,
   return total;
 }
 
-// `rhs[first:second]`. Both operands are indices of `rhs` in the range its
-// declaration was written with, which is what §11.5.1 resolves a select
-// against; the caller maps the bits it wants onto them.
+// `rhs[first:second]`. Both operands are indices of `rhs` in the range §11.5.1
+// resolves a select against; the caller maps the bits it wants onto them.
 Expr* MakeRhsPartSelect(Expr* rhs, int64_t first, int64_t second,
                         Arena& arena) {
   auto* hi_lit = arena.Create<Expr>();
@@ -190,8 +189,8 @@ Expr* MakeRhsPartSelect(Expr* rhs, int64_t first, int64_t second,
 
 // Recursion-invariant context for splitting a concatenation continuous-assign
 // lvalue (bundled to keep the helper within the parameter-count threshold).
-// `scope` folds the packed dimension of whatever signal the right-hand side
-// names, so the slices below can be written in its declared range.
+// `scope` folds the packed dimension of whatever signal an element of the
+// lvalue names, so each element's width is the one its declaration gives it.
 struct ConcatContAssignCtx {
   ModuleItem* item;
   RtlirModule* mod;
@@ -200,16 +199,36 @@ struct ConcatContAssignCtx {
   const ScopeMap& scope;
 };
 
-// §11.5.1: the range a select on this right-hand side resolves against. A named
-// signal carries the packed dimension of its declaration; anything else -- a
-// literal, a concatenation, the nested part-select the recursion below builds
-// -- carries no declaration of its own and is addressed as [`width`-1:0].
-PackedRange RhsSelectRange(const Expr* rhs, uint32_t width,
-                           const ConcatContAssignCtx& cx) {
-  if (rhs && rhs->kind == ExprKind::kIdentifier) {
-    return SignalDeclaredRange(rhs->text, cx.mod, cx.scope);
-  }
-  return PackedRange::Implicit(width);
+// §11.6.1 makes the whole target the context the right-hand side is evaluated
+// in, and §11.8.2 propagates that width down into the context-determined
+// operands of the expression. Splitting the assignment element by element takes
+// the context away, each emitted assignment carrying only the width of the
+// element it drives, so the expression under the slice is evaluated at the
+// width its own operands give it. §10.3.2's Example 2 is what that loses:
+// `assign {carry_out, sum_out} = ina + inb + carry_in;` has to add at five bits
+// for the carry to exist at all.
+//
+// The width is put back the way §11.6.2 puts it back -- "adding an integer
+// value of 0 to the expression will cause the evaluation to be performed using
+// the bit size of integers" -- with a zero of the target's width rather than an
+// integer's, so the addition is performed at the width the concatenation gives
+// it and at no other. The zero is signed so that the widening does not change
+// the type of what it widens: §11.8.1 makes a result unsigned "if any operand
+// is unsigned", so an unsigned right-hand side stays unsigned and zero-extends
+// into the new bits, and a signed one stays signed and sign-extends.
+Expr* MakeWidenedRhs(Expr* rhs, uint32_t width, Arena& arena) {
+  std::string text = std::format("{}'sd0", width);
+  auto* zero = arena.Create<Expr>();
+  zero->kind = ExprKind::kIntegerLiteral;
+  zero->text = {arena.AllocString(text.c_str(), text.size()), text.size()};
+  zero->range = rhs->range;
+  auto* sum = arena.Create<Expr>();
+  sum->kind = ExprKind::kBinary;
+  sum->op = TokenKind::kPlus;
+  sum->lhs = rhs;
+  sum->rhs = zero;
+  sum->range = rhs->range;
+  return sum;
 }
 
 // §11.4.1: a continuous assignment to a concatenation drives each element from
@@ -219,15 +238,23 @@ PackedRange RhsSelectRange(const Expr* rhs, uint32_t width,
 void EmitConcatContAssigns(const ConcatContAssignCtx& cx, Expr* lhs,
                            Expr* rhs) {
   uint32_t hi = ConcatLhsWidth(lhs, cx.mod, cx.scope);
-  // §11.5.1: `hi` counts bits up from the least significant end of the
-  // right-hand side, and the select naming a run of them has to name them by
-  // their index in the range the right-hand side was declared with -- the most
-  // significant bit of `wire [8:1] src` is src[8], not src[7].
-  PackedRange range = RhsSelectRange(rhs, hi, cx);
+  // Nothing to drive from, and nothing to drive into: a target whose elements
+  // are all of unknown width leaves no assignment to emit, and a source the
+  // parser never built leaves nothing to widen.
+  if (hi == 0 || rhs == nullptr) return;
+  Expr* widened = MakeWidenedRhs(rhs, hi, cx.arena);
+  // §11.5.1 resolves a select against the range its operand was declared with,
+  // and what is sliced here carries no declaration: the widened right-hand side
+  // is an expression `hi` bits wide, addressed as [`hi`-1:0]. A signal named as
+  // the right-hand side keeps its own range only for naming its bits, and the
+  // bit at a given offset from the least significant end is the same bit either
+  // way -- the most significant bit of `wire [8:1] src` is src[8] and is bit 7
+  // of the value the addition above produces.
+  PackedRange range = PackedRange::Implicit(hi);
   for (auto* el : lhs->elements) {
     uint32_t w = ConcatLhsWidth(el, cx.mod, cx.scope);
     if (w == 0) continue;
-    Expr* elem_rhs = MakeRhsPartSelect(rhs, range.IndexAtOffset(hi - 1),
+    Expr* elem_rhs = MakeRhsPartSelect(widened, range.IndexAtOffset(hi - 1),
                                        range.IndexAtOffset(hi - w), cx.arena);
     hi -= w;
     if (el->kind == ExprKind::kConcatenation) {

@@ -403,4 +403,96 @@ TEST(ContAssignStatementSim, ConcatTargetNamingOneNetTwiceTakesTwoSlots) {
   EXPECT_EQ(a->resolved->value.ToUint64(), 0xAu);
 }
 
+// §10.3.2's own Example 2, with the values §11.6.2 gives the same shape: ina is
+// 9 and inb is 8, so the sum is 18 and does not fit the four bits either
+// operand has. §11.6.1 evaluates the right-hand side in the context of the
+// whole left-hand side, which is five bits here, so 18 is 5'b10010 and the
+// carry the target is written to catch reaches `carry_out`.
+//
+// The assignment is split into one per element, and each element carried its
+// own width as the context, so the addition was performed at four bits and bit
+// 4 did not exist: `carry_out` read 0 while `sum_out` read 2 either way, which
+// is why the carry is the whole of the claim.
+TEST(ContAssignStatementSim, ConcatTargetEvaluatesTheRhsAtTheWholeTargetWidth) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire carry_out, carry_in;\n"
+      "  wire [3:0] sum_out, ina, inb;\n"
+      "  assign ina = 4'd9;\n"
+      "  assign inb = 4'd8;\n"
+      "  assign carry_in = 1'b1;\n"
+      "  assign {carry_out, sum_out} = ina + inb + carry_in;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* carry_out = f.ctx.FindVariable("carry_out");
+  auto* sum_out = f.ctx.FindVariable("sum_out");
+  ASSERT_NE(carry_out, nullptr);
+  ASSERT_NE(sum_out, nullptr);
+  EXPECT_EQ(carry_out->value.ToUint64(), 1u);
+  EXPECT_EQ(sum_out->value.ToUint64(), 2u);
+}
+
+// The context is the whole target's width and not the nesting level's: the same
+// sum drives `{carry_out, {sum_hi, sum_lo}}`, whose inner concatenation is four
+// bits and whose outer is five. An implementation that evaluated the right-hand
+// side at the width of the element it was slicing would add at four bits here
+// too, and the two-bit pieces of the sum would come out of a value that lost
+// its carry.
+TEST(ContAssignStatementSim, NestedConcatTargetEvaluatesAtTheOutermostWidth) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire carry_out, carry_in;\n"
+      "  wire [1:0] sum_hi, sum_lo;\n"
+      "  wire [3:0] ina, inb;\n"
+      "  assign ina = 4'd9;\n"
+      "  assign inb = 4'd8;\n"
+      "  assign carry_in = 1'b1;\n"
+      "  assign {carry_out, {sum_hi, sum_lo}} = ina + inb + carry_in;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* carry_out = f.ctx.FindVariable("carry_out");
+  auto* sum_hi = f.ctx.FindVariable("sum_hi");
+  auto* sum_lo = f.ctx.FindVariable("sum_lo");
+  ASSERT_NE(carry_out, nullptr);
+  ASSERT_NE(sum_hi, nullptr);
+  ASSERT_NE(sum_lo, nullptr);
+  EXPECT_EQ(carry_out->value.ToUint64(), 1u);
+  EXPECT_EQ(sum_hi->value.ToUint64(), 0u);
+  EXPECT_EQ(sum_lo->value.ToUint64(), 2u);
+}
+
+// Widening the right-hand side must not change its type. §11.8.1 makes an
+// expression's type depend only on its operands and makes a result unsigned "if
+// any operand is unsigned", and §11.6.1's assignment context then extends a
+// signed right-hand side by replicating its sign. `a` is a signed 4-bit -1
+// driving a five-bit target, so every bit of the target is 1: `c` reads 1 and
+// `s` reads 15. Extending it as an unsigned value instead leaves `c` at 0,
+// which is what widening with an unsigned zero would produce.
+TEST(ContAssignStatementSim, ConcatTargetSignExtendsASignedRhs) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire signed [3:0] a;\n"
+      "  wire c;\n"
+      "  wire [3:0] s;\n"
+      "  assign a = -4'sd1;\n"
+      "  assign {c, s} = a;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* c = f.ctx.FindVariable("c");
+  auto* sv = f.ctx.FindVariable("s");
+  ASSERT_NE(c, nullptr);
+  ASSERT_NE(sv, nullptr);
+  EXPECT_EQ(c->value.ToUint64(), 1u);
+  EXPECT_EQ(sv->value.ToUint64(), 0xFu);
+}
+
 }  // namespace
