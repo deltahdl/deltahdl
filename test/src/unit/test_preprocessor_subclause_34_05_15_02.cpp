@@ -62,29 +62,40 @@ constexpr std::string_view kNamedScheme = "base64";
 constexpr std::string_view kAnnouncingDirective =
     "`pragma protect data_block\n";
 
-// §34.5.22.1's expression, which the tool writes immediately after the data
-// block. It is the `pragma directive that ends that block, and what it
-// announces is the digest checked against it.
+// §34.5.22's expression, which serves twice over. Written between a region's
+// delimiters it asks for a digest, which is what makes the envelope carry one;
+// written by the tool into the envelope it announces that digest on the line
+// beneath it, immediately after the data block. So it is the `pragma directive
+// the data block runs up against, and what it announces is checked against
+// what that block recovered to.
 constexpr std::string_view kDigestAnnouncingDirective =
     "`pragma protect digest_block\n";
 
-// A region naming `scheme` for its block, with the design between the
-// delimiters of §34.5.1 and §34.5.2.
-std::string RegionEncodedIn(std::string_view scheme) {
+// A region naming `scheme` for its block and writing `asks` between its
+// delimiters, with the design after it.
+std::string RegionEncodedIn(std::string_view scheme, std::string_view asks) {
   std::string text = "`pragma protect begin\n";
   text += "`pragma protect encoding=(enctype=\"";
   text.append(scheme).append("\")\n");
+  text.append(asks);
   text.append(kSealedDesign);
   text += "`pragma protect end\n";
   return text;
 }
 
-// The envelope this tool writes for that region.
-std::string EnvelopeEncodedIn(std::string_view scheme) {
+// The envelope this tool writes for a region naming `scheme` and asking `asks`.
+std::string EnvelopeOfRegion(std::string_view scheme, std::string_view asks) {
   std::string envelope =
-      EncryptEnvelopes(RegionEncodedIn(scheme), std::string(kRegionKey));
+      EncryptEnvelopes(RegionEncodedIn(scheme, asks), std::string(kRegionKey));
   EXPECT_EQ(envelope.find(kSealedDesign), std::string::npos) << envelope;
   return envelope;
+}
+
+// The envelope for a region that asks for nothing beyond its scheme, which is
+// what most cases here are about: no digest is requested, so the envelope
+// carries the data block and no block after it.
+std::string EnvelopeEncodedIn(std::string_view scheme) {
+  return EnvelopeOfRegion(scheme, "");
 }
 
 // The characters standing on the line beneath the expression announcing the
@@ -180,13 +191,17 @@ TEST(ProtectDataBlockDescription, ABlockStandingOnSeveralLinesIsReadWhole) {
 
 // The other half of "says nothing about where it ends": what ends it. A block
 // runs to the next `pragma directive, none of §34.5.9.2's schemes spelling one,
-// and that directive still takes effect. The envelope this tool
-// writes puts §34.5.22's digest_block expression immediately after the data
-// block, so a reading that swallowed the directive would check no digest --
-// and a digest altered by hand would then go unreported.
+// and that directive still takes effect. §34.5.22 puts the digest_block
+// expression immediately after the block it vouches for, so a reading that
+// swallowed that directive would check no digest -- and a digest altered by
+// hand would then go unreported.
 TEST(ProtectDataBlockDescription, TheDirectiveEndingABlockStillTakesEffect) {
-  std::string broken = WithBlockBrokenIntoLines(EnvelopeEncodedIn(kNamedScheme),
-                                                kAnnouncingDirective, 3);
+  // §34.5.22.2 makes a digest_block written between the delimiters a request,
+  // so this region is the one whose envelope carries a directive after the data
+  // block for that block to run up against.
+  std::string broken = WithBlockBrokenIntoLines(
+      EnvelopeOfRegion(kNamedScheme, kDigestAnnouncingDirective),
+      kAnnouncingDirective, 3);
   auto at = broken.find(kDigestAnnouncingDirective);
   ASSERT_NE(at, std::string::npos) << broken;
   // A character well inside the digest, which §34.5.22.2 puts on the line after
