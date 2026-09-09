@@ -26,6 +26,15 @@ ClockingDir ClockingDirOf(Direction dir) {
   return ClockingDir::kInput;
 }
 
+// Where a clocking block is being lowered: the instance prefix its names belong
+// to and the context and arena a constant skew is folded against. Bundled
+// because the three travel together through every step below.
+struct ClockingLowerScope {
+  const std::string& inst_prefix;
+  SimContext& ctx;
+  Arena& arena;
+};
+
 // §14.4: "the default input skew is 1step", which names the value the signal
 // held in the time step before the clocking event rather than a delay measured
 // after it. The parser writes that skew as a literal spelled `1step`
@@ -41,9 +50,9 @@ bool IsOneStepSkew(const Expr* delay) {
 // (Elaborator::ValidateClockingBlock), so it is folded here against the context
 // the design is being lowered into. A 1step skew measures no delay at all and
 // is carried by the mark above instead.
-SimTime ClockingSkewOf(const Expr* delay, SimContext& ctx, Arena& arena) {
+SimTime ClockingSkewOf(const Expr* delay, const ClockingLowerScope& scope) {
   if (delay == nullptr || IsOneStepSkew(delay)) return SimTime{0};
-  return SimTime{EvalExpr(delay, ctx, arena).ToUint64()};
+  return SimTime{EvalExpr(delay, scope.ctx, scope.arena).ToUint64()};
 }
 
 // §14.3 gives each clocking_item an optional clocking_skew and §14.4 has the
@@ -64,13 +73,16 @@ const Expr* SkewExprOf(const ClockingSignalDecl& decl, const ModuleItem* item,
 }
 
 ClockingSignal ClockingSignalOf(const ClockingSignalDecl& decl,
-                                const ModuleItem* item, SimContext& ctx,
-                                Arena& arena) {
+                                const ModuleItem* item,
+                                const ClockingLowerScope& scope) {
   ClockingSignal sig;
+  // §14.3 names a signal by the bare name of the module the block stands in,
+  // which is how ClockingBlock keeps it; ClockingBlock::inst_prefix is what
+  // joins it to the instance's own variable.
   sig.signal_name = decl.name;
   sig.direction = ClockingDirOf(decl.direction);
   const Expr* skew = SkewExprOf(decl, item, sig.direction);
-  sig.skew = ClockingSkewOf(skew, ctx, arena);
+  sig.skew = ClockingSkewOf(skew, scope);
   sig.is_one_step_skew = IsOneStepSkew(skew);
   // §14.4: an explicit #0 input is sampled in the Observed region rather than
   // in the Preponed one, so a stated zero is not the same as a stated nothing.
@@ -89,24 +101,31 @@ ClockingSignal ClockingSignalOf(const ClockingSignalDecl& decl,
 // that is not a plain identifier names no variable the clock watcher could
 // attach to, which is the other way a declaration arrives with nothing here to
 // use.
-std::optional<ClockingBlock> BuildClockingBlock(const ModuleItem* item,
-                                                SimContext& ctx, Arena& arena) {
+std::optional<ClockingBlock> BuildClockingBlock(
+    const ModuleItem* item, const ClockingLowerScope& scope) {
   if (item->name.empty() || item->clocking_event.empty()) return std::nullopt;
   const Expr* clock = item->clocking_event[0].signal;
   if (clock == nullptr || clock->kind != ExprKind::kIdentifier) {
     return std::nullopt;
   }
   ClockingBlock block;
-  block.name = item->name;
+  // §14.3 names a block within its module, so two instances of one module
+  // declare two blocks of one name; the instance prefix is what registers them
+  // apart, and ClockingManager::FindInScope is what reaches each from the bare
+  // name a reference in that instance spells. Both strings are arena-persisted
+  // because the manager keys on a string_view.
+  block.name = *scope.arena.Create<std::string>(scope.inst_prefix +
+                                                std::string(item->name));
+  block.inst_prefix = *scope.arena.Create<std::string>(scope.inst_prefix);
   block.clock_signal = clock->text;
   block.clock_edge = item->clocking_event[0].edge;
   block.default_input_skew =
-      ClockingSkewOf(item->default_input_skew_delay, ctx, arena);
+      ClockingSkewOf(item->default_input_skew_delay, scope);
   block.default_output_skew =
-      ClockingSkewOf(item->default_output_skew_delay, ctx, arena);
+      ClockingSkewOf(item->default_output_skew_delay, scope);
   block.is_global = item->is_global_clocking;
   for (const auto& decl : item->clocking_signals) {
-    block.signals.push_back(ClockingSignalOf(decl, item, ctx, arena));
+    block.signals.push_back(ClockingSignalOf(decl, item, scope));
   }
   return block;
 }

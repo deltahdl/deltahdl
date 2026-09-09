@@ -169,13 +169,14 @@ static void FireClockingEvent(ClockingManager* mgr, const ClockWatch& watch,
                               SimContext& ctx, Scheduler& sched) {
   SampleBlockInputs(mgr, watch, ctx, false);
   auto* ev = sched.GetEventPool().Acquire();
-  auto observed = watch;
-  auto name = watch.block_name;
-  ev->callback = [mgr, observed, name, &ctx, &sched]() {
-    SampleBlockInputs(mgr, observed, ctx, true);
-    mgr->MarkBlockEventTime(name, sched.CurrentTime());
-    mgr->NotifyBlockEvent(name);
-    mgr->InvokeEdgeCallbacks(name);
+  // The watch is captured by value because the callback runs in the Observed
+  // region, after this function and the caller that owns the watch have both
+  // returned.
+  ev->callback = [mgr, watch, &ctx, &sched]() {
+    SampleBlockInputs(mgr, watch, ctx, true);
+    mgr->MarkBlockEventTime(watch.block_name, sched.CurrentTime());
+    mgr->NotifyBlockEvent(watch.block_name);
+    mgr->InvokeEdgeCallbacks(watch.block_name);
   };
   sched.ScheduleEvent(sched.CurrentTime(), Region::kObserved, ev);
 }
