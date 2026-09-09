@@ -20,6 +20,26 @@ class Arena;
 
 StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                   Arena& arena);
+
+// The two halves of that statement's store, reached by the subroutine body
+// executor as well. §10.4 puts procedural assignments "within procedures such
+// as always, initial, task, and function" and names one set of left-hand sides
+// for all of them, so a body inside a subroutine reaches this dispatch rather
+// than restating which forms count -- which is what left a class method
+// dropping an array assignment, a streaming target, an associative copy, an
+// event alias and a virtual interface bind in silence.
+//
+// The first answers the forms the target's own kind decides before any value is
+// made: a virtual interface, a `new`, an associative array, a queue, an event,
+// an unpacked slice or subarray, and a compound operator. It returns true when
+// it stored.
+bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
+                                      Arena& arena);
+// The second stores a value the caller has already made: a concatenation or
+// assignment-pattern target, a streaming target, §11.4.14's left-alignment, a
+// bit or part select, a whole array, and the scalar write the rest fall to.
+void ApplyGenericBlockingAssign(const Stmt* stmt, Logic4Vec rhs_val,
+                                SimContext& ctx, Arena& arena);
 StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena);
 StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena);

@@ -821,8 +821,8 @@ void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 // the generic rhs value (virtual interfaces, class `new`, associative-array
 // copy/literal, streaming-to-queue, queue/event/slice/subarray, and compound
 // operators). Returns true when one of them fully handled the assignment.
-static bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
-                                             Arena& arena) {
+bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
+                                      Arena& arena) {
   if (TryVirtualInterfaceAssign(stmt, ctx)) return true;
   if (TrySemaphoreNewAssign(stmt, ctx, arena)) return true;
   if (TryClassNewAssign(stmt, ctx, arena)) return true;
@@ -852,8 +852,8 @@ static bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
 // Apply the generic blocking assignment of `rhs_val` once the special-case
 // handlers have declined. Covers concatenation/pattern unpack, streaming
 // unpack, bit/part-select writes, array writes, and the scalar fallback.
-static void ApplyGenericBlockingAssign(const Stmt* stmt, Logic4Vec rhs_val,
-                                       SimContext& ctx, Arena& arena) {
+void ApplyGenericBlockingAssign(const Stmt* stmt, Logic4Vec rhs_val,
+                                SimContext& ctx, Arena& arena) {
   // §10.9: a typed assignment pattern expression (type'{...}) is also a valid
   // left-hand target, and TryUnpackConcatLhs strips the type prefix so its
   // members unpack the RHS exactly as a bare positional pattern does.

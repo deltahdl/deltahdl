@@ -19,37 +19,6 @@ namespace delta {
 // declarations, conditionals and loops -- and calls ExecFuncBlockingAssign at
 // the end of this file for every one of these forms.
 
-// §10.4 lists "Bit-selects, part-selects, and slices of packed arrays" among
-// the left-hand sides a procedural assignment may take, and puts such
-// assignments "within procedures such as always, initial, task, and function",
-// so a select target inside a subroutine body names the same things it names
-// outside one. This looked for an element variable named `a[i]` and nothing
-// else, so of the forms §11.5.1 defines only an unpacked array element was
-// reached: a bit-select of a packed variable built the name `v[2]`, which no
-// variable answers to, and wrote nothing, and a part-select built its name from
-// the msb expression alone and wrote nothing either. Neither was reported.
-//
-// What it did write, it wrote whole. A Logic4Vec carries its own width, so
-// `elem->value = val` put the value's width in the element's place rather than
-// truncating into it, which is the §10.7 defect 820f37a1e fixed at the
-// identifier arm and left here because a select's width is its own question.
-//
-// TrySelectBlockingAssign is what the assignment outside a subroutine asks, and
-// it asks it of every form at once: an unpacked array element resized to the
-// element's width, a queue or associative element by its own writer, the bits
-// an associative element's select names, a compound `a[i][j]`, the byte a
-// string's index names (§6.16), and otherwise WriteBitSelect, which deposits
-// the value into the window the select opened and leaves the rest of the
-// variable standing. The associative-array key rules §7.8.1, §7.8.4 and §7.8.6
-// decide still reach it, TryAssocIndexedWrite being one of the writers it
-// dispatches to, so `aa[-1] = v` still reaches the entry the same statement
-// reaches among a module's items rather than a second entry of its own.
-static void ExecFuncSelectAssign(const Expr* lhs, const Logic4Vec& val,
-                                 SimContext& ctx, Arena& arena) {
-  Logic4Vec rhs_val = val;
-  TrySelectBlockingAssign(lhs, rhs_val, ctx, arena);
-}
-
 // True when lhs is a `<base>.<member>` member access whose base identifier name
 // matches base_name and whose member is a plain identifier.
 static bool IsMemberAccessOn(const Expr* lhs, std::string_view base_name) {
@@ -105,84 +74,31 @@ static void WriteSelfProperty(ClassObject* self, std::string_view name,
   ctx.NotifyClassHandleWatchers(self->handle);
 }
 
-// Assigns to a plain identifier lhs: writes the local variable when present,
-// otherwise falls back to a property on the current `this` object.
+// §8.10: a method writes a static property of its enclosing class by
+// unqualified reference, mirroring the read path in EvalIdentifier, and §8.11
+// has an unqualified name that is not a static property name the instance
+// property of the object the method was invoked on. Neither target is one the
+// module path knows -- outside a subroutine there is no enclosing class and no
+// invoking instance -- so they are answered here, and every other target falls
+// to the store §10.4 gives every procedure alike.
 //
-// §10.7: "the MSBs of the right-hand expression shall be discarded to match the
-// size of the left-hand side", and a right-hand side narrower than the target
-// is padded to it. A Logic4Vec carries its own width, so writing the value over
-// the variable put the expression's width in the variable's place instead and
-// truncated nothing: the `a = 8'hff` of §10.7's Example 1 left a six-bit `a`
-// eight bits wide reading 255 rather than 6'h3f. The same statement outside a
-// subroutine has always been resized, by AssignToScalarLhs in
-// statement_assign_core.cpp; a subroutine body runs on its own statement
-// executor and so has to be told the same rule separately.
-//
-// ConvertRealOnAssign is the resize, and carries §6.12.1's real conversion with
-// it, which a target registered as real needs before its bits mean anything.
-//
-// §6.16 gives a string no declared width for a value to be resized to -- it is
-// as long as what it holds -- so a string target keeps the value it was handed.
-// A string local is marked as one where it is created, without which this would
-// read its width from whatever it was last assigned and truncate every later
-// assignment to the length of the first.
-static void ExecFuncIdentifierAssign(const Expr* lhs, const Logic4Vec& val,
-                                     SimContext& ctx, Arena& arena) {
-  auto* var = ctx.FindVariable(lhs->text);
-  if (var) {
-    // §10.6.2: "A force statement to a variable shall override a procedural
-    // assignment, continuous assignment or an assign procedural continuous
-    // assignment to the variable until a release procedural statement is
-    // executed on the variable." §10.4 puts procedural assignments "within
-    // procedures such as always, initial, task, and function", so an assignment
-    // written in a subroutine body is one of the assignments a force overrides,
-    // and this executor consulted the flag nowhere. AssignToScalarLhs declines
-    // on the same test outside a subroutine. A release clears the flag and
-    // leaves the value standing, so the next assignment through here lands.
-    if (var->is_forced) return;
-    if (var->is_string) {
-      var->value = val;
-    } else {
-      var->value = ConvertRealOnAssign(val, lhs, var->value.width, ctx, arena);
-      // §6.11.2: "When a 4-state value is automatically converted to a 2-state
-      // value, any unknown or high-impedance bits shall be converted to zeros."
-      // AssignToScalarLhs converts on the same test outside a subroutine, and
-      // this executor converted nowhere, so an x assigned to a `bit` or an
-      // `int` in a task or function body survived as an x.
-      if (!var->is_4state) CoerceTo2State(var->value);
-    }
-    // §9.4.2: "A non-edge implicit event shall be detected on any change in the
-    // value of the expression", and the subclause names a subroutine as the
-    // writer where it requires that "Changing the value of object data members,
-    // aggregate elements, or the size of a dynamically sized array referenced
-    // by a method or function shall cause the event expression to be
-    // reevaluated". A watcher is the only route by which a process parked on
-    // @(x), wait(x) or an always_comb's inferred sensitivity list is resumed,
-    // and this executor notified none: a module-scope variable, or a caller's
-    // variable reached through a `ref` formal, written from a function body
-    // left every process waiting on it parked for the rest of the run. The
-    // notification is unconditional, whether a given change counts being the
-    // awaiter's own test -- AnyChangeAwaiter::ChangeGatePasses and
-    // EventAwaiter::CheckEdge each decline a wake on a value that did not
-    // change. It sits behind the is_forced return because a variable that
-    // declines the store declines the notification with it, as WriteVar and
-    // WriteBitSelect both do.
-    var->NotifyWatchers();
-    return;
-  }
-  // §8.10: a static method writes a static property of the enclosing class by
-  // unqualified reference (mirrors the read path in EvalIdentifier). Static
-  // storage takes precedence over an instance property of the same name.
+// Static storage takes precedence over an instance property of the same name.
+// A declared local shadows both, and that is the caller's test rather than this
+// one's: it asks only for a name no local answers.
+static bool TryFuncClassPropertyWrite(const Expr* lhs, const Logic4Vec& val,
+                                      SimContext& ctx, Arena& arena) {
   const ClassTypeInfo* method_cls = ctx.CurrentMethodClass();
-  if (method_cls) {
+  if (method_cls != nullptr) {
     auto it = method_cls->static_properties.find(std::string(lhs->text));
     if (it != method_cls->static_properties.end()) {
       it->second = val;
-      return;
+      return true;
     }
   }
   auto* self = ctx.CurrentThis();
-  if (self) WriteSelfProperty(self, lhs->text, val, ctx, arena);
+  if (self == nullptr) return false;
+  WriteSelfProperty(self, lhs->text, val, ctx, arena);
+  return true;
 }
 
 // §8.7: `new` has no type of its own -- "the left-hand side of the assignment
@@ -277,30 +193,24 @@ static bool TryFuncSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
   return TryQueueBlockingAssign(stmt, ctx, arena);
 }
 
-// Write an already-evaluated value to the target the left-hand side names.
-static void ExecFuncWriteValue(const Expr* lhs, const Logic4Vec& val,
-                               SimContext& ctx, Arena& arena) {
-  // §11.4.12: "The concatenation is treated as a packed vector of bits. It can
-  // be used on the left-hand side of an assignment", the clause's own example
-  // being `{log1, log2, log3} = 3'b111;`. §10.4 puts procedural assignments
-  // "within procedures such as always, initial, task, and function", so that is
-  // as true in a subroutine body as outside one -- and this function named no
-  // concatenation form at all, so such an assignment wrote nothing and reported
-  // nothing. TryUnpackConcatLhs is what the assignment outside a subroutine
-  // asks, and it answers for §10.9's assignment-pattern target as well.
-  if (TryUnpackConcatLhs(lhs, val, ctx, arena)) return;
-  if (lhs->kind == ExprKind::kIdentifier) {
-    ExecFuncIdentifierAssign(lhs, val, ctx, arena);
-    return;
-  }
-  if (lhs->kind == ExprKind::kSelect) {
-    ExecFuncSelectAssign(lhs, val, ctx, arena);
-    return;
-  }
+// §8's write targets a subroutine body has and no procedure outside one does:
+// §8.11's `this.x`, §8.15's `super.x`, and the unqualified reference §8.10 and
+// §8.11 give a method over its class's static and instance properties. Returns
+// true when the target was one of those and the value was stored.
+//
+// Everything else is left to the store the module path performs. §10.4 puts
+// procedural assignments "within procedures such as always, initial, task, and
+// function" and names one set of left-hand sides for all of them, so a
+// concatenation target, a streaming target, a select, a whole array and the
+// scalar write are the same statements here as there -- and listing them again
+// is what left an array assignment, a streaming target and the rest of them
+// dropped in silence inside a class method (#3496).
+static bool TryFuncClassTargetWrite(const Expr* lhs, const Logic4Vec& val,
+                                    SimContext& ctx, Arena& arena) {
   if (IsMemberAccessOn(lhs, "this")) {
     auto* self = ctx.CurrentThis();
     if (self) WriteSelfProperty(self, lhs->rhs->text, val, ctx, arena);
-    return;
+    return true;
   }
   if (IsMemberAccessOn(lhs, "super")) {
     auto* self = ctx.CurrentThis();
@@ -315,18 +225,15 @@ static void ExecFuncWriteValue(const Expr* lhs, const Logic4Vec& val,
       // through WriteSelfProperty, so it announces the change itself.
       ctx.NotifyClassHandleWatchers(self->handle);
     }
-    return;
+    return true;
   }
-  // §8.4: a member access whose base is neither `this` nor `super` names a
-  // field of whatever the base denotes -- an object reached through a handle
-  // variable, a static class property, or a struct field. The two branches
-  // above cover only the enclosing object, so without this a write such as
-  // `p.x = 42` through an ordinary handle would be dropped silently. The
-  // shared writer resolves the base and performs the write for every one of
-  // those forms.
-  if (lhs->kind == ExprKind::kMemberAccess) {
-    WriteStructField(lhs, val, ctx);
+  // A local of the same name is the name's own declaration and shadows the
+  // property, so the property write is asked for only where no local answers.
+  if (lhs->kind == ExprKind::kIdentifier &&
+      ctx.FindVariable(lhs->text) == nullptr) {
+    return TryFuncClassPropertyWrite(lhs, val, ctx, arena);
   }
+  return false;
 }
 
 // §10.7 opens by making the left-hand side the context for the right-hand
@@ -346,14 +253,28 @@ static void ExecFuncWriteValue(const Expr* lhs, const Logic4Vec& val,
 // seventeen bits of a sixteen-bit sum rather than being handed a truncated one
 // to extend.
 //
-// LhsContextWidth alone, rather than the EvalRhsWithStructContext that wraps it
-// outside a subroutine: that function also packs a §10.9.2 assignment pattern
-// and a §11.9 tagged expression against the target's layout, which are claims
-// of their own about clauses this is not.
+// EvalRhsWithStructContext is what asks for that width outside a subroutine,
+// and it is what asks for it here: beside the width it packs a §10.9.2
+// structure assignment pattern and a §11.9 tagged expression against the
+// target's own layout, so each field expression is coerced to its member's
+// width rather than concatenated at its self-determined one. §10.4 gives every
+// procedure one set of assignments, so a pattern packed against the union
+// member it names in an initial block is packed against it in a method too.
 void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->lhs) return;
   if (TryFuncSpecialBlockingAssign(stmt, ctx, arena)) return;
-  uint32_t ctx_width = LhsContextWidth(stmt->lhs, ctx, arena);
+  // §10.4 names one set of left-hand sides for every procedure, "always,
+  // initial, task, and function" alike, so the forms the target's own kind
+  // decides are the module path's own dispatch rather than a list restated
+  // here. Restating them is what left a whole-array assignment, an assignment
+  // pattern, a streaming target, an associative copy, an event alias, a virtual
+  // interface bind, an unpacked slice and a subarray write dropped in silence
+  // in a class method, which is the only route into a class body.
+  //
+  // It comes after the four forms above it because those answer for a class
+  // context this dispatch has no test for: `new` resolved against a property of
+  // the enclosing class, and the compound operator over one.
+  if (TryDispatchSpecialBlockingAssign(stmt, ctx, arena)) return;
   // §6.8: "A variable is an abstraction of a data storage element. A variable
   // shall store a value from one assignment to the next." Two variables are two
   // storage elements. No clause has to forbid them sharing one buffer -- the
@@ -368,13 +289,14 @@ void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   // ExecBlockingAssignImpl; this executor evaluates its own right-hand side and
   // reaches neither of that path's production points.
   //
-  // Every store below takes its value from here -- the identifier arm, the
-  // string arm beside it, the select writers behind TrySelectBlockingAssign,
-  // the class property and the struct field -- so one copy where the value is
-  // produced covers all of them, and no store has to know.
+  // Every store below takes its value from here -- the class property, the
+  // struct field, and everything ApplyGenericBlockingAssign writes -- so one
+  // copy where the value is produced covers all of them, and no store has to
+  // know.
   Logic4Vec val =
-      OwnRhsWords(EvalExpr(stmt->rhs, ctx, arena, ctx_width), arena);
-  ExecFuncWriteValue(stmt->lhs, val, ctx, arena);
+      OwnRhsWords(EvalRhsWithStructContext(stmt, ctx, arena), arena);
+  if (TryFuncClassTargetWrite(stmt->lhs, val, ctx, arena)) return;
+  ApplyGenericBlockingAssign(stmt, val, ctx, arena);
 }
 
 }  // namespace delta

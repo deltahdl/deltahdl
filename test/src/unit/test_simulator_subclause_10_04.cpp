@@ -198,4 +198,110 @@ TEST(ProceduralAssignSim, NonblockingFlowSwapsInSameBlock) {
   EXPECT_EQ(b, 1u);
 }
 
+// §10.4 puts procedural assignments "within procedures such as always,
+// initial, task, and function", and names one set of left-hand sides for all of
+// them. So a form legal in an initial block is legal in a subroutine body, and
+// the cases below write each one from inside a class method: ExecClassMethod
+// (src/simulator/eval_function.cpp) is the only route into a class body, so a
+// form the subroutine executor did not implement was unreachable there rather
+// than recoverable by writing the call another way. Each of these wrote nothing
+// and reported nothing before that executor reached the same dispatch the
+// module path uses (#3496).
+//
+// Each writes locals of the method and returns what they hold, so what the case
+// observes is the assignment inside the body rather than anything about how a
+// property is reached.
+
+// §10.4's "aggregate variables (Clause 7)" as an array pattern, which drives
+// each element. The sum is read back rather than one element, so a pattern that
+// landed on the array's carrier instead of on its elements answers zero.
+TEST(ClassMethodAssignSim, AnArrayPatternAssignsFromAClassMethod) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  function int fill();\n"
+                      "    logic [7:0] mem [0:2];\n"
+                      "    mem = '{8'h11, 8'h22, 8'h33};\n"
+                      "    return mem[0] + mem[1] + mem[2];\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    result = c.fill();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            0x66u);
+}
+
+// §11.4.14's streaming concatenation on the left, which unpacks the value into
+// the variables the braces name.
+TEST(ClassMethodAssignSim, AStreamingTargetAssignsFromAClassMethod) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  function int split();\n"
+                      "    logic [7:0] hi, lo;\n"
+                      "    {>>8{hi, lo}} = 16'hDEAD;\n"
+                      "    return {hi, lo};\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    result = c.split();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            0xDEADu);
+}
+
+// §11.4.12's concatenation target: "The concatenation is treated as a packed
+// vector of bits. It can be used on the left-hand side of an assignment."
+TEST(ClassMethodAssignSim, AConcatenationTargetAssignsFromAClassMethod) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  function int split();\n"
+                      "    logic [3:0] a, b;\n"
+                      "    {a, b} = 8'h5C;\n"
+                      "    return a * 256 + b;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    result = c.split();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            0x50Cu);
+}
+
+// §7.8.6's copy of a whole associative array, which rebuilds the destination's
+// entries. A write that wrote the destination's carrier variable instead leaves
+// the entry the read asks for unallocated.
+TEST(ClassMethodAssignSim, AnAssociativeCopyAssignsFromAClassMethod) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  function int copy();\n"
+                      "    int src [int];\n"
+                      "    int dst [int];\n"
+                      "    src[7] = 42;\n"
+                      "    dst = src;\n"
+                      "    return dst[7];\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    result = c.copy();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            42u);
+}
+
 }  // namespace
