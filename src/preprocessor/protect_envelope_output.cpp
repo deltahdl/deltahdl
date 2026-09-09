@@ -334,10 +334,15 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   // §34.5.11.2 has the identifier name "the encryption algorithm that shall be
   // used to encrypt subsequent begin-end blocks", so the cipher the region
   // named is the one its block is written under and the one the envelope
-  // states. A region naming none takes this implementation's own, and one
-  // naming a cipher this implementation does not have never reaches here.
+  // states -- where this implementation has it. Only Table 34-3's required
+  // des-cbc is that; a region naming none, or naming a cipher this
+  // implementation does not have, is written under this implementation's own
+  // and the envelope says so. A region asking for a cipher there is none of is
+  // reported where it closes and sealed all the same, and stating the name it
+  // asked for would leave an envelope claiming an algorithm nobody used, which
+  // is the defect #3270 was.
   std::string_view block_method = ProtectPragmaValueBody(envelope.data_method);
-  if (block_method.empty()) block_method = kDataMethod;
+  if (block_method != kDesCbcMethod) block_method = kDataMethod;
   text.append(ProtectEnvelopeDescriptionDirectives(
       {kEncryptAgent, kEncryptAgentInfo,
        kSignedEnvelope ? std::string_view{} : block_method,

@@ -104,8 +104,8 @@ constexpr uint8_t kSubstitutionBoxes[8][64] = {
 // The sixteen subkeys, in the order encryption applies them.
 void KeySchedule(uint64_t key, uint64_t subkeys[16]) {
   uint64_t permuted = Permute(key, 64, kPermutedChoiceOne, 56);
-  uint32_t left = static_cast<uint32_t>((permuted >> 28) & 0x0FFFFFFFU);
-  uint32_t right = static_cast<uint32_t>(permuted & 0x0FFFFFFFU);
+  auto left = static_cast<uint32_t>((permuted >> 28) & 0x0FFFFFFFU);
+  auto right = static_cast<uint32_t>(permuted & 0x0FFFFFFFU);
   for (unsigned round = 0; round < 16; ++round) {
     unsigned by = kKeyRotations[round];
     left = ((left << by) | (left >> (28 - by))) & 0x0FFFFFFFU;

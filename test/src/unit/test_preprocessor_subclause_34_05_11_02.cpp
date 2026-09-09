@@ -561,7 +561,7 @@ void ExpectDesVector(std::string_view key_hex, std::string_view plain_hex,
 
 // The worked example the algorithm is usually published with.
 TEST(ProtectDataMethodCipher, TheWorkedExampleVectorIsAnswered) {
-  ExpectDesVector("133457799BBCDDFF", "0123456789ABCDEF", "85E813540F0AB405");
+  ExpectDesVector("133457799BBCDFF1", "0123456789ABCDEF", "85E813540F0AB405");
 }
 
 // A second vector, chosen because its answer is a block of zeros: a cipher that
@@ -582,7 +582,7 @@ TEST(ProtectDataMethodCipher, TheZeroKeyAndZeroBlockVectorIsAnswered) {
 // out as two different ones. The text is recovered under the same key and IV,
 // which is what says the chaining is undone as well as done.
 TEST(ProtectDataMethodCipher, ChainingMakesTwoLikeBlocksDiffer) {
-  const std::string kKey = BytesOfHex("133457799BBCDDFF");
+  const std::string kKey = BytesOfHex("133457799BBCDFF1");
   const std::string kIv = BytesOfHex("0011223344556677");
   const std::string kText = "abcdefghabcdefgh";
   std::string ciphered = DesCbcEncrypt(kText, kKey, kIv);
@@ -602,12 +602,15 @@ TEST(ProtectDataMethodCipher, ADifferentKeyDoesNotGiveTheTextBack) {
   const std::string kIv = BytesOfHex("0011223344556677");
   const std::string kText = "module m; endmodule\n";
   std::string ciphered =
-      DesCbcEncrypt(kText, BytesOfHex("133457799BBCDDFF"), kIv);
+      DesCbcEncrypt(kText, BytesOfHex("133457799BBCDFF1"), kIv);
   ASSERT_FALSE(ciphered.empty());
 
+  // The two keys differ at bit 2 of their last byte. FIPS 46-3 leaves bit 8 of
+  // every key byte to parity and never reads it, so a pair differing only there
+  // is one key written twice and would come back.
   std::string recovered;
   bool opened =
-      DesCbcDecrypt(ciphered, BytesOfHex("133457799BBCDDFE"), kIv, &recovered);
+      DesCbcDecrypt(ciphered, BytesOfHex("133457799BBCDFF5"), kIv, &recovered);
   EXPECT_FALSE(opened && recovered == kText);
 }
 

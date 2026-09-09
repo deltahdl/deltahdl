@@ -42,7 +42,12 @@ namespace delta {
 ProtectDataDecryption DataDecryptionInEffect(const RegionKeyNames& names,
                                              std::string_view method) {
   ProtectDataDecryption data;
-  data.method = method.empty() ? std::string(kDataMethod) : std::string(method);
+  // Only §34.5.11.2's required des-cbc is a stated cipher this implementation
+  // encrypts under, so it is the one a region can send here; everything else,
+  // an unstated method and a cipher this implementation does not have alike,
+  // leaves the block under this implementation's own and says so.
+  data.method =
+      method == kDesCbcMethod ? std::string(method) : std::string(kDataMethod);
   data.keyname = ProtectPragmaValueBody(names.data_keyname);
   // §34.5.27 holds the blocks of one envelope to carrying the same data
   // decryption pragma expressions, and §34.5.10 and §34.5.13 define two of them
