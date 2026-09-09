@@ -7,6 +7,7 @@
 #include "lexer/token.h"
 #include "simulator/evaluation.h"
 #include "simulator/evaluation_internal.h"
+#include "simulator/wide_arith.h"
 
 namespace delta {
 
@@ -284,6 +285,16 @@ static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
     return result;
   }
 
+  // §11.6.1 makes the result as wide as the widest operand and §11.4.3 defines
+  // the operators over the whole of that width, so above one word the operands
+  // are read and the result written across every word rather than through the
+  // machine word the two arms below compute in: on a `logic [127:0]`,
+  // 128'h1_0000_0000_0000_0000 + 128'h1 read 1, the only set bit of the first
+  // operand being bit 64.
+  if (width > 64) {
+    return EvalWideArith(op, lhs, rhs, {width, lhs.is_signed && rhs.is_signed},
+                         arena);
+  }
   if (lhs.is_signed && rhs.is_signed) {
     return EvalSignedArith(op, lhs, rhs, width, arena);
   }

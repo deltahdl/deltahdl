@@ -490,4 +490,157 @@ TEST(EvalOp, PowerIntegerBaseRealExponentYieldsReal) {
                    2.0);
 }
 
+// §11.6.1 makes a binary arithmetic operator's result as wide as its widest
+// operand, and §11.4.3's Table 11-3 defines `a + b` as "a plus b" over the
+// whole of it. Both operands were read through Logic4Vec::ToUint64 and the
+// result written through MakeLogic4VecVal, each of which touches words[0]
+// alone, so on a 128-bit declaration the only set bit of
+// 128'h1_0000_0000_0000_0000 was invisible and the sum read 1.
+//
+// The assertions are on the words rather than through ToUint64, which is the
+// projection under test and cannot express a high-word expectation. This first
+// case carries nothing across the word boundary, which is what isolates the
+// truncation from the carry.
+TEST(EvalOp, WideAdditionKeepsTheBitsAboveTheFirstWord) {
+  SimFixture f;
+  auto* r = RunAndFindVar(
+      "module t;\n"
+      "  logic [127:0] a, b, r;\n"
+      "  initial begin\n"
+      "    a = 128'h1_0000_0000_0000_0000;\n"
+      "    b = 128'h1;\n"
+      "    r = a + b;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(r, nullptr);
+  ASSERT_GE(r->value.nwords, 2u);
+  EXPECT_EQ(r->value.words[0].aval, 1u);
+  EXPECT_EQ(r->value.words[1].aval, 1u);
+}
+
+// The carry the case above does not exercise: a sum whose low word wraps has to
+// carry into the next, which a word-wise addition gets wrong by forgetting.
+TEST(EvalOp, WideAdditionCarriesAcrossTheWordBoundary) {
+  SimFixture f;
+  auto* r = RunAndFindVar(
+      "module t;\n"
+      "  logic [127:0] a, b, r;\n"
+      "  initial begin\n"
+      "    a = 128'hFFFF_FFFF_FFFF_FFFF;\n"
+      "    b = 128'h1;\n"
+      "    r = a + b;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(r, nullptr);
+  ASSERT_GE(r->value.nwords, 2u);
+  EXPECT_EQ(r->value.words[0].aval, 0u);
+  EXPECT_EQ(r->value.words[1].aval, 1u);
+}
+
+// The borrow, which is the same boundary from the other side.
+TEST(EvalOp, WideSubtractionBorrowsAcrossTheWordBoundary) {
+  SimFixture f;
+  auto* r = RunAndFindVar(
+      "module t;\n"
+      "  logic [127:0] a, b, r;\n"
+      "  initial begin\n"
+      "    a = 128'h1_0000_0000_0000_0000;\n"
+      "    b = 128'h1;\n"
+      "    r = a - b;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(r, nullptr);
+  ASSERT_GE(r->value.nwords, 2u);
+  EXPECT_EQ(r->value.words[0].aval, 0xFFFFFFFFFFFFFFFFull);
+  EXPECT_EQ(r->value.words[1].aval, 0u);
+}
+
+// A product whose operands each fit in one word and whose result does not:
+// 2**40 times 2**40 is 2**80, which lives entirely in the second word. The
+// single-word arm answered 0, the product having wrapped.
+TEST(EvalOp, WideMultiplicationReachesTheSecondWord) {
+  SimFixture f;
+  auto* r = RunAndFindVar(
+      "module t;\n"
+      "  logic [127:0] a, b, r;\n"
+      "  initial begin\n"
+      "    a = 128'h100_0000_0000;\n"
+      "    b = 128'h100_0000_0000;\n"
+      "    r = a * b;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(r, nullptr);
+  ASSERT_GE(r->value.nwords, 2u);
+  EXPECT_EQ(r->value.words[0].aval, 0u);
+  EXPECT_EQ(r->value.words[1].aval, uint64_t{1} << 16);
+}
+
+// Division across the boundary: 2**80 divided by 2**40 is 2**40, so the
+// dividend's bits live above the word the quotient's do.
+TEST(EvalOp, WideDivisionReadsTheWholeDividend) {
+  SimFixture f;
+  auto* r = RunAndFindVar(
+      "module t;\n"
+      "  logic [127:0] a, b, r;\n"
+      "  initial begin\n"
+      "    a = 128'h1_0000_0000_0000_0000_0000;\n"
+      "    b = 128'h100_0000_0000;\n"
+      "    r = a / b;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(r, nullptr);
+  ASSERT_GE(r->value.nwords, 2u);
+  EXPECT_EQ(r->value.words[0].aval, uint64_t{1} << 40);
+  EXPECT_EQ(r->value.words[1].aval, 0u);
+}
+
+// §11.6.1's signed interpretation above one word: SignExtend gives up at 64
+// bits and read a negative 128-bit value as whatever its low word held,
+// unsigned. -1 plus 2 is 1 whatever the width, and the high word of the sum
+// says whether the sign reached it: a value whose high word stayed all ones
+// would read 128'hFFFF...0001.
+TEST(EvalOp, WideSignedAdditionKeepsTheSignAboveTheFirstWord) {
+  SimFixture f;
+  auto* r = RunAndFindVar(
+      "module t;\n"
+      "  logic signed [127:0] a, b, r;\n"
+      "  initial begin\n"
+      "    a = -1;\n"
+      "    b = 2;\n"
+      "    r = a + b;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(r, nullptr);
+  ASSERT_GE(r->value.nwords, 2u);
+  EXPECT_EQ(r->value.words[0].aval, 1u);
+  EXPECT_EQ(r->value.words[1].aval, 0u);
+}
+
+// A width that is not a multiple of the word size: the carry out of bit 95 has
+// nowhere to go, so the bits above it in the top word must stay clear rather
+// than holding what the arithmetic carried into them.
+TEST(EvalOp, WideAdditionMasksAboveADeclaredWidthInsideAWord) {
+  SimFixture f;
+  auto* r = RunAndFindVar(
+      "module t;\n"
+      "  logic [95:0] a, b, r;\n"
+      "  initial begin\n"
+      "    a = 96'hFFFF_FFFF_FFFF_FFFF_FFFF_FFFF;\n"
+      "    b = 96'h1;\n"
+      "    r = a + b;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(r, nullptr);
+  ASSERT_GE(r->value.nwords, 2u);
+  EXPECT_EQ(r->value.words[0].aval, 0u);
+  EXPECT_EQ(r->value.words[1].aval, 0u);
+}
+
 }  // namespace

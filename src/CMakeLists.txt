@@ -361,6 +361,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_system_task.cpp
     simulator/eval_system_task_dump.cpp
     simulator/evaluation_ops.cpp
+    simulator/wide_arith.cpp
     simulator/lowerer_class.cpp
     simulator/lowerer_var.cpp
     simulator/sdf_annotate.cpp
