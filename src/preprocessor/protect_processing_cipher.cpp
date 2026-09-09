@@ -3,8 +3,10 @@
 #include <string>
 #include <string_view>
 
+#include "preprocessor/protect_des.h"
 #include "preprocessor/protect_digest.h"
 #include "preprocessor/protect_encoding.h"
+#include "preprocessor/protect_key_method.h"
 #include "preprocessor/protect_processing.h"
 
 namespace delta {
@@ -107,6 +109,91 @@ std::string CombineWithKey(std::string_view bytes, std::string_view key) {
   return combined;
 }
 
+// §34.5.11.2's des-cbc takes a 64-bit key and a design's key is a string of any
+// length, so the key the cipher runs under is derived from it rather than being
+// it. The derivation is the same run KeyStream produces, of which the first
+// block is taken: a digest is a value in which a change anywhere in the input
+// changes the whole output, so two keys differing at any one character give
+// different DES keys.
+//
+// FIPS 46-3 leaves the low bit of each key byte to parity and never reads it,
+// so the derivation says nothing about those bits and the cipher ignores them.
+std::string DesKeyOf(std::string_view key) {
+  std::string derived = KeyStream(key, kDesKeyBytes);
+  if (derived.size() != kDesKeyBytes) return "";
+  return derived;
+}
+
+// §34.5.11.2 recommends the IV be randomly generated for each use of the
+// cipher, so two envelopes made from one region under one key differ. The run
+// is taken from the key and the cleartext with a counter that moves on at every
+// call, which is what keeps two encryptions of the same text apart.
+std::string FreshInitializationVector(std::string_view key,
+                                      std::string_view cleartext) {
+  static uint64_t counter = 0;
+  ++counter;
+  std::string seed(key);
+  seed.append(cleartext);
+  for (size_t n = 8; n > 0; --n) {
+    seed.push_back(static_cast<char>((counter >> ((n - 1) * 8)) & 0xFFU));
+  }
+  std::string run = KeyStream(seed, kDesBlockBytes);
+  if (run.size() != kDesBlockBytes) return "";
+  return run;
+}
+
+// Whether `method` names §34.5.11.2's required cipher. Every other identifier
+// reaching here is this implementation's own, an empty one included: a region
+// naming a cipher this implementation does not have is turned away where the
+// region closes, and one naming none takes the default.
+bool UsesDesCbc(std::string_view method) { return method == kDesCbcMethod; }
+
+// The bytes a block records under `method`, before any coding scheme is applied
+// to them: the fingerprint of the region, the region, and whatever the cipher
+// makes of the two.
+std::string EncryptedRegionBytes(std::string_view cleartext,
+                                 std::string_view key,
+                                 std::string_view method) {
+  std::string blob = FingerprintPrefix(FingerprintOf(cleartext));
+  blob.append(cleartext);
+  if (!UsesDesCbc(method)) {
+    std::string combined = CombineWithKey(blob, key);
+    // CombineWithKey leaves nothing where it could not produce a run as long as
+    // the bytes, and an empty block written out would be a region whose text
+    // went nowhere rather than a region that was sealed.
+    if (combined.size() != blob.size()) return "";
+    return combined;
+  }
+  std::string des_key = DesKeyOf(key);
+  std::string iv = FreshInitializationVector(key, blob);
+  if (des_key.empty() || iv.empty()) return "";
+  std::string ciphertext = DesCbcEncrypt(blob, des_key, iv);
+  if (ciphertext.empty()) return "";
+  // §34.5.15.2: "the IV cipher-block shall be prepended to the encrypted data
+  // before encoding is performed", so it travels ahead of the ciphertext rather
+  // than beside it in the envelope's description.
+  return iv + ciphertext;
+}
+
+// The bytes the block records, run backwards through `method`. False where the
+// cipher cannot make anything of them, which a key that is not the one the
+// region was encrypted under reaches as readily as bytes this never wrote.
+bool RecoverRegionBytes(std::string_view block, std::string_view key,
+                        std::string_view method, std::string* recovered) {
+  if (!UsesDesCbc(method)) {
+    recovered->assign(CombineWithKey(block, key));
+    return recovered->size() == block.size();
+  }
+  // §34.5.15.2: "the first cipher-block of the decoded data_block shall be
+  // removed for use as the IV. The remainder of the data_block shall be
+  // internally decrypted."
+  if (block.size() <= kDesBlockBytes) return false;
+  std::string des_key = DesKeyOf(key);
+  if (des_key.empty()) return false;
+  return DesCbcDecrypt(block.substr(kDesBlockBytes), des_key,
+                       block.substr(0, kDesBlockBytes), recovered);
+}
+
 }  // namespace
 
 // The block a region is recorded in is written as text by §34.5.9's coding
@@ -114,32 +201,37 @@ std::string CombineWithKey(std::string_view bytes, std::string_view key) {
 // what a text's encoding pragma expression settles, so the writing and the
 // reading of a block are given a scheme rather than holding one of their own.
 
-size_t ProtectedRegionBlockSize(std::string_view cleartext) {
-  return kFingerprintBytes + cleartext.size();
+size_t ProtectedRegionBlockSize(std::string_view cleartext,
+                                std::string_view method) {
+  size_t recorded = kFingerprintBytes + cleartext.size();
+  if (!UsesDesCbc(method)) return recorded;
+  // §34.5.15.2 has the IV cipher-block prepended to the encrypted data, and a
+  // block cipher writes whole blocks: the padding always adds at least one
+  // byte, so a recording already a whole number of blocks long grows by a whole
+  // block of it.
+  size_t padded = recorded + kDesBlockBytes - (recorded % kDesBlockBytes);
+  return kDesBlockBytes + padded;
 }
 
 std::string EncryptProtectedRegion(std::string_view cleartext,
                                    std::string_view key,
-                                   std::string_view enctype) {
+                                   std::string_view enctype,
+                                   std::string_view method) {
   if (key.empty()) return "";
-  std::string blob = FingerprintPrefix(FingerprintOf(cleartext));
-  blob.append(cleartext);
-  std::string combined = CombineWithKey(blob, key);
-  // CombineWithKey leaves nothing where it could not produce a run as long as
-  // the bytes, and an empty block written out would be a region whose text went
-  // nowhere rather than a region that was sealed.
-  if (combined.size() != blob.size()) return "";
+  std::string recorded = EncryptedRegionBytes(cleartext, key, method);
+  if (recorded.empty()) return "";
   ProtectEncoding encoding;
   encoding.enctype = std::string(enctype);
-  return EncodeProtectBlock(combined, encoding);
+  return EncodeProtectBlock(recorded, encoding);
 }
 
 bool DecryptProtectedBlock(std::string_view block, std::string_view key,
-                           std::string* cleartext) {
+                           std::string* cleartext, std::string_view method) {
   if (key.empty()) return false;
   if (block.size() < kFingerprintBytes) return false;
-  std::string recovered = CombineWithKey(block, key);
-  if (recovered.size() != block.size()) return false;
+  std::string recovered;
+  if (!RecoverRegionBytes(block, key, method, &recovered)) return false;
+  if (recovered.size() < kFingerprintBytes) return false;
   std::string_view text = std::string_view(recovered).substr(kFingerprintBytes);
   if (FingerprintOf(text) != ReadFingerprintPrefix(recovered)) return false;
   cleartext->assign(text);
@@ -147,10 +239,11 @@ bool DecryptProtectedBlock(std::string_view block, std::string_view key,
 }
 
 bool DecryptProtectedRegion(std::string_view data_block, std::string_view key,
-                            std::string* cleartext, std::string_view enctype) {
+                            std::string* cleartext, std::string_view enctype,
+                            std::string_view method) {
   std::string block;
   if (!DecodeProtectBlock(data_block, enctype, &block)) return false;
-  return DecryptProtectedBlock(block, key, cleartext);
+  return DecryptProtectedBlock(block, key, cleartext, method);
 }
 
 }  // namespace delta

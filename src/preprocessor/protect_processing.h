@@ -49,14 +49,20 @@ namespace delta {
 // decryption looks for the region's own text.
 inline constexpr std::string_view kDataBlockKeyword = "data_block";
 
-// How many bytes the block recording `cleartext` holds before that block is
-// written as text. §34.5.9 has an encrypting tool state this count against the
-// bytes subkeyword of the encoding it writes, so that whatever reads the block
-// knows how much data the characters stand for without decoding them first.
+// How many bytes the block recording `cleartext` under `method` holds before
+// that block is written as text. §34.5.9 has an encrypting tool state this
+// count against the bytes subkeyword of the encoding it writes, so that
+// whatever reads the block knows how much data the characters stand for without
+// decoding them first.
 //
-// It is more than the length of the cleartext, because a block records what
-// the region was as well as the region itself.
-size_t ProtectedRegionBlockSize(std::string_view cleartext);
+// It is more than the length of the cleartext, because a block records what the
+// region was as well as the region itself. Under §34.5.11.2's des-cbc it is
+// more again: a block cipher writes whole blocks, so the recording is padded up
+// to one, and §34.5.15.2 has the IV cipher-block travel ahead of the encrypted
+// data. An empty method is this implementation's own cipher, whose block is as
+// long as what went into it.
+size_t ProtectedRegionBlockSize(std::string_view cleartext,
+                                std::string_view method = {});
 
 // Encrypts one region of cleartext under `key` and returns the text that
 // records it, written in the coding scheme `enctype` names. An empty key
@@ -69,9 +75,17 @@ size_t ProtectedRegionBlockSize(std::string_view cleartext);
 // block of it stands on the one line §34.5.15.2 begins it on. The reading side
 // takes a block on several lines all the same, that being what an envelope
 // another tool wrote may carry; #3612 covers writing one.
+// `method` names the cipher, as §34.5.11.2 has the data_method expression name
+// it. Two are provided: Table 34-3's required des-cbc, named by kDesCbcMethod
+// in preprocessor/protect_key_method.h, and this implementation's own, which
+// every other method reaches -- an empty one included, that being what a region
+// stating no data_method leaves. A region naming a cipher this implementation
+// does not have never reaches here: ReportUnprovidedDataMethod in
+// preprocessor/protect_processing.cpp turns it away where the region closes.
 std::string EncryptProtectedRegion(std::string_view cleartext,
                                    std::string_view key,
-                                   std::string_view enctype = kBlockEnctype);
+                                   std::string_view enctype = kBlockEnctype,
+                                   std::string_view method = {});
 
 // The inverse, taking the block as the bytes it holds rather than as the text
 // it was written as: recovers into `*cleartext` the region those bytes record.
@@ -84,14 +98,16 @@ std::string EncryptProtectedRegion(std::string_view cleartext,
 // under -- an empty key, a different key, and bytes this encryption never
 // produced all reach here the same way.
 bool DecryptProtectedBlock(std::string_view block, std::string_view key,
-                           std::string* cleartext);
+                           std::string* cleartext,
+                           std::string_view method = {});
 
 // The two steps together, for a caller holding a block as the text it was
 // written as: reads `data_block` out of the scheme `enctype` names and then
 // recovers the region the bytes record. False where either step fails.
 bool DecryptProtectedRegion(std::string_view data_block, std::string_view key,
                             std::string* cleartext,
-                            std::string_view enctype = kBlockEnctype);
+                            std::string_view enctype = kBlockEnctype,
+                            std::string_view method = {});
 
 // Envelope encryption over a whole source text. Every encryption envelope in
 // `source_text` comes back a decryption envelope carrying its body encrypted

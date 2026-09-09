@@ -779,7 +779,7 @@ TEST(ProtectDataPublicKeyDecryptionInput,
   const std::string kOurs = "`pragma protect data_method=\"x-deltahdl-stream\"";
   auto at = envelope.find(kOurs);
   ASSERT_NE(at, std::string::npos) << envelope;
-  std::string theirs = "`pragma protect data_method=\"des-cbc\"";
+  std::string theirs = "`pragma protect data_method=\"aes128-cbc\"";
   std::string retitled = envelope;
   retitled.replace(at, kOurs.size(), theirs);
 

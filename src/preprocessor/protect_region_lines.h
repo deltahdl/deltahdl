@@ -148,16 +148,18 @@ struct RegionKeyReader {
 // block. §34.5.27 forms the block's buffer from them and holds every block of
 // one envelope to carrying the same ones.
 //
-// The cipher is this implementation's own rather than whichever one the text
-// named, because what §34.5.14 has a reader take out of a key block is the
-// cipher the data block it is about to open was really encrypted under, and a
-// region is encrypted under this tool's cipher whatever the text asked for.
+// `method` is the cipher the region named for its data, empty where it named
+// none. What §34.5.14 has a reader take out of a key block is the cipher the
+// data block it is about to open was really encrypted under, and that is the
+// one the region asked for wherever this implementation has it -- §34.5.11.2's
+// required des-cbc, or its own where the region asked for nothing.
 //
 // The key itself is not among them here. The tool has not made one yet at the
 // point a region asks for a block, and one key serves every block of a region,
 // so it is filled in once the blocks are written rather than carried on each
 // request.
-ProtectDataDecryption DataDecryptionInEffect(const RegionKeyNames& names);
+ProtectDataDecryption DataDecryptionInEffect(const RegionKeyNames& names,
+                                             std::string_view method = {});
 
 // The names, entities, algorithms and blocks the walk over an encryption
 // envelope's own lines has gathered where it now stands, `contained` saying a

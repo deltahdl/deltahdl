@@ -165,6 +165,13 @@ struct EncryptionEnvelope {
   // the identifier unchanged in the output file, and one left among the body's
   // lines would go into the block along with them.
   std::string_view key_method;
+  // The cipher the enclosed text named for its own data. §34.5.11.2 has the
+  // identifier name "the encryption algorithm that shall be used to encrypt
+  // subsequent begin-end blocks", so a region naming one has said what its
+  // block is to be produced with, and the envelope both writes it and encrypts
+  // under it. Empty where the text named none, which is this implementation's
+  // own cipher.
+  std::string_view data_method;
   // The coding scheme the enclosed text asked its blocks to be written under.
   // §34.5.9 has an encoding pragma expression found in the input specify how
   // the output is encoded, so what a region wrote for itself is what its own

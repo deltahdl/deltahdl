@@ -18,6 +18,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     common/diagnostic.cpp
     common/source_mgr.cpp
     preprocessor/macro_table.cpp
+    preprocessor/protect_des.cpp
     preprocessor/protect_digest.cpp
     preprocessor/protect_digest_algorithms.cpp
     preprocessor/protect_digest_block.cpp

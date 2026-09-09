@@ -331,9 +331,17 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   // where a digital signature is used, which is what an envelope carrying key
   // blocks is. The description then states no cipher and
   // ProtectEnvelopeDescriptionDirectives writes none.
+  // §34.5.11.2 has the identifier name "the encryption algorithm that shall be
+  // used to encrypt subsequent begin-end blocks", so the cipher the region
+  // named is the one its block is written under and the one the envelope
+  // states. A region naming none takes this implementation's own, and one
+  // naming a cipher this implementation does not have never reaches here.
+  std::string_view block_method = ProtectPragmaValueBody(envelope.data_method);
+  if (block_method.empty()) block_method = kDataMethod;
   text.append(ProtectEnvelopeDescriptionDirectives(
       {kEncryptAgent, kEncryptAgentInfo,
-       kSignedEnvelope ? std::string_view{} : kDataMethod, envelope_encoding}));
+       kSignedEnvelope ? std::string_view{} : block_method,
+       envelope_encoding}));
   AppendClearNames(envelope, block_encoding, kSignedEnvelope, &text);
   // §34.5.27 has the blocks carrying the key the region's data are under
   // written into the envelope ahead of the block those keys open. A reader has
@@ -354,7 +362,7 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   // block before any of the encoding was applied to it, so it is taken from
   // what goes into the writing rather than from the characters that come out.
   text.append(ProtectEncodedValueDirective(
-      block_encoding, ProtectedRegionBlockSize(envelope.body)));
+      block_encoding, ProtectedRegionBlockSize(envelope.body, block_method)));
   // §34.5.15.1 spells the expression as the keyword standing alone, and
   // §34.5.15.2 has it indicate "that a data block begins on the next line in
   // the file". The block is therefore written beneath the keyword rather than
@@ -363,8 +371,8 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   // (preprocessor/protect_digest_block.cpp) and ProtectKeyBlockDirective
   // (preprocessor/protect_key_block.cpp) are the same three lines.
   text.append("`pragma protect ").append(kDataBlockKeyword).append("\n");
-  text.append(
-      EncryptProtectedRegion(envelope.body, how.key, block_encoding.enctype));
+  text.append(EncryptProtectedRegion(envelope.body, how.key,
+                                     block_encoding.enctype, block_method));
   text.push_back('\n');
   // §34.5.22 owes a digest block to the data block as well as each key block,
   // immediately following the block it refers to. The digest is computed over

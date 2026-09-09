@@ -137,20 +137,21 @@ TEST(ProtectDataBlockSyntax, TheKeywordAloneTakesTheLineBeneathItAsTheBlock) {
 // beneath the directive rather than for the rest of the directive's own text.
 //
 // One report names both halves. §34.5.11.2 has the data_method state the
-// algorithm a block is to be decrypted with, and this implementation provides
-// one cipher that des-cbc is not; that value is read only once a line has been
-// taken as the block. So a reading that swallowed the comma into a pragma_value
-// of data_block would report nothing here: no block would have been announced,
-// and des-cbc would never have been in effect over one.
+// algorithm a block is to be decrypted with, and aes128-cbc is one of Table
+// 34-3's optional identifiers that this implementation does not provide; that
+// value is read only once a line has been taken as the block. So a reading that
+// swallowed the comma into a pragma_value of data_block would report nothing
+// here: no block would have been announced, and aes128-cbc would never have
+// been in effect over one.
 TEST(ProtectDataBlockSyntax, TheKeywordAloneEndsAtTheComma) {
   PreprocFixture f;
   std::string described =
-      "`pragma protect data_block, data_method=\"des-cbc\"\n";
+      "`pragma protect data_block, data_method=\"aes128-cbc\"\n";
   described.append(kUnopenableBlock).append("\n");
   Preprocess(ForeignEnvelope(described), f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "data block states an encryption algorithm this "
-                            "implementation does not provide: des-cbc",
+                            "implementation does not provide: aes128-cbc",
                             3, "34.5.11.2"));
 }
 

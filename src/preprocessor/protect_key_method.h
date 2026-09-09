@@ -22,6 +22,13 @@ namespace delta {
 // The keyword's own name, as §34.4 tabulates it.
 inline constexpr std::string_view kKeyMethodKeyword = "key_method";
 
+// The one identifier of that table §34.5.11.2 marks required, so it is the one
+// cipher a tool may be handed a block under without having been told anything
+// about the tool that wrote it: "the required methods are standard in every
+// implementation". The cipher behind it is FIPS 46-3's, in
+// preprocessor/protect_des.h.
+inline constexpr std::string_view kDesCbcMethod = "des-cbc";
+
 // One row of the table of encryption algorithm identifiers: the identifier,
 // whether every implementation provides the cipher behind it, and the published
 // cipher that identifier stands for.

@@ -40,22 +40,28 @@ namespace {
 // §34.5.11.2 has the identifier name "the encryption algorithm that shall be
 // used to encrypt subsequent begin-end blocks", so a region naming one has
 // stated what its blocks are to be produced with. This implementation provides
-// one cipher and names it kDataMethod (preprocessor/protect_envelope_output.h),
-// and encrypting a region under that where the text named another would hand
-// the author a file claiming an algorithm nobody used.
+// two: §34.5.11.2's required des-cbc, whose cipher is in
+// preprocessor/protect_des.h, and its own, named kDataMethod in
+// preprocessor/protect_envelope_output.h. Encrypting a region under one of
+// those where the text named a third would hand the author a file claiming an
+// algorithm nobody used.
 //
 // The report says which half of Table 34-3 the identifier came from. One the
 // table marks required is "standard in every implementation", so a text naming
-// it assumed nothing and this tool is what falls short; #3430 covers providing
-// those ciphers. Any other names a cipher a text assumed its reader knew.
+// it assumed nothing and this tool would be what falls short; des-cbc is the
+// only identifier the table marks so, and it is provided, so what reaches that
+// half of the message is an optional cipher spelled as the table spells it.
+// Any other names a cipher a text assumed its reader knew.
 //
 // A region naming nothing is not refused anything, and neither is one naming
-// the identifier this tool writes.
+// either identifier this tool encrypts under.
 void ReportUnprovidedDataMethod(const RegionKeyReader& in_effect,
                                 DiagEngine* diag, uint32_t file_id) {
   if (diag == nullptr) return;
   std::string_view stated = ProtectPragmaValueBody(in_effect.data_method);
-  if (stated.empty() || stated == kDataMethod) return;
+  if (stated.empty() || stated == kDataMethod || stated == kDesCbcMethod) {
+    return;
+  }
   std::string message(
       "protect pragma data_method asks for an encryption algorithm this "
       "implementation does not provide: ");
@@ -196,14 +202,17 @@ std::string_view RegionKey(const RegionKeyNames& names,
 // this region ends. Nothing reads the line off a lone request either way:
 // §34.5.27's requirement is one two blocks can break and one cannot.
 ProtectKeyBlockRequests DesignatedKeyBlocks(const RegionKeyNames& names,
-                                            uint32_t closing_line) {
+                                            uint32_t closing_line,
+                                            std::string_view data_method) {
   ProtectKeyBlockRequests requests;
   if (!names.key_keyname.empty()) {
     requests.Designate(names.key_keyowner, names.key_keyname,
-                       DataDecryptionInEffect(names), closing_line);
+                       DataDecryptionInEffect(names, data_method),
+                       closing_line);
   } else if (!names.key_public_key.empty()) {
     requests.DesignatePublicKey(names.key_keyowner, names.key_public_key,
-                                DataDecryptionInEffect(names), closing_line);
+                                DataDecryptionInEffect(names, data_method),
+                                closing_line);
   }
   return requests;
 }
@@ -414,7 +423,8 @@ RegionEncryption RegionEncryptionFor(const RegionKeyReader& in_effect,
   }
   ProtectKeyBlockRequests requests =
       region.written_inside.key_blocks.Empty()
-          ? DesignatedKeyBlocks(in_effect.names, closing_line)
+          ? DesignatedKeyBlocks(in_effect.names, closing_line,
+                                ProtectPragmaValueBody(in_effect.data_method))
           : region.written_inside.key_blocks;
   how.key_blocks = ProtectKeyBlocksFor(
       requests, region.body, keys,
@@ -504,6 +514,7 @@ std::string ClosedRegionText(const ReadRegion& region,
   envelope.digest_method = in_effect.digest_method;
   envelope.digest_key_method = in_effect.digest_key_method;
   envelope.key_method = in_effect.key_method;
+  envelope.data_method = in_effect.data_method;
   envelope.requested_encoding = region.written_inside.encoding;
   return DecryptionEnvelopeText(envelope, how);
 }

@@ -39,9 +39,10 @@
 
 namespace delta {
 
-ProtectDataDecryption DataDecryptionInEffect(const RegionKeyNames& names) {
+ProtectDataDecryption DataDecryptionInEffect(const RegionKeyNames& names,
+                                             std::string_view method) {
   ProtectDataDecryption data;
-  data.method = kDataMethod;
+  data.method = method.empty() ? std::string(kDataMethod) : std::string(method);
   data.keyname = ProtectPragmaValueBody(names.data_keyname);
   // §34.5.27 holds the blocks of one envelope to carrying the same data
   // decryption pragma expressions, and §34.5.10 and §34.5.13 define two of them
@@ -166,7 +167,9 @@ void TakeKeyPublicKeyLine(std::string_view line, uint32_t line_num,
   // no key at all and asks for no block.
   reader->key_blocks.DesignatePublicKey(
       reader->names.key_keyowner, reader->names.key_public_key,
-      DataDecryptionInEffect(reader->names), line_num);
+      DataDecryptionInEffect(reader->names,
+                             ProtectPragmaValueBody(reader->data_method)),
+      line_num);
 }
 
 // A line the previous one announced the data's public key on is that key's
@@ -373,8 +376,11 @@ void TakeKeyDesignations(std::string_view line, uint32_t line_num,
   if (!key_name.empty()) {
     names->key_keyname = key_name;
     reader->key_keyname_line = line_num;
-    reader->key_blocks.Designate(names->key_keyowner, key_name,
-                                 DataDecryptionInEffect(*names), line_num);
+    reader->key_blocks.Designate(
+        names->key_keyowner, key_name,
+        DataDecryptionInEffect(*names,
+                               ProtectPragmaValueBody(reader->data_method)),
+        line_num);
   }
 }
 
