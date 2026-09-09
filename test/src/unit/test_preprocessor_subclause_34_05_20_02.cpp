@@ -197,7 +197,11 @@ std::string EnvelopeSealingItsDigestUnder(std::string_view digest_key,
   policy.method = std::string(kDefaultDigestMethod);
   policy.key = std::string(sealed_under);
   std::string text = "`pragma protect begin_protected\n";
-  text.append(ProtectKeyBlockDirectives(request, content, kBlockKey, encoding));
+  // §34.5.24 has the block sealed under the cipher the region's key_method
+  // names, and this envelope states none, so it is written under this
+  // implementation's own -- which an empty identifier selects.
+  text.append(
+      ProtectKeyBlockDirectives(request, content, kBlockKey, encoding, {}));
   text.append(ProtectDigestBlockDirectives(content, policy, encoding));
   text.append("`pragma protect end_protected\n");
   return text;
