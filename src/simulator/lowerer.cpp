@@ -441,9 +441,12 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
   // evaluated in the Observed region on the sampled values of the variables the
   // property names.
   p->is_concurrent_clocked = proc.is_concurrent_clocked;
-  if (proc.is_concurrent_clocked) {
-    RegisterAssertionSampledVars(proc.body, ctx_, inst_prefix_);
-  }
+  // §16.9.3 has the sampled value functions "not limited to assertion
+  // features", so the variables they name are enrolled wherever the call is
+  // written and not only where a concurrent assertion's property stands. A
+  // process naming none enrols nothing, which is every process in a design that
+  // uses neither.
+  RegisterAssertionSampledVars(proc.body, ctx_, inst_prefix_);
   // §18.14.1: a static process is seeded with the next value from the
   // enclosing initialization RNG. Lowering happens before any thread runs, so
   // the active stream here is the context-wide generator, which embodies the

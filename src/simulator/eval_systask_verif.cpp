@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "common/arena.h"
-#include "elaborator/global_clocking_sampled_value.h"
 #include "parser/assertion_control_task.h"
 #include "parser/ast.h"
 #include "simulator/coverage_control.h"
