@@ -356,10 +356,25 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   return v;
 }
 
+// §7.10/§7.4.2: the storage the declaration's own dimensions ask for, which a
+// body local needs as much as a declaration outside a subroutine does. The
+// variable CreateFuncLocalVar makes carries one element's width, and
+// CreateDeclAggregate makes the queue or the elements beside it, which is the
+// step the two paths did not share: `int q[$];` in a task body was a plain
+// vector, and since the elaborator now gives a procedural declaration the
+// dimensions its typedef carries, `q_t qu;` reaches here with the same
+// dimensions and the same need.
+static void CreateFuncLocalAggregate(const Stmt* stmt, Variable* var,
+                                     const FuncExecCtx& exec) {
+  if (var == nullptr) return;
+  CreateDeclAggregate(stmt, var->value.width, exec.ctx, exec.arena);
+}
+
 static void ExecFuncVarDeclAutomatic(const Stmt* stmt,
                                      const FuncExecCtx& exec) {
-  CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type, stmt->var_init,
-                     exec.ctx, exec.arena);
+  auto* v = CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type,
+                               stmt->var_init, exec.ctx, exec.arena);
+  CreateFuncLocalAggregate(stmt, v, exec);
 }
 
 static void ExecFuncVarDeclStatic(const Stmt* stmt, const FuncExecCtx& exec) {
@@ -370,6 +385,7 @@ static void ExecFuncVarDeclStatic(const Stmt* stmt, const FuncExecCtx& exec) {
   }
   auto* v = CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type,
                                stmt->var_init, exec.ctx, exec.arena);
+  CreateFuncLocalAggregate(stmt, v, exec);
   exec.ctx.SaveStaticFuncVar(exec.func_name, stmt->var_name, v);
 }
 
@@ -383,8 +399,9 @@ static void ExecFuncVarDecl(const Stmt* stmt, const FuncExecCtx& exec) {
     return;
   }
   if (exec.ctx.FindLocalVariable(stmt->var_name)) return;
-  CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type, stmt->var_init,
-                     exec.ctx, exec.arena);
+  auto* v = CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type,
+                               stmt->var_init, exec.ctx, exec.arena);
+  CreateFuncLocalAggregate(stmt, v, exec);
 }
 
 static std::string GetForeachArrayName(const Expr* expr) {

@@ -207,6 +207,23 @@ static bool CreateBlockQueue(const Stmt* stmt, uint32_t elem_width,
   return true;
 }
 
+// §7.10 and §7.4.2: the storage a declaration's unpacked dimensions ask for
+// beside the variable that carries one element's width. A queue dimension is
+// not the range dimension of a fixed-size unpacked array, so a declaration is
+// one or the other and never both.
+//
+// Both procedural declaration paths call this: a declaration outside a
+// subroutine, which reaches CreateDeclVariable above, and one inside a
+// subroutine body, which the function-body executor creates its local for. The
+// two used to differ -- only the first made a queue -- so `int q[$];` written
+// in a task body was a plain vector and q.push_back had no store to reach.
+void CreateDeclAggregate(const Stmt* stmt, uint32_t elem_width, SimContext& ctx,
+                         Arena& arena) {
+  if (!CreateBlockQueue(stmt, elem_width, ctx, arena)) {
+    CreateBlockArrayElements(stmt, elem_width, ctx, arena);
+  }
+}
+
 static bool TryExecWeakRefVarDecl(const Stmt* stmt, SimContext& ctx,
                                   Arena& arena) {
   if (stmt->var_decl_type.type_name != "weak_reference") return false;
@@ -328,11 +345,7 @@ static void CreateDeclVariable(const Stmt* stmt, uint32_t width, bool is_real,
     if (is_real && width < 64) width = 64;
     CreateVarInScope(stmt->var_name, width, ctx);
     if (is_real) ctx.RegisterRealVariable(stmt->var_name);
-    // §7.10: a queue dimension is not the range dimension of a fixed-size
-    // unpacked array, so a declaration is one or the other and never both.
-    if (!CreateBlockQueue(stmt, width, ctx, arena)) {
-      CreateBlockArrayElements(stmt, width, ctx, arena);
-    }
+    CreateDeclAggregate(stmt, width, ctx, arena);
   }
 }
 

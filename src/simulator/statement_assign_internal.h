@@ -81,6 +81,14 @@ void ClearSelectIndices(const Expr* lhs, SimContext& ctx);
 // Clause 7, and this decides which of those a select names and writes it
 // accordingly. Always returns true: a select target is this function's to
 // answer for, whether or not it found something to write.
+// The queue or the unpacked-array elements a procedural declaration's own
+// dimensions ask for, beside the variable that carries one element's width.
+// Both procedural declaration paths ask for them: §7.10's queue and §7.4.2's
+// array are the same declaration whether it is written inside a subroutine or
+// outside one.
+void CreateDeclAggregate(const Stmt* stmt, uint32_t elem_width, SimContext& ctx,
+                         Arena& arena);
+
 bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
                              SimContext& ctx, Arena& arena);
 

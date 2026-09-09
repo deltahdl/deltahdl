@@ -1,6 +1,7 @@
 #include <cmath>
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -14,6 +15,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -282,6 +284,62 @@ void Elaborator::ValidateCuTypedefs() {
     ValidateTypedefShape(item->typedef_type, item->loc,
                          /*member_default_scope=*/nullptr);
   }
+}
+
+// §6.18: "the type of the object is the type the name stands for", and §7.4.4
+// keeps a typedef's unpacked dimensions in the type rather than in the
+// declaration that uses the name -- `typedef bsix mem_type [0:3]` and
+// `mem_type ba [0:7]` are the clause's own example of dimensions defined in
+// stages. So `q_t qu;` declares a queue and `arr_t a;` four elements wherever
+// either is written.
+//
+// AdoptTypedefArrayDims (elaborator_decls_var.cpp) gives those dimensions to a
+// declaration written among a module's items. A declaration written inside a
+// procedure is a Stmt and reached it nowhere, and the simulator's two
+// procedural declaration paths read the statement's own dimensions and nothing
+// else, so such a declaration was a plain variable of the element's type: a
+// queue typedef declared a 32-bit vector and an unpacked-array typedef one
+// element.
+//
+// The rewrite is the one the module-scope path makes -- the name's own type in
+// place of the name, and the typedef's dimensions onto the declaration -- and
+// it is made only where the declaration wrote no dimensions of its own, since
+// §7.4.4's staging puts the declaration's own dimensions outside the typedef's
+// and that is a shape this does not yet carry.
+void Elaborator::AdoptTypedefDimsInStmt(Stmt* s) {
+  if (s == nullptr) return;
+  if ((s->kind == StmtKind::kVarDecl || s->kind == StmtKind::kBlockItemDecl) &&
+      s->var_unpacked_dims.empty() &&
+      s->var_decl_type.kind == DataTypeKind::kNamed) {
+    auto dims = td_array_dims_.find(s->var_decl_type.type_name);
+    auto base = typedefs_.find(s->var_decl_type.type_name);
+    if (dims != td_array_dims_.end() && base != typedefs_.end()) {
+      bool was_const = s->var_decl_type.is_const;
+      s->var_decl_type = base->second;
+      s->var_decl_type.is_const = was_const;
+      s->var_unpacked_dims = dims->second;
+    }
+  }
+  ForEachChildStmt(s,
+                   [this](Stmt* const& sub) { AdoptTypedefDimsInStmt(sub); });
+}
+
+// Every procedure of a module, including the ones a generate construct holds:
+// §27.6 makes a generate block's declarations declarations of the module, so a
+// declaration written in one is written in the module's scope and stands under
+// the same clause.
+void Elaborator::AdoptProceduralTypedefDims(const ModuleDecl* decl) {
+  std::function<void(ModuleItem*)> visit = [&](ModuleItem* item) {
+    if (item == nullptr) return;
+    AdoptTypedefDimsInStmt(item->body);
+    for (auto* s : item->func_body_stmts) AdoptTypedefDimsInStmt(s);
+    for (auto* child : item->gen_body) visit(child);
+    visit(item->gen_else);
+    for (auto& case_item : item->gen_case_items) {
+      for (auto* child : case_item.body) visit(child);
+    }
+  };
+  for (auto* item : decl->items) visit(item);
 }
 
 void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {

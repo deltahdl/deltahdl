@@ -635,6 +635,10 @@ class Elaborator : public ElaboratorClassRules {
 
   void ValidateProceduralNetAssign();
   void ValidateDynamicArrayNba(const ModuleDecl* decl);
+  // §6.18/§7.4.4: gives a declaration written inside a procedure the unpacked
+  // dimensions its typedef carries, which the module-scope path already adopts.
+  void AdoptProceduralTypedefDims(const ModuleDecl* decl);
+  void AdoptTypedefDimsInStmt(Stmt* s);
   void ValidateArrayQueryOnDynamicType(const ModuleDecl* decl);
   void ValidateArrayQueryOnVariableDim(const ModuleDecl* decl);
   void ValidateRandomSeedType(const ModuleDecl* decl);

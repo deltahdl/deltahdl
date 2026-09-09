@@ -415,4 +415,74 @@ TEST(MultidimensionalArraySimulation,
   EXPECT_EQ(v, 0xDu);
 }
 
+// §6.18 makes a declared object "the type the name stands for" and §7.4.4 keeps
+// a typedef's unpacked dimensions in the type rather than in the declaration
+// that uses the name, so `q_t qu;` declares a queue wherever it is written. A
+// declaration among a module's items adopted those dimensions; one written
+// inside a subroutine is a statement and adopted nothing, so the local was a
+// plain vector of the element's width and push_back reached no store at all.
+//
+// The size is what says it is a queue: a vector answers §20.7's $size of its
+// own width or nothing, where three pushes onto a queue answer 3.
+TEST(MultidimensionalArraySimulation, QueueTypedefLocalInAFunctionIsAQueue) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef int q_t[$];\n"
+      "  int result;\n"
+      "  function automatic int fill();\n"
+      "    q_t qu;\n"
+      "    qu.push_back(7);\n"
+      "    qu.push_back(8);\n"
+      "    qu.push_back(9);\n"
+      "    return qu.size() * 100 + qu[1];\n"
+      "  endfunction\n"
+      "  initial result = fill();\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 308u);
+}
+
+// The fixed-size half of the same rule: four elements, each its own storage,
+// where the declaration was one variable of one element's width and the three
+// writes below all landed in it.
+TEST(MultidimensionalArraySimulation, ArrayTypedefLocalInAFunctionHasElements) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef int arr_t[4];\n"
+      "  int result;\n"
+      "  function automatic int fill();\n"
+      "    arr_t a;\n"
+      "    a[0] = 5;\n"
+      "    a[3] = 9;\n"
+      "    return a[0] * 100 + a[3];\n"
+      "  endfunction\n"
+      "  initial result = fill();\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 509u);
+}
+
+// The same two declarations written in an initial block, which is the other
+// procedural declaration path: a statement executed by the statement executor
+// rather than by the subroutine-body executor, and each has to reach the
+// dimensions for itself.
+TEST(MultidimensionalArraySimulation, AggregateTypedefLocalsInAnInitialBlock) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef int q_t[$];\n"
+      "  typedef int arr_t[4];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    q_t qu;\n"
+      "    arr_t a;\n"
+      "    qu.push_back(4);\n"
+      "    qu.push_back(6);\n"
+      "    a[2] = 7;\n"
+      "    result = qu.size() * 100 + qu[1] * 10 + a[2];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 267u);
+}
+
 }  // namespace

@@ -95,6 +95,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
       &Elaborator::ValidateMatchesIfPredicateType,
       &Elaborator::ValidateDisableTargets,
       nullptr,  // ValidateProceduralNetAssign
+      &Elaborator::AdoptProceduralTypedefDims,
       &Elaborator::ValidateDynamicArrayNba,
       &Elaborator::ValidateArrayQueryOnDynamicType,
       &Elaborator::ValidateArrayQueryOnVariableDim,
