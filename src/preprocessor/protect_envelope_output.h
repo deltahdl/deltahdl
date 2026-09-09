@@ -229,20 +229,22 @@ std::string_view RegionDigestKey(const RegionKeyNames& names,
 // enclosed text asked for, where a block of that scheme stands on one line, and
 // this implementation's own otherwise.
 //
-// A line length the text stated is not carried across, and a scheme that breaks
-// its own output is not written under. §34.5.9 states the encoding once for the
-// whole envelope, so the scheme it names writes every encoded value the
-// envelope carries, and not all of those may run to several lines: §34.5.15.2's
-// block may, its keyword beginning it on the line beneath and nothing saying
-// where it ends, while §34.5.13.2's, §34.5.14.2's, §34.5.19's, §34.5.20's and
-// §34.5.26's key values are "the next line" each.
+// A line length the text stated is carried across; a scheme that breaks its own
+// output is not written under. §34.5.9.2 separates the two. The length is "the
+// maximum number of characters (after any encoding) in a single line of the
+// data_block", which names one block, and §34.5.15.2 has that block begin on
+// the line beneath its keyword and says nothing about where it ends: breaking
+// it is what the subkeyword is for, "so that the generated text files [are]
+// usable by commonly available text tools". The scheme is the other half: the
+// same clause has the encoding specify "how the data_block, digest_block, and
+// key_block content shall be encoded", and §34.5.13.2 and its siblings put each
+// key value on "the next line" under it too, so a scheme whose own output runs
+// to several lines would break values the clause gives one line each.
 //
-// The reading side takes a block on several lines either way -- that is what an
-// envelope another tool wrote may carry, and
 // Preprocessor::ReadProtectDataBlock (preprocessor/preprocessor.h) is handed
-// the run of its lines joined, as Preprocessor::ReadProtectKeyBlock and
-// Preprocessor::ReadProtectDigestBlock are for the blocks §34.5.27 and
-// §34.5.22 announce. #3612 covers writing one.
+// the run of a block's lines joined, as Preprocessor::ReadProtectKeyBlock and
+// Preprocessor::ReadProtectDigestBlock are for the blocks §34.5.27 and §34.5.22
+// announce, so a block another tool broke reads back whichever scheme it chose.
 ProtectEncoding EnvelopeBlockEncoding(const ProtectEncoding& requested);
 
 // The decryption envelope one encryption envelope is transformed into: the

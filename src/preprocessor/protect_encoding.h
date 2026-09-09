@@ -73,17 +73,19 @@ bool IsRequiredProtectEncodingAlgorithm(std::string_view enctype);
 // Whether a value written under `enctype` stands on one line: the characters
 // that scheme writes hold no line break.
 //
-// §34.5.9's encoding is stated once for a whole envelope, so the scheme it
-// names writes every encoded value that envelope carries -- and not all of
-// those may run to several lines. §34.5.15.2 has a data block "begin on the
-// next line in the file" and says nothing about where it ends, so a block may;
-// §34.5.13.2 and §34.5.14.2 say instead that "the next line contains the
-// encoded value" of the key they announce, and §34.5.19, §34.5.20 and §34.5.26
-// word theirs the same way, so those values are one line each. An envelope
-// declaring a scheme that breaks its output would break those too, so the
-// writing keeps to the schemes that do not. The reading side accepts a block on
-// several lines either way, which is what an envelope another tool wrote may
-// carry. #3612 covers writing one.
+// §34.5.9.2 has the encoding specify "how the data_block, digest_block, and
+// key_block content shall be encoded", and §34.5.13.2 and its siblings encode
+// each key value under it as well, so the scheme an envelope names writes every
+// encoded value that envelope carries -- and not all of those may run to
+// several lines. §34.5.15.2 has a data block "begin on the next line in the
+// file" and says nothing about where it ends, so a block may; §34.5.13.2 and
+// §34.5.14.2 say instead that "the next line contains the encoded value" of the
+// key they announce, and §34.5.19, §34.5.20 and §34.5.26 word theirs the same
+// way, so those values are one line each. An envelope declaring a scheme that
+// breaks its output would break those too, so the writing keeps to the schemes
+// that do not, and breaks the one block §34.5.9.2's line_length names instead.
+// The reading side accepts a block on several lines either way, which is what
+// an envelope another tool wrote may carry.
 bool ProtectEncodingFitsOneLine(std::string_view enctype);
 
 // Whether this implementation can write and read a block under `enctype`.

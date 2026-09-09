@@ -559,36 +559,52 @@ TEST(ProtectEncodingEncryptionOutput, TheBlockHoldsOnlyWhatASourceLineCarries) {
 }
 
 // What the tool states is what the tool did, which is the point of stating it.
-// A block written on the line beneath its keyword is a block on one line, so
-// there is no length at which its writing was broken and the envelope states
-// none -- not even the length the region asked for.
+// §34.5.9.2 defines the length as "the maximum number of characters (after any
+// encoding) in a single line of the data_block", so a region asking for one has
+// its block broken at it and the envelope states the length it broke at.
 //
-// The reading takes a block on several lines: §34.5.15.2 begins one on that
-// line and says nothing about where it ends, and an envelope another tool wrote
-// may carry one. The writing keeps to one line all the same, because §34.5.9
-// states the encoding once for the whole envelope and the key values beside the
-// block are one line each -- §34.5.13.2 and §34.5.14.2 say "the next line
-// contains the encoded value" -- so a length honored here would break those
-// too. #3612 covers writing a block on several lines.
-//
-// An envelope that repeated the request would send its reader looking for
-// breaks that are not there.
-//
-// The block the keyword announces is measured against the length the region
-// asked for, and it is longer. A writing broken at that length would have put
-// no more than that many characters on the announced line, so the measurement
-// is what says the length was dropped rather than honored. Asking instead
-// whether the announced line holds a line break would ask nothing:
-// EncodingDataBlockOf (test_fixtures/fixture_protect_encoding.h) reads up to
-// the first one, so its result holds none whatever the tool wrote.
-TEST(ProtectEncodingEncryptionOutput, AnEnvelopeStatesNoLengthItDidNotBreakAt) {
+// The first line of the block is measured against the length asked for, and the
+// whole of the block is measured against it too: a writing that dropped the
+// length would have put every character on the announced line, which is far
+// longer. The envelope is then read back under the key, which is what says the
+// breaks belong to the writing rather than to the data -- §34.5.15.2 having the
+// block begin on that line and say nothing about where it ends, so the reading
+// takes every line of it.
+TEST(ProtectEncodingEncryptionOutput, AnEnvelopeStatesTheLengthItBrokeAt) {
   constexpr size_t kLengthAskedFor = 8;
   std::string list = "(enctype=\"base64\", line_length=";
   list.append(std::to_string(kLengthAskedFor)).append(")");
   std::string envelope = EnvelopeAround(StatesEncoding(list));
   ASSERT_TRUE(Holds(envelope, "enctype=\"base64\""));
-  EXPECT_FALSE(Holds(envelope, "line_length"));
-  EXPECT_GT(EncodingDataBlockOf(envelope).size(), kLengthAskedFor);
+  EXPECT_TRUE(Holds(envelope, "line_length=8"));
+  EXPECT_LE(EncodingDataBlockOf(envelope).size(), kLengthAskedFor);
+  EXPECT_GT(EncodingDataBlockLinesOf(envelope).size(), kLengthAskedFor);
+
+  PreprocFixture f;
+  std::string read = Preprocess(envelope, f, HoldingTheKey());
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Holds(read, kEncodingSealedDesign));
+}
+
+// The other half of §34.5.9.2's separation: the length names the data_block and
+// the scheme names all three blocks, so the key block of the same envelope is
+// written on the one line §34.5.27.2 begins it on. A reader takes the length as
+// the clause defines it, against the data block, and would find no break where
+// it looked in a key block if it took it otherwise.
+TEST(ProtectEncodingEncryptionOutput, TheStatedLengthBreaksTheDataBlockAlone) {
+  std::string list = "(enctype=\"base64\", line_length=8)";
+  std::string envelope =
+      EnvelopeAround(StatesEncoding(list) + std::string(kDigestBlockLine));
+  ASSERT_TRUE(Holds(envelope, "line_length=8"));
+  EXPECT_TRUE(Holds(EncodingDataBlockLinesOf(envelope), "\n"));
+
+  // §34.5.22.2 begins the digest on the line following its own keyword, and the
+  // length names the data_block, so the digest stands on that one line. It runs
+  // to some thirty characters under this scheme, so a length of eight applied
+  // here would have broken it into four.
+  std::string digest = BlockLinesAfter(envelope, kDigestBlockLine);
+  EXPECT_FALSE(digest.empty()) << envelope;
+  EXPECT_FALSE(Holds(digest, "\n")) << envelope;
 }
 
 // The length itself, where the writing does break at it: the most characters

@@ -216,12 +216,14 @@ size_t ProtectedRegionBlockSize(std::string_view cleartext,
 std::string EncryptProtectedRegion(std::string_view cleartext,
                                    std::string_view key,
                                    std::string_view enctype,
-                                   std::string_view method) {
+                                   std::string_view method,
+                                   size_t line_length) {
   if (key.empty()) return "";
   std::string recorded = EncryptedRegionBytes(cleartext, key, method);
   if (recorded.empty()) return "";
   ProtectEncoding encoding;
   encoding.enctype = std::string(enctype);
+  encoding.line_length = line_length;
   return EncodeProtectBlock(recorded, encoding);
 }
 

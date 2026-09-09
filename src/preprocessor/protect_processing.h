@@ -70,11 +70,16 @@ size_t ProtectedRegionBlockSize(std::string_view cleartext,
 // implementation does not provide and a key no keyed run can be derived from.
 //
 // The scheme defaults to this implementation's own, which is what a region
-// encrypted by a text that stated no encoding is written in. Its alphabet holds
-// letters, digits and two punctuation characters only and no line break, so a
-// block of it stands on the one line §34.5.15.2 begins it on. The reading side
-// takes a block on several lines all the same, that being what an envelope
-// another tool wrote may carry; #3612 covers writing one.
+// encrypted by a text that stated no encoding is written in.
+//
+// `line_length` breaks the written block so that no line of it runs past that
+// many characters, and zero asks for no break. §34.5.9.2 defines the subkeyword
+// as "the maximum number of characters (after any encoding) in a single line of
+// the data_block", naming that block and no other, so it is the data block's
+// caller that passes one: a key block and a digest block are written on the one
+// line §34.5.27.2 and §34.5.22.2 begin them on. §34.5.15.2 says a data block
+// begins on the line beneath its keyword and says nothing about where it ends,
+// which is what leaves it free to run on.
 // `method` names the cipher, as §34.5.11.2 has the data_method expression name
 // it. Two are provided: Table 34-3's required des-cbc, named by kDesCbcMethod
 // in preprocessor/protect_key_method.h, and this implementation's own, which
@@ -85,7 +90,8 @@ size_t ProtectedRegionBlockSize(std::string_view cleartext,
 std::string EncryptProtectedRegion(std::string_view cleartext,
                                    std::string_view key,
                                    std::string_view enctype = kBlockEnctype,
-                                   std::string_view method = {});
+                                   std::string_view method = {},
+                                   size_t line_length = 0);
 
 // The inverse, taking the block as the bytes it holds rather than as the text
 // it was written as: recovers into `*cleartext` the region those bytes record.

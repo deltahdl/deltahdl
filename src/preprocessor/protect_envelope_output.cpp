@@ -300,6 +300,11 @@ ProtectEncoding EnvelopeBlockEncoding(const ProtectEncoding& requested) {
   if (ProtectEncodingFitsOneLine(requested.enctype)) {
     encoding.enctype = requested.enctype;
   }
+  // §34.5.9.2 gives the length one block: "the maximum number of characters
+  // (after any encoding) in a single line of the data_block". So it is carried
+  // across whatever scheme the envelope settles on, and the data block is the
+  // only place it is spent.
+  encoding.line_length = requested.line_length;
   return encoding;
 }
 
@@ -379,7 +384,8 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   // (preprocessor/protect_key_block.cpp) are the same three lines.
   text.append("`pragma protect ").append(kDataBlockKeyword).append("\n");
   text.append(EncryptProtectedRegion(envelope.body, how.key,
-                                     block_encoding.enctype, block_method));
+                                     block_encoding.enctype, block_method,
+                                     block_encoding.line_length));
   text.push_back('\n');
   // §34.5.22 owes a digest block to the data block as well as each key block,
   // immediately following the block it refers to. The digest is computed over

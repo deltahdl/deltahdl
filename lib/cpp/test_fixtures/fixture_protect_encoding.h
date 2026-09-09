@@ -213,10 +213,45 @@ inline std::string EnvelopeAround(std::string_view inside) {
   return EnvelopeOf(RegionHolding(inside));
 }
 
+// Every line recording one envelope's sealed region, joined with the breaks
+// between them, and empty where the text carries no data_block expression.
+// §34.5.15.2 begins the block on the line beneath the keyword and says nothing
+// about where it ends, so the block runs to the next `pragma directive: none of
+// §34.5.9.2's schemes spells one, which is what makes that line the one a block
+// can never carry. A bare backtick is not it: uuencode writes the grave accent
+// for a six-bit zero, so a line of one is the terminator its own output ends
+// with.
+inline std::string BlockLinesAfter(std::string_view envelope,
+                                   std::string_view opening) {
+  size_t opens = envelope.find(opening);
+  if (opens == std::string_view::npos) return {};
+  std::string_view rest = envelope.substr(opens + opening.size());
+  std::string block;
+  while (!rest.empty()) {
+    size_t ends = rest.find('\n');
+    std::string_view line =
+        ends == std::string_view::npos ? rest : rest.substr(0, ends);
+    if (line.rfind("`pragma", 0) == 0) break;
+    if (!block.empty()) block.push_back('\n');
+    block.append(line);
+    if (ends == std::string_view::npos) break;
+    rest.remove_prefix(ends + 1);
+  }
+  return block;
+}
+
+// The same for the block §34.5.15.1's keyword announces, which is the one
+// §34.5.9.2's line_length names.
+inline std::string EncodingDataBlockLinesOf(std::string_view envelope) {
+  return BlockLinesAfter(envelope, kEncodingBlockOpening);
+}
+
 // The characters recording one envelope's sealed region: the line beneath its
 // data_block expression, and empty where the text carries no such expression.
 // §34.5.15.1 spells that expression as the keyword standing alone, and
-// §34.5.15.2 has the block begin on the next line.
+// §34.5.15.2 has the block begin on the next line. Only the first line comes
+// back, so a caller whose block may run to several wants
+// EncodingDataBlockLinesOf above.
 inline std::string EncodingDataBlockOf(std::string_view envelope) {
   size_t opens = envelope.find(kEncodingBlockOpening);
   if (opens == std::string_view::npos) return {};
