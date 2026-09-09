@@ -73,6 +73,25 @@ Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx);
 // path is resolved when the statement executes, and a nonblocking assignment
 // defers only the deposit. That is why the resolution is an entity of its own
 // rather than a step inside the write.
+// §7.2.1: the run of bits of a class property's value that a member path names.
+// A property declared with a packed struct or union type holds the whole
+// structure in one value (§6.8), so `c.p.b` addresses a window of `p` rather
+// than storage of its own. `valid` is false for a path that names no such
+// window, which leaves the caller the answer it had.
+struct PropertyFieldWindow {
+  std::string_view property;
+  uint32_t bit_offset = 0;
+  uint32_t width = 0;
+  bool valid = false;
+};
+
+// The window `path` names in a property of `type`, resolved through the layout
+// registered for the property's declared type name. Shared by the write side
+// and the read side so one path answers the same window to both.
+PropertyFieldWindow ResolveClassPropertyField(const ClassTypeInfo* type,
+                                              std::string_view path,
+                                              SimContext& ctx);
+
 struct FieldTarget {
   enum class Kind : uint8_t {
     kNone,      // the path names no storage; the caller declines
@@ -82,13 +101,17 @@ struct FieldTarget {
     kVariable,  // a whole variable of its own: a component of the interface
                 // instance a virtual interface is bound to (§25.9)
     kProperty,  // a property of one class object (§8.5)
-    kStatic,    // a static property of one class type (§8.9)
+    kPropertyBits,  // a window of bits inside one property's value: the member
+                    // §7.2.1 selects of a packed structure the property holds
+    kStatic,        // a static property of one class type (§8.9)
   };
   Kind kind = Kind::kNone;
 
   // kBits: the variable holding the packed object, and the window of it the
-  // member occupies. kVariable: the whole variable the path named, which owns
-  // every bit of its own storage, so the window fields say nothing about it.
+  // member occupies. kPropertyBits: the same window, of the value the property
+  // named below holds rather than of a variable, so `var` says nothing about
+  // it. kVariable: the whole variable the path named, which owns every bit of
+  // its own storage, so the window fields say nothing about it.
   Variable* var = nullptr;
   uint32_t bit_offset = 0;
   uint32_t width = 0;
@@ -111,8 +134,8 @@ struct FieldTarget {
   // kStatic: the entry in the class type's shared static-property map.
   Logic4Vec* slot = nullptr;
 
-  // kProperty and kStatic: the property's name, or the part of a dotted path
-  // that is stored under one key.
+  // kProperty, kPropertyBits and kStatic: the property's name, or the part of a
+  // dotted path that is stored under one key.
   std::string field;
 
   // Whether a value is to be deposited: kNone found no storage and kNoOp

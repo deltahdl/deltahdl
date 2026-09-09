@@ -611,6 +611,17 @@ struct RtlirDesign {
   // reason and by the same walk, since a simulator asking IsSignedType of a
   // name has no typedef map to resolve it through.
   std::unordered_map<std::string_view, bool> type_signed;
+  // §7.2.1: the resolved declaration of every packed struct or union a typedef
+  // names. The three maps above say what a name stands for -- how wide, what
+  // kind, signed or not -- and none of them says what is inside it, which is
+  // what a member select of a value held under that type has to ask: `p.b`
+  // names a run of bits of `p` and the offset of that run is a fact about
+  // `pair_t`. A simulator has no typedef table to resolve the name through, and
+  // the layout it does register is keyed by the name of a variable, so a value
+  // held anywhere else -- a class property (§8.3) -- had nothing to ask at all.
+  // Each entry is an arena-owned copy with its nested aggregate members
+  // resolved, so it outlives the elaborator that built it.
+  std::unordered_map<std::string_view, const DataType*> type_layouts;
 
   std::vector<ModuleItem*> cu_function_decls;
 

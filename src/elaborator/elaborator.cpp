@@ -210,6 +210,17 @@ struct TypeNameFacts {
   std::unordered_map<std::string_view, uint32_t>& widths;
   std::unordered_map<std::string_view, DataTypeKind>& kinds;
   std::unordered_map<std::string_view, bool>& is_signed;
+  std::unordered_map<std::string_view, const DataType*>& layouts;
+};
+
+// What the typedef table has to say about the names in it: the table itself,
+// the names within it that stand for an aggregate, and the arena the resolved
+// copies recorded from it are built in. Bundled because a fourth fact is now
+// read off the same table and the three sources are one subject.
+struct TypeNameSources {
+  const TypedefMap& typedefs;
+  const std::unordered_set<std::string_view>& aggregates;
+  Arena& arena;
 };
 
 // §6.18's "type the name stands for", following a chain of typedefs to the kind
@@ -253,14 +264,26 @@ static uint32_t TypeNameWidth(const DataType& dtype, const TypedefMap& typedefs,
 // that is what every reader already treats as "no width the type declares" and
 // falls back from. The whole aggregate's bit count is a different claim and not
 // one an unpacked array has at all (§7.4).
-void PopulateTypeWidths(const TypedefMap& typedefs,
-                        const std::unordered_set<std::string_view>& aggregates,
-                        TypeNameFacts& out) {
-  for (const auto& [name, dtype] : typedefs) {
+//
+// §7.2.1's layout is the fourth fact, and it is recorded for the names that
+// have one: a typedef standing for a packed struct or union. The copy is taken
+// into the arena, with its nested aggregate members resolved the way a
+// variable's declaration resolves them, because the typedef table it is read
+// from belongs to the elaborator and is gone by the time a run reads a member
+// out of a value held under the name.
+void PopulateTypeWidths(const TypeNameSources& src, TypeNameFacts& out) {
+  for (const auto& [name, dtype] : src.typedefs) {
     out.widths[name] =
-        TypeNameWidth(dtype, typedefs, aggregates.count(name) > 0);
-    out.kinds[name] = ResolvedTypeKind(dtype, typedefs);
-    out.is_signed[name] = IsSignedType(dtype, typedefs);
+        TypeNameWidth(dtype, src.typedefs, src.aggregates.count(name) > 0);
+    out.kinds[name] = ResolvedTypeKind(dtype, src.typedefs);
+    out.is_signed[name] = IsSignedType(dtype, src.typedefs);
+    if (dtype.kind != DataTypeKind::kStruct &&
+        dtype.kind != DataTypeKind::kUnion) {
+      continue;
+    }
+    auto* copy = src.arena.Create<DataType>(dtype);
+    ResolveNestedAggregateTypes(*copy, src.typedefs, src.arena);
+    out.layouts[name] = copy;
   }
 }
 
@@ -398,12 +421,11 @@ void CopyDesignMetadata(RtlirDesign* design, const CompilationUnit* unit,
 // typedef's bit width and transferring the CU declarations plus the captured
 // severity metadata (§20.10.1) onto the finished design.
 void FinalizeDesignTail(RtlirDesign* design, const CompilationUnit* unit,
-                        const TypedefMap& typedefs,
-                        const std::unordered_set<std::string_view>& aggregates,
+                        const TypeNameSources& src,
                         const DesignMetadata& meta) {
   TypeNameFacts facts{design->type_widths, design->type_kinds,
-                      design->type_signed};
-  PopulateTypeWidths(typedefs, aggregates, facts);
+                      design->type_signed, design->type_layouts};
+  PopulateTypeWidths(src, facts);
   CopyDesignMetadata(design, unit, meta);
 }
 
@@ -649,7 +671,8 @@ RtlirDesign* Elaborator::ElaborateTops(
   }
 
   FinalizeDesignTail(
-      design, unit_, typedefs_, aggregate_typedef_names_,
+      design, unit_,
+      TypeNameSources{typedefs_, aggregate_typedef_names_, arena_},
       DesignMetadata{elab_simulation_blocked_, elab_last_severity_,
                      elab_last_severity_msg_, elab_last_severity_scope_,
                      elab_last_severity_loc_});

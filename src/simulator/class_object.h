@@ -82,6 +82,13 @@ struct ClassTypeInfo {
     // into an unsigned property reads back negative -- 240 into `bit [7:0]`
     // reading -16.
     bool is_signed = false;
+    // §6.18/§7.2.1: the name of the type the declaration wrote, empty where it
+    // wrote a type with no name of its own. It is what a member select of the
+    // value the property holds resolves against: a property declared `pair_t p`
+    // holds the whole structure in one value (§6.8), and the offset of `p.b`
+    // within it is a fact about `pair_t` rather than about the property, which
+    // SimContext::FindStructType answers by that name.
+    std::string_view type_name;
   };
   std::vector<PropertyInfo> properties;
 

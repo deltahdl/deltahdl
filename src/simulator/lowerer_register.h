@@ -7,6 +7,7 @@ namespace delta {
 
 class Arena;
 struct DataType;
+struct RtlirDesign;
 struct RtlirModule;
 struct RtlirPort;
 class SimContext;
@@ -52,6 +53,15 @@ void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
 // under its instance prefix, and the name is the only thing that differs.
 void CreatePortVariable(std::string_view name, const RtlirPort& port,
                         SimContext& ctx, Arena& arena);
+
+// §7.2.1: register the layout of every packed struct or union a typedef of the
+// design names, keyed by that name, so a member select of a value held under
+// the name can be resolved without a typedef table. The layouts a variable's
+// declaration registers are keyed by the variable's own name and answer only
+// for it; a value held in a class property (§8.3) is named by no variable and
+// has this to ask instead.
+void RegisterDesignTypeLayouts(const RtlirDesign* design, SimContext& ctx,
+                               Arena& arena);
 
 void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx, Arena& arena);
 void RegisterModulePorts(const RtlirModule* mod, SimContext& ctx, Arena& arena);

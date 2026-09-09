@@ -186,6 +186,34 @@ static const ClassTypeInfo::PropertyInfo* FindPropertyInfo(
   return nullptr;
 }
 
+// §7.2.1: the window of a class property's value that a member path names, and
+// whether the path names one. `c.p.b` selects a member of the structure the
+// property `p` holds -- §6.8 has the property store that structure as one value
+// -- so the path resolves to a run of bits of `p` rather than to a property of
+// its own. The layout is a fact about the declared type, which
+// SimContext::FindStructType answers by the name the declaration wrote; a
+// property whose type has no name of its own, or names something that is not an
+// aggregate, has no window and the caller keeps the arm it had.
+PropertyFieldWindow ResolveClassPropertyField(const ClassTypeInfo* type,
+                                              std::string_view path,
+                                              SimContext& ctx) {
+  PropertyFieldWindow window;
+  auto dot = path.find('.');
+  if (type == nullptr || dot == std::string_view::npos) return window;
+  auto first = path.substr(0, dot);
+  const auto* prop = FindPropertyInfo(type, first);
+  if (prop == nullptr || prop->type_name.empty()) return window;
+  const StructTypeInfo* info = ctx.FindStructType(prop->type_name);
+  if (info == nullptr) return window;
+  if (!ResolveStructFieldPath(info, path.substr(dot + 1), &window.bit_offset,
+                              &window.width)) {
+    return window;
+  }
+  window.property = first;
+  window.valid = true;
+  return window;
+}
+
 Logic4Vec CoerceToPropertyType(const ClassTypeInfo* type, std::string_view name,
                                Logic4Vec val, Arena& arena) {
   // §6.8 makes a variable "an abstraction of a data storage element" that
@@ -276,6 +304,22 @@ static FieldTarget ResolveClassFieldTarget(ClassObject* obj,
     if (auto* next_obj = ctx.GetClassObject(handle_val.ToUint64())) {
       return ResolveClassFieldTarget(next_obj, nullptr,
                                      field_path.substr(dot + 1), ctx);
+    }
+    // §7.2.1: `first` holds a structure rather than a handle, so the rest of
+    // the path selects a member of it. The flattened key below would store the
+    // value under a name the class never declared and leave the property the
+    // path actually names untouched.
+    PropertyFieldWindow window = ResolveClassPropertyField(
+        declared_type ? declared_type : obj->type, field_path, ctx);
+    if (window.valid) {
+      FieldTarget bits;
+      bits.kind = FieldTarget::Kind::kPropertyBits;
+      bits.obj = obj;
+      bits.type = declared_type;
+      bits.field = std::string(window.property);
+      bits.bit_offset = window.bit_offset;
+      bits.width = window.width;
+      return bits;
     }
   }
   FieldTarget target;
@@ -504,6 +548,23 @@ void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
       if (target.notify) target.notify->NotifyWatchers();
       if (target.obj) ctx.NotifyClassHandleWatchers(target.obj->handle);
       return;
+    case FieldTarget::Kind::kPropertyBits: {
+      // §7.2.1 selects a member of the structure the property holds, so the
+      // deposit lands in the property's own bits and the property is stored
+      // back whole. A property is only its Logic4Vec, and the value read out of
+      // it is the one the object holds, so the copy is taken before the deposit
+      // writes into it.
+      Logic4Vec held =
+          target.type
+              ? target.obj->GetPropertyForType(target.field, target.type, arena)
+              : target.obj->GetProperty(target.field, arena);
+      Logic4Vec updated = OwnRhsWords(held, arena);
+      DepositBitField(updated, target.bit_offset, rhs_val, target.width);
+      SetClassField(target.obj, target.type, target.field, updated, arena);
+      if (target.notify) target.notify->NotifyWatchers();
+      if (target.obj) ctx.NotifyClassHandleWatchers(target.obj->handle);
+      return;
+    }
     case FieldTarget::Kind::kStatic:
       *target.slot =
           CoerceToPropertyType(target.type, target.field, rhs_val, arena);
@@ -576,6 +637,8 @@ static uint32_t FieldTargetWidth(const FieldTarget& target) {
       const auto* prop = FindPropertyInfo(start, target.field);
       return (prop != nullptr && prop->width_is_declared) ? prop->width : 0;
     }
+    case FieldTarget::Kind::kPropertyBits:
+      return target.width;
     case FieldTarget::Kind::kStatic:
       return target.slot != nullptr ? target.slot->width : 0;
     case FieldTarget::Kind::kNone:

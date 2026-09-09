@@ -274,4 +274,90 @@ TEST(PackedStructSimulation, NonblockingWriteToBitMemberReachesThatMember) {
   LowerRunAndCheck(f, design, {{"r", 0xA5u}, {"s", 0xA500u}});
 }
 
+// §7.2.1 writes a member select as `struct_variable.member` and makes no part
+// of the selection depend on what the structure is stored in. A class property
+// declared with a packed struct type holds the whole structure in one value
+// (§6.8/§8.3), so `c.p.b` selects a run of that value's bits exactly as `s.b`
+// selects a run of a module variable's.
+//
+// The member write went to a property keyed by the whole dotted path -- a name
+// the class never declared -- so `c.p` kept the 16'hAABB it was assigned and
+// only a read written the same way could see the 8'h05. Reading the property
+// itself is what tells them apart.
+TEST(PackedStructSimulation, MemberWriteThroughAClassPropertyLandsInTheValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] b; logic [7:0] l; } pair_t;\n"
+      "  class C;\n"
+      "    pair_t p;\n"
+      "  endclass\n"
+      "  logic [15:0] r1;\n"
+      "  logic [7:0] r2;\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    c = new;\n"
+      "    c.p = 16'hAABB;\n"
+      "    c.p.b = 8'h05;\n"
+      "    r1 = c.p;\n"
+      "    r2 = c.p.b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors) << "source reported an elaboration error";
+  LowerRunAndCheck(f, design, {{"r1", 0x05BBu}, {"r2", 0x05u}});
+}
+
+// The other half: a member read after a whole-property write. The value is in
+// the property, so both members are read out of it -- the high member is 8'hAA
+// and the low one 8'hBB. The read answered from the flattened key instead,
+// which no write had created, and ClassObject::GetProperty answers a known zero
+// for a key it does not hold.
+TEST(PackedStructSimulation, MemberReadThroughAClassPropertyTakesItsBits) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] b; logic [7:0] l; } pair_t;\n"
+      "  class C;\n"
+      "    pair_t p;\n"
+      "  endclass\n"
+      "  logic [7:0] rb, rl;\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    c = new;\n"
+      "    c.p = 16'hAABB;\n"
+      "    rb = c.p.b;\n"
+      "    rl = c.p.l;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors) << "source reported an elaboration error";
+  LowerRunAndCheck(f, design, {{"rb", 0xAAu}, {"rl", 0xBBu}});
+}
+
+// A member write reaches its own member and no other, which is what says the
+// window is the one the layout gives rather than the whole property: the low
+// member takes 8'h07 and the high member keeps the 8'hAA it was assigned.
+TEST(PackedStructSimulation, MemberWriteThroughAPropertyLeavesTheOtherMember) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] b; logic [7:0] l; } pair_t;\n"
+      "  class C;\n"
+      "    pair_t p;\n"
+      "  endclass\n"
+      "  logic [15:0] r1;\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    c = new;\n"
+      "    c.p = 16'hAABB;\n"
+      "    c.p.l = 8'h07;\n"
+      "    r1 = c.p;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors) << "source reported an elaboration error";
+  LowerRunAndCheck(f, design, {{"r1", 0xAA07u}});
+}
+
 }  // namespace

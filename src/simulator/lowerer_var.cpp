@@ -53,6 +53,33 @@ static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
   return info;
 }
 
+// §7.2.1: the bit count of an aggregate declaration, which is the frame its
+// members' offsets are measured in. A packed struct is as wide as its members
+// together and a packed union as wide as its widest, which is the same sum
+// BuildStructTypeInfo walks below.
+static uint32_t AggregateTypeWidth(const DataType* dtype) {
+  uint32_t total = 0;
+  for (const auto& m : dtype->struct_members) {
+    uint32_t w = EvalStructMemberWidth(m);
+    if (dtype->kind == DataTypeKind::kUnion) {
+      total = std::max(total, w);
+    } else {
+      total += w;
+    }
+  }
+  return total;
+}
+
+void RegisterDesignTypeLayouts(const RtlirDesign* design, SimContext& ctx,
+                               Arena& arena) {
+  for (const auto& [name, dtype] : design->type_layouts) {
+    if (dtype == nullptr || dtype->struct_members.empty()) continue;
+    auto* info =
+        BuildStructTypeInfo(dtype, AggregateTypeWidth(dtype), name, arena);
+    ctx.RegisterStructType(name, *info);
+  }
+}
+
 static void RegisterStructInfo(std::string_view name, const RtlirVariable& var,
                                SimContext& ctx, Arena& arena) {
   if (!var.dtype || var.dtype->struct_members.empty()) return;

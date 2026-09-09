@@ -96,12 +96,12 @@ static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls) {
       uint32_t w = EvalTypeWidth(member->data_type, {});
       bool sized = w != 0;
       if (w == 0) w = 32;
-      info->properties.push_back({member->name, w, member->is_static,
-                                  member->is_local, member->is_protected,
-                                  member->is_const, member->init_expr,
-                                  Is4stateType(member->data_type, {}), sized,
-                                  IsRealKind(member->data_type.kind),
-                                  IsSignedType(member->data_type, {})});
+      info->properties.push_back(
+          {member->name, w, member->is_static, member->is_local,
+           member->is_protected, member->is_const, member->init_expr,
+           Is4stateType(member->data_type, {}), sized,
+           IsRealKind(member->data_type.kind),
+           IsSignedType(member->data_type, {}), member->data_type.type_name});
     } else if (member->kind == ClassMemberKind::kMethod && member->method) {
       std::string name(member->method->name);
       info->methods[name] = member->method;

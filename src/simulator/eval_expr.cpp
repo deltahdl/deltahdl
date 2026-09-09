@@ -237,6 +237,16 @@ static Logic4Vec ResolveClassFieldChain(ClassObject* obj,
   Logic4Vec handle_val = ReadClassField(obj, declared_type, first, arena);
   auto* next_obj = ctx.GetClassObject(handle_val.ToUint64());
   if (!next_obj) {
+    // §7.2.1: `first` holds a structure rather than a handle, so the rest of
+    // the path selects a member of the value just read. The flattened key below
+    // names a property the class never declared, which answers what an earlier
+    // write to the same path left there and a known zero where there was none.
+    PropertyFieldWindow window = ResolveClassPropertyField(
+        declared_type ? declared_type : obj->type, field_path, ctx);
+    if (window.valid) {
+      return ExtractBitField(arena, handle_val, window.bit_offset,
+                             window.width);
+    }
     return ReadClassField(obj, declared_type, field_path, arena);
   }
   return ResolveClassFieldChain(next_obj, nullptr, rest, ctx, arena);

@@ -770,6 +770,9 @@ void Lowerer::Lower(const RtlirDesign* design) {
     RegisterScopeTimescales(top, ctx_);
   }
   RegisterDesignTypeWidths(design, ctx_);
+  // §7.2.1: what is inside each of those names, for the member selects that
+  // reach a value no variable holds.
+  RegisterDesignTypeLayouts(design, ctx_, arena_);
   InitPackageDataVariables(design, ctx_, arena_);
 
   // §16.5.1 reads a concurrent assertion's variables as of the Preponed region
