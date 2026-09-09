@@ -178,10 +178,13 @@ static void FoldDriverIntoMax(uint8_t val, uint8_t str, NetType net_type,
   }
 }
 
-static void ComputeSingleBitStrength(
+// The strongest driver of one bit, folded as §28.12.1 has the stronger signal
+// dominate the weaker: the level, the value at that level, whether two values
+// tie there, and the strength the winning driver carries.
+static MaxTracker FoldDriversForBit(
     const std::vector<Logic4Vec>& drivers,
-    const std::vector<DriverStrength>& strengths, NetStrength& out,
-    NetType net_type, uint32_t bit) {
+    const std::vector<DriverStrength>& strengths, NetType net_type,
+    uint32_t bit) {
   MaxTracker m;
   for (size_t d = 0; d < drivers.size(); ++d) {
     uint8_t val = GetBitVal(drivers[d], bit).val;
@@ -202,6 +205,70 @@ static void ComputeSingleBitStrength(
     FoldDriverIntoMax(val, str, net_type, m);
     if (m.str != before) m.ds = strengths[d];
   }
+  return m;
+}
+
+// §28.12.3: one combination per signal of known value and unambiguous strength
+// weaker than the ambiguous one `out` holds, which is the clause's own shape --
+// a range, and the drivers beneath it.
+static void CombineWeakerUnambigInto(
+    NetStrength& out, const std::vector<Logic4Vec>& drivers,
+    const std::vector<DriverStrength>& strengths, uint8_t max_str,
+    uint32_t bit) {
+  for (const UnambigSignal& u :
+       FindWeakerUnambig(drivers, strengths, max_str, bit)) {
+    out = CombineAmbigWithUnambig(out, u.vu, u.su);
+  }
+}
+
+// §28.12.2 classifies "signals with a value x" as having "strength levels
+// consisting of subdivisions of both the strength1 and the strength0 parts of
+// the scale of strengths", so a driver whose value is x puts its own level on
+// both sides: it is the value that is unknown, not the strength. Both bounds
+// sit at that level, which is the case §21.2.1.4 renders with a mnemonic --
+// "for the unknown value, a mnemonic is used when both the 0 and 1 strength
+// components are at the same strength level".
+//
+// This is not the equal-and-opposite conflict its caller handles. There
+// §28.12.2 adds "all the smaller strength levels" to the result, which is why
+// that branch leaves the lower bounds at high impedance and this one does not.
+// A wired net reaches here through WiredAnd/WiredOr rather than by a driver
+// spelling x, and the answer is the same either way, so the net type does not
+// enter into it -- while it did, a strongly driven x on an ordinary wire filled
+// neither side and was reported as nothing driving the net.
+//
+// §28.6 Table 28-5 is the exception, and it is spelt in the driver's own
+// strength. A three-state gate with a control of x or z drives L or H -- "a
+// result that has a value 0 or z" and "a value 1 or z" -- which §28.12.2's
+// Figure 28-7 and Figure 28-8 draw as a range on one side of the scale running
+// from the driving level down to high impedance, and nothing at all on the
+// other. Such a driver spells x with the side it does not drive at the
+// high-impedance level, so that side contributes no range and the side it
+// drives contributes one reaching high impedance.
+static void UnknownValueStrength(const MaxTracker& m, NetStrength& out) {
+  auto s = static_cast<Strength>(m.str);
+  auto ds0 = static_cast<uint8_t>(m.ds.s0);
+  auto ds1 = static_cast<uint8_t>(m.ds.s1);
+  if (ds0 != 0 && ds1 != 0) {
+    out.s0_hi = out.s0_lo = s;
+    out.s1_hi = out.s1_lo = s;
+    return;
+  }
+  if (ds0 != 0) {
+    out.s0_hi = static_cast<Strength>(ds0);
+    out.s0_lo = Strength::kHighz;
+  }
+  if (ds1 != 0) {
+    out.s1_hi = static_cast<Strength>(ds1);
+    out.s1_lo = Strength::kHighz;
+  }
+}
+
+static void ComputeSingleBitStrength(
+    const std::vector<Logic4Vec>& drivers,
+    const std::vector<DriverStrength>& strengths, NetStrength& out,
+    NetType net_type, uint32_t bit) {
+  MaxTracker m = FoldDriversForBit(drivers, strengths, net_type, bit);
   out = NetStrength{};
   if (m.val == 3) return;
   auto s = static_cast<Strength>(m.str);
@@ -210,75 +277,34 @@ static void ComputeSingleBitStrength(
     out.s1_hi = s;
     // §28.12.3 makes one combination per signal of known value and unambiguous
     // strength, so every weaker driver is combined in turn. None of them moves
-    // a bound, and the reason is worth stating rather than discovering: the
-    // range above runs from the conflict level down to high impedance on both
-    // sides -- §28.12.2 gives such a conflict "the strength levels of both
+    // a bound here, and the reason is worth stating rather than discovering:
+    // the range above runs from the conflict level down to high impedance on
+    // both sides -- §28.12.2 gives such a conflict "the strength levels of both
     // signals and all the smaller strength levels" -- and §28.12.3's rule c
     // returns every level rule b takes out of it, the gap between the surviving
-    // sides crossing high impedance (Figure 28-23). The loop stands because the
-    // clause has the combination made, and because an ambiguous signal
-    // occupying one side alone -- what §28.12.2's Figure 28-6 gives a
-    // three-state gate with an unknown control -- is one this resolver does not
-    // build yet (#3468) and one the combination does decide.
-    std::vector<UnambigSignal> weaker =
-        FindWeakerUnambig(drivers, strengths, m.str, bit);
-    for (const UnambigSignal& u : weaker) {
-      out = CombineAmbigWithUnambig(out, u.vu, u.su);
-    }
+    // sides crossing high impedance (Figure 28-23). The combination is made
+    // because the clause has it made, and it decides the one-sided range a
+    // three-state gate with an unknown control drives (§28.6), which the arm
+    // below builds.
+    CombineWeakerUnambigInto(out, drivers, strengths, m.str, bit);
     return;
   }
   if (m.val == 0) {
     out.s0_hi = out.s0_lo = s;
-  } else if (m.val == 1) {
+    return;
+  }
+  if (m.val == 1) {
     out.s1_hi = out.s1_lo = s;
-  } else if (m.val == 2) {
-    // §28.12.2 classifies "signals with a value x" as having "strength levels
-    // consisting of subdivisions of both the strength1 and the strength0 parts
-    // of the scale of strengths", so a driver whose value is x puts its own
-    // level on both sides: it is the value that is unknown, not the strength.
-    // Both bounds sit at that level, which is the case §21.2.1.4 renders with a
-    // mnemonic -- "for the unknown value, a mnemonic is used when both the 0
-    // and 1 strength components are at the same strength level".
-    //
-    // This is not the equal-and-opposite conflict above. There §28.12.2 adds
-    // "all the smaller strength levels" to the result, which is why that branch
-    // leaves the lower bounds at high impedance and this one does not. A wired
-    // net reaches here through WiredAnd/WiredOr rather than by a driver
-    // spelling x, and the answer is the same either way, so the net type does
-    // not enter into it -- while it did, a strongly driven x on an ordinary
-    // wire filled neither side and was reported as nothing driving the net.
-    //
-    // §28.6 Table 28-5 is the exception, and it is spelt in the driver's own
-    // strength. A three-state gate with a control of x or z drives L or H --
-    // "a result that has a value 0 or z" and "a value 1 or z" -- which
-    // §28.12.2's Figure 28-7 and Figure 28-8 draw as a range on one side of the
-    // scale running from the driving level down to high impedance, and nothing
-    // at all on the other. Such a driver spells x with the side it does not
-    // drive at the high-impedance level, so that side contributes no range and
-    // the side it drives contributes one reaching high impedance.
-    auto ds0 = static_cast<uint8_t>(m.ds.s0);
-    auto ds1 = static_cast<uint8_t>(m.ds.s1);
-    if (ds0 == 0 || ds1 == 0) {
-      if (ds0 != 0) {
-        out.s0_hi = static_cast<Strength>(ds0);
-        out.s0_lo = Strength::kHighz;
-      }
-      if (ds1 != 0) {
-        out.s1_hi = static_cast<Strength>(ds1);
-        out.s1_lo = Strength::kHighz;
-      }
-      // §28.12.3 combines an ambiguous signal with each weaker signal of known
-      // value and unambiguous strength, which is what Figure 28-23 draws for
-      // exactly this shape: a one-sided range and a weaker driver of the other
-      // value.
-      for (const UnambigSignal& u :
-           FindWeakerUnambig(drivers, strengths, m.str, bit)) {
-        out = CombineAmbigWithUnambig(out, u.vu, u.su);
-      }
-      return;
-    }
-    out.s0_hi = out.s0_lo = s;
-    out.s1_hi = out.s1_lo = s;
+    return;
+  }
+  UnknownValueStrength(m, out);
+  if (out.IsAmbiguous()) {
+    // §28.12.3 combines an ambiguous signal with each weaker signal of known
+    // value and unambiguous strength, which is what Figure 28-23 draws for
+    // exactly this shape: a one-sided range and a weaker driver of the other
+    // value. An x driving both sides at one level is not ambiguous and nothing
+    // weaker reaches it (§28.12.1).
+    CombineWeakerUnambigInto(out, drivers, strengths, m.str, bit);
   }
 }
 
