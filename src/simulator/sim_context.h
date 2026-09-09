@@ -42,9 +42,11 @@
 #include "simulator/sim_context_name_tables.h"
 #include "simulator/sim_context_random_stability.h"
 #include "simulator/sim_context_types.h"
-// SpecifyManager, held by value behind the owning unique_ptr below. The
-// constructor of this class is defined inline, which instantiates that
-// pointer's destructor, so a forward declaration is not enough.
+// SpecifyManager and DpiRuntime, each held by value behind an owning unique_ptr
+// below. The constructor of this class is defined inline, which instantiates
+// those pointers' destructors, so a forward declaration is not enough for
+// either.
+#include "simulator/dpi_runtime.h"
 #include "simulator/instance_prefix_override.h"
 #include "simulator/specify.h"
 #include "simulator/sva_engine_sampling.h"
@@ -55,7 +57,6 @@
 namespace delta {
 
 class DiagEngine;
-class DpiRuntime;
 class SpecifyManager;
 struct ModuleItem;
 struct Process;
