@@ -70,6 +70,35 @@ bool ResolveStructFieldPath(const StructTypeInfo* info, std::string_view path,
                             uint32_t* bit_offset, uint32_t* width,
                             DataTypeKind* out_kind = nullptr);
 
+// §10.6: one expression a procedural continuous assignment drives an element
+// from, and the part of that expression's value the element takes -- the whole
+// of it where the statement named the element alone, and §11.4.12's slice where
+// the target was a concatenation.
+struct ElementDriveSource {
+  const Expr* rhs = nullptr;
+  uint32_t src_lo = 0;
+  uint32_t width = 0;
+  uint32_t rhs_width = 0;
+};
+
+// §10.6.1 gives the assign statement "a singular variable reference" and
+// §10.6.2 gives force the same, and §6.4 makes "any data type except an
+// unpacked structure, unpacked union, or unpacked array" singular -- which an
+// element of one is, whatever the container's own type. An element of a queue
+// or of an associative array is therefore a target of both statements, and it
+// is a bare Logic4Vec with no Variable to carry Variable::is_forced or
+// Variable::assign_cont_rhs. What the two statements install is recorded here
+// instead, one record per element, and the container's own writers consult it
+// the way every other writer consults the flags on a Variable.
+struct ElementDrive {
+  ElementDriveSource forced;
+  ElementDriveSource assigned;
+
+  bool Drives() const {
+    return forced.rhs != nullptr || assigned.rhs != nullptr;
+  }
+};
+
 struct QueueObject {
   std::vector<Logic4Vec> elements;
   std::vector<uint64_t> element_ids;
@@ -80,6 +109,24 @@ struct QueueObject {
   bool is_4state = true;
   int32_t max_size = -1;
   uint32_t generation = 0;
+
+  // §10.6: what a force or an assign standing on an element drives it from,
+  // keyed by the identity §7.10.3 gives that element. The identity is what the
+  // record is keyed by rather than the position, because a queue's elements
+  // move: a push_front slides every one of them along, and the statement stands
+  // on the element it named rather than on the place it was in. An element
+  // removed from the queue takes its record with it, which is the only answer
+  // available -- the clause says nothing about a force on an element that has
+  // since been deleted, and there is nothing left for a release to name.
+  std::map<uint64_t, ElementDrive> element_drives;
+
+  // Whether a §10.6 statement is driving the element at `index`, which makes a
+  // procedural write to it a no-op.
+  bool ElementIsDriven(size_t index) const {
+    if (index >= element_ids.size()) return false;
+    auto it = element_drives.find(element_ids[index]);
+    return it != element_drives.end() && it->second.Drives();
+  }
 
   uint64_t AllocateId() { return ++next_elem_id_; }
 
@@ -150,6 +197,12 @@ struct AssocArrayObject {
   // question; it names no struct type, so a read still yields x or 0.
   bool has_elem_init = false;
   Logic4Vec elem_init;
+  // §10.6: what a force or an assign standing on an element drives it from,
+  // keyed the way the element itself is. An associative array's keys are its
+  // elements' identities, so a record outlives every insertion and deletion of
+  // another entry and goes only when its own entry is deleted.
+  std::map<int64_t, ElementDrive> int_drives;
+  std::map<std::string, ElementDrive> str_drives;
   uint32_t Size() const;
 };
 

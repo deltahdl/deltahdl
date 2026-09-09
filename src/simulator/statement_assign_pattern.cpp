@@ -459,7 +459,15 @@ bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
   auto* aa = ctx.FindAssocArray(lhs->base->text);
   if (!aa || !lhs->index) return false;
   if (aa->is_string_key) {
-    aa->str_data[AssocStringKey(EvalExpr(lhs->index, ctx, arena))] = rhs_val;
+    auto key = AssocStringKey(EvalExpr(lhs->index, ctx, arena));
+    // §10.6.1 has an assign "override all procedural assignments to a
+    // variable" and §10.6.2 says the same of a force, and §6.4 makes this
+    // element a variable of its own. A statement standing on it therefore
+    // ignores this write exactly as Variable::is_forced makes every other
+    // writer ignore one, and an ignored write changed nothing to announce.
+    auto driven = aa->str_drives.find(key);
+    if (driven != aa->str_drives.end() && driven->second.Drives()) return true;
+    aa->str_data[key] = rhs_val;
   } else {
     auto key_val = EvalExpr(lhs->index, ctx, arena);
     if (HasUnknownBits(key_val)) {
@@ -472,6 +480,8 @@ bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
     }
     auto key = AssocIntKey(key_val, aa->is_wildcard, aa->index_width,
                            aa->is_index_signed);
+    auto driven = aa->int_drives.find(key);
+    if (driven != aa->int_drives.end() && driven->second.Drives()) return true;
     aa->int_data[key] = rhs_val;
   }
   // §9.4.2: the element that changed is an aggregate element, which the clause
@@ -519,6 +529,11 @@ bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
     return true;
   }
   if (idx >= 0 && idx < sz) {
+    // §10.6.1's assign and §10.6.2's force both "override all procedural
+    // assignments" to what they stand on, and §6.4 makes this element a
+    // variable of its own, so a write to a driven element is ignored and there
+    // is nothing to announce.
+    if (q->ElementIsDriven(static_cast<size_t>(idx))) return true;
     q->elements[static_cast<size_t>(idx)] = rhs_val;
     NotifyOwningVar(ctx, lhs->base->text);
     return true;
@@ -549,6 +564,11 @@ static int64_t EvalQueueIndex(const Expr* expr, QueueObject* q, SimContext& ctx,
     if (raw & sign) raw |= ~uint64_t{0} << val.width;
   }
   return static_cast<int64_t>(raw);
+}
+
+int64_t QueueElementIndex(const Expr* index, QueueObject* q, SimContext& ctx,
+                          Arena& arena, bool* has_xz) {
+  return EvalQueueIndex(index, q, ctx, arena, has_xz);
 }
 
 static bool CollectFromQueueSlice(const Expr* expr, SimContext& ctx,

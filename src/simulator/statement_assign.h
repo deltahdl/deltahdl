@@ -14,6 +14,7 @@ struct Stmt;
 struct Variable;
 struct ClassObject;
 struct ClassTypeInfo;
+struct QueueObject;
 class SimContext;
 class Arena;
 
@@ -212,6 +213,15 @@ Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width, Arena& arena);
 Logic4Vec CoerceToPropertyType(const ClassTypeInfo* type, std::string_view name,
                                Logic4Vec val, Arena& arena);
 bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
+// §7.10.1: the element of `q` an index expression names, with `$` standing for
+// the last element as the clause writes it. Signed, because §7.10.1 gives an
+// out-of-range index its own answer -- "a read ... shall return the value of
+// the element type's default", a write "shall be ignored" -- and a negative
+// index is one of the ways to be out of range. `has_xz` reports an index
+// carrying an unknown bit, which §7.10.1 makes invalid whatever its value.
+int64_t QueueElementIndex(const Expr* index, QueueObject* q, SimContext& ctx,
+                          Arena& arena, bool* has_xz);
+
 bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
                           SimContext& ctx, Arena& arena);
 bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,

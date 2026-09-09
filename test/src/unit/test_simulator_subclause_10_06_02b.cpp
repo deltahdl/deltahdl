@@ -753,4 +753,105 @@ TEST(ForceReleaseSim, ReleaseThenAStreamingConcatTargetWriteResumes) {
   EXPECT_EQ(vb->value.ToUint64(), 0xCDu);
 }
 
+// §10.6.2 gives force "a reference to a singular variable" among its targets,
+// and §6.4 makes singular "any data type except an unpacked structure, unpacked
+// union, or unpacked array" -- which an element of one of those is, whatever
+// the container's own type. A queue element is therefore a target of the
+// statement, and the override the rest of this file reads on a variable is read
+// here on an element: the write of 3 while the force stands is ignored, and the
+// write of 7 after the release lands.
+//
+// The element lives in a QueueObject as a bare Logic4Vec, so the resolution
+// answered the one-element carrier registered under the queue's own name --
+// which no read of the queue consults -- and the force settled a variable
+// nothing reads, leaving q[0] at the 5 it was pushed with.
+TEST(ForceReleaseSim, ForceOfAQueueElementOverridesAWriteToIt) {
+  SimFixture f;
+  auto* r1 = RunAndFindVar(
+      "module t;\n"
+      "  int q[$];\n"
+      "  int r1, r2, r3;\n"
+      "  initial begin\n"
+      "    q.push_back(5);\n"
+      "    force q[0] = 9;\n"
+      "    r1 = q[0];\n"
+      "    q[0] = 3;\n"
+      "    r2 = q[0];\n"
+      "    release q[0];\n"
+      "    q[0] = 7;\n"
+      "    r3 = q[0];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r1");
+  ASSERT_NE(r1, nullptr);
+  EXPECT_EQ(r1->value.ToUint64(), 9u);
+  auto* r2 = f.ctx.FindVariable("r2");
+  auto* r3 = f.ctx.FindVariable("r3");
+  ASSERT_NE(r2, nullptr);
+  ASSERT_NE(r3, nullptr);
+  EXPECT_EQ(r2->value.ToUint64(), 9u);
+  EXPECT_EQ(r3->value.ToUint64(), 7u);
+}
+
+// The same rule on an associative array element, which is a separate store with
+// a separate writer: §7.8 keys its elements rather than positioning them, and
+// nothing the queue case exercises answers for it.
+TEST(ForceReleaseSim, ForceOfAnAssociativeElementOverridesAWriteToIt) {
+  SimFixture f;
+  auto* r1 = RunAndFindVar(
+      "module t;\n"
+      "  int aa[string];\n"
+      "  int r1, r2, r3;\n"
+      "  initial begin\n"
+      "    aa[\"k\"] = 7;\n"
+      "    force aa[\"k\"] = 9;\n"
+      "    r1 = aa[\"k\"];\n"
+      "    aa[\"k\"] = 3;\n"
+      "    r2 = aa[\"k\"];\n"
+      "    release aa[\"k\"];\n"
+      "    aa[\"k\"] = 4;\n"
+      "    r3 = aa[\"k\"];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r1");
+  ASSERT_NE(r1, nullptr);
+  EXPECT_EQ(r1->value.ToUint64(), 9u);
+  auto* r2 = f.ctx.FindVariable("r2");
+  auto* r3 = f.ctx.FindVariable("r3");
+  ASSERT_NE(r2, nullptr);
+  ASSERT_NE(r3, nullptr);
+  EXPECT_EQ(r2->value.ToUint64(), 9u);
+  EXPECT_EQ(r3->value.ToUint64(), 4u);
+}
+
+// §10.6.2's force is a continuous assignment rather than one write: "if b or c
+// changes, a will be forced to the new value of the expression b + f(c)". The
+// element follows its expression for the same reason a variable does, so
+// raising `a` from 1 to 10 moves q[0] from 3 to 12 with no further statement
+// naming it. A force that only wrote once passes the case above and fails this.
+TEST(ForceReleaseSim, ForceOfAQueueElementFollowsItsExpression) {
+  SimFixture f;
+  auto* r1 = RunAndFindVar(
+      "module t;\n"
+      "  int q[$];\n"
+      "  logic [7:0] a, b;\n"
+      "  int r1, r2;\n"
+      "  initial begin\n"
+      "    a = 8'd1;\n"
+      "    b = 8'd2;\n"
+      "    q.push_back(0);\n"
+      "    force q[0] = a + b;\n"
+      "    r1 = q[0];\n"
+      "    a = 8'd10;\n"
+      "    r2 = q[0];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r1");
+  ASSERT_NE(r1, nullptr);
+  EXPECT_EQ(r1->value.ToUint64(), 3u);
+  auto* r2 = f.ctx.FindVariable("r2");
+  ASSERT_NE(r2, nullptr);
+  EXPECT_EQ(r2->value.ToUint64(), 12u);
+}
+
 }  // namespace
