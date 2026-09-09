@@ -566,14 +566,30 @@ static ExecTask RunInertialContAssignDelay(
   co_return StmtResult::kDone;
 }
 
+// §30.4: the net this assignment drives, which is the signal a module path can
+// name as its destination. §30.4.1 makes that destination "a net or variable
+// that is connected to a module output port or inout port", and §10.3.2 lets
+// the driver of such a net name a select of it, so the destination is the same
+// net whichever way the left-hand side is written: the identifier of a bare
+// target, and the base of a select. That is the name MakeContAssignDriver above
+// already resolves the driver against.
+static std::string_view ContAssignTargetName(const Expr* lhs) {
+  if (lhs == nullptr) return {};
+  if (lhs->kind == ExprKind::kIdentifier) return lhs->text;
+  if (lhs->kind == ExprKind::kSelect && lhs->base != nullptr &&
+      lhs->base->kind == ExprKind::kIdentifier) {
+    return lhs->base->text;
+  }
+  return {};
+}
+
 // The manager to consult for a module path delay onto `target`, or null when no
 // registered module path names it as a destination. Null is the answer for
-// every target in a design that declared no specify block, and for a target
-// that is not a plain name, which no module path can be written against.
+// every target in a design that declared no specify block, and for a left-hand
+// side that names no net at all, which no module path can be written against.
 static const SpecifyManager* ModulePathManagerFor(SimContext& ctx,
-                                                  bool lhs_is_name,
                                                   std::string_view target) {
-  if (!lhs_is_name) return nullptr;
+  if (target.empty()) return nullptr;
   const SpecifyManager* mgr = ctx.GetSpecifyManager();
   if (mgr == nullptr) return nullptr;
   if (!IsModulePathOutput(*mgr, target)) return nullptr;
@@ -656,12 +672,14 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
   ContAssignDriver drv = MakeContAssignDriver(params.lhs, ctx);
 
   // The name a module path declared in this instance gives this assignment's
-  // target: the bare identifier under the instance prefix, which is what
-  // PathDelay::inst_prefix and PathDelay::dst_port together spell. Built once
-  // outside the loop because ModulePathDrive::output is a view of it.
-  std::string path_output =
-      lhs_is_name ? params.inst_prefix + std::string(params.lhs->text)
-                  : std::string();
+  // target: the net the driver resolves against, under the instance prefix,
+  // which is what PathDelay::inst_prefix and PathDelay::dst_port together
+  // spell. Built once outside the loop because ModulePathDrive::output is a
+  // view of it.
+  std::string_view target_name = ContAssignTargetName(params.lhs);
+  std::string path_output = target_name.empty()
+                                ? std::string()
+                                : params.inst_prefix + std::string(target_name);
 
   std::function<void(const Logic4Vec&)> commit = [&](const Logic4Vec& v) {
     CommitContAssignValue(params, drv, v, ctx, arena);
@@ -674,8 +692,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
   // registers the specify blocks after it has lowered the modules; this body
   // first runs when the scheduler resumes it, by which time they are in. A
   // driver this answers null for takes exactly the route it took before.
-  const SpecifyManager* path_mgr =
-      ModulePathManagerFor(ctx, lhs_is_name, path_output);
+  const SpecifyManager* path_mgr = ModulePathManagerFor(ctx, path_output);
 
   // A continuous assignment must drive its left-hand side at least once when it
   // is activated, even if a simulation stop was already requested for the
