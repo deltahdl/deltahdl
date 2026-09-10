@@ -96,6 +96,16 @@ void CallBuildPeriodRoutinesInModule(const RtlirModule* mod,
   for (const auto& assign : mod->assigns) {
     CallBuildPeriodRoutinesInExpr(assign.rhs, period);
   }
+  // §36.9: a name is reached "when the associated system task and system
+  // function $ name is encountered in the SystemVerilog source description",
+  // and §6.8's declaration initializer is one of the places the source writes
+  // one. `int r = $probe();` is an instance of the call as much as an
+  // assignment in a process is, and the walk over processes reaches no
+  // declaration, so the name was encountered there and the compiletf ran for it
+  // no times at all.
+  for (const auto& var : mod->variables) {
+    CallBuildPeriodRoutinesInExpr(var.init_expr, period);
+  }
   // §13.4: a call written in a subroutine's body stands in the source
   // description whether or not any process reaches the subroutine, and the walk
   // over a process's statements does not descend into a declaration.
