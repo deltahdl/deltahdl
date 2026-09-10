@@ -1,12 +1,23 @@
 #include "lexer/lexer.h"
 
 #include <cctype>
+#include <format>
+#include <string>
 
+#include "common/lexical_limits.h"
 #include "lexer/keywords.h"
 
 namespace delta {
 
 namespace {
+
+// §5.6 has an over-long identifier reported, and the report names the limit it
+// exceeded. Built from kMaxIdentifierLength so the number in the message is the
+// number that was applied.
+std::string IdentifierTooLongMessage() {
+  return std::format("identifier exceeds maximum length of {} characters",
+                     kMaxIdentifierLength);
+}
 
 // Split a pragma comment body into whitespace-delimited words.
 std::vector<std::string_view> SplitPragmaWords(std::string_view body) {
@@ -544,9 +555,8 @@ Token Lexer::LexIdentifier() {
   tok.kind = kw.value_or(TokenKind::kIdentifier);
   tok.loc = loc;
   tok.text = text;
-  if (text.size() > 1024) {
-    diag_.Error(loc, "identifier exceeds maximum length of 1024 characters",
-                Subclause("5.6"));
+  if (text.size() > kMaxIdentifierLength) {
+    diag_.Error(loc, IdentifierTooLongMessage(), Subclause("5.6"));
   }
   return tok;
 }
@@ -662,9 +672,8 @@ Token Lexer::LexEscapedIdentifier() {
   tok.kind = TokenKind::kEscapedIdentifier;
   tok.loc = loc;
   tok.text = source_.substr(start, pos_ - start);
-  if (tok.text.size() > 1024) {
-    diag_.Error(loc, "identifier exceeds maximum length of 1024 characters",
-                Subclause("5.6"));
+  if (tok.text.size() > kMaxIdentifierLength) {
+    diag_.Error(loc, IdentifierTooLongMessage(), Subclause("5.6"));
   }
   return tok;
 }

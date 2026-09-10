@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/lexical_limits.h"
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
@@ -51,6 +52,28 @@ VpiHandle VpiContext::RegisterSystf(VpiSystfData* data) {
     last_error_.message =
         "system task or function name must be '$' followed by one or more "
         "identifier characters";
+    return nullptr;
+  }
+
+  // §38.37.1: of the tfname a registration carries, "the maximum name length
+  // shall be the same as for SystemVerilog identifiers", which §5.6 caps at the
+  // implementation's own limit and requires an error to be reported for. That
+  // limit is kMaxIdentifierLength, the one the lexer measures an identifier
+  // against, so the two are the same by construction rather than by agreement
+  // between two literals.
+  //
+  // §36.3's "the name can be any size" governs the name a SystemVerilog source
+  // file writes and not this one: that is the token LexSystemIdentifier reads,
+  // and this is the string a PLI application hands the registration.
+  if (std::string_view(data->tfname).size() > kMaxIdentifierLength) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    // The message names the rule rather than the number, both because
+    // VpiErrorInfo::message is a const char* with nowhere to keep a built
+    // string and because the rule is that the two maxima agree, not that either
+    // is 1024.
+    last_error_.message =
+        "system task or function name exceeds the maximum identifier length";
     return nullptr;
   }
 

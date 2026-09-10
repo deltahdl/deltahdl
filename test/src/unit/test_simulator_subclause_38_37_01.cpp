@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <string_view>
+
+#include "common/lexical_limits.h"
 #include "simulator/vpi.h"
 
 namespace delta {
@@ -99,6 +103,45 @@ TEST_F(VpiSystfCallbacksRegistration, AcceptsWellFormedName) {
   EXPECT_NE(vpi_register_systf(&data), nullptr);
   ASSERT_EQ(vpi_ctx_.RegisteredSystfs().size(), 1u);
   EXPECT_STREQ(vpi_ctx_.RegisteredSystfs()[0].tfname, "$good_name");
+}
+
+// §38.37.1: "The maximum name length shall be the same as for SystemVerilog
+// identifiers." §5.6 sets that for an identifier -- an implementation may cap
+// it, "but the limit shall be at least 1024 characters" -- and this tool's cap
+// is kMaxIdentifierLength, the one src/lexer/lexer.cpp measures an identifier
+// against. A name of exactly that length is the longest the rule admits, so the
+// registration stands.
+TEST_F(VpiSystfCallbacksRegistration, AcceptsANameAtTheIdentifierMaximum) {
+  std::string name = "$" + std::string(kMaxIdentifierLength - 1, 'a');
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = name.data();
+
+  EXPECT_NE(vpi_register_systf(&data), nullptr);
+  ASSERT_EQ(vpi_ctx_.RegisteredSystfs().size(), 1u);
+  EXPECT_EQ(std::string_view(vpi_ctx_.RegisteredSystfs()[0].tfname).size(),
+            kMaxIdentifierLength);
+}
+
+// §38.37.1 with one character more: the name is past the maximum, so the
+// registration is refused -- no callback object, nothing stored -- and §5.6's
+// "an error shall be reported" is what vpi_chk_error reads back. Every
+// character of this name is one §38.37.1 calls legal, so length is the only
+// thing that can have refused it.
+TEST_F(VpiSystfCallbacksRegistration, RejectsANameBeyondTheIdentifierMaximum) {
+  std::string name = "$" + std::string(kMaxIdentifierLength, 'a');
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = name.data();
+
+  EXPECT_EQ(vpi_register_systf(&data), nullptr);
+  EXPECT_TRUE(vpi_ctx_.RegisteredSystfs().empty());
+
+  SVpiErrorInfo info = {};
+  EXPECT_NE(vpi_chk_error(&info), 0);
+  EXPECT_STREQ(info.message,
+               "system task or function name exceeds the maximum identifier "
+               "length");
 }
 
 // -----------------------------------------------------------------------------
