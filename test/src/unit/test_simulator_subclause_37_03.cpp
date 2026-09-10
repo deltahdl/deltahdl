@@ -38,7 +38,7 @@ int g_bus_size = 0;
 int g_bus_vector = -1;
 int g_scalar_vector = -1;
 
-int Figure37_1Calltf(const char*) {
+int Figure371Calltf(const char*) {
   vpiHandle mod = vpi_handle_by_name("m1", nullptr);
   if (mod == nullptr) return 0;
 
@@ -80,14 +80,14 @@ void RegisterFigureProbe() {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
   data.tfname = "$probe";
-  data.calltf = &Figure37_1Calltf;
+  data.calltf = &Figure371Calltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }
 
 // Figure 37-1's design: a module holding nets, instantiated so the application
 // has a module object to start from. One net is a vector and one is not, which
 // is what makes the Boolean property say something.
-void RunFigure37_1(SimFixture& f) {
+void RunFigure371(SimFixture& f) {
   auto* design = ElaborateSrc(
       "module m;\n"
       "  wire w;\n"
@@ -114,7 +114,7 @@ TEST_F(VpiObjectClassifications, BothRelationsOfTheFigureAreTraversable) {
   RegisterFigureProbe();
 
   SimFixture f;
-  RunFigure37_1(f);
+  RunFigure371(f);
 
   // The one-to-many: both nets the module declares.
   EXPECT_EQ(g_nets_from_module, 2);
@@ -128,7 +128,7 @@ TEST_F(VpiObjectClassifications, TheThreePropertiesOfANetAreAnswered) {
   RegisterFigureProbe();
 
   SimFixture f;
-  RunFigure37_1(f);
+  RunFigure371(f);
 
   // vpiName, a string: the name the source declared.
   EXPECT_EQ(g_bus_name, "bus");
