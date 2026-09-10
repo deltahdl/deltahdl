@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi.h"
 
@@ -153,6 +154,77 @@ TEST(SourceDelayPublic, HandleDelayNotDivertedForNonDelayObject) {
   module.delay_expr = &delay;
 
   EXPECT_EQ(ctx.Handle(vpiDelay, &module), nullptr);
+
+  SetGlobalVpiContext(nullptr);
+}
+
+// What the application found, against a design. A calltf is a plain C function
+// with no return path to the case that provoked it.
+int g_one_delay_type = 0;
+int g_two_delay_type = 0;
+int g_two_delay_op_type = 0;
+int g_two_delay_operands = 0;
+
+int ProbeSourceDelaysCalltf(const char*) {
+  vpiHandle one = vpi_handle_by_name("m1.s", nullptr);
+  vpiHandle two = vpi_handle_by_name("m1.w", nullptr);
+  if (one == nullptr || two == nullptr) return 0;
+
+  if (vpiHandle expr = vpi_handle(vpiDelay, one)) {
+    g_one_delay_type = vpi_get(vpiType, expr);
+  }
+  vpiHandle list = vpi_handle(vpiDelay, two);
+  if (list == nullptr) return 0;
+  g_two_delay_type = vpi_get(vpiType, list);
+  g_two_delay_op_type = vpi_get(vpiOpType, list);
+  if (vpiHandle itr = vpi_iterate(vpiOperand, list)) {
+    while (vpi_scan(itr) != nullptr) ++g_two_delay_operands;
+  }
+  return 0;
+}
+
+void RegisterSourceDelayProbe() {
+  g_one_delay_type = 0;
+  g_two_delay_type = 0;
+  g_two_delay_op_type = 0;
+  g_two_delay_operands = 0;
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = "$probe";
+  data.calltf = &ProbeSourceDelaysCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+}
+
+// Claims S1 and S2, against a design. A net declared with one delay reaches a
+// constant expression through vpiDelay, and a net declared with two reaches an
+// operation whose vpiOpType is vpiListOp, over the two delays as its operands.
+// VpiObject::delay_expr is what the relation is read from and no pass of the
+// attach wrote it, so both reached nothing at all whatever the source declared.
+TEST(SourceDelayDesign, ANetsDeclaredDelaysAreReachedThroughVpiDelay) {
+  VpiContext vpi_ctx;
+  SetGlobalVpiContext(&vpi_ctx);
+  RegisterSourceDelayProbe();
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire #(3, 5) w;\n"
+      "  wire #7 s;\n"
+      "  assign w = 1'b0;\n"
+      "  assign s = 1'b0;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  m m1();\n"
+      "  initial $probe;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  EXPECT_EQ(g_one_delay_type, vpiConstant);
+  EXPECT_EQ(g_two_delay_type, vpiOperation);
+  EXPECT_EQ(g_two_delay_op_type, vpiListOp);
+  EXPECT_EQ(g_two_delay_operands, 2);
 
   SetGlobalVpiContext(nullptr);
 }

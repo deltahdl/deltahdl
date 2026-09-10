@@ -18,6 +18,7 @@ namespace delta {
 
 struct Expr;
 struct RtlirDesign;
+struct RtlirNet;
 
 class VpiContext {
  public:
@@ -748,6 +749,13 @@ class VpiContext {
   // §38.10: the design's module paths; §38.11: each module's definition name.
   void AttachModulePathDelays(SimContext& sim_ctx);
   void AttachModuleDefNames(SimContext& sim_ctx);
+
+  // §37.3.4: the source-written delay expression each delay-carrying object of
+  // the design reaches through vpiDelay, and the one a net's declaration wrote.
+  // Both are written in vpi_design_attach.cpp.
+  void AttachSourceDelayExpressions(SimContext& sim_ctx,
+                                    const RtlirDesign* design);
+  VpiObject* NetSourceDelayExpression(SimContext& sim_ctx, const RtlirNet& net);
 
   // §37.2.2: release one handle plus the handles to every callback placed on
   // the object it names. Building block for the simulation-event release rules.
