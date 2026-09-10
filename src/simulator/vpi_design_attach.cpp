@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "elaborator/rtlir.h"
+#include "parser/ast_expr.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
@@ -245,6 +246,147 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
   }
 }
 
+namespace {
+
+// §37.37: one end of an intermodule path as the connection that makes the path
+// names it -- the instance whose port it is, the port's own name, the signal of
+// the enclosing scope the instantiation connected it to, and the direction that
+// says which end of a path the port can be.
+struct InterModPortRef {
+  std::string inst_path;
+  std::string_view port_name;
+  std::string_view signal;
+  Direction direction;
+};
+
+// §37.37: one intermodule path, as the two ports it runs between.
+struct InterModConnection {
+  std::string from_inst;
+  std::string_view from_port;
+  std::string to_inst;
+  std::string_view to_port;
+};
+
+// The signal of the enclosing scope a port connection names. §23.3.2 lets the
+// actual be an expression, and an expression names no single signal two ports
+// can both be on, so only a connection written as a plain name puts its port
+// where a path can reach it.
+std::string_view ConnectedSignalName(const Expr* conn) {
+  if (conn == nullptr || conn->kind != ExprKind::kIdentifier) return {};
+  return conn->text;
+}
+
+// §37.37: an intermodule path runs from the port driving a signal to a port
+// receiving it, which makes an inout port either end and a port that is neither
+// no end at all. The two ends are distinct ports of one signal.
+bool InterModPathRuns(const InterModPortRef& from, const InterModPortRef& to) {
+  if (&from == &to) return false;
+  if (from.signal != to.signal) return false;
+  const bool kDrives = from.direction == Direction::kOutput ||
+                       from.direction == Direction::kInout;
+  const bool kReceives =
+      to.direction == Direction::kInput || to.direction == Direction::kInout;
+  return kDrives && kReceives;
+}
+
+// Every port the instances of `mod` connect to a signal of `mod`'s own scope.
+// A path within this scope runs between two of them.
+void CollectScopePortRefs(const RtlirModule* mod, const std::string& prefix,
+                          std::vector<InterModPortRef>& refs) {
+  for (const auto& child : mod->children) {
+    std::string inst_path = prefix;
+    if (!inst_path.empty()) inst_path += '.';
+    inst_path += std::string(child.inst_name);
+    refs.reserve(refs.size() + child.port_bindings.size());
+    for (const auto& binding : child.port_bindings) {
+      std::string_view signal = ConnectedSignalName(binding.connection);
+      if (signal.empty()) continue;
+      refs.push_back({inst_path, binding.port_name, signal, binding.direction});
+    }
+  }
+}
+
+// The paths running out of one port: one to each port of the same signal that
+// receives what this one drives.
+void PairOnePortRef(const InterModPortRef& from,
+                    const std::vector<InterModPortRef>& refs,
+                    std::vector<InterModConnection>& out) {
+  out.reserve(out.size() + refs.size());
+  for (const auto& to : refs) {
+    if (!InterModPathRuns(from, to)) continue;
+    out.push_back({from.inst_path, from.port_name, to.inst_path, to.port_name});
+  }
+}
+
+// The paths one scope's connections make: every ordered pair of that scope's
+// connected ports a signal runs between.
+void PairScopePortRefs(const std::vector<InterModPortRef>& refs,
+                       std::vector<InterModConnection>& out) {
+  for (const auto& from : refs) PairOnePortRef(from, refs, out);
+}
+
+// Every intermodule path the design makes, gathered by walking the instance
+// paths outward from each top the way the ports themselves are.
+void CollectInterModConnections(const RtlirDesign* design,
+                                std::vector<InterModConnection>& out) {
+  std::vector<std::pair<const RtlirModule*, std::string>> work;
+  work.reserve(design->top_modules.size());
+  for (auto* top : design->top_modules) work.emplace_back(top, std::string());
+
+  while (!work.empty()) {
+    auto [mod, prefix] = work.back();
+    work.pop_back();
+    if (mod == nullptr) continue;
+    PushChildInstances(mod, prefix, work);
+    // A path is a connection between two of one scope's instances, so the
+    // scope holding the instantiations is where both its ends are named.
+    std::vector<InterModPortRef> refs;
+    CollectScopePortRefs(mod, prefix, refs);
+    PairScopePortRefs(refs, out);
+  }
+}
+
+// The port object one end of a path names, which AttachDesignPorts made. A
+// connection naming a port its module does not declare has none to name.
+VpiObject* DesignPortObject(VpiHandle module, std::string_view port_name) {
+  if (module == nullptr) return nullptr;
+  for (auto* child : module->children) {
+    if (child->type == kVpiPort && child->name == port_name) return child;
+  }
+  return nullptr;
+}
+
+}  // namespace
+
+void VpiContext::AttachDesignInterModPaths(const RtlirDesign* design) {
+  // §37.37: an intermodule path runs between the ports of two module instances,
+  // and detail 1 says how a PLI application gets to one -- "vpi_handle_multi(
+  // vpiInterModPath, port1, port2) can be used". Nothing under src/ made one,
+  // so a run held no intermodule path at all and the whole of this model
+  // answered for paths a test had built and for none a design connected.
+  if (design == nullptr) return;
+
+  std::vector<InterModConnection> conns;
+  CollectInterModConnections(design, conns);
+  for (const InterModConnection& conn : conns) {
+    VpiObject* from = DesignPortObject(DesignObjectForFlatName(conn.from_inst),
+                                       conn.from_port);
+    VpiObject* to =
+        DesignPortObject(DesignObjectForFlatName(conn.to_inst), conn.to_port);
+    if (from == nullptr || to == nullptr) continue;
+
+    auto* path = AllocObject();
+    path->type = vpiInterModPath;
+    // §37.37 (the diagram's one-to-many relation to ports): the ports the path
+    // runs between, and the link back from each of them, which is where
+    // vpi_handle_multi() finds the path the two ports are both on.
+    path->children.push_back(from);
+    path->children.push_back(to);
+    from->children.push_back(path);
+    to->children.push_back(path);
+  }
+}
+
 void VpiContext::AttachModuleDefNames(SimContext& sim_ctx) {
   // §38.11's example is what a definition name is for: vpi_handle_by_name
   // reaches an instance and vpi_get_str(vpiDefName, mod) says what it is an
@@ -365,6 +507,9 @@ void AttachDesignToPliApplications(const RtlirDesign* design, SimContext& ctx) {
   }
   vpi.Attach(ctx);
   vpi.AttachDesignPorts(design);
+  // §37.37: the paths run between the port objects the line above made, so they
+  // are gathered once those exist.
+  vpi.AttachDesignInterModPaths(design);
 }
 
 }  // namespace delta

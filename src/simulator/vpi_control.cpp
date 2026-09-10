@@ -191,6 +191,29 @@ void CollectChildrenOfType(VpiHandle ref, int type,
   }
 }
 
+// Whether `obj` is one of the objects `ref` reaches.
+bool IsChildOf(VpiHandle ref, const VpiObject* obj) {
+  for (auto* child : ref->children) {
+    if (child == obj) return true;
+  }
+  return false;
+}
+
+// §37.37 detail 1: "To get to an intermodule path, vpi_handle_multi(
+// vpiInterModPath, port1, port2) can be used." The path that gets to is the one
+// running between those two ports, so what qualifies is a path both of them are
+// on: a path on one port alone runs to a port somewhere else, and a request
+// naming two ports with no path between them reaches nothing.
+void CollectPathsBetween(VpiHandle ref1, VpiHandle ref2,
+                         std::vector<VpiObject*>& out) {
+  if (!ref1 || !ref2) return;
+  for (auto* child : ref1->children) {
+    if (child->type != vpiInterModPath) continue;
+    if (!IsChildOf(ref2, child)) continue;
+    out.push_back(child);
+  }
+}
+
 }  // namespace
 
 VpiHandle VpiContext::HandleMulti(int type, VpiHandle ref1, VpiHandle ref2) {
@@ -207,8 +230,12 @@ VpiHandle VpiContext::HandleMulti(int type, VpiHandle ref1, VpiHandle ref2) {
 
   auto* result = AllocObject();
   result->type = type;
-  CollectChildrenOfType(ref1, type, result->children);
-  CollectChildrenOfType(ref2, type, result->children);
+  if (type == vpiInterModPath) {
+    CollectPathsBetween(ref1, ref2, result->children);
+  } else {
+    CollectChildrenOfType(ref1, type, result->children);
+    CollectChildrenOfType(ref2, type, result->children);
+  }
   if (result->children.empty()) return nullptr;
   return result;
 }

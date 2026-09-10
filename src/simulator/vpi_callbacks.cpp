@@ -333,6 +333,11 @@ void VpiContext::NoteErrorRecorded() {
   // §36.10.1: an error is what the callbacks are set up for, so a routine that
   // recorded none has nothing to deliver.
   if (last_error_.level == 0) return;
+  // An error callback is an application, so the VPI routines it calls record
+  // errors of their own on the way out. A pass already running is what those
+  // land in the middle of, and delivering a second pass from inside the first
+  // would have the same application called again for the error its own call
+  // raised, without end.
   if (dispatching_error_callbacks_) return;
 
   dispatching_error_callbacks_ = true;

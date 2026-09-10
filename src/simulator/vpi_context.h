@@ -26,8 +26,10 @@ class VpiContext {
   void Attach(SimContext& sim_ctx);
 
   // §37.14: the ports each module instance declares, off the design, where a
-  // port's direction and declared order live.
+  // port's direction and declared order live. §37.37: the intermodule paths
+  // running between the ports two instances connect to one signal.
   void AttachDesignPorts(const RtlirDesign* design);
+  void AttachDesignInterModPaths(const RtlirDesign* design);
 
   void SetScheduler(Scheduler* sched) { scheduler_ = sched; }
 
@@ -715,9 +717,7 @@ class VpiContext {
 
   // §36.10.1: "Callbacks can be set up for when an error occurs as well." This
   // is that occurrence, delivered on the way out of the VPI routine that
-  // recorded the error; a routine that recorded nothing delivers nothing. Which
-  // of §38.36.3's two error reasons it goes to, and why a pass already running
-  // delivers no second one, are written where it is defined.
+  // recorded the error. Which reason it goes to is written where it is defined.
   void NoteErrorRecorded();
 
  private:
