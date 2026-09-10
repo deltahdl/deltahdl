@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
+#include "fixture_simulator.h"
 #include "simulator/vpi.h"
 
 namespace delta {
@@ -135,6 +138,130 @@ TEST_F(CalltfApplicationRoutine, SuppliedRoutineRoundTripsAndReceivesUserData) {
   VpiSystfInvoke(read_back.calltf, read_back.user_data);
   EXPECT_EQ(g_calltf_calls, 1);
   EXPECT_EQ(g_calltf_arg, reinterpret_cast<const char*>(&payload));
+}
+
+// -----------------------------------------------------------------------------
+// §36.8.3: "A calltf VPI application routine shall be called each time the
+// associated user-defined system task or system function is executed within the
+// SystemVerilog source code", and the clause's example is one call site inside
+// a loop: "the following SystemVerilog loop would call the calltf routine that
+// is associated with the $get_vector user-defined system task name 1024 times".
+// So what the rule counts is executions, and not the one call the source
+// description wrote -- which is the count §36.8.2's compiletf answers with.
+//
+// Every case above drives the routine by hand, which says nothing about what a
+// running design does with it. These run one.
+// -----------------------------------------------------------------------------
+
+// What the applications below recorded across a whole run. A calltf is a plain
+// C function with no return path to the case that provoked it, so file scope is
+// the only place it has to leave a count.
+int g_calltf_runs = 0;
+int g_compiletf_runs = 0;
+uint64_t g_arg_total = 0;
+
+// Counts its own executions and adds up the first argument as it stood at each
+// one. The total is what separates one execution from many even where the count
+// does not: a run that built the call once and reused it adds the same value
+// every time.
+int CountingCalltf(const char*) {
+  ++g_calltf_runs;
+  vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
+  if (call == nullptr) return 0;
+  vpiHandle args = vpi_iterate(vpiArgument, call);
+  if (args == nullptr) return 0;
+  vpiHandle arg = vpi_scan(args);
+  if (arg == nullptr) return 0;
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(arg, &value);
+  g_arg_total += static_cast<uint64_t>(value.value.integer);
+  return 0;
+}
+
+int CountingCompiletf(const char*) {
+  ++g_compiletf_runs;
+  return 0;
+}
+
+// Registers $probe with both routines, so one run answers §36.8.3's count and
+// §36.8.2's side by side. A system task rather than a system function because
+// §36.5 makes a task the type whose call is a statement, which is the position
+// the clause's own example writes its call in.
+void RegisterCountingProbe() {
+  g_calltf_runs = 0;
+  g_compiletf_runs = 0;
+  g_arg_total = 0;
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = "$probe";
+  data.calltf = &CountingCalltf;
+  data.compiletf = &CountingCompiletf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+}
+
+TEST_F(CalltfApplicationRoutine, RunsOncePerExecutionOfTheOneCallSite) {
+  RegisterCountingProbe();
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int i;\n"
+      "  initial for (i = 1; i <= 4; i = i + 1) $probe(i);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  // Four executions of the one call the source wrote. The compiletf's count is
+  // the discriminating half: a run that called both routines per call site
+  // answers 1 here too, and a run that called both per execution answers 4
+  // there.
+  EXPECT_EQ(g_calltf_runs, 4);
+  EXPECT_EQ(g_compiletf_runs, 1);
+}
+
+TEST_F(CalltfApplicationRoutine, ReadsTheArgumentsAsTheyStandAtEachExecution) {
+  RegisterCountingProbe();
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int i;\n"
+      "  initial for (i = 1; i <= 4; i = i + 1) $probe(i);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  // §36.8.3's example has the calltf read a test vector and put it where the
+  // design will use it, once per iteration, so each execution is a fresh look
+  // at the arguments rather than a repeat of the first. The loop counter is 1,
+  // 2, 3 and 4 at the four executions, and 10 is a total only four separate
+  // reads produce -- a call object built once and reused adds 1 four times.
+  EXPECT_EQ(g_arg_total, 10u);
+}
+
+TEST_F(CalltfApplicationRoutine, RunsAgainAtEveryLaterTimeTheCallIsReached) {
+  RegisterCountingProbe();
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int i;\n"
+      "  initial for (i = 1; i <= 3; i = i + 1) #5 $probe(i);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  // The clause's example reaches its call once per posedge, so the executions
+  // it counts are spread through simulation time rather than run off end to end
+  // in one step. A delay ahead of the call puts these three at 5, 10 and 15,
+  // and the count is the same three.
+  EXPECT_EQ(g_calltf_runs, 3);
+  EXPECT_EQ(g_arg_total, 6u);
+  EXPECT_EQ(g_compiletf_runs, 1);
 }
 
 }  // namespace
