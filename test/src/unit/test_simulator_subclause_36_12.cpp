@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi.h"
 
@@ -147,6 +148,87 @@ TEST_F(VpiCompatibility, MemoryAndMemoryWordAreRelationsRatherThanObjects) {
   ASSERT_EQ(words.size(), 1u);
   EXPECT_EQ(words[0], &word);
   EXPECT_EQ(vpi_get(vpiType, words[0]), vpiReg);
+}
+
+// What the application found in the design.
+int g_array_kind = 0;
+int g_integer_kind = 0;
+int g_real_kind = 0;
+int g_reg_kind = 0;
+int g_arrays_seen = 0;
+
+int InspectKindsCalltf(const char*) {
+  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+  if (mod == nullptr) return 0;
+
+  vpiHandle mem = vpi_handle_by_name("m1.mem", nullptr);
+  if (mem != nullptr) g_array_kind = vpi_get(vpiType, mem);
+  vpiHandle i = vpi_handle_by_name("m1.i", nullptr);
+  if (i != nullptr) g_integer_kind = vpi_get(vpiType, i);
+  vpiHandle r = vpi_handle_by_name("m1.r", nullptr);
+  if (r != nullptr) g_real_kind = vpi_get(vpiType, r);
+  vpiHandle b = vpi_handle_by_name("m1.b", nullptr);
+  if (b != nullptr) g_reg_kind = vpi_get(vpiType, b);
+
+  vpiHandle it = vpi_iterate(vpiRegArray, mod);
+  if (it == nullptr) return 0;
+  while (vpi_scan(it) != nullptr) ++g_arrays_seen;
+  return 0;
+}
+
+void RegisterKindProbe() {
+  g_array_kind = 0;
+  g_integer_kind = 0;
+  g_real_kind = 0;
+  g_reg_kind = 0;
+  g_arrays_seen = 0;
+
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = "$probe";
+  data.calltf = &InspectKindsCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+}
+
+// Rows 3, 4 and 7 against a design: an unpacked array is a vpiRegArray object
+// whatever it holds, and an integer, a real and a reg are each the kind they
+// were declared. Every variable of an elaborated design was stamped vpiReg, so
+// none of the three rows held for any of them and a vpiRegArray iteration
+// reached no array at all.
+TEST_F(VpiCompatibility, ADesignsVariablesCarryTheKindsTheTableRequires) {
+  RegisterKindProbe();
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;
+      "
+      "  reg [7:0] mem [0:3];
+      "
+      "  integer i;
+      "
+      "  real r;
+      "
+      "  reg b;
+      "
+      "endmodule
+      "
+      "module t;
+      "
+      "  m m1();
+      "
+      "  initial $probe;
+      "
+      "endmodule
+      ",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  EXPECT_EQ(g_array_kind, vpiRegArray);
+  EXPECT_EQ(g_integer_kind, vpiIntegerVar);
+  EXPECT_EQ(g_real_kind, vpiRealVar);
+  EXPECT_EQ(g_reg_kind, vpiReg);
+  EXPECT_EQ(g_arrays_seen, 1);
 }
 
 }  // namespace

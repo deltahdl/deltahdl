@@ -13,6 +13,7 @@
 #include "common/source_mgr.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
@@ -303,6 +304,73 @@ void WalkInstancePaths(const RtlirDesign* design, Visit visit) {
 // about the declaration it was made from, which the run does not carry and the
 // design does: this walks the design's declarations and tells each object the
 // run built for one where it is.
+// §36.12.1 Table 36-10 rows 3, 4 and 7: the object kind an elaborated variable
+// carries. In the IEEE 1800 standards "these array types are always represented
+// as vpiRegArray objects, and vpiIntegerVar and vpiTimeVar objects are always
+// non-array variables", a real array is "exclusively represented as vpiRegArray
+// objects", and a vpiRegArray iteration therefore "includes arrays of
+// vpiIntegerVar, vpiTimeVar, and vpiRealVar". So an unpacked array is one kind
+// whatever it holds, and every other variable is the kind it was declared.
+int VpiVariableObjectKind(const RtlirVariable& var) {
+  if (var.num_unpacked_dims > 0) return vpiRegArray;
+  if (var.dtype == nullptr) return kVpiReg;
+  switch (var.dtype->kind) {
+    case DataTypeKind::kInteger:
+      return vpiIntegerVar;
+    case DataTypeKind::kTime:
+      return vpiTimeVar;
+    case DataTypeKind::kReal:
+    case DataTypeKind::kRealtime:
+      return vpiRealVar;
+    case DataTypeKind::kShortreal:
+      return vpiShortRealVar;
+    case DataTypeKind::kByte:
+      return vpiByteVar;
+    case DataTypeKind::kShortint:
+      return vpiShortIntVar;
+    case DataTypeKind::kInt:
+      return vpiIntVar;
+    case DataTypeKind::kLongint:
+      return vpiLongIntVar;
+    case DataTypeKind::kBit:
+      return vpiBitVar;
+    case DataTypeKind::kString:
+      return vpiStringVar;
+    case DataTypeKind::kChandle:
+      return vpiChandleVar;
+    case DataTypeKind::kEnum:
+      return vpiEnumVar;
+    case DataTypeKind::kStruct:
+      return vpiStructVar;
+    case DataTypeKind::kUnion:
+      return vpiUnionVar;
+    default:
+      // §37.17 detail 19: a logic var and a reg are the same object kind, and
+      // it is what a variable the clause draws no separate box for carries.
+      return kVpiReg;
+  }
+}
+
+// §36.12.1 Table 36-10: tell each object the run built for a variable which
+// kind of variable it is. VpiContext::Attach stamps every one of them vpiReg,
+// which rows 3, 4 and 7 rule out: a design's array variables were vpiRegArray
+// objects to nothing, so a vpiRegArray iteration reached none of them, and an
+// integer, time or real variable answered that it was a reg.
+void RecordVariableObjectKinds(
+    const RtlirDesign* design,
+    const std::unordered_map<std::string_view, VpiObject*>& objects) {
+  if (design == nullptr) return;
+
+  WalkInstancePaths(
+      design, [&](const RtlirModule* mod, const std::string& prefix) {
+        for (const RtlirVariable& var : mod->variables) {
+          VpiHandle obj =
+              FindObjectForFlatName(objects, VpiFlatName(prefix, var.name));
+          if (obj != nullptr) obj->type = VpiVariableObjectKind(var);
+        }
+      });
+}
+
 void RecordDeclarationSourceLocations(
     const RtlirDesign* design,
     const std::unordered_map<std::string_view, VpiObject*>& objects,
@@ -597,6 +665,7 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
       obj->size = static_cast<int>(net->resolved->value.width);
     }
   }
+  RecordVariableObjectKinds(design, object_map_);
   RecordDeclarationSourceLocations(design, object_map_, SourcesOf(sim_ctx_));
 }
 
