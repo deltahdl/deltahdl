@@ -634,6 +634,42 @@ static bool TryEvalCoverageSysCall(const Expr* expr, SimContext& ctx,
   return false;
 }
 
+// What a registered PLI application makes of a system call written in an
+// expression, and whether the registry claimed the name at all. Answers both
+// halves through `out` so that the evaluator below asks the registry once,
+// where it asked once before §36.5's report was owed as well.
+//
+// §36.5: a user-defined system task "can be used in the same places a
+// SystemVerilog void function can be used", and §13.4.1 has exactly one such
+// place -- "function calls may be used as expressions unless of type void,
+// which are statements". The caller is the other position, so a task named
+// there is a task standing where a value is wanted, and the clause's own
+// reason is what is reported: a task "does not return any value". The
+// statement executor calls the application instead (TryExecSystemCallTask),
+// which is why nothing reaching here is the task's one legal position.
+static bool TryEvalRegisteredSystf(const Expr* expr, SimContext& ctx,
+                                   Arena& arena, std::string_view name,
+                                   Logic4Vec& out) {
+  if (SystemCallNamesARegisteredTask(expr)) {
+    ctx.GetDiag().Error(
+        expr->range.start,
+        std::string(name) +
+            " is a user-defined system task and returns no value, so it "
+            "cannot be used as an expression",
+        Subclause("36.5"));
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
+
+  // §36.4: `expr` is the call site, so the task/function arguments it wrote are
+  // what the application reads through §37.42's vpiArgument iteration. They are
+  // not handed to the application as C arguments -- "the task/function
+  // arguments are not passed to the PLI application" -- and the calltf's own
+  // parameter stays its registered user_data.
+  return GetGlobalVpiContext().CallRegisteredSystf(std::string(name).c_str(),
+                                                   expr, ctx, out, arena);
+}
+
 Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto name = expr->callee;
 
@@ -651,33 +687,8 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // "SystemVerilog timing checks, such as $setup, are not system tasks and
   // cannot be overridden", and a timing check reaches the specify machinery
   // rather than this evaluator.
-
-  // §36.5: a user-defined system task "can be used in the same places a
-  // SystemVerilog void function can be used", and §13.4.1 has exactly one such
-  // place -- "function calls may be used as expressions unless of type void,
-  // which are statements". This evaluator is the other position, so a task
-  // named here is a task standing where a value is wanted, and the clause's
-  // own reason is what is reported: a task "does not return any value". The
-  // statement executor calls the application instead (TryExecSystemCallTask),
-  // which is why nothing reaching this line is the task's one legal position.
-  if (SystemCallNamesARegisteredTask(expr)) {
-    ctx.GetDiag().Error(
-        expr->range.start,
-        std::string(name) +
-            " is a user-defined system task and returns no value, so it "
-            "cannot be used as an expression",
-        Subclause("36.5"));
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-
   Logic4Vec systf_result;
-  // §36.4: `expr` is the call site, so the task/function arguments it wrote are
-  // what the application reads through §37.42's vpiArgument iteration. They are
-  // not handed to the application as C arguments -- "the task/function
-  // arguments are not passed to the PLI application" -- and the calltf's own
-  // parameter stays its registered user_data.
-  if (GetGlobalVpiContext().CallRegisteredSystf(std::string(name).c_str(), expr,
-                                                ctx, systf_result, arena)) {
+  if (TryEvalRegisteredSystf(expr, ctx, arena, name, systf_result)) {
     return systf_result;
   }
 
