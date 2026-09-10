@@ -3,6 +3,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi.h"
 
@@ -141,6 +142,53 @@ TEST_F(VpiCompareObjectsSim, NullHandleNeverCompareEqual) {
   EXPECT_EQ(vpi_compare_objects(nullptr, mod), 0);
   EXPECT_EQ(vpi_compare_objects(mod, nullptr), 0);
   EXPECT_EQ(vpi_compare_objects(nullptr, nullptr), 0);
+}
+
+// §38.3: the question is whether two handles "refer to the same underlying
+// simulation object". For a variable that object is the storage the run keeps
+// for it, and two objects of the model can name one piece of that storage at
+// once - which the comparison read as two different objects, having compared
+// only the representatives.
+TEST_F(VpiCompareObjectsSim, TwoObjectsOnOneVariableAreTheSameObject) {
+  auto* storage = sim_ctx_.CreateVariable("v", 8);
+  ASSERT_NE(storage, nullptr);
+
+  auto* first = vpi_ctx_.CreateParameter("first", 0);
+  first->var = storage;
+  auto* second = vpi_ctx_.CreateParameter("second", 0);
+  second->var = storage;
+
+  EXPECT_EQ(vpi_compare_objects(first, second), 1);
+}
+
+// §38.3: the same of a net, whose underlying simulation object is the net the
+// run drives.
+TEST_F(VpiCompareObjectsSim, TwoObjectsOnOneNetAreTheSameObject) {
+  auto* mod = vpi_ctx_.CreateModule("top", "top");
+  auto* first = vpi_ctx_.CreatePort("a", kVpiInput, mod);
+  auto* second = vpi_ctx_.CreatePort("b", kVpiInput, mod);
+
+  Net net;
+  first->net = &net;
+  second->net = &net;
+
+  EXPECT_EQ(vpi_compare_objects(first, second), 1);
+}
+
+// §38.3: objects on different storage are different objects, so the rule above
+// is about naming one piece of it rather than about carrying storage at all.
+TEST_F(VpiCompareObjectsSim, ObjectsOnDifferentStorageAreDifferentObjects) {
+  auto* one = sim_ctx_.CreateVariable("one", 8);
+  auto* other = sim_ctx_.CreateVariable("other", 8);
+  ASSERT_NE(one, nullptr);
+  ASSERT_NE(other, nullptr);
+
+  auto* first = vpi_ctx_.CreateParameter("first", 0);
+  first->var = one;
+  auto* second = vpi_ctx_.CreateParameter("second", 0);
+  second->var = other;
+
+  EXPECT_EQ(vpi_compare_objects(first, second), 0);
 }
 
 }  // namespace

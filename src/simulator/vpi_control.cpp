@@ -258,7 +258,16 @@ int VpiContext::CompareObjects(VpiHandle obj1, VpiHandle obj2) {
   // representatives are compared, not the original handle pointers, so two
   // distinct handles that alias one object still compare equal - object
   // equivalence cannot be settled by a C "==" of the handles.
-  return a == b ? 1 : 0;
+  if (a == b) return 1;
+
+  // §38.3 asks whether the handles "refer to the same underlying simulation
+  // object", and for a variable or a net that object is the storage the run
+  // keeps for it - which two objects of the model can name at once, a net and
+  // the variable its resolution writes among them. Only the representatives
+  // were compared, so two handles on one piece of the run's storage answered
+  // that they were different objects.
+  if (a->var != nullptr && a->var == b->var) return 1;
+  return a->net != nullptr && a->net == b->net ? 1 : 0;
 }
 
 VpiHandle VpiContext::CreateHandleFor(VpiHandle object) {
