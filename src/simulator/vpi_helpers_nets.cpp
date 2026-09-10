@@ -802,6 +802,33 @@ bool VpiIsPrimitiveArrayType(int type) {
   }
 }
 
+bool VpiIsNetsType(int type) {
+  // §37.16: `nets` is drawn as a class definition - bold italic letters in a
+  // dotted enclosure - holding the net bit, the interconnect array, the array
+  // net, and the `net` grouping of the concrete net kinds. §37.4.1 makes such
+  // an enclosure a grouping rather than an object, so vpiNet's own spelling
+  // names one of the kinds inside it and these are what an object drawn as a
+  // net actually carries. vpiLogicNet and vpiArrayNet share values with vpiNet
+  // and vpiNetArray (§37.16 details 27 and 29), so each value is written once.
+  switch (type) {
+    case kVpiNet:
+    case vpiNetBit:
+    case vpiNetArray:
+    case vpiStructNet:
+    case vpiUnionNet:
+    case vpiEnumNet:
+    case vpiIntegerNet:
+    case vpiTimeNet:
+    case vpiBitNet:
+    case vpiPackedArrayNet:
+    case vpiInterconnectNet:
+    case vpiInterconnectArray:
+      return true;
+    default:
+      return false;
+  }
+}
+
 // §37.39 (figure): which of a module path's three term relations reaches this
 // term. vpiModPathOut reaches the output terms; of the input terms,
 // vpiModDataPathIn reaches the data source of an edge-sensitive path and

@@ -634,12 +634,21 @@ std::vector<VpiHandle> VpiStructUnionMembers(VpiHandle aggregate) {
   // nothing.
   std::vector<VpiHandle> members;
   if (!aggregate) return members;
+  // The var forms hold variables and the net forms nets, so which side the
+  // aggregate is on says which class its members come from. The two predicates
+  // above read only the member's vpiParent prefix, which every child of the
+  // aggregate satisfies - a typespec drawn by an edge of its own among them -
+  // so the member's own kind is what tells a member from the rest.
+  const bool kHoldsVariables =
+      aggregate->type == vpiStructVar || aggregate->type == vpiUnionVar;
   for (auto* child : aggregate->children) {
     if (child->parent != aggregate) continue;
-    if (VpiVariableIsStructUnionMember(child) ||
-        VpiNetStructUnionMember(child)) {
-      members.push_back(child);
-    }
+    const bool kIsMember =
+        kHoldsVariables
+            ? VpiIsVariablesType(child->type) &&
+                  VpiVariableIsStructUnionMember(child)
+            : VpiIsNetsType(child->type) && VpiNetStructUnionMember(child);
+    if (kIsMember) members.push_back(child);
   }
   return members;
 }

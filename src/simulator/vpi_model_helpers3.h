@@ -360,6 +360,12 @@ int VpiNetLineNo(bool implicit, int declared_line);
 // classification that reads it.
 bool VpiIsPrimitiveType(int type);
 
+// §37.16: the object definitions the `nets` class groups - the net bit, the
+// interconnect array, the array net, and the concrete net kinds of the `net`
+// grouping inside it. §37.4.1 makes a dotted enclosure a grouping rather than
+// an object, so these are the kinds an object drawn as a net carries.
+bool VpiIsNetsType(int type);
+
 // §37.39 (figure): the path terms one of a module path's three term relations
 // reaches - vpiModPathOut the output terms, and of the input terms
 // vpiModDataPathIn the data source of an edge-sensitive path and vpiModPathIn
