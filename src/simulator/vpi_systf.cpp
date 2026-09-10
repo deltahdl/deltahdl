@@ -17,7 +17,10 @@
 #include "simulator/sim_context.h"
 #include "simulator/vpi.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
-// the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
+// the SystemVerilog VPI header alongside the §37.10 vpiInstance relation, and
+// §37.59's vpiRefObj -- the reference an expression naming a variable is -- is
+// there with them.
+#include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_internal.h"
 
