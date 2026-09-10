@@ -461,7 +461,27 @@ bool TryResolveConditionRelation(int type, VpiHandle ref, VpiHandle& out) {
     out = VpiCasePropertyConditionExpr(ref);
     return true;
   }
+  // §37.72 (figure): a case statement reaches the expression it selects on
+  // through vpiCondition, the same tagged edge every conditional statement
+  // above carries. The case was the one statement of the family this resolver
+  // did not name, so the relation fell through to a traversal that cannot serve
+  // it and the expression was unreachable.
+  if (ref->type == vpiCase) {
+    out = VpiCaseConditionExpr(ref);
+    return true;
+  }
   return false;
+}
+
+// §37.72 (figure): the pattern a tagged pattern tags and the one a struct
+// pattern holds, both drawn to the `pattern` class. §37.4.1 makes the class a
+// grouping, so vpiPattern is the group's name and the object it reaches is of
+// one of the kinds the group holds - which the generic traversal, matching a
+// child's own type against vpiPattern, reached for no pattern at all.
+bool TryResolvePatternRelation(int type, VpiHandle ref, VpiHandle& out) {
+  if (type != vpiPattern || !VpiIsPatternType(ref->type)) return false;
+  out = VpiPatternOf(ref);
+  return true;
 }
 
 // §37.79/§37.76: the lhs/rhs of the procedural continuous assignment family
@@ -683,6 +703,7 @@ bool TryResolveDesignatedRelation(int type, VpiHandle ref, VpiHandle& out) {
          TryResolveClockingAndParentRelation(type, ref, out) ||
          TryResolveParameterRelation(type, ref, out) ||
          TryResolveConditionRelation(type, ref, out) ||
+         TryResolvePatternRelation(type, ref, out) ||
          TryResolveAssignAndStmtRelation(type, ref, out) ||
          TryResolveIndexRelation(type, ref, out) ||
          TryResolvePrefixWithRelation(type, ref, out) ||

@@ -79,21 +79,62 @@ bool VpiIsAtomicStmtType(int type) {
   }
 }
 
-bool VpiIsCaseItemConditionType(int type) {
-  // §37.72: a case item reaches its match expressions through the vpiExpr edge,
-  // which the diagram draws to both the pattern grouping and a plain expr. A
-  // condition is therefore one of the pattern kinds (any/tagged/struct pattern,
-  // or a bare pattern) or an expression.
+bool VpiIsPatternType(int type) {
+  // §37.72: `pattern` is drawn as a class definition - bold italic letters in a
+  // dotted enclosure - and §37.4.1 makes such an enclosure a grouping of the
+  // object definitions inside it rather than an object anything can be. The
+  // three inside this one are what the class holds, and vpiPattern is the name
+  // of the group rather than a kind any pattern object has.
   switch (type) {
     case vpiAnyPattern:
     case vpiTaggedPattern:
     case vpiStructPattern:
-    case vpiPattern:
-    case vpiExpr:
       return true;
     default:
-      return VpiIsExprType(type);
+      return false;
   }
+}
+
+VpiHandle VpiPatternOf(VpiHandle pattern) {
+  // §37.72 (figure): a tagged pattern reaches the pattern it tags and a struct
+  // pattern the patterns of its members, each drawn to the `pattern` class. The
+  // arrow names the class, so what it reaches is an object of one of the kinds
+  // the class groups - never one whose own type is vpiPattern, which is the
+  // group's name. Null where the pattern holds none.
+  if (!pattern) return nullptr;
+  for (auto* child : pattern->children) {
+    if (VpiIsPatternType(child->type)) return child;
+  }
+  return nullptr;
+}
+
+bool VpiIsCaseItemConditionType(int type) {
+  // §37.72: a case item reaches its match expressions through the vpiExpr edge,
+  // which the diagram draws to both the pattern class and a plain expr. A
+  // condition is therefore a pattern of one of the kinds that class groups, or
+  // an expression.
+  if (VpiIsPatternType(type)) return true;
+  return type == vpiExpr || VpiIsExprType(type);
+}
+
+VpiHandle VpiCaseConditionExpr(VpiHandle case_stmt) {
+  // §37.72 (figure): a case statement reaches the expression it selects on
+  // through vpiCondition, exactly as the conditional and looping statements of
+  // §37.71, §37.74 and §37.75 reach theirs. The condition's own type is an
+  // expression kind rather than the vpiCondition relation tag, so it is found
+  // by scanning for the first expression child; the case items the diagram's
+  // other edge reaches are vpiCaseItem children this scan skips. Null when no
+  // condition is attached.
+  //
+  // Nothing resolved this relation at all, and the generic traversal it fell
+  // through to looks for a child whose own type is the requested one -- which
+  // for a relation tag is a kind no object has -- so the expression a case
+  // selects on was reachable from the case by no route.
+  if (!case_stmt) return nullptr;
+  for (auto* child : case_stmt->children) {
+    if (VpiIsExprType(child->type)) return child;
+  }
+  return nullptr;
 }
 
 std::vector<VpiHandle> VpiCaseItemMatchExprs(VpiHandle case_item) {

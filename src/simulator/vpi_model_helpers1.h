@@ -297,10 +297,23 @@ bool VpiIsPropertyVariableValueAccessible();
 // no condition expression, so it groups none (detail 5).
 std::vector<VpiHandle> VpiCaseItemConditions(VpiHandle case_item);
 
+// §37.72: the object definitions the `pattern` class groups. §37.4.1 makes a
+// dotted enclosure a grouping rather than an object, so vpiPattern names the
+// group and no pattern object carries it as its type.
+bool VpiIsPatternType(int type);
+
+// §37.72 (figure): the pattern a tagged or struct pattern reaches, drawn to the
+// `pattern` class. Null where it holds none.
+VpiHandle VpiPatternOf(VpiHandle pattern);
+
+// §37.72 (figure): the expression a case statement selects on, reached through
+// vpiCondition. Null when no condition is attached.
+VpiHandle VpiCaseConditionExpr(VpiHandle case_stmt);
+
 // §37.72: the object kinds a case item's match expressions may reach. The
-// diagram draws the case item's vpiExpr edge to both the pattern grouping and a
-// plain expr, so a condition is one of the pattern kinds (any/tagged/struct
-// pattern, or a bare pattern) or an ordinary expression.
+// diagram draws the case item's vpiExpr edge to both the pattern class and a
+// plain expr, so a condition is a pattern of one of the kinds that class groups
+// or an ordinary expression.
 bool VpiIsCaseItemConditionType(int type);
 
 // §37.72 detail 1: the case conditions a (statement) case item groups - its

@@ -56,7 +56,6 @@ TEST_F(CasePattern, CaseItemConditionTypesAreClassified) {
   EXPECT_TRUE(VpiIsCaseItemConditionType(vpiAnyPattern));
   EXPECT_TRUE(VpiIsCaseItemConditionType(vpiTaggedPattern));
   EXPECT_TRUE(VpiIsCaseItemConditionType(vpiStructPattern));
-  EXPECT_TRUE(VpiIsCaseItemConditionType(vpiPattern));
   EXPECT_TRUE(VpiIsCaseItemConditionType(vpiExpr));
   EXPECT_TRUE(VpiIsCaseItemConditionType(vpiOperation));  // an expr-class kind
 
@@ -186,6 +185,85 @@ TEST_F(CasePattern, PatternReachIsSpecificToCaseItems) {
   ASSERT_NE(it, nullptr);
   EXPECT_EQ(ctx_.Scan(it), &pattern);
   EXPECT_EQ(ctx_.Scan(it), nullptr);
+}
+
+// Diagram (case -> vpiCondition -> expr): a case statement reaches the
+// expression it selects on through vpiCondition, the tagged one-to-one edge
+// §37.4.3 walks with vpi_handle(). The case items the diagram's other edge
+// reaches are not it.
+TEST_F(CasePattern, CaseStatementReachesTheExpressionItSelectsOn) {
+  VpiObject selector;
+  selector.type = vpiOperation;
+  VpiObject item;
+  item.type = vpiCaseItem;
+
+  VpiObject case_stmt;
+  case_stmt.type = vpiCase;
+  case_stmt.children = {&item, &selector};
+
+  EXPECT_EQ(vpi_handle(vpiCondition, &case_stmt), &selector);
+}
+
+// Diagram edge: a case statement written with no selector expression reaches
+// none, rather than one of its case items.
+TEST_F(CasePattern, CaseStatementWithNoSelectorReachesNoCondition) {
+  VpiObject item;
+  item.type = vpiCaseItem;
+
+  VpiObject case_stmt;
+  case_stmt.type = vpiCase;
+  case_stmt.children = {&item};
+
+  EXPECT_EQ(vpi_handle(vpiCondition, &case_stmt), nullptr);
+}
+
+// Diagram (pattern class membership): `pattern` is a class enclosure, so the
+// kinds it groups are the three object definitions drawn inside it, and the
+// class constant itself is not one of them (§37.4.1).
+TEST_F(CasePattern, ThePatternClassGroupsTheThreePatternKinds) {
+  EXPECT_TRUE(VpiIsPatternType(vpiAnyPattern));
+  EXPECT_TRUE(VpiIsPatternType(vpiTaggedPattern));
+  EXPECT_TRUE(VpiIsPatternType(vpiStructPattern));
+
+  EXPECT_FALSE(VpiIsPatternType(vpiPattern));
+  EXPECT_FALSE(VpiIsPatternType(vpiOperation));
+}
+
+// Diagram (tagged pattern -> pattern): a tagged pattern reaches the pattern it
+// tags. The arrow names the `pattern` class, so what comes back is an object of
+// a kind that class groups - the tagged pattern's typespec, drawn by its other
+// arrow, is not one.
+TEST_F(CasePattern, ATaggedPatternReachesThePatternItTags) {
+  VpiObject inner;
+  inner.type = vpiStructPattern;
+  VpiObject typespec;
+  typespec.type = vpiTypespec;
+
+  VpiObject tagged;
+  tagged.type = vpiTaggedPattern;
+  tagged.name = "kind";
+  tagged.children = {&typespec, &inner};
+
+  EXPECT_EQ(vpi_handle(vpiPattern, &tagged), &inner);
+  EXPECT_EQ(vpi_handle(vpiTypespec, &tagged), &typespec);
+  EXPECT_STREQ(vpi_get_str(vpiName, &tagged), "kind");
+}
+
+// Diagram (struct pattern -> pattern): a struct pattern reaches the pattern of
+// its member the same way, and a pattern holding none reaches none.
+TEST_F(CasePattern, AStructPatternReachesItsMemberPattern) {
+  VpiObject member;
+  member.type = vpiAnyPattern;
+
+  VpiObject struct_pattern;
+  struct_pattern.type = vpiStructPattern;
+  struct_pattern.children = {&member};
+
+  EXPECT_EQ(vpi_handle(vpiPattern, &struct_pattern), &member);
+
+  VpiObject leaf;
+  leaf.type = vpiAnyPattern;
+  EXPECT_EQ(vpi_handle(vpiPattern, &leaf), nullptr);
 }
 
 }  // namespace
