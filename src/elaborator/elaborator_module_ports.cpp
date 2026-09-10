@@ -413,6 +413,9 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
       interconnect_names_.insert(port.name);
 
     RtlirPort rp = ElaborateOnePort(decl, port, ctx);
+    // §37.3.3: where the port declaration stands, which the port object
+    // reports through vpiLineNo and vpiFile.
+    rp.loc = port.loc;
     FoldPortDefaultValue(arena_, param_scope, rp);
 
     if (port.is_interface_port) {

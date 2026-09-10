@@ -111,6 +111,10 @@ struct RtlirPort {
   // holds and this says which addresses reach them, which are different
   // questions for every dimension not written `[0:n]`.
   std::vector<RtlirUnpackedDim> unpacked_dims;
+
+  // §37.3.3: where the port declaration stands, which vpiLineNo and vpiFile are
+  // read off for the port object §37.14's instance-to-port relation reaches.
+  SourceLoc loc;
 };
 
 struct RtlirNet {
@@ -183,6 +187,13 @@ struct RtlirNet {
 
   std::string_view nettype_name;
   std::vector<ResolvedAttribute> attrs;
+
+  // §37.3.3: where the declaration that made this net stands. The two location
+  // properties that clause gives every object corresponding to source text --
+  // vpiLineNo and vpiFile -- are read off this, so a net whose declaration was
+  // not recorded here answers neither. Invalid for a net no declaration
+  // produced, an implicitly declared one among them.
+  SourceLoc loc;
 };
 
 struct RtlirVariable {
@@ -236,6 +247,12 @@ struct RtlirVariable {
   std::string_view class_type_name;
   std::string_view enum_type_name;
   std::vector<ResolvedAttribute> attrs;
+
+  // §37.3.3: where the declaration that made this variable stands, which
+  // vpiLineNo and vpiFile are read off exactly as they are for a net. Invalid
+  // for a variable the elaborator synthesized rather than read out of a
+  // declaration, which corresponds to nothing in the source text to report.
+  SourceLoc loc;
 };
 
 // §27.4: the implicit localparam of every enclosing loop generate block -- "an

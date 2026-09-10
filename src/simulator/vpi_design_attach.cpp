@@ -4,9 +4,13 @@
 #include <deque>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
+#include "common/source_mgr.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_expr.h"
 #include "simulator/net.h"
@@ -22,15 +26,69 @@
 
 namespace delta {
 
+namespace {
+
+// The child of `parent` carrying this name, or null where it has none. §36.10
+// makes each instance's objects "uniquely accessible", so one component of a
+// flat name is matched against the children of the scope reached so far rather
+// than against every object of the design.
+VpiHandle ChildNamed(VpiHandle parent, std::string_view name) {
+  for (auto* child : parent->children) {
+    if (child->name == name) return child;
+  }
+  return nullptr;
+}
+
+// The object a flat design name already stands for, and null where the name
+// reaches none. DesignObjectForFlatName below makes the scopes it passes
+// through; this one makes nothing, which is what a reader that has something to
+// say about an object the run built wants: a declaration the run built no
+// object for is passed over rather than given an empty one.
+VpiHandle FindObjectForFlatName(
+    const std::unordered_map<std::string_view, VpiObject*>& objects,
+    std::string_view flat_name) {
+  std::vector<std::string_view> parts = VpiNamePathComponents(flat_name);
+  if (parts.empty()) return nullptr;
+
+  auto root = objects.find(parts.front());
+  if (root == objects.end()) return nullptr;
+
+  VpiHandle current = root->second;
+  for (std::size_t i = 1; i < parts.size() && current != nullptr; ++i) {
+    current = ChildNamed(current, parts[i]);
+  }
+  return current;
+}
+
+// §37.3.3: write the file and line of `loc` onto `obj`, which is what
+// vpi_get(vpiLineNo) and vpi_get_str(vpiFile) then report for it. A declaration
+// whose position the elaborator did not record says nothing about where the
+// object stands, and a context attached to no run has no source description to
+// resolve a file_id against; either leaves both properties as they were rather
+// than reporting line zero and a file this tool invented.
+void RecordSourceLocation(VpiHandle obj, SourceLoc loc,
+                          const SourceManager* sources) {
+  if (obj == nullptr || sources == nullptr || !loc.IsValid()) return;
+  obj->line_no = static_cast<int>(loc.line);
+  obj->file = std::string(sources->FilePath(loc.file_id));
+}
+
+// The source description a context attached to a run reads its locations
+// against, and null for one attached to none.
+const SourceManager* SourcesOf(SimContext* sim_ctx) {
+  return sim_ctx == nullptr ? nullptr : &sim_ctx->GetDiag().Sources();
+}
+
+}  // namespace
+
 VpiHandle VpiContext::DesignScopeChild(VpiHandle parent, std::string_view part,
                                        std::string_view full_path) {
   if (parent == nullptr) {
     auto it = object_map_.find(part);
     if (it != object_map_.end()) return it->second;
   } else {
-    for (auto* child : parent->children) {
-      if (child->name == part) return child;
-    }
+    VpiHandle existing = ChildNamed(parent, part);
+    if (existing != nullptr) return existing;
   }
 
   // The component names an instance the walk has not been through before, so
@@ -211,6 +269,14 @@ void PushChildInstances(
   }
 }
 
+// The flat name the simulator keys one declaration of this scope under: the
+// instance path with the declared name on the end. A top module carries the
+// empty prefix and keys its own declarations under their bare names.
+std::string VpiFlatName(const std::string& prefix, std::string_view name) {
+  if (prefix.empty()) return std::string(name);
+  return prefix + "." + std::string(name);
+}
+
 // Every scope of the design, visited outward from each top module under the
 // flat instance path the simulator keys that scope's objects under. A top
 // carries the empty prefix, having no instantiation over it to be named by.
@@ -227,6 +293,35 @@ void WalkInstancePaths(const RtlirDesign* design, Visit visit) {
     PushChildInstances(mod, prefix, work);
     visit(mod, prefix);
   }
+}
+
+// §37.3.3: "These properties are applicable to every object that corresponds to
+// some object within the source code." Nothing under src/ ever wrote either
+// one, so vpiLineNo answered zero and vpiFile answered NULL for every object of
+// every design, and the two location properties could be read back only off an
+// object a test had built and stamped by hand. Where an object stands is a fact
+// about the declaration it was made from, which the run does not carry and the
+// design does: this walks the design's declarations and tells each object the
+// run built for one where it is.
+void RecordDeclarationSourceLocations(
+    const RtlirDesign* design,
+    const std::unordered_map<std::string_view, VpiObject*>& objects,
+    const SourceManager* sources) {
+  if (design == nullptr) return;
+
+  WalkInstancePaths(
+      design, [&](const RtlirModule* mod, const std::string& prefix) {
+        for (const RtlirNet& net : mod->nets) {
+          RecordSourceLocation(
+              FindObjectForFlatName(objects, VpiFlatName(prefix, net.name)),
+              net.loc, sources);
+        }
+        for (const RtlirVariable& var : mod->variables) {
+          RecordSourceLocation(
+              FindObjectForFlatName(objects, VpiFlatName(prefix, var.name)),
+              var.loc, sources);
+        }
+      });
 }
 
 }  // namespace
@@ -249,8 +344,13 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
 
         module->children.reserve(module->children.size() + mod->ports.size());
         int index = 0;
+        const SourceManager* sources = SourcesOf(sim_ctx_);
         for (const auto& port : mod->ports) {
-          FillPortObject(AllocObject(), port, index++, module, name_pool_);
+          auto* obj = AllocObject();
+          FillPortObject(obj, port, index++, module, name_pool_);
+          // §37.3.3: a port is written in the source text, so its object stands
+          // where the declaration does and reports it.
+          RecordSourceLocation(obj, port.loc, sources);
         }
       });
 }
@@ -457,7 +557,7 @@ void VpiContext::AttachModulePathDelays(SimContext& sim_ctx) {
   }
 }
 
-void VpiContext::Attach(SimContext& sim_ctx) {
+void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   // §37.44: the run the thread objects are made against. They cannot all be
   // made here -- a fork branch begins while the design executes, long after
   // this -- so what is kept is the run itself.
@@ -497,6 +597,7 @@ void VpiContext::Attach(SimContext& sim_ctx) {
       obj->size = static_cast<int>(net->resolved->value.width);
     }
   }
+  RecordDeclarationSourceLocations(design, object_map_, SourcesOf(sim_ctx_));
 }
 
 void AttachDesignToPliApplications(const RtlirDesign* design, SimContext& ctx) {
@@ -508,7 +609,7 @@ void AttachDesignToPliApplications(const RtlirDesign* design, SimContext& ctx) {
   if (vpi.RegisteredSystfs().empty() && vpi.RegisteredCallbacks().empty()) {
     return;
   }
-  vpi.Attach(ctx);
+  vpi.Attach(ctx, design);
   vpi.AttachDesignPorts(design);
   // §37.37: the paths run between the port objects the line above made, so they
   // are gathered once those exist.

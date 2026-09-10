@@ -25,6 +25,9 @@ namespace delta {
 void Elaborator::ElaborateSpecparam(ModuleItem* item, RtlirModule* mod) {
   RtlirVariable var;
   var.name = ScopedName(item->name);
+  // §37.3.3: a §6.20.5 specify parameter is written in the source text like
+  // any other declaration, so its object reports where.
+  var.loc = item->loc;
   if (item->data_type.packed_dim_left && item->data_type.packed_dim_right) {
     var.width = EvalTypeWidth(item->data_type);
     if (var.width == 0) var.width = 32;

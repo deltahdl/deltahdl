@@ -751,6 +751,9 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   }
   RtlirNet net;
   net.name = ScopedName(item->name);
+  // §37.3.3: the declaration is where this net stands in the source text,
+  // and vpiLineNo and vpiFile report it once the net is an object.
+  net.loc = item->loc;
 
   if (item->data_type.is_interconnect) {
     net.net_type = NetType::kInterconnect;

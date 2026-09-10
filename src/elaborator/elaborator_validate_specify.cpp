@@ -27,6 +27,8 @@ void RegisterSpecifyBlockSpecparams(
     const_names.insert(sp->param_name);
     RtlirVariable var;
     var.name = sp->param_name;
+    // §37.3.3: the specparam stands where the specify block wrote it.
+    var.loc = sp->loc;
     var.width = 32;
     var.init_expr = sp->param_value;
     mod->variables.push_back(var);

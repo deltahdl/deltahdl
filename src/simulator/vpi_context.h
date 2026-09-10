@@ -23,7 +23,7 @@ class VpiContext {
   VpiContext() = default;
   ~VpiContext();
 
-  void Attach(SimContext& sim_ctx);
+  void Attach(SimContext& sim_ctx, const RtlirDesign* design = nullptr);
 
   // §37.14: the ports each module instance declares, off the design, where a
   // port's direction and declared order live. §37.37: the intermodule paths
