@@ -1,6 +1,7 @@
 #include "simulator/vpi_design_attach.h"
 
 #include <cstddef>
+#include <deque>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -159,6 +160,58 @@ VpiActiveFrameScope::~VpiActiveFrameScope() {
   GetGlobalVpiContext().RestoreActiveFrame(outer_);
 }
 
+namespace {
+
+// §37.14: the vpiDirection a declared port reports. A port declared with no
+// direction, and §13's ref direction, which the diagram's port has no value
+// for, report none.
+int VpiPortDirectionOf(Direction direction) {
+  switch (direction) {
+    case Direction::kInput:
+      return kVpiInput;
+    case Direction::kOutput:
+      return kVpiOutput;
+    case Direction::kInout:
+      return kVpiInout;
+    default:
+      return 0;
+  }
+}
+
+// One port of a module instance, as the object §37.14's instance-to-port
+// relation reaches. `index` is the position the module declared it in, which
+// detail 9 has vpiPortIndex report and which starts at zero, and `size` is the
+// width detail 6 has vpiScalar and vpiVector read -- "whether the port is 1 bit
+// or more than 1 bit ... not anything about what is connected to the port".
+void FillPortObject(VpiObject* obj, const RtlirPort& port, int index,
+                    VpiHandle module, std::deque<std::string>& names) {
+  obj->type = kVpiPort;
+  names.emplace_back(port.name);
+  obj->name = names.back();
+  obj->index = index;
+  obj->size = static_cast<int>(port.width);
+  obj->direction = VpiPortDirectionOf(port.direction);
+  obj->parent = module;
+  module->children.push_back(obj);
+}
+
+// The instances `mod` holds, pushed onto the walk under their own paths. An
+// instance's path is its parent's with its name on the end, which is the string
+// the simulator keys every object of that instance under.
+void PushChildInstances(
+    const RtlirModule* mod, const std::string& prefix,
+    std::vector<std::pair<const RtlirModule*, std::string>>& work) {
+  work.reserve(work.size() + mod->children.size());
+  for (const auto& child : mod->children) {
+    std::string child_prefix = prefix;
+    if (!child_prefix.empty()) child_prefix += '.';
+    child_prefix += std::string(child.inst_name);
+    work.emplace_back(child.resolved, child_prefix);
+  }
+}
+
+}  // namespace
+
 void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
   // §37.14: the ports a module instance declares, as the objects the diagram's
   // one-to-many instance-to-port relation reaches. VpiContext::CreatePort could
@@ -171,43 +224,23 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
   // empty prefix and has no module object over it to hang ports from, the same
   // boundary the module paths meet.
   std::vector<std::pair<const RtlirModule*, std::string>> work;
+  work.reserve(design->top_modules.size());
   for (auto* top : design->top_modules) work.emplace_back(top, std::string());
 
   while (!work.empty()) {
     auto [mod, prefix] = work.back();
     work.pop_back();
     if (mod == nullptr) continue;
-
-    for (const auto& child : mod->children) {
-      std::string child_prefix = prefix;
-      if (!child_prefix.empty()) child_prefix += '.';
-      child_prefix += std::string(child.inst_name);
-      work.emplace_back(child.resolved, child_prefix);
-    }
+    PushChildInstances(mod, prefix, work);
     if (prefix.empty()) continue;
 
     VpiHandle module = DesignObjectForFlatName(prefix);
     if (module == nullptr) continue;
 
+    module->children.reserve(module->children.size() + mod->ports.size());
     int index = 0;
     for (const auto& port : mod->ports) {
-      auto* obj = AllocObject();
-      obj->type = kVpiPort;
-      name_pool_.emplace_back(port.name);
-      obj->name = name_pool_.back();
-      // §37.14 detail 9: "vpiPortIndex can be used to determine the port
-      // order. The first port has a port index of zero."
-      obj->index = index++;
-      // §37.14 detail 6: "properties vpiScalar and vpiVector shall indicate
-      // whether the port is 1 bit or more than 1 bit", which is the width it
-      // was declared with rather than anything about what is connected to it.
-      obj->size = static_cast<int>(port.width);
-      obj->direction = port.direction == Direction::kInput    ? kVpiInput
-                       : port.direction == Direction::kOutput ? kVpiOutput
-                       : port.direction == Direction::kInout  ? kVpiInout
-                                                              : 0;
-      obj->parent = module;
-      module->children.push_back(obj);
+      FillPortObject(AllocObject(), port, index++, module, name_pool_);
     }
   }
 }
