@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
 #include "fixture_lexer.h"
-#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -92,20 +91,20 @@ TEST(SystemNameLexing, EscapedNameIsNotSystemIdentifier) {
   EXPECT_NE(r.token.kind, TokenKind::kSystemIdentifier);
 }
 
-TEST(SystemNameLexing, MaxLengthOk) {
-  std::string id = "$" + std::string(1023, 'a');
+// §5.6.3: "Additional user-defined system tasks and system functions can be
+// defined using the PLI, as described in Clause 36." What a name of one may be
+// is therefore Clause 36's to say and not this subclause's, and §5.6's cap on
+// "the maximum length of identifiers" does not reach a name that is neither of
+// the two things §5.6 calls an identifier. A name past that cap is one system
+// identifier here; §36.3's own file holds the rule and both sides of it.
+TEST(SystemNameLexing, LengthIsClause36sToBoundAndItBoundsNone) {
+  std::string id = "$" + std::string(2000, 'a');
   id += " ";
   auto [tokens, errors] = LexWithDiag(id);
   EXPECT_FALSE(errors);
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
-}
-
-TEST(SystemNameLexing, ExceedsMaxLength) {
-  std::string id = "$" + std::string(1024, 'a');
-  auto diags = LexDiagnostics(id);
-  EXPECT_TRUE(ReportedError(
-      diags, "identifier exceeds maximum length of 1024 characters", 1, "5.6"));
+  EXPECT_EQ(tokens[0].text.size(), 2001u);
 }
 
 }  // namespace

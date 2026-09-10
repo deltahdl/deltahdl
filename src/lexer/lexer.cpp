@@ -626,10 +626,18 @@ Token Lexer::LexSystemIdentifier() {
   tok.kind = TokenKind::kSystemIdentifier;
   tok.loc = loc;
   tok.text = source_.substr(start, pos_ - start);
-  if (tok.text.size() > 1024) {
-    diag_.Error(loc, "identifier exceeds maximum length of 1024 characters",
-                Subclause("5.6"));
-  }
+  // No length is checked here, unlike LexIdentifier and LexEscapedIdentifier.
+  // §5.6 lets an implementation cap "the maximum length of identifiers", and an
+  // identifier there is "either a simple identifier or an escaped identifier"
+  // -- a simple identifier's first character "shall not be a digit or $", so a
+  // name this lexes is neither. §5.6.3 hands its rules to Clause 36 instead
+  // ("Additional user-defined system tasks and system functions can be defined
+  // using the PLI, as described in Clause 36"), and §36.3 states them: the name
+  // begins with $, its remaining characters are letters, digits, underscores or
+  // dollar signs, it is case sensitive, and "the name can be any size, and all
+  // characters are significant". A.9.3's system_tf_identifier production bounds
+  // no length either, and footnote 55 adds only that the $ is not followed by
+  // white space and that the name is not escaped.
   return tok;
 }
 

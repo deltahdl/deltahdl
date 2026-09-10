@@ -16,7 +16,9 @@ using namespace delta;
 //   S2: the remaining characters are letters, digits, the underscore (_),
 //       or the dollar sign ($).
 //   S3: the name is case sensitive (upper/lower considered unique).
-//   S4: the name can be any size, and all characters are significant.
+//   S4: the name can be any size, and all characters are significant. §5.6's
+//       identifier length cap does not reach it, §5.6.3 having handed a
+//       user-defined system task or system function name to Clause 36.
 //
 // Descendant subclauses (36.3.1 callback registry, 36.3.2 overriding built-ins)
 // are out of scope here.
@@ -122,18 +124,37 @@ TEST(SystemTfNameLexing, AllCharactersAreSignificant) {
   EXPECT_NE(a.token.text, b.token.text);
 }
 
-// S4 edge: a large name at the lexer's length guard boundary is accepted as a
-// single system identifier with its full text retained and no diagnostic — the
-// "any size" facet exercised up to the production limit.
-TEST(SystemTfNameLexing, LargeNameWithinLimitAccepted) {
+// S4: 1024 characters is where §5.6 lets an implementation stop reading an
+// identifier -- "the limit shall be at least 1024 characters" -- so a name of
+// exactly that length is the last one both readings of the rule accept.
+TEST(SystemTfNameLexing, AName1024CharactersLongIsAccepted) {
   std::string name = "$";
-  name.append(1023, 'a');  // 1024 characters total, at the guard boundary
+  name.append(1023, 'a');
   auto [tokens, errors] = LexWithDiag(name + " ");
   EXPECT_FALSE(errors);
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(tokens[0].text, name);
   EXPECT_EQ(tokens[0].text.size(), 1024u);
+}
+
+// S4 is where the two part. §5.6 caps an identifier, but an identifier there is
+// "either a simple identifier or an escaped identifier" and a simple
+// identifier's first character "shall not be a digit or $", so a system task or
+// system function name is neither; §5.6.3 hands its rules to Clause 36
+// ("Additional user-defined system tasks and system functions can be defined
+// using the PLI, as described in Clause 36"), and this is the rule Clause 36
+// gives: "The name can be any size, and all characters are significant." So a
+// name past that cap is lexed whole, with no diagnostic.
+TEST(SystemTfNameLexing, ANameLongerThan1024CharactersIsStillOneName) {
+  std::string name = "$";
+  name.append(2000, 'a');
+  auto [tokens, errors] = LexWithDiag(name + " ");
+  EXPECT_FALSE(errors);
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[0].text, name);
+  EXPECT_EQ(tokens[0].text.size(), 2001u);
 }
 
 }  // namespace

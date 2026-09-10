@@ -86,6 +86,11 @@ TEST(IdentifierLexing, SystemIdentWithDollar) {
   EXPECT_EQ(tokens[0].text, "$foo$bar");
 }
 
+// A.9.3 bounds no length on system_tf_identifier, and footnote 55 adds only
+// that the $ is not followed by white space and that the name is not escaped.
+// §5.6's cap is on an identifier, which A.9.3 spells with its own productions;
+// what bounds a system task or system function name is §36.3, which bounds
+// nothing -- so this is a length the production admits rather than a limit.
 TEST(IdentifierLexing, SystemIdentMaxLength) {
   std::string id = "$" + std::string(1023, 'a');
   auto [tokens, errors] = LexWithDiag(id);
@@ -93,13 +98,6 @@ TEST(IdentifierLexing, SystemIdentMaxLength) {
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(tokens[0].text.size(), 1024u);
-}
-
-TEST(IdentifierLexing, SystemIdentExceedsMaxLength) {
-  std::string id = "$" + std::string(1025, 'a');
-  auto diags = LexDiagnostics(id);
-  EXPECT_TRUE(ReportedError(
-      diags, "identifier exceeds maximum length of 1024 characters", 1, "5.6"));
 }
 
 TEST(IdentifierLexing, BareDollarIsNotSystemIdent) {
