@@ -480,6 +480,8 @@ bool VpiIterateMatches(int obj_type, int type, VpiHandle ref,
   // always procedures the class groups rather than an object whose own type is
   // the class name, which is a kind no procedure has.
   if (type == vpiProcess) return VpiIsProcessType(obj_type);
+  // §37.20 detail 1: vpiMemory is a method returning vpiRegArray objects.
+  if (type == vpiMemory) return obj_type == VpiMemoryIterationItemType();
   // §37.11/§37.5: the module's edges to `instance array` and to the `primitive
   // array` nested inside it are drawn to those class enclosures, so they reach
   // the module, interface, program, gate, switch and udp arrays the two group.

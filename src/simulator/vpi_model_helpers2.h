@@ -149,6 +149,12 @@ VpiHandle VpiRangeRightRange(const VpiRangeDesc& range);
 // to the class reaches.
 bool VpiIsVariablesType(int type);
 
+// §37.20 (figure): whether an array variable is a memory - an array whose words
+// are regs, which is what §37.20 detail 1 makes vpiMemoryWord return. False for
+// an array of any other variable kind and for anything that is not an array
+// variable.
+bool VpiArrayVarIsMemory(VpiHandle var);
+
 // §37.26 (figure): the members a structure or union holds, which its vpiMember
 // relation reaches - the variables of a struct or union var and the nets of a
 // struct or union net. Empty for a null handle or an aggregate with none.

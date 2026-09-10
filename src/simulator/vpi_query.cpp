@@ -483,6 +483,14 @@ int VpiGetSimplePropertyB(int property, VpiHandle obj, bool& handled) {
     case vpiPacked:
       return VpiBool(obj->packed || obj->type == vpiPackedArrayVar ||
                      VpiVariableIsPackedArrayMember(obj));
+    // §37.20 (figure): a reg array reports whether it is a memory. §37.20
+    // detail 1 turned vpiMemory and vpiMemoryWord into methods returning
+    // vpiRegArray and vpiReg, so what tells a memory from any other array
+    // variable is that its words are regs. The property was defined and
+    // dispatched by nothing, so every array variable of every design answered
+    // that it was not a memory.
+    case vpiIsMemory:
+      return VpiBool(VpiArrayVarIsMemory(obj));
     // §37.26 (figure): a union object reports whether it is a tagged union as
     // the vpiTagged Boolean property.
     case vpiTagged:

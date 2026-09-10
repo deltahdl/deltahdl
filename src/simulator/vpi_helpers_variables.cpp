@@ -127,6 +127,20 @@ bool VpiIsPackedArrayVarElementType(int type) {
   }
 }
 
+bool VpiArrayVarIsMemory(VpiHandle var) {
+  // §37.20 (figure): a reg array reports whether it is a memory through
+  // vpiIsMemory. Detail 1 says what a memory is now made of - vpiMemoryWord
+  // "will return objects of type vpiReg" - so an array variable is a memory
+  // exactly when the words it holds are regs. An array of some other variable
+  // kind is an array variable and not a memory, and neither is an object that
+  // is not an array variable at all.
+  if (!var || !VpiIsArrayVarType(var->type)) return false;
+  for (auto* child : var->children) {
+    if (child->type == kVpiReg) return true;
+  }
+  return false;
+}
+
 bool VpiVariableIsPackedArrayMember(VpiHandle var) {
   // §37.18 detail 4: vpiPackedArrayMember is TRUE for a struct var, union var,
   // enum var, or packed array var whose vpiParent prefix is a packed array var.
