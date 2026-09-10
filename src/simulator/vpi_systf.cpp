@@ -10,6 +10,8 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "parser/ast.h"
+#include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -96,7 +98,46 @@ const VpiSystfData* VpiContext::ResolveSystf(const char* name) const {
   return nullptr;
 }
 
-bool VpiContext::CallRegisteredSystf(const char* name, Logic4Vec& result,
+namespace {
+
+// §36.4: one task/function argument as the application reaches it. An actual
+// that names a variable is carried by that variable itself, so a write through
+// vpi_put_value lands where the design will read it and a read sees whatever
+// the design last wrote -- the clause asks for both, "PLI routines are provided
+// that allow the PLI applications to read and write to the task/function
+// arguments". Anything else is an expression rather than a name: its value goes
+// into a holder of its own, which reads correctly and which a write cannot
+// carry back to a call site with nowhere to put it.
+//
+// §37.42 detail 8 spells an omitted argument, which a call site writes as an
+// empty position, and VpiMakeEmptyArgument is what sets that shape.
+VpiObject* SystfCallArgument(VpiObject* arg, const Expr* actual,
+                             SimContext& ctx, Arena& arena) {
+  if (actual == nullptr) {
+    VpiMakeEmptyArgument(arg);
+    return arg;
+  }
+  Variable* named = actual->kind == ExprKind::kIdentifier
+                        ? ctx.FindVariable(actual->text)
+                        : nullptr;
+  if (named != nullptr) {
+    arg->type = vpiRefObj;
+    arg->name = actual->text;
+    arg->var = named;
+  } else {
+    arg->type = vpiOperation;
+    auto* holder = arena.Create<Variable>();
+    holder->value = EvalExpr(actual, ctx, arena);
+    arg->var = holder;
+  }
+  arg->size = static_cast<int>(arg->var->value.width);
+  return arg;
+}
+
+}  // namespace
+
+bool VpiContext::CallRegisteredSystf(const char* name, const Expr* call_site,
+                                     SimContext& ctx, Logic4Vec& result,
                                      Arena& arena) {
   const VpiSystfData* data = ResolveSystf(name);
   if (data == nullptr) return false;
@@ -118,6 +159,16 @@ bool VpiContext::CallRegisteredSystf(const char* name, Logic4Vec& result,
   value_holder->value = MakeLogic4VecVal(arena, 32, 0);
   call->var = value_holder;
   call->size = 32;
+
+  // §36.4: the arguments the call site wrote, hung on the call so §37.42's
+  // vpiArgument iteration reaches them. They are attached before the calltf
+  // runs, because the application reads them from inside it.
+  if (call_site != nullptr) {
+    for (const Expr* actual : call_site->args) {
+      call->children.push_back(
+          SystfCallArgument(AllocObject(), actual, ctx, arena));
+    }
+  }
 
   // A call reached from inside another PLI application is the inner one while
   // it runs, so the outer call is put back rather than cleared.

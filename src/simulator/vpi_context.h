@@ -14,6 +14,8 @@
 
 namespace delta {
 
+struct Expr;
+
 class VpiContext {
  public:
   VpiContext() = default;
@@ -50,7 +52,18 @@ class VpiContext {
   // moment from this one and a separate reading of the clause;
   // VpiSystfCallbackFiresAtBuild (src/simulator/vpi_control.cpp) already models
   // which of the three that is.
-  bool CallRegisteredSystf(const char* name, Logic4Vec& result, Arena& arena);
+  //
+  // §36.4 decides what the application is handed. "When the PLI applications
+  // associated with a user-defined system task or system function are called,
+  // the task/function arguments are not passed to the PLI application. Instead,
+  // a number of PLI routines are provided that allow the PLI applications to
+  // read and write to the task/function arguments." So the calltf is handed its
+  // own user_data and nothing else, and `call_site` is what the arguments are
+  // read off: they are hung on the call object §37.42 gives the application, to
+  // be reached from there by vpi_iterate(vpiArgument, ...). `ctx` is where an
+  // argument that names a variable finds it.
+  bool CallRegisteredSystf(const char* name, const Expr* call_site,
+                           SimContext& ctx, Logic4Vec& result, Arena& arena);
 
   // §36.3.2: resolve the effective registration for a system task/function
   // name, honouring the override rule. A user-provided PLI application

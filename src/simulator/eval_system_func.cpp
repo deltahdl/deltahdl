@@ -652,8 +652,13 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // cannot be overridden", and a timing check reaches the specify machinery
   // rather than this evaluator.
   Logic4Vec systf_result;
-  if (GetGlobalVpiContext().CallRegisteredSystf(std::string(name).c_str(),
-                                                systf_result, arena)) {
+  // §36.4: `expr` is the call site, so the task/function arguments it wrote are
+  // what the application reads through §37.42's vpiArgument iteration. They are
+  // not handed to the application as C arguments -- "the task/function
+  // arguments are not passed to the PLI application" -- and the calltf's own
+  // parameter stays its registered user_data.
+  if (GetGlobalVpiContext().CallRegisteredSystf(std::string(name).c_str(), expr,
+                                                ctx, systf_result, arena)) {
     return systf_result;
   }
 
