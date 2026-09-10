@@ -474,8 +474,15 @@ int VpiGetSimplePropertyB(int property, VpiHandle obj, bool& handled) {
     // §37.26 (figure): a structure or union object reports whether it is packed
     // as the vpiPacked Boolean property (TRUE for a packed aggregate). Any
     // object not declared packed reports FALSE.
+    //
+    // §37.18 detail 1: a packed array var, and the struct, union or enum var
+    // objects underlying one, are packed by construction - "vpiVector and
+    // vpiPacked for these objects and their underlying struct var, union var,
+    // or enum var elements shall always be TRUE" - so neither depends on the
+    // stored flag, which a packed array left unset reported FALSE from.
     case vpiPacked:
-      return VpiBool(obj->packed);
+      return VpiBool(obj->packed || obj->type == vpiPackedArrayVar ||
+                     VpiVariableIsPackedArrayMember(obj));
     // §37.26 (figure): a union object reports whether it is a tagged union as
     // the vpiTagged Boolean property.
     case vpiTagged:

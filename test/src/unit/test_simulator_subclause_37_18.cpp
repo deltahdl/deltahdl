@@ -238,5 +238,68 @@ TEST(PackedArrayVarModel, VectorAlwaysTrueForPackedArrayVar) {
   EXPECT_FALSE(VpiVariableScalar(q));
 }
 
+// Detail 1: "vpiVector and vpiPacked for these objects and their underlying
+// struct var, union var, or enum var elements shall always be TRUE." A packed
+// array var is packed by construction, so the property does not wait on a flag
+// the object was built with; nor does an element underlying one.
+TEST(PackedArrayVarPublic, PackedIsAlwaysTrueForAPackedArrayAndItsElements) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+
+  VpiObject array;
+  array.type = vpiPackedArrayVar;  // no packed flag set on it
+  VpiObject element;
+  element.type = vpiStructVar;
+  element.parent = &array;
+  array.children = {&element};
+
+  EXPECT_EQ(vpi_get(vpiPacked, &array), 1);
+  EXPECT_EQ(vpi_get(vpiPacked, &element), 1);
+
+  SetGlobalVpiContext(nullptr);
+}
+
+// Detail 1 scope: the rule is about a packed array and what underlies one.
+// §37.26's structure keeps reporting the flag it was declared with, so an
+// unpacked struct standing on its own is not swept up by it.
+TEST(PackedArrayVarPublic, PackedStillReportsTheFlagForAnythingElse) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+
+  VpiObject unpacked;
+  unpacked.type = vpiStructVar;
+  EXPECT_EQ(vpi_get(vpiPacked, &unpacked), 0);
+
+  VpiObject packed;
+  packed.type = vpiStructVar;
+  packed.packed = true;
+  EXPECT_EQ(vpi_get(vpiPacked, &packed), 1);
+
+  SetGlobalVpiContext(nullptr);
+}
+
+// Figure (vpiParent): a subelement of a packed array variable reaches the array
+// it is an element of. An object that is not such a subelement reaches none
+// through this edge.
+TEST(PackedArrayVarPublic, ASubelementReachesThePackedArrayItBelongsTo) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+
+  VpiObject array;
+  array.type = vpiPackedArrayVar;
+  VpiObject element;
+  element.type = vpiEnumVar;
+  element.parent = &array;
+  array.children = {&element};
+
+  EXPECT_EQ(vpi_handle(vpiParent, &element), &array);
+
+  VpiObject loose;
+  loose.type = vpiEnumVar;
+  EXPECT_EQ(vpi_handle(vpiParent, &loose), nullptr);
+
+  SetGlobalVpiContext(nullptr);
+}
+
 }  // namespace
 }  // namespace delta

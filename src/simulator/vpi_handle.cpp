@@ -358,6 +358,14 @@ static bool TryResolveParentRelation(int type, VpiHandle ref, VpiHandle& out) {
     out = ref->parent;
     return true;
   }
+  // §37.18 (figure): a subelement of a packed array variable reaches the array
+  // it is an element of through vpiParent. The relation is a tag no object's
+  // type is, so the traversal this fell through to reached the array from none
+  // of its subelements.
+  if (VpiVariableIsPackedArrayMember(ref)) {
+    out = ref->parent;
+    return true;
+  }
   return false;
 }
 
