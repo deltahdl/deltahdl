@@ -651,6 +651,25 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // "SystemVerilog timing checks, such as $setup, are not system tasks and
   // cannot be overridden", and a timing check reaches the specify machinery
   // rather than this evaluator.
+
+  // §36.5: a user-defined system task "can be used in the same places a
+  // SystemVerilog void function can be used", and §13.4.1 has exactly one such
+  // place -- "function calls may be used as expressions unless of type void,
+  // which are statements". This evaluator is the other position, so a task
+  // named here is a task standing where a value is wanted, and the clause's
+  // own reason is what is reported: a task "does not return any value". The
+  // statement executor calls the application instead (TryExecSystemCallTask),
+  // which is why nothing reaching this line is the task's one legal position.
+  if (SystemCallNamesARegisteredTask(expr)) {
+    ctx.GetDiag().Error(
+        expr->range.start,
+        std::string(name) +
+            " is a user-defined system task and returns no value, so it "
+            "cannot be used as an expression",
+        Subclause("36.5"));
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+
   Logic4Vec systf_result;
   // §36.4: `expr` is the call site, so the task/function arguments it wrote are
   // what the application reads through §37.42's vpiArgument iteration. They are

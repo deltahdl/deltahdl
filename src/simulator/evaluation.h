@@ -249,6 +249,19 @@ Logic4Vec EvalMatches(const Expr* expr, SimContext& ctx, Arena& arena);
 
 Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena);
 
+// §36.5: reports whether `expr` names a user-defined system task, meaning a
+// registration whose type is vpiSysTask. The clause makes the type "determine
+// how a PLI application is called from the SystemVerilog source code", and the
+// two types differ in the position the call may stand in: a task "can be used
+// in the same places a SystemVerilog void function can be used", which §13.4.1
+// makes a statement, while a function "can be used in the same places a
+// SystemVerilog function can be used" and "returns a value". So the answer
+// here is what decides between the statement executor, which calls the task's
+// application, and the expression evaluator, which reports it. Defined beside
+// TryExecSystemCallTask (see stmt_exec.h) so that one reading of the registry
+// answers both.
+bool SystemCallNamesARegisteredTask(const Expr* expr);
+
 // §20.4.2: build the report line $printtimescale displays for `expr` against
 // the timescale state in `ctx` (see eval_function.cpp for the format).
 std::string BuildPrinttimescaleReport(const Expr* expr, SimContext& ctx);

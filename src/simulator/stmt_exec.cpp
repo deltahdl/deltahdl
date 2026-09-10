@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <cstring>
 #include <functional>
-#include <iostream>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -450,34 +449,6 @@ static ExecTask ExecProcessAwait(const Expr* expr, SimContext& ctx,
     co_await ProcessAwaitAwaiter{proc};
   }
   co_return StmtResult::kDone;
-}
-
-bool TryExecSystemCallTask(const Expr* expr, SimContext& ctx, Arena& arena) {
-  if (!expr || expr->kind != ExprKind::kSystemCall) return false;
-
-  // $cast invoked as a task: the evaluation performs the assignment when the
-  // cast is valid and leaves the destination untouched otherwise. Unlike the
-  // function form (which simply reports 0), the task form signals an invalid
-  // assignment with a run-time error.
-  if (expr->callee == "$cast") {
-    auto result = EvalExpr(expr, ctx, arena);
-    if (result.ToUint64() == 0) {
-      ctx.GetDiag().Error(expr->range.start,
-                          "$cast task could not assign the source expression "
-                          "to the destination; assignment is invalid",
-                          Subclause("6.24.2"));
-    }
-    return true;
-  }
-
-  // §20.17.2: invoked as a task, $stacktrace displays the call stack of the
-  // context calling it, up to the top-level process. The function form, which
-  // instead returns the same text as a string, is evaluated as an expression.
-  if (expr->callee == "$stacktrace") {
-    std::cout << BuildStackTraceReport(ctx) << "\n";
-    return true;
-  }
-  return false;
 }
 
 // Reports whether the expression is a `<process handle>.await()` method call.

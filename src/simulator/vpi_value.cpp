@@ -446,6 +446,20 @@ static bool PutValueTargetIsRejected(VpiHandle obj, VpiErrorInfo& error) {
     return true;
   }
 
+  // §36.5: a user-defined system function "returns a value" and a user-defined
+  // system task "does not return any value", so a write through the call handle
+  // §37.42 gives the application -- which is how a system function's result is
+  // delivered -- has nowhere to land on a task call. §38.34 lists the objects
+  // this routine "can be applied to" and names system function calls among
+  // them, with no system task call beside it. The put is rejected, an error is
+  // recorded, and the run reads no value out of the task.
+  if (obj->type == vpiSysTaskCall) {
+    RecordVpiError(error,
+                   "vpi_put_value(): a user-defined system task call has no "
+                   "return value to write");
+    return true;
+  }
+
   // §37.35 detail 2: among primitives, vpi_put_value() may be applied only to a
   // sequential UDP. Putting a value to any other primitive kind - a gate,
   // switch, combinational UDP, or a generic primitive - is not allowed, so the

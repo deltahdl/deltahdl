@@ -210,6 +210,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_format.cpp
     simulator/stmt_exec.cpp
     simulator/stmt_exec_deferred.cpp
+    simulator/systf_call_statement.cpp
     simulator/statement_assign.cpp
     simulator/statement_assign_core.cpp
     simulator/statement_assign_object.cpp
