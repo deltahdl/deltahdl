@@ -200,26 +200,16 @@ TEST_F(VpiCompatibility, ADesignsVariablesCarryTheKindsTheTableRequires) {
 
   SimFixture f;
   auto* design = ElaborateSrc(
-      "module m;
-      "
-      "  reg [7:0] mem [0:3];
-      "
-      "  integer i;
-      "
-      "  real r;
-      "
-      "  reg b;
-      "
-      "endmodule
-      "
-      "module t;
-      "
-      "  m m1();
-      "
-      "  initial $probe;
-      "
-      "endmodule
-      ",
+      "module m;\n"
+      "  reg [7:0] mem [0:3];\n"
+      "  integer i;\n"
+      "  real r;\n"
+      "  reg b;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  m m1();\n"
+      "  initial $probe;\n"
+      "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
