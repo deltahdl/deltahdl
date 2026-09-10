@@ -61,8 +61,13 @@ using PLI_BYTE8 = char;
 #define vpiPropertyDecl 655
 #define vpiSequenceDecl 661
 #define vpiImmediateAssert 665
-#define vpiImmediateAssume 666
-#define vpiImmediateCover 667
+/* Annex M numbers these two apart from the 665 that precedes them: 666 is
+ * vpiReturn and 667 vpiAnyPattern, and §37.60 draws an immediate assume, an
+ * immediate cover and a return statement as three separate members of the
+ * atomic stmt class, which a shared value leaves a vpi_get(vpiType) unable to
+ * tell apart. */
+#define vpiImmediateAssume 694
+#define vpiImmediateCover 695
 
 #define vpiConstraint 653
 #define vpiConstraintOrdering 654

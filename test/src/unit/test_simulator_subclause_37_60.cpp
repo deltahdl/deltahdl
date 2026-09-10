@@ -52,6 +52,7 @@ TEST_F(AtomicStatement, DiagramMembersAreAtomicStatements) {
                    vpiImmediateAssert,
                    vpiImmediateAssume,
                    vpiImmediateCover,
+                   vpiReturnStmt,
                    vpiBreak,
                    vpiContinue,
                    vpiNullStmt}) {
@@ -101,6 +102,27 @@ TEST_F(AtomicStatement, EmptyNameNullingDoesNotApplyToNonAtomicObjects) {
   const char* result = vpi_get_str(vpiName, &non_stmt);
   ASSERT_NE(result, nullptr);
   EXPECT_STREQ(result, "");
+}
+
+// §37.60 draws twenty-eight members inside the atomic stmt class, and drawing
+// them separately is a claim that they are separate: a vpi_get(vpiType) on a
+// statement reports one of them, and two members sharing a constant leave that
+// report unable to say which one it found. Annex M is what numbers them, and it
+// gives an immediate assume 694 and an immediate cover 695 -- the 666 and 667
+// they carried are vpiReturn's and vpiAnyPattern's, so an immediate assume read
+// as a return statement and an immediate cover as a case-item any-pattern.
+TEST_F(AtomicStatement, TheMembersOfTheClassHaveConstantsOfTheirOwn) {
+  EXPECT_EQ(vpiImmediateAssert, 665);
+  EXPECT_EQ(vpiImmediateAssume, 694);
+  EXPECT_EQ(vpiImmediateCover, 695);
+  EXPECT_EQ(vpiReturnStmt, 691);
+
+  // The three the collisions were with, which the class draws elsewhere or not
+  // at all: a return statement is its own member, while vpiReturn and
+  // vpiAnyPattern are not statements.
+  EXPECT_NE(vpiImmediateAssume, vpiReturn);
+  EXPECT_NE(vpiImmediateCover, vpiAnyPattern);
+  EXPECT_NE(vpiImmediateAssume, vpiReturnStmt);
 }
 
 }  // namespace

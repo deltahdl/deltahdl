@@ -67,10 +67,9 @@ bool VpiIsAtomicStmtType(int type) {
     case vpiExpectStmt:
     case vpiForeachStmt:
     case vpiImmediateAssert:
-    // vpiReturn shares this constant value with vpiImmediateAssume in this
-    // header set, so the return statement is classified through the same case.
     case vpiImmediateAssume:
     case vpiImmediateCover:
+    case vpiReturnStmt:
     case vpiBreak:
     case vpiContinue:
     case vpiNullStmt:
