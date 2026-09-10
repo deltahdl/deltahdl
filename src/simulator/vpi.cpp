@@ -11,6 +11,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "simulator/vpi_internal.h"
+
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
@@ -131,7 +133,15 @@ vpiHandle vpi_iterate(PLI_INT32 type, vpiHandle ref) {
           delta::VpiRoutine::kIterate)) {
     return nullptr;
   }
-  return delta::GetGlobalVpiContext().Iterate(type, ref);
+  // §36.12.2.2: the default mode the run was given "shall determine the
+  // compatibility mode VPI behavior for all applications not using the
+  // compile-based scheme detailed in Mechanism 1", and an application reaching
+  // this entry point is one of those - the compile-based scheme renames its
+  // calls to the variants in vpi_compatibility.cpp instead. The mode was
+  // recorded and read by nothing, so it determined no behavior at all.
+  return VpiIterateInCompatibilityMode(
+      type, ref,
+      delta::GetGlobalVpiContext().EffectiveCompatibilityMode(false, 0));
 }
 
 vpiHandle vpi_scan(vpiHandle iterator) {

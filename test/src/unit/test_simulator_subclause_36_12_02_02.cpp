@@ -103,5 +103,63 @@ TEST_F(VpiDefaultCompatibilityMode, Mechanism1ApplicationKeepsItsOwnMode) {
       vpiMode1800v2009);
 }
 
+// -----------------------------------------------------------------------------
+// What the default determines. §36.12.2.2 does not stop at a means to set the
+// mode: it says the selection "shall determine the compatibility mode VPI
+// behavior for all applications not using the compile-based scheme detailed in
+// Mechanism 1". The mode was recorded, EffectiveCompatibilityMode answered
+// which one governed an application, and no routine asked either - so a run
+// given a default behaved exactly as a run without one and the mechanism
+// determined nothing.
+// -----------------------------------------------------------------------------
+
+// §36.12.2.2 with §36.12.1 Table 36-10 row 5: an application that made no
+// compile-time selection is governed by the run's default, so under an IEEE
+// 1364 default its vpiVariables iteration excludes the vpiReg and vpiRegArray
+// objects that standard excluded from it.
+TEST_F(VpiDefaultCompatibilityMode, TheDefaultGovernsAnApplicationsIteration) {
+  VpiObject reg;
+  reg.type = vpiReg;
+  VpiObject int_var;
+  int_var.type = vpiIntVar;
+
+  VpiObject scope;
+  scope.type = vpiModule;
+  scope.children = {&reg, &int_var};
+
+  // With no default selected the run behaves as this standard describes.
+  vpiHandle current = vpi_iterate(vpiVariables, &scope);
+  ASSERT_NE(current, nullptr);
+  EXPECT_EQ(vpi_scan(current), &reg);
+  EXPECT_EQ(vpi_scan(current), &int_var);
+  EXPECT_EQ(vpi_scan(current), nullptr);
+
+  ASSERT_TRUE(vpi_ctx_.SetDefaultCompatibilityMode(vpiMode1364v2001));
+
+  vpiHandle older = vpi_iterate(vpiVariables, &scope);
+  ASSERT_NE(older, nullptr);
+  EXPECT_EQ(vpi_scan(older), &int_var);
+  EXPECT_EQ(vpi_scan(older), nullptr);
+}
+
+// §36.12.2.2: a default naming one of the IEEE 1800 standards leaves the
+// behavior this standard describes in place, the rows of Table 36-10 those
+// versions share with it being the ones an application would notice.
+TEST_F(VpiDefaultCompatibilityMode, An1800DefaultLeavesTheBehaviorAsItIs) {
+  VpiObject reg;
+  reg.type = vpiReg;
+
+  VpiObject scope;
+  scope.type = vpiModule;
+  scope.children = {&reg};
+
+  ASSERT_TRUE(vpi_ctx_.SetDefaultCompatibilityMode(vpiMode1800v2009));
+
+  vpiHandle it = vpi_iterate(vpiVariables, &scope);
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(vpi_scan(it), &reg);
+  EXPECT_EQ(vpi_scan(it), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

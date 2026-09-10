@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "simulator/vpi.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 
 // The reader §38.4's entry point starts an argument list for; the vpi_control
@@ -52,13 +53,23 @@ bool Vpi1364IterationKeeps(int type, delta::VpiHandle ref,
   return true;
 }
 
-// The iterator the current routine builds, with the objects an IEEE 1364
-// application does not expect dropped. An iteration left with nothing is the
-// NULL §38.23 gives one that reaches no object, so the emptied iterator is
-// released rather than handed back.
-vpiHandle Vpi1364Iterate(PLI_INT32 type, vpiHandle ref) {
-  vpiHandle iterator = vpi_iterate(type, ref);
-  if (iterator == nullptr) return nullptr;
+// §36.12.1 Table 36-10: whether the version in force is one of the IEEE 1364
+// standards, whose iterations rows 5, 6 and 7 differ in.
+bool VpiModeIs1364(int mode) {
+  return mode == vpiMode1364v1995 || mode == vpiMode1364v2001 ||
+         mode == vpiMode1364v2005;
+}
+
+}  // namespace
+
+vpiHandle VpiIterateInCompatibilityMode(PLI_INT32 type, vpiHandle ref,
+                                        int mode) {
+  // The iterator the current routine builds, with the objects an application
+  // of `mode` does not expect dropped. An iteration left with nothing is the
+  // NULL §38.23 gives one that reaches no object, so the emptied iterator is
+  // released rather than handed back.
+  vpiHandle iterator = delta::GetGlobalVpiContext().Iterate(type, ref);
+  if (iterator == nullptr || !VpiModeIs1364(mode)) return iterator;
   std::vector<delta::VpiObject*> kept;
   for (auto* object : iterator->children) {
     if (Vpi1364IterationKeeps(type, ref, object)) kept.push_back(object);
@@ -68,8 +79,6 @@ vpiHandle Vpi1364Iterate(PLI_INT32 type, vpiHandle ref) {
   vpi_release_handle(iterator);
   return nullptr;
 }
-
-}  // namespace
 
 // IEEE Std 1364-1995.
 PLI_INT32 vpi_compare_objects_1364v1995(vpiHandle obj1, vpiHandle obj2) {
@@ -118,7 +127,12 @@ PLI_INT32 vpi_control_1364v1995(PLI_INT32 operation, ...) {
   return result;
 }
 vpiHandle vpi_iterate_1364v1995(PLI_INT32 type, vpiHandle ref) {
-  return Vpi1364Iterate(type, ref);
+  // §36.12.2.2: an application using Mechanism 1 is governed by the mode
+  // compiled into it, whatever default the run was given.
+  return VpiIterateInCompatibilityMode(
+      type, ref,
+      delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
+          true, vpiMode1364v1995));
 }
 
 // IEEE Std 1364-2001.
@@ -168,7 +182,12 @@ PLI_INT32 vpi_control_1364v2001(PLI_INT32 operation, ...) {
   return result;
 }
 vpiHandle vpi_iterate_1364v2001(PLI_INT32 type, vpiHandle ref) {
-  return Vpi1364Iterate(type, ref);
+  // §36.12.2.2: an application using Mechanism 1 is governed by the mode
+  // compiled into it, whatever default the run was given.
+  return VpiIterateInCompatibilityMode(
+      type, ref,
+      delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
+          true, vpiMode1364v2001));
 }
 
 // IEEE Std 1364-2005.
@@ -218,7 +237,12 @@ PLI_INT32 vpi_control_1364v2005(PLI_INT32 operation, ...) {
   return result;
 }
 vpiHandle vpi_iterate_1364v2005(PLI_INT32 type, vpiHandle ref) {
-  return Vpi1364Iterate(type, ref);
+  // §36.12.2.2: an application using Mechanism 1 is governed by the mode
+  // compiled into it, whatever default the run was given.
+  return VpiIterateInCompatibilityMode(
+      type, ref,
+      delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
+          true, vpiMode1364v2005));
 }
 
 // IEEE Std 1800-2005.
@@ -268,7 +292,10 @@ PLI_INT32 vpi_control_1800v2005(PLI_INT32 operation, ...) {
   return result;
 }
 vpiHandle vpi_iterate_1800v2005(PLI_INT32 type, vpiHandle ref) {
-  return vpi_iterate(type, ref);
+  return VpiIterateInCompatibilityMode(
+      type, ref,
+      delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
+          true, vpiMode1800v2005));
 }
 
 // IEEE Std 1800-2009.
@@ -318,7 +345,10 @@ PLI_INT32 vpi_control_1800v2009(PLI_INT32 operation, ...) {
   return result;
 }
 vpiHandle vpi_iterate_1800v2009(PLI_INT32 type, vpiHandle ref) {
-  return vpi_iterate(type, ref);
+  return VpiIterateInCompatibilityMode(
+      type, ref,
+      delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
+          true, vpiMode1800v2009));
 }
 
 // IEEE Std 1800-2012.
@@ -368,5 +398,7 @@ PLI_INT32 vpi_control_1800v2012(PLI_INT32 operation, ...) {
   return result;
 }
 vpiHandle vpi_iterate_1800v2012(PLI_INT32 type, vpiHandle ref) {
-  return vpi_iterate(type, ref);
+  return VpiIterateInCompatibilityMode(
+      type, ref,
+      delta::GetGlobalVpiContext().EffectiveCompatibilityMode(true, 0));
 }

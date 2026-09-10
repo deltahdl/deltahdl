@@ -21,6 +21,12 @@ bool VpiIsVirtualInterfaceArray(VpiHandle obj);
 // vpi_handle.cpp, and vpi_value.cpp.
 bool VpiObjectIsPrimitive(int type);
 
+// §36.12.2.2: the iteration a compatibility mode gives an application - the
+// current one, with the objects that mode's applications do not expect dropped.
+// Defined in vpi_compatibility.cpp, used by vpi.cpp for the run-wide default
+// and by the compile-based variants for the mode compiled into them.
+vpiHandle VpiIterateInCompatibilityMode(int type, VpiHandle ref, int mode);
+
 // Defined in vpi_systf.cpp, used by vpi_handle.cpp.
 std::vector<std::string_view> VpiNamePathComponents(std::string_view name);
 
