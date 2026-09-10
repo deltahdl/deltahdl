@@ -279,6 +279,14 @@ VpiHandle VpiContext::CreateHandleFor(VpiHandle object) {
   // is a distinct object (a different pointer than the one passed in), which is
   // the "may create two distinct handles" latitude the standard grants.
   VpiObject* rep = ResolveSameObject(object);
+
+  // §37.2.4: "A tool can create a handle that refers to an object only during
+  // the lifetime of the object." Past that lifetime there is no object for a
+  // handle to refer to, so none is made; a handle handed back here would be
+  // invalid from the moment it was created, and §37.2.4 forbids a program both
+  // from referring through it and from releasing it.
+  if (!rep->object_exists) return nullptr;
+
   auto* handle = AllocObject();
   handle->type = rep->type;
 
@@ -340,8 +348,13 @@ bool VpiContext::HandleValid(VpiHandle handle) const {
   // handle: non-null, unreleased, and naming an object that still exists.
   if (!handle) return false;
   if (handle->released) return false;
-  if (!handle->object_exists) return false;
-  return true;
+
+  // Existence is a property of the object, while release is a property of the
+  // handle. A handle made by CreateHandleFor() is a record of its own that
+  // aliases the representative, so its own object_exists flag says nothing
+  // about the object it denotes: the chain has to be resolved first, or an
+  // alias to an object that has ceased to exist answers that it is still valid.
+  return ResolveSameObject(handle)->object_exists;
 }
 
 bool VpiContext::HandleSurvivesRestart(VpiHandle handle) const {

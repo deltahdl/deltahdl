@@ -450,7 +450,9 @@ class VpiContext {
   // nonetheless denotes the same underlying object. Because the two handles
   // refer to one object they are equivalent: vpi_compare_objects() reports them
   // equal even though a C "==" of the handle pointers would not. A null object
-  // names nothing, so the result is null.
+  // names nothing, so the result is null, and §37.2.4 permits a handle to an
+  // object only during that object's lifetime, so an object that has ceased to
+  // exist yields null as well.
   VpiHandle CreateHandleFor(VpiHandle object);
 
   // §37.2.2: release a handle, the operation vpi_release_handle() performs. The

@@ -70,5 +70,49 @@ TEST_F(VpiHandleValiditySim, NullHandleIsInvalid) {
   EXPECT_FALSE(vpi_ctx_.HandleValid(nullptr));
 }
 
+// §37.2.4: validity ends when "the object that it refers to ceases to exist",
+// and that is the object rather than the handle record. A distinct handle
+// aliasing the same object stops being valid when the object goes, even though
+// nothing was written on the alias itself.
+TEST_F(VpiHandleValiditySim, HandleAliasingAVanishedObjectIsInvalid) {
+  auto* mod = vpi_ctx_.CreateModule("top", "top");
+  auto* other = vpi_ctx_.CreateHandleFor(mod);
+  ASSERT_NE(other, mod);
+  ASSERT_TRUE(vpi_ctx_.HandleValid(other));
+
+  mod->object_exists = false;  // the object ceases to exist
+
+  EXPECT_FALSE(vpi_ctx_.HandleValid(other));
+}
+
+// §37.2.4: "nor shall a VPI program attempt to release an invalid handle", so
+// vpi_release_handle() reports failure for the alias of an object that has
+// ceased to exist, the same as it does for the handle the object was reached
+// through.
+TEST_F(VpiHandleValiditySim, ReleasingAnAliasOfAVanishedObjectFails) {
+  auto* mod = vpi_ctx_.CreateModule("top", "top");
+  auto* other = vpi_ctx_.CreateHandleFor(mod);
+  ASSERT_EQ(vpi_ctx_.ReleaseHandleStatus(other), 1);
+
+  auto* third = vpi_ctx_.CreateHandleFor(mod);
+  ASSERT_NE(third, nullptr);  // a live object still yields a handle
+  mod->object_exists = false;
+
+  EXPECT_EQ(vpi_ctx_.ReleaseHandleStatus(third), 0);
+  EXPECT_EQ(vpi_ctx_.ReleaseHandleStatus(mod), 0);
+}
+
+// §37.2.4: "A tool can create a handle that refers to an object only during the
+// lifetime of the object." Past that lifetime no handle is made, since one made
+// then would be invalid from its own creation.
+TEST_F(VpiHandleValiditySim, NoHandleIsCreatedPastAnObjectsLifetime) {
+  auto* mod = vpi_ctx_.CreateModule("top", "top");
+  ASSERT_NE(vpi_ctx_.CreateHandleFor(mod), nullptr);
+
+  mod->object_exists = false;
+
+  EXPECT_EQ(vpi_ctx_.CreateHandleFor(mod), nullptr);
+}
+
 }  // namespace
 }  // namespace delta
