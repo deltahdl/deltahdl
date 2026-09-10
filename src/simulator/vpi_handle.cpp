@@ -330,6 +330,20 @@ static bool TryResolveClockingRelation(int type, VpiHandle ref,
     out = VpiRefObjTypespec(ref);
     return true;
   }
+  // §37.5/§37.6/§37.9 (figure): a module, interface or program reaches the one
+  // clocking block it named default and the one it named global, and the
+  // expression its default disable iff was written with. All three are relation
+  // tags, so the traversal these fell through to -- which looks for a child
+  // whose own type is the type asked for -- reached none of them from any
+  // scope.
+  if (type == vpiDefaultClocking || type == vpiGlobalClocking) {
+    out = VpiScopeNamedClockingBlock(ref, type == vpiGlobalClocking);
+    return true;
+  }
+  if (type == vpiDefaultDisableIff) {
+    out = VpiScopeDefaultDisableIff(ref);
+    return true;
+  }
   if (type != vpiClockingEvent) return false;
   if (ref->type == vpiClockingBlock) {
     out = VpiClockingBlockClockingEvent(ref);

@@ -152,5 +152,75 @@ TEST_F(Module, ModuleIterationOverParentScopeIsNotFilteredByTopLevel) {
   EXPECT_TRUE(saw_nested);
 }
 
+// -----------------------------------------------------------------------------
+// The three tagged edges §37.5 draws beside the module's own details: the
+// clocking block it named default, the one it named global, and the expression
+// its default disable iff was written with. Each is a relation tag, so the
+// generic traversal - which looks for a child whose own type is the type asked
+// for - reached none of them from any module.
+// -----------------------------------------------------------------------------
+
+// Figure (vpiDefaultClocking / vpiGlobalClocking): a module names at most one
+// clocking block of each kind among the blocks it declares, and each edge
+// reaches the one so named rather than the first block the module holds.
+TEST_F(Module, AModuleReachesTheClockingBlocksItNamed) {
+  VpiObject ordinary;
+  ordinary.type = vpiClockingBlock;
+  VpiObject global_block;
+  global_block.type = vpiClockingBlock;
+  global_block.global_clocking = true;
+  VpiObject default_block;
+  default_block.type = vpiClockingBlock;
+  default_block.default_clocking = true;
+
+  VpiObject mod;
+  mod.type = kVpiModule;
+  mod.children = {&ordinary, &global_block, &default_block};
+
+  EXPECT_EQ(vpi_handle(vpiDefaultClocking, &mod), &default_block);
+  EXPECT_EQ(vpi_handle(vpiGlobalClocking, &mod), &global_block);
+}
+
+// Figure: a module that named neither reaches neither, rather than whichever
+// clocking block it happens to declare first.
+TEST_F(Module, AModuleThatNamedNoClockingBlockReachesNone) {
+  VpiObject ordinary;
+  ordinary.type = vpiClockingBlock;
+
+  VpiObject mod;
+  mod.type = kVpiModule;
+  mod.children = {&ordinary};
+
+  EXPECT_EQ(vpi_handle(vpiDefaultClocking, &mod), nullptr);
+  EXPECT_EQ(vpi_handle(vpiGlobalClocking, &mod), nullptr);
+}
+
+// Figure (vpiDefaultDisableIff): the edge is drawn to an enclosure with no name
+// holding an expr and a distribution, so either is what it reaches. A clocking
+// block, drawn by an edge of its own, is not.
+TEST_F(Module, AModuleReachesItsDefaultDisableIff) {
+  VpiObject block;
+  block.type = vpiClockingBlock;
+  VpiObject condition;
+  condition.type = vpiOperation;
+
+  VpiObject mod;
+  mod.type = kVpiModule;
+  mod.children = {&block, &condition};
+  EXPECT_EQ(vpi_handle(vpiDefaultDisableIff, &mod), &condition);
+
+  VpiObject dist;
+  dist.type = vpiDistribution;
+  VpiObject with_dist;
+  with_dist.type = kVpiModule;
+  with_dist.children = {&dist};
+  EXPECT_EQ(vpi_handle(vpiDefaultDisableIff, &with_dist), &dist);
+
+  VpiObject plain;
+  plain.type = kVpiModule;
+  plain.children = {&block};
+  EXPECT_EQ(vpi_handle(vpiDefaultDisableIff, &plain), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

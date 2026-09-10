@@ -360,6 +360,14 @@ int VpiNetLineNo(bool implicit, int declared_line);
 // classification that reads it.
 bool VpiIsPrimitiveType(int type);
 
+// §37.5/§37.6/§37.9 (figure): the clocking block a scope named default, or the
+// one it named global. Null where the scope named none.
+VpiHandle VpiScopeNamedClockingBlock(VpiHandle scope, bool global);
+
+// §37.5/§37.6/§37.9 (figure): the expression or distribution a scope's default
+// disable iff was written with. Null where the scope wrote none.
+VpiHandle VpiScopeDefaultDisableIff(VpiHandle scope);
+
 // §37.16: the object definitions the `nets` class groups - the net bit, the
 // interconnect array, the array net, and the concrete net kinds of the `net`
 // grouping inside it. §37.4.1 makes a dotted enclosure a grouping rather than

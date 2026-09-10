@@ -25,6 +25,14 @@ struct VpiObject {
   int size = 0;
   int index = 0;
 
+  // §37.5/§37.6/§37.9: which of a scope's clocking blocks the
+  // vpiDefaultClocking and vpiGlobalClocking edges reach. §14.12 lets a scope
+  // name one of each among the blocks it declares, and the edges are drawn to
+  // those two rather than to the blocks in general, so the block itself carries
+  // which it is. Both false for an ordinary clocking block.
+  bool default_clocking = false;
+  bool global_clocking = false;
+
   // §37.39: the four properties the data model draws on a module path and the
   // one it draws on a path term beside its direction. A module path reports
   // which kind of path it is through vpiPathType (vpiPathFull for a full

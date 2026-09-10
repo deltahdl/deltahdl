@@ -84,6 +84,34 @@ VpiHandle VpiInstanceOf(VpiHandle obj) {
   return nullptr;
 }
 
+VpiHandle VpiScopeNamedClockingBlock(VpiHandle scope, bool global) {
+  // §37.5/§37.6/§37.9 (figure): the clocking block a scope named default, or
+  // the one it named global. §14.12 lets a scope name one of each among the
+  // blocks it declares, so the block carries which it is and the edge reaches
+  // the one so marked. Null where the scope named none.
+  if (!scope) return nullptr;
+  for (auto* child : scope->children) {
+    if (child->type != vpiClockingBlock) continue;
+    if (global ? child->global_clocking : child->default_clocking) return child;
+  }
+  return nullptr;
+}
+
+VpiHandle VpiScopeDefaultDisableIff(VpiHandle scope) {
+  // §37.5/§37.6/§37.9 (figure): the vpiDefaultDisableIff edge is drawn to an
+  // enclosure with no name holding an expr and a distribution, and §37.4.1
+  // makes such an enclosure a grouping of the objects in it. So what the edge
+  // reaches is an expression or a distribution; a scope names at most one, so
+  // it is the first child of either kind. Null where the scope wrote none.
+  if (!scope) return nullptr;
+  for (auto* child : scope->children) {
+    if (VpiIsExprType(child->type) || child->type == vpiDistribution) {
+      return child;
+    }
+  }
+  return nullptr;
+}
+
 VpiHandle VpiModuleOf(VpiHandle obj) {
   // §37.10 detail 2: report the nearest enclosing module, or null when no
   // module encloses the object.
