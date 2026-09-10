@@ -369,12 +369,17 @@ void VpiContext::ReleaseHandlesForRestart() {
 // §37.2.2: release a handle along with the handles to every callback placed on
 // the object it names. A callback handle records, in `index`, the slot of the
 // callback whose `obj` is the watched object; any such handle is released too.
+//
+// §37.2.3: which callbacks those are is settled by §38.3's comparison rather
+// than by a C "==" of the handles, since a callback is placed on an object and
+// the application may have registered it through a handle other than the one
+// being released.
 void VpiContext::ReleaseHandleWithCallbacks(VpiObject* object) {
   if (!object) return;
   object->released = true;
   for (VpiObject* cb : cb_handles_) {
     if (cb->index >= 0 && cb->index < static_cast<int>(callbacks_.size()) &&
-        callbacks_[cb->index].obj == object) {
+        CompareObjects(callbacks_[cb->index].obj, object) != 0) {
       cb->released = true;
     }
   }

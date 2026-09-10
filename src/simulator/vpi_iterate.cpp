@@ -580,7 +580,15 @@ void CollectCallbackObjects(VpiObject* ref,
   for (auto* cb_obj : cb_handles) {
     int idx = cb_obj->index;
     if (idx < 0 || idx >= static_cast<int>(callbacks.size())) continue;
-    if (callbacks[idx].obj == ref) iter->children.push_back(cb_obj);
+    // §37.2.3: "Handle equivalence cannot be determined with a C '==='
+    // comparison. The function vpi_compare_objects() compares the objects they
+    // refer to." A callback is placed on an object, not on the handle the
+    // application happened to register it through, so a second handle to that
+    // object has to find it - and pointer equality found it only through the
+    // one handle.
+    if (GetGlobalVpiContext().CompareObjects(callbacks[idx].obj, ref) != 0) {
+      iter->children.push_back(cb_obj);
+    }
   }
 }
 
