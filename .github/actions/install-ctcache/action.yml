@@ -1,0 +1,48 @@
+---
+description: >-
+  Install clang-tidy-cache from the ctcache repository, retried so that a
+  runner which cannot reach github.com for a moment does not take a whole
+  clang-tidy matrix red. Nothing is pinned: the caller gets whatever the
+  default branch holds, which is the floating toolchain every other install
+  in this repository takes.
+name: Install ctcache
+runs:
+  steps:
+    - name: Install clang-tidy-cache from ctcache
+      run: |
+        # pip clones the repository before it installs anything, and a clone
+        # that cannot reach github.com is the failure this loop exists for.
+        # Run 34421440312 lost clang-tidy-test-shard-03 to "fatal: unable to
+        # access ... Failed to connect to github.com port 443 after 134795 ms"
+        # with nothing wrong in the tree, and the same job passed unchanged on
+        # a rerun -- the shard never reached clang-tidy at all, so what the
+        # gate reported was the runner's network rather than the code it is
+        # there to judge.
+        #
+        # Each attempt is bounded by `timeout` for the reason the retry in
+        # .github/actions/install-llvm is: the failure met here is a stall
+        # rather than an error, and waiting is not a non-zero exit status, so
+        # an unbounded attempt can hold the step open until the runner's
+        # six-hour limit and leave the remaining attempts unrun. -k escalates
+        # to SIGKILL for a clone that ignores SIGTERM.
+        #
+        # GIT_HTTP_LOW_SPEED_* give git a bound of its own, so a connection
+        # that was accepted and then went quiet fails that attempt rather than
+        # running it out against the timeout above. This is the same division
+        # install-llvm draws with Acquire::*::Timeout: the inner bound fails
+        # the request, the outer one fails the attempt.
+        export GIT_HTTP_LOW_SPEED_LIMIT=1000
+        export GIT_HTTP_LOW_SPEED_TIME=30
+        for n in 1 2 3 4 5; do
+          if timeout -k 30 300 pip install \
+            git+https://github.com/matus-chochlik/ctcache.git; then
+            exit 0
+          fi
+          echo "::warning::ctcache install failed or stalled (attempt ${n});" \
+            "retrying in $((n * 5))s"
+          sleep $((n * 5))
+        done
+        echo "::error::ctcache install failed after 5 attempts"
+        exit 1
+      shell: bash
+  using: composite

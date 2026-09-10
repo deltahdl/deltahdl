@@ -1649,7 +1649,7 @@ jobs:
       - name: Install LLVM
         uses: ./.github/actions/install-llvm
       - name: Install ctcache
-        run: pip install git+https://github.com/matus-chochlik/ctcache.git
+        uses: ./.github/actions/install-ctcache
       - name: Create clang-tidy wrapper
         run: |
           sudo tee /usr/local/bin/clang-tidy-cached << 'WRAPPER'
@@ -1705,7 +1705,7 @@ jobs:
       - name: Install LLVM
         uses: ./.github/actions/install-llvm
       - name: Install ctcache
-        run: pip install git+https://github.com/matus-chochlik/ctcache.git
+        uses: ./.github/actions/install-ctcache
       - name: Create clang-tidy wrapper
         run: |
           sudo tee /usr/local/bin/clang-tidy-cached << 'WRAPPER'
