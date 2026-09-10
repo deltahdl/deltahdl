@@ -302,6 +302,15 @@ static const char* VpiDecompileStr(VpiHandle obj) {
   return obj->decompile.empty() ? nullptr : obj->decompile.c_str();
 }
 
+// §38.31 and §38.9: the four callback reasons an application may read the
+// save/restart location from. Both clauses name two of them and neither names
+// any other, so a routine running for something else -- or for no callback at
+// all -- is not one of the application callback routines they describe.
+static bool VpiSaveRestartReasonAllowsLocation(int reason) {
+  return reason == kCbStartOfSave || reason == kCbEndOfSave ||
+         reason == kCbStartOfRestart || reason == kCbEndOfRestart;
+}
+
 // §38.11: resolves the string-valued property switch for vpi_get_str(), after
 // the caller has handled the null- and protected-object gating. Factored out of
 // VpiContext::GetStrRaw so the entry point stays small; the per-case spec
@@ -383,7 +392,20 @@ const char* VpiContext::GetStr(int property, VpiHandle obj) {
 }
 
 const char* VpiContext::GetStrRaw(int property, VpiHandle obj) {
-  if (!obj) return nullptr;
+  if (!obj) {
+    // §38.31: "an application can get the path to the implementation's
+    // save/restart location by calling vpi_get_str(vpiSaveRestartLocation,
+    // NULL) from an application callback routine that has been called for
+    // reason cbStartOfSave or cbEndOfSave", and §38.9 says the same of the two
+    // restart reasons. It is the one string property drawn on no object, and a
+    // null handle stopped here before reaching any property at all.
+    if (property == vpiSaveRestartLocation &&
+        VpiSaveRestartReasonAllowsLocation(current_callback_reason_) &&
+        !save_restart_location_.empty()) {
+      return save_restart_location_.c_str();
+    }
+    return nullptr;
+  }
   // §37.3.6: a protected object's properties are inaccessible unless otherwise
   // specified, so a string query for one is an error. The vpiType and
   // vpiIsProtected properties are the exception - permitted for all objects -

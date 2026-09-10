@@ -92,6 +92,12 @@ std::string CoverageScopeName(VpiHandle scope_handle) {
 
 }  // namespace
 
+// §40.5.3: statement, toggle, and FSM coverage are not individually
+// controllable, so the Start/Stop/Reset/Check actions act on the scope the
+// handle names as a whole rather than on any per-statement, per-signal, or
+// per-FSM object. The return is the §40.3.1 status value the equivalent system
+// function produces, so the detailed outcome -- and the collection-state change
+// it reflects -- is observable to the caller.
 int VpiContext::ControlCoverage(int operation, int coverage_type,
                                 VpiHandle scope_handle,
                                 const std::string& name) {

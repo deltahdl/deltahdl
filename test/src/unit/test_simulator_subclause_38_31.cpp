@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstring>
+#include <string>
 
 #include "helpers_vpi_save_restore_probe.h"
 
@@ -250,6 +251,57 @@ TEST_F(VpiPutDataSim, MultipleWritesReadBackInDifferentChunkSizes) {
   EXPECT_EQ(0, std::memcmp(r.buf1, "AB", 2));
   EXPECT_EQ(r.ret2, 4);
   EXPECT_EQ(0, std::memcmp(r.buf2, "CDEF", 4));
+}
+
+// §38.31 names one more thing an application does from a save routine: "an
+// application can get the path to the implementation's save/restart location by
+// calling vpi_get_str(vpiSaveRestartLocation, NULL) from an application
+// callback routine that has been called for reason cbStartOfSave or
+// cbEndOfSave." That query answered null under every run, and not because the
+// tool had no location to report: vpi_get_str() refused a null handle before
+// reaching any property at all, and this is the one string property drawn on no
+// object.
+
+// What the application read.
+std::string g_location_in_save;
+bool g_location_read_in_save = false;
+bool g_location_read_outside = false;
+
+int ReadLocationCb(VpiCbData*) {
+  const char* path = vpi_get_str(vpiSaveRestartLocation, nullptr);
+  g_location_read_in_save = path != nullptr;
+  if (path != nullptr) g_location_in_save = path;
+  return 0;
+}
+
+int ReadLocationOutsideCb(VpiCbData*) {
+  g_location_read_outside =
+      vpi_get_str(vpiSaveRestartLocation, nullptr) != nullptr;
+  return 0;
+}
+
+TEST_F(VpiPutDataSim, TheSaveRestartLocationIsReadableFromASaveRoutine) {
+  g_location_in_save.clear();
+  g_location_read_in_save = false;
+  vpi_ctx_.SetSaveRestartLocation("run.save");
+
+  DispatchWith(cbStartOfSave, ReadLocationCb, nullptr);
+
+  ASSERT_TRUE(g_location_read_in_save);
+  EXPECT_EQ(g_location_in_save, "run.save");
+}
+
+TEST_F(VpiPutDataSim, TheSaveRestartLocationIsNotReadableElsewhere) {
+  g_location_read_outside = false;
+  vpi_ctx_.SetSaveRestartLocation("run.save");
+
+  // §38.31 and §38.9 name four reasons between them and no others, so a routine
+  // running for one they do not name is not one of the application callback
+  // routines they describe. Without this the case above passes on a tool that
+  // answered the query from anywhere.
+  DispatchWith(cbEndOfSimulation, ReadLocationOutsideCb, nullptr);
+
+  EXPECT_FALSE(g_location_read_outside);
 }
 
 }  // namespace

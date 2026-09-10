@@ -54,15 +54,9 @@ class VpiContext {
   // VpiSystfCallbackFiresAtBuild (src/simulator/vpi_control.cpp) already models
   // which of the three that is.
   //
-  // §36.4 decides what the application is handed. "When the PLI applications
-  // associated with a user-defined system task or system function are called,
-  // the task/function arguments are not passed to the PLI application. Instead,
-  // a number of PLI routines are provided that allow the PLI applications to
-  // read and write to the task/function arguments." So the calltf is handed its
-  // own user_data and nothing else, and `call_site` is what the arguments are
-  // read off: they are hung on the call object §37.42 gives the application, to
-  // be reached from there by vpi_iterate(vpiArgument, ...). `ctx` is where an
-  // argument that names a variable finds it.
+  // §36.4 decides what the application is handed, and `call_site` is what the
+  // arguments are read off; the clause's own words on both are written where
+  // MakeSystfCallObject builds the call.
   bool CallRegisteredSystf(const char* name, const Expr* call_site,
                            SimContext& ctx, Logic4Vec& result, Arena& arena);
 
@@ -295,14 +289,8 @@ class VpiContext {
   // to the scope named by `scope_handle` (an instance or assertion handle);
   // vpiCoverageSave applies the §40.3.2.5 rules and vpiCoverageMerge the
   // §40.3.2.4 rules to the coverage database located by `name`. `coverage_type`
-  // is one of the §40.5.1 coverage type properties.
-  //
-  // Statement, toggle, and FSM coverage are not individually controllable, so
-  // the Start/Stop/Reset/Check actions act on the scope the handle names as a
-  // whole rather than on any per-statement, per-signal, or per-FSM object. The
-  // return is the §40.3.1 status value the equivalent system function produces,
-  // so the detailed outcome - and the collection-state change it reflects - is
-  // observable to the caller.
+  // is one of the §40.5.1 coverage type properties. What the actions act on and
+  // what the return means are written where it is defined.
   int ControlCoverage(int operation, int coverage_type, VpiHandle scope_handle,
                       const std::string& name);
 
@@ -692,6 +680,16 @@ class VpiContext {
   }
   VpiHandle ActiveTimeFormatCall() const { return active_time_format_call_; }
 
+  // §38.31 / §38.9: the path to this implementation's save/restart location,
+  // read with vpi_get_str(vpiSaveRestartLocation, NULL) from a save or restart
+  // callback. Empty is no location rather than an empty path.
+  void SetSaveRestartLocation(std::string path) {
+    save_restart_location_ = std::move(path);
+  }
+  const std::string& SaveRestartLocation() const {
+    return save_restart_location_;
+  }
+
   const VpiErrorInfo& LastError() const { return last_error_; }
 
   // §38.2: the error status is reset by any VPI routine call except
@@ -909,6 +907,8 @@ class VpiContext {
   // It is deliberately separate storage from str_pool_ (the buffer that backs
   // s_vpi_value strings), which the clause requires to be a different buffer.
   std::string get_str_buffer_;
+
+  std::string save_restart_location_;
 
   // §38.15: vpi_get_value() owns the memory for the vector arm of the value
   // union; each retrieval keeps its s_vpi_vecval array alive here until the
