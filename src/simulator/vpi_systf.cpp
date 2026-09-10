@@ -159,7 +159,13 @@ VpiObject* SystfCallArgument(VpiObject* arg, const Expr* actual,
                         : nullptr;
   if (named != nullptr) {
     arg->type = vpiRefObj;
-    arg->name = actual->text;
+    // Expr::text is a view into the source buffer, which does not end where the
+    // identifier does, so the name is copied into the run's arena to be the
+    // standalone string VpiObject::name has to hold. Without the copy
+    // vpi_get_str(vpiName, arg) reported the rest of the source file.
+    arg->name = std::string_view(
+        arena.AllocString(actual->text.data(), actual->text.size()),
+        actual->text.size());
     arg->var = named;
   } else {
     arg->type = vpiOperation;

@@ -11,6 +11,11 @@ namespace delta {
 
 struct VpiObject {
   int type = 0;
+  // §38.11 hands this back as a C string: VpiNameStr in vpi_query_str.cpp
+  // returns name.data() and VpiContext::GetStr copies from there to the NUL, so
+  // a view whose end is not one reports whatever follows it in the buffer it
+  // points into. Every name set here is therefore a standalone string -- a
+  // view into a longer one is copied before it is stored.
   std::string_view name;
   std::string full_name;
   Variable* var = nullptr;
