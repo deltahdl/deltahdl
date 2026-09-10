@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
+#include "simulator/sim_context.h"
+#include "simulator/specify.h"
+#include "simulator/specify_timing_check.h"
 #include "simulator/vpi.h"
 
 namespace delta {
@@ -177,6 +181,62 @@ TEST_F(OverrideBuiltinSystf,
   ASSERT_NE(vpi_register_systf(&other), nullptr);
 
   EXPECT_EQ(vpi_ctx_.ResolveSystf("$random"), nullptr);
+}
+
+// How many times the application registered under $setup below has been
+// called. §36.3.2's exception is that it is never called at all, so the counter
+// exists to be read as zero.
+int g_setup_calls = 0;
+
+int SetupCalltf(const char*) {
+  ++g_setup_calls;
+  return 0;
+}
+
+// §36.3.2's one exception to the override rule: "SystemVerilog timing checks,
+// such as $setup, are not system tasks and cannot be overridden." The
+// registration itself is accepted -- §36.9.1 takes any name beginning with $,
+// and nothing there knows which names clause 31 spends -- so what carries the
+// exception is that the $setup a specify block writes never becomes a call:
+// Parser::ParseTimingCheck reads it into a TimingCheckEntry, which reaches
+// SpecifyManager rather than the evaluator's dispatch.
+//
+// Both halves are asserted because a dispatch that took this $setup for a
+// system task name would fail them together -- the application would run and
+// the check would not be registered -- while a run that registered the check
+// and called the application too would fail only the first.
+TEST_F(OverrideBuiltinSystf, ATimingCheckCannotBeOverridden) {
+  g_setup_calls = 0;
+  s_vpi_systf_data setup = {};
+  setup.type = vpiSysTask;
+  setup.tfname = "$setup";
+  setup.calltf = SetupCalltf;
+  ASSERT_NE(vpi_register_systf(&setup), nullptr);
+
+  SimFixture f;
+  // §31.3.1 orders $setup's arguments data_event, reference_event, limit, so
+  // `d` is the data event and `clk` the reference.
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic d;\n"
+      "  logic clk;\n"
+      "  specify\n"
+      "    $setup(d, posedge clk, 7);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+
+  EXPECT_EQ(g_setup_calls, 0);
+  const SpecifyManager* mgr = f.ctx.GetSpecifyManager();
+  ASSERT_NE(mgr, nullptr);
+  bool registered_as_a_check = false;
+  for (const auto& check : mgr->GetTimingChecks()) {
+    if (check.kind == TimingCheckKind::kSetup) registered_as_a_check = true;
+  }
+  EXPECT_TRUE(registered_as_a_check);
 }
 
 }  // namespace
