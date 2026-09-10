@@ -41,12 +41,19 @@ TEST_F(VpiIterateSim, IterateModuleChildPorts) {
   EXPECT_EQ(count, 2);
 }
 
-TEST_F(VpiIterateSim, IterateGlobalRegsAfterAttach) {
-  sim_ctx_.CreateVariable("v1", 8);
-  sim_ctx_.CreateVariable("v2", 16);
+// §38.23: the iterator walks "all objects of type type associated with object
+// ref", so the regs of a run are reached by asking the scope that holds them.
+// §37.4.3 gives a NULL reference only to a relationship the diagrams draw from
+// a circle, and a scope's regs are drawn from the scope.
+TEST_F(VpiIterateSim, IterateRegsOfAScopeAfterAttach) {
+  sim_ctx_.CreateVariable("m1.v1", 8);
+  sim_ctx_.CreateVariable("m1.v2", 16);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle iter = vpi_iterate(vpiReg, nullptr);
+  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+  ASSERT_NE(mod, nullptr);
+
+  vpiHandle iter = vpi_iterate(vpiReg, mod);
   ASSERT_NE(iter, nullptr);
 
   int count = 0;

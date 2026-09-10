@@ -617,6 +617,21 @@ void CollectMatchingChildren(int type, VpiHandle ref,
   }
 }
 
+// §37.4.3: a relationship traversed with NULL for the ref_h is one the data
+// model diagrams draw from a circle. Every other relationship is drawn from a
+// reference object and means nothing without one, which §38.23 says in its own
+// terms: the iterator walks "all objects of type type associated with object
+// ref". These are the one-to-many relationships this model draws from a circle
+// and answers by sweeping the objects it holds - §37.5 detail 1's top-level
+// modules ("Top-level modules shall be accessed using vpi_iterate() with a NULL
+// reference object"), §37.80's registered callbacks and §39.3.1's assertions.
+// §37.42's user-defined system tf objects, §37.81's time queue and §37.44's
+// threads are drawn from a circle too and are answered ahead of this out of
+// their own registries.
+bool VpiIsNullReferenceRelation(int type) {
+  return type == kVpiModule || type == vpiCallback || type == vpiAssertion;
+}
+
 // §37.49 + §37.5 detail 1: the null-reference walk - collect every object the
 // (type, ref) iteration matches. A NULL-reference vpiModule iteration reaches
 // only the top-level modules, never a module nested within another scope.
@@ -724,7 +739,11 @@ void DispatchVpiIterate(int type, VpiHandle ref, const VpiIterateModes& modes,
   }
   if (ref) {
     CollectMatchingChildren(type, ref, modes, iter);
-  } else {
+  } else if (VpiIsNullReferenceRelation(type)) {
+    // §37.4.3: the sweep answers only where a circle originates the
+    // relationship. Asked for anything else, a null reference names no
+    // traversal, and the empty iterator the caller then discards is the NULL
+    // §38.23 gives an iteration with no objects.
     CollectMatchingObjects(type, ref, modes, stores.all_objects, iter);
   }
 }
