@@ -60,15 +60,26 @@ static bool NetNamesAPortOf(const RtlirModule* mod, std::string_view name) {
 // per instance, and with none created there was nothing under either name --
 // the design held the declaration and no storage for it.
 //
-// A port is the exception, and it is the one this used to be drawn around: a
-// regular module drives a net declared in an enclosing scope through its port,
-// so a same-named net materialized here would shadow that outer net and the
-// assign would never reach it. An interface keeps every one of its nets,
-// ports included, because §25.3.2 has its members shared through the port by
-// reference rather than driven across it.
+// Two shapes reach an enclosing scope's net rather than owning one, and both
+// are left alone. A port is one: a regular module drives a net declared outside
+// it through its port, so a same-named net materialized here would shadow that
+// outer net and the assign would never reach it. A nested declaration is the
+// other: §23.4 has "the outer name space is visible to the inner module", so a
+// name a continuous assign inside it writes may be one declared around it, and
+// the net the elaborator made for that reference stands for the outer object.
+// §23.9's module boundary is what leaves an ordinary instance out of this --
+// a module instantiated rather than declared here sees none of those names, so
+// every net it declares is its own.
+//
+// An interface keeps every one of its nets, ports included, because §25.3.2 has
+// its members shared through the port by reference rather than driven across
+// it.
 static void CreateChildModuleNets(const std::string& inst_prefix,
-                                  const RtlirModule* resolved, SimContext& ctx,
+                                  const RtlirModuleInst& child, SimContext& ctx,
                                   Arena& arena) {
+  const RtlirModule* resolved = child.resolved;
+  bool owns_its_nets = resolved->is_interface || !child.is_nested_decl;
+  if (!owns_its_nets) return;
   for (const auto& net : resolved->nets) {
     if (!resolved->is_interface && NetNamesAPortOf(resolved, net.name)) {
       continue;
@@ -109,7 +120,7 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     RecordSpecifyScope(child.resolved);
     CreateChildModuleVariables(inst_prefix_, child.resolved);
     CreateChildModulePorts(inst_prefix_, child.resolved, ctx_, arena_);
-    CreateChildModuleNets(inst_prefix_, child.resolved, ctx_, arena_);
+    CreateChildModuleNets(inst_prefix_, child, ctx_, arena_);
     // 21.2.1.5: register the child instance's tasks/functions so a call within
     // its own body resolves (and %m composes the instance + subroutine path);
     // LowerModule registers these for the top only.
