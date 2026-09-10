@@ -1,19 +1,10 @@
 #pragma once
 
-// Umbrella header for the VPI interface. The declarations were split into the
-// topical sub-headers below to keep each file within the repository's per-file
-// line limit; they are included here in dependency order so that every existing
-// `#include "simulator/vpi.h"` continues to provide the same complete interface
-// it always did. Do not reorder these includes - later sub-headers depend on
-// types declared in earlier ones, and the PLI typedefs/macros in
-// vpi_user_macros.h are intentionally introduced after the delta::VpiContext
-// declarations, matching the original single-file ordering.
+// The repository's own spelling of the VPI interface, and the one every
+// translation unit under src/ that reaches the VPI is written against. What it
+// provides is simulator/vpi_user.h, which holds the sub-headers in dependency
+// order and which §36.7 names as the file a PLI application includes; the two
+// names stand for one interface today because every declaration an application
+// needs is one this tool's own code needs too.
 
-#include "simulator/vpi_constants.h"
-#include "simulator/vpi_context.h"
-#include "simulator/vpi_data_structs.h"
-#include "simulator/vpi_model_helpers1.h"
-#include "simulator/vpi_model_helpers2.h"
-#include "simulator/vpi_model_helpers3.h"
-#include "simulator/vpi_object.h"
-#include "simulator/vpi_user_macros.h"
+#include "simulator/vpi_user.h"

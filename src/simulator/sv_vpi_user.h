@@ -3,7 +3,7 @@
 #ifndef SV_VPI_USER_H
 #define SV_VPI_USER_H
 
-#include "simulator/vpi.h"
+#include "simulator/vpi_user.h"
 
 #ifdef __cplusplus
 extern "C" {
