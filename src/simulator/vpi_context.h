@@ -10,6 +10,7 @@
 #include "simulator/coverage_control.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_data_structs.h"
+#include "simulator/vpi_globals.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_pli_types.h"
 
@@ -30,6 +31,7 @@ class VpiContext {
   // running between the ports two instances connect to one signal.
   void AttachDesignPorts(const RtlirDesign* design);
   void AttachDesignInterModPaths(const RtlirDesign* design);
+  void AttachTopModules(const RtlirDesign* design);
 
   void SetScheduler(Scheduler* sched) { scheduler_ = sched; }
 
@@ -926,24 +928,5 @@ class VpiContext {
   // needs to keep.
   std::vector<unsigned char> value_array_storage_;
 };
-
-Region RegionForPliCallback(int reason);
-
-bool IsOneShotPliCallback(int reason);
-
-VpiContext& GetGlobalVpiContext();
-void SetGlobalVpiContext(VpiContext* ctx);
-
-// §36.9.1: the intended use model places a reference to a registration
-// routine in the vlog_startup_routines[] array. Each entry is a function that
-// takes no arguments and returns nothing, and the array is conventionally
-// null-terminated.
-using VlogStartupRoutine = void (*)();
-
-// §36.9.1: walking the vlog_startup_routines[] array calls each non-null
-// entry in order, giving each routine its chance to register user-defined
-// system tasks and functions before elaboration begins. Iteration stops at
-// the first null sentinel.
-void InvokeVlogStartupRoutines(VlogStartupRoutine* routines);
 
 }  // namespace delta

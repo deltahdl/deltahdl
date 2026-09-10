@@ -664,6 +664,46 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   }
   RecordVariableObjectKinds(design, object_map_);
   RecordDeclarationSourceLocations(design, object_map_, SourcesOf(sim_ctx_));
+  AttachTopModules(design);
+}
+
+void VpiContext::AttachTopModules(const RtlirDesign* design) {
+  // §37.5 detail 1: "Top-level modules shall be accessed using vpi_iterate()
+  // with a NULL reference object", which is where a PLI application walking a
+  // design begins. Nothing built an object for a top module: the simulator keys
+  // an instance's objects on a flat name and a top carries the empty prefix, so
+  // what the passes above entered were the top's own contents under their bare
+  // names and the top itself was an object of no kind. The iteration that
+  // reaches the tops therefore reached none of them, VpiObject::top_module was
+  // read by that filter and by vpi_get(vpiTopModule) and was written by
+  // nothing, and §37.1's "using VPI data models" had no first step.
+  if (design == nullptr) return;
+
+  for (auto* top : design->top_modules) {
+    if (top == nullptr) continue;
+    // The objects already entered under bare names are the top's contents, so
+    // they become its children and it becomes their enclosing instance. They
+    // stay keyed under those names, which is what the simulator keys their
+    // storage on and what vpi_handle_by_name() has always answered to.
+    std::vector<VpiObject*> contents;
+    for (auto& [name, object] : object_map_) {
+      if (object != nullptr && object->parent == nullptr) {
+        contents.push_back(object);
+      }
+    }
+
+    name_pool_.emplace_back(top->name);
+    auto* obj = AllocObject();
+    obj->type = kVpiModule;
+    obj->name = name_pool_.back();
+    obj->full_name = std::string(top->name);
+    obj->top_module = true;
+    for (auto* object : contents) {
+      object->parent = obj;
+      obj->children.push_back(object);
+    }
+    object_map_[obj->name] = obj;
+  }
 }
 
 void AttachDesignToPliApplications(const RtlirDesign* design, SimContext& ctx) {
