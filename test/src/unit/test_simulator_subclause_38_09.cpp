@@ -11,6 +11,22 @@ namespace {
 // reason cbStartOfRestart or cbEndOfRestart. The probe routines and fixture
 // that drive these reads live in helpers_vpi_save_restore_probe.h.
 
+// A single vpi_put_data() call, which §38.31 makes legal only from a
+// cbStartOfSave or cbEndOfSave application routine -- the same shape the read
+// probes in helpers_vpi_save_restore_probe.h have for the same reason on the
+// other side.
+struct SingleWrite {
+  int id = 0;
+  char* data = nullptr;
+  int len = 0;
+};
+
+inline int WriteOnceCb(VpiCbData* cb) {
+  auto* p = static_cast<SingleWrite*>(cb->user_data);
+  vpi_put_data(p->id, p->data, p->len);
+  return 0;
+}
+
 // Reads with a null destination buffer, modeling an application that failed to
 // provide the allocated storage the routine requires.
 int ReadIntoNullCb(VpiCbData* cb) {
@@ -187,7 +203,11 @@ TEST_F(VpiGetDataSim, TheIdIsTheOneTheToolHandsBack) {
   // vpi_put_data() for a given id." So the data goes in under that id and comes
   // back out under it, which is the whole of the clause's own flow.
   char saved[] = {'i', 'd'};
-  vpi_put_data(id, saved, 2);
+  SingleWrite write;
+  write.id = id;
+  write.data = saved;
+  write.len = 2;
+  DispatchWith(cbStartOfSave, WriteOnceCb, &write);
 
   SingleRead probe;
   probe.id = id;
