@@ -26,23 +26,27 @@ class TraversingExpressions : public ::testing::Test {
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
-  // §36.10.3's own traverseExpr(), with the leaves recorded rather than
-  // processed so a case can say which of them the walk arrived at.
-  void TraverseExpr(vpiHandle expr) {
-    switch (vpi_get(vpiType, expr)) {
-      case vpiOperation: {
-        vpiHandle sub_expr_i = vpi_iterate(vpiOperand, expr);
-        if (sub_expr_i != nullptr) {
-          while (vpiHandle sub_expr_h = vpi_scan(sub_expr_i)) {
-            TraverseExpr(sub_expr_h);
-          }
-        }
-        break;
-      }
-      default:
-        leaves_.push_back(expr);
-        break;
+  // The operation arm of §36.10.3's traverseExpr(): iterate vpiOperand and
+  // recurse into each operand vpi_scan() hands back.
+  void TraverseOperands(vpiHandle expr) {
+    vpiHandle sub_expr_i = vpi_iterate(vpiOperand, expr);
+    if (sub_expr_i == nullptr) return;  // else it is of op type vpiNullOp
+    while (vpiHandle sub_expr_h = vpi_scan(sub_expr_i)) {
+      TraverseExpr(sub_expr_h);
     }
+  }
+
+  // §36.10.3's own traverseExpr(), with the leaves recorded rather than
+  // processed so a case can say which of them the walk arrived at. The clause
+  // writes the two arms as a switch on vpi_get(vpiType, expr); they are written
+  // here as the operation test and the default beside it, which the nesting
+  // limit clang-tidy holds a test function under leaves room for.
+  void TraverseExpr(vpiHandle expr) {
+    if (vpi_get(vpiType, expr) == vpiOperation) {
+      TraverseOperands(expr);
+      return;
+    }
+    leaves_.push_back(expr);  // do whatever to the leaf object
   }
 
   std::vector<vpiHandle> leaves_;

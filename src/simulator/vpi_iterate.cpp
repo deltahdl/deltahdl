@@ -782,10 +782,30 @@ bool DispatchRegistryMode(int type, VpiHandle ref,
 // computed from a non-null reference - net/variable drivers and loads, foreach
 // loop variables, constraint-expression bodies, and registered callback
 // objects. Returns true if one of these modes applied.
+// §36.10.3/§37.26/§37.39: route the reference-object modes whose collector
+// hands back the objects as a list - an operation's operands, the members of a
+// structure or union, and the terms of a module path. They are grouped apart
+// from the modes above so neither dispatcher grows past the complexity limit
+// clang-tidy-src holds every function under.
+bool DispatchListedMode(int type, VpiHandle ref, const VpiIterateModes& modes,
+                        VpiObject* iter) {
+  std::vector<VpiHandle> listed;
+  if (modes.operation_operands) {
+    listed = VpiOperationOperands(ref);
+  } else if (modes.struct_union_members) {
+    listed = VpiStructUnionMembers(ref);
+  } else if (modes.mod_path_terms) {
+    listed = VpiModPathTerms(type, ref);
+  } else {
+    return false;
+  }
+  for (VpiHandle object : listed) iter->children.push_back(object);
+  return true;
+}
+
 bool DispatchRefSpecialMode(int type, VpiHandle ref,
                             const VpiIterateModes& modes,
                             VpiIterateStores& stores, VpiObject* iter) {
-  (void)type;
   if (modes.net_driver || modes.net_load) {
     CollectNetDriversOrLoads(ref, modes.net_driver, iter);
     return true;
@@ -803,27 +823,7 @@ bool DispatchRefSpecialMode(int type, VpiHandle ref,
     CollectConstraintExprs(ref, iter);
     return true;
   }
-  if (modes.operation_operands) {
-    // §36.10.3 (traverseExpr): the operands the operation was written with.
-    for (VpiHandle operand : VpiOperationOperands(ref)) {
-      iter->children.push_back(operand);
-    }
-    return true;
-  }
-  if (modes.struct_union_members) {
-    // §37.26 (figure): the members the structure or union holds.
-    for (VpiHandle member : VpiStructUnionMembers(ref)) {
-      iter->children.push_back(member);
-    }
-    return true;
-  }
-  if (modes.mod_path_terms) {
-    // §37.39 (figure): the terms the named relation reaches.
-    for (VpiHandle term : VpiModPathTerms(type, ref)) {
-      iter->children.push_back(term);
-    }
-    return true;
-  }
+  if (DispatchListedMode(type, ref, modes, iter)) return true;
   if (modes.let_argument) {
     CollectLetExprArguments(ref, iter);
     return true;
