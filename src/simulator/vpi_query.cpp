@@ -40,9 +40,15 @@ int VpiGetSize(VpiHandle obj) {
 
 // §37.34/§37.8/§37.41: computes vpiAccessType, whose legal values depend on the
 // object kind - a constraint reports vpiExternAcc or 0, an interface tf decl
-// reports vpiForkJoinAcc/vpiExternAcc or vpiUndefined, a DPI task/function
-// reports its import/export access - everything else reports its stored access
-// type.
+// reports vpiForkJoinAcc/vpiExternAcc or vpiUndefined, and a DPI task or
+// function reports its import/export access (§37.41 detail 6).
+//
+// Three diagrams draw this property and no other does: §37.34 draws it on the
+// constraint, §37.8 on the interface tf decl, and §37.41 on the `task func`
+// enclosure, which carries it for the task and the function alike. Every other
+// object kind reported whatever the field held, which is a value the data model
+// gives it nowhere; §38.6 makes vpiUndefined what vpi_get() answers where it
+// has none to give.
 int VpiGetAccessType(VpiHandle obj) {
   if (obj->type == vpiConstraint)
     return obj->access_type == vpiExternAcc ? vpiExternAcc : 0;
@@ -51,8 +57,8 @@ int VpiGetAccessType(VpiHandle obj) {
             obj->access_type == vpiExternAcc)
                ? obj->access_type
                : vpiUndefined;
-  if ((obj->type == vpiFunction || obj->type == vpiTask) && obj->is_dpi)
-    return obj->dpi_export ? vpiDPIExportAcc : vpiDPIImportAcc;
+  if (!VpiIsTaskFuncType(obj->type)) return vpiUndefined;
+  if (obj->is_dpi) return obj->dpi_export ? vpiDPIExportAcc : vpiDPIImportAcc;
   return obj->access_type;
 }
 

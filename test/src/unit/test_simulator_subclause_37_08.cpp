@@ -62,14 +62,26 @@ TEST_F(InterfaceTfDecl, OutOfDomainAccessTypeCollapsesToUndefined) {
   EXPECT_EQ(vpi_get(vpiAccessType, &unset), vpiUndefined);
 }
 
-// D2 scope guard: the interface-tf-decl clamp is keyed on the object type, so a
-// non-interface-tf-decl object is untouched by this clause's rule and passes
-// its stored value straight through.
+// D2 scope guard: the interface-tf-decl clamp is keyed on the object type, so
+// the other objects the property is drawn on keep their own rules. §37.41
+// draws it on the `task func` enclosure, and a task there reports the access it
+// was declared with rather than this clause's two values.
 TEST_F(InterfaceTfDecl, ClampIsScopedToInterfaceTfDecl) {
-  VpiObject other;
-  other.type = vpiReg;
-  other.access_type = 99;  // would be clamped if the guard were not type-keyed
-  EXPECT_EQ(vpi_get(vpiAccessType, &other), 99);
+  VpiObject task;
+  task.type = vpiTask;
+  task.access_type = 99;  // would be clamped if the guard were not type-keyed
+  EXPECT_EQ(vpi_get(vpiAccessType, &task), 99);
+}
+
+// The property is drawn on the interface tf decl, on §37.34's constraint and on
+// §37.41's task func enclosure, and on nothing else. An object the data model
+// gives no access type reports none, rather than handing back a number the
+// diagrams never gave it.
+TEST_F(InterfaceTfDecl, AnObjectDrawnWithNoAccessTypeReportsNone) {
+  VpiObject net;
+  net.type = kVpiNet;
+  net.access_type = 99;
+  EXPECT_EQ(vpi_get(vpiAccessType, &net), vpiUndefined);
 }
 
 }  // namespace

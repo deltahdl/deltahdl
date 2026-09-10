@@ -159,10 +159,11 @@ TEST_F(ConstraintDistribution, AccessTypeIsExternAccOrZero) {
   odd_constraint.access_type = 99;  // not vpiExternAcc
   EXPECT_EQ(vpi_get(vpiAccessType, &odd_constraint), 0);
 
-  // The clamp is scoped to constraints: a non-constraint passes its value
-  // through.
+  // The clamp is scoped to constraints: another object the property is drawn
+  // on keeps its own rule. §37.41 draws it on the task func enclosure, where a
+  // function reports the access it was declared with.
   VpiObject non_constraint;
-  non_constraint.type = vpiReg;
+  non_constraint.type = vpiFunction;
   non_constraint.access_type = 99;
   EXPECT_EQ(vpi_get(vpiAccessType, &non_constraint), 99);
 }
