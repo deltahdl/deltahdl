@@ -31,7 +31,7 @@ namespace {
 std::vector<int> g_reasons;
 std::vector<vpiHandle> g_objects;
 
-PLI_INT32 RecordTransientEvent(p_cb_data data) {
+int RecordTransientEvent(VpiCbData* data) {
   g_reasons.push_back(data->reason);
   g_objects.push_back(data->obj);
   return 0;
