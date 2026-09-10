@@ -139,6 +139,11 @@ VpiHandle VpiContext::ThreadObjectFor(Process* proc) {
   obj->type = vpiThread;
   obj->active = proc->active;
   thread_objects_[proc] = obj;
+  // §37.3.8: a thread is one of the transient objects whose life "may be
+  // tracked through various callbacks", and cbStartOfThread is the one that
+  // reports its beginning. This is where the thread becomes an object of the
+  // model, and no site delivered the callback at all.
+  DispatchCallbacks(cbStartOfThread, obj);
   return obj;
 }
 
@@ -202,6 +207,11 @@ VpiHandle VpiContext::ActivateFrame() {
   }
   frame->active = true;
   active_frame_ = frame;
+  // §37.3.8: a frame is a transient object too, and cbStartOfFrame reports the
+  // beginning of one. Detail 4 of §37.43 has at most one frame active at a time
+  // in a thread, so the frame's life is the activation this ends rather than
+  // the allocation above, which a call chain entered again reuses.
+  DispatchCallbacks(cbStartOfFrame, frame);
   return outer;
 }
 
@@ -209,7 +219,13 @@ void VpiContext::RestoreActiveFrame(VpiHandle previous) {
   if (sim_ctx_ == nullptr) return;
   // §37.43 (vpiActive): the frame being left is no longer the active one, and
   // the frame it was activated from becomes active again.
-  if (active_frame_ != nullptr) active_frame_->active = false;
+  //
+  // §37.3.8: leaving it ends that frame's life, which is what cbEndOfFrame is
+  // there to report.
+  if (active_frame_ != nullptr) {
+    DispatchCallbacks(cbEndOfFrame, active_frame_);
+    active_frame_->active = false;
+  }
   active_frame_ = previous;
   if (active_frame_ != nullptr) active_frame_->active = true;
 }

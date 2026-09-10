@@ -411,6 +411,15 @@ void VpiContext::ReleaseFrameOrThreadObject(VpiHandle root) {
   // §37.2.2 (frame/thread free): release the freed object, all of its
   // subelements, and the callbacks placed on any of them.
   ReleaseHandleSubtree(root);
+
+  // §37.3.8: "The life of a transient object may be tracked through various
+  // callbacks", and a frame and a thread are two of the kinds it names. The end
+  // of one is where cbEndOfFrame and cbEndOfThread are delivered; an
+  // application that registered either was called by nothing at all, so the
+  // life it was registered to track ran its course unreported.
+  if (root == nullptr) return;
+  if (root->type == vpiFrame) DispatchCallbacks(cbEndOfFrame, root);
+  if (root->type == vpiThread) DispatchCallbacks(cbEndOfThread, root);
 }
 
 void VpiContext::ReleaseClassObject(VpiHandle class_object) {
@@ -423,6 +432,13 @@ void VpiContext::ReleaseClassObject(VpiHandle class_object) {
   for (VpiObject* member : class_object->children) {
     if (member->automatic) ReleaseHandleSubtree(member);
   }
+
+  // §37.3.8: reclaiming the memory of a class object is the end of that
+  // object's life, and the subclause gives it two of the callbacks it lists -
+  // cbReclaimObj for the reclaim itself and cbEndOfObject for the object
+  // ceasing to exist. Neither was delivered from anywhere.
+  DispatchCallbacks(cbReclaimObj, class_object);
+  DispatchCallbacks(cbEndOfObject, class_object);
 }
 
 bool VpiContext::SetDefaultCompatibilityMode(int mode) {
