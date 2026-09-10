@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi.h"
 
@@ -129,6 +130,110 @@ TEST(ThreadModel, ThreadIterationIsEmptyWhenNoneSpawned) {
   thread.type = vpiThread;
   EXPECT_TRUE(VpiThreadThreads(&thread).empty());
   EXPECT_TRUE(VpiThreadThreads(nullptr).empty());
+}
+
+// -----------------------------------------------------------------------------
+// §37.44 detail 1: "A thread is a SystemVerilog process such as an always
+// procedure or a branch of a fork construct." Every case above builds its
+// threads by hand, which says what the model reports about an object and
+// nothing about where such an object comes from -- and no run produced one at
+// all, so the whole of this model answered for a design only in a test that
+// wrote the design's threads itself.
+//
+// The cases below run a design and let an application reach the threads it has,
+// through the iteration the diagram's circle relation draws: vpi_iterate with a
+// null reference.
+// -----------------------------------------------------------------------------
+
+// What the application made of the run's threads. A calltf is a plain C
+// function with no return path to the case that provoked it.
+int g_threads_seen = 0;
+int g_non_threads_seen = 0;
+int g_threads_with_a_parent = 0;
+int g_spawned_total = 0;
+
+int InspectThreadsCalltf(const char*) {
+  vpiHandle threads = vpi_iterate(vpiThread, nullptr);
+  if (threads == nullptr) return 0;
+  for (vpiHandle t = vpi_scan(threads); t != nullptr; t = vpi_scan(threads)) {
+    ++g_threads_seen;
+    if (vpi_get(vpiType, t) != vpiThread) ++g_non_threads_seen;
+    if (VpiThreadParent(t) != nullptr) ++g_threads_with_a_parent;
+    g_spawned_total += static_cast<int>(VpiThreadThreads(t).size());
+  }
+  return 0;
+}
+
+void RegisterThreadProbe() {
+  g_threads_seen = 0;
+  g_non_threads_seen = 0;
+  g_threads_with_a_parent = 0;
+  g_spawned_total = 0;
+
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = "$probe";
+  data.calltf = &InspectThreadsCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+}
+
+// The clause's two examples in one design: a process, and two branches of a
+// fork inside it. The call is written after the join so all three have run by
+// the time the application looks.
+void RunAForkOfTwoBranches(SimFixture& f) {
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a;\n"
+      "  int b;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "      b = 2;\n"
+      "    join\n"
+      "    $probe;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+}
+
+class ThreadModelInARun : public ::testing::Test {
+ protected:
+  void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
+  void TearDown() override { SetGlobalVpiContext(nullptr); }
+
+  VpiContext vpi_ctx_;
+};
+
+TEST_F(ThreadModelInARun, TheRunsThreadsAreReachedByANullReferencedIteration) {
+  RegisterThreadProbe();
+
+  SimFixture f;
+  RunAForkOfTwoBranches(f);
+
+  // The procedure and the two branches of the fork it ran, which is §37.44
+  // detail 1's own list of what a thread is. Before this the iteration answered
+  // with nothing whatever the design did, no run having made a thread object.
+  EXPECT_GE(g_threads_seen, 3);
+  // And every one of them is a thread, rather than the iteration having handed
+  // back whatever else the context holds.
+  EXPECT_EQ(g_non_threads_seen, 0);
+}
+
+TEST_F(ThreadModelInARun, AForkBranchReachesTheThreadThatSpawnedIt) {
+  RegisterThreadProbe();
+
+  SimFixture f;
+  RunAForkOfTwoBranches(f);
+
+  // §37.44 (vpiParent -> thread, and the one-to-many thread relation): the two
+  // branches are the threads with a parent, and the procedure that forked them
+  // is the thread that has two. The two counts are the same pair of edges read
+  // from each end, so a model linking a branch to a parent that does not own it
+  // answers differently.
+  EXPECT_EQ(g_threads_with_a_parent, 2);
+  EXPECT_EQ(g_spawned_total, 2);
 }
 
 }  // namespace

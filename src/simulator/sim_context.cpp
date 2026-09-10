@@ -401,6 +401,12 @@ Net* SimContext::CreateNet(std::string_view name, NetType type, uint32_t width,
 
 void SimContext::SetCurrentProcess(Process* proc) {
   if (proc == current_process_) return;
+  // §37.44: a process reaching here is one the run has a thread for. This is
+  // the one place every process passes through, which is what makes the list it
+  // builds the run's threads rather than some of them.
+  if (proc != nullptr && threads_seen_.insert(proc).second) {
+    threads_.push_back(proc);
+  }
   // §13.3.2: SetCurrentProcess is the thread-switch primitive -- every process
   // resume is preceded by a call here. Hand the scope stack off between threads
   // so automatic-task (and block) locals stay private to each activation: park

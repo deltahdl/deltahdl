@@ -374,6 +374,15 @@ class SimContext : public DeclaredNameTables, public RandomStability {
 
   void SetCurrentProcess(Process* proc);
   Process* CurrentProcess() const { return current_process_; }
+
+  // §37.44: the run's threads, in the order they first ran. "A thread is a
+  // SystemVerilog process such as an always procedure or a branch of a fork
+  // construct", and SetCurrentProcess is where one becomes that: the comment on
+  // it calls it the thread-switch primitive, every process resume passing
+  // through it, so a process that has run is in here and one the run never
+  // reached is not. VpiContext::Attach reads this to give §37.44's model
+  // something the design produced.
+  const std::vector<Process*>& GetThreads() const { return threads_; }
   bool IsReactiveContext() const;
 
   // §23.9: a name written without a hierarchical path resolves within the
@@ -810,6 +819,11 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   std::unique_ptr<DpiRuntime> owned_dpi_runtime_;
   DpiRuntime* dpi_runtime_ = nullptr;
   Process* current_process_ = nullptr;
+  // §37.44: the processes SetCurrentProcess has switched to, in order, and the
+  // set that keeps the order list free of repeats -- a process is switched to
+  // once per resume and is one thread however many times it runs.
+  std::vector<Process*> threads_;
+  std::unordered_set<Process*> threads_seen_;
   // The instance being built. See SetLoweringInstancePrefix.
   std::string lowering_inst_prefix_;
   InstancePrefixOverrideState prefix_override_;

@@ -16,6 +16,7 @@ class SimContext;
 class Scheduler;
 class Arena;
 struct Net;
+struct Process;
 struct Variable;
 
 constexpr int kVpiModule = 32;

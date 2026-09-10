@@ -6,7 +6,10 @@
 #include <vector>
 
 #include "simulator/net.h"
+#include "simulator/process.h"
 #include "simulator/sim_context.h"
+// §37.44's vpiThread is defined in the SystemVerilog VPI header.
+#include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_internal.h"
@@ -57,7 +60,45 @@ VpiHandle VpiContext::DesignObjectForFlatName(std::string_view flat_name) {
   return current;
 }
 
+VpiHandle VpiContext::ThreadObjectFor(Process* proc) {
+  if (proc == nullptr) return nullptr;
+  auto it = thread_objects_.find(proc);
+  if (it != thread_objects_.end()) {
+    // §37.44 (vpiActive): the property belongs to the process, so it is read
+    // when asked for rather than frozen into the object when it was made.
+    it->second->active = proc->active;
+    return it->second;
+  }
+  auto* obj = AllocObject();
+  obj->type = vpiThread;
+  obj->active = proc->active;
+  thread_objects_[proc] = obj;
+  return obj;
+}
+
+void VpiContext::RefreshThreadObjects() {
+  if (sim_ctx_ == nullptr) return;
+  for (Process* proc : sim_ctx_->GetThreads()) {
+    VpiHandle obj = ThreadObjectFor(proc);
+    // §37.44 (thread one-to-many thread): the threads this one spawned, which
+    // detail 1 calls "a branch of a fork construct". They hang off the parent
+    // as its thread children, which is where VpiThreadThreads reads them and
+    // where VpiThreadParent reads the link back.
+    for (Process* child : proc->children) {
+      VpiHandle child_obj = ThreadObjectFor(child);
+      if (child_obj->parent != nullptr) continue;
+      child_obj->parent = obj;
+      obj->children.push_back(child_obj);
+    }
+  }
+}
+
 void VpiContext::Attach(SimContext& sim_ctx) {
+  // §37.44: the run the thread objects are made against. They cannot all be
+  // made here -- a fork branch begins while the design executes, long after
+  // this -- so what is kept is the run itself.
+  sim_ctx_ = &sim_ctx;
+
   // §36.10: "VPI routines provide access to objects in an instantiated
   // SystemVerilog design. An instantiated design is one where each instance of
   // an object is uniquely accessible. For instance, if a module m contains wire

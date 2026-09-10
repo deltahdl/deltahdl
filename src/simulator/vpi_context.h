@@ -700,16 +700,18 @@ class VpiContext {
   // most recent routine; a failing routine then records a fresh error.
   void ResetErrorStatus() { last_error_ = {}; }
 
+  // §37.44: the VPI object standing for one of the run's threads, and the pass
+  // that brings the set of them up to date with the run. Both are written in
+  // src/simulator/vpi_design_attach.cpp, beside the rest of what puts the
+  // design within reach of a PLI application.
+  VpiHandle ThreadObjectFor(Process* proc);
+  void RefreshThreadObjects();
+
   // §36.10.1: "Callbacks can be set up for when an error occurs as well." This
   // is that occurrence, delivered on the way out of the VPI routine that
-  // recorded the error, so an application registered for one hears about the
-  // error rather than only being able to ask after it. A routine that recorded
-  // nothing delivers nothing.
-  //
-  // §38.36.3 decides which reason: cbPLIError is a "simulation run-time error
-  // occurred in a PLI function call" and cbError one that occurred outside one,
-  // so the s_vpi_error_info state §38.2 gives the error is what selects between
-  // them -- vpiPLI is an error the PLI raised.
+  // recorded the error; a routine that recorded nothing delivers nothing. Which
+  // of §38.36.3's two error reasons it goes to, and why a pass already running
+  // delivers no second one, are written where it is defined.
   void NoteErrorRecorded();
 
  private:
@@ -891,6 +893,12 @@ class VpiContext {
   // and delivering that one from inside this pass would re-enter the same
   // callbacks with an error they have not returned from yet.
   bool dispatching_error_callbacks_ = false;
+
+  // §37.44: the run this context is attached to, and the thread object standing
+  // for each of its processes. The run is held because a thread comes and goes
+  // while the design executes, so the objects are made against it as it stands.
+  SimContext* sim_ctx_ = nullptr;
+  std::unordered_map<Process*, VpiObject*> thread_objects_;
 
   // §38.11: vpi_get_str() places its result in one temporary buffer that every
   // call reuses, so an earlier returned pointer is clobbered by a later call.

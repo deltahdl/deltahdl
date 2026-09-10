@@ -515,6 +515,19 @@ void CollectUserSystf(const std::vector<VpiObject*>& all_objects,
   }
 }
 
+// §37.44 (the circle relation): the run's threads, reached by an iteration with
+// a null reference. Every thread object the context has made is one of the
+// run's, VpiContext::RefreshThreadObjects having made them from the processes
+// the run switched to and the branches those spawned, so the objects themselves
+// are the list -- a fork branch is a thread of the run as much as the always
+// procedure that forked it is.
+void CollectThreads(const std::vector<VpiObject*>& all_objects,
+                    VpiObject* iter) {
+  for (auto* obj : all_objects) {
+    if (obj->type == vpiThread) iter->children.push_back(obj);
+  }
+}
+
 // §37.81: collect the surviving simulation-time-queue slots. Detail 3: the slot
 // at the current simulation time takes part only when events remain scheduled
 // before its read-only synch region; a future slot always contributes. Detail
@@ -660,6 +673,10 @@ bool DispatchRegistryMode(int type, VpiHandle ref,
     CollectTimeQueueSlots(time_queue_slots, all_objects, iter);
     return true;
   }
+  if (!ref && type == vpiThread) {
+    CollectThreads(all_objects, iter);
+    return true;
+  }
   return false;
 }
 
@@ -715,6 +732,10 @@ void DispatchVpiIterate(int type, VpiHandle ref, const VpiIterateModes& modes,
 }  // namespace
 
 VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
+  // §37.44: a thread that started since the last iteration is one of the run's
+  // threads too, so the objects are brought up to date before this one answers.
+  RefreshThreadObjects();
+
   // Classify this (type, ref) iteration into its special modes. The detailed
   // §37.x reasoning for each mode lives in ComputeVpiIterateModes; collecting
   // them there keeps this routine focused on dispatch.
