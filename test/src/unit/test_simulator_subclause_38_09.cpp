@@ -172,5 +172,31 @@ TEST_F(VpiGetDataSim, ReadingPastEndOfSavedDataWarnsAndZeroFills) {
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiWarning);
 }
 
+// §38.9 names where the first of vpi_get_data()'s three arguments comes from:
+// the id is "a save/restart ID returned from vpi_get(vpiSaveRestartID, NULL)".
+// That query answered with the 0 an unknown property gets, which is the one
+// value vpi_get_data() and vpi_put_data() refuse, so an application following
+// the clause could not obtain an id to save under at all -- every case above
+// picks a number of its own and seeds the store behind the routine's back.
+TEST_F(VpiGetDataSim, TheIdIsTheOneTheToolHandsBack) {
+  int id = vpi_get(vpiSaveRestartID, nullptr);
+  ASSERT_NE(id, 0);
+
+  // §38.9: "the first call for a given id will retrieve the data starting at
+  // what was placed into the save/restart location with the first call to
+  // vpi_put_data() for a given id." So the data goes in under that id and comes
+  // back out under it, which is the whole of the clause's own flow.
+  char saved[] = {'i', 'd'};
+  vpi_put_data(id, saved, 2);
+
+  SingleRead probe;
+  probe.id = id;
+  probe.request = 2;
+  DispatchWith(cbStartOfRestart, ReadOnceCb, &probe);
+
+  EXPECT_EQ(probe.returned, 2);
+  EXPECT_EQ(0, std::memcmp(probe.buf, saved, 2));
+}
+
 }  // namespace
 }  // namespace delta

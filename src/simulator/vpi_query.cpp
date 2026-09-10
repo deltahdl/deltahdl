@@ -522,6 +522,11 @@ int VpiContext::Get(int property, VpiHandle obj) {
     if (property == vpiTimePrecision || property == vpiTimeUnit) {
       return SmallestModuleTimePrecision();
     }
+    // §38.9: the id an application passes to vpi_put_data() and vpi_get_data()
+    // is the one this query hands back, and asking for it is what the clause
+    // has an application do first. It was answered with the 0 every unknown
+    // property gets, which is the value those two routines refuse.
+    if (property == vpiSaveRestartID) return kVpiRunSaveRestartId;
     return 0;
   }
   // §37.3.6: unless otherwise specified, asking vpi_get() for a property of a
