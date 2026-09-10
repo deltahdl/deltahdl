@@ -179,12 +179,20 @@ bool VpiContext::CallRegisteredSystf(const char* name, const Expr* call_site,
   call->name = data->tfname != nullptr ? std::string_view(data->tfname)
                                        : std::string_view();
   auto* value_holder = arena.Create<Variable>();
-  // §38.37.1: "If no sizetf is provided, a user-defined system function of type
-  // vpiSizedFunc or vpiSizedSignedFunc shall return 32 bits", which is the
-  // width the call answers with when the application writes nothing.
-  value_holder->value = MakeLogic4VecVal(arena, 32, 0);
+  // §36.8.1: "The value returned by the sizetf routine shall be the number of
+  // bits that the calltf routine shall provide as the return value for the
+  // system function", so the holder the application writes through is that
+  // wide. §38.37.1's default is what SystfResultSizeBits answers where no
+  // sizetf is provided: "a user-defined system function of type vpiSizedFunc or
+  // vpiSizedSignedFunc shall return 32 bits". A sizetf answering with no bits
+  // at all describes no value, so the default stands rather than a width
+  // nothing can hold.
+  int result_bits = SystfResultSizeBits(*data);
+  auto width = static_cast<uint32_t>(
+      result_bits > 0 ? result_bits : kVpiDefaultSizedFuncBits);
+  value_holder->value = MakeLogic4VecVal(arena, width, 0);
   call->var = value_holder;
-  call->size = 32;
+  call->size = static_cast<int>(width);
 
   // §36.4: the arguments the call site wrote, hung on the call so §37.42's
   // vpiArgument iteration reaches them. They are attached before the calltf

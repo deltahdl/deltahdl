@@ -575,6 +575,18 @@ class VpiContext {
 
   const std::vector<VpiSystfData>& RegisteredSystfs() const { return systfs_; }
 
+  // §36.8.1: the number of bits "that the calltf routine shall provide as the
+  // return value for the system function". VpiSystfResultSizeBits computes it,
+  // and this is where the clause's other sentence about the routine lands:
+  // "Each sizetf routine shall be called at most once." The first ask of a
+  // registration runs it; every later ask answers with what that run returned,
+  // so a system function a design calls a thousand times is sized once.
+  //
+  // A record that is not one of this context's registrations -- a caller's own
+  // s_vpi_systf_data, which the free function is happy to measure -- has no
+  // registration to remember the answer against, so it is measured each time.
+  int SystfResultSizeBits(const VpiSystfData& data);
+
   const std::vector<VpiCbData>& RegisteredCallbacks() const {
     return callbacks_;
   }
@@ -686,6 +698,10 @@ class VpiContext {
   void ReleaseHandleSubtree(VpiObject* root);
 
   std::vector<VpiSystfData> systfs_;
+  // §36.8.1: what each registration's sizetf returned, keyed by its position in
+  // systfs_, which is stable because registrations are appended and never
+  // removed. Absent until the first ask, which is the run the clause allows.
+  std::unordered_map<size_t, int> systf_result_bits_;
   std::vector<VpiCbData> callbacks_;
   std::vector<VpiHandle> cb_handles_;
   std::unordered_map<std::string_view, VpiObject*> object_map_;

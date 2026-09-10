@@ -644,6 +644,21 @@ bool VpiSystfSizetfIsCalled(const VpiSystfData& data) {
                                       data.sysfunctype == kVpiSizedSignedFunc);
 }
 
+int VpiContext::SystfResultSizeBits(const VpiSystfData& data) {
+  // The registration this record is, if it is one of ours. Compared by address
+  // rather than by content: two registrations may carry identical fields, and
+  // §36.8.1 counts sizetf calls per registration.
+  for (size_t i = 0; i < systfs_.size(); ++i) {
+    if (&systfs_[i] != &data) continue;
+    auto it = systf_result_bits_.find(i);
+    if (it != systf_result_bits_.end()) return it->second;
+    int bits = VpiSystfResultSizeBits(data);
+    systf_result_bits_.emplace(i, bits);
+    return bits;
+  }
+  return VpiSystfResultSizeBits(data);
+}
+
 int VpiSystfResultSizeBits(const VpiSystfData& data) {
   // §38.37.1: a sized system function takes its width from the sizetf
   // application when one is provided; with no sizetf it returns 32 bits.
