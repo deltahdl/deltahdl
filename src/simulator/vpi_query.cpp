@@ -147,12 +147,27 @@ int VpiGetTypeRestricted(int property, VpiHandle obj, bool& handled) {
   switch (property) {
     case vpiObjId:
       return VpiGetObjId(obj);
-    // §37.14 detail 6: a port reports whether it is scalar/vector by its width;
-    // any other object reports 0.
+    // §37.14 detail 6: a port reports whether it is scalar/vector by its width.
+    //
+    // §37.3 gives a net the same pair. Its example of a data model diagram is
+    // Figure 37-1, and what it says of it is that "objects of type net have
+    // properties vpiName, vpiVector, and vpiSize with data types string,
+    // Boolean, and integer, respectively" -- so a net answering 0 to vpiVector
+    // whatever it was declared as leaves one of the three properties the
+    // clause's own example names unanswered for the object it names them on.
+    // §37.16 detail 28 is the rule: a bit or logic net with a packed dimension
+    // is a vector and one with none is a scalar, and the width a run's net
+    // object carries is what that dimension made of it.
+    //
+    // Any other object reports 0.
     case vpiScalar:
-      return obj->type == vpiPort && VpiPortScalar(obj->size) ? 1 : 0;
+      return VpiScalarVectorAppliesTo(obj->type) && VpiPortScalar(obj->size)
+                 ? 1
+                 : 0;
     case vpiVector:
-      return obj->type == vpiPort && VpiPortVector(obj->size) ? 1 : 0;
+      return VpiScalarVectorAppliesTo(obj->type) && VpiPortVector(obj->size)
+                 ? 1
+                 : 0;
     // §37.14 details 7 and 9: the port index gives port order; it does not
     // apply to a port bit, which reports vpiUndefined.
     case vpiPortIndex:
