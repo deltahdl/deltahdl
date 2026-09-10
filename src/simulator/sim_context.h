@@ -444,6 +444,15 @@ class SimContext : public DeclaredNameTables, public RandomStability {
     return variables_;
   }
 
+  // §36.10: the run's nets, keyed the way GetVariables keys its variables --
+  // one flat string per object, the instance prefix folded into it. VpiContext
+  // ::Attach reads both, because "VPI routines provide access to objects in an
+  // instantiated SystemVerilog design" and the clause's own example of such an
+  // object is a wire.
+  const std::unordered_map<std::string_view, Net*>& GetNets() const {
+    return nets_;
+  }
+
   // §20.15.6: the live registry of stochastic-analysis queues, keyed by the
   // q_id supplied to $q_initialize. Its membership drives the "undefined
   // q_id" status, and each entry's capacity and occupancy drive the "queue

@@ -27,17 +27,6 @@
 
 namespace delta {
 
-void VpiContext::Attach(SimContext& sim_ctx) {
-  for (auto& [name, var] : sim_ctx.GetVariables()) {
-    auto* obj = AllocObject();
-    obj->type = kVpiReg;
-    obj->name = name;
-    obj->var = var;
-    obj->size = static_cast<int>(var->value.width);
-    object_map_[name] = obj;
-  }
-}
-
 VpiHandle VpiContext::RegisterSystf(VpiSystfData* data) {
   if (!data) return nullptr;
 

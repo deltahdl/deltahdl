@@ -1,5 +1,6 @@
 #pragma once
 
+#include <deque>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -712,6 +713,22 @@ class VpiContext {
                                 SimContext& ctx, Arena& arena,
                                 bool evaluate_args);
 
+  // §36.10: the object one component of a flat design name stands for, found
+  // among the objects already made under `parent` (or at the top level when
+  // `parent` is null) and made as a module instance when it is not there yet.
+  // `full_path` is the dotted prefix ending at this component, which is the
+  // object's vpiFullName.
+  VpiHandle DesignScopeChild(VpiHandle parent, std::string_view part,
+                             std::string_view full_path);
+
+  // §36.10: the object a whole flat design name stands for, with the instance
+  // scopes standing above it made as the walk passes through them. "An
+  // instantiated design is one where each instance of an object is uniquely
+  // accessible", and the simulator keys an object on one flat string, so the
+  // string has to be split back into the scopes it was built from for §38.21 to
+  // walk it a component at a time.
+  VpiHandle DesignObjectForFlatName(std::string_view flat_name);
+
   // §37.2.2: release one handle plus the handles to every callback placed on
   // the object it names. Building block for the simulation-event release rules.
   void ReleaseHandleWithCallbacks(VpiObject* object);
@@ -848,6 +865,14 @@ class VpiContext {
   std::vector<const char*> invocation_argv_;
 
   std::vector<std::string> str_pool_;
+
+  // §36.10: the names of the objects Attach makes. A design object is keyed in
+  // the simulator on a whole flat string, and the components this splits it
+  // into are not strings of their own; VpiObject::name has to be one, so each
+  // component is copied here. A deque because object_map_ and every
+  // VpiObject::name hold views into these, and appending to a deque leaves the
+  // elements already in it where they are.
+  std::deque<std::string> name_pool_;
 
   // §38.11: vpi_get_str() places its result in one temporary buffer that every
   // call reuses, so an earlier returned pointer is clobbered by a later call.
