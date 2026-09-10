@@ -541,6 +541,13 @@ typedef struct t_vpi_strengthval {
 using s_vpi_arrayvalue = delta::VpiArrayValue;
 typedef delta::VpiArrayValue* p_vpi_arrayvalue;
 
+// §36.11 groups the VPI routines by what they are for, and Table 36-1 through
+// Table 36-9 name every one of them. Each is declared here, and each carries
+// the types its own subclause of Clause 38 gives it in its Syntax and Arguments
+// rows - a type or index argument is PLI_INT32 and a status result is
+// PLI_INT32, not the plain int several of them were written with. On this
+// target the two spell one type, so no application changes; what changes is
+// that the header says which one it means.
 vpiHandle vpi_register_systf(s_vpi_systf_data* data);
 void vpi_get_systf_info(vpiHandle obj, s_vpi_systf_data* systf_data_p);
 void vpi_get_cb_info(vpiHandle obj, s_cb_data* cb_data_p);
@@ -553,24 +560,24 @@ PLI_INT32 vpi_put_data(PLI_INT32 id, PLI_BYTE8* data_loc,
                        PLI_INT32 num_of_bytes);
 PLI_INT32 vpi_put_userdata(vpiHandle obj, void* userdata);
 void* vpi_get_userdata(vpiHandle obj);
-vpiHandle vpi_handle(int type, vpiHandle ref);
+vpiHandle vpi_handle(PLI_INT32 type, vpiHandle ref);
 vpiHandle vpi_handle_by_name(const char* name, vpiHandle scope);
-vpiHandle vpi_handle_by_index(vpiHandle parent, int index);
-vpiHandle vpi_handle_by_multi_index(vpiHandle parent, int num_index,
-                                    int* index_array);
-vpiHandle vpi_handle_multi(int type, vpiHandle ref1, vpiHandle ref2);
-int vpi_compare_objects(vpiHandle obj1, vpiHandle obj2);
-vpiHandle vpi_iterate(int type, vpiHandle ref);
+vpiHandle vpi_handle_by_index(vpiHandle parent, PLI_INT32 index);
+vpiHandle vpi_handle_by_multi_index(vpiHandle parent, PLI_INT32 num_index,
+                                    PLI_INT32* index_array);
+vpiHandle vpi_handle_multi(PLI_INT32 type, vpiHandle ref1, vpiHandle ref2);
+PLI_INT32 vpi_compare_objects(vpiHandle obj1, vpiHandle obj2);
+vpiHandle vpi_iterate(PLI_INT32 type, vpiHandle ref);
 vpiHandle vpi_scan(vpiHandle iterator);
 void vpi_get_value(vpiHandle obj, s_vpi_value* value);
 vpiHandle vpi_put_value(vpiHandle obj, s_vpi_value* value, s_vpi_time* time,
-                        int flags);
+                        PLI_INT32 flags);
 void vpi_put_value_array(vpiHandle obj, p_vpi_arrayvalue arrayvalue_p,
                          PLI_INT32* index_p, PLI_UINT32 num);
 void vpi_get_value_array(vpiHandle obj, p_vpi_arrayvalue arrayvalue_p,
                          PLI_INT32* index_p, PLI_UINT32 num);
 vpiHandle vpi_register_cb(s_cb_data* data);
-int vpi_remove_cb(vpiHandle cb_handle);
+PLI_INT32 vpi_remove_cb(vpiHandle cb_handle);
 // §37.4.2: "Integer and Boolean properties are accessed with the routine
 // vpi_get(). These properties are of type PLI_INT32", and "String properties
 // are accessed with routine vpi_get_str(). String properties are of type
@@ -583,10 +590,10 @@ int vpi_remove_cb(vpiHandle cb_handle);
 PLI_INT32 vpi_get(PLI_INT32 property, vpiHandle obj);
 PLI_INT64 vpi_get64(PLI_INT32 property, vpiHandle obj);
 PLI_BYTE8* vpi_get_str(PLI_INT32 property, vpiHandle obj);
-int vpi_free_object(vpiHandle obj);
+PLI_INT32 vpi_free_object(vpiHandle obj);
 PLI_INT32 vpi_release_handle(vpiHandle obj);
-int vpi_control(int operation, ...);
-int vpi_chk_error(SVpiErrorInfo* info);
+PLI_INT32 vpi_control(PLI_INT32 operation, ...);
+PLI_INT32 vpi_chk_error(SVpiErrorInfo* info);
 PLI_INT32 vpi_get_vlog_info(SVpiVlogInfo* info);
 PLI_INT32 vpi_flush();
 PLI_UINT32 vpi_mcd_open(PLI_BYTE8* file);

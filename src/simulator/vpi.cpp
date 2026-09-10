@@ -91,7 +91,7 @@ void* vpi_get_userdata(vpiHandle obj) {
   return delta::GetGlobalVpiContext().GetUserData(obj);
 }
 
-vpiHandle vpi_handle(int type, vpiHandle ref) {
+vpiHandle vpi_handle(PLI_INT32 type, vpiHandle ref) {
   VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().Handle(type, ref);
 }
@@ -101,29 +101,29 @@ vpiHandle vpi_handle_by_name(const char* name, vpiHandle scope) {
   return delta::GetGlobalVpiContext().HandleByName(name, scope);
 }
 
-vpiHandle vpi_handle_by_index(vpiHandle parent, int index) {
+vpiHandle vpi_handle_by_index(vpiHandle parent, PLI_INT32 index) {
   VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().HandleByIndex(index, parent);
 }
 
-vpiHandle vpi_handle_by_multi_index(vpiHandle parent, int num_index,
-                                    int* index_array) {
+vpiHandle vpi_handle_by_multi_index(vpiHandle parent, PLI_INT32 num_index,
+                                    PLI_INT32* index_array) {
   VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().HandleByMultiIndex(num_index, index_array,
                                                          parent);
 }
 
-vpiHandle vpi_handle_multi(int type, vpiHandle ref1, vpiHandle ref2) {
+vpiHandle vpi_handle_multi(PLI_INT32 type, vpiHandle ref1, vpiHandle ref2) {
   VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().HandleMulti(type, ref1, ref2);
 }
 
-int vpi_compare_objects(vpiHandle obj1, vpiHandle obj2) {
+PLI_INT32 vpi_compare_objects(vpiHandle obj1, vpiHandle obj2) {
   VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().CompareObjects(obj1, obj2);
 }
 
-vpiHandle vpi_iterate(int type, vpiHandle ref) {
+vpiHandle vpi_iterate(PLI_INT32 type, vpiHandle ref) {
   VpiRoutineErrorScope error_scope;
   // §36.10.2: nothing but the two registration routines is available until the
   // cbEndOfCompile callbacks run.
@@ -151,7 +151,7 @@ void vpi_get_value(vpiHandle obj, s_vpi_value* value) {
 }
 
 vpiHandle vpi_put_value(vpiHandle obj, s_vpi_value* value, s_vpi_time* time,
-                        int flags) {
+                        PLI_INT32 flags) {
   VpiRoutineErrorScope error_scope;
   // §36.10.2: nothing but the two registration routines is available until the
   // cbEndOfCompile callbacks run.
@@ -179,7 +179,7 @@ vpiHandle vpi_register_cb(s_cb_data* data) {
   return delta::GetGlobalVpiContext().RegisterCb(data);
 }
 
-int vpi_remove_cb(vpiHandle cb_handle) {
+PLI_INT32 vpi_remove_cb(vpiHandle cb_handle) {
   VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().RemoveCb(cb_handle);
 }
@@ -199,7 +199,7 @@ PLI_BYTE8* vpi_get_str(PLI_INT32 property, vpiHandle obj) {
   return delta::GetGlobalVpiContext().GetStr(property, obj);
 }
 
-int vpi_free_object(vpiHandle obj) {
+PLI_INT32 vpi_free_object(vpiHandle obj) {
   VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().FreeObject(obj);
 }
@@ -209,7 +209,7 @@ PLI_INT32 vpi_release_handle(vpiHandle obj) {
   return delta::GetGlobalVpiContext().ReleaseHandleStatus(obj);
 }
 
-int vpi_control(int operation, ...) {
+PLI_INT32 vpi_control(PLI_INT32 operation, ...) {
   // §38.4: vpi_control(operation, varargs) takes a variable number of
   // operation-specific arguments. Read exactly the arguments the operation
   // defines before forwarding the request to the simulator.
@@ -271,7 +271,7 @@ int vpi_control(int operation, ...) {
   return result;
 }
 
-int vpi_chk_error(SVpiErrorInfo* info) {
+PLI_INT32 vpi_chk_error(SVpiErrorInfo* info) {
   // §38.2: vpi_chk_error() returns the severity level (a Table 38-1 constant)
   // of the error left by the previous VPI routine call, or 0 (false) when that
   // call did not result in an error. When info is non-null the error detail is
