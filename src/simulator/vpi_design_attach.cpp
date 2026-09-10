@@ -7,6 +7,7 @@
 
 #include "simulator/net.h"
 #include "simulator/process.h"
+#include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 // §37.44's vpiThread is defined in the SystemVerilog VPI header.
 #include "simulator/sv_vpi_user.h"
@@ -78,7 +79,7 @@ VpiHandle VpiContext::ThreadObjectFor(Process* proc) {
 
 void VpiContext::RefreshThreadObjects() {
   if (sim_ctx_ == nullptr) return;
-  for (Process* proc : sim_ctx_->GetThreads()) {
+  for (Process* proc : sim_ctx_->GetScheduler().Threads()) {
     VpiHandle obj = ThreadObjectFor(proc);
     // §37.44 (thread one-to-many thread): the threads this one spawned, which
     // detail 1 calls "a branch of a fork construct". They hang off the parent

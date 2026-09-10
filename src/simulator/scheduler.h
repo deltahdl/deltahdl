@@ -5,6 +5,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <unordered_set>
 #include <vector>
 
 #include "common/types.h"
@@ -12,6 +13,7 @@
 namespace delta {
 
 class SimContext;
+struct Process;
 
 enum class EventKind : uint8_t {
   kUpdate,
@@ -89,6 +91,19 @@ class Scheduler {
     if (it == event_calendar_.end()) return current_time_;
     return it->first;
   }
+
+  // §37.44: record that the run has switched to `proc`, and hand back the
+  // threads it has switched to so far, in that order. "A thread is a
+  // SystemVerilog process such as an always procedure or a branch of a fork
+  // construct", and a switch to one is where a process becomes that: a process
+  // this has never seen is one the run never reached. SimContext::
+  // SetCurrentProcess is the one place every resume passes through and is what
+  // calls this; VpiContext::RefreshThreadObjects reads the list back.
+  void NoteThreadSwitch(Process* proc) {
+    if (proc == nullptr) return;
+    if (threads_seen_.insert(proc).second) threads_.push_back(proc);
+  }
+  const std::vector<Process*>& Threads() const { return threads_; }
 
   Region CurrentRegion() const { return current_region_; }
   bool HasEvents() const { return !event_calendar_.empty(); }
@@ -198,6 +213,12 @@ class Scheduler {
   SimContext* ctx_ = nullptr;
   std::map<SimTime, TimeSlot> event_calendar_;
   std::vector<std::function<void()>> post_timestep_cbs_;
+  // §37.44: the processes the run has switched to, in order, and the set that
+  // keeps that order free of repeats -- a process is switched to once per
+  // resume and is one thread however many times it runs.
+  std::vector<Process*> threads_;
+  std::unordered_set<Process*> threads_seen_;
+
   SimTime current_time_{0};
   Region current_region_ = Region::kCOUNT;
   size_t illegal_preponed_schedule_count_ = 0;
