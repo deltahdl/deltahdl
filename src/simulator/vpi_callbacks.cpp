@@ -164,6 +164,14 @@ int VpiContext::RemoveCb(VpiHandle cb_handle) {
     // rather than reporting success a second time.
     if (callbacks_[idx].reason < 0) return 0;
     callbacks_[idx].reason = -1;
+    // §37.2.2: "Handles may also be released as part of the action of other VPI
+    // function calls, in particular: a) vpi_remove_callback() releases the
+    // associated callback handle." Clearing the registration is what stops the
+    // callback from being delivered; releasing the handle is what stops it
+    // being a live handle to the callback object, which the clause has this
+    // routine do and which nothing did - so a removed callback's handle went on
+    // naming a live object and every routine went on accepting it.
+    ReleaseHandle(cb_handle);
     return 1;
   }
   return 0;
