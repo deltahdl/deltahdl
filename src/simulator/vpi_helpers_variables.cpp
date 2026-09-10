@@ -127,6 +127,33 @@ bool VpiIsPackedArrayVarElementType(int type) {
   }
 }
 
+// §37.21 detail 1: a structure, union, or class variable owns the additional
+// driver/load collection behaviour - the relation must also reach drivers/loads
+// of bit/part-selects and nested members of the variable.
+bool VpiIsStructUnionOrClassVar(int type) {
+  return type == vpiStructVar || type == vpiUnionVar || type == vpiClassVar;
+}
+
+// §37.21 detail 1: the select kinds whose drivers/loads count toward an
+// aggregate variable - a bit-select or either form of part-select.
+bool VpiIsVariableSelectType(int type) {
+  return type == vpiBitSelect || type == vpiPartSelect ||
+         type == vpiIndexedPartSelect;
+}
+
+// §37.21 detail 1: the children worth descending into when gathering the
+// drivers or loads of an aggregate variable - a bit-select or part-select of
+// the variable, or a member nested inside it (itself any variable kind,
+// including a further aggregate that is walked recursively).
+bool VpiIsVariableSelectOrMemberType(int type) {
+  // §37.4.1: a member nested inside an aggregate is a variable, and which kinds
+  // those are is what the `variables` class groups. The set was written out
+  // here with vpiVariables among its cases -- the class rather than a kind any
+  // object has -- and without kinds the class does group, so an int var or a
+  // string var member was descended into by neither.
+  return VpiIsVariableSelectType(type) || VpiIsVariablesType(type);
+}
+
 bool VpiArrayVarIsMemory(VpiHandle var) {
   // §37.20 (figure): a reg array reports whether it is a memory through
   // vpiIsMemory. Detail 1 says what a memory is now made of - vpiMemoryWord

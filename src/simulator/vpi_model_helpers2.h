@@ -149,6 +149,20 @@ VpiHandle VpiRangeRightRange(const VpiRangeDesc& range);
 // to the class reaches.
 bool VpiIsVariablesType(int type);
 
+// §37.21 detail 1: a structure, union, or class variable owns the additional
+// driver/load collection behaviour, so the relation must also reach the
+// drivers/loads of its bit/part-selects and nested members.
+bool VpiIsStructUnionOrClassVar(int type);
+
+// §37.21 detail 1: the select kinds whose drivers/loads count toward an
+// aggregate variable - a bit-select or either form of part-select.
+bool VpiIsVariableSelectType(int type);
+
+// §37.21 detail 1: the children worth descending into when gathering the
+// drivers or loads of an aggregate variable - a select of the variable, or a
+// member nested inside it, itself of any kind the `variables` class groups.
+bool VpiIsVariableSelectOrMemberType(int type);
+
 // §37.20 (figure): whether an array variable is a memory - an array whose words
 // are regs, which is what §37.20 detail 1 makes vpiMemoryWord return. False for
 // an array of any other variable kind and for anything that is not an array

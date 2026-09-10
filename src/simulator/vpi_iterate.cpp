@@ -117,33 +117,6 @@ bool VpiPortIsComplexExpressionLoad(VpiHandle port) {
 
 namespace {
 
-// §37.21 detail 1: a structure, union, or class variable owns the additional
-// driver/load collection behaviour - the relation must also reach drivers/loads
-// of bit/part-selects and nested members of the variable.
-bool VpiIsStructUnionOrClassVar(int type) {
-  return type == vpiStructVar || type == vpiUnionVar || type == vpiClassVar;
-}
-
-// §37.21 detail 1: the select kinds whose drivers/loads count toward an
-// aggregate variable - a bit-select or either form of part-select.
-bool VpiIsVariableSelectType(int type) {
-  return type == vpiBitSelect || type == vpiPartSelect ||
-         type == vpiIndexedPartSelect;
-}
-
-// §37.21 detail 1: the children worth descending into when gathering the
-// drivers or loads of an aggregate variable - a bit-select or part-select of
-// the variable, or a member nested inside it (itself any variable kind,
-// including a further aggregate that is walked recursively).
-bool VpiIsVariableSelectOrMemberType(int type) {
-  // §37.4.1: a member nested inside an aggregate is a variable, and which kinds
-  // those are is what the `variables` class groups. The set was written out
-  // here with vpiVariables among its cases -- the class rather than a kind any
-  // object has -- and without kinds the class does group, so an int var or a
-  // string var member was descended into by neither.
-  return VpiIsVariableSelectType(type) || VpiIsVariablesType(type);
-}
-
 // §37.21 (figure) + detail 1: gather a variable's drivers (want_driver) or
 // loads into the iterator. The variable's own driver/load children are always
 // collected. When descend is set - the variable is a structure, union, or class
@@ -197,6 +170,8 @@ struct VpiIterateModes {
   bool interconnect_net_element = false;
   bool interconnect_net_member = false;
   bool memory_word = false;
+  // §36.12 Table 36-10 item 6: a vpiReg iteration over an array variable.
+  bool array_var_elements = false;
   bool net_driver = false;
   bool net_load = false;
   bool variable_driver = false;
@@ -291,6 +266,11 @@ void ComputeInterconnectModes(int type, VpiHandle ref, VpiIterateModes& m) {
 // per §37.46), rather than children whose own type is the relation type.
 void ComputeDriverLoadModes(int type, VpiHandle ref, VpiIterateModes& m) {
   m.memory_word = ref && VpiIsArrayVarType(ref->type) && type == vpiMemoryWord;
+  // §36.12 Table 36-10 item 6: in the IEEE 1800 standards a vpiReg iteration on
+  // a vpiRegArray retrieves array elements of other variable kinds too, the
+  // array object being what §37.17 represents an unpacked array of any variable
+  // with.
+  m.array_var_elements = ref && VpiIsArrayVarType(ref->type) && type == kVpiReg;
   m.net_driver = ref && (ref->type == vpiNet || ref->type == vpiNetBit) &&
                  type == vpiDriver;
   m.net_load =
@@ -395,6 +375,10 @@ bool VpiIterateMatchesKindMode(int obj_type, const VpiIterateModes& modes,
                                bool* matched) {
   if (modes.memory_word) {
     *matched = obj_type == kVpiReg;
+    return true;
+  }
+  if (modes.array_var_elements) {
+    *matched = VpiIsVariablesType(obj_type);
     return true;
   }
   if (modes.class_methods) {
