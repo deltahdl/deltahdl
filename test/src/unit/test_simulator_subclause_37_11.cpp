@@ -219,5 +219,89 @@ TEST(InstanceArrayModel, EmptyLeftmostRangeReportsNullBounds) {
   EXPECT_EQ(VpiInstanceArrayRightRange(dims), nullptr);
 }
 
+// -----------------------------------------------------------------------------
+// The class edges. §37.11 draws `instance array` in bold italic inside a dotted
+// enclosure holding the module, interface and program arrays, with `primitive
+// array` -- itself an enclosure over the gate, switch and udp arrays -- nested
+// among them. §37.4.1 makes each a grouping rather than an object, so
+// vpiInstanceArray and vpiPrimitiveArray are the two groups' names; matching
+// either against an object's own type, which is what the generic traversal
+// does, reached no array a design instantiates.
+// -----------------------------------------------------------------------------
+
+// §37.5 (figure, module <==> instance array): a module's instance arrays are
+// what the edge drawn to the class reaches. A primitive array is drawn inside
+// the same enclosure, so it comes back too; a module that is not an array does
+// not.
+TEST(InstanceArrayPublic, AModuleIteratesTheInstanceArraysItHolds) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+
+  VpiObject module_array;
+  module_array.type = vpiModuleArray;
+  VpiObject single;
+  single.type = vpiModule;
+  VpiObject gate_array;
+  gate_array.type = vpiGateArray;
+
+  VpiObject mod;
+  mod.type = vpiModule;
+  mod.children = {&module_array, &single, &gate_array};
+
+  vpiHandle it = vpi_iterate(vpiInstanceArray, &mod);
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(vpi_scan(it), &module_array);
+  EXPECT_EQ(vpi_scan(it), &gate_array);
+  EXPECT_EQ(vpi_scan(it), nullptr);
+
+  SetGlobalVpiContext(nullptr);
+}
+
+// §37.11 (figure, primitive array): the nested enclosure names a group of its
+// own, so its edge reaches the gate, switch and udp arrays and not the module
+// array drawn beside them.
+TEST(InstanceArrayPublic, ThePrimitiveArrayEdgeReachesOnlyPrimitiveArrays) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+
+  VpiObject module_array;
+  module_array.type = vpiModuleArray;
+  VpiObject switch_array;
+  switch_array.type = vpiSwitchArray;
+  VpiObject udp_array;
+  udp_array.type = vpiUdpArray;
+
+  VpiObject mod;
+  mod.type = vpiModule;
+  mod.children = {&module_array, &switch_array, &udp_array};
+
+  vpiHandle it = vpi_iterate(vpiPrimitiveArray, &mod);
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(vpi_scan(it), &switch_array);
+  EXPECT_EQ(vpi_scan(it), &udp_array);
+  EXPECT_EQ(vpi_scan(it), nullptr);
+
+  SetGlobalVpiContext(nullptr);
+}
+
+// §37.11: a module holding no array of either kind reaches none, which §38.23
+// reports as no iterator.
+TEST(InstanceArrayPublic, AModuleWithNoArraysIteratesToNone) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+
+  VpiObject single;
+  single.type = vpiModule;
+
+  VpiObject mod;
+  mod.type = vpiModule;
+  mod.children = {&single};
+
+  EXPECT_EQ(vpi_iterate(vpiInstanceArray, &mod), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiPrimitiveArray, &mod), nullptr);
+
+  SetGlobalVpiContext(nullptr);
+}
+
 }  // namespace
 }  // namespace delta

@@ -469,6 +469,11 @@ bool VpiIterateMatches(int obj_type, int type, VpiHandle ref,
   // always procedures the class groups rather than an object whose own type is
   // the class name, which is a kind no procedure has.
   if (type == vpiProcess) return VpiIsProcessType(obj_type);
+  // §37.11/§37.5: the module's edges to `instance array` and to the `primitive
+  // array` nested inside it are drawn to those class enclosures, so they reach
+  // the module, interface, program, gate, switch and udp arrays the two group.
+  if (type == vpiInstanceArray) return VpiIsInstanceArrayType(obj_type);
+  if (type == vpiPrimitiveArray) return VpiIsPrimitiveArrayType(obj_type);
   // §37.24/§37.40/§37.72/§37.42/§37.34: the edge-specific special modes.
   if (VpiIterateMatchesEdgeMode(obj_type, type, ref, modes, &matched)) {
     return matched;
