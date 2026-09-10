@@ -215,7 +215,13 @@ static const char* VpiAdditionalTypeConstantName(int property, VpiHandle obj) {
 // obj reports its actual interface/modport name, an interface typespec reports
 // its modport/interface identifier, and any other kind has no definition name.
 static const char* VpiDefNameStr(VpiHandle obj) {
-  if (obj->type == kVpiModule) return obj->name.data();
+  // §38.11: an instance reports what it is an instance of, which the design
+  // recorded against its path; a module object standing for a definition rather
+  // than an instance has no such record and its own name is its definition
+  // name.
+  if (obj->type == kVpiModule) {
+    return obj->def_name.empty() ? obj->name.data() : obj->def_name.c_str();
+  }
   // §37.15 detail 6: a ref obj whose actual is an interface or modport
   // reports that interface's definition name or the modport name.
   if (obj->type == vpiRefObj) return VpiRefObjDefName(obj);

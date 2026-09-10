@@ -157,6 +157,23 @@ VpiActiveFrameScope::~VpiActiveFrameScope() {
   GetGlobalVpiContext().RestoreActiveFrame(outer_);
 }
 
+void VpiContext::AttachModuleDefNames(SimContext& sim_ctx) {
+  // §38.11's example is what a definition name is for: vpi_handle_by_name
+  // reaches an instance and vpi_get_str(vpiDefName, mod) says what it is an
+  // instance of -- "Module top.mod1 is an instance of %s". The instance's own
+  // name is vpiName and is the answer to a different question, so a module
+  // reporting it here said that top.mod1 is an instance of mod1.
+  //
+  // The run has the answer already: the lowerer records each instance's module
+  // type against the instance path, which is the same string the module object
+  // carries as its vpiFullName.
+  for (auto* obj : all_objects_) {
+    if (obj->type != kVpiModule || obj->full_name.empty()) continue;
+    std::string_view type = sim_ctx.FindInstanceType(obj->full_name);
+    if (!type.empty()) obj->def_name = std::string(type);
+  }
+}
+
 void VpiContext::AttachModulePathDelays(SimContext& sim_ctx) {
   // §38.10: "the VPI routine vpi_get_delays() shall retrieve the delays or
   // pulse limits of an object". A module path is one of the four kinds of
@@ -232,6 +249,7 @@ void VpiContext::Attach(SimContext& sim_ctx) {
     obj->var = var;
     obj->size = static_cast<int>(var->value.width);
   }
+  AttachModuleDefNames(sim_ctx);
   AttachModulePathDelays(sim_ctx);
   for (auto& [name, net] : sim_ctx.GetNets()) {
     VpiHandle obj = DesignObjectForFlatName(name);
