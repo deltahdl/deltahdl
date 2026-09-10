@@ -33,6 +33,7 @@
 #include "simulator/specify_sdf.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
+#include "simulator/vpi_systf_build.h"
 
 namespace delta {
 
@@ -822,6 +823,12 @@ void Lowerer::Lower(const RtlirDesign* design) {
   }
 
   AttachCuMethodsToClasses(design, ctx_);
+
+  // §36.8: the simulation data structure is built by the time this returns, so
+  // this is the period §36.8.1's sizetf and §36.8.2's compiletf are called in
+  // -- last of everything the build does, and before the scheduler runs an
+  // event.
+  CallBuildPeriodSystfRoutines(design);
 }
 
 }  // namespace delta
