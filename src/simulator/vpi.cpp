@@ -209,13 +209,13 @@ PLI_INT32 vpi_release_handle(vpiHandle obj) {
   return delta::GetGlobalVpiContext().ReleaseHandleStatus(obj);
 }
 
-PLI_INT32 vpi_control(PLI_INT32 operation, ...) {
+PLI_INT32 VpiControlWithArgs(PLI_INT32 operation, va_list args) {
   // §38.4: vpi_control(operation, varargs) takes a variable number of
   // operation-specific arguments. Read exactly the arguments the operation
-  // defines before forwarding the request to the simulator.
-  VpiRoutineErrorScope error_scope;
-  va_list args;
-  va_start(args, operation);
+  // defines before forwarding the request to the simulator. The reading is
+  // factored out of the entry point so §36.12.2.1's compatibility variants of
+  // vpi_control can start their own list and hand it here rather than
+  // duplicating the argument shapes of every operation.
   int result = 0;
   switch (operation) {
     case delta::kVpiStop:
@@ -267,6 +267,15 @@ PLI_INT32 vpi_control(PLI_INT32 operation, ...) {
       result = delta::GetGlobalVpiContext().Control(operation);
       break;
   }
+  return result;
+}
+
+PLI_INT32 vpi_control(PLI_INT32 operation, ...) {
+  // §38.4: the entry point starts the argument list the reader above walks.
+  VpiRoutineErrorScope error_scope;
+  va_list args;
+  va_start(args, operation);
+  PLI_INT32 result = VpiControlWithArgs(operation, args);
   va_end(args);
   return result;
 }

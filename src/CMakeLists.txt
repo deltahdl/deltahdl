@@ -390,6 +390,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/sva_engine_sampling.cpp
     simulator/sva_engine_sequences.cpp
     simulator/vpi_callbacks.cpp
+    simulator/vpi_compatibility.cpp
     simulator/vpi_control.cpp
     simulator/vpi_design_attach.cpp
     simulator/vpi_handle.cpp
