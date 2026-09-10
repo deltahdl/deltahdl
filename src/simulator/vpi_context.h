@@ -707,6 +707,12 @@ class VpiContext {
   VpiHandle ThreadObjectFor(Process* proc);
   void RefreshThreadObjects();
 
+  // §37.43 detail 4: activate the frame of a subroutine the run has just
+  // entered, answering with the frame that was active, and put that one back
+  // when the subroutine returns. Written beside the rest of it.
+  VpiHandle ActivateFrame();
+  void RestoreActiveFrame(VpiHandle previous);
+
   // §36.10.1: "Callbacks can be set up for when an error occurs as well." This
   // is that occurrence, delivered on the way out of the VPI routine that
   // recorded the error; a routine that recorded nothing delivers nothing. Which
@@ -727,20 +733,12 @@ class VpiContext {
                                 SimContext& ctx, Arena& arena,
                                 bool evaluate_args);
 
-  // §36.10: the object one component of a flat design name stands for, found
-  // among the objects already made under `parent` (or at the top level when
-  // `parent` is null) and made as a module instance when it is not there yet.
-  // `full_path` is the dotted prefix ending at this component, which is the
-  // object's vpiFullName.
+  // §36.10: the object one component of a flat design name stands for, and the
+  // object a whole such name stands for with the instance scopes above it made
+  // as the walk passes through them. Both are written in
+  // src/simulator/vpi_design_attach.cpp, where the reading is.
   VpiHandle DesignScopeChild(VpiHandle parent, std::string_view part,
                              std::string_view full_path);
-
-  // §36.10: the object a whole flat design name stands for, with the instance
-  // scopes standing above it made as the walk passes through them. "An
-  // instantiated design is one where each instance of an object is uniquely
-  // accessible", and the simulator keys an object on one flat string, so the
-  // string has to be split back into the scopes it was built from for §38.21 to
-  // walk it a component at a time.
   VpiHandle DesignObjectForFlatName(std::string_view flat_name);
 
   // §37.2.2: release one handle plus the handles to every callback placed on

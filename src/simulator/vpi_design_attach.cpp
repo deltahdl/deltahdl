@@ -94,6 +94,68 @@ void VpiContext::RefreshThreadObjects() {
   }
 }
 
+namespace {
+
+// The first child of `obj` whose type is `type`, which is how this model links
+// a frame to the frames and threads around it.
+VpiObject* FirstChildOfType(VpiObject* obj, int type) {
+  if (obj == nullptr) return nullptr;
+  for (auto* child : obj->children) {
+    if (child->type == type) return child;
+  }
+  return nullptr;
+}
+
+}  // namespace
+
+VpiHandle VpiContext::ActivateFrame() {
+  // §36.6: a run holding no PLI application has no design attached and nothing
+  // to reach a frame through, so it pays nothing for this.
+  if (sim_ctx_ == nullptr) return nullptr;
+
+  VpiHandle outer = active_frame_;
+  VpiHandle thread = ThreadObjectFor(sim_ctx_->CurrentProcess());
+  // §37.43 detail 5: "The vpiParent relation shall indicate the frame from
+  // which the child frame was activated." The outermost frame of a call chain
+  // was activated from no frame, so it hangs off the thread instead, which is
+  // the diagram's frame--thread edge and reports no parent frame.
+  VpiHandle holder = outer != nullptr ? outer : thread;
+  if (holder == nullptr) return nullptr;
+
+  // A call chain of the same shape entered again reuses the frame already made
+  // at this point in it. Detail 4 has at most one frame active at a time in a
+  // thread, and what tells one activation from the next is which frame is
+  // active rather than which object stands for it -- a design calling a
+  // function a thousand times has one frame a thousand times over, not a
+  // thousand objects.
+  VpiObject* frame = FirstChildOfType(holder, vpiFrame);
+  if (frame == nullptr) {
+    frame = AllocObject();
+    frame->type = vpiFrame;
+    frame->parent = holder;
+    holder->children.push_back(frame);
+  }
+  frame->active = true;
+  active_frame_ = frame;
+  return outer;
+}
+
+void VpiContext::RestoreActiveFrame(VpiHandle previous) {
+  if (sim_ctx_ == nullptr) return;
+  // §37.43 (vpiActive): the frame being left is no longer the active one, and
+  // the frame it was activated from becomes active again.
+  if (active_frame_ != nullptr) active_frame_->active = false;
+  active_frame_ = previous;
+  if (active_frame_ != nullptr) active_frame_->active = true;
+}
+
+VpiActiveFrameScope::VpiActiveFrameScope()
+    : outer_(GetGlobalVpiContext().ActivateFrame()) {}
+
+VpiActiveFrameScope::~VpiActiveFrameScope() {
+  GetGlobalVpiContext().RestoreActiveFrame(outer_);
+}
+
 void VpiContext::Attach(SimContext& sim_ctx) {
   // §37.44: the run the thread objects are made against. They cannot all be
   // made here -- a fork branch begins while the design executes, long after

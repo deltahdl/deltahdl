@@ -762,6 +762,17 @@ VpiHandle VpiFrameThread(VpiHandle frame) {
   for (auto* child : frame->children) {
     if (child->type == vpiThread) return child;
   }
+  // A frame a run activated has no thread child: the thread holds the frame,
+  // and making the two each other's child would put a cycle in the object
+  // graph that ReleaseHandleSubtree walks. §37.43 detail 5 leaves the way up:
+  // a frame was activated from the frame above it and the outermost of a call
+  // chain from the thread itself, so the chain of parents ends at the thread
+  // this frame belongs to.
+  VpiHandle up = frame;
+  while (up->parent != nullptr && up->parent->type == vpiFrame) {
+    up = up->parent;
+  }
+  if (up->parent != nullptr && up->parent->type == vpiThread) return up->parent;
   return nullptr;
 }
 

@@ -6,6 +6,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
+#include "fixture_simulator.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
@@ -298,6 +299,118 @@ TEST_F(FrameSim, PutValueWithoutDelayOnAutomaticVariableIsApplied) {
   vpi_ctx_.PutValue(h, &val, nullptr, vpiNoDelay);
 
   EXPECT_EQ(var->value.ToUint64(), 55u);
+}
+
+// -----------------------------------------------------------------------------
+// §37.43 detail 4: "There is at most only one active frame at any time in a
+// given thread. To get a handle to the currently active frame, use
+// vpi_handle(vpiFrame, NULL)."
+//
+// Every case above builds its frames by hand, so what they observe is what the
+// model reports about an object rather than where such an object comes from --
+// and nothing in the tool ever made a frame active, so the routine detail 4
+// names answered null under every design there is.
+// -----------------------------------------------------------------------------
+
+// What the application found. A calltf is a plain C function with no return
+// path to the case that provoked it.
+bool g_frame_found = false;
+int g_frame_type = 0;
+int g_frame_is_active = 0;
+bool g_frame_has_a_thread = false;
+bool g_frame_has_a_parent_frame = false;
+
+int InspectFrameCalltf(const char*) {
+  vpiHandle frame = vpi_handle(vpiFrame, nullptr);
+  g_frame_found = frame != nullptr;
+  if (frame == nullptr) return 0;
+  g_frame_type = vpi_get(vpiType, frame);
+  g_frame_is_active = vpi_get(vpiActive, frame);
+  g_frame_has_a_thread = VpiFrameThread(frame) != nullptr;
+  g_frame_has_a_parent_frame = VpiFrameParent(frame) != nullptr;
+  return 0;
+}
+
+void RegisterFrameProbe() {
+  g_frame_found = false;
+  g_frame_type = 0;
+  g_frame_is_active = 0;
+  g_frame_has_a_thread = false;
+  g_frame_has_a_parent_frame = false;
+
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = "$probe";
+  data.calltf = &InspectFrameCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+}
+
+class FrameModelInARun : public ::testing::Test {
+ protected:
+  void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
+  void TearDown() override { SetGlobalVpiContext(nullptr); }
+
+  VpiContext vpi_ctx_;
+};
+
+TEST_F(FrameModelInARun, TheActiveFrameIsTheSubroutineTheRunIsInside) {
+  RegisterFrameProbe();
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int r;\n"
+      "  function automatic int one();\n"
+      "    $probe;\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "  initial r = one();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  // The call is written inside the function, so the frame standing when the
+  // application looks is that function's activation.
+  ASSERT_TRUE(g_frame_found);
+  EXPECT_EQ(g_frame_type, vpiFrame);
+  EXPECT_EQ(g_frame_is_active, 1);
+  // §37.43 (the frame--thread edge): the frame belongs to the thread that
+  // entered it, which §37.44 detail 1 is the other half of.
+  EXPECT_TRUE(g_frame_has_a_thread);
+  // §37.43 detail 5: this one was activated from no frame -- it is the
+  // outermost of the call chain -- so it reports no parent frame.
+  EXPECT_FALSE(g_frame_has_a_parent_frame);
+}
+
+TEST_F(FrameModelInARun, AFrameActivatedFromAnotherReportsItAsItsParent) {
+  RegisterFrameProbe();
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int r;\n"
+      "  function automatic int inner();\n"
+      "    $probe;\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "  function automatic int outer();\n"
+      "    return inner();\n"
+      "  endfunction\n"
+      "  initial r = outer();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  // §37.43 detail 5: "The vpiParent relation shall indicate the frame from
+  // which the child frame was activated." The thread worked its way one step
+  // further down the call chain here than in the case above, and that step is
+  // the whole of the difference in what the application sees.
+  ASSERT_TRUE(g_frame_found);
+  EXPECT_EQ(g_frame_is_active, 1);
+  EXPECT_TRUE(g_frame_has_a_parent_frame);
+  EXPECT_TRUE(g_frame_has_a_thread);
 }
 
 }  // namespace

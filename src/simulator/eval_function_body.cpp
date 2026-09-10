@@ -12,6 +12,7 @@
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_exec.h"
+#include "simulator/vpi_design_attach.h"
 
 namespace delta {
 // The statement executor for a subroutine body (13.4). A function or task
@@ -604,6 +605,12 @@ static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
 
 void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
                       SimContext& ctx, Arena& arena) {
+  // §37.44 detail 1: "as a thread works its way down a call chain of tasks
+  // and/or functions, a new frame is activated as each new task or function is
+  // entered". This is that entry for a function or a method, and the scope is
+  // what leaves the frame that was active standing again however the body ends
+  // -- a return out of the middle of it included.
+  VpiActiveFrameScope frame;
   // A return type nothing can size -- void, a string, a class handle, a
   // parameterized method's type -- leaves the return statement to take the
   // expression's own vector, which is what it has always done. A typedef name

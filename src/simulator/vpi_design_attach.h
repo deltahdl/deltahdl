@@ -3,6 +3,7 @@
 namespace delta {
 
 class SimContext;
+struct VpiObject;
 
 // §36.6: put the design the run has just built within reach of the PLI
 // applications linked into this tool, so that "the library of PLI C functions"
@@ -25,5 +26,31 @@ class SimContext;
 // callback (§36.9.2), so a run holding neither has nobody to reach the design
 // through this library and is left with the objects it would have had.
 void AttachDesignToPliApplications(SimContext& ctx);
+
+// §37.43: one subroutine activation, as the frame the VPI reaches. "A frame
+// shall represent any dynamically activated procedural scope, together with its
+// locally declared automatic variables, events, and event arrays" (detail 1),
+// and §37.44 detail 1 says when one is activated: "as a thread works its way
+// down a call chain of tasks and/or functions, a new frame is activated as each
+// new task or function is entered". So the activation is an object whose life
+// is the call's, which is what this is -- constructed where the body is entered
+// and destroyed however the body leaves, including the early return out of the
+// middle of one.
+//
+// Detail 4 is what it is for: "There is at most only one active frame at any
+// time in a given thread. To get a handle to the currently active frame, use
+// vpi_handle(vpiFrame, NULL)." Nothing in the tool ever made a frame active, so
+// that routine answered null under every design.
+class VpiActiveFrameScope {
+ public:
+  VpiActiveFrameScope();
+  ~VpiActiveFrameScope();
+
+  VpiActiveFrameScope(const VpiActiveFrameScope&) = delete;
+  VpiActiveFrameScope& operator=(const VpiActiveFrameScope&) = delete;
+
+ private:
+  VpiObject* outer_ = nullptr;
+};
 
 }  // namespace delta
