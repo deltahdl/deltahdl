@@ -510,6 +510,26 @@ bool TryResolvePrimitiveRelation(int type, VpiHandle ref, VpiHandle& out) {
 //
 // Either arm leaves the traversal alone when it finds nothing, so an object
 // carrying a class name as its type is still reached the way it always was.
+// §37.27 (figure): a named event reaches its event typespec and a named event
+// array its array typespec, both edges drawn to the `typespec` class §37.25
+// fills with the concrete typespec kinds. §37.4.1 makes that enclosure a
+// grouping, so the object either edge reaches is an event typespec, an array
+// typespec, a struct typespec and so on - never one whose own type is
+// vpiTypespec, which is the group's name and which the generic traversal was
+// left looking for.
+//
+// The traversal is left alone where no child is a typespec, so an object
+// carrying the class name as its own type is still reached the way it was.
+bool TryResolveTypespecClassRelation(int type, VpiHandle ref, VpiHandle& out) {
+  if (type != vpiTypespec) return false;
+  for (auto* child : ref->children) {
+    if (!VpiIsTypespecType(child->type)) continue;
+    out = child;
+    return true;
+  }
+  return false;
+}
+
 bool TryResolveProcessStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type != vpiStmt || !VpiIsProcessType(ref->type)) return false;
   for (auto* child : ref->children) {
@@ -762,6 +782,7 @@ bool TryResolveDesignatedRelation(int type, VpiHandle ref, VpiHandle& out) {
          TryResolveParameterRelation(type, ref, out) ||
          TryResolveConditionRelation(type, ref, out) ||
          TryResolveProcessAndStmtRelation(type, ref, out) ||
+         TryResolveTypespecClassRelation(type, ref, out) ||
          TryResolvePatternRelation(type, ref, out) ||
          TryResolvePrimitiveRelation(type, ref, out) ||
          TryResolveAssignAndStmtRelation(type, ref, out) ||

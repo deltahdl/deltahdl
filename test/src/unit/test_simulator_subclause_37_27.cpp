@@ -133,5 +133,87 @@ TEST(NamedEventModel, WaitingAndIndexRelationsSelectDistinctTargets) {
   EXPECT_EQ(indices[0], &index);
 }
 
+// -----------------------------------------------------------------------------
+// The two typespec edges. §37.27 draws a named event to its event typespec and
+// a named event array to its array typespec, both to the `typespec` class
+// §37.25 fills with the concrete typespec kinds. §37.4.1 makes that enclosure a
+// grouping rather than an object, so vpiTypespec is the group's name; matching
+// it against an object's own type, which is what the generic traversal does,
+// reached the typespec of no named event any design declares.
+// -----------------------------------------------------------------------------
+
+// Class membership: the kinds the enclosure holds are the concrete typespecs
+// §37.25 draws inside it. The class constant itself is not one of them, and
+// neither is an object of some other kind.
+TEST(NamedEventModel, TheTypespecClassGroupsTheConcreteTypespecKinds) {
+  EXPECT_TRUE(VpiIsTypespecType(vpiEventTypespec));
+  EXPECT_TRUE(VpiIsTypespecType(vpiArrayTypespec));
+  EXPECT_TRUE(VpiIsTypespecType(vpiStructTypespec));
+  EXPECT_TRUE(VpiIsTypespecType(vpiTypeParameter));
+
+  EXPECT_FALSE(VpiIsTypespecType(vpiTypespec));
+  EXPECT_FALSE(VpiIsTypespecType(vpiNamedEvent));
+}
+
+// §37.27 (figure, named event --vpiTypespec--> event typespec): a named event
+// reaches the event typespec drawn on it. A waiting thread hanging off the same
+// event, which the diagram reaches by an edge of its own, is not it.
+TEST(NamedEventModel, ANamedEventReachesItsEventTypespec) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+
+  VpiObject waiter;
+  waiter.type = vpiThread;
+  VpiObject typespec;
+  typespec.type = vpiEventTypespec;
+
+  VpiObject event;
+  event.type = vpiNamedEvent;
+  event.children = {&waiter, &typespec};
+
+  EXPECT_EQ(vpi_handle(vpiTypespec, &event), &typespec);
+
+  SetGlobalVpiContext(nullptr);
+}
+
+// §37.27 (figure, named event array --vpiTypespec--> array typespec): the array
+// reaches the array typespec drawn on it, by the same edge and the same class.
+// A range declaration, which detail 3 reaches by its own iteration, is not it.
+TEST(NamedEventModel, ANamedEventArrayReachesItsArrayTypespec) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+
+  VpiObject range;
+  range.type = vpiRange;
+  VpiObject typespec;
+  typespec.type = vpiArrayTypespec;
+
+  VpiObject array;
+  array.type = vpiNamedEventArray;
+  array.children = {&range, &typespec};
+
+  EXPECT_EQ(vpi_handle(vpiTypespec, &array), &typespec);
+
+  SetGlobalVpiContext(nullptr);
+}
+
+// §37.27 (figure): a named event declared with no typespec reaches none, rather
+// than some other object hanging off it.
+TEST(NamedEventModel, ANamedEventWithNoTypespecReachesNone) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+
+  VpiObject waiter;
+  waiter.type = vpiThread;
+
+  VpiObject event;
+  event.type = vpiNamedEvent;
+  event.children = {&waiter};
+
+  EXPECT_EQ(vpi_handle(vpiTypespec, &event), nullptr);
+
+  SetGlobalVpiContext(nullptr);
+}
+
 }  // namespace
 }  // namespace delta

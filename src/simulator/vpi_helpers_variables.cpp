@@ -50,6 +50,42 @@ VpiHandle VpiRangeRightRange(const VpiRangeDesc& range) {
 // §37.17 Variables.
 // ===========================================================================
 
+bool VpiIsTypespecType(int type) {
+  // §37.25: `typespec` is drawn as a class definition - bold italic letters in
+  // a dotted enclosure - and §37.4.1 makes such an enclosure a grouping of the
+  // object definitions inside it rather than an object anything can be. So
+  // vpiTypespec is the group's name and these are the kinds a typespec object
+  // actually has. Four of them carry a second spelling at the same value -
+  // vpiChandleTypespec, vpiIntegerTypespec, vpiTimeTypespec and
+  // vpiRealTypespec - so each value is written once, under the spelling the
+  // enclosure draws it with.
+  switch (type) {
+    case vpiShortRealTypespec:
+    case vpiByteTypespec:
+    case vpiShortIntTypespec:
+    case vpiIntTypespec:
+    case vpiLongIntTypespec:
+    case vpiClassTypespec:
+    case vpiEnumTypespec:
+    case vpiStringTypespec:
+    case vpiStructTypespec:
+    case vpiUnionTypespec:
+    case vpiBitTypespec:
+    case vpiLogicTypespec:
+    case vpiPackedArrayTypespec:
+    case vpiArrayTypespec:
+    case vpiVoidTypespec:
+    case vpiSequenceTypespec:
+    case vpiPropertyTypespec:
+    case vpiEventTypespec:
+    case vpiInterfaceTypespec:
+    case vpiTypeParameter:
+      return true;
+    default:
+      return false;
+  }
+}
+
 bool VpiIsVariablesType(int type) {
   // §37.4.1: the objects the `variables` class groups are the ones §37.17 draws
   // inside its dotted enclosure. A class "groups other objects and classes" and
