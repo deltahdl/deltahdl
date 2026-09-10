@@ -9,6 +9,7 @@
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/specify.h"
 // §37.44's vpiThread is defined in the SystemVerilog VPI header.
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
@@ -156,6 +157,56 @@ VpiActiveFrameScope::~VpiActiveFrameScope() {
   GetGlobalVpiContext().RestoreActiveFrame(outer_);
 }
 
+void VpiContext::AttachModulePathDelays(SimContext& sim_ctx) {
+  // §38.10: "the VPI routine vpi_get_delays() shall retrieve the delays or
+  // pulse limits of an object". A module path is one of the four kinds of
+  // object the clause gives legal no_of_delays values for, and it is the one
+  // whose twelve transition delays the clause takes without interpreting them
+  // -- the 12-value row of Table 38-2 is the path's own array. No object a run
+  // built carried a delay at all, so the routine had only what a caller put in
+  // an object of its own making to retrieve.
+  SpecifyManager* specify = sim_ctx.GetSpecifyManager();
+  if (specify == nullptr) return;
+
+  for (const PathDelay& path : specify->GetPathDelays()) {
+    // §30.3 puts a specify block inside a module declaration, so the paths it
+    // declares belong to the instance that declared them. A path of a module
+    // elaborated as a top carries the empty prefix and has no module object
+    // over it to hang from.
+    if (path.inst_prefix.empty()) continue;
+    std::string_view scope = path.inst_prefix;
+    scope.remove_suffix(1);  // the prefix ends in the separator
+    VpiHandle module = DesignObjectForFlatName(scope);
+    if (module == nullptr) continue;
+
+    auto* obj = AllocObject();
+    obj->type = vpiModPath;
+    obj->parent = module;
+    module->children.push_back(obj);
+    // §38.10: "the application-allocated s_vpi_delay array shall contain delays
+    // in the same order in which they occur in the SystemVerilog description",
+    // which for a module path is the order of its transition slots, and the
+    // pulse limits §30.7 gives each of them travel with each delay.
+    obj->delays.reserve(path.delay_count);
+    for (uint8_t i = 0; i < path.delay_count; ++i) {
+      VpiDelayInfo info;
+      info.delay = static_cast<double>(path.delays[i]);
+      info.min_delay = info.delay;
+      info.typ_delay = info.delay;
+      info.max_delay = info.delay;
+      info.reject = static_cast<double>(path.reject_limit[i]);
+      info.min_reject = info.reject;
+      info.typ_reject = info.reject;
+      info.max_reject = info.reject;
+      info.error = static_cast<double>(path.error_limit[i]);
+      info.min_error = info.error;
+      info.typ_error = info.error;
+      info.max_error = info.error;
+      obj->delays.push_back(info);
+    }
+  }
+}
+
 void VpiContext::Attach(SimContext& sim_ctx) {
   // §37.44: the run the thread objects are made against. They cannot all be
   // made here -- a fork branch begins while the design executes, long after
@@ -181,6 +232,7 @@ void VpiContext::Attach(SimContext& sim_ctx) {
     obj->var = var;
     obj->size = static_cast<int>(var->value.width);
   }
+  AttachModulePathDelays(sim_ctx);
   for (auto& [name, net] : sim_ctx.GetNets()) {
     VpiHandle obj = DesignObjectForFlatName(name);
     if (obj == nullptr || net == nullptr) continue;

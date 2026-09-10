@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "common/arena.h"
+#include "fixture_simulator.h"
 #include "helpers_vpi_delays_fixture.h"
 #include "simulator/scheduler.h"
 #include "simulator/vpi.h"
@@ -319,6 +320,128 @@ TEST_F(VpiGetDelaysSim, NullArgumentsAreSafe) {
   vpi_get_delays(nullptr, &delay);  // null handle
 
   SUCCEED();
+}
+
+// -----------------------------------------------------------------------------
+// §38.10: "The VPI routine vpi_get_delays() shall retrieve the delays or pulse
+// limits of an object and place them in an s_vpi_delay structure that has been
+// allocated by the application."
+//
+// Every case above hands the routine an object it filled in itself, so what
+// they observe is the retrieval and never the delays -- and no object a run
+// built carried one at all, the design's module paths, primitives and timing
+// checks reaching the VPI as nothing. The routine was complete over objects
+// that only a test ever made.
+// -----------------------------------------------------------------------------
+
+// What the application found. A calltf is a plain C function with no return
+// path to the case that provoked it.
+int g_paths_seen = 0;
+uint64_t g_smallest_delay = 0;
+uint64_t g_largest_delay = 0;
+
+int DisplayPathDelaysCalltf(const char*) {
+  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+  if (mod == nullptr) return 0;
+  vpiHandle paths = vpi_iterate(vpiModPath, mod);
+  if (paths == nullptr) return 0;
+
+  for (vpiHandle path = vpi_scan(paths); path != nullptr;
+       path = vpi_scan(paths)) {
+    ++g_paths_seen;
+    // The structure is the application's, which is what §38.10 says of it, and
+    // one delay is a legal count for a path delay object: "for path delay
+    // objects, the no_of_delays value shall be 1, 2, 3, 6, or 12".
+    s_vpi_time da[1] = {};
+    s_vpi_delay delays = {};
+    delays.da = da;
+    delays.no_of_delays = 1;
+    delays.time_type = vpiSimTime;
+    vpi_get_delays(path, &delays);
+
+    uint64_t got = da[0].low;
+    if (g_paths_seen == 1) {
+      g_smallest_delay = got;
+      g_largest_delay = got;
+    } else if (got < g_smallest_delay) {
+      g_smallest_delay = got;
+    } else if (got > g_largest_delay) {
+      g_largest_delay = got;
+    }
+  }
+  return 0;
+}
+
+void RegisterPathDelayProbe() {
+  g_paths_seen = 0;
+  g_smallest_delay = 0;
+  g_largest_delay = 0;
+
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = "$probe";
+  data.calltf = &DisplayPathDelaysCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+}
+
+// A module whose specify block declares two module paths with different delays,
+// instantiated so the application has a module object to iterate from. The two
+// delays stand in a ratio of three, which is what a case can read whatever time
+// unit the run keeps its ticks in.
+void RunAModuleOfTwoPaths(SimFixture& f) {
+  auto* design = ElaborateSrc(
+      "module m(input a, input c, output b, output d);\n"
+      "  assign b = a;\n"
+      "  assign d = c;\n"
+      "  specify\n"
+      "    (a => b) = 3;\n"
+      "    (c => d) = 9;\n"
+      "  endspecify\n"
+      "endmodule\n"
+      "module t;\n"
+      "  wire p, q, r, s;\n"
+      "  m m1(p, q, r, s);\n"
+      "  initial $probe;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+}
+
+class VpiGetDelaysInARun : public ::testing::Test {
+ protected:
+  void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
+  void TearDown() override { SetGlobalVpiContext(nullptr); }
+
+  VpiContext vpi_ctx_;
+};
+
+TEST_F(VpiGetDelaysInARun, TheDesignsModulePathsAreObjectsToRetrieveFrom) {
+  RegisterPathDelayProbe();
+
+  SimFixture f;
+  RunAModuleOfTwoPaths(f);
+
+  // Both paths the specify block declared are reached, which they were not
+  // before: a run put no delay-bearing object within reach of an application at
+  // all, so the iteration handed back nothing to retrieve from.
+  EXPECT_EQ(g_paths_seen, 2);
+}
+
+TEST_F(VpiGetDelaysInARun, TheRetrievedDelayIsTheOneTheSourceDeclared) {
+  RegisterPathDelayProbe();
+
+  SimFixture f;
+  RunAModuleOfTwoPaths(f);
+
+  ASSERT_EQ(g_paths_seen, 2);
+  // Neither delay is zero, and the larger is three times the smaller, which is
+  // the ratio the source wrote them in. The ratio rather than the two numbers
+  // because the value the routine reports is in the run's own time unit, and
+  // what the case is about is the delay coming from the declaration rather than
+  // from anywhere else.
+  EXPECT_GT(g_smallest_delay, 0u);
+  EXPECT_EQ(g_largest_delay, g_smallest_delay * 3);
 }
 
 }  // namespace

@@ -741,6 +741,10 @@ class VpiContext {
                              std::string_view full_path);
   VpiHandle DesignObjectForFlatName(std::string_view flat_name);
 
+  // §38.10: put the design's module paths within reach as the objects
+  // vpi_get_delays() retrieves delays from. Written beside the rest of Attach.
+  void AttachModulePathDelays(SimContext& sim_ctx);
+
   // §37.2.2: release one handle plus the handles to every callback placed on
   // the object it names. Building block for the simulation-event release rules.
   void ReleaseHandleWithCallbacks(VpiObject* object);
