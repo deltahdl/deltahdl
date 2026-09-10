@@ -394,6 +394,30 @@ TEST(VpiCompatibilityModeBinding, Version1800v2023Retargets) {
 
 }  // namespace
 
+#undef vpi_compare_objects
+#undef vpi_control
+#undef vpi_get
+#undef vpi_get_str
+#undef vpi_get_value
+#undef vpi_handle
+#undef vpi_handle_by_index
+#undef vpi_handle_by_multi_index
+#undef vpi_handle_by_name
+#undef vpi_handle_multi
+#undef vpi_iterate
+#undef vpi_put_value
+#undef vpi_register_cb
+#undef vpi_scan
+#undef VPI_COMPATIBILITY_VERSION_1364v1995
+#undef VPI_COMPATIBILITY_VERSION_1364v2001
+#undef VPI_COMPATIBILITY_VERSION_1364v2005
+#undef VPI_COMPATIBILITY_VERSION_1800v2005
+#undef VPI_COMPATIBILITY_VERSION_1800v2009
+#undef VPI_COMPATIBILITY_VERSION_1800v2012
+#undef VPI_COMPATIBILITY_VERSION_1800v2017
+#undef VPI_COMPATIBILITY_VERSION_1800v2023
+#undef VPI_COMPATIBILITY_H
+
 // --- Section: the redefinition is performed by vpi_user.h ---
 // §36.12.2.1 puts the mechanism in the file the application includes: "one of
 // the following compiler symbols shall be defined prior to compilation of any
