@@ -499,6 +499,43 @@ bool TryResolvePrimitiveRelation(int type, VpiHandle ref, VpiHandle& out) {
   return true;
 }
 
+// §37.63 (figure): a process and the statement it executes are drawn to each
+// other. The statement end is the `stmt` class, which §37.60 fills with the
+// scope and atomic statement kinds, and the process end is the `process` class
+// of the initial, final and always procedures. §37.4.1 makes each enclosure a
+// grouping, so what either edge reaches is an object of one of the kinds its
+// class holds - a begin, a fork, an if, an assignment on one side and an
+// initial, a final or an always on the other - never one whose own type is the
+// class name, which is what the generic traversal was left looking for.
+//
+// Either arm leaves the traversal alone when it finds nothing, so an object
+// carrying a class name as its type is still reached the way it always was.
+bool TryResolveProcessStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
+  if (type != vpiStmt || !VpiIsProcessType(ref->type)) return false;
+  for (auto* child : ref->children) {
+    if (!VpiIsScopeBodyStmtType(child->type)) continue;
+    out = child;
+    return true;
+  }
+  return false;
+}
+
+bool TryResolveStmtProcessRelation(int type, VpiHandle ref, VpiHandle& out) {
+  if (type != vpiProcess) return false;
+  for (VpiObject* scope = ref->parent; scope != nullptr;
+       scope = scope->parent) {
+    if (!VpiIsProcessType(scope->type)) continue;
+    out = scope;
+    return true;
+  }
+  return false;
+}
+
+bool TryResolveProcessAndStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
+  return TryResolveProcessStmtRelation(type, ref, out) ||
+         TryResolveStmtProcessRelation(type, ref, out);
+}
+
 bool TryResolvePatternRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type != vpiPattern || !VpiIsPatternType(ref->type)) return false;
   out = VpiPatternOf(ref);
@@ -724,6 +761,7 @@ bool TryResolveDesignatedRelation(int type, VpiHandle ref, VpiHandle& out) {
          TryResolveClockingAndParentRelation(type, ref, out) ||
          TryResolveParameterRelation(type, ref, out) ||
          TryResolveConditionRelation(type, ref, out) ||
+         TryResolveProcessAndStmtRelation(type, ref, out) ||
          TryResolvePatternRelation(type, ref, out) ||
          TryResolvePrimitiveRelation(type, ref, out) ||
          TryResolveAssignAndStmtRelation(type, ref, out) ||

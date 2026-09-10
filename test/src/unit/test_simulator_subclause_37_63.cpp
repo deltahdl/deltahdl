@@ -59,5 +59,80 @@ TEST_F(Process, ProcessWithoutALegalAlwaysTypeReportsUndefined) {
   EXPECT_EQ(vpi_get(vpiAlwaysType, &bad_process), vpiUndefined);
 }
 
+// -----------------------------------------------------------------------------
+// The edge between a process and the statement it executes. §37.63 draws it
+// with a head at each end: the statement end is the `stmt` class, which §37.60
+// fills with the scope and atomic statement kinds, and the process end is the
+// `process` class of the initial, final and always procedures. §37.4.1 makes
+// each enclosure a grouping rather than an object, so vpiStmt and vpiProcess
+// are the two groups' names; matching either against an object's own type,
+// which is what the generic traversal does, reached the body of no procedure
+// any design elaborates and let no statement name the procedure running it.
+// -----------------------------------------------------------------------------
+
+// §37.63 (figure, process -> stmt): an always procedure reaches the statement
+// it executes, whichever of the kinds the `stmt` class groups that statement
+// is - here the begin block a multi-statement body is written as.
+TEST_F(Process, AProcessReachesTheStatementItExecutes) {
+  VpiObject body;
+  body.type = vpiNamedBegin;
+
+  VpiObject process;
+  process.type = vpiAlways;
+  process.children = {&body};
+
+  EXPECT_EQ(vpi_handle(vpiStmt, &process), &body);
+}
+
+// §37.63 (figure): the same edge is drawn on all three procedure kinds, and a
+// body written as a single atomic statement is as much a member of the `stmt`
+// class as a block is.
+TEST_F(Process, AnInitialReachesAnAtomicStatementBody) {
+  VpiObject body;
+  body.type = vpiAssignment;
+
+  VpiObject process;
+  process.type = vpiInitial;
+  process.children = {&body};
+
+  EXPECT_EQ(vpi_handle(vpiStmt, &process), &body);
+}
+
+// §37.63 (figure, stmt -> process): the arrow carries a head at each end, so a
+// statement names the procedure running it. A statement nested inside the
+// procedure's block reaches the same procedure, the edge being drawn to the
+// process rather than to the immediately enclosing statement.
+TEST_F(Process, AStatementReachesTheProcedureRunningIt) {
+  VpiObject process;
+  process.type = vpiFinal;
+
+  VpiObject body;
+  body.type = vpiBegin;
+  body.parent = &process;
+  process.children = {&body};
+
+  VpiObject nested;
+  nested.type = vpiAssignment;
+  nested.parent = &body;
+  body.children = {&nested};
+
+  EXPECT_EQ(vpi_handle(vpiProcess, &body), &process);
+  EXPECT_EQ(vpi_handle(vpiProcess, &nested), &process);
+}
+
+// §37.63 (figure): a statement standing under no procedure names none, rather
+// than some enclosing object of another kind.
+TEST_F(Process, AStatementOutsideAProcedureReachesNone) {
+  VpiObject mod;
+  mod.type = kVpiModule;
+
+  VpiObject stmt;
+  stmt.type = vpiAssignment;
+  stmt.parent = &mod;
+  mod.children = {&stmt};
+
+  EXPECT_EQ(vpi_handle(vpiProcess, &stmt), nullptr);
+}
+
 }  // namespace
 }  // namespace delta
