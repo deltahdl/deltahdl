@@ -748,6 +748,24 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   AttachTopModules(design);
 }
 
+namespace {
+
+// §37.4.2 reads a diagram's `str: vpiFullName` with vpi_get_str, and §37.3.1
+// writes what that string is: the hierarchical path name a design is reached by
+// -- "top.m1.w" for the wire w of the instance m1 of the top module top. An
+// object entered under a flat name that began below the top carries only the
+// part of that path below it, so the top's own name is put back on the front of
+// every full name in the subtree it has just adopted.
+void PrefixFullNamesWithTop(VpiObject* obj, std::string_view top) {
+  if (obj == nullptr) return;
+  if (!obj->full_name.empty()) {
+    obj->full_name = std::string(top) + "." + obj->full_name;
+  }
+  for (auto* child : obj->children) PrefixFullNamesWithTop(child, top);
+}
+
+}  // namespace
+
 void VpiContext::AttachTopModules(const RtlirDesign* design) {
   // §37.5 detail 1: "Top-level modules shall be accessed using vpi_iterate()
   // with a NULL reference object", which is where a PLI application walking a
@@ -782,6 +800,9 @@ void VpiContext::AttachTopModules(const RtlirDesign* design) {
     for (auto* object : contents) {
       object->parent = obj;
       obj->children.push_back(object);
+      // The path each of these was entered under began below the top, so the
+      // top is now a step of it that its vpiFullName does not name.
+      PrefixFullNamesWithTop(object, obj->name);
     }
     object_map_[obj->name] = obj;
   }
