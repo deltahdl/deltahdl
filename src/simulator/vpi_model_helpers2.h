@@ -149,11 +149,6 @@ VpiHandle VpiRangeRightRange(const VpiRangeDesc& range);
 // to the class reaches.
 bool VpiIsVariablesType(int type);
 
-// §37.25: the object definitions the `typespec` class groups. §37.4.1 makes a
-// dotted enclosure a grouping rather than an object, so vpiTypespec names the
-// group and a typespec object carries one of these kinds instead.
-bool VpiIsTypespecType(int type);
-
 // §37.17 detail 19: a logic var is the same object kind as a reg; treat either
 // as a logic variable so an existing reg-typed object is classified correctly.
 bool VpiIsLogicVarType(int type);

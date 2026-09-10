@@ -143,16 +143,16 @@ TEST(NamedEventModel, WaitingAndIndexRelationsSelectDistinctTargets) {
 // -----------------------------------------------------------------------------
 
 // Class membership: the kinds the enclosure holds are the concrete typespecs
-// §37.25 draws inside it. The class constant itself is not one of them, and
-// neither is an object of some other kind.
+// §37.25 draws inside it, which is what the edge has to reach. An object of
+// some other kind is not one of them.
 TEST(NamedEventModel, TheTypespecClassGroupsTheConcreteTypespecKinds) {
   EXPECT_TRUE(VpiIsTypespecType(vpiEventTypespec));
   EXPECT_TRUE(VpiIsTypespecType(vpiArrayTypespec));
   EXPECT_TRUE(VpiIsTypespecType(vpiStructTypespec));
   EXPECT_TRUE(VpiIsTypespecType(vpiTypeParameter));
 
-  EXPECT_FALSE(VpiIsTypespecType(vpiTypespec));
   EXPECT_FALSE(VpiIsTypespecType(vpiNamedEvent));
+  EXPECT_FALSE(VpiIsTypespecType(vpiThread));
 }
 
 // §37.27 (figure, named event --vpiTypespec--> event typespec): a named event
