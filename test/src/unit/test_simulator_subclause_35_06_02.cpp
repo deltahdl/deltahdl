@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -279,7 +281,17 @@ TEST(DpiOutputInoutValueChanges, ChangedArgReportedAtItsDeclaredIndex) {
 // meet, and Variable::NotifyWatchers is what a value change reaches.
 // ---------------------------------------------------------------------------
 
-// A design holding one variable `a` set to `actual`, handed to an import whose
+// The declaration a design gives the one variable `a` it holds, and the
+// expression its call site binds to the output formal. The formal is always
+// int, so a width below 32 is a call whose copy-out narrows; `arg` is `a`
+// itself, or an expression naming part of it.
+struct AnOutputActual {
+  uint32_t width = 32;
+  bool is_4state = true;
+  std::string_view arg = "a";
+};
+
+// A design holding that variable set to `actual`, handed to an import whose
 // foreign body leaves `wrote` in its output formal. `events` counts the times
 // the variable's value change was propagated, and Actual() is what it holds
 // once the call has returned.
@@ -288,7 +300,7 @@ struct AnOutputActualInADesign {
   SimFixture f;
   int events = 0;
 
-  AnOutputActualInADesign(int32_t actual, int32_t wrote) {
+  AnOutputActualInADesign(AnOutputActual decl, int32_t actual, int32_t wrote) {
     DpiRtFunction func;
     func.c_name = "c_set_out";
     func.sv_name = "set_out";
@@ -300,8 +312,10 @@ struct AnOutputActualInADesign {
     };
     rt.RegisterImport(std::move(func));
     f.ctx.SetDpiRuntime(&rt);
-    auto* var = f.ctx.CreateVariable("a", 32);
-    var->value = MakeLogic4VecVal(f.arena, 32, static_cast<uint64_t>(actual));
+    auto* var = f.ctx.CreateVariable("a", decl.width);
+    var->is_4state = decl.is_4state;
+    var->value =
+        MakeLogic4VecVal(f.arena, decl.width, static_cast<uint64_t>(actual));
     int* events_slot = &events;
     // Returning false keeps the watcher registered, so a second propagation
     // would be counted too rather than going unseen.
@@ -309,7 +323,8 @@ struct AnOutputActualInADesign {
       ++*events_slot;
       return false;
     });
-    EvalFunctionCall(ParseExprFrom("set_out(a)", f), f.ctx, f.arena);
+    EvalFunctionCall(ParseExprFrom("set_out(" + std::string(decl.arg) + ")", f),
+                     f.ctx, f.arena);
   }
 
   uint64_t Actual() { return f.ctx.FindVariable("a")->value.ToUint64(); }
@@ -320,14 +335,14 @@ struct AnOutputActualInADesign {
 // propagation of one assignment. The foreign body writes 99 over a 7, so the
 // design sees the change once.
 TEST(DpiValueChangeInADesign, AnOutputActualAlteredByAnImportRaisesOneEvent) {
-  AnOutputActualInADesign run(/*actual=*/7, /*wrote=*/99);
+  AnOutputActualInADesign run(AnOutputActual{}, /*actual=*/7, /*wrote=*/99);
   EXPECT_EQ(run.events, 1);
 }
 
 // The change that was propagated is the one the import made, which is what
 // makes the count above a value change rather than a bare notification.
 TEST(DpiValueChangeInADesign, ThePropagatedValueIsWhatTheImportWrote) {
-  AnOutputActualInADesign run(/*actual=*/7, /*wrote=*/99);
+  AnOutputActualInADesign run(AnOutputActual{}, /*actual=*/7, /*wrote=*/99);
   EXPECT_EQ(run.Actual(), 99U);
 }
 
@@ -336,8 +351,46 @@ TEST(DpiValueChangeInADesign, ThePropagatedValueIsWhatTheImportWrote) {
 // the value a variable already holds is not a value change. The foreign body
 // writes back the 50 the actual came in with, so the design sees nothing.
 TEST(DpiValueChangeInADesign, AnUnalteredOutputActualRaisesNoEvent) {
-  AnOutputActualInADesign run(/*actual=*/50, /*wrote=*/50);
+  AnOutputActualInADesign run(AnOutputActual{}, /*actual=*/50, /*wrote=*/50);
   EXPECT_EQ(run.events, 0);
+}
+
+// §35.6.2 measures the propagation by the assignment and not by the formal:
+// "the value propagation (i.e., value change events) happens as if an actual
+// argument was assigned a formal argument immediately after control returns".
+// The foreign body moves its `int` formal from an undetermined value to 21, but
+// the actual is four bits wide and 21 assigned to it leaves the 4'b0101 it came
+// in with, so the assignment changes nothing and the design sees nothing.
+TEST(DpiValueChangeInADesign, ATruncatedWritebackOfTheSameValueRaisesNoEvent) {
+  AnOutputActualInADesign run(AnOutputActual{4, false, "a"}, /*actual=*/5,
+                              /*wrote=*/21);
+
+  EXPECT_EQ(run.events, 0);
+  EXPECT_EQ(run.Actual(), 5U);
+}
+
+// The other side of that measurement, so the narrowing is not read as licence
+// to propagate nothing: 22 assigned to the same four-bit actual leaves 4'b0110,
+// which is a value change, so the design sees it once and the actual holds 6.
+TEST(DpiValueChangeInADesign, ATruncatedWritebackToANewValueStillRaisesOne) {
+  AnOutputActualInADesign run(AnOutputActual{4, false, "a"}, /*actual=*/5,
+                              /*wrote=*/22);
+
+  EXPECT_EQ(run.events, 1);
+  EXPECT_EQ(run.Actual(), 6U);
+}
+
+// A left-hand side naming part of a variable rather than the whole of it is
+// stored over that part, so what §35.6.2's assignment leaves there is not read
+// off the variable and the propagation stands. `a` is 4'b0101 and the formal is
+// written 99, whose bit 0 is 1, so the bit select `a[1]` takes a 1 and the
+// design sees the change once.
+TEST(DpiValueChangeInADesign, AnOutputActualNamingABitSelectStillPropagates) {
+  AnOutputActualInADesign run(AnOutputActual{4, false, "a[1]"}, /*actual=*/5,
+                              /*wrote=*/99);
+
+  EXPECT_EQ(run.events, 1);
+  EXPECT_EQ(run.Actual(), 7U);
 }
 
 }  // namespace

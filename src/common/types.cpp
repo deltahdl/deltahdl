@@ -59,6 +59,17 @@ bool Logic4Vec::IsTruthy() const {
   return false;
 }
 
+bool Logic4Vec::SameValueAs(const Logic4Vec& other) const {
+  if (width != other.width || nwords != other.nwords) return false;
+  for (uint32_t i = 0; i < nwords; ++i) {
+    if (words[i].aval != other.words[i].aval ||
+        words[i].bval != other.words[i].bval) {
+      return false;
+    }
+  }
+  return true;
+}
+
 uint64_t Logic4Vec::ToUint64() const {
   if (nwords == 0) {
     return 0;

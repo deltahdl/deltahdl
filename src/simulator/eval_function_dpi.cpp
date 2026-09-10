@@ -14,7 +14,9 @@
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
+#include "simulator/statement_assign_internal.h"
 #include "simulator/svdpi.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -327,11 +329,48 @@ std::vector<DpiArgValue> BindDpiCallActuals(const DpiRtFunction* import,
   return BindDpiActualsPositional(b);
 }
 
+// §35.6.2: "the value propagation (i.e., value change events) happens as if an
+// actual argument was assigned a formal argument immediately after control
+// returns", so what raises an event is that assignment leaving the actual
+// holding something else. DpiRuntime answers a narrower question -- whether the
+// foreign function moved the formal -- and the two agree only where the
+// assignment loses nothing. Where it loses something they part: an `int` formal
+// the callee leaves at 21, assigned to a `bit [3:0]` actual holding 5, leaves
+// the 5 it found, which is no value change of the actual however far the formal
+// moved.
+//
+// This is that assignment asked ahead of itself, by the conversions the store
+// makes and no others: §6.12.1's real boundary and §10.7's width through
+// ConvertRealOnAssign, and §6.11.2's unknowns through CoerceTo2State.
+//
+// It is asked only of a bare name, which is the one left-hand side
+// PerformBlockingAssign carries down that path. A select, a concatenation, a
+// streaming target or a member path is stored by a route of its own, over a
+// window rather than the whole of what the name resolves to, and so is a
+// left-hand side this cannot answer for: those report as changing and keep the
+// propagation they have. So does a name resolving to no variable. A forced
+// variable needs no case here -- §10.6.2 has the store leave it alone, and it
+// leaves it without notifying either.
+bool AssignmentWouldChangeActual(const Expr* lhs, const Logic4Vec& next,
+                                 SimContext& ctx, Arena& arena) {
+  Variable* var = lhs != nullptr && lhs->kind == ExprKind::kIdentifier
+                      ? ResolveLhsVariable(lhs, ctx)
+                      : nullptr;
+  if (var == nullptr) return true;
+  Logic4Vec stored =
+      ConvertRealOnAssign(next, lhs, var->value.width, ctx, arena);
+  if (!var->is_4state) CoerceTo2State(stored);
+  return !var->value.SameValueAs(stored);
+}
+
 // §35.6.2: the value changes of an imported function's output and inout
 // arguments are handled once control has returned, by propagating each as if
 // the actual were assigned the formal immediately after the return. `changes`
-// names the actuals the call altered, in declaration order, so an actual the
-// call left as it found it is assigned nothing and propagates nothing.
+// names the actuals whose formal the call altered, in declaration order, so an
+// actual whose formal the call left as it found it is assigned nothing and
+// propagates nothing. Of the rest, the ones the assignment would leave holding
+// what they already hold propagate nothing either, per
+// AssignmentWouldChangeActual above.
 // §13.5.2 has WritebackOutputArgs in eval_function_args.cpp do the equivalent
 // for a native subroutine, reading the values out of the callee's local
 // variables; a foreign callee has none, so the values are read out of the
@@ -348,10 +387,11 @@ void WritebackDpiChangedArgs(const DpiRtFunction* import,
     // The value arrives at the width the formal declares, unknown bits and
     // all, and the assignment narrows it to whatever the actual holds, as an
     // assignment to that actual would anywhere else.
-    PerformBlockingAssign(b.call->args[static_cast<size_t>(ai)],
-                          DpiValueOfType(b.arena, import->args[i].type,
-                                         import->args[i].width, actuals[i]),
-                          b.ctx, b.arena);
+    const Expr* lhs = b.call->args[static_cast<size_t>(ai)];
+    Logic4Vec next = DpiValueOfType(b.arena, import->args[i].type,
+                                    import->args[i].width, actuals[i]);
+    if (!AssignmentWouldChangeActual(lhs, next, b.ctx, b.arena)) continue;
+    PerformBlockingAssign(lhs, next, b.ctx, b.arena);
   }
 }
 

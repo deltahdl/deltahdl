@@ -37,16 +37,6 @@
 
 namespace delta {
 
-static bool SameValue(const Logic4Vec& a, const Logic4Vec& b) {
-  if (a.width != b.width || a.nwords != b.nwords) return false;
-  for (uint32_t i = 0; i < a.nwords; ++i) {
-    if (a.words[i].aval != b.words[i].aval ||
-        a.words[i].bval != b.words[i].bval)
-      return false;
-  }
-  return true;
-}
-
 static uint64_t TicksUntil(uint64_t target, const SimContext& ctx) {
   uint64_t now = ctx.CurrentTime().ticks;
   return target > now ? target - now : 0;
@@ -181,8 +171,8 @@ ExecTask RunModulePathTransition(const ModulePathDrive& drive,
     if (co_await InertialDelayAwaiter{ctx, remaining, drive.sources}) break;
 
     auto next = EvalExpr(drive.rhs, ctx, drive.arena, drive.width);
-    if (SameValue(next, val)) continue;
-    if (!SameValue(next, old_val)) {
+    if (next.SameValueAs(val)) continue;
+    if (!next.SameValueAs(old_val)) {
       // The driver wants a different value than the one pending, so the pending
       // transition is dropped and the new one takes its own delay.
       val = next;

@@ -42,6 +42,14 @@ struct Logic4Vec {
   // wider than 64 bits.
   uint64_t ToUint64() const;
   std::string ToString() const;
+
+  // Whether `other` is the same value: the same width, and the same 0, 1, x or
+  // z in every bit position. This is what a value change is measured against,
+  // so it is a bit-for-bit identity rather than a numeric comparison -- two
+  // values ToUint64 answers the same for can differ in width and in every
+  // unknown bit, since that projection reads one word and collapses x and z
+  // alike to 0.
+  bool SameValueAs(const Logic4Vec& other) const;
 };
 
 // A copy of a Logic4Vec that owns the words it holds.
