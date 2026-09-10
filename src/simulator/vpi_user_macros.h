@@ -571,9 +571,18 @@ void vpi_get_value_array(vpiHandle obj, p_vpi_arrayvalue arrayvalue_p,
                          PLI_INT32* index_p, PLI_UINT32 num);
 vpiHandle vpi_register_cb(s_cb_data* data);
 int vpi_remove_cb(vpiHandle cb_handle);
-int vpi_get(int property, vpiHandle obj);
-PLI_INT64 vpi_get64(int property, vpiHandle obj);
-const char* vpi_get_str(int property, vpiHandle obj);
+// §37.4.2: "Integer and Boolean properties are accessed with the routine
+// vpi_get(). These properties are of type PLI_INT32", and "String properties
+// are accessed with routine vpi_get_str(). String properties are of type
+// PLI_BYTE8 *." The clause writes both accesses out, and an application copying
+// them -- `PLI_INT32 size = vpi_get(vpiSize, obj_h);` and `PLI_BYTE8 *name =
+// vpi_get_str(vpiName, obj_h);` -- compiles against these declarations and no
+// other: the string one used to hand back a pointer to const, which is not the
+// type the clause gives a string property and which the assignment it writes
+// cannot be made from. §38.6, §38.7 and §38.11 give the same three prototypes.
+PLI_INT32 vpi_get(PLI_INT32 property, vpiHandle obj);
+PLI_INT64 vpi_get64(PLI_INT32 property, vpiHandle obj);
+PLI_BYTE8* vpi_get_str(PLI_INT32 property, vpiHandle obj);
 int vpi_free_object(vpiHandle obj);
 PLI_INT32 vpi_release_handle(vpiHandle obj);
 int vpi_control(int operation, ...);

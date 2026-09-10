@@ -269,7 +269,7 @@ class VpiContext {
   // for a null handle.
   int SmallestModuleTimePrecision() const;
 
-  const char* GetStr(int property, VpiHandle obj);
+  PLI_BYTE8* GetStr(int property, VpiHandle obj);
   // §38.11: computes the raw string value for a property, pointing into the
   // object's own storage (or null). GetStr() copies the result into the shared
   // temporary buffer the clause mandates; this helper does not.

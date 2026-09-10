@@ -184,17 +184,17 @@ int vpi_remove_cb(vpiHandle cb_handle) {
   return delta::GetGlobalVpiContext().RemoveCb(cb_handle);
 }
 
-int vpi_get(int property, vpiHandle obj) {
+PLI_INT32 vpi_get(PLI_INT32 property, vpiHandle obj) {
   VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().Get(property, obj);
 }
 
-PLI_INT64 vpi_get64(int property, vpiHandle obj) {
+PLI_INT64 vpi_get64(PLI_INT32 property, vpiHandle obj) {
   VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().Get64(property, obj);
 }
 
-const char* vpi_get_str(int property, vpiHandle obj) {
+PLI_BYTE8* vpi_get_str(PLI_INT32 property, vpiHandle obj) {
   VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().GetStr(property, obj);
 }

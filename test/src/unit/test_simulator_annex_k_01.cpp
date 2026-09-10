@@ -27,8 +27,12 @@ namespace {
 // declaration provision purely at compile time.
 static_assert(std::is_same_v<decltype(vpi_register_cb), vpiHandle(s_cb_data*)>,
               "vpi_user.h must provide vpi_register_cb");
-static_assert(std::is_same_v<decltype(vpi_get), int(int, vpiHandle)>,
-              "vpi_user.h must provide vpi_get");
+static_assert(
+    std::is_same_v<decltype(vpi_get), PLI_INT32(PLI_INT32, vpiHandle)>,
+    "vpi_user.h must provide vpi_get");
+static_assert(
+    std::is_same_v<decltype(vpi_get_str), PLI_BYTE8*(PLI_INT32, vpiHandle)>,
+    "vpi_user.h must provide vpi_get_str");
 static_assert(std::is_same_v<decltype(vpi_iterate), vpiHandle(int, vpiHandle)>,
               "vpi_user.h must provide vpi_iterate");
 static_assert(std::is_same_v<decltype(vpi_scan), vpiHandle(vpiHandle)>,

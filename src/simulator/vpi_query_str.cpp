@@ -375,7 +375,7 @@ static const char* VpiGetStrRawProperty(int property, VpiHandle obj) {
   }
 }
 
-const char* VpiContext::GetStr(int property, VpiHandle obj) {
+PLI_BYTE8* VpiContext::GetStr(int property, VpiHandle obj) {
   // §38.11: vpi_get_str() returns string property values. The value is placed
   // in a single temporary buffer reused by every call - so a pointer from an
   // earlier call is overwritten by the next - and that buffer is distinct from
@@ -388,7 +388,10 @@ const char* VpiContext::GetStr(int property, VpiHandle obj) {
   // the next call overwrites its contents.
   if (get_str_buffer_.capacity() < 256) get_str_buffer_.reserve(256);
   get_str_buffer_.assign(raw);
-  return get_str_buffer_.c_str();
+  // §37.4.2: a string property is of type PLI_BYTE8 *, so what leaves here is a
+  // pointer an application can hold in one. The buffer is this context's own,
+  // and §38.11 makes it the temporary every call overwrites.
+  return get_str_buffer_.data();
 }
 
 const char* VpiContext::GetStrRaw(int property, VpiHandle obj) {
