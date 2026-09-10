@@ -15,92 +15,116 @@
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
 
+namespace {
+
+// The error status of one VPI routine call, from end to end. §38.2 has "the
+// error status ... reset by any VPI routine call except vpi_chk_error()", which
+// is what the constructor does, and §36.10.1 has "callbacks can be set up for
+// when an error occurs as well", which is what the destructor delivers: an
+// error this routine recorded is the occurrence those callbacks are registered
+// for, and it has occurred by the time the routine is done recording it.
+//
+// One object per routine rather than a call at each of the sites that record an
+// error, because what a routine reports is the error status it leaves behind
+// and not each write on the way there: a routine that records one error and
+// then replaces it has had one error occur in it.
+class VpiRoutineErrorScope {
+ public:
+  VpiRoutineErrorScope() { delta::GetGlobalVpiContext().ResetErrorStatus(); }
+  ~VpiRoutineErrorScope() { delta::GetGlobalVpiContext().NoteErrorRecorded(); }
+
+  VpiRoutineErrorScope(const VpiRoutineErrorScope&) = delete;
+  VpiRoutineErrorScope& operator=(const VpiRoutineErrorScope&) = delete;
+};
+
+}  // namespace
+
 vpiHandle vpi_register_systf(s_vpi_systf_data* data) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().RegisterSystf(data);
 }
 
 void vpi_get_systf_info(vpiHandle obj, s_vpi_systf_data* systf_data_p) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   delta::GetGlobalVpiContext().GetSystfInfo(obj, systf_data_p);
 }
 
 void vpi_get_cb_info(vpiHandle obj, s_cb_data* cb_data_p) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   delta::GetGlobalVpiContext().GetCbInfo(obj, cb_data_p);
 }
 
 void vpi_get_time(vpiHandle obj, s_vpi_time* time_p) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   delta::GetGlobalVpiContext().GetTime(obj, time_p);
 }
 
 void vpi_get_delays(vpiHandle obj, p_vpi_delay delay_p) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   delta::GetGlobalVpiContext().GetDelays(obj, delay_p);
 }
 
 void vpi_put_delays(vpiHandle obj, p_vpi_delay delay_p) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   delta::GetGlobalVpiContext().PutDelays(obj, delay_p);
 }
 
 PLI_INT32 vpi_get_data(PLI_INT32 id, PLI_BYTE8* data_loc,
                        PLI_INT32 num_of_bytes) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().GetData(id, data_loc, num_of_bytes);
 }
 
 PLI_INT32 vpi_put_data(PLI_INT32 id, PLI_BYTE8* data_loc,
                        PLI_INT32 num_of_bytes) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().PutData(id, data_loc, num_of_bytes);
 }
 
 PLI_INT32 vpi_put_userdata(vpiHandle obj, void* userdata) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().PutUserData(obj, userdata);
 }
 
 void* vpi_get_userdata(vpiHandle obj) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().GetUserData(obj);
 }
 
 vpiHandle vpi_handle(int type, vpiHandle ref) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().Handle(type, ref);
 }
 
 vpiHandle vpi_handle_by_name(const char* name, vpiHandle scope) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().HandleByName(name, scope);
 }
 
 vpiHandle vpi_handle_by_index(vpiHandle parent, int index) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().HandleByIndex(index, parent);
 }
 
 vpiHandle vpi_handle_by_multi_index(vpiHandle parent, int num_index,
                                     int* index_array) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().HandleByMultiIndex(num_index, index_array,
                                                          parent);
 }
 
 vpiHandle vpi_handle_multi(int type, vpiHandle ref1, vpiHandle ref2) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().HandleMulti(type, ref1, ref2);
 }
 
 int vpi_compare_objects(vpiHandle obj1, vpiHandle obj2) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().CompareObjects(obj1, obj2);
 }
 
 vpiHandle vpi_iterate(int type, vpiHandle ref) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   // §36.10.2: nothing but the two registration routines is available until the
   // cbEndOfCompile callbacks run.
   if (delta::GetGlobalVpiContext().RoutineIsUnavailableNow(
@@ -111,12 +135,12 @@ vpiHandle vpi_iterate(int type, vpiHandle ref) {
 }
 
 vpiHandle vpi_scan(vpiHandle iterator) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().Scan(iterator);
 }
 
 void vpi_get_value(vpiHandle obj, s_vpi_value* value) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   // §36.10.2: nothing but the two registration routines is available until the
   // cbEndOfCompile callbacks run.
   if (delta::GetGlobalVpiContext().RoutineIsUnavailableNow(
@@ -128,7 +152,7 @@ void vpi_get_value(vpiHandle obj, s_vpi_value* value) {
 
 vpiHandle vpi_put_value(vpiHandle obj, s_vpi_value* value, s_vpi_time* time,
                         int flags) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   // §36.10.2: nothing but the two registration routines is available until the
   // cbEndOfCompile callbacks run.
   if (delta::GetGlobalVpiContext().RoutineIsUnavailableNow(
@@ -140,48 +164,48 @@ vpiHandle vpi_put_value(vpiHandle obj, s_vpi_value* value, s_vpi_time* time,
 
 void vpi_put_value_array(vpiHandle obj, p_vpi_arrayvalue arrayvalue_p,
                          PLI_INT32* index_p, PLI_UINT32 num) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   delta::GetGlobalVpiContext().PutValueArray(obj, arrayvalue_p, index_p, num);
 }
 
 void vpi_get_value_array(vpiHandle obj, p_vpi_arrayvalue arrayvalue_p,
                          PLI_INT32* index_p, PLI_UINT32 num) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   delta::GetGlobalVpiContext().GetValueArray(obj, arrayvalue_p, index_p, num);
 }
 
 vpiHandle vpi_register_cb(s_cb_data* data) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().RegisterCb(data);
 }
 
 int vpi_remove_cb(vpiHandle cb_handle) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().RemoveCb(cb_handle);
 }
 
 int vpi_get(int property, vpiHandle obj) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().Get(property, obj);
 }
 
 PLI_INT64 vpi_get64(int property, vpiHandle obj) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().Get64(property, obj);
 }
 
 const char* vpi_get_str(int property, vpiHandle obj) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().GetStr(property, obj);
 }
 
 int vpi_free_object(vpiHandle obj) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().FreeObject(obj);
 }
 
 PLI_INT32 vpi_release_handle(vpiHandle obj) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().ReleaseHandleStatus(obj);
 }
 
@@ -189,7 +213,7 @@ int vpi_control(int operation, ...) {
   // §38.4: vpi_control(operation, varargs) takes a variable number of
   // operation-specific arguments. Read exactly the arguments the operation
   // defines before forwarding the request to the simulator.
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   va_list args;
   va_start(args, operation);
   int result = 0;
@@ -259,7 +283,7 @@ int vpi_chk_error(SVpiErrorInfo* info) {
 }
 
 PLI_INT32 vpi_get_vlog_info(SVpiVlogInfo* info) {
-  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  VpiRoutineErrorScope error_scope;
   // §38.17: return 1 (true) on success and 0 (false) when the information
   // cannot be supplied.
   return delta::GetGlobalVpiContext().GetVlogInfo(info) ? 1 : 0;
@@ -491,7 +515,7 @@ PLI_INT32 vpi_flush() {
   // channel and current log file. Like the other VPI entry points it clears the
   // pending error status (§38.2) before doing its work. Returns 0 on success
   // and nonzero on failure.
-  delta::GetGlobalVpiContext().ResetErrorStatus();
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().Flush();
 }
 
@@ -499,7 +523,7 @@ PLI_UINT32 vpi_mcd_open(PLI_BYTE8* file) {
   // §38.27: open a file for writing and return its multichannel descriptor.
   // Clears the pending error status (§38.2) like the other entry points. A
   // missing file name names nothing to open, so the routine returns 0 on error.
-  delta::GetGlobalVpiContext().ResetErrorStatus();
+  VpiRoutineErrorScope error_scope;
   if (file == nullptr) return 0;
   return delta::GetGlobalVpiContext().McdOpen(file);
 }
@@ -509,7 +533,7 @@ PLI_UINT32 vpi_mcd_close(PLI_UINT32 mcd) {
   // pending error status (§38.2) like the other entry points. Returns 0 when
   // every requested channel was closed, otherwise the mcd of the unclosed
   // channels.
-  delta::GetGlobalVpiContext().ResetErrorStatus();
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().McdClose(mcd);
 }
 
@@ -517,7 +541,7 @@ PLI_INT32 vpi_mcd_flush(PLI_UINT32 mcd) {
   // §38.25: flush the output buffers for the file(s) named by a multichannel
   // descriptor. Clears the pending error status (§38.2) like the other entry
   // points. Returns 0 when the named buffers were flushed, nonzero on failure.
-  delta::GetGlobalVpiContext().ResetErrorStatus();
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().McdFlush(mcd);
 }
 
@@ -525,14 +549,14 @@ PLI_BYTE8* vpi_mcd_name(PLI_UINT32 cd) {
   // §38.26: return the name of the file represented by a single-channel
   // descriptor. Clears the pending error status (§38.2) like the other entry
   // points. Returns NULL on error, including a descriptor naming no open file.
-  delta::GetGlobalVpiContext().ResetErrorStatus();
+  VpiRoutineErrorScope error_scope;
   return delta::GetGlobalVpiContext().McdName(cd);
 }
 
 PLI_INT32 vpi_mcd_printf(PLI_UINT32 mcd, PLI_BYTE8* format, ...) {
   // §38.28: write to the file(s) named by a multichannel descriptor. Clears the
   // pending error status (§38.2) like the other entry points.
-  delta::GetGlobalVpiContext().ResetErrorStatus();
+  VpiRoutineErrorScope error_scope;
 
   // §38.28: the text is controlled by a format string using the same format as
   // the C fprintf() routine; a missing format string names nothing to print, so
@@ -562,7 +586,7 @@ PLI_INT32 vpi_mcd_vprintf(PLI_UINT32 mcd, PLI_BYTE8* format, va_list ap) {
   // that the variable-argument list has already been started by the caller. It
   // therefore receives an already-started va_list instead of starting its own.
   // Like the other entry points it clears the pending error status (§38.2).
-  delta::GetGlobalVpiContext().ResetErrorStatus();
+  VpiRoutineErrorScope error_scope;
 
   // §38.29: the text is controlled by a C fprintf()-style format string; with
   // no format string there is nothing to print, so report the error by
@@ -588,7 +612,7 @@ PLI_INT32 vpi_printf(PLI_BYTE8* format, ...) {
   // §38.30: write to both the output channel of the tool that invoked the PLI
   // application and the current tool log file. Clears the pending error status
   // (§38.2) like the other entry points.
-  delta::GetGlobalVpiContext().ResetErrorStatus();
+  VpiRoutineErrorScope error_scope;
 
   // §38.30: the text is controlled by a format string using the same format as
   // the C printf() routine; a missing format string names nothing to print, so
@@ -617,7 +641,7 @@ PLI_INT32 vpi_vprintf(PLI_BYTE8* format, va_list ap) {
   // that the variable-argument list has already been started by the caller. It
   // therefore receives an already-started va_list instead of starting its own.
   // Like the other entry points it clears the pending error status (§38.2).
-  delta::GetGlobalVpiContext().ResetErrorStatus();
+  VpiRoutineErrorScope error_scope;
 
   // §38.41: the text is controlled by a C printf()-style format string; with no
   // format string there is nothing to print, so report the error by returning

@@ -329,6 +329,20 @@ int VpiContext::DispatchCallbacks(int reason, VpiHandle obj, void* user_data) {
   return fired;
 }
 
+void VpiContext::NoteErrorRecorded() {
+  // §36.10.1: an error is what the callbacks are set up for, so a routine that
+  // recorded none has nothing to deliver.
+  if (last_error_.level == 0) return;
+  if (dispatching_error_callbacks_) return;
+
+  dispatching_error_callbacks_ = true;
+  // §38.36.3: "cbPLIError -- simulation run-time error occurred in a PLI
+  // function call", against cbError's "simulation run-time error occurred". The
+  // state §38.2 gives the error is what separates them.
+  DispatchCallbacks(last_error_.state == kVpiPLI ? kCbPLIError : kCbError);
+  dispatching_error_callbacks_ = false;
+}
+
 int VpiContext::DispatchReset() {
   // §38.33: a reset drops the user-data stored on every call instance before
   // the reset callbacks run, so a vpi_get_userdata() during cbEndOfReset starts

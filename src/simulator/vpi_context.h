@@ -700,6 +700,18 @@ class VpiContext {
   // most recent routine; a failing routine then records a fresh error.
   void ResetErrorStatus() { last_error_ = {}; }
 
+  // §36.10.1: "Callbacks can be set up for when an error occurs as well." This
+  // is that occurrence, delivered on the way out of the VPI routine that
+  // recorded the error, so an application registered for one hears about the
+  // error rather than only being able to ask after it. A routine that recorded
+  // nothing delivers nothing.
+  //
+  // §38.36.3 decides which reason: cbPLIError is a "simulation run-time error
+  // occurred in a PLI function call" and cbError one that occurred outside one,
+  // so the s_vpi_error_info state §38.2 gives the error is what selects between
+  // them -- vpiPLI is an error the PLI raised.
+  void NoteErrorRecorded();
+
  private:
   VpiHandle AllocObject();
 
@@ -873,6 +885,12 @@ class VpiContext {
   // VpiObject::name hold views into these, and appending to a deque leaves the
   // elements already in it where they are.
   std::deque<std::string> name_pool_;
+
+  // §36.10.1: whether an error-callback pass is already running. A callback may
+  // call VPI routines of its own and one of those may record an error in turn,
+  // and delivering that one from inside this pass would re-enter the same
+  // callbacks with an error they have not returned from yet.
+  bool dispatching_error_callbacks_ = false;
 
   // §38.11: vpi_get_str() places its result in one temporary buffer that every
   // call reuses, so an earlier returned pointer is clobbered by a later call.
