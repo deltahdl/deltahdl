@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "fixture_simulator.h"
 #include "helpers_vpi_delays_fixture.h"
 #include "simulator/scheduler.h"
 #include "simulator/vpi.h"
@@ -319,6 +320,115 @@ TEST_F(VpiPutDelaysSim, IntermodulePathAcceptsTwoOrThree) {
   vpi_get_delays(imp, &get);
   EXPECT_DOUBLE_EQ(out[0].real, 12.0);
   EXPECT_DOUBLE_EQ(out[1].real, 34.0);
+}
+
+// -----------------------------------------------------------------------------
+// §38.32's own example application:
+//
+//   void set_path_rise_fall_delays(path, rise, fall)
+//   vpiHandle path;
+//   double rise, fall;
+//   {
+//      static s_vpi_time path_da[2];
+//      static s_vpi_delay delay_s = {NULL, 2, vpiScaledRealTime};
+//      static p_vpi_delay delay_p = &delay_s;
+//      delay_s.da = path_da;
+//      path_da[0].real = rise;
+//      path_da[1].real = fall;
+//      vpi_put_delays(path, delay_p);
+//   }
+//
+// It "accepts a module path handle ... and replaces the delays of the indicated
+// path", and every case above hands the routine an object it made itself. A
+// module path a design declared is the object the example is written for.
+// -----------------------------------------------------------------------------
+
+// What the application read back after writing.
+bool g_path_written = false;
+double g_rise_read_back = 0.0;
+double g_fall_read_back = 0.0;
+
+int SetPathRiseFallDelaysCalltf(const char*) {
+  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+  if (mod == nullptr) return 0;
+  vpiHandle paths = vpi_iterate(vpiModPath, mod);
+  if (paths == nullptr) return 0;
+  vpiHandle path = vpi_scan(paths);
+  if (path == nullptr) return 0;
+
+  // The example, with its own shape: two delays, scaled real time, the rise in
+  // da[0] and the fall in da[1].
+  s_vpi_time path_da[2] = {};
+  s_vpi_delay delay_s = {};
+  delay_s.da = path_da;
+  delay_s.no_of_delays = 2;
+  delay_s.time_type = vpiScaledRealTime;
+  path_da[0].real = 11.0;
+  path_da[1].real = 22.0;
+  vpi_put_delays(path, &delay_s);
+  g_path_written = true;
+
+  // §38.32: "the same ordering of delays shall be used as described in the
+  // vpi_get_delays() function", so reading the path back is what says the two
+  // routines agree about which delay is which.
+  s_vpi_time read_da[2] = {};
+  s_vpi_delay read_s = {};
+  read_s.da = read_da;
+  read_s.no_of_delays = 2;
+  read_s.time_type = vpiScaledRealTime;
+  vpi_get_delays(path, &read_s);
+  g_rise_read_back = read_da[0].real;
+  g_fall_read_back = read_da[1].real;
+  return 0;
+}
+
+void RegisterPathWriteProbe() {
+  g_path_written = false;
+  g_rise_read_back = 0.0;
+  g_fall_read_back = 0.0;
+
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = "$probe";
+  data.calltf = &SetPathRiseFallDelaysCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+}
+
+class VpiPutDelaysInARun : public ::testing::Test {
+ protected:
+  void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
+  void TearDown() override { SetGlobalVpiContext(nullptr); }
+
+  VpiContext vpi_ctx_;
+};
+
+TEST_F(VpiPutDelaysInARun, TheExampleReplacesTheDelaysOfADesignsModulePath) {
+  RegisterPathWriteProbe();
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input a, output b);\n"
+      "  assign b = a;\n"
+      "  specify\n"
+      "    (a => b) = 3;\n"
+      "  endspecify\n"
+      "endmodule\n"
+      "module t;\n"
+      "  wire p, q;\n"
+      "  m m1(p, q);\n"
+      "  initial $probe;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  ASSERT_TRUE(g_path_written);
+  // The path went in declared with one delay and comes back out carrying the
+  // two the application wrote, in the order it wrote them. Replaced rather than
+  // added to, which is what the example does and what an application reading
+  // the path back has to see.
+  EXPECT_DOUBLE_EQ(g_rise_read_back, 11.0);
+  EXPECT_DOUBLE_EQ(g_fall_read_back, 22.0);
 }
 
 }  // namespace
