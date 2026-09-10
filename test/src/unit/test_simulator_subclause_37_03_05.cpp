@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi.h"
 
@@ -187,6 +188,86 @@ TEST_F(ExpressionsWithSideEffects, PutValueWithPlainIndexIsNotRefused) {
 
   SVpiErrorInfo info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
+}
+
+// Claim D: the classification the subclause opens with, applied to a source
+// expression. An increment or decrement operator (§11.4.2) and an assignment
+// operator (§11.4.1) have side effects; an expression carrying one as an
+// operand, argument or index has them too; an expression built from neither
+// does not.
+TEST(SideEffectClassification, TheFormsTheSubclauseLists) {
+  SimFixture f;
+
+  EXPECT_TRUE(VpiSourceExprHasSideEffects(ParseExprFrom("i++", f)));
+  EXPECT_TRUE(VpiSourceExprHasSideEffects(ParseExprFrom("--i", f)));
+  EXPECT_TRUE(VpiSourceExprHasSideEffects(ParseExprFrom("(j = 3)", f)));
+  EXPECT_TRUE(VpiSourceExprHasSideEffects(ParseExprFrom("(j += 3)", f)));
+
+  // As an operand, and as an index expression - §37.3.5's own my_array[i++].
+  EXPECT_TRUE(VpiSourceExprHasSideEffects(ParseExprFrom("a + (i++)", f)));
+  EXPECT_TRUE(VpiSourceExprHasSideEffects(ParseExprFrom("my_array[i++]", f)));
+
+  EXPECT_FALSE(VpiSourceExprHasSideEffects(ParseExprFrom("a + b", f)));
+  EXPECT_FALSE(VpiSourceExprHasSideEffects(ParseExprFrom("my_array[k]", f)));
+  EXPECT_FALSE(VpiSourceExprHasSideEffects(nullptr));
+}
+
+// What the application found. A calltf is a plain C function with no return
+// path to the case that provoked it.
+bool g_arg_has_side_effects = false;
+int g_arg_side_effect_count = -1;
+
+int ProbeArgumentCalltf(const char*) {
+  vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
+  if (call == nullptr) return 0;
+  vpiHandle itr = vpi_iterate(vpiArgument, call);
+  if (itr == nullptr) return 0;
+  vpiHandle arg = vpi_scan(itr);
+  if (arg == nullptr) return 0;
+
+  g_arg_has_side_effects = VpiExpressionHasSideEffects(arg);
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(arg, &value);
+  g_arg_side_effect_count = arg->side_effect_count;
+  return 0;
+}
+
+// Claim A, against a design: an argument a system task was called with is one
+// of the two ways §37.3.5 says VPI gives an application access to a source
+// expression, so an argument written `i++` is an expression with side effects
+// and vpi_get_value() on it performs the evaluation the clause mandates.
+// Nothing marked an argument object at all, so the subclause's rules stood over
+// an empty set and this argument answered that it had no side effects.
+TEST(SideEffectClassification, ASystemTaskArgumentCarriesItsSideEffects) {
+  VpiContext vpi_ctx;
+  SetGlobalVpiContext(&vpi_ctx);
+  g_arg_has_side_effects = false;
+  g_arg_side_effect_count = -1;
+
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = "$probe";
+  data.calltf = &ProbeArgumentCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  integer i;\n"
+      "  initial begin\n"
+      "    i = 0;\n"
+      "    $probe(i++);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  EXPECT_TRUE(g_arg_has_side_effects);
+  EXPECT_EQ(g_arg_side_effect_count, 1);
+
+  SetGlobalVpiContext(nullptr);
 }
 
 }  // namespace

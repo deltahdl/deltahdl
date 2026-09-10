@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "common/types.h"
+#include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
@@ -265,6 +266,69 @@ bool VpiExpressionHasSideEffects(const VpiObject* obj) {
   // §37.3.5: the mark records the classification described in the subclause; an
   // absent object cannot have side effects.
   return obj && obj->has_side_effects;
+}
+
+// §11.4.1 lists the assignment operators as the simple "=" together with "the C
+// assignment operators and special bitwise assignment operators: +=, -=, *=,
+// /=, %=, &=, |=, ^=, <<=, >>=, <<<=, and >>>=". Each of them stores into its
+// left-hand side, which is the state change §37.3.5 calls a side effect.
+static bool IsAssignmentOperator(TokenKind op) {
+  switch (op) {
+    case TokenKind::kEq:
+    case TokenKind::kPlusEq:
+    case TokenKind::kMinusEq:
+    case TokenKind::kStarEq:
+    case TokenKind::kSlashEq:
+    case TokenKind::kPercentEq:
+    case TokenKind::kAmpEq:
+    case TokenKind::kPipeEq:
+    case TokenKind::kCaretEq:
+    case TokenKind::kLtLtEq:
+    case TokenKind::kGtGtEq:
+    case TokenKind::kLtLtLtEq:
+    case TokenKind::kGtGtGtEq:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// §37.3.5's first two bullets, which are decided by the expression's own form:
+// an assignment operator (§11.4.1) or an increment or decrement operator
+// (§11.4.2), the latter written either side of its operand.
+static bool ExprIsSideEffectingForm(const Expr* expr) {
+  if (expr->kind == ExprKind::kUnary || expr->kind == ExprKind::kPostfixUnary) {
+    return expr->op == TokenKind::kPlusPlus ||
+           expr->op == TokenKind::kMinusMinus;
+  }
+  return expr->kind == ExprKind::kBinary && IsAssignmentOperator(expr->op);
+}
+
+bool VpiSourceExprHasSideEffects(const Expr* expr) {
+  if (expr == nullptr) return false;
+  if (ExprIsSideEffectingForm(expr)) return true;
+
+  // §37.3.5's fourth bullet: "Expressions in which other expressions with side
+  // effects appear as operands, arguments, or index expressions." Every place a
+  // subexpression can be written is one of those three, so the whole expression
+  // is walked rather than a chosen few of its edges.
+  const Expr* const kEdges[] = {
+      expr->lhs,        expr->rhs,         expr->condition, expr->true_expr,
+      expr->false_expr, expr->base,        expr->index,     expr->index_end,
+      expr->with_expr,  expr->repeat_count};
+  for (const Expr* edge : kEdges) {
+    if (VpiSourceExprHasSideEffects(edge)) return true;
+  }
+  for (const Expr* arg : expr->args) {
+    if (VpiSourceExprHasSideEffects(arg)) return true;
+  }
+  for (const Expr* element : expr->elements) {
+    if (VpiSourceExprHasSideEffects(element)) return true;
+  }
+  for (const Expr* key : expr->pattern_keys) {
+    if (VpiSourceExprHasSideEffects(key)) return true;
+  }
+  return false;
 }
 
 static void RecordVpiError(VpiErrorInfo& error, const char* message) {

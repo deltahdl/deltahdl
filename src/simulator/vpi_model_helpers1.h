@@ -9,6 +9,8 @@
 
 namespace delta {
 
+struct Expr;
+
 // §37.10 details 1 and 10: one entry per typedef/nettype an instance could
 // report. The vpiTypedef and vpiNetTypedef iterations return only entries that
 // are user-defined (not built-in) AND explicitly declared inside the instance,
@@ -577,6 +579,20 @@ bool VpiIsExprType(int type);
 // question share this single predicate, so the notion of "expression with side
 // effects" is decided in one place.
 bool VpiExpressionHasSideEffects(const VpiObject* obj);
+
+// §37.3.5: whether a source expression is one of the forms the subclause lists
+// as having side effects when it is evaluated - an assignment operator
+// (§11.4.1), an increment or decrement operator (§11.4.2), or an expression in
+// which one of those "appear as operands, arguments, or index expressions".
+// This is what stamps VpiObject::has_side_effects on the expression objects VPI
+// hands an application, which the predicate above then reads.
+//
+// A function call is the subclause's remaining form, and it is listed with a
+// condition on it: a call has side effects when it changes "the state of the
+// simulation other than via their return values". This tool does not determine
+// that of a call, and §37.3.5 says implementations differ in exactly that
+// ability, so a call is not classified here rather than being classified wrong.
+bool VpiSourceExprHasSideEffects(const Expr* expr);
 
 // §37.3.4 (Delays and values): the object kinds whose delays are written within
 // the SystemVerilog source and are therefore reachable as an expression through

@@ -162,6 +162,15 @@ VpiObject* SystfCallArgument(VpiObject* arg, const Expr* actual,
     if (evaluate) holder->value = EvalExpr(actual, ctx, arena);
     arg->var = holder;
   }
+  // §37.3.5: "VPI gives applications access to arbitrarily complex expressions
+  // from the SystemVerilog source, either as arguments to system tasks or
+  // functions (see 36.4) or by traversing the design hierarchy. Expressions may
+  // have side effects when evaluated." This is that first way, and
+  // VpiObject::has_side_effects is the mark the value, property and relation
+  // routines settle the subclause's rules by. No pass wrote it, so no argument
+  // an application was ever handed was an expression with side effects and
+  // every one of those rules stood over an empty set.
+  arg->has_side_effects = VpiSourceExprHasSideEffects(actual);
   arg->size = static_cast<int>(arg->var->value.width);
   return arg;
 }
