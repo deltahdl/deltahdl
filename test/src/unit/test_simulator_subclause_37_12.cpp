@@ -422,10 +422,14 @@ TEST(ScopePublic, VirtualInterfaceIterationExpandsArrayElements) {
   EXPECT_EQ(vifs[2], &elem1);
 
   // D7: vpiVariables reports the array of virtual interfaces as the single
-  // array var that declares it, not its individual elements.
+  // array var that declares it, not its individual elements. The standalone
+  // virtual interface var comes back beside it, §37.17 drawing `virtual
+  // interface var` inside the `variables` class enclosure that this relation is
+  // drawn to (§37.4.1).
   std::vector<VpiHandle> vars = Collect(ctx, ctx.Iterate(vpiVariables, &scope));
-  ASSERT_EQ(vars.size(), 1u);
-  EXPECT_EQ(vars[0], &vif_array);
+  ASSERT_EQ(vars.size(), 2u);
+  EXPECT_EQ(vars[0], &standalone_vif);
+  EXPECT_EQ(vars[1], &vif_array);
 
   SetGlobalVpiContext(nullptr);
 }

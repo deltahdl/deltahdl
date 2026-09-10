@@ -128,8 +128,12 @@ bool VpiIsClockingIODeclExprType(int type) {
   // kinds a clocking io decl's vpiExpr relation may reach. As in §37.13's io
   // decl, the named target is a net, a variable (a logic var shares vpiReg's
   // code), or a ref obj.
-  return type == vpiRefObj || type == kVpiNet || type == kVpiReg ||
-         type == vpiVariables || VpiIsLogicVarType(type);
+  // §37.4.1: the figure draws this relation to the `nets` and `variables`
+  // classes, and a class groups object definitions rather than being one, so
+  // the variable arm is every kind that class groups. Naming vpiVariables
+  // itself admitted a kind no object has while leaving out every variable that
+  // is not a logic var.
+  return type == vpiRefObj || type == kVpiNet || VpiIsVariablesType(type);
 }
 
 VpiHandle VpiClockingIODeclExpr(VpiHandle io_decl) {

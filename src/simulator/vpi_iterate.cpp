@@ -136,19 +136,12 @@ bool VpiIsVariableSelectType(int type) {
 // the variable, or a member nested inside it (itself any variable kind,
 // including a further aggregate that is walked recursively).
 bool VpiIsVariableSelectOrMemberType(int type) {
-  if (VpiIsVariableSelectType(type)) return true;
-  if (VpiIsLogicVarType(type) || VpiIsArrayVarType(type)) return true;
-  switch (type) {
-    case vpiStructVar:
-    case vpiUnionVar:
-    case vpiClassVar:
-    case vpiEnumVar:
-    case vpiPackedArrayVar:
-    case vpiVariables:
-      return true;
-    default:
-      return false;
-  }
+  // §37.4.1: a member nested inside an aggregate is a variable, and which kinds
+  // those are is what the `variables` class groups. The set was written out
+  // here with vpiVariables among its cases -- the class rather than a kind any
+  // object has -- and without kinds the class does group, so an int var or a
+  // string var member was descended into by neither.
+  return VpiIsVariableSelectType(type) || VpiIsVariablesType(type);
 }
 
 // §37.21 (figure) + detail 1: gather a variable's drivers (want_driver) or
@@ -486,14 +479,21 @@ void CollectVirtualInterfaceVars(VpiObject* ref, VpiObject* iter) {
   }
 }
 
-// §37.12 detail 7: collect the scope's variables (vpiVariables), reporting an
-// array of virtual interfaces as the single array var that declares it rather
-// than expanded.
+// §37.12 (figure): the scope's vpiVariables relation is drawn to the
+// `variables` class, and §37.4.1 makes a dotted enclosure a grouping of the
+// object definitions inside it rather than an object anything can be. So the
+// objects this reaches are the ones that class groups -- a logic var, an int
+// var, a string var and the rest of §37.17's enclosure -- and not a child whose
+// own type is the class constant, which is a kind no object has. Matching the
+// constant is what made the relation reach nothing at all in a design, whose
+// variables VpiContext::Attach stamps vpiReg.
+//
+// §37.12 detail 7: an array of virtual interfaces is reported as the single
+// array var that declares it rather than expanded, which is what matching the
+// array var itself does.
 void CollectScopeVariables(VpiObject* ref, VpiObject* iter) {
   for (auto* child : ref->children) {
-    if (child->type == vpiVariables || VpiIsVirtualInterfaceArray(child)) {
-      iter->children.push_back(child);
-    }
+    if (VpiIsVariablesType(child->type)) iter->children.push_back(child);
   }
 }
 

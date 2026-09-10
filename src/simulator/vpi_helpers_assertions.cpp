@@ -87,9 +87,8 @@ bool VpiIsClassMemberValueType(int type) {
   // event array. Anything else reached from a class defn is not value-bearing
   // in this sense. This mirrors the variable/event grouping used for frame
   // automatics (§37.43).
-  return type == vpiVariables || VpiIsLogicVarType(type) ||
-         VpiIsArrayVarType(type) || type == vpiClassVar ||
-         type == vpiNamedEvent || type == vpiNamedEventArray;
+  return VpiIsVariablesType(type) || type == vpiNamedEvent ||
+         type == vpiNamedEventArray;
 }
 
 VpiHandle VpiAssertionClockingBlock(VpiHandle assertion) {

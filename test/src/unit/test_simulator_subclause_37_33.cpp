@@ -191,7 +191,7 @@ TEST_F(ClassVariablesAndObjects,
   automatic_method.type = vpiTask;
   automatic_method.automatic = true;  // automatic property/method
   VpiObject member_var;
-  member_var.type = vpiVariables;  // not a method
+  member_var.type = vpiLogicVar;  // not a method
 
   VpiObject class_obj;
   class_obj.type = vpiClassObj;
@@ -215,10 +215,10 @@ TEST_F(ClassVariablesAndObjects,
 TEST_F(ClassVariablesAndObjects,
        VariablesIterationFromObjectReturnsBothLifetimes) {
   VpiObject static_var;
-  static_var.type = vpiVariables;
+  static_var.type = vpiLogicVar;
   static_var.automatic = false;  // static property
   VpiObject automatic_var;
-  automatic_var.type = vpiVariables;
+  automatic_var.type = vpiIntVar;
   automatic_var.automatic = true;  // automatic property
 
   VpiObject class_obj;
@@ -298,8 +298,12 @@ TEST_F(ClassVariablesAndObjects,
   vpiHandle var_it = vpi_iterate(vpiVariables, &class_obj);
   ASSERT_NE(var_it, nullptr);
   std::vector<vpiHandle> vars = ScanAll(var_it);
-  ASSERT_EQ(vars.size(), 1u);
-  EXPECT_EQ(vars[0], &vif_array);
+  // The scalar virtual interface var comes back beside the array, §37.17
+  // drawing `virtual interface var` inside the `variables` class enclosure this
+  // relation is drawn to (§37.4.1); the array is the one reported whole.
+  ASSERT_EQ(vars.size(), 2u);
+  EXPECT_EQ(vars[0], &scalar_vif);
+  EXPECT_EQ(vars[1], &vif_array);
 }
 
 // D8: a class object's vpiParameter iteration returns both the parameters from

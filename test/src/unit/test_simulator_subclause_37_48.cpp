@@ -119,13 +119,15 @@ TEST_F(ClockingBlock, ActualReachesActualWhenNotVirtualInterfacePrefixed) {
 }
 
 // Figure (clocking io decl -> nets / variables / ref obj): the io-decl expr
-// predicate recognizes a ref obj, a net, a reg/logic var, and the variables
-// grouping, and rejects an unrelated kind such as a delay control.
+// predicate recognizes a ref obj, a net, and a variable of any kind the
+// `variables` class groups (§37.4.1) -- a logic var and an int var alike -- and
+// rejects an unrelated kind such as a delay control.
 TEST_F(ClockingBlock, IODeclExprGroupMembership) {
   EXPECT_TRUE(VpiIsClockingIODeclExprType(vpiRefObj));
   EXPECT_TRUE(VpiIsClockingIODeclExprType(kVpiNet));
   EXPECT_TRUE(VpiIsClockingIODeclExprType(kVpiReg));
-  EXPECT_TRUE(VpiIsClockingIODeclExprType(vpiVariables));
+  EXPECT_TRUE(VpiIsClockingIODeclExprType(vpiIntVar));
+  EXPECT_TRUE(VpiIsClockingIODeclExprType(vpiStringVar));
   EXPECT_FALSE(VpiIsClockingIODeclExprType(vpiDelayControl));
 }
 
@@ -195,13 +197,13 @@ TEST_F(ClockingBlock, IODeclExprReachesNamedVariable) {
 }
 
 // D4 input form (figure clocking io decl -> variables grouping): the named
-// target may be a member of the variables grouping recognized only through that
-// grouping's own tag (a distinct admitted type from a concrete reg variable).
-// vpiExpr reaches it through the same resolver, so the grouping arm is observed
-// end to end and not just at the type predicate.
+// target may be any variable the `variables` class groups (§37.4.1), not only
+// the logic var whose code the reg shares. vpiExpr reaches it through the same
+// resolver, so the grouping arm is observed end to end and not just at the type
+// predicate.
 TEST_F(ClockingBlock, IODeclExprReachesVariablesGrouping) {
-  VpiObject var;  // named target carrying the variables grouping tag
-  var.type = vpiVariables;
+  VpiObject var;  // a variable of a kind the variables class groups
+  var.type = vpiIntVar;
 
   VpiObject io_decl;
   io_decl.type = vpiClockingIODecl;

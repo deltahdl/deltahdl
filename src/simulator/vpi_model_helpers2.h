@@ -141,6 +141,14 @@ VpiHandle VpiRangeRightRange(const VpiRangeDesc& range);
 // §37.17 Variables.
 // ===========================================================================
 
+// §37.4.1: `variables` is drawn as a class definition -- bold italic letters in
+// a dotted enclosure -- which "groups other objects and classes" rather than
+// being an object of its own, so vpiVariables is the name of that group and no
+// object's vpiType is ever it. This answers what the group holds: the object
+// definitions §37.17 draws inside the enclosure, which is what a relation drawn
+// to the class reaches.
+bool VpiIsVariablesType(int type);
+
 // §37.17 detail 19: a logic var is the same object kind as a reg; treat either
 // as a logic variable so an existing reg-typed object is classified correctly.
 bool VpiIsLogicVarType(int type);

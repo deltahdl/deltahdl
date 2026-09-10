@@ -59,7 +59,7 @@ TEST_F(ClassDefinition, ClassMethodsIterationExcludesImplicitBuiltins) {
   VpiObject declared_task;
   declared_task.type = vpiTask;
   VpiObject member_var;
-  member_var.type = vpiVariables;  // not a method
+  member_var.type = vpiLogicVar;  // not a method
 
   VpiObject class_defn;
   class_defn.type = vpiClassDefn;

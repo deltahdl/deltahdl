@@ -782,11 +782,11 @@ std::vector<VpiHandle> VpiFrameAutomatics(VpiHandle frame) {
   std::vector<VpiHandle> automatics;
   if (!frame) return automatics;
   for (auto* child : frame->children) {
-    // The diagram draws the variables node as the variables class, so accept
-    // the class node itself as well as the concrete logic/array variable kinds
-    // (§37.17), alongside named events and named event arrays.
-    if (child->type == vpiVariables || VpiIsLogicVarType(child->type) ||
-        VpiIsArrayVarType(child->type) || child->type == vpiNamedEvent ||
+    // §37.4.1: the diagram draws the variables node as the `variables` class,
+    // which groups the object definitions inside its enclosure rather than
+    // being an object of its own, so the automatics are objects of those kinds
+    // (§37.17) alongside named events and named event arrays.
+    if (VpiIsVariablesType(child->type) || child->type == vpiNamedEvent ||
         child->type == vpiNamedEventArray) {
       automatics.push_back(child);
     }

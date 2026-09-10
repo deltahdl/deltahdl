@@ -50,6 +50,38 @@ VpiHandle VpiRangeRightRange(const VpiRangeDesc& range) {
 // §37.17 Variables.
 // ===========================================================================
 
+bool VpiIsVariablesType(int type) {
+  // §37.4.1: the objects the `variables` class groups are the ones §37.17 draws
+  // inside its dotted enclosure. A class "groups other objects and classes" and
+  // is not one itself, so vpiVariables is not among them: a child carrying it
+  // as its own type is an object of a kind the standard draws nowhere, and the
+  // variables an application is after carry the kinds below.
+  if (VpiIsLogicVarType(type) || VpiIsArrayVarType(type)) return true;
+  switch (type) {
+    case vpiShortRealVar:
+    case vpiRealVar:
+    case vpiByteVar:
+    case vpiShortIntVar:
+    case vpiIntVar:
+    case vpiLongIntVar:
+    case vpiIntegerVar:
+    case vpiTimeVar:
+    case vpiPackedArrayVar:
+    case vpiBitVar:
+    case vpiStructVar:
+    case vpiUnionVar:
+    case vpiEnumVar:
+    case vpiStringVar:
+    case vpiChandleVar:
+    case vpiClassVar:
+    case vpiVirtualInterfaceVar:
+    case vpiVarBit:
+      return true;
+    default:
+      return false;
+  }
+}
+
 bool VpiIsLogicVarType(int type) {
   // §37.17 detail 19: a logic var and a reg are the same object kind.
   return type == vpiLogicVar || type == kVpiReg;
