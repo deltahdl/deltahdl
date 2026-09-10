@@ -15,7 +15,7 @@ namespace {
 // delay property (reached through vpi_get_delays()/vpi_put_delays()), a
 // traversal to its ports, and a way in through vpi_handle_multi(). Every
 // underlying routine is supplied by the dependencies (§37.14 ports, §38.10
-// vpi_get_delays, §38.32 vpi_put_delays, and the generic vpi_handle_multi);
+// vpi_get_delays, §38.32 vpi_put_delays, and §38.22 vpi_handle_multi);
 // these tests observe each diagram relation being applied to an object of type
 // vpiInterModPath.
 class IntermodulePathModel : public ::testing::Test {
@@ -52,10 +52,7 @@ TEST_F(IntermodulePathModel, ReachedByHandleMultiFromTwoPorts) {
   port1->children.push_back(path);
   port2->children.push_back(path);
 
-  vpiHandle reached = vpi_handle_multi(vpiInterModPath, port1, port2);
-  ASSERT_NE(reached, nullptr);
-  ASSERT_FALSE(reached->children.empty());
-  EXPECT_EQ(reached->children[0]->type, vpiInterModPath);
+  EXPECT_EQ(vpi_handle_multi(vpiInterModPath, port1, port2), path);
 }
 
 // §37.37 Detail 1 (negative): when the two ports have no intermodule path
@@ -150,13 +147,10 @@ vpiHandle PortOfInstance(const char* inst, const char* port) {
 }
 
 // §37.37 detail 1: the path between two ports, through the multi-handle the
-// detail names.
+// detail names. §38.22 has that handle name the path itself, so it is what an
+// application goes on to use.
 vpiHandle PathBetween(vpiHandle port1, vpiHandle port2) {
-  vpiHandle multi = vpi_handle_multi(vpiInterModPath, port1, port2);
-  if (multi == nullptr) return nullptr;
-  vpiHandle paths = vpi_iterate(vpiInterModPath, multi);
-  if (paths == nullptr) return nullptr;
-  return vpi_scan(paths);
+  return vpi_handle_multi(vpiInterModPath, port1, port2);
 }
 
 void RecordPathPorts(vpiHandle path) {

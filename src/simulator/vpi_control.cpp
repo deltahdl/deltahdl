@@ -176,19 +176,10 @@ namespace {
 // input-port reference objects the path runs between. Those two ports shall be
 // of the same size; they may, however, sit at different levels of the
 // hierarchy, which is deliberately left unconstrained. A size mismatch cannot
-// describe a valid intermodule path, so it is rejected by the caller.
+// describe a valid intermodule path, so it is rejected by the caller, which is
+// also where a missing reference has already been answered.
 bool InterModPathSizeMismatch(int type, VpiHandle ref1, VpiHandle ref2) {
-  return type == vpiInterModPath && ref1 && ref2 && ref1->size != ref2->size;
-}
-
-// Append every child of `ref` whose kind matches `type` to `out`. A null `ref`
-// contributes nothing.
-void CollectChildrenOfType(VpiHandle ref, int type,
-                           std::vector<VpiObject*>& out) {
-  if (!ref) return;
-  for (auto* child : ref->children) {
-    if (child->type == type) out.push_back(child);
-  }
+  return type == vpiInterModPath && ref1->size != ref2->size;
 }
 
 // Whether `obj` is one of the objects `ref` reaches.
@@ -199,25 +190,33 @@ bool IsChildOf(VpiHandle ref, const VpiObject* obj) {
   return false;
 }
 
-// §37.37 detail 1: "To get to an intermodule path, vpi_handle_multi(
-// vpiInterModPath, port1, port2) can be used." The path that gets to is the one
-// running between those two ports, so what qualifies is a path both of them are
-// on: a path on one port alone runs to a port somewhere else, and a request
-// naming two ports with no path between them reaches nothing.
-void CollectPathsBetween(VpiHandle ref1, VpiHandle ref2,
-                         std::vector<VpiObject*>& out) {
-  if (!ref1 || !ref2) return;
+// §38.22 Synopsis: "Obtain a handle for an object in a many-to-one
+// relationship." The one object is the one of kind `type` that every reference
+// object reaches: an object only one of them reaches stands in a relationship
+// with that one alone, which is the one-to-one relationship vpi_handle() is
+// for. §37.37 detail 1 is this rule read for an intermodule path -- "To get to
+// an intermodule path, vpi_handle_multi(vpiInterModPath, port1, port2) can be
+// used" -- whose one object is the path running between the two named ports.
+VpiObject* ObjectSharedBy(VpiHandle ref1, VpiHandle ref2, int type) {
+  if (!ref1 || !ref2) return nullptr;
   for (auto* child : ref1->children) {
-    if (child->type != vpiInterModPath) continue;
+    if (child->type != type) continue;
     if (!IsChildOf(ref2, child)) continue;
-    out.push_back(child);
+    return child;
   }
+  return nullptr;
 }
 
 }  // namespace
 
+// §38.22 Returns: "vpiHandle -- Handle to an object." What comes back is the
+// object of the many-to-one relationship rather than anything holding it, which
+// is what the Related routines row separates this routine from its neighbours
+// by: vpi_iterate() and vpi_scan() walk a one-to-many relationship and
+// vpi_handle() answers a one-to-one one. So an application that reaches an
+// intermodule path this way holds the path itself and can put delays on it.
 VpiHandle VpiContext::HandleMulti(int type, VpiHandle ref1, VpiHandle ref2) {
-  if (!ref1 && !ref2) return nullptr;
+  if (!ref1 || !ref2) return nullptr;
 
   if (InterModPathSizeMismatch(type, ref1, ref2)) {
     last_error_.state = kVpiPLI;
@@ -228,16 +227,7 @@ VpiHandle VpiContext::HandleMulti(int type, VpiHandle ref1, VpiHandle ref2) {
     return nullptr;
   }
 
-  auto* result = AllocObject();
-  result->type = type;
-  if (type == vpiInterModPath) {
-    CollectPathsBetween(ref1, ref2, result->children);
-  } else {
-    CollectChildrenOfType(ref1, type, result->children);
-    CollectChildrenOfType(ref2, type, result->children);
-  }
-  if (result->children.empty()) return nullptr;
-  return result;
+  return ObjectSharedBy(ref1, ref2, type);
 }
 
 // §38.3: resolve a handle to the representative of the underlying simulation
