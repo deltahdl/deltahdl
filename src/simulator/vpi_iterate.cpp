@@ -452,6 +452,11 @@ bool VpiIterateMatches(int obj_type, int type, VpiHandle ref,
   // §37.x: the vpiAssertion relation reaches every assertion kind, checked
   // between the two grouped mode blocks exactly as in the original order.
   if (type == vpiAssertion) return VpiIsAssertionType(obj_type);
+  // §37.35/§37.5: the module-to-primitive edge is drawn to the `primitive`
+  // class, so it reaches the gates, switches and UDPs the class groups.
+  // Matching the class constant against an object's own type reached none of
+  // them: §37.4.1 makes the enclosure a grouping and no object is one.
+  if (type == vpiPrimitive) return VpiIsPrimitiveType(obj_type);
   // §37.24/§37.40/§37.72/§37.42/§37.34: the edge-specific special modes.
   if (VpiIterateMatchesEdgeMode(obj_type, type, ref, modes, &matched)) {
     return matched;

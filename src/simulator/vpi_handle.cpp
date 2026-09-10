@@ -478,6 +478,27 @@ bool TryResolveConditionRelation(int type, VpiHandle ref, VpiHandle& out) {
 // grouping, so vpiPattern is the group's name and the object it reaches is of
 // one of the kinds the group holds - which the generic traversal, matching a
 // child's own type against vpiPattern, reached for no pattern at all.
+// §37.35 (figure): a prim term and the primitive it belongs to are drawn to
+// each other, the primitive end being the `primitive` class. §37.4.1 makes that
+// enclosure a grouping, so the object the edge reaches is a gate, a switch or a
+// UDP - never one whose own type is vpiPrimitive, which the generic traversal
+// was left looking for.
+bool TryResolvePrimitiveRelation(int type, VpiHandle ref, VpiHandle& out) {
+  if (type != vpiPrimitive) return false;
+  if (ref->parent != nullptr && VpiIsPrimitiveType(ref->parent->type)) {
+    out = ref->parent;
+    return true;
+  }
+  for (auto* child : ref->children) {
+    if (VpiIsPrimitiveType(child->type)) {
+      out = child;
+      return true;
+    }
+  }
+  out = nullptr;
+  return true;
+}
+
 bool TryResolvePatternRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type != vpiPattern || !VpiIsPatternType(ref->type)) return false;
   out = VpiPatternOf(ref);
@@ -704,6 +725,7 @@ bool TryResolveDesignatedRelation(int type, VpiHandle ref, VpiHandle& out) {
          TryResolveParameterRelation(type, ref, out) ||
          TryResolveConditionRelation(type, ref, out) ||
          TryResolvePatternRelation(type, ref, out) ||
+         TryResolvePrimitiveRelation(type, ref, out) ||
          TryResolveAssignAndStmtRelation(type, ref, out) ||
          TryResolveIndexRelation(type, ref, out) ||
          TryResolvePrefixWithRelation(type, ref, out) ||

@@ -339,11 +339,29 @@ void VpiContext::GetTime(VpiHandle obj, VpiTime* time_p) {
   }
 }
 
+bool VpiIsPrimitiveType(int type) {
+  // §37.35: `primitive` is drawn as a class definition - bold italic letters in
+  // a dotted enclosure - holding the gate, switch and udp object definitions,
+  // and §37.4.1 makes such an enclosure a grouping rather than an object of its
+  // own. So vpiPrimitive is the name of the group and these are the kinds an
+  // object grouped by it actually has; §37.36 detail 2's sequential and
+  // combinational UDPs are the two forms the udp definition takes.
+  switch (type) {
+    case vpiGate:
+    case vpiSwitch:
+    case vpiUdp:
+    case vpiSeqPrim:
+    case vpiCombPrim:
+      return true;
+    default:
+      return false;
+  }
+}
+
 // §38.10: the four object categories that carry delays. Their legal
 // no_of_delays values differ, so vpi_get_delays() classifies the object first.
 bool VpiObjectIsPrimitive(int type) {
-  return type == vpiGate || type == vpiSwitch || type == vpiUdp ||
-         type == vpiPrimitive || type == vpiSeqPrim || type == vpiCombPrim;
+  return VpiIsPrimitiveType(type) || type == vpiPrimitive;
 }
 
 namespace {

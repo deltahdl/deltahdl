@@ -151,5 +151,82 @@ TEST_F(PrimitivePrimTerm, PutValueAcceptedOnSequentialUdp) {
   EXPECT_EQ(var->value.words[0].aval & 1, 1u);
 }
 
+// -----------------------------------------------------------------------------
+// The `primitive` class. §37.35 draws it as a class definition - bold italic
+// letters in a dotted enclosure - holding the gate, switch and udp object
+// definitions, and §37.5 draws the module's edge to that enclosure. §37.4.1
+// makes such an enclosure a grouping rather than an object of its own, so
+// vpiPrimitive names the group; matching it against an object's own type, which
+// is what the generic traversal does, reached no primitive of any design.
+// -----------------------------------------------------------------------------
+
+// Class membership: the kinds the enclosure holds are the gate, the switch and
+// the udp, the last in the sequential and combinational forms §37.36 detail 2
+// distinguishes. The class constant itself is not one of them.
+TEST_F(PrimitivePrimTerm, ThePrimitiveClassGroupsTheConcreteKinds) {
+  EXPECT_TRUE(VpiIsPrimitiveType(vpiGate));
+  EXPECT_TRUE(VpiIsPrimitiveType(vpiSwitch));
+  EXPECT_TRUE(VpiIsPrimitiveType(vpiUdp));
+  EXPECT_TRUE(VpiIsPrimitiveType(vpiSeqPrim));
+  EXPECT_TRUE(VpiIsPrimitiveType(vpiCombPrim));
+
+  EXPECT_FALSE(VpiIsPrimitiveType(vpiPrimitive));
+  EXPECT_FALSE(VpiIsPrimitiveType(kVpiNet));
+}
+
+// §37.5 (figure, module ==> primitive): a module's primitives are what the edge
+// drawn to the class reaches, so the iteration hands back the gate, the switch
+// and the UDP the module instantiates. A net of the same module is not one.
+TEST_F(PrimitivePrimTerm, AModuleIteratesThePrimitivesItInstantiates) {
+  VpiObject gate;
+  gate.type = vpiGate;
+  VpiObject net;
+  net.type = kVpiNet;
+  VpiObject switch_prim;
+  switch_prim.type = vpiSwitch;
+  VpiObject udp;
+  udp.type = vpiUdp;
+
+  VpiObject mod;
+  mod.type = kVpiModule;
+  mod.children = {&gate, &net, &switch_prim, &udp};
+
+  vpiHandle it = vpi_iterate(vpiPrimitive, &mod);
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(vpi_scan(it), &gate);
+  EXPECT_EQ(vpi_scan(it), &switch_prim);
+  EXPECT_EQ(vpi_scan(it), &udp);
+  EXPECT_EQ(vpi_scan(it), nullptr);
+}
+
+// §37.35 (figure, primitive <-> prim term): a terminal and the primitive it
+// belongs to are drawn to each other, the primitive end being the class. The
+// terminal reaches its primitive, whichever of the class's kinds it is.
+TEST_F(PrimitivePrimTerm, APrimTermReachesThePrimitiveItBelongsTo) {
+  VpiObject udp;
+  udp.type = vpiUdp;
+
+  VpiObject term;
+  term.type = vpiPrimTerm;
+  term.parent = &udp;
+  udp.children.push_back(&term);
+
+  EXPECT_EQ(vpi_handle(vpiPrimitive, &term), &udp);
+}
+
+// §37.35 (figure): an object standing in no such relationship reaches no
+// primitive rather than some object of an unrelated kind.
+TEST_F(PrimitivePrimTerm, AnObjectWithNoPrimitiveReachesNone) {
+  VpiObject net;
+  net.type = kVpiNet;
+
+  VpiObject mod;
+  mod.type = kVpiModule;
+  mod.children = {&net};
+
+  EXPECT_EQ(vpi_handle(vpiPrimitive, &mod), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiPrimitive, &mod), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

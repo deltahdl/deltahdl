@@ -352,6 +352,14 @@ bool VpiPortInstReferenceQualifies(bool connected_to_any_port_bit);
 // declared net reports the line it was declared on.
 int VpiNetLineNo(bool implicit, int declared_line);
 
+// §37.35: the object definitions the `primitive` class groups - the gate, the
+// switch, and the udp in the sequential and combinational forms §37.36 detail 2
+// distinguishes. §37.4.1 makes a dotted enclosure a grouping rather than an
+// object, so vpiPrimitive names the group and no primitive object carries it as
+// its type. Defined in src/simulator/vpi_systf.cpp beside the delay
+// classification that reads it.
+bool VpiIsPrimitiveType(int type);
+
 // §37.3.3: whether an object kind carries the source-location properties
 // vpiLineNo and vpiFile. True for every object that corresponds to something in
 // the source text; false for the kinds §37.3.3 names as exceptions - those that
