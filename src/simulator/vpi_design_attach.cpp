@@ -633,9 +633,9 @@ VpiObject* VpiContext::NetSourceDelayExpression(SimContext& sim_ctx,
   // §28.16's rise, fall and turn-off delays survive elaboration on RtlirNet in
   // the order the declaration wrote them, and the slots fill left to right, so
   // the first empty one ends the list the source specified.
-  Expr* const written[3] = {net.delay_rise, net.delay_fall, net.delay_turnoff};
+  Expr* const kWritten[3] = {net.delay_rise, net.delay_fall, net.delay_turnoff};
   std::vector<VpiObject*> constants;
-  for (Expr* delay : written) {
+  for (Expr* delay : kWritten) {
     if (delay == nullptr) break;
     // Each written delay stands as a constant expression carrying the value
     // evaluating it produced. The storage goes on the run's arena rather than
