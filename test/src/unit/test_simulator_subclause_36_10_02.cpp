@@ -158,5 +158,78 @@ TEST_F(VpiFunctionAvailability, StartupWalkEstablishesAndRestoresPhase) {
   EXPECT_EQ(vpi_ctx_.ToolPhase(), VpiToolPhase::kFull);
 }
 
+// §36.10.2 (C2) as the interface applies it, rather than as a predicate answers
+// it: "Only the following two routines can be called at this time", so a call
+// to any other from a startup routine is refused. vpi_iterate is one of the
+// three VpiRoutine names for the bulk of the interface that waits, and a
+// refusal reports through §36.10.1's vpi_chk_error.
+TEST_F(VpiFunctionAvailability, IterateIsRefusedDuringStartup) {
+  vpi_ctx_.SetToolPhase(VpiToolPhase::kStartup);
+
+  EXPECT_EQ(vpi_iterate(vpiModule, nullptr), nullptr);
+
+  SVpiErrorInfo info = {};
+  EXPECT_NE(vpi_chk_error(&info), 0);
+  EXPECT_STREQ(info.message,
+               "VPI routine is not available until cbEndOfCompile; only "
+               "vpi_register_systf() and vpi_register_cb() may be called "
+               "before then");
+}
+
+// §36.10.2 (C4): "The next earliest phase is when the sizetf routines are
+// called ... At this phase, no additional access is permitted." So the sizetf
+// phase refuses what the startup phase refused, rather than opening anything.
+TEST_F(VpiFunctionAvailability, IterateIsRefusedDuringTheSizetfPhase) {
+  vpi_ctx_.SetToolPhase(VpiToolPhase::kSizetf);
+
+  EXPECT_EQ(vpi_iterate(vpiModule, nullptr), nullptr);
+  EXPECT_NE(vpi_chk_error(nullptr), 0);
+}
+
+// §36.10.2 (C6): "After the sizetf routines are called, the routines registered
+// for reason cbEndOfCompile are called. At this point, and continuing until the
+// tool has finished execution, all functionality is available." So the full
+// phase refuses none of the three the model names -- and the two registration
+// routines were never refused in any phase, which is what makes the restriction
+// a restriction on the rest rather than on everything.
+TEST_F(VpiFunctionAvailability, TheFullPhaseRefusesNothingAndStartupSparesTwo) {
+  vpi_ctx_.SetToolPhase(VpiToolPhase::kFull);
+  EXPECT_FALSE(vpi_ctx_.RoutineIsUnavailableNow(VpiRoutine::kIterate));
+  EXPECT_FALSE(vpi_ctx_.RoutineIsUnavailableNow(VpiRoutine::kGetValue));
+  EXPECT_FALSE(vpi_ctx_.RoutineIsUnavailableNow(VpiRoutine::kPutValue));
+
+  vpi_ctx_.SetToolPhase(VpiToolPhase::kStartup);
+  EXPECT_FALSE(vpi_ctx_.RoutineIsUnavailableNow(VpiRoutine::kRegisterSystf));
+  EXPECT_FALSE(vpi_ctx_.RoutineIsUnavailableNow(VpiRoutine::kRegisterCb));
+  EXPECT_TRUE(vpi_ctx_.RoutineIsUnavailableNow(VpiRoutine::kIterate));
+}
+
+// §36.10.2 (C2): the value routines wait with the rest. vpi_get_value writes
+// nothing into the caller's structure while it is refused, so the format the
+// caller asked for is still there afterwards and no value has been read over
+// it.
+TEST_F(VpiFunctionAvailability, GetValueIsRefusedDuringStartup) {
+  vpi_ctx_.SetToolPhase(VpiToolPhase::kStartup);
+
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  value.value.integer = 4321;
+  vpi_get_value(nullptr, &value);
+
+  EXPECT_EQ(value.value.integer, 4321);
+  EXPECT_NE(vpi_chk_error(nullptr), 0);
+}
+
+// §36.10.2 (C2): and so does the write side.
+TEST_F(VpiFunctionAvailability, PutValueIsRefusedDuringStartup) {
+  vpi_ctx_.SetToolPhase(VpiToolPhase::kStartup);
+
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  value.value.integer = 1;
+  EXPECT_EQ(vpi_put_value(nullptr, &value, nullptr, vpiNoDelay), nullptr);
+  EXPECT_NE(vpi_chk_error(nullptr), 0);
+}
+
 }  // namespace
 }  // namespace delta

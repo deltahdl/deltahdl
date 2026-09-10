@@ -101,6 +101,12 @@ int vpi_compare_objects(vpiHandle obj1, vpiHandle obj2) {
 
 vpiHandle vpi_iterate(int type, vpiHandle ref) {
   delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  // §36.10.2: nothing but the two registration routines is available until the
+  // cbEndOfCompile callbacks run.
+  if (delta::GetGlobalVpiContext().RoutineIsUnavailableNow(
+          delta::VpiRoutine::kIterate)) {
+    return nullptr;
+  }
   return delta::GetGlobalVpiContext().Iterate(type, ref);
 }
 
@@ -111,12 +117,24 @@ vpiHandle vpi_scan(vpiHandle iterator) {
 
 void vpi_get_value(vpiHandle obj, s_vpi_value* value) {
   delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  // §36.10.2: nothing but the two registration routines is available until the
+  // cbEndOfCompile callbacks run.
+  if (delta::GetGlobalVpiContext().RoutineIsUnavailableNow(
+          delta::VpiRoutine::kGetValue)) {
+    return;
+  }
   delta::GetGlobalVpiContext().GetValue(obj, value);
 }
 
 vpiHandle vpi_put_value(vpiHandle obj, s_vpi_value* value, s_vpi_time* time,
                         int flags) {
   delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  // §36.10.2: nothing but the two registration routines is available until the
+  // cbEndOfCompile callbacks run.
+  if (delta::GetGlobalVpiContext().RoutineIsUnavailableNow(
+          delta::VpiRoutine::kPutValue)) {
+    return nullptr;
+  }
   return delta::GetGlobalVpiContext().PutValue(obj, value, time, flags);
 }
 

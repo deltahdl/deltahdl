@@ -593,6 +593,20 @@ class VpiContext {
   void SetToolPhase(VpiToolPhase phase) { tool_phase_ = phase; }
   VpiToolPhase ToolPhase() const { return tool_phase_; }
 
+  // §36.10.2: whether `routine` is refused because the tool has not reached the
+  // phase that makes it available. "When the routines within the
+  // vlog_startup_routines[] array are executed, there is very little
+  // functionality available. Only the following two routines can be called at
+  // this time" -- vpi_register_systf() and vpi_register_cb() -- and the sizetf
+  // phase that follows adds none, "no additional access" being permitted there.
+  // All functionality arrives with the cbEndOfCompile callbacks and stands
+  // "until the tool has finished execution".
+  //
+  // A refused call records §36.10.1's error, which is what vpi_chk_error
+  // reports, and the entry point yields nothing rather than answering out of a
+  // data structure the tool has not built yet.
+  bool RoutineIsUnavailableNow(VpiRoutine routine);
+
   // §38.36.2: the scheduler records when simulation has advanced past time zero
   // into a time slice, and when it has reached the read-only synch region of a
   // time slice. vpi_register_cb() consults these to reject the zero-delay

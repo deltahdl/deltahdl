@@ -544,6 +544,20 @@ bool VpiPhaseRestrictsFunctionality(VpiToolPhase phase) {
   return phase != VpiToolPhase::kFull;
 }
 
+bool VpiContext::RoutineIsUnavailableNow(VpiRoutine routine) {
+  // §36.10.2 restricts by phase and then by routine: the two registration
+  // routines are available throughout, and everything else waits for the full
+  // phase.
+  if (!VpiPhaseRestrictsFunctionality(tool_phase_)) return false;
+  if (VpiRoutineAvailableInStartup(routine)) return false;
+  last_error_.state = kVpiError;
+  last_error_.level = kVpiError;
+  last_error_.message =
+      "VPI routine is not available until cbEndOfCompile; only "
+      "vpi_register_systf() and vpi_register_cb() may be called before then";
+  return true;
+}
+
 bool VpiRoutineAvailableInStartup(VpiRoutine routine) {
   // §36.10.2: only the two registration routines may be called while the
   // vlog_startup_routines[] array executes.
