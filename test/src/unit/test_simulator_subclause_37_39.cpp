@@ -90,5 +90,105 @@ TEST_F(ModulePathModel, ModuleIsNullWhenNoInstanceEncloses) {
   EXPECT_EQ(vpi_handle(kVpiModule, path), nullptr);
 }
 
+// -----------------------------------------------------------------------------
+// The properties and the path-term relations §37.39 draws. A module path
+// reports which kind of path it is, the polarity of the path and of its data
+// path, and whether it carries an ifnone condition; a path term reports the
+// edge it is sensitive to beside its direction; and three relations reach the
+// terms. None of them was served: the property switch named none of the four,
+// and each of the three relations is a tag no object's type is, so the generic
+// traversal reached the terms of no module path in any design.
+// -----------------------------------------------------------------------------
+
+// Diagram (mod path properties): a module path reports its path type, its two
+// polarities and its ifnone flag.
+TEST_F(ModulePathModel, AModulePathReportsItsOwnProperties) {
+  VpiObject path;
+  path.type = vpiModPath;
+  path.path_type = vpiPathParallel;
+  path.polarity = vpiPositive;
+  path.data_polarity = vpiNegative;
+  path.mod_path_has_if_none = true;
+
+  EXPECT_EQ(vpi_get(vpiPathType, &path), vpiPathParallel);
+  EXPECT_EQ(vpi_get(vpiPolarity, &path), vpiPositive);
+  EXPECT_EQ(vpi_get(vpiDataPolarity, &path), vpiNegative);
+  EXPECT_EQ(vpi_get(vpiModPathHasIfNone, &path), 1);
+
+  // A full-connection path written without an ifnone reports the other kind and
+  // a false flag, so neither value is whatever the field happened to hold.
+  VpiObject full;
+  full.type = vpiModPath;
+  full.path_type = vpiPathFull;
+  EXPECT_EQ(vpi_get(vpiPathType, &full), vpiPathFull);
+  EXPECT_EQ(vpi_get(vpiModPathHasIfNone, &full), 0);
+}
+
+// Diagram (path term properties): a path term reports the edge it is sensitive
+// to, alongside the direction the same object carries.
+TEST_F(ModulePathModel, APathTermReportsItsEdgeAndDirection) {
+  VpiObject term;
+  term.type = vpiPathTerm;
+  term.direction = kVpiInput;
+  term.edge = vpiEdge01;
+
+  EXPECT_EQ(vpi_get(vpiEdge, &term), vpiEdge01);
+  EXPECT_EQ(vpi_get(kVpiDirection, &term), kVpiInput);
+}
+
+// Diagram (mod path -> path term, three relations): the output terms come back
+// from vpiModPathOut, the plain input terms from vpiModPathIn, and the data
+// source of an edge-sensitive path from vpiModDataPathIn. The three sets are
+// disjoint, so a term reached by one is reached by neither of the others.
+TEST_F(ModulePathModel, TheThreeTermRelationsReachTheirOwnTerms) {
+  VpiObject in_term;
+  in_term.type = vpiPathTerm;
+  in_term.direction = kVpiInput;
+  VpiObject data_term;
+  data_term.type = vpiPathTerm;
+  data_term.direction = kVpiInput;
+  data_term.data_path_term = true;
+  VpiObject out_term;
+  out_term.type = vpiPathTerm;
+  out_term.direction = kVpiOutput;
+  VpiObject not_a_term;
+  not_a_term.type = vpiConstant;
+
+  VpiObject path;
+  path.type = vpiModPath;
+  path.children = {&in_term, &data_term, &out_term, &not_a_term};
+
+  vpiHandle ins = vpi_iterate(vpiModPathIn, &path);
+  ASSERT_NE(ins, nullptr);
+  EXPECT_EQ(vpi_scan(ins), &in_term);
+  EXPECT_EQ(vpi_scan(ins), nullptr);
+
+  vpiHandle datas = vpi_iterate(vpiModDataPathIn, &path);
+  ASSERT_NE(datas, nullptr);
+  EXPECT_EQ(vpi_scan(datas), &data_term);
+  EXPECT_EQ(vpi_scan(datas), nullptr);
+
+  vpiHandle outs = vpi_iterate(vpiModPathOut, &path);
+  ASSERT_NE(outs, nullptr);
+  EXPECT_EQ(vpi_scan(outs), &out_term);
+  EXPECT_EQ(vpi_scan(outs), nullptr);
+}
+
+// Diagram: a path with no term of a given role reaches none through that
+// relation, which §38.23 reports as no iterator.
+TEST_F(ModulePathModel, ARelationWithNoTermOfItsRoleReachesNone) {
+  VpiObject out_term;
+  out_term.type = vpiPathTerm;
+  out_term.direction = kVpiOutput;
+
+  VpiObject path;
+  path.type = vpiModPath;
+  path.children = {&out_term};
+
+  EXPECT_EQ(vpi_iterate(vpiModPathIn, &path), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiModDataPathIn, &path), nullptr);
+  EXPECT_NE(vpi_iterate(vpiModPathOut, &path), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

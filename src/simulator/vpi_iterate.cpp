@@ -219,6 +219,8 @@ struct VpiIterateModes {
   // §37.57 detail 1: a let expression's vpiArgument iteration, which reads the
   // let declaration's formals rather than the expression's own children.
   bool let_argument = false;
+  // §37.39: one of a module path's three path-term relations.
+  bool mod_path_terms = false;
 };
 
 // The context-owned object and registry stores an iteration is resolved
@@ -341,6 +343,11 @@ void ComputeConstraintAndCallbackModes(int type, VpiHandle ref,
   m.constraint_expr = ref && type == vpiConstraintExpr &&
                       VpiIsConstraintExprContainerType(ref->type);
   m.callback_object = ref && type == vpiCallback;
+  // §37.39: a module path's three path-term relations, which reach terms whose
+  // own type is vpiPathTerm rather than the relation tag.
+  m.mod_path_terms = ref && ref->type == vpiModPath &&
+                     (type == vpiModPathIn || type == vpiModPathOut ||
+                      type == vpiModDataPathIn);
 }
 
 // Classify a (type, ref) iteration into its special modes. The detailed §37.x
@@ -633,6 +640,30 @@ void CollectMatchingChildren(int type, VpiHandle ref,
   }
 }
 
+// §37.39 (figure): collect the path terms one of a module path's three
+// term relations reaches. vpiModPathOut reaches the output terms; of the input
+// terms, vpiModDataPathIn reaches the data source of an edge-sensitive path and
+// vpiModPathIn the rest, which a term's own direction cannot tell apart because
+// both are inputs.
+//
+// The three were served by the generic child walk, which looks for a child
+// whose own type is the type asked for. Each of them is a relation tag and no
+// object's type is one, so a module path's terms were reached by none of them.
+bool VpiModPathTermMatches(int type, VpiHandle term) {
+  const bool kIsOut = term->direction == kVpiOutput;
+  if (type == vpiModPathOut) return kIsOut;
+  if (kIsOut) return false;
+  return type == vpiModDataPathIn ? term->data_path_term
+                                  : !term->data_path_term;
+}
+
+void CollectModPathTerms(int type, VpiObject* ref, VpiObject* iter) {
+  for (auto* child : ref->children) {
+    if (child->type != vpiPathTerm) continue;
+    if (VpiModPathTermMatches(type, child)) iter->children.push_back(child);
+  }
+}
+
 // §37.4.3: a relationship traversed with NULL for the ref_h is one the data
 // model diagrams draw from a circle. Every other relationship is drawn from a
 // reference object and means nothing without one, which §38.23 says in its own
@@ -778,6 +809,10 @@ bool DispatchRefSpecialMode(int type, VpiHandle ref,
   }
   if (modes.constraint_expr) {
     CollectConstraintExprs(ref, iter);
+    return true;
+  }
+  if (modes.mod_path_terms) {
+    CollectModPathTerms(type, ref, iter);
     return true;
   }
   if (modes.let_argument) {

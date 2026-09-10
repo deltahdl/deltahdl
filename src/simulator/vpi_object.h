@@ -25,6 +25,27 @@ struct VpiObject {
   int size = 0;
   int index = 0;
 
+  // §37.39: the four properties the data model draws on a module path and the
+  // one it draws on a path term beside its direction. A module path reports
+  // which kind of path it is through vpiPathType (vpiPathFull for a full
+  // connection, vpiPathParallel for a parallel one), the polarity of the path
+  // and of its data path through vpiPolarity and vpiDataPolarity, and whether
+  // it was written with an ifnone condition through vpiModPathHasIfNone; a path
+  // term reports the edge it is sensitive to through vpiEdge. All are zero (and
+  // the flag false) for an object that bears none of them.
+  int path_type = 0;
+  int polarity = 0;
+  int data_polarity = 0;
+  int edge = 0;
+  bool mod_path_has_if_none = false;
+
+  // §37.39: which of a module path's three path-term relations reaches this
+  // term. vpiModPathOut reaches the output terms; of the input terms,
+  // vpiModDataPathIn reaches the data source of an edge-sensitive path and
+  // vpiModPathIn the rest, which the term's own vpiDirection cannot tell apart
+  // because both are inputs.
+  bool data_path_term = false;
+
   // §37.36 detail 2: the primitive type a UDP reports through
   // vpi_get(vpiPrimType)
   // - vpiSeqPrim for a sequential UDP, vpiCombPrim for a combinational one. The

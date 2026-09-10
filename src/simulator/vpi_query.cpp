@@ -260,6 +260,22 @@ int VpiGetSimplePropertyA(int property, VpiHandle obj, bool& handled) {
       return obj->index;
     case kVpiDirection:
       return obj->direction;
+    // §37.39: a module path reports which kind of path it is, the polarity of
+    // the path and of its data path, and whether it carries an ifnone
+    // condition; a path term reports the edge it is sensitive to. The diagram
+    // draws each on one of the two objects, and every one of them answered zero
+    // for every module path and path term of every design, the property switch
+    // naming none of them.
+    case vpiPathType:
+      return obj->path_type;
+    case vpiPolarity:
+      return obj->polarity;
+    case vpiDataPolarity:
+      return obj->data_polarity;
+    case vpiModPathHasIfNone:
+      return VpiBool(obj->mod_path_has_if_none);
+    case vpiEdge:
+      return obj->edge;
     // §37.14 detail 1: a port reports its port type (vpiPort/vpiInterfacePort/
     // vpiModportPort), fixed by the formal.
     case vpiPortType:
