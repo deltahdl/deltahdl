@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "simulator/vpi.h"
+#include "simulator/vpi_internal.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
@@ -152,6 +153,46 @@ bool VpiIsVariableSelectOrMemberType(int type) {
   // object has -- and without kinds the class does group, so an int var or a
   // string var member was descended into by neither.
   return VpiIsVariableSelectType(type) || VpiIsVariablesType(type);
+}
+
+// §37.12 detail 7: expand a declared array of virtual interfaces into its
+// individual virtual interface var elements.
+static void VpiAppendVirtualInterfaceArrayElems(VpiHandle array_var,
+                                                std::vector<VpiHandle>& out) {
+  for (auto* elem : array_var->children) {
+    if (elem->type == vpiVirtualInterfaceVar) out.push_back(elem);
+  }
+}
+
+std::vector<VpiHandle> VpiScopeVirtualInterfaceVars(VpiHandle scope) {
+  // §37.12 detail 7: the scope's virtual interface vars, a declared array of
+  // virtual interfaces expanded into its individual elements. The iteration is
+  // supported only in an elaborated context; within a lexical context such as a
+  // class defn (§37.31) it is not supported and yields nothing.
+  std::vector<VpiHandle> vifs;
+  if (!scope || scope->type == vpiClassDefn) return vifs;
+  for (auto* child : scope->children) {
+    if (child->type == vpiVirtualInterfaceVar) {
+      vifs.push_back(child);
+    } else if (VpiIsVirtualInterfaceArray(child)) {
+      VpiAppendVirtualInterfaceArrayElems(child, vifs);
+    }
+  }
+  return vifs;
+}
+
+std::vector<VpiHandle> VpiScopeVariables(VpiHandle scope) {
+  // §37.12 (figure): the scope's vpiVariables relation is drawn to the
+  // `variables` class, so it reaches the objects that class groups (§37.4.1).
+  // Detail 7: an array of virtual interfaces is reported as the single array
+  // var that declares it rather than expanded, which is what matching the array
+  // var itself does.
+  std::vector<VpiHandle> variables;
+  if (!scope) return variables;
+  for (auto* child : scope->children) {
+    if (VpiIsVariablesType(child->type)) variables.push_back(child);
+  }
+  return variables;
 }
 
 bool VpiArrayVarIsMemory(VpiHandle var) {

@@ -226,7 +226,7 @@ class VpiContext {
   VpiHandle HandleByMultiIndex(int num_index, const int* index_array,
                                VpiHandle parent);
   VpiHandle Handle(int type, VpiHandle ref);
-  VpiHandle Iterate(int type, VpiHandle ref);
+  VpiHandle Iterate(int type, VpiHandle ref, int compatibility_mode = 0);
   VpiHandle Scan(VpiHandle iterator);
   void GetValue(VpiHandle obj, VpiValue* value);
   VpiHandle PutValue(VpiHandle obj, VpiValue* value, VpiTime* time, int flags);

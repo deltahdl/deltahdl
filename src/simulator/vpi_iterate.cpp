@@ -478,50 +478,6 @@ bool VpiIterateMatches(int obj_type, int type, VpiHandle ref,
   return obj_type == type;
 }
 
-// §37.12 detail 7: collect the scope's virtual interface vars
-// (vpiVirtualInterfaceVar) into the iterator, expanding a declared array of
-// virtual interfaces into its individual elements. The iteration is supported
-// only in an elaborated context; within a lexical context such as a class defn
-// (§37.31) it is not supported and yields nothing.
-// §37.12 detail 7: expand a declared array of virtual interfaces into its
-// individual virtual interface var elements, appending each to the iterator.
-void CollectVirtualInterfaceArrayElems(VpiObject* array_var, VpiObject* iter) {
-  for (auto* elem : array_var->children) {
-    if (elem->type == vpiVirtualInterfaceVar) {
-      iter->children.push_back(elem);
-    }
-  }
-}
-
-void CollectVirtualInterfaceVars(VpiObject* ref, VpiObject* iter) {
-  if (ref->type == vpiClassDefn) return;
-  for (auto* child : ref->children) {
-    if (child->type == vpiVirtualInterfaceVar) {
-      iter->children.push_back(child);
-    } else if (VpiIsVirtualInterfaceArray(child)) {
-      CollectVirtualInterfaceArrayElems(child, iter);
-    }
-  }
-}
-
-// §37.12 (figure): the scope's vpiVariables relation is drawn to the
-// `variables` class, and §37.4.1 makes a dotted enclosure a grouping of the
-// object definitions inside it rather than an object anything can be. So the
-// objects this reaches are the ones that class groups -- a logic var, an int
-// var, a string var and the rest of §37.17's enclosure -- and not a child whose
-// own type is the class constant, which is a kind no object has. Matching the
-// constant is what made the relation reach nothing at all in a design, whose
-// variables VpiContext::Attach stamps vpiReg.
-//
-// §37.12 detail 7: an array of virtual interfaces is reported as the single
-// array var that declares it rather than expanded, which is what matching the
-// array var itself does.
-void CollectScopeVariables(VpiObject* ref, VpiObject* iter) {
-  for (auto* child : ref->children) {
-    if (VpiIsVariablesType(child->type)) iter->children.push_back(child);
-  }
-}
-
 // §37.12 detail 4: collect the objects actually imported into the scope - those
 // referenced across an import declaration, marked imported.
 void CollectImportedObjects(VpiObject* ref, VpiObject* iter) {
@@ -728,11 +684,15 @@ bool DispatchScopeMode(int type, VpiHandle ref, const VpiIterateModes& modes,
                        VpiObject* iter) {
   (void)type;
   if (modes.vif) {
-    CollectVirtualInterfaceVars(ref, iter);
+    for (VpiHandle vif : VpiScopeVirtualInterfaceVars(ref)) {
+      iter->children.push_back(vif);
+    }
     return true;
   }
   if (modes.variables) {
-    CollectScopeVariables(ref, iter);
+    for (VpiHandle var : VpiScopeVariables(ref)) {
+      iter->children.push_back(var);
+    }
     return true;
   }
   if (modes.import) {
@@ -844,7 +804,7 @@ void DispatchVpiIterate(int type, VpiHandle ref, const VpiIterateModes& modes,
 
 }  // namespace
 
-VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
+VpiHandle VpiContext::Iterate(int type, VpiHandle ref, int compatibility_mode) {
   // §37.44: a thread that started since the last iteration is one of the run's
   // threads too, so the objects are brought up to date before this one answers.
   RefreshThreadObjects();
@@ -892,6 +852,21 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   if (iter->children.empty()) {
     delete iter;
     return nullptr;
+  }
+  // §36.12.3: "If the design contains unsupported constructs, the behavior of
+  // the VPI implementation is undefined. The extent of checking for consistency
+  // between constructs and mode is left to the discretion of the VPI
+  // implementation." This is the extent of it: an application running under a
+  // compatibility mode that reaches a construct its standard has no notion of
+  // is told so through §38.2's error, rather than left with a behavior nobody
+  // defined. What it reached still comes back, because §36.12.2 rules out
+  // emulating a construct that has no older behavior to emulate.
+  const char* kUnsupported =
+      VpiCompatibilityUnsupportedConstruct(compatibility_mode, iter->children);
+  if (kUnsupported != nullptr) {
+    last_error_.state = kVpiPLI;
+    last_error_.level = kVpiError;
+    last_error_.message = kUnsupported;
   }
   return iter;
 }

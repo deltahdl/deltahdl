@@ -21,6 +21,13 @@ bool VpiIsVirtualInterfaceArray(VpiHandle obj);
 // vpi_handle.cpp, and vpi_value.cpp.
 bool VpiObjectIsPrimitive(int type);
 
+// §36.12.3: the message an application running under `mode` is given where the
+// objects an iteration reached include a construct that mode's standard has no
+// notion of, and null where they do not. Defined in vpi_compatibility.cpp,
+// called from VpiContext::Iterate, which records it as the §38.2 error.
+const char* VpiCompatibilityUnsupportedConstruct(
+    int mode, const std::vector<VpiObject*>& objects);
+
 // §36.12.2.2: the iteration a compatibility mode gives an application - the
 // current one, with the objects that mode's applications do not expect dropped.
 // Defined in vpi_compatibility.cpp, used by vpi.cpp for the run-wide default

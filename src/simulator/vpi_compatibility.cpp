@@ -65,12 +65,32 @@ bool VpiModeIs1364(int mode) {
 
 namespace delta {
 
+const char* VpiCompatibilityUnsupportedConstruct(
+    int mode, const std::vector<VpiObject*>& objects) {
+  // §36.12.3 leaves "the extent of checking for consistency between constructs
+  // and mode ... to the discretion of the VPI implementation", and this is the
+  // extent of it. Annex K reserves the object-type values 1 through 299 for
+  // vpi_user.h and Annex M reserves 600 through 999 for the SystemVerilog
+  // extensions, so a kind numbered in Annex M's range is a construct the IEEE
+  // 1364 standards have no notion of. An application running under one of their
+  // modes that reaches such an object is applied to a design §36.12.2 says the
+  // mechanism does not cover, and it is told so.
+  if (!VpiModeIs1364(mode)) return nullptr;
+  for (const auto* object : objects) {
+    if (object->type >= 600 && object->type <= 999) {
+      return "vpi_iterate(): the design contains a construct the selected VPI "
+             "compatibility mode has no notion of";
+    }
+  }
+  return nullptr;
+}
+
 vpiHandle VpiIterateInCompatibilityMode(int type, VpiHandle ref, int mode) {
   // The iterator the current routine builds, with the objects an application
   // of `mode` does not expect dropped. An iteration left with nothing is the
   // NULL §38.23 gives one that reaches no object, so the emptied iterator is
   // released rather than handed back.
-  vpiHandle iterator = delta::GetGlobalVpiContext().Iterate(type, ref);
+  vpiHandle iterator = delta::GetGlobalVpiContext().Iterate(type, ref, mode);
   if (iterator == nullptr || !VpiModeIs1364(mode)) return iterator;
   std::vector<delta::VpiObject*> kept;
   for (auto* object : iterator->children) {

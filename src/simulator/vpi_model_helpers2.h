@@ -163,6 +163,16 @@ bool VpiIsVariableSelectType(int type);
 // member nested inside it, itself of any kind the `variables` class groups.
 bool VpiIsVariableSelectOrMemberType(int type);
 
+// §37.12 detail 7: the virtual interface vars a scope declares, an array of
+// them expanded into its elements. Empty for a null handle and for a lexical
+// context such as a class defn, where the iteration is not supported.
+std::vector<VpiHandle> VpiScopeVirtualInterfaceVars(VpiHandle scope);
+
+// §37.12 (figure): the variables a scope declares, as the vpiVariables relation
+// reaches them - the kinds the `variables` class groups, with an array of
+// virtual interfaces reported as the single array var that declares it.
+std::vector<VpiHandle> VpiScopeVariables(VpiHandle scope);
+
 // §37.20 (figure): whether an array variable is a memory - an array whose words
 // are regs, which is what §37.20 detail 1 makes vpiMemoryWord return. False for
 // an array of any other variable kind and for anything that is not an array
