@@ -31,10 +31,22 @@
 // aliases of those C++ types rather than structures of their own, which is a
 // fact about how this tool realizes the interface rather than about the clause.
 //
+// §36.12.2.1 puts the compatibility mechanism in this file: "When a mode is
+// selected by one of the means above, C-preprocessor constructs in vpi_user.h
+// cause the following VPI functions to be redefined to mode-specific versions",
+// and "a compilation error will occur during the processing of vpi_user.h if
+// more than one of the preceding symbols is defined". The constructs live in
+// simulator/vpi_compatibility.h and were reached by nothing an application
+// includes, so the clause's own example -- define the symbol, include
+// vpi_user.h -- selected a mode and got no redefinition at all. The header is
+// read here, ahead of the declarations it renames, which is the whole of what
+// makes the selection take effect.
+//
 // Do not reorder the includes - each depends on types the ones above it
 // declare, and the PLI typedefs and macros come last, after the delta::
 // declarations they alias.
 
+#include "simulator/vpi_compatibility.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"

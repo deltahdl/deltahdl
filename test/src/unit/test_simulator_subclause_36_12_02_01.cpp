@@ -393,3 +393,29 @@ TEST(VpiCompatibilityModeBinding, Version1800v2023Retargets) {
 }
 
 }  // namespace
+
+// --- Section: the redefinition is performed by vpi_user.h ---
+// §36.12.2.1 puts the mechanism in the file the application includes: "one of
+// the following compiler symbols shall be defined prior to compilation of any
+// of the standard VPI include files", and "when a mode is selected by one of
+// the means above, C-preprocessor constructs in vpi_user.h cause the following
+// VPI functions to be redefined to mode-specific versions". So the clause's own
+// example - define the symbol, then include vpi_user.h - is what has to
+// perform the retargeting, and it is what this section does. The constructs
+// were reached only by including the header that holds them, which no
+// application the clause describes names.
+#define VPI_COMPATIBILITY_VERSION_1364v2005 1
+#include "simulator/vpi_user.h"
+
+namespace {
+
+TEST(VpiCompatibilityModeBinding, VpiUserHeaderPerformsTheRedefinition) {
+  EXPECT_STREQ(DELTA_VPI_STR(vpi_compare_objects),
+               "vpi_compare_objects_1364v2005");
+  EXPECT_STREQ(DELTA_VPI_STR(vpi_get), "vpi_get_1364v2005");
+  EXPECT_STREQ(DELTA_VPI_STR(vpi_handle), "vpi_handle_1364v2005");
+  EXPECT_STREQ(DELTA_VPI_STR(vpi_iterate), "vpi_iterate_1364v2005");
+  EXPECT_STREQ(DELTA_VPI_STR(vpi_scan), "vpi_scan_1364v2005");
+}
+
+}  // namespace

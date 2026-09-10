@@ -14,19 +14,9 @@
 // - and only if what they do is the behavior of the version selected.
 #define VPI_COMPATIBILITY_VERSION_1364v2001 1
 
-// The selection is read before the VPI headers, because it is what renames
-// the entry points their prototypes declare. The conditional is what keeps it
-// there: the formatter regroups includes and sorts this one after
-// simulator/vpi.h, which would emit the prototypes under their plain names
-// and leave every renamed call undeclared.
-#ifdef VPI_COMPATIBILITY_VERSION_1364v2001
-#include "simulator/vpi_compatibility.h"
-#endif
-
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
-#include "simulator/vpi.h"
 
 namespace delta {
 namespace {
