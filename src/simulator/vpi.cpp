@@ -139,7 +139,7 @@ vpiHandle vpi_iterate(PLI_INT32 type, vpiHandle ref) {
   // this entry point is one of those - the compile-based scheme renames its
   // calls to the variants in vpi_compatibility.cpp instead. The mode was
   // recorded and read by nothing, so it determined no behavior at all.
-  return VpiIterateInCompatibilityMode(
+  return delta::VpiIterateInCompatibilityMode(
       type, ref,
       delta::GetGlobalVpiContext().EffectiveCompatibilityMode(false, 0));
 }
