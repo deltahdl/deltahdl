@@ -232,6 +232,10 @@ bool VpiObjectCarriesSourceDelay(int type) {
     case vpiModPath:
     case vpiTchk:
     case vpiContAssign:
+    // §37.47 (figure): the vpiDelay edge is drawn on the unnamed enclosure that
+    // holds the continuous assignment and its bits alike, so a cont assign bit
+    // reaches the same source-written delay its assignment does.
+    case vpiContAssignBit:
       return true;
     default:
       return false;

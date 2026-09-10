@@ -106,5 +106,82 @@ TEST_F(ContinuousAssignment, ValueChangeCallbackAllowedOnContAssignAndBit) {
   EXPECT_NE(ctx_.RegisterCb(&on_bit), nullptr);
 }
 
+// -----------------------------------------------------------------------------
+// The edges the enclosure carries. §37.47 draws `cont assign` and `cont assign
+// bit` inside one dotted outline with no name, and hangs vpiLhs, vpiRhs and
+// vpiDelay off that outline rather than off either object. §37.4.1 makes an
+// unnamed enclosure a grouping of the objects drawn in it, so both of them
+// carry all three edges. None of the three named a continuous assignment at
+// all: vpiLhs and vpiRhs were served for the procedural assignment family and
+// the alias statement only, and vpiDelay for the whole assignment but not its
+// bits, so the traversal fell through to a match of a child's own type against
+// a relation tag, which no object carries.
+// -----------------------------------------------------------------------------
+
+// §37.47 (figure, vpiLhs/vpiRhs): a continuous assignment reaches the net it
+// drives and the expression it drives it with.
+TEST_F(ContinuousAssignment, AContinuousAssignmentReachesItsTwoSides) {
+  VpiObject target;
+  target.type = kVpiNet;
+  VpiObject source;
+  source.type = vpiOperation;
+
+  VpiObject assign;
+  assign.type = vpiContAssign;
+  assign.lhs = &target;
+  assign.rhs = &source;
+
+  EXPECT_EQ(vpi_handle(vpiLhs, &assign), &target);
+  EXPECT_EQ(vpi_handle(vpiRhs, &assign), &source);
+}
+
+// §37.47 (figure): the two edges are drawn on the enclosure, so a cont assign
+// bit answers for them exactly as the whole assignment does.
+TEST_F(ContinuousAssignment, AContAssignBitReachesTheSameTwoSides) {
+  VpiObject target;
+  target.type = vpiNetBit;
+  VpiObject source;
+  source.type = vpiConstant;
+
+  VpiObject bit;
+  bit.type = vpiContAssignBit;
+  bit.lhs = &target;
+  bit.rhs = &source;
+
+  EXPECT_EQ(vpi_handle(vpiLhs, &bit), &target);
+  EXPECT_EQ(vpi_handle(vpiRhs, &bit), &source);
+}
+
+// §37.47 (figure, vpiDelay): the delay edge is drawn on the same enclosure, so
+// a cont assign bit reaches the source-written delay its assignment does.
+TEST_F(ContinuousAssignment, AContAssignBitReachesItsSourceDelay) {
+  EXPECT_TRUE(VpiObjectCarriesSourceDelay(vpiContAssign));
+  EXPECT_TRUE(VpiObjectCarriesSourceDelay(vpiContAssignBit));
+
+  VpiObject delay_expr;
+  delay_expr.type = vpiConstant;
+
+  VpiObject bit;
+  bit.type = vpiContAssignBit;
+  bit.delay_expr = &delay_expr;
+
+  EXPECT_EQ(vpi_handle(vpiDelay, &bit), &delay_expr);
+}
+
+// §37.47 (figure): an assignment written with no delay reaches none, and the
+// edges stay distinct - a target is not reported as a source.
+TEST_F(ContinuousAssignment, TheEdgesStayDistinctAndReportNoneWhenAbsent) {
+  VpiObject target;
+  target.type = kVpiNet;
+
+  VpiObject assign;
+  assign.type = vpiContAssign;
+  assign.lhs = &target;
+
+  EXPECT_EQ(vpi_handle(vpiLhs, &assign), &target);
+  EXPECT_EQ(vpi_handle(vpiRhs, &assign), nullptr);
+  EXPECT_EQ(vpi_handle(vpiDelay, &assign), nullptr);
+}
+
 }  // namespace
 }  // namespace delta
