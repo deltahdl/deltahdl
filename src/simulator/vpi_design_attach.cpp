@@ -313,17 +313,18 @@ void WalkInstancePaths(const RtlirDesign* design, Visit visit) {
 // whatever it holds, and every other variable is the kind it was declared.
 int VpiVariableObjectKind(const RtlirVariable& var) {
   if (var.num_unpacked_dims > 0) return vpiRegArray;
-  if (var.dtype == nullptr) return kVpiReg;
-  switch (var.dtype->kind) {
+  // A name declared through a typedef reports kNamed, so the flags the
+  // elaborator resolved through the typedef answer first for the kinds that
+  // have one.
+  if (var.decl_kind == DataTypeKind::kShortreal) return vpiShortRealVar;
+  if (var.is_real) return vpiRealVar;
+  if (var.is_string) return vpiStringVar;
+  if (var.is_chandle) return vpiChandleVar;
+  switch (var.decl_kind) {
     case DataTypeKind::kInteger:
       return vpiIntegerVar;
     case DataTypeKind::kTime:
       return vpiTimeVar;
-    case DataTypeKind::kReal:
-    case DataTypeKind::kRealtime:
-      return vpiRealVar;
-    case DataTypeKind::kShortreal:
-      return vpiShortRealVar;
     case DataTypeKind::kByte:
       return vpiByteVar;
     case DataTypeKind::kShortint:
@@ -334,10 +335,6 @@ int VpiVariableObjectKind(const RtlirVariable& var) {
       return vpiLongIntVar;
     case DataTypeKind::kBit:
       return vpiBitVar;
-    case DataTypeKind::kString:
-      return vpiStringVar;
-    case DataTypeKind::kChandle:
-      return vpiChandleVar;
     case DataTypeKind::kEnum:
       return vpiEnumVar;
     case DataTypeKind::kStruct:

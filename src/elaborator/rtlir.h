@@ -208,6 +208,13 @@ struct RtlirVariable {
   const Expr* init_expr = nullptr;
   const DataType* dtype = nullptr;
   DataTypeKind elem_type_kind = DataTypeKind::kImplicit;
+  // §36.12.1 Table 36-10 rows 3 and 4: what the declaration named this
+  // variable, which is the box §37.17 draws it in - an integer var, a time var,
+  // a real var and so on. The flags above answer a few of those questions and
+  // no others, and `dtype` is carried only where the declaration wrote a packed
+  // dimension, so neither says what a plain `integer i;` is. kImplicit for a
+  // declaration that named no type of its own.
+  DataTypeKind decl_kind = DataTypeKind::kImplicit;
   uint32_t unpacked_size = 0;
   // The address the first unpacked dimension counts from. int64_t because
   // §7.4.2 admits a negative bound, and `int x [-3:5]` counts from -3.

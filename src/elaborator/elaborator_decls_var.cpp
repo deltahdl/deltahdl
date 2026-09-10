@@ -362,6 +362,10 @@ void RecordViParamOverrides(
 // type. Width/signedness/struct/enum info is filled in separately.
 void SetVariableKindFlags(const ModuleItem* item, RtlirVariable& var,
                           const TypedefMap& typedefs) {
+  // §36.12.1 Table 36-10 rows 3 and 4: the type the declaration named, which is
+  // what tells an integer var from a time var from a plain logic one once the
+  // variable is an object.
+  var.decl_kind = item->data_type.kind;
   var.is_4state = Is4stateType(item->data_type, typedefs);
   var.is_event = (item->data_type.kind == DataTypeKind::kEvent);
   var.is_chandle = (item->data_type.kind == DataTypeKind::kChandle);
