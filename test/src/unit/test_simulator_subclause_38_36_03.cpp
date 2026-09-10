@@ -7,6 +7,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_simulator.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi.h"
@@ -298,6 +299,109 @@ TEST_F(VpiActionFeatureCallbacks, RemovedCallbackIsNotDispatched) {
 
   EXPECT_EQ(fired, 1);
   EXPECT_EQ(g_invocations, 1);
+}
+
+// -----------------------------------------------------------------------------
+// §38.36.3 separates the two kinds of reason it defines by whether they happen:
+// "actions are differentiated from features in that actions shall occur in all
+// VPI-compliant tools, whereas features might not exist in all VPI-compliant
+// tools." Three of the action reasons are the tool's own lifetime --
+// cbEndOfCompile, cbStartOfSimulation and cbEndOfSimulation -- and no run
+// delivered any of them. They could be registered, as the cases above show,
+// and then the tool compiled a design, ran it and finished without one
+// occurring.
+//
+// The cases below run a design and read back what arrived.
+// -----------------------------------------------------------------------------
+
+// The order the reasons arrived in, which is what the three cases are about:
+// each names a point in the tool's life, so what says they were delivered there
+// rather than together is the sequence.
+std::vector<int> g_action_order;
+
+int RecordEndOfCompile(VpiCbData*) {
+  g_action_order.push_back(cbEndOfCompile);
+  return 0;
+}
+
+int RecordStartOfSimulation(VpiCbData*) {
+  g_action_order.push_back(cbStartOfSimulation);
+  return 0;
+}
+
+int RecordEndOfSimulation(VpiCbData*) {
+  g_action_order.push_back(cbEndOfSimulation);
+  return 0;
+}
+
+void RegisterLifetimeCallbacks() {
+  g_action_order.clear();
+
+  s_cb_data compiled = {};
+  compiled.reason = cbEndOfCompile;
+  compiled.cb_rtn = &RecordEndOfCompile;
+  ASSERT_NE(vpi_register_cb(&compiled), nullptr);
+
+  s_cb_data started = {};
+  started.reason = cbStartOfSimulation;
+  started.cb_rtn = &RecordStartOfSimulation;
+  ASSERT_NE(vpi_register_cb(&started), nullptr);
+
+  s_cb_data ended = {};
+  ended.reason = cbEndOfSimulation;
+  ended.cb_rtn = &RecordEndOfSimulation;
+  ASSERT_NE(vpi_register_cb(&ended), nullptr);
+}
+
+class VpiLifetimeCallbacksInARun : public ::testing::Test {
+ protected:
+  void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
+  void TearDown() override { SetGlobalVpiContext(nullptr); }
+
+  VpiContext vpi_ctx_;
+};
+
+TEST_F(VpiLifetimeCallbacksInARun, TheThreeLifetimeActionsOccurInOrder) {
+  RegisterLifetimeCallbacks();
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int r;\n"
+      "  initial r = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  // The order is the tool's life: the data structure is compiled, simulation
+  // starts, simulation ends. Asserting the sequence rather than three counts is
+  // what separates three callbacks delivered where they belong from three
+  // delivered together at whichever point a tool happened to fire them.
+  EXPECT_EQ(g_action_order,
+            (std::vector<int>{cbEndOfCompile, cbStartOfSimulation,
+                              cbEndOfSimulation}));
+}
+
+TEST_F(VpiLifetimeCallbacksInARun, TheEndOfSimulationActionOccursAfterAFinish) {
+  RegisterLifetimeCallbacks();
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  initial begin\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  // §38.36.3 gives cbEndOfSimulation two ways of being reached, "because no
+  // more events remain in the event queue or a $finish system task executed",
+  // and the case above is the first of them. This is the second.
+  ASSERT_FALSE(g_action_order.empty());
+  EXPECT_EQ(g_action_order.back(), cbEndOfSimulation);
 }
 
 }  // namespace

@@ -33,6 +33,7 @@
 #include "simulator/specify_sdf.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach.h"
 #include "simulator/vpi_systf_build.h"
 
@@ -837,6 +838,17 @@ void Lowerer::Lower(const RtlirDesign* design) {
   // -- last of everything the build does, and before the scheduler runs an
   // event.
   CallBuildPeriodSystfRoutines(design, ctx_, arena_);
+
+  // §38.36.3: "cbEndOfCompile -- end of simulation data structure compilation
+  // or build", which is here: the structure is built and the build period's
+  // routines have run. §36.10.2 puts it in the same place and says what it
+  // opens -- "after the sizetf routines are called, the routines registered for
+  // reason cbEndOfCompile are called. At this point, and continuing until the
+  // tool has finished execution, all functionality is available" -- so the
+  // phase moves with it.
+  VpiContext& vpi = GetGlobalVpiContext();
+  vpi.DispatchCallbacks(kCbEndOfCompile);
+  vpi.SetToolPhase(VpiToolPhase::kFull);
 }
 
 }  // namespace delta

@@ -5,6 +5,7 @@
 
 #include "common/arena.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
 
 namespace delta {
 
@@ -141,6 +142,13 @@ static bool SlotHasLiveEvent(const TimeSlot& slot) {
 }
 
 void Scheduler::Run() {
+  // §38.36.3: "cbStartOfSimulation -- start of simulation (beginning of time
+  // zero simulation cycle)". It is one of the action reasons, which the clause
+  // separates from the feature reasons by saying that "actions shall occur in
+  // all VPI-compliant tools", and this is where simulation starts: the design
+  // is built and no event has run.
+  GetGlobalVpiContext().DispatchCallbacks(kCbStartOfSimulation);
+
   // §20.2: an explicit $finish/$stop/$fatal requests a hard halt through the
   // SimContext. Honor it between time slots so no later-time events run once
   // the halt is pending -- a process suspended on a delay must not resume in a
@@ -173,6 +181,11 @@ void Scheduler::Run() {
   // after Run() returns - resolves in the top scope instead of inheriting the
   // last-run instance's prefix and finding a same-named variable it shadows.
   if (ctx_) ctx_->SetCurrentProcess(nullptr);
+
+  // §38.36.3: "cbEndOfSimulation -- end of simulation (simulation ended because
+  // no more events remain in the event queue or a $finish system task
+  // executed)". Both are how the loop above ends.
+  GetGlobalVpiContext().DispatchCallbacks(kCbEndOfSimulation);
 }
 
 void Scheduler::ExecuteTimeSlot(TimeSlot& slot) {
