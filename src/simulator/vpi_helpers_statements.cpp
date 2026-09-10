@@ -172,6 +172,17 @@ int VpiAssignmentOpType(std::string_view assign_operator) {
   return vpiAssignmentOp;
 }
 
+bool VpiIsProcessType(int type) {
+  // §37.63: `process` is drawn as a class definition - bold italic letters in a
+  // dotted enclosure - holding the initial, final and always object
+  // definitions, and §37.4.1 makes such an enclosure a grouping rather than an
+  // object of its own. So vpiProcess is the group's name and these three are
+  // the kinds a procedure an application reaches actually has; detail 1's four
+  // always_comb/always_ff/always_latch forms are vpiAlwaysType values of the
+  // always object rather than object kinds beside it.
+  return type == vpiAlways || type == vpiInitial || type == vpiFinal;
+}
+
 bool VpiIsAlwaysType(int always_type) {
   // §37.63 detail 1: vpiAlwaysType can be exactly one of these four constants.
   // vpiAlways names a general always procedure; vpiAlwaysComb, vpiAlwaysFF, and

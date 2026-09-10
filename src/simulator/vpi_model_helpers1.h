@@ -625,6 +625,12 @@ int VpiAssignmentOpType(std::string_view assign_operator);
 // one of the four and vpiUndefined otherwise.
 bool VpiIsAlwaysType(int always_type);
 
+// §37.63: the object definitions the `process` class groups - the initial, the
+// final and the always procedure. §37.4.1 makes a dotted enclosure a grouping
+// rather than an object, so vpiProcess names the group and no procedure carries
+// it as its type.
+bool VpiIsProcessType(int type);
+
 // §37.65 Event control detail 1: the statement an event control "@" reaches
 // through vpiStmt. An event control associated with an assignment - the event
 // control drawn on an assignment object (§37.64), recognized here by its parent

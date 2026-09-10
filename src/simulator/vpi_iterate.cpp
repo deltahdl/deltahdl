@@ -457,6 +457,11 @@ bool VpiIterateMatches(int obj_type, int type, VpiHandle ref,
   // Matching the class constant against an object's own type reached none of
   // them: §37.4.1 makes the enclosure a grouping and no object is one.
   if (type == vpiPrimitive) return VpiIsPrimitiveType(obj_type);
+  // §37.9/§37.5/§37.63: the edge from a program or a module to its procedures
+  // is drawn to the `process` class, so it reaches the initial, final and
+  // always procedures the class groups rather than an object whose own type is
+  // the class name, which is a kind no procedure has.
+  if (type == vpiProcess) return VpiIsProcessType(obj_type);
   // §37.24/§37.40/§37.72/§37.42/§37.34: the edge-specific special modes.
   if (VpiIterateMatchesEdgeMode(obj_type, type, ref, modes, &matched)) {
     return matched;
