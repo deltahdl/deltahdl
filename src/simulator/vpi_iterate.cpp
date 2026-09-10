@@ -216,6 +216,9 @@ struct VpiIterateModes {
   bool foreach_stmt_loopvars = false;
   bool constraint_expr = false;
   bool callback_object = false;
+  // §37.57 detail 1: a let expression's vpiArgument iteration, which reads the
+  // let declaration's formals rather than the expression's own children.
+  bool let_argument = false;
 };
 
 // The context-owned object and registry stores an iteration is resolved
@@ -240,6 +243,9 @@ struct VpiIterateStores {
 // locating index expressions.
 void ComputeTfAndEventModes(int type, VpiHandle ref, VpiIterateModes& m) {
   m.tf_argument = ref && VpiIsTfCallType(ref->type) && type == vpiArgument;
+  // §37.57 (figure): a let expression carries a vpiArgument edge of its own,
+  // and detail 1 gives it a rule the tf call's edge does not have.
+  m.let_argument = ref && ref->type == vpiLetExpr && type == vpiArgument;
   m.named_event_waiting =
       ref && ref->type == vpiNamedEvent && type == vpiWaitingProcesses;
   m.named_event_index = ref && ref->type == vpiNamedEvent && type == vpiIndex;
@@ -632,6 +638,50 @@ bool VpiIsNullReferenceRelation(int type) {
   return type == kVpiModule || type == vpiCallback || type == vpiAssertion;
 }
 
+// §37.57 detail 1: whether the instantiation left this argument position empty.
+// §37.42 detail 8 is how the model writes an omitted call argument - an
+// operation whose vpiOpType is the null operation - and a let instantiation
+// that writes nothing for a port leaves the same hole.
+bool VpiLetArgumentIsOmitted(VpiHandle actual) {
+  return actual != nullptr && actual->type == vpiOperation &&
+         actual->op_type == vpiNullOp;
+}
+
+// §37.57 (figure) + detail 1: collect a let expression's arguments. The formals
+// are the seq formal decls of the let declaration the expression's tagless edge
+// reaches, in declaration order, and the actuals are the expressions the
+// instantiation wrote. Detail 1 puts the arguments in formal order and fills an
+// omitted one from its formal's default value, "so that the correspondence
+// between each argument and its respective formal can be made".
+//
+// Nothing collected these. vpiArgument is a relation tag and no object's type
+// is one, so the generic child walk this fell through to matched nothing, a let
+// expression's arguments were reachable by no route, and VpiLetExprArguments --
+// the rule detail 1 states - was called by no routine in the simulator.
+void CollectLetExprArguments(VpiObject* ref, VpiObject* iter) {
+  VpiHandle decl = nullptr;
+  std::vector<VpiHandle> provided;
+  for (auto* child : ref->children) {
+    if (child->type == vpiLetDecl) {
+      decl = child;
+    } else if (VpiIsExprType(child->type)) {
+      provided.push_back(VpiLetArgumentIsOmitted(child) ? nullptr : child);
+    }
+  }
+
+  std::vector<VpiLetFormal> formals;
+  for (VpiHandle formal : VpiSeqFormals(decl)) {
+    formals.push_back(VpiLetFormal{VpiLetFormalDefault(formal)});
+  }
+
+  for (VpiHandle argument : VpiLetExprArguments(formals, provided)) {
+    // A formal the instantiation left empty and that declares no default has
+    // no argument object to hand back. §11.12 requires a value for such a
+    // formal, so no let a compilation accepted reaches this.
+    if (argument != nullptr) iter->children.push_back(argument);
+  }
+}
+
 // §37.49 + §37.5 detail 1: the null-reference walk - collect every object the
 // (type, ref) iteration matches. A NULL-reference vpiModule iteration reaches
 // only the top-level modules, never a module nested within another scope.
@@ -718,6 +768,10 @@ bool DispatchRefSpecialMode(int type, VpiHandle ref,
   }
   if (modes.constraint_expr) {
     CollectConstraintExprs(ref, iter);
+    return true;
+  }
+  if (modes.let_argument) {
+    CollectLetExprArguments(ref, iter);
     return true;
   }
   if (modes.callback_object) {

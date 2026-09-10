@@ -442,6 +442,11 @@ struct VpiLetFormal {
   VpiHandle default_value = nullptr;
 };
 
+// §37.57 detail 1: the default value a let formal was declared with - the
+// value that stands in as the argument when an instantiation supplies none.
+// Null where the formal declares no default.
+VpiHandle VpiLetFormalDefault(VpiHandle formal);
+
 // §37.57 detail 1: the arguments the vpiArgument iteration returns for a let
 // expression, in the order the let's formals are declared so each argument can
 // be matched to its formal. `provided` is parallel to `formals`; a null entry

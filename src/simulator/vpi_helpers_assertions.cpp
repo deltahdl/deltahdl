@@ -709,6 +709,19 @@ VpiHandle VpiSeqFormalInitExpr(VpiHandle formal) {
 // §37.57 Let.
 // ===========================================================================
 
+VpiHandle VpiLetFormalDefault(VpiHandle formal) {
+  // §37.57 detail 1: "If a formal has a default value, that value shall appear
+  // as the argument should the instantiation not provide a value for that
+  // argument." The default is the expression the formal was declared with,
+  // which is the formal's first expression child - its typespec, drawn by
+  // §37.53's own edge, is not one. Null where the formal declares no default.
+  if (!formal) return nullptr;
+  for (auto* child : formal->children) {
+    if (VpiIsExprType(child->type)) return child;
+  }
+  return nullptr;
+}
+
 std::vector<VpiHandle> VpiLetExprArguments(
     const std::vector<VpiLetFormal>& formals,
     const std::vector<VpiHandle>& provided) {
