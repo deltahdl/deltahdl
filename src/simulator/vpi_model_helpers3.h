@@ -248,7 +248,7 @@ bool VpiPortVector(int port_width);
 // vpiScalar and vpiVector off the width they carry -- a port, and a net, which
 // §37.3's example gives the property to in as many words.
 inline bool VpiScalarVectorAppliesTo(int type) {
-  return type == vpiPort || type == kVpiNet;
+  return type == kVpiPort || type == kVpiNet;
 }
 
 // §37.14 detail 7: vpiPortIndex and vpiName do not apply to a port bit (only to
