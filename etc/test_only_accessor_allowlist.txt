@@ -21,7 +21,6 @@ GetPrimitiveDrivers src/simulator/specify.h specify.cpp:873 updates each driver 
 GetSpecparamValues src/simulator/specify.h specify_pulse.cpp:220 reads the stored value to increment it
 OpenEnvelopes src/preprocessor/protect_envelope.h protect_envelope.cpp:32 counts them :74 finds the one to close and :103 :106 append a keyword to the innermost
 PendingEnvelopeKeywords src/preprocessor/protect_envelope.h protect_envelope.cpp:61 moves them onto the envelope being opened
-RegisteredCallbacks src/simulator/vpi_context.h vpi_callbacks.cpp:160 :175 :298 :304 :357 and vpi_control.cpp:322 :344 dispatch and cancel through it
 
 # Nothing under src/ reads the data; each is filed.
 ClosedEnvelopes src/preprocessor/protect_envelope.h #3602

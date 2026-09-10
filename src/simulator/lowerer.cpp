@@ -33,6 +33,7 @@
 #include "simulator/specify_sdf.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
+#include "simulator/vpi_design_attach.h"
 #include "simulator/vpi_systf_build.h"
 
 namespace delta {
@@ -823,6 +824,13 @@ void Lowerer::Lower(const RtlirDesign* design) {
   }
 
   AttachCuMethodsToClasses(design, ctx_);
+
+  // §36.6: the design is put within reach of the PLI applications here, ahead
+  // of the build period below and of every event after it, because a routine
+  // called in either period is one of the "C language functions that utilize
+  // the library of PLI C functions to access and interact dynamically with
+  // SystemVerilog software implementations".
+  AttachDesignToPliApplications(ctx_);
 
   // §36.8: the simulation data structure is built by the time this returns, so
   // this is the period §36.8.1's sizetf and §36.8.2's compiletf are called in
