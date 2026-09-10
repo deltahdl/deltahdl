@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "fixture_simulator.h"
 #include "simulator/vpi.h"
 
 namespace delta {
@@ -140,6 +143,112 @@ TEST_F(CompiletfApplicationRoutine,
   VpiSystfInvoke(read_back.compiletf, read_back.user_data);
   EXPECT_EQ(g_compiletf_calls, 1);
   EXPECT_EQ(g_compiletf_arg, reinterpret_cast<const char*>(&payload));
+}
+
+// -----------------------------------------------------------------------------
+// §36.8.2: "This routine is typically used to check the correctness of any
+// arguments passed to the user-defined system task or system function in the
+// SystemVerilog source code." §36.4 leaves an application no way to those
+// arguments other than the call handle vpi_handle(vpiSysTfCall, NULL) answers
+// with -- "the task/function arguments are not passed to the PLI application"
+// and §38.37.1 makes user_data "the only argument passed to the compiletf,
+// sizetf, and calltf routines" -- so a compiletf run with no call standing is a
+// compiletf that can check nothing at all. The cases below run a real design
+// and let the application look.
+// -----------------------------------------------------------------------------
+
+// What the compiletf below found, left at file scope because a compiletf is a
+// plain C function with no return path to the case that provoked it. The two
+// names are copied rather than kept as pointers: §38.11 has vpi_get_str() place
+// its answer in one buffer reused by every call, so the pointer from the first
+// call names the second call's string by the time a case reads it.
+int g_call_type_seen = 0;
+int g_args_seen_at_compile = -1;
+std::string g_call_name_seen;
+std::string g_first_arg_name_seen;
+
+int InspectingCompiletf(const char*) {
+  g_call_type_seen = 0;
+  g_args_seen_at_compile = -1;
+  g_call_name_seen.clear();
+  g_first_arg_name_seen.clear();
+
+  vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
+  if (call == nullptr) return 0;
+  g_call_type_seen = vpi_get(vpiType, call);
+  const char* call_name = vpi_get_str(vpiName, call);
+  if (call_name != nullptr) g_call_name_seen = call_name;
+
+  vpiHandle args = vpi_iterate(vpiArgument, call);
+  g_args_seen_at_compile = 0;
+  if (args == nullptr) return 0;
+  for (vpiHandle arg = vpi_scan(args); arg != nullptr; arg = vpi_scan(args)) {
+    ++g_args_seen_at_compile;
+    if (g_args_seen_at_compile != 1) continue;
+    const char* arg_name = vpi_get_str(vpiName, arg);
+    if (arg_name != nullptr) g_first_arg_name_seen = arg_name;
+  }
+  return 0;
+}
+
+// Registers $probe with the inspecting compiletf and no calltf. The calltf is
+// left out because §36.8.2's period is the build rather than the execution, and
+// a registration with nothing to run at execution is what keeps the two apart:
+// everything a case below reads was written before the scheduler ran an event.
+void RegisterInspectingProbe(int type) {
+  s_vpi_systf_data data = {};
+  data.type = type;
+  data.tfname = "$probe";
+  data.compiletf = &InspectingCompiletf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+}
+
+TEST_F(CompiletfApplicationRoutine, ReachesTheCallTheSourceWroteItFor) {
+  RegisterInspectingProbe(vpiSysTask);
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int r;\n"
+      "  initial $probe(r, 1 + 2);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  // The call the compiletf was run for is the one the source wrote: a system
+  // task call named by the registration's tfname, carrying the two arguments
+  // the call site listed. A compiletf reached with no call standing leaves
+  // every one of these at the value it was cleared to.
+  EXPECT_EQ(g_call_type_seen, vpiSysTaskCall);
+  EXPECT_EQ(g_call_name_seen, "$probe");
+  EXPECT_EQ(g_args_seen_at_compile, 2);
+  // §36.4: an argument that names a variable is reached as that variable, which
+  // is what lets a compiletf say which name a call was written against.
+  EXPECT_EQ(g_first_arg_name_seen, "r");
+}
+
+TEST_F(CompiletfApplicationRoutine, ReachesASystemFunctionCallTheSameWay) {
+  // §36.8.2 applies to both kinds -- the routine is called "when the
+  // user-defined system task or system function name is encountered" -- and
+  // §37.42 gives a function call its own object type, so the application can
+  // tell which kind it is checking the arguments of.
+  RegisterInspectingProbe(vpiSysFunc);
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int r;\n"
+      "  initial r = $probe(r);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  EXPECT_EQ(g_call_type_seen, vpiSysFuncCall);
+  EXPECT_EQ(g_call_name_seen, "$probe");
+  EXPECT_EQ(g_args_seen_at_compile, 1);
+  EXPECT_EQ(g_first_arg_name_seen, "r");
 }
 
 }  // namespace

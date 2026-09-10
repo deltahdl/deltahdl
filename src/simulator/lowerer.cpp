@@ -836,7 +836,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
   // this is the period §36.8.1's sizetf and §36.8.2's compiletf are called in
   // -- last of everything the build does, and before the scheduler runs an
   // event.
-  CallBuildPeriodSystfRoutines(design);
+  CallBuildPeriodSystfRoutines(design, ctx_, arena_);
 }
 
 }  // namespace delta

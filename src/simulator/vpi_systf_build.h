@@ -3,6 +3,8 @@
 namespace delta {
 
 struct RtlirDesign;
+class SimContext;
+class Arena;
 
 // §36.8: run the build-period routines of every registration the design's
 // system calls name. "VPI-based system tasks have sizetf, compiletf, and calltf
@@ -29,6 +31,15 @@ struct RtlirDesign;
 // already refused a design that is not there, and refused one §20.10.1 marked
 // unstartable, so `design` is a design that was built rather than one that
 // might have been.
-void CallBuildPeriodSystfRoutines(const RtlirDesign* design);
+//
+// `ctx` and `arena` are what §36.8.2's compiletf is given its call through.
+// The clause has the routine "check the correctness of any arguments passed to
+// the user-defined system task or system function in the SystemVerilog source
+// code", and §36.4 has an application read those arguments off the call object
+// rather than off its own parameter list, so the call each compiletf is run for
+// is built here: `ctx` is where an argument that names a variable finds it, and
+// `arena` is what the call and its arguments are allocated out of.
+void CallBuildPeriodSystfRoutines(const RtlirDesign* design, SimContext& ctx,
+                                  Arena& arena);
 
 }  // namespace delta

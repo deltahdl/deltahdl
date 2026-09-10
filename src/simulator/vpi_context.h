@@ -65,6 +65,20 @@ class VpiContext {
   bool CallRegisteredSystf(const char* name, const Expr* call_site,
                            SimContext& ctx, Logic4Vec& result, Arena& arena);
 
+  // §36.8.2: run the compiletf of one system task or system function call the
+  // source description wrote, with that call standing where the application
+  // looks for it. The clause has the routine "check the correctness of any
+  // arguments passed to the user-defined system task or system function in the
+  // SystemVerilog source code", and §36.4 leaves an application no other way of
+  // reaching those arguments -- a compiletf is handed its own user_data and
+  // nothing else -- so a compiletf called with no current call is one that can
+  // check nothing. `call_site` is the expression the source wrote, and its
+  // arguments are hung on the call unevaluated, this period standing before the
+  // first event.
+  void CallCompiletfForSourceCall(const VpiSystfData& data,
+                                  const Expr* call_site, SimContext& ctx,
+                                  Arena& arena);
+
   // §36.3.2: resolve the effective registration for a system task/function
   // name, honouring the override rule. A user-provided PLI application
   // associated with the same name as a built-in overrides that built-in,
@@ -687,6 +701,16 @@ class VpiContext {
 
  private:
   VpiHandle AllocObject();
+
+  // §37.42: the object standing for one system task or system function call,
+  // carrying the arguments the call site wrote and, where the registration is a
+  // system function, the storage its return value is written through. Both
+  // periods that call a PLI application build one, and `evaluate_args` is the
+  // whole of the difference between them: an execution-time call reads each
+  // actual's value, a build-period call has none to read.
+  VpiHandle MakeSystfCallObject(const VpiSystfData& data, const Expr* call_site,
+                                SimContext& ctx, Arena& arena,
+                                bool evaluate_args);
 
   // §37.2.2: release one handle plus the handles to every callback placed on
   // the object it names. Building block for the simulation-event release rules.

@@ -23,6 +23,11 @@ namespace {
 // the one call written in it.
 struct BuildPeriod {
   VpiContext& vpi;
+  // §36.8.2: what a compiletf's call object is built against. `ctx` is where an
+  // argument that names a variable finds it, and `arena` is what the call and
+  // its arguments are allocated out of.
+  SimContext& ctx;
+  Arena& arena;
   std::unordered_set<const Expr*> called;
 };
 
@@ -54,7 +59,13 @@ void CallBuildPeriodRoutinesForCall(const Expr* call, BuildPeriod& period) {
   if (VpiSystfSizetfIsCalled(*data)) period.vpi.SystfResultSizeBits(*data);
   period.vpi.SetToolPhase(outer);
 
-  VpiSystfInvoke(data->compiletf, data->user_data);
+  // §36.8.2: "This routine is typically used to check the correctness of any
+  // arguments passed to the user-defined system task or system function in the
+  // SystemVerilog source code", so the call the routine is being run for is
+  // stood up around it rather than the routine being called on its own -- the
+  // arguments are hung on that call and §36.4 gives an application no other
+  // way to them.
+  period.vpi.CallCompiletfForSourceCall(*data, call, period.ctx, period.arena);
 }
 
 // Every system call written anywhere in `e`. A system call may stand inside
@@ -100,8 +111,9 @@ void CallBuildPeriodRoutinesInModule(const RtlirModule* mod,
 
 }  // namespace
 
-void CallBuildPeriodSystfRoutines(const RtlirDesign* design) {
-  BuildPeriod period{GetGlobalVpiContext(), {}};
+void CallBuildPeriodSystfRoutines(const RtlirDesign* design, SimContext& ctx,
+                                  Arena& arena) {
+  BuildPeriod period{GetGlobalVpiContext(), ctx, arena, {}};
   // A run with nothing registered has no PLI routine to call at any period, so
   // the design is not walked at all rather than walked for names the registry
   // would refuse every one of.

@@ -137,8 +137,19 @@ namespace {
 //
 // §37.42 detail 8 spells an omitted argument, which a call site writes as an
 // empty position, and VpiMakeEmptyArgument is what sets that shape.
+//
+// `evaluate` is what separates the two periods a call object is built in.
+// §36.8.3 has the calltf called "each time the associated user-defined system
+// task or system function is executed", so an actual that is an expression has
+// a value there and the holder is filled with it. §36.8.2 has the compiletf
+// called "when the user-defined system task or system function name is
+// encountered during parsing or compiling", where the design has not run: there
+// is no value to read, and reading one would mean running the source's own
+// functions once per call site before the simulation started, so the holder is
+// left empty and the argument stands for what the source wrote rather than for
+// what it will produce.
 VpiObject* SystfCallArgument(VpiObject* arg, const Expr* actual,
-                             SimContext& ctx, Arena& arena) {
+                             SimContext& ctx, Arena& arena, bool evaluate) {
   if (actual == nullptr) {
     VpiMakeEmptyArgument(arg);
     return arg;
@@ -153,7 +164,7 @@ VpiObject* SystfCallArgument(VpiObject* arg, const Expr* actual,
   } else {
     arg->type = vpiOperation;
     auto* holder = arena.Create<Variable>();
-    holder->value = EvalExpr(actual, ctx, arena);
+    if (evaluate) holder->value = EvalExpr(actual, ctx, arena);
     arg->var = holder;
   }
   arg->size = static_cast<int>(arg->var->value.width);
@@ -162,22 +173,19 @@ VpiObject* SystfCallArgument(VpiObject* arg, const Expr* actual,
 
 }  // namespace
 
-bool VpiContext::CallRegisteredSystf(const char* name, const Expr* call_site,
-                                     SimContext& ctx, Logic4Vec& result,
-                                     Arena& arena) {
-  const VpiSystfData* data = ResolveSystf(name);
-  if (data == nullptr) return false;
-
-  // §37.42: the system task or function call currently invoking a PLI
-  // application, which the application reaches with
-  // vpi_handle(vpiSysTfCall, NULL). It is also where a system function's
-  // return value is put: vpi_put_value writes through the object's own
-  // storage, so the call carries a variable of its own for the application to
-  // write and for the caller below to read back.
+VpiHandle VpiContext::MakeSystfCallObject(const VpiSystfData& data,
+                                          const Expr* call_site,
+                                          SimContext& ctx, Arena& arena,
+                                          bool evaluate_args) {
+  // §37.42: the system task or function call a PLI application is run for,
+  // which the application reaches with vpi_handle(vpiSysTfCall, NULL). It is
+  // also where a system function's return value is put: vpi_put_value writes
+  // through the object's own storage, so the call carries a variable of its own
+  // for the application to write and for this routine's caller to read back.
   auto* call = AllocObject();
-  call->type = (data->type == vpiSysFunc) ? vpiSysFuncCall : vpiSysTaskCall;
-  call->name = data->tfname != nullptr ? std::string_view(data->tfname)
-                                       : std::string_view();
+  call->type = (data.type == vpiSysFunc) ? vpiSysFuncCall : vpiSysTaskCall;
+  call->name = data.tfname != nullptr ? std::string_view(data.tfname)
+                                      : std::string_view();
   auto* value_holder = arena.Create<Variable>();
   // §36.8.1: "The value returned by the sizetf routine shall be the number of
   // bits that the calltf routine shall provide as the return value for the
@@ -187,7 +195,7 @@ bool VpiContext::CallRegisteredSystf(const char* name, const Expr* call_site,
   // vpiSizedSignedFunc shall return 32 bits". A sizetf answering with no bits
   // at all describes no value, so the default stands rather than a width
   // nothing can hold.
-  int result_bits = SystfResultSizeBits(*data);
+  int result_bits = SystfResultSizeBits(data);
   auto width = static_cast<uint32_t>(
       result_bits > 0 ? result_bits : kVpiDefaultSizedFuncBits);
   value_holder->value = MakeLogic4VecVal(arena, width, 0);
@@ -195,14 +203,25 @@ bool VpiContext::CallRegisteredSystf(const char* name, const Expr* call_site,
   call->size = static_cast<int>(width);
 
   // §36.4: the arguments the call site wrote, hung on the call so §37.42's
-  // vpiArgument iteration reaches them. They are attached before the calltf
+  // vpiArgument iteration reaches them. They are attached before the routine
   // runs, because the application reads them from inside it.
   if (call_site != nullptr) {
     for (const Expr* actual : call_site->args) {
       call->children.push_back(
-          SystfCallArgument(AllocObject(), actual, ctx, arena));
+          SystfCallArgument(AllocObject(), actual, ctx, arena, evaluate_args));
     }
   }
+  return call;
+}
+
+bool VpiContext::CallRegisteredSystf(const char* name, const Expr* call_site,
+                                     SimContext& ctx, Logic4Vec& result,
+                                     Arena& arena) {
+  const VpiSystfData* data = ResolveSystf(name);
+  if (data == nullptr) return false;
+
+  VpiHandle call = MakeSystfCallObject(*data, call_site, ctx, arena,
+                                       /*evaluate_args=*/true);
 
   // A call reached from inside another PLI application is the inner one while
   // it runs, so the outer call is put back rather than cleared.
@@ -213,8 +232,28 @@ bool VpiContext::CallRegisteredSystf(const char* name, const Expr* call_site,
   }
   SetCurrentSystfCall(outer_call);
 
-  result = value_holder->value;
+  result = call->var->value;
   return true;
+}
+
+void VpiContext::CallCompiletfForSourceCall(const VpiSystfData& data,
+                                            const Expr* call_site,
+                                            SimContext& ctx, Arena& arena) {
+  // §36.8.2: "Providing a compiletf routine is optional." A registration that
+  // supplied none has nothing to call and nothing to call it for, so no call
+  // object is stood up either.
+  if (data.compiletf == nullptr) return;
+
+  VpiHandle call = MakeSystfCallObject(data, call_site, ctx, arena,
+                                       /*evaluate_args=*/false);
+
+  // The same standing-and-restoring the calltf gets, and for the same reason:
+  // a compiletf that reaches a PLI routine which itself calls a system task
+  // leaves this one to be put back.
+  VpiHandle outer_call = CurrentSystfCall();
+  SetCurrentSystfCall(call);
+  VpiSystfInvoke(data.compiletf, data.user_data);
+  SetCurrentSystfCall(outer_call);
 }
 
 void VpiContext::GetSystfInfo(VpiHandle obj, VpiSystfData* systf_data_p) {
