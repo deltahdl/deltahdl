@@ -223,6 +223,8 @@ struct VpiIterateModes {
   bool mod_path_terms = false;
   // §37.26: a structure or union's vpiMember relation.
   bool struct_union_members = false;
+  // §36.10.3: an operation's vpiOperand relation.
+  bool operation_operands = false;
 };
 
 // The context-owned object and registry stores an iteration is resolved
@@ -345,6 +347,9 @@ void ComputeConstraintAndCallbackModes(int type, VpiHandle ref,
   m.constraint_expr = ref && type == vpiConstraintExpr &&
                       VpiIsConstraintExprContainerType(ref->type);
   m.callback_object = ref && type == vpiCallback;
+  // §36.10.3: an operation reaches its operands, which carry their own
+  // expression kinds rather than the relation tag.
+  m.operation_operands = ref && type == vpiOperand && ref->type == vpiOperation;
   // §37.26: a structure or union reaches the members it holds through
   // vpiMember, whose targets carry their own variable or net kind.
   m.struct_union_members =
@@ -796,6 +801,13 @@ bool DispatchRefSpecialMode(int type, VpiHandle ref,
   }
   if (modes.constraint_expr) {
     CollectConstraintExprs(ref, iter);
+    return true;
+  }
+  if (modes.operation_operands) {
+    // §36.10.3 (traverseExpr): the operands the operation was written with.
+    for (VpiHandle operand : VpiOperationOperands(ref)) {
+      iter->children.push_back(operand);
+    }
     return true;
   }
   if (modes.struct_union_members) {

@@ -625,6 +625,11 @@ int VpiAssignmentOpType(std::string_view assign_operator);
 // one of the four and vpiUndefined otherwise.
 bool VpiIsAlwaysType(int always_type);
 
+// §36.10.3: the operands of an operation, as vpi_iterate(vpiOperand, expr)
+// presents them - the operation's expression children in written order. Empty
+// for a null handle or an object that is not an operation.
+std::vector<VpiHandle> VpiOperationOperands(VpiHandle operation);
+
 // §37.63: the object definitions the `process` class groups - the initial, the
 // final and the always procedure. §37.4.1 makes a dotted enclosure a grouping
 // rather than an object, so vpiProcess names the group and no procedure carries

@@ -172,6 +172,25 @@ int VpiAssignmentOpType(std::string_view assign_operator) {
   return vpiAssignmentOp;
 }
 
+std::vector<VpiHandle> VpiOperationOperands(VpiHandle operation) {
+  // §36.10.3: "Expressions with multiple operands will result in a handle of
+  // type vpiOperation", and the routine the clause prints for walking one
+  // reaches those operands with vpi_iterate(vpiOperand, expr). An operand is
+  // itself an expression - the example recurses into each - so the operands are
+  // the operation's expression children, in the order it was written.
+  //
+  // Nothing served the relation. vpiOperand is a relation tag and no object's
+  // type is one, so the generic child walk this fell through to reached no
+  // operand of any operation, and the clause's own traverseExpr() descended
+  // into nothing.
+  std::vector<VpiHandle> operands;
+  if (!operation || operation->type != vpiOperation) return operands;
+  for (auto* child : operation->children) {
+    if (VpiIsExprType(child->type)) operands.push_back(child);
+  }
+  return operands;
+}
+
 bool VpiIsProcessType(int type) {
   // §37.63: `process` is drawn as a class definition - bold italic letters in a
   // dotted enclosure - holding the initial, final and always object
