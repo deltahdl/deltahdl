@@ -861,12 +861,12 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref, int compatibility_mode) {
   // is told so through §38.2's error, rather than left with a behavior nobody
   // defined. What it reached still comes back, because §36.12.2 rules out
   // emulating a construct that has no older behavior to emulate.
-  const char* kUnsupported =
+  const char* unsupported =
       VpiCompatibilityUnsupportedConstruct(compatibility_mode, iter->children);
-  if (kUnsupported != nullptr) {
+  if (unsupported != nullptr) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
-    last_error_.message = kUnsupported;
+    last_error_.message = unsupported;
   }
   return iter;
 }
