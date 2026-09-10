@@ -13,11 +13,19 @@
 // renames every call, so the capability is provided only if those names resolve
 // - and only if what they do is the behavior of the version selected.
 #define VPI_COMPATIBILITY_VERSION_1364v2001 1
+
+// clang-format off
+// The mechanism's header is read before the VPI headers, and stays there: it
+// is the selection that renames the entry points, so the declarations below
+// have to be read after it. Sorted in with them it lands last, the prototypes
+// are emitted under their plain names, and only the calls are renamed.
+#include "simulator/vpi_compatibility.h"
+// clang-format on
+
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi.h"
-#include "simulator/vpi_compatibility.h"
 
 namespace delta {
 namespace {
