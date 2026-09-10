@@ -94,7 +94,7 @@ TEST_F(VpiHandleComparison, ReleasingAnObjectReleasesItsCallbacksAnyHandle) {
   ASSERT_NE(cb, nullptr);
   ASSERT_FALSE(cb->released);
 
-  ctx_.ReleaseHandleWithCallbacks(mod);
+  ctx_.ReleaseFrameOrThreadObject(mod);
 
   EXPECT_TRUE(mod->released);
   EXPECT_TRUE(cb->released);
