@@ -38,15 +38,41 @@ static void CreateChildModulePorts(const std::string& inst_prefix,
   }
 }
 
+// Whether `name` is one of the module's ports. A port's net is the parent's,
+// reached through the binding CreateChildModulePorts makes, so the child does
+// not own one of its own under its prefix.
+static bool NetNamesAPortOf(const RtlirModule* mod, std::string_view name) {
+  for (const auto& port : mod->ports) {
+    if (port.name == name) return true;
+  }
+  return false;
+}
+
 // 25.3.2: a child instance's nets - e.g. an interface `wire` member accessed
 // through a port by reference - must be materialized under the child's instance
 // prefix, just like its variables. LowerModule does this for the top via
 // RegisterModuleNets; child instances need the prefixed form so a continuous
 // assign driven through the port resolves onto the shared net.
+//
+// §36.10 is why a regular module's nets are materialized too: "if a module m
+// contains wire w and is instantiated twice as m1 and m2, then m1.w and m2.w
+// are two distinct objects". A net a module declares for itself has one object
+// per instance, and with none created there was nothing under either name --
+// the design held the declaration and no storage for it.
+//
+// A port is the exception, and it is the one this used to be drawn around: a
+// regular module drives a net declared in an enclosing scope through its port,
+// so a same-named net materialized here would shadow that outer net and the
+// assign would never reach it. An interface keeps every one of its nets,
+// ports included, because §25.3.2 has its members shared through the port by
+// reference rather than driven across it.
 static void CreateChildModuleNets(const std::string& inst_prefix,
                                   const RtlirModule* resolved, SimContext& ctx,
                                   Arena& arena) {
   for (const auto& net : resolved->nets) {
+    if (!resolved->is_interface && NetNamesAPortOf(resolved, net.name)) {
+      continue;
+    }
     auto* name = arena.Create<std::string>(inst_prefix + std::string(net.name));
     auto* created = ctx.CreateNet(
         *name, net.net_type, net.width,
@@ -83,14 +109,7 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     RecordSpecifyScope(child.resolved);
     CreateChildModuleVariables(inst_prefix_, child.resolved);
     CreateChildModulePorts(inst_prefix_, child.resolved, ctx_, arena_);
-    // 25.3.2: only an interface instance owns nets that must be materialized
-    // under its prefix (its `wire` members, shared through ports by reference).
-    // A regular module or program instead drives nets declared in an enclosing
-    // scope through a continuous assign; materializing a same-named net here
-    // would shadow that outer net so the assign never reaches it.
-    if (child.resolved->is_interface) {
-      CreateChildModuleNets(inst_prefix_, child.resolved, ctx_, arena_);
-    }
+    CreateChildModuleNets(inst_prefix_, child.resolved, ctx_, arena_);
     // 21.2.1.5: register the child instance's tasks/functions so a call within
     // its own body resolves (and %m composes the instance + subroutine path);
     // LowerModule registers these for the top only.
