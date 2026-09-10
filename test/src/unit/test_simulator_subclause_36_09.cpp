@@ -167,11 +167,15 @@ TEST_F(PliMechanism, ANameEncounteredInADeclarationReachesItsApplications) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
 
-  // Both reasons are reached, which is what the case is about. The order is not
-  // asserted: this simulator performs §6.8's static initialization while it
-  // builds the design rather than at time zero, so the calltf for a declaration
-  // initializer runs inside the build rather than after it, and that is a
-  // question about when initialization happens rather than about §36.9.
+  // Both reasons are reached, which is what the case is about. The order is
+  // not asserted, and it is the standard rather than this simulator that
+  // leaves it open: §10.5 has "setting the initial value of a static variable
+  // as part of the variable declaration ... occur before any initial or always
+  // procedures are started", which is inside the build here, while §38.37.1
+  // has the compiletf occur "when the simulation data structure is compiled or
+  // built" -- one period, and nothing in either clause ordering the two within
+  // it. A case asserting an order would be asserting a rule the standard does
+  // not state.
   EXPECT_EQ(std::count(g_reached.begin(), g_reached.end(), "probe-compiletf"),
             1);
   EXPECT_EQ(std::count(g_reached.begin(), g_reached.end(), "probe-calltf"), 1);
