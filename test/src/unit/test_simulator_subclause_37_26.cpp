@@ -161,5 +161,90 @@ TEST_F(StructuresAndUnions, RestrictionDoesNotApplyToOrdinaryObjects) {
   }
 }
 
+// -----------------------------------------------------------------------------
+// The member edge. §37.26 draws vpiMember from the struct and union var forms
+// to the `variables` class and from the struct and union net forms to `nets`.
+// The relation was served for §37.24's interconnect net alone, and every
+// structure and union fell through to the generic child walk, which looks for a
+// child whose own type is the type asked for; vpiMember is a relation tag and
+// no object's type is one, so a structure's members were reached by nothing.
+// -----------------------------------------------------------------------------
+
+// §37.26 (figure, struct var --vpiMember--> variables): a struct variable
+// reaches the variables it holds, whatever kind each of them is. An object that
+// is not one of its members is not among them.
+TEST_F(StructuresAndUnions, AStructVariableReachesTheVariablesItHolds) {
+  VpiObject aggregate;
+  aggregate.type = vpiStructVar;
+
+  VpiObject first;
+  first.type = vpiLogicVar;
+  first.parent = &aggregate;
+  VpiObject second;
+  second.type = vpiIntVar;
+  second.parent = &aggregate;
+  VpiObject typespec;  // drawn by an edge of its own, not a member
+  typespec.type = vpiStructTypespec;
+  typespec.parent = &aggregate;
+  aggregate.children = {&first, &typespec, &second};
+
+  vpiHandle it = vpi_iterate(vpiMember, &aggregate);
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(vpi_scan(it), &first);
+  EXPECT_EQ(vpi_scan(it), &second);
+  EXPECT_EQ(vpi_scan(it), nullptr);
+}
+
+// §37.26 (figure, union var): the same edge is drawn on the union form, and a
+// member's own kind may be a further aggregate.
+TEST_F(StructuresAndUnions, AUnionVariableReachesItsMembers) {
+  VpiObject aggregate;
+  aggregate.type = vpiUnionVar;
+
+  VpiObject nested;
+  nested.type = vpiStructVar;
+  nested.parent = &aggregate;
+  aggregate.children = {&nested};
+
+  vpiHandle it = vpi_iterate(vpiMember, &aggregate);
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(vpi_scan(it), &nested);
+  EXPECT_EQ(vpi_scan(it), nullptr);
+}
+
+// §37.26 (figure, struct net --vpiMember--> nets): the net forms carry the same
+// edge, drawn to the nets they hold rather than to variables.
+TEST_F(StructuresAndUnions, AStructNetReachesTheNetsItHolds) {
+  VpiObject aggregate;
+  aggregate.type = vpiStructNet;
+
+  VpiObject member;
+  member.type = kVpiNet;
+  member.parent = &aggregate;
+  aggregate.children = {&member};
+
+  vpiHandle it = vpi_iterate(vpiMember, &aggregate);
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(vpi_scan(it), &member);
+  EXPECT_EQ(vpi_scan(it), nullptr);
+}
+
+// §37.26 (figure): an aggregate holding no member reaches none, which §38.23
+// reports as no iterator, and the edge stays the aggregate's own - a variable
+// that is not a structure reaches nothing through it.
+TEST_F(StructuresAndUnions, AnAggregateWithNoMembersReachesNone) {
+  VpiObject empty;
+  empty.type = vpiStructVar;
+  EXPECT_EQ(vpi_iterate(vpiMember, &empty), nullptr);
+
+  VpiObject plain;
+  plain.type = vpiLogicVar;
+  VpiObject child;
+  child.type = vpiLogicVar;
+  child.parent = &plain;
+  plain.children = {&child};
+  EXPECT_EQ(vpi_iterate(vpiMember, &plain), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

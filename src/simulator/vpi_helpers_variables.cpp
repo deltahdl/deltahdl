@@ -620,6 +620,30 @@ bool VpiIsStructOrUnionType(int type) {
          type == vpiUnionNet;
 }
 
+std::vector<VpiHandle> VpiStructUnionMembers(VpiHandle aggregate) {
+  // §37.26 (figure): the var forms draw vpiMember to the `variables` class and
+  // the net forms to `nets`, and the model already answers from a member's own
+  // side which aggregate holds it - §37.17 detail 17 for a variable and §37.16
+  // detail 33 for a net, both reading the member's vpiParent prefix. So the
+  // members are the children those two call members of this aggregate.
+  //
+  // vpiMember was served for §37.24's interconnect net alone. Every structure
+  // and union fell through to the generic child walk, which looks for a child
+  // whose own type is the type asked for; vpiMember is a relation tag and no
+  // object's type is one, so the members of a struct or union were reached by
+  // nothing.
+  std::vector<VpiHandle> members;
+  if (!aggregate) return members;
+  for (auto* child : aggregate->children) {
+    if (child->parent != aggregate) continue;
+    if (VpiVariableIsStructUnionMember(child) ||
+        VpiNetStructUnionMember(child)) {
+      members.push_back(child);
+    }
+  }
+  return members;
+}
+
 bool VpiIsEntireUnpackedStructOrUnion(int type, bool packed) {
   // §37.26 detail 1: the value-access restriction applies to an entire unpacked
   // structure or union. A packed aggregate has a single vector value and is

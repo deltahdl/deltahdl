@@ -360,6 +360,12 @@ int VpiNetLineNo(bool implicit, int declared_line);
 // classification that reads it.
 bool VpiIsPrimitiveType(int type);
 
+// §37.39 (figure): the path terms one of a module path's three term relations
+// reaches - vpiModPathOut the output terms, and of the input terms
+// vpiModDataPathIn the data source of an edge-sensitive path and vpiModPathIn
+// the rest. Empty for a null handle or a path with no term of that role.
+std::vector<VpiHandle> VpiModPathTerms(int type, VpiHandle path);
+
 // §37.3.3: whether an object kind carries the source-location properties
 // vpiLineNo and vpiFile. True for every object that corresponds to something in
 // the source text; false for the kinds §37.3.3 names as exceptions - those that

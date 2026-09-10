@@ -149,6 +149,11 @@ VpiHandle VpiRangeRightRange(const VpiRangeDesc& range);
 // to the class reaches.
 bool VpiIsVariablesType(int type);
 
+// §37.26 (figure): the members a structure or union holds, which its vpiMember
+// relation reaches - the variables of a struct or union var and the nets of a
+// struct or union net. Empty for a null handle or an aggregate with none.
+std::vector<VpiHandle> VpiStructUnionMembers(VpiHandle aggregate);
+
 // §37.17 detail 19: a logic var is the same object kind as a reg; treat either
 // as a logic variable so an existing reg-typed object is classified correctly.
 bool VpiIsLogicVarType(int type);

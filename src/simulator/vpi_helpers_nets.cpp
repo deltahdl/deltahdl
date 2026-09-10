@@ -802,6 +802,33 @@ bool VpiIsPrimitiveArrayType(int type) {
   }
 }
 
+// §37.39 (figure): which of a module path's three term relations reaches this
+// term. vpiModPathOut reaches the output terms; of the input terms,
+// vpiModDataPathIn reaches the data source of an edge-sensitive path and
+// vpiModPathIn the rest, which a term's own direction cannot tell apart because
+// both are inputs.
+static bool VpiModPathTermMatches(int type, VpiHandle term) {
+  const bool kIsOut = term->direction == kVpiOutput;
+  if (type == vpiModPathOut) return kIsOut;
+  if (kIsOut) return false;
+  return type == vpiModDataPathIn ? term->data_path_term
+                                  : !term->data_path_term;
+}
+
+std::vector<VpiHandle> VpiModPathTerms(int type, VpiHandle path) {
+  // §37.39 (figure): the path terms one of the three relations reaches. Each of
+  // them is a relation tag and a term's own type is vpiPathTerm, so the generic
+  // child walk - which compares a child's type to the type asked for - reached
+  // a module path's terms through none of the three.
+  std::vector<VpiHandle> terms;
+  if (!path) return terms;
+  for (auto* child : path->children) {
+    if (child->type != vpiPathTerm) continue;
+    if (VpiModPathTermMatches(type, child)) terms.push_back(child);
+  }
+  return terms;
+}
+
 bool VpiIsInstanceArrayType(int type) {
   // §37.11 (instance-array diagram): the module, interface, and program arrays
   // drawn beneath instance array, plus every primitive array (a primitive array
