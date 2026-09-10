@@ -831,7 +831,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
   // called in either period is one of the "C language functions that utilize
   // the library of PLI C functions to access and interact dynamically with
   // SystemVerilog software implementations".
-  AttachDesignToPliApplications(ctx_);
+  AttachDesignToPliApplications(design, ctx_);
 
   // §36.8: the simulation data structure is built by the time this returns, so
   // this is the period §36.8.1's sizetf and §36.8.2's compiletf are called in

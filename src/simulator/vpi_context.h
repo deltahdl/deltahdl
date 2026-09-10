@@ -16,6 +16,7 @@
 namespace delta {
 
 struct Expr;
+struct RtlirDesign;
 
 class VpiContext {
  public:
@@ -93,12 +94,9 @@ class VpiContext {
   void GetSystfInfo(VpiHandle obj, VpiSystfData* systf_data_p);
 
   // §38.8: report the registration of the simulation-related callback denoted
-  // by `obj` into the application-allocated structure `cb_data_p`. The
-  // structure's memory belongs to the caller; this routine only writes the
-  // stored s_cb_data fields into it - it never allocates that storage. A null
-  // destination, a null handle, or a handle that does not name a registered
-  // simulation callback leaves the destination untouched. (Use GetSystfInfo for
-  // a system task/function callback instead.)
+  // by `obj` into the application-allocated structure `cb_data_p`, which
+  // belongs to the caller. What leaves it untouched is written where this is
+  // defined; a system task/function callback goes to GetSystfInfo instead.
   void GetCbInfo(VpiHandle obj, VpiCbData* cb_data_p);
 
   // §38.13: write the relevant simulation time into the application-allocated
@@ -740,10 +738,12 @@ class VpiContext {
   VpiHandle DesignObjectForFlatName(std::string_view flat_name);
 
   // §38.10: put the design's module paths within reach as the objects
-  // vpi_get_delays() retrieves delays from, and §38.11: tell each module object
-  // what it is an instance of. Written beside the rest of Attach.
+  // vpi_get_delays() retrieves delays from; §38.11: tell each module object
+  // what it is an instance of; §37.14: give each instance the ports it
+  // declares. Written beside the rest of Attach.
   void AttachModulePathDelays(SimContext& sim_ctx);
   void AttachModuleDefNames(SimContext& sim_ctx);
+  void AttachDesignPorts(const RtlirDesign* design);
 
   // §37.2.2: release one handle plus the handles to every callback placed on
   // the object it names. Building block for the simulation-event release rules.

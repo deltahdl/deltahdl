@@ -3,6 +3,7 @@
 namespace delta {
 
 class SimContext;
+struct RtlirDesign;
 struct VpiObject;
 
 // §36.6: put the design the run has just built within reach of the PLI
@@ -25,7 +26,11 @@ struct VpiObject;
 // a system task or system function registration (§36.9.1) and a simulation
 // callback (§36.9.2), so a run holding neither has nobody to reach the design
 // through this library and is left with the objects it would have had.
-void AttachDesignToPliApplications(SimContext& ctx);
+//
+// `design` is what §37.14's ports are read off: the simulator keys a port's
+// storage under the instance prefix like any other object, but the direction
+// and the order the module declared them in live in the elaborated design.
+void AttachDesignToPliApplications(const RtlirDesign* design, SimContext& ctx);
 
 // §37.43: one subroutine activation, as the frame the VPI reaches. "A frame
 // shall represent any dynamically activated procedural scope, together with its

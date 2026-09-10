@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi.h"
 
@@ -229,6 +230,123 @@ TEST_F(PortContext, NullPortSizeIsZero) {
   sized_port.type = vpiPort;
   sized_port.size = 8;
   EXPECT_EQ(vpi_get(vpiSize, &sized_port), 8);
+}
+
+// -----------------------------------------------------------------------------
+// §37.14 draws a one-to-many relation from an instance to its ports, and every
+// case above builds the ports it then asks about. VpiContext::CreatePort could
+// make one and nothing under src/ called it, so a design's ports were not
+// objects at all: the whole of this model answered for ports a test had built
+// and for none a module declared.
+// -----------------------------------------------------------------------------
+
+// What the application found walking one instance's ports.
+int g_ports_seen = 0;
+std::string g_first_port_name;
+int g_first_port_index = -1;
+int g_first_port_direction = 0;
+int g_wide_port_vector = -1;
+int g_wide_port_size = 0;
+int g_narrow_port_scalar = -1;
+
+int WalkPortsCalltf(const char*) {
+  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+  if (mod == nullptr) return 0;
+  vpiHandle ports = vpi_iterate(vpiPort, mod);
+  if (ports == nullptr) return 0;
+
+  for (vpiHandle port = vpi_scan(ports); port != nullptr;
+       port = vpi_scan(ports)) {
+    ++g_ports_seen;
+    const char* name = vpi_get_str(vpiName, port);
+    if (g_ports_seen == 1) {
+      if (name != nullptr) g_first_port_name = name;
+      g_first_port_index = vpi_get(vpiPortIndex, port);
+      g_first_port_direction = vpi_get(vpiDirection, port);
+    }
+    if (name != nullptr && std::string(name) == "b") {
+      g_wide_port_vector = vpi_get(vpiVector, port);
+      g_wide_port_size = vpi_get(vpiSize, port);
+    }
+    if (name != nullptr && std::string(name) == "c") {
+      g_narrow_port_scalar = vpi_get(vpiScalar, port);
+    }
+  }
+  return 0;
+}
+
+void RegisterPortProbe() {
+  g_ports_seen = 0;
+  g_first_port_name.clear();
+  g_first_port_index = -1;
+  g_first_port_direction = 0;
+  g_wide_port_vector = -1;
+  g_wide_port_size = 0;
+  g_narrow_port_scalar = -1;
+
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = "$probe";
+  data.calltf = &WalkPortsCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+}
+
+// A module declaring three ports of two widths and two directions,
+// instantiated so the application has an instance to walk from.
+void RunAModuleOfThreePorts(SimFixture& f) {
+  auto* design = ElaborateSrc(
+      "module m(input a, input [7:0] b, output c);\n"
+      "  assign c = a;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  wire p;\n"
+      "  wire [7:0] q;\n"
+      "  wire r;\n"
+      "  m m1(p, q, r);\n"
+      "  initial $probe;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+}
+
+class PortModelInARun : public ::testing::Test {
+ protected:
+  void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
+  void TearDown() override { SetGlobalVpiContext(nullptr); }
+
+  VpiContext vpi_ctx_;
+};
+
+TEST_F(PortModelInARun, AnInstanceReachesThePortsItDeclares) {
+  RegisterPortProbe();
+
+  SimFixture f;
+  RunAModuleOfThreePorts(f);
+
+  EXPECT_EQ(g_ports_seen, 3);
+  // §37.14 detail 9: "vpiPortIndex can be used to determine the port order. The
+  // first port has a port index of zero", and detail 8 has a named port report
+  // the name it was given.
+  EXPECT_EQ(g_first_port_name, "a");
+  EXPECT_EQ(g_first_port_index, 0);
+  EXPECT_EQ(g_first_port_direction, vpiInput);
+}
+
+TEST_F(PortModelInARun, ThePortsWidthDecidesScalarAndVector) {
+  RegisterPortProbe();
+
+  SimFixture f;
+  RunAModuleOfThreePorts(f);
+
+  // §37.14 detail 6: "properties vpiScalar and vpiVector shall indicate whether
+  // the port is 1 bit or more than 1 bit. They shall not indicate anything
+  // about what is connected to the port." Both ports here are connected to a
+  // net of their own width, so what separates them is the declaration.
+  ASSERT_EQ(g_ports_seen, 3);
+  EXPECT_EQ(g_wide_port_size, 8);
+  EXPECT_EQ(g_wide_port_vector, 1);
+  EXPECT_EQ(g_narrow_port_scalar, 1);
 }
 
 }  // namespace

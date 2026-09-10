@@ -3,8 +3,10 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
+#include "elaborator/rtlir.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
@@ -157,6 +159,59 @@ VpiActiveFrameScope::~VpiActiveFrameScope() {
   GetGlobalVpiContext().RestoreActiveFrame(outer_);
 }
 
+void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
+  // §37.14: the ports a module instance declares, as the objects the diagram's
+  // one-to-many instance-to-port relation reaches. VpiContext::CreatePort could
+  // make one and nothing under src/ called it, so a design's ports were not
+  // objects at all and the whole of §37.14 answered only for ports a test built
+  // itself.
+  if (design == nullptr) return;
+
+  // The instance paths, walked outward from each top. A top module carries the
+  // empty prefix and has no module object over it to hang ports from, the same
+  // boundary the module paths meet.
+  std::vector<std::pair<const RtlirModule*, std::string>> work;
+  for (auto* top : design->top_modules) work.emplace_back(top, std::string());
+
+  while (!work.empty()) {
+    auto [mod, prefix] = work.back();
+    work.pop_back();
+    if (mod == nullptr) continue;
+
+    for (const auto& child : mod->children) {
+      std::string child_prefix = prefix;
+      if (!child_prefix.empty()) child_prefix += '.';
+      child_prefix += std::string(child.inst_name);
+      work.emplace_back(child.resolved, child_prefix);
+    }
+    if (prefix.empty()) continue;
+
+    VpiHandle module = DesignObjectForFlatName(prefix);
+    if (module == nullptr) continue;
+
+    int index = 0;
+    for (const auto& port : mod->ports) {
+      auto* obj = AllocObject();
+      obj->type = kVpiPort;
+      name_pool_.emplace_back(port.name);
+      obj->name = name_pool_.back();
+      // §37.14 detail 9: "vpiPortIndex can be used to determine the port
+      // order. The first port has a port index of zero."
+      obj->index = index++;
+      // §37.14 detail 6: "properties vpiScalar and vpiVector shall indicate
+      // whether the port is 1 bit or more than 1 bit", which is the width it
+      // was declared with rather than anything about what is connected to it.
+      obj->size = static_cast<int>(port.width);
+      obj->direction = port.direction == Direction::kInput    ? kVpiInput
+                       : port.direction == Direction::kOutput ? kVpiOutput
+                       : port.direction == Direction::kInout  ? kVpiInout
+                                                              : 0;
+      obj->parent = module;
+      module->children.push_back(obj);
+    }
+  }
+}
+
 void VpiContext::AttachModuleDefNames(SimContext& sim_ctx) {
   // §38.11's example is what a definition name is for: vpi_handle_by_name
   // reaches an instance and vpi_get_str(vpiDefName, mod) says what it is an
@@ -266,7 +321,7 @@ void VpiContext::Attach(SimContext& sim_ctx) {
   }
 }
 
-void AttachDesignToPliApplications(SimContext& ctx) {
+void AttachDesignToPliApplications(const RtlirDesign* design, SimContext& ctx) {
   VpiContext& vpi = GetGlobalVpiContext();
   // §36.9's two registrations are what a PLI application has become part of
   // this tool by, so between them they say whether the run holds one at all.
@@ -276,6 +331,7 @@ void AttachDesignToPliApplications(SimContext& ctx) {
     return;
   }
   vpi.Attach(ctx);
+  vpi.AttachDesignPorts(design);
 }
 
 }  // namespace delta
