@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_simulator.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi.h"
@@ -96,6 +99,108 @@ TEST_F(VpiIterateSim, IterateNoMatchingObjectsReturnsNull) {
   vpi_ctx_.CreatePort("p0", kVpiInput, mod);
 
   EXPECT_EQ(vpi_iterate(vpiParameter, mod), nullptr);
+}
+
+// -----------------------------------------------------------------------------
+// §38.23's own worked example. The clause ends with an application that walks
+// a module's nets -- "the following example application uses vpi_iterate() and
+// vpi_scan() to display each net (including the size for vectors) declared in
+// the module" -- built out of vpi_iterate(vpiNet, mod), vpi_scan, vpiName and
+// vpiSize.
+//
+// Every case above hands vpi_iterate objects it made itself, which says what
+// the routine does with an object and nothing about a design having one. These
+// run the example against a design.
+// -----------------------------------------------------------------------------
+
+// What the application found. A calltf is a plain C function with no return
+// path to the case that provoked it, and vpi_get_str hands back one buffer
+// every call reuses (§38.11), so the names are copied as they are read.
+int g_nets_seen = 0;
+std::string g_first_net_name;
+std::string g_second_net_name;
+int g_widest_net_size = 0;
+
+int DisplayNetsCalltf(const char*) {
+  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+  if (mod == nullptr) return 0;
+  vpiHandle itr = vpi_iterate(vpiNet, mod);
+  if (itr == nullptr) return 0;
+  for (vpiHandle net = vpi_scan(itr); net != nullptr; net = vpi_scan(itr)) {
+    ++g_nets_seen;
+    const char* name = vpi_get_str(vpiName, net);
+    if (name != nullptr) {
+      (g_nets_seen == 1 ? g_first_net_name : g_second_net_name) = name;
+    }
+    int size = vpi_get(vpiSize, net);
+    if (size > g_widest_net_size) g_widest_net_size = size;
+  }
+  return 0;
+}
+
+void RegisterNetProbe() {
+  g_nets_seen = 0;
+  g_first_net_name.clear();
+  g_second_net_name.clear();
+  g_widest_net_size = 0;
+
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = "$probe";
+  data.calltf = &DisplayNetsCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+}
+
+// A module declaring the example's two shapes of net -- a scalar and a vector
+// -- instantiated so the application has a module handle to iterate from.
+void RunAModuleOfTwoNets(SimFixture& f) {
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire w;\n"
+      "  wire [7:0] bus;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  m m1();\n"
+      "  initial $probe;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+}
+
+class VpiIterateInARun : public ::testing::Test {
+ protected:
+  void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
+  void TearDown() override { SetGlobalVpiContext(nullptr); }
+
+  VpiContext vpi_ctx_;
+};
+
+TEST_F(VpiIterateInARun, TheIterationWalksEveryNetTheModuleDeclares) {
+  RegisterNetProbe();
+
+  SimFixture f;
+  RunAModuleOfTwoNets(f);
+
+  // §38.23: "vpi_iterate() shall be used to traverse one-to-many
+  // relationships", and a module to its nets is one of them. Both of the
+  // module's nets are walked, and each answers to the name the source gave it.
+  EXPECT_EQ(g_nets_seen, 2);
+  EXPECT_TRUE(g_first_net_name == "w" || g_second_net_name == "w");
+  EXPECT_TRUE(g_first_net_name == "bus" || g_second_net_name == "bus");
+}
+
+TEST_F(VpiIterateInARun, TheExamplesVectorNetReportsItsSize) {
+  RegisterNetProbe();
+
+  SimFixture f;
+  RunAModuleOfTwoNets(f);
+
+  // The example displays "the size for vectors", read off each net the
+  // iteration handed back. The wider of the two is the eight-bit bus, which is
+  // a size only the net object the design built carries -- one made by hand
+  // carries whatever the case put in it.
+  EXPECT_EQ(g_widest_net_size, 8);
 }
 
 }  // namespace
