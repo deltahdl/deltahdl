@@ -211,6 +211,24 @@ void PushChildInstances(
   }
 }
 
+// Every scope of the design, visited outward from each top module under the
+// flat instance path the simulator keys that scope's objects under. A top
+// carries the empty prefix, having no instantiation over it to be named by.
+template <typename Visit>
+void WalkInstancePaths(const RtlirDesign* design, Visit visit) {
+  std::vector<std::pair<const RtlirModule*, std::string>> work;
+  work.reserve(design->top_modules.size());
+  for (auto* top : design->top_modules) work.emplace_back(top, std::string());
+
+  while (!work.empty()) {
+    auto [mod, prefix] = work.back();
+    work.pop_back();
+    if (mod == nullptr) continue;
+    PushChildInstances(mod, prefix, work);
+    visit(mod, prefix);
+  }
+}
+
 }  // namespace
 
 void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
@@ -221,29 +239,20 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
   // itself.
   if (design == nullptr) return;
 
-  // The instance paths, walked outward from each top. A top module carries the
-  // empty prefix and has no module object over it to hang ports from, the same
-  // boundary the module paths meet.
-  std::vector<std::pair<const RtlirModule*, std::string>> work;
-  work.reserve(design->top_modules.size());
-  for (auto* top : design->top_modules) work.emplace_back(top, std::string());
+  WalkInstancePaths(
+      design, [this](const RtlirModule* mod, const std::string& prefix) {
+        // A top module has no module object over it to hang ports from, the
+        // same boundary the module paths meet.
+        if (prefix.empty()) return;
+        VpiHandle module = DesignObjectForFlatName(prefix);
+        if (module == nullptr) return;
 
-  while (!work.empty()) {
-    auto [mod, prefix] = work.back();
-    work.pop_back();
-    if (mod == nullptr) continue;
-    PushChildInstances(mod, prefix, work);
-    if (prefix.empty()) continue;
-
-    VpiHandle module = DesignObjectForFlatName(prefix);
-    if (module == nullptr) continue;
-
-    module->children.reserve(module->children.size() + mod->ports.size());
-    int index = 0;
-    for (const auto& port : mod->ports) {
-      FillPortObject(AllocObject(), port, index++, module, name_pool_);
-    }
-  }
+        module->children.reserve(module->children.size() + mod->ports.size());
+        int index = 0;
+        for (const auto& port : mod->ports) {
+          FillPortObject(AllocObject(), port, index++, module, name_pool_);
+        }
+      });
 }
 
 namespace {
@@ -329,21 +338,15 @@ void PairScopePortRefs(const std::vector<InterModPortRef>& refs,
 // paths outward from each top the way the ports themselves are.
 void CollectInterModConnections(const RtlirDesign* design,
                                 std::vector<InterModConnection>& out) {
-  std::vector<std::pair<const RtlirModule*, std::string>> work;
-  work.reserve(design->top_modules.size());
-  for (auto* top : design->top_modules) work.emplace_back(top, std::string());
-
-  while (!work.empty()) {
-    auto [mod, prefix] = work.back();
-    work.pop_back();
-    if (mod == nullptr) continue;
-    PushChildInstances(mod, prefix, work);
-    // A path is a connection between two of one scope's instances, so the
-    // scope holding the instantiations is where both its ends are named.
-    std::vector<InterModPortRef> refs;
-    CollectScopePortRefs(mod, prefix, refs);
-    PairScopePortRefs(refs, out);
-  }
+  WalkInstancePaths(design,
+                    [&out](const RtlirModule* mod, const std::string& prefix) {
+                      // A path is a connection between two of one scope's
+                      // instances, so the scope holding the instantiations is
+                      // where both its ends are named.
+                      std::vector<InterModPortRef> refs;
+                      CollectScopePortRefs(mod, prefix, refs);
+                      PairScopePortRefs(refs, out);
+                    });
 }
 
 // The port object one end of a path names, which AttachDesignPorts made. A
