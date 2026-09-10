@@ -126,7 +126,7 @@ VpiHandle VpiContext::RegisterCb(VpiCbData* data) {
 
   const char* placement_error = VpiCheckCallbackPlacement(*data, tool_phase_);
   if (placement_error != nullptr) {
-    last_error_.state = kVpiError;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message = placement_error;
     return nullptr;
@@ -136,7 +136,7 @@ VpiHandle VpiContext::RegisterCb(VpiCbData* data) {
       *data, sim_progressed_into_time_slice_, current_callback_reason_,
       at_read_only_synch_time_);
   if (timing_error != nullptr) {
-    last_error_.state = kVpiError;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message = timing_error;
     return nullptr;

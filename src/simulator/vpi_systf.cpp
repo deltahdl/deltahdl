@@ -47,7 +47,7 @@ VpiHandle VpiContext::RegisterSystf(VpiSystfData* data) {
   // identifier. Refuse a name that fails either part of the rule (a missing or
   // bare "$", or any illegal trailing character).
   if (!VpiSystfNameIsValid(data->tfname)) {
-    last_error_.state = kVpiError;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message =
         "system task or function name must be '$' followed by one or more "
@@ -66,7 +66,7 @@ VpiHandle VpiContext::RegisterSystf(VpiSystfData* data) {
   // file writes and not this one: that is the token LexSystemIdentifier reads,
   // and this is the string a PLI application hands the registration.
   if (std::string_view(data->tfname).size() > kMaxIdentifierLength) {
-    last_error_.state = kVpiError;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     // The message names the rule rather than the number, both because
     // VpiErrorInfo::message is a const char* with nowhere to keep a built
@@ -81,7 +81,7 @@ VpiHandle VpiContext::RegisterSystf(VpiSystfData* data) {
   // or the resolution of references. Once elaboration has begun the window has
   // closed, so reject the registration.
   if (elaboration_started_) {
-    last_error_.state = kVpiError;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message =
         "system task or function registration must precede elaboration";
@@ -513,7 +513,7 @@ void VpiContext::GetDelays(VpiHandle obj, VpiDelay* delay_p) {
   // port. Treat such a request as an error (§38.2) and leave the caller's array
   // alone.
   if (obj->type == vpiPort && !VpiPortDelaysApplicable(obj->port_type)) {
-    last_error_.state = kVpiError;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message =
         "vpi_get_delays(): delays are not applicable to an interface port";
@@ -525,7 +525,7 @@ void VpiContext::GetDelays(VpiHandle obj, VpiDelay* delay_p) {
   // it (§38.2) and leave the caller's array untouched.
   if (!VpiNoOfDelaysLegal(obj->type, delay_p->no_of_delays,
                           obj->delays.size())) {
-    last_error_.state = kVpiError;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message =
         "vpi_get_delays(): the requested number of delays is not legal for "
@@ -560,7 +560,7 @@ void VpiContext::PutDelays(VpiHandle obj, VpiDelay* delay_p) {
   // §37.14 detail 2: the delay routines do not apply to an interface port.
   // Treat such a request as an error (§38.2) and change nothing.
   if (obj->type == vpiPort && !VpiPortDelaysApplicable(obj->port_type)) {
-    last_error_.state = kVpiError;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message =
         "vpi_put_delays(): delays are not applicable to an interface port";
@@ -572,7 +572,7 @@ void VpiContext::PutDelays(VpiHandle obj, VpiDelay* delay_p) {
   // this object is an error; record it (§38.2) and set nothing.
   if (!VpiNoOfDelaysLegal(obj->type, delay_p->no_of_delays,
                           obj->delays.size())) {
-    last_error_.state = kVpiError;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message =
         "vpi_put_delays(): the requested number of delays is not legal for "
@@ -620,7 +620,7 @@ int VpiContext::GetData(int id, char* data_loc, int num_of_bytes) {
   // the routine reports by returning 0.
   if (current_callback_reason_ != kCbStartOfRestart &&
       current_callback_reason_ != kCbEndOfRestart) {
-    last_error_.state = kVpiError;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message =
         "vpi_get_data() may only be called from a cbStartOfRestart or "
@@ -632,7 +632,7 @@ int VpiContext::GetData(int id, char* data_loc, int num_of_bytes) {
   // is a failure - return 0.
   auto it = save_data_.find(id);
   if (data_loc == nullptr || num_of_bytes <= 0 || it == save_data_.end()) {
-    last_error_.state = kVpiError;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message = "vpi_get_data() could not retrieve saved data";
     return 0;
@@ -651,7 +651,7 @@ int VpiContext::GetData(int id, char* data_loc, int num_of_bytes) {
     for (int i = 0; i < kRetrieved; ++i) data_loc[i] = bytes[cursor + i];
     for (int i = kRetrieved; i < num_of_bytes; ++i) data_loc[i] = '\0';
     cursor += kAvailable;
-    last_error_.state = kVpiWarning;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiWarning;
     last_error_.message =
         "vpi_get_data() requested more data than were saved for this id";
@@ -672,7 +672,7 @@ int VpiContext::PutData(int id, const char* data_loc, int num_of_bytes) {
   // routine reports by returning zero bytes written.
   if (current_callback_reason_ != kCbStartOfSave &&
       current_callback_reason_ != kCbEndOfSave) {
-    last_error_.state = kVpiError;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message =
         "vpi_put_data() may only be called from a cbStartOfSave or "
@@ -684,7 +684,7 @@ int VpiContext::PutData(int id, const char* data_loc, int num_of_bytes) {
   // be supplied by the application. Either condition is a detected error, which
   // returns zero bytes written.
   if (data_loc == nullptr || num_of_bytes <= 0) {
-    last_error_.state = kVpiError;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message =
         "vpi_put_data() requires a non-null source and a positive byte count";
@@ -708,7 +708,7 @@ int VpiContext::PutUserData(VpiHandle obj, void* userdata) {
   // (§38.2) and the routine returns 0 with no association made.
   if (obj == nullptr ||
       (obj->type != vpiSysTaskCall && obj->type != vpiSysFuncCall)) {
-    last_error_.state = kVpiError;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message =
         "vpi_put_userdata() requires a system task or system function call "
@@ -729,7 +729,7 @@ void* VpiContext::GetUserData(VpiHandle obj) {
   // routine returns null.
   if (obj == nullptr ||
       (obj->type != vpiSysTaskCall && obj->type != vpiSysFuncCall)) {
-    last_error_.state = kVpiError;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message =
         "vpi_get_userdata() requires a system task or system function call "

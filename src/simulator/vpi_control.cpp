@@ -191,7 +191,7 @@ VpiHandle VpiContext::HandleMulti(int type, VpiHandle ref1, VpiHandle ref2) {
   if (!ref1 && !ref2) return nullptr;
 
   if (InterModPathSizeMismatch(type, ref1, ref2)) {
-    last_error_.state = kVpiError;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message =
         "vpi_handle_multi(): the two ports of an intermodule path must be of "
@@ -550,7 +550,7 @@ bool VpiContext::RoutineIsUnavailableNow(VpiRoutine routine) {
   // phase.
   if (!VpiPhaseRestrictsFunctionality(tool_phase_)) return false;
   if (VpiRoutineAvailableInStartup(routine)) return false;
-  last_error_.state = kVpiError;
+  last_error_.state = kVpiPLI;
   last_error_.level = kVpiError;
   last_error_.message =
       "VPI routine is not available until cbEndOfCompile; only "

@@ -188,6 +188,18 @@ constexpr int kVpiError = 3;
 constexpr int kVpiSystem = 4;
 constexpr int kVpiInternal = 5;
 
+// §38.2 (Figure 38-1): the s_vpi_error_info state field, "vpi[Compile,PLI,Run]"
+// -- what the tool was doing when the error occurred, and not how bad it was.
+// The severity is the level field above, and the two are numbered
+// independently, so a state carrying a level's constant reads as one of these
+// three by accident: kVpiError is the value vpiRun has and kVpiWarning the
+// value vpiPLI has. An error a VPI routine itself raises is kVpiPLI, that being
+// what the routine was doing; kVpiCompile and kVpiRun name the other two
+// activities an error can arise in.
+constexpr int kVpiCompile = 1;
+constexpr int kVpiPLI = 2;
+constexpr int kVpiRun = 3;
+
 // §38.10: one delay element carried by a delay-bearing object (a primitive, a
 // module path, a timing check, or an intermodule path). `delay` is the plain
 // value reported when min:typ:max is not requested; the min/typ/max triples

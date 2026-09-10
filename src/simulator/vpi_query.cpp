@@ -519,7 +519,7 @@ int VpiContext::Get(int property, VpiHandle obj) {
   // shall still permit access to vpiSize, so that property passes through too
   // when the object is one of the expr-class kinds.
   if (VpiGetProtectedRefused(property, obj)) {
-    last_error_.state = kVpiError;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message = "vpi_get() on a protected object is an error";
     return vpiUndefined;
@@ -533,7 +533,7 @@ int VpiContext::Get(int property, VpiHandle obj) {
   // records the error and returns vpiUndefined, the value vpi_get() yields on
   // error.
   if (obj->property_needs_side_effect_eval && property != kVpiType) {
-    last_error_.state = kVpiError;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message =
         "vpi_get(): this property cannot be determined without evaluating an "
@@ -566,7 +566,7 @@ PLI_INT64 VpiContext::Get64(int property, VpiHandle obj) {
   // the carve-outs vpi_get() applies (§37.3.6, §37.59).
   if (obj->is_protected && property != kVpiType && property != vpiIsProtected &&
       (property != kVpiSize || !VpiIsExprType(obj->type))) {
-    last_error_.state = kVpiError;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message = "vpi_get64() on a protected object is an error";
     return vpiUndefined;
@@ -597,7 +597,7 @@ int VpiContext::FreeObject(VpiHandle obj) {
   // as deprecated - pointing the program at the replacement - and performs no
   // release, reporting failure.
   (void)obj;
-  last_error_.state = kVpiWarning;
+  last_error_.state = kVpiPLI;
   last_error_.level = kVpiWarning;
   last_error_.message =
       "vpi_free_object() is deprecated; use vpi_release_handle() instead";

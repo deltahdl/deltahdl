@@ -121,5 +121,49 @@ TEST_F(VpiErrorCheckSim, ChkErrorDoesNotResetErrorStatus) {
   EXPECT_EQ(info.level, vpiError);
 }
 
+// §38.2 (Figure 38-1): the s_vpi_error_info structure carries a state beside
+// the level, "vpi[Compile,PLI,Run]", and what it names is what the tool was
+// doing when the error arose rather than how severe the error was. That is the
+// level's job, and the two fields are numbered independently: an error the
+// registration routine refused a name with had its state set to the level's own
+// constant, which reads as vpiRun -- the tool executing the simulation -- for
+// an error raised inside a VPI routine before the simulation started.
+TEST_F(VpiErrorCheckSim, TheStateNamesTheActivityAndTheLevelTheSeverity) {
+  RaiseError();
+
+  SVpiErrorInfo info = {};
+  ASSERT_EQ(vpi_chk_error(&info), vpiError);
+
+  // The routine itself is what raised this, so the activity is the PLI.
+  EXPECT_EQ(info.state, vpiPLI);
+  EXPECT_EQ(info.level, vpiError);
+  // And the two fields do not carry one value between them.
+  EXPECT_NE(info.state, info.level);
+}
+
+// §38.2: the state does not move with the severity. A routine that records a
+// warning rather than an error was doing the same thing when it did so, so the
+// state reads the same and only the level differs. vpi_free_object() is the
+// warning to hand: Annex C.2.4 deprecated it, and the call records that.
+TEST_F(VpiErrorCheckSim, TheStateIsTheSameWhateverTheSeverity) {
+  vpi_free_object(nullptr);
+
+  SVpiErrorInfo info = {};
+  ASSERT_EQ(vpi_chk_error(&info), vpiWarning);
+
+  EXPECT_EQ(info.state, vpiPLI);
+  EXPECT_EQ(info.level, vpiWarning);
+}
+
+// §38.2 (Figure 38-1): the three states the field is drawn from. They are their
+// own set of constants, listed in Annex K beside the severity levels rather
+// than among them, and the overlap in value with vpiNotice, vpiWarning and
+// vpiError is what makes a state written with a level's constant invisible.
+TEST_F(VpiErrorCheckSim, TheStateConstantsAreTheThreeTheFigureNames) {
+  EXPECT_EQ(vpiCompile, 1);
+  EXPECT_EQ(vpiPLI, 2);
+  EXPECT_EQ(vpiRun, 3);
+}
+
 }  // namespace
 }  // namespace delta

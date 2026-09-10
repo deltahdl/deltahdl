@@ -264,7 +264,7 @@ bool VpiExpressionHasSideEffects(const VpiObject* obj) {
 }
 
 static void RecordVpiError(VpiErrorInfo& error, const char* message) {
-  error.state = kVpiError;
+  error.state = kVpiPLI;
   error.level = kVpiError;
   error.message = message;
 }

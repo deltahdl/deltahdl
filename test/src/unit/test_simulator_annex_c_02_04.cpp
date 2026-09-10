@@ -44,7 +44,7 @@ TEST_F(VpiFreeObjectDeprecated, RecordsADeprecationDiagnostic) {
   vpi_free_object(&obj);
 
   const VpiErrorInfo& err = vpi_ctx_.LastError();
-  EXPECT_EQ(err.state, kVpiWarning);
+  EXPECT_EQ(err.level, kVpiWarning);
   ASSERT_NE(err.message, nullptr);
   EXPECT_NE(std::string(err.message).find("vpi_release_handle"),
             std::string::npos);
@@ -75,7 +75,7 @@ TEST_F(VpiFreeObjectDeprecated, DeprecationAppliesEvenToANullHandle) {
   EXPECT_EQ(vpi_free_object(nullptr), 0);
 
   const VpiErrorInfo& err = vpi_ctx_.LastError();
-  EXPECT_EQ(err.state, kVpiWarning);
+  EXPECT_EQ(err.level, kVpiWarning);
   ASSERT_NE(err.message, nullptr);
   EXPECT_NE(std::string(err.message).find("vpi_release_handle"),
             std::string::npos);

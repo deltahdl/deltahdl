@@ -384,7 +384,7 @@ const char* VpiContext::GetStrRaw(int property, VpiHandle obj) {
   // so they fall through; any other property records the error and yields no
   // string.
   if (obj->is_protected && property != kVpiType && property != vpiIsProtected) {
-    last_error_.state = kVpiError;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message = "vpi_get_str() on a protected object is an error";
     return nullptr;

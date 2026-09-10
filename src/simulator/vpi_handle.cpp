@@ -22,7 +22,7 @@ namespace {
 // Records a VPI error (state, level, and message) on the supplied error slot,
 // matching the §38.2 convention used throughout the handle-resolution routines.
 void SetVpiHandleError(VpiErrorInfo& err, const char* message) {
-  err.state = kVpiError;
+  err.state = kVpiPLI;
   err.level = kVpiError;
   err.message = message;
 }

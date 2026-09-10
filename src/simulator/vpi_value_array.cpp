@@ -556,7 +556,7 @@ void VpiContext::GetValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p,
   // overwritten to NULL). Setting the rawvals arm clears the whole union, since
   // every arm aliases the same storage.
   auto fail = [&](const char* msg) {
-    last_error_.state = kVpiError;
+    last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message = msg;
     arrayvalue_p->value.rawvals = nullptr;
