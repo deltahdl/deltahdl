@@ -788,6 +788,20 @@ VpiHandle VpiContext::Scan(VpiHandle iterator) {
   // handing back the next one on each call so the traversal advances one object
   // at a time. A null handle has nothing to traverse.
   if (!iterator) return nullptr;
+  // §38.40 Arguments: the one handle this routine takes is a "handle to an
+  // iterator object returned from vpi_iterate()", and §38.23 makes that handle
+  // an object of type vpiIterator. Any other object directs no traversal, so
+  // walking its children hands an application objects out of a call the clause
+  // gives no meaning to -- and retiring it at the end of that walk destroys an
+  // object the context owns and goes on owning. It is refused instead, with the
+  // §38.2 error an application reads through vpi_chk_error().
+  if (iterator->type != vpiIterator) {
+    last_error_.state = kVpiPLI;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_scan(): the handle is not an iterator returned from vpi_iterate()";
+    return nullptr;
+  }
   // §38.40: when the objects are exhausted there is nothing more to return.
   // Reporting NULL also retires the iterator handle - it is no longer valid and
   // must not be used again - so the storage is released here.
