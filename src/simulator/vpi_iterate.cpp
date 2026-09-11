@@ -625,7 +625,13 @@ void CollectMatchingChildren(int type, VpiHandle ref,
 // threads are drawn from a circle too and are answered ahead of this out of
 // their own registries.
 bool VpiIsNullReferenceRelation(int type) {
-  return type == kVpiModule || type == vpiCallback || type == vpiAssertion;
+  // §37.36 (figure) draws the udp defn from a circle too: a UDP definition
+  // belongs to no scope, so the application reaches the design's definitions
+  // with a NULL reference object. The relation was not among these, so an
+  // iteration over them was a walk of the reference object's children and a
+  // NULL reference reached nothing.
+  return type == kVpiModule || type == vpiCallback || type == vpiAssertion ||
+         type == vpiUdpDefn;
 }
 
 // §37.57 detail 1: whether the instantiation left this argument position empty.

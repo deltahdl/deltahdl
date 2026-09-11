@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <deque>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -10,6 +11,10 @@
 #include "simulator/vpi_object.h"
 
 namespace delta {
+
+struct RtlirDesign;
+struct UdpDecl;
+struct UdpTableRow;
 
 // ===========================================================================
 // §37.28 Parameter, spec param, def param, param assign. The VPI object model
@@ -601,4 +606,29 @@ VpiHandle VpiInstanceArrayLeftRange(const std::vector<VpiArrayDimension>& dims);
 // VpiInstanceArrayLeftRange.
 VpiHandle VpiInstanceArrayRightRange(
     const std::vector<VpiArrayDimension>& dims);
+
+// ===========================================================================
+// §37.36 UDP. The clause draws a "udp defn" from a circle - an object reached
+// with a NULL reference object rather than through a scope - carrying the
+// declaration's name, its input count, its primitive type, and the table
+// entries of its rows. These build that object out of the design.
+// ===========================================================================
+
+// §37.36 (figure): the UDP declarations a design instantiates, each named once.
+// A declaration reaches elaboration on the instances of it, so the distinct
+// declarations behind those instances are what the definitions are made from.
+std::vector<const UdpDecl*> VpiDesignUdpDecls(const RtlirDesign* design);
+
+// §37.36 (figure): fill in a udp defn. Its properties are the declaration's own
+// - the name it reports through vpiDefName, how many inputs it takes (vpiSize),
+// and detail 2's vpiPrimType, vpiSeqPrim for a sequential UDP and vpiCombPrim
+// for a combinational one.
+void VpiFillUdpDefnObject(VpiObject* obj, const UdpDecl& decl,
+                          std::deque<std::string>& names);
+
+// §37.36 (figure): fill in one of the udp defn's table entries, which reports
+// how many symbol entries its row holds through vpiSize.
+void VpiFillUdpTableEntryObject(VpiObject* obj, const UdpTableRow& row,
+                                VpiObject* defn);
+
 }  // namespace delta

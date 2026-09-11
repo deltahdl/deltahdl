@@ -13,6 +13,7 @@
 #include "common/source_mgr.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_specify.h"
 #include "parser/ast_type.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
@@ -780,6 +781,18 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   // §37.23: the scope a nettype declaration hangs in is the one the top has
   // just adopted, so the declarations are made once those scopes are final.
   AttachNettypeDeclarations(design);
+
+  // §37.36 (figure): the UDP definitions of the design. A udp defn is drawn
+  // from a circle, so it belongs to no scope and is reached with a NULL
+  // reference object; nothing built one, so every property and relation the
+  // figure draws on it answered for no design at all.
+  for (const UdpDecl* decl : VpiDesignUdpDecls(design)) {
+    auto* defn = AllocObject();
+    VpiFillUdpDefnObject(defn, *decl, name_pool_);
+    for (const UdpTableRow& row : decl->table) {
+      VpiFillUdpTableEntryObject(AllocObject(), row, defn);
+    }
+  }
 }
 
 namespace {

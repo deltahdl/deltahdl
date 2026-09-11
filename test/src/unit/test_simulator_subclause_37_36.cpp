@@ -7,9 +7,11 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
+#include "fixture_simulator.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi.h"
 
 namespace delta {
@@ -231,6 +233,81 @@ TEST_F(UdpModel, TableEntryValueRejectsStringLikeAndNumericFormats) {
     SVpiErrorInfo info = {};
     EXPECT_EQ(vpi_chk_error(&info), vpiError) << "format " << format;
   }
+}
+
+// What the application found. A calltf is a plain C function with no return
+// path to the case that provoked it.
+int g_udp_defns = 0;
+std::string g_udp_def_name;
+int g_udp_inputs = 0;
+int g_udp_prim_type = 0;
+int g_udp_table_entries = 0;
+
+int ProbeUdpDefnsCalltf(const char*) {
+  // §37.4.3: the udp defn is drawn from a circle, so the iteration that reaches
+  // the design's definitions is traversed with NULL for the ref_h.
+  vpiHandle itr = vpi_iterate(vpiUdpDefn, nullptr);
+  if (itr == nullptr) return 0;
+  while (vpiHandle defn = vpi_scan(itr)) {
+    ++g_udp_defns;
+    if (const char* name = vpi_get_str(vpiDefName, defn)) {
+      g_udp_def_name = name;
+    }
+    g_udp_inputs = vpi_get(vpiSize, defn);
+    g_udp_prim_type = vpi_get(vpiPrimType, defn);
+    if (vpiHandle rows = vpi_iterate(vpiTableEntry, defn)) {
+      while (vpi_scan(rows) != nullptr) ++g_udp_table_entries;
+    }
+  }
+  return 0;
+}
+
+// §37.36 against a design. Every property and relation the figure draws is
+// drawn on a udp defn, and no pass built one, so the clause answered for no
+// design at all: the circle iteration that is how an application reaches a
+// design's UDP definitions returned none of them.
+TEST(UdpDesign, ADesignsUdpDeclarationIsAUdpDefnObject) {
+  VpiContext vpi_ctx;
+  SetGlobalVpiContext(&vpi_ctx);
+  g_udp_defns = 0;
+  g_udp_def_name.clear();
+  g_udp_inputs = 0;
+  g_udp_prim_type = 0;
+  g_udp_table_entries = 0;
+
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = "$probe";
+  data.calltf = &ProbeUdpDefnsCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "primitive my_and(o, a, b);\n"
+      "  output o;\n"
+      "  input a, b;\n"
+      "  table\n"
+      "    0 ? : 0;\n"
+      "    ? 0 : 0;\n"
+      "    1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module t;\n"
+      "  wire o;\n"
+      "  my_and u1(o, 1'b1, 1'b0);\n"
+      "  initial $probe;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  EXPECT_EQ(g_udp_defns, 1);
+  EXPECT_EQ(g_udp_def_name, "my_and");
+  // The figure's "number of inputs" property.
+  EXPECT_EQ(g_udp_inputs, 2);
+  // Detail 2: a UDP with no state is combinational.
+  EXPECT_EQ(g_udp_prim_type, vpiCombPrim);
+  EXPECT_EQ(g_udp_table_entries, 3);
 }
 
 }  // namespace

@@ -1,13 +1,17 @@
+#include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstdarg>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <deque>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include "elaborator/rtlir.h"
+#include "parser/ast_specify.h"
 #include "simulator/vpi.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
@@ -166,6 +170,54 @@ int VpiSmallestTimePrecision(const std::vector<int>& precisions) {
     if (precision < smallest) smallest = precision;
   }
   return smallest;
+}
+
+// ===========================================================================
+// §37.36 UDP.
+// ===========================================================================
+
+std::vector<const UdpDecl*> VpiDesignUdpDecls(const RtlirDesign* design) {
+  std::vector<const UdpDecl*> decls;
+  if (design == nullptr) return decls;
+
+  std::vector<const RtlirModule*> work(design->top_modules.begin(),
+                                       design->top_modules.end());
+  while (!work.empty()) {
+    const RtlirModule* mod = work.back();
+    work.pop_back();
+    if (mod == nullptr) continue;
+    for (const auto& child : mod->children) work.push_back(child.resolved);
+    for (const RtlirUdpInst& inst : mod->udp_insts) {
+      if (inst.decl == nullptr) continue;
+      if (std::find(decls.begin(), decls.end(), inst.decl) == decls.end()) {
+        decls.push_back(inst.decl);
+      }
+    }
+  }
+  return decls;
+}
+
+void VpiFillUdpDefnObject(VpiObject* obj, const UdpDecl& decl,
+                          std::deque<std::string>& names) {
+  obj->type = vpiUdpDefn;
+  names.emplace_back(decl.name);
+  obj->name = names.back();
+  obj->def_name = std::string(decl.name);
+  obj->size = static_cast<int>(decl.input_names.size());
+  // §37.36 detail 2: "vpiPrimType returns vpiSeqPrim for sequential UDPs and
+  // vpiCombPrim for combinational UDPs."
+  obj->prim_type = decl.is_sequential ? vpiSeqPrim : vpiCombPrim;
+}
+
+void VpiFillUdpTableEntryObject(VpiObject* obj, const UdpTableRow& row,
+                                VpiObject* defn) {
+  obj->type = vpiTableEntry;
+  // The symbol entries of a row are the input symbols it matches on, the
+  // current state a sequential row carries, and the output symbol it names.
+  obj->size = static_cast<int>(row.inputs.size()) +
+              (row.current_state != 0 ? 1 : 0) + 1;
+  obj->parent = defn;
+  defn->children.push_back(obj);
 }
 
 }  // namespace delta
