@@ -272,6 +272,27 @@ void FillPortObject(VpiObject* obj, const RtlirPort& port, int index,
   module->children.push_back(obj);
 }
 
+// §37.24 (figure): the interconnect net a port declared with the `interconnect`
+// keyword stands for. §37.24's whole model is about these objects and no pass
+// made one, so a design declaring a generic interconnect port had no
+// interconnect net at all: the vpiElement and vpiMember rules of detail 1 and
+// the dimension-at-a-time walk of detail 2 ran only over objects a test built.
+//
+// The net is hung in the instance the port belongs to and is the port's
+// §37.14 vpiLowConn - the connection inside the instance - which is what an
+// application walking in from the port reaches.
+void FillInterconnectNetObject(VpiObject* obj, const RtlirPort& port,
+                               VpiObject* port_obj, VpiHandle module,
+                               std::deque<std::string>& names) {
+  obj->type = vpiInterconnectNet;
+  names.emplace_back(port.name);
+  obj->name = names.back();
+  obj->size = static_cast<int>(port.width);
+  obj->parent = module;
+  module->children.push_back(obj);
+  port_obj->low_conn = obj;
+}
+
 // The instances `mod` holds, pushed onto the walk under their own paths. An
 // instance's path is its parent's with its name on the end, which is the string
 // the simulator keys every object of that instance under.
@@ -416,25 +437,28 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
   // itself.
   if (design == nullptr) return;
 
-  WalkInstancePaths(
-      design, [this](const RtlirModule* mod, const std::string& prefix) {
-        // A top module has no module object over it to hang ports from, the
-        // same boundary the module paths meet.
-        if (prefix.empty()) return;
-        VpiHandle module = DesignObjectForFlatName(prefix);
-        if (module == nullptr) return;
+  WalkInstancePaths(design, [this](const RtlirModule* mod,
+                                   const std::string& prefix) {
+    // A top module has no module object over it to hang ports from, the
+    // same boundary the module paths meet.
+    if (prefix.empty()) return;
+    VpiHandle module = DesignObjectForFlatName(prefix);
+    if (module == nullptr) return;
 
-        module->children.reserve(module->children.size() + mod->ports.size());
-        int index = 0;
-        const SourceManager* sources = SourcesOf(sim_ctx_);
-        for (const auto& port : mod->ports) {
-          auto* obj = AllocObject();
-          FillPortObject(obj, port, index++, module, name_pool_);
-          // §37.3.3: a port is written in the source text, so its object stands
-          // where the declaration does and reports it.
-          RecordSourceLocation(obj, port.loc, sources);
-        }
-      });
+    module->children.reserve(module->children.size() + mod->ports.size());
+    int index = 0;
+    const SourceManager* sources = SourcesOf(sim_ctx_);
+    for (const auto& port : mod->ports) {
+      auto* obj = AllocObject();
+      FillPortObject(obj, port, index++, module, name_pool_);
+      // §37.3.3: a port is written in the source text, so its object stands
+      // where the declaration does and reports it.
+      RecordSourceLocation(obj, port.loc, sources);
+      if (port.is_interconnect) {
+        FillInterconnectNetObject(AllocObject(), port, obj, module, name_pool_);
+      }
+    }
+  });
 }
 
 namespace {

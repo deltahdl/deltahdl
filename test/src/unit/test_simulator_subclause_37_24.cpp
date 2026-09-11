@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi.h"
 
@@ -192,6 +194,75 @@ TEST(GenericInterconnectModel, NetSubobjectIterationEmptyWhenNoTypespec) {
 
   EXPECT_EQ(ctx.Iterate(vpiElement, &net), nullptr);
   EXPECT_EQ(ctx.Iterate(vpiMember, &net), nullptr);
+}
+
+// What the application found. A calltf is a plain C function with no return
+// path to the case that provoked it.
+int g_interconnect_nets = 0;
+std::string g_interconnect_net_name;
+bool g_reached_from_the_port = false;
+
+int ProbeInterconnectCalltf(const char*) {
+  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+  if (mod == nullptr) return 0;
+
+  vpiHandle itr = vpi_iterate(vpiInterconnectNet, mod);
+  if (itr != nullptr) {
+    while (vpiHandle net = vpi_scan(itr)) {
+      ++g_interconnect_nets;
+      if (const char* name = vpi_get_str(vpiName, net)) {
+        g_interconnect_net_name = name;
+      }
+    }
+  }
+
+  // §37.14 detail 10: the connection inside the instance. For a generic
+  // interconnect port that is the interconnect net the port stands for.
+  vpiHandle port = vpi_handle_by_name("m1.ic", nullptr);
+  if (port == nullptr) {
+    vpiHandle ports = vpi_iterate(vpiPort, mod);
+    port = ports == nullptr ? nullptr : vpi_scan(ports);
+  }
+  if (port != nullptr) {
+    vpiHandle low = vpi_handle(vpiLowConn, port);
+    g_reached_from_the_port =
+        low != nullptr && vpi_get(vpiType, low) == vpiInterconnectNet;
+  }
+  return 0;
+}
+
+// §37.24 against a design. The subclause's model is about interconnect objects
+// and no pass built one, so a design declaring a generic interconnect port had
+// no interconnect net at all and every rule of the clause stood over objects a
+// test had made for itself.
+TEST(GenericInterconnectDesign, AnInterconnectPortStandsUpAnInterconnectNet) {
+  VpiContext vpi_ctx;
+  SetGlobalVpiContext(&vpi_ctx);
+  g_interconnect_nets = 0;
+  g_interconnect_net_name.clear();
+  g_reached_from_the_port = false;
+
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = "$probe";
+  data.calltf = &ProbeInterconnectCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m(interconnect ic);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  m m1();\n"
+      "  initial $probe;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  EXPECT_EQ(g_interconnect_nets, 1);
+  EXPECT_EQ(g_interconnect_net_name, "ic");
+  EXPECT_TRUE(g_reached_from_the_port);
 }
 
 }  // namespace
