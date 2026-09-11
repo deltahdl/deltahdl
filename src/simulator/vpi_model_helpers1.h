@@ -747,6 +747,22 @@ bool VpiIsWaitType(int type);
 // §37.66, which leaves a wait's condition to this helper.
 VpiHandle VpiWaitConditionExpr(VpiHandle wait);
 
+// §37.67 Waits: the else action statement an ordered wait reaches through
+// vpiElseStmt. §9.4.4 gives a wait_order the action block "[ statement_or_null
+// ] [ else statement_or_null ]", so the else is the second statement the object
+// carries; the first is the body the vpiStmt edge reaches. Null for an ordered
+// wait written without an else, and for every other kind - a plain wait and a
+// wait fork have no else action to name.
+VpiHandle VpiOrderedWaitElseStmt(VpiHandle wait);
+
+// §37.47 (figure): whether an object kind is one of the two the clause's
+// unnamed dotted enclosure holds - a continuous assignment and a continuous
+// assignment bit. §37.4.1 makes an unnamed enclosure a grouping of what is
+// drawn inside it that "shall not be referenced as a group elsewhere", so the
+// vpiLhs, vpiRhs and vpiDelay edges drawn on it belong to both of them and
+// this is what says which those are.
+bool VpiIsContAssignKind(int type);
+
 // §37.69 Repeat control: the count expression a repeat control reaches through
 // its unlabeled edge to an expr (the vpiExpr relation) - the number of triggers
 // of the intra-assignment repeat event control "repeat (n) @(event)". The

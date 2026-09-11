@@ -293,6 +293,34 @@ VpiHandle VpiWaitConditionExpr(VpiHandle wait) {
   return nullptr;
 }
 
+// §37.47 (figure): the dotted enclosure holding `cont assign` and `cont assign
+// bit` carries no name, and §37.4.1 makes such an enclosure a grouping of the
+// objects drawn inside it that "shall not be referenced as a group elsewhere".
+// So what it groups is answered here rather than published as a class, and the
+// vpiLhs, vpiRhs and vpiDelay edges drawn on it belong to both of them.
+bool VpiIsContAssignKind(int type) {
+  return type == vpiContAssign || type == vpiContAssignBit;
+}
+
+// §37.67 (figure): the else action statement an ordered wait reaches through
+// vpiElseStmt. §9.4.4 writes a wait_order's action block as "[
+// statement_or_null ] [ else statement_or_null ]", so the else is the second of
+// the two statements the object carries and the first is the body vpiStmt
+// reaches. vpiElseStmt is a relation tag rather than an object kind, so the
+// walk that looks for a child whose own type is the tag found the else action
+// of no ordered wait a design could hold; the statements are told apart by
+// their position instead, which is how §37.55 tells an assertion's pass action
+// from its fail action.
+VpiHandle VpiOrderedWaitElseStmt(VpiHandle wait) {
+  if (!wait || wait->type != vpiOrderedWait) return nullptr;
+  int seen = 0;
+  for (auto* child : wait->children) {
+    if (!VpiIsScopeBodyStmtType(child->type)) continue;
+    if (++seen == 2) return child;
+  }
+  return nullptr;
+}
+
 VpiHandle VpiRepeatControlExpr(VpiHandle repeat_control) {
   // §37.69: a repeat control reaches its count expression through the diagram's
   // unlabeled edge to an expr - the vpiExpr relation. The count is the

@@ -237,6 +237,11 @@ bool VpiImmediateAssertionHasElseStmt(int type) {
   return type == vpiImmediateAssert || type == vpiImmediateAssume;
 }
 
+// §37.55 (figure): an immediate assert, assume or cover reaches the expression
+// it asserts through vpiExpr, its pass action through vpiStmt, and - for the
+// assert and assume boxes - its else action through vpiElseStmt. The three were
+// computed by helpers no dispatch called, so every edge of the subclause's
+// figure reached nothing through the public routine.
 VpiHandle VpiImmediateAssertionExpr(VpiHandle assertion) {
   // §37.55: the asserted expression, reached through vpiExpr and modeled as the
   // assertion's first expression child. Null when none is attached.

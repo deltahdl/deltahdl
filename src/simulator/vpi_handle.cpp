@@ -583,7 +583,11 @@ bool TryResolveTypespecClassRelation(int type, VpiHandle ref, VpiHandle& out) {
 // the process arm already asks for.
 bool TryResolveBodyStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type != vpiStmt) return false;
-  if (!VpiIsProcessType(ref->type) && !VpiIsWhileOrRepeatType(ref->type)) {
+  // §37.67 draws the same untagged arrow from the `waits` enclosure, so a wait,
+  // an ordered wait and a wait fork reach a body by the relation a process and
+  // a loop reach one by.
+  if (!VpiIsProcessType(ref->type) && !VpiIsWhileOrRepeatType(ref->type) &&
+      !VpiIsWaitType(ref->type)) {
     return false;
   }
   for (auto* child : ref->children) {
@@ -618,15 +622,6 @@ bool TryResolvePatternRelation(int type, VpiHandle ref, VpiHandle& out) {
 
 // §37.79/§37.76: the lhs/rhs of the procedural continuous assignment family
 // (assign/force/deassign/release) and of alias statements.
-// §37.47 (figure): the dotted enclosure holding `cont assign` and `cont assign
-// bit` carries no name, and §37.4.1 makes such an enclosure a grouping of the
-// objects drawn inside it that "shall not be referenced as a group elsewhere".
-// So what it groups is answered here rather than published as a class, and the
-// vpiLhs, vpiRhs and vpiDelay edges drawn on it belong to both of them.
-bool VpiIsContAssignKind(int type) {
-  return type == vpiContAssign || type == vpiContAssignBit;
-}
-
 bool TryResolveAssignLhsRhsRelation(int type, VpiHandle ref, VpiHandle& out) {
   const int kRef = ref->type;
   // §37.79/§37.76/§37.47: the assignment kinds that name a left-hand side - the
@@ -656,24 +651,28 @@ bool TryResolveAssignLhsRhsRelation(int type, VpiHandle ref, VpiHandle& out) {
 // §37.71/§37.69/§37.77: an if-else's else branch, the expressions of repeat
 // controls and disables, and a task/func body statement.
 bool TryResolveElseExprStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
-  // §37.55 (figure): an immediate assert, assume or cover reaches the
-  // expression it asserts through vpiExpr, its pass action through vpiStmt, and
-  // - for the assert and assume boxes - its else action through vpiElseStmt.
-  // The three were computed by helpers no dispatch called, so every edge of the
-  // subclause's figure reached nothing through the public routine.
+  // §37.55 (figure): the three edges an immediate assertion draws, which the
+  // helpers named here set out.
   if (VpiIsImmediateAssertionType(ref->type)) {
-    if (type == vpiExpr) {
-      out = VpiImmediateAssertionExpr(ref);
-      return true;
+    switch (type) {
+      case vpiExpr:
+        out = VpiImmediateAssertionExpr(ref);
+        return true;
+      case vpiStmt:
+        out = VpiImmediateAssertionStmt(ref);
+        return true;
+      case vpiElseStmt:
+        out = VpiImmediateAssertionElseStmt(ref);
+        return true;
+      default:
+        break;
     }
-    if (type == vpiStmt) {
-      out = VpiImmediateAssertionStmt(ref);
-      return true;
-    }
-    if (type == vpiElseStmt) {
-      out = VpiImmediateAssertionElseStmt(ref);
-      return true;
-    }
+  }
+  // §37.67: the else action of an ordered wait, told from its body by position
+  // because vpiElseStmt is a relation tag and no statement's type is one.
+  if (type == vpiElseStmt && ref->type == vpiOrderedWait) {
+    out = VpiOrderedWaitElseStmt(ref);
+    return true;
   }
   if (type == vpiElseStmt && ref->type == vpiIfElse) {
     out = VpiIfElseStmt(ref);
