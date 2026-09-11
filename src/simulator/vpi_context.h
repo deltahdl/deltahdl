@@ -301,10 +301,10 @@ class VpiContext {
   int ControlCoverage(int operation, int coverage_type, VpiHandle scope_handle,
                       const std::string& name);
 
-  // §40.5.3: the coverage-control state vpi_control() drives. It applies the
-  // same §40.3.2.1/.4/.5 rules the $coverage_* system functions use, so tests
-  // can register scopes and databases and observe the rules being applied.
-  CoverageControlState& GetCoverageControlState() { return coverage_control_; }
+  // §40.5.3: the coverage-control state vpi_control() drives - the run's own
+  // wherever a run is attached, because §40.5 extends §40.2's one coverage API
+  // rather than keeping a second one. Written in vpi_control.cpp.
+  CoverageControlState& GetCoverageControlState();
 
   bool ChkError(VpiErrorInfo* info);
 

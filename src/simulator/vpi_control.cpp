@@ -13,6 +13,7 @@
 #include "common/types.h"
 #include "simulator/dpi.h"
 #include "simulator/net.h"
+#include "simulator/sim_context.h"
 #include "simulator/vpi.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
@@ -100,6 +101,23 @@ std::string CoverageScopeName(VpiHandle scope_handle) {
 // per-FSM object. The return is the §40.3.1 status value the equivalent system
 // function produces, so the detailed outcome -- and the collection-state change
 // it reflects -- is observable to the caller.
+CoverageControlState& VpiContext::GetCoverageControlState() {
+  // §40.2: "This clause defines the coverage API in SystemVerilog" - one API,
+  // of which §40.5's routines are the VPI extension rather than a second one,
+  // and §40.5.3's controls "carry the semantics of $coverage_control()". So
+  // what a PLI application starts, stops, resets or reads is the coverage of
+  // the run it is loaded into: the state the SimContext keeps, which the
+  // language's own access functions of §40.3.2 answer out of. Two stores would
+  // have meant a design whose $coverage_get reported nothing of what a PLI
+  // application had been collecting, and the reverse.
+  //
+  // A context with no run attached - a PLI application reaching the routines
+  // before a design is there, and a test that stands a VpiContext up alone -
+  // has this context's own state to work in instead.
+  if (sim_ctx_ != nullptr) return sim_ctx_->GetCoverageControlState();
+  return coverage_control_;
+}
+
 int VpiContext::ControlCoverage(int operation, int coverage_type,
                                 VpiHandle scope_handle,
                                 const std::string& name) {
@@ -116,18 +134,19 @@ int VpiContext::ControlCoverage(int operation, int coverage_type,
       // whole rather than on any sub-object of it.
       CoverageControl control = CoverageControlForOperation(operation);
       std::string scope = CoverageScopeName(scope_handle);
-      return static_cast<int>(coverage_control_.Control(control, scope));
+      return static_cast<int>(
+          GetCoverageControlState().Control(control, scope));
     }
     case vpiCoverageSave:
       // §40.5.3: save the current coverage of the requested type to the named
       // coverage database, per $coverage_save() (§40.3.2.5).
       return static_cast<int>(
-          coverage_control_.CoverageSave(coverage_type, name));
+          GetCoverageControlState().CoverageSave(coverage_type, name));
     case vpiCoverageMerge:
       // §40.5.3: merge coverage of the requested type from the named coverage
       // database into the simulation, per $coverage_merge() (§40.3.2.4).
       return static_cast<int>(
-          coverage_control_.CoverageMerge(coverage_type, name));
+          GetCoverageControlState().CoverageMerge(coverage_type, name));
     default:
       // Not a coverage control operation: nothing to apply.
       return 0;
