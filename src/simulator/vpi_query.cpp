@@ -471,6 +471,15 @@ int VpiGetSimplePropertyB(int property, VpiHandle obj, bool& handled) {
     // only when is_dpi is set; report zero (none) otherwise.
     case vpiDPICStr:
       return VpiGetDpicStr(obj);
+    // §37.41 (figure): the two Booleans the task and function declaration
+    // diagram carries that nothing answered - whether the task or function is a
+    // class method, and whether the function is signed. §37.4.2 reads a Boolean
+    // property with vpi_get(), so a property no case here reaches is one the
+    // figure draws and no application can read.
+    case vpiMethod:
+      return VpiBool(VpiTaskFuncIsMethod(obj));
+    case vpiSigned:
+      return VpiBool(VpiFunctionIsSigned(obj));
     // §37.34: whether a constraint is virtual, as a Boolean property.
     case vpiVirtual:
       return VpiBool(obj->is_virtual);

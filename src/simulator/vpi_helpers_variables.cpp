@@ -509,6 +509,38 @@ int VpiVariableVisibility(bool is_class_member, int declared_visibility) {
   return vpiPublicVis;
 }
 
+bool VpiTaskFuncIsMethod(VpiHandle tf) {
+  // §37.41 (figure): "-> method / bool: vpiMethod" is drawn on the task func
+  // enclosure, and detail 4 says what a method is - "a task or function that is
+  // a class member". §37.31 detail 1 draws a class defn's vpiMethods relation
+  // to that same enclosure, so a task or function declared as a class item is
+  // one and a task or function declared anywhere else is not.
+  if (!tf || !VpiIsClassMethodType(tf->type)) return false;
+  return tf->parent != nullptr && tf->parent->type == vpiClassDefn;
+}
+
+bool VpiFunctionIsSigned(VpiHandle function) {
+  // §37.41 (figure): "-> sign / bool: vpiSigned" is drawn on the function.
+  // Detail 1 says the function "shall contain an object with the same name,
+  // size, and type as the function", and detail 2 reaches that object through
+  // vpiReturn, so the function's signedness is its return object's: §6.11 makes
+  // byte, shortint, int, longint and integer signed by default, and leaves the
+  // 4-state vector kinds unsigned. A task returns nothing and is not signed.
+  if (!function || function->type != vpiFunction) return false;
+  const VpiObject* ret = function->return_var;
+  if (ret == nullptr) return false;
+  switch (ret->type) {
+    case vpiByteVar:
+    case vpiShortIntVar:
+    case vpiIntVar:
+    case vpiLongIntVar:
+    case vpiIntegerVar:
+      return true;
+    default:
+      return false;
+  }
+}
+
 int VpiTaskFuncVisibility(bool is_class_member, int declared_visibility) {
   // §37.41 detail 4: a task or function that is not a class member, and a class
   // member (method) that is neither local nor protected, reports vpiPublicVis;

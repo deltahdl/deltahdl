@@ -13,10 +13,11 @@ namespace {
 // vpiVisibility, vpiVirtual, vpiAutomatic, and the DPI properties vpiDPIPure,
 // vpiDPIContext, vpiDPICStr, and vpiDPICIdentifier. The structural edges
 // (vpiLeftRange/vpiRightRange, io decl, func/task call, class defn, vpiParent)
-// and the bare figure properties are descriptive or generic; the lifetime
-// property vpiAutomatic belongs to §37.3.7 and vpiVirtual is reported
-// generically. These tests pin the twelve numbered Details that constrain the
-// model:
+// are descriptive or generic; the lifetime property vpiAutomatic belongs to
+// §37.3.7 and vpiVirtual is reported generically. The figure's vpiMethod and
+// vpiSigned carry no numbered detail of their own but are Booleans §37.4.2
+// reads with vpi_get(), so they are pinned below alongside the details. These
+// tests pin the twelve numbered Details that constrain the model:
 //   1-3) vpiReturn reaches a return-capture variable, always a var, that also
 //        carries a user-defined return type for inspection;
 //   4)   vpiVisibility falls back to vpiPublicVis;
@@ -216,6 +217,74 @@ TEST_F(TaskFuncDeclaration, FunctionSizeTracksReturnVariableOrZeroForVoid) {
   EXPECT_EQ(VpiFunctionSize(/*is_void_function=*/false,
                             /*return_size_defined=*/false, 16),
             0);
+}
+
+// The figure's "-> method / bool: vpiMethod" on the task func enclosure. Detail
+// 4 says what a method is - a task or function that is a class member - and
+// §37.31 detail 1 draws a class defn's vpiMethods relation to that enclosure.
+// No case answered the property, so the figure's Boolean read nothing whatever
+// the task or function was.
+TEST_F(TaskFuncDeclaration, MethodIsTrueForATaskOrFunctionOfAClass) {
+  VpiObject cls;
+  cls.type = vpiClassDefn;
+
+  VpiObject method;
+  method.type = vpiFunction;
+  method.parent = &cls;
+  VpiObject task_method;
+  task_method.type = vpiTask;
+  task_method.parent = &cls;
+
+  EXPECT_EQ(vpi_get(vpiMethod, &method), 1);
+  EXPECT_EQ(vpi_get(vpiMethod, &task_method), 1);
+}
+
+// The same property on a task or function declared outside a class, and on an
+// object that is not a task or function at all: neither is a method.
+TEST_F(TaskFuncDeclaration, MethodIsFalseOutsideAClass) {
+  VpiObject module;
+  module.type = vpiModule;
+
+  VpiObject fn;
+  fn.type = vpiFunction;
+  fn.parent = &module;
+
+  EXPECT_EQ(vpi_get(vpiMethod, &fn), 0);
+  EXPECT_EQ(vpi_get(vpiMethod, &module), 0);
+}
+
+// The figure's "-> sign / bool: vpiSigned" on the function. Detail 1 makes the
+// function's return object share its type and detail 2 reaches it through
+// vpiReturn, so the property is that object's signedness: §6.11 makes integer
+// and the sized integral kinds signed and leaves the 4-state vector kinds
+// unsigned.
+TEST_F(TaskFuncDeclaration, SignedFollowsTheReturnVariablesType) {
+  VpiObject signed_ret;
+  signed_ret.type = vpiIntVar;
+  VpiObject signed_fn;
+  signed_fn.type = vpiFunction;
+  signed_fn.return_var = &signed_ret;
+
+  VpiObject unsigned_ret;
+  unsigned_ret.type = vpiLogicVar;
+  VpiObject unsigned_fn;
+  unsigned_fn.type = vpiFunction;
+  unsigned_fn.return_var = &unsigned_ret;
+
+  EXPECT_EQ(vpi_get(vpiSigned, &signed_fn), 1);
+  EXPECT_EQ(vpi_get(vpiSigned, &unsigned_fn), 0);
+}
+
+// A task returns nothing, so it has no return object to take a sign from, and
+// neither has a void function (detail 12's vpiSize-0 case).
+TEST_F(TaskFuncDeclaration, SignedIsFalseWithoutAReturnVariable) {
+  VpiObject task;
+  task.type = vpiTask;
+  VpiObject void_fn;
+  void_fn.type = vpiFunction;  // no return_var: a void function
+
+  EXPECT_EQ(vpi_get(vpiSigned, &task), 0);
+  EXPECT_EQ(vpi_get(vpiSigned, &void_fn), 0);
 }
 
 }  // namespace

@@ -350,6 +350,17 @@ int VpiVariableVisibility(bool is_class_member, int declared_visibility);
 // function that is not a class member - reports vpiPublicVis.
 int VpiTaskFuncVisibility(bool is_class_member, int declared_visibility);
 
+// §37.41 (figure): vpiMethod, the Boolean the task func enclosure carries. TRUE
+// for a task or function declared as a class item - what detail 4 calls a class
+// member - and FALSE for every other object.
+bool VpiTaskFuncIsMethod(VpiHandle tf);
+
+// §37.41 (figure): vpiSigned, the Boolean the function carries. Detail 1 makes
+// the function's return object share its type and detail 2 reaches it through
+// vpiReturn, so the answer is whether that object's kind is one §6.11 makes
+// signed. FALSE for a task and for every object that is not a function.
+bool VpiFunctionIsSigned(VpiHandle function);
+
 // §37.17 detail 25: vpiFullName for a class data member. A non-static member
 // has none (the empty string marks its absence); a static member's full name is
 // the hierarchical path written through its "class defn", e.g.
