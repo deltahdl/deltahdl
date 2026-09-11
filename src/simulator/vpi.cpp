@@ -549,15 +549,26 @@ PLI_BYTE8* VpiContext::McdName(PLI_UINT32 cd) {
 }
 
 PLI_INT32 VpiContext::McdPrintf(PLI_UINT32 mcd, std::string_view text) {
+  // §38.28: the routine "shall not write to a file represented by an fd file
+  // descriptor returned from $fopen (indicated by the MSB being set)". The MSB
+  // is what §38.27 reserves to say a descriptor is a file descriptor rather
+  // than an mcd, and an fd is one whole value rather than a set of discrete
+  // channel bits, so a descriptor carrying that bit names no channel at all -
+  // the bits below it are part of the fd. Every bit was read as a channel here,
+  // so an fd both reached the file this clause withholds from the routine and,
+  // through the index bits $fopen leaves in it, wrote text to the tool's output
+  // channel and to whichever mcd-opened files those bits happened to name.
+  if ((mcd & kVpiFdDescriptorChannel) != 0) return 0;
+
   // §38.28: write the formatted text to one or more channels (up to 31)
   // determined by the descriptor. Each channel is a discrete bit of the integer
   // mcd, so several channels can be written simultaneously in a single call:
   // bit 0 names channel 1 - the tool's output channel and current log file -
-  // bit 1 names channel 2, and so on, while the MSB names a file opened as an
-  // fd by $fopen (§21.3.1). Every named channel receives the same text,
-  // appended to its output buffer (the buffer §38.25 later flushes to the
-  // file).
-  for (int bit = 0; bit < 32; ++bit) {
+  // bit 1 names channel 2, and so on up to bit 30 and channel 31, which is as
+  // far as the count of channels goes because the bit above them is the fd
+  // marker. Every named channel receives the same text, appended to its output
+  // buffer (the buffer §38.25 later flushes to the file).
+  for (int bit = 0; bit < 31; ++bit) {
     PLI_UINT32 channel = PLI_UINT32{1} << bit;
     if ((mcd & channel) == 0) continue;
     WriteMcdChannel(channel, text);
@@ -565,7 +576,10 @@ PLI_INT32 VpiContext::McdPrintf(PLI_UINT32 mcd, std::string_view text) {
 
   // §38.28: the routine returns the number of characters printed. The count is
   // the length of the formatted text, independent of how many channels received
-  // it, mirroring C fprintf().
+  // it, mirroring C fprintf(). An fd descriptor left above with zero says the
+  // same thing of a call that printed nowhere: EOF is what the clause reserves
+  // for an error, and a descriptor this routine does not serve is a destination
+  // it declines rather than a failure to write one it does.
   return static_cast<PLI_INT32>(text.size());
 }
 
