@@ -396,6 +396,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_handle.cpp
     simulator/vpi_helpers_assertions.cpp
     simulator/vpi_helpers_instance.cpp
+    simulator/vpi_helpers_loops.cpp
     simulator/vpi_helpers_nets.cpp
     simulator/vpi_helpers_statements.cpp
     simulator/vpi_helpers_timing_controls.cpp

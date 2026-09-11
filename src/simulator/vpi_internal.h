@@ -24,6 +24,15 @@ bool VpiIsBodyStmtOwnerType(int type);
 // vpi_handle.cpp.
 VpiHandle VpiExpectElseStmt(VpiHandle expect);
 
+// §37.74: the first of the initialization or increment statements a for
+// statement's header writes, which the diagram's single arrow reaches. Defined
+// in vpi_helpers_loops.cpp, used by vpi_handle.cpp.
+VpiHandle VpiForHeaderStmt(int type, VpiHandle for_stmt);
+
+// §37.74: every one of them, which the diagram's double arrow walks. Defined in
+// vpi_helpers_loops.cpp, used by vpi_iterate.cpp.
+void VpiCollectForHeaderStmts(int type, VpiHandle for_stmt, VpiHandle iter);
+
 // Defined in vpi_helpers_statements.cpp, used by vpi_iterate.cpp.
 bool VpiIsVirtualInterfaceArray(VpiHandle obj);
 

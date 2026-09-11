@@ -230,27 +230,6 @@ bool VpiIsAlwaysType(int always_type) {
          always_type == vpiAlwaysFF || always_type == vpiAlwaysLatch;
 }
 
-bool VpiIsWhileOrRepeatType(int type) {
-  // §37.66: the two looping statements the while/repeat diagram groups together
-  // - a while statement and a repeat statement. Both reach a controlling
-  // condition expression (vpiCondition) and a body statement (vpiStmt) through
-  // the same relations.
-  return type == vpiWhile || type == vpiRepeat;
-}
-
-VpiHandle VpiLoopConditionExpr(VpiHandle loop) {
-  // §37.66: a while or repeat statement reaches its controlling condition
-  // through vpiCondition. The condition is an expression child whose own type
-  // is an expression kind (an operation, a reference, a constant, ...) rather
-  // than the vpiCondition relation tag, so it is found by scanning for the
-  // first expression child. Null when none is attached.
-  if (!loop || !VpiIsWhileOrRepeatType(loop->type)) return nullptr;
-  for (auto* child : loop->children) {
-    if (VpiIsExprType(child->type)) return child;
-  }
-  return nullptr;
-}
-
 bool VpiIsBodyStmtOwnerType(int type) {
   // The kinds that reach a body statement through vpiStmt by the object model
   // drawing an untagged single arrow from them to the dotted `stmt` enclosure.
@@ -260,21 +239,25 @@ bool VpiIsBodyStmtOwnerType(int type) {
   // §37.67 from the `waits` enclosure, §37.70 from a forever, which is the
   // whole of that clause - a forever carries no condition, no property and no
   // detail beside its body - §37.71 from the enclosure holding `if` and
-  // `if else`, where it is the then-branch the condition selects, and §37.73
-  // from an expect statement, where it is the action a passing property
-  // specification runs.
+  // `if else`, where it is the then-branch the condition selects, §37.73 from
+  // an expect statement, where it is the action a passing property
+  // specification runs, and §37.74 from a for statement, where it is the body
+  // the header loops over - the statements the header itself writes being held
+  // apart from the children so that none of them stands where the body is
+  // looked for.
   //
-  // The forever, the two conditionals and the expect statement were the ones
-  // left out, so the relation fell through to the traversal that looks for a
-  // child whose own type is the relation tag. §37.4.1 makes the dotted `stmt`
-  // enclosure a class that groups other objects and classes rather than an
-  // object kind, so no statement a design holds has vpiStmt for its own type,
-  // and the body of every forever loop, the then-branch of every conditional
-  // and the pass action of every expect statement that could be written were
-  // reached by nothing.
+  // The forever, the two conditionals, the expect statement and the for
+  // statement were the ones left out, so the relation fell through to the
+  // traversal that looks for a child whose own type is the relation tag.
+  // §37.4.1 makes the dotted `stmt` enclosure a class that groups other objects
+  // and classes rather than an object kind, so no statement a design holds has
+  // vpiStmt for its own type, and the body of every forever loop, the
+  // then-branch of every conditional the pass action of every expect statement
+  // and the body of every for loop that could be written were reached by
+  // nothing.
   return VpiIsProcessType(type) || VpiIsWhileOrRepeatType(type) ||
          VpiIsWaitType(type) || type == vpiForever ||
-         VpiIsIfOrIfElseType(type) || type == vpiExpectStmt;
+         VpiIsIfOrIfElseType(type) || type == vpiExpectStmt || type == vpiFor;
 }
 
 bool VpiIsWaitType(int type) {
@@ -426,38 +409,6 @@ VpiHandle VpiIfElseStmt(VpiHandle if_stmt) {
   // count never reached one and no else-branch was found.
   if (!if_stmt) return nullptr;
   return SecondBodyStmt(if_stmt);
-}
-
-VpiHandle VpiForConditionExpr(VpiHandle for_stmt) {
-  // §37.74: a for statement reaches its controlling condition through
-  // vpiCondition. As with the other looping and conditional statements, the
-  // condition's own type is an expression kind (an operation, a reference, a
-  // constant, ...) rather than the vpiCondition relation tag, so it is found by
-  // scanning for the first expression child. The for statement's other children
-  // - its initialization statements (vpiForInitStmt), increment statements
-  // (vpiForIncStmt), and body (vpiStmt) - are statement-edge children that this
-  // scan skips. Null when no condition is attached.
-  if (!for_stmt) return nullptr;
-  for (auto* child : for_stmt->children) {
-    if (VpiIsExprType(child->type)) return child;
-  }
-  return nullptr;
-}
-
-VpiHandle VpiDoWhileConditionExpr(VpiHandle do_while) {
-  // §37.75: a do-while statement reaches its controlling condition through
-  // vpiCondition. As with the other looping and conditional statements
-  // (§37.66/§37.71/§37.74), the condition's own type is an expression kind (an
-  // operation, a reference, a constant, ...) rather than the vpiCondition
-  // relation tag, so it is found by scanning for the first expression child.
-  // The do-while's body, drawn by the diagram's unlabeled edge to a statement,
-  // is a statement-edge child that this scan skips. Null when no condition is
-  // attached.
-  if (!do_while) return nullptr;
-  for (auto* child : do_while->children) {
-    if (VpiIsExprType(child->type)) return child;
-  }
-  return nullptr;
 }
 
 VpiHandle VpiReturnConditionExpr(VpiHandle return_stmt) {

@@ -576,6 +576,19 @@ struct VpiObject {
   // that is neither a foreach constraint nor a foreach statement.
   std::vector<VpiObject*> loop_vars;
 
+  // §37.74 (figure): the initialization statements a for statement's header
+  // writes before the loop runs and the increment statements it writes after
+  // each pass, in source order - what the vpiForInitStmt and vpiForIncStmt
+  // iterations walk and what their single-arrow forms reach the first of. They
+  // are held here rather than among the object's children because the diagram's
+  // untagged arrow reaches the body among those, and a header statement
+  // standing there would be taken for the body; their own types are the kinds
+  // §37.4.1's `stmt` class groups rather than either relation tag, so a type
+  // match could not tell the three apart either. Empty for every object that is
+  // not a for statement, and for a header that writes none.
+  std::vector<VpiObject*> for_init_stmts;
+  std::vector<VpiObject*> for_inc_stmts;
+
   // §37.38 detail 3: the constraint expressions held in the body of a
   // constraint-expression container - an implication, a constraint if, a
   // constraint if-else, or a foreach constraint - in the order they occur. The

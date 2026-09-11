@@ -7,21 +7,27 @@ namespace delta {
 namespace {
 
 // §37.74 For: the object model diagram for a for statement. The clause carries
-// no numbered Details, no 'shall' sentences, and no BNF - it is the diagram
-// alone. The for object draws four edges: an iteration of initialization
-// statements (vpiForInitStmt), an iteration of increment statements
-// (vpiForIncStmt), a controlling condition expression (vpiCondition), and an
-// unlabeled edge to a body statement (the generic vpiStmt relation). It also
-// carries the vpiLocalVarDecls property ("has local variables"), which is owned
-// by §37.12 and is not retested here.
+// no numbered Details, no 'shall' sentences and no BNF - it is the diagram
+// alone, and the diagram draws six arrows. vpiForInitStmt and vpiForIncStmt are
+// each drawn twice, once as a double arrow and once as a single one, which
+// §37.4.3 makes a vpi_iterate() over every statement of that part of the header
+// and a vpi_handle() to the first of them; a for header writes a comma list of
+// either, which is what the pair is for. Beside them the diagram draws
+// vpiCondition to an expr and an untagged arrow to the dotted `stmt` enclosure,
+// which §37.4.3 names vpiStmt and which is the body the loop runs. The for
+// object also carries the vpiLocalVarDecls property ("has local variables"),
+// which is owned by §37.12 and is not retested here.
 //
-// Only the vpiCondition edge needs dedicated production code: the condition's
-// own type is an expression kind, not the vpiCondition relation tag, so the
-// generic child walk cannot find it - exactly as for the while/repeat (§37.66)
-// and if/if-else (§37.71) statements. The initialization and increment
-// iterations and the body edge are statement-edge children served by the
-// generic traversal and iteration. These tests observe the production paths
-// applying each rule.
+// §37.4.1 makes a dotted enclosure a class grouping other objects and classes
+// rather than a kind, so an init statement, an increment statement and the body
+// all carry the kind a statement of a design carries - an assignment, an
+// increment operation, a begin - and none of them carries vpiForInitStmt,
+// vpiForIncStmt or vpiStmt, which name the arrows. A type match cannot tell the
+// three apart either, which is why the header's statements are held in the for
+// statement's own init and increment lists and the body is the statement child
+// the untagged arrow reaches. Read the other way, as children whose own types
+// are the relation tags, the header of no for loop that could be written was
+// reached at all. These tests observe each edge through its public dispatch.
 
 // The fixture installs a context so the public vpi_handle/vpi_iterate entry
 // points run their real dispatch over the test objects.
@@ -34,41 +40,31 @@ class For : public ::testing::Test {
 
 // Condition edge (vpiCondition -> expr): a for statement reaches its
 // controlling condition through the public vpi_handle(vpiCondition, ...)
-// dispatch. The scan is type-directed: among the initialization statement,
-// increment statement, and body
-// - all statement-edge children - it skips every non-expression child and
-// returns the condition expression rather than the first child.
-TEST_F(For, ForStatementReachesConditionAmongInitIncrementAndBody) {
-  VpiObject init;
-  init.type = vpiForInitStmt;  // an initialization statement, listed first
-  VpiObject condition;
-  condition.type = vpiOperation;  // the condition: an expression kind
-  VpiObject increment;
-  increment.type = vpiForIncStmt;  // an increment statement
+// dispatch. The scan is type-directed, so it skips the body statement and
+// returns the condition rather than the first child.
+TEST_F(For, ForStatementReachesConditionAmongItsChildren) {
   VpiObject body;
-  body.type = vpiStmt;  // the body (the diagram's unlabeled edge)
+  body.type = vpiBegin;  // a statement child, listed first
+  VpiObject condition;
+  condition.type = vpiOperation;
 
   VpiObject for_stmt;
   for_stmt.type = vpiFor;
-  for_stmt.children = {&init, &condition, &increment, &body};
+  for_stmt.children = {&body, &condition};
 
   EXPECT_EQ(vpi_handle(vpiCondition, &for_stmt), &condition);
 }
 
 // Condition edge reports no expression when the for statement has no condition
-// child (a for loop written without a controlling expression): the scan finds
-// no expression among the statement-edge children and returns null.
+// child - a for loop written without a controlling expression, which 12.7.1
+// allows and which runs forever.
 TEST_F(For, ForWithoutConditionReportsNoCondition) {
-  VpiObject init;
-  init.type = vpiForInitStmt;
-  VpiObject increment;
-  increment.type = vpiForIncStmt;
   VpiObject body;
-  body.type = vpiStmt;
+  body.type = vpiBegin;
 
   VpiObject for_stmt;
   for_stmt.type = vpiFor;
-  for_stmt.children = {&init, &increment, &body};
+  for_stmt.children = {&body};
 
   EXPECT_EQ(vpi_handle(vpiCondition, &for_stmt), nullptr);
 }
@@ -88,138 +84,168 @@ TEST_F(For, ForConditionRelationIsScopedToForStatements) {
   EXPECT_EQ(vpi_handle(vpiCondition, &not_a_for), nullptr);
 }
 
-// Initialization edge (vpiForInitStmt iteration): a for statement may carry
-// more than one initialization statement (a comma list), all reached through
-// the vpiForInitStmt iteration. They are statement-edge children served by the
-// generic type-matched iteration, which collects them in order while skipping
-// the condition, increment, and body.
-TEST_F(For, ForInitializationStatementsReachedThroughVpiForInitStmt) {
+// Initialization double arrow: a for statement whose header writes a comma list
+// of initialization statements reaches all of them, in source order, through
+// the vpiForInitStmt iteration. They carry the kinds a statement of a design
+// carries, and the increment statements and the body are not among them.
+TEST_F(For, InitializationStatementsReachedThroughTheVpiForInitStmtIteration) {
   VpiObject init0;
-  init0.type = vpiForInitStmt;
+  init0.type = vpiAssignment;
   VpiObject init1;
-  init1.type = vpiForInitStmt;
-  VpiObject condition;
-  condition.type = vpiOperation;
+  init1.type = vpiAssignment;
   VpiObject increment;
-  increment.type = vpiForIncStmt;
+  increment.type = vpiAssignment;
   VpiObject body;
-  body.type = vpiStmt;
+  body.type = vpiBegin;
 
   VpiObject for_stmt;
   for_stmt.type = vpiFor;
-  for_stmt.children = {&init0, &condition, &init1, &increment, &body};
+  for_stmt.children = {&body};
+  for_stmt.for_init_stmts = {&init0, &init1};
+  for_stmt.for_inc_stmts = {&increment};
 
   VpiHandle it = ctx_.Iterate(vpiForInitStmt, &for_stmt);
   ASSERT_NE(it, nullptr);
   EXPECT_EQ(ctx_.Scan(it), &init0);
   EXPECT_EQ(ctx_.Scan(it), &init1);
-  EXPECT_EQ(ctx_.Scan(it),
-            nullptr);  // drains; condition/increment/body excluded
+  EXPECT_EQ(ctx_.Scan(it), nullptr);  // drains; increment and body excluded
 }
 
-// Increment edge (vpiForIncStmt iteration): symmetrically, the increment
-// statements of a for statement are reached through the vpiForIncStmt
-// iteration, collected in order and distinct from the initialization
-// statements.
-TEST_F(For, ForIncrementStatementsReachedThroughVpiForIncStmt) {
+// Increment double arrow: symmetrically, the increment statements are reached
+// through the vpiForIncStmt iteration, in order, and the initialization
+// statements are not among them.
+TEST_F(For, IncrementStatementsReachedThroughTheVpiForIncStmtIteration) {
   VpiObject init;
-  init.type = vpiForInitStmt;
+  init.type = vpiAssignment;
   VpiObject increment0;
-  increment0.type = vpiForIncStmt;
+  increment0.type = vpiAssignment;
   VpiObject increment1;
-  increment1.type = vpiForIncStmt;
+  increment1.type = vpiAssignment;
   VpiObject body;
-  body.type = vpiStmt;
+  body.type = vpiBegin;
 
   VpiObject for_stmt;
   for_stmt.type = vpiFor;
-  for_stmt.children = {&init, &increment0, &increment1, &body};
+  for_stmt.children = {&body};
+  for_stmt.for_init_stmts = {&init};
+  for_stmt.for_inc_stmts = {&increment0, &increment1};
 
   VpiHandle it = ctx_.Iterate(vpiForIncStmt, &for_stmt);
   ASSERT_NE(it, nullptr);
   EXPECT_EQ(ctx_.Scan(it), &increment0);
   EXPECT_EQ(ctx_.Scan(it), &increment1);
-  EXPECT_EQ(ctx_.Scan(it), nullptr);  // drains; init/body excluded
+  EXPECT_EQ(ctx_.Scan(it), nullptr);  // drains; init and body excluded
 }
 
-// Body edge (the diagram's unlabeled arrow to a statement): a for statement
-// reaches its body through the public vpi_handle(vpiStmt, ...) dispatch. The
-// generic vpiStmt traversal is type-directed: it skips the initialization,
-// condition, and increment children and returns the body statement.
-TEST_F(For, ForStatementReachesBodyThroughVpiStmt) {
-  VpiObject init;
-  init.type = vpiForInitStmt;
-  VpiObject condition;
-  condition.type = vpiOperation;
-  VpiObject increment;
-  increment.type = vpiForIncStmt;
-  VpiObject body;
-  body.type = vpiStmt;
+// The single arrows drawn beside those iterations: vpi_handle reaches the first
+// statement of each part of the header, which is the whole of it for the common
+// header that writes one of each.
+TEST_F(For, SingleArrowsReachTheFirstStatementOfEachPartOfTheHeader) {
+  VpiObject init0;
+  init0.type = vpiAssignment;
+  VpiObject init1;
+  init1.type = vpiAssignment;
+  VpiObject increment0;
+  increment0.type = vpiAssignment;
+  VpiObject increment1;
+  increment1.type = vpiAssignment;
 
   VpiObject for_stmt;
   for_stmt.type = vpiFor;
-  for_stmt.children = {&init, &condition, &increment, &body};
+  for_stmt.for_init_stmts = {&init0, &init1};
+  for_stmt.for_inc_stmts = {&increment0, &increment1};
+
+  EXPECT_EQ(vpi_handle(vpiForInitStmt, &for_stmt), &init0);
+  EXPECT_EQ(vpi_handle(vpiForIncStmt, &for_stmt), &increment0);
+}
+
+// Both relations report nothing for a header that writes neither part: the
+// iterations are empty and the single arrows reach no statement. A for loop
+// written "for (;;)" is the case.
+TEST_F(For, AHeaderThatWritesNeitherPartReachesNothingByEitherRelation) {
+  VpiObject body;
+  body.type = vpiBegin;
+
+  VpiObject for_stmt;
+  for_stmt.type = vpiFor;
+  for_stmt.children = {&body};
+
+  EXPECT_EQ(ctx_.Iterate(vpiForInitStmt, &for_stmt), nullptr);
+  EXPECT_EQ(ctx_.Iterate(vpiForIncStmt, &for_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiForInitStmt, &for_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiForIncStmt, &for_stmt), nullptr);
+}
+
+// The header relations are scoped to the for statement: an object of another
+// kind asked for either of them reaches nothing, so the lists are not read off
+// an object the diagram does not draw them on.
+TEST_F(For, HeaderRelationsAreScopedToForStatements) {
+  VpiObject body;
+  body.type = vpiBegin;
+
+  VpiObject not_a_for;
+  not_a_for.type = vpiWhile;
+  not_a_for.children = {&body};
+
+  EXPECT_EQ(vpi_handle(vpiForInitStmt, &not_a_for), nullptr);
+  EXPECT_EQ(ctx_.Iterate(vpiForInitStmt, &not_a_for), nullptr);
+}
+
+// Body edge (the untagged arrow to `stmt`): a for statement reaches the body it
+// loops over through vpi_handle(vpiStmt, ...) - the statement child, told from
+// the condition by kind and from the header's statements by their being held
+// apart from the children.
+TEST_F(For, ForStatementReachesBodyByTheKindTheStmtClassGroups) {
+  VpiObject condition;
+  condition.type = vpiOperation;
+  VpiObject init;
+  init.type = vpiAssignment;
+  VpiObject body;
+  body.type = vpiBegin;
+
+  VpiObject for_stmt;
+  for_stmt.type = vpiFor;
+  for_stmt.children = {&condition, &body};
+  for_stmt.for_init_stmts = {&init};
 
   EXPECT_EQ(vpi_handle(vpiStmt, &for_stmt), &body);
 }
 
-// Body edge edge case (no body): a for statement carrying initialization,
-// condition, and increment children but no body statement reaches no body. The
-// generic vpiStmt traversal finds no statement-tagged child and reports null -
-// the same type-directed path that locates the body when one is present, here
-// exercised on its empty outcome.
+// Body edge: the body is reached whatever kind it is written as - a lone
+// statement, a block, or a nested loop.
+TEST_F(For, EachKindABodyCarriesIsReached) {
+  for (int body_kind :
+       {vpiAssignment, vpiNamedBegin, vpiFork, vpiFor, vpiNullStmt}) {
+    VpiObject body;
+    body.type = body_kind;
+
+    VpiObject for_stmt;
+    for_stmt.type = vpiFor;
+    for_stmt.children = {&body};
+
+    EXPECT_EQ(vpi_handle(vpiStmt, &for_stmt), &body)
+        << "body kind " << body_kind;
+  }
+}
+
+// Body edge edge case: a for statement carrying a condition and a header but no
+// body statement reaches no body, and neither the condition nor a header
+// statement is handed back in its place.
 TEST_F(For, ForWithoutBodyReportsNoStatement) {
-  VpiObject init;
-  init.type = vpiForInitStmt;
   VpiObject condition;
   condition.type = vpiOperation;
+  VpiObject init;
+  init.type = vpiAssignment;
   VpiObject increment;
-  increment.type = vpiForIncStmt;
+  increment.type = vpiAssignment;
 
   VpiObject for_stmt;
   for_stmt.type = vpiFor;
-  for_stmt.children = {&init, &condition, &increment};
+  for_stmt.children = {&condition};
+  for_stmt.for_init_stmts = {&init};
+  for_stmt.for_inc_stmts = {&increment};
 
   EXPECT_EQ(vpi_handle(vpiStmt, &for_stmt), nullptr);
-}
-
-// Initialization edge edge case (no init statements): a for statement written
-// without an initialization clause has an empty vpiForInitStmt iteration. The
-// generic type-matched iteration finds no init-tagged child and reports
-// nothing, even though the condition and body are present and reachable through
-// their own edges.
-TEST_F(For, ForInitializationIterationIsEmptyWithoutInitStatements) {
-  VpiObject condition;
-  condition.type = vpiOperation;
-  VpiObject increment;
-  increment.type = vpiForIncStmt;
-  VpiObject body;
-  body.type = vpiStmt;
-
-  VpiObject for_stmt;
-  for_stmt.type = vpiFor;
-  for_stmt.children = {&condition, &increment, &body};
-
-  EXPECT_EQ(ctx_.Iterate(vpiForInitStmt, &for_stmt), nullptr);
-}
-
-// Increment edge edge case (no increment statements): symmetrically, a for
-// statement with no increment clause has an empty vpiForIncStmt iteration. The
-// iteration surfaces neither the initialization statement nor the body, both of
-// which carry a different relation tag.
-TEST_F(For, ForIncrementIterationIsEmptyWithoutIncrementStatements) {
-  VpiObject init;
-  init.type = vpiForInitStmt;
-  VpiObject condition;
-  condition.type = vpiOperation;
-  VpiObject body;
-  body.type = vpiStmt;
-
-  VpiObject for_stmt;
-  for_stmt.type = vpiFor;
-  for_stmt.children = {&init, &condition, &body};
-
-  EXPECT_EQ(ctx_.Iterate(vpiForIncStmt, &for_stmt), nullptr);
 }
 
 }  // namespace

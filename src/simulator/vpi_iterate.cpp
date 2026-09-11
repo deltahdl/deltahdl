@@ -186,6 +186,8 @@ struct VpiIterateModes {
   bool struct_union_members = false;
   // §36.10.3: an operation's vpiOperand relation.
   bool operation_operands = false;
+  // §37.74: a for statement's vpiForInitStmt or vpiForIncStmt iteration.
+  bool for_header_stmts = false;
 };
 
 // The context-owned object and registry stores an iteration is resolved
@@ -332,6 +334,11 @@ void ComputeConstraintAndCallbackModes(int type, VpiHandle ref,
   m.else_constraint_expr =
       ref && type == vpiElseConst && ref->type == vpiConstrIfElse;
   m.callback_object = ref && type == vpiCallback;
+  // §37.74: a for statement's header statements, held apart from its children
+  // because their own kinds are the ones the `stmt` class groups rather than
+  // either relation tag.
+  m.for_header_stmts = ref && ref->type == vpiFor &&
+                       (type == vpiForInitStmt || type == vpiForIncStmt);
   // §36.10.3: an operation reaches its operands, which carry their own
   // expression kinds rather than the relation tag.
   m.operation_operands = ref && type == vpiOperand && ref->type == vpiOperation;
@@ -798,6 +805,10 @@ bool DispatchRefSpecialMode(int type, VpiHandle ref,
   }
   if (modes.callback_object) {
     CollectCallbackObjects(ref, stores.cb_handles, stores.callbacks, iter);
+    return true;
+  }
+  if (modes.for_header_stmts) {
+    VpiCollectForHeaderStmts(type, ref, iter);
     return true;
   }
   return false;
