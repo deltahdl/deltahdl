@@ -106,14 +106,17 @@ TEST_F(AssertionControlFunctions, AnAttemptIsNamedByItsStartTime) {
 // the constant that says on what basis they occur.
 TEST_F(AssertionControlFunctions, SteppingIsEnabledForTheNamedAttempt) {
   vpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
-  api_.NoteAssertionAttemptStarted("handshake_p", 10);
 
+  // §39.5.2: "The stepping mode of any particular attempt cannot be modified
+  // after the assertion attempt in question has started", so the attempt this
+  // names is one that has not started yet.
   s_vpi_time attempt = {};
   attempt.type = vpiSimTime;
   attempt.low = 10;
   EXPECT_EQ(vpi_control(vpiAssertionEnableStep, assertion, &attempt,
                         vpiAssertionClockSteps),
             1);
+  api_.NoteAssertionAttemptStarted("handshake_p", 10);
   EXPECT_TRUE(api_.AssertionStepEnabled("handshake_p", 10));
 
   EXPECT_EQ(vpi_control(vpiAssertionDisableStep, assertion, &attempt), 1);
