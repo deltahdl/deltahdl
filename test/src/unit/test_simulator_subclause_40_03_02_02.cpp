@@ -137,4 +137,26 @@ TEST(CoverageGetMax, MissingArgumentsIsBadArgument) {
             kError);
 }
 
+// §40.3.2.1 Table 40-2 for the maximum as well: what represents 100% coverage
+// of a hierarchy is the coverable items of everything in it, so the same scope
+// under the two scope definitions reports two different maxima - and a coverage
+// percentage taken over a hierarchy is only right when both halves of it are
+// read the same way.
+TEST(CoverageGetMax, TheScopeDefinitionDecidesWhatIsSummed) {
+  SimFixture f;
+  Cov(f).SetCoverableItems("top.dut", kToggle, 8);
+  Cov(f).SetCoverableItems("top.dut.u1", kToggle, 4);
+
+  auto get_max = [&f](int scope_def, std::string_view scope) {
+    auto* call = MkSysCall(f.arena, "$coverage_get_max",
+                           {MkInt(f.arena, static_cast<uint64_t>(kToggle)),
+                            MkInt(f.arena, static_cast<uint64_t>(scope_def)),
+                            MkStr(f.arena, scope)});
+    return static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64());
+  };
+
+  EXPECT_EQ(get_max(11 /* `SV_COV_HIER */, "top.dut"), 12);
+  EXPECT_EQ(get_max(10 /* `SV_COV_MODULE */, "top.dut"), 8);
+}
+
 }  // namespace

@@ -297,6 +297,14 @@ static Logic4Vec EvalCoverageControl(const Expr* expr, SimContext& ctx,
   if (!CoverageControlFromInt(control_value, &control)) {
     return status_vec(CoverageStatus::kError);
   }
+  // §40.3.2.1 Table 40-2: the third argument says whether the hierarchy below
+  // the named scope is controlled with it. A scope definition the clause does
+  // not name is a bad argument, which is the `SV_COV_ERROR the clause reports
+  // "on all operations ... typically due to errors in arguments".
+  bool include_below = true;
+  if (!CoverageScopeDefIncludesBelow(expr, ctx, arena, 2, &include_below)) {
+    return status_vec(CoverageStatus::kError);
+  }
   // The fourth argument names the module definition or instance. When given as
   // a string literal it is used directly; otherwise the scope is left empty.
   std::string scope;
@@ -304,7 +312,8 @@ static Logic4Vec EvalCoverageControl(const Expr* expr, SimContext& ctx,
       expr->args[3]->kind == ExprKind::kStringLiteral) {
     scope = ExtractStrArg(expr->args[3]);
   }
-  return status_vec(ctx.GetCoverageControlState().Control(control, scope));
+  return status_vec(
+      ctx.GetCoverageControlState().Control(control, scope, include_below));
 }
 
 // Builds the 32-bit integer coverage result shared by the §40.3.2 query
@@ -325,6 +334,32 @@ static std::string CoverageStrArg(const Expr* expr, size_t index) {
   return std::string();
 }
 
+// §40.3.2.1 Table 40-2: the scope_def argument beside the scope says how far
+// the call reaches - `SV_COV_HIER over "the named instance and any hierarchy
+// below it", `SV_COV_MODULE over that instance alone, "excluding any hierarchy
+// in instances below that instance". The two are the §40.3.1 constants 11 and
+// 10; nothing else names a scope definition, and a call that wrote something
+// else wrote a bad argument.
+constexpr int kSvCovModule = 10;
+constexpr int kSvCovHier = 11;
+
+static bool CoverageScopeDefIncludesBelow(const Expr* expr, SimContext& ctx,
+                                          Arena& arena, size_t index,
+                                          bool* include_below) {
+  if (expr->args.size() <= index) return false;
+  int scope_def =
+      static_cast<int>(EvalExpr(expr->args[index], ctx, arena).ToUint64());
+  if (scope_def == kSvCovHier) {
+    *include_below = true;
+    return true;
+  }
+  if (scope_def == kSvCovModule) {
+    *include_below = false;
+    return true;
+  }
+  return false;
+}
+
 // Shared evaluator for the §40.3.2 coverage query functions. They all return
 // the §40.3.2.2 integer result pattern: `SV_COV_ERROR when the first
 // (coverage_type) argument is missing, otherwise the value produced by `query`
@@ -342,14 +377,24 @@ static Logic4Vec EvalCoverageQuery(const Expr* expr, SimContext& ctx,
   int coverage_type =
       static_cast<int>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
   std::string str_arg = CoverageStrArg(expr, str_arg_index);
+  // §40.3.2.1 Table 40-2 governs the two hierarchy queries too: their second
+  // argument is the same scope_def. The database queries of §40.3.2.4/.5 name
+  // no scope, so they have none to read and none to refuse.
+  bool include_below = true;
+  bool queries_a_scope =
+      query == CoverageQuery::kGetMax || query == CoverageQuery::kGet;
+  if (queries_a_scope &&
+      !CoverageScopeDefIncludesBelow(expr, ctx, arena, 1, &include_below)) {
+    return CoverageIntResult(arena, static_cast<int>(CoverageStatus::kError));
+  }
   auto& state = ctx.GetCoverageControlState();
   switch (query) {
     case CoverageQuery::kGetMax:
-      return CoverageIntResult(arena,
-                               state.CoverageMax(str_arg, coverage_type));
+      return CoverageIntResult(
+          arena, state.CoverageMax(str_arg, coverage_type, include_below));
     case CoverageQuery::kGet:
-      return CoverageIntResult(arena,
-                               state.CoverageGet(str_arg, coverage_type));
+      return CoverageIntResult(
+          arena, state.CoverageGet(str_arg, coverage_type, include_below));
     case CoverageQuery::kMerge:
       return CoverageIntResult(
           arena, static_cast<int>(state.CoverageMerge(coverage_type, str_arg)));

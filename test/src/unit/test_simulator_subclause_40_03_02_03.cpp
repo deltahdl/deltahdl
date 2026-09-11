@@ -123,4 +123,29 @@ TEST(CoverageGet, MissingArgumentsIsBadArgument) {
             kError);
 }
 
+// §40.3.2.1 Table 40-2 governs this query's scope_def too: with `SV_COV_HIER
+// the current coverage is the sum over the named instance "and any hierarchy
+// below it", and with `SV_COV_MODULE it is the named instance alone. The two
+// answers differ by exactly what the instances below hold.
+TEST(CoverageGet, TheScopeDefinitionDecidesWhatIsSummed) {
+  SimFixture f;
+  Cov(f).SetCoveredItems("top.dut", kToggle, 5);
+  Cov(f).SetCoveredItems("top.dut.u1", kToggle, 3);
+  Cov(f).SetCoveredItems("top.dut.u1.leaf", kToggle, 1);
+  Cov(f).SetCoveredItems("top.other", kToggle, 100);
+
+  auto get = [&f](int scope_def, std::string_view scope) {
+    auto* call = MkSysCall(f.arena, "$coverage_get",
+                           {MkInt(f.arena, static_cast<uint64_t>(kToggle)),
+                            MkInt(f.arena, static_cast<uint64_t>(scope_def)),
+                            MkStr(f.arena, scope)});
+    return static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64());
+  };
+
+  // The whole hierarchy below top.dut, and nothing outside it.
+  EXPECT_EQ(get(11 /* `SV_COV_HIER */, "top.dut"), 9);
+  // The instance alone.
+  EXPECT_EQ(get(10 /* `SV_COV_MODULE */, "top.dut"), 5);
+}
+
 }  // namespace

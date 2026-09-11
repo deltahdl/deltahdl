@@ -202,4 +202,77 @@ TEST(CoverageControl, MissingArgumentsIsBadArgument) {
             kError);
 }
 
+// §40.3.2.1 Table 40-2: what a call names is the scope plus, where the
+// scope_def says so, the hierarchy below it. These cases drive the third
+// argument rather than holding it at `SV_COV_HIER.
+int RunControlWithScopeDef(SimFixture& f, int control, int scope_def,
+                           std::string_view scope) {
+  auto* call = MkSysCall(f.arena, "$coverage_control",
+                         {MkInt(f.arena, static_cast<uint64_t>(control)),
+                          MkInt(f.arena, 23 /* `SV_COV_TOGGLE */),
+                          MkInt(f.arena, static_cast<uint64_t>(scope_def)),
+                          MkStr(f.arena, scope)});
+  return static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64());
+}
+
+constexpr int kSvCovModule = 10;
+constexpr int kSvCovHier = 11;
+
+// §40.3.2.1 Table 40-2, the `SV_COV_HIER row: the control reaches "the named
+// instance and any hierarchy below it", so starting collection over an instance
+// starts it in the instances below that one as well.
+TEST(CoverageControl, HierReachesTheHierarchyBelowTheNamedInstance) {
+  SimFixture f;
+  Cov(f).SetAvailability("top.dut", CoverageAvailability::kFull);
+  Cov(f).SetAvailability("top.dut.u1", CoverageAvailability::kFull);
+  Cov(f).SetAvailability("top.other", CoverageAvailability::kFull);
+
+  EXPECT_EQ(RunControlWithScopeDef(f, kStart, kSvCovHier, "top.dut"), kOk);
+
+  EXPECT_TRUE(Cov(f).IsCollecting("top.dut"));
+  EXPECT_TRUE(Cov(f).IsCollecting("top.dut.u1"));
+  // An instance that is not below the named one is no part of the call.
+  EXPECT_FALSE(Cov(f).IsCollecting("top.other"));
+}
+
+// §40.3.2.1 Table 40-2, the `SV_COV_MODULE row: the control reaches the named
+// instance alone, "excluding any hierarchy in instances below that instance".
+// The two scope definitions differ in exactly this, which the run below the
+// instance is what shows.
+TEST(CoverageControl, ModuleReachesTheNamedInstanceAlone) {
+  SimFixture f;
+  Cov(f).SetAvailability("top.dut", CoverageAvailability::kFull);
+  Cov(f).SetAvailability("top.dut.u1", CoverageAvailability::kFull);
+
+  EXPECT_EQ(RunControlWithScopeDef(f, kStart, kSvCovModule, "top.dut"), kOk);
+
+  EXPECT_TRUE(Cov(f).IsCollecting("top.dut"));
+  EXPECT_FALSE(Cov(f).IsCollecting("top.dut.u1"));
+}
+
+// §40.3.2.1: "`SV_COV_PARTIAL, on a check or start operation, denotes that
+// coverage is only partially available in the specified hierarchy." Over a
+// hierarchy, that is what an instance below the named one offering no coverage
+// makes of a start the named instance alone would have reported `SV_COV_OK for.
+TEST(CoverageControl, APartlyCoverableHierarchyReportsPartial) {
+  SimFixture f;
+  Cov(f).SetAvailability("top.dut", CoverageAvailability::kFull);
+  Cov(f).SetAvailability("top.dut.u1", CoverageAvailability::kNone);
+
+  EXPECT_EQ(RunControlWithScopeDef(f, kStart, kSvCovHier, "top.dut"), kPartial);
+  EXPECT_EQ(RunControlWithScopeDef(f, kStart, kSvCovModule, "top.dut"), kOk);
+}
+
+// §40.3.2.1: the scope definitions are the two the clause names, and a call
+// that wrote something else wrote a bad argument - reported with `SV_COV_ERROR
+// "on all operations ... typically due to errors in arguments" - rather than
+// being taken for one of them.
+TEST(CoverageControl, AnUnknownScopeDefinitionIsABadArgument) {
+  SimFixture f;
+  Cov(f).SetAvailability("top.dut", CoverageAvailability::kFull);
+
+  EXPECT_EQ(RunControlWithScopeDef(f, kStart, 99, "top.dut"), kError);
+  EXPECT_FALSE(Cov(f).IsCollecting("top.dut"));
+}
+
 }  // namespace

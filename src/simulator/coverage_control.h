@@ -116,20 +116,10 @@ class CoverageControlState {
   // type offers no coverage (`SV_COV_NOCOV, 0); a count too large to represent
   // as an integer overflows (`SV_COV_OVERFLOW); otherwise the positive sum is
   // the maximum coverage number.
-  int CoverageMax(const std::string& scope, int coverage_type) const {
-    auto it = scopes_.find(scope);
-    if (it == scopes_.end()) {
-      return static_cast<int>(CoverageStatus::kError);
-    }
-    auto type_it = it->second.coverable_items.find(coverage_type);
-    if (type_it == it->second.coverable_items.end() || type_it->second <= 0) {
-      return static_cast<int>(CoverageStatus::kNoCoverage);
-    }
-    if (type_it->second >
-        static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max())) {
-      return static_cast<int>(CoverageStatus::kOverflow);
-    }
-    return static_cast<int>(type_it->second);
+  int CoverageMax(const std::string& scope, int coverage_type,
+                  bool include_below = true) const {
+    return HierarchyCount(scope, coverage_type, include_below,
+                          &ScopeState::coverable_items);
   }
 
   // §40.3.2.3 ($coverage_get): returns the current coverage value for
@@ -144,20 +134,10 @@ class CoverageControlState {
   // (no entry, or none of its items covered yet) reports no coverage
   // (`SV_COV_NOCOV, 0, since a positive value is strictly greater than zero);
   // otherwise the positive count is the current coverage number.
-  int CoverageGet(const std::string& scope, int coverage_type) const {
-    auto it = scopes_.find(scope);
-    if (it == scopes_.end()) {
-      return static_cast<int>(CoverageStatus::kError);
-    }
-    auto type_it = it->second.covered_items.find(coverage_type);
-    if (type_it == it->second.covered_items.end() || type_it->second <= 0) {
-      return static_cast<int>(CoverageStatus::kNoCoverage);
-    }
-    if (type_it->second >
-        static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max())) {
-      return static_cast<int>(CoverageStatus::kOverflow);
-    }
-    return static_cast<int>(type_it->second);
+  int CoverageGet(const std::string& scope, int coverage_type,
+                  bool include_below = true) const {
+    return HierarchyCount(scope, coverage_type, include_below,
+                          &ScopeState::covered_items);
   }
 
   // Registers a named coverage database the tool could load, mirroring what a
@@ -302,14 +282,52 @@ class CoverageControlState {
 
   // Performs the §40.3.2.1 action selected by `control` over `scope` and
   // returns the resulting §40.3.1 status.
-  CoverageStatus Control(CoverageControl control, const std::string& scope) {
+  // §40.3.2.1 Table 40-2: what one call names depends on the scope_def
+  // argument beside the scope. `SV_COV_HIER names "the named instance and any
+  // hierarchy below it"; `SV_COV_MODULE names "just the named instance,
+  // excluding any hierarchy in instances below that instance". `include_below`
+  // is that argument, and a scope lies below another when its hierarchical
+  // path continues that path past a dot.
+  //
+  // The table's other column, where the string is a module definition name
+  // rather than an instance path, asks for the sum over "all instances of the
+  // given module". This model holds the scopes under the names the design
+  // registered them by and has no definition-to-instances map to walk, so a
+  // definition name is the one scope registered under it.
+  static bool ScopeIsBelow(const std::string& root,
+                           const std::string& candidate) {
+    return candidate.size() > root.size() + 1 &&
+           candidate.compare(0, root.size(), root) == 0 &&
+           candidate[root.size()] == '.';
+  }
+
+  CoverageStatus Control(CoverageControl control, const std::string& scope,
+                         bool include_below = true) {
     auto it = scopes_.find(scope);
     // A scope the design does not contain is a bad argument: §40.3.2.1 reports
     // `SV_COV_ERROR for errors such as a nonexisting module.
     if (it == scopes_.end()) {
       return CoverageStatus::kError;
     }
-    ScopeState& s = it->second;
+    CoverageStatus status = ControlOne(control, it->second);
+    if (!include_below) return status;
+    // §40.3.2.1: over a hierarchy, the operation is applied to everything in it
+    // and the status reported is of the hierarchy - `SV_COV_PARTIAL "denotes
+    // that coverage is only partially available in the specified hierarchy",
+    // which is what a scope below the named one reporting something else makes
+    // of a start or a check.
+    for (auto& entry : scopes_) {
+      if (!ScopeIsBelow(scope, entry.first)) continue;
+      status =
+          CombineHierarchyStatus(status, ControlOne(control, entry.second));
+    }
+    return status;
+  }
+
+ private:
+  // The one-scope control, which the hierarchy walk above applies to each scope
+  // it names.
+  CoverageStatus ControlOne(CoverageControl control, ScopeState& s) {
     switch (control) {
       case CoverageControl::kStart:
         // `SV_COV_START starts collection where coverage is available. Starting
@@ -359,7 +377,26 @@ class CoverageControlState {
     return CoverageStatus::kError;
   }
 
- private:
+  // §40.3.2.1: the status of a hierarchy, given the status of what has been
+  // walked so far and of one more scope in it. Full coverage everywhere is
+  // `SV_COV_OK and none anywhere is `SV_COV_NOCOV; anything in between - some
+  // of the hierarchy covered and some not - is the `SV_COV_PARTIAL the clause
+  // gives a start or a check over a partially available hierarchy. An error
+  // stands, since a bad argument is not made good by the rest of the walk.
+  static CoverageStatus CombineHierarchyStatus(CoverageStatus so_far,
+                                               CoverageStatus next) {
+    if (so_far == CoverageStatus::kError || next == CoverageStatus::kError) {
+      return CoverageStatus::kError;
+    }
+    if (so_far == next) return so_far;
+    if (so_far == CoverageStatus::kOk || next == CoverageStatus::kOk ||
+        so_far == CoverageStatus::kPartial ||
+        next == CoverageStatus::kPartial) {
+      return CoverageStatus::kPartial;
+    }
+    return so_far;
+  }
+
   struct ScopeState {
     CoverageAvailability availability = CoverageAvailability::kNone;
     bool collecting = false;
@@ -397,6 +434,44 @@ class CoverageControlState {
       s.has_data = true;
       ++s.started;
     }
+  }
+
+  // §40.3.2.1 Table 40-2 for the two query functions: the count of one
+  // coverage type over the scopes a call names - the named scope, and the
+  // hierarchy below it where the scope_def argument said to include it. The
+  // §40.3.2.2/§40.3.2.3 result rules are applied to the sum: a scope the design
+  // does not contain is a bad argument, a sum of nothing is no coverage, and a
+  // sum too large to represent overflows.
+  int HierarchyCount(
+      const std::string& scope, int coverage_type, bool include_below,
+      std::unordered_map<int, std::int64_t> ScopeState::* member) const {
+    auto it = scopes_.find(scope);
+    if (it == scopes_.end()) {
+      return static_cast<int>(CoverageStatus::kError);
+    }
+    std::int64_t total = ScopeCount(it->second.*member, coverage_type);
+    if (include_below) {
+      for (const auto& entry : scopes_) {
+        if (!ScopeIsBelow(scope, entry.first)) continue;
+        total += ScopeCount(entry.second.*member, coverage_type);
+      }
+    }
+    if (total <= 0) {
+      return static_cast<int>(CoverageStatus::kNoCoverage);
+    }
+    if (total >
+        static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max())) {
+      return static_cast<int>(CoverageStatus::kOverflow);
+    }
+    return static_cast<int>(total);
+  }
+
+  // One scope's count of a coverage type, which is nothing where it holds no
+  // items of that type.
+  static std::int64_t ScopeCount(
+      const std::unordered_map<int, std::int64_t>& items, int coverage_type) {
+    auto it = items.find(coverage_type);
+    return it == items.end() ? 0 : it->second;
   }
 
   std::uint64_t Field(const std::string& scope,
