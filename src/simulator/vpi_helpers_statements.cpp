@@ -255,22 +255,26 @@ bool VpiIsBodyStmtOwnerType(int type) {
   // The kinds that reach a body statement through vpiStmt by the object model
   // drawing an untagged single arrow from them to the dotted `stmt` enclosure.
   // §37.4.3 makes an untagged relation's type the enclosure's words with "vpi"
-  // in front, so one arrow drawn five times is one relation: §37.63 draws it
+  // in front, so one arrow drawn six times is one relation: §37.63 draws it
   // from a process, §37.66 from the enclosure holding `while` and `repeat`,
   // §37.67 from the `waits` enclosure, §37.70 from a forever, which is the
   // whole of that clause - a forever carries no condition, no property and no
-  // detail beside its body - and §37.71 from the enclosure holding `if` and
-  // `if else`, where it is the then-branch the condition selects.
+  // detail beside its body - §37.71 from the enclosure holding `if` and
+  // `if else`, where it is the then-branch the condition selects, and §37.73
+  // from an expect statement, where it is the action a passing property
+  // specification runs.
   //
-  // The forever and the two conditionals were the ones left out, so the
-  // relation fell through to the traversal that looks for a child whose own
-  // type is the relation tag. §37.4.1 makes the dotted `stmt` enclosure a class
-  // that groups other objects and classes rather than an object kind, so no
-  // statement a design holds has vpiStmt for its own type and the body of every
-  // forever loop and the then-branch of every conditional that could be written
-  // were reached by nothing.
+  // The forever, the two conditionals and the expect statement were the ones
+  // left out, so the relation fell through to the traversal that looks for a
+  // child whose own type is the relation tag. §37.4.1 makes the dotted `stmt`
+  // enclosure a class that groups other objects and classes rather than an
+  // object kind, so no statement a design holds has vpiStmt for its own type,
+  // and the body of every forever loop, the then-branch of every conditional
+  // and the pass action of every expect statement that could be written were
+  // reached by nothing.
   return VpiIsProcessType(type) || VpiIsWhileOrRepeatType(type) ||
-         VpiIsWaitType(type) || type == vpiForever || VpiIsIfOrIfElseType(type);
+         VpiIsWaitType(type) || type == vpiForever ||
+         VpiIsIfOrIfElseType(type) || type == vpiExpectStmt;
 }
 
 bool VpiIsWaitType(int type) {
@@ -307,6 +311,25 @@ bool VpiIsContAssignKind(int type) {
   return type == vpiContAssign || type == vpiContAssignBit;
 }
 
+namespace {
+
+// The second of the statements an object carries, or null where it carries
+// fewer than two. §37.67's ordered wait, §37.71's if-else and §37.73's expect
+// statement each draw two arrows to the dotted `stmt` enclosure - a body or
+// pass action and an else action - and §37.4.1 makes that enclosure a class
+// grouping other objects and classes rather than a kind, so neither statement
+// carries the name of either arrow and position is what tells them apart.
+VpiHandle SecondBodyStmt(VpiHandle stmt) {
+  int seen = 0;
+  for (auto* child : stmt->children) {
+    if (!VpiIsScopeBodyStmtType(child->type)) continue;
+    if (++seen == 2) return child;
+  }
+  return nullptr;
+}
+
+}  // namespace
+
 // §37.67 (figure): the else action statement an ordered wait reaches through
 // vpiElseStmt. §9.4.4 writes a wait_order's action block as "[
 // statement_or_null ] [ else statement_or_null ]", so the else is the second of
@@ -318,12 +341,19 @@ bool VpiIsContAssignKind(int type) {
 // from its fail action.
 VpiHandle VpiOrderedWaitElseStmt(VpiHandle wait) {
   if (!wait || wait->type != vpiOrderedWait) return nullptr;
-  int seen = 0;
-  for (auto* child : wait->children) {
-    if (!VpiIsScopeBodyStmtType(child->type)) continue;
-    if (++seen == 2) return child;
-  }
-  return nullptr;
+  return SecondBodyStmt(wait);
+}
+
+// §37.73 (figure): the else action statement an expect statement reaches
+// through vpiElseStmt, drawn beside an untagged arrow to a pass action and one
+// to the property specification the statement watches. The two actions are the
+// two statements the object carries, in the order 16.17 writes them, so the
+// else is the second; the walk that looks for a child whose own type is the
+// vpiElseStmt tag reached the fail action of no expect statement a design could
+// hold, the tag naming a relation rather than a kind.
+VpiHandle VpiExpectElseStmt(VpiHandle expect) {
+  if (!expect || expect->type != vpiExpectStmt) return nullptr;
+  return SecondBodyStmt(expect);
 }
 
 bool VpiIsDisableTargetType(int type) {
@@ -395,14 +425,7 @@ VpiHandle VpiIfElseStmt(VpiHandle if_stmt) {
   // is - a begin, an assignment, another if - and never the class's name; the
   // count never reached one and no else-branch was found.
   if (!if_stmt) return nullptr;
-  bool seen_then = false;
-  for (auto* child : if_stmt->children) {
-    if (VpiIsScopeBodyStmtType(child->type)) {
-      if (seen_then) return child;
-      seen_then = true;
-    }
-  }
-  return nullptr;
+  return SecondBodyStmt(if_stmt);
 }
 
 VpiHandle VpiForConditionExpr(VpiHandle for_stmt) {

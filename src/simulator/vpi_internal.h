@@ -19,6 +19,11 @@ bool VpiIsScopeBodyStmtType(int type);
 // vpi_helpers_statements.cpp, used by vpi_handle.cpp.
 bool VpiIsBodyStmtOwnerType(int type);
 
+// §37.73: the else action of an expect statement - the second of the two
+// statements it carries. Defined in vpi_helpers_statements.cpp, used by
+// vpi_handle.cpp.
+VpiHandle VpiExpectElseStmt(VpiHandle expect);
+
 // Defined in vpi_helpers_statements.cpp, used by vpi_iterate.cpp.
 bool VpiIsVirtualInterfaceArray(VpiHandle obj);
 

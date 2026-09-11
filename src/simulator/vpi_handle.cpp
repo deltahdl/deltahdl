@@ -664,6 +664,12 @@ bool TryResolveElseExprStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
     out = VpiIfElseStmt(ref);
     return true;
   }
+  // §37.73: the else action of an expect statement, told from its pass action
+  // by position for the reason an ordered wait's is.
+  if (type == vpiElseStmt && ref->type == vpiExpectStmt) {
+    out = VpiExpectElseStmt(ref);
+    return true;
+  }
   if (type == vpiExpr && ref->type == vpiRepeatControl) {
     out = VpiRepeatControlExpr(ref);
     return true;
