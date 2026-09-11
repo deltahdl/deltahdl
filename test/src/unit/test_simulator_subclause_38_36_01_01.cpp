@@ -1,9 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "common/types.h"
 #include "simulator/net.h"
+#include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi.h"
 
@@ -25,6 +29,7 @@ int g_stmt_calls = 0;
 VpiValue* g_stmt_value = reinterpret_cast<VpiValue*>(1);
 int g_stmt_index = -1;
 VpiTime* g_stmt_time = reinterpret_cast<VpiTime*>(1);
+VpiTime g_stmt_time_seen = {};
 
 int RecordStmtCb(VpiCbData* data) {
   ++g_stmt_calls;
@@ -32,6 +37,7 @@ int RecordStmtCb(VpiCbData* data) {
     g_stmt_value = data->value;
     g_stmt_index = data->index;
     g_stmt_time = data->time;
+    if (data->time) g_stmt_time_seen = *data->time;
   }
   return 0;
 }
@@ -43,9 +49,20 @@ class VpiStmtCallback : public ::testing::Test {
     g_stmt_value = reinterpret_cast<VpiValue*>(1);
     g_stmt_index = -1;
     g_stmt_time = reinterpret_cast<VpiTime*>(1);
+    g_stmt_time_seen = VpiTime{};
+    vpi_ctx_.SetScheduler(&scheduler_);
     SetGlobalVpiContext(&vpi_ctx_);
   }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
+
+  // Advance the simulation clock to `t` by draining a no-op event scheduled
+  // there; after Run() the scheduler's current time is that slot.
+  void AdvanceTo(uint64_t t) {
+    auto* ev = scheduler_.GetEventPool().Acquire();
+    ev->callback = []() {};
+    scheduler_.ScheduleEvent(SimTime{t}, Region::kActive, ev);
+    scheduler_.Run();
+  }
 
   // Build a handle that stands for a statement (here a named-begin block, one
   // of the cbStmt-eligible objects). `protect` marks it as residing in a
@@ -167,10 +184,19 @@ TEST_F(VpiStmtCallback, SuppressTimeNullsDispatchedTimePointer) {
 
 // §38.36.1.1: the NULL-time rule is specific to vpiSuppressTime. When a real
 // time type (here vpiSimTime) is requested, the routine receives a time pointer
-// rather than NULL.
-TEST_F(VpiStmtCallback, NonSuppressTimePreservesDispatchedTimePointer) {
+// rather than NULL, and what it points at "will contain the current simulation
+// time, of the type ... indicated in the call to vpi_register_cb()". At
+// registration "only the type is used", so the low word the application left in
+// its own structure says nothing about when the statement ran: the time the
+// routine reads is the one the simulation had reached as the statement was
+// about to execute. The structure it reads is the dispatch's own, the
+// registration's being left as the application wrote it.
+TEST_F(VpiStmtCallback, DispatchedTimeCarriesTheCurrentSimulationTime) {
+  AdvanceTo(37);
+
   VpiTime t = {};
   t.type = vpiSimTime;
+  t.low = 5;  // not a time of anything: at registration only the type is used
   s_cb_data cb = {};
   cb.reason = cbStmt;
   cb.cb_rtn = &RecordStmtCb;
@@ -180,7 +206,12 @@ TEST_F(VpiStmtCallback, NonSuppressTimePreservesDispatchedTimePointer) {
   vpi_ctx_.DispatchCallbacks(cbStmt);
 
   ASSERT_EQ(g_stmt_calls, 1);
-  EXPECT_EQ(g_stmt_time, &t);
+  ASSERT_NE(g_stmt_time, nullptr);
+  EXPECT_EQ(g_stmt_time_seen.type, vpiSimTime);
+  EXPECT_EQ(g_stmt_time_seen.low, 37u);
+  EXPECT_EQ(g_stmt_time_seen.high, 0u);
+  EXPECT_NE(g_stmt_time, &t);
+  EXPECT_EQ(t.low, 5u);
 }
 
 }  // namespace

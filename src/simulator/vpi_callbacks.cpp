@@ -294,13 +294,30 @@ namespace {
 // NULL and the index field is always 0. In addition, when the callback was
 // registered with a vpiSuppressTime time type, no time is passed to the routine
 // and the time pointer is set to NULL. A non-cbStmt callback is left untouched.
-void VpiNormalizeCbStmtData(VpiCbData& data) {
+//
+// Otherwise the routine is passed a time structure "which will contain the
+// current simulation time, of the type ... indicated in the call to
+// vpi_register_cb()". At registration "only the type is used", so the structure
+// the application supplied there says which form to deliver and nothing about
+// when: the time itself is read here, as the statement is about to execute. It
+// goes into storage the dispatch owns, because the structure the routine sees
+// is not the registration's and writing through that pointer would overwrite
+// the request. vpiScaledRealTime is scaled to the timescale of the statement in
+// the obj field, the object this delivery is about.
+void VpiNormalizeCbStmtData(VpiCbData& data, VpiTime& delivered,
+                            VpiContext& ctx) {
   if (data.reason != cbStmt) return;
   data.value = nullptr;
   data.index = 0;
-  if (data.time != nullptr && data.time->type == vpiSuppressTime) {
+  if (data.time == nullptr) return;
+  if (data.time->type == vpiSuppressTime) {
     data.time = nullptr;
+    return;
   }
+  delivered.type = data.time->type;
+  ctx.GetTime(delivered.type == kVpiScaledRealTime ? data.obj : nullptr,
+              &delivered);
+  data.time = &delivered;
 }
 
 // §38.36.1: shape the s_cb_data fields that a simulation-event callback
@@ -381,8 +398,10 @@ int VpiContext::DispatchCallbacks(int reason, VpiHandle obj, void* user_data) {
   // firing.
   auto deliver = [&](VpiCbData data) {
     // §38.36.1.1: apply the fixed s_cb_data field contents a cbStmt callback
-    // requires before the routine sees them.
-    VpiNormalizeCbStmtData(data);
+    // requires before the routine sees them, and the current simulation time it
+    // is passed in the form the registration asked for.
+    VpiTime delivered_stmt_time;
+    VpiNormalizeCbStmtData(data, delivered_stmt_time, *this);
     // §38.36.1: a cbReclaimObj or cbEndOfObject callback is passed no time, so
     // clear the time pointer before the routine runs.
     VpiNormalizeSimEventCbData(data);
