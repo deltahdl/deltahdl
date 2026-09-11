@@ -7,9 +7,28 @@
 namespace delta {
 namespace {
 
+// A cbEndOfReset routine that reads the user-data field and then sets it
+// again, which §38.14 says an application may do during or after such a
+// callback. The handle, what the read found and what the routine put there are
+// file-scope so the routine, whose signature the standard fixes, can reach
+// them.
+VpiHandle g_reset_call = nullptr;
+void* g_seen_during_reset = nullptr;
+int g_value_set_during_reset = 0;
+bool g_reset_routine_ran = false;
+int ReadAndRestoreUserData(VpiCbData*) {
+  g_reset_routine_ran = true;
+  g_seen_during_reset = vpi_get_userdata(g_reset_call);
+  vpi_put_userdata(g_reset_call, &g_value_set_during_reset);
+  return 0;
+}
+
 class VpiGetUserDataSim : public ::testing::Test {
  protected:
   void SetUp() override {
+    g_reset_call = nullptr;
+    g_seen_during_reset = nullptr;
+    g_reset_routine_ran = false;
     vpi_ctx_.SetScheduler(&scheduler_);
     SetGlobalVpiContext(&vpi_ctx_);
   }
@@ -93,6 +112,30 @@ TEST_F(VpiGetUserDataSim, ReturnsNullAfterReset) {
   vpi_ctx_.DispatchReset();
 
   EXPECT_EQ(vpi_get_userdata(call), nullptr);
+}
+
+// §38.14's last sentence: "The user-data field can be set up again during or
+// after callbacks of type cbEndOfRestart or cbEndOfReset." That puts the clear
+// before those callbacks rather than after them, which only a read from inside
+// one can tell: a routine delivered during the reset finds the field already
+// null, and what it puts there is what a later read finds.
+TEST_F(VpiGetUserDataSim, AReadDuringEndOfResetStartsFromNullAndCanBeSetAgain) {
+  VpiHandle call = MakeCall(vpiSysTaskCall);
+  int before_reset = 0;
+  ASSERT_EQ(vpi_put_userdata(call, &before_reset), 1);
+
+  g_reset_call = call;
+  s_cb_data cb = {};
+  cb.reason = cbEndOfReset;
+  cb.cb_rtn = ReadAndRestoreUserData;
+  ASSERT_NE(vpi_register_cb(&cb), nullptr);
+
+  vpi_ctx_.DispatchReset();
+
+  ASSERT_TRUE(g_reset_routine_ran);
+  EXPECT_EQ(g_seen_during_reset, nullptr);  // the clear came first
+  EXPECT_EQ(vpi_get_userdata(call), &g_value_set_during_reset);
+  EXPECT_NE(vpi_get_userdata(call), &before_reset);
 }
 
 }  // namespace
