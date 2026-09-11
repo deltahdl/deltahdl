@@ -335,17 +335,16 @@ PLI_UINT32 VpiContext::McdOpen(const std::string& filename) {
   // vpi_mcd_open() assigned it or $fopen seeded it - is reported on the very
   // descriptor it already holds, rather than consuming a second channel.
   //
-  // An entry holding the fd channel alone is not that: it records a file
-  // $fopen opened in its fd form, which this routine's descriptors are not
-  // compatible with, so a channel of its own is opened for it here. The fd was
-  // handed straight back, as though the two were one kind of descriptor, and
-  // every mcd routine given it then worked on a channel the clause says it does
-  // not name.
+  // An entry with that bit set is not that: it records a file $fopen opened in
+  // its fd form, and an fd is one value rather than a set of channels, which is
+  // what "not compatible" amounts to. Such a file gets a channel of its own
+  // here. The fd was handed straight back, as though the two were one kind of
+  // descriptor, so every mcd routine given it worked on whichever channels the
+  // fd's own numbering happened to set bits for.
   auto existing = mcd_open_files_.find(filename);
-  PLI_UINT32 open_channels = existing == mcd_open_files_.end()
-                                 ? 0u
-                                 : existing->second & ~kVpiFdDescriptorChannel;
-  if (open_channels != 0) return open_channels;
+  const bool kOpenAsMcd = existing != mcd_open_files_.end() &&
+                          (existing->second & kVpiFdDescriptorChannel) == 0;
+  if (kOpenAsMcd) return existing->second;
 
   // §38.27: an open that cannot be carried out returns 0.
   if (mcd_open_should_fail_) return 0;
@@ -361,9 +360,9 @@ PLI_UINT32 VpiContext::McdOpen(const std::string& filename) {
     // §38.27: open the file for writing and hand back its multichannel
     // descriptor, recording it so a later open of the same file finds it.
     mcd_allocated_channels_ |= channel;
-    // The file may already be named by the fd channel, which this claim is
-    // added to rather than replacing: each is closed on its own.
-    mcd_open_files_[filename] |= channel;
+    // A file recorded under an fd is now recorded under the channel this
+    // namespace opened for it; the fd remains $fopen's own to close.
+    mcd_open_files_[filename] = channel;
     return channel;
   }
 
