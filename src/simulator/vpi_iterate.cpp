@@ -805,6 +805,14 @@ void DispatchVpiIterate(int type, VpiHandle ref, const VpiIterateModes& modes,
     return;
   }
   if (ref) {
+    // §39.3.1 step b: an instance handle passed as the reference walks "all
+    // assertions in an instance", which the children of the instance object are
+    // only the outermost of. Every other relation is the single-level walk the
+    // data model draws.
+    if (type == vpiAssertion && VpiIsInstanceType(ref->type)) {
+      VpiCollectInstanceAssertions(ref, iter);
+      return;
+    }
     CollectMatchingChildren(type, ref, modes, iter);
   } else if (VpiIsNullReferenceRelation(type)) {
     // §37.4.3: the sweep answers only where a circle originates the

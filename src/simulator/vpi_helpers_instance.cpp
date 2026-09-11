@@ -82,6 +82,24 @@ bool VpiIsInstanceType(int type) {
          type == vpiProgram;
 }
 
+void VpiCollectInstanceAssertions(VpiHandle scope, VpiHandle iter) {
+  // §39.3.1 step b: "Iterate all assertions in an instance: pass the
+  // appropriate instance handle as a reference handle to vpi_iterate()." All of
+  // them is what the step asks for, and an assertion is written wherever the
+  // instance body admits one - directly, inside a begin block, inside a
+  // procedure, inside a generate scope - so the walk descends through the
+  // scopes the body holds rather than reading off its immediate children.
+  for (VpiObject* child : scope->children) {
+    if (child == nullptr) continue;
+    if (VpiIsAssertionType(child->type)) iter->children.push_back(child);
+    // An assertion inside a nested instance is an assertion of that instance,
+    // which is what its own handle would be passed to reach: the walk stops at
+    // the boundary rather than claiming what belongs to the instance below.
+    if (VpiIsInstanceType(child->type)) continue;
+    VpiCollectInstanceAssertions(child, iter);
+  }
+}
+
 VpiHandle VpiInstanceOf(VpiHandle obj) {
   // §37.10 detail 3: walk outward to the first enclosing scope that is itself
   // an instance; that is the immediate instance the object is instantiated in.

@@ -56,6 +56,11 @@ void VpiCollectCallbackObjects(VpiHandle ref,
 // Defined in vpi_helpers_statements.cpp, used by vpi_iterate.cpp.
 bool VpiIsVirtualInterfaceArray(VpiHandle obj);
 
+// §39.3.1 step b: the assertions of one instance - every assertion written
+// anywhere in its body, and none of those belonging to an instance nested
+// inside it. Defined in vpi_helpers_instance.cpp, used by vpi_iterate.cpp.
+void VpiCollectInstanceAssertions(VpiHandle scope, VpiHandle iter);
+
 // Defined in vpi_systf.cpp, used by vpi_helpers_statements.cpp,
 // vpi_handle.cpp, and vpi_value.cpp.
 bool VpiObjectIsPrimitive(int type);

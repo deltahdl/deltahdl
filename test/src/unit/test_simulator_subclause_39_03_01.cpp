@@ -211,5 +211,76 @@ TEST(ObtainAssertionHandles, UnnamedAssertionCannotBeFoundByName) {
   EXPECT_EQ(ctx.HandleByName("", nullptr), nullptr);
 }
 
+// Step b, all of them: an assertion is written wherever an instance body admits
+// one, and the concurrent assertions of a design sit inside its procedures and
+// generate scopes as readily as directly in the module body. The walk of an
+// instance reaches those too - "all assertions in an instance" is what the step
+// asks for, and a walk that read off the instance's immediate children reported
+// only the ones written at the top of it.
+TEST(ObtainAssertionHandles, InstanceWalkReachesAssertionsInsideItsBlocks) {
+  VpiContext ctx;
+  VpiObject dut;
+  dut.type = vpiModule;
+
+  VpiObject at_the_top;
+  at_the_top.type = vpiAssert;
+  VpiObject block;
+  block.type = vpiNamedBegin;
+  VpiObject in_the_block;
+  in_the_block.type = vpiCover;
+  VpiObject deeper;
+  deeper.type = vpiAlways;
+  VpiObject in_the_procedure;
+  in_the_procedure.type = vpiImmediateAssert;
+
+  deeper.children = {&in_the_procedure};
+  block.children = {&in_the_block, &deeper};
+  dut.children = {&at_the_top, &block};
+
+  VpiHandle it = ctx.Iterate(vpiAssertion, &dut);
+  ASSERT_NE(it, nullptr);
+  std::vector<VpiHandle> seen;
+  while (VpiHandle h = ctx.Scan(it)) seen.push_back(h);
+
+  EXPECT_EQ(seen.size(), 3u);
+  EXPECT_NE(std::find(seen.begin(), seen.end(), &at_the_top), seen.end());
+  EXPECT_NE(std::find(seen.begin(), seen.end(), &in_the_block), seen.end());
+  EXPECT_NE(std::find(seen.begin(), seen.end(), &in_the_procedure), seen.end());
+  // The block itself is no assertion, so the walk reports it as none.
+  EXPECT_EQ(std::find(seen.begin(), seen.end(), &block), seen.end());
+}
+
+// Step b, the boundary the walk stops at: an assertion written inside a module
+// instantiated within this one belongs to that instance, which is the handle an
+// application would pass to reach it. Descending through the body does not
+// cross into it.
+TEST(ObtainAssertionHandles, InstanceWalkStopsAtAnInstanceNestedInside) {
+  VpiContext ctx;
+  VpiObject dut;
+  dut.type = vpiModule;
+  VpiObject own;
+  own.type = vpiAssert;
+  VpiObject sub;
+  sub.type = vpiModule;
+  VpiObject in_sub;
+  in_sub.type = vpiAssert;
+  sub.children = {&in_sub};
+  dut.children = {&own, &sub};
+
+  VpiHandle it = ctx.Iterate(vpiAssertion, &dut);
+  ASSERT_NE(it, nullptr);
+  std::vector<VpiHandle> seen;
+  while (VpiHandle h = ctx.Scan(it)) seen.push_back(h);
+
+  ASSERT_EQ(seen.size(), 1u);
+  EXPECT_EQ(seen[0], &own);
+
+  // The assertion of the instance below is reached by passing that instance.
+  VpiHandle sub_it = ctx.Iterate(vpiAssertion, &sub);
+  ASSERT_NE(sub_it, nullptr);
+  EXPECT_EQ(ctx.Scan(sub_it), &in_sub);
+  EXPECT_EQ(ctx.Scan(sub_it), nullptr);
+}
+
 }  // namespace
 }  // namespace delta
