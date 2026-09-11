@@ -6,18 +6,26 @@
 namespace delta {
 namespace {
 
-// §37.77 Disables: the object model diagram groups two statements under the
-// abstract "disables" label - a disable statement and a disable fork statement
-// - and draws a single labeled edge, vpiExpr, from the disable statement to the
-// named scope it terminates: a task, a function, a named begin block, or a
-// named fork block. The clause carries no BNF, no numbered Details, and no
-// 'shall' sentences; that vpiExpr edge and its four target kinds are its entire
-// content. The edge needs dedicated production code because the scope at its
-// far end is not an expression - its own type is a scope kind, not the vpiExpr
-// relation tag - so the generic vpiExpr traversal in vpi_handle cannot find it.
-// The disable fork statement names no scope and so draws no such edge. These
-// tests observe that production path applying the rule through the public
-// vpi_handle dispatch.
+// §37.77 Disables: the object model diagram draws a class definition, bold
+// italic letters in a dotted enclosure named "disables", holding two statements
+// - a disable statement and a disable fork statement - and draws a single
+// labeled edge, vpiExpr, from the disable statement alone to the named scope it
+// terminates: a task, a function, a named begin block, or a named fork block.
+// The clause carries no BNF, no numbered Details, and no 'shall' sentences;
+// that class and that edge are its entire content. The edge needs dedicated
+// production code because the scope at its far end is not an expression - its
+// own type is a scope kind, not the vpiExpr relation tag - so the generic
+// vpiExpr traversal in vpi_handle cannot find it. The disable fork statement
+// terminates the calling process's children and names no scope, so it draws no
+// such edge.
+//
+// §37.4.1 makes the class a grouping of both kinds, and §37.60 draws it inside
+// `atomic stmt` as a reference, so both are atomic statements and both are
+// among the kinds every relation the model draws to the dotted `stmt`
+// enclosure reaches. Only the disable was named there, as though vpiDisable
+// were the name of the pair rather than the kind of one of them, so a disable
+// fork was no statement at all and the body of no loop, branch or block could
+// be one. These tests observe both through the public vpi_handle dispatch.
 
 // The fixture installs a context so the public vpi_handle entry point runs its
 // real dispatch over the test objects.
@@ -119,6 +127,44 @@ TEST_F(Disables, DisableForkHasNoVpiExprTarget) {
   disable_fork.children = {&named_fork};
 
   EXPECT_EQ(vpi_handle(vpiExpr, &disable_fork), nullptr);
+}
+
+// The class: the predicate admits the two kinds the diagram draws inside the
+// `disables` enclosure and rejects statements of other kinds, including the
+// scopes a disable names, which are drawn at the far end of its edge rather
+// than in the class.
+TEST_F(Disables, VpiIsDisableTypeAdmitsBothKindsAndRejectsOthers) {
+  EXPECT_TRUE(VpiIsDisableType(vpiDisable));
+  EXPECT_TRUE(VpiIsDisableType(vpiDisableFork));
+  EXPECT_FALSE(VpiIsDisableType(vpiNamedFork));
+  EXPECT_FALSE(VpiIsDisableType(vpiWaitFork));
+  EXPECT_FALSE(VpiIsDisableType(vpiNullStmt));
+}
+
+// §37.60 draws the class inside `atomic stmt`, so both kinds are atomic
+// statements. A disable fork was not, which put it outside the `stmt` class
+// §37.4.1 has every statement relation reach.
+TEST_F(Disables, BothKindsAreAtomicStatements) {
+  EXPECT_TRUE(VpiIsAtomicStmtType(vpiDisable));
+  EXPECT_TRUE(VpiIsAtomicStmtType(vpiDisableFork));
+}
+
+// The consequence, observed through a relation: a statement of either kind is
+// reached as the body of a loop, which is one of the untagged arrows the model
+// draws to `stmt`. "forever disable fork;" is the case the class reference
+// decides.
+TEST_F(Disables, EitherKindIsReachedAsTheBodyOfALoop) {
+  for (int disable_kind : {vpiDisable, vpiDisableFork}) {
+    VpiObject body;
+    body.type = disable_kind;
+
+    VpiObject forever_stmt;
+    forever_stmt.type = vpiForever;
+    forever_stmt.children = {&body};
+
+    EXPECT_EQ(vpi_handle(vpiStmt, &forever_stmt), &body)
+        << "disable kind " << disable_kind;
+  }
 }
 
 }  // namespace

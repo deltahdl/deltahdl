@@ -58,16 +58,33 @@ bool VpiIsExprType(int type) {
 }
 
 bool VpiIsAtomicStmtType(int type) {
-  // §37.60: the members drawn inside the atomic stmt class. The waits,
-  // disables, and tf call entries are themselves groupings; their concrete
-  // kinds (the wait, the disable, and the task/system-task calls) stand in for
-  // them here.
+  // §37.60: the members drawn inside the atomic stmt class.
+  //
+  // Three of those members - `waits`, `disables` and `tf call` - are class
+  // references rather than object definitions, and §37.4.1 makes a class a
+  // grouping of every object drawn inside it, so each stands for all of its
+  // kinds. One kind of each stood in for the whole of it. §37.67 draws a wait,
+  // an ordered wait and a wait fork in `waits` and §37.77 draws a disable and a
+  // disable fork in `disables`, so an ordered wait, a wait fork and a disable
+  // fork were no more atomic statements than a module is, and with that no
+  // statements at all: every relation the model draws to the dotted `stmt`
+  // enclosure reaches the kinds that class groups, and those three were outside
+  // it. Both groupings are named here in full.
+  //
+  // `tf call` is still the task call and the system-task call alone. §37.42
+  // draws four more kinds in it, and every one of them is a call that returns a
+  // value, which §37.59 also draws inside `expr`. A kind in both classes is
+  // reached by the condition scans and the body scans alike, and the objects
+  // that carry a condition and a body carry them as children in one list, so
+  // admitting the four here would have a loop's condition answer for its body.
+  // Telling the two apart is §37.60's reading to settle, not a line in this
+  // switch.
+  if (VpiIsWaitType(type) || VpiIsDisableType(type)) return true;
   switch (type) {
     case vpiIf:
     case vpiIfElse:
     case vpiWhile:
     case vpiRepeat:
-    case vpiWait:  // the "waits" grouping
     case vpiCase:
     case vpiFor:
     case vpiDelayControl:
@@ -76,7 +93,6 @@ bool VpiIsAtomicStmtType(int type) {
     case vpiAssignment:
     case vpiAssignStmt:
     case vpiDeassign:
-    case vpiDisable:      // the "disables" grouping
     case vpiTaskCall:     // the "tf call" grouping: a task call ...
     case vpiSysTaskCall:  // ... or a system-task call
     case vpiForever:
@@ -339,6 +355,17 @@ VpiHandle VpiOrderedWaitElseStmt(VpiHandle wait) {
 VpiHandle VpiExpectElseStmt(VpiHandle expect) {
   if (!expect || expect->type != vpiExpectStmt) return nullptr;
   return SecondBodyStmt(expect);
+}
+
+bool VpiIsDisableType(int type) {
+  // §37.77: the two statements the disables diagram groups - a disable, which
+  // names the scope it terminates through vpiExpr, and a disable fork, which
+  // terminates the calling process's children and so names none. The grouping
+  // is a class definition, drawn in bold italic letters in a dotted enclosure,
+  // so vpiDisable is the kind of the one statement rather than the name of the
+  // pair, and §37.60 draws the class inside `atomic stmt` as a reference to
+  // both.
+  return type == vpiDisable || type == vpiDisableFork;
 }
 
 bool VpiIsDisableTargetType(int type) {

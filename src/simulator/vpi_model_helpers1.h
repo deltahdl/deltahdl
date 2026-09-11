@@ -737,6 +737,12 @@ VpiHandle VpiReturnConditionExpr(VpiHandle return_stmt);
 // wait, a controlling condition (vpiCondition).
 bool VpiIsWaitType(int type);
 
+// §37.77 Disables: the two statements the disables diagram groups - a disable
+// and a disable fork. §37.60 draws that class inside `atomic stmt`, so both are
+// atomic statements; only the disable draws the vpiExpr edge to the scope it
+// terminates.
+bool VpiIsDisableType(int type);
+
 // §37.67 Waits: the controlling condition a wait or ordered wait statement
 // reaches through vpiCondition. The condition may be either an expression or a
 // sequence instance; either way its own type is an expression/sequence kind
