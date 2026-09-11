@@ -262,6 +262,33 @@ void VpiNormalizeSimEventCbData(VpiCbData& data) {
   }
 }
 
+// §38.36.2: shape the s_cb_data a simulation-time callback delivers. "When a
+// simulation time callback occurs, the application callback routine shall be
+// passed a single argument, which is a pointer to an s_cb_data structure [this
+// is not a pointer to the same structure that was passed to
+// vpi_register_cb()]. The time structure shall contain the current simulation
+// time", and "the value fields are ignored for all reasons with simulation
+// time callbacks".
+//
+// The routine was passed the time the registration asked the callback to fire
+// at, which is the delay or the requested moment rather than the time the
+// simulation is at when it fires, and it was passed whatever value the
+// registration carried. The current time goes into storage the dispatch owns:
+// the structure the routine sees is not the registration's, so writing through
+// the pointer the registration supplied would overwrite the request. The
+// requested form is kept, vpiSimTime delivering the raw count and
+// vpiScaledRealTime a real scaled to the timescale of the obj field, which
+// §38.36.2 names as "the object for determining the time scaling".
+void VpiNormalizeSimTimeCbData(VpiCbData& data, VpiTime& delivered,
+                               VpiContext& ctx) {
+  if (!VpiIsSimulationTimeCallbackReason(data.reason)) return;
+  delivered.type = data.time != nullptr ? data.time->type : kVpiSimTime;
+  ctx.GetTime(delivered.type == kVpiScaledRealTime ? data.obj : nullptr,
+              &delivered);
+  data.time = &delivered;
+  data.value = nullptr;
+}
+
 // §38.36.1.3: report whether this delivery targets a module instance through a
 // cbStmt callback, which must fan out to every statement in the module rather
 // than fire once for the module as a whole.
@@ -291,6 +318,10 @@ int VpiContext::DispatchCallbacks(int reason, VpiHandle obj, void* user_data) {
     // §38.36.1: a cbReclaimObj or cbEndOfObject callback is passed no time, so
     // clear the time pointer before the routine runs.
     VpiNormalizeSimEventCbData(data);
+    // §38.36.2: a simulation-time callback is passed the current simulation
+    // time and no value.
+    VpiTime delivered_time;
+    VpiNormalizeSimTimeCbData(data, delivered_time, *this);
     // §38.9: record the reason of the routine about to run so that a routine
     // gated on its callback reason (e.g. vpi_get_data, legal only under
     // cbStartOfRestart/cbEndOfRestart) can observe it. Restore the prior value
