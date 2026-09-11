@@ -5,6 +5,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_reported_error.h"
 #include "lexer/lexer.h"
 
 using namespace delta;
@@ -137,6 +138,52 @@ TEST(FsmConcatPragmaLexing, RecognizedWithinModuleBody) {
   EXPECT_EQ(pragmas[0].signals, (std::vector<std::string>{"hi", "lo"}));
   EXPECT_EQ(pragmas[0].fsm_name, "my_fsm");
   EXPECT_EQ(pragmas[0].enum_name, "state_e");
+}
+
+// §40.4.3: "Bit-selects or part-selects of signals cannot be used in the
+// concatenation." A comment carrying the whole of the form around the braces is
+// an FSM its author meant to specify, so the prohibition that stopped it being
+// one is reported rather than leaving the FSM unrecognized with nothing to say
+// why. It is a warning because the prohibition is on what the tool can use: the
+// comment annotates a design that is legal with or without it.
+TEST(FsmConcatPragmaLexing, SelectMemberIsReportedAgainstTheProhibition) {
+  const std::string kSrc =
+      "module fsm;\n"
+      "  logic [3:0] hi;\n"
+      "  logic lo;\n"
+      "  /* tool state_vector {hi[3:0], lo} my_fsm enum state_e */\n"
+      "endmodule\n";
+
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", kSrc);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  lexer.LexAll();
+
+  EXPECT_TRUE(lexer.FsmConcatPragmas().empty());
+  EXPECT_TRUE(ReportedWarning(
+      diag.Diagnostics(),
+      "bit-select or part-select cannot be used in an FSM state_vector "
+      "concatenation",
+      LineHolding(kSrc, "/* tool state_vector"), "40.4.3"));
+}
+
+// The report is of the prohibition and not of every comment the recognizer
+// passes over: a comment that never had the §40.4.3 form - one whose braces
+// hold no select, and one that is not a pragma at all - leaves the source
+// silent, because nothing there is an FSM that the prohibition kept from being
+// recognized.
+TEST(FsmConcatPragmaLexing, NothingIsReportedWhereNoSelectWasWritten) {
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>",
+                         "/* tool state_vector {hi lo} my_fsm enum e */\n"
+                         "/* an ordinary comment */\n");
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  lexer.LexAll();
+
+  EXPECT_TRUE(lexer.FsmConcatPragmas().empty());
+  EXPECT_TRUE(diag.Diagnostics().empty());
 }
 
 }  // namespace

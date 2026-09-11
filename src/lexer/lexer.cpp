@@ -362,6 +362,35 @@ void Lexer::TryRecognizeFsmPartSelectPragma(
   fsm_part_select_pragmas_.push_back(pragma);
 }
 
+void Lexer::ReportConcatSelectProhibition(std::string_view inside,
+                                          SourceLoc loc) {
+  // §40.4.3: "Bit-selects or part-selects of signals cannot be used in the
+  // concatenation." The caller has matched the whole of the form around the
+  // braces - the keywords, the FSM name, the enumeration binding - so a select
+  // between them is an FSM its author meant to specify and the prohibition is
+  // what stopped it being one. Saying so is the difference between an FSM the
+  // user can see went unrecognized and one that quietly did. A member that
+  // breaks some other rule is not this report: the comment is then one the
+  // recognizer passed over rather than a prohibition it applied.
+  //
+  // The source stays legal, so this is a warning rather than an error: a pragma
+  // is a comment, and a comment the tool cannot use leaves the design it
+  // annotates as well formed as it was.
+  if (inside.find('[') == std::string_view::npos) {
+    return;
+  }
+  // A comment the parser backtracks over reaches the recognizer again, and one
+  // comment breaking one rule is one report.
+  if (PragmaAlreadyRecorded(fsm_concat_select_reports_, loc)) {
+    return;
+  }
+  fsm_concat_select_reports_.push_back({loc});
+  diag_.Warning(loc,
+                "bit-select or part-select cannot be used in an FSM "
+                "state_vector concatenation",
+                Subclause("40.4.3"));
+}
+
 void Lexer::TryRecognizeFsmConcatPragma(
     const std::vector<std::string_view>& words, SourceLoc loc) {
   // The caller has already matched the leading `tool state_vector`. §40.4.3's
@@ -394,6 +423,7 @@ void Lexer::TryRecognizeFsmConcatPragma(
 
   FsmConcatPragma pragma;
   if (!ParseConcatMembers(inside, pragma.signal_names)) {
+    ReportConcatSelectProhibition(inside, loc);
     return;
   }
 

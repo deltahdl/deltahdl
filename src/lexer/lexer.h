@@ -115,6 +115,7 @@ class Lexer {
       const std::vector<std::string_view>& words, SourceLoc loc);
   void TryRecognizeFsmConcatPragma(const std::vector<std::string_view>& words,
                                    SourceLoc loc);
+  void ReportConcatSelectProhibition(std::string_view inside, SourceLoc loc);
 
  public:
   // Public so the free pragma-recognition helpers in lexer.cpp can call it.
@@ -181,6 +182,13 @@ class Lexer {
   std::vector<FsmStatePragma> fsm_state_pragmas_;
   std::vector<FsmPartSelectPragma> fsm_part_select_pragmas_;
   std::vector<FsmConcatPragma> fsm_concat_pragmas_;
+  // §40.4.3 prohibitions already reported, so a comment the parser backtracks
+  // over is reported once. Only the location matters, which is what the
+  // recorded-pragma check reads of any of these lists.
+  struct ConcatSelectReport {
+    SourceLoc loc;
+  };
+  std::vector<ConcatSelectReport> fsm_concat_select_reports_;
 };
 
 }  // namespace delta
