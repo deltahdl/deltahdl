@@ -890,11 +890,11 @@ class VpiContext {
   std::string product_ = "DeltaHDL";
   std::string version_ = "0.1.0";
 
-  // §38.17: the invocation command line reported by vpi_get_vlog_info(). The
-  // owning strings live in invocation_args_ (entry zero is the tool name); the
-  // pointer array handed back as argv is rebuilt into invocation_argv_ on each
-  // query so every entry references a NUL-terminated copy of one token.
+  // §38.17: what vpi_get_vlog_info() reports - the command line's own strings,
+  // the words read out of any options file it names, and the pointer array
+  // handed back as argv, which GetVlogInfo rebuilds from both on each query.
   std::vector<std::string> invocation_args_;
+  std::vector<std::string> invocation_file_args_;
   std::vector<const char*> invocation_argv_;
 
   std::vector<std::string> str_pool_;

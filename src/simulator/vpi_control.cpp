@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <fstream>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -148,22 +150,145 @@ void VpiContext::SetInvocationArguments(
   for (const std::string& option : options) invocation_args_.push_back(option);
 }
 
+namespace {
+
+// §38.17: the option this tool passes a file of options with. The driver reads
+// it in src/driver/cli_options.cpp, and the clause says what
+// vpi_get_vlog_info() reports of such a file: "the argument strings returned by
+// vpi_get_vlog_info() shall contain the vendor option string name followed by a
+// pointer to a NULL-terminated array of pointers to characters".
+constexpr std::string_view kVpiVendorOptionsFileFlag = "-f";
+
+// The driver caps how deep options files may nest; this walk caps it the same
+// way, so a file that names its way back to itself ends here too.
+constexpr int kVpiMaxOptionsFileDepth = 16;
+
+// §38.17: one array of pointers the report holds - the command line itself, or
+// the parsed contents of an options file. An entry is either a word, given as
+// its index in the string pool, or the pointer to a nested array, given as that
+// array's index.
+struct VpiArgvEntry {
+  size_t word = 0;
+  int nested_array = -1;
+};
+struct VpiArgvArray {
+  std::vector<VpiArgvEntry> entries;
+  size_t offset = 0;
+};
+
+// §38.17: the words an options file holds, parsed the way the tool parses them
+// - whitespace-separated, a word beginning with # commenting out the rest of
+// its line.
+std::vector<std::string> VpiOptionsFileWords(const std::string& path) {
+  std::vector<std::string> words;
+  std::ifstream ifs(path);
+  if (!ifs) return words;
+  std::string line;
+  while (std::getline(ifs, line)) {
+    std::istringstream words_of_line(line);
+    std::string word;
+    while (words_of_line >> word) {
+      if (!word.empty() && word[0] == '#') break;
+      words.push_back(std::move(word));
+    }
+  }
+  return words;
+}
+
+// §38.17: lay one list of words into an array of the report, pooling each word
+// and opening a nested array wherever the vendor option names a file. Returns
+// the index of the array it built.
+int VpiBuildArgvArray(const std::vector<std::string>& words, int depth,
+                      std::vector<std::string>* pool,
+                      std::vector<VpiArgvArray>* arrays) {
+  int self = static_cast<int>(arrays->size());
+  arrays->emplace_back();
+  for (size_t i = 0; i < words.size(); ++i) {
+    pool->push_back(words[i]);
+    (*arrays)[static_cast<size_t>(self)].entries.push_back(
+        {pool->size() - 1, -1});
+    const bool kNamesFile = words[i] == kVpiVendorOptionsFileFlag &&
+                            i + 1 < words.size() &&
+                            depth < kVpiMaxOptionsFileDepth;
+    if (!kNamesFile) continue;
+    // §38.17: "The value in entry zero shall contain the name of the file. The
+    // remaining entries shall contain pointers to NULL-terminated character
+    // arrays containing the different options in the file."
+    std::vector<std::string> nested = {words[i + 1]};
+    for (std::string& word : VpiOptionsFileWords(words[i + 1])) {
+      nested.push_back(std::move(word));
+    }
+    int child = VpiBuildArgvArray(nested, depth + 1, pool, arrays);
+    (*arrays)[static_cast<size_t>(self)].entries.push_back({0, child});
+    ++i;  // the file name is the nested array's entry zero, not an entry here
+  }
+  return self;
+}
+
+// §38.17: give every array a place in the report and fill in the words. The
+// command line comes first and its entries are argc; each array after it ends
+// in the NULL the clause requires, so it is one longer than its entries. The
+// pointer a vendor file option is followed by is left for VpiLinkArgvArrays,
+// which needs every array's place before it can name one.
+void VpiPlaceArgvArrays(const std::vector<std::string>& pool,
+                        std::vector<VpiArgvArray>* arrays,
+                        std::vector<const char*>* argv) {
+  size_t offset = 0;
+  for (size_t k = 0; k < arrays->size(); ++k) {
+    (*arrays)[k].offset = offset;
+    offset += (*arrays)[k].entries.size() + (k == 0 ? 0 : 1);
+  }
+  argv->assign(offset, nullptr);
+  for (const VpiArgvArray& array : *arrays) {
+    size_t at = array.offset;
+    for (const VpiArgvEntry& entry : array.entries) {
+      if (entry.nested_array < 0) (*argv)[at] = pool[entry.word].c_str();
+      ++at;
+    }
+  }
+}
+
+// §38.17: "the vendor option string name followed by a pointer to a
+// NULL-terminated array of pointers to characters" - the pointer is written
+// here, once the array it reaches has a place of its own in the report.
+void VpiLinkArgvArrays(const std::vector<VpiArgvArray>& arrays,
+                       std::vector<const char*>* argv) {
+  for (const VpiArgvArray& array : arrays) {
+    size_t at = array.offset;
+    for (const VpiArgvEntry& entry : array.entries) {
+      if (entry.nested_array >= 0) {
+        const char** nested =
+            argv->data() +
+            arrays[static_cast<size_t>(entry.nested_array)].offset;
+        (*argv)[at] = reinterpret_cast<const char*>(nested);
+      }
+      ++at;
+    }
+  }
+}
+
+}  // namespace
+
 bool VpiContext::GetVlogInfo(VpiVlogInfo* info) {
   // §38.17: a null result structure cannot receive the information, so the
   // routine fails.
   if (!info) return false;
 
-  // §38.17: rebuild the argv pointer array so each entry references a
-  // NUL-terminated copy of one command-line token (std::string guarantees the
-  // terminator). There are argc entries, and entry zero is the tool name -
-  // both guaranteed by how invocation_args_ was populated.
-  invocation_argv_.clear();
-  invocation_argv_.reserve(invocation_args_.size());
-  for (const std::string& arg : invocation_args_) {
-    invocation_argv_.push_back(arg.c_str());
-  }
+  // §38.17: rebuild the report. The command line is the first array and its
+  // length is argc, entry zero being the tool name - both guaranteed by how
+  // invocation_args_ was populated. Wherever it names an options file, the
+  // entry after the vendor option holds a pointer to that file's own array
+  // rather than the file name as a string, and those arrays are laid out after
+  // the command line's entries. Nothing built them: a named file was reported
+  // as the plain word it was written as, so what the tool had actually read out
+  // of it was in the report nowhere.
+  invocation_file_args_.clear();
+  std::vector<VpiArgvArray> arrays;
+  VpiBuildArgvArray(invocation_args_, 0, &invocation_file_args_, &arrays);
+  VpiPlaceArgvArrays(invocation_file_args_, &arrays, &invocation_argv_);
+  VpiLinkArgvArrays(arrays, &invocation_argv_);
 
-  info->argc = static_cast<int>(invocation_argv_.size());
+  info->argc = static_cast<int>(arrays.empty() ? 0 : arrays[0].entries.size());
   info->argv = invocation_argv_.empty() ? nullptr : invocation_argv_.data();
   info->product = product_.c_str();
   info->version = version_.c_str();
