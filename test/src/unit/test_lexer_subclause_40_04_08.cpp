@@ -45,23 +45,26 @@ using namespace delta;
 namespace {
 
 // Figure 40-2 verbatim, down to the spacing of `reg[31:0]` and the closing
-// comment on `endmodule`.
-const std::string kFigure =
-    "module m3;\n"
-    "\n"
-    "reg[31:0] cs;\n"
-    "reg[31:0] /* tool enum MY_FSM */ ns;\n"
-    "reg[31:0] clk;\n"
-    "reg[31:0] rst;\n"
-    "\n"
-    "// tool state_vector cs enum MY_FSM\n"
-    "\n"
-    "parameter // tool enum MY_FSM\n"
-    "p1=10,\n"
-    "p2=11,\n"
-    "p3=12;\n"
-    "\n"
-    "endmodule // m3\n";
+// comment on `endmodule`. It is built on each call rather than held in a
+// constant of its own, a std::string at namespace scope being an initializer
+// that runs before main with nowhere to throw to.
+std::string TheFigure() {
+  return "module m3;\n"
+         "\n"
+         "reg[31:0] cs;\n"
+         "reg[31:0] /* tool enum MY_FSM */ ns;\n"
+         "reg[31:0] clk;\n"
+         "reg[31:0] rst;\n"
+         "\n"
+         "// tool state_vector cs enum MY_FSM\n"
+         "\n"
+         "parameter // tool enum MY_FSM\n"
+         "p1=10,\n"
+         "p2=11,\n"
+         "p3=12;\n"
+         "\n"
+         "endmodule // m3\n";
+}
 
 // The figure is drawn with three pragmas and no more: the next-state signal's,
 // the current-state signal's, and the possible states'. Two are written after
@@ -70,7 +73,7 @@ const std::string kFigure =
 // is the whole of what makes this one FSM rather than three annotations that
 // happen to share a module.
 TEST(FsmPragmaExampleLexing, TheFigureIsDrawnWithThreePragmasOfOneFsm) {
-  auto pragmas = CollectFsmPragmas(kFigure);
+  auto pragmas = CollectFsmPragmas(TheFigure());
   ASSERT_EQ(pragmas.size(), 3u);
 
   EXPECT_EQ(pragmas[0].form, "enum_only");
@@ -97,8 +100,8 @@ TEST(FsmPragmaExampleLexing,
      TheSignalFollowingTheFirstPragmaHoldsTheNextState) {
   const std::vector<std::string> kNextState = {"ns"};
 
-  EXPECT_EQ(KindBeforeEnumPragma(kFigure, 0), TokenKind::kRBracket);
-  EXPECT_EQ(NamesFollowingEnumPragma(kFigure, 0), kNextState);
+  EXPECT_EQ(KindBeforeEnumPragma(TheFigure(), 0), TokenKind::kRBracket);
+  EXPECT_EQ(NamesFollowingEnumPragma(TheFigure(), 0), kNextState);
 }
 
 // "Signal cs holds the current state" - §40.4.1's rule. The figure names that
@@ -107,7 +110,7 @@ TEST(FsmPragmaExampleLexing,
 // state is read from the pragma's own operand and the distance from the
 // declaration is nothing to it.
 TEST(FsmPragmaExampleLexing, TheStateVectorPragmaNamesTheCurrentStateSignal) {
-  auto pragmas = CollectFsmPragmas(kFigure);
+  auto pragmas = CollectFsmPragmas(TheFigure());
   ASSERT_EQ(pragmas.size(), 3u);
   EXPECT_EQ(pragmas[1].form, "state_vector");
   EXPECT_EQ(pragmas[1].signal, "cs");
@@ -123,8 +126,8 @@ TEST(FsmPragmaExampleLexing, TheStateVectorPragmaNamesTheCurrentStateSignal) {
 TEST(FsmPragmaExampleLexing, TheNamesFollowingTheLastPragmaArePossibleStates) {
   const std::vector<std::string> kPossibleStates = {"p1", "p2", "p3"};
 
-  EXPECT_EQ(KindBeforeEnumPragma(kFigure, 1), TokenKind::kKwParameter);
-  EXPECT_EQ(NamesFollowingEnumPragma(kFigure, 1), kPossibleStates);
+  EXPECT_EQ(KindBeforeEnumPragma(TheFigure(), 1), TokenKind::kKwParameter);
+  EXPECT_EQ(NamesFollowingEnumPragma(TheFigure(), 1), kPossibleStates);
 }
 
 // The figure closes with `endmodule // m3`, a one-line comment that is not a
@@ -135,7 +138,7 @@ TEST(FsmPragmaExampleLexing, TheNamesFollowingTheLastPragmaArePossibleStates) {
 TEST(FsmPragmaExampleLexing, TheClosingCommentIsNoPragmaAndNothingIsReported) {
   SourceManager mgr;
   DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>", kFigure);
+  auto fid = mgr.AddFile("<test>", TheFigure());
   Lexer lexer(mgr.FileContent(fid), fid, diag);
   lexer.LexAll();
 
