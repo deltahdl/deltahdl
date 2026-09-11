@@ -47,13 +47,18 @@ constexpr int kOverflow = static_cast<int>(CoverageStatus::kOverflow);
 
 constexpr std::string_view kScope = "$root.tb.unit1";
 
-// Evaluates $coverage_get(coverage_type, `SV_COV_HIER, scope) through the
+// §40.3.2.1 Table 40-2 scope_def constants (second argument).
+constexpr int kModule = 10;
+constexpr int kHier = 11;
+
+// Evaluates $coverage_get(coverage_type, scope_def, scope) through the
 // production evaluator and returns the reported value as a signed integer.
-int RunGet(SimFixture& f, int coverage_type, std::string_view scope) {
-  auto* call =
-      MkSysCall(f.arena, "$coverage_get",
-                {MkInt(f.arena, static_cast<uint64_t>(coverage_type)),
-                 MkInt(f.arena, 11 /* `SV_COV_HIER */), MkStr(f.arena, scope)});
+int RunGet(SimFixture& f, int coverage_type, int scope_def,
+           std::string_view scope) {
+  auto* call = MkSysCall(f.arena, "$coverage_get",
+                         {MkInt(f.arena, static_cast<uint64_t>(coverage_type)),
+                          MkInt(f.arena, static_cast<uint64_t>(scope_def)),
+                          MkStr(f.arena, scope)});
   return static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64());
 }
 
@@ -69,8 +74,8 @@ TEST(CoverageGet, ReportsCurrentCoveredCountPerType) {
   Cov(f).SetCoveredItems(std::string(kScope), kToggle, 12);
   Cov(f).SetCoveredItems(std::string(kScope), kAssertion, 3);
 
-  EXPECT_EQ(RunGet(f, kToggle, kScope), 12);
-  EXPECT_EQ(RunGet(f, kAssertion, kScope), 3);
+  EXPECT_EQ(RunGet(f, kToggle, kHier, kScope), 12);
+  EXPECT_EQ(RunGet(f, kAssertion, kHier, kScope), 3);
 }
 
 // The current coverage value is the number covered, not the maximum: with more
@@ -82,7 +87,7 @@ TEST(CoverageGet, ReportsCoveredCountDistinctFromMaximum) {
   Cov(f).SetCoverableItems(std::string(kScope), kToggle, 48);
   Cov(f).SetCoveredItems(std::string(kScope), kToggle, 30);
 
-  EXPECT_EQ(RunGet(f, kToggle, kScope), 30);
+  EXPECT_EQ(RunGet(f, kToggle, kHier, kScope), 30);
 }
 
 // 0 (`SV_COV_NOCOV): a scope that exists but has covered no items of the
@@ -93,14 +98,14 @@ TEST(CoverageGet, NoCoveredItemsReportsNoCoverage) {
   Cov(f).SetCoveredItems(std::string(kScope), kToggle, 12);
 
   // No assertion items have been covered in this scope.
-  EXPECT_EQ(RunGet(f, kAssertion, kScope), kNoCov);
+  EXPECT_EQ(RunGet(f, kAssertion, kHier, kScope), kNoCov);
 }
 
 // -1 (`SV_COV_ERROR): a scope the design does not contain is a bad argument and
 // reports an error.
 TEST(CoverageGet, UnknownScopeIsBadArgument) {
   SimFixture f;
-  EXPECT_EQ(RunGet(f, kToggle, "$root.tb.nonesuch"), kError);
+  EXPECT_EQ(RunGet(f, kToggle, kHier, "$root.tb.nonesuch"), kError);
 }
 
 // -2 (`SV_COV_OVERFLOW): a current coverage count too large to represent as an
@@ -111,7 +116,7 @@ TEST(CoverageGet, CountExceedingIntegerRangeOverflows) {
       std::string(kScope), kToggle,
       static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max()) + 1);
 
-  EXPECT_EQ(RunGet(f, kToggle, kScope), kOverflow);
+  EXPECT_EQ(RunGet(f, kToggle, kHier, kScope), kOverflow);
 }
 
 // -1 (`SV_COV_ERROR) edge: a call with no arguments cannot name a coverage type
@@ -134,18 +139,10 @@ TEST(CoverageGet, TheScopeDefinitionDecidesWhatIsSummed) {
   Cov(f).SetCoveredItems("top.dut.u1.leaf", kToggle, 1);
   Cov(f).SetCoveredItems("top.other", kToggle, 100);
 
-  auto get = [&f](int scope_def, std::string_view scope) {
-    auto* call = MkSysCall(f.arena, "$coverage_get",
-                           {MkInt(f.arena, static_cast<uint64_t>(kToggle)),
-                            MkInt(f.arena, static_cast<uint64_t>(scope_def)),
-                            MkStr(f.arena, scope)});
-    return static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64());
-  };
-
   // The whole hierarchy below top.dut, and nothing outside it.
-  EXPECT_EQ(get(11 /* `SV_COV_HIER */, "top.dut"), 9);
+  EXPECT_EQ(RunGet(f, kToggle, kHier, "top.dut"), 9);
   // The instance alone.
-  EXPECT_EQ(get(10 /* `SV_COV_MODULE */, "top.dut"), 5);
+  EXPECT_EQ(RunGet(f, kToggle, kModule, "top.dut"), 5);
 }
 
 // §40.3.2.1 Table 40-2's definition-name column reaches this query too, which
@@ -163,16 +160,8 @@ TEST(CoverageGet, ADefinitionNameSumsOverEveryInstanceOfThatModule) {
   Cov(f).SetCoveredItems("top.u2.inner", kToggle, 8);
   Cov(f).SetModuleDefinition("top.u2.inner", "other");
 
-  auto get = [&f](int scope_def, std::string_view scope) {
-    auto* call = MkSysCall(f.arena, "$coverage_get",
-                           {MkInt(f.arena, static_cast<uint64_t>(kToggle)),
-                            MkInt(f.arena, static_cast<uint64_t>(scope_def)),
-                            MkStr(f.arena, scope)});
-    return static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64());
-  };
-
-  EXPECT_EQ(get(11 /* `SV_COV_HIER */, "leaf"), 14);
-  EXPECT_EQ(get(10 /* `SV_COV_MODULE */, "leaf"), 6);
+  EXPECT_EQ(RunGet(f, kToggle, kHier, "leaf"), 14);
+  EXPECT_EQ(RunGet(f, kToggle, kModule, "leaf"), 6);
 }
 
 }  // namespace
