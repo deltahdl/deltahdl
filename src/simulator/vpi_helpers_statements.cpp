@@ -19,9 +19,24 @@ namespace delta {
 bool VpiIsExprType(int type) {
   // §37.59: the member kinds the expr class draws - an operation, a constant, a
   // part-select or indexed part-select, the func/method-func/sys-func calls, a
-  // let expression, and a reference (the concrete simple expression). Variables
-  // and nets are not expressions, so a protected variable still has its
-  // properties guarded (detail 8 carves out only protected expressions).
+  // let expression, and the `simple expr` class nested inside it.
+  //
+  // That nested class is a class, and §37.4.1 makes one a grouping of "other
+  // objects and classes" rather than a kind of its own, so what the expr class
+  // holds is what `simple expr` holds. §37.58 draws it holding a ref obj, a
+  // parameter, a spec param, a var select and a bit select, beside the nets and
+  // variables classes. Only the ref obj was named here, as though the reference
+  // were the whole of a simple expression: a parameter, a spec param and either
+  // kind of select were expressions to nothing, so every arrow the model draws
+  // to `expr` - a loop's condition (§37.66), a wait's (§37.67), a repeat
+  // control's count (§37.69), an if's (§37.71), a return's value (§37.78), a
+  // typespec member's default (§37.25 detail 7) and the operands of an
+  // operation among them - passed over a source expression written as any of
+  // the four.
+  //
+  // Variables and nets stay out, which is what the two classes drawn beside
+  // those five in §37.58 are: a protected variable keeps its properties
+  // guarded, §37.3.5 detail 8 carving out only protected expressions.
   switch (type) {
     case vpiOperation:
     case vpiConstant:
@@ -32,6 +47,10 @@ bool VpiIsExprType(int type) {
     case vpiSysFuncCall:
     case vpiLetExpr:
     case vpiRefObj:
+    case vpiParameter:
+    case vpiSpecParam:
+    case vpiVarSelect:
+    case vpiBitSelect:
       return true;
     default:
       return false;
@@ -211,42 +230,6 @@ bool VpiIsAlwaysType(int always_type) {
          always_type == vpiAlwaysFF || always_type == vpiAlwaysLatch;
 }
 
-VpiHandle VpiEventControlStmt(VpiHandle event_control) {
-  // §37.65 detail 1: an event control reaches the statement it guards through
-  // vpiStmt. When the event control is associated with an assignment - i.e. it
-  // is the event control drawn on an assignment object (§37.64) - that
-  // statement is always null, since the assignment itself is the action and
-  // there is no separate guarded statement. For any other event control the
-  // first statement child is returned, or null when none is attached.
-  if (!event_control) return nullptr;
-  if (event_control->parent && event_control->parent->type == vpiAssignment) {
-    return nullptr;
-  }
-  for (auto* child : event_control->children) {
-    if (child->type == vpiStmt) return child;
-  }
-  return nullptr;
-}
-
-VpiHandle VpiEventControlConditionExpr(VpiHandle event_control) {
-  // §37.65: an event control "@" reaches its controlling condition through
-  // vpiCondition. The diagram routes that edge to one of three operand kinds -
-  // an expression (e.g. "@(a or b)", "@(posedge clk)"), a sequence instance
-  // (e.g. "@(seq)"), or a named event (e.g. "@ev"). The condition is therefore
-  // the first child whose own type is one of those kinds, never the
-  // vpiCondition relation tag itself, which is why the generic child walk
-  // cannot serve it. The guarded body is a statement child and is skipped by
-  // this scan. Null when no condition operand is attached.
-  if (!event_control) return nullptr;
-  for (auto* child : event_control->children) {
-    if (VpiIsExprType(child->type) || child->type == vpiSequenceInst ||
-        child->type == vpiNamedEvent) {
-      return child;
-    }
-  }
-  return nullptr;
-}
-
 bool VpiIsWhileOrRepeatType(int type) {
   // §37.66: the two looping statements the while/repeat diagram groups together
   // - a while statement and a repeat statement. Both reach a controlling
@@ -317,23 +300,6 @@ VpiHandle VpiOrderedWaitElseStmt(VpiHandle wait) {
   for (auto* child : wait->children) {
     if (!VpiIsScopeBodyStmtType(child->type)) continue;
     if (++seen == 2) return child;
-  }
-  return nullptr;
-}
-
-VpiHandle VpiRepeatControlExpr(VpiHandle repeat_control) {
-  // §37.69: a repeat control reaches its count expression through the diagram's
-  // unlabeled edge to an expr - the vpiExpr relation. The count is the
-  // repetition number of an intra-assignment repeat event control ("repeat (n)
-  // @(event)"). Its own type is an expression kind (an operation, a constant, a
-  // reference,
-  // ...) rather than the vpiExpr relation tag, so it is found by scanning for
-  // the first expression child; null when none is attached. The repeat
-  // control's other unlabeled edge, to the event control, reaches a child whose
-  // own type is vpiEventControl and is left to the generic traversal.
-  if (!repeat_control) return nullptr;
-  for (auto* child : repeat_control->children) {
-    if (VpiIsExprType(child->type)) return child;
   }
   return nullptr;
 }
@@ -455,42 +421,6 @@ VpiHandle VpiReturnConditionExpr(VpiHandle return_stmt) {
   // returns null.
   if (!return_stmt) return nullptr;
   for (auto* child : return_stmt->children) {
-    if (VpiIsExprType(child->type)) return child;
-  }
-  return nullptr;
-}
-
-VpiHandle VpiDelayControlStmt(VpiHandle delay_control) {
-  // §37.68 detail 1: a delay control reaches the statement it guards through
-  // vpiStmt. When the delay control is associated with an assignment - i.e. it
-  // is the delay control drawn on an assignment object (§37.64) - that
-  // statement is always null, since the assignment itself is the action and
-  // there is no separate guarded statement. For any other delay control the
-  // first statement child is returned, or null when none is attached.
-  if (!delay_control) return nullptr;
-  if (delay_control->parent && delay_control->parent->type == vpiAssignment) {
-    return nullptr;
-  }
-  for (auto* child : delay_control->children) {
-    if (child->type == vpiStmt) return child;
-  }
-  return nullptr;
-}
-
-VpiHandle VpiDelayControlDelayExpr(VpiHandle delay_control) {
-  // §37.68: a delay control "#" reaches the expression giving its delay through
-  // the vpiDelay relation - the "#" operand ("#5", "#(a+b)", "#dly"). That edge
-  // holds whether or not the delay control is associated with an assignment: an
-  // intra-assignment delay ("x = #5 y") reports a null guarded statement
-  // (detail 1) yet still carries a delay expression, so this scan does not
-  // apply the assignment-association carve-out that VpiDelayControlStmt does.
-  // The delay operand is the delay control's first child whose own type is an
-  // expression kind (a constant, an operation, a reference, ...) - never the
-  // guarded statement child (a vpiStmt) and never the vpiDelay relation tag
-  // itself, which is why the generic child walk keyed on the relation enum
-  // cannot serve it. Null when no delay operand is attached.
-  if (!delay_control) return nullptr;
-  for (auto* child : delay_control->children) {
     if (VpiIsExprType(child->type)) return child;
   }
   return nullptr;

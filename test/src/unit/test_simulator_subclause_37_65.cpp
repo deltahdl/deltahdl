@@ -15,6 +15,12 @@ namespace {
 // vpiCondition operand reached by VpiEventControlConditionExpr, and the
 // vpiStmt/D1 edge applied by VpiEventControlStmt - directly and through the
 // public vpi_handle(...) dispatch path.
+//
+// The statement objects below carry the kinds §37.4.1's dotted `stmt` class
+// groups rather than vpiStmt itself: that enclosure is a class grouping other
+// objects, so no statement of a design has the relation's tag for its own kind,
+// and a scan that asked for one found the guarded statement of no timing
+// control any design could hold.
 
 // The fixture installs a context so the public vpi_handle entry point runs its
 // real dispatch over the test objects.
@@ -30,7 +36,7 @@ class EventControl : public ::testing::Test {
 // assignment association and does not blanket-null every event control's stmt.
 TEST_F(EventControl, StandaloneEventControlReachesItsStatement) {
   VpiObject stmt;
-  stmt.type = vpiStmt;
+  stmt.type = vpiBegin;
 
   VpiObject event_control;
   event_control.type = vpiEventControl;
@@ -62,7 +68,7 @@ TEST_F(EventControl, NullAndEmptyEventControlsReportNoStatement) {
 // entry point.
 TEST_F(EventControl, RuleAppliesThroughPublicVpiHandleDispatch) {
   VpiObject guarded;
-  guarded.type = vpiStmt;
+  guarded.type = vpiBegin;
 
   VpiObject assignment;
   assignment.type = vpiAssignment;
@@ -116,7 +122,7 @@ TEST_F(EventControl, ConditionRelationReachesEachEventOperandKind) {
 // mistaken for the vpiCondition operand.
 TEST_F(EventControl, ConditionRelationIgnoresGuardedStatement) {
   VpiObject body;
-  body.type = vpiStmt;
+  body.type = vpiBegin;
 
   VpiObject event_control;
   event_control.type = vpiEventControl;

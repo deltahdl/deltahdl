@@ -14,6 +14,12 @@ namespace {
 // tests observe the production code that applies that rule
 // (VpiDelayControlStmt) both directly and through the public
 // vpi_handle(vpiStmt, ...) dispatch path.
+//
+// The statement objects below carry the kinds §37.4.1's dotted `stmt` class
+// groups rather than vpiStmt itself: that enclosure is a class grouping other
+// objects, so no statement of a design has the relation's tag for its own kind,
+// and a scan that asked for one found the guarded statement of no timing
+// control any design could hold.
 
 // The fixture installs a context so the public vpi_handle entry point runs its
 // real dispatch over the test objects.
@@ -29,7 +35,7 @@ class DelayControl : public ::testing::Test {
 // assignment association and does not blanket-null every delay control's stmt.
 TEST_F(DelayControl, StandaloneDelayControlReachesItsStatement) {
   VpiObject stmt;
-  stmt.type = vpiStmt;
+  stmt.type = vpiBegin;
 
   VpiObject delay_control;
   delay_control.type = vpiDelayControl;
@@ -41,7 +47,7 @@ TEST_F(DelayControl, StandaloneDelayControlReachesItsStatement) {
   // procedural statement) is still an ordinary delay control, so the statement
   // is reached.
   VpiObject host_stmt;
-  host_stmt.type = vpiStmt;
+  host_stmt.type = vpiBegin;
   delay_control.parent = &host_stmt;
   EXPECT_EQ(VpiDelayControlStmt(&delay_control), &stmt);
 }
@@ -62,7 +68,7 @@ TEST_F(DelayControl, NullAndEmptyDelayControlsReportNoStatement) {
 // entry point.
 TEST_F(DelayControl, RuleAppliesThroughPublicVpiHandleDispatch) {
   VpiObject guarded;
-  guarded.type = vpiStmt;
+  guarded.type = vpiBegin;
 
   VpiObject assignment;
   assignment.type = vpiAssignment;
@@ -88,7 +94,7 @@ TEST_F(DelayControl, DelayControlReachesItsDelayExpressionThroughVpiDelay) {
   delay_expr.type = vpiConstant;  // e.g. the "5" in "#5 stmt;"
 
   VpiObject guarded;
-  guarded.type = vpiStmt;
+  guarded.type = vpiBegin;
 
   VpiObject delay_control;
   delay_control.type = vpiDelayControl;
@@ -129,7 +135,7 @@ TEST_F(DelayControl, NullAndDelaylessControlsReportNoDelayExpression) {
   VpiObject only_stmt;
   only_stmt.type = vpiDelayControl;
   VpiObject guarded;
-  guarded.type = vpiStmt;
+  guarded.type = vpiBegin;
   only_stmt.children = {&guarded};
   EXPECT_EQ(VpiDelayControlDelayExpr(&only_stmt), nullptr);
 }

@@ -24,6 +24,14 @@ namespace {
 
 // Diagram: the expr class groups exactly the drawn member kinds; variables,
 // nets and other objects are not expressions.
+//
+// One of the members drawn inside it is the `simple expr` class, and §37.4.1
+// makes a class a grouping of "other objects and classes" rather than a kind of
+// its own, so what the expr class holds includes what that one holds. §37.58
+// draws `simple expr` holding a ref obj, a parameter, a spec param, a var
+// select and a bit select. Only the ref obj was admitted here, as though a
+// reference were the whole of a simple expression, so an expression written as
+// any of the other four was an expression to nothing.
 TEST(ExpressionModel, ExprClassGroupsItsMemberKinds) {
   for (int type : {vpiOperation, vpiConstant, vpiPartSelect,
                    vpiIndexedPartSelect, vpiFuncCall, vpiMethodFuncCall,
@@ -31,6 +39,14 @@ TEST(ExpressionModel, ExprClassGroupsItsMemberKinds) {
     EXPECT_TRUE(VpiIsExprType(type)) << "type=" << type;
   }
 
+  // §37.58: the rest of what the nested `simple expr` class groups.
+  for (int type : {vpiParameter, vpiSpecParam, vpiVarSelect, vpiBitSelect}) {
+    EXPECT_TRUE(VpiIsExprType(type)) << "simple expr type=" << type;
+  }
+
+  // The nets and variables classes drawn beside those five stay out: §37.3.5
+  // detail 8 carves out only a protected expression, so a protected variable
+  // keeps its properties guarded.
   EXPECT_FALSE(VpiIsExprType(vpiReg));
   EXPECT_FALSE(VpiIsExprType(vpiNet));
   EXPECT_FALSE(VpiIsExprType(vpiModule));
