@@ -674,7 +674,15 @@ int VpiContext::Get(int property, VpiHandle obj) {
 // provides the shared full-width access path and the error behaviour those
 // properties rely on.
 PLI_INT64 VpiContext::Get64(int property, VpiHandle obj) {
-  if (!obj) return 0;
+  // §38.6 gives a null handle a meaning of its own for two properties - "For
+  // object property vpiTimeUnit or vpiTimePrecision, if the object is NULL,
+  // then the simulation time unit shall be returned" - and §38.9 gives it
+  // another for the save/restart id. Those are answers about the run rather
+  // than about an object, so they do not change with the width of the reader
+  // asking; this returned a zero of its own instead, and the same query put to
+  // the 64-bit routine reported no unit where the 32-bit one reported the
+  // run's.
+  if (!obj) return Get(property, obj);
   // §38.7: as with vpi_get(), unless otherwise specified querying a property of
   // a protected object is an error, and on any error vpi_get64() returns
   // vpiUndefined. The vpiType and vpiIsProtected properties stay accessible for

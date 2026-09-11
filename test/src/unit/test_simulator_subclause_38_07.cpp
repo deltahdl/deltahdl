@@ -52,8 +52,48 @@ TEST_F(VpiGet64Sim, ProtectedObjectQueryReturnsVpiUndefined) {
   EXPECT_NE(info.level, 0);
 }
 
-// §38.7: a null object handle has no property to read; the routine returns 0.
-TEST_F(VpiGet64Sim, NullHandleReturnsZero) {
+// §38.7: "Unless otherwise specified, calling vpi_get64() for a protected
+// object shall be an error." The exceptions are the ones §37.3.6 and §37.59
+// specify for reading a protected object at all - vpiType and vpiIsProtected,
+// permitted for every object, and vpiSize on a protected expression - so the
+// 64-bit reader lets those through as the 32-bit one does rather than refusing
+// every property alike.
+TEST_F(VpiGet64Sim, TheProtectedRuleKeepsTheExceptionsSpecifiedElsewhere) {
+  VpiObject locked;
+  locked.type = vpiClassObj;
+  locked.is_protected = true;
+
+  EXPECT_EQ(vpi_get64(vpiType, &locked), vpiClassObj);
+  EXPECT_EQ(vpi_get64(vpiIsProtected, &locked), 1);
+
+  // §37.59 detail 8: a protected expression still reports its size.
+  VpiObject locked_expr;
+  locked_expr.type = vpiOperation;
+  locked_expr.is_protected = true;
+  locked_expr.size = 16;
+
+  EXPECT_EQ(vpi_get64(vpiSize, &locked_expr), 16);
+}
+
+// §38.6: "For object property vpiTimeUnit or vpiTimePrecision, if the object is
+// NULL, then the simulation time unit shall be returned", and §38.9 answers a
+// null handle asked for the save/restart id with the run's. Those say something
+// about the run rather than about an object, so the width of the reader asking
+// does not change them - vpi_get64() answered 0 for both where vpi_get()
+// answered the run's.
+TEST_F(VpiGet64Sim, ANullHandleReadsTheSameRunWideAnswersVpiGetReads) {
+  VpiHandle module = vpi_ctx_.CreateModule("t", "t");
+  module->time_precision = -9;
+
+  ASSERT_EQ(vpi_get(vpiTimePrecision, nullptr), -9);  // the run's, not zero
+  EXPECT_EQ(vpi_get64(vpiTimePrecision, nullptr), -9);
+  EXPECT_EQ(vpi_get64(vpiTimeUnit, nullptr), vpi_get(vpiTimeUnit, nullptr));
+
+  ASSERT_NE(vpi_get(vpiSaveRestartID, nullptr), 0);
+  EXPECT_EQ(vpi_get64(vpiSaveRestartID, nullptr),
+            vpi_get(vpiSaveRestartID, nullptr));
+
+  // A property a null handle says nothing about still reads as nothing.
   EXPECT_EQ(vpi_get64(vpiObjId, nullptr), 0);
 }
 
