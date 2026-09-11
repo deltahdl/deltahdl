@@ -9,10 +9,13 @@ namespace {
 // §37.79 Assign statement, deassign, force, release: the object model diagram
 // for the procedural continuous assignment family. The clause carries no BNF,
 // no numbered Details, and no 'shall' sentences - it is the diagram alone. The
-// diagram groups the four statement kinds into two pairs and draws expression
-// edges from them: an assign statement and a force each reach a target through
-// vpiLhs and a value through vpiRhs; a deassign and a release each reach a
-// target through vpiLhs only (they name a target but supply no value).
+// diagram draws two dotted enclosures with no name, which §37.4.1 makes
+// unnamed classes: groupings that "shall not be referenced as a group
+// elsewhere", so what each says is that its members draw the same edges and
+// nothing names the pair. The first holds a force and an assign statement and
+// carries two single arrows, vpiRhs and vpiLhs, each to an expr; the second
+// holds a deassign and a release and carries vpiLhs alone, those two naming a
+// target and supplying no value.
 //
 // Each edge needs dedicated production code because both sides are expression
 // kinds (an operation, a reference, a constant, ...), not the vpiLhs / vpiRhs
@@ -135,6 +138,55 @@ TEST_F(AssignDeassignForceRelease, LhsRelationIsScopedToTheAssignmentFamily) {
   not_in_family.lhs = &target;
 
   EXPECT_EQ(vpi_handle(vpiLhs, &not_in_family), nullptr);
+}
+
+// Both edges reach whatever expression kind the target or the value is written
+// as. §37.59's `expr` class groups the operations, constants and calls, and
+// through the `simple expr` class §37.58 nests inside it, the references,
+// parameters and selects as well - a forced target is written as a reference or
+// a select, and a forced value as any of them.
+TEST_F(AssignDeassignForceRelease, EachExpressionKindIsReachedByBothEdges) {
+  for (int expr_kind : {vpiOperation, vpiConstant, vpiRefObj, vpiFuncCall,
+                        vpiParameter, vpiBitSelect, vpiPartSelect}) {
+    VpiObject target;
+    target.type = expr_kind;
+    VpiObject value;
+    value.type = expr_kind;
+
+    VpiObject force;
+    force.type = vpiForce;
+    force.lhs = &target;
+    force.rhs = &value;
+
+    EXPECT_EQ(vpi_handle(vpiLhs, &force), &target) << "kind " << expr_kind;
+    EXPECT_EQ(vpi_handle(vpiRhs, &force), &value) << "kind " << expr_kind;
+  }
+}
+
+// Each of the four kinds claims the edges its class draws: a statement with no
+// expression attached reports none, and an expression among its children is not
+// taken for one, the edges being held as the statement's own rather than found
+// by a walk over what it contains.
+TEST_F(AssignDeassignForceRelease, EachKindReportsNoExpressionWhenNoneIsSet) {
+  VpiObject stray;
+  stray.type = vpiRefObj;  // an expression child, attached to neither edge
+
+  for (int stmt_kind : {vpiAssignStmt, vpiForce, vpiDeassign, vpiRelease}) {
+    VpiObject stmt;
+    stmt.type = stmt_kind;
+    stmt.children = {&stray};
+
+    EXPECT_EQ(vpi_handle(vpiLhs, &stmt), nullptr) << "kind " << stmt_kind;
+  }
+
+  // The two that do draw vpiRhs report none when no value is attached either.
+  for (int stmt_kind : {vpiAssignStmt, vpiForce}) {
+    VpiObject stmt;
+    stmt.type = stmt_kind;
+    stmt.children = {&stray};
+
+    EXPECT_EQ(vpi_handle(vpiRhs, &stmt), nullptr) << "kind " << stmt_kind;
+  }
 }
 
 }  // namespace
