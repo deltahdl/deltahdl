@@ -98,7 +98,17 @@ int VpiGetAllocScheme(VpiHandle obj) {
 // kinds; any other kind reports vpiUndefined.
 int VpiGetHasActual(VpiHandle obj) {
   if (!VpiIsDynamicPrefixSourceType(obj->type)) return vpiUndefined;
-  return VpiObjectHasActual(obj->actual_origin, obj->actual != nullptr) ? 1 : 0;
+  // §37.61 detail 3: the two current-simulation-time bullets are written about
+  // the prefix - "whenever the prefix object has a corresponding actual at the
+  // current simulation time" and, for FALSE, "whenever the prefix object has no
+  // corresponding actual" - so a prefixed object's answer is read off the
+  // object that prefixes it. Reading it off the object itself made a reference
+  // through a bound virtual interface report that it had no actual, the
+  // reference carrying none of its own. An object with no prefix has only its
+  // own binding to answer from.
+  const VpiObject* bound = obj->prefix != nullptr ? obj->prefix : obj;
+  return VpiObjectHasActual(obj->actual_origin, bound->actual != nullptr) ? 1
+                                                                          : 0;
 }
 
 // §37.16 detail 21: vpiExpanded on a net bit reports the parent net's value;

@@ -175,6 +175,96 @@ VpiObject* SystfCallArgument(VpiObject* arg, const Expr* actual,
   return arg;
 }
 
+// §37.61 detail 1: "The vpiPrefix relation shall be non-NULL when the object
+// represents an expression or task call in the SystemVerilog source code
+// prefixed by a virtual interface or a clocking block". A system task or
+// function argument written `vif.sig` is such an expression and `vif` is the
+// virtual interface var prefixing it, so this answers that variable and
+// nullptr for an actual written any other way. It is what decides whether the
+// argument object is built as a dynamically prefixed one at all: nothing in the
+// run ever wrote VpiObject::prefix, so vpi_handle(vpiPrefix, arg) reported NULL
+// for every object any design produced and the whole subclause stood over
+// objects a test had built by hand.
+Variable* DynamicPrefixBaseVar(const Expr* actual, SimContext& ctx) {
+  if (actual == nullptr || actual->kind != ExprKind::kMemberAccess) {
+    return nullptr;
+  }
+  if (actual->lhs == nullptr || actual->lhs->kind != ExprKind::kIdentifier) {
+    return nullptr;
+  }
+  Variable* base = ctx.FindVariable(actual->lhs->text);
+  return ctx.IsVirtualInterfaceVar(base) ? base : nullptr;
+}
+
+// §25.9: the interface member a prefixed argument names, which is the right
+// side of the member access when that is a plain name and the access's own text
+// otherwise -- the shape the expression evaluator reads such a reference in.
+std::string_view DynamicPrefixFieldName(const Expr* actual) {
+  return (actual->rhs != nullptr && actual->rhs->kind == ExprKind::kIdentifier)
+             ? actual->rhs->text
+             : actual->text;
+}
+
+// §37.61: what a dynamically prefixed argument is made from. `base` is the
+// virtual interface var the source wrote as the prefix; `member` is the
+// interface instance's variable the named member resolves to; `actual` is the
+// instance the prefix holds at the current simulation time, which §37.61 detail
+// 3 reads as whether the prefix "has a corresponding actual". The last two are
+// null exactly while the virtual interface holds null.
+struct DynamicPrefix {
+  Variable* base = nullptr;
+  Variable* member = nullptr;
+  VpiHandle actual = nullptr;
+};
+
+// §25.9: resolve the prefix against the run. An unbound virtual interface
+// denotes no instance, so it reaches neither a member variable nor an actual.
+DynamicPrefix ResolveDynamicPrefix(const Expr* actual, Variable* base,
+                                   SimContext& ctx, VpiContext& vpi) {
+  DynamicPrefix prefix;
+  prefix.base = base;
+  if (!ctx.VirtualInterfaceIsBound(base)) return prefix;
+  std::string scope(ctx.VirtualInterfaceBinding(base));
+  prefix.member = ctx.FindVariable(scope + "." +
+                                   std::string(DynamicPrefixFieldName(actual)));
+  prefix.actual = vpi.HandleByName(scope.c_str(), nullptr);
+  return prefix;
+}
+
+// The run's arena is where a string a VpiObject holds has to live: Expr::text
+// is a view into the source buffer, which does not end where the name does, and
+// a joined name is a temporary that the object would outlive.
+std::string_view ArenaName(Arena& arena, const std::string& name) {
+  return std::string_view(arena.AllocString(name.data(), name.size()),
+                          name.size());
+}
+
+// §37.61 (figure): fill `arg` as the dynamically prefixed object the actual
+// stands for and `prefix` as the object it is prefixed by. The figure draws the
+// vpiPrefix arrow from a simple expression -- §37.58's reference -- to the
+// virtual interface var, and gives the prefixed object the "-> has actual"
+// property that detail 3 answers off the prefix.
+void FillPrefixedArgument(VpiObject* arg, VpiObject* prefix, const Expr* actual,
+                          const DynamicPrefix& resolved, Arena& arena) {
+  prefix->type = vpiVirtualInterfaceVar;
+  prefix->name = ArenaName(arena, std::string(actual->lhs->text));
+  prefix->var = resolved.base;
+  // §37.29 (figure, Example 2): vpiActual of a virtual interface var is the
+  // interface instance it holds, and NULL while it holds none.
+  prefix->actual = resolved.actual;
+
+  arg->type = vpiRefObj;
+  arg->name = ArenaName(arena, std::string(actual->lhs->text) + "." +
+                                   std::string(DynamicPrefixFieldName(actual)));
+  arg->prefix = prefix;
+  // §36.4: an actual that names a variable is carried by that variable itself,
+  // so an application reads and writes the interface instance's own storage. An
+  // unbound prefix names none, and a holder of its own stands where it would.
+  arg->var =
+      resolved.member != nullptr ? resolved.member : arena.Create<Variable>();
+  arg->size = static_cast<int>(arg->var->value.width);
+}
+
 }  // namespace
 
 VpiHandle VpiContext::MakeSystfCallObject(const VpiSystfData& data,
@@ -211,8 +301,20 @@ VpiHandle VpiContext::MakeSystfCallObject(const VpiSystfData& data,
   // runs, because the application reads them from inside it.
   if (call_site != nullptr) {
     for (const Expr* actual : call_site->args) {
-      call->children.push_back(
-          SystfCallArgument(AllocObject(), actual, ctx, arena, evaluate_args));
+      auto* arg = AllocObject();
+      // §37.61 detail 1: an actual the source prefixed by a virtual interface
+      // is the prefixed object the clause is written about, and it is built as
+      // one rather than as the anonymous expression holder every non-identifier
+      // actual used to become.
+      Variable* base = DynamicPrefixBaseVar(actual, ctx);
+      if (base != nullptr) {
+        FillPrefixedArgument(arg, AllocObject(), actual,
+                             ResolveDynamicPrefix(actual, base, ctx, *this),
+                             arena);
+      } else {
+        SystfCallArgument(arg, actual, ctx, arena, evaluate_args);
+      }
+      call->children.push_back(arg);
     }
   }
   return call;

@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi.h"
 
@@ -175,6 +178,143 @@ TEST_F(DynamicPrefixing, HasActualIsUndefinedForNonSourceKind) {
   VpiObject module;
   module.type = vpiModule;
   EXPECT_EQ(vpi_get(vpiHasActual, &module), vpiUndefined);
+}
+
+// The clause against a described design. Everything above drives the rules over
+// objects a case built, and nothing in the run ever wrote VpiObject::prefix: an
+// argument the source prefixed by a virtual interface was built as the
+// anonymous expression holder every non-identifier actual became, so
+// vpi_handle(vpiPrefix, arg) reported NULL for every object any design
+// produced, vpi_get(vpiHasActual, arg) was asked of a kind it is not drawn on,
+// and detail 2's shared allocation scheme stood over an empty set. These cases
+// read the clause back off a design that writes the prefix.
+
+// What the application found. A calltf is a plain C function with no return
+// path to the case that provoked it.
+std::string g_arg_name;
+std::string g_prefix_name;
+int g_arg_type = 0;
+int g_arg_size = 0;
+int g_arg_has_actual = -1;
+int g_prefix_type = 0;
+bool g_second_arg_has_prefix = true;
+
+int ReadPrefixCalltf(const char*) {
+  // §37.42: the call the application is running for, and the arguments the call
+  // site wrote.
+  vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
+  if (call == nullptr) return 0;
+  vpiHandle itr = vpi_iterate(vpiArgument, call);
+  if (itr == nullptr) return 0;
+  vpiHandle arg = vpi_scan(itr);
+  if (arg == nullptr) return 0;
+
+  g_arg_type = vpi_get(vpiType, arg);
+  g_arg_size = vpi_get(vpiSize, arg);
+  if (const char* name = vpi_get_str(vpiName, arg)) g_arg_name = name;
+  // §37.61: the property edge the figure draws on the prefixed object.
+  g_arg_has_actual = vpi_get(vpiHasActual, arg);
+
+  // §37.4.3: the single arrow tagged vpiPrefix is walked with vpi_handle().
+  vpiHandle prefix = vpi_handle(vpiPrefix, arg);
+  if (prefix != nullptr) {
+    g_prefix_type = vpi_get(vpiType, prefix);
+    if (const char* name = vpi_get_str(vpiName, prefix)) g_prefix_name = name;
+  }
+
+  // Detail 1's FALSE side, from the same call: an argument the source wrote
+  // with no prefix is prefixed by nothing.
+  if (vpiHandle plain = vpi_scan(itr)) {
+    g_second_arg_has_prefix = vpi_handle(vpiPrefix, plain) != nullptr;
+  }
+  return 0;
+}
+
+class DynamicPrefixingOfADesign : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    SetGlobalVpiContext(&ctx_);
+    g_arg_name.clear();
+    g_prefix_name.clear();
+    g_arg_type = 0;
+    g_arg_size = 0;
+    g_arg_has_actual = -1;
+    g_prefix_type = 0;
+    g_second_arg_has_prefix = true;
+  }
+  void TearDown() override { SetGlobalVpiContext(nullptr); }
+
+  void Probe(const char* src) {
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = "$probe";
+    data.calltf = &ReadPrefixCalltf;
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+
+    auto* design = ElaborateSrc(src, f_);
+    ASSERT_NE(design, nullptr);
+    LowerAndRun(design, f_);
+  }
+
+  VpiContext ctx_;
+  SimFixture f_;
+};
+
+// D1 against a design: an argument the source wrote as `vif.a` is the
+// expression the clause calls dynamically prefixed - a simple expression, which
+// §37.58 draws as a reference - and its vpiPrefix reaches the virtual interface
+// var `vif`. The size discriminates what the reference is bound to: 8 is the
+// interface instance's own variable, which is what the prefix resolves to, and
+// a holder standing in for an unresolved member would report 0. The second
+// argument, written with no prefix, reports none.
+TEST_F(DynamicPrefixingOfADesign, PrefixOfAVirtualInterfaceArgument) {
+  Probe(
+      "interface simple_bus;\n"
+      "  logic [7:0] a;\n"
+      "endinterface\n"
+      "module top;\n"
+      "  simple_bus u();\n"
+      "  virtual simple_bus vif;\n"
+      "  logic [3:0] plain;\n"
+      "  initial begin\n"
+      "    vif = u;\n"
+      "    $probe(vif.a, plain);\n"
+      "  end\n"
+      "endmodule\n");
+
+  EXPECT_EQ(g_arg_type, vpiRefObj);
+  EXPECT_EQ(g_arg_name, "vif.a");
+  EXPECT_EQ(g_arg_size, 8);
+  EXPECT_EQ(g_prefix_type, vpiVirtualInterfaceVar);
+  EXPECT_EQ(g_prefix_name, "vif");
+  EXPECT_FALSE(g_second_arg_has_prefix);
+
+  // D3: the prefix holds an interface instance at the current simulation time,
+  // so the prefixed object has a corresponding actual.
+  EXPECT_EQ(g_arg_has_actual, 1);
+}
+
+// D3 against a design, the FALSE side: a virtual interface holding null has no
+// corresponding actual at the current simulation time, so neither does the
+// object it prefixes. The prefix is reached all the same - detail 1 makes it
+// non-NULL for what the source wrote, not for what the prefix currently holds.
+TEST_F(DynamicPrefixingOfADesign, UnboundPrefixHasNoActual) {
+  Probe(
+      "interface simple_bus;\n"
+      "  logic [7:0] a;\n"
+      "endinterface\n"
+      "module top;\n"
+      "  simple_bus u();\n"
+      "  virtual simple_bus vif;\n"
+      "  initial begin\n"
+      "    vif = null;\n"
+      "    $probe(vif.a);\n"
+      "  end\n"
+      "endmodule\n");
+
+  EXPECT_EQ(g_arg_type, vpiRefObj);
+  EXPECT_EQ(g_prefix_type, vpiVirtualInterfaceVar);
+  EXPECT_EQ(g_arg_has_actual, 0);
 }
 
 }  // namespace
