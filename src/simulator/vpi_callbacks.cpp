@@ -66,6 +66,21 @@ const char* VpiCheckCallbackPlacement(const VpiCbData& data,
            "in a protected portion of the code";
   }
 
+  // §38.36.1.2: "Every possible object within the stmt class qualifies for
+  // having a cbStmt callback placed on it. Each possible object is listed in
+  // Table 38-6" - and the table is what §38.36.1.1 points the obj field at for
+  // "the allowable objects". A handle to an object of any other kind names no
+  // statement this callback could be called before, so the registration is
+  // refused rather than answered with a callback nothing could ever fire. The
+  // one handle in the field that is not a statement is a module instance, which
+  // §38.36.1.3 defines as placing the callback on every statement the instance
+  // holds rather than on the module itself.
+  if (data.reason == cbStmt && data.obj && data.obj->type != kVpiModule &&
+      !VpiIsScopeBodyStmtType(data.obj->type)) {
+    return "vpi_register_cb(): a cbStmt callback may be placed only on one of "
+           "the statement objects Table 38-6 lists, or on a module instance";
+  }
+
   return nullptr;
 }
 

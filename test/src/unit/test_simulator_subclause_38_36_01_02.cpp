@@ -101,5 +101,40 @@ TEST_F(VpiStmtCallbackByType, EveryTable38_6ObjectQualifies) {
   }
 }
 
+// §38.36.1.2: the objects that qualify are the ones the statement class groups,
+// which is what Table 38-6 lists in full, and §38.36.1.1 points the obj field
+// at that table for "the allowable objects". So a handle to an object of
+// another kind - here a reg, which is a variable and no kind of statement -
+// names nothing this callback could be called before executing, and the
+// registration is refused with a null handle and a recorded error rather than
+// answered with a callback that could never fire.
+TEST_F(VpiStmtCallbackByType, ObjectOutsideTheStatementClassDoesNotQualify) {
+  vpiHandle reg = MakeHandleOfType("v", vpiReg);
+  ASSERT_NE(reg, nullptr);
+
+  s_cb_data cb = {};
+  cb.reason = cbStmt;
+  cb.obj = reg;
+  EXPECT_EQ(vpi_register_cb(&cb), nullptr);
+
+  SVpiErrorInfo info = {};
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
+}
+
+// §38.36.1.2 lists the statements a cbStmt callback may be placed on, and
+// §38.36.1.3 allows the obj field one handle that is not among them: a module
+// instance, which places the callback on every statement in the instance. The
+// rule above holds what is outside Table 38-6 away from the field without
+// reaching that handle.
+TEST_F(VpiStmtCallbackByType, ModuleInstanceRemainsAllowedInTheObjField) {
+  vpiHandle mod = MakeHandleOfType("m", vpiModule);
+  ASSERT_NE(mod, nullptr);
+
+  s_cb_data cb = {};
+  cb.reason = cbStmt;
+  cb.obj = mod;
+  EXPECT_NE(vpi_register_cb(&cb), nullptr);
+}
+
 }  // namespace
 }  // namespace delta
