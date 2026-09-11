@@ -1,25 +1,31 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/variable.h"
 #include "simulator/vpi.h"
 
 namespace delta {
 namespace {
 
-// §37.83 Attribute: the object model diagram draws an attribute object reached
-// from a long list of design objects (instances, ports, nets, variables,
-// statements, processes, class definitions, and so on) through the vpiParent
-// edge, and gives the attribute object four scalar property accesses:
+// §37.83 Attribute: the object model diagram draws a dotted enclosure with no
+// name holding a long list of design objects - instances, ports, nets,
+// variables, statements, processes, class definitions and the rest - and two
+// arrows between that enclosure and the `attribute` object. They differ in
+// their heads, which §37.4.3 makes the difference between the two routines: the
+// one into `attribute` is a double arrow with no tag, so it is
+// vpi_iterate(vpiAttribute, obj) over the attributes an object carries, and the
+// one back is a single arrow tagged vpiParent, so it is
+// vpi_handle(vpiParent, attr) to the one object an attribute is attached to.
+// The attribute object carries four property accesses:
 //   -> name              str: vpiName
 //   -> On definition     bool: vpiDefAttribute
 //   -> value             vpi_get_value()
 //   -> definition location  str: vpiDefFile, int: vpiDefLineNo
-// There is no BNF and no 'shall' sentence; the clause owns the attribute's
-// vpiParent navigation and its three scalar properties beyond the name. The
-// attribute's value is reached through vpi_get_value() (§38.34, a dependency),
-// and its vpiName is the generic name read shared by every object. These tests
-// observe the production code apply each owned edge and property through the
-// public vpi_handle/vpi_get/vpi_get_str dispatch paths.
+// There is no BNF and no 'shall' sentence. The value is read through
+// vpi_get_value() (§38.34, a dependency) and the name through the generic read
+// every object shares; the rest the clause owns. These tests observe the
+// production code apply both arrows and every property through the public
+// vpi_handle/vpi_iterate/vpi_get/vpi_get_str/vpi_get_value dispatch paths.
 
 // The fixture installs a context so the public entry points run their real
 // dispatch over the test objects.
@@ -30,8 +36,8 @@ class Attribute : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Diagram edge (vpiParent): an attribute reaches the design object it is
-// attached to. The owning object is one of the many kinds the figure lists;
+// The single arrow back (vpiParent): an attribute reaches the design object it
+// is attached to. The owning object is one of the many kinds the figure lists;
 // here a net carries the attribute, and vpi_handle(vpiParent, ...) reaches that
 // net rather than some other null result.
 TEST_F(Attribute, ParentReachesTheOwningObject) {
@@ -114,6 +120,86 @@ TEST_F(Attribute, DefinitionLocationPropertiesGuardedToAttribute) {
   not_an_attribute.type = vpiModule;
   EXPECT_EQ(vpi_get_str(vpiDefFile, &not_an_attribute), nullptr);
   EXPECT_EQ(vpi_get(vpiDefLineNo, &not_an_attribute), vpiUndefined);
+}
+
+// The untagged double arrow into `attribute`: an object reaches the attributes
+// it carries through vpi_iterate(vpiAttribute, obj), in the order they were
+// written, and children of other kinds are not among them. Each attribute
+// reached is the one whose vpiParent is that object, which is the same pair of
+// arrows read from both ends.
+TEST_F(Attribute, AnObjectIteratesTheAttributesItCarries) {
+  VpiObject owning_module;
+  owning_module.type = vpiModule;
+
+  VpiObject keep;
+  keep.type = vpiAttribute;
+  keep.name = "keep";
+  keep.parent = &owning_module;
+
+  VpiObject a_net;  // a child of another kind, which the iteration steps over
+  a_net.type = vpiNet;
+
+  VpiObject dont_touch;
+  dont_touch.type = vpiAttribute;
+  dont_touch.name = "dont_touch";
+  dont_touch.parent = &owning_module;
+
+  owning_module.children = {&keep, &a_net, &dont_touch};
+
+  vpiHandle it = vpi_iterate(vpiAttribute, &owning_module);
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(vpi_scan(it), &keep);
+  EXPECT_EQ(vpi_scan(it), &dont_touch);
+  EXPECT_EQ(vpi_scan(it), nullptr);
+
+  EXPECT_EQ(vpi_handle(vpiParent, &keep), &owning_module);
+  EXPECT_EQ(vpi_handle(vpiParent, &dont_touch), &owning_module);
+}
+
+// The double arrow's empty outcome: an object carrying no attribute iterates
+// none, so the children it does carry are not handed back in their place.
+TEST_F(Attribute, AnObjectWithNoAttributeIteratesNone) {
+  VpiObject a_net;
+  a_net.type = vpiNet;
+
+  VpiObject owning_module;
+  owning_module.type = vpiModule;
+  owning_module.children = {&a_net};
+
+  EXPECT_EQ(vpi_iterate(vpiAttribute, &owning_module), nullptr);
+}
+
+// Figure property (-> value): an attribute reports the value it was written
+// with through vpi_get_value(), which is what the figure draws on it rather
+// than a vpi_get integer property. An attribute given no value reports none.
+TEST_F(Attribute, ValueReportedThroughVpiGetValue) {
+  Logic4Word storage{};
+  Variable var{};
+  var.value.width = 32;
+  var.value.nwords = 1;
+  var.value.words = &storage;
+  storage.aval = 7;
+
+  VpiObject attr;
+  attr.type = vpiAttribute;
+  attr.name = "priority";
+  attr.var = &var;
+
+  VpiValue value{};
+  value.format = vpiIntVal;
+  vpi_get_value(&attr, &value);
+  EXPECT_EQ(value.value.integer, 7);
+
+  // An attribute written with no value has none to read, so the request leaves
+  // the caller's structure as it found it rather than inventing one.
+  VpiObject no_value;
+  no_value.type = vpiAttribute;
+
+  VpiValue untouched{};
+  untouched.format = vpiIntVal;
+  untouched.value.integer = 99;
+  vpi_get_value(&no_value, &untouched);
+  EXPECT_EQ(untouched.value.integer, 99);
 }
 
 }  // namespace
