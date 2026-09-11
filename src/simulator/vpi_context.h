@@ -679,14 +679,12 @@ class VpiContext {
   void SetCurrentSystfCall(VpiHandle call) { current_systf_call_ = call; }
   VpiHandle CurrentSystfCall() const { return current_systf_call_; }
 
-  // §37.82: record the system task call that established the active time
-  // format, i.e. the $timeformat() call. An application reaches it through
-  // vpi_handle(vpiActiveTimeFormat, NULL) (see Handle). It stays null until
-  // $timeformat() runs, which is what makes that traversal return NULL when no
-  // time format has been set (detail 1).
-  void SetActiveTimeFormatCall(VpiHandle call) {
-    active_time_format_call_ = call;
-  }
+  // §37.82: stand up the system task call that established the active time
+  // format, i.e. the $timeformat() call, which an application reaches through
+  // vpi_handle(vpiActiveTimeFormat, NULL) (see Handle). $timeformat() calls
+  // this as it runs; before it has, nothing stands there, which is what makes
+  // that traversal return NULL (detail 1). Written in vpi_systf.cpp.
+  void NoteTimeFormatCall();
   VpiHandle ActiveTimeFormatCall() const { return active_time_format_call_; }
 
   // §38.31 / §38.9: the path to this implementation's save/restart location,

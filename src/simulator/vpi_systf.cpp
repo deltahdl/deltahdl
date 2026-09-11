@@ -402,6 +402,21 @@ void VpiContext::GetCbInfo(VpiHandle obj, VpiCbData* cb_data_p) {
   *cb_data_p = callbacks_[idx];
 }
 
+void VpiContext::NoteTimeFormatCall() {
+  // §37.82: the clause's one edge reaches the $timeformat() call that
+  // established the active time format, and §37.42's `tf call` class - the
+  // dotted enclosure the arrow points at - groups the system task call among
+  // the kinds it holds, so that call is what stands here. Detail 1 reserves
+  // NULL for a run where $timeformat() has not been called; nothing stood a
+  // call object up when one had, so the traversal answered every run the way
+  // the detail has it answer only that one. The call the format came from is
+  // the most recent, a later one replacing it as it replaces the format.
+  auto* call = AllocObject();
+  call->type = vpiSysTaskCall;
+  call->name = "$timeformat";
+  active_time_format_call_ = call;
+}
+
 VpiHandle VpiContext::CreateTimeQueue() {
   // §38.13: a time queue object carries no further state of its own; its kind
   // is enough for GetTime() to know to report the next future event time.

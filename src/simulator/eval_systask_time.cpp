@@ -34,6 +34,9 @@
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+// §37.82: the VPI model reaches the $timeformat() call that set the active time
+// format, so the run stands one up as the task runs.
+#include "simulator/vpi.h"
 
 namespace delta {
 
@@ -300,6 +303,11 @@ Logic4Vec EvalTimeformatTask(const Expr* expr, SimContext& ctx, Arena& arena) {
   }
   ApplyTimeformatTextFields(expr, ctx, arena, spec);
   ctx.SetTimeFormat(spec);
+  // §37.82: an application reaches the $timeformat() call the active format
+  // came from through vpi_handle(vpiActiveTimeFormat, NULL), and detail 1 keeps
+  // NULL for a run where the task has not been called - so this call is what it
+  // reaches from here on.
+  GetGlobalVpiContext().NoteTimeFormatCall();
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
