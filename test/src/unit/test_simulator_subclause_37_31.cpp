@@ -246,14 +246,20 @@ TEST_F(ClassDefinition, ParameterIterationReportsPortAndBodyWithLocalParam) {
 
 // D6: the vpiArgument iteration from an extends object returns the expressions
 // supplied for constructor chaining (8.17). The targets are expressions, so a
-// child of a non-expression kind (here a parameter) is not reported.
+// child of a non-expression kind is not reported. The non-expression child is
+// the class typespec the diagram draws the extends object reaching for its base
+// class - the one other child an extends object of a design carries, and the
+// one the argument iteration has to step over. A parameter stood here before,
+// as a kind no expression scan would admit; §37.58 draws a parameter inside the
+// `simple expr` class §37.59's `expr` groups, so it is an expression and the
+// case it was written to make was made by an argument.
 TEST_F(ClassDefinition, ExtendsArgumentIterationReturnsChainingExpressions) {
   VpiObject arg_a;
   arg_a.type = vpiConstant;
   VpiObject arg_b;
   arg_b.type = vpiRefObj;
   VpiObject not_an_expr;
-  not_an_expr.type = vpiParameter;
+  not_an_expr.type = vpiClassTypespec;
 
   VpiObject extends;
   extends.type = vpiExtends;
