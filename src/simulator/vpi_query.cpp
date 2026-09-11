@@ -330,10 +330,13 @@ int VpiGetSimplePropertyA(int property, VpiHandle obj, bool& handled) {
       return VpiBool(obj->top_module);
     // §37.84: an iterator reports the kind of object its iteration walks - the
     // type code it was created to traverse - through the integer
-    // vpiIteratorType property. A non-iterator object has no walked kind, so it
-    // reports 0.
+    // vpiIteratorType property. The figure draws that property on the
+    // `iterator` object alone, so asking any other kind for it is not a request
+    // the model answers; it reported 0, which reads as a type code rather than
+    // as the absence of one, so a caller could not tell a non-iterator from an
+    // iteration over nothing.
     case vpiIteratorType:
-      return obj->iter_type;
+      return obj->type != vpiIterator ? vpiUndefined : obj->iter_type;
     // §37.5: a module reports its default net decay time (in time units)
     // through the vpiDefDecayTime integer property.
     case vpiDefDecayTime:
