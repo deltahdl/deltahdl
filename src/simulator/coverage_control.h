@@ -296,10 +296,13 @@ class CoverageControlState {
       return CoverageStatus::kNoCoverage;
     }
     // Write (or overwrite) the entry to reflect the current state: it belongs
-    // to this design and holds the saved coverage type.
+    // to this design, holds the saved coverage type, and carries the coverage
+    // that stood at the moment of the save, which §40.3.2.5 requires back from
+    // a later $coverage_merge() of the same name.
     CoverageDatabase& db = databases_[name];
     db.from_this_design = true;
     db.coverage_types = {coverage_type};
+    SaveCurrentCoverage(db, coverage_type);
     ++db.saves;
     return CoverageStatus::kOk;
   }
@@ -532,6 +535,22 @@ class CoverageControlState {
       if (type_it == entry.second.end()) continue;
       std::int64_t& covered = scopes_[entry.first].covered_items[coverage_type];
       covered = std::max(covered, type_it->second);
+    }
+  }
+
+  // §40.3.2.5: writes "the current state of coverage" of one type into a
+  // database entry - the covered-item count every scope stands at, which is
+  // what §40.3.2.4 loads back when the same name is merged. The entry holds the
+  // state as it was when the save ran rather than a view that follows
+  // collection afterwards, so what was there from an earlier save under the
+  // same name goes; a save names one coverage type, so the rest of what the
+  // scopes have covered is no part of it.
+  void SaveCurrentCoverage(CoverageDatabase& db, int coverage_type) const {
+    db.covered_items.clear();
+    for (const auto& entry : scopes_) {
+      auto type_it = entry.second.covered_items.find(coverage_type);
+      if (type_it == entry.second.covered_items.end()) continue;
+      db.covered_items[entry.first][coverage_type] = type_it->second;
     }
   }
 

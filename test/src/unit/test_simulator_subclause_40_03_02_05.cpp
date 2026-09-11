@@ -71,16 +71,65 @@ TEST(CoverageSave, AvailableTypeIsSavedAndReportsOk) {
 }
 
 // §40.3.2.5: data saved to the database shall be retrievable later by
-// $coverage_merge() supplying the same name. After a successful save, a merge
-// of the same type and name finds the data (for this design) and merges it.
+// $coverage_merge() supplying the same name. What comes back is the coverage
+// itself rather than a database that merely exists, so the coverage levels the
+// scopes stood at go into the entry and the merge puts them back - here into a
+// simulation whose own coverage has since been reset, which is what leaves the
+// database as the only place the levels reported afterwards can have come from.
 TEST(CoverageSave, SavedDataAreRetrievableByMergeWithTheSameName) {
   SimFixture f;
   Cov(f).SetCoverageAvailableForSave(kToggle, true);
+  Cov(f).SetCoveredItems("top.dut", kToggle, 6);
+  Cov(f).SetCoveredItems("top.dut.u1", kToggle, 4);
 
   ASSERT_EQ(RunSave(f, kToggle, kName), kOk);
+  Cov(f).Control(CoverageControl::kReset, "top.dut");
+  ASSERT_EQ(Cov(f).CoverageGet("top.dut", kToggle), kNoCov);
 
   EXPECT_EQ(RunMerge(f, kToggle, kName), kOk);
   EXPECT_EQ(Cov(f).MergeCount(std::string(kName)), 1u);
+  EXPECT_EQ(Cov(f).CoverageGet("top.dut", kToggle, /*include_below=*/false), 6);
+  EXPECT_EQ(Cov(f).CoverageGet("top.dut", kToggle), 10);
+}
+
+// §40.3.2.5 saves "the current state of coverage", so the entry holds the
+// levels as they stood when the save ran rather than a view that follows
+// collection afterwards: what the design covers after the save is not in it,
+// and a merge of that name brings back the earlier state.
+TEST(CoverageSave, TheEntryHoldsTheCoverageAsItStoodAtTheSave) {
+  SimFixture f;
+  const std::string kScope = "top.dut";
+  Cov(f).SetCoverageAvailableForSave(kToggle, true);
+  Cov(f).SetCoveredItems(kScope, kToggle, 6);
+
+  ASSERT_EQ(RunSave(f, kToggle, kName), kOk);
+
+  // Collection carries on past the save, and then the simulation's own coverage
+  // is cleared, leaving only what the entry holds to come back.
+  Cov(f).SetCoveredItems(kScope, kToggle, 9);
+  Cov(f).Control(CoverageControl::kReset, kScope);
+
+  ASSERT_EQ(RunMerge(f, kToggle, kName), kOk);
+  EXPECT_EQ(Cov(f).CoverageGet(kScope, kToggle), 6);
+}
+
+// The call names one coverage type, and that is the state it saves: what the
+// design has covered of another type is no part of the entry, so a merge of the
+// same name does not find that type there and brings none of it back.
+TEST(CoverageSave, SavesOnlyTheCoverageTypeTheCallNames) {
+  SimFixture f;
+  const std::string kScope = "top.dut";
+  Cov(f).SetCoverageAvailableForSave(kToggle, true);
+  Cov(f).SetCoveredItems(kScope, kToggle, 6);
+  Cov(f).SetCoveredItems(kScope, kAssertion, 3);
+
+  ASSERT_EQ(RunSave(f, kToggle, kName), kOk);
+  Cov(f).Control(CoverageControl::kReset, kScope);
+
+  EXPECT_EQ(RunMerge(f, kAssertion, kName), kNoCov);
+  ASSERT_EQ(RunMerge(f, kToggle, kName), kOk);
+  EXPECT_EQ(Cov(f).CoverageGet(kScope, kAssertion), kNoCov);
+  EXPECT_EQ(Cov(f).CoverageGet(kScope, kToggle), 6);
 }
 
 // `SV_COV_NOCOV: when no coverage of the requested type is available in this
