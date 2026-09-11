@@ -53,13 +53,6 @@ void VpiCollectCallbackObjects(VpiHandle ref,
                                const std::vector<VpiCbData>& callbacks,
                                VpiHandle iter);
 
-// §37.80 (figure): the callback placed on `obj` - what the diagram's single
-// arrow from a prim term, an expr, a time queue or a stmt reaches. Null where
-// the object was given none. Defined in vpi_callbacks.cpp, used by
-// vpi_handle.cpp.
-VpiHandle VpiCallbackOn(VpiHandle obj, const std::vector<VpiHandle>& cb_handles,
-                        const std::vector<VpiCbData>& callbacks);
-
 // Defined in vpi_helpers_statements.cpp, used by vpi_iterate.cpp.
 bool VpiIsVirtualInterfaceArray(VpiHandle obj);
 

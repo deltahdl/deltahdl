@@ -568,6 +568,16 @@ bool TryResolveTypespecClassRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
+// §37.80 (figure): the callback a prim term, an expr, a time queue or a stmt
+// reaches through the diagram's single arrow. The object holds it as a
+// designated pointer, set when the callback was registered, because a callback
+// object lives in the run's registry rather than among the object's children.
+bool TryResolveCallbackRelation(int type, VpiHandle ref, VpiHandle& out) {
+  if (type != vpiCallback || !VpiIsCallbackHostType(ref->type)) return false;
+  out = ref->callback;
+  return true;
+}
+
 bool TryResolvePatternRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type != vpiPattern || !VpiIsPatternType(ref->type)) return false;
   out = VpiPatternOf(ref);
@@ -842,7 +852,8 @@ bool TryResolveDesignatedRelation(int type, VpiHandle ref, VpiHandle& out) {
          TryResolveIndexRelation(type, ref, out) ||
          TryResolvePrefixWithRelation(type, ref, out) ||
          TryResolveTimingAndNettypeRelation(type, ref, out) ||
-         TryResolveInstanceRelation(type, ref, out);
+         TryResolveInstanceRelation(type, ref, out) ||
+         TryResolveCallbackRelation(type, ref, out);
 }
 
 }  // namespace
@@ -891,13 +902,6 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // helper documents the §37.x details for the relations it serves. When one
   // matches, its (possibly null) result is the answer; otherwise the lookup
   // falls through to the generic traversal.
-  // §37.80 (figure): the callback a prim term, an expr, a time queue or a stmt
-  // reaches, which the run holds in its callback registry rather than among the
-  // object's children.
-  if (type == vpiCallback && VpiIsCallbackHostType(ref->type)) {
-    return VpiCallbackOn(ref, cb_handles_, callbacks_);
-  }
-
   VpiHandle designated = nullptr;
   if (TryResolveDesignatedRelation(type, ref, designated)) return designated;
 

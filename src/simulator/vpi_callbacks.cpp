@@ -171,26 +171,6 @@ void VpiCollectCallbackObjects(VpiHandle ref,
   }
 }
 
-VpiHandle VpiCallbackOn(VpiHandle obj, const std::vector<VpiHandle>& cb_handles,
-                        const std::vector<VpiCbData>& callbacks) {
-  // §37.80 (figure): the single arrow a prim term, an expr, a time queue and a
-  // stmt each draw to `callback`, which §37.4.3 makes vpi_handle(vpiCallback,
-  // obj). It reached nothing: a callback object lives in the run's registry
-  // rather than among the object's children, and the walk that serves an
-  // untagged relation looks for a child whose own type is the relation's. The
-  // arrow is a one-to-one relationship, so the callback it reaches is the first
-  // the object was given; the rest of them, and the callbacks no such object
-  // holds, are what the iterations reach.
-  for (auto* cb_obj : cb_handles) {
-    int idx = cb_obj->index;
-    if (idx < 0 || idx >= static_cast<int>(callbacks.size())) continue;
-    if (GetGlobalVpiContext().CompareObjects(callbacks[idx].obj, obj) != 0) {
-      return cb_obj;
-    }
-  }
-  return nullptr;
-}
-
 VpiHandle VpiContext::RegisterCb(VpiCbData* data) {
   if (!data) return nullptr;
 
@@ -218,6 +198,18 @@ VpiHandle VpiContext::RegisterCb(VpiCbData* data) {
   cb_obj->type = kVpiCallback;
   cb_obj->index = static_cast<int>(callbacks_.size() - 1);
   cb_handles_.push_back(cb_obj);
+
+  // §37.80 (figure): a prim term, an expr, a time queue and a stmt each draw a
+  // single arrow to `callback`, which §37.4.3 makes vpi_handle(vpiCallback,
+  // obj) - the callback that object was given. It reached nothing: a callback
+  // object lives in this registry rather than among the object's children, and
+  // the walk that serves an untagged relation looks for a child whose own type
+  // is the relation's. The object holds it from here, the arrow being
+  // one-to-one and so reaching the first callback the object was given.
+  if (data->obj != nullptr && VpiIsCallbackHostType(data->obj->type) &&
+      data->obj->callback == nullptr) {
+    data->obj->callback = cb_obj;
+  }
   return cb_obj;
 }
 
@@ -242,6 +234,12 @@ int VpiContext::RemoveCb(VpiHandle cb_handle) {
     // routine do and which nothing did - so a removed callback's handle went on
     // naming a live object and every routine went on accepting it.
     ReleaseHandle(cb_handle);
+    // §37.80: with the handle released, the object that reached this callback
+    // through the diagram's single arrow reaches it no longer.
+    VpiHandle placed_on = callbacks_[idx].obj;
+    if (placed_on != nullptr && placed_on->callback == cb_handle) {
+      placed_on->callback = nullptr;
+    }
     return 1;
   }
   return 0;

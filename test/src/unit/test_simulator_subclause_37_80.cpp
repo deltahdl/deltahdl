@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <array>
+#include <cstddef>
+
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi.h"
 
@@ -190,19 +193,28 @@ TEST_F(Callback, IterationFromObjectWithoutCallbackYieldsNoIterator) {
 // draws in `expr` and every kind the `stmt` class groups is an object the
 // arrow is drawn from.
 TEST_F(Callback, TheSingleArrowIsDrawnFromEveryKindTheTwoClassesGroup) {
-  for (int host_kind : {vpiPrimTerm, vpiTimeQueue, vpiOperation, vpiConstant,
-                        vpiRefObj, vpiBegin, vpiAssignment, vpiForever}) {
-    VpiObject object;
-    object.type = host_kind;
+  constexpr std::array<int, 8> kHostKinds = {
+      vpiPrimTerm, vpiTimeQueue, vpiOperation,  vpiConstant,
+      vpiRefObj,   vpiBegin,     vpiAssignment, vpiForever};
+  // The objects outlive the registrations, which record the address of the one
+  // a callback was placed on; a fresh object per iteration would take the same
+  // storage as the last and every callback would name it.
+  std::array<VpiObject, kHostKinds.size()> objects;
+  std::array<vpiHandle, kHostKinds.size()> registered = {};
+
+  for (size_t i = 0; i < kHostKinds.size(); ++i) {
+    objects[i].type = kHostKinds[i];
 
     s_cb_data cb = {};
     cb.reason = cbValueChange;
-    cb.obj = &object;
-    vpiHandle registered = vpi_register_cb(&cb);
-    ASSERT_NE(registered, nullptr) << "host kind " << host_kind;
+    cb.obj = &objects[i];
+    registered[i] = vpi_register_cb(&cb);
+    ASSERT_NE(registered[i], nullptr) << "host kind " << kHostKinds[i];
+  }
 
-    EXPECT_EQ(vpi_handle(vpiCallback, &object), registered)
-        << "host kind " << host_kind;
+  for (size_t i = 0; i < kHostKinds.size(); ++i) {
+    EXPECT_EQ(vpi_handle(vpiCallback, &objects[i]), registered[i])
+        << "host kind " << kHostKinds[i];
   }
 }
 
@@ -263,6 +275,24 @@ TEST_F(Callback, NullReferenceIterationReachesOnlyTheUnrelatedCallbacks) {
   // It is reached from the statement instead, which is the arrow the diagram
   // does draw.
   EXPECT_EQ(vpi_handle(vpiCallback, &statement), stmt_cb);
+}
+
+// §37.2.2 has vpi_remove_cb() release the callback's handle, so the object that
+// reached it through the diagram's single arrow reaches it no longer: the
+// relation reports none rather than a handle to an object the run has let go.
+TEST_F(Callback, TheSingleArrowReachesNothingOnceTheCallbackIsRemoved) {
+  VpiObject statement;
+  statement.type = vpiAssignStmt;
+
+  s_cb_data cb = {};
+  cb.reason = cbValueChange;
+  cb.obj = &statement;
+  vpiHandle registered = vpi_register_cb(&cb);
+  ASSERT_NE(registered, nullptr);
+  ASSERT_EQ(vpi_handle(vpiCallback, &statement), registered);
+
+  EXPECT_EQ(vpi_remove_cb(registered), 1);
+  EXPECT_EQ(vpi_handle(vpiCallback, &statement), nullptr);
 }
 
 }  // namespace

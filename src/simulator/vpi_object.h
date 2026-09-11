@@ -576,6 +576,15 @@ struct VpiObject {
   // that is neither a foreach constraint nor a foreach statement.
   std::vector<VpiObject*> loop_vars;
 
+  // §37.80 (figure): the callback this object was given, which the diagram's
+  // single arrow from a prim term, an expr, a time queue or a stmt reaches. A
+  // callback object lives in the run's callback registry rather than among this
+  // object's children, so the walk that serves an untagged relation finds none
+  // there and the arrow is held as a designated pointer instead. Null for an
+  // object no callback was placed on, and for one whose callback has been
+  // removed - vpi_remove_cb() releases the handle, so nothing reaches it after.
+  VpiObject* callback = nullptr;
+
   // §37.74 (figure): the initialization statements a for statement's header
   // writes before the loop runs and the increment statements it writes after
   // each pass, in source order - what the vpiForInitStmt and vpiForIncStmt
