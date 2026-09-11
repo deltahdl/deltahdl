@@ -417,9 +417,37 @@ bool CloseMcdChannelBit(
   return false;
 }
 
+// §38.24: close the file an fd from $fopen names. An fd is one value rather
+// than a set of channels, so it names one file and there is no channel to
+// release. Returns 0 when the file was open and the fd itself when it was not,
+// which is what "the mcd of the unclosed channels" comes to for a descriptor
+// that is not a set of them.
+PLI_UINT32 CloseMcdFd(PLI_UINT32 fd,
+                      std::unordered_map<std::string, PLI_UINT32>& open_files) {
+  for (auto it = open_files.begin(); it != open_files.end(); ++it) {
+    if (it->second == fd) {
+      open_files.erase(it);
+      return 0;
+    }
+  }
+  return fd;
+}
+
 }  // namespace
 
 PLI_UINT32 VpiContext::McdClose(PLI_UINT32 mcd) {
+  // §38.24: "This routine can also be used to close file descriptors that were
+  // opened using the system function $fopen", and §38.27 reserves channel 32 -
+  // the MSB - to stand for such an fd. An fd is one value rather than a set of
+  // channels, so a descriptor carrying that bit names one file and is closed as
+  // one. The walk below read an fd's own numbering as channels instead: it
+  // closed whatever files those bits happened to name, reported the reserved
+  // channel 1 among the unclosed whenever the fd's low bit was set, and left
+  // the file the fd actually named open.
+  if ((mcd & kVpiFdDescriptorChannel) != 0) {
+    return CloseMcdFd(mcd, mcd_open_files_);
+  }
+
   // §38.24: walk the descriptor bit by bit. Each channel is a discrete bit, so
   // a single call closes several channels at once. A bit that cannot be closed
   // is gathered into the error result and reported back to the caller.

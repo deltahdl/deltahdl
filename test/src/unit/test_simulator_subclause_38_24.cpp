@@ -132,5 +132,38 @@ TEST_F(VpiMcdCloseSim, ClosesDescriptorOpenedByFopen) {
   EXPECT_EQ(vpi_mcd_open(fresh), fopen_mcd);
 }
 
+// §38.24: "This routine can also be used to close file descriptors that were
+// opened using the system function $fopen." §38.27 reserves channel 32 - the
+// MSB - to stand for such an fd, and an fd is one value rather than a set of
+// channels, so the descriptor names one file and closing it closes that file
+// alone. Read as channels, its own numbering would have closed whatever files
+// those bits named and left this one open.
+TEST_F(VpiMcdCloseSim, ClosesAnFdOpenedByFopen) {
+  PLI_UINT32 fopen_fd = 0x80000005u;  // the MSB set: an fd, not an mcd
+  vpi_ctx_.RegisterFopenMcdFile("opened_as_fd.log", fopen_fd);
+
+  // A file on channel 3 - which bit 2 of that fd's numbering would name if the
+  // value were read as a set of channels.
+  char other[] = "channel_three.log";
+  PLI_UINT32 other_mcd = vpi_mcd_open(other);
+  ASSERT_NE(other_mcd, 0u);
+
+  EXPECT_EQ(vpi_mcd_close(fopen_fd), 0u);
+  EXPECT_FALSE(vpi_ctx_.IsMcdFileOpen("opened_as_fd.log"));
+
+  // The file the fd's bits would have named is untouched, and so is the
+  // predefined channel 1 its low bit would have reported unclosed.
+  EXPECT_TRUE(vpi_ctx_.IsMcdFileOpen("channel_three.log"));
+}
+
+// §38.24: on error the routine returns the descriptor of what it could not
+// close. An fd naming no open file closes nothing, so it comes back as it was
+// given rather than reporting success.
+TEST_F(VpiMcdCloseSim, AnFdNamingNoOpenFileIsReportedBack) {
+  PLI_UINT32 unknown_fd = 0x80000007u;
+
+  EXPECT_EQ(vpi_mcd_close(unknown_fd), unknown_fd);
+}
+
 }  // namespace
 }  // namespace delta
