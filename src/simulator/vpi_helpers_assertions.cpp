@@ -246,25 +246,37 @@ VpiHandle VpiImmediateAssertionExpr(VpiHandle assertion) {
   return nullptr;
 }
 
-VpiHandle VpiImmediateAssertionStmt(VpiHandle assertion) {
-  // §37.55: the pass action statement, modeled as the assertion's first
-  // statement child reached through vpiStmt. Null when none is attached.
-  if (!assertion) return nullptr;
+// §37.55: the assertion's action statements in the order they were written -
+// the pass action first and, for an assert or an assume, the else action after
+// it. A statement's own type is a statement kind (an assignment, a begin, a
+// task call) rather than the vpiStmt or vpiElseStmt relation tag, which is a
+// name for the edge and a type no object has, so the two are told apart by
+// position rather than by a type match.
+static std::vector<VpiHandle> ImmediateAssertionStmts(VpiHandle assertion) {
+  std::vector<VpiHandle> stmts;
+  if (!assertion) return stmts;
   for (auto* child : assertion->children) {
-    if (child->type == vpiStmt) return child;
+    if (VpiIsScopeBodyStmtType(child->type)) stmts.push_back(child);
   }
-  return nullptr;
+  return stmts;
+}
+
+VpiHandle VpiImmediateAssertionStmt(VpiHandle assertion) {
+  // §37.55: the pass action statement, reached through vpiStmt. Null when the
+  // assertion was written without one.
+  std::vector<VpiHandle> stmts = ImmediateAssertionStmts(assertion);
+  return stmts.empty() ? nullptr : stmts.front();
 }
 
 VpiHandle VpiImmediateAssertionElseStmt(VpiHandle assertion) {
-  // §37.55: the else (fail) action statement, modeled as the assertion's first
-  // else-statement child reached through vpiElseStmt. Null when none is
-  // attached (always the case for an immediate cover).
+  // §37.55: the else (fail) action statement, reached through vpiElseStmt. The
+  // edge is drawn from the assert and assume boxes and not from cover, so an
+  // immediate cover has none however many statements it carries. Null when the
+  // assertion was written without an else action.
   if (!assertion) return nullptr;
-  for (auto* child : assertion->children) {
-    if (child->type == vpiElseStmt) return child;
-  }
-  return nullptr;
+  if (!VpiImmediateAssertionHasElseStmt(assertion->type)) return nullptr;
+  std::vector<VpiHandle> stmts = ImmediateAssertionStmts(assertion);
+  return stmts.size() < 2 ? nullptr : stmts[1];
 }
 
 bool VpiIsSequenceExprType(int type) {

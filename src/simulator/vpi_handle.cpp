@@ -633,6 +633,25 @@ bool TryResolveAssignLhsRhsRelation(int type, VpiHandle ref, VpiHandle& out) {
 // §37.71/§37.69/§37.77: an if-else's else branch, the expressions of repeat
 // controls and disables, and a task/func body statement.
 bool TryResolveElseExprStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
+  // §37.55 (figure): an immediate assert, assume or cover reaches the
+  // expression it asserts through vpiExpr, its pass action through vpiStmt, and
+  // - for the assert and assume boxes - its else action through vpiElseStmt.
+  // The three were computed by helpers no dispatch called, so every edge of the
+  // subclause's figure reached nothing through the public routine.
+  if (VpiIsImmediateAssertionType(ref->type)) {
+    if (type == vpiExpr) {
+      out = VpiImmediateAssertionExpr(ref);
+      return true;
+    }
+    if (type == vpiStmt) {
+      out = VpiImmediateAssertionStmt(ref);
+      return true;
+    }
+    if (type == vpiElseStmt) {
+      out = VpiImmediateAssertionElseStmt(ref);
+      return true;
+    }
+  }
   if (type == vpiElseStmt && ref->type == vpiIfElse) {
     out = VpiIfElseStmt(ref);
     return true;

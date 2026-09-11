@@ -96,21 +96,28 @@ TEST(ImmediateAssertionModel, IsDeferredAndIsFinalAreUndefinedElsewhere) {
 // through vpiStmt. The diagram draws both edges from each of the assert,
 // assume, and cover boxes, so the traversals are observed on all three kinds.
 TEST(ImmediateAssertionModel, EachKindReachesExpressionAndPassStatement) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
   for (int kind : {vpiImmediateAssert, vpiImmediateAssume, vpiImmediateCover}) {
     VpiObject assertion;
     assertion.type = kind;
     VpiObject expr;
     expr.type = vpiOperation;  // an expr-class kind
     VpiObject pass;
-    pass.type = vpiStmt;
+    // §37.55 draws the edge to a `stmt`, and a statement's own type is a
+    // statement kind rather than the vpiStmt relation tag.
+    pass.type = vpiBegin;
     assertion.children = {&expr, &pass};
 
-    EXPECT_EQ(VpiImmediateAssertionExpr(&assertion), &expr) << "kind=" << kind;
-    EXPECT_EQ(VpiImmediateAssertionStmt(&assertion), &pass) << "kind=" << kind;
+    // The figure's edges through the public routine, which is where an
+    // application reads them.
+    EXPECT_EQ(vpi_handle(vpiExpr, &assertion), &expr) << "kind=" << kind;
+    EXPECT_EQ(vpi_handle(vpiStmt, &assertion), &pass) << "kind=" << kind;
   }
 
   EXPECT_EQ(VpiImmediateAssertionExpr(nullptr), nullptr);
   EXPECT_EQ(VpiImmediateAssertionStmt(nullptr), nullptr);
+  SetGlobalVpiContext(nullptr);
 }
 
 // vpiElseStmt is routed from the assert and assume boxes but not from cover, so
@@ -124,24 +131,36 @@ TEST(ImmediateAssertionModel, ElseStatementPresenceByKind) {
 // An immediate assert traverses to its else statement through vpiElseStmt; an
 // immediate cover, built with only a pass statement, reaches none.
 TEST(ImmediateAssertionModel, AssertReachesElseStatementCoverDoesNot) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+
+  // The two action statements in the order they were written: the pass action
+  // first, the else action after it. Each carries its own statement kind, not
+  // the relation tag naming the edge that reaches it.
   VpiObject assertion;
   assertion.type = vpiImmediateAssert;
   VpiObject pass;
-  pass.type = vpiStmt;
+  pass.type = vpiBegin;
   VpiObject els;
-  els.type = vpiElseStmt;
+  els.type = vpiAssignment;
   assertion.children = {&pass, &els};
-  EXPECT_EQ(VpiImmediateAssertionElseStmt(&assertion), &els);
+  EXPECT_EQ(vpi_handle(vpiStmt, &assertion), &pass);
+  EXPECT_EQ(vpi_handle(vpiElseStmt, &assertion), &els);
 
+  // The figure draws no vpiElseStmt edge from the cover box, so a cover reaches
+  // no else action however many statements it was written with.
   VpiObject cover;
   cover.type = vpiImmediateCover;
   VpiObject cover_pass;
-  cover_pass.type = vpiStmt;
-  cover.children = {&cover_pass};
-  EXPECT_EQ(VpiImmediateAssertionStmt(&cover), &cover_pass);
-  EXPECT_EQ(VpiImmediateAssertionElseStmt(&cover), nullptr);
+  cover_pass.type = vpiBegin;
+  VpiObject cover_second;
+  cover_second.type = vpiAssignment;
+  cover.children = {&cover_pass, &cover_second};
+  EXPECT_EQ(vpi_handle(vpiStmt, &cover), &cover_pass);
+  EXPECT_EQ(vpi_handle(vpiElseStmt, &cover), nullptr);
 
   EXPECT_EQ(VpiImmediateAssertionElseStmt(nullptr), nullptr);
+  SetGlobalVpiContext(nullptr);
 }
 
 // The traversals each match by kind, so an immediate assertion whose only child
