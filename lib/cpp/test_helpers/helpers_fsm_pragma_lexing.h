@@ -56,31 +56,40 @@ inline bool IsAfter(SourceLoc loc, SourceLoc other) {
          (loc.line == other.line && loc.column > other.column);
 }
 
-// Where the first enum-only FSM pragma of a lexed source stands. §40.4.4
-// through §40.4.6 each place that pragma against something - a signal
-// declaration, a multi-signal one, a parameter - and say what follows it, so
-// its location is what a case reads to apply the rule to the source it wrote
-// rather than to a list of names it already knew.
-inline SourceLoc FirstEnumPragmaLoc(const Lexer& lexer) {
+// Where the enum-only FSM pragma at `index` among a lexed source's enum-only
+// pragmas stands. §40.4.4 through §40.4.6 each place that pragma against
+// something - a signal declaration, a multi-signal one, a parameter - and say
+// what follows it, so its location is what a case reads to apply the rule to
+// the source it wrote rather than to a list of names it already knew. The index
+// is there because §40.4.8's figure writes one module carrying three of these
+// pragmas, one for each rule, so which of them a rule is read off is a choice
+// rather than always the first.
+inline SourceLoc EnumPragmaLocAt(const Lexer& lexer, size_t index) {
+  size_t seen = 0;
   for (const auto& p : lexer.FsmStatePragmas()) {
-    if (p.form == Lexer::FsmStatePragma::Form::kEnumOnly) {
+    if (p.form != Lexer::FsmStatePragma::Form::kEnumOnly) {
+      continue;
+    }
+    if (seen == index) {
       return p.loc;
     }
+    ++seen;
   }
   return SourceLoc();
 }
 
-// The names declared after the first enum-only pragma of `src`, in order, as
-// far as the semicolon that ends the declaration the pragma sits in. §40.4.5's
-// first and next signal and §40.4.6's possible states are read from this list.
-inline std::vector<std::string> NamesFollowingEnumPragma(
-    const std::string& src) {
+// The names declared after the enum-only pragma at `index` of `src`, in order,
+// as far as the semicolon that ends the declaration the pragma sits in.
+// §40.4.5's first and next signal and §40.4.6's possible states are read from
+// this list.
+inline std::vector<std::string> NamesFollowingEnumPragma(const std::string& src,
+                                                         size_t index = 0) {
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", src);
   Lexer lexer(mgr.FileContent(fid), fid, diag);
   auto tokens = lexer.LexAll();
-  SourceLoc pragma_loc = FirstEnumPragmaLoc(lexer);
+  SourceLoc pragma_loc = EnumPragmaLocAt(lexer, index);
 
   size_t i = 0;
   while (i < tokens.size() && !IsAfter(tokens[i].loc, pragma_loc)) {
@@ -98,17 +107,18 @@ inline std::vector<std::string> NamesFollowingEnumPragma(
   return names;
 }
 
-// The kind of the last token standing before the first enum-only pragma of
+// The kind of the last token standing before the enum-only pragma at `index` of
 // `src`, which is what §40.4.6's placement rule is about: the pragma goes
 // immediately after the `parameter` keyword, or immediately after the bit width
 // where one is used.
-inline TokenKind KindBeforeEnumPragma(const std::string& src) {
+inline TokenKind KindBeforeEnumPragma(const std::string& src,
+                                      size_t index = 0) {
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", src);
   Lexer lexer(mgr.FileContent(fid), fid, diag);
   auto tokens = lexer.LexAll();
-  SourceLoc pragma_loc = FirstEnumPragmaLoc(lexer);
+  SourceLoc pragma_loc = EnumPragmaLocAt(lexer, index);
 
   TokenKind before = TokenKind::kEof;
   for (const auto& t : tokens) {
