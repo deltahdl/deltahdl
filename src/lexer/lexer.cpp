@@ -77,6 +77,28 @@ bool BuildSimpleFsmStatePragma(const std::vector<std::string_view>& words,
   return false;
 }
 
+// One bound of a §40.4.2 part-select `signal_name[n:n]`. The bounds are bit
+// numbers of the signal, so digits that do not name one are not the form. A run
+// of digits too long to be an index is rejected rather than carried round: a
+// bound that wrapped would let the pragma through naming a range of the signal
+// nothing in the source wrote, and a coverage tool would report the FSM as held
+// by the wrong bits of the vector.
+bool ParsePartSelectBound(std::string_view text, int& out) {
+  int value = 0;
+  for (char c : text) {
+    if (!std::isdigit(static_cast<unsigned char>(c))) {
+      return false;
+    }
+    int digit = c - '0';
+    if (value > (std::numeric_limits<int>::max() - digit) / 10) {
+      return false;
+    }
+    value = value * 10 + digit;
+  }
+  out = value;
+  return true;
+}
+
 // Find the index of the word carrying the closing brace of a §40.4.3
 // concatenation. The braced list may span several whitespace-delimited words.
 // Returns words.size() when no closing brace is present.
@@ -262,28 +284,7 @@ bool Lexer::ParsePartSelect(std::string_view word, std::string_view& base,
   if (hi.empty() || lo.empty()) {
     return false;
   }
-  // The bounds of `signal_name[n:n]` are bit numbers of the signal, so digits
-  // that do not name one are not the form. A run of digits too long to be an
-  // index is rejected rather than carried round: a bound that wrapped would let
-  // the pragma through naming a range of the signal nothing in the source
-  // wrote, and the coverage tool would report the FSM as held by the wrong bits
-  // of the vector.
-  auto parse_index = [](std::string_view text, int& out) -> bool {
-    int value = 0;
-    for (char c : text) {
-      if (!std::isdigit(static_cast<unsigned char>(c))) {
-        return false;
-      }
-      int digit = c - '0';
-      if (value > (std::numeric_limits<int>::max() - digit) / 10) {
-        return false;
-      }
-      value = value * 10 + digit;
-    }
-    out = value;
-    return true;
-  };
-  if (!parse_index(hi, msb) || !parse_index(lo, lsb)) {
+  if (!ParsePartSelectBound(hi, msb) || !ParsePartSelectBound(lo, lsb)) {
     return false;
   }
   base = candidate_base;
