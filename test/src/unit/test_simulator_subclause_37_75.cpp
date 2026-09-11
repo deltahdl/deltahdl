@@ -10,14 +10,18 @@ namespace {
 // foreach statement. The clause carries two diagrams and two numbered Details.
 //
 // The do-while diagram draws a controlling condition expression (vpiCondition)
-// and an unlabeled edge to a body statement (the generic vpiStmt relation). As
-// with the other looping and conditional statements (§37.66/§37.71/§37.74), the
-// condition's own type is an expression kind rather than the vpiCondition
-// relation tag, so it needs dedicated production code; the body is a
-// statement-edge child served by the generic traversal.
+// and an unlabeled edge to the dotted `stmt` enclosure, which §37.4.3 names
+// vpiStmt and which is the body the loop runs. As with the other looping and
+// conditional statements (§37.66/§37.71/§37.74), the condition's own type is an
+// expression kind rather than the vpiCondition relation tag, so it needs
+// dedicated production code. So does the body: §37.4.1 makes a dotted enclosure
+// a class grouping other objects and classes rather than a kind, so the body
+// carries the kind a statement of a design carries - a begin, an assignment,
+// another loop - and never vpiStmt, and read the other way the relation reached
+// the body of no do-while and no foreach that could be written.
 //
 // The foreach diagram draws the indexed variable (vpiVariables), the loop's
-// index variables (vpiLoopVars), and an unlabeled edge to a body statement. Its
+// index variables (vpiLoopVars), and the same unlabeled edge to a body. Its
 // two Details are this clause's own rules:
 //   D1 - the variable reached from a foreach statement via vpiVariables
 //        represents the packed array, unpacked array, or string var being
@@ -45,7 +49,7 @@ class DoWhileForeach : public ::testing::Test {
 // the condition expression rather than the first child.
 TEST_F(DoWhileForeach, DoWhileReachesConditionAmongConditionAndBody) {
   VpiObject body;
-  body.type = vpiStmt;  // the body (the diagram's unlabeled edge), listed first
+  body.type = vpiBegin;  // the body, a kind the `stmt` class groups, first
   VpiObject condition;
   condition.type = vpiOperation;  // the condition: an expression kind
 
@@ -61,7 +65,7 @@ TEST_F(DoWhileForeach, DoWhileReachesConditionAmongConditionAndBody) {
 // children and returns null.
 TEST_F(DoWhileForeach, DoWhileWithoutConditionReportsNoCondition) {
   VpiObject body;
-  body.type = vpiStmt;
+  body.type = vpiBegin;
 
   VpiObject do_while;
   do_while.type = vpiDoWhile;
@@ -86,15 +90,15 @@ TEST_F(DoWhileForeach, DoWhileConditionRelationIsScopedToDoWhile) {
   EXPECT_EQ(vpi_handle(vpiCondition, &not_a_do_while), nullptr);
 }
 
-// Do-while body edge (the diagram's unlabeled arrow to a statement): a do-while
+// Do-while body edge (the diagram's unlabeled arrow to `stmt`): a do-while
 // statement reaches its body through the public vpi_handle(vpiStmt, ...)
-// dispatch. The generic vpiStmt traversal is type-directed: it skips the
-// condition child and returns the body statement.
+// dispatch, which skips the condition child and returns the statement - one of
+// the kinds the `stmt` class groups, told from the condition by that.
 TEST_F(DoWhileForeach, DoWhileReachesBodyThroughVpiStmt) {
   VpiObject condition;
   condition.type = vpiOperation;
   VpiObject body;
-  body.type = vpiStmt;
+  body.type = vpiBegin;
 
   VpiObject do_while;
   do_while.type = vpiDoWhile;
@@ -217,17 +221,17 @@ TEST_F(DoWhileForeach,
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
-// Foreach body edge (the diagram's unlabeled arrow to a statement): a foreach
+// Foreach body edge (the diagram's unlabeled arrow to `stmt`): a foreach
 // statement reaches its body through the public vpi_handle(vpiStmt, ...)
-// dispatch. The generic vpiStmt traversal is type-directed and returns the body
-// statement; the indexed-variable and loop-variable edges are reached through
-// their own dedicated relations and are not statement-tagged children, so they
-// do not interfere.
+// dispatch, which returns the statement child. The indexed-variable and
+// loop-variable edges are held as the statement's own designated array and
+// loop-var list rather than among its children, so neither stands where the
+// body is looked for.
 TEST_F(DoWhileForeach, ForeachStatementReachesBodyThroughVpiStmt) {
   VpiObject array;
   array.type = vpiPackedArrayVar;  // the indexed variable (its own relation)
   VpiObject body;
-  body.type = vpiStmt;  // the body (the diagram's unlabeled edge)
+  body.type = vpiBegin;  // the body, a kind the `stmt` class groups
 
   VpiObject foreach;
   foreach
@@ -255,6 +259,51 @@ TEST_F(DoWhileForeach,
   not_a_foreach.loop_vars = {&var_i};  // must not be walked here
 
   EXPECT_EQ(vpi_iterate(vpiLoopVars, &not_a_foreach), nullptr);
+}
+
+// Body edge: both loops reach a body whatever kind it is written as - a lone
+// statement, a block, or a nested loop - because what the relation asks for is
+// membership of the `stmt` class rather than any one kind.
+TEST_F(DoWhileForeach, EachKindABodyCarriesIsReachedByBothLoopKinds) {
+  for (int loop_kind : {vpiDoWhile, vpiForeachStmt}) {
+    for (int body_kind :
+         {vpiAssignment, vpiNamedBegin, vpiFork, vpiDoWhile, vpiNullStmt}) {
+      VpiObject body;
+      body.type = body_kind;
+
+      VpiObject loop;
+      loop.type = loop_kind;
+      loop.children = {&body};
+
+      EXPECT_EQ(vpi_handle(vpiStmt, &loop), &body)
+          << "loop kind " << loop_kind << ", body kind " << body_kind;
+    }
+  }
+}
+
+// Body edge, empty outcome: a do-while carrying only its condition and a
+// foreach carrying only the array it indexes each report no body, so neither
+// the condition nor the indexed array is handed back in a body's place.
+TEST_F(DoWhileForeach, NeitherLoopReportsABodyWhenItCarriesNoStatement) {
+  VpiObject condition;
+  condition.type = vpiOperation;
+
+  VpiObject do_while;
+  do_while.type = vpiDoWhile;
+  do_while.children = {&condition};
+
+  EXPECT_EQ(vpi_handle(vpiStmt, &do_while), nullptr);
+
+  VpiObject array;
+  array.type = vpiPackedArrayVar;
+
+  VpiObject foreach;
+  foreach
+    .type = vpiForeachStmt;
+  foreach
+    .foreach_array = &array;
+
+  EXPECT_EQ(vpi_handle(vpiStmt, &foreach), nullptr);
 }
 
 }  // namespace

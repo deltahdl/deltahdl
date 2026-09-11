@@ -234,30 +234,32 @@ bool VpiIsBodyStmtOwnerType(int type) {
   // The kinds that reach a body statement through vpiStmt by the object model
   // drawing an untagged single arrow from them to the dotted `stmt` enclosure.
   // §37.4.3 makes an untagged relation's type the enclosure's words with "vpi"
-  // in front, so one arrow drawn six times is one relation: §37.63 draws it
-  // from a process, §37.66 from the enclosure holding `while` and `repeat`,
-  // §37.67 from the `waits` enclosure, §37.70 from a forever, which is the
-  // whole of that clause - a forever carries no condition, no property and no
-  // detail beside its body - §37.71 from the enclosure holding `if` and
-  // `if else`, where it is the then-branch the condition selects, §37.73 from
+  // in front, so one arrow drawn eight times is one relation. §37.63 draws it
+  // from a process and §37.66 from the enclosure holding `while` and `repeat`;
+  // §37.67 draws it from the `waits` enclosure; §37.70 from a forever, which is
+  // the whole of that clause, a forever carrying no condition, no property and
+  // no detail beside its body; §37.71 from the enclosure holding `if` and
+  // `if else`, where it is the then-branch the condition selects; §37.73 from
   // an expect statement, where it is the action a passing property
-  // specification runs, and §37.74 from a for statement, where it is the body
-  // the header loops over - the statements the header itself writes being held
-  // apart from the children so that none of them stands where the body is
-  // looked for.
+  // specification runs; §37.74 from a for statement, where it is the body the
+  // header loops over, the statements the header itself writes being held apart
+  // from the children so that none of them stands where the body is looked for;
+  // and §37.75 from a do-while and from a foreach statement, whose other edges
+  // reach a condition, the array being indexed and the index variables, none of
+  // them a statement.
   //
-  // The forever, the two conditionals, the expect statement and the for
-  // statement were the ones left out, so the relation fell through to the
-  // traversal that looks for a child whose own type is the relation tag.
-  // §37.4.1 makes the dotted `stmt` enclosure a class that groups other objects
-  // and classes rather than an object kind, so no statement a design holds has
-  // vpiStmt for its own type, and the body of every forever loop, the
-  // then-branch of every conditional the pass action of every expect statement
-  // and the body of every for loop that could be written were reached by
-  // nothing.
+  // Every kind but the process and §37.66's two loops was left out, so the
+  // relation fell through to the traversal that looks for a child whose own
+  // type is the relation tag. §37.4.1 makes the dotted `stmt` enclosure a class
+  // that groups other objects and classes rather than an object kind, so no
+  // statement a design holds has vpiStmt for its own type, and the body of
+  // every forever, for, do-while and foreach loop, the then-branch of every
+  // conditional and the pass action of every expect statement that could be
+  // written were reached by nothing.
   return VpiIsProcessType(type) || VpiIsWhileOrRepeatType(type) ||
          VpiIsWaitType(type) || type == vpiForever ||
-         VpiIsIfOrIfElseType(type) || type == vpiExpectStmt || type == vpiFor;
+         VpiIsIfOrIfElseType(type) || type == vpiExpectStmt || type == vpiFor ||
+         type == vpiDoWhile || type == vpiForeachStmt;
 }
 
 bool VpiIsWaitType(int type) {
