@@ -31,6 +31,11 @@ class VpiCoverageControlSim : public ::testing::Test {
 
   static int Status(CoverageStatus s) { return static_cast<int>(s); }
 
+  // §40.3.1 coverage-type constants. The coverage state is keyed by these, and
+  // §40.5.1's properties name the same types to vpi_control(), so a case that
+  // primes the state names the type here and asks for it there.
+  static constexpr int kSvCovAssertion = 20;
+
   SourceManager mgr_;
   Arena arena_;
   Scheduler scheduler_{arena_};
@@ -166,13 +171,14 @@ TEST_F(VpiCoverageControlSim, CoverageIsControllableOnlyAtInstanceLevel) {
 // nothing saved when it is not.
 TEST_F(VpiCoverageControlSim, SaveAppliesCoverageSaveRules) {
   vpi_ctx_.GetCoverageControlState().SetCoverageAvailableForSave(
-      vpiAssertCoverage, true);
+      kSvCovAssertion, true);
 
   EXPECT_EQ(vpi_control(vpiCoverageSave, vpiAssertCoverage, "covdb"),
             Status(CoverageStatus::kOk));
   EXPECT_EQ(vpi_ctx_.GetCoverageControlState().SaveCount("covdb"), 1u);
 
-  // A type with no coverage available to save records nothing.
+  // A type with no coverage available to save records nothing: only the
+  // assertion type above was made savable, and vpiToggleCoverage names another.
   EXPECT_EQ(vpi_control(vpiCoverageSave, vpiToggleCoverage, "toggledb"),
             Status(CoverageStatus::kNoCoverage));
   EXPECT_EQ(vpi_ctx_.GetCoverageControlState().SaveCount("toggledb"), 0u);
@@ -184,7 +190,7 @@ TEST_F(VpiCoverageControlSim, SaveAppliesCoverageSaveRules) {
 // this design and holds the type, `SV_COV_ERROR when the name does not exist.
 TEST_F(VpiCoverageControlSim, MergeAppliesCoverageMergeRules) {
   vpi_ctx_.GetCoverageControlState().RegisterCoverageDatabase(
-      "covdb", /*from_this_design=*/true, {vpiAssertCoverage});
+      "covdb", /*from_this_design=*/true, {kSvCovAssertion});
 
   EXPECT_EQ(vpi_control(vpiCoverageMerge, vpiAssertCoverage, "covdb"),
             Status(CoverageStatus::kOk));

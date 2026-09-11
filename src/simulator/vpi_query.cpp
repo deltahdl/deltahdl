@@ -4,11 +4,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "simulator/vpi.h"
+#include "simulator/vpi_coverage.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
@@ -655,6 +657,21 @@ int VpiContext::Get(int property, VpiHandle obj) {
         "vpi_get(): this property cannot be determined without evaluating an "
         "expression with side effects";
     return vpiUndefined;
+  }
+  // §40.5.2: "To obtain coverage information, the vpi_get() function is
+  // extended with additional VPI properties that can be obtained from the
+  // following existing handles", of which vpi_get(<coverageType>,
+  // instance_handle) "returns the number of covered items of the given coverage
+  // type in the given instance". That is the figure $coverage_get reports for
+  // the instance (§40.3.2.3), and it is read out of the state §40.5.3's
+  // controls move and §40.3.2's system functions answer from, §40.5 being the
+  // VPI extension of §40.2's one coverage API rather than a second one. Left to
+  // the dispatch below, a coverage type was an unknown property and got the 0
+  // every unknown property gets, so no coverage a PLI application collected
+  // could be read back through the routine this subclause extends.
+  if (std::optional<int> coverage_type = CoverageTypeForVpiProperty(property)) {
+    return GetCoverageControlState().CoverageGet(CoverageScopeName(obj),
+                                                 *coverage_type);
   }
   // The integer properties whose value depends on the object kind are
   // dispatched first; if one of them matches, its value is returned directly.

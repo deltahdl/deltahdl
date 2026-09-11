@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <fstream>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -15,6 +16,7 @@
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi.h"
+#include "simulator/vpi_coverage.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
@@ -77,11 +79,9 @@ CoverageControl CoverageControlForOperation(int operation) {
   }
 }
 
-// The handle names the controlled scope. A handle's hierarchical name
-// identifies the instance; a handle with no full name falls back to its simple
-// name. A null handle names no scope, which the control rules treat as a
-// nonexisting scope (a bad argument).
-std::string CoverageScopeName(VpiHandle scope_handle) {
+}  // namespace
+
+std::string CoverageScopeName(const VpiObject* scope_handle) {
   std::string scope;
   if (scope_handle != nullptr) {
     if (!scope_handle->full_name.empty()) {
@@ -93,7 +93,30 @@ std::string CoverageScopeName(VpiHandle scope_handle) {
   return scope;
 }
 
-}  // namespace
+// §40.5.1's coverage type properties name the same four coverage types §40.3.1
+// names with its `SV_COV_* macros, and §40.5.3 has the VPI operations carry the
+// semantics of the system functions that take those macros. One coverage of one
+// type, then, whichever door it is reached through - so a property arriving
+// through VPI is put into the terms the coverage state is keyed in before it
+// reaches the state. Untranslated, a database saved by $coverage_save under
+// `SV_COV_ASSERTION held nothing a vpi_control(vpiCoverageMerge,
+// vpiAssertCoverage, ...) could find, and a database saved through VPI was as
+// invisible to $coverage_merge, each reporting `SV_COV_NOCOV over coverage the
+// other had just recorded.
+std::optional<int> CoverageTypeForVpiProperty(int property) {
+  switch (property) {
+    case vpiAssertCoverage:
+      return kCoverageTypeAssertion;
+    case vpiFsmStateCoverage:
+      return kCoverageTypeFsmState;
+    case vpiStatementCoverage:
+      return kCoverageTypeStatement;
+    case vpiToggleCoverage:
+      return kCoverageTypeToggle;
+    default:
+      return std::nullopt;
+  }
+}
 
 // §40.5.3: statement, toggle, and FSM coverage are not individually
 // controllable, so the Start/Stop/Reset/Check actions act on the scope the
@@ -139,14 +162,18 @@ int VpiContext::ControlCoverage(int operation, int coverage_type,
     }
     case vpiCoverageSave:
       // §40.5.3: save the current coverage of the requested type to the named
-      // coverage database, per $coverage_save() (§40.3.2.5).
-      return static_cast<int>(
-          GetCoverageControlState().CoverageSave(coverage_type, name));
+      // coverage database, per $coverage_save() (§40.3.2.5). The type is the
+      // one §40.3.1 names, so the entry is one $coverage_merge can load.
+      return static_cast<int>(GetCoverageControlState().CoverageSave(
+          CoverageTypeForVpiProperty(coverage_type).value_or(coverage_type),
+          name));
     case vpiCoverageMerge:
       // §40.5.3: merge coverage of the requested type from the named coverage
-      // database into the simulation, per $coverage_merge() (§40.3.2.4).
-      return static_cast<int>(
-          GetCoverageControlState().CoverageMerge(coverage_type, name));
+      // database into the simulation, per $coverage_merge() (§40.3.2.4), and
+      // in the same terms, so a database $coverage_save wrote is found here.
+      return static_cast<int>(GetCoverageControlState().CoverageMerge(
+          CoverageTypeForVpiProperty(coverage_type).value_or(coverage_type),
+          name));
     default:
       // Not a coverage control operation: nothing to apply.
       return 0;

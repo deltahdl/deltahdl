@@ -34,6 +34,19 @@ enum class CoverageControl : std::uint8_t {
   kCheck = 3,
 };
 
+// §40.3.1 coverage-type constants: the values the `SV_COV_ASSERTION,
+// `SV_COV_FSM_STATE, `SV_COV_STATEMENT and `SV_COV_TOGGLE macros carry, as
+// src/preprocessor/preprocessor.cpp predefines them. The state below keys
+// coverage by these, so everything that names a coverage type to it names it in
+// these terms - the §40.3.2 system functions, which pass the macro's own value
+// straight through, and the §40.5 VPI extensions, whose §40.5.1 properties spell
+// the same four types differently and are translated to these before they
+// arrive.
+constexpr int kCoverageTypeAssertion = 20;
+constexpr int kCoverageTypeFsmState = 21;
+constexpr int kCoverageTypeStatement = 22;
+constexpr int kCoverageTypeToggle = 23;
+
 // §40.3.1 status values returned by $coverage_control. The numeric values match
 // the `SV_COV_* `define macros.
 enum class CoverageStatus : std::int8_t {

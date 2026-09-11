@@ -1,22 +1,51 @@
 #pragma once
 
-// IEEE 1800-2023 §40.5.2 "Obtaining coverage information".
+// IEEE 1800-2023 §40.5 "VPI coverage extensions", and §40.5.2 "Obtaining
+// coverage information" within it.
 //
-// This subclause has no grammar. It describes what a PLI client reads back
-// through vpi_get() for the coverage properties enumerated in §40.5.1: how many
-// items of a coverage type an instance has covered, whether a particular item
-// is covered, and the per-assertion tallies (attempts, successes, vacuous
+// §40.5.2 has no grammar. It describes what a PLI client reads back through
+// vpi_get() for the coverage properties enumerated in §40.5.1: how many items
+// of a coverage type an instance has covered, whether a particular item is
+// covered, and the per-assertion tallies (attempts, successes, vacuous
 // successes, disables, kills, failures) that explain that verdict.
 //
-// The query rules are encoded here as small pure helpers over plain tally
-// structures so they can be exercised directly. The simulator's VPI entry
-// points feed real per-object tallies into these same helpers when answering a
-// vpi_get() call.
+// The first of those - the number of covered items of a coverage type in an
+// instance - is answered by vpi_get() out of the run's own coverage state, in
+// vpi_query.cpp, because it is the figure $coverage_get reports for the same
+// scope and §40.5 extends §40.2's one coverage API rather than keeping a second
+// one. The two routines this file declares are what puts a query or a control
+// arriving through VPI into that state's terms.
+//
+// The remaining query rules are encoded below as small pure helpers over plain
+// tally structures so they can be exercised directly. Nothing yet produces the
+// per-object tallies they read: recording an assertion's attempts, successes
+// and failures as it is evaluated is the collection those properties report on,
+// and until the simulator keeps it there is no tally for vpi_get() to hand
+// them.
 
 #include <cstdint>
 #include <optional>
+#include <string>
 
 namespace delta {
+
+struct VpiObject;
+
+// §40.5.1 gives the four coverage types VPI property names of their own and
+// §40.3.1 gives the same four the `SV_COV_* macros, while §40.5.3 has the VPI
+// operations carry the semantics of the system functions those macros are
+// written for. What is named is therefore one coverage of one type reached
+// through two doors, and the coverage state is keyed by the §40.3.1 value the
+// system functions hand it, so a property arriving through VPI is put into
+// those terms before it reaches the state. Absent for an argument naming none
+// of the four. Written in vpi_control.cpp, beside the operations that use it.
+std::optional<int> CoverageTypeForVpiProperty(int property);
+
+// The scope a coverage handle names: its hierarchical name, or its simple name
+// where it carries no hierarchical one. A null handle names no scope, which the
+// §40.3.2 rules read as a nonexisting one - a bad argument. Written in
+// vpi_control.cpp.
+std::string CoverageScopeName(const VpiObject* scope_handle);
 
 // The §40.5.1 coverage properties relevant to a coverage query. The four
 // *Coverage members are instance-level coverage types; the remaining members
